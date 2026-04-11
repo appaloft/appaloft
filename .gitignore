@@ -29,6 +29,8 @@ apps/web/.svelte-kit
 apps/web/playwright-report
 apps/web/test-results
 apps/web/package
+apps/desktop/out
+apps/desktop/dist
 runtime/logs/*
 runtime/public/*
 .yundu

@@ -79,6 +79,13 @@
 
 	type SourceKind = "local-folder" | "github" | "remote-git" | "docker-image" | "compose";
 	type DraftMode = "existing" | "new";
+	type YunduDesktopBridge = {
+		selectDirectory?: () => Promise<string | null | undefined>;
+	};
+	type WindowWithYunduDesktopBridge = Window &
+		typeof globalThis & {
+			yunduDesktop?: YunduDesktopBridge;
+		};
 	type ProviderSummary = {
 		key: string;
 		title: string;
@@ -270,6 +277,7 @@
 	let selectedGitHubRepository = $state<GitHubRepositorySummary | null>(null);
 
 	let localFolderLocator = $state(".");
+	let localFolderSelectionNotice = $state<string | null>(null);
 	let githubLocator = $state("https://github.com/");
 	let remoteGitLocator = $state("");
 	let dockerImageLocator = $state("");
@@ -322,6 +330,10 @@
 	);
 	const githubConnected = $derived(Boolean(githubProvider?.connected));
 	const authIdentity = $derived(readSessionIdentity(authSession.session));
+	const canChooseNativeLocalFolder = $derived(
+		browser &&
+			typeof (window as WindowWithYunduDesktopBridge).yunduDesktop?.selectDirectory === "function",
+	);
 	const selectedProject = $derived(projects.find((project) => project.id === selectedProjectId) ?? null);
 	const selectedServer = $derived(servers.find((server) => server.id === selectedServerId) ?? null);
 	const selectedEnvironment = $derived(
@@ -593,6 +605,30 @@
 				return;
 			default:
 				localFolderLocator = value;
+		}
+	}
+
+	async function chooseLocalFolder(): Promise<void> {
+		localFolderSelectionNotice = null;
+
+		if (!browser) {
+			return;
+		}
+
+		const selectDirectory = (window as WindowWithYunduDesktopBridge).yunduDesktop?.selectDirectory;
+
+		if (!selectDirectory) {
+			localFolderSelectionNotice = "当前浏览器不能只读取本地路径，请直接输入或粘贴目录路径。";
+			return;
+		}
+
+		try {
+			const locator = await selectDirectory();
+			if (locator?.trim()) {
+				localFolderLocator = locator.trim();
+			}
+		} catch (error) {
+			localFolderSelectionNotice = readErrorMessage(error);
 		}
 	}
 
@@ -1292,13 +1328,45 @@
 										<label class="text-xs font-medium text-muted-foreground" for="source-locator">
 											来源地址
 										</label>
-										<Input
-											id="source-locator"
-											value={sourceLocator}
-											oninput={(event) =>
-												setSourceLocator((event.currentTarget as HTMLInputElement).value)}
-											placeholder={sourcePlaceholder}
-										/>
+										{#if sourceKind === "local-folder"}
+											<div class="flex gap-2">
+												<Input
+													id="source-locator"
+													class="font-mono text-xs"
+													bind:value={localFolderLocator}
+													placeholder={sourcePlaceholder}
+												/>
+												<Button
+													type="button"
+													variant="outline"
+													class="shrink-0"
+													disabled={!canChooseNativeLocalFolder}
+													title={
+														canChooseNativeLocalFolder
+															? "选择本地目录"
+															: "普通浏览器不能只读取本地路径，请手动输入。"
+													}
+													onclick={chooseLocalFolder}
+												>
+													<FolderOpen class="size-4" />
+													选择目录
+												</Button>
+											</div>
+											<p class="text-xs text-muted-foreground">
+												普通浏览器不会读取本机绝对路径，请直接输入或粘贴；桌面版可只选择并保存路径。
+											</p>
+											{#if localFolderSelectionNotice}
+												<p class="text-xs text-destructive">{localFolderSelectionNotice}</p>
+											{/if}
+										{:else}
+											<Input
+												id="source-locator"
+												value={sourceLocator}
+												oninput={(event) =>
+													setSourceLocator((event.currentTarget as HTMLInputElement).value)}
+												placeholder={sourcePlaceholder}
+											/>
+										{/if}
 									</div>
 								</div>
 
