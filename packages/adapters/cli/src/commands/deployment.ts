@@ -2,6 +2,7 @@ import { Args, Command as EffectCommand, Options } from "@effect/cli";
 import {
   CreateDeploymentCommand,
   DeploymentLogsQuery,
+  ListDeploymentsQuery,
   RollbackDeploymentCommand,
 } from "@yundu/application";
 
@@ -77,6 +78,24 @@ export const logsCommand = EffectCommand.make(
   },
   ({ deploymentId }) => runQuery(DeploymentLogsQuery.create({ deploymentId })),
 ).pipe(EffectCommand.withDescription("Show deployment logs"));
+
+const listDeploymentsCommand = EffectCommand.make(
+  "list",
+  {
+    project: projectOption,
+  },
+  ({ project }) =>
+    runQuery(
+      ListDeploymentsQuery.create({
+        projectId: optionalValue(project),
+      }),
+    ),
+).pipe(EffectCommand.withDescription("List deployments"));
+
+export const deploymentsCommand = EffectCommand.make("deployments").pipe(
+  EffectCommand.withDescription("Deployment queries"),
+  EffectCommand.withSubcommands([listDeploymentsCommand]),
+);
 
 export const rollbackCommand = EffectCommand.make(
   "rollback",

@@ -222,6 +222,7 @@ export const operationCatalog = [
     inputSchema: listDeploymentsQueryInputSchema,
     serviceToken: tokens.listDeploymentsQueryService,
     transports: {
+      cli: "yundu deployments list",
       orpc: { method: "GET", path: "/api/deployments" },
     },
   },
