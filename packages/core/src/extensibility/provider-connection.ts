@@ -21,6 +21,10 @@ export interface ProviderConnectionState {
   createdAt: CreatedAt;
 }
 
+export interface ProviderConnectionVisitor<TContext, TResult> {
+  visitProviderConnection(providerConnection: ProviderConnection, context: TContext): TResult;
+}
+
 export class ProviderConnection extends AggregateRoot<ProviderConnectionState> {
   private constructor(state: ProviderConnectionState) {
     super(state);
@@ -41,6 +45,13 @@ export class ProviderConnection extends AggregateRoot<ProviderConnectionState> {
 
   static rehydrate(state: ProviderConnectionState): ProviderConnection {
     return new ProviderConnection(state);
+  }
+
+  accept<TContext, TResult>(
+    visitor: ProviderConnectionVisitor<TContext, TResult>,
+    context: TContext,
+  ): TResult {
+    return visitor.visitProviderConnection(this, context);
   }
 
   activate(at: OccurredAt): void {

@@ -12,6 +12,10 @@ export interface ProjectState {
   createdAt: CreatedAt;
 }
 
+export interface ProjectVisitor<TContext, TResult> {
+  visitProject(project: Project, context: TContext): TResult;
+}
+
 export class Project extends AggregateRoot<ProjectState> {
   private constructor(state: ProjectState) {
     super(state);
@@ -42,6 +46,13 @@ export class Project extends AggregateRoot<ProjectState> {
 
   static rehydrate(state: ProjectState): Project {
     return new Project(state);
+  }
+
+  accept<TContext, TResult>(
+    visitor: ProjectVisitor<TContext, TResult>,
+    context: TContext,
+  ): TResult {
+    return visitor.visitProject(this, context);
   }
 
   toState(): ProjectState {

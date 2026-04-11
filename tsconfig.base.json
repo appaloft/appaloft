@@ -20,6 +20,7 @@
     "paths": {
       "@yundu/core": ["./packages/core/src/index.ts"],
       "@yundu/application": ["./packages/application/src/index.ts"],
+      "@yundu/cli-logging": ["./packages/cli-logging/src/index.ts"],
       "@yundu/contracts": ["./packages/contracts/src/index.ts"],
       "@yundu/config": ["./packages/config/src/index.ts"],
       "@yundu/observability": ["./packages/observability/src/index.ts"],

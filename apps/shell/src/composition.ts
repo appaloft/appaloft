@@ -23,7 +23,7 @@ import {
 import { createDatabase, createMigrator, type PgliteRuntimeAssets } from "@yundu/persistence-pg";
 import { type LocalPluginHost } from "@yundu/plugin-host";
 import { container, type DependencyContainer } from "tsyringe";
-
+import { ShellDeploymentProgressReporter } from "./deployment-progress-reporter";
 import { registerApplicationServices } from "./register-application-services";
 import { registerRuntimeDependencies } from "./register-runtime-dependencies";
 
@@ -82,6 +82,7 @@ export async function createAppComposition(
     ...(config.databaseUrl ? { databaseUrl: config.databaseUrl } : {}),
   });
   const migrator = createMigrator(database.db);
+  const deploymentProgressReporter = new ShellDeploymentProgressReporter();
 
   if (config.databaseDriver === "pglite") {
     await migrator.migrateToLatest();
@@ -102,6 +103,7 @@ export async function createAppComposition(
     database,
     migrator,
     authRuntime,
+    deploymentProgressReporter,
   });
   registerApplicationServices(childContainer);
   const idGenerator = resolveToken<IdGenerator>(childContainer, tokens.idGenerator);
@@ -157,6 +159,7 @@ export async function createAppComposition(
     commandBus,
     queryBus,
     executionContextFactory,
+    deploymentProgressObserver: deploymentProgressReporter,
   });
 
   return {

@@ -19,6 +19,10 @@ export interface WorkloadState {
   createdAt: CreatedAt;
 }
 
+export interface WorkloadVisitor<TContext, TResult> {
+  visitWorkload(workload: Workload, context: TContext): TResult;
+}
+
 export class Workload extends AggregateRoot<WorkloadState> {
   private constructor(state: WorkloadState) {
     super(state);
@@ -49,6 +53,13 @@ export class Workload extends AggregateRoot<WorkloadState> {
 
   static rehydrate(state: WorkloadState): Workload {
     return new Workload(state);
+  }
+
+  accept<TContext, TResult>(
+    visitor: WorkloadVisitor<TContext, TResult>,
+    context: TContext,
+  ): TResult {
+    return visitor.visitWorkload(this, context);
   }
 
   toState(): WorkloadState {

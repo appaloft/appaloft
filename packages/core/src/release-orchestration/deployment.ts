@@ -39,6 +39,10 @@ export interface DeploymentState {
   rollbackOfDeploymentId?: DeploymentId;
 }
 
+export interface DeploymentVisitor<TContext, TResult> {
+  visitDeployment(deployment: Deployment, context: TContext): TResult;
+}
+
 export class Deployment extends AggregateRoot<DeploymentState> {
   private constructor(state: DeploymentState) {
     super(state);
@@ -81,6 +85,13 @@ export class Deployment extends AggregateRoot<DeploymentState> {
       ...state,
       logs: [...state.logs],
     });
+  }
+
+  accept<TContext, TResult>(
+    visitor: DeploymentVisitor<TContext, TResult>,
+    context: TContext,
+  ): TResult {
+    return visitor.visitDeployment(this, context);
   }
 
   markPlanning(at: StartedAt): Result<void> {

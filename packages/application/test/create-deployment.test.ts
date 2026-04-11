@@ -70,6 +70,7 @@ import {
 import { type ExecutionContext, toRepositoryContext } from "../src/execution-context";
 import {
   type DeploymentContextDefaultsPolicy,
+  type DeploymentProgressReporter,
   type ExecutionBackend,
   type RuntimePlanResolver,
   type SourceDetector,
@@ -179,6 +180,10 @@ class HermeticExecutionBackend implements ExecutionBackend {
 
     return ok({ deployment });
   }
+}
+
+class NoopDeploymentProgressReporter implements DeploymentProgressReporter {
+  report(): void {}
 }
 
 class ExplicitContextRequiredPolicy implements DeploymentContextDefaultsPolicy {
@@ -303,6 +308,7 @@ describe("CreateDeploymentUseCase", () => {
       new StaticRuntimePlanResolver(),
       new HermeticExecutionBackend(),
       eventBus,
+      new NoopDeploymentProgressReporter(),
       logger,
       new DeploymentSnapshotFactory(clock, idGenerator),
       new RuntimePlanResolutionInputBuilder(clock, idGenerator),
@@ -366,6 +372,7 @@ describe("CreateDeploymentUseCase", () => {
       new StaticRuntimePlanResolver(),
       new HermeticExecutionBackend(),
       eventBus,
+      new NoopDeploymentProgressReporter(),
       logger,
       new DeploymentSnapshotFactory(clock, idGenerator),
       new RuntimePlanResolutionInputBuilder(clock, idGenerator),

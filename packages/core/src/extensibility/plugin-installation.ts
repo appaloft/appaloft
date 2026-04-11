@@ -21,6 +21,10 @@ export interface PluginInstallationState {
   installedAt: InstalledAt;
 }
 
+export interface PluginInstallationVisitor<TContext, TResult> {
+  visitPluginInstallation(pluginInstallation: PluginInstallation, context: TContext): TResult;
+}
+
 export class PluginInstallation extends AggregateRoot<PluginInstallationState> {
   private constructor(state: PluginInstallationState) {
     super(state);
@@ -37,6 +41,13 @@ export class PluginInstallation extends AggregateRoot<PluginInstallationState> {
 
   static rehydrate(state: PluginInstallationState): PluginInstallation {
     return new PluginInstallation(state);
+  }
+
+  accept<TContext, TResult>(
+    visitor: PluginInstallationVisitor<TContext, TResult>,
+    context: TContext,
+  ): TResult {
+    return visitor.visitPluginInstallation(this, context);
   }
 
   disable(at: OccurredAt): void {

@@ -1,6 +1,7 @@
 export * from "./cqrs";
 export * from "./deployment-handlers";
 export * from "./deployment-messages";
+export * from "./deployment-progress";
 export * from "./environment-handlers";
 export * from "./environment-messages";
 export * from "./execution-context";

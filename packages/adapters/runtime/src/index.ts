@@ -3,6 +3,7 @@ import {
   CommandText,
   DeploymentTargetDescriptor,
   DeploymentLogEntry,
+  DeploymentLogSourceValue,
   DeploymentPhaseValue,
   DetectSummary,
   ErrorCodeText,
@@ -38,9 +39,12 @@ import {
 } from "@yundu/core";
 import {
   createAdapterSpanName,
+  deploymentProgressSteps,
+  reportDeploymentProgress,
   yunduTraceAttributes,
   type ExecutionContext,
   type AppLogger,
+  type DeploymentProgressReporter,
   type ExecutionBackend,
   type RequestedDeploymentConfig,
   type RuntimePlanResolver,
@@ -299,23 +303,27 @@ interface ExecutionSession {
   logs: DeploymentLogEntry[];
 }
 
+type LogPhase = "detect" | "plan" | "package" | "deploy" | "verify" | "rollback";
+type LogLevel = "debug" | "info" | "warn" | "error";
+
 function phaseLog(
-  phase: string,
+  phase: LogPhase,
   message: string,
-  level = "info",
+  level: LogLevel = "info",
 ): DeploymentLogEntry {
   return DeploymentLogEntry.rehydrate({
     timestamp: OccurredAt.rehydrate(new Date().toISOString()),
-    phase: DeploymentPhaseValue.rehydrate(phase as "detect" | "plan" | "package" | "deploy" | "verify" | "rollback"),
-    level: LogLevelValue.rehydrate(level as "debug" | "info" | "warn" | "error"),
+    source: DeploymentLogSourceValue.rehydrate("yundu"),
+    phase: DeploymentPhaseValue.rehydrate(phase),
+    level: LogLevelValue.rehydrate(level),
     message: MessageText.rehydrate(message),
   });
 }
 
 function shouldFail(deployment: Deployment): boolean {
-    const state = deployment.toState();
-    return (
-      state.runtimePlan.source.locator.includes("fail") ||
+  const state = deployment.toState();
+  return (
+    state.runtimePlan.source.locator.includes("fail") ||
     state.environmentSnapshot.variables.some(
       (variable) =>
         variable.key === "YUNDU_SIMULATE_FAILURE" && variable.value === "true",
@@ -325,6 +333,28 @@ function shouldFail(deployment: Deployment): boolean {
 
 export class InMemoryExecutionBackend implements ExecutionBackend {
   private readonly sessions = new Map<string, ExecutionSession>();
+
+  constructor(private readonly progressReporter: DeploymentProgressReporter) {}
+
+  private report(
+    context: ExecutionContext,
+    input: {
+      deploymentId: string;
+      phase: "detect" | "plan" | "package" | "deploy" | "verify" | "rollback";
+      message: string;
+      status?: "running" | "succeeded" | "failed";
+      level?: "debug" | "info" | "warn" | "error";
+    },
+  ): void {
+    reportDeploymentProgress(this.progressReporter, context, {
+      deploymentId: input.deploymentId,
+      phase: input.phase,
+      message: input.message,
+      ...(input.status ? { status: input.status } : {}),
+      ...(input.level ? { level: input.level } : {}),
+      step: deploymentProgressSteps[input.phase],
+    });
+  }
 
   private applyResult(
     deployment: Deployment,
@@ -365,15 +395,25 @@ export class InMemoryExecutionBackend implements ExecutionBackend {
           phaseLog("deploy", `Applying runtime plan ${state.runtimePlan.id}`),
           phaseLog("verify", `Checking deployment health on ${state.serverId}`),
         ];
+        for (const log of logs) {
+          this.report(context, {
+            deploymentId: state.id.value,
+            phase: log.phase as "detect" | "plan" | "package" | "deploy" | "verify",
+            status: "succeeded",
+            message: log.message,
+          });
+        }
 
         if (shouldFail(deployment)) {
-          logs.push(
-            phaseLog(
-              "verify",
-              "Simulated verification failure triggered by runtime input",
-              "error",
-            ),
-          );
+          const message = "Simulated verification failure triggered by runtime input";
+          logs.push(phaseLog("verify", message, "error"));
+          this.report(context, {
+            deploymentId: state.id.value,
+            phase: "verify",
+            status: "failed",
+            level: "error",
+            message,
+          });
           return ok({
             deployment: this.applyResult(
               deployment,
@@ -389,6 +429,12 @@ export class InMemoryExecutionBackend implements ExecutionBackend {
         }
 
         logs.push(phaseLog("verify", "Deployment completed successfully"));
+        this.report(context, {
+          deploymentId: state.id.value,
+          phase: "verify",
+          status: "succeeded",
+          message: "Deployment completed successfully",
+        });
 
         return ok({
           deployment: this.applyResult(
@@ -425,6 +471,14 @@ export class InMemoryExecutionBackend implements ExecutionBackend {
           phaseLog("rollback", `Executing rollback plan ${plan.id}`),
           phaseLog("rollback", "Rollback completed successfully"),
         ];
+        for (const log of logs) {
+          this.report(context, {
+            deploymentId: deployment.toState().id.value,
+            phase: "rollback",
+            status: "succeeded",
+            message: log.message,
+          });
+        }
 
         return ok({
           deployment: this.applyResult(

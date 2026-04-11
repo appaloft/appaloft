@@ -29,6 +29,10 @@ export interface EnvironmentState {
   variables: EnvironmentConfigSet;
 }
 
+export interface EnvironmentVisitor<TContext, TResult> {
+  visitEnvironment(environment: Environment, context: TContext): TResult;
+}
+
 export class Environment extends AggregateRoot<EnvironmentState> {
   private constructor(state: EnvironmentState) {
     super(state);
@@ -60,6 +64,13 @@ export class Environment extends AggregateRoot<EnvironmentState> {
       ...state,
       variables: EnvironmentConfigSet.rehydrate(state.variables.toState()),
     });
+  }
+
+  accept<TContext, TResult>(
+    visitor: EnvironmentVisitor<TContext, TResult>,
+    context: TContext,
+  ): TResult {
+    return visitor.visitEnvironment(this, context);
   }
 
   setVariable(input: {

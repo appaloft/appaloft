@@ -9,6 +9,7 @@ import {
   DeploymentId,
   DeploymentLogEntry,
   type DeploymentLogEntry as DeploymentLogEntryType,
+  DeploymentLogSourceValue,
   DeploymentPhaseValue,
   DeploymentStatusValue,
   DeploymentTargetDescriptor,
@@ -132,6 +133,7 @@ export interface SerializedEnvironmentSnapshot extends Record<string, unknown> {
 
 export interface SerializedDeploymentLog extends Record<string, unknown> {
   timestamp: string;
+  source?: "yundu" | "application";
   phase: DeploymentPhaseInput;
   level: LogLevelInput;
   message: string;
@@ -315,6 +317,7 @@ export function serializeDeploymentLogs(logs: DeploymentLogEntryType[]): Seriali
     const state = log.toState();
     return {
       timestamp: state.timestamp.value,
+      source: state.source.value,
       phase: state.phase.value,
       level: state.level.value,
       message: state.message.value,
@@ -326,6 +329,7 @@ export function rehydrateDeploymentLogs(raw: unknown): DeploymentLogEntry[] {
   return ((raw as SerializedDeploymentLog[] | null | undefined) ?? []).map((entry) =>
     DeploymentLogEntry.rehydrate({
       timestamp: OccurredAt.rehydrate(entry.timestamp),
+      source: DeploymentLogSourceValue.rehydrate(entry.source ?? "yundu"),
       phase: DeploymentPhaseValue.rehydrate(entry.phase as DeploymentPhaseInput),
       level: LogLevelValue.rehydrate(entry.level as LogLevelInput),
       message: MessageText.rehydrate(entry.message),

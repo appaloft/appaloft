@@ -25,6 +25,10 @@ export interface ResourceBindingState {
   createdAt: CreatedAt;
 }
 
+export interface ResourceBindingVisitor<TContext, TResult> {
+  visitResourceBinding(resourceBinding: ResourceBinding, context: TContext): TResult;
+}
+
 export class ResourceBinding extends AggregateRoot<ResourceBindingState> {
   private constructor(state: ResourceBindingState) {
     super(state);
@@ -47,6 +51,13 @@ export class ResourceBinding extends AggregateRoot<ResourceBindingState> {
 
   static rehydrate(state: ResourceBindingState): ResourceBinding {
     return new ResourceBinding(state);
+  }
+
+  accept<TContext, TResult>(
+    visitor: ResourceBindingVisitor<TContext, TResult>,
+    context: TContext,
+  ): TResult {
+    return visitor.visitResourceBinding(this, context);
   }
 
   toState(): ResourceBindingState {

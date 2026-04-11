@@ -186,6 +186,7 @@ export const diffEnvironmentResponseSchema = z.array(
 
 export const deploymentLogEntrySchema = z.object({
   timestamp: z.string(),
+  source: z.enum(["yundu", "application"]),
   phase: z.enum(["detect", "plan", "package", "deploy", "verify", "rollback"]),
   level: z.enum(["debug", "info", "warn", "error"]),
   message: z.string(),

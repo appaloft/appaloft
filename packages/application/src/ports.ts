@@ -2,6 +2,7 @@ import {
   type BuildStrategyKind,
   type ConfigScope,
   type Deployment,
+  type DeploymentLogSource,
   type DeploymentMutationSpec,
   type DeploymentSelectionSpec,
   type DeploymentStatus,
@@ -49,6 +50,45 @@ export interface AppLogger {
 
 export interface EventBus {
   publish(context: ExecutionContext, events: DomainEvent[]): Promise<void>;
+}
+
+export type DeploymentProgressPhase =
+  | "detect"
+  | "plan"
+  | "package"
+  | "deploy"
+  | "verify"
+  | "rollback";
+
+export type DeploymentProgressStatus = "running" | "succeeded" | "failed";
+
+export interface DeploymentProgressEvent {
+  timestamp: string;
+  source: DeploymentLogSource;
+  phase: DeploymentProgressPhase;
+  level: LogLevel;
+  message: string;
+  deploymentId?: string;
+  status?: DeploymentProgressStatus;
+  step?: {
+    current: number;
+    total: number;
+    label: string;
+  };
+  stream?: "stdout" | "stderr";
+}
+
+export type DeploymentProgressListener = (
+  context: ExecutionContext,
+  event: DeploymentProgressEvent,
+) => void;
+
+export interface DeploymentProgressReporter {
+  report(context: ExecutionContext, event: DeploymentProgressEvent): void;
+}
+
+export interface DeploymentProgressObserver {
+  subscribe(listener: DeploymentProgressListener): () => void;
 }
 
 export interface ProjectRepository {
@@ -118,6 +158,7 @@ export interface EnvironmentSummary {
 
 export interface DeploymentLogSummary {
   timestamp: string;
+  source: DeploymentLogSource;
   phase: "detect" | "plan" | "package" | "deploy" | "verify" | "rollback";
   level: LogLevel;
   message: string;

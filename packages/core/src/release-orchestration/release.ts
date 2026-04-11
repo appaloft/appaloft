@@ -26,6 +26,10 @@ export interface ReleaseState {
   sealedAt?: SealedAt;
 }
 
+export interface ReleaseVisitor<TContext, TResult> {
+  visitRelease(release: Release, context: TContext): TResult;
+}
+
 export class Release extends AggregateRoot<ReleaseState> {
   private constructor(state: ReleaseState) {
     super(state);
@@ -44,6 +48,13 @@ export class Release extends AggregateRoot<ReleaseState> {
 
   static rehydrate(state: ReleaseState): Release {
     return new Release(state);
+  }
+
+  accept<TContext, TResult>(
+    visitor: ReleaseVisitor<TContext, TResult>,
+    context: TContext,
+  ): TResult {
+    return visitor.visitRelease(this, context);
   }
 
   seal(at: SealedAt): Result<void> {

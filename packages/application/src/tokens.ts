@@ -3,6 +3,7 @@ export const tokens = {
   idGenerator: Symbol.for("yundu.id_generator"),
   logger: Symbol.for("yundu.logger"),
   eventBus: Symbol.for("yundu.event_bus"),
+  deploymentProgressReporter: Symbol.for("yundu.deployment_progress_reporter"),
   projectRepository: Symbol.for("yundu.project_repository"),
   serverRepository: Symbol.for("yundu.server_repository"),
   environmentRepository: Symbol.for("yundu.environment_repository"),
