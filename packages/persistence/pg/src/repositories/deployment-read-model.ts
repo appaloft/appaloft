@@ -111,6 +111,7 @@ export class PgDeploymentReadModel implements DeploymentReadModel {
             },
             logs: logs.map((entry) => ({
               timestamp: entry.timestamp,
+              source: entry.source ?? "yundu",
               phase: entry.phase,
               level: entry.level,
               message: entry.message,
@@ -145,6 +146,7 @@ export class PgDeploymentReadModel implements DeploymentReadModel {
           .executeTakeFirst();
         return ((row?.logs ?? []) as unknown as SerializedDeploymentLog[]).map((entry) => ({
           timestamp: entry.timestamp,
+          source: entry.source ?? "yundu",
           phase: entry.phase,
           level: entry.level,
           message: entry.message,

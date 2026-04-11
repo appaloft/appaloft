@@ -20,6 +20,10 @@ export interface DeploymentTargetState {
   createdAt: CreatedAt;
 }
 
+export interface DeploymentTargetVisitor<TContext, TResult> {
+  visitDeploymentTarget(target: DeploymentTarget, context: TContext): TResult;
+}
+
 export class DeploymentTarget extends AggregateRoot<DeploymentTargetState> {
   private constructor(state: DeploymentTargetState) {
     super(state);
@@ -53,6 +57,13 @@ export class DeploymentTarget extends AggregateRoot<DeploymentTargetState> {
 
   static rehydrate(state: DeploymentTargetState): DeploymentTarget {
     return new DeploymentTarget(state);
+  }
+
+  accept<TContext, TResult>(
+    visitor: DeploymentTargetVisitor<TContext, TResult>,
+    context: TContext,
+  ): TResult {
+    return visitor.visitDeploymentTarget(this, context);
   }
 
   toState(): DeploymentTargetState {

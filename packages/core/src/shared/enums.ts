@@ -93,3 +93,7 @@ export type VariableExposure = (typeof variableExposures)[number];
 export const logLevels = ["debug", "info", "warn", "error"] as const;
 
 export type LogLevel = (typeof logLevels)[number];
+
+export const deploymentLogSources = ["yundu", "application"] as const;
+
+export type DeploymentLogSource = (typeof deploymentLogSources)[number];

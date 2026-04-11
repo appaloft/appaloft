@@ -27,6 +27,10 @@ export interface ResourceInstanceState {
   createdAt: CreatedAt;
 }
 
+export interface ResourceInstanceVisitor<TContext, TResult> {
+  visitResourceInstance(resourceInstance: ResourceInstance, context: TContext): TResult;
+}
+
 export class ResourceInstance extends AggregateRoot<ResourceInstanceState> {
   private constructor(state: ResourceInstanceState) {
     super(state);
@@ -48,6 +52,13 @@ export class ResourceInstance extends AggregateRoot<ResourceInstanceState> {
 
   static rehydrate(state: ResourceInstanceState): ResourceInstance {
     return new ResourceInstance(state);
+  }
+
+  accept<TContext, TResult>(
+    visitor: ResourceInstanceVisitor<TContext, TResult>,
+    context: TContext,
+  ): TResult {
+    return visitor.visitResourceInstance(this, context);
   }
 
   markReady(at: OccurredAt, endpoint?: EndpointText): void {

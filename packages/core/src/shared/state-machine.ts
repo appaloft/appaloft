@@ -1,6 +1,7 @@
 import {
   buildStrategyKinds,
   configScopes,
+  deploymentLogSources,
   deploymentStatuses,
   environmentKinds,
   executionStrategyKinds,
@@ -18,6 +19,7 @@ import { ScalarValueObject } from "./value-object";
 export {
   buildStrategyKinds,
   configScopes,
+  deploymentLogSources,
   deploymentStatuses,
   environmentKinds,
   executionStrategyKinds,
@@ -730,6 +732,34 @@ export class LogLevelValue extends EnumValueObject<(typeof logLevels)[number]> {
 
   static rehydrate(value: (typeof logLevels)[number]): LogLevelValue {
     return new LogLevelValue(value);
+  }
+}
+
+const deploymentLogSourceBrand: unique symbol = Symbol("DeploymentLogSourceValue");
+export class DeploymentLogSourceValue extends EnumValueObject<
+  (typeof deploymentLogSources)[number]
+> {
+  private [deploymentLogSourceBrand]!: void;
+
+  private constructor(value: (typeof deploymentLogSources)[number]) {
+    super(value);
+  }
+
+  static create(value: string): Result<DeploymentLogSourceValue> {
+    return createEnumValue(
+      value,
+      deploymentLogSources,
+      "Deployment log source",
+      (validated) => new DeploymentLogSourceValue(validated),
+    );
+  }
+
+  static yundu(): DeploymentLogSourceValue {
+    return new DeploymentLogSourceValue("yundu");
+  }
+
+  static rehydrate(value: (typeof deploymentLogSources)[number]): DeploymentLogSourceValue {
+    return new DeploymentLogSourceValue(value);
   }
 }
 

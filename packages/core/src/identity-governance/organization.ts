@@ -30,6 +30,14 @@ export interface OrganizationState {
   createdAt: CreatedAt;
 }
 
+export interface OrganizationMemberVisitor<TContext, TResult> {
+  visitOrganizationMember(member: OrganizationMember, context: TContext): TResult;
+}
+
+export interface OrganizationVisitor<TContext, TResult> {
+  visitOrganization(organization: Organization, context: TContext): TResult;
+}
+
 export class OrganizationPlan extends ValueObject<OrganizationPlanState> {
   private constructor(state: OrganizationPlanState) {
     super(state);
@@ -67,6 +75,13 @@ export class OrganizationMember extends Entity<OrganizationMemberState> {
 
   static rehydrate(state: OrganizationMemberState): OrganizationMember {
     return new OrganizationMember(state);
+  }
+
+  accept<TContext, TResult>(
+    visitor: OrganizationMemberVisitor<TContext, TResult>,
+    context: TContext,
+  ): TResult {
+    return visitor.visitOrganizationMember(this, context);
   }
 
   changeRole(role: OrganizationRoleValue): void {
@@ -132,6 +147,13 @@ export class Organization extends AggregateRoot<OrganizationState> {
       ...state,
       members: [...state.members],
     });
+  }
+
+  accept<TContext, TResult>(
+    visitor: OrganizationVisitor<TContext, TResult>,
+    context: TContext,
+  ): TResult {
+    return visitor.visitOrganization(this, context);
   }
 
   addMember(input: OrganizationMemberState): Result<void> {

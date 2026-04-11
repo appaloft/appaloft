@@ -1,6 +1,6 @@
+import { copyFile, mkdir } from "node:fs/promises";
 import { resolve } from "node:path";
-import { $ } from "bun";
 
 const distDir = resolve("dist");
-await $`mkdir -p ${distDir}`;
-await Bun.write(resolve(distDir, "server.js"), Bun.file(resolve("server.js")));
+await mkdir(distDir, { recursive: true });
+await copyFile(resolve("server.js"), resolve(distDir, "server.js"));

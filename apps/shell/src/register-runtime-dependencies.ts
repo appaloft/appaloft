@@ -11,6 +11,7 @@ import {
   type AppLogger,
   type Clock,
   CommandBus,
+  type DeploymentProgressReporter,
   type EventBus,
   type ExecutionContext,
   type IdGenerator,
@@ -122,6 +123,7 @@ export interface RegisterRuntimeDependenciesInput {
   database: DatabaseConnection;
   migrator: ConstructorParameters<typeof PgDiagnostics>[1];
   authRuntime: AuthRuntime;
+  deploymentProgressReporter: DeploymentProgressReporter;
 }
 
 export function registerRuntimeDependencies(
@@ -140,6 +142,7 @@ export function registerRuntimeDependencies(
       (dependencyContainer) => new InMemoryEventBus(dependencyContainer.resolve(tokens.logger)),
     ),
   });
+  container.registerInstance(tokens.deploymentProgressReporter, input.deploymentProgressReporter);
 
   container.register(tokens.projectRepository, {
     useFactory: instanceCachingFactory(() => new PgProjectRepository(input.database.db)),
@@ -187,8 +190,11 @@ export function registerRuntimeDependencies(
           new LocalExecutionBackend(
             join(input.config.dataDir, "runtime"),
             dependencyContainer.resolve(tokens.logger),
+            dependencyContainer.resolve(tokens.deploymentProgressReporter),
           ),
-          new InMemoryExecutionBackend(),
+          new InMemoryExecutionBackend(
+            dependencyContainer.resolve(tokens.deploymentProgressReporter),
+          ),
         ),
     ),
   });

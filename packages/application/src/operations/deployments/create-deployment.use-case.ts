@@ -1,9 +1,10 @@
 import { ok, type Result, safeTry, UpsertDeploymentSpec } from "@yundu/core";
 import { inject, injectable } from "tsyringe";
-
+import { deploymentProgressSteps, reportDeploymentProgress } from "../../deployment-progress";
 import { type ExecutionContext, toRepositoryContext } from "../../execution-context";
 import {
   type AppLogger,
+  type DeploymentProgressReporter,
   type DeploymentRepository,
   type EventBus,
   type ExecutionBackend,
@@ -34,6 +35,8 @@ export class CreateDeploymentUseCase {
     private readonly executionBackend: ExecutionBackend,
     @inject(tokens.eventBus)
     private readonly eventBus: EventBus,
+    @inject(tokens.deploymentProgressReporter)
+    private readonly deploymentProgressReporter: DeploymentProgressReporter,
     @inject(tokens.logger)
     private readonly logger: AppLogger,
     @inject(tokens.deploymentSnapshotFactory)
@@ -59,6 +62,7 @@ export class CreateDeploymentUseCase {
       eventBus,
       executionBackend,
       logger,
+      deploymentProgressReporter,
       runtimePlanResolutionInputBuilder,
       runtimePlanResolver,
       sourceDetector,
@@ -66,11 +70,30 @@ export class CreateDeploymentUseCase {
     const repositoryContext = toRepositoryContext(context);
 
     return safeTry(async function* () {
+      reportDeploymentProgress(deploymentProgressReporter, context, {
+        phase: "detect",
+        status: "running",
+        step: deploymentProgressSteps.detect,
+        message: "Resolve deployment context and inspect source",
+      });
       const resolvedContextResult = await deploymentContextResolver.resolve(context, input);
       const { project, server, environment } = yield* resolvedContextResult;
 
       const detectedResult = await sourceDetector.detect(context, input.sourceLocator);
       const detected = yield* detectedResult;
+      reportDeploymentProgress(deploymentProgressReporter, context, {
+        phase: "detect",
+        status: "succeeded",
+        step: deploymentProgressSteps.detect,
+        message: `Detected ${detected.source.kind} source ${detected.source.displayName}`,
+      });
+
+      reportDeploymentProgress(deploymentProgressReporter, context, {
+        phase: "plan",
+        status: "running",
+        step: deploymentProgressSteps.plan,
+        message: "Create environment snapshot and runtime plan",
+      });
       const snapshotResult = deploymentSnapshotFactory.create(environment);
       const snapshot = yield* snapshotResult;
       const runtimePlanInputResult = runtimePlanResolutionInputBuilder.build({
@@ -83,6 +106,12 @@ export class CreateDeploymentUseCase {
       const runtimePlanInput = yield* runtimePlanInputResult;
       const runtimePlanResult = await runtimePlanResolver.resolve(context, runtimePlanInput);
       const runtimePlan = yield* runtimePlanResult;
+      reportDeploymentProgress(deploymentProgressReporter, context, {
+        phase: "plan",
+        status: "succeeded",
+        step: deploymentProgressSteps.plan,
+        message: `Selected ${runtimePlan.buildStrategy} strategy for ${runtimePlan.execution.kind}`,
+      });
       const deploymentResult = deploymentFactory.create({
         project,
         server,

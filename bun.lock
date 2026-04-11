@@ -85,6 +85,7 @@
         "@effect/cli": "^0.75.0",
         "@effect/platform-node": "^0.106.0",
         "@yundu/application": "workspace:*",
+        "@yundu/cli-logging": "workspace:*",
         "@yundu/contracts": "workspace:*",
         "effect": "^3.21.0",
       },
@@ -136,6 +137,13 @@
       "name": "@yundu/auth-better",
       "dependencies": {
         "better-auth": "^1.6.1",
+      },
+    },
+    "packages/cli-logging": {
+      "name": "@yundu/cli-logging",
+      "dependencies": {
+        "@yundu/application": "workspace:*",
+        "@yundu/core": "workspace:*",
       },
     },
     "packages/config": {
@@ -674,6 +682,8 @@
     "@yundu/application": ["@yundu/application@workspace:packages/application"],
 
     "@yundu/auth-better": ["@yundu/auth-better@workspace:packages/auth/better"],
+
+    "@yundu/cli-logging": ["@yundu/cli-logging@workspace:packages/cli-logging"],
 
     "@yundu/config": ["@yundu/config@workspace:packages/config"],
 

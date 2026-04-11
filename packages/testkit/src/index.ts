@@ -376,6 +376,7 @@ export class MemoryDeploymentReadModel implements DeploymentReadModel {
             : {}),
           logs: deployment.logs.map((log) => ({
             timestamp: log.timestamp,
+            source: log.source as DeploymentLogSummary["source"],
             phase: log.phase as DeploymentLogSummary["phase"],
             level: log.level as DeploymentLogSummary["level"],
             message: log.message,
@@ -389,6 +390,7 @@ export class MemoryDeploymentReadModel implements DeploymentReadModel {
     void context;
     return (this.repository.items.get(id)?.toState().logs ?? []).map((log) => ({
       timestamp: log.timestamp,
+      source: log.source as DeploymentLogSummary["source"],
       phase: log.phase as DeploymentLogSummary["phase"],
       level: log.level as DeploymentLogSummary["level"],
       message: log.message,

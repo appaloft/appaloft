@@ -1,17 +1,13 @@
 {
-  "name": "@yundu/adapter-cli",
+  "name": "@yundu/cli-logging",
   "private": true,
   "type": "module",
   "exports": {
     ".": "./src/index.ts"
   },
   "dependencies": {
-    "@effect/cli": "^0.75.0",
-    "@effect/platform-node": "^0.106.0",
     "@yundu/application": "workspace:*",
-    "@yundu/cli-logging": "workspace:*",
-    "@yundu/contracts": "workspace:*",
-    "effect": "^3.21.0"
+    "@yundu/core": "workspace:*"
   },
   "scripts": {
     "lint": "biome check .",

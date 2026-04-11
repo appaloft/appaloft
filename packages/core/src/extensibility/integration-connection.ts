@@ -21,6 +21,13 @@ export interface IntegrationConnectionState {
   createdAt: CreatedAt;
 }
 
+export interface IntegrationConnectionVisitor<TContext, TResult> {
+  visitIntegrationConnection(
+    integrationConnection: IntegrationConnection,
+    context: TContext,
+  ): TResult;
+}
+
 export class IntegrationConnection extends AggregateRoot<IntegrationConnectionState> {
   private constructor(state: IntegrationConnectionState) {
     super(state);
@@ -43,6 +50,13 @@ export class IntegrationConnection extends AggregateRoot<IntegrationConnectionSt
 
   static rehydrate(state: IntegrationConnectionState): IntegrationConnection {
     return new IntegrationConnection(state);
+  }
+
+  accept<TContext, TResult>(
+    visitor: IntegrationConnectionVisitor<TContext, TResult>,
+    context: TContext,
+  ): TResult {
+    return visitor.visitIntegrationConnection(this, context);
   }
 
   connect(at: OccurredAt, externalAccountId?: ExternalAccountId): void {

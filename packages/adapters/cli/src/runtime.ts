@@ -2,11 +2,15 @@ import {
   type Command as AppCommand,
   type Query as AppQuery,
   type CommandBus,
+  type DeploymentProgressEvent,
+  type DeploymentProgressListener,
+  type DeploymentProgressObserver,
   type ExecutionContextFactory,
   type QueryBus,
 } from "@yundu/application";
+import { createCliLogRenderer } from "@yundu/cli-logging";
 import { type DomainError, type Result } from "@yundu/core";
-import { Console, Context, Effect, Layer, Option } from "effect";
+import { Context, Effect, Layer, Option } from "effect";
 
 export interface CliProgram {
   parseAsync(argv?: string[]): Promise<void>;
@@ -18,6 +22,11 @@ export interface CliProgramInput {
   commandBus: CommandBus;
   queryBus: QueryBus;
   executionContextFactory: ExecutionContextFactory;
+  deploymentProgressObserver?: DeploymentProgressObserver;
+}
+
+export interface ExecuteCommandOptions {
+  onDeploymentProgress?: DeploymentProgressListener;
 }
 
 export class CliRuntime extends Context.Tag("CliRuntime")<
@@ -25,7 +34,10 @@ export class CliRuntime extends Context.Tag("CliRuntime")<
   {
     readonly version: string;
     readonly startServer: () => Promise<void>;
-    readonly executeCommand: <T>(message: AppCommand<T>) => Promise<Result<T>>;
+    readonly executeCommand: <T>(
+      message: AppCommand<T>,
+      options?: ExecuteCommandOptions,
+    ) => Promise<Result<T>>;
     readonly executeQuery: <T>(message: AppQuery<T>) => Promise<Result<T>>;
   }
 >() {}
@@ -34,18 +46,30 @@ export const CliRuntimeLive = (input: CliProgramInput) =>
   Layer.succeed(CliRuntime, {
     version: input.version,
     startServer: input.startServer,
-    executeCommand: <T>(message: AppCommand<T>) =>
-      input.commandBus.execute(
-        input.executionContextFactory.create({
-          entrypoint: "cli",
-          actor: {
-            kind: "system",
-            id: "cli",
-            label: "yundu-cli",
-          },
-        }),
-        message,
-      ),
+    executeCommand: async <T>(message: AppCommand<T>, options?: ExecuteCommandOptions) => {
+      const context = input.executionContextFactory.create({
+        entrypoint: "cli",
+        actor: {
+          kind: "system",
+          id: "cli",
+          label: "yundu-cli",
+        },
+      });
+      const unsubscribe =
+        options?.onDeploymentProgress && input.deploymentProgressObserver
+          ? input.deploymentProgressObserver.subscribe((eventContext, event) => {
+              if (eventContext.requestId === context.requestId) {
+                options.onDeploymentProgress?.(eventContext, event);
+              }
+            })
+          : undefined;
+
+      try {
+        return await input.commandBus.execute(context, message);
+      } finally {
+        unsubscribe?.();
+      }
+    },
     executeQuery: <T>(message: AppQuery<T>) =>
       input.queryBus.execute(
         input.executionContextFactory.create({
@@ -68,7 +92,10 @@ export const optionalNumber = (value: Option.Option<string>): number | undefined
   return raw === undefined ? undefined : Number(raw);
 };
 
-export const print = (value: unknown) => Console.log(JSON.stringify(value, null, 2) ?? "null");
+export const print = (value: unknown) =>
+  Effect.sync(() => {
+    createCliLogRenderer().json(value);
+  });
 
 const resultToEffect = <T>(result: Result<T>): Effect.Effect<T, DomainError> =>
   result.match<Effect.Effect<T, DomainError>>(
@@ -76,17 +103,50 @@ const resultToEffect = <T>(result: Result<T>): Effect.Effect<T, DomainError> =>
     (error) => Effect.fail(error as DomainError),
   );
 
-export const runCommand = <T>(
+const runLoggedCommand = <T>(
   message: Result<AppCommand<T>>,
+  options: {
+    appLogLines: number;
+  },
 ): Effect.Effect<void, DomainError, CliRuntime> =>
   Effect.gen(function* () {
     const cli = yield* CliRuntime;
     const command = yield* resultToEffect(message);
-    const result = yield* Effect.promise(() => cli.executeCommand(command));
-    const output = yield* resultToEffect(result);
+    const renderer = createCliLogRenderer({
+      appLogLines: options.appLogLines,
+    });
+    let failed = false;
+    let output: T | undefined;
+
+    try {
+      const result = yield* Effect.promise(() =>
+        cli.executeCommand(command, {
+          onDeploymentProgress: (_context, event: DeploymentProgressEvent) => {
+            renderer.deploymentProgress(event);
+          },
+        }),
+      );
+      output = yield* resultToEffect(result);
+    } catch (error) {
+      failed = true;
+      throw error;
+    } finally {
+      renderer.stopDeploymentProgress({ failed });
+    }
 
     yield* print(output);
   });
+
+export const runCommand = <T>(
+  message: Result<AppCommand<T>>,
+): Effect.Effect<void, DomainError, CliRuntime> => runLoggedCommand(message, { appLogLines: 3 });
+
+export const runDeploymentCommand = <T>(
+  message: Result<AppCommand<T>>,
+  options: {
+    appLogLines: number;
+  },
+): Effect.Effect<void, DomainError, CliRuntime> => runLoggedCommand(message, options);
 
 export const runQuery = <T>(
   message: Result<AppQuery<T>>,
@@ -101,18 +161,18 @@ export const runQuery = <T>(
   });
 
 export const printCliError = (error: unknown) =>
-  Console.error(
-    JSON.stringify(
-      {
-        error,
-      },
-      null,
-      2,
-    ) ?? String(error),
-  ).pipe(
-    Effect.zipRight(
-      Effect.sync(() => {
-        process.exitCode = 1;
-      }),
-    ),
-  );
+  Effect.sync(() => {
+    createCliLogRenderer().plain({
+      label: "error",
+      level: "error",
+      message:
+        JSON.stringify(
+          {
+            error,
+          },
+          null,
+          2,
+        ) ?? String(error),
+    });
+    process.exitCode = 1;
+  });

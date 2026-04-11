@@ -1,10 +1,18 @@
 import { spawn, spawnSync } from "node:child_process";
-import { closeSync, existsSync, mkdirSync, openSync } from "node:fs";
+import { closeSync, existsSync, mkdirSync, openSync, readSync, statSync } from "node:fs";
 import { createServer } from "node:net";
 import { dirname, resolve } from "node:path";
-import type { AppLogger, ExecutionBackend, ExecutionContext } from "@yundu/application";
+import {
+  deploymentProgressSteps,
+  type AppLogger,
+  type DeploymentProgressReporter,
+  type ExecutionBackend,
+  type ExecutionContext,
+  reportDeploymentProgress,
+} from "@yundu/application";
 import {
   DeploymentLogEntry,
+  DeploymentLogSourceValue,
   DeploymentPhaseValue,
   domainError,
   ErrorCodeText,
@@ -24,31 +32,23 @@ import {
 
 type LogPhase = "detect" | "plan" | "package" | "deploy" | "verify" | "rollback";
 type LogLevel = "debug" | "info" | "warn" | "error";
+type LogSource = "yundu" | "application";
+
+const persistedOutputLineLimit = 50;
 
 function phaseLog(
   phase: LogPhase,
   message: string,
   level: LogLevel = "info",
+  source: LogSource = "yundu",
 ): DeploymentLogEntry {
   return DeploymentLogEntry.rehydrate({
     timestamp: OccurredAt.rehydrate(new Date().toISOString()),
+    source: DeploymentLogSourceValue.rehydrate(source),
     phase: DeploymentPhaseValue.rehydrate(phase),
     level: LogLevelValue.rehydrate(level),
     message: MessageText.rehydrate(message),
   });
-}
-
-function toLogs(
-  phase: LogPhase,
-  output: string,
-  level: LogLevel,
-): DeploymentLogEntry[] {
-  return output
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0)
-    .slice(0, 50)
-    .map((line) => phaseLog(phase, line, level));
 }
 
 function normalizeWorkingDirectory(locator: string): string {
@@ -85,6 +85,22 @@ function deploymentEnv(
 
 async function reservePort(preferred?: number): Promise<number> {
   if (preferred) {
+    await new Promise<void>((resolvePort, reject) => {
+      const server = createServer();
+      server.listen(preferred, "0.0.0.0", () => {
+        server.close((error) => {
+          if (error) {
+            reject(error);
+            return;
+          }
+
+          resolvePort();
+        });
+      });
+      server.on("error", (error) => {
+        reject(new Error(`Port ${preferred} is not available: ${error.message}`));
+      });
+    });
     return preferred;
   }
 
@@ -165,6 +181,155 @@ function runSyncCommand(input: {
   };
 }
 
+class LineBuffer {
+  private pending = "";
+
+  push(chunk: string): string[] {
+    const combined = `${this.pending}${chunk}`;
+    const parts = combined.split(/\r?\n/);
+    this.pending = parts.pop() ?? "";
+    return parts.map((line) => line.trim()).filter((line) => line.length > 0);
+  }
+
+  flush(): string[] {
+    const line = this.pending.trim();
+    this.pending = "";
+    return line ? [line] : [];
+  }
+}
+
+async function runStreamingCommand(input: {
+  command: string;
+  cwd: string;
+  env: NodeJS.ProcessEnv;
+  onOutput(line: string, level: LogLevel, stream: "stdout" | "stderr"): void;
+}): Promise<{
+  exitCode: number;
+  stdout: string;
+  stderr: string;
+  failed: boolean;
+  reason?: string;
+}> {
+  if (!existsSync(input.cwd) || !statSync(input.cwd).isDirectory()) {
+    return {
+      exitCode: 1,
+      stdout: "",
+      stderr: "",
+      failed: true,
+      reason: `working directory does not exist: ${input.cwd}`,
+    };
+  }
+
+  return await new Promise((resolveCommand) => {
+    const child = spawn(input.command, {
+      cwd: input.cwd,
+      env: input.env,
+      shell: true,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    const stdout = new LineBuffer();
+    const stderr = new LineBuffer();
+    let stdoutText = "";
+    let stderrText = "";
+    let spawnReason: string | undefined;
+
+    child.stdout?.setEncoding("utf8");
+    child.stderr?.setEncoding("utf8");
+
+    child.stdout?.on("data", (chunk: string) => {
+      stdoutText += chunk;
+      for (const line of stdout.push(chunk)) {
+        input.onOutput(line, "info", "stdout");
+      }
+    });
+
+    child.stderr?.on("data", (chunk: string) => {
+      stderrText += chunk;
+      for (const line of stderr.push(chunk)) {
+        input.onOutput(line, "warn", "stderr");
+      }
+    });
+
+    child.on("error", (error) => {
+      spawnReason = error.message;
+    });
+
+    child.on("close", (code, signal) => {
+      for (const line of stdout.flush()) {
+        input.onOutput(line, "info", "stdout");
+      }
+      for (const line of stderr.flush()) {
+        input.onOutput(line, "warn", "stderr");
+      }
+
+      resolveCommand({
+        exitCode: code ?? 1,
+        stdout: stdoutText,
+        stderr: stderrText,
+        failed: code !== 0,
+        ...(signal ? { reason: `terminated by signal ${signal}` } : {}),
+        ...(spawnReason ? { reason: spawnReason } : {}),
+      });
+    });
+  });
+}
+
+class AppLogTailer {
+  private readonly lines = new LineBuffer();
+  private offset: number;
+  private interval: ReturnType<typeof setInterval> | undefined;
+
+  constructor(
+    private readonly path: string,
+    private readonly onLine: (line: string) => void,
+  ) {
+    this.offset = existsSync(path) ? statSync(path).size : 0;
+  }
+
+  start(): void {
+    this.interval = setInterval(() => {
+      this.poll();
+    }, 100);
+    this.interval.unref?.();
+  }
+
+  stop(): void {
+    if (this.interval) {
+      clearInterval(this.interval);
+      this.interval = undefined;
+    }
+    this.poll();
+    for (const line of this.lines.flush()) {
+      this.onLine(line);
+    }
+  }
+
+  private poll(): void {
+    if (!existsSync(this.path)) {
+      return;
+    }
+
+    const size = statSync(this.path).size;
+    if (size <= this.offset) {
+      return;
+    }
+
+    const length = size - this.offset;
+    const buffer = Buffer.alloc(length);
+    const fd = openSync(this.path, "r");
+    try {
+      readSync(fd, buffer, 0, length, this.offset);
+    } finally {
+      closeSync(fd);
+    }
+    this.offset = size;
+
+    for (const line of this.lines.push(buffer.toString("utf8"))) {
+      this.onLine(line);
+    }
+  }
+}
+
 function killProcess(pid: string | undefined): void {
   if (!pid) {
     return;
@@ -185,7 +350,90 @@ export class LocalExecutionBackend implements ExecutionBackend {
   constructor(
     private readonly runtimeRoot: string,
     private readonly logger: AppLogger,
+    private readonly progressReporter: DeploymentProgressReporter,
   ) {}
+
+  private report(
+    context: ExecutionContext,
+    input: {
+      deploymentId: string;
+      phase: LogPhase;
+      message: string;
+      level?: LogLevel;
+      source?: LogSource;
+      status?: "running" | "succeeded" | "failed";
+      stream?: "stdout" | "stderr";
+    },
+  ): void {
+    reportDeploymentProgress(this.progressReporter, context, {
+      deploymentId: input.deploymentId,
+      phase: input.phase,
+      message: input.message,
+      ...(input.level ? { level: input.level } : {}),
+      ...(input.source ? { source: input.source } : {}),
+      ...(input.status ? { status: input.status } : {}),
+      ...(input.stream ? { stream: input.stream } : {}),
+      step: deploymentProgressSteps[input.phase],
+    });
+  }
+
+  private pushOutputLog(
+    logs: DeploymentLogEntry[],
+    input: {
+      context: ExecutionContext;
+      deploymentId: string;
+      phase: LogPhase;
+      line: string;
+      level: LogLevel;
+      stream: "stdout" | "stderr";
+      persistedCount: number;
+    },
+  ): number {
+    this.report(input.context, {
+      deploymentId: input.deploymentId,
+      phase: input.phase,
+      source: "application",
+      level: input.level,
+      message: input.line,
+      stream: input.stream,
+    });
+
+    if (input.persistedCount >= persistedOutputLineLimit) {
+      return input.persistedCount;
+    }
+
+    logs.push(phaseLog(input.phase, input.line, input.level, "application"));
+    return input.persistedCount + 1;
+  }
+
+  private pushCommandOutput(
+    logs: DeploymentLogEntry[],
+    input: {
+      context: ExecutionContext;
+      deploymentId: string;
+      phase: LogPhase;
+      output: string;
+      level: LogLevel;
+      stream: "stdout" | "stderr";
+    },
+  ): void {
+    let persistedCount = 0;
+
+    for (const line of input.output
+      .split(/\r?\n/)
+      .map((outputLine) => outputLine.trim())
+      .filter((outputLine) => outputLine.length > 0)) {
+      persistedCount = this.pushOutputLog(logs, {
+        context: input.context,
+        deploymentId: input.deploymentId,
+        phase: input.phase,
+        line,
+        level: input.level,
+        stream: input.stream,
+        persistedCount,
+      });
+    }
+  }
 
   private applyFailure(
     deployment: Deployment,
@@ -213,6 +461,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
   }
 
   private async executeHostProcess(
+    context: ExecutionContext,
     deployment: Deployment,
   ): Promise<Result<{ deployment: Deployment }>> {
     const state = deployment.toState();
@@ -227,42 +476,72 @@ export class LocalExecutionBackend implements ExecutionBackend {
     const logs: DeploymentLogEntry[] = [
       phaseLog("plan", `Using local host-process execution in ${workdir}`),
     ];
+    const hasWorkspacePreparation = Boolean(
+      state.runtimePlan.execution.installCommand || state.runtimePlan.execution.buildCommand,
+    );
 
-    const maybeRun = (
+    const maybeRun = async (
       phase: LogPhase,
       command: string | undefined,
       label: string,
-    ): boolean => {
+    ): Promise<boolean> => {
       if (!command) {
         return true;
       }
 
       logs.push(phaseLog(phase, `${label}: ${command}`));
-      const result = runSyncCommand({
+      this.report(context, {
+        deploymentId: state.id.value,
+        phase,
+        status: "running",
+        message: `${label}: ${command}`,
+      });
+      let persistedCount = 0;
+      const result = await runStreamingCommand({
         command,
         cwd: workdir,
         env,
+        onOutput: (line, level, stream) => {
+          persistedCount = this.pushOutputLog(logs, {
+            context,
+            deploymentId: state.id.value,
+            phase,
+            line,
+            level,
+            stream,
+            persistedCount,
+          });
+        },
       });
-      logs.push(...toLogs(phase, result.stdout, "info"));
-      logs.push(...toLogs(phase, result.stderr, "warn"));
+      void result.stdout;
+      void result.stderr;
 
       if (!result.failed) {
+        this.report(context, {
+          deploymentId: state.id.value,
+          phase,
+          status: "succeeded",
+          message: `${label} completed`,
+        });
         return true;
       }
 
-      logs.push(
-        phaseLog(
-          phase,
-          result.reason
-            ? `${label} failed: ${result.reason}`
-            : `${label} failed with exit code ${result.exitCode}`,
-          "error",
-        ),
-      );
+      const message =
+        result.reason
+          ? `${label} failed: ${result.reason}`
+          : `${label} failed with exit code ${result.exitCode}`;
+      logs.push(phaseLog(phase, message, "error"));
+      this.report(context, {
+        deploymentId: state.id.value,
+        phase,
+        status: "failed",
+        level: "error",
+        message,
+      });
       return false;
     };
 
-    if (!maybeRun("package", state.runtimePlan.execution.installCommand, "Install command")) {
+    if (!(await maybeRun("package", state.runtimePlan.execution.installCommand, "Install command"))) {
       return ok({
         deployment: this.applyFailure(deployment, {
           logs,
@@ -274,7 +553,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
       });
     }
 
-    if (!maybeRun("package", state.runtimePlan.execution.buildCommand, "Build command")) {
+    if (!(await maybeRun("package", state.runtimePlan.execution.buildCommand, "Build command"))) {
       return ok({
         deployment: this.applyFailure(deployment, {
           logs,
@@ -286,13 +565,30 @@ export class LocalExecutionBackend implements ExecutionBackend {
       });
     }
 
+    if (!hasWorkspacePreparation) {
+      this.report(context, {
+        deploymentId: state.id.value,
+        phase: "package",
+        status: "succeeded",
+        message: "No workspace install/build commands configured",
+      });
+    }
+
     const startCommand = state.runtimePlan.execution.startCommand;
     if (!startCommand) {
+      const message = "Start command is required for host-process execution";
+      this.report(context, {
+        deploymentId: state.id.value,
+        phase: "deploy",
+        status: "failed",
+        level: "error",
+        message,
+      });
       return ok({
         deployment: this.applyFailure(deployment, {
           logs: [
             ...logs,
-            phaseLog("deploy", "Start command is required for host-process execution", "error"),
+            phaseLog("deploy", message, "error"),
           ],
           errorCode: "missing_start_command",
           metadata: {
@@ -303,6 +599,27 @@ export class LocalExecutionBackend implements ExecutionBackend {
     }
 
     logs.push(phaseLog("deploy", `Start command: ${startCommand}`));
+    this.report(context, {
+      deploymentId: state.id.value,
+      phase: "deploy",
+      status: "running",
+      message: `Start command: ${startCommand}`,
+    });
+    const logTailer = new AppLogTailer(logPath, (line) => {
+      const persistedCount = logs.filter(
+        (log) => log.source === "application" && log.phase === "deploy",
+      ).length;
+      this.pushOutputLog(logs, {
+        context,
+        deploymentId: state.id.value,
+        phase: "deploy",
+        line,
+        level: "info",
+        stream: "stdout",
+        persistedCount,
+      });
+    });
+    logTailer.start();
     const stdoutFd = openSync(logPath, "a");
     const stderrFd = openSync(logPath, "a");
     const child = spawn(startCommand, {
@@ -316,21 +633,39 @@ export class LocalExecutionBackend implements ExecutionBackend {
     closeSync(stderrFd);
     child.unref();
 
+    this.report(context, {
+      deploymentId: state.id.value,
+      phase: "deploy",
+      status: "succeeded",
+      message: `Started process ${child.pid}`,
+    });
+
     const healthPath = state.runtimePlan.execution.healthCheckPath ?? "/";
     const url = `http://127.0.0.1:${port}${healthPath}`;
+    this.report(context, {
+      deploymentId: state.id.value,
+      phase: "verify",
+      status: "running",
+      message: `Checking ${url}`,
+    });
     const health = await waitForHealth(url);
+    logTailer.stop();
 
     if (!health.ok) {
       killProcess(String(child.pid));
+      const message = `Health check failed for ${url}${health.reason ? `: ${health.reason}` : ""}`;
+      this.report(context, {
+        deploymentId: state.id.value,
+        phase: "verify",
+        status: "failed",
+        level: "error",
+        message,
+      });
       return ok({
         deployment: this.applyFailure(deployment, {
           logs: [
             ...logs,
-            phaseLog(
-              "verify",
-              `Health check failed for ${url}${health.reason ? `: ${health.reason}` : ""}`,
-              "error",
-            ),
+            phaseLog("verify", message, "error"),
           ],
           errorCode: "local_health_check_failed",
           retryable: true,
@@ -345,7 +680,14 @@ export class LocalExecutionBackend implements ExecutionBackend {
       });
     }
 
-    logs.push(phaseLog("verify", `Application is reachable at ${url}`));
+    const message = `Application is reachable at ${url}`;
+    logs.push(phaseLog("verify", message));
+    this.report(context, {
+      deploymentId: state.id.value,
+      phase: "verify",
+      status: "succeeded",
+      message,
+    });
     deployment.applyExecutionResult(FinishedAt.rehydrate(new Date().toISOString()), ExecutionResult.rehydrate({
       exitCode: ExitCode.rehydrate(0),
       status: ExecutionStatusValue.rehydrate("succeeded"),
@@ -363,6 +705,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
   }
 
   private async executeDockerContainer(
+    context: ExecutionContext,
     deployment: Deployment,
   ): Promise<Result<{ deployment: Deployment }>> {
     const state = deployment.toState();
@@ -373,6 +716,12 @@ export class LocalExecutionBackend implements ExecutionBackend {
     const logs: DeploymentLogEntry[] = [
       phaseLog("plan", `Using local docker-container execution in ${workdir}`),
     ];
+    this.report(context, {
+      deploymentId: state.id.value,
+      phase: "package",
+      status: "running",
+      message: "Prepare Docker container deployment",
+    });
 
     const dockerVersion = runSyncCommand({
       command: "docker version --format '{{.Server.Version}}'",
@@ -381,11 +730,19 @@ export class LocalExecutionBackend implements ExecutionBackend {
     });
 
     if (dockerVersion.failed) {
+      const message = "Docker is not available on the local machine";
+      this.report(context, {
+        deploymentId: state.id.value,
+        phase: "package",
+        status: "failed",
+        level: "error",
+        message,
+      });
       return ok({
         deployment: this.applyFailure(deployment, {
           logs: [
             ...logs,
-            phaseLog("deploy", "Docker is not available on the local machine", "error"),
+            phaseLog("deploy", message, "error"),
           ],
           errorCode: "docker_unavailable",
           retryable: false,
@@ -394,26 +751,54 @@ export class LocalExecutionBackend implements ExecutionBackend {
     }
 
     let image = state.runtimePlan.execution.image;
-    const containerName = sanitizeName(`yundu-${state.id}`);
+    const containerName = sanitizeName(`yundu-${state.id.value}`);
 
     if (state.runtimePlan.buildStrategy === "dockerfile") {
-      image = sanitizeName(`yundu-image-${state.id}`);
+      image = sanitizeName(`yundu-image-${state.id.value}`);
       const dockerfilePath = state.runtimePlan.execution.dockerfilePath ?? "Dockerfile";
       logs.push(phaseLog("package", `docker build -t ${image} -f ${dockerfilePath} ${workdir}`));
+      this.report(context, {
+        deploymentId: state.id.value,
+        phase: "package",
+        status: "running",
+        message: `Build image ${image}`,
+      });
       const build = runSyncCommand({
         command: `docker build -t ${image} -f ${dockerfilePath} ${workdir}`,
         cwd: workdir,
         env,
       });
-      logs.push(...toLogs("package", build.stdout, "info"));
-      logs.push(...toLogs("package", build.stderr, "warn"));
+      this.pushCommandOutput(logs, {
+        context,
+        deploymentId: state.id.value,
+        phase: "package",
+        output: build.stdout,
+        level: "info",
+        stream: "stdout",
+      });
+      this.pushCommandOutput(logs, {
+        context,
+        deploymentId: state.id.value,
+        phase: "package",
+        output: build.stderr,
+        level: "warn",
+        stream: "stderr",
+      });
 
       if (build.failed || !image) {
+        const message = "Docker image build failed";
+        this.report(context, {
+          deploymentId: state.id.value,
+          phase: "package",
+          status: "failed",
+          level: "error",
+          message,
+        });
         return ok({
           deployment: this.applyFailure(deployment, {
             logs: [
               ...logs,
-              phaseLog("package", "Docker image build failed", "error"),
+              phaseLog("package", message, "error"),
             ],
             errorCode: "docker_build_failed",
             retryable: true,
@@ -423,16 +808,31 @@ export class LocalExecutionBackend implements ExecutionBackend {
     }
 
     if (!image) {
+      const message = "Docker image is required for docker execution";
+      this.report(context, {
+        deploymentId: state.id.value,
+        phase: "package",
+        status: "failed",
+        level: "error",
+        message,
+      });
       return ok({
         deployment: this.applyFailure(deployment, {
           logs: [
             ...logs,
-            phaseLog("package", "Docker image is required for docker execution", "error"),
+            phaseLog("package", message, "error"),
           ],
           errorCode: "missing_docker_image",
         }).deployment,
       });
     }
+
+    this.report(context, {
+      deploymentId: state.id.value,
+      phase: "package",
+      status: "succeeded",
+      message: "Docker package is ready",
+    });
 
     runSyncCommand({
       command: `docker rm -f ${containerName}`,
@@ -449,20 +849,48 @@ export class LocalExecutionBackend implements ExecutionBackend {
       .join(" ");
     const runCommand = `docker run -d --rm --name ${containerName} -p ${port}:${port} ${envFlags} ${image}`;
     logs.push(phaseLog("deploy", runCommand));
+    this.report(context, {
+      deploymentId: state.id.value,
+      phase: "deploy",
+      status: "running",
+      message: `Start container ${containerName}`,
+    });
     const run = runSyncCommand({
       command: runCommand,
       cwd: workdir,
       env,
     });
-    logs.push(...toLogs("deploy", run.stdout, "info"));
-    logs.push(...toLogs("deploy", run.stderr, "warn"));
+    this.pushCommandOutput(logs, {
+      context,
+      deploymentId: state.id.value,
+      phase: "deploy",
+      output: run.stdout,
+      level: "info",
+      stream: "stdout",
+    });
+    this.pushCommandOutput(logs, {
+      context,
+      deploymentId: state.id.value,
+      phase: "deploy",
+      output: run.stderr,
+      level: "warn",
+      stream: "stderr",
+    });
 
     if (run.failed) {
+      const message = "Docker container failed to start";
+      this.report(context, {
+        deploymentId: state.id.value,
+        phase: "deploy",
+        status: "failed",
+        level: "error",
+        message,
+      });
       return ok({
         deployment: this.applyFailure(deployment, {
           logs: [
             ...logs,
-            phaseLog("deploy", "Docker container failed to start", "error"),
+            phaseLog("deploy", message, "error"),
           ],
           errorCode: "docker_run_failed",
           retryable: true,
@@ -474,9 +902,21 @@ export class LocalExecutionBackend implements ExecutionBackend {
         }).deployment,
       });
     }
+    this.report(context, {
+      deploymentId: state.id.value,
+      phase: "deploy",
+      status: "succeeded",
+      message: `Container ${containerName} started`,
+    });
 
     const healthPath = state.runtimePlan.execution.healthCheckPath ?? "/";
     const url = `http://127.0.0.1:${port}${healthPath}`;
+    this.report(context, {
+      deploymentId: state.id.value,
+      phase: "verify",
+      status: "running",
+      message: `Checking ${url}`,
+    });
     const health = await waitForHealth(url);
 
     if (!health.ok) {
@@ -485,15 +925,19 @@ export class LocalExecutionBackend implements ExecutionBackend {
         cwd: workdir,
         env,
       });
+      const message = `Container health check failed for ${url}${health.reason ? `: ${health.reason}` : ""}`;
+      this.report(context, {
+        deploymentId: state.id.value,
+        phase: "verify",
+        status: "failed",
+        level: "error",
+        message,
+      });
       return ok({
         deployment: this.applyFailure(deployment, {
           logs: [
             ...logs,
-            phaseLog(
-              "verify",
-              `Container health check failed for ${url}${health.reason ? `: ${health.reason}` : ""}`,
-              "error",
-            ),
+            phaseLog("verify", message, "error"),
           ],
           errorCode: "docker_health_check_failed",
           retryable: true,
@@ -507,7 +951,14 @@ export class LocalExecutionBackend implements ExecutionBackend {
       });
     }
 
-    logs.push(phaseLog("verify", `Container is reachable at ${url}`));
+    const message = `Container is reachable at ${url}`;
+    logs.push(phaseLog("verify", message));
+    this.report(context, {
+      deploymentId: state.id.value,
+      phase: "verify",
+      status: "succeeded",
+      message,
+    });
     deployment.applyExecutionResult(FinishedAt.rehydrate(new Date().toISOString()), ExecutionResult.rehydrate({
       exitCode: ExitCode.rehydrate(0),
       status: ExecutionStatusValue.rehydrate("succeeded"),
@@ -524,6 +975,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
   }
 
   private async executeDockerCompose(
+    context: ExecutionContext,
     deployment: Deployment,
   ): Promise<Result<{ deployment: Deployment }>> {
     const state = deployment.toState();
@@ -535,21 +987,49 @@ export class LocalExecutionBackend implements ExecutionBackend {
       phaseLog("plan", `Using local docker-compose-stack execution in ${workdir}`),
       phaseLog("deploy", `docker compose -f ${composeFile} up -d --build`),
     ];
+    this.report(context, {
+      deploymentId: state.id.value,
+      phase: "deploy",
+      status: "running",
+      message: `Start compose stack ${composeFile}`,
+    });
 
     const up = runSyncCommand({
       command: `docker compose -f ${composeFile} up -d --build`,
       cwd: workdir,
       env,
     });
-    logs.push(...toLogs("deploy", up.stdout, "info"));
-    logs.push(...toLogs("deploy", up.stderr, "warn"));
+    this.pushCommandOutput(logs, {
+      context,
+      deploymentId: state.id.value,
+      phase: "deploy",
+      output: up.stdout,
+      level: "info",
+      stream: "stdout",
+    });
+    this.pushCommandOutput(logs, {
+      context,
+      deploymentId: state.id.value,
+      phase: "deploy",
+      output: up.stderr,
+      level: "warn",
+      stream: "stderr",
+    });
 
     if (up.failed) {
+      const message = "Docker compose deployment failed";
+      this.report(context, {
+        deploymentId: state.id.value,
+        phase: "deploy",
+        status: "failed",
+        level: "error",
+        message,
+      });
       return ok({
         deployment: this.applyFailure(deployment, {
           logs: [
             ...logs,
-            phaseLog("deploy", "Docker compose deployment failed", "error"),
+            phaseLog("deploy", message, "error"),
           ],
           errorCode: "docker_compose_failed",
           retryable: true,
@@ -561,7 +1041,20 @@ export class LocalExecutionBackend implements ExecutionBackend {
       });
     }
 
-    logs.push(phaseLog("verify", "Compose stack started successfully"));
+    this.report(context, {
+      deploymentId: state.id.value,
+      phase: "deploy",
+      status: "succeeded",
+      message: "Compose stack started",
+    });
+    const message = "Compose stack started successfully";
+    logs.push(phaseLog("verify", message));
+    this.report(context, {
+      deploymentId: state.id.value,
+      phase: "verify",
+      status: "succeeded",
+      message,
+    });
     deployment.applyExecutionResult(FinishedAt.rehydrate(new Date().toISOString()), ExecutionResult.rehydrate({
       exitCode: ExitCode.rehydrate(0),
       status: ExecutionStatusValue.rehydrate("succeeded"),
@@ -579,16 +1072,15 @@ export class LocalExecutionBackend implements ExecutionBackend {
     context: ExecutionContext,
     deployment: Deployment,
   ): Promise<Result<{ deployment: Deployment }>> {
-    void context;
     const state = deployment.toState();
     try {
       switch (state.runtimePlan.execution.kind) {
         case "host-process":
-          return await this.executeHostProcess(deployment);
+          return await this.executeHostProcess(context, deployment);
         case "docker-container":
-          return await this.executeDockerContainer(deployment);
+          return await this.executeDockerContainer(context, deployment);
         case "docker-compose-stack":
-          return await this.executeDockerCompose(deployment);
+          return await this.executeDockerCompose(context, deployment);
         default:
           return err(
             domainError.validation(
@@ -597,10 +1089,19 @@ export class LocalExecutionBackend implements ExecutionBackend {
           );
       }
     } catch (error) {
-      this.logger.error("local_execution_backend.execute_failed", {
+      this.report(context, {
         deploymentId: state.id.value,
-        message: error instanceof Error ? error.message : String(error),
+        phase: "deploy",
+        status: "failed",
+        level: "error",
+        message: error instanceof Error ? error.message : "Unknown local execution error",
       });
+      if (context.entrypoint !== "cli") {
+        this.logger.error("local_execution_backend.execute_failed", {
+          deploymentId: state.id.value,
+          message: error instanceof Error ? error.message : String(error),
+        });
+      }
       return ok({
         deployment: this.applyFailure(deployment, {
           logs: [
@@ -622,7 +1123,6 @@ export class LocalExecutionBackend implements ExecutionBackend {
     deployment: Deployment,
     plan: RollbackPlan,
   ): Promise<Result<{ deployment: Deployment }>> {
-    void context;
     void plan;
     const state = deployment.toState();
     const metadata = state.runtimePlan.execution.metadata ?? {};
@@ -632,10 +1132,21 @@ export class LocalExecutionBackend implements ExecutionBackend {
     const logs: DeploymentLogEntry[] = [];
 
     try {
+      this.report(context, {
+        deploymentId: state.id.value,
+        phase: "rollback",
+        status: "running",
+        message: "Apply rollback plan",
+      });
       switch (state.runtimePlan.execution.kind) {
         case "host-process":
           killProcess(metadata.pid);
-          logs.push(phaseLog("rollback", metadata.pid ? `Stopped process ${metadata.pid}` : "No process id recorded"));
+          logs.push(
+            phaseLog(
+              "rollback",
+              metadata.pid ? `Stopped process ${metadata.pid}` : "No process id recorded",
+            ),
+          );
           break;
         case "docker-container":
           if (metadata.containerName) {
@@ -679,9 +1190,22 @@ export class LocalExecutionBackend implements ExecutionBackend {
         retryable: false,
         logs,
       }));
+      this.report(context, {
+        deploymentId: state.id.value,
+        phase: "rollback",
+        status: "succeeded",
+        message: "Rollback completed",
+      });
 
       return ok({ deployment });
     } catch (error) {
+      this.report(context, {
+        deploymentId: state.id.value,
+        phase: "rollback",
+        status: "failed",
+        level: "error",
+        message: error instanceof Error ? error.message : "Unknown rollback error",
+      });
       return ok({
         deployment: this.applyFailure(deployment, {
           logs: [

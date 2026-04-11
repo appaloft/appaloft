@@ -11,6 +11,7 @@ import { err, ok, type Result } from "../shared/result";
 import {
   type BuildStrategyKindValue,
   type buildStrategyKinds,
+  DeploymentLogSourceValue,
   type DeploymentPhaseValue,
   type ExecutionStatusValue,
   type ExecutionStrategyKindValue,
@@ -81,10 +82,15 @@ export interface RuntimePlanState {
 
 export interface DeploymentLogEntryState {
   timestamp: OccurredAt;
+  source: DeploymentLogSourceValue;
   phase: DeploymentPhaseValue;
   level: LogLevelValue;
   message: MessageText;
 }
+
+type DeploymentLogEntryRehydrateState = Omit<DeploymentLogEntryState, "source"> & {
+  source?: DeploymentLogSourceValue;
+};
 
 export interface ExecutionResultState {
   status: ExecutionStatusValue;
@@ -353,12 +359,19 @@ export class DeploymentLogEntry extends ValueObject<DeploymentLogEntryState> {
     return ok(new DeploymentLogEntry(input));
   }
 
-  static rehydrate(state: DeploymentLogEntryState): DeploymentLogEntry {
-    return new DeploymentLogEntry(state);
+  static rehydrate(state: DeploymentLogEntryRehydrateState): DeploymentLogEntry {
+    return new DeploymentLogEntry({
+      ...state,
+      source: state.source ?? DeploymentLogSourceValue.yundu(),
+    });
   }
 
   get timestamp(): string {
     return this.state.timestamp.value;
+  }
+
+  get source(): string {
+    return this.state.source.value;
   }
 
   get phase(): string {
