@@ -1,24 +1,54 @@
 {
   "name": "yundu",
   "private": true,
+  "type": "module",
   "scripts": {
     "build": "turbo run build",
-    "dev": "turbo run dev",
-    "lint": "turbo run lint",
-    "format": "prettier --write \"**/*.{ts,tsx,md}\"",
-    "check-types": "turbo run check-types"
+    "dev": "turbo run dev --parallel",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "lint:ci": "biome ci .",
+    "lint:staged": "lint-staged",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "test:unit": "turbo run test:unit",
+    "test:integration": "turbo run test:integration",
+    "test:e2e": "turbo run test:e2e",
+    "format": "biome format --write .",
+    "serve": "bun run --cwd apps/shell src/index.ts serve",
+    "doctor": "bun run --cwd apps/shell src/index.ts doctor",
+    "db:migrate": "bun run --cwd apps/shell src/index.ts db migrate",
+    "db:status": "bun run --cwd apps/shell src/index.ts db status",
+    "package:binary-bundle": "bun run scripts/release/build-binary-bundle.ts",
+    "package:artifacts": "bun run scripts/release/build-artifacts.ts",
+    "checksums": "bun run scripts/release/generate-checksums.ts",
+    "smoke:local:commands": "bun run scripts/smoke/local-deploy.ts --method=workspace-commands --port=4310",
+    "smoke:local:docker": "bun run scripts/smoke/local-deploy.ts --method=dockerfile --port=4311",
+    "prepare": "husky"
+  },
+  "lint-staged": {
+    "*.{js,jsx,ts,tsx,mjs,cjs,mts,cts,json,jsonc,css,graphql,gql,html}": [
+      "biome check --write"
+    ]
   },
   "devDependencies": {
-    "prettier": "^3.7.4",
+    "@biomejs/biome": "^2.4.11",
+    "@types/node": "^22.18.9",
+    "@types/semver": "^7.7.1",
+    "@yundu/adapter-packaging": "workspace:*",
+    "bun-types": "^1.3.2",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.4.0",
     "turbo": "^2.9.5",
-    "typescript": "5.9.2"
+    "typescript": "6.0.2"
   },
   "engines": {
-    "node": ">=18"
+    "bun": ">=1.3.11"
   },
   "packageManager": "bun@1.3.11",
   "workspaces": [
     "apps/*",
-    "packages/*"
+    "packages/*",
+    "packages/*/*"
   ]
 }

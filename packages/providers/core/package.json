@@ -1,0 +1,17 @@
+{
+  "name": "@yundu/provider-core",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@yundu/application": "workspace:*"
+  },
+  "scripts": {
+    "lint": "biome check .",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "bun test",
+    "test:unit": "bun test"
+  }
+}

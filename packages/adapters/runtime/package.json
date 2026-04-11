@@ -1,0 +1,18 @@
+{
+	"name": "@yundu/adapter-runtime",
+	"private": true,
+	"type": "module",
+	"exports": {
+		".": "./src/index.ts"
+	},
+	"dependencies": {
+		"@yundu/application": "workspace:*",
+		"@yundu/core": "workspace:*"
+	},
+	"scripts": {
+		"lint": "biome check .",
+		"typecheck": "tsc -p tsconfig.json --noEmit",
+		"test": "bun test",
+		"test:unit": "bun test"
+	}
+}

@@ -1,159 +1,140 @@
-# Turborepo starter
+# Yundu
 
-This Turborepo starter is maintained by the Turborepo core team.
+Yundu is an AI-native local-to-cloud deployment platform for developers who want to deploy local workspaces, local Git repositories, GitHub repositories, zip archives, Docker images, or Compose bundles onto their own servers.
 
-## Using this example
+The system is backend-first and interface-agnostic:
 
-Run the following command:
+- `CLI`, `HTTP API`, and future `MCP tools` are first-class entry points
+- the web console is a static interface, not the product core
+- the deployment runtime, environment model, and planning pipeline live in the backend
 
-```sh
-npx create-turbo@latest
+## Current Milestone
+
+Milestone 1 is implemented:
+
+- Bun + TypeScript strict monorepo with Turborepo
+- `apps/shell` bootstraps the backend runtime and CLI
+- `apps/web` builds as a static SvelteKit app
+- `apps/web` consumes the backend through `@yundu/orpc/client` and `@tanstack/svelte-query`
+- Elysia serves `/api/health`, `/api/readiness`, `/api/version`, project/server/environment/deployment APIs
+- CLI supports `serve`, `doctor`, `db migrate`, `project`, `server`, `deploy`, `rollback`, `env`, `plugins`, `providers`
+- Kysely persistence is wired with migrations for external PostgreSQL and embedded PGlite modes
+- default self-hosted mode stays anonymous with no required login
+- hosted control-plane mode adds first-party Better Auth runtime support and can still load operator-installed system plugins
+- environment snapshots, masking, promote, and diff exist in the domain/application model
+- a hermetic fake execution backend drives deployment state, logs, and rollback flows
+- GitHub integration and Generic SSH provider skeletons exist
+- release artifacts, Dockerfile, Compose files, tests, and GitHub Actions are included
+
+## Quick Start
+
+1. Install dependencies.
+
+```bash
+bun install
 ```
 
-## What's inside?
+2. Choose a database mode.
 
-This Turborepo includes the following packages/apps:
+```bash
+# embedded PGlite is now the default local dev mode
+export YUNDU_DATABASE_DRIVER=pglite
 
-### Apps and Packages
-
-- `docs`: a [Next.js](https://nextjs.org/) app
-- `web`: another [Next.js](https://nextjs.org/) app
-- `@repo/ui`: a stub React component library shared by both `web` and `docs` applications
-- `@repo/eslint-config`: `eslint` configurations (includes `eslint-config-next` and `eslint-config-prettier`)
-- `@repo/typescript-config`: `tsconfig.json`s used throughout the monorepo
-
-Each package/app is 100% [TypeScript](https://www.typescriptlang.org/).
-
-### Utilities
-
-This Turborepo has some additional tools already setup for you:
-
-- [TypeScript](https://www.typescriptlang.org/) for static type checking
-- [ESLint](https://eslint.org/) for code linting
-- [Prettier](https://prettier.io) for code formatting
-
-### Build
-
-To build all apps and packages, run the following command:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
-
-```sh
-cd my-turborepo
-turbo build
+# or external PostgreSQL
+# docker compose -f docker-compose.dev.yml up -d
+# export YUNDU_DATABASE_DRIVER=postgres
+# export YUNDU_DATABASE_URL=postgres://postgres:postgres@localhost:5432/yundu
 ```
 
-Without global `turbo`, use your package manager:
+3. Apply migrations.
 
-```sh
-cd my-turborepo
-npx turbo build
-bun dlx turbo build
-bun exec turbo build
+```bash
+bun run db:migrate
 ```
 
-You can build a specific package by using a [filter](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters):
+4. Start the backend.
 
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
-
-```sh
-turbo build --filter=docs
+```bash
+bun run serve
 ```
 
-Without global `turbo`:
+5. Start the web interface in another terminal.
 
-```sh
-npx turbo build --filter=docs
-bun exec turbo build --filter=docs
-bun exec turbo build --filter=docs
+```bash
+bun --cwd apps/web run dev
 ```
 
-### Develop
+## Build And Package
 
-To develop all apps and packages, run the following command:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
-
-```sh
-cd my-turborepo
-turbo dev
+```bash
+bun run build
+bun run package:binary-bundle
+bun run package:artifacts
+bun run checksums
+docker build -t yundu-all-in-one:local .
 ```
 
-Without global `turbo`, use your package manager:
+Release outputs currently target:
 
-```sh
-cd my-turborepo
-npx turbo dev
-bun exec turbo dev
-bun exec turbo dev
+- `yundu-backend`
+- `yundu-web-static`
+- `yundu-binary-bundle`
+- `Dockerfile` for `yundu-all-in-one`
+- `docker-compose.selfhost.yml`
+- `release-manifest.json`
+- `checksums.txt`
+
+## Runtime Shapes
+
+Yundu is intentionally not single-shape:
+
+- split deployment: static frontend + standalone backend
+- all-in-one Docker image
+- self-hosted Docker Compose bundle
+- future optional binary mode
+
+Important:
+
+- optional binary distribution is only a packaging form
+- PostgreSQL remains the primary hosted/production backend
+- PGlite is supported for embedded single-instance installs with on-disk data under `.yundu/data`
+- hosted auth and tenant features are additive, not mandatory for local/self-hosted use
+- `yundu-binary-bundle` now packages a single Bun-compiled executable with embedded web console assets and embedded PGlite runtime assets
+
+## Repository Layout
+
+```text
+apps/
+  shell/   backend composition root, runtime entry, CLI
+  web/     static SvelteKit console
+packages/
+  core/ application/ contracts/ config/ observability/
+  persistence/pg/
+  adapters/{http-elysia,cli,filesystem,runtime,packaging}/
+  providers/{core,generic-ssh,aliyun,tencent}/
+  integrations/{core,github,gitlab}/
+  plugins/{sdk,host,builtins}/
+  ai/mcp/
+  testkit/
+  ui/
+docs/
+  architecture, environments, testing, operations, release, security, ADRs
 ```
 
-You can develop a specific package by using a [filter](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters):
+## Documentation
 
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
+- [Chinese README](./README.zh-CN.md)
+- [Bootstrap](./docs/BOOTSTRAP.md)
+- [Architecture](./docs/ARCHITECTURE.md)
+- [Environments](./docs/ENVIRONMENTS.md)
+- [Plugins](./docs/PLUGINS.md)
+- [Providers](./docs/PROVIDERS.md)
+- [Testing](./docs/TESTING.md)
+- [Operations](./docs/OPERATIONS.md)
+- [Release](./docs/RELEASE.md)
+- [Security](./docs/SECURITY.md)
+- [AGENTS rules](./AGENTS.md)
 
-```sh
-turbo dev --filter=web
-```
+## License
 
-Without global `turbo`:
-
-```sh
-npx turbo dev --filter=web
-bun exec turbo dev --filter=web
-bun exec turbo dev --filter=web
-```
-
-### Remote Caching
-
-> [!TIP]
-> Vercel Remote Cache is free for all plans. Get started today at [vercel.com](https://vercel.com/signup?utm_source=remote-cache-sdk&utm_campaign=free_remote_cache).
-
-Turborepo can use a technique known as [Remote Caching](https://turborepo.dev/docs/core-concepts/remote-caching) to share cache artifacts across machines, enabling you to share build caches with your team and CI/CD pipelines.
-
-By default, Turborepo will cache locally. To enable Remote Caching you will need an account with Vercel. If you don't have an account you can [create one](https://vercel.com/signup?utm_source=turborepo-examples), then enter the following commands:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
-
-```sh
-cd my-turborepo
-turbo login
-```
-
-Without global `turbo`, use your package manager:
-
-```sh
-cd my-turborepo
-npx turbo login
-bun exec turbo login
-bun exec turbo login
-```
-
-This will authenticate the Turborepo CLI with your [Vercel account](https://vercel.com/docs/concepts/personal-accounts/overview).
-
-Next, you can link your Turborepo to your Remote Cache by running the following command from the root of your Turborepo:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
-
-```sh
-turbo link
-```
-
-Without global `turbo`:
-
-```sh
-npx turbo link
-bun exec turbo link
-bun exec turbo link
-```
-
-## Useful Links
-
-Learn more about the power of Turborepo:
-
-- [Tasks](https://turborepo.dev/docs/crafting-your-repository/running-tasks)
-- [Caching](https://turborepo.dev/docs/crafting-your-repository/caching)
-- [Remote Caching](https://turborepo.dev/docs/core-concepts/remote-caching)
-- [Filtering](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters)
-- [Configuration Options](https://turborepo.dev/docs/reference/configuration)
-- [CLI Usage](https://turborepo.dev/docs/reference/command-line-reference)
+MIT

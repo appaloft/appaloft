@@ -1,0 +1,23 @@
+FROM oven/bun:1.3.11 AS builder
+WORKDIR /app
+ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
+
+COPY . .
+
+RUN bun install --frozen-lockfile
+RUN bun run --cwd apps/shell build
+RUN bun run --cwd apps/web build
+
+FROM oven/bun:1.3.11 AS runtime
+WORKDIR /app
+
+COPY --from=builder /app/apps/shell/dist/yundu /app/yundu
+COPY --from=builder /app/apps/web/build /app/web
+
+ENV YUNDU_HTTP_HOST=0.0.0.0
+ENV YUNDU_HTTP_PORT=3001
+ENV YUNDU_WEB_STATIC_DIR=/app/web
+
+EXPOSE 3001
+
+CMD ["bun", "/app/yundu", "serve"]

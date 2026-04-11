@@ -1,21 +1,60 @@
 {
   "$schema": "https://turborepo.dev/schema.json",
   "ui": "tui",
+  "globalEnv": [
+    "YUNDU_RUNTIME_MODE",
+    "YUNDU_SYSTEM_PLUGINS",
+    "YUNDU_DATABASE_DRIVER",
+    "YUNDU_DATABASE_URL",
+    "YUNDU_DATA_DIR",
+    "YUNDU_PGLITE_DATA_DIR",
+    "YUNDU_BETTER_AUTH_URL",
+    "YUNDU_BETTER_AUTH_SECRET",
+    "YUNDU_HTTP_HOST",
+    "YUNDU_HTTP_PORT",
+    "YUNDU_APP_VERSION",
+    "YUNDU_WEB_STATIC_DIR",
+    "YUNDU_WEB_ORIGIN",
+    "YUNDU_OTEL_ENABLED",
+    "YUNDU_E2E_EXTERNAL_SERVER"
+  ],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
       "inputs": ["$TURBO_DEFAULT$", ".env*"],
-      "outputs": [".next/**", "!.next/cache/**"]
+      "outputs": ["dist/**", "build/**", "coverage/**", "test-results/**"]
     },
     "lint": {
       "dependsOn": ["^lint"]
     },
-    "check-types": {
-      "dependsOn": ["^check-types"]
+    "typecheck": {
+      "dependsOn": ["^typecheck"]
+    },
+    "test": {
+      "dependsOn": ["^test"],
+      "outputs": ["coverage/**", "test-results/**"]
+    },
+    "test:unit": {
+      "dependsOn": ["^test:unit"],
+      "outputs": ["coverage/**"]
+    },
+    "test:integration": {
+      "dependsOn": ["^test:integration"],
+      "outputs": ["coverage/**"]
+    },
+    "test:e2e": {
+      "dependsOn": ["^build", "^test:e2e"],
+      "outputs": ["coverage/**", "test-results/**"]
     },
     "dev": {
       "cache": false,
       "persistent": true
+    },
+    "db:migrate": {
+      "cache": false
+    },
+    "db:status": {
+      "cache": false
     }
   }
 }

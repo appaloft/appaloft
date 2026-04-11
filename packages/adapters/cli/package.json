@@ -1,0 +1,17 @@
+{
+  "name": "@yundu/adapter-cli",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@yundu/application": "workspace:*",
+    "@yundu/contracts": "workspace:*",
+    "commander": "^14.0.1"
+  },
+  "scripts": {
+    "lint": "biome check .",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  }
+}

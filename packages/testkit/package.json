@@ -1,0 +1,17 @@
+{
+  "name": "@yundu/testkit",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@yundu/application": "workspace:*",
+    "@yundu/core": "workspace:*"
+  },
+  "scripts": {
+    "lint": "biome check .",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "bun test"
+  }
+}

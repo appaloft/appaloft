@@ -1,0 +1,16 @@
+{
+  "name": "@yundu/plugin-host",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@yundu/application": "workspace:*",
+    "@yundu/plugin-sdk": "workspace:*"
+  },
+  "scripts": {
+    "lint": "biome check .",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  }
+}
