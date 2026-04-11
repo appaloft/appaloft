@@ -145,6 +145,16 @@ Examples:
 `;
 }
 
+async function adHocSignDarwinExecutable(binaryPath: string): Promise<void> {
+  if (process.platform !== "darwin") {
+    return;
+  }
+
+  // Bun --compile mutates Bun's signed executable, so replace the stale signature.
+  await $`codesign --remove-signature ${binaryPath}`.quiet().nothrow();
+  await run(["codesign", "--force", "--sign", "-", binaryPath], dirname(binaryPath));
+}
+
 async function directoryExists(path: string): Promise<boolean> {
   return (await $`test -d ${path}`.quiet().nothrow()).exitCode === 0;
 }
@@ -195,6 +205,7 @@ export async function createBinaryBundle(input: {
   });
 
   await run(["bun", "build", binaryEntryPath, "--compile", "--outfile", binaryPath], input.root);
+  await adHocSignDarwinExecutable(binaryPath);
 
   await copyFileIfExists(join(input.root, ".env.example"), join(input.outDir, ".env.example"));
 

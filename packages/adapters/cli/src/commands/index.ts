@@ -1,7 +1,7 @@
 import { Command as EffectCommand } from "@effect/cli";
 
 import { dbCommand } from "./db.js";
-import { deployCommand, logsCommand, rollbackCommand } from "./deployment.js";
+import { deployCommand, deploymentsCommand, logsCommand, rollbackCommand } from "./deployment.js";
 import { envCommand } from "./environment.js";
 import { pluginsCommand, providersCommand } from "./integrations.js";
 import { doctorCommand, initCommand, serveCommand, versionCommand } from "./lifecycle.js";
@@ -18,6 +18,7 @@ export const mainCommand = EffectCommand.make("yundu").pipe(
     dbCommand,
     projectCommand,
     serverCommand,
+    deploymentsCommand,
     deployCommand,
     logsCommand,
     rollbackCommand,
