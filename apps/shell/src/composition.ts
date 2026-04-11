@@ -1,5 +1,7 @@
 import "reflect-metadata";
 
+import { fileURLToPath } from "node:url";
+
 import { createCliProgram } from "@yundu/adapter-cli";
 import { createHttpApp } from "@yundu/adapter-http-elysia";
 import {
@@ -52,6 +54,20 @@ function resolveToken<T>(dependencyContainer: DependencyContainer, token: symbol
   return dependencyContainer.resolve(token as never) as T;
 }
 
+async function resolveWebStaticDir(
+  config: AppConfig,
+  options?: ShellRuntimeOptions,
+): Promise<string | undefined> {
+  if (config.webStaticDir || options?.embeddedWebAssets) {
+    return config.webStaticDir;
+  }
+
+  const localWebBuildDir = new URL("../../web/build/", import.meta.url);
+  const localWebIndex = new URL("index.html", localWebBuildDir);
+
+  return (await Bun.file(localWebIndex).exists()) ? fileURLToPath(localWebBuildDir) : undefined;
+}
+
 export async function createAppComposition(
   flags?: Partial<AppConfig>,
   options?: ShellRuntimeOptions,
@@ -100,9 +116,10 @@ export async function createAppComposition(
     childContainer,
     tokens.integrationAuthPort,
   );
+  const webStaticDir = await resolveWebStaticDir(config, options);
 
   const httpApp = createHttpApp({
-    config,
+    config: webStaticDir ? { ...config, webStaticDir } : config,
     commandBus,
     queryBus,
     logger,
