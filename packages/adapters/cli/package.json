@@ -6,9 +6,11 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
+    "@effect/cli": "^0.75.0",
+    "@effect/platform-node": "^0.106.0",
     "@yundu/application": "workspace:*",
     "@yundu/contracts": "workspace:*",
-    "commander": "^14.0.1"
+    "effect": "^3.21.0"
   },
   "scripts": {
     "lint": "biome check .",
