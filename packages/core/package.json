@@ -1,0 +1,17 @@
+{
+  "name": "@yundu/core",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "neverthrow": "^8.2.0"
+  },
+  "scripts": {
+    "lint": "biome check .",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "bun test",
+    "test:unit": "bun test"
+  }
+}

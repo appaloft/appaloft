@@ -1,38 +1,46 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
-
 # Dependencies
 node_modules
-.pnp
-.pnp.js
+apps/*/node_modules
+packages/*/node_modules
+packages/*/*/node_modules
 
 # Local env files
 .env
 .env.local
-.env.development.local
-.env.test.local
-.env.production.local
+.env.*.local
 
 # Testing
 coverage
+test-results
+playwright-report
+blob-report
+.playwright
+.playwright-cli
 
 # Turbo
 .turbo
 
-# Vercel
-.vercel
-
-# Build Outputs
-.next/
-out/
+# Build outputs
 build
 dist
-
+*.bun-build
+.svelte-kit
+apps/web/.svelte-kit
+apps/web/playwright-report
+apps/web/test-results
+apps/web/package
+runtime/logs/*
+runtime/public/*
+.yundu
 
 # Debug
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+.pnpm-debug.log*
 
 # Misc
 .DS_Store
 *.pem
+*.tsbuildinfo
+bun.lockb

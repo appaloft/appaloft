@@ -1,0 +1,82 @@
+name: E2E
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: yundu
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d yundu"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      YUNDU_DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/yundu
+      YUNDU_HTTP_HOST: 127.0.0.1
+      YUNDU_HTTP_PORT: 3101
+      YUNDU_APP_VERSION: 0.1.0-e2e
+      YUNDU_E2E_EXTERNAL_SERVER: "true"
+      YUNDU_OTEL_ENABLED: "false"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.11
+
+      - name: Install
+        run: bun install --frozen-lockfile
+
+      - name: Install Playwright Browser
+        working-directory: apps/web
+        run: bunx playwright install --with-deps chromium
+
+      - name: Prepare runtime logs
+        run: mkdir -p runtime/logs
+
+      - name: Migrate Database
+        run: bun run db:migrate
+
+      - name: Start Yundu Backend
+        run: |
+          bun run serve > runtime/logs/e2e-server.log 2>&1 &
+          echo $! > .yundu-server.pid
+
+      - name: Wait For Backend
+        run: bun run scripts/test/wait-for-http.ts http://127.0.0.1:3101/api/health 60000
+
+      - name: Shell CLI + HTTP E2E
+        working-directory: apps/shell
+        run: bun run test:e2e
+
+      - name: Web Playwright Smoke
+        working-directory: apps/web
+        run: bun run test:e2e
+
+      - name: Stop Backend
+        if: always()
+        run: |
+          if [ -f .yundu-server.pid ]; then
+            kill "$(cat .yundu-server.pid)" || true
+          fi
+
+      - name: Upload E2E Logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: yundu-e2e-logs
+          path: |
+            runtime/logs
+            apps/web/playwright-report
+            apps/web/test-results

@@ -1,0 +1,42 @@
+{
+  "name": "@yundu/shell",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "yundu": "./src/index.ts"
+  },
+  "scripts": {
+    "dev": "bun run --watch src/index.ts serve",
+    "build": "mkdir -p dist && bun build src/index.ts --outfile dist/yundu --target bun",
+    "lint": "biome check .",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "bun test",
+    "test:e2e": "bun test test/e2e/hosted-system-plugins.test.ts && bun test test/e2e/pglite-cli-http.test.ts && bun test test/e2e/local-shell-deploy.test.ts && bun test test/e2e/cli-http.test.ts",
+    "db:migrate": "bun run src/index.ts db migrate",
+    "db:status": "bun run src/index.ts db status"
+  },
+  "dependencies": {
+    "@yundu/adapter-cli": "workspace:*",
+    "@yundu/adapter-filesystem": "workspace:*",
+    "@yundu/adapter-http-elysia": "workspace:*",
+    "@yundu/adapter-runtime": "workspace:*",
+    "@yundu/ai-mcp": "workspace:*",
+    "@yundu/application": "workspace:*",
+    "@yundu/auth-better": "workspace:*",
+    "@yundu/config": "workspace:*",
+    "@yundu/contracts": "workspace:*",
+    "@yundu/integration-github": "workspace:*",
+    "@yundu/integration-gitlab": "workspace:*",
+    "@yundu/observability": "workspace:*",
+    "@yundu/persistence-pg": "workspace:*",
+    "@yundu/plugin-builtins": "workspace:*",
+    "@yundu/plugin-host": "workspace:*",
+    "@yundu/provider-aliyun": "workspace:*",
+    "@yundu/provider-generic-ssh": "workspace:*",
+    "@yundu/provider-local-shell": "workspace:*",
+    "@yundu/provider-tencent": "workspace:*",
+    "nanoid": "^5.1.7",
+    "reflect-metadata": "^0.2.2",
+    "tsyringe": "^4.10.0"
+  }
+}

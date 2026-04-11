@@ -1,0 +1,19 @@
+{
+  "name": "@yundu/adapter-http-elysia",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@yundu/application": "workspace:*",
+    "@yundu/contracts": "workspace:*",
+    "@yundu/orpc": "workspace:*",
+    "@yundu/plugin-sdk": "workspace:*",
+    "elysia": "^1.4.28"
+  },
+  "scripts": {
+    "lint": "biome check .",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  }
+}

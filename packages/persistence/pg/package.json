@@ -1,0 +1,22 @@
+{
+  "name": "@yundu/persistence-pg",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@electric-sql/pglite": "^0.4.3",
+    "@yundu/application": "workspace:*",
+    "@yundu/core": "workspace:*",
+    "kysely": "^0.28.15",
+    "kysely-postgres-js": "^3.0.0",
+    "postgres": "^3.4.9"
+  },
+  "scripts": {
+    "lint": "biome check .",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "bun test",
+    "test:integration": "bun test"
+  }
+}
