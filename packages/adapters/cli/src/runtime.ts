@@ -29,6 +29,10 @@ export interface ExecuteCommandOptions {
   onDeploymentProgress?: DeploymentProgressListener;
 }
 
+function readCliLocale(): string | undefined {
+  return process.env.YUNDU_LOCALE ?? process.env.LANG;
+}
+
 export class CliRuntime extends Context.Tag("CliRuntime")<
   CliRuntime,
   {
@@ -47,8 +51,10 @@ export const CliRuntimeLive = (input: CliProgramInput) =>
     version: input.version,
     startServer: input.startServer,
     executeCommand: async <T>(message: AppCommand<T>, options?: ExecuteCommandOptions) => {
+      const locale = readCliLocale();
       const context = input.executionContextFactory.create({
         entrypoint: "cli",
+        ...(locale ? { locale } : {}),
         actor: {
           kind: "system",
           id: "cli",
@@ -70,10 +76,13 @@ export const CliRuntimeLive = (input: CliProgramInput) =>
         unsubscribe?.();
       }
     },
-    executeQuery: <T>(message: AppQuery<T>) =>
-      input.queryBus.execute(
+    executeQuery: <T>(message: AppQuery<T>) => {
+      const locale = readCliLocale();
+
+      return input.queryBus.execute(
         input.executionContextFactory.create({
           entrypoint: "cli",
+          ...(locale ? { locale } : {}),
           actor: {
             kind: "system",
             id: "cli",
@@ -81,7 +90,8 @@ export const CliRuntimeLive = (input: CliProgramInput) =>
           },
         }),
         message,
-      ),
+      );
+    },
   });
 
 export const optionalValue = <T>(value: Option.Option<T>): T | undefined =>
@@ -97,7 +107,7 @@ export const print = (value: unknown) =>
     createCliLogRenderer().json(value);
   });
 
-const resultToEffect = <T>(result: Result<T>): Effect.Effect<T, DomainError> =>
+export const resultToEffect = <T>(result: Result<T>): Effect.Effect<T, DomainError> =>
   result.match<Effect.Effect<T, DomainError>>(
     (value) => Effect.succeed(value),
     (error) => Effect.fail(error as DomainError),

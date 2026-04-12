@@ -29,6 +29,7 @@
     findProject,
     formatTime,
   } from "$lib/console/utils";
+  import { i18nKeys, t } from "$lib/i18n";
 
   const { projectsQuery, serversQuery, environmentsQuery, deploymentsQuery } = createConsoleQueries(browser);
 
@@ -68,12 +69,12 @@
 </script>
 
 <svelte:head>
-  <title>Deployments · Yundu</title>
+  <title>{$t(i18nKeys.console.deployments.pageTitle)} · Yundu</title>
 </svelte:head>
 
 <ConsoleShell
-  title="部署"
-  description={selectedProject ? `${selectedProject.name} 的部署记录` : "部署记录和项目关系"}
+  title={$t(i18nKeys.console.deployments.pageTitle)}
+  description={selectedProject ? $t(i18nKeys.console.deployments.pageDescriptionForProject, { projectName: selectedProject.name }) : $t(i18nKeys.console.deployments.pageDescription)}
 >
   {#if pageLoading}
     <div class="space-y-6">
@@ -101,21 +102,21 @@
     </div>
   {:else if deployments.length === 0}
     <section class="rounded-lg border bg-background p-6 md:p-8">
-      <Badge class="w-fit" variant="outline">暂无部署</Badge>
+      <Badge class="w-fit" variant="outline">{$t(i18nKeys.console.deployments.noFilteredDeployments)}</Badge>
       <div class="mt-4 max-w-2xl space-y-3">
-        <h1 class="text-2xl font-semibold md:text-3xl">创建一次部署，项目关系才会真正跑起来。</h1>
+        <h1 class="text-2xl font-semibold md:text-3xl">{$t(i18nKeys.console.deployments.emptyTitle)}</h1>
         <p class="text-sm leading-6 text-muted-foreground">
-          部署会绑定一个项目、一个环境和一个服务器，并保存 runtime plan 与环境快照。没有项目也可以从这里开始。
+          {$t(i18nKeys.console.deployments.emptyBody)}
         </p>
       </div>
       <div class="mt-6 flex flex-wrap gap-2">
         <Button size="lg" onclick={requestQuickDeploy}>
           <Rocket class="size-4" />
-          创建部署
+          {$t(i18nKeys.common.actions.createDeployment)}
         </Button>
         <Button href="/projects" size="lg" variant="outline">
           <FolderOpen class="size-4" />
-          查看项目
+          {$t(i18nKeys.common.actions.viewProjects)}
         </Button>
       </div>
     </section>
@@ -124,20 +125,20 @@
       <section class="flex flex-col gap-4 rounded-lg border bg-background p-5 md:flex-row md:items-center md:justify-between">
         <div class="space-y-2">
           <Badge class="w-fit" variant="outline">
-            {selectedProject ? selectedProject.name : "全部项目"}
+            {selectedProject ? selectedProject.name : $t(i18nKeys.console.deployments.allProjects)}
           </Badge>
-          <h1 class="text-2xl font-semibold">部署记录</h1>
+          <h1 class="text-2xl font-semibold">{$t(i18nKeys.console.deployments.records)}</h1>
           <p class="text-sm text-muted-foreground">
-            每条记录都保留 source、项目、环境、服务器和 runtime plan 的关系。
+            {$t(i18nKeys.console.deployments.description)}
           </p>
         </div>
         <div class="flex flex-wrap gap-2">
           {#if selectedProject}
-            <Button href="/deployments" variant="outline">查看全部</Button>
+            <Button href="/deployments" variant="outline">{$t(i18nKeys.common.actions.viewAll)}</Button>
           {/if}
           <Button onclick={requestQuickDeploy}>
             <Rocket class="size-4" />
-            新部署
+            {$t(i18nKeys.common.actions.newDeployment)}
           </Button>
         </div>
       </section>
@@ -145,19 +146,19 @@
       <section class="grid gap-4 md:grid-cols-3">
         <Card>
           <CardHeader class="pb-2">
-            <CardDescription>当前列表</CardDescription>
+            <CardDescription>{$t(i18nKeys.common.domain.currentList)}</CardDescription>
             <CardTitle class="text-2xl">{visibleDeployments.length}</CardTitle>
           </CardHeader>
         </Card>
         <Card>
           <CardHeader class="pb-2">
-            <CardDescription>项目</CardDescription>
+            <CardDescription>{$t(i18nKeys.common.domain.projects)}</CardDescription>
             <CardTitle class="text-2xl">{projects.length}</CardTitle>
           </CardHeader>
         </Card>
         <Card>
           <CardHeader class="pb-2">
-            <CardDescription>服务器</CardDescription>
+            <CardDescription>{$t(i18nKeys.common.domain.servers)}</CardDescription>
             <CardTitle class="text-2xl">{servers.length}</CardTitle>
           </CardHeader>
         </Card>
@@ -166,19 +167,19 @@
       <section class="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
         <Card>
           <CardHeader>
-            <CardTitle>部署列表</CardTitle>
-            <CardDescription>项目和部署分开管理，但这里保留它们的绑定关系。</CardDescription>
+            <CardTitle>{$t(i18nKeys.console.deployments.listTitle)}</CardTitle>
+            <CardDescription>{$t(i18nKeys.console.deployments.listDescription)}</CardDescription>
           </CardHeader>
           <CardContent class="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>来源</TableHead>
-                  <TableHead>项目</TableHead>
-                  <TableHead>环境</TableHead>
-                  <TableHead>服务器</TableHead>
-                  <TableHead>状态</TableHead>
-                  <TableHead>时间</TableHead>
+                  <TableHead>{$t(i18nKeys.common.domain.source)}</TableHead>
+                  <TableHead>{$t(i18nKeys.common.domain.project)}</TableHead>
+                  <TableHead>{$t(i18nKeys.common.domain.environment)}</TableHead>
+                  <TableHead>{$t(i18nKeys.common.domain.server)}</TableHead>
+                  <TableHead>{$t(i18nKeys.common.domain.status)}</TableHead>
+                  <TableHead>{$t(i18nKeys.common.domain.time)}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -211,7 +212,7 @@
                 {:else}
                   <TableRow>
                     <TableCell colspan={6} class="text-center text-muted-foreground">
-                      这个项目还没有部署记录。
+                      {$t(i18nKeys.console.deployments.noFilteredDeployments)}
                     </TableCell>
                   </TableRow>
                 {/if}
@@ -222,8 +223,8 @@
 
         <Card>
           <CardHeader>
-            <CardTitle>最近一次</CardTitle>
-            <CardDescription>快速确认项目、环境、服务器和 source 是否串对。</CardDescription>
+            <CardTitle>{$t(i18nKeys.console.deployments.latestTitle)}</CardTitle>
+            <CardDescription>{$t(i18nKeys.console.deployments.latestDescription)}</CardDescription>
           </CardHeader>
           <CardContent>
             {#if latestDeployment}
@@ -246,21 +247,21 @@
                   <div class="flex items-center justify-between gap-3 rounded-md border px-4 py-3">
                     <span class="flex items-center gap-2 text-muted-foreground">
                       <FolderOpen class="size-4" />
-                      项目
+                      {$t(i18nKeys.common.domain.project)}
                     </span>
                     <span class="font-medium">{latestProject?.name ?? latestDeployment.projectId}</span>
                   </div>
                   <div class="flex items-center justify-between gap-3 rounded-md border px-4 py-3">
                     <span class="flex items-center gap-2 text-muted-foreground">
                       <ShieldCheck class="size-4" />
-                      环境
+                      {$t(i18nKeys.common.domain.environment)}
                     </span>
                     <span class="font-medium">{latestEnvironment?.name ?? latestDeployment.environmentId}</span>
                   </div>
                   <div class="flex items-center justify-between gap-3 rounded-md border px-4 py-3">
                     <span class="flex items-center gap-2 text-muted-foreground">
                       <Server class="size-4" />
-                      服务器
+                      {$t(i18nKeys.common.domain.server)}
                     </span>
                     <span class="font-medium">{latestServer?.name ?? latestDeployment.serverId}</span>
                   </div>
@@ -268,14 +269,14 @@
 
                 {#if latestProject}
                   <Button href={`/projects?projectId=${latestProject.id}`} variant="outline">
-                    打开项目
+                    {$t(i18nKeys.common.actions.openProject)}
                     <ArrowRight class="size-4" />
                   </Button>
                 {/if}
               </div>
             {:else}
               <div class="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
-                当前筛选下没有部署记录。
+                {$t(i18nKeys.console.deployments.noFilteredDeployments)}
               </div>
             {/if}
           </CardContent>

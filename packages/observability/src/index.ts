@@ -14,6 +14,7 @@ import {
   type TraceAttributeValue,
 } from "@yundu/application";
 import { type AppConfig } from "@yundu/config";
+import { createYunduTranslator, normalizeYunduLocale } from "@yundu/i18n";
 
 function sanitizeContext(value: unknown, secretMask: string): unknown {
   if (Array.isArray(value)) {
@@ -134,9 +135,13 @@ class DefaultExecutionContextFactory implements ExecutionContextFactory {
   ) {}
 
   create(input: Parameters<ExecutionContextFactoryContract["create"]>[0]): ExecutionContext {
+    const locale = normalizeYunduLocale(input.locale);
+
     return {
       requestId: input.requestId ?? this.idGenerator.next("req"),
       entrypoint: input.entrypoint,
+      locale,
+      t: createYunduTranslator({ locale }),
       tracer: this.tracer,
       ...(input.actor ? { actor: input.actor } : {}),
     };

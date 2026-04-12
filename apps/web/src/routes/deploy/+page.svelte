@@ -1,12 +1,13 @@
 <script lang="ts">
   import ConsoleShell from "$lib/components/console/ConsoleShell.svelte";
   import QuickDeploySheet from "$lib/components/console/QuickDeploySheet.svelte";
+  import { i18nKeys, t } from "$lib/i18n";
 </script>
 
 <svelte:head>
-  <title>New Deployment · Yundu</title>
+  <title>{$t(i18nKeys.common.actions.newDeployment)} · Yundu</title>
 </svelte:head>
 
-<ConsoleShell title="新部署" description="选择 source、项目、服务器和环境">
+<ConsoleShell title={$t(i18nKeys.common.actions.newDeployment)} description={$t(i18nKeys.console.deployments.description)}>
   <QuickDeploySheet />
 </ConsoleShell>

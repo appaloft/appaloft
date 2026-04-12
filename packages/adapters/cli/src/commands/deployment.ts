@@ -1,5 +1,3 @@
-import { existsSync } from "node:fs";
-import { isAbsolute, resolve } from "node:path";
 import { Args, Command as EffectCommand, Options } from "@effect/cli";
 import {
   CreateDeploymentCommand,
@@ -7,6 +5,7 @@ import {
   ListDeploymentsQuery,
   RollbackDeploymentCommand,
 } from "@yundu/application";
+import { Effect } from "effect";
 
 import {
   optionalNumber,
@@ -15,8 +14,10 @@ import {
   runDeploymentCommand,
   runQuery,
 } from "../runtime.js";
+import { resolveInteractiveDeploymentInput } from "./deployment-interaction.js";
+import { deploymentMethods, normalizeCliPathOrSource } from "./deployment-source.js";
 
-const pathOrSourceArg = Args.text({ name: "pathOrSource" });
+const pathOrSourceArg = Args.text({ name: "pathOrSource" }).pipe(Args.optional);
 const deploymentIdArg = Args.text({ name: "deploymentId" });
 
 const projectOption = Options.text("project").pipe(Options.optional);
@@ -25,14 +26,6 @@ const destinationOption = Options.text("destination").pipe(Options.optional);
 const environmentOption = Options.text("environment").pipe(Options.optional);
 const resourceOption = Options.text("resource").pipe(Options.optional);
 const configOption = Options.text("config").pipe(Options.optional);
-const deploymentMethods = [
-  "auto",
-  "dockerfile",
-  "docker-compose",
-  "prebuilt-image",
-  "workspace-commands",
-] as const;
-type DeploymentMethod = (typeof deploymentMethods)[number];
 const methodOption = Options.choice("method", deploymentMethods).pipe(Options.optional);
 const installOption = Options.text("install").pipe(Options.optional);
 const buildOption = Options.text("build").pipe(Options.optional);
@@ -44,33 +37,6 @@ const appLogLinesOption = Options.text("app-log-lines").pipe(Options.withDefault
 function parseAppLogLines(value: string): number {
   const parsed = Number(value);
   return Number.isInteger(parsed) && parsed >= 0 ? parsed : 3;
-}
-
-function isRemoteOrImageSource(locator: string): boolean {
-  return (
-    /^(https?|ssh|git):\/\//.test(locator) ||
-    /^[^/\\]+@[^/\\]+:/.test(locator) ||
-    locator.startsWith("docker://") ||
-    locator.startsWith("image://")
-  );
-}
-
-function normalizeCliPathOrSource(locator: string, method: DeploymentMethod): string {
-  if (method === "prebuilt-image" || isRemoteOrImageSource(locator) || isAbsolute(locator)) {
-    return locator;
-  }
-
-  const bases = [process.env.PWD, process.cwd()].filter(
-    (base): base is string => typeof base === "string" && base.length > 0,
-  );
-  for (const base of bases) {
-    const candidate = resolve(base, locator);
-    if (existsSync(candidate)) {
-      return candidate;
-    }
-  }
-
-  return locator;
 }
 
 export const deployCommand = EffectCommand.make(
@@ -107,28 +73,45 @@ export const deployCommand = EffectCommand.make(
     server,
     start,
   }) =>
-    runDeploymentCommand(
-      CreateDeploymentCommand.create({
-        configFilePath: optionalValue(config),
-        projectId: optionalValue(project),
-        serverId: optionalValue(server),
-        destinationId: optionalValue(destination),
-        environmentId: optionalValue(environment),
-        resourceId: optionalValue(resource),
-        sourceLocator: normalizeCliPathOrSource(pathOrSource, optionalValue(method) ?? "auto"),
-        deploymentMethod: optionalValue(method),
-        installCommand: optionalValue(install),
-        buildCommand: optionalValue(build),
-        startCommand: optionalValue(start),
-        ...(optionalNumber(port) === undefined ? {} : { port: optionalNumber(port) }),
-        ...(optionalValue(healthPath) === undefined
-          ? {}
-          : { healthCheckPath: optionalValue(healthPath) }),
-      }),
-      {
+    Effect.gen(function* () {
+      const sourceLocator = optionalValue(pathOrSource);
+      const deploymentMethod = optionalValue(method);
+      const portValue = optionalNumber(port);
+      const configFilePath = optionalValue(config);
+      const projectId = optionalValue(project);
+      const serverId = optionalValue(server);
+      const destinationId = optionalValue(destination);
+      const environmentId = optionalValue(environment);
+      const resourceId = optionalValue(resource);
+      const installCommand = optionalValue(install);
+      const buildCommand = optionalValue(build);
+      const startCommand = optionalValue(start);
+      const healthCheckPath = optionalValue(healthPath);
+      const seed = {
+        ...(configFilePath ? { configFilePath } : {}),
+        ...(projectId ? { projectId } : {}),
+        ...(serverId ? { serverId } : {}),
+        ...(destinationId ? { destinationId } : {}),
+        ...(environmentId ? { environmentId } : {}),
+        ...(resourceId ? { resourceId } : {}),
+        ...(deploymentMethod ? { deploymentMethod } : {}),
+        ...(installCommand ? { installCommand } : {}),
+        ...(buildCommand ? { buildCommand } : {}),
+        ...(startCommand ? { startCommand } : {}),
+        ...(portValue === undefined ? {} : { port: portValue }),
+        ...(healthCheckPath ? { healthCheckPath } : {}),
+      };
+      const input = sourceLocator
+        ? {
+            ...seed,
+            sourceLocator: normalizeCliPathOrSource(sourceLocator, deploymentMethod ?? "auto"),
+          }
+        : yield* resolveInteractiveDeploymentInput(seed);
+
+      return yield* runDeploymentCommand(CreateDeploymentCommand.create(input), {
         appLogLines: parseAppLogLines(appLogLines),
-      },
-    ),
+      });
+    }),
 ).pipe(EffectCommand.withDescription("Create a deployment"));
 
 export const logsCommand = EffectCommand.make(

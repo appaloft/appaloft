@@ -79,6 +79,13 @@ describe("shell embedded pglite e2e", () => {
       | undefined;
 
     try {
+      const nonInteractiveDeploy = runCli(["deploy"], {
+        dataDir,
+        pgliteDataDir,
+      });
+      expect(nonInteractiveDeploy.exitCode).toBe(1);
+      expect(nonInteractiveDeploy.stderr).toContain("pathOrSource is required");
+
       const suffix = crypto.randomUUID().slice(0, 6);
       const project = runCli(["project", "create", "--name", `Embedded ${suffix}`], {
         dataDir,
@@ -96,7 +103,7 @@ describe("shell embedded pglite e2e", () => {
           "--host",
           "127.0.0.1",
           "--provider",
-          "generic-ssh",
+          "local-shell",
         ],
         {
           dataDir,
@@ -149,7 +156,7 @@ describe("shell embedded pglite e2e", () => {
           "--method",
           "workspace-commands",
           "--build",
-          "node build.mjs",
+          "bun build.mjs",
           "--start",
           "node dist/server.js",
         ],

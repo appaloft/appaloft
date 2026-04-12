@@ -21,6 +21,7 @@
     findProject,
     formatTime,
   } from "$lib/console/utils";
+  import { i18nKeys, t } from "$lib/i18n";
 
   const {
     readinessQuery,
@@ -57,10 +58,10 @@
 </script>
 
 <svelte:head>
-  <title>Console · Yundu</title>
+  <title>{$t(i18nKeys.console.home.pageTitle)} · Yundu</title>
 </svelte:head>
 
-<ConsoleShell title="首页" description="控制面状态、最近动作和入口">
+<ConsoleShell title={$t(i18nKeys.console.home.pageTitle)} description={$t(i18nKeys.console.home.pageDescription)}>
   {#if pageLoading}
     <div class="space-y-6">
       <div class="grid gap-4 md:grid-cols-4">
@@ -90,27 +91,33 @@
         <section class="overflow-hidden rounded-lg border bg-background">
           <div class="grid gap-0 lg:grid-cols-[1.1fr_0.9fr]">
             <div class="space-y-5 p-6 md:p-8">
-              <Badge class="w-fit" variant="outline">需要第一个部署目标</Badge>
+              <Badge class="w-fit" variant="outline">{$t(i18nKeys.console.home.targetNeeded)}</Badge>
               <div class="max-w-2xl space-y-3">
-                <h1 class="text-2xl font-semibold md:text-3xl">先把项目、服务器和环境串起来。</h1>
+                <h1 class="text-2xl font-semibold md:text-3xl">{$t(i18nKeys.console.home.deploymentBaseTitle)}</h1>
                 <p class="text-sm leading-6 text-muted-foreground">
-                  Yundu 会把一次发布拆成 detect、plan、execute、verify、rollback。第一个部署会同时建立项目关系、目标服务器和环境快照。
+                  {$t(i18nKeys.console.home.deploymentBaseBody)}
                 </p>
               </div>
               <div class="flex flex-wrap gap-2">
                 <Button size="lg" onclick={requestQuickDeploy}>
                   <Rocket class="size-4" />
-                  创建第一个部署
+                  {$t(i18nKeys.common.actions.createDeployment)}
                 </Button>
                 <Button href="/projects" size="lg" variant="outline">
                   <FolderOpen class="size-4" />
-                  先看项目
+                  {$t(i18nKeys.common.actions.viewProjects)}
                 </Button>
               </div>
             </div>
             <div class="border-t bg-muted/40 p-6 lg:border-l lg:border-t-0">
               <div class="grid gap-3">
-                {#each ["选择 source", "创建项目", "注册服务器", "保存环境快照", "生成部署记录"] as step, index (step)}
+                {#each [
+                  $t(i18nKeys.console.home.deploymentFlowSource),
+                  $t(i18nKeys.console.home.deploymentFlowCreateProject),
+                  $t(i18nKeys.console.home.deploymentFlowCreateServer),
+                  $t(i18nKeys.console.home.deploymentFlowCreateEnvironment),
+                  $t(i18nKeys.console.home.deploymentFlowDeploymentRecord),
+                ] as step, index (step)}
                   <div class="flex items-center gap-3 rounded-md border bg-background px-4 py-3">
                     <span class="flex size-7 items-center justify-center rounded-md bg-primary text-xs font-medium text-primary-foreground">
                       {index + 1}
@@ -125,15 +132,15 @@
       {:else if hasProjectsWithoutDeployments}
         <section class="flex flex-col gap-4 rounded-lg border border-amber-300/70 bg-amber-50/70 p-5 md:flex-row md:items-center md:justify-between">
           <div class="space-y-2">
-            <Badge class="w-fit border-amber-400 text-amber-900" variant="outline">项目还没有部署</Badge>
-            <h1 class="text-xl font-semibold text-amber-950">已有项目，下一步是绑定 source、服务器和环境。</h1>
+            <Badge class="w-fit border-amber-400 text-amber-900" variant="outline">{$t(i18nKeys.console.deployments.noFilteredDeployments)}</Badge>
+            <h1 class="text-xl font-semibold text-amber-950">{$t(i18nKeys.console.home.deploymentsWithoutRecordsTitle)}</h1>
             <p class="text-sm text-amber-900">
-              当前有 {projects.length} 个项目，但没有部署记录。创建一次部署后，项目页和部署页会互相串起关系。
+              {$t(i18nKeys.console.home.deploymentsWithoutRecordsBody, { count: projects.length })}
             </p>
           </div>
           <Button class="bg-amber-950 text-white hover:bg-amber-900" onclick={requestQuickDeploy}>
             <Rocket class="size-4" />
-            开始部署
+            {$t(i18nKeys.common.actions.createDeployment)}
           </Button>
         </section>
       {/if}
@@ -141,44 +148,44 @@
       <section class="grid gap-4 md:grid-cols-4">
         <Card>
           <CardHeader class="pb-2">
-            <CardDescription>项目</CardDescription>
+            <CardDescription>{$t(i18nKeys.common.domain.projects)}</CardDescription>
             <CardTitle class="text-2xl">{projects.length}</CardTitle>
           </CardHeader>
           <CardContent>
             <Button href="/projects" variant="ghost" class="px-0">
-              查看项目
+              {$t(i18nKeys.common.actions.viewProjects)}
               <ArrowRight class="size-4" />
             </Button>
           </CardContent>
         </Card>
         <Card>
           <CardHeader class="pb-2">
-            <CardDescription>部署</CardDescription>
+            <CardDescription>{$t(i18nKeys.common.domain.deployments)}</CardDescription>
             <CardTitle class="text-2xl">{deployments.length}</CardTitle>
           </CardHeader>
           <CardContent>
             <Button href="/deployments" variant="ghost" class="px-0">
-              查看部署
+              {$t(i18nKeys.common.actions.viewDeployments)}
               <ArrowRight class="size-4" />
             </Button>
           </CardContent>
         </Card>
         <Card>
           <CardHeader class="pb-2">
-            <CardDescription>服务器</CardDescription>
+            <CardDescription>{$t(i18nKeys.common.domain.servers)}</CardDescription>
             <CardTitle class="text-2xl">{servers.length}</CardTitle>
           </CardHeader>
           <CardContent class="text-sm text-muted-foreground">
-            {servers.length > 0 ? "可作为部署目标" : "部署时可直接创建"}
+            {servers.length > 0 ? $t(i18nKeys.console.home.serverAvailableTarget) : $t(i18nKeys.console.home.serverCreatedDuringDeployment)}
           </CardContent>
         </Card>
         <Card>
           <CardHeader class="pb-2">
-            <CardDescription>环境</CardDescription>
+            <CardDescription>{$t(i18nKeys.common.domain.environments)}</CardDescription>
             <CardTitle class="text-2xl">{environments.length}</CardTitle>
           </CardHeader>
           <CardContent class="text-sm text-muted-foreground">
-            {environments.length > 0 ? "已保存变量快照入口" : "部署时建立第一个环境"}
+            {environments.length > 0 ? $t(i18nKeys.console.home.environmentSnapshotEntry) : $t(i18nKeys.console.home.environmentCreatedDuringDeployment)}
           </CardContent>
         </Card>
       </section>
@@ -186,8 +193,8 @@
       <section class="grid gap-6 lg:grid-cols-[1fr_1fr]">
         <Card>
           <CardHeader>
-            <CardTitle>最近部署</CardTitle>
-            <CardDescription>只保留最近一次动作；完整列表在部署页。</CardDescription>
+            <CardTitle>{$t(i18nKeys.console.home.latestDeploymentTitle)}</CardTitle>
+            <CardDescription>{$t(i18nKeys.console.home.latestDeploymentDescription)}</CardDescription>
           </CardHeader>
           <CardContent>
             {#if latestDeployment}
@@ -204,13 +211,13 @@
                   </Badge>
                 </div>
                 <Button href="/deployments" variant="outline">
-                  打开部署页
+                  {$t(i18nKeys.common.actions.openDeployments)}
                   <ArrowRight class="size-4" />
                 </Button>
               </div>
             {:else}
               <div class="rounded-md border border-dashed p-5 text-sm text-muted-foreground">
-                还没有部署记录。快速部署会创建项目关系、环境快照和部署记录。
+                {$t(i18nKeys.console.home.latestDeploymentEmpty)}
               </div>
             {/if}
           </CardContent>
@@ -218,8 +225,8 @@
 
         <Card>
           <CardHeader>
-            <CardTitle>项目关系</CardTitle>
-            <CardDescription>首页只显示前三个项目；完整关系在项目页。</CardDescription>
+            <CardTitle>{$t(i18nKeys.console.home.projectRelationsTitle)}</CardTitle>
+            <CardDescription>{$t(i18nKeys.console.home.projectRelationsDescription)}</CardDescription>
           </CardHeader>
           <CardContent class="space-y-3">
             {#if projects.length > 0}
@@ -233,14 +240,14 @@
                     <span class="block text-xs text-muted-foreground">{project.slug}</span>
                   </span>
                   <span class="flex flex-wrap justify-end gap-2 text-xs text-muted-foreground">
-                    <span>{countProjectEnvironments(project, environments)} 环境</span>
-                    <span>{countProjectDeployments(project, deployments)} 部署</span>
+                    <span>{countProjectEnvironments(project, environments)} {$t(i18nKeys.common.domain.environments)}</span>
+                    <span>{countProjectDeployments(project, deployments)} {$t(i18nKeys.common.domain.deployments)}</span>
                   </span>
                 </a>
               {/each}
             {:else}
               <div class="rounded-md border border-dashed p-5 text-sm text-muted-foreground">
-                创建第一个项目后，这里会出现项目与部署关系。
+                {$t(i18nKeys.console.home.projectRelationsEmpty)}
               </div>
             {/if}
           </CardContent>
@@ -251,21 +258,21 @@
         <div class="rounded-lg border bg-background p-4">
           <div class="flex items-center gap-2 text-sm font-medium">
             <ShieldCheck class="size-4 text-muted-foreground" />
-            Readiness
+            {$t(i18nKeys.console.home.readinessCard)}
           </div>
           <p class="mt-3 text-sm text-muted-foreground">{readiness?.status ?? "unknown"}</p>
         </div>
         <div class="rounded-lg border bg-background p-4">
           <div class="flex items-center gap-2 text-sm font-medium">
             <Waypoints class="size-4 text-muted-foreground" />
-            Mode
+            {$t(i18nKeys.console.home.modeCard)}
           </div>
           <p class="mt-3 text-sm text-muted-foreground">{version?.mode ?? "self-hosted"}</p>
         </div>
         <div class="rounded-lg border bg-background p-4">
           <div class="flex items-center gap-2 text-sm font-medium">
             <Server class="size-4 text-muted-foreground" />
-            Database
+            {$t(i18nKeys.console.home.databaseCard)}
           </div>
           <p class="mt-3 text-sm text-muted-foreground">
             {readiness?.details?.databaseDriver ?? "unknown"}

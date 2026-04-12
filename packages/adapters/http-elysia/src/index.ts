@@ -12,6 +12,12 @@ import { type AppConfig } from "@yundu/config";
 import { apiVersion } from "@yundu/contracts";
 import { type Result } from "@yundu/core";
 import { yunduDeploymentConfigJsonSchema } from "@yundu/deployment-config";
+import {
+  createYunduTranslator,
+  i18nKeys,
+  resolveYunduLocaleFromHeaders,
+  translateDomainError,
+} from "@yundu/i18n";
 import { mountYunduOrpcRoutes } from "@yundu/orpc";
 import {
   type SystemPluginHttpMiddleware,
@@ -76,14 +82,14 @@ function readErrorMessage(error: unknown): string {
     return error.message;
   }
 
-  return "Unhandled adapter error";
+  return createYunduTranslator()(i18nKeys.errors.backend.adapterUnhandled);
 }
 
-function unwrapResult<T>(result: Result<T>): T {
+function unwrapResult<T>(context: ExecutionContext, result: Result<T>): T {
   return result.match(
     (value) => value,
     (error) => {
-      throw new Error(error.message);
+      throw new Error(translateDomainError(error, context.t));
     },
   );
 }
@@ -318,16 +324,15 @@ export function createHttpApp(input: {
       timestamp: new Date().toISOString(),
     }))
     .get("/api/readiness", async ({ request }) => {
-      const doctor = unwrapResult(DoctorQuery.create());
       const requestId = request.headers.get("x-request-id");
-      const result = await input.queryBus.execute(
-        input.executionContextFactory.create({
-          entrypoint: "http",
-          ...(requestId ? { requestId } : {}),
-        }),
-        doctor,
-      );
-      return unwrapResult(result).readiness;
+      const context = input.executionContextFactory.create({
+        entrypoint: "http",
+        locale: resolveYunduLocaleFromHeaders(request.headers),
+        ...(requestId ? { requestId } : {}),
+      });
+      const doctor = unwrapResult(context, DoctorQuery.create());
+      const result = await input.queryBus.execute(context, doctor);
+      return unwrapResult(context, result).readiness;
     })
     .get("/api/version", () => ({
       name: input.config.appName,

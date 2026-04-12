@@ -79,7 +79,11 @@ import {
   NoopLogger,
   SequenceIdGenerator,
 } from "@yundu/testkit";
-import { type ExecutionContext, toRepositoryContext } from "../src/execution-context";
+import {
+  createExecutionContext,
+  type ExecutionContext,
+  toRepositoryContext,
+} from "../src/execution-context";
 import {
   type DeploymentConfigReader,
   type DeploymentConfigSnapshot,
@@ -288,7 +292,7 @@ class LocalEmbeddedDefaultsPolicy implements DeploymentContextDefaultsPolicy {
 }
 
 function createTestContext(): ExecutionContext {
-  return {
+  return createExecutionContext({
     entrypoint: "cli",
     requestId: "req_test",
     tracer: {
@@ -304,7 +308,7 @@ function createTestContext(): ExecutionContext {
         );
       },
     },
-  };
+  });
 }
 
 describe("CreateDeploymentUseCase", () => {

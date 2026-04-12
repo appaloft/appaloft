@@ -1,5 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import { type RepositoryContext } from "@yundu/application";
+import {
+  createExecutionContext,
+  type RepositoryContext,
+  toRepositoryContext,
+} from "@yundu/application";
 
 import {
   BuildStrategyKindValue,
@@ -68,22 +72,25 @@ import {
 } from "@yundu/core";
 
 function createRepositoryContext(): RepositoryContext {
-  return {
-    requestId: "req_pg_test",
-    tracer: {
-      startActiveSpan(_name, _options, callback) {
-        return Promise.resolve(
-          callback({
-            addEvent() {},
-            recordError() {},
-            setAttribute() {},
-            setAttributes() {},
-            setStatus() {},
-          }),
-        );
+  return toRepositoryContext(
+    createExecutionContext({
+      entrypoint: "system",
+      requestId: "req_pg_test",
+      tracer: {
+        startActiveSpan(_name, _options, callback) {
+          return Promise.resolve(
+            callback({
+              addEvent() {},
+              recordError() {},
+              setAttribute() {},
+              setAttributes() {},
+              setStatus() {},
+            }),
+          );
+        },
       },
-    },
-  };
+    }),
+  );
 }
 
 function ensureReflectMetadata(): void {

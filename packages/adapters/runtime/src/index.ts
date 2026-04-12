@@ -49,6 +49,7 @@ import {
   type RequestedDeploymentConfig,
   type RuntimePlanResolver,
 } from "@yundu/application";
+import { i18nKeys } from "@yundu/i18n";
 import { LocalExecutionBackend } from "./local-execution";
 import { SshExecutionBackend } from "./ssh-execution";
 
@@ -412,7 +413,7 @@ export class InMemoryExecutionBackend implements ExecutionBackend {
         }
 
         if (shouldFail(deployment)) {
-          const message = "Simulated verification failure triggered by runtime input";
+          const message = context.t(i18nKeys.backend.progress.simulatedVerificationFailure);
           logs.push(phaseLog("verify", message, "error"));
           this.report(context, {
             deploymentId: state.id.value,
@@ -435,12 +436,13 @@ export class InMemoryExecutionBackend implements ExecutionBackend {
           });
         }
 
-        logs.push(phaseLog("verify", "Deployment completed successfully"));
+        const completedMessage = context.t(i18nKeys.backend.progress.deploymentCompleted);
+        logs.push(phaseLog("verify", completedMessage));
         this.report(context, {
           deploymentId: state.id.value,
           phase: "verify",
           status: "succeeded",
-          message: "Deployment completed successfully",
+          message: completedMessage,
         });
 
         return ok({
@@ -470,13 +472,13 @@ export class InMemoryExecutionBackend implements ExecutionBackend {
       },
       async () => {
         if (plan.steps.length === 0) {
-          return err(domainError.invariant("Rollback plan must contain at least one step"));
+          return err(domainError.invariant(context.t(i18nKeys.backend.progress.rollbackPlanEmpty)));
         }
 
         const logs: DeploymentLogEntry[] = [
           phaseLog("rollback", `Loading snapshot ${plan.snapshotId}`),
           phaseLog("rollback", `Executing rollback plan ${plan.id}`),
-          phaseLog("rollback", "Rollback completed successfully"),
+          phaseLog("rollback", context.t(i18nKeys.backend.progress.rollbackCompleted)),
         ];
         for (const log of logs) {
           this.report(context, {

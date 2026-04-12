@@ -1,4 +1,13 @@
 import { type DomainError } from "@yundu/core";
+import {
+  createYunduTranslator,
+  defaultYunduLocale,
+  normalizeYunduLocale,
+  type TranslationKey,
+  type TranslationValues,
+  type YunduLocale,
+  type YunduTranslate,
+} from "@yundu/i18n";
 
 export type TraceAttributeValue = boolean | number | string;
 export type TraceAttributes = Record<string, TraceAttributeValue | undefined>;
@@ -32,13 +41,17 @@ export interface AppTracer {
 export interface ExecutionContext {
   actor?: ExecutionActor;
   entrypoint: AppEntrypoint;
+  locale: YunduLocale;
   requestId: string;
+  t: YunduTranslate;
   tracer: AppTracer;
 }
 
 export interface RepositoryContext {
   actor?: ExecutionActor;
+  locale: YunduLocale;
   requestId: string;
+  t: YunduTranslate;
   tracer: AppTracer;
   transaction?: unknown;
 }
@@ -47,9 +60,15 @@ export interface ExecutionContextFactory {
   create(input: {
     actor?: ExecutionActor;
     entrypoint: AppEntrypoint;
+    locale?: string;
     requestId?: string;
   }): ExecutionContext;
 }
+
+const defaultTranslate = createYunduTranslator({ locale: defaultYunduLocale });
+
+export const translateKey = (key: TranslationKey, values?: TranslationValues): string =>
+  defaultTranslate(key, values);
 
 const noopSpan: AppSpan = {
   addEvent() {},
@@ -72,12 +91,19 @@ function createRequestId(): string {
 export function createExecutionContext(input: {
   actor?: ExecutionActor;
   entrypoint: AppEntrypoint;
+  locale?: string;
   requestId?: string;
   tracer?: AppTracer;
+  t?: YunduTranslate;
 }): ExecutionContext {
+  const locale = normalizeYunduLocale(input.locale);
+  const t = input.t ?? createYunduTranslator({ locale });
+
   return {
     entrypoint: input.entrypoint,
+    locale,
     requestId: input.requestId ?? createRequestId(),
+    t,
     tracer: input.tracer ?? noopTracer,
     ...(input.actor ? { actor: input.actor } : {}),
   };
@@ -94,6 +120,7 @@ export const yunduTraceAttributes = {
   errorCode: `${yunduTraceAttributePrefix}.error.code`,
   handlerName: `${yunduTraceAttributePrefix}.handler.name`,
   integrationKey: `${yunduTraceAttributePrefix}.integration.key`,
+  locale: `${yunduTraceAttributePrefix}.locale`,
   mutationSpecName: `${yunduTraceAttributePrefix}.mutation_spec.name`,
   queryName: `${yunduTraceAttributePrefix}.query.name`,
   readModelName: `${yunduTraceAttributePrefix}.read_model.name`,
@@ -107,6 +134,7 @@ export function createExecutionContextAttributes(context: ExecutionContext): Tra
   return {
     [yunduTraceAttributes.requestId]: context.requestId,
     [yunduTraceAttributes.entrypoint]: context.entrypoint,
+    [yunduTraceAttributes.locale]: context.locale,
     [yunduTraceAttributes.actorId]: context.actor?.id,
     [yunduTraceAttributes.actorKind]: context.actor?.kind,
   };
@@ -126,7 +154,9 @@ export function toRepositoryContext(
   },
 ): RepositoryContext {
   return {
+    locale: context.locale,
     requestId: context.requestId,
+    t: context.t,
     tracer: context.tracer,
     ...(context.actor ? { actor: context.actor } : {}),
     ...(input?.transaction ? { transaction: input.transaction } : {}),

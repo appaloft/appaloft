@@ -1,0 +1,16 @@
+{
+  "name": "@yundu/i18n",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "i18next": "^25.6.3"
+  },
+  "scripts": {
+    "lint": "biome check .",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "bun test"
+  }
+}

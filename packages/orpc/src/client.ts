@@ -1,6 +1,7 @@
 import { createORPCClient } from "@orpc/client";
 import { RPCLink } from "@orpc/client/fetch";
 import { createTanstackQueryUtils } from "@orpc/tanstack-query";
+import { defaultYunduLocale, yunduLocaleHeader } from "@yundu/i18n";
 
 import { type YunduOrpcClientContract } from "./client-contract";
 
@@ -23,15 +24,25 @@ function resolveAbsoluteBaseUrl(baseUrl: string): string {
 }
 
 export type YunduOrpcClient = YunduOrpcClientContract;
+export type YunduOrpcLocaleResolver = () => string | null | undefined;
 
-export function createYunduOrpcClient(baseUrl: string): YunduOrpcClient {
+export function createYunduOrpcClient(
+  baseUrl: string,
+  localeResolver?: YunduOrpcLocaleResolver,
+): YunduOrpcClient {
   const link = new RPCLink({
     url: `${resolveAbsoluteBaseUrl(baseUrl)}/api/rpc`,
+    headers: () => ({
+      [yunduLocaleHeader]: localeResolver?.() ?? defaultYunduLocale,
+    }),
   });
 
   return createORPCClient<YunduOrpcClient>(link);
 }
 
-export function createYunduOrpcQueryUtils(baseUrl: string) {
-  return createTanstackQueryUtils(createYunduOrpcClient(baseUrl));
+export function createYunduOrpcQueryUtils(
+  baseUrl: string,
+  localeResolver?: YunduOrpcLocaleResolver,
+) {
+  return createTanstackQueryUtils(createYunduOrpcClient(baseUrl, localeResolver));
 }

@@ -1,6 +1,6 @@
 <script lang="ts">
   import { browser } from "$app/environment";
-  import { replaceState } from "$app/navigation";
+  import { afterNavigate, replaceState } from "$app/navigation";
   import { page } from "$app/state";
   import {
     CheckCircle2,
@@ -16,11 +16,13 @@
     Waypoints,
   } from "@lucide/svelte";
   import { createMutation, createQuery, queryOptions } from "@tanstack/svelte-query";
+  import type { TranslationKey } from "@yundu/i18n";
   import type {
     AuthSessionResponse,
     EnvironmentSummary,
     GitHubRepositorySummary,
     ProjectSummary,
+    ResourceSummary,
     ServerSummary,
   } from "@yundu/contracts";
 
@@ -41,6 +43,7 @@
   import { Badge } from "$lib/components/ui/badge";
   import { defaultAuthSession, type ProviderSummary } from "$lib/console/queries";
   import { readSessionIdentity } from "$lib/console/utils";
+  import { i18nKeys, t } from "$lib/i18n";
   import { orpcClient } from "$lib/orpc";
   import { queryClient } from "$lib/query-client";
 
@@ -48,6 +51,11 @@
   type DraftMode = "existing" | "new";
   type EnvironmentKind = EnvironmentSummary["kind"];
   type DeploymentStepKey = "source" | "project" | "server" | "environment" | "variables" | "review";
+  type SummaryRow = {
+    label: string;
+    value: string;
+    mono?: boolean;
+  };
   type YunduDesktopBridge = {
     selectDirectory?: () => Promise<string | null | undefined>;
   };
@@ -68,38 +76,38 @@
 
   const sourceOptions: Array<{
     key: SourceKind;
-    label: string;
-    hint: string;
+    labelKey: TranslationKey;
+    hintKey: TranslationKey;
     icon: typeof FolderOpen;
   }> = [
     {
       key: "local-folder",
-      label: "本地目录",
-      hint: "适合当前工作区或本地源码目录。",
+      labelKey: i18nKeys.console.quickDeploy.sourceLocalFolder,
+      hintKey: i18nKeys.console.quickDeploy.sourceLocalFolderHint,
       icon: FolderOpen,
     },
     {
       key: "github",
-      label: "GitHub 仓库",
-      hint: "授权后从仓库直接回填项目与来源。",
+      labelKey: i18nKeys.console.quickDeploy.sourceGithub,
+      hintKey: i18nKeys.console.quickDeploy.sourceGithubHint,
       icon: GitBranch,
     },
     {
       key: "remote-git",
-      label: "Remote Git",
-      hint: "适合 GitHub 之外的 git 源。",
+      labelKey: i18nKeys.console.quickDeploy.sourceRemoteGit,
+      hintKey: i18nKeys.console.quickDeploy.sourceRemoteGitHint,
       icon: GitBranch,
     },
     {
       key: "docker-image",
-      label: "Docker 镜像",
-      hint: "直接发布已有镜像，无需再构建。",
+      labelKey: i18nKeys.console.quickDeploy.sourceDockerImage,
+      hintKey: i18nKeys.console.quickDeploy.sourceDockerImageHint,
       icon: Package,
     },
     {
       key: "compose",
-      label: "Compose",
-      hint: "导入 compose 清单或仓库中的 compose 路径。",
+      labelKey: i18nKeys.console.quickDeploy.sourceCompose,
+      hintKey: i18nKeys.console.quickDeploy.sourceComposeHint,
       icon: Waypoints,
     },
   ];
@@ -117,33 +125,15 @@
       icon: Waypoints,
     },
     {
-      key: "project",
-      title: "项目",
-      description: "复用或创建项目",
-      icon: Package,
-    },
-    {
       key: "server",
       title: "服务器",
       description: "选择部署目标",
       icon: Server,
     },
     {
-      key: "environment",
-      title: "环境",
-      description: "绑定环境快照",
-      icon: Settings2,
-    },
-    {
-      key: "variables",
-      title: "变量",
-      description: "按需加入首个变量",
-      icon: TerminalSquare,
-    },
-    {
       key: "review",
       title: "提交",
-      description: "确认并创建部署",
+      description: "确认部署，可按需编辑项目、环境、资源和变量",
       icon: Play,
     },
   ];
@@ -201,10 +191,17 @@
   let environmentMode = $state<DraftMode>(
     parseDraftMode(browser ? page.url.searchParams.get("environmentMode") : null),
   );
+  let projectContextEnabled = $state(browser ? page.url.searchParams.get("editProject") === "true" : false);
+  let environmentContextEnabled = $state(
+    browser ? page.url.searchParams.get("editEnvironment") === "true" : false,
+  );
+  let resourceContextEnabled = $state(browser ? page.url.searchParams.get("editResource") === "true" : false);
+  let variableContextEnabled = $state(browser ? page.url.searchParams.get("editVariables") === "true" : false);
 
   let selectedProjectId = $state(browser ? (page.url.searchParams.get("projectId") ?? "") : "");
   let selectedServerId = $state(browser ? (page.url.searchParams.get("serverId") ?? "") : "");
   let selectedEnvironmentId = $state(browser ? (page.url.searchParams.get("environmentId") ?? "") : "");
+  let selectedResourceId = $state(browser ? (page.url.searchParams.get("resourceId") ?? "") : "");
 
   let projectName = $state(browser ? (page.url.searchParams.get("projectName") ?? "") : "");
   let projectDescription = $state(browser ? (page.url.searchParams.get("projectDescription") ?? "") : "");
@@ -229,6 +226,7 @@
   let dockerImageLocator = $state(browser ? (page.url.searchParams.get("sourceLocator") ?? "") : "");
   let composeLocator = $state(browser ? (page.url.searchParams.get("sourceLocator") ?? "") : "");
   let lastAppliedUrlSearch = browser ? page.url.search : "";
+  let routerStateReady = $state(false);
 
   let deployFeedback = $state<{
     kind: "success" | "error";
@@ -264,18 +262,37 @@
   }));
   const createDeploymentMutation = createMutation(() => ({
     mutationFn: (input: {
-      projectId: string;
+      projectId?: string;
       serverId: string;
-      environmentId: string;
+      environmentId?: string;
+      resourceId?: string;
       sourceLocator: string;
       deploymentMethod?: "auto" | "dockerfile" | "docker-compose" | "prebuilt-image" | "workspace-commands";
     }) => orpcClient.deployments.create(input),
   }));
+  const resourcesQuery = createQuery(() =>
+    queryOptions({
+      queryKey: [
+        "resources",
+        projectContextEnabled ? selectedProjectId : "",
+        environmentContextEnabled ? selectedEnvironmentId : "",
+      ],
+      queryFn: () =>
+        orpcClient.resources.list({
+          ...(projectContextEnabled && selectedProjectId ? { projectId: selectedProjectId } : {}),
+          ...(environmentContextEnabled && selectedEnvironmentId
+            ? { environmentId: selectedEnvironmentId }
+            : {}),
+        }),
+      enabled: browser && enabled,
+    }),
+  );
 
   const authSession = $derived(authSessionQuery.data ?? defaultAuthSession);
   const projects = $derived((projectsQuery.data?.items ?? []) as ProjectSummary[]);
   const servers = $derived((serversQuery.data?.items ?? []) as ServerSummary[]);
   const environments = $derived((environmentsQuery.data?.items ?? []) as EnvironmentSummary[]);
+  const resources = $derived((resourcesQuery.data?.items ?? []) as ResourceSummary[]);
   const providers = $derived((providersQuery.data?.items ?? []) as ProviderSummary[]);
   const githubProvider = $derived(
     authSession.providers.find((provider) => provider.key === "github") ?? null,
@@ -290,6 +307,9 @@
   const selectedServer = $derived(servers.find((server) => server.id === selectedServerId) ?? null);
   const selectedEnvironment = $derived(
     environments.find((environment) => environment.id === selectedEnvironmentId) ?? null,
+  );
+  const selectedResource = $derived(
+    resources.find((resource) => resource.id === selectedResourceId) ?? null,
   );
   const filteredEnvironments = $derived.by(() => {
     if (projectMode === "existing" && selectedProjectId) {
@@ -354,7 +374,7 @@
   const deploymentCommandPreview = $derived.by(() => {
     const segments = [`yundu deploy ${sourceLocator || "."}`];
 
-    if (selectedProjectId) {
+    if (projectContextEnabled && selectedProjectId) {
       segments.push(`--project ${selectedProjectId}`);
     }
 
@@ -362,8 +382,12 @@
       segments.push(`--server ${selectedServerId}`);
     }
 
-    if (selectedEnvironmentId) {
+    if (environmentContextEnabled && selectedEnvironmentId) {
       segments.push(`--environment ${selectedEnvironmentId}`);
+    }
+
+    if (resourceContextEnabled && selectedResourceId) {
+      segments.push(`--resource ${selectedResourceId}`);
     }
 
     return segments.join(" ");
@@ -386,9 +410,134 @@
       return selectedGitHubRepository.fullName;
     }
 
-    return sourceLocator || "未填写来源地址";
+    return sourceLocator || $t(i18nKeys.console.quickDeploy.sourceNotSet);
+  });
+  const sourceDetailRows = $derived.by((): SummaryRow[] => {
+    if (sourceKind === "github" && selectedGitHubRepository) {
+      return [
+        {
+          label: $t(i18nKeys.console.quickDeploy.githubRepository),
+          value: selectedGitHubRepository.fullName,
+        },
+        {
+          label: $t(i18nKeys.console.quickDeploy.defaultBranch),
+          value: selectedGitHubRepository.defaultBranch,
+        },
+        {
+          label: $t(i18nKeys.console.quickDeploy.repositoryVisibility),
+          value: selectedGitHubRepository.private
+            ? $t(i18nKeys.console.quickDeploy.privateRepository)
+            : $t(i18nKeys.console.quickDeploy.publicRepository),
+        },
+        {
+          label: $t(i18nKeys.console.quickDeploy.cloneUrl),
+          value: selectedGitHubRepository.cloneUrl,
+          mono: true,
+        },
+      ];
+    }
+
+    if (sourceKind === "github") {
+      return [
+        {
+          label: $t(i18nKeys.console.quickDeploy.githubRepository),
+          value: sourceSummary,
+          mono: true,
+        },
+      ];
+    }
+
+    if (sourceKind === "remote-git") {
+      return [
+        {
+          label: $t(i18nKeys.console.quickDeploy.remoteGitUrl),
+          value: sourceSummary,
+          mono: true,
+        },
+      ];
+    }
+
+    if (sourceKind === "docker-image") {
+      return [
+        {
+          label: $t(i18nKeys.console.quickDeploy.dockerImage),
+          value: sourceSummary,
+          mono: true,
+        },
+      ];
+    }
+
+    if (sourceKind === "compose") {
+      return [
+        {
+          label: $t(i18nKeys.console.quickDeploy.composeManifest),
+          value: sourceSummary,
+          mono: true,
+        },
+      ];
+    }
+
+    return [
+      {
+        label: $t(i18nKeys.console.quickDeploy.localFolderPath),
+        value: sourceSummary,
+        mono: true,
+      },
+    ];
+  });
+  const inferredSourceName = $derived.by(() => {
+    if (sourceKind === "github" && selectedGitHubRepository) {
+      return selectedGitHubRepository.name;
+    }
+
+    const locator = sourceLocator.trim();
+    if (!locator) {
+      return "local-resource";
+    }
+
+    const withoutQuery = locator.split(/[?#]/)[0] ?? locator;
+    const withoutTag = sourceKind === "docker-image"
+      ? (withoutQuery.split(":")[0] ?? withoutQuery)
+      : withoutQuery;
+    const segments = withoutTag.split(/[\\/]/).filter(Boolean);
+    const lastSegment = segments.at(-1) ?? withoutTag;
+
+    return lastSegment.replace(/\.git$/, "") || "local-resource";
+  });
+  const defaultProjectSummary = $derived.by(() => {
+    if (selectedProject) {
+      return selectedProject.name;
+    }
+
+    return projectName.trim() || inferredSourceName;
+  });
+  const defaultEnvironmentSummary = $derived.by(() => {
+    if (selectedEnvironment) {
+      return `${selectedEnvironment.name} · ${selectedEnvironment.kind}`;
+    }
+
+    return `${environmentName.trim() || "local"} · ${environmentKind}`;
+  });
+  const defaultResourceSummary = $derived.by(() => {
+    if (selectedResource) {
+      return `${selectedResource.name} · ${selectedResource.kind}`;
+    }
+
+    if (sourceKind === "compose") {
+      return `${inferredSourceName} · compose-stack`;
+    }
+
+    if (sourceKind === "docker-image") {
+      return `${inferredSourceName} · application`;
+    }
+
+    return `${inferredSourceName} · application`;
   });
   const projectSummary = $derived.by(() => {
+    if (!projectContextEnabled) {
+      return defaultProjectSummary;
+    }
+
     if (projectMode === "existing") {
       return selectedProject?.name ?? "未选择项目";
     }
@@ -405,6 +554,10 @@
       : "待创建服务器";
   });
   const environmentSummary = $derived.by(() => {
+    if (!environmentContextEnabled) {
+      return defaultEnvironmentSummary;
+    }
+
     if (environmentMode === "existing") {
       return selectedEnvironment
         ? `${selectedEnvironment.name} · ${selectedEnvironment.kind}`
@@ -413,7 +566,20 @@
 
     return environmentName.trim() ? `${environmentName.trim()} · ${environmentKind}` : "待创建环境";
   });
+  const resourceSummary = $derived.by(() => {
+    if (!resourceContextEnabled) {
+      return defaultResourceSummary;
+    }
+
+    return selectedResource
+      ? `${selectedResource.name} · ${selectedResource.kind}`
+      : "未选择资源";
+  });
   const variableSummary = $derived.by(() => {
+    if (!variableContextEnabled) {
+      return "跳过";
+    }
+
     if (!variableKey.trim()) {
       return "不创建变量";
     }
@@ -441,6 +607,10 @@
     (githubRepositoriesQuery.data?.items ?? []) as GitHubRepositorySummary[],
   );
 
+  afterNavigate(() => {
+    routerStateReady = true;
+  });
+
   $effect(() => {
     if (!browser) {
       return;
@@ -456,7 +626,7 @@
   });
 
   $effect(() => {
-    if (!browser) {
+    if (!browser || !routerStateReady) {
       return;
     }
 
@@ -509,7 +679,7 @@
   });
 
   $effect(() => {
-    if (projectMode === "new") {
+    if (projectContextEnabled && projectMode === "new") {
       environmentMode = "new";
       selectedEnvironmentId = "";
     }
@@ -533,6 +703,12 @@
       !providerOptions.some((provider) => provider.key === serverProviderKey)
     ) {
       serverProviderKey = providerOptions[0].key;
+    }
+  });
+
+  $effect(() => {
+    if (resourceContextEnabled && resourcesQuery.isSuccess && selectedResourceId && !selectedResource) {
+      selectedResourceId = "";
     }
   });
 
@@ -622,10 +798,13 @@
       setSearchParam(params, "githubRepositoryId", selectedGitHubRepositoryId);
     }
 
-    setSearchParam(params, "projectMode", projectMode, "new");
-    setSearchParam(params, "projectId", selectedProjectId);
-    setSearchParam(params, "projectName", projectName);
-    setSearchParam(params, "projectDescription", projectDescription);
+    setSearchParam(params, "editProject", projectContextEnabled ? "true" : "false", "false");
+    if (projectContextEnabled) {
+      setSearchParam(params, "projectMode", projectMode, "new");
+      setSearchParam(params, "projectId", selectedProjectId);
+      setSearchParam(params, "projectName", projectName);
+      setSearchParam(params, "projectDescription", projectDescription);
+    }
 
     setSearchParam(params, "serverMode", serverMode, "new");
     setSearchParam(params, "serverId", selectedServerId);
@@ -634,14 +813,25 @@
     setSearchParam(params, "serverPort", serverPort, "22");
     setSearchParam(params, "serverProvider", serverProviderKey, "local-shell");
 
-    setSearchParam(params, "environmentMode", environmentMode, "new");
-    setSearchParam(params, "environmentId", selectedEnvironmentId);
-    setSearchParam(params, "environmentName", environmentName, "local");
-    setSearchParam(params, "environmentKind", environmentKind, "local");
+    setSearchParam(params, "editEnvironment", environmentContextEnabled ? "true" : "false", "false");
+    if (environmentContextEnabled) {
+      setSearchParam(params, "environmentMode", environmentMode, "new");
+      setSearchParam(params, "environmentId", selectedEnvironmentId);
+      setSearchParam(params, "environmentName", environmentName, "local");
+      setSearchParam(params, "environmentKind", environmentKind, "local");
+    }
 
-    setSearchParam(params, "variableKey", variableKey);
-    if (variableKey.trim()) {
-      setSearchParam(params, "variableSecret", variableIsSecret ? "true" : "false", "true");
+    setSearchParam(params, "editResource", resourceContextEnabled ? "true" : "false", "false");
+    if (resourceContextEnabled) {
+      setSearchParam(params, "resourceId", selectedResourceId);
+    }
+
+    setSearchParam(params, "editVariables", variableContextEnabled ? "true" : "false", "false");
+    if (variableContextEnabled) {
+      setSearchParam(params, "variableKey", variableKey);
+      if (variableKey.trim()) {
+        setSearchParam(params, "variableSecret", variableIsSecret ? "true" : "false", "true");
+      }
     }
 
     return url;
@@ -656,10 +846,15 @@
     projectMode = parseDraftMode(params.get("projectMode"));
     serverMode = parseDraftMode(params.get("serverMode"));
     environmentMode = parseDraftMode(params.get("environmentMode"));
+    projectContextEnabled = params.get("editProject") === "true";
+    environmentContextEnabled = params.get("editEnvironment") === "true";
+    resourceContextEnabled = params.get("editResource") === "true";
+    variableContextEnabled = params.get("editVariables") === "true";
 
     selectedProjectId = params.get("projectId") ?? "";
     selectedServerId = params.get("serverId") ?? "";
     selectedEnvironmentId = params.get("environmentId") ?? "";
+    selectedResourceId = params.get("resourceId") ?? "";
 
     projectName = params.get("projectName") ?? "";
     projectDescription = params.get("projectDescription") ?? "";
@@ -740,17 +935,18 @@
             githubConnected &&
             Boolean(selectedGitHubRepository || githubLocator.trim()),
         );
-      case "project":
-        return projectMode === "existing" ? Boolean(selectedProjectId) : Boolean(projectName.trim());
       case "server":
         return serverMode === "existing"
           ? Boolean(selectedServerId)
           : Boolean(serverName.trim() && serverHost.trim());
+      case "project":
+        return !projectContextEnabled || (projectMode === "existing" ? Boolean(selectedProjectId) : Boolean(projectName.trim()));
       case "environment":
-        return environmentMode === "existing"
+        return !environmentContextEnabled || (environmentMode === "existing"
           ? Boolean(selectedEnvironmentId)
-          : Boolean(environmentName.trim());
+          : Boolean(environmentName.trim()));
       case "variables":
+        return true;
       case "review":
         return true;
     }
@@ -794,7 +990,7 @@
     const selectDirectory = (window as WindowWithYunduDesktopBridge).yunduDesktop?.selectDirectory;
 
     if (!selectDirectory) {
-      localFolderSelectionNotice = "当前浏览器不能只读取本地路径，请直接输入或粘贴目录路径。";
+      localFolderSelectionNotice = $t(i18nKeys.console.quickDeploy.chooseSourceDirectoryBrowserHint);
       return;
     }
 
@@ -838,7 +1034,7 @@
     } catch (error) {
       deployFeedback = {
         kind: "error",
-        title: "无法连接 GitHub",
+        title: $t(i18nKeys.common.actions.connectGitHub),
         detail: readErrorMessage(error),
       };
     }
@@ -861,6 +1057,7 @@
       queryClient.invalidateQueries({ queryKey: ["projects"] }),
       queryClient.invalidateQueries({ queryKey: ["servers"] }),
       queryClient.invalidateQueries({ queryKey: ["environments"] }),
+      queryClient.invalidateQueries({ queryKey: ["resources"] }),
       queryClient.invalidateQueries({ queryKey: ["deployments"] }),
     ]);
   }
@@ -883,9 +1080,9 @@
         }
       }
 
-      let projectId = selectedProjectId;
+      let projectId = projectContextEnabled ? selectedProjectId : undefined;
 
-      if (projectMode === "new") {
+      if (projectContextEnabled && projectMode === "new") {
         if (!projectName.trim()) {
           throw new Error("请填写项目名。");
         }
@@ -899,7 +1096,7 @@
         await projectsQuery.refetch();
       }
 
-      if (!projectId) {
+      if (projectContextEnabled && !projectId) {
         throw new Error("请选择或创建一个项目。");
       }
 
@@ -925,11 +1122,15 @@
         throw new Error("请选择或创建一个服务器。");
       }
 
-      let environmentId = selectedEnvironmentId;
+      let environmentId = environmentContextEnabled ? selectedEnvironmentId : undefined;
 
-      if (environmentMode === "new") {
+      if (environmentContextEnabled && environmentMode === "new") {
         if (!environmentName.trim()) {
           throw new Error("请填写环境名。");
+        }
+
+        if (!projectId) {
+          throw new Error("新建环境前请先编辑并选择或创建项目。");
         }
 
         const createdEnvironment = await createEnvironmentMutation.mutateAsync({
@@ -942,11 +1143,19 @@
         await environmentsQuery.refetch();
       }
 
-      if (!environmentId) {
+      if (environmentContextEnabled && !environmentId) {
         throw new Error("请选择或创建一个环境。");
       }
 
-      if (variableKey.trim()) {
+      if (resourceContextEnabled && !selectedResourceId) {
+        throw new Error("请选择资源，或关闭资源编辑以使用默认值。");
+      }
+
+      if (variableContextEnabled && variableKey.trim()) {
+        if (!environmentId) {
+          throw new Error("设置变量前请先编辑并选择或创建环境。");
+        }
+
         await setEnvironmentVariableMutation.mutateAsync({
           environmentId,
           key: variableKey.trim(),
@@ -960,10 +1169,11 @@
       }
 
       const deployment = await createDeploymentMutation.mutateAsync({
-        projectId,
         serverId,
-        environmentId,
         sourceLocator,
+        ...(projectId ? { projectId } : {}),
+        ...(environmentId ? { environmentId } : {}),
+        ...(resourceContextEnabled && selectedResourceId ? { resourceId: selectedResourceId } : {}),
         ...(deploymentMethodForSource()
           ? { deploymentMethod: deploymentMethodForSource() }
           : {}),
@@ -973,13 +1183,13 @@
 
       deployFeedback = {
         kind: "success",
-        title: "部署记录已创建",
+        title: $t(i18nKeys.console.quickDeploy.deployFeedbackSuccessTitle),
         detail: `deploymentId: ${deployment.id}`,
       };
     } catch (error) {
       deployFeedback = {
         kind: "error",
-        title: "无法创建部署",
+        title: $t(i18nKeys.console.quickDeploy.deployFeedbackErrorTitle),
         detail: readErrorMessage(error),
       };
     }
@@ -990,7 +1200,7 @@
   <div class="space-y-5">
       <Card>
         <CardHeader>
-          <CardTitle>部署入口 · {activeStepDetails.title}</CardTitle>
+          <CardTitle>{$t(i18nKeys.console.quickDeploy.deploymentEntryTitle, { stepTitle: activeStepDetails.title })}</CardTitle>
           <CardDescription>{activeStepDetails.description}</CardDescription>
         </CardHeader>
         <CardContent class="space-y-6">
@@ -1029,7 +1239,7 @@
           <div class="space-y-3">
             <div class="flex items-center gap-2 text-sm font-medium">
               <Waypoints class="size-4 text-muted-foreground" />
-              <span>来源</span>
+              <span>{$t(i18nKeys.common.domain.source)}</span>
             </div>
             <div class="grid gap-2">
               {#each sourceOptions as option (option.key)}
@@ -1044,20 +1254,20 @@
                 >
                   <option.icon class="mt-0.5 size-4 text-muted-foreground" />
                   <span class="space-y-1">
-                    <span class="block text-sm font-medium">{option.label}</span>
-                    <span class="block text-xs text-muted-foreground">{option.hint}</span>
+                    <span class="block text-sm font-medium">{$t(option.labelKey)}</span>
+                    <span class="block text-xs text-muted-foreground">{$t(option.hintKey)}</span>
                   </span>
                 </button>
               {/each}
             </div>
             {#if sourceKind === "github"}
               <div class="rounded-md border bg-muted/30 px-3 py-3 text-sm text-muted-foreground">
-                选择 GitHub 仓库后会自动使用仓库 clone 地址。
+                {$t(i18nKeys.console.quickDeploy.githubRepositoryAutoLocator)}
               </div>
             {:else}
               <div class="space-y-2">
                 <label class="text-xs font-medium text-muted-foreground" for="source-locator">
-                  来源地址
+                  {$t(i18nKeys.console.quickDeploy.sourceAddress)}
                 </label>
                 {#if sourceKind === "local-folder"}
                 <div class="flex gap-2">
@@ -1073,17 +1283,15 @@
                     variant="outline"
                     class="shrink-0"
                     disabled={!canChooseNativeLocalFolder}
-                    title={
-                      canChooseNativeLocalFolder ? "选择本地目录" : "普通浏览器不能只读取本地路径，请手动输入。"
-                    }
+                    title={canChooseNativeLocalFolder ? $t(i18nKeys.common.actions.selectDirectory) : $t(i18nKeys.console.quickDeploy.chooseSourceDirectoryBrowserHint)}
                     onclick={chooseLocalFolder}
                   >
                     <FolderOpen class="size-4" />
-                    选择目录
+                    {$t(i18nKeys.common.actions.selectDirectory)}
                   </Button>
                 </div>
                 <p class="text-xs text-muted-foreground">
-                  普通浏览器不会读取本机绝对路径，请直接输入或粘贴；桌面版可只选择并保存路径。
+                  {$t(i18nKeys.console.quickDeploy.chooseSourceDirectoryBrowserHint)}
                 </p>
                 {#if localFolderSelectionNotice}
                   <p class="text-xs text-destructive">{localFolderSelectionNotice}</p>
@@ -1105,34 +1313,34 @@
               <Separator />
               <div class="flex items-center justify-between gap-2">
                 <div>
-                  <p class="text-sm font-medium">GitHub 仓库</p>
-                  <p class="text-xs text-muted-foreground">只有需要导入 GitHub 时才会触发登录。</p>
+                  <p class="text-sm font-medium">{$t(i18nKeys.console.quickDeploy.githubRepository)}</p>
+                  <p class="text-xs text-muted-foreground">{$t(i18nKeys.console.quickDeploy.githubOnlyLoginWhenNeeded)}</p>
                 </div>
                 {#if githubConnected}
-                  <Badge>已连接</Badge>
+                  <Badge>{$t(i18nKeys.common.status.connected)}</Badge>
                 {:else}
-                  <Badge variant="outline">按需授权</Badge>
+                  <Badge variant="outline">{$t(i18nKeys.common.status.onDemandAuthorization)}</Badge>
                 {/if}
               </div>
               {#if authIdentity}
                 <div class="rounded-md border bg-muted/40 px-3 py-3 text-sm">
-                  <span class="text-muted-foreground">当前身份</span>
+                  <span class="text-muted-foreground">{$t(i18nKeys.console.quickDeploy.currentIdentity)}</span>
                   <span class="ml-2 font-medium">{authIdentity}</span>
                 </div>
               {/if}
 
               {#if !githubProvider?.configured}
                 <div class="rounded-md border border-dashed px-3 py-3 text-sm text-muted-foreground">
-                  后端尚未配置 GitHub OAuth。
+                  {$t(i18nKeys.console.quickDeploy.githubOAuthNotConfigured)}
                 </div>
               {:else if !githubConnected}
                 <Button variant="outline" class="w-full" onclick={connectGitHub}>
                   <GitBranch class="size-4" />
-                  连接 GitHub
+                  {$t(i18nKeys.common.actions.connectGitHub)}
                 </Button>
               {:else}
                 <div class="space-y-3">
-                  <Input bind:value={githubRepositorySearch} placeholder="搜索 GitHub 仓库" />
+                  <Input bind:value={githubRepositorySearch} placeholder={$t(i18nKeys.console.quickDeploy.githubRepositorySearch)} />
                   <div class="max-h-64 space-y-2 overflow-auto rounded-md border p-2">
                     {#if githubRepositoriesQuery.isPending}
                       {#each Array.from({ length: 4 }) as _, index (index)}
@@ -1153,7 +1361,7 @@
                             <span>
                               <span class="block text-sm font-medium">{repository.fullName}</span>
                               <span class="mt-1 block text-xs text-muted-foreground">
-                                {repository.description ?? "暂无描述"}
+                                {repository.description ?? $t(i18nKeys.common.domain.description)}
                               </span>
                             </span>
                             <Badge variant="outline">
@@ -1163,7 +1371,7 @@
                         </button>
                       {/each}
                     {:else}
-                      <p class="px-2 py-3 text-sm text-muted-foreground">当前没有仓库结果。</p>
+                      <p class="px-2 py-3 text-sm text-muted-foreground">{$t(i18nKeys.console.quickDeploy.noRepositoryResults)}</p>
                     {/if}
                   </div>
                 </div>
@@ -1176,7 +1384,7 @@
             <Separator />
             <div class="flex items-center gap-2 text-sm font-medium">
               <Package class="size-4 text-muted-foreground" />
-              <span>项目</span>
+              <span>{$t(i18nKeys.common.domain.project)}</span>
             </div>
             <div class="grid grid-cols-2 gap-2">
               <Button
@@ -1185,7 +1393,7 @@
                   projectMode = "existing";
                 }}
               >
-                使用已有
+                {$t(i18nKeys.common.modes.useExisting)}
               </Button>
               <Button
                 variant={projectMode === "new" ? "default" : "outline"}
@@ -1193,7 +1401,7 @@
                   projectMode = "new";
                 }}
               >
-                新建项目
+                {$t(i18nKeys.common.modes.newProject)}
               </Button>
             </div>
             {#if projectMode === "existing"}
@@ -1212,20 +1420,20 @@
                     </Button>
                   {/each}
                 {:else}
-                  <p class="px-2 py-2 text-sm text-muted-foreground">暂无项目可选。</p>
+                  <p class="px-2 py-2 text-sm text-muted-foreground">{$t(i18nKeys.console.quickDeploy.noProjectOptions)}</p>
                 {/if}
               </div>
             {:else}
               <div class="space-y-3">
                 <div class="space-y-2">
                   <label class="text-xs font-medium text-muted-foreground" for="project-name">
-                    项目名
+                    {$t(i18nKeys.common.domain.name)}
                   </label>
                   <Input id="project-name" bind:value={projectName} placeholder="platform-control-plane" />
                 </div>
                 <div class="space-y-2">
                   <label class="text-xs font-medium text-muted-foreground" for="project-description">
-                    描述
+                    {$t(i18nKeys.common.domain.description)}
                   </label>
                   <Textarea
                     id="project-description"
@@ -1243,7 +1451,7 @@
             <Separator />
             <div class="flex items-center gap-2 text-sm font-medium">
               <Server class="size-4 text-muted-foreground" />
-              <span>服务器</span>
+              <span>{$t(i18nKeys.common.domain.server)}</span>
             </div>
             <div class="grid grid-cols-2 gap-2">
               <Button
@@ -1252,7 +1460,7 @@
                   serverMode = "existing";
                 }}
               >
-                使用已有
+                {$t(i18nKeys.common.modes.useExisting)}
               </Button>
               <Button
                 variant={serverMode === "new" ? "default" : "outline"}
@@ -1260,7 +1468,7 @@
                   serverMode = "new";
                 }}
               >
-                新建服务器
+                {$t(i18nKeys.common.modes.newServer)}
               </Button>
             </div>
             {#if serverMode === "existing"}
@@ -1279,7 +1487,7 @@
                     </Button>
                   {/each}
                 {:else}
-                  <p class="px-2 py-2 text-sm text-muted-foreground">暂无服务器可选。</p>
+                  <p class="px-2 py-2 text-sm text-muted-foreground">{$t(i18nKeys.console.quickDeploy.noServerOptions)}</p>
                 {/if}
               </div>
             {:else}
@@ -1287,7 +1495,7 @@
                 <div class="grid gap-3 sm:grid-cols-2">
                   <div class="space-y-2">
                     <label class="text-xs font-medium text-muted-foreground" for="server-name">
-                      名称
+                      {$t(i18nKeys.common.domain.name)}
                     </label>
                     <Input id="server-name" bind:value={serverName} placeholder="edge-1" />
                   </div>
@@ -1300,12 +1508,12 @@
                 </div>
                 <div class="space-y-2">
                   <label class="text-xs font-medium text-muted-foreground" for="server-host">
-                    主机地址
+                      {$t(i18nKeys.common.domain.server)}
                   </label>
                   <Input id="server-host" bind:value={serverHost} placeholder="203.0.113.10" />
                 </div>
                 <div class="space-y-2">
-                  <p class="text-xs font-medium text-muted-foreground">Provider</p>
+                  <p class="text-xs font-medium text-muted-foreground">{$t(i18nKeys.common.domain.provider)}</p>
                   <div class="grid gap-2">
                     {#each providerOptions as provider (provider.key)}
                       <Button
@@ -1330,7 +1538,7 @@
             <Separator />
             <div class="flex items-center gap-2 text-sm font-medium">
               <Settings2 class="size-4 text-muted-foreground" />
-              <span>环境</span>
+              <span>{$t(i18nKeys.common.domain.environment)}</span>
             </div>
             <div class="grid grid-cols-2 gap-2">
               <Button
@@ -1339,7 +1547,7 @@
                   environmentMode = "existing";
                 }}
               >
-                使用已有
+                {$t(i18nKeys.common.modes.useExisting)}
               </Button>
               <Button
                 variant={environmentMode === "new" ? "default" : "outline"}
@@ -1347,7 +1555,7 @@
                   environmentMode = "new";
                 }}
               >
-                新建环境
+                {$t(i18nKeys.common.modes.newEnvironment)}
               </Button>
             </div>
             {#if environmentMode === "existing"}
@@ -1366,19 +1574,19 @@
                     </Button>
                   {/each}
                 {:else}
-                  <p class="px-2 py-2 text-sm text-muted-foreground">暂无环境可选。</p>
+                  <p class="px-2 py-2 text-sm text-muted-foreground">{$t(i18nKeys.console.quickDeploy.noEnvironmentOptions)}</p>
                 {/if}
               </div>
             {:else}
               <div class="space-y-3">
                 <div class="space-y-2">
                   <label class="text-xs font-medium text-muted-foreground" for="environment-name">
-                    环境名
+                    {$t(i18nKeys.common.domain.name)}
                   </label>
                   <Input id="environment-name" bind:value={environmentName} placeholder="production" />
                 </div>
                 <div class="space-y-2">
-                  <p class="text-xs font-medium text-muted-foreground">环境类型</p>
+                  <p class="text-xs font-medium text-muted-foreground">{$t(i18nKeys.console.quickDeploy.environmentKind)}</p>
                   <div class="grid grid-cols-2 gap-2">
                     {#each environmentKinds as kind (kind)}
                       <Button
@@ -1402,7 +1610,7 @@
             <Separator />
             <div class="flex items-center gap-2 text-sm font-medium">
               <TerminalSquare class="size-4 text-muted-foreground" />
-              <span>首个变量</span>
+              <span>{$t(i18nKeys.console.quickDeploy.firstVariable)}</span>
             </div>
             <div class="space-y-3">
               <div class="grid gap-3 sm:grid-cols-2">
@@ -1426,7 +1634,7 @@
                   variableIsSecret = !variableIsSecret;
                 }}
               >
-                {variableIsSecret ? "作为 Secret 存储" : "作为普通配置存储"}
+                {variableIsSecret ? $t(i18nKeys.console.quickDeploy.secretStorage) : $t(i18nKeys.console.quickDeploy.variablePlainStorage)}
               </Button>
             </div>
           </div>
@@ -1436,28 +1644,261 @@
               <div class="space-y-2">
                 <div class="flex items-center gap-2 text-sm font-medium">
                   <ShieldCheck class="size-4 text-muted-foreground" />
-                  <span>确认部署</span>
+                  <span>{$t(i18nKeys.console.quickDeploy.reviewDeployment)}</span>
                 </div>
                 <p class="text-sm leading-6 text-muted-foreground">
-                  提交后会按当前选择创建或复用项目、服务器和环境，再生成部署记录。
+                  {$t(i18nKeys.console.quickDeploy.reviewBody)}
                 </p>
               </div>
               <div class="grid gap-3 text-sm md:grid-cols-2">
                 <div class="rounded-md border px-3 py-3">
-                  <p class="text-xs text-muted-foreground">来源</p>
-                  <p class="mt-1 truncate font-medium">{selectedSourceOption.label} · {sourceSummary}</p>
+                  <p class="text-xs text-muted-foreground">{$t(i18nKeys.common.domain.source)}</p>
+                  <p class="mt-1 truncate font-medium">{$t(selectedSourceOption.labelKey)} · {sourceSummary}</p>
                 </div>
                 <div class="rounded-md border px-3 py-3">
-                  <p class="text-xs text-muted-foreground">项目</p>
+                  <p class="text-xs text-muted-foreground">{$t(i18nKeys.common.domain.project)}</p>
                   <p class="mt-1 truncate font-medium">{projectSummary}</p>
                 </div>
                 <div class="rounded-md border px-3 py-3">
-                  <p class="text-xs text-muted-foreground">服务器</p>
+                  <p class="text-xs text-muted-foreground">{$t(i18nKeys.common.domain.server)}</p>
                   <p class="mt-1 truncate font-medium">{serverSummary}</p>
                 </div>
                 <div class="rounded-md border px-3 py-3">
-                  <p class="text-xs text-muted-foreground">环境</p>
+                  <p class="text-xs text-muted-foreground">{$t(i18nKeys.common.domain.environment)}</p>
                   <p class="mt-1 truncate font-medium">{environmentSummary}</p>
+                </div>
+                <div class="rounded-md border px-3 py-3">
+                  <p class="text-xs text-muted-foreground">{$t(i18nKeys.common.domain.resource)}</p>
+                  <p class="mt-1 truncate font-medium">{resourceSummary}</p>
+                </div>
+                <div class="rounded-md border px-3 py-3">
+                  <p class="text-xs text-muted-foreground">{$t(i18nKeys.common.domain.variables)}</p>
+                  <p class="mt-1 truncate font-medium">{variableSummary}</p>
+                </div>
+              </div>
+
+              <div class="space-y-3">
+                <div class="rounded-md border px-3 py-3">
+                  <div class="flex items-center justify-between gap-3">
+                    <div>
+                      <p class="text-sm font-medium">{$t(i18nKeys.common.domain.project)}</p>
+                      <p class="text-xs text-muted-foreground">{projectSummary}</p>
+                    </div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={projectContextEnabled ? "default" : "outline"}
+                      onclick={() => {
+                        projectContextEnabled = !projectContextEnabled;
+                      }}
+                    >
+                      {projectContextEnabled ? "使用默认值" : "编辑"}
+                    </Button>
+                  </div>
+                  {#if projectContextEnabled}
+                    <div class="mt-3 space-y-3">
+                      <div class="grid grid-cols-2 gap-2">
+                        <Button
+                          variant={projectMode === "existing" ? "default" : "outline"}
+                          onclick={() => {
+                            projectMode = "existing";
+                          }}
+                        >
+                          {$t(i18nKeys.common.modes.useExisting)}
+                        </Button>
+                        <Button
+                          variant={projectMode === "new" ? "default" : "outline"}
+                          onclick={() => {
+                            projectMode = "new";
+                          }}
+                        >
+                          {$t(i18nKeys.common.modes.newProject)}
+                        </Button>
+                      </div>
+                      {#if projectMode === "existing"}
+                        <div class="max-h-44 space-y-2 overflow-auto rounded-md border p-2">
+                          {#if projects.length > 0}
+                            {#each projects as project (project.id)}
+                              <Button
+                                class="w-full justify-start"
+                                size="sm"
+                                variant={selectedProjectId === project.id ? "default" : "ghost"}
+                                onclick={() => {
+                                  selectedProjectId = project.id;
+                                }}
+                              >
+                                {project.name}
+                              </Button>
+                            {/each}
+                          {:else}
+                            <p class="px-2 py-2 text-sm text-muted-foreground">{$t(i18nKeys.console.quickDeploy.noProjectOptions)}</p>
+                          {/if}
+                        </div>
+                      {:else}
+                        <div class="grid gap-3 sm:grid-cols-2">
+                          <Input bind:value={projectName} placeholder="platform-control-plane" />
+                          <Input bind:value={projectDescription} placeholder={$t(i18nKeys.common.domain.description)} />
+                        </div>
+                      {/if}
+                    </div>
+                  {/if}
+                </div>
+
+                <div class="rounded-md border px-3 py-3">
+                  <div class="flex items-center justify-between gap-3">
+                    <div>
+                      <p class="text-sm font-medium">{$t(i18nKeys.common.domain.environment)}</p>
+                      <p class="text-xs text-muted-foreground">{environmentSummary}</p>
+                    </div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={environmentContextEnabled ? "default" : "outline"}
+                      onclick={() => {
+                        environmentContextEnabled = !environmentContextEnabled;
+                      }}
+                    >
+                      {environmentContextEnabled ? "使用默认值" : "编辑"}
+                    </Button>
+                  </div>
+                  {#if environmentContextEnabled}
+                    <div class="mt-3 space-y-3">
+                      <div class="grid grid-cols-2 gap-2">
+                        <Button
+                          variant={environmentMode === "existing" ? "default" : "outline"}
+                          onclick={() => {
+                            environmentMode = "existing";
+                          }}
+                        >
+                          {$t(i18nKeys.common.modes.useExisting)}
+                        </Button>
+                        <Button
+                          variant={environmentMode === "new" ? "default" : "outline"}
+                          onclick={() => {
+                            environmentMode = "new";
+                          }}
+                        >
+                          {$t(i18nKeys.common.modes.newEnvironment)}
+                        </Button>
+                      </div>
+                      {#if environmentMode === "existing"}
+                        <div class="max-h-44 space-y-2 overflow-auto rounded-md border p-2">
+                          {#if filteredEnvironments.length > 0}
+                            {#each filteredEnvironments as environment (environment.id)}
+                              <Button
+                                class="w-full justify-start"
+                                size="sm"
+                                variant={selectedEnvironmentId === environment.id ? "default" : "ghost"}
+                                onclick={() => {
+                                  selectedEnvironmentId = environment.id;
+                                }}
+                              >
+                                {environment.name} · {environment.kind}
+                              </Button>
+                            {/each}
+                          {:else}
+                            <p class="px-2 py-2 text-sm text-muted-foreground">{$t(i18nKeys.console.quickDeploy.noEnvironmentOptions)}</p>
+                          {/if}
+                        </div>
+                      {:else}
+                        <div class="space-y-3">
+                          <Input bind:value={environmentName} placeholder="production" />
+                          <div class="grid grid-cols-2 gap-2">
+                            {#each environmentKinds as kind (kind)}
+                              <Button
+                                size="sm"
+                                variant={environmentKind === kind ? "default" : "outline"}
+                                onclick={() => {
+                                  environmentKind = kind;
+                                }}
+                              >
+                                {kind}
+                              </Button>
+                            {/each}
+                          </div>
+                        </div>
+                      {/if}
+                    </div>
+                  {/if}
+                </div>
+
+                <div class="rounded-md border px-3 py-3">
+                  <div class="flex items-center justify-between gap-3">
+                    <div>
+                      <p class="text-sm font-medium">{$t(i18nKeys.common.domain.resource)}</p>
+                      <p class="text-xs text-muted-foreground">{resourceSummary}</p>
+                    </div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={resourceContextEnabled ? "default" : "outline"}
+                      onclick={() => {
+                        resourceContextEnabled = !resourceContextEnabled;
+                      }}
+                    >
+                      {resourceContextEnabled ? "使用默认值" : "编辑"}
+                    </Button>
+                  </div>
+                  {#if resourceContextEnabled}
+                    <div class="mt-3 max-h-44 space-y-2 overflow-auto rounded-md border p-2">
+                      {#if resourcesQuery.isPending}
+                        {#each Array.from({ length: 3 }) as _, index (index)}
+                          <Skeleton class="h-10 w-full" />
+                        {/each}
+                      {:else if resources.length > 0}
+                        {#each resources as resource (resource.id)}
+                          <Button
+                            class="w-full justify-start"
+                            size="sm"
+                            variant={selectedResourceId === resource.id ? "default" : "ghost"}
+                            onclick={() => {
+                              selectedResourceId = resource.id;
+                            }}
+                          >
+                            {resource.name} · {resource.kind}
+                          </Button>
+                        {/each}
+                      {:else}
+                        <p class="px-2 py-2 text-sm text-muted-foreground">暂无资源可选；关闭编辑会由部署上下文自动创建。</p>
+                      {/if}
+                    </div>
+                  {/if}
+                </div>
+
+                <div class="rounded-md border px-3 py-3">
+                  <div class="flex items-center justify-between gap-3">
+                    <div>
+                      <p class="text-sm font-medium">{$t(i18nKeys.common.domain.variables)}</p>
+                      <p class="text-xs text-muted-foreground">{variableSummary}</p>
+                    </div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={variableContextEnabled ? "default" : "outline"}
+                      onclick={() => {
+                        variableContextEnabled = !variableContextEnabled;
+                      }}
+                    >
+                      {variableContextEnabled ? "跳过" : "编辑"}
+                    </Button>
+                  </div>
+                  {#if variableContextEnabled}
+                    <div class="mt-3 space-y-3">
+                      <div class="grid gap-3 sm:grid-cols-2">
+                        <Input bind:value={variableKey} placeholder="DATABASE_URL" />
+                        <Input bind:value={variableValue} placeholder="postgres://..." />
+                      </div>
+                      <Button
+                        variant={variableIsSecret ? "default" : "outline"}
+                        size="sm"
+                        onclick={() => {
+                          variableIsSecret = !variableIsSecret;
+                        }}
+                      >
+                        {variableIsSecret ? $t(i18nKeys.console.quickDeploy.secretStorage) : $t(i18nKeys.console.quickDeploy.variablePlainStorage)}
+                      </Button>
+                    </div>
+                  {/if}
                 </div>
               </div>
             </div>
@@ -1465,7 +1906,7 @@
         </CardContent>
         <CardFooter class="flex flex-col gap-3 border-t sm:flex-row sm:items-center sm:justify-between">
           <p class="text-xs text-muted-foreground">
-            步骤 {currentStepIndex + 1} / {deploymentSteps.length} · {activeStepDetails.title}
+            {$t(i18nKeys.console.quickDeploy.step, { current: currentStepIndex + 1, total: deploymentSteps.length, title: activeStepDetails.title })}
           </p>
           <div class="flex w-full gap-2 sm:w-auto">
             <Button
@@ -1474,70 +1915,70 @@
               disabled={currentStepIndex === 0}
               onclick={goToPreviousStep}
             >
-              上一步
+              {$t(i18nKeys.common.actions.previous)}
             </Button>
             {#if activeStep !== "review"}
               <Button class="flex-1 sm:flex-none" disabled={!canAdvance} onclick={goToNextStep}>
-                下一步
+                {$t(i18nKeys.common.actions.next)}
               </Button>
             {/if}
           </div>
         </CardFooter>
       </Card>
 
-      {#if selectedGitHubRepository}
-        <Card>
-          <CardHeader>
-            <CardTitle>已选择仓库</CardTitle>
-            <CardDescription>仓库信息会自动回填到部署表单。</CardDescription>
-          </CardHeader>
-          <CardContent class="space-y-3 text-sm">
-            <div class="flex items-center justify-between gap-3">
-              <span class="text-muted-foreground">仓库</span>
-              <span class="font-medium">{selectedGitHubRepository.fullName}</span>
-            </div>
-            <div class="flex items-center justify-between gap-3">
-              <span class="text-muted-foreground">默认分支</span>
-              <span class="font-medium">{selectedGitHubRepository.defaultBranch}</span>
-            </div>
-            <div class="flex items-center justify-between gap-3">
-              <span class="text-muted-foreground">克隆地址</span>
-              <span class="truncate font-mono text-xs">{selectedGitHubRepository.cloneUrl}</span>
-            </div>
-          </CardContent>
-        </Card>
-      {/if}
   </div>
 
   <aside class="space-y-5 xl:sticky xl:top-5 xl:self-start">
       <Card>
         <CardHeader>
-          <CardTitle>当前摘要</CardTitle>
-          <CardDescription>已经选择的内容会持续保留在这里。</CardDescription>
+          <CardTitle>{$t(i18nKeys.console.quickDeploy.currentSummary)}</CardTitle>
+          <CardDescription>{$t(i18nKeys.console.quickDeploy.currentSummaryDescription)}</CardDescription>
         </CardHeader>
         <CardContent class="space-y-3 text-sm">
           <div class="flex items-center justify-between gap-3">
-            <span class="text-muted-foreground">来源类型</span>
-            <span class="font-medium">{selectedSourceOption.label}</span>
+            <span class="text-muted-foreground">{$t(i18nKeys.console.quickDeploy.sourceType)}</span>
+            <span class="font-medium">{$t(selectedSourceOption.labelKey)}</span>
+          </div>
+          <div class="rounded-md border bg-muted/20 px-3 py-3">
+            <div class="mb-2 flex items-center justify-between gap-3">
+              <span class="text-xs font-medium uppercase text-muted-foreground">
+                {$t(i18nKeys.console.quickDeploy.sourceDetails)}
+              </span>
+              {#if sourceKind === "github" && selectedGitHubRepository}
+                <Badge variant="outline">
+                  {selectedGitHubRepository.private ? $t(i18nKeys.console.quickDeploy.privateRepository) : $t(i18nKeys.console.quickDeploy.publicRepository)}
+                </Badge>
+              {/if}
+            </div>
+            <div class="space-y-2">
+              {#each sourceDetailRows as row, index (`${row.label}-${index}`)}
+                <div class="flex min-w-0 items-start justify-between gap-3">
+                  <span class="shrink-0 text-muted-foreground">{row.label}</span>
+                  <span class={`min-w-0 flex-1 truncate text-right font-medium ${row.mono ? "font-mono text-xs" : ""}`}>
+                    {row.value}
+                  </span>
+                </div>
+              {/each}
+            </div>
           </div>
           <div class="flex items-center justify-between gap-3">
-            <span class="text-muted-foreground">来源地址</span>
-            <span class="truncate font-mono text-xs">{sourceSummary}</span>
-          </div>
-          <div class="flex items-center justify-between gap-3">
-            <span class="text-muted-foreground">项目</span>
+            <span class="text-muted-foreground">{$t(i18nKeys.common.domain.project)}</span>
             <span class="font-medium">{projectSummary}</span>
           </div>
           <div class="flex items-center justify-between gap-3">
-            <span class="text-muted-foreground">服务器</span>
+            <span class="text-muted-foreground">{$t(i18nKeys.common.domain.server)}</span>
             <span class="font-medium">{serverSummary}</span>
           </div>
           <div class="flex items-center justify-between gap-3">
-            <span class="text-muted-foreground">环境</span>
+            <span class="text-muted-foreground">{$t(i18nKeys.common.domain.environment)}</span>
             <span class="font-medium">{environmentSummary}</span>
           </div>
           <div class="flex items-center justify-between gap-3">
-            <span class="text-muted-foreground">变量</span>
+            <span class="text-muted-foreground">{$t(i18nKeys.common.domain.resource)}</span>
+            <span class="font-medium">{resourceSummary}</span>
+          </div>
+          <div class="flex items-center justify-between gap-3">
+            <span class="text-muted-foreground">{$t(i18nKeys.common.domain.variables)}</span>
             <span class="font-medium">{variableSummary}</span>
           </div>
         </CardContent>
@@ -1546,10 +1987,10 @@
             <Button class="w-full" disabled={deployPending} onclick={handleQuickDeploy}>
               {#if deployPending}
                 <LoaderCircle class="size-4 animate-spin" />
-                正在提交
+                {$t(i18nKeys.console.quickDeploy.submitPending)}
               {:else}
                 <Play class="size-4" />
-                创建并部署
+                {$t(i18nKeys.common.actions.createAndDeploy)}
               {/if}
             </Button>
             <pre class="overflow-x-auto rounded-md border bg-muted px-3 py-3 text-xs text-muted-foreground">{deploymentCommandPreview}</pre>

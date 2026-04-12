@@ -41,9 +41,9 @@ describe("api client helpers", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     await expect(request("/api/projects")).rejects.toThrow(
-      'API request failed for /api/projects: 500 password authentication failed for user "postgres"',
+      'API 请求失败 /api/projects：500 password authentication failed for user "postgres"',
     );
     expect(readErrorMessage(new Error("boom"))).toBe("boom");
-    expect(readErrorMessage("opaque")).toBe("Unknown request failure");
+    expect(readErrorMessage("opaque")).toBe("未知请求失败");
   });
 });
