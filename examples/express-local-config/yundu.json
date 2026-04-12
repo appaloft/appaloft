@@ -1,0 +1,29 @@
+{
+  "$schema": "../../packages/deployment-config/json-schema/yundu.config.schema.json",
+  "project": {
+    "name": "Express Local Config",
+    "description": "Config-driven local Express deployment example."
+  },
+  "environment": {
+    "name": "local",
+    "kind": "local"
+  },
+  "targets": [
+    {
+      "key": "local",
+      "name": "Local Machine",
+      "providerKey": "local-shell",
+      "host": "127.0.0.1",
+      "port": 22
+    }
+  ],
+  "deployment": {
+    "targetKey": "local",
+    "method": "workspace-commands",
+    "installCommand": "npm install",
+    "buildCommand": "npm run build",
+    "startCommand": "npm run start:built",
+    "port": 4310,
+    "healthCheckPath": "/health"
+  }
+}
