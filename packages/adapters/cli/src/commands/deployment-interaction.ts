@@ -1,0 +1,570 @@
+import {
+  type CreateDeploymentCommandInput,
+  CreateEnvironmentCommand,
+  CreateProjectCommand,
+  type EnvironmentSummary,
+  ListEnvironmentsQuery,
+  ListProjectsQuery,
+  ListResourcesQuery,
+  ListServersQuery,
+  type ProjectSummary,
+  RegisterServerCommand,
+  type ResourceSummary,
+  type ServerSummary,
+} from "@yundu/application";
+import { domainError, type EnvironmentKind, environmentKinds } from "@yundu/core";
+import { Effect } from "effect";
+
+import { type CliInteraction, effectCliInteraction } from "../interaction.js";
+import { CliRuntime, resultToEffect } from "../runtime.js";
+import {
+  type DeploymentMethod,
+  deploymentMethods,
+  normalizeCliPathOrSource,
+} from "./deployment-source.js";
+
+interface DeploymentPromptSeed {
+  configFilePath?: string;
+  projectId?: string;
+  serverId?: string;
+  destinationId?: string;
+  environmentId?: string;
+  resourceId?: string;
+  sourceLocator?: string;
+  deploymentMethod?: DeploymentMethod;
+  installCommand?: string;
+  buildCommand?: string;
+  startCommand?: string;
+  port?: number;
+  healthCheckPath?: string;
+}
+
+interface ResolvedReference {
+  id: string;
+  label: string;
+}
+
+interface ResolvedOptionalReference {
+  id?: string;
+  label: string;
+}
+
+const defaultProjectName = "Local Workspace";
+const defaultEnvironmentName = "local";
+const defaultServerName = "local-machine";
+const defaultServerHost = "127.0.0.1";
+const defaultServerPort = 22;
+const defaultServerProviderKey = "local-shell";
+
+function trimToUndefined(value: string): string | undefined {
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
+function slugify(value: string): string {
+  return (
+    value
+      .trim()
+      .toLowerCase()
+      .replace(/\.git$/, "")
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "") || "app"
+  );
+}
+
+function inferNameFromSource(sourceLocator: string): string {
+  const withoutQuery = sourceLocator.split(/[?#]/)[0] ?? sourceLocator;
+  const segments = withoutQuery.split(/[\\/]/).filter(Boolean);
+  return slugify(segments.at(-1) ?? defaultProjectName);
+}
+
+function requireNonEmpty(label: string) {
+  return (value: string) => (value.trim() ? null : `${label} is required`);
+}
+
+function requirePositiveInteger(label: string) {
+  return (value: string) => {
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return `${label} is required`;
+    }
+
+    const parsed = Number(trimmed);
+    return Number.isInteger(parsed) && parsed > 0 ? null : `${label} must be a positive integer`;
+  };
+}
+
+function findProject(projects: ProjectSummary[], name: string): ProjectSummary | undefined {
+  const slug = slugify(name);
+  return projects.find((project) => project.slug === slug || slugify(project.name) === slug);
+}
+
+function findServer(
+  servers: ServerSummary[],
+  input: { host: string; port: number; providerKey: string },
+): ServerSummary | undefined {
+  return servers.find(
+    (server) =>
+      server.host === input.host &&
+      server.port === input.port &&
+      server.providerKey === input.providerKey,
+  );
+}
+
+function findEnvironment(
+  environments: EnvironmentSummary[],
+  input: { projectId: string; name: string; kind: EnvironmentKind },
+): EnvironmentSummary | undefined {
+  const slug = slugify(input.name);
+  return environments.find(
+    (environment) =>
+      environment.projectId === input.projectId &&
+      slugify(environment.name) === slug &&
+      environment.kind === input.kind,
+  );
+}
+
+function listProjects() {
+  return Effect.gen(function* () {
+    const cli = yield* CliRuntime;
+    const message = yield* resultToEffect(ListProjectsQuery.create());
+    const result = yield* Effect.promise(() => cli.executeQuery(message));
+    return yield* resultToEffect(result);
+  });
+}
+
+function listServers() {
+  return Effect.gen(function* () {
+    const cli = yield* CliRuntime;
+    const message = yield* resultToEffect(ListServersQuery.create());
+    const result = yield* Effect.promise(() => cli.executeQuery(message));
+    return yield* resultToEffect(result);
+  });
+}
+
+function listEnvironments(projectId?: string) {
+  return Effect.gen(function* () {
+    const cli = yield* CliRuntime;
+    const message = yield* resultToEffect(ListEnvironmentsQuery.create({ projectId }));
+    const result = yield* Effect.promise(() => cli.executeQuery(message));
+    return yield* resultToEffect(result);
+  });
+}
+
+function listResources(projectId?: string, environmentId?: string) {
+  return Effect.gen(function* () {
+    const cli = yield* CliRuntime;
+    const message = yield* resultToEffect(ListResourcesQuery.create({ projectId, environmentId }));
+    const result = yield* Effect.promise(() => cli.executeQuery(message));
+    return yield* resultToEffect(result);
+  });
+}
+
+function createProject(input: { name: string }) {
+  return Effect.gen(function* () {
+    const cli = yield* CliRuntime;
+    const message = yield* resultToEffect(CreateProjectCommand.create(input));
+    const result = yield* Effect.promise(() => cli.executeCommand(message));
+    return yield* resultToEffect(result);
+  });
+}
+
+function createServer(input: { name: string; host: string; providerKey: string; port: number }) {
+  return Effect.gen(function* () {
+    const cli = yield* CliRuntime;
+    const message = yield* resultToEffect(RegisterServerCommand.create(input));
+    const result = yield* Effect.promise(() => cli.executeCommand(message));
+    return yield* resultToEffect(result);
+  });
+}
+
+function createEnvironment(input: { projectId: string; name: string; kind: EnvironmentKind }) {
+  return Effect.gen(function* () {
+    const cli = yield* CliRuntime;
+    const message = yield* resultToEffect(CreateEnvironmentCommand.create(input));
+    const result = yield* Effect.promise(() => cli.executeCommand(message));
+    return yield* resultToEffect(result);
+  });
+}
+
+function printDeploymentSummary(input: {
+  sourceLocator: string;
+  deploymentMethod: DeploymentMethod;
+  project: ResolvedReference;
+  server: ResolvedReference;
+  environment: ResolvedReference;
+  resource: ResolvedOptionalReference;
+}) {
+  return Effect.sync(() => {
+    process.stderr.write(
+      `${[
+        "Deployment summary:",
+        `  Source: ${input.sourceLocator}`,
+        `  Method: ${input.deploymentMethod}`,
+        `  Project: ${input.project.label}`,
+        `  Server: ${input.server.label}`,
+        `  Environment: ${input.environment.label}`,
+        `  Resource: ${input.resource.label}`,
+      ].join("\n")}\n`,
+    );
+  });
+}
+
+function resolveProject(input: {
+  interaction: CliInteraction;
+  projects: ProjectSummary[];
+  seed: DeploymentPromptSeed;
+  sourceLocator: string;
+}) {
+  return Effect.gen(function* () {
+    if (input.seed.projectId) {
+      return {
+        id: input.seed.projectId,
+        label: input.seed.projectId,
+      };
+    }
+
+    const projectName = yield* input.interaction.text({
+      message: "Project name",
+      defaultValue: inferNameFromSource(input.sourceLocator),
+      validate: requireNonEmpty("Project name"),
+    });
+    const existing = findProject(input.projects, projectName);
+    if (existing) {
+      return {
+        id: existing.id,
+        label: `${existing.name} (${existing.slug})`,
+      };
+    }
+
+    const created = yield* createProject({ name: projectName.trim() });
+    return {
+      id: created.id,
+      label: projectName.trim(),
+    };
+  });
+}
+
+function resolveServer(input: {
+  interaction: CliInteraction;
+  servers: ServerSummary[];
+  seed: DeploymentPromptSeed;
+}) {
+  return Effect.gen(function* () {
+    if (input.seed.serverId) {
+      return {
+        id: input.seed.serverId,
+        label: input.seed.serverId,
+      };
+    }
+
+    const host = yield* input.interaction.text({
+      message: "Server host",
+      defaultValue: defaultServerHost,
+      validate: requireNonEmpty("Server host"),
+    });
+    const providerKey = yield* input.interaction.text({
+      message: "Server provider",
+      defaultValue: defaultServerProviderKey,
+      validate: requireNonEmpty("Server provider"),
+    });
+    const port = Number(
+      yield* input.interaction.text({
+        message: "Server port",
+        defaultValue: String(defaultServerPort),
+        validate: requirePositiveInteger("Server port"),
+      }),
+    );
+    const existing = findServer(input.servers, {
+      host: host.trim(),
+      providerKey: providerKey.trim(),
+      port,
+    });
+    if (existing) {
+      return {
+        id: existing.id,
+        label: `${existing.name} ${existing.providerKey} ${existing.host}:${existing.port}`,
+      };
+    }
+
+    const name = yield* input.interaction.text({
+      message: "Server name",
+      defaultValue: defaultServerName,
+      validate: requireNonEmpty("Server name"),
+    });
+    const created = yield* createServer({
+      name: name.trim(),
+      host: host.trim(),
+      providerKey: providerKey.trim(),
+      port,
+    });
+    return {
+      id: created.id,
+      label: `${name.trim()} ${providerKey.trim()} ${host.trim()}:${port}`,
+    };
+  });
+}
+
+function resolveEnvironment(input: {
+  interaction: CliInteraction;
+  seed: DeploymentPromptSeed;
+  projectId: string;
+}) {
+  return Effect.gen(function* () {
+    if (input.seed.environmentId) {
+      return {
+        id: input.seed.environmentId,
+        label: input.seed.environmentId,
+      };
+    }
+
+    const environments = (yield* listEnvironments(input.projectId)).items;
+    const name = yield* input.interaction.text({
+      message: "Environment name",
+      defaultValue: defaultEnvironmentName,
+      validate: requireNonEmpty("Environment name"),
+    });
+    const kind = yield* input.interaction.select<EnvironmentKind>({
+      message: "Environment kind",
+      choices: environmentKinds.map((environmentKind) => ({
+        title: environmentKind,
+        value: environmentKind,
+      })),
+    });
+    const existing = findEnvironment(environments, {
+      projectId: input.projectId,
+      name,
+      kind,
+    });
+    if (existing) {
+      return {
+        id: existing.id,
+        label: `${existing.name} (${existing.kind})`,
+      };
+    }
+
+    const created = yield* createEnvironment({
+      projectId: input.projectId,
+      name: name.trim(),
+      kind,
+    });
+    return {
+      id: created.id,
+      label: `${name.trim()} (${kind})`,
+    };
+  });
+}
+
+function resolveResource(input: {
+  interaction: CliInteraction;
+  seed: DeploymentPromptSeed;
+  projectId: string;
+  environmentId: string;
+}) {
+  return Effect.gen(function* () {
+    if (input.seed.resourceId) {
+      return {
+        id: input.seed.resourceId,
+        label: input.seed.resourceId,
+      };
+    }
+
+    const resources = (yield* listResources(input.projectId, input.environmentId)).items;
+    if (resources.length === 0) {
+      return {
+        label: "deployment default",
+      };
+    }
+
+    const resourceId = yield* input.interaction.select<string | undefined>({
+      message: "Resource",
+      choices: [
+        {
+          title: "Use deployment default resource",
+          value: undefined,
+          description: "The deployment context will reuse or create its default resource.",
+        },
+        ...resources.map((resource: ResourceSummary) => ({
+          title: `${resource.name} (${resource.kind})`,
+          value: resource.id,
+          description: `deployments: ${resource.deploymentCount}`,
+        })),
+      ],
+    });
+    const selectedResource = resources.find((resource) => resource.id === resourceId);
+
+    return resourceId
+      ? {
+          id: resourceId,
+          label: selectedResource
+            ? `${selectedResource.name} (${selectedResource.kind})`
+            : resourceId,
+        }
+      : {
+          label: "deployment default",
+        };
+  });
+}
+
+function resolveAdvancedDeploymentConfig(input: {
+  interaction: CliInteraction;
+  seed: DeploymentPromptSeed;
+}) {
+  return Effect.gen(function* () {
+    const shouldConfigure =
+      input.seed.installCommand ||
+      input.seed.buildCommand ||
+      input.seed.startCommand ||
+      input.seed.port ||
+      input.seed.healthCheckPath ||
+      (yield* input.interaction.confirm({
+        message: "Advanced config?",
+        defaultValue: false,
+      }));
+
+    if (!shouldConfigure) {
+      return {};
+    }
+
+    const installCommand =
+      input.seed.installCommand ??
+      trimToUndefined(
+        yield* input.interaction.text({
+          message: "Install command",
+          defaultValue: "",
+        }),
+      );
+    const buildCommand =
+      input.seed.buildCommand ??
+      trimToUndefined(
+        yield* input.interaction.text({
+          message: "Build command",
+          defaultValue: "",
+        }),
+      );
+    const startCommand =
+      input.seed.startCommand ??
+      trimToUndefined(
+        yield* input.interaction.text({
+          message: "Start command",
+          defaultValue: "",
+        }),
+      );
+    const port =
+      input.seed.port ??
+      Number(
+        trimToUndefined(
+          yield* input.interaction.text({
+            message: "Application port",
+            defaultValue: "",
+            validate: (value) => {
+              const trimmed = value.trim();
+              if (!trimmed) {
+                return null;
+              }
+
+              return Number.isInteger(Number(trimmed)) && Number(trimmed) > 0
+                ? null
+                : "Application port must be a positive integer";
+            },
+          }),
+        ) ?? Number.NaN,
+      );
+    const healthCheckPath =
+      input.seed.healthCheckPath ??
+      trimToUndefined(
+        yield* input.interaction.text({
+          message: "Health check path",
+          defaultValue: "",
+        }),
+      );
+
+    return {
+      ...(installCommand ? { installCommand } : {}),
+      ...(buildCommand ? { buildCommand } : {}),
+      ...(startCommand ? { startCommand } : {}),
+      ...(Number.isInteger(port) && port > 0 ? { port } : {}),
+      ...(healthCheckPath ? { healthCheckPath } : {}),
+    };
+  });
+}
+
+export function resolveInteractiveDeploymentInput(
+  seed: DeploymentPromptSeed,
+  interaction: CliInteraction = effectCliInteraction,
+) {
+  return Effect.gen(function* () {
+    if (!seed.sourceLocator && (!process.stdin.isTTY || !process.stdout.isTTY)) {
+      yield* Effect.sync(() => {
+        process.exitCode = 1;
+      });
+      return yield* Effect.fail(
+        domainError.validation("pathOrSource is required outside an interactive terminal"),
+      );
+    }
+
+    const sourceLocator =
+      seed.sourceLocator ??
+      (yield* interaction.text({
+        message: "Source (path/git/image/compose)",
+        defaultValue: ".",
+        validate: requireNonEmpty("Source"),
+      }));
+    const deploymentMethod =
+      seed.deploymentMethod ??
+      (yield* interaction.select<DeploymentMethod>({
+        message: "Deployment method",
+        choices: deploymentMethods.map((method) => ({
+          title: method,
+          value: method,
+        })),
+      }));
+    const normalizedSourceLocator = normalizeCliPathOrSource(sourceLocator, deploymentMethod);
+    const projects = (yield* listProjects()).items;
+    const servers = (yield* listServers()).items;
+    const project = yield* resolveProject({
+      interaction,
+      projects,
+      seed,
+      sourceLocator: normalizedSourceLocator,
+    });
+    const server = yield* resolveServer({
+      interaction,
+      servers,
+      seed,
+    });
+    const environment = yield* resolveEnvironment({
+      interaction,
+      seed,
+      projectId: project.id,
+    });
+    const resource = yield* resolveResource({
+      interaction,
+      seed,
+      projectId: project.id,
+      environmentId: environment.id,
+    });
+    const advancedConfig = yield* resolveAdvancedDeploymentConfig({ interaction, seed });
+
+    yield* printDeploymentSummary({
+      sourceLocator: normalizedSourceLocator,
+      deploymentMethod,
+      project,
+      server,
+      environment,
+      resource,
+    });
+
+    return {
+      ...(seed.configFilePath ? { configFilePath: seed.configFilePath } : {}),
+      projectId: project.id,
+      serverId: server.id,
+      ...(seed.destinationId ? { destinationId: seed.destinationId } : {}),
+      environmentId: environment.id,
+      ...(resource.id ? { resourceId: resource.id } : {}),
+      sourceLocator: normalizedSourceLocator,
+      deploymentMethod,
+      ...advancedConfig,
+    } satisfies CreateDeploymentCommandInput;
+  });
+}

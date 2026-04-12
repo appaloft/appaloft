@@ -22,6 +22,8 @@
     DropdownMenuContent,
     DropdownMenuItem,
     DropdownMenuLabel,
+    DropdownMenuRadioGroup,
+    DropdownMenuRadioItem,
     DropdownMenuSeparator,
     DropdownMenuTrigger,
   } from "$lib/components/ui/dropdown-menu";
@@ -44,6 +46,7 @@
   } from "$lib/components/ui/sidebar";
   import { createConsoleQueries, defaultAuthSession } from "$lib/console/queries";
   import { initials, readSessionIdentity } from "$lib/console/utils";
+  import { i18nKeys, locale, setLocale, t } from "$lib/i18n";
 
   type Props = {
     title: string;
@@ -52,10 +55,10 @@
   };
 
   const navigationItems = [
-    { href: "/", label: "首页", icon: Gauge },
-    { href: "/projects", label: "项目", icon: FolderOpen },
-    { href: "/deployments", label: "部署", icon: Rocket },
-    { href: "/deploy", label: "新部署", icon: Play },
+    { href: "/", labelKey: i18nKeys.console.nav.home, icon: Gauge },
+    { href: "/projects", labelKey: i18nKeys.console.nav.projects, icon: FolderOpen },
+    { href: "/deployments", labelKey: i18nKeys.console.nav.deployments, icon: Rocket },
+    { href: "/deploy", labelKey: i18nKeys.console.nav.deploy, icon: Play },
   ] as const;
 
   let { title, description, children }: Props = $props();
@@ -151,32 +154,32 @@
           <AvatarFallback>{initials("Yundu")}</AvatarFallback>
         </Avatar>
         <span class="min-w-0 group-data-[collapsible=icon]:hidden">
-          <span class="block truncate text-sm font-medium">Yundu</span>
-          <span class="block truncate text-xs text-muted-foreground">部署控制台</span>
+          <span class="block truncate text-sm font-medium">{$t(i18nKeys.common.app.productName)}</span>
+          <span class="block truncate text-xs text-muted-foreground">{$t(i18nKeys.common.app.consoleSubtitle)}</span>
         </span>
       </a>
       <SidebarInput
         bind:value={projectSearch}
         class="group-data-[collapsible=icon]:hidden"
-        placeholder="搜索项目"
+        placeholder={$t(i18nKeys.console.shell.projectSearch)}
       />
     </SidebarHeader>
 
     <SidebarContent>
       <SidebarGroup>
-        <SidebarGroupLabel>工作台</SidebarGroupLabel>
+        <SidebarGroupLabel>{$t(i18nKeys.console.nav.workspace)}</SidebarGroupLabel>
         <SidebarGroupContent>
           <SidebarMenu>
             {#each navigationItems as item (item.href)}
               <SidebarMenuItem>
                 <SidebarMenuButton
                   isActive={pathname === item.href}
-                  tooltipContent={item.label}
+                  tooltipContent={$t(item.labelKey)}
                 >
                   {#snippet child({ props })}
                     <a href={item.href} {...props}>
                       <item.icon class="size-4" />
-                      <span>{item.label}</span>
+                      <span>{$t(item.labelKey)}</span>
                     </a>
                   {/snippet}
                 </SidebarMenuButton>
@@ -187,7 +190,7 @@
       </SidebarGroup>
 
       <SidebarGroup>
-        <SidebarGroupLabel>项目</SidebarGroupLabel>
+        <SidebarGroupLabel>{$t(i18nKeys.common.domain.projects)}</SidebarGroupLabel>
         <SidebarGroupContent>
           <SidebarMenu>
             {#if filteredProjects.length > 0}
@@ -205,11 +208,11 @@
               {/each}
             {:else}
               <SidebarMenuItem>
-                <SidebarMenuButton tooltipContent="暂无项目">
+                <SidebarMenuButton tooltipContent={$t(i18nKeys.console.shell.noProjects)}>
                   {#snippet child({ props })}
                     <a href="/projects" {...props}>
                       <Package class="size-4" />
-                      <span>暂无项目</span>
+                      <span>{$t(i18nKeys.console.shell.noProjects)}</span>
                     </a>
                   {/snippet}
                 </SidebarMenuButton>
@@ -229,9 +232,9 @@
             <AvatarFallback>{initials(authIdentity ?? "Yundu")}</AvatarFallback>
           </Avatar>
           <span class="min-w-0 flex-1 group-data-[collapsible=icon]:hidden">
-            <span class="block truncate text-sm font-medium">{authIdentity ?? "未登录"}</span>
+            <span class="block truncate text-sm font-medium">{authIdentity ?? $t(i18nKeys.common.status.unauthenticated)}</span>
             <span class="block truncate text-xs text-muted-foreground">
-              GitHub {githubConnected ? "已授权" : authIdentity ? "待授权" : "按需连接"}
+              GitHub {githubConnected ? $t(i18nKeys.common.status.connected) : authIdentity ? $t(i18nKeys.common.status.pendingAuthorization) : $t(i18nKeys.common.status.onDemandAuthorization)}
             </span>
           </span>
           <ChevronUp class="size-4 text-muted-foreground group-data-[collapsible=icon]:hidden" />
@@ -240,26 +243,36 @@
           <DropdownMenuLabel>
             <div class="flex items-center gap-2">
               <UserRound class="size-4" />
-              <span class="min-w-0 truncate">{authIdentity ?? "用户设置"}</span>
+              <span class="min-w-0 truncate">{authIdentity ?? $t(i18nKeys.console.shell.userSettings)}</span>
             </div>
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
           <DropdownMenuItem disabled={!githubProvider?.configured || githubConnected} onclick={connectGitHub}>
             <GitBranch class="size-4" />
-            {githubConnected ? "GitHub 已授权" : "连接 GitHub"}
+            {githubConnected ? `GitHub ${$t(i18nKeys.common.status.connected)}` : $t(i18nKeys.common.actions.connectGitHub)}
           </DropdownMenuItem>
           <DropdownMenuItem onclick={() => navigateTo("/projects")}>
             <FolderOpen class="size-4" />
-            项目设置
+            {$t(i18nKeys.console.nav.settings)}
           </DropdownMenuItem>
           <DropdownMenuItem onclick={() => navigateTo("/deployments")}>
             <Rocket class="size-4" />
-            部署记录
+            {$t(i18nKeys.console.deployments.records)}
           </DropdownMenuItem>
           <DropdownMenuItem onclick={() => navigateTo("/deploy")}>
             <Play class="size-4" />
-            新建部署
+            {$t(i18nKeys.common.actions.newDeployment)}
           </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuLabel>{$t(i18nKeys.common.language.label)}</DropdownMenuLabel>
+          <DropdownMenuRadioGroup value={$locale}>
+            <DropdownMenuRadioItem value="zh-CN" onclick={() => setLocale("zh-CN")}>
+              {$t(i18nKeys.common.language.simplifiedChinese)}
+            </DropdownMenuRadioItem>
+            <DropdownMenuRadioItem value="en-US" onclick={() => setLocale("en-US")}>
+              {$t(i18nKeys.common.language.english)}
+            </DropdownMenuRadioItem>
+          </DropdownMenuRadioGroup>
         </DropdownMenuContent>
       </DropdownMenu>
     </SidebarFooter>
@@ -285,7 +298,7 @@
           variant="outline"
         >
           <Play class="size-4" />
-          新部署
+          {$t(i18nKeys.common.actions.newDeployment)}
         </Button>
       </div>
     </header>
@@ -296,16 +309,16 @@
           <CardHeader>
             <CardTitle class="flex items-center gap-2">
               <ServerCrash class="size-5" />
-              后端不可用
+              {$t(i18nKeys.errors.web.backendUnavailable)}
             </CardTitle>
             <CardDescription>
-              先启动 `yundu serve`，再确认数据库已就绪。若使用 PostgreSQL，请检查用户名和密码。
+              {$t(i18nKeys.errors.web.backendUnavailableDescription)}
             </CardDescription>
           </CardHeader>
           <CardContent class="space-y-4">
             <pre class="overflow-x-auto rounded-md border bg-muted px-3 py-3 text-xs text-muted-foreground">{connectionError}</pre>
             <div class="flex flex-wrap gap-2">
-              <Button variant="outline" onclick={openHealthCheck}>检查 /api/health</Button>
+              <Button variant="outline" onclick={openHealthCheck}>{$t(i18nKeys.common.actions.checkHealth)}</Button>
               <Badge variant="outline">yundu db migrate && yundu serve</Badge>
             </div>
           </CardContent>

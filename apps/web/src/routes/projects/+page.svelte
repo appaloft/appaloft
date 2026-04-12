@@ -29,6 +29,7 @@
     deploymentBadgeVariant,
     formatTime,
   } from "$lib/console/utils";
+  import { i18nKeys, t } from "$lib/i18n";
 
   const { projectsQuery, environmentsQuery, deploymentsQuery } = createConsoleQueries(browser);
 
@@ -61,10 +62,10 @@
 </script>
 
 <svelte:head>
-  <title>Projects · Yundu</title>
+  <title>{$t(i18nKeys.console.projects.pageTitle)} · Yundu</title>
 </svelte:head>
 
-<ConsoleShell title="项目" description="项目、环境和部署关系">
+<ConsoleShell title={$t(i18nKeys.console.projects.pageTitle)} description={$t(i18nKeys.console.projects.description)}>
   {#if pageLoading}
     <div class="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
       <Card>
@@ -91,20 +92,20 @@
     </div>
   {:else if projects.length === 0}
     <section class="rounded-lg border bg-background p-6 md:p-8">
-      <Badge class="w-fit" variant="outline">暂无项目</Badge>
+      <Badge class="w-fit" variant="outline">{$t(i18nKeys.console.shell.noProjects)}</Badge>
       <div class="mt-4 max-w-2xl space-y-3">
-        <h1 class="text-2xl font-semibold md:text-3xl">先创建一个项目，再让部署记录挂到它下面。</h1>
+        <h1 class="text-2xl font-semibold md:text-3xl">{$t(i18nKeys.console.projects.emptyTitle)}</h1>
         <p class="text-sm leading-6 text-muted-foreground">
-          快速部署会把 source、项目、服务器和环境一次性串起来。之后部署页按项目展示每一次发布结果。
+          {$t(i18nKeys.console.projects.emptyBody)}
         </p>
       </div>
       <div class="mt-6 flex flex-wrap gap-2">
         <Button size="lg" onclick={requestQuickDeploy}>
           <Rocket class="size-4" />
-          创建项目并部署
+          {$t(i18nKeys.common.actions.createAndDeploy)}
         </Button>
         <Button href="/deployments" size="lg" variant="outline">
-          打开部署页
+          {$t(i18nKeys.common.actions.openDeployments)}
         </Button>
       </div>
     </section>
@@ -113,19 +114,19 @@
       <section class="grid gap-4 md:grid-cols-3">
         <Card>
           <CardHeader class="pb-2">
-            <CardDescription>项目</CardDescription>
+            <CardDescription>{$t(i18nKeys.common.domain.projects)}</CardDescription>
             <CardTitle class="text-2xl">{projects.length}</CardTitle>
           </CardHeader>
         </Card>
         <Card>
           <CardHeader class="pb-2">
-            <CardDescription>环境</CardDescription>
+            <CardDescription>{$t(i18nKeys.common.domain.environments)}</CardDescription>
             <CardTitle class="text-2xl">{environments.length}</CardTitle>
           </CardHeader>
         </Card>
         <Card>
           <CardHeader class="pb-2">
-            <CardDescription>部署</CardDescription>
+            <CardDescription>{$t(i18nKeys.common.domain.deployments)}</CardDescription>
             <CardTitle class="text-2xl">{deployments.length}</CardTitle>
           </CardHeader>
         </Card>
@@ -135,24 +136,24 @@
         <Card>
           <CardHeader class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <CardTitle>项目列表</CardTitle>
-              <CardDescription>项目是部署记录、环境变量和目标关系的归属点。</CardDescription>
+              <CardTitle>{$t(i18nKeys.console.projects.projectListTitle)}</CardTitle>
+              <CardDescription>{$t(i18nKeys.console.projects.projectListDescription)}</CardDescription>
             </div>
             <Button onclick={requestQuickDeploy}>
               <Rocket class="size-4" />
-              新部署
+              {$t(i18nKeys.common.actions.newDeployment)}
             </Button>
           </CardHeader>
           <CardContent class="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>项目</TableHead>
+                  <TableHead>{$t(i18nKeys.common.domain.project)}</TableHead>
                   <TableHead>Slug</TableHead>
-                  <TableHead>环境</TableHead>
-                  <TableHead>部署</TableHead>
-                  <TableHead>创建时间</TableHead>
-                  <TableHead class="w-[96px]">操作</TableHead>
+                  <TableHead>{$t(i18nKeys.common.domain.environments)}</TableHead>
+                  <TableHead>{$t(i18nKeys.common.domain.deployments)}</TableHead>
+                  <TableHead>{$t(i18nKeys.common.domain.time)}</TableHead>
+                  <TableHead class="w-[96px]">{$t(i18nKeys.console.nav.settings)}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -169,7 +170,7 @@
                         size="sm"
                         variant={selectedProject?.id === project.id ? "default" : "ghost"}
                       >
-                        管理
+                        {$t(i18nKeys.console.nav.settings)}
                       </Button>
                     </TableCell>
                   </TableRow>
@@ -181,9 +182,9 @@
 
         <Card>
           <CardHeader>
-            <CardTitle>{selectedProject?.name ?? "未选择项目"}</CardTitle>
+            <CardTitle>{selectedProject?.name ?? $t(i18nKeys.console.projects.noProjectSelected)}</CardTitle>
             <CardDescription>
-              {selectedProject?.description ?? "环境和部署记录会按项目聚合。"}
+              {selectedProject?.description ?? $t(i18nKeys.console.projects.noProjectSelectedDescription)}
             </CardDescription>
           </CardHeader>
           <CardContent class="space-y-5">
@@ -192,14 +193,14 @@
                 <div class="rounded-md border bg-muted/30 p-4">
                   <div class="flex items-center gap-2 text-sm font-medium">
                     <Settings2 class="size-4 text-muted-foreground" />
-                    环境
+                    {$t(i18nKeys.common.domain.environments)}
                   </div>
                   <p class="mt-3 text-2xl font-semibold">{selectedProjectEnvironments.length}</p>
                 </div>
                 <div class="rounded-md border bg-muted/30 p-4">
                   <div class="flex items-center gap-2 text-sm font-medium">
                     <Rocket class="size-4 text-muted-foreground" />
-                    部署
+                    {$t(i18nKeys.common.domain.deployments)}
                   </div>
                   <p class="mt-3 text-2xl font-semibold">{selectedProjectDeployments.length}</p>
                 </div>
@@ -207,7 +208,7 @@
 
               <div class="space-y-3">
                 <div class="flex items-center justify-between gap-3">
-                  <h2 class="text-sm font-medium">环境</h2>
+                  <h2 class="text-sm font-medium">{$t(i18nKeys.common.domain.environments)}</h2>
                   <Badge variant="outline">{selectedProjectEnvironments.length}</Badge>
                 </div>
                 {#if selectedProjectEnvironments.length > 0}
@@ -215,22 +216,22 @@
                     <div class="rounded-md border px-4 py-3">
                       <p class="text-sm font-medium">{environment.name}</p>
                       <p class="mt-1 text-xs text-muted-foreground">
-                        {environment.kind} · {environment.maskedVariables.length} 个变量
+                        {environment.kind} · {$t(i18nKeys.console.projects.environmentCount, { count: environment.maskedVariables.length })}
                       </p>
                     </div>
                   {/each}
                 {:else}
                   <div class="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
-                    这个项目还没有环境。创建部署时可以一并建立 production 环境。
+                    {$t(i18nKeys.console.projects.noEnvironment)}
                   </div>
                 {/if}
               </div>
 
               <div class="space-y-3">
                 <div class="flex items-center justify-between gap-3">
-                  <h2 class="text-sm font-medium">最近部署</h2>
+                  <h2 class="text-sm font-medium">{$t(i18nKeys.console.home.latestDeploymentTitle)}</h2>
                   <Button href={`/deployments?projectId=${selectedProject.id}`} size="sm" variant="outline">
-                    查看全部
+                    {$t(i18nKeys.common.actions.viewAll)}
                     <ArrowRight class="size-4" />
                   </Button>
                 </div>
@@ -258,13 +259,13 @@
                     <div class="flex items-start gap-3">
                       <FolderOpen class="mt-0.5 size-4 text-muted-foreground" />
                       <div class="space-y-2">
-                        <p class="text-sm font-medium">这个项目还没有部署。</p>
+                        <p class="text-sm font-medium">{$t(i18nKeys.console.projects.noProjectDeploymentTitle)}</p>
                         <p class="text-sm text-muted-foreground">
-                          先发起一次部署，之后每次运行、回滚和环境快照都会挂到这里。
+                          {$t(i18nKeys.console.projects.noProjectDeploymentBody)}
                         </p>
                         <Button size="sm" onclick={requestQuickDeploy}>
                           <Rocket class="size-4" />
-                          部署这个项目
+                          {$t(i18nKeys.common.actions.createDeployment)}
                         </Button>
                       </div>
                     </div>

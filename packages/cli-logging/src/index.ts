@@ -344,8 +344,8 @@ export class DeploymentLogRenderer {
     }
 
     const lines = [
-      this.formatYunduLine(current.event),
-      ...current.appLogs.map((event) => this.formatAppLine(event)),
+      this.formatYunduLine(current.event, { truncate: true }),
+      ...current.appLogs.map((event) => this.formatAppLine(event, { truncate: true })),
     ];
 
     this.clearPreviousLines();
@@ -393,7 +393,7 @@ export class DeploymentLogRenderer {
 
     this.clearPreviousLines();
     this.current = undefined;
-    this.writeHistoryLine(this.formatYunduLine(event));
+    this.writeHistoryLine(this.formatYunduLine(event, { truncate: false }));
   }
 
   private flushCurrent(input: { keepAppLogs: boolean }): void {
@@ -404,11 +404,11 @@ export class DeploymentLogRenderer {
 
     this.clearPreviousLines();
     this.current = undefined;
-    this.writeHistoryLine(this.formatYunduLine(current.event));
+    this.writeHistoryLine(this.formatYunduLine(current.event, { truncate: false }));
 
     if (input.keepAppLogs) {
       for (const event of current.appLogs) {
-        this.writeHistoryLine(this.formatAppLine(event));
+        this.writeHistoryLine(this.formatAppLine(event, { truncate: false }));
       }
     }
   }
@@ -435,7 +435,7 @@ export class DeploymentLogRenderer {
       : event.phase;
   }
 
-  private formatYunduLine(event: DeploymentProgressEvent): string {
+  private formatYunduLine(event: DeploymentProgressEvent, input: { truncate: boolean }): string {
     const frame = spinnerFrames[this.spinnerIndex] ?? "-";
     const mark = statusMark(event, frame);
     const markColor =
@@ -447,15 +447,17 @@ export class DeploymentLogRenderer {
     const label = applyColor(this.color, "yundu", ansi.bold, ansi.cyan);
     const status = applyColor(this.color, mark, markColor);
     const prefix = `${status} ${label} ${applyColor(this.color, `[${this.stepText(event)}]`, ansi.bold)}`;
-    return truncate(`${prefix} ${event.message}`, this.output.columns ?? 120);
+    const line = `${prefix} ${event.message}`;
+    return input.truncate ? truncate(line, this.output.columns ?? 120) : line;
   }
 
-  private formatAppLine(event: DeploymentProgressEvent): string {
+  private formatAppLine(event: DeploymentProgressEvent, input: { truncate: boolean }): string {
     const label = applyColor(this.color, labelFor(event), ansi.dim, ansi.magenta);
     const levelColor =
       event.level === "error" ? ansi.red : event.level === "warn" ? ansi.yellow : ansi.dim;
     const message = applyColor(this.color, event.message, levelColor);
-    return truncate(`  ${label} | ${message}`, this.output.columns ?? 120);
+    const line = `  ${label} | ${message}`;
+    return input.truncate ? truncate(line, this.output.columns ?? 120) : line;
   }
 }
 

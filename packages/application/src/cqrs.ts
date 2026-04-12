@@ -1,4 +1,5 @@
 import { domainError, err, type Result } from "@yundu/core";
+import { i18nKeys } from "@yundu/i18n";
 import { type DependencyContainer } from "tsyringe";
 
 import {
@@ -79,7 +80,7 @@ export class CommandBus {
 
     if (!handlerType) {
       return err(
-        domainError.infra("No command handler registered", {
+        domainError.infra(context.t(i18nKeys.backend.cqrs.noCommandHandler), {
           command: command.constructor.name,
         }),
       );
@@ -148,7 +149,7 @@ export class QueryBus {
 
     if (!handlerType) {
       return err(
-        domainError.infra("No query handler registered", {
+        domainError.infra(context.t(i18nKeys.backend.cqrs.noQueryHandler), {
           query: query.constructor.name,
         }),
       );

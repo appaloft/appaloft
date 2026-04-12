@@ -64,6 +64,7 @@ import {
   rollbackDeploymentResponseSchema,
 } from "@yundu/contracts";
 import { type DomainError, type Result } from "@yundu/core";
+import { resolveYunduLocaleFromHeaders, translateDomainError } from "@yundu/i18n";
 import { type Elysia } from "elysia";
 import { z } from "zod";
 
@@ -233,69 +234,77 @@ async function logOrpcErrorResponse(
   });
 }
 
-function toOrpcError(error: DomainError) {
+function toOrpcError(error: DomainError, context: ExecutionContext) {
+  const message = translateDomainError(error, context.t);
+
   switch (error.code) {
     case "not_found":
       return new ORPCError("NOT_FOUND", {
-        message: error.message,
+        message,
         status: 404,
         data: {
           domainCode: error.code,
+          locale: context.locale,
         },
       });
     case "conflict":
       return new ORPCError("CONFLICT", {
-        message: error.message,
+        message,
         status: 409,
         data: {
           domainCode: error.code,
+          locale: context.locale,
         },
       });
     case "validation_error":
     case "invariant_violation":
       return new ORPCError("BAD_REQUEST", {
-        message: error.message,
+        message,
         status: 400,
         data: {
           domainCode: error.code,
+          locale: context.locale,
         },
       });
     default:
       if (error.category === "provider") {
         return new ORPCError("BAD_GATEWAY", {
-          message: error.message,
+          message,
           status: 502,
           data: {
             domainCode: error.code,
+            locale: context.locale,
           },
         });
       }
 
       if (error.category === "retryable") {
         return new ORPCError("SERVICE_UNAVAILABLE", {
-          message: error.message,
+          message,
           status: 503,
           data: {
             domainCode: error.code,
+            locale: context.locale,
           },
         });
       }
 
       return new ORPCError("INTERNAL_SERVER_ERROR", {
-        message: error.message,
+        message,
         status: 500,
         data: {
           domainCode: error.code,
+          locale: context.locale,
         },
       });
   }
 }
 
-function unwrapResult<T>(result: Result<T>): T {
+function unwrapResult<T>(context: ExecutionContext, result: Result<T>): T {
   return result.match(
     (value) => value,
     (error) => {
-      throw toOrpcError(error);
+      throw toOrpcError(error, context);
     },
   );
 }
@@ -305,7 +314,11 @@ async function executeCommand<TMessage extends Command<TResult>, TResult>(
   message: Result<TMessage>,
 ): Promise<TResult> {
   return unwrapResult(
-    await context.commandBus.execute(context.executionContext, unwrapResult(message)),
+    context.executionContext,
+    await context.commandBus.execute(
+      context.executionContext,
+      unwrapResult(context.executionContext, message),
+    ),
   );
 }
 
@@ -314,7 +327,11 @@ async function executeQuery<TMessage extends Query<TResult>, TResult>(
   message: Result<TMessage>,
 ): Promise<TResult> {
   return unwrapResult(
-    await context.queryBus.execute(context.executionContext, unwrapResult(message)),
+    context.executionContext,
+    await context.queryBus.execute(
+      context.executionContext,
+      unwrapResult(context.executionContext, message),
+    ),
   );
 }
 
@@ -327,6 +344,7 @@ function createRequestExecutionContext(
 
   return executionContextFactory.create({
     entrypoint,
+    locale: resolveYunduLocaleFromHeaders(request.headers),
     ...(requestId ? { requestId } : {}),
   });
 }

@@ -70,6 +70,7 @@
         "@tanstack/svelte-query": "^6.1.14",
         "@types/node": "^22",
         "@yundu/contracts": "workspace:*",
+        "@yundu/i18n": "workspace:*",
         "@yundu/orpc": "workspace:*",
         "bits-ui": "^2.16.3",
         "clsx": "^2.1.1",
@@ -110,6 +111,7 @@
         "@yundu/application": "workspace:*",
         "@yundu/contracts": "workspace:*",
         "@yundu/deployment-config": "workspace:*",
+        "@yundu/i18n": "workspace:*",
         "@yundu/orpc": "workspace:*",
         "@yundu/plugin-sdk": "workspace:*",
         "elysia": "^1.4.28",
@@ -123,6 +125,7 @@
       "dependencies": {
         "@yundu/application": "workspace:*",
         "@yundu/core": "workspace:*",
+        "@yundu/i18n": "workspace:*",
       },
     },
     "packages/ai/mcp": {
@@ -136,6 +139,7 @@
       "name": "@yundu/application",
       "dependencies": {
         "@yundu/core": "workspace:*",
+        "@yundu/i18n": "workspace:*",
         "reflect-metadata": "^0.2.2",
         "tsyringe": "^4.10.0",
         "zod": "^4.1.12",
@@ -176,6 +180,12 @@
         "zod": "^4.1.12",
       },
     },
+    "packages/i18n": {
+      "name": "@yundu/i18n",
+      "dependencies": {
+        "i18next": "^25.6.3",
+      },
+    },
     "packages/integrations/core": {
       "name": "@yundu/integration-core",
       "dependencies": {
@@ -203,6 +213,9 @@
         "@opentelemetry/resources": "^2.1.0",
         "@opentelemetry/sdk-node": "^0.207.0",
         "@opentelemetry/semantic-conventions": "^1.38.0",
+        "@yundu/application": "workspace:*",
+        "@yundu/config": "workspace:*",
+        "@yundu/i18n": "workspace:*",
       },
     },
     "packages/orpc": {
@@ -215,6 +228,7 @@
         "@yundu/application": "workspace:*",
         "@yundu/contracts": "workspace:*",
         "@yundu/core": "workspace:*",
+        "@yundu/i18n": "workspace:*",
         "elysia": "^1.4.28",
         "zod": "^4.1.12",
       },
@@ -292,6 +306,8 @@
     },
   },
   "packages": {
+    "@babel/runtime": ["@babel/runtime@7.29.2", "", {}, "sha512-JiDShH45zKHWyGe4ZNVRrCjBz8Nh9TMmZG1kh4QTK8hCBTWBi8Da+i7s1fJw7/lYpM4ccepSNfqzZ/QvABBi5g=="],
+
     "@better-auth/core": ["@better-auth/core@1.6.1", "", { "dependencies": { "@opentelemetry/semantic-conventions": "^1.39.0", "@standard-schema/spec": "^1.1.0", "zod": "^4.3.6" }, "peerDependencies": { "@better-auth/utils": "0.4.0", "@better-fetch/fetch": "1.1.21", "@cloudflare/workers-types": ">=4", "@opentelemetry/api": "^1.9.0", "better-call": "1.3.5", "jose": "^6.1.0", "kysely": "^0.28.5", "nanostores": "^1.0.1" }, "optionalPeers": ["@cloudflare/workers-types"] }, "sha512-HnRQEuuCT7tIc2GMuRGqudt0DNO8+LhoR3O1heY/nYMxbxPVOBm/f4UQFXeb5HYcHpDrwTO+woWpp318OQ++Uw=="],
 
     "@better-auth/drizzle-adapter": ["@better-auth/drizzle-adapter@1.6.1", "", { "peerDependencies": { "@better-auth/core": "^1.6.1", "@better-auth/utils": "0.4.0", "drizzle-orm": ">=0.41.0" }, "optionalPeers": ["drizzle-orm"] }, "sha512-DgFDG8emuBxHYHA1xfUSCtMExsxOw6W3A1AVLA8TzYIg4qjkfDXcnI40ZPkDfsdnYm2WwQgJYRWP5KXlESakGA=="],
@@ -784,6 +800,8 @@
 
     "@yundu/desktop": ["@yundu/desktop@workspace:apps/desktop"],
 
+    "@yundu/i18n": ["@yundu/i18n@workspace:packages/i18n"],
+
     "@yundu/integration-core": ["@yundu/integration-core@workspace:packages/integrations/core"],
 
     "@yundu/integration-github": ["@yundu/integration-github@workspace:packages/integrations/github"],
@@ -929,6 +947,8 @@
     "graceful-fs": ["graceful-fs@4.2.11", "", {}, "sha512-RbJ5/jmFcNNCcDV5o9eTnBLJ/HszWV0P73bc+Ff4nS/rJj+YaS6IGyiOL0VoBYX+l1Wrl3k63h/KrH+nhJ0XvQ=="],
 
     "husky": ["husky@9.1.7", "", { "bin": { "husky": "bin.js" } }, "sha512-5gs5ytaNjBrh5Ow3zrvdUUY+0VxIuWVL4i9irt6friV+BqdCfmV11CQTWMiBYWHbXhco+J1kHfTOUkePhCDvMA=="],
+
+    "i18next": ["i18next@25.10.10", "", { "dependencies": { "@babel/runtime": "^7.29.2" }, "peerDependencies": { "typescript": "^5 || ^6" }, "optionalPeers": ["typescript"] }, "sha512-cqUW2Z3EkRx7NqSyywjkgCLK7KLCL6IFVFcONG7nVYIJ3ekZ1/N5jUsihHV6Bq37NfhgtczxJcxduELtjTwkuQ=="],
 
     "ieee754": ["ieee754@1.2.1", "", {}, "sha512-dcyqhDvX1C46lXZcVqCpK+FtMRQVdIMN6/Df5js2zouUsqG7I6sFxitIC+7KYK29KdXOLHdu9zL4sFnoVQnqaA=="],
 

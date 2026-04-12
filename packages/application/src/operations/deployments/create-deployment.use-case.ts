@@ -1,4 +1,5 @@
 import { ok, type Result, safeTry, UpsertDeploymentSpec } from "@yundu/core";
+import { i18nKeys } from "@yundu/i18n";
 import { inject, injectable } from "tsyringe";
 import { deploymentProgressSteps, reportDeploymentProgress } from "../../deployment-progress";
 import { type ExecutionContext, toRepositoryContext } from "../../execution-context";
@@ -78,7 +79,7 @@ export class CreateDeploymentUseCase {
         phase: "detect",
         status: "running",
         step: deploymentProgressSteps.detect,
-        message: "Resolve deployment context and inspect source",
+        message: context.t(i18nKeys.backend.deployment.resolveContextAndDetect),
       });
       const effectiveInputResult = await deploymentContextBootstrapService.bootstrap(
         context,
@@ -98,14 +99,17 @@ export class CreateDeploymentUseCase {
         phase: "detect",
         status: "succeeded",
         step: deploymentProgressSteps.detect,
-        message: `Detected ${detected.source.kind} source ${detected.source.displayName}`,
+        message: context.t(i18nKeys.backend.deployment.detectedSource, {
+          kind: detected.source.kind,
+          displayName: detected.source.displayName,
+        }),
       });
 
       reportDeploymentProgress(deploymentProgressReporter, context, {
         phase: "plan",
         status: "running",
         step: deploymentProgressSteps.plan,
-        message: "Create environment snapshot and runtime plan",
+        message: context.t(i18nKeys.backend.deployment.createSnapshotAndPlan),
       });
       const snapshotResult = deploymentSnapshotFactory.create(environment);
       const snapshot = yield* snapshotResult;
@@ -123,7 +127,10 @@ export class CreateDeploymentUseCase {
         phase: "plan",
         status: "succeeded",
         step: deploymentProgressSteps.plan,
-        message: `Selected ${runtimePlan.buildStrategy} strategy for ${runtimePlan.execution.kind}`,
+        message: context.t(i18nKeys.backend.deployment.selectedRuntimeStrategy, {
+          buildStrategy: runtimePlan.buildStrategy,
+          executionKind: runtimePlan.execution.kind,
+        }),
       });
       const deploymentResult = deploymentFactory.create({
         project,

@@ -7,7 +7,8 @@
 	},
 	"dependencies": {
 		"@yundu/application": "workspace:*",
-		"@yundu/core": "workspace:*"
+		"@yundu/core": "workspace:*",
+		"@yundu/i18n": "workspace:*"
 	},
 	"scripts": {
 		"lint": "biome check .",

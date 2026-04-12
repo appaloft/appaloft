@@ -32,6 +32,7 @@
     "@tanstack/svelte-query": "^6.1.14",
     "@types/node": "^22",
     "@yundu/contracts": "workspace:*",
+    "@yundu/i18n": "workspace:*",
     "@yundu/orpc": "workspace:*",
     "bits-ui": "^2.16.3",
     "clsx": "^2.1.1",

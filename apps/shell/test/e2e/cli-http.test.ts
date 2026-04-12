@@ -120,7 +120,7 @@ describe("shell CLI + HTTP e2e", () => {
       "--host",
       "127.0.0.1",
       "--provider",
-      "generic-ssh",
+      "local-shell",
     ]);
     const serverId = parseJson<{ id: string }>(server.stdout).id;
     expect(server.exitCode).toBe(0);
@@ -190,7 +190,7 @@ describe("shell CLI + HTTP e2e", () => {
       "--method",
       "workspace-commands",
       "--build",
-      "node build.mjs",
+      "bun build.mjs",
       "--start",
       "node dist/server.js",
     ]);

@@ -15,7 +15,7 @@ export function createCliProgram(input: CliProgramInput): CliProgram {
         version: input.version,
       })(argv).pipe(
         Effect.provide(live),
-        Effect.catchAll((error) => printCliError(error)),
+        Effect.catchAll((error) => printCliError(error).pipe(Effect.zipRight(Effect.fail(error)))),
         Effect.runPromise,
       ),
   };
