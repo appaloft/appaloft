@@ -1,7 +1,7 @@
 <script lang="ts">
   import { browser } from "$app/environment";
   import { page } from "$app/state";
-  import { FolderOpen, Gauge, GitBranch, Package, Play, Rocket, ServerCrash } from "@lucide/svelte";
+  import { ChevronUp, FolderOpen, Gauge, GitBranch, Package, Play, Rocket, ServerCrash, UserRound } from "@lucide/svelte";
   import type { Snippet } from "svelte";
 
   import { API_BASE, readErrorMessage, request } from "$lib/api/client";
@@ -16,7 +16,14 @@
     CardHeader,
     CardTitle,
   } from "$lib/components/ui/card";
-  import QuickDeploySheet from "$lib/components/console/QuickDeploySheet.svelte";
+  import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+  } from "$lib/components/ui/dropdown-menu";
   import {
     Sidebar,
     SidebarContent,
@@ -47,23 +54,20 @@
     { href: "/", label: "首页", icon: Gauge },
     { href: "/projects", label: "项目", icon: FolderOpen },
     { href: "/deployments", label: "部署", icon: Rocket },
+    { href: "/deploy", label: "新部署", icon: Play },
   ] as const;
 
   let { title, description, children }: Props = $props();
   let projectSearch = $state("");
-  let quickDeployOpen = $state(false);
 
 	const {
 		healthQuery,
-		readinessQuery,
 		versionQuery,
 		authSessionQuery,
 		projectsQuery,
 	} = createConsoleQueries(browser);
 
   const pathname = $derived(page.url.pathname);
-  const health = $derived(healthQuery.data ?? null);
-  const readiness = $derived(readinessQuery.data ?? null);
   const version = $derived(versionQuery.data ?? null);
 	const authSession = $derived(authSessionQuery.data ?? defaultAuthSession);
 	const projects = $derived(projectsQuery.data?.items ?? []);
@@ -85,10 +89,6 @@
   const githubConnected = $derived(Boolean(githubProvider?.connected));
   const authIdentity = $derived(readSessionIdentity(authSession.session));
   const connectionError = $derived(healthQuery.error ? readErrorMessage(healthQuery.error) : "");
-  const statusLabel = $derived(
-    !health ? "API 离线" : readiness?.status === "degraded" ? "需要检查" : "API 在线",
-  );
-  const databaseDriver = $derived(readiness?.details?.databaseDriver ?? "unknown");
   const deploymentModeLabel = $derived(version?.mode ?? "self-hosted");
 
   $effect(() => {
@@ -97,7 +97,7 @@
     }
 
     const openQuickDeploy = () => {
-      quickDeployOpen = true;
+      window.location.href = "/deploy";
     };
 
     window.addEventListener("yundu:open-quick-deploy", openQuickDeploy);
@@ -131,6 +131,12 @@
   function openHealthCheck(): void {
     if (browser) {
       window.open(`${API_BASE}/api/health`, "_blank");
+    }
+  }
+
+  function navigateTo(path: string): void {
+    if (browser) {
+      window.location.href = path;
     }
   }
 </script>
@@ -214,34 +220,47 @@
     </SidebarContent>
 
     <SidebarFooter>
-      <div class="rounded-md border bg-background px-3 py-3 text-sm group-data-[collapsible=icon]:hidden">
-        <div class="flex items-center justify-between gap-2">
-          <span class="text-muted-foreground">GitHub</span>
-          <Badge variant={githubConnected ? "default" : "outline"}>
-            {githubConnected ? "已连接" : "按需连接"}
-          </Badge>
-        </div>
-        <p class="mt-2 text-xs text-muted-foreground">
-          {githubConnected
-            ? authIdentity ?? "已授权，可直接选择仓库"
-            : githubProvider?.configured
-              ? "选择 GitHub source 时再授权。"
-              : "后端尚未配置 GitHub OAuth。"}
-        </p>
-        {#if githubProvider?.configured && !githubConnected}
-          <Button class="mt-3 w-full" size="sm" variant="outline" onclick={connectGitHub}>
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          class="flex w-full items-center gap-2 rounded-md border bg-background px-2 py-2 text-left text-sm transition-colors hover:bg-muted/50 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0"
+        >
+          <Avatar size="sm">
+            <AvatarFallback>{initials(authIdentity ?? "Yundu")}</AvatarFallback>
+          </Avatar>
+          <span class="min-w-0 flex-1 group-data-[collapsible=icon]:hidden">
+            <span class="block truncate text-sm font-medium">{authIdentity ?? "未登录"}</span>
+            <span class="block truncate text-xs text-muted-foreground">
+              GitHub {githubConnected ? "已授权" : authIdentity ? "待授权" : "按需连接"}
+            </span>
+          </span>
+          <ChevronUp class="size-4 text-muted-foreground group-data-[collapsible=icon]:hidden" />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" side="top" class="w-56">
+          <DropdownMenuLabel>
+            <div class="flex items-center gap-2">
+              <UserRound class="size-4" />
+              <span class="min-w-0 truncate">{authIdentity ?? "用户设置"}</span>
+            </div>
+          </DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem disabled={!githubProvider?.configured || githubConnected} onclick={connectGitHub}>
             <GitBranch class="size-4" />
-            连接 GitHub
-          </Button>
-        {/if}
-      </div>
-
-      <div class="flex flex-wrap gap-2 group-data-[collapsible=icon]:hidden">
-        <Badge variant={!health ? "secondary" : readiness?.status === "degraded" ? "outline" : "default"}>
-          {statusLabel}
-        </Badge>
-        <Badge variant="outline">{databaseDriver}</Badge>
-      </div>
+            {githubConnected ? "GitHub 已授权" : "连接 GitHub"}
+          </DropdownMenuItem>
+          <DropdownMenuItem onclick={() => navigateTo("/projects")}>
+            <FolderOpen class="size-4" />
+            项目设置
+          </DropdownMenuItem>
+          <DropdownMenuItem onclick={() => navigateTo("/deployments")}>
+            <Rocket class="size-4" />
+            部署记录
+          </DropdownMenuItem>
+          <DropdownMenuItem onclick={() => navigateTo("/deploy")}>
+            <Play class="size-4" />
+            新建部署
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
     </SidebarFooter>
     <SidebarRail />
   </Sidebar>
@@ -260,14 +279,12 @@
       <div class="flex items-center gap-2">
         <Badge variant="outline" class="hidden md:inline-flex">{deploymentModeLabel}</Badge>
         <Button
+          href="/deploy"
           size="sm"
           variant="outline"
-          onclick={() => {
-            quickDeployOpen = true;
-          }}
         >
           <Play class="size-4" />
-          快速部署
+          新部署
         </Button>
       </div>
     </header>
@@ -297,6 +314,4 @@
       {/if}
     </main>
   </SidebarInset>
-
-  <QuickDeploySheet bind:open={quickDeployOpen} />
 </SidebarProvider>

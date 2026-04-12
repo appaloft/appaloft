@@ -1,5 +1,5 @@
 import { spawn, spawnSync } from "node:child_process";
-import { closeSync, existsSync, mkdirSync, openSync, readSync, statSync } from "node:fs";
+import { closeSync, existsSync, mkdirSync, openSync, readSync, rmSync, statSync } from "node:fs";
 import { createServer } from "node:net";
 import { dirname, resolve } from "node:path";
 import {
@@ -8,6 +8,7 @@ import {
   type DeploymentProgressReporter,
   type ExecutionBackend,
   type ExecutionContext,
+  type IntegrationAuthPort,
   reportDeploymentProgress,
 } from "@yundu/application";
 import {
@@ -58,6 +59,29 @@ function normalizeWorkingDirectory(locator: string): string {
   }
 
   return dirname(resolved);
+}
+
+function isGitHubHttpsLocator(locator: string): boolean {
+  try {
+    const parsed = new URL(locator);
+    return parsed.protocol === "https:" && parsed.hostname.toLowerCase() === "github.com";
+  } catch {
+    return false;
+  }
+}
+
+function withGitHubAccessToken(locator: string, accessToken: string): string {
+  const parsed = new URL(locator);
+  parsed.username = "x-access-token";
+  parsed.password = accessToken;
+  return parsed.toString();
+}
+
+function redactSecrets(input: string, secrets: readonly string[] = []): string {
+  return secrets.reduce(
+    (text, secret) => (secret.length > 0 ? text.replaceAll(secret, "[redacted]") : text),
+    input,
+  );
 }
 
 function deploymentEnv(
@@ -160,6 +184,7 @@ function runSyncCommand(input: {
   command: string;
   cwd: string;
   env: NodeJS.ProcessEnv;
+  redactions?: readonly string[];
 }): {
   exitCode: number;
   stdout: string;
@@ -176,10 +201,39 @@ function runSyncCommand(input: {
 
   return {
     exitCode: result.status ?? 1,
-    stdout: result.stdout ?? "",
-    stderr: result.stderr ?? "",
+    stdout: redactSecrets(result.stdout ?? "", input.redactions),
+    stderr: redactSecrets(result.stderr ?? "", input.redactions),
     failed: result.status !== 0,
     ...(result.signal ? { reason: `terminated by signal ${result.signal}` } : {}),
+  };
+}
+
+function runSyncProcess(input: {
+  command: string;
+  args: string[];
+  cwd: string;
+  env: NodeJS.ProcessEnv;
+  redactions?: readonly string[];
+}): {
+  exitCode: number;
+  stdout: string;
+  stderr: string;
+  failed: boolean;
+  reason?: string;
+} {
+  const result = spawnSync(input.command, input.args, {
+    cwd: input.cwd,
+    env: input.env,
+    encoding: "utf8",
+  });
+
+  return {
+    exitCode: result.status ?? 1,
+    stdout: redactSecrets(result.stdout ?? "", input.redactions),
+    stderr: redactSecrets(result.stderr ?? "", input.redactions),
+    failed: result.status !== 0,
+    ...(result.signal ? { reason: `terminated by signal ${result.signal}` } : {}),
+    ...(result.error ? { reason: result.error.message } : {}),
   };
 }
 
@@ -204,6 +258,7 @@ async function runStreamingCommand(input: {
   command: string;
   cwd: string;
   env: NodeJS.ProcessEnv;
+  redactions?: readonly string[];
   onOutput(line: string, level: LogLevel, stream: "stdout" | "stderr"): void;
 }): Promise<{
   exitCode: number;
@@ -241,14 +296,14 @@ async function runStreamingCommand(input: {
     child.stdout?.on("data", (chunk: string) => {
       stdoutText += chunk;
       for (const line of stdout.push(chunk)) {
-        input.onOutput(line, "info", "stdout");
+        input.onOutput(redactSecrets(line, input.redactions), "info", "stdout");
       }
     });
 
     child.stderr?.on("data", (chunk: string) => {
       stderrText += chunk;
       for (const line of stderr.push(chunk)) {
-        input.onOutput(line, "warn", "stderr");
+        input.onOutput(redactSecrets(line, input.redactions), "warn", "stderr");
       }
     });
 
@@ -258,16 +313,16 @@ async function runStreamingCommand(input: {
 
     child.on("close", (code, signal) => {
       for (const line of stdout.flush()) {
-        input.onOutput(line, "info", "stdout");
+        input.onOutput(redactSecrets(line, input.redactions), "info", "stdout");
       }
       for (const line of stderr.flush()) {
-        input.onOutput(line, "warn", "stderr");
+        input.onOutput(redactSecrets(line, input.redactions), "warn", "stderr");
       }
 
       resolveCommand({
         exitCode: code ?? 1,
-        stdout: stdoutText,
-        stderr: stderrText,
+        stdout: redactSecrets(stdoutText, input.redactions),
+        stderr: redactSecrets(stderrText, input.redactions),
         failed: code !== 0,
         ...(signal ? { reason: `terminated by signal ${signal}` } : {}),
         ...(spawnReason ? { reason: spawnReason } : {}),
@@ -353,6 +408,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
     private readonly runtimeRoot: string,
     private readonly logger: AppLogger,
     private readonly progressReporter: DeploymentProgressReporter,
+    private readonly integrationAuthPort?: IntegrationAuthPort,
   ) {}
 
   private report(
@@ -417,11 +473,12 @@ export class LocalExecutionBackend implements ExecutionBackend {
       output: string;
       level: LogLevel;
       stream: "stdout" | "stderr";
+      redactions?: readonly string[];
     },
   ): void {
     let persistedCount = 0;
 
-    for (const line of input.output
+    for (const line of redactSecrets(input.output, input.redactions)
       .split(/\r?\n/)
       .map((outputLine) => outputLine.trim())
       .filter((outputLine) => outputLine.length > 0)) {
@@ -462,13 +519,144 @@ export class LocalExecutionBackend implements ExecutionBackend {
     return resolve(this.runtimeRoot, "local-deployments", deploymentId);
   }
 
+  private async prepareLocalSource(
+    context: ExecutionContext,
+    deployment: Deployment,
+    logs: DeploymentLogEntry[],
+    input: {
+      runtimeDir: string;
+      env: NodeJS.ProcessEnv;
+      fallbackWorkdir: string;
+    },
+  ): Promise<
+    | {
+        prepared: true;
+        workdir: string;
+        metadata: Record<string, string>;
+      }
+    | {
+        prepared: false;
+        deployment: Deployment;
+      }
+  > {
+    const state = deployment.toState();
+    const source = state.runtimePlan.source;
+
+    if (state.runtimePlan.buildStrategy === "prebuilt-image" || source.kind === "docker-image") {
+      mkdirSync(input.runtimeDir, { recursive: true });
+      return {
+        prepared: true,
+        workdir: input.runtimeDir,
+        metadata: {
+          sourceStrategy: "prebuilt-image",
+        },
+      };
+    }
+
+    if (source.kind !== "remote-git") {
+      return {
+        prepared: true,
+        workdir: input.fallbackWorkdir,
+        metadata: {
+          sourceStrategy: "local-workspace",
+        },
+      };
+    }
+
+    const sourceDir = resolve(input.runtimeDir, "source");
+    mkdirSync(input.runtimeDir, { recursive: true });
+    rmSync(sourceDir, { recursive: true, force: true });
+
+    const accessToken = isGitHubHttpsLocator(source.locator)
+      ? await this.integrationAuthPort?.getProviderAccessToken(context, "github")
+      : null;
+    const cloneLocator = accessToken
+      ? withGitHubAccessToken(source.locator, accessToken)
+      : source.locator;
+
+    logs.push(phaseLog("package", `Clone remote git source into ${sourceDir}`));
+    this.report(context, {
+      deploymentId: state.id.value,
+      phase: "package",
+      status: "running",
+      message: `Clone remote git source ${source.displayName}`,
+    });
+
+    const clone = runSyncProcess({
+      command: "git",
+      args: ["clone", "--depth", "1", cloneLocator, sourceDir],
+      cwd: input.runtimeDir,
+      env: input.env,
+      redactions: accessToken ? [accessToken, cloneLocator] : [cloneLocator],
+    });
+    this.pushCommandOutput(logs, {
+      context,
+      deploymentId: state.id.value,
+      phase: "package",
+      output: clone.stdout,
+      level: "info",
+      stream: "stdout",
+      redactions: accessToken ? [accessToken, cloneLocator] : [cloneLocator],
+    });
+    this.pushCommandOutput(logs, {
+      context,
+      deploymentId: state.id.value,
+      phase: "package",
+      output: clone.stderr,
+      level: "warn",
+      stream: "stderr",
+      redactions: accessToken ? [accessToken, cloneLocator] : [cloneLocator],
+    });
+
+    if (clone.failed) {
+      const message = clone.reason
+        ? `Remote git clone failed: ${clone.reason}`
+        : `Remote git clone failed with exit code ${clone.exitCode}`;
+      logs.push(phaseLog("package", message, "error"));
+      this.report(context, {
+        deploymentId: state.id.value,
+        phase: "package",
+        status: "failed",
+        level: "error",
+        message,
+      });
+
+      return {
+        prepared: false,
+        deployment: this.applyFailure(deployment, {
+          logs,
+          errorCode: "remote_git_clone_failed",
+          retryable: true,
+          metadata: {
+            source: source.locator,
+            sourceDir,
+          },
+        }).deployment,
+      };
+    }
+
+    this.report(context, {
+      deploymentId: state.id.value,
+      phase: "package",
+      status: "succeeded",
+      message: "Remote git source is ready",
+    });
+
+    return {
+      prepared: true,
+      workdir: sourceDir,
+      metadata: {
+        sourceStrategy: "remote-git",
+        sourceDir,
+      },
+    };
+  }
+
   private async executeHostProcess(
     context: ExecutionContext,
     deployment: Deployment,
   ): Promise<Result<{ deployment: Deployment }>> {
     const state = deployment.toState();
-    const workdir =
-      state.runtimePlan.execution.workingDirectory ?? normalizeWorkingDirectory(state.runtimePlan.source.locator);
     const runtimeDir = this.runtimeDirectory(state.id.value);
     const logPath = resolve(runtimeDir, "app.log");
     mkdirSync(runtimeDir, { recursive: true });
@@ -476,8 +664,21 @@ export class LocalExecutionBackend implements ExecutionBackend {
     const port = await reservePort(state.runtimePlan.execution.port);
     const env = deploymentEnv(deployment, port);
     const logs: DeploymentLogEntry[] = [
-      phaseLog("plan", `Using local host-process execution in ${workdir}`),
+      phaseLog("plan", "Using local host-process execution"),
     ];
+    const preparedSource = await this.prepareLocalSource(context, deployment, logs, {
+      runtimeDir,
+      env,
+      fallbackWorkdir:
+        state.runtimePlan.execution.workingDirectory ?? normalizeWorkingDirectory(state.runtimePlan.source.locator),
+    });
+
+    if (!preparedSource.prepared) {
+      return ok({ deployment: preparedSource.deployment });
+    }
+
+    const workdir = preparedSource.workdir;
+    logs.push(phaseLog("plan", `Host process working directory: ${workdir}`));
     const hasWorkspacePreparation = Boolean(
       state.runtimePlan.execution.installCommand || state.runtimePlan.execution.buildCommand,
     );
@@ -701,6 +902,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
         pid: String(child.pid),
         port: String(port),
         url,
+        ...preparedSource.metadata,
       },
     }));
     return ok({ deployment });
@@ -711,13 +913,25 @@ export class LocalExecutionBackend implements ExecutionBackend {
     deployment: Deployment,
   ): Promise<Result<{ deployment: Deployment }>> {
     const state = deployment.toState();
-    const workdir =
-      state.runtimePlan.execution.workingDirectory ?? normalizeWorkingDirectory(state.runtimePlan.source.locator);
+    const runtimeDir = this.runtimeDirectory(state.id.value);
     const port = await reservePort(state.runtimePlan.execution.port);
     const env = deploymentEnv(deployment, port);
     const logs: DeploymentLogEntry[] = [
-      phaseLog("plan", `Using local docker-container execution in ${workdir}`),
+      phaseLog("plan", "Using local docker-container execution"),
     ];
+    const preparedSource = await this.prepareLocalSource(context, deployment, logs, {
+      runtimeDir,
+      env,
+      fallbackWorkdir:
+        state.runtimePlan.execution.workingDirectory ?? normalizeWorkingDirectory(state.runtimePlan.source.locator),
+    });
+
+    if (!preparedSource.prepared) {
+      return ok({ deployment: preparedSource.deployment });
+    }
+
+    const workdir = preparedSource.workdir;
+    logs.push(phaseLog("plan", `Docker working directory: ${workdir}`));
     this.report(context, {
       deploymentId: state.id.value,
       phase: "package",
@@ -900,6 +1114,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
             image,
             containerName,
             port: String(port),
+            ...preparedSource.metadata,
           },
         }).deployment,
       });
@@ -948,6 +1163,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
             containerName,
             port: String(port),
             url,
+            ...preparedSource.metadata,
           },
         }).deployment,
       });
@@ -971,6 +1187,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
         containerName,
         port: String(port),
         url,
+        ...preparedSource.metadata,
       },
     }));
     return ok({ deployment });
@@ -981,14 +1198,31 @@ export class LocalExecutionBackend implements ExecutionBackend {
     deployment: Deployment,
   ): Promise<Result<{ deployment: Deployment }>> {
     const state = deployment.toState();
-    const workdir =
-      state.runtimePlan.execution.workingDirectory ?? normalizeWorkingDirectory(state.runtimePlan.source.locator);
-    const composeFile = state.runtimePlan.execution.composeFile ?? state.runtimePlan.source.locator;
+    const runtimeDir = this.runtimeDirectory(state.id.value);
     const env = deploymentEnv(deployment, state.runtimePlan.execution.port);
     const logs: DeploymentLogEntry[] = [
-      phaseLog("plan", `Using local docker-compose-stack execution in ${workdir}`),
-      phaseLog("deploy", `docker compose -f ${composeFile} up -d --build`),
+      phaseLog("plan", "Using local docker-compose-stack execution"),
     ];
+    const preparedSource = await this.prepareLocalSource(context, deployment, logs, {
+      runtimeDir,
+      env,
+      fallbackWorkdir:
+        state.runtimePlan.execution.workingDirectory ?? normalizeWorkingDirectory(state.runtimePlan.source.locator),
+    });
+
+    if (!preparedSource.prepared) {
+      return ok({ deployment: preparedSource.deployment });
+    }
+
+    const workdir = preparedSource.workdir;
+    const composeFile =
+      state.runtimePlan.source.kind === "remote-git" &&
+      (!state.runtimePlan.execution.composeFile ||
+        state.runtimePlan.execution.composeFile === state.runtimePlan.source.locator)
+        ? resolve(workdir, "docker-compose.yml")
+        : (state.runtimePlan.execution.composeFile ?? state.runtimePlan.source.locator);
+    logs.push(phaseLog("plan", `Compose working directory: ${workdir}`));
+    logs.push(phaseLog("deploy", `docker compose -f ${composeFile} up -d --build`));
     this.report(context, {
       deploymentId: state.id.value,
       phase: "deploy",
@@ -1038,6 +1272,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
           metadata: {
             composeFile,
             workdir,
+            ...preparedSource.metadata,
           },
         }).deployment,
       });
@@ -1065,6 +1300,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
       metadata: {
         composeFile,
         workdir,
+        ...preparedSource.metadata,
       },
     }));
     return ok({ deployment });

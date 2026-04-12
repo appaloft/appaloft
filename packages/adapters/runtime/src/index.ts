@@ -50,6 +50,9 @@ import {
   type RuntimePlanResolver,
 } from "@yundu/application";
 import { LocalExecutionBackend } from "./local-execution";
+import { SshExecutionBackend } from "./ssh-execution";
+
+export { SshExecutionBackend } from "./ssh-execution";
 
 function resolvePackageManager(source: SourceDescriptor): "npm" | "bun" | "pnpm" {
   const packageManager = source.metadata?.packageManager;
@@ -286,6 +289,10 @@ export class DefaultRuntimePlanResolver implements RuntimePlanResolver {
               serverIds: [input.server.id],
               metadata: {
                 snapshotId: input.environmentSnapshot.toState().id.value,
+                ...(input.server.host?.value ? { serverHost: input.server.host.value } : {}),
+                ...(input.server.port?.value
+                  ? { serverPort: String(input.server.port.value) }
+                  : {}),
               },
             }),
             detectSummary: DetectSummary.rehydrate(input.detectedReasoning.join(" | ")),
@@ -503,6 +510,7 @@ export class InMemoryExecutionBackend implements ExecutionBackend {
 export class RoutingExecutionBackend implements ExecutionBackend {
   constructor(
     private readonly localBackend: LocalExecutionBackend,
+    private readonly sshBackend: SshExecutionBackend,
     private readonly fallbackBackend: ExecutionBackend,
   ) {}
 
@@ -512,6 +520,10 @@ export class RoutingExecutionBackend implements ExecutionBackend {
   ): Promise<Result<{ deployment: Deployment }>> {
     if (deployment.toState().runtimePlan.target.providerKey === "local-shell") {
       return await this.localBackend.execute(context, deployment);
+    }
+
+    if (deployment.toState().runtimePlan.target.providerKey === "generic-ssh") {
+      return await this.sshBackend.execute(context, deployment);
     }
 
     return await this.fallbackBackend.execute(context, deployment);
@@ -524,6 +536,10 @@ export class RoutingExecutionBackend implements ExecutionBackend {
   ): Promise<Result<{ deployment: Deployment }>> {
     if (deployment.toState().runtimePlan.target.providerKey === "local-shell") {
       return await this.localBackend.rollback(context, deployment, plan);
+    }
+
+    if (deployment.toState().runtimePlan.target.providerKey === "generic-ssh") {
+      return await this.sshBackend.rollback(context, deployment, plan);
     }
 
     return await this.fallbackBackend.rollback(context, deployment, plan);

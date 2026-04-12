@@ -7,11 +7,42 @@ const port = String(3400 + Math.floor(Math.random() * 200));
 const baseUrl = `http://127.0.0.1:${port}`;
 const shellRoot = new URL("../..", import.meta.url).pathname;
 
+function runtimeEnv(options: {
+  dataDir: string;
+  pgliteDataDir: string;
+  baseUrl: string;
+  port: string;
+  githubClientId?: string;
+  githubClientSecret?: string;
+}): Record<string, string | undefined> {
+  return {
+    ...process.env,
+    YUNDU_RUNTIME_MODE: "hosted-control-plane",
+    YUNDU_DATABASE_DRIVER: "pglite",
+    YUNDU_DATA_DIR: options.dataDir,
+    YUNDU_PGLITE_DATA_DIR: options.pgliteDataDir,
+    YUNDU_BETTER_AUTH_URL: options.baseUrl,
+    YUNDU_BETTER_AUTH_SECRET: "development-only-yundu-better-auth-secret-change-me",
+    YUNDU_HTTP_HOST: "127.0.0.1",
+    YUNDU_HTTP_PORT: options.port,
+    YUNDU_APP_VERSION: "0.1.0-hosted-test",
+    YUNDU_WEB_STATIC_DIR: "",
+    ...(options.githubClientId ? { YUNDU_GITHUB_CLIENT_ID: options.githubClientId } : {}),
+    ...(options.githubClientSecret
+      ? { YUNDU_GITHUB_CLIENT_SECRET: options.githubClientSecret }
+      : {}),
+  };
+}
+
 function runCli(
   args: string[],
   options: {
     dataDir: string;
     pgliteDataDir: string;
+    baseUrl?: string;
+    port?: string;
+    githubClientId?: string;
+    githubClientSecret?: string;
   },
 ): {
   exitCode: number;
@@ -20,19 +51,14 @@ function runCli(
 } {
   const result = Bun.spawnSync([process.execPath, "run", "src/index.ts", ...args], {
     cwd: shellRoot,
-    env: {
-      ...process.env,
-      YUNDU_RUNTIME_MODE: "hosted-control-plane",
-      YUNDU_DATABASE_DRIVER: "pglite",
-      YUNDU_DATA_DIR: options.dataDir,
-      YUNDU_PGLITE_DATA_DIR: options.pgliteDataDir,
-      YUNDU_BETTER_AUTH_URL: baseUrl,
-      YUNDU_BETTER_AUTH_SECRET: "development-only-yundu-better-auth-secret-change-me",
-      YUNDU_HTTP_HOST: "127.0.0.1",
-      YUNDU_HTTP_PORT: port,
-      YUNDU_APP_VERSION: "0.1.0-hosted-test",
-      YUNDU_WEB_STATIC_DIR: "",
-    },
+    env: runtimeEnv({
+      dataDir: options.dataDir,
+      pgliteDataDir: options.pgliteDataDir,
+      baseUrl: options.baseUrl ?? baseUrl,
+      port: options.port ?? port,
+      ...(options.githubClientId ? { githubClientId: options.githubClientId } : {}),
+      ...(options.githubClientSecret ? { githubClientSecret: options.githubClientSecret } : {}),
+    }),
     stdout: "pipe",
     stderr: "pipe",
   });
@@ -77,19 +103,7 @@ describe("hosted auth runtime e2e", () => {
 
       serverProcess = Bun.spawn([process.execPath, "run", "src/index.ts", "serve"], {
         cwd: shellRoot,
-        env: {
-          ...process.env,
-          YUNDU_RUNTIME_MODE: "hosted-control-plane",
-          YUNDU_DATABASE_DRIVER: "pglite",
-          YUNDU_DATA_DIR: dataDir,
-          YUNDU_PGLITE_DATA_DIR: pgliteDataDir,
-          YUNDU_BETTER_AUTH_URL: baseUrl,
-          YUNDU_BETTER_AUTH_SECRET: "development-only-yundu-better-auth-secret-change-me",
-          YUNDU_HTTP_HOST: "127.0.0.1",
-          YUNDU_HTTP_PORT: port,
-          YUNDU_APP_VERSION: "0.1.0-hosted-test",
-          YUNDU_WEB_STATIC_DIR: "",
-        },
+        env: runtimeEnv({ dataDir, pgliteDataDir, baseUrl, port }),
         stdout: "ignore",
         stderr: "ignore",
       });
@@ -162,6 +176,94 @@ describe("hosted auth runtime e2e", () => {
       );
 
       expect(await betterAuthSessionResponse.text()).toBe("null");
+    } finally {
+      serverProcess?.kill();
+      await serverProcess?.exited;
+      rmSync(workspaceDir, {
+        recursive: true,
+        force: true,
+      });
+    }
+  }, 30000);
+
+  test("returns a GitHub authorization URL when OAuth is configured", async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), "yundu-github-oauth-"));
+    const dataDir = join(workspaceDir, ".yundu", "data");
+    const pgliteDataDir = join(dataDir, "pglite");
+    const oauthPort = String(3600 + Math.floor(Math.random() * 200));
+    const oauthBaseUrl = `http://127.0.0.1:${oauthPort}`;
+    let serverProcess: Bun.Subprocess | null = null;
+
+    try {
+      const migration = runCli(["db", "migrate"], {
+        dataDir,
+        pgliteDataDir,
+        baseUrl: oauthBaseUrl,
+        port: oauthPort,
+        githubClientId: "yundu-test-client",
+        githubClientSecret: "yundu-test-secret",
+      });
+      expect(migration.exitCode).toBe(0);
+
+      serverProcess = Bun.spawn([process.execPath, "run", "src/index.ts", "serve"], {
+        cwd: shellRoot,
+        env: runtimeEnv({
+          dataDir,
+          pgliteDataDir,
+          baseUrl: oauthBaseUrl,
+          port: oauthPort,
+          githubClientId: "yundu-test-client",
+          githubClientSecret: "yundu-test-secret",
+        }),
+        stdout: "ignore",
+        stderr: "ignore",
+      });
+
+      await waitForHealth(`${oauthBaseUrl}/api/health`);
+
+      const authSessionResponse = await fetch(`${oauthBaseUrl}/api/auth/session`);
+      expect(authSessionResponse.ok).toBe(true);
+      expect(
+        (await authSessionResponse.json()) as {
+          providers: Array<{ key: string; configured: boolean; connected: boolean }>;
+        },
+      ).toEqual(
+        expect.objectContaining({
+          providers: expect.arrayContaining([
+            expect.objectContaining({
+              key: "github",
+              configured: true,
+              connected: false,
+            }),
+          ]),
+        }),
+      );
+
+      const authorizeResponse = await fetch(`${oauthBaseUrl}/api/auth/sign-in/social`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          provider: "github",
+          callbackURL: `${oauthBaseUrl}/after-oauth`,
+          scopes: ["repo", "read:user"],
+          disableRedirect: true,
+        }),
+      });
+      expect(authorizeResponse.ok).toBe(true);
+
+      const authorizePayload = (await authorizeResponse.json()) as {
+        redirect: boolean;
+        url?: string;
+      };
+      expect(authorizePayload.redirect).toBe(false);
+      expect(typeof authorizePayload.url).toBe("string");
+
+      const authorizeUrl = new URL(authorizePayload.url ?? "");
+      expect(authorizeUrl.origin).toBe("https://github.com");
+      expect(authorizeUrl.pathname).toBe("/login/oauth/authorize");
+      expect(authorizeUrl.searchParams.get("client_id")).toBe("yundu-test-client");
     } finally {
       serverProcess?.kill();
       await serverProcess?.exited;

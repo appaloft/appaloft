@@ -4,7 +4,8 @@
   "type": "module",
   "scripts": {
     "build": "turbo run build",
-    "dev": "turbo run dev --parallel",
+    "dev": "bun --env-file=.env run scripts/dev/console-dev.ts",
+    "dev:all": "turbo run dev --parallel",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
     "lint:ci": "biome ci .",

@@ -6,6 +6,9 @@ import { PostgresJSDialect } from "kysely-postgres-js";
 import postgres from "postgres";
 
 import { initialMigration } from "./migrations/001_initial";
+import { betterAuthMigration } from "./migrations/002_better_auth";
+import { destinationBackfillMigration } from "./migrations/003_destination_backfill";
+import { legacyDeploymentResourcesMigration } from "./migrations/004_legacy_deployment_resources";
 import { PgliteDialect } from "./pglite-dialect";
 import { type Database } from "./schema";
 
@@ -91,6 +94,9 @@ class StaticMigrationProvider implements MigrationProvider {
   async getMigrations() {
     return {
       "001_initial": initialMigration,
+      "002_better_auth": betterAuthMigration,
+      "003_destination_backfill": destinationBackfillMigration,
+      "004_legacy_deployment_resources": legacyDeploymentResourcesMigration,
     };
   }
 }

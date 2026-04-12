@@ -1,4 +1,4 @@
-import { betterAuth } from "better-auth";
+import { type BetterAuthOptions, betterAuth } from "better-auth";
 import { organization } from "better-auth/plugins";
 
 export interface AuthProviderStatus {
@@ -25,6 +25,7 @@ export interface BetterAuthRuntimeConfig {
   enabled: boolean;
   baseURL: string;
   secret: string;
+  database?: BetterAuthOptions["database"];
   githubClientId?: string;
   githubClientSecret?: string;
 }
@@ -67,6 +68,7 @@ export class BetterAuthRuntime implements AuthRuntime {
       baseURL: this.config.baseURL,
       basePath: "/api/auth",
       secret: this.config.secret,
+      ...(this.config.database ? { database: this.config.database } : {}),
       account: {
         storeAccountCookie: true,
       },
