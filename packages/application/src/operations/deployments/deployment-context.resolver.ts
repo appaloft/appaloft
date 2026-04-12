@@ -13,9 +13,6 @@ import {
   ProjectId,
   type Result,
   safeTry,
-  UpsertDeploymentTargetSpec,
-  UpsertEnvironmentSpec,
-  UpsertProjectSpec,
 } from "@yundu/core";
 import { inject, injectable } from "tsyringe";
 import {
@@ -25,17 +22,11 @@ import {
 } from "../../execution-context";
 
 import {
-  type AppLogger,
-  type DeploymentContextDefaultsDecision,
-  type DeploymentContextDefaultsFactoryPort,
-  type DeploymentContextDefaultsPolicy,
   type EnvironmentRepository,
-  type EventBus,
   type ProjectRepository,
   type ServerRepository,
 } from "../../ports";
 import { tokens } from "../../tokens";
-import { publishDomainEventsAndReturn } from "../publish-domain-events";
 import { type CreateDeploymentCommandInput } from "./create-deployment.command";
 
 export interface ResolvedDeploymentContext {
@@ -53,31 +44,16 @@ export class DeploymentContextResolver {
     private readonly serverRepository: ServerRepository,
     @inject(tokens.environmentRepository)
     private readonly environmentRepository: EnvironmentRepository,
-    @inject(tokens.deploymentContextDefaultsPolicy)
-    private readonly defaultsPolicy: DeploymentContextDefaultsPolicy,
-    @inject(tokens.deploymentContextDefaultsFactory)
-    private readonly defaultsFactory: DeploymentContextDefaultsFactoryPort,
-    @inject(tokens.eventBus)
-    private readonly eventBus: EventBus,
-    @inject(tokens.logger)
-    private readonly logger: AppLogger,
   ) {}
 
   async resolve(
     context: ExecutionContext,
     input: CreateDeploymentCommandInput,
   ): Promise<Result<ResolvedDeploymentContext>> {
-    const { defaultsFactory, defaultsPolicy } = this;
     const self = this;
     const repositoryContext = toRepositoryContext(context);
 
     return safeTry(async function* () {
-      const defaultsDecision = defaultsPolicy.decide({
-        sourceLocator: input.sourceLocator,
-        requestedDeploymentMethod: input.deploymentMethod ?? "auto",
-      });
-      const defaults = yield* defaultsDecision;
-
       const explicitProjectResult = await self.loadProject(repositoryContext, input.projectId);
       const explicitProject = yield* explicitProjectResult;
       const explicitEnvironmentResult = await self.loadEnvironment(
@@ -96,14 +72,6 @@ export class DeploymentContextResolver {
             explicitEnvironment.toState().projectId.value,
           );
           project = yield* implicitProjectResult;
-        } else {
-          const defaultProjectResult = await self.resolveProject(
-            context,
-            repositoryContext,
-            defaults,
-            defaultsFactory,
-          );
-          project = yield* defaultProjectResult;
         }
       }
 
@@ -111,16 +79,9 @@ export class DeploymentContextResolver {
         return err(domainError.validation("Unable to resolve project for deployment context"));
       }
 
-      let environment = explicitEnvironment;
+      const environment = explicitEnvironment;
       if (!environment) {
-        const defaultEnvironmentResult = await self.resolveEnvironment(
-          context,
-          repositoryContext,
-          project,
-          defaults,
-          defaultsFactory,
-        );
-        environment = yield* defaultEnvironmentResult;
+        return err(domainError.validation("environmentId is required for this deployment context"));
       }
 
       if (!environment.toState().projectId.equals(project.toState().id)) {
@@ -132,15 +93,9 @@ export class DeploymentContextResolver {
         );
       }
 
-      let server = explicitServer;
+      const server = explicitServer;
       if (!server) {
-        const defaultServerResult = await self.resolveServer(
-          context,
-          repositoryContext,
-          defaults,
-          defaultsFactory,
-        );
-        server = yield* defaultServerResult;
+        return err(domainError.validation("serverId is required for this deployment context"));
       }
 
       return ok({
@@ -207,145 +162,6 @@ export class DeploymentContextResolver {
         DeploymentTargetByIdSpec.create(id),
       );
       return server ? ok(server) : err(domainError.notFound("server", serverId));
-    });
-  }
-
-  private async resolveProject(
-    executionContext: ExecutionContext,
-    repositoryContext: RepositoryContext,
-    defaults: DeploymentContextDefaultsDecision,
-    defaultsFactory: DeploymentContextDefaultsFactoryPort,
-  ): Promise<Result<Project>> {
-    const projectDefaults = defaults.project;
-
-    if (projectDefaults.mode === "required") {
-      return err(domainError.validation("projectId is required for this deployment context"));
-    }
-
-    const self = this;
-
-    return safeTry(async function* () {
-      const selectionResult =
-        projectDefaults.preset === "local-project"
-          ? defaultsFactory.localProjectSelection()
-          : err(domainError.validation("Unsupported project defaults preset"));
-      const selection = yield* selectionResult;
-      const existing = await self.projectRepository.findOne(repositoryContext, selection);
-
-      if (existing) {
-        return ok(existing);
-      }
-
-      const projectResult = defaultsFactory.createLocalProject();
-      const project = yield* projectResult;
-
-      await self.projectRepository.upsert(
-        repositoryContext,
-        project,
-        UpsertProjectSpec.fromProject(project),
-      );
-      await publishDomainEventsAndReturn(
-        executionContext,
-        self.eventBus,
-        self.logger,
-        project,
-        undefined,
-      );
-
-      return ok(project);
-    });
-  }
-
-  private async resolveEnvironment(
-    executionContext: ExecutionContext,
-    repositoryContext: RepositoryContext,
-    project: Project,
-    defaults: DeploymentContextDefaultsDecision,
-    defaultsFactory: DeploymentContextDefaultsFactoryPort,
-  ): Promise<Result<EnvironmentProfile>> {
-    const environmentDefaults = defaults.environment;
-
-    if (environmentDefaults.mode === "required") {
-      return err(domainError.validation("environmentId is required for this deployment context"));
-    }
-
-    const self = this;
-
-    return safeTry(async function* () {
-      const selectionResult =
-        environmentDefaults.preset === "local-environment"
-          ? defaultsFactory.localEnvironmentSelection(project)
-          : err(domainError.validation("Unsupported environment defaults preset"));
-      const selection = yield* selectionResult;
-      const existing = await self.environmentRepository.findOne(repositoryContext, selection);
-
-      if (existing) {
-        return ok(existing);
-      }
-
-      const environmentResult = defaultsFactory.createLocalEnvironment(project);
-      const environment = yield* environmentResult;
-
-      await self.environmentRepository.upsert(
-        repositoryContext,
-        environment,
-        UpsertEnvironmentSpec.fromEnvironment(environment),
-      );
-      await publishDomainEventsAndReturn(
-        executionContext,
-        self.eventBus,
-        self.logger,
-        environment,
-        undefined,
-      );
-
-      return ok(environment);
-    });
-  }
-
-  private async resolveServer(
-    executionContext: ExecutionContext,
-    repositoryContext: RepositoryContext,
-    defaults: DeploymentContextDefaultsDecision,
-    defaultsFactory: DeploymentContextDefaultsFactoryPort,
-  ): Promise<Result<DeploymentTarget>> {
-    const serverDefaults = defaults.server;
-
-    if (serverDefaults.mode === "required") {
-      return err(domainError.validation("serverId is required for this deployment context"));
-    }
-
-    const self = this;
-
-    return safeTry(async function* () {
-      const selectionResult =
-        serverDefaults.preset === "local-server"
-          ? defaultsFactory.localServerSelection()
-          : err(domainError.validation("Unsupported server defaults preset"));
-      const selection = yield* selectionResult;
-      const existing = await self.serverRepository.findOne(repositoryContext, selection);
-
-      if (existing) {
-        return ok(existing);
-      }
-
-      const serverResult = defaultsFactory.createLocalServer();
-      const server = yield* serverResult;
-
-      await self.serverRepository.upsert(
-        repositoryContext,
-        server,
-        UpsertDeploymentTargetSpec.fromDeploymentTarget(server),
-      );
-      await publishDomainEventsAndReturn(
-        executionContext,
-        self.eventBus,
-        self.logger,
-        server,
-        undefined,
-      );
-
-      return ok(server);
     });
   }
 }

@@ -4,6 +4,7 @@ import {
   CreateProjectUseCase,
   DbMigrateUseCase,
   DbStatusQueryService,
+  DeploymentContextBootstrapService,
   DeploymentContextDefaultsFactory,
   DeploymentContextResolver,
   DeploymentFactory,
@@ -49,6 +50,10 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(
     tokens.deploymentContextDefaultsFactory,
     DeploymentContextDefaultsFactory,
+  );
+  container.registerSingleton(
+    tokens.deploymentContextBootstrapService,
+    DeploymentContextBootstrapService,
   );
   container.registerSingleton(tokens.deploymentSnapshotFactory, DeploymentSnapshotFactory);
   container.registerSingleton(

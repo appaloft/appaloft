@@ -138,7 +138,7 @@ Implemented operations:
 
 | Capability | Kind | Operation Key | Message | Schema | CLI | oRPC / HTTP |
 | --- | --- | --- | --- | --- | --- | --- |
-| Create deployment | Command | `deployments.create` | `CreateDeploymentCommand` | `CreateDeploymentCommandInput` | `yundu deploy <path-or-source>` | `POST /api/deployments` |
+| Create deployment | Command | `deployments.create` | `CreateDeploymentCommand` | `CreateDeploymentCommandInput` | `yundu deploy <path-or-source> [--config yundu.json]` | `POST /api/deployments` |
 | List deployments | Query | `deployments.list` | `ListDeploymentsQuery` | `ListDeploymentsQueryInput` | `yundu deployments list` | `GET /api/deployments` |
 | Read deployment logs | Query | `deployments.logs` | `DeploymentLogsQuery` | `DeploymentLogsQueryInput` | `yundu logs <deploymentId>` | `GET /api/deployments/{deploymentId}/logs` |
 | Roll back deployment | Command | `deployments.rollback` | `RollbackDeploymentCommand` | `RollbackDeploymentCommandInput` | `yundu rollback <deploymentId>` | `POST /api/deployments/{deploymentId}/rollback` |
@@ -156,6 +156,20 @@ Current boundary:
   - current values: `auto`, `dockerfile`, `docker-compose`, `prebuilt-image`, `workspace-commands`
 - command-driven deployments may also carry `installCommand`, `buildCommand`, `startCommand`,
   `port`, and `healthCheckPath`
+- command-driven deployments may carry `configFilePath`; local adapters may also discover
+  `yundu.json`, `yundu.config.json`, or `.yundu.json` beside the local source
+- deployment config is a bootstrap hint, not a replacement aggregate:
+  - `packages/deployment-config` owns the Zod schema and generated JSON Schema for these files
+  - HTTP exposes the generated schema at `/api/schemas/yundu-config.json`
+  - filesystem adapters read JSON and infer local project metadata from Node, Python, and Java
+    project files
+  - application services apply config bootstrap and default-context bootstrap as ordered strategies
+    in the same deployment-context bootstrap layer
+  - the config strategy validates provider keys through the provider registry
+  - configured projects, environments, and deployment targets are reused or created through the
+    normal repositories before the runtime plan is built
+  - if the command explicitly supplies `projectId`, `environmentId`, or `serverId`, those explicit
+    identifiers still win for the deployment selection
 - detect and plan happen inside the deployment write flow
 
 Core next operations expected here:

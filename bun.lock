@@ -104,6 +104,7 @@
       "dependencies": {
         "@yundu/application": "workspace:*",
         "@yundu/core": "workspace:*",
+        "@yundu/deployment-config": "workspace:*",
       },
     },
     "packages/adapters/http-elysia": {
@@ -111,6 +112,7 @@
       "dependencies": {
         "@yundu/application": "workspace:*",
         "@yundu/contracts": "workspace:*",
+        "@yundu/deployment-config": "workspace:*",
         "@yundu/orpc": "workspace:*",
         "@yundu/plugin-sdk": "workspace:*",
         "elysia": "^1.4.28",
@@ -168,6 +170,13 @@
       "name": "@yundu/core",
       "dependencies": {
         "neverthrow": "^8.2.0",
+      },
+    },
+    "packages/deployment-config": {
+      "name": "@yundu/deployment-config",
+      "dependencies": {
+        "@yundu/core": "workspace:*",
+        "zod": "^4.1.12",
       },
     },
     "packages/integrations/core": {
@@ -847,6 +856,8 @@
     "@yundu/contracts": ["@yundu/contracts@workspace:packages/contracts"],
 
     "@yundu/core": ["@yundu/core@workspace:packages/core"],
+
+    "@yundu/deployment-config": ["@yundu/deployment-config@workspace:packages/deployment-config"],
 
     "@yundu/desktop": ["@yundu/desktop@workspace:apps/desktop"],
 

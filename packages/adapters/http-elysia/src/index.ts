@@ -11,6 +11,7 @@ import {
 import { type AppConfig } from "@yundu/config";
 import { apiVersion } from "@yundu/contracts";
 import { type Result } from "@yundu/core";
+import { yunduDeploymentConfigJsonSchema } from "@yundu/deployment-config";
 import { mountYunduOrpcRoutes } from "@yundu/orpc";
 import {
   type SystemPluginHttpMiddleware,
@@ -334,6 +335,7 @@ export function createHttpApp(input: {
       apiVersion,
       mode: input.config.runtimeMode,
     }))
+    .get("/api/schemas/yundu-config.json", () => yunduDeploymentConfigJsonSchema)
     .get("/api/auth/session", async ({ request }) => {
       if (!input.authRuntime) {
         return {
