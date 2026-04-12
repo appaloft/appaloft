@@ -92,6 +92,10 @@ export async function createAppComposition(
     enabled: config.authProvider === "better-auth",
     baseURL: config.betterAuthBaseUrl,
     secret: config.betterAuthSecret,
+    database: {
+      db: database.db,
+      type: "postgres",
+    },
     ...(config.githubClientId ? { githubClientId: config.githubClientId } : {}),
     ...(config.githubClientSecret ? { githubClientSecret: config.githubClientSecret } : {}),
   });

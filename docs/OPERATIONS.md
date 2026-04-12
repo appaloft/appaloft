@@ -24,7 +24,24 @@ Apply migrations:
 bun run db:migrate
 ```
 
-Run backend:
+Run the local web console and backend together:
+
+```bash
+bun run dev
+```
+
+This root command starts only `apps/shell` and `apps/web`, not the desktop app. Open:
+
+```text
+http://localhost:3001
+```
+
+By default the Vite dev server listens on port `3001`, the backend listens on port `3002`, and Vite
+proxies `/api` to the backend. Override the dev-only ports with `YUNDU_DEV_WEB_PORT` and
+`YUNDU_DEV_BACKEND_PORT` when needed. Override the public browser origin used for OAuth callbacks
+with `YUNDU_DEV_WEB_ORIGIN`.
+
+Run backend only:
 
 ```bash
 bun run serve
@@ -54,10 +71,29 @@ export YUNDU_GITHUB_CLIENT_ID=...
 export YUNDU_GITHUB_CLIENT_SECRET=...
 ```
 
-Run web:
+GitHub repository import uses a deferred OAuth flow. The operator can open the console without
+signing in, then authorize only after choosing a GitHub source in the deploy flow. Create a GitHub
+OAuth App in GitHub developer settings and set its authorization callback URL to:
+
+```text
+<YUNDU_BETTER_AUTH_URL>/api/auth/callback/github
+```
+
+For local development with the default backend URL, that is:
+
+```text
+http://localhost:3001/api/auth/callback/github
+```
+
+The OAuth App cannot be fully created in Yundu source code because GitHub issues the client id and
+client secret. Yundu reads those values from `YUNDU_GITHUB_CLIENT_ID` and
+`YUNDU_GITHUB_CLIENT_SECRET`, then stores Better Auth users, sessions, linked accounts, and provider
+tokens in the configured Postgres-compatible database.
+
+Run web only:
 
 ```bash
-YUNDU_WEB_DEV_PROXY_TARGET=http://127.0.0.1:3001 bun --cwd apps/web run dev
+YUNDU_WEB_DEV_PROXY_TARGET=http://127.0.0.1:3002 bun --cwd apps/web run dev -- --port 3001 --strictPort
 ```
 
 Default web behavior:
@@ -136,6 +172,15 @@ Available deployment methods:
 - `prebuilt-image`
   - run an existing image locally
 
+`generic-ssh` deploy targets support Docker container execution on a remote Linux host. For
+`dockerfile` plans, Yundu materializes the source on the control-plane machine first: GitHub and
+other remote git sources are cloned into the runtime directory, then the prepared workspace is
+uploaded to the SSH host and built there. For `prebuilt-image` plans, Yundu skips git/source
+materialization and runs the image directly on the SSH host.
+
+The SSH target must already allow non-interactive SSH from the machine running Yundu and have Docker
+installed. The server `host` may include a user, for example `root@203.0.113.10`.
+
 Quick smoke against the included Express demo:
 
 ```bash
@@ -165,6 +210,34 @@ bun run --cwd apps/shell src/index.ts deploy examples/express-hello \
   --method workspace-commands \
   --build "npm run build" \
   --start "npm run start:built" \
+  --port 4310 \
+  --health-path /health
+```
+
+Manual CLI flow for a generic SSH Dockerfile target. For a private GitHub repository, prefer the web
+flow after GitHub OAuth sign-in so the request-scoped token can be used during materialization; CLI
+deployments need the git URL to be accessible from the local git environment.
+
+```bash
+bun run --cwd apps/shell src/index.ts server register --name ssh-demo --host root@<server-ip> --provider generic-ssh
+
+bun run --cwd apps/shell src/index.ts deploy https://github.com/nichenqin/yundu-express-hello.git \
+  --project <projectId> \
+  --server <serverId> \
+  --environment <environmentId> \
+  --method dockerfile \
+  --port 4310 \
+  --health-path /health
+```
+
+Manual CLI flow for a generic SSH prebuilt image target:
+
+```bash
+bun run --cwd apps/shell src/index.ts deploy ghcr.io/<owner>/<image>:<tag> \
+  --project <projectId> \
+  --server <serverId> \
+  --environment <environmentId> \
+  --method prebuilt-image \
   --port 4310 \
   --health-path /health
 ```

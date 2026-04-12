@@ -9,6 +9,7 @@ import {
   InMemoryExecutionBackend,
   LocalExecutionBackend,
   RoutingExecutionBackend,
+  SshExecutionBackend,
 } from "@yundu/adapter-runtime";
 import {
   type AppLogger,
@@ -209,6 +210,13 @@ export function registerRuntimeDependencies(
             join(input.config.dataDir, "runtime"),
             dependencyContainer.resolve(tokens.logger),
             dependencyContainer.resolve(tokens.deploymentProgressReporter),
+            dependencyContainer.resolve(tokens.integrationAuthPort),
+          ),
+          new SshExecutionBackend(
+            join(input.config.dataDir, "runtime"),
+            dependencyContainer.resolve(tokens.logger),
+            dependencyContainer.resolve(tokens.deploymentProgressReporter),
+            dependencyContainer.resolve(tokens.integrationAuthPort),
           ),
           new InMemoryExecutionBackend(
             dependencyContainer.resolve(tokens.deploymentProgressReporter),
