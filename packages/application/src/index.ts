@@ -11,6 +11,8 @@ export * from "./ports";
 export * from "./project-handlers";
 export * from "./project-messages";
 export * from "./release-orchestration";
+export * from "./resource-handlers";
+export * from "./resource-messages";
 export * from "./runtime-topology";
 export * from "./server-handlers";
 export * from "./server-messages";

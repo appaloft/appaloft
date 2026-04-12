@@ -16,6 +16,10 @@ import {
   DeploymentTargetDescriptor,
   DeploymentTargetId,
   DeploymentTargetName,
+  Destination,
+  DestinationId,
+  DestinationKindValue,
+  DestinationName,
   DetectSummary,
   DisplayNameText,
   Environment,
@@ -41,6 +45,10 @@ import {
   ProjectId,
   ProjectName,
   ProviderKey,
+  Resource,
+  ResourceId,
+  ResourceKindValue,
+  ResourceName,
   type Result,
   type RollbackPlan,
   RuntimeExecutionPlan,
@@ -52,8 +60,10 @@ import {
   TargetKindValue,
   UpdatedAt,
   UpsertDeploymentTargetSpec,
+  UpsertDestinationSpec,
   UpsertEnvironmentSpec,
   UpsertProjectSpec,
+  UpsertResourceSpec,
   VariableExposureValue,
   VariableKindValue,
 } from "@yundu/core";
@@ -61,8 +71,10 @@ import {
   CapturedEventBus,
   FixedClock,
   MemoryDeploymentRepository,
+  MemoryDestinationRepository,
   MemoryEnvironmentRepository,
   MemoryProjectRepository,
+  MemoryResourceRepository,
   MemoryServerRepository,
   NoopLogger,
   SequenceIdGenerator,
@@ -241,7 +253,9 @@ class ExplicitContextRequiredPolicy implements DeploymentContextDefaultsPolicy {
     return ok({
       project: { mode: "required" as const },
       server: { mode: "required" as const },
+      destination: { mode: "required" as const },
       environment: { mode: "required" as const },
+      resource: { mode: "required" as const },
     });
   }
 }
@@ -257,9 +271,17 @@ class LocalEmbeddedDefaultsPolicy implements DeploymentContextDefaultsPolicy {
         mode: "reuse-or-create" as const,
         preset: "local-server" as const,
       },
+      destination: {
+        mode: "reuse-or-create" as const,
+        preset: "local-destination" as const,
+      },
       environment: {
         mode: "reuse-or-create" as const,
         preset: "local-environment" as const,
+      },
+      resource: {
+        mode: "reuse-or-create" as const,
+        preset: "local-resource" as const,
       },
     });
   }
@@ -289,7 +311,9 @@ describe("CreateDeploymentUseCase", () => {
   test("creates a deployment with an immutable environment snapshot", async () => {
     const projects = new MemoryProjectRepository();
     const servers = new MemoryServerRepository();
+    const destinations = new MemoryDestinationRepository();
     const environments = new MemoryEnvironmentRepository();
+    const resources = new MemoryResourceRepository();
     const deployments = new MemoryDeploymentRepository();
     const clock = new FixedClock("2026-01-01T00:00:00.000Z");
     const idGenerator = new SequenceIdGenerator();
@@ -312,11 +336,27 @@ describe("CreateDeploymentUseCase", () => {
       providerKey: ProviderKey.rehydrate("generic-ssh"),
       createdAt: CreatedAt.rehydrate(clock.now()),
     })._unsafeUnwrap();
+    const destination = Destination.register({
+      id: DestinationId.rehydrate("dst_demo"),
+      serverId: DeploymentTargetId.rehydrate("srv_demo"),
+      name: DestinationName.rehydrate("default"),
+      kind: DestinationKindValue.rehydrate("generic"),
+      createdAt: CreatedAt.rehydrate(clock.now()),
+    })._unsafeUnwrap();
     const environment = Environment.create({
       id: EnvironmentId.rehydrate("env_demo"),
       projectId: ProjectId.rehydrate("prj_demo"),
       name: EnvironmentName.rehydrate("production"),
       kind: EnvironmentKindValue.rehydrate("production"),
+      createdAt: CreatedAt.rehydrate(clock.now()),
+    })._unsafeUnwrap();
+    const resource = Resource.create({
+      id: ResourceId.rehydrate("res_demo"),
+      projectId: ProjectId.rehydrate("prj_demo"),
+      environmentId: EnvironmentId.rehydrate("env_demo"),
+      destinationId: DestinationId.rehydrate("dst_demo"),
+      name: ResourceName.rehydrate("web"),
+      kind: ResourceKindValue.rehydrate("application"),
       createdAt: CreatedAt.rehydrate(clock.now()),
     })._unsafeUnwrap();
 
@@ -336,13 +376,25 @@ describe("CreateDeploymentUseCase", () => {
       server,
       UpsertDeploymentTargetSpec.fromDeploymentTarget(server),
     );
+    await destinations.upsert(
+      repositoryContext,
+      destination,
+      UpsertDestinationSpec.fromDestination(destination),
+    );
     await environments.upsert(
       repositoryContext,
       environment,
       UpsertEnvironmentSpec.fromEnvironment(environment),
     );
+    await resources.upsert(repositoryContext, resource, UpsertResourceSpec.fromResource(resource));
 
-    const contextResolver = new DeploymentContextResolver(projects, servers, environments);
+    const contextResolver = new DeploymentContextResolver(
+      projects,
+      servers,
+      destinations,
+      environments,
+      resources,
+    );
     const useCase = new CreateDeploymentUseCase(
       deployments,
       contextResolver,
@@ -350,7 +402,9 @@ describe("CreateDeploymentUseCase", () => {
         new NullDeploymentConfigReader(),
         projects,
         servers,
+        destinations,
         environments,
+        resources,
         new StaticProviderRegistry(),
         new ExplicitContextRequiredPolicy(),
         defaultsFactory,
@@ -374,7 +428,9 @@ describe("CreateDeploymentUseCase", () => {
     const result = await useCase.execute(context, {
       projectId: "prj_demo",
       serverId: "srv_demo",
+      destinationId: "dst_demo",
       environmentId: "env_demo",
+      resourceId: "res_demo",
       sourceLocator: ".",
     });
 
@@ -401,7 +457,9 @@ describe("CreateDeploymentUseCase", () => {
   test("bootstraps a default local deployment context when ids are omitted", async () => {
     const projects = new MemoryProjectRepository();
     const servers = new MemoryServerRepository();
+    const destinations = new MemoryDestinationRepository();
     const environments = new MemoryEnvironmentRepository();
+    const resources = new MemoryResourceRepository();
     const deployments = new MemoryDeploymentRepository();
     const clock = new FixedClock("2026-01-01T00:00:00.000Z");
     const idGenerator = new SequenceIdGenerator();
@@ -411,7 +469,13 @@ describe("CreateDeploymentUseCase", () => {
     const context = createTestContext();
     const repositoryContext = toRepositoryContext(context);
 
-    const contextResolver = new DeploymentContextResolver(projects, servers, environments);
+    const contextResolver = new DeploymentContextResolver(
+      projects,
+      servers,
+      destinations,
+      environments,
+      resources,
+    );
     const useCase = new CreateDeploymentUseCase(
       deployments,
       contextResolver,
@@ -419,7 +483,9 @@ describe("CreateDeploymentUseCase", () => {
         new NullDeploymentConfigReader(),
         projects,
         servers,
+        destinations,
         environments,
+        resources,
         new StaticProviderRegistry(),
         new LocalEmbeddedDefaultsPolicy(),
         defaultsFactory,
@@ -447,7 +513,9 @@ describe("CreateDeploymentUseCase", () => {
     expect(result.isOk()).toBe(true);
     expect(projects.items.size).toBe(1);
     expect(servers.items.size).toBe(1);
+    expect(destinations.items.size).toBe(1);
     expect(environments.items.size).toBe(1);
+    expect(resources.items.size).toBe(1);
 
     const deployment = await deployments.findOne(
       repositoryContext,
@@ -456,6 +524,8 @@ describe("CreateDeploymentUseCase", () => {
     expect(deployment?.toState().projectId.value).toBe("prj_0001");
     expect(deployment?.toState().environmentId.value).toBe("env_0002");
     expect(deployment?.toState().serverId.value).toBe("srv_0003");
+    expect(deployment?.toState().destinationId.value).toBe("dst_0004");
+    expect(deployment?.toState().resourceId.value).toBe("res_0005");
     expect([...servers.items.values()][0]?.toState().providerKey.value).toBe("local-shell");
     expect([...environments.items.values()][0]?.toState().name.value).toBe("local");
   });
@@ -463,7 +533,9 @@ describe("CreateDeploymentUseCase", () => {
   test("bootstraps deployment context from deployment config", async () => {
     const projects = new MemoryProjectRepository();
     const servers = new MemoryServerRepository();
+    const destinations = new MemoryDestinationRepository();
     const environments = new MemoryEnvironmentRepository();
+    const resources = new MemoryResourceRepository();
     const deployments = new MemoryDeploymentRepository();
     const clock = new FixedClock("2026-01-01T00:00:00.000Z");
     const idGenerator = new SequenceIdGenerator();
@@ -473,7 +545,13 @@ describe("CreateDeploymentUseCase", () => {
     const context = createTestContext();
     const repositoryContext = toRepositoryContext(context);
 
-    const contextResolver = new DeploymentContextResolver(projects, servers, environments);
+    const contextResolver = new DeploymentContextResolver(
+      projects,
+      servers,
+      destinations,
+      environments,
+      resources,
+    );
     const useCase = new CreateDeploymentUseCase(
       deployments,
       contextResolver,
@@ -485,6 +563,10 @@ describe("CreateDeploymentUseCase", () => {
           environment: {
             name: "production",
             kind: "production",
+          },
+          resource: {
+            name: "web",
+            kind: "application",
           },
           targets: [
             {
@@ -504,7 +586,9 @@ describe("CreateDeploymentUseCase", () => {
         }),
         projects,
         servers,
+        destinations,
         environments,
+        resources,
         new StaticProviderRegistry(),
         new ExplicitContextRequiredPolicy(),
         defaultsFactory,
@@ -532,7 +616,9 @@ describe("CreateDeploymentUseCase", () => {
     expect(result.isOk()).toBe(true);
     expect([...projects.items.values()][0]?.toState().name.value).toBe("Configured App");
     expect([...environments.items.values()][0]?.toState().name.value).toBe("production");
+    expect([...resources.items.values()][0]?.toState().name.value).toBe("web");
     expect([...servers.items.values()][0]?.toState().providerKey.value).toBe("aliyun");
+    expect([...destinations.items.values()][0]?.toState().name.value).toBe("default");
 
     const deployment = await deployments.findOne(
       repositoryContext,
@@ -541,5 +627,7 @@ describe("CreateDeploymentUseCase", () => {
     expect(deployment?.toState().projectId.value).toBe("prj_0001");
     expect(deployment?.toState().environmentId.value).toBe("env_0002");
     expect(deployment?.toState().serverId.value).toBe("srv_0003");
+    expect(deployment?.toState().destinationId.value).toBe("dst_0004");
+    expect(deployment?.toState().resourceId.value).toBe("res_0005");
   });
 });

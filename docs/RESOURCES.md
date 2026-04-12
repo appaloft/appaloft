@@ -1,7 +1,15 @@
 # Resources
 
+Yundu now uses two related but different resource concepts:
+
+- `Resource`: the project/environment-scoped deployable unit, such as a Next.js frontend, Express
+  backend, Redis, Postgres, worker, static site, or Docker Compose stack.
+- `Destination`: the target-side placement / isolation boundary where a resource deploys.
+- `ResourceInstance`: a provisioned or externally attached dependency resource used through
+  bindings, such as a managed Postgres instance or object storage bucket.
+
 `ResourceInstance` and `ResourceBinding` are first-class Yundu concepts even before the full
-resource provisioning context is implemented.
+provider-backed resource provisioning context is implemented.
 
 ## Why This Exists
 
@@ -11,6 +19,13 @@ semantics that must stay explicit.
 
 ## Resource Concepts
 
+- `Resource`
+  - a project/environment-scoped deployable unit
+  - a compose-stack resource may contain multiple named services
+  - may point at a default destination
+- `Destination`
+  - belongs to one deployment target / server
+  - represents runtime placement, not project organization
 - `ResourceInstance`
   - a provisioned or externally attached dependency
 - `ResourceBinding`
@@ -23,10 +38,12 @@ semantics that must stay explicit.
 ## Current Status
 
 Implemented in `core`:
+- `Resource`
+- `Destination`
+- `ResourceInstance`
 - `ResourceBinding`
 
 Planned but not yet implemented:
-- `ResourceInstance`
 - resource provisioning commands
 - resource restore / backup / upgrade flows
 - release-scoped binding snapshots

@@ -54,6 +54,34 @@ export const targetKinds = ["single-server", "future-multi-server", "future-k8s"
 
 export type TargetKind = (typeof targetKinds)[number];
 
+export const destinationKinds = ["docker", "compose", "host-process", "generic"] as const;
+
+export type DestinationKind = (typeof destinationKinds)[number];
+
+export const resourceKinds = [
+  "application",
+  "service",
+  "database",
+  "cache",
+  "compose-stack",
+  "worker",
+  "static-site",
+  "external",
+] as const;
+
+export type ResourceKind = (typeof resourceKinds)[number];
+
+export const resourceServiceKinds = [
+  "web",
+  "api",
+  "worker",
+  "database",
+  "cache",
+  "service",
+] as const;
+
+export type ResourceServiceKind = (typeof resourceServiceKinds)[number];
+
 export const deploymentStatuses = [
   "created",
   "planning",

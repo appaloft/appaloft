@@ -131,6 +131,42 @@ export const environmentSummarySchema = z.object({
   maskedVariables: z.array(environmentVariableSchema),
 });
 
+export const resourceServiceSummarySchema = z.object({
+  name: z.string(),
+  kind: z.enum(["web", "api", "worker", "database", "cache", "service"]),
+});
+
+export const resourceSummarySchema = z.object({
+  id: z.string(),
+  projectId: z.string(),
+  environmentId: z.string(),
+  destinationId: z.string().optional(),
+  name: z.string(),
+  slug: z.string(),
+  kind: z.enum([
+    "application",
+    "service",
+    "database",
+    "cache",
+    "compose-stack",
+    "worker",
+    "static-site",
+    "external",
+  ]),
+  description: z.string().optional(),
+  createdAt: z.string(),
+  services: z.array(resourceServiceSummarySchema),
+  deploymentCount: z.number(),
+  lastDeploymentId: z.string().optional(),
+  lastDeploymentStatus: z
+    .enum(["created", "planning", "planned", "running", "succeeded", "failed", "rolled-back"])
+    .optional(),
+});
+
+export const listResourcesResponseSchema = z.object({
+  items: z.array(resourceSummarySchema),
+});
+
 export const createEnvironmentInputSchema = z.object({
   projectId: z.string(),
   name: z.string().min(1),
@@ -252,7 +288,9 @@ export const deploymentSummarySchema = z.object({
   id: z.string(),
   projectId: z.string(),
   environmentId: z.string(),
+  resourceId: z.string(),
   serverId: z.string(),
+  destinationId: z.string(),
   status: z.enum([
     "created",
     "planning",
@@ -282,7 +320,9 @@ export const createDeploymentInputSchema = z.object({
   configFilePath: z.string().optional(),
   projectId: z.string().optional(),
   serverId: z.string().optional(),
+  destinationId: z.string().optional(),
   environmentId: z.string().optional(),
+  resourceId: z.string().optional(),
   sourceLocator: z.string().min(1),
   deploymentMethod: z
     .enum(["auto", "dockerfile", "docker-compose", "prebuilt-image", "workspace-commands"])
@@ -364,9 +404,11 @@ export type RegisterServerInput = z.infer<typeof registerServerInputSchema>;
 export type RegisterServerResponse = z.infer<typeof registerServerResponseSchema>;
 export type ListServersResponse = z.infer<typeof listServersResponseSchema>;
 export type EnvironmentSummary = z.infer<typeof environmentSummarySchema>;
+export type ResourceSummary = z.infer<typeof resourceSummarySchema>;
 export type CreateEnvironmentInput = z.infer<typeof createEnvironmentInputSchema>;
 export type CreateEnvironmentResponse = z.infer<typeof createEnvironmentResponseSchema>;
 export type ListEnvironmentsResponse = z.infer<typeof listEnvironmentsResponseSchema>;
+export type ListResourcesResponse = z.infer<typeof listResourcesResponseSchema>;
 export type SetEnvironmentVariableInput = z.infer<typeof setEnvironmentVariableInputSchema>;
 export type PromoteEnvironmentInput = z.infer<typeof promoteEnvironmentInputSchema>;
 export type PromoteEnvironmentResponse = z.infer<typeof promoteEnvironmentResponseSchema>;

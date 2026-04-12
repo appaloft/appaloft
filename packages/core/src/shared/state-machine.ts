@@ -3,6 +3,7 @@ import {
   configScopes,
   deploymentLogSources,
   deploymentStatuses,
+  destinationKinds,
   environmentKinds,
   executionStrategyKinds,
   logLevels,
@@ -21,6 +22,7 @@ export {
   configScopes,
   deploymentLogSources,
   deploymentStatuses,
+  destinationKinds,
   environmentKinds,
   executionStrategyKinds,
   logLevels,
@@ -145,6 +147,28 @@ export class TargetKindValue extends EnumValueObject<(typeof targetKinds)[number
 
   static rehydrate(value: (typeof targetKinds)[number]): TargetKindValue {
     return new TargetKindValue(value);
+  }
+}
+
+const destinationKindBrand: unique symbol = Symbol("DestinationKindValue");
+export class DestinationKindValue extends EnumValueObject<(typeof destinationKinds)[number]> {
+  private [destinationKindBrand]!: void;
+
+  private constructor(value: (typeof destinationKinds)[number]) {
+    super(value);
+  }
+
+  static create(value: string): Result<DestinationKindValue> {
+    return createEnumValue(
+      value,
+      destinationKinds,
+      "Destination kind",
+      (validated) => new DestinationKindValue(validated),
+    );
+  }
+
+  static rehydrate(value: (typeof destinationKinds)[number]): DestinationKindValue {
+    return new DestinationKindValue(value);
   }
 }
 
@@ -500,6 +524,92 @@ export class ResourceInstanceKindValue extends EnumValueObject<
     value: "postgres" | "redis" | "s3" | "dns" | "secret-manager" | "registry" | "generic-service",
   ): ResourceInstanceKindValue {
     return new ResourceInstanceKindValue(value);
+  }
+}
+
+const resourceKindBrand: unique symbol = Symbol("ResourceKindValue");
+export class ResourceKindValue extends EnumValueObject<
+  | "application"
+  | "service"
+  | "database"
+  | "cache"
+  | "compose-stack"
+  | "worker"
+  | "static-site"
+  | "external"
+> {
+  private [resourceKindBrand]!: void;
+
+  private constructor(
+    value:
+      | "application"
+      | "service"
+      | "database"
+      | "cache"
+      | "compose-stack"
+      | "worker"
+      | "static-site"
+      | "external",
+  ) {
+    super(value);
+  }
+
+  static create(value: string): Result<ResourceKindValue> {
+    return createEnumValue(
+      value,
+      [
+        "application",
+        "service",
+        "database",
+        "cache",
+        "compose-stack",
+        "worker",
+        "static-site",
+        "external",
+      ] as const,
+      "Resource kind",
+      (validated) => new ResourceKindValue(validated),
+    );
+  }
+
+  static rehydrate(
+    value:
+      | "application"
+      | "service"
+      | "database"
+      | "cache"
+      | "compose-stack"
+      | "worker"
+      | "static-site"
+      | "external",
+  ): ResourceKindValue {
+    return new ResourceKindValue(value);
+  }
+}
+
+const resourceServiceKindBrand: unique symbol = Symbol("ResourceServiceKindValue");
+export class ResourceServiceKindValue extends EnumValueObject<
+  "web" | "api" | "worker" | "database" | "cache" | "service"
+> {
+  private [resourceServiceKindBrand]!: void;
+
+  private constructor(value: "web" | "api" | "worker" | "database" | "cache" | "service") {
+    super(value);
+  }
+
+  static create(value: string): Result<ResourceServiceKindValue> {
+    return createEnumValue(
+      value,
+      ["web", "api", "worker", "database", "cache", "service"] as const,
+      "Resource service kind",
+      (validated) => new ResourceServiceKindValue(validated),
+    );
+  }
+
+  static rehydrate(
+    value: "web" | "api" | "worker" | "database" | "cache" | "service",
+  ): ResourceServiceKindValue {
+    return new ResourceServiceKindValue(value);
   }
 }
 

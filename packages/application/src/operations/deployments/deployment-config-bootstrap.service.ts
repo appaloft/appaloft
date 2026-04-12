@@ -1,11 +1,19 @@
 import {
   CreatedAt,
   DeploymentTarget,
+  DeploymentTargetByIdSpec,
   DeploymentTargetByProviderAndHostSpec,
   DeploymentTargetId,
   DeploymentTargetName,
   DescriptionText,
+  Destination,
+  DestinationByIdSpec,
+  DestinationByServerAndNameSpec,
+  DestinationId,
+  DestinationKindValue,
+  DestinationName,
   domainError,
+  EnvironmentByIdSpec,
   EnvironmentByProjectAndNameSpec,
   EnvironmentId,
   EnvironmentKindValue,
@@ -22,11 +30,22 @@ import {
   ProjectName,
   ProjectSlug,
   ProviderKey,
+  Resource,
+  ResourceByEnvironmentAndSlugSpec,
+  ResourceId,
+  ResourceKindValue,
+  ResourceName,
+  ResourceServiceKindValue,
+  ResourceServiceName,
+  type ResourceServiceState,
+  ResourceSlug,
   type Result,
   safeTry,
   UpsertDeploymentTargetSpec,
+  UpsertDestinationSpec,
   UpsertEnvironmentSpec,
   UpsertProjectSpec,
+  UpsertResourceSpec,
 } from "@yundu/core";
 import { inject, injectable } from "tsyringe";
 import { type ExecutionContext, toRepositoryContext } from "../../execution-context";
@@ -37,15 +56,18 @@ import {
   type DeploymentConfigSnapshot,
   type DeploymentConfiguredEnvironment,
   type DeploymentConfiguredProject,
+  type DeploymentConfiguredResource,
   type DeploymentConfiguredTarget,
   type DeploymentContextDefaultsDecision,
   type DeploymentContextDefaultsFactoryPort,
   type DeploymentContextDefaultsPolicy,
+  type DestinationRepository,
   type EnvironmentRepository,
   type EventBus,
   type IdGenerator,
   type ProjectRepository,
   type ProviderRegistry,
+  type ResourceRepository,
   type ServerRepository,
 } from "../../ports";
 import { tokens } from "../../tokens";
@@ -129,8 +151,12 @@ export class DeploymentContextBootstrapService {
     private readonly projectRepository: ProjectRepository,
     @inject(tokens.serverRepository)
     private readonly serverRepository: ServerRepository,
+    @inject(tokens.destinationRepository)
+    private readonly destinationRepository: DestinationRepository,
     @inject(tokens.environmentRepository)
     private readonly environmentRepository: EnvironmentRepository,
+    @inject(tokens.resourceRepository)
+    private readonly resourceRepository: ResourceRepository,
     @inject(tokens.providerRegistry)
     private readonly providerRegistry: ProviderRegistry,
     @inject(tokens.deploymentContextDefaultsPolicy)
@@ -188,24 +214,48 @@ export class DeploymentContextBootstrapService {
           : undefined);
 
       let selectedServerId = input.serverId;
+      let selectedDestinationId = input.destinationId;
       if (!selectedServerId && config?.targets && config.targets.length > 0) {
         const targetIds = new Map<DeploymentConfiguredTarget, string>();
+        const destinationIds = new Map<DeploymentConfiguredTarget, string>();
 
         for (const target of config.targets) {
           const targetId = yield* await self.resolveConfiguredTarget(context, target);
           targetIds.set(target, targetId);
+          const destinationId = yield* await self.resolveConfiguredDestination(
+            context,
+            targetId,
+            target.destination,
+          );
+          destinationIds.set(target, destinationId);
         }
 
         const selectedTarget = selectDeploymentTarget(config.targets, config.deployment?.targetKey);
         selectedServerId =
           selectedServerId ?? (selectedTarget ? targetIds.get(selectedTarget) : undefined);
+        selectedDestinationId =
+          selectedDestinationId ??
+          (selectedTarget ? destinationIds.get(selectedTarget) : undefined);
       }
+      const resourceId =
+        input.resourceId ??
+        (projectId && environmentId && config?.resource
+          ? yield* await self.resolveConfiguredResource(
+              context,
+              projectId,
+              environmentId,
+              config.resource,
+              selectedDestinationId,
+            )
+          : undefined);
 
       return ok({
         ...input,
         ...(projectId ? { projectId } : {}),
         ...(environmentId ? { environmentId } : {}),
+        ...(resourceId ? { resourceId } : {}),
         ...(selectedServerId ? { serverId: selectedServerId } : {}),
+        ...(selectedDestinationId ? { destinationId: selectedDestinationId } : {}),
       });
     });
   }
@@ -225,7 +275,7 @@ export class DeploymentContextBootstrapService {
       const projectId =
         input.projectId ??
         (input.environmentId
-          ? undefined
+          ? yield* await self.resolveProjectIdForEnvironment(context, input.environmentId)
           : yield* await self.resolveDefaultProject(context, defaults));
       const environmentId =
         input.environmentId ??
@@ -234,12 +284,30 @@ export class DeploymentContextBootstrapService {
           : undefined);
       const serverId =
         input.serverId ?? (yield* await self.resolveDefaultServer(context, defaults));
+      const destinationId =
+        input.destinationId ??
+        (serverId
+          ? yield* await self.resolveDefaultDestination(context, defaults, serverId)
+          : undefined);
+      const resourceId =
+        input.resourceId ??
+        (projectId && environmentId && destinationId
+          ? yield* await self.resolveDefaultResource(
+              context,
+              defaults,
+              projectId,
+              environmentId,
+              destinationId,
+            )
+          : undefined);
 
       return ok({
         ...input,
         ...(projectId ? { projectId } : {}),
         ...(environmentId ? { environmentId } : {}),
+        ...(resourceId ? { resourceId } : {}),
         ...(serverId ? { serverId } : {}),
+        ...(destinationId ? { destinationId } : {}),
       });
     });
   }
@@ -389,6 +457,110 @@ export class DeploymentContextBootstrapService {
     });
   }
 
+  private async resolveConfiguredDestination(
+    context: ExecutionContext,
+    serverIdValue: string,
+    destinationConfig?: DeploymentConfiguredTarget["destination"],
+  ): Promise<Result<string>> {
+    const { clock, destinationRepository, eventBus, idGenerator, logger } = this;
+    const repositoryContext = toRepositoryContext(context);
+
+    return safeTry(async function* () {
+      const serverId = yield* DeploymentTargetId.create(serverIdValue);
+      const name = yield* DestinationName.create(destinationConfig?.name ?? "default");
+      const existing = await destinationRepository.findOne(
+        repositoryContext,
+        DestinationByServerAndNameSpec.create(serverId, name),
+      );
+
+      if (existing) {
+        return ok(existing.toState().id.value);
+      }
+
+      const destinationId = yield* DestinationId.create(idGenerator.next("dst"));
+      const kind = yield* DestinationKindValue.create(destinationConfig?.kind ?? "generic");
+      const createdAt = yield* CreatedAt.create(clock.now());
+      const destination = yield* Destination.register({
+        id: destinationId,
+        serverId,
+        name,
+        kind,
+        createdAt,
+      });
+
+      await destinationRepository.upsert(
+        repositoryContext,
+        destination,
+        UpsertDestinationSpec.fromDestination(destination),
+      );
+      await publishDomainEventsAndReturn(context, eventBus, logger, destination, undefined);
+
+      return ok(destination.toState().id.value);
+    });
+  }
+
+  private async resolveConfiguredResource(
+    context: ExecutionContext,
+    projectIdValue: string,
+    environmentIdValue: string,
+    resourceConfig: DeploymentConfiguredResource,
+    destinationIdValue?: string,
+  ): Promise<Result<string>> {
+    const { clock, eventBus, idGenerator, logger, resourceRepository } = this;
+    const repositoryContext = toRepositoryContext(context);
+
+    return safeTry(async function* () {
+      const projectId = yield* ProjectId.create(projectIdValue);
+      const environmentId = yield* EnvironmentId.create(environmentIdValue);
+      const destinationId = destinationIdValue
+        ? yield* DestinationId.create(destinationIdValue)
+        : undefined;
+      const name = yield* ResourceName.create(resourceConfig.name);
+      const slug = yield* ResourceSlug.fromName(name);
+      const existing = await resourceRepository.findOne(
+        repositoryContext,
+        ResourceByEnvironmentAndSlugSpec.create(projectId, environmentId, slug),
+      );
+
+      if (existing) {
+        return ok(existing.toState().id.value);
+      }
+
+      const services: ResourceServiceState[] = [];
+      for (const service of resourceConfig.services ?? []) {
+        services.push({
+          name: yield* ResourceServiceName.create(service.name),
+          kind: yield* ResourceServiceKindValue.create(service.kind),
+        });
+      }
+
+      const resourceId = yield* ResourceId.create(idGenerator.next("res"));
+      const kind = yield* ResourceKindValue.create(resourceConfig.kind ?? "application");
+      const createdAt = yield* CreatedAt.create(clock.now());
+      const description = DescriptionText.fromOptional(resourceConfig.description);
+      const resource = yield* Resource.create({
+        id: resourceId,
+        projectId,
+        environmentId,
+        ...(destinationId ? { destinationId } : {}),
+        name,
+        kind,
+        services,
+        createdAt,
+        ...(description ? { description } : {}),
+      });
+
+      await resourceRepository.upsert(
+        repositoryContext,
+        resource,
+        UpsertResourceSpec.fromResource(resource),
+      );
+      await publishDomainEventsAndReturn(context, eventBus, logger, resource, undefined);
+
+      return ok(resource.toState().id.value);
+    });
+  }
+
   private async resolveDefaultProject(
     context: ExecutionContext,
     defaults: DeploymentContextDefaultsDecision,
@@ -424,6 +596,28 @@ export class DeploymentContextBootstrapService {
       await publishDomainEventsAndReturn(context, eventBus, logger, project, undefined);
 
       return ok(project.toState().id.value);
+    });
+  }
+
+  private async resolveProjectIdForEnvironment(
+    context: ExecutionContext,
+    environmentIdValue: string,
+  ): Promise<Result<string>> {
+    const { environmentRepository } = this;
+    const repositoryContext = toRepositoryContext(context);
+
+    return safeTry(async function* () {
+      const environmentId = yield* EnvironmentId.create(environmentIdValue);
+      const environment = await environmentRepository.findOne(
+        repositoryContext,
+        EnvironmentByIdSpec.create(environmentId),
+      );
+
+      if (!environment) {
+        return err(domainError.notFound("environment", environmentIdValue));
+      }
+
+      return ok(environment.toState().projectId.value);
     });
   }
 
@@ -476,6 +670,88 @@ export class DeploymentContextBootstrapService {
     });
   }
 
+  private async resolveDefaultResource(
+    context: ExecutionContext,
+    defaults: DeploymentContextDefaultsDecision,
+    projectIdValue: string,
+    environmentIdValue: string,
+    destinationIdValue: string,
+  ): Promise<Result<string>> {
+    const resourceDefaults = defaults.resource;
+    const {
+      defaultsFactory,
+      environmentRepository,
+      eventBus,
+      logger,
+      projectRepository,
+      resourceRepository,
+      destinationRepository,
+    } = this;
+    const repositoryContext = toRepositoryContext(context);
+
+    if (resourceDefaults.mode === "required") {
+      return err(domainError.validation("resourceId is required for this deployment context"));
+    }
+
+    return safeTry(async function* () {
+      const projectId = yield* ProjectId.create(projectIdValue);
+      const environmentId = yield* EnvironmentId.create(environmentIdValue);
+      const destinationId = yield* DestinationId.create(destinationIdValue);
+      const project = await projectRepository.findOne(
+        repositoryContext,
+        ProjectByIdSpec.create(projectId),
+      );
+
+      if (!project) {
+        return err(domainError.notFound("project", projectIdValue));
+      }
+
+      const environment = await environmentRepository.findOne(
+        repositoryContext,
+        EnvironmentByIdSpec.create(environmentId),
+      );
+
+      if (!environment) {
+        return err(domainError.notFound("environment", environmentIdValue));
+      }
+
+      const destination = await destinationRepository.findOne(
+        repositoryContext,
+        DestinationByIdSpec.create(destinationId),
+      );
+
+      if (!destination) {
+        return err(domainError.notFound("destination", destinationIdValue));
+      }
+
+      const selectionResult =
+        resourceDefaults.preset === "local-resource"
+          ? defaultsFactory.localResourceSelection(project, environment)
+          : err(domainError.validation("Unsupported resource defaults preset"));
+      const selection = yield* selectionResult;
+      const existing = await resourceRepository.findOne(repositoryContext, selection);
+
+      if (existing) {
+        return ok(existing.toState().id.value);
+      }
+
+      const resource = yield* defaultsFactory.createLocalResource(
+        project,
+        environment,
+        destination,
+      );
+
+      await resourceRepository.upsert(
+        repositoryContext,
+        resource,
+        UpsertResourceSpec.fromResource(resource),
+      );
+      await publishDomainEventsAndReturn(context, eventBus, logger, resource, undefined);
+
+      return ok(resource.toState().id.value);
+    });
+  }
+
   private async resolveDefaultServer(
     context: ExecutionContext,
     defaults: DeploymentContextDefaultsDecision,
@@ -511,6 +787,55 @@ export class DeploymentContextBootstrapService {
       await publishDomainEventsAndReturn(context, eventBus, logger, server, undefined);
 
       return ok(server.toState().id.value);
+    });
+  }
+
+  private async resolveDefaultDestination(
+    context: ExecutionContext,
+    defaults: DeploymentContextDefaultsDecision,
+    serverIdValue: string,
+  ): Promise<Result<string>> {
+    const destinationDefaults = defaults.destination;
+    const { defaultsFactory, destinationRepository, eventBus, logger, serverRepository } = this;
+    const repositoryContext = toRepositoryContext(context);
+
+    if (destinationDefaults.mode === "required") {
+      return err(domainError.validation("destinationId is required for this deployment context"));
+    }
+
+    return safeTry(async function* () {
+      const serverId = yield* DeploymentTargetId.create(serverIdValue);
+      const server = await serverRepository.findOne(
+        repositoryContext,
+        DeploymentTargetByIdSpec.create(serverId),
+      );
+
+      if (!server) {
+        return err(domainError.notFound("server", serverIdValue));
+      }
+
+      const selectionResult =
+        destinationDefaults.preset === "local-destination"
+          ? defaultsFactory.localDestinationSelection(server)
+          : err(domainError.validation("Unsupported destination defaults preset"));
+      const selection = yield* selectionResult;
+      const existing = await destinationRepository.findOne(repositoryContext, selection);
+
+      if (existing) {
+        return ok(existing.toState().id.value);
+      }
+
+      const destinationResult = defaultsFactory.createLocalDestination(server);
+      const destination = yield* destinationResult;
+
+      await destinationRepository.upsert(
+        repositoryContext,
+        destination,
+        UpsertDestinationSpec.fromDestination(destination),
+      );
+      await publishDomainEventsAndReturn(context, eventBus, logger, destination, undefined);
+
+      return ok(destination.toState().id.value);
     });
   }
 }

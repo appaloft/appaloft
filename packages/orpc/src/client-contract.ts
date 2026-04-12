@@ -8,6 +8,7 @@ import {
   type ListDeploymentsQueryInput,
   type ListEnvironmentsQueryInput,
   type ListGitHubRepositoriesQueryInput,
+  type ListResourcesQueryInput,
   type PromoteEnvironmentCommandInput,
   type RegisterServerCommandInput,
   type RollbackDeploymentCommandInput,
@@ -28,6 +29,7 @@ import {
   type ListPluginsResponse,
   type ListProjectsResponse,
   type ListProvidersResponse,
+  type ListResourcesResponse,
   type ListServersResponse,
   type PromoteEnvironmentResponse,
   type RegisterServerResponse,
@@ -97,6 +99,14 @@ export type YunduOrpcClientContract = {
       YunduClientContext,
       DiffEnvironmentsQueryInput,
       DiffEnvironmentResponse,
+      YunduClientError
+    >;
+  };
+  resources: {
+    list: Client<
+      YunduClientContext,
+      ListResourcesQueryInput,
+      ListResourcesResponse,
       YunduClientError
     >;
   };

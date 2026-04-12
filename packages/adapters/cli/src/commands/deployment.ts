@@ -21,7 +21,9 @@ const deploymentIdArg = Args.text({ name: "deploymentId" });
 
 const projectOption = Options.text("project").pipe(Options.optional);
 const serverOption = Options.text("server").pipe(Options.optional);
+const destinationOption = Options.text("destination").pipe(Options.optional);
 const environmentOption = Options.text("environment").pipe(Options.optional);
+const resourceOption = Options.text("resource").pipe(Options.optional);
 const configOption = Options.text("config").pipe(Options.optional);
 const deploymentMethods = [
   "auto",
@@ -77,7 +79,9 @@ export const deployCommand = EffectCommand.make(
     pathOrSource: pathOrSourceArg,
     project: projectOption,
     server: serverOption,
+    destination: destinationOption,
     environment: environmentOption,
+    resource: resourceOption,
     config: configOption,
     method: methodOption,
     install: installOption,
@@ -91,6 +95,7 @@ export const deployCommand = EffectCommand.make(
     appLogLines,
     build,
     config,
+    destination,
     environment,
     healthPath,
     install,
@@ -98,6 +103,7 @@ export const deployCommand = EffectCommand.make(
     pathOrSource,
     port,
     project,
+    resource,
     server,
     start,
   }) =>
@@ -106,7 +112,9 @@ export const deployCommand = EffectCommand.make(
         configFilePath: optionalValue(config),
         projectId: optionalValue(project),
         serverId: optionalValue(server),
+        destinationId: optionalValue(destination),
         environmentId: optionalValue(environment),
+        resourceId: optionalValue(resource),
         sourceLocator: normalizeCliPathOrSource(pathOrSource, optionalValue(method) ?? "auto"),
         deploymentMethod: optionalValue(method),
         installCommand: optionalValue(install),
@@ -135,11 +143,13 @@ const listDeploymentsCommand = EffectCommand.make(
   "list",
   {
     project: projectOption,
+    resource: resourceOption,
   },
-  ({ project }) =>
+  ({ project, resource }) =>
     runQuery(
       ListDeploymentsQuery.create({
         projectId: optionalValue(project),
+        resourceId: optionalValue(resource),
       }),
     ),
 ).pipe(EffectCommand.withDescription("List deployments"));

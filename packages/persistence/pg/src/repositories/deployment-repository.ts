@@ -53,7 +53,9 @@ class KyselyDeploymentMutationVisitor
         id: spec.state.id.value,
         project_id: spec.state.projectId.value,
         environment_id: spec.state.environmentId.value,
+        resource_id: spec.state.resourceId.value,
         server_id: spec.state.serverId.value,
+        destination_id: spec.state.destinationId.value,
         status: spec.state.status.value,
         runtime_plan: serializeRuntimePlan(spec.state.runtimePlan),
         environment_snapshot: serializeEnvironmentSnapshot(spec.state.environmentSnapshot),
@@ -92,6 +94,9 @@ export class PgDeploymentRepository implements DeploymentRepository {
           .values(mutation.values)
           .onConflict((conflict) =>
             conflict.column("id").doUpdateSet({
+              resource_id: mutation.values.resource_id,
+              server_id: mutation.values.server_id,
+              destination_id: mutation.values.destination_id,
               status: mutation.values.status,
               runtime_plan: mutation.values.runtime_plan as unknown as Record<string, unknown>,
               environment_snapshot: mutation.values.environment_snapshot as unknown as Record<

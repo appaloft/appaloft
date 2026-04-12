@@ -4,8 +4,10 @@ import { domainError } from "../shared/errors";
 import {
   type DeploymentId,
   type DeploymentTargetId,
+  type DestinationId,
   type EnvironmentId,
   type ProjectId,
+  type ResourceId,
   type RollbackPlanId,
 } from "../shared/identifiers";
 import { err, ok, type Result } from "../shared/result";
@@ -28,7 +30,9 @@ export interface DeploymentState {
   id: DeploymentId;
   projectId: ProjectId;
   environmentId: EnvironmentId;
+  resourceId: ResourceId;
   serverId: DeploymentTargetId;
+  destinationId: DestinationId;
   status: DeploymentStatusValue;
   runtimePlan: RuntimePlan;
   environmentSnapshot: EnvironmentSnapshot;
@@ -52,7 +56,9 @@ export class Deployment extends AggregateRoot<DeploymentState> {
     id: DeploymentId;
     projectId: ProjectId;
     environmentId: EnvironmentId;
+    resourceId: ResourceId;
     serverId: DeploymentTargetId;
+    destinationId: DestinationId;
     runtimePlan: RuntimePlan;
     environmentSnapshot: EnvironmentSnapshot;
     createdAt: CreatedAt;
@@ -67,7 +73,9 @@ export class Deployment extends AggregateRoot<DeploymentState> {
         id: input.id,
         projectId: input.projectId,
         environmentId: input.environmentId,
+        resourceId: input.resourceId,
         serverId: input.serverId,
+        destinationId: input.destinationId,
         status: DeploymentStatusValue.created(),
         runtimePlan: input.runtimePlan,
         environmentSnapshot: input.environmentSnapshot,

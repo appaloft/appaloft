@@ -197,6 +197,27 @@ export class DeploymentTargetName extends NonEmptyTextValue {
   }
 }
 
+const destinationNameBrand: unique symbol = Symbol("DestinationName");
+export class DestinationName extends NonEmptyTextValue {
+  private [destinationNameBrand]!: void;
+
+  private constructor(value: string) {
+    super(value);
+  }
+
+  static create(value: string): Result<DestinationName> {
+    return createRequiredTextValue(
+      value,
+      "Destination name",
+      (normalized) => new DestinationName(normalized),
+    );
+  }
+
+  static rehydrate(value: string): DestinationName {
+    return new DestinationName(rehydrateRequiredText(value));
+  }
+}
+
 const workloadNameBrand: unique symbol = Symbol("WorkloadName");
 export class WorkloadName extends NonEmptyTextValue {
   private [workloadNameBrand]!: void;
@@ -215,6 +236,73 @@ export class WorkloadName extends NonEmptyTextValue {
 
   static rehydrate(value: string): WorkloadName {
     return new WorkloadName(rehydrateRequiredText(value));
+  }
+}
+
+const resourceNameBrand: unique symbol = Symbol("ResourceName");
+export class ResourceName extends NonEmptyTextValue {
+  private [resourceNameBrand]!: void;
+
+  private constructor(value: string) {
+    super(value);
+  }
+
+  static create(value: string): Result<ResourceName> {
+    return createRequiredTextValue(
+      value,
+      "Resource name",
+      (normalized) => new ResourceName(normalized),
+    );
+  }
+
+  static rehydrate(value: string): ResourceName {
+    return new ResourceName(rehydrateRequiredText(value));
+  }
+}
+
+const resourceSlugBrand: unique symbol = Symbol("ResourceSlug");
+export class ResourceSlug extends ScalarValueObject<string> {
+  private [resourceSlugBrand]!: void;
+
+  private constructor(value: string) {
+    super(value);
+  }
+
+  static create(value: string): Result<ResourceSlug> {
+    return createSlugTextValue(
+      value,
+      "Resource slug",
+      (normalized) => new ResourceSlug(normalized),
+    );
+  }
+
+  static fromName(name: ResourceName): Result<ResourceSlug> {
+    return ResourceSlug.create(slugify(name.value));
+  }
+
+  static rehydrate(value: string): ResourceSlug {
+    return new ResourceSlug(rehydrateRequiredText(value).toLowerCase());
+  }
+}
+
+const resourceServiceNameBrand: unique symbol = Symbol("ResourceServiceName");
+export class ResourceServiceName extends NonEmptyTextValue {
+  private [resourceServiceNameBrand]!: void;
+
+  private constructor(value: string) {
+    super(value);
+  }
+
+  static create(value: string): Result<ResourceServiceName> {
+    return createRequiredTextValue(
+      value,
+      "Resource service name",
+      (normalized) => new ResourceServiceName(normalized),
+    );
+  }
+
+  static rehydrate(value: string): ResourceServiceName {
+    return new ResourceServiceName(rehydrateRequiredText(value));
   }
 }
 

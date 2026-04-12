@@ -5,6 +5,11 @@ import {
   DeploymentTargetId,
   DeploymentTargetName,
   DescriptionText,
+  Destination,
+  DestinationByServerAndNameSpec,
+  DestinationId,
+  DestinationKindValue,
+  DestinationName,
   EnvironmentByProjectAndNameSpec,
   EnvironmentId,
   EnvironmentKindValue,
@@ -19,6 +24,12 @@ import {
   ProjectName,
   ProjectSlug,
   ProviderKey,
+  Resource,
+  ResourceByEnvironmentAndSlugSpec,
+  ResourceId,
+  ResourceKindValue,
+  ResourceName,
+  ResourceSlug,
   type Result,
   safeTry,
 } from "@yundu/core";
@@ -99,6 +110,33 @@ export class DeploymentContextDefaultsFactory implements DeploymentContextDefaul
     });
   }
 
+  localDestinationSelection(server: DeploymentTarget): Result<DestinationByServerAndNameSpec> {
+    return safeTry(function* () {
+      const name = yield* DestinationName.create("default");
+      return ok(DestinationByServerAndNameSpec.create(server.toState().id, name));
+    });
+  }
+
+  createLocalDestination(server: DeploymentTarget): Result<Destination> {
+    const { clock, idGenerator } = this;
+
+    return safeTry(function* () {
+      const id = yield* DestinationId.create(idGenerator.next("dst"));
+      const name = yield* DestinationName.create("default");
+      const kind = yield* DestinationKindValue.create("host-process");
+      const createdAt = yield* CreatedAt.create(clock.now());
+
+      const destination = yield* Destination.register({
+        id,
+        serverId: server.toState().id,
+        name,
+        kind,
+        createdAt,
+      });
+      return ok(destination);
+    });
+  }
+
   localEnvironmentSelection(project: Project): Result<EnvironmentByProjectAndNameSpec> {
     return safeTry(function* () {
       const name = yield* EnvironmentName.create("local");
@@ -123,6 +161,49 @@ export class DeploymentContextDefaultsFactory implements DeploymentContextDefaul
         createdAt,
       });
       return ok(environment);
+    });
+  }
+
+  localResourceSelection(
+    project: Project,
+    environment: EnvironmentProfile,
+  ): Result<ResourceByEnvironmentAndSlugSpec> {
+    return safeTry(function* () {
+      const name = yield* ResourceName.create("app");
+      const slug = yield* ResourceSlug.fromName(name);
+      return ok(
+        ResourceByEnvironmentAndSlugSpec.create(
+          project.toState().id,
+          environment.toState().id,
+          slug,
+        ),
+      );
+    });
+  }
+
+  createLocalResource(
+    project: Project,
+    environment: EnvironmentProfile,
+    destination: Destination,
+  ): Result<Resource> {
+    const { clock, idGenerator } = this;
+
+    return safeTry(function* () {
+      const id = yield* ResourceId.create(idGenerator.next("res"));
+      const name = yield* ResourceName.create("app");
+      const kind = yield* ResourceKindValue.create("application");
+      const createdAt = yield* CreatedAt.create(clock.now());
+
+      const resource = yield* Resource.create({
+        id,
+        projectId: project.toState().id,
+        environmentId: environment.toState().id,
+        destinationId: destination.toState().id,
+        name,
+        kind,
+        createdAt,
+      });
+      return ok(resource);
     });
   }
 }

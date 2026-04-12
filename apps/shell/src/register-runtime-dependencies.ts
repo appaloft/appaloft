@@ -31,11 +31,14 @@ import {
   type DatabaseConnection,
   PgDeploymentReadModel,
   PgDeploymentRepository,
+  PgDestinationRepository,
   PgDiagnostics,
   PgEnvironmentReadModel,
   PgEnvironmentRepository,
   PgProjectReadModel,
   PgProjectRepository,
+  PgResourceReadModel,
+  PgResourceRepository,
   PgServerReadModel,
   PgServerRepository,
 } from "@yundu/persistence-pg";
@@ -153,8 +156,14 @@ export function registerRuntimeDependencies(
   container.register(tokens.serverRepository, {
     useFactory: instanceCachingFactory(() => new PgServerRepository(input.database.db)),
   });
+  container.register(tokens.destinationRepository, {
+    useFactory: instanceCachingFactory(() => new PgDestinationRepository(input.database.db)),
+  });
   container.register(tokens.environmentRepository, {
     useFactory: instanceCachingFactory(() => new PgEnvironmentRepository(input.database.db)),
+  });
+  container.register(tokens.resourceRepository, {
+    useFactory: instanceCachingFactory(() => new PgResourceRepository(input.database.db)),
   });
   container.register(tokens.deploymentRepository, {
     useFactory: instanceCachingFactory(() => new PgDeploymentRepository(input.database.db)),
@@ -175,6 +184,9 @@ export function registerRuntimeDependencies(
     useFactory: instanceCachingFactory(
       () => new PgEnvironmentReadModel(input.database.db, input.config.secretMask),
     ),
+  });
+  container.register(tokens.resourceReadModel, {
+    useFactory: instanceCachingFactory(() => new PgResourceReadModel(input.database.db)),
   });
   container.register(tokens.deploymentReadModel, {
     useFactory: instanceCachingFactory(() => new PgDeploymentReadModel(input.database.db)),

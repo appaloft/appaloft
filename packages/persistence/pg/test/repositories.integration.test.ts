@@ -14,6 +14,10 @@ import {
   DeploymentTargetDescriptor,
   DeploymentTargetId,
   DeploymentTargetName,
+  Destination,
+  DestinationId,
+  DestinationKindValue,
+  DestinationName,
   DetectSummary,
   DisplayNameText,
   EnvironmentId,
@@ -39,6 +43,10 @@ import {
   ProjectId,
   ProjectName,
   ProviderKey,
+  Resource,
+  ResourceId,
+  ResourceKindValue,
+  ResourceName,
   RuntimeExecutionPlan,
   RuntimePlan,
   RuntimePlanId,
@@ -50,8 +58,10 @@ import {
   TargetKindValue,
   UpdatedAt,
   UpsertDeploymentSpec,
+  UpsertDestinationSpec,
   UpsertEnvironmentSpec,
   UpsertProjectSpec,
+  UpsertResourceSpec,
   UpsertServerSpec,
   VariableExposureValue,
   VariableKindValue,
@@ -111,9 +121,11 @@ describe("postgres persistence integration", () => {
       createMigrator,
       PgDeploymentReadModel,
       PgDeploymentRepository,
+      PgDestinationRepository,
       PgEnvironmentReadModel,
       PgEnvironmentRepository,
       PgProjectRepository,
+      PgResourceRepository,
       PgServerRepository,
     } = await import("../src/index");
     const database = await createDatabase({
@@ -125,7 +137,9 @@ describe("postgres persistence integration", () => {
 
     const projectRepository = new PgProjectRepository(database.db);
     const serverRepository = new PgServerRepository(database.db);
+    const destinationRepository = new PgDestinationRepository(database.db);
     const environmentRepository = new PgEnvironmentRepository(database.db);
+    const resourceRepository = new PgResourceRepository(database.db);
     const environmentReadModel = new PgEnvironmentReadModel(database.db, "****");
     const deploymentRepository = new PgDeploymentRepository(database.db);
     const deploymentReadModel = new PgDeploymentReadModel(database.db);
@@ -144,11 +158,27 @@ describe("postgres persistence integration", () => {
       providerKey: ProviderKey.rehydrate("generic-ssh"),
       createdAt: CreatedAt.rehydrate("2026-01-01T00:00:00.000Z"),
     })._unsafeUnwrap();
+    const destination = Destination.register({
+      id: DestinationId.rehydrate(`dst_${suffix}`),
+      serverId: DeploymentTargetId.rehydrate(`srv_${suffix}`),
+      name: DestinationName.rehydrate("default"),
+      kind: DestinationKindValue.rehydrate("generic"),
+      createdAt: CreatedAt.rehydrate("2026-01-01T00:00:00.000Z"),
+    })._unsafeUnwrap();
     const environment = EnvironmentProfile.create({
       id: EnvironmentId.rehydrate(`env_${suffix}`),
       projectId: ProjectId.rehydrate(`prj_${suffix}`),
       name: EnvironmentName.rehydrate("production"),
       kind: EnvironmentKindValue.rehydrate("production"),
+      createdAt: CreatedAt.rehydrate("2026-01-01T00:00:00.000Z"),
+    })._unsafeUnwrap();
+    const resource = Resource.create({
+      id: ResourceId.rehydrate(`res_${suffix}`),
+      projectId: ProjectId.rehydrate(`prj_${suffix}`),
+      environmentId: EnvironmentId.rehydrate(`env_${suffix}`),
+      destinationId: DestinationId.rehydrate(`dst_${suffix}`),
+      name: ResourceName.rehydrate("web"),
+      kind: ResourceKindValue.rehydrate("application"),
       createdAt: CreatedAt.rehydrate("2026-01-01T00:00:00.000Z"),
     })._unsafeUnwrap();
 
@@ -164,17 +194,25 @@ describe("postgres persistence integration", () => {
 
     await projectRepository.upsert(context, project, UpsertProjectSpec.fromProject(project));
     await serverRepository.upsert(context, server, UpsertServerSpec.fromServer(server));
+    await destinationRepository.upsert(
+      context,
+      destination,
+      UpsertDestinationSpec.fromDestination(destination),
+    );
     await environmentRepository.upsert(
       context,
       environment,
       UpsertEnvironmentSpec.fromEnvironment(environment),
     );
+    await resourceRepository.upsert(context, resource, UpsertResourceSpec.fromResource(resource));
 
     const deployment = Deployment.create({
       id: DeploymentId.rehydrate(`dep_${suffix}`),
       projectId: ProjectId.rehydrate(`prj_${suffix}`),
       serverId: DeploymentTargetId.rehydrate(`srv_${suffix}`),
+      destinationId: DestinationId.rehydrate(`dst_${suffix}`),
       environmentId: EnvironmentId.rehydrate(`env_${suffix}`),
+      resourceId: ResourceId.rehydrate(`res_${suffix}`),
       runtimePlan: RuntimePlan.rehydrate({
         id: RuntimePlanId.rehydrate(`plan_${suffix}`),
         source: SourceDescriptor.rehydrate({
@@ -236,7 +274,7 @@ describe("postgres persistence integration", () => {
     );
 
     const environments = await environmentReadModel.list(context, `prj_${suffix}`);
-    const deployments = await deploymentReadModel.list(context, `prj_${suffix}`);
+    const deployments = await deploymentReadModel.list(context, { projectId: `prj_${suffix}` });
 
     expect(environments[0]?.maskedVariables).toEqual([
       expect.objectContaining({

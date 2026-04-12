@@ -2,6 +2,9 @@ import {
   type DeploymentTarget,
   DeploymentTargetByIdSpec,
   DeploymentTargetId,
+  type Destination,
+  DestinationByIdSpec,
+  DestinationId,
   domainError,
   EnvironmentByIdSpec,
   EnvironmentId,
@@ -11,6 +14,9 @@ import {
   type Project,
   ProjectByIdSpec,
   ProjectId,
+  type Resource,
+  ResourceByIdSpec,
+  ResourceId,
   type Result,
   safeTry,
 } from "@yundu/core";
@@ -22,8 +28,10 @@ import {
 } from "../../execution-context";
 
 import {
+  type DestinationRepository,
   type EnvironmentRepository,
   type ProjectRepository,
+  type ResourceRepository,
   type ServerRepository,
 } from "../../ports";
 import { tokens } from "../../tokens";
@@ -32,7 +40,9 @@ import { type CreateDeploymentCommandInput } from "./create-deployment.command";
 export interface ResolvedDeploymentContext {
   project: Project;
   server: DeploymentTarget;
+  destination: Destination;
   environment: EnvironmentProfile;
+  resource: Resource;
 }
 
 @injectable()
@@ -42,8 +52,12 @@ export class DeploymentContextResolver {
     private readonly projectRepository: ProjectRepository,
     @inject(tokens.serverRepository)
     private readonly serverRepository: ServerRepository,
+    @inject(tokens.destinationRepository)
+    private readonly destinationRepository: DestinationRepository,
     @inject(tokens.environmentRepository)
     private readonly environmentRepository: EnvironmentRepository,
+    @inject(tokens.resourceRepository)
+    private readonly resourceRepository: ResourceRepository,
   ) {}
 
   async resolve(
@@ -63,6 +77,13 @@ export class DeploymentContextResolver {
       const explicitEnvironment = yield* explicitEnvironmentResult;
       const explicitServerResult = await self.loadServer(repositoryContext, input.serverId);
       const explicitServer = yield* explicitServerResult;
+      const explicitDestinationResult = await self.loadDestination(
+        repositoryContext,
+        input.destinationId,
+      );
+      const explicitDestination = yield* explicitDestinationResult;
+      const explicitResourceResult = await self.loadResource(repositoryContext, input.resourceId);
+      const explicitResource = yield* explicitResourceResult;
 
       let project = explicitProject;
       if (!project) {
@@ -93,15 +114,64 @@ export class DeploymentContextResolver {
         );
       }
 
+      const resource = explicitResource;
+      if (!resource) {
+        return err(domainError.validation("resourceId is required for this deployment context"));
+      }
+
+      if (!resource.toState().projectId.equals(project.toState().id)) {
+        return err(
+          domainError.validation("Resource does not belong to the selected project", {
+            resourceId: resource.toState().id.value,
+            projectId: project.toState().id.value,
+          }),
+        );
+      }
+
+      if (!resource.toState().environmentId.equals(environment.toState().id)) {
+        return err(
+          domainError.validation("Resource does not belong to the selected environment", {
+            resourceId: resource.toState().id.value,
+            environmentId: environment.toState().id.value,
+          }),
+        );
+      }
+
       const server = explicitServer;
       if (!server) {
         return err(domainError.validation("serverId is required for this deployment context"));
       }
 
+      const destination = explicitDestination;
+      if (!destination) {
+        return err(domainError.validation("destinationId is required for this deployment context"));
+      }
+
+      if (!destination.toState().serverId.equals(server.toState().id)) {
+        return err(
+          domainError.validation("Destination does not belong to the selected server", {
+            destinationId: destination.toState().id.value,
+            serverId: server.toState().id.value,
+          }),
+        );
+      }
+
+      const resourceDestinationId = resource.toState().destinationId;
+      if (resourceDestinationId && !resourceDestinationId.equals(destination.toState().id)) {
+        return err(
+          domainError.validation("Resource does not deploy to the selected destination", {
+            resourceId: resource.toState().id.value,
+            destinationId: destination.toState().id.value,
+          }),
+        );
+      }
+
       return ok({
         project,
         server,
+        destination,
         environment,
+        resource,
       });
     });
   }
@@ -162,6 +232,45 @@ export class DeploymentContextResolver {
         DeploymentTargetByIdSpec.create(id),
       );
       return server ? ok(server) : err(domainError.notFound("server", serverId));
+    });
+  }
+
+  private async loadResource(
+    context: RepositoryContext,
+    resourceId?: string,
+  ): Promise<Result<Resource | null>> {
+    if (!resourceId) {
+      return ok(null);
+    }
+
+    const self = this;
+
+    return safeTry(async function* () {
+      const id = yield* ResourceId.create(resourceId);
+      const resource = await self.resourceRepository.findOne(context, ResourceByIdSpec.create(id));
+      return resource ? ok(resource) : err(domainError.notFound("resource", resourceId));
+    });
+  }
+
+  private async loadDestination(
+    context: RepositoryContext,
+    destinationId?: string,
+  ): Promise<Result<Destination | null>> {
+    if (!destinationId) {
+      return ok(null);
+    }
+
+    const self = this;
+
+    return safeTry(async function* () {
+      const id = yield* DestinationId.create(destinationId);
+      const destination = await self.destinationRepository.findOne(
+        context,
+        DestinationByIdSpec.create(id),
+      );
+      return destination
+        ? ok(destination)
+        : err(domainError.notFound("destination", destinationId));
     });
   }
 }

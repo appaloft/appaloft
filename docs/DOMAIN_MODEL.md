@@ -9,9 +9,18 @@
 
 ## Design Goal
 
-Yundu is not primarily "server CRUD". Its core problem is:
+Yundu is not primarily "server CRUD". Its core project-facing flow is:
 
-`Environment -> Workload -> Config / Resource Binding -> Release -> Deployment`
+`Project -> Environment -> Resource -> Deployment`
+
+Resources are the deployable units users organize inside environments. Workloads, config,
+dependency bindings, releases, and runtime targets sit underneath that flow:
+
+`Resource -> Workload -> Config / Resource Binding -> Release -> Deployment`
+
+Runtime placement is a separate relationship:
+
+`Resource -> Destination -> DeploymentTarget(Server)`
 
 A deployment platform only becomes coherent when those boundaries are explicit.
 
@@ -58,24 +67,31 @@ Implemented now:
 
 Owns:
 - `DeploymentTarget`
+- `Destination`
 - target capability and provider-facing endpoint metadata
+- deployment placement / isolation boundaries on a target
 
 Implemented now:
 - `DeploymentTarget`
+- `Destination`
 
 Transport compatibility note:
 - CLI / HTTP still expose `server` naming for backward compatibility
 - the core domain term is `DeploymentTarget`
+- `Destination` is the concrete place a resource deploys to on a target/server; proxy and domain
+  routing are not yet modeled as aggregates
 
 ### Workload Delivery
 
 Owns:
+- `Resource`
 - `Workload`
 - `SourceSpec`
 - `BuildSpec`
 - `RuntimeSpec`
 
 Implemented now:
+- foundational `Resource`
 - foundational `Workload`, `SourceSpec`, `BuildSpec`, `RuntimeSpec` models in `core`
 - runtime planning still flows through `RuntimePlanResolver` and `RuntimePlan`
 
@@ -135,6 +151,8 @@ Implemented now:
 - `Project`
 - `Environment`
 - `DeploymentTarget`
+- `Destination`
+- `Resource`
 - `Workload`
 - `ResourceInstance`
 - `ResourceBinding`
@@ -165,7 +183,9 @@ Implemented now:
 
 - `ProjectRepository` persists only the `Project` aggregate root
 - `ServerRepository` persists only the `DeploymentTarget` aggregate root exposed through transport-compatible `server` naming
+- `DestinationRepository` persists only the `Destination` aggregate root
 - `EnvironmentRepository` persists only the `Environment` aggregate root
+- `ResourceRepository` persists only the `Resource` aggregate root
 - `DeploymentRepository` persists only the `Deployment` aggregate root
 - selection spec visitors own the full persistence-query translation
 - persistence adapters pass a `SelectQueryBuilder` into the selection visitor and execute the returned builder
@@ -207,7 +227,7 @@ Current scope:
 ### DeploymentTarget
 
 Meaning:
-- generalized runtime destination
+- generalized server / runtime host target
 
 Rules:
 - one target has one provider family
@@ -218,6 +238,22 @@ Current scope:
 - current transport compatibility name: `server`
 - may be reused or created from deployment config after provider-key validation in the application
   layer; provider SDK specifics remain outside the aggregate
+
+### Destination
+
+Meaning:
+- deployment placement and isolation boundary on a `DeploymentTarget`
+- the target-side landing zone a resource deploys to
+
+Rules:
+- belongs to exactly one deployment target/server
+- names are unique within a target
+- deployments reference the selected destination as well as the selected target
+
+Current scope:
+- persisted and bootstrapped as a default local destination
+- deployment config may declare a target-local destination
+- proxy/domain routing remains a future access-layer model
 
 ### Workload
 
@@ -231,6 +267,24 @@ Rules:
 Current scope:
 - foundational aggregate in `core`
 - not yet persisted or exposed through commands
+
+### Resource
+
+Meaning:
+- project/environment-scoped deployable unit
+- can represent an app, API service, database, cache, worker, static site, external service, or
+  Docker Compose stack
+
+Rules:
+- names are unique within a project environment
+- compose-stack resources may contain multiple named services
+- a resource may point at a default destination
+- deployments belong to a resource, not directly to a raw source locator
+
+Current scope:
+- foundational aggregate in `core`
+- persisted and listed through application read models
+- deployment creation can resolve, bootstrap, and attach a resource and destination
 
 ### Release
 
@@ -248,7 +302,7 @@ Current scope:
 ### Deployment
 
 Meaning:
-- one execution attempt of a delivery plan against a deployment target
+- one execution attempt of a delivery plan for a resource against a destination on a deployment target
 
 Rules:
 - state transitions are ordered
@@ -257,7 +311,9 @@ Rules:
 
 Current scope:
 - state machine for plan -> run -> verify -> rollback
-- still carries `serverId` in persisted shape for transport compatibility
+- belongs to exactly one `Resource`
+- carries both `destinationId` and `serverId`; `serverId` remains in persisted shape for transport
+  compatibility and efficient target lookup
 
 ### ResourceBinding
 
@@ -336,6 +392,7 @@ New domain work should go into the bounded-context directories above.
 Application slices should be understood through the same contexts:
 
 - `workspace`: projects and environments
+- `workload-delivery`: project resources and workloads
 - `runtime-topology`: deployment target registration and listing
 - `release-orchestration`: deployment creation, listing, logs, rollback
 - `extensibility`: providers, plugins, GitHub repository browsing, diagnostics

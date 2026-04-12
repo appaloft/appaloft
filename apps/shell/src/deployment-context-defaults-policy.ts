@@ -15,16 +15,26 @@ const localEmbeddedDefaults: DeploymentContextDefaultsDecision = {
     mode: "reuse-or-create",
     preset: "local-server",
   },
+  destination: {
+    mode: "reuse-or-create",
+    preset: "local-destination",
+  },
   environment: {
     mode: "reuse-or-create",
     preset: "local-environment",
+  },
+  resource: {
+    mode: "reuse-or-create",
+    preset: "local-resource",
   },
 };
 
 const explicitContextRequired: DeploymentContextDefaultsDecision = {
   project: { mode: "required" },
   server: { mode: "required" },
+  destination: { mode: "required" },
   environment: { mode: "required" },
+  resource: { mode: "required" },
 };
 
 export class ShellDeploymentContextDefaultsPolicy implements DeploymentContextDefaultsPolicy {

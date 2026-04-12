@@ -2,5 +2,6 @@ export * from "./deployment-messages";
 export * from "./environment-messages";
 export * from "./operation-catalog";
 export * from "./project-messages";
+export * from "./resource-messages";
 export * from "./server-messages";
 export * from "./system-messages";

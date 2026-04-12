@@ -3,9 +3,11 @@ import {
   Deployment,
   type Deployment as DeploymentAggregate,
   DeploymentId,
+  type Destination,
   type EnvironmentProfile,
   type EnvironmentSnapshot,
   type Project,
+  type Resource,
   type Result,
   type RuntimePlan,
   type Server,
@@ -28,7 +30,9 @@ export class DeploymentFactory {
   create(input: {
     project: Project;
     server: Server;
+    destination: Destination;
     environment: EnvironmentProfile;
+    resource: Resource;
     runtimePlan: RuntimePlan;
     environmentSnapshot: EnvironmentSnapshot;
   }): Result<DeploymentAggregate> {
@@ -42,7 +46,9 @@ export class DeploymentFactory {
         id: deploymentId,
         projectId: input.project.toState().id,
         serverId: input.server.toState().id,
+        destinationId: input.destination.toState().id,
         environmentId: input.environment.toState().id,
+        resourceId: input.resource.toState().id,
         runtimePlan: input.runtimePlan,
         environmentSnapshot: input.environmentSnapshot,
         createdAt,
@@ -65,7 +71,9 @@ export class DeploymentFactory {
         id: deploymentId,
         projectId: state.projectId,
         serverId: state.serverId,
+        destinationId: state.destinationId,
         environmentId: state.environmentId,
+        resourceId: state.resourceId,
         runtimePlan: state.runtimePlan,
         environmentSnapshot: state.environmentSnapshot,
         createdAt,

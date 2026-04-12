@@ -90,7 +90,7 @@ export class CreateDeploymentUseCase {
         context,
         effectiveInput,
       );
-      const { project, server, environment } = yield* resolvedContextResult;
+      const { project, server, destination, environment, resource } = yield* resolvedContextResult;
 
       const detectedResult = await sourceDetector.detect(context, effectiveInput.sourceLocator);
       const detected = yield* detectedResult;
@@ -128,7 +128,9 @@ export class CreateDeploymentUseCase {
       const deploymentResult = deploymentFactory.create({
         project,
         server,
+        destination,
         environment,
+        resource,
         runtimePlan,
         environmentSnapshot: snapshot,
       });
