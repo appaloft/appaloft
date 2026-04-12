@@ -26,6 +26,10 @@ bun run checksums
 - `checksums.txt`
 - release archives created in CI for GitHub Releases
 
+The binary bundle is the deployment default. See
+[`DESKTOP_PACKAGING_COMPARISON.md`](./DESKTOP_PACKAGING_COMPARISON.md) before changing the desktop
+wrapper strategy.
+
 ## GitHub Release Flow
 
 `release.yml`:

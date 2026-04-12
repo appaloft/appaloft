@@ -1,0 +1,35 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Yundu",
+  "version": "0.1.0",
+  "identifier": "ai.yundu.desktop.tauri",
+  "build": {
+    "beforeDevCommand": {
+      "cwd": "..",
+      "script": "bun run prepare:sidecar",
+      "wait": true
+    },
+    "beforeBuildCommand": {
+      "cwd": "..",
+      "script": "bun run prepare:sidecar"
+    },
+    "frontendDist": "frontend-dist"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "category": "DeveloperTool",
+    "icon": ["icons/icon.png"],
+    "externalBin": ["binaries/yundu"],
+    "macOS": {
+      "minimumSystemVersion": "11.0"
+    }
+  }
+}

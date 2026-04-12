@@ -1,0 +1,17 @@
+[package]
+name = "yundu-desktop"
+version = "0.1.0"
+description = "Yundu Tauri desktop shell"
+edition = "2021"
+
+[lib]
+name = "yundu_desktop_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.5.1", features = [] }
+
+[dependencies]
+tauri = { version = "2.10.1", features = [] }
+tauri-plugin-dialog = "2.7.0"
+tauri-plugin-shell = "2.3.5"
