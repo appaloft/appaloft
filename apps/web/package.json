@@ -7,7 +7,7 @@
     "dev": "vite dev",
     "build": "rm -rf .svelte-kit/output build && vite build",
     "preview": "vite preview",
-    "prepare": "if [ \"$PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD\" = \"1\" ]; then svelte-kit sync; else playwright install && svelte-kit sync; fi || echo ''",
+    "prepare": "svelte-kit sync || echo ''",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
     "typecheck": "bun run check",
     "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
@@ -15,7 +15,8 @@
     "format": "biome format --write .",
     "test:unit": "vitest",
     "test": "bun run test:unit -- --run && bun run test:e2e",
-    "test:e2e": "playwright test"
+    "test:e2e": "bun run test:e2e:webview",
+    "test:e2e:webview": "bun run build && bun test test/e2e-webview"
   },
   "devDependencies": {
     "@fontsource-variable/inter": "^5.2.8",
@@ -24,7 +25,6 @@
     "@fontsource/ibm-plex-sans": "^5.2.8",
     "@internationalized/date": "^3.12.0",
     "@lucide/svelte": "^1.8.0",
-    "@playwright/test": "^1.59.1",
     "@sveltejs/adapter-static": "^3.0.10",
     "@sveltejs/kit": "^2.57.0",
     "@sveltejs/vite-plugin-svelte": "^7.0.0",
