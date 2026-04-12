@@ -195,8 +195,19 @@ test("renders the console dashboard with mocked control-plane data", async ({ pa
   await page.goto("/");
 
   await expect(page.getByText("最近部署")).toBeVisible();
-  await expect(page.getByRole("columnheader", { name: "项目" })).toBeVisible();
   await expect(page.getByRole("button", { name: "快速部署" })).toBeVisible();
+  await expect(page.getByRole("link", { name: /查看项目/ })).toBeVisible();
+  await expect(page.getByRole("link", { name: /查看部署/ })).toBeVisible();
+  await expect(page.getByText("Demo", { exact: true }).first()).toBeVisible();
+  await expect(page.getByText("succeeded", { exact: true }).first()).toBeVisible();
+
+  await page.goto("/projects");
+  await expect(page.getByRole("columnheader", { name: "项目" })).toBeVisible();
+  await expect(page.getByText("Demo", { exact: true }).first()).toBeVisible();
+  await expect(page.getByText("production", { exact: true }).first()).toBeVisible();
+
+  await page.goto("/deployments");
+  await expect(page.getByRole("columnheader", { name: "来源" })).toBeVisible();
   await expect(page.getByText("Demo", { exact: true }).first()).toBeVisible();
   await expect(page.getByText("edge", { exact: true }).first()).toBeVisible();
   await expect(page.getByText("production", { exact: true }).first()).toBeVisible();
@@ -332,8 +343,10 @@ test("shows the GitHub repository picker and fills the import wizard after auth"
               id: "repo_platform",
               name: "platform",
               fullName: "acme/platform",
+              ownerLogin: "acme",
               description: "Primary deployment control plane",
               defaultBranch: "main",
+              htmlUrl: "https://github.com/acme/platform",
               cloneUrl: "https://github.com/acme/platform.git",
               private: true,
               updatedAt: "2026-01-01T00:00:00.000Z",
