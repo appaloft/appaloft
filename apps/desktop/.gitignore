@@ -1,0 +1,4 @@
+src-tauri/binaries/yundu-*
+!src-tauri/binaries/.gitkeep
+src-tauri/gen/
+src-tauri/target/

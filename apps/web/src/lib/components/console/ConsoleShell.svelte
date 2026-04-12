@@ -1,5 +1,6 @@
 <script lang="ts">
   import { browser } from "$app/environment";
+  import { goto } from "$app/navigation";
   import { page } from "$app/state";
   import { ChevronUp, FolderOpen, Gauge, GitBranch, Package, Play, Rocket, ServerCrash, UserRound } from "@lucide/svelte";
   import type { Snippet } from "svelte";
@@ -97,7 +98,7 @@
     }
 
     const openQuickDeploy = () => {
-      window.location.href = "/deploy";
+      void goto("/deploy");
     };
 
     window.addEventListener("yundu:open-quick-deploy", openQuickDeploy);
@@ -136,7 +137,7 @@
 
   function navigateTo(path: string): void {
     if (browser) {
-      window.location.href = path;
+      void goto(path);
     }
   }
 </script>

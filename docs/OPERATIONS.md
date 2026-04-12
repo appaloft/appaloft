@@ -61,6 +61,15 @@ The binary bundle is self-contained:
 - the PGlite fs bundle and wasm modules are embedded into the executable
 - `YUNDU_WEB_STATIC_DIR` remains available only as an override for an external web build
 
+Run the Tauri desktop shell:
+
+```bash
+bun run desktop:dev
+```
+
+This still uses the same binary bundle as the backend. Tauri packaging requires a Rust toolchain;
+keep `yundu-binary-bundle` as the deployment artifact.
+
 Hosted control-plane mode with first-party Better Auth runtime:
 
 ```bash

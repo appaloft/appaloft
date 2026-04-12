@@ -1,29 +1,30 @@
 # @yundu/desktop
 
-Electron shell for the Yundu local desktop app.
+Tauri shell for the Yundu local desktop app.
 
-The desktop app does not own deployment business logic. It starts the packaged `yundu` backend binary, opens the embedded web console over loopback HTTP, and exposes a small native bridge for desktop-only capabilities such as selecting a local source directory path.
+The desktop app does not own deployment business logic. It starts the packaged `yundu` backend
+binary as a Tauri sidecar, opens the embedded web console over loopback HTTP, and exposes the same
+small `window.yunduDesktop.selectDirectory()` bridge used by the web console.
 
 ## Commands
 
-```bash
-bun run build
-bun run dev
-bun run package
-```
-
-`bun run dev` expects `dist/release/yundu-binary-bundle/yundu` to exist. From the repository root, run:
+From the repository root:
 
 ```bash
 bun run package:binary-bundle
 bun run --cwd apps/desktop dev
 ```
 
-The Electron main and preload builds use `electron-vite`; the renderer remains the static Yundu web console served by the local backend.
-
-To build a distributable desktop app from the repository root:
+To build a macOS `.app` bundle:
 
 ```bash
 bun run package:binary-bundle
-bun run --cwd apps/desktop package
+bun run --cwd apps/desktop package:app
 ```
+
+`prepare:sidecar` copies `dist/release/yundu-binary-bundle/yundu` to the Tauri sidecar path
+expected by the current host target. Override target detection with `YUNDU_TAURI_TARGET_TRIPLE`
+when preparing a sidecar for a different target.
+
+This package is intentionally not wired into the root `build` or `typecheck` tasks yet. Tauri
+packaging requires a Rust toolchain, while the current CI only installs Bun.

@@ -22,6 +22,8 @@
     "db:status": "bun run --cwd apps/shell src/index.ts db status",
     "package:binary-bundle": "bun run scripts/release/build-binary-bundle.ts",
     "package:artifacts": "bun run scripts/release/build-artifacts.ts",
+    "desktop:dev": "bun run package:binary-bundle && bun run --cwd apps/desktop dev",
+    "desktop:package": "bun run package:binary-bundle && bun run --cwd apps/desktop package:app",
     "checksums": "bun run scripts/release/generate-checksums.ts",
     "smoke:local:commands": "bun run scripts/smoke/local-deploy.ts --method=workspace-commands --port=4310",
     "smoke:local:docker": "bun run scripts/smoke/local-deploy.ts --method=dockerfile --port=4311",
