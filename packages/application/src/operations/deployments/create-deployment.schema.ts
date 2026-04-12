@@ -3,6 +3,7 @@ import { z } from "zod";
 import { nonEmptyTrimmedString } from "../shared-schema";
 
 export const createDeploymentCommandInputSchema = z.object({
+  configFilePath: nonEmptyTrimmedString("Deployment config file path").optional(),
   projectId: nonEmptyTrimmedString("Project id").optional(),
   serverId: nonEmptyTrimmedString("Server id").optional(),
   environmentId: nonEmptyTrimmedString("Environment id").optional(),

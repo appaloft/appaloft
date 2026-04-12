@@ -1,5 +1,6 @@
 export * from "./operations/deployments/create-deployment.use-case";
 export * from "./operations/deployments/deployment.factory";
+export * from "./operations/deployments/deployment-config-bootstrap.service";
 export * from "./operations/deployments/deployment-context.resolver";
 export * from "./operations/deployments/deployment-context-defaults.factory";
 export * from "./operations/deployments/deployment-lifecycle.service";

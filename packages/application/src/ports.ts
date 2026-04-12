@@ -287,6 +287,44 @@ export interface RequestedDeploymentConfig {
   healthCheckPath?: string;
 }
 
+export interface DeploymentConfiguredProject {
+  name: string;
+  description?: string;
+}
+
+export interface DeploymentConfiguredEnvironment {
+  name: string;
+  kind?: EnvironmentKind;
+}
+
+export interface DeploymentConfiguredTarget {
+  key?: string;
+  name?: string;
+  providerKey: string;
+  host?: string;
+  port?: number;
+}
+
+export interface DeploymentConfigSnapshot {
+  configFilePath?: string;
+  project?: DeploymentConfiguredProject;
+  environment?: DeploymentConfiguredEnvironment;
+  targets?: DeploymentConfiguredTarget[];
+  deployment?: Partial<RequestedDeploymentConfig> & {
+    targetKey?: string;
+  };
+}
+
+export interface DeploymentConfigReader {
+  read(
+    context: ExecutionContext,
+    input: {
+      sourceLocator: string;
+      configFilePath?: string;
+    },
+  ): Promise<Result<DeploymentConfigSnapshot | null>>;
+}
+
 export interface DeploymentContextDefaultsPolicyInput {
   sourceLocator: string;
   requestedDeploymentMethod: RequestedDeploymentMethod;

@@ -1,6 +1,9 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import { join } from "node:path";
-import { FileSystemSourceDetector } from "@yundu/adapter-filesystem";
+import {
+  FileSystemDeploymentConfigReader,
+  FileSystemSourceDetector,
+} from "@yundu/adapter-filesystem";
 import {
   DefaultRuntimePlanResolver,
   InMemoryExecutionBackend,
@@ -179,6 +182,9 @@ export function registerRuntimeDependencies(
 
   container.register(tokens.sourceDetector, {
     useFactory: instanceCachingFactory(() => new FileSystemSourceDetector()),
+  });
+  container.register(tokens.deploymentConfigReader, {
+    useFactory: instanceCachingFactory(() => new FileSystemDeploymentConfigReader()),
   });
   container.register(tokens.runtimePlanResolver, {
     useFactory: instanceCachingFactory(() => new DefaultRuntimePlanResolver()),

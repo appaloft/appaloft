@@ -15,6 +15,7 @@ import { tokens } from "../../tokens";
 import { publishDomainEventsAndReturn } from "../publish-domain-events";
 import { type CreateDeploymentCommandInput } from "./create-deployment.command";
 import { type DeploymentFactory } from "./deployment.factory";
+import { type DeploymentContextBootstrapService } from "./deployment-config-bootstrap.service";
 import { type DeploymentContextResolver } from "./deployment-context.resolver";
 import { type DeploymentLifecycleService } from "./deployment-lifecycle.service";
 import { type DeploymentSnapshotFactory } from "./deployment-snapshot.factory";
@@ -27,6 +28,8 @@ export class CreateDeploymentUseCase {
     private readonly deploymentRepository: DeploymentRepository,
     @inject(tokens.deploymentContextResolver)
     private readonly deploymentContextResolver: DeploymentContextResolver,
+    @inject(tokens.deploymentContextBootstrapService)
+    private readonly deploymentContextBootstrapService: DeploymentContextBootstrapService,
     @inject(tokens.sourceDetector)
     private readonly sourceDetector: SourceDetector,
     @inject(tokens.runtimePlanResolver)
@@ -55,6 +58,7 @@ export class CreateDeploymentUseCase {
   ): Promise<Result<{ id: string }>> {
     const {
       deploymentFactory,
+      deploymentContextBootstrapService,
       deploymentContextResolver,
       deploymentLifecycleService,
       deploymentRepository,
@@ -76,10 +80,19 @@ export class CreateDeploymentUseCase {
         step: deploymentProgressSteps.detect,
         message: "Resolve deployment context and inspect source",
       });
-      const resolvedContextResult = await deploymentContextResolver.resolve(context, input);
+      const effectiveInputResult = await deploymentContextBootstrapService.bootstrap(
+        context,
+        input,
+      );
+      const effectiveInput = yield* effectiveInputResult;
+
+      const resolvedContextResult = await deploymentContextResolver.resolve(
+        context,
+        effectiveInput,
+      );
       const { project, server, environment } = yield* resolvedContextResult;
 
-      const detectedResult = await sourceDetector.detect(context, input.sourceLocator);
+      const detectedResult = await sourceDetector.detect(context, effectiveInput.sourceLocator);
       const detected = yield* detectedResult;
       reportDeploymentProgress(deploymentProgressReporter, context, {
         phase: "detect",
@@ -101,7 +114,7 @@ export class CreateDeploymentUseCase {
         server,
         environmentSnapshot: snapshot,
         detectedReasoning: detected.reasoning,
-        command: input,
+        command: effectiveInput,
       });
       const runtimePlanInput = yield* runtimePlanInputResult;
       const runtimePlanResult = await runtimePlanResolver.resolve(context, runtimePlanInput);

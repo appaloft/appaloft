@@ -8,6 +8,7 @@
   "dependencies": {
     "@yundu/application": "workspace:*",
     "@yundu/contracts": "workspace:*",
+    "@yundu/deployment-config": "workspace:*",
     "@yundu/orpc": "workspace:*",
     "@yundu/plugin-sdk": "workspace:*",
     "elysia": "^1.4.28"

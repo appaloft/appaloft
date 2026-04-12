@@ -1,0 +1,19 @@
+{
+  "name": "@yundu/deployment-config",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./schema": "./json-schema/yundu.config.schema.json"
+  },
+  "dependencies": {
+    "@yundu/core": "workspace:*",
+    "zod": "^4.1.12"
+  },
+  "scripts": {
+    "build": "bun run build:schema",
+    "build:schema": "bun run scripts/build-json-schema.ts",
+    "lint": "biome check .",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  }
+}

@@ -1,0 +1,246 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "minLength": 1
+    },
+    "project": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Project name to reuse or create."
+        },
+        "description": {
+          "description": "Optional project description.",
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": ["name"],
+      "additionalProperties": false,
+      "description": "Project bootstrap settings."
+    },
+    "environment": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Environment name to reuse or create."
+        },
+        "kind": {
+          "description": "Environment kind. Defaults to custom when omitted.",
+          "type": "string",
+          "enum": ["local", "development", "test", "staging", "production", "preview", "custom"]
+        }
+      },
+      "required": ["name"],
+      "additionalProperties": false,
+      "description": "Environment bootstrap settings."
+    },
+    "targets": {
+      "type": "array",
+      "items": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "key": {
+                "description": "Stable target key for deployment.targetKey selection.",
+                "type": "string",
+                "minLength": 1
+              },
+              "name": {
+                "description": "Deployment target display name.",
+                "type": "string",
+                "minLength": 1
+              },
+              "host": {
+                "description": "Target host. Local shell defaults to 127.0.0.1 when omitted.",
+                "type": "string",
+                "minLength": 1
+              },
+              "port": {
+                "description": "Target management port.",
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              },
+              "providerKey": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Registered provider key, for example local-shell."
+              }
+            },
+            "required": ["providerKey"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "key": {
+                "description": "Stable target key for deployment.targetKey selection.",
+                "type": "string",
+                "minLength": 1
+              },
+              "name": {
+                "description": "Deployment target display name.",
+                "type": "string",
+                "minLength": 1
+              },
+              "host": {
+                "description": "Target host. Local shell defaults to 127.0.0.1 when omitted.",
+                "type": "string",
+                "minLength": 1
+              },
+              "port": {
+                "description": "Target management port.",
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              },
+              "provider": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Alias for providerKey."
+              }
+            },
+            "required": ["provider"],
+            "additionalProperties": false
+          }
+        ],
+        "description": "Deployment target bootstrap settings."
+      }
+    },
+    "servers": {
+      "description": "Alias for targets, kept for transport-compatible server wording.",
+      "type": "array",
+      "items": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "key": {
+                "description": "Stable target key for deployment.targetKey selection.",
+                "type": "string",
+                "minLength": 1
+              },
+              "name": {
+                "description": "Deployment target display name.",
+                "type": "string",
+                "minLength": 1
+              },
+              "host": {
+                "description": "Target host. Local shell defaults to 127.0.0.1 when omitted.",
+                "type": "string",
+                "minLength": 1
+              },
+              "port": {
+                "description": "Target management port.",
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              },
+              "providerKey": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Registered provider key, for example local-shell."
+              }
+            },
+            "required": ["providerKey"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "key": {
+                "description": "Stable target key for deployment.targetKey selection.",
+                "type": "string",
+                "minLength": 1
+              },
+              "name": {
+                "description": "Deployment target display name.",
+                "type": "string",
+                "minLength": 1
+              },
+              "host": {
+                "description": "Target host. Local shell defaults to 127.0.0.1 when omitted.",
+                "type": "string",
+                "minLength": 1
+              },
+              "port": {
+                "description": "Target management port.",
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              },
+              "provider": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Alias for providerKey."
+              }
+            },
+            "required": ["provider"],
+            "additionalProperties": false
+          }
+        ],
+        "description": "Deployment target bootstrap settings."
+      }
+    },
+    "deployment": {
+      "type": "object",
+      "properties": {
+        "targetKey": {
+          "description": "Configured target key, name, or provider alias to deploy to.",
+          "type": "string",
+          "minLength": 1
+        },
+        "target": {
+          "description": "Alias for targetKey.",
+          "type": "string",
+          "minLength": 1
+        },
+        "method": {
+          "description": "Requested deployment method.",
+          "type": "string",
+          "enum": ["auto", "dockerfile", "docker-compose", "prebuilt-image", "workspace-commands"]
+        },
+        "installCommand": {
+          "type": "string",
+          "minLength": 1
+        },
+        "buildCommand": {
+          "type": "string",
+          "minLength": 1
+        },
+        "startCommand": {
+          "type": "string",
+          "minLength": 1
+        },
+        "port": {
+          "description": "Application port.",
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "healthCheckPath": {
+          "type": "string",
+          "minLength": 1
+        },
+        "healthPath": {
+          "description": "Alias for healthCheckPath.",
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false,
+      "description": "Deployment command defaults."
+    }
+  },
+  "additionalProperties": false,
+  "description": "Yundu deployment config file."
+}

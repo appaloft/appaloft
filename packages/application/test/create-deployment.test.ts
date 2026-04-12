@@ -69,14 +69,19 @@ import {
 } from "@yundu/testkit";
 import { type ExecutionContext, toRepositoryContext } from "../src/execution-context";
 import {
+  type DeploymentConfigReader,
+  type DeploymentConfigSnapshot,
   type DeploymentContextDefaultsPolicy,
   type DeploymentProgressReporter,
   type ExecutionBackend,
+  type ProviderDescriptor,
+  type ProviderRegistry,
   type RuntimePlanResolver,
   type SourceDetector,
 } from "../src/ports";
 import {
   CreateDeploymentUseCase,
+  DeploymentContextBootstrapService,
   DeploymentContextDefaultsFactory,
   DeploymentContextResolver,
   DeploymentFactory,
@@ -186,6 +191,51 @@ class NoopDeploymentProgressReporter implements DeploymentProgressReporter {
   report(): void {}
 }
 
+class NullDeploymentConfigReader implements DeploymentConfigReader {
+  async read() {
+    return ok(null);
+  }
+}
+
+class StaticDeploymentConfigReader implements DeploymentConfigReader {
+  constructor(private readonly config: DeploymentConfigSnapshot) {}
+
+  async read() {
+    return ok(this.config);
+  }
+}
+
+class StaticProviderRegistry implements ProviderRegistry {
+  list(): ProviderDescriptor[] {
+    return [
+      {
+        key: "local-shell",
+        title: "Local Shell",
+        category: "deploy-target",
+        capabilities: ["single-server"],
+      },
+      {
+        key: "generic-ssh",
+        title: "Generic SSH",
+        category: "deploy-target",
+        capabilities: ["single-server"],
+      },
+      {
+        key: "aliyun",
+        title: "Alibaba Cloud",
+        category: "cloud-provider",
+        capabilities: ["ecs"],
+      },
+      {
+        key: "tencent-cloud",
+        title: "Tencent Cloud",
+        category: "cloud-provider",
+        capabilities: ["cvm"],
+      },
+    ];
+  }
+}
+
 class ExplicitContextRequiredPolicy implements DeploymentContextDefaultsPolicy {
   decide() {
     return ok({
@@ -292,18 +342,23 @@ describe("CreateDeploymentUseCase", () => {
       UpsertEnvironmentSpec.fromEnvironment(environment),
     );
 
-    const contextResolver = new DeploymentContextResolver(
-      projects,
-      servers,
-      environments,
-      new ExplicitContextRequiredPolicy(),
-      defaultsFactory,
-      eventBus,
-      logger,
-    );
+    const contextResolver = new DeploymentContextResolver(projects, servers, environments);
     const useCase = new CreateDeploymentUseCase(
       deployments,
       contextResolver,
+      new DeploymentContextBootstrapService(
+        new NullDeploymentConfigReader(),
+        projects,
+        servers,
+        environments,
+        new StaticProviderRegistry(),
+        new ExplicitContextRequiredPolicy(),
+        defaultsFactory,
+        clock,
+        idGenerator,
+        eventBus,
+        logger,
+      ),
       new StaticSourceDetector(),
       new StaticRuntimePlanResolver(),
       new HermeticExecutionBackend(),
@@ -356,18 +411,23 @@ describe("CreateDeploymentUseCase", () => {
     const context = createTestContext();
     const repositoryContext = toRepositoryContext(context);
 
-    const contextResolver = new DeploymentContextResolver(
-      projects,
-      servers,
-      environments,
-      new LocalEmbeddedDefaultsPolicy(),
-      defaultsFactory,
-      eventBus,
-      logger,
-    );
+    const contextResolver = new DeploymentContextResolver(projects, servers, environments);
     const useCase = new CreateDeploymentUseCase(
       deployments,
       contextResolver,
+      new DeploymentContextBootstrapService(
+        new NullDeploymentConfigReader(),
+        projects,
+        servers,
+        environments,
+        new StaticProviderRegistry(),
+        new LocalEmbeddedDefaultsPolicy(),
+        defaultsFactory,
+        clock,
+        idGenerator,
+        eventBus,
+        logger,
+      ),
       new StaticSourceDetector(),
       new StaticRuntimePlanResolver(),
       new HermeticExecutionBackend(),
@@ -398,5 +458,88 @@ describe("CreateDeploymentUseCase", () => {
     expect(deployment?.toState().serverId.value).toBe("srv_0003");
     expect([...servers.items.values()][0]?.toState().providerKey.value).toBe("local-shell");
     expect([...environments.items.values()][0]?.toState().name.value).toBe("local");
+  });
+
+  test("bootstraps deployment context from deployment config", async () => {
+    const projects = new MemoryProjectRepository();
+    const servers = new MemoryServerRepository();
+    const environments = new MemoryEnvironmentRepository();
+    const deployments = new MemoryDeploymentRepository();
+    const clock = new FixedClock("2026-01-01T00:00:00.000Z");
+    const idGenerator = new SequenceIdGenerator();
+    const eventBus = new CapturedEventBus();
+    const logger = new NoopLogger();
+    const defaultsFactory = new DeploymentContextDefaultsFactory(clock, idGenerator);
+    const context = createTestContext();
+    const repositoryContext = toRepositoryContext(context);
+
+    const contextResolver = new DeploymentContextResolver(projects, servers, environments);
+    const useCase = new CreateDeploymentUseCase(
+      deployments,
+      contextResolver,
+      new DeploymentContextBootstrapService(
+        new StaticDeploymentConfigReader({
+          project: {
+            name: "Configured App",
+          },
+          environment: {
+            name: "production",
+            kind: "production",
+          },
+          targets: [
+            {
+              key: "aliyun",
+              name: "Aliyun Production",
+              providerKey: "aliyun",
+              host: "203.0.113.10",
+              port: 22,
+            },
+          ],
+          deployment: {
+            targetKey: "aliyun",
+            method: "workspace-commands",
+            startCommand: "node dist/server.js",
+            port: 3000,
+          },
+        }),
+        projects,
+        servers,
+        environments,
+        new StaticProviderRegistry(),
+        new ExplicitContextRequiredPolicy(),
+        defaultsFactory,
+        clock,
+        idGenerator,
+        eventBus,
+        logger,
+      ),
+      new StaticSourceDetector(),
+      new StaticRuntimePlanResolver(),
+      new HermeticExecutionBackend(),
+      eventBus,
+      new NoopDeploymentProgressReporter(),
+      logger,
+      new DeploymentSnapshotFactory(clock, idGenerator),
+      new RuntimePlanResolutionInputBuilder(clock, idGenerator),
+      new DeploymentFactory(clock, idGenerator),
+      new DeploymentLifecycleService(clock),
+    );
+
+    const result = await useCase.execute(context, {
+      sourceLocator: ".",
+    });
+
+    expect(result.isOk()).toBe(true);
+    expect([...projects.items.values()][0]?.toState().name.value).toBe("Configured App");
+    expect([...environments.items.values()][0]?.toState().name.value).toBe("production");
+    expect([...servers.items.values()][0]?.toState().providerKey.value).toBe("aliyun");
+
+    const deployment = await deployments.findOne(
+      repositoryContext,
+      DeploymentByIdSpec.create(DeploymentId.rehydrate(result._unsafeUnwrap().id)),
+    );
+    expect(deployment?.toState().projectId.value).toBe("prj_0001");
+    expect(deployment?.toState().environmentId.value).toBe("env_0002");
+    expect(deployment?.toState().serverId.value).toBe("srv_0003");
   });
 });

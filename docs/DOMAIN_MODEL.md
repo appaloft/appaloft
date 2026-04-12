@@ -187,6 +187,8 @@ Rules:
 Current scope:
 - metadata and ownership
 - does not yet own persisted source bindings
+- may be bootstrapped from a local deployment config or inferred local source metadata, but that
+  config remains an adapter/application input and is not persisted as project source binding
 
 ### Environment
 
@@ -214,6 +216,8 @@ Rules:
 Current scope:
 - single-node target metadata
 - current transport compatibility name: `server`
+- may be reused or created from deployment config after provider-key validation in the application
+  layer; provider SDK specifics remain outside the aggregate
 
 ### Workload
 

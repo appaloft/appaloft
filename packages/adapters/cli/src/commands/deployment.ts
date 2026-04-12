@@ -22,6 +22,7 @@ const deploymentIdArg = Args.text({ name: "deploymentId" });
 const projectOption = Options.text("project").pipe(Options.optional);
 const serverOption = Options.text("server").pipe(Options.optional);
 const environmentOption = Options.text("environment").pipe(Options.optional);
+const configOption = Options.text("config").pipe(Options.optional);
 const deploymentMethods = [
   "auto",
   "dockerfile",
@@ -30,7 +31,7 @@ const deploymentMethods = [
   "workspace-commands",
 ] as const;
 type DeploymentMethod = (typeof deploymentMethods)[number];
-const methodOption = Options.choice("method", deploymentMethods).pipe(Options.withDefault("auto"));
+const methodOption = Options.choice("method", deploymentMethods).pipe(Options.optional);
 const installOption = Options.text("install").pipe(Options.optional);
 const buildOption = Options.text("build").pipe(Options.optional);
 const startOption = Options.text("start").pipe(Options.optional);
@@ -77,6 +78,7 @@ export const deployCommand = EffectCommand.make(
     project: projectOption,
     server: serverOption,
     environment: environmentOption,
+    config: configOption,
     method: methodOption,
     install: installOption,
     build: buildOption,
@@ -88,6 +90,7 @@ export const deployCommand = EffectCommand.make(
   ({
     appLogLines,
     build,
+    config,
     environment,
     healthPath,
     install,
@@ -100,11 +103,12 @@ export const deployCommand = EffectCommand.make(
   }) =>
     runDeploymentCommand(
       CreateDeploymentCommand.create({
+        configFilePath: optionalValue(config),
         projectId: optionalValue(project),
         serverId: optionalValue(server),
         environmentId: optionalValue(environment),
-        sourceLocator: normalizeCliPathOrSource(pathOrSource, method),
-        deploymentMethod: method,
+        sourceLocator: normalizeCliPathOrSource(pathOrSource, optionalValue(method) ?? "auto"),
+        deploymentMethod: optionalValue(method),
         installCommand: optionalValue(install),
         buildCommand: optionalValue(build),
         startCommand: optionalValue(start),

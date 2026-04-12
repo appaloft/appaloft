@@ -208,7 +208,7 @@ export const operationCatalog = [
     inputSchema: createDeploymentCommandInputSchema,
     serviceToken: tokens.createDeploymentUseCase,
     transports: {
-      cli: "yundu deploy <path-or-source>",
+      cli: "yundu deploy <path-or-source> [--config yundu.json]",
       orpc: { method: "POST", path: "/api/deployments" },
     },
   },

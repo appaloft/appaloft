@@ -279,9 +279,10 @@ export const deploymentSummarySchema = z.object({
 });
 
 export const createDeploymentInputSchema = z.object({
-  projectId: z.string(),
-  serverId: z.string(),
-  environmentId: z.string(),
+  configFilePath: z.string().optional(),
+  projectId: z.string().optional(),
+  serverId: z.string().optional(),
+  environmentId: z.string().optional(),
   sourceLocator: z.string().min(1),
   deploymentMethod: z
     .enum(["auto", "dockerfile", "docker-compose", "prebuilt-image", "workspace-commands"])

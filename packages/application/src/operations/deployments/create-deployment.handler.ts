@@ -18,11 +18,12 @@ export class CreateDeploymentCommandHandler
 
   handle(context: ExecutionContext, command: CreateDeploymentCommand) {
     return this.useCase.execute(context, {
+      ...(command.configFilePath ? { configFilePath: command.configFilePath } : {}),
       projectId: command.projectId,
       serverId: command.serverId,
       environmentId: command.environmentId,
       sourceLocator: command.sourceLocator,
-      deploymentMethod: command.deploymentMethod,
+      ...(command.deploymentMethod ? { deploymentMethod: command.deploymentMethod } : {}),
       ...(command.installCommand ? { installCommand: command.installCommand } : {}),
       ...(command.buildCommand ? { buildCommand: command.buildCommand } : {}),
       ...(command.startCommand ? { startCommand: command.startCommand } : {}),
