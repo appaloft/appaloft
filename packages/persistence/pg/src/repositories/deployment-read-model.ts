@@ -18,7 +18,13 @@ import {
 export class PgDeploymentReadModel implements DeploymentReadModel {
   constructor(private readonly db: Kysely<Database>) {}
 
-  async list(context: RepositoryContext, projectId?: string) {
+  async list(
+    context: RepositoryContext,
+    input?: {
+      projectId?: string;
+      resourceId?: string;
+    },
+  ) {
     const executor = resolveRepositoryExecutor(this.db, context);
     return context.tracer.startActiveSpan(
       createReadModelSpanName("deployment", "list"),
@@ -30,8 +36,12 @@ export class PgDeploymentReadModel implements DeploymentReadModel {
       async () => {
         let query = executor.selectFrom("deployments").selectAll().orderBy("created_at", "desc");
 
-        if (projectId) {
-          query = query.where("project_id", "=", projectId);
+        if (input?.projectId) {
+          query = query.where("project_id", "=", input.projectId);
+        }
+
+        if (input?.resourceId) {
+          query = query.where("resource_id", "=", input.resourceId);
         }
 
         const rows = await query.execute();
@@ -47,7 +57,9 @@ export class PgDeploymentReadModel implements DeploymentReadModel {
             id: row.id,
             projectId: row.project_id,
             environmentId: row.environment_id,
+            resourceId: row.resource_id,
             serverId: row.server_id,
+            destinationId: row.destination_id,
             status: row.status as Awaited<
               ReturnType<DeploymentReadModel["list"]>
             >[number]["status"],

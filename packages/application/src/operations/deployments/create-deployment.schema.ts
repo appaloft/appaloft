@@ -6,7 +6,9 @@ export const createDeploymentCommandInputSchema = z.object({
   configFilePath: nonEmptyTrimmedString("Deployment config file path").optional(),
   projectId: nonEmptyTrimmedString("Project id").optional(),
   serverId: nonEmptyTrimmedString("Server id").optional(),
+  destinationId: nonEmptyTrimmedString("Destination id").optional(),
   environmentId: nonEmptyTrimmedString("Environment id").optional(),
+  resourceId: nonEmptyTrimmedString("Resource id").optional(),
   sourceLocator: nonEmptyTrimmedString("Source locator"),
   deploymentMethod: z
     .enum(["auto", "dockerfile", "docker-compose", "prebuilt-image", "workspace-commands"])

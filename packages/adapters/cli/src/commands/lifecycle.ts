@@ -31,6 +31,10 @@ interface InitConfig {
     name: string;
     kind: "local";
   };
+  resource: {
+    name: string;
+    kind: "application";
+  };
   targets: InitConfigTarget[];
   deployment: {
     targetKey: string;
@@ -173,6 +177,10 @@ async function createInitConfig(input: {
       environment: {
         name: "local",
         kind: "local",
+      },
+      resource: {
+        name: "app",
+        kind: "application",
       },
       targets: selectedTargets,
       deployment: {

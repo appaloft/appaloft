@@ -391,9 +391,9 @@ export class InMemoryExecutionBackend implements ExecutionBackend {
             "plan",
             `Selected ${state.runtimePlan.buildStrategy} strategy in ${state.runtimePlan.packagingMode} mode`,
           ),
-          phaseLog("package", `Prepared deployment bundle for server ${state.serverId}`),
+          phaseLog("package", `Prepared deployment bundle for resource ${state.resourceId.value}`),
           phaseLog("deploy", `Applying runtime plan ${state.runtimePlan.id}`),
-          phaseLog("verify", `Checking deployment health on ${state.serverId}`),
+          phaseLog("verify", `Checking deployment health for resource ${state.resourceId.value}`),
         ];
         for (const log of logs) {
           this.report(context, {

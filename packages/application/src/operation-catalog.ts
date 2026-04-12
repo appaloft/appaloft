@@ -12,13 +12,20 @@ import { showEnvironmentQueryInputSchema } from "./operations/environments/show-
 import { unsetEnvironmentVariableCommandInputSchema } from "./operations/environments/unset-environment-variable.command";
 import { createProjectCommandInputSchema } from "./operations/projects/create-project.command";
 import { listProjectsQueryInputSchema } from "./operations/projects/list-projects.query";
+import { listResourcesQueryInputSchema } from "./operations/resources/list-resources.query";
 import { listServersQueryInputSchema } from "./operations/servers/list-servers.query";
 import { registerServerCommandInputSchema } from "./operations/servers/register-server.command";
 import { listGitHubRepositoriesQueryInputSchema } from "./operations/system/list-github-repositories.query";
 import { tokens } from "./tokens";
 
 type OperationKind = "command" | "query";
-type OperationDomain = "projects" | "servers" | "environments" | "deployments" | "system";
+type OperationDomain =
+  | "projects"
+  | "servers"
+  | "environments"
+  | "resources"
+  | "deployments"
+  | "system";
 
 export interface OperationCatalogEntry {
   key: string;
@@ -95,6 +102,20 @@ export const operationCatalog = [
     transports: {
       cli: "yundu server list",
       orpc: { method: "GET", path: "/api/servers" },
+    },
+  },
+  {
+    key: "resources.list",
+    kind: "query",
+    domain: "resources",
+    messageName: "ListResourcesQuery",
+    handlerName: "ListResourcesQueryHandler",
+    serviceName: "ListResourcesQueryService",
+    inputSchema: listResourcesQueryInputSchema,
+    serviceToken: tokens.listResourcesQueryService,
+    transports: {
+      cli: "yundu resource list",
+      orpc: { method: "GET", path: "/api/resources" },
     },
   },
   {

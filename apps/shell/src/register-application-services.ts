@@ -19,6 +19,7 @@ import {
   ListPluginsQueryService,
   ListProjectsQueryService,
   ListProvidersQueryService,
+  ListResourcesQueryService,
   ListServersQueryService,
   PromoteEnvironmentUseCase,
   RegisterServerUseCase,
@@ -35,6 +36,7 @@ import { type DependencyContainer } from "tsyringe";
 export function registerApplicationServices(container: DependencyContainer): void {
   container.registerSingleton(tokens.createProjectUseCase, CreateProjectUseCase);
   container.registerSingleton(tokens.listProjectsQueryService, ListProjectsQueryService);
+  container.registerSingleton(tokens.listResourcesQueryService, ListResourcesQueryService);
   container.registerSingleton(tokens.registerServerUseCase, RegisterServerUseCase);
   container.registerSingleton(tokens.listServersQueryService, ListServersQueryService);
   container.registerSingleton(tokens.createEnvironmentUseCase, CreateEnvironmentUseCase);

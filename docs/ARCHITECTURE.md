@@ -69,7 +69,7 @@ flowchart TD
 
 - `packages/core`
   - bounded contexts live under `shared`, `workspace`, `configuration`, `runtime-topology`, `workload-delivery`, `dependency-resources`, and `release-orchestration`
-  - currently implemented aggregates: `Project`, `Environment`, `DeploymentTarget`, `Deployment`, foundational `Workload`, foundational `Release`, foundational `ResourceBinding`
+  - currently implemented aggregates: `Project`, `Environment`, `DeploymentTarget`, `Destination`, `Resource`, `Deployment`, foundational `Workload`, foundational `Release`, foundational `ResourceInstance`, foundational `ResourceBinding`
   - value-ish domain data: `RuntimePlan`, `EnvironmentSnapshot`, `EnvironmentConfigSet`
   - domain events, explicit result/error model
 - `packages/application`
@@ -78,7 +78,7 @@ flowchart TD
   - repository/read-model/provider/plugin/integration ports
   - deployment-context defaults stay split between policy and semantic factory
   - policy decides whether identifiers are required or which preset applies
-  - factory exposes meaningful preset methods such as local project/server/environment selection and creation
+  - factory exposes meaningful preset methods such as local project/server/destination/environment selection and creation
 - `packages/orpc`
   - typed transport contracts
   - oRPC RPC handlers mounted at `/api/rpc` for first-party clients such as `apps/web`

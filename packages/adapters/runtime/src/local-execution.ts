@@ -70,6 +70,8 @@ function deploymentEnv(
     YUNDU_DEPLOYMENT_ID: state.id.value,
     YUNDU_PROJECT_ID: state.projectId.value,
     YUNDU_ENVIRONMENT_ID: state.environmentId.value,
+    YUNDU_RESOURCE_ID: state.resourceId.value,
+    YUNDU_DESTINATION_ID: state.destinationId.value,
   } as NodeJS.ProcessEnv;
 
   for (const variable of state.environmentSnapshot.variables) {

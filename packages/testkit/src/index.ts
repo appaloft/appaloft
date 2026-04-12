@@ -5,6 +5,7 @@ import {
   type DeploymentReadModel,
   type DeploymentRepository,
   type DeploymentSummary,
+  type DestinationRepository,
   type EnvironmentReadModel,
   type EnvironmentRepository,
   type EnvironmentSummary,
@@ -14,6 +15,9 @@ import {
   type ProjectReadModel,
   type ProjectRepository,
   type RepositoryContext,
+  type ResourceReadModel,
+  type ResourceRepository,
+  type ResourceSummary,
   type ServerReadModel,
   type ServerRepository,
 } from "@yundu/application";
@@ -27,6 +31,11 @@ import {
   DeploymentTargetByProviderAndHostSpec,
   type DeploymentTargetMutationSpec,
   type DeploymentTargetSelectionSpec,
+  Destination,
+  DestinationByIdSpec,
+  DestinationByServerAndNameSpec,
+  type DestinationMutationSpec,
+  type DestinationSelectionSpec,
   Environment,
   EnvironmentByIdSpec,
   EnvironmentByProjectAndNameSpec,
@@ -37,6 +46,11 @@ import {
   ProjectBySlugSpec,
   type ProjectMutationSpec,
   type ProjectSelectionSpec,
+  Resource,
+  ResourceByEnvironmentAndSlugSpec,
+  ResourceByIdSpec,
+  type ResourceMutationSpec,
+  type ResourceSelectionSpec,
 } from "@yundu/core";
 
 export class FixedClock implements Clock {
@@ -179,6 +193,41 @@ export class MemoryServerReadModel implements ServerReadModel {
   }
 }
 
+export class MemoryDestinationRepository implements DestinationRepository {
+  readonly items = new Map<string, Destination>();
+
+  async upsert(
+    context: RepositoryContext,
+    destination: Destination,
+    spec: DestinationMutationSpec,
+  ): Promise<void> {
+    void context;
+    void spec;
+    this.items.set(destination.toState().id.value, Destination.rehydrate(destination.toState()));
+  }
+
+  async findOne(
+    context: RepositoryContext,
+    spec: DestinationSelectionSpec,
+  ): Promise<Destination | null> {
+    void context;
+    if (spec instanceof DestinationByIdSpec) {
+      return this.items.get(spec.id.value) ?? null;
+    }
+
+    if (spec instanceof DestinationByServerAndNameSpec) {
+      for (const destination of this.items.values()) {
+        const state = destination.toState();
+        if (state.serverId.equals(spec.serverId) && state.name.equals(spec.name)) {
+          return destination;
+        }
+      }
+    }
+
+    return null;
+  }
+}
+
 export class MemoryEnvironmentRepository implements EnvironmentRepository {
   readonly items = new Map<string, Environment>();
 
@@ -254,6 +303,96 @@ export class MemoryEnvironmentReadModel implements EnvironmentReadModel {
   }
 }
 
+export class MemoryResourceRepository implements ResourceRepository {
+  readonly items = new Map<string, Resource>();
+
+  async upsert(
+    context: RepositoryContext,
+    resource: Resource,
+    spec: ResourceMutationSpec,
+  ): Promise<void> {
+    void context;
+    void spec;
+    this.items.set(resource.toState().id.value, Resource.rehydrate(resource.toState()));
+  }
+
+  async findOne(context: RepositoryContext, spec: ResourceSelectionSpec): Promise<Resource | null> {
+    void context;
+    if (spec instanceof ResourceByIdSpec) {
+      return this.items.get(spec.id.value) ?? null;
+    }
+
+    if (spec instanceof ResourceByEnvironmentAndSlugSpec) {
+      for (const resource of this.items.values()) {
+        const state = resource.toState();
+        if (
+          state.projectId.equals(spec.projectId) &&
+          state.environmentId.equals(spec.environmentId) &&
+          state.slug.equals(spec.slug)
+        ) {
+          return resource;
+        }
+      }
+    }
+
+    return null;
+  }
+}
+
+export class MemoryResourceReadModel implements ResourceReadModel {
+  constructor(
+    private readonly repository: MemoryResourceRepository,
+    private readonly deployments?: MemoryDeploymentRepository,
+  ) {}
+
+  async list(
+    context: RepositoryContext,
+    input?: {
+      projectId?: string;
+      environmentId?: string;
+    },
+  ) {
+    void context;
+    return [...this.repository.items.values()]
+      .map((resource) => resource.toState())
+      .filter((resource) =>
+        input?.projectId ? resource.projectId.value === input.projectId : true,
+      )
+      .filter((resource) =>
+        input?.environmentId ? resource.environmentId.value === input.environmentId : true,
+      )
+      .map((resource): ResourceSummary => {
+        const deployments = [...(this.deployments?.items.values() ?? [])]
+          .map((deployment) => deployment.toState())
+          .filter((deployment) => deployment.resourceId.equals(resource.id));
+        const lastDeployment = deployments[0];
+
+        return {
+          id: resource.id.value,
+          projectId: resource.projectId.value,
+          environmentId: resource.environmentId.value,
+          ...(resource.destinationId ? { destinationId: resource.destinationId.value } : {}),
+          name: resource.name.value,
+          slug: resource.slug.value,
+          kind: resource.kind.value,
+          ...(resource.description ? { description: resource.description.value } : {}),
+          services: resource.services.map((service) => ({
+            name: service.name.value,
+            kind: service.kind.value,
+          })),
+          deploymentCount: deployments.length,
+          ...(lastDeployment
+            ? {
+                lastDeploymentId: lastDeployment.id.value,
+                lastDeploymentStatus: lastDeployment.status.value,
+              }
+            : {}),
+          createdAt: resource.createdAt.value,
+        };
+      });
+  }
+}
+
 export class MemoryDeploymentRepository implements DeploymentRepository {
   readonly items = new Map<string, Deployment>();
 
@@ -283,17 +422,30 @@ export class MemoryDeploymentRepository implements DeploymentRepository {
 export class MemoryDeploymentReadModel implements DeploymentReadModel {
   constructor(private readonly repository: MemoryDeploymentRepository) {}
 
-  async list(context: RepositoryContext, projectId?: string) {
+  async list(
+    context: RepositoryContext,
+    input?: {
+      projectId?: string;
+      resourceId?: string;
+    },
+  ) {
     void context;
     return [...this.repository.items.values()]
       .map((deployment) => deployment.toState())
-      .filter((deployment) => (projectId ? deployment.projectId.value === projectId : true))
+      .filter((deployment) =>
+        input?.projectId ? deployment.projectId.value === input.projectId : true,
+      )
+      .filter((deployment) =>
+        input?.resourceId ? deployment.resourceId.value === input.resourceId : true,
+      )
       .map(
         (deployment): DeploymentSummary => ({
           id: deployment.id.value,
           projectId: deployment.projectId.value,
           environmentId: deployment.environmentId.value,
+          resourceId: deployment.resourceId.value,
           serverId: deployment.serverId.value,
+          destinationId: deployment.destinationId.value,
           status: deployment.status.value,
           runtimePlan: {
             id: deployment.runtimePlan.id,

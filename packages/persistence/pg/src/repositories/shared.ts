@@ -16,6 +16,9 @@ import {
   DeploymentTargetId,
   DeploymentTargetName,
   DescriptionText,
+  DestinationId,
+  DestinationKindValue,
+  DestinationName,
   DetectSummary,
   DisplayNameText,
   EnvironmentConfigSet,
@@ -43,6 +46,12 @@ import {
   ProjectName,
   ProjectSlug,
   ProviderKey,
+  ResourceId,
+  ResourceKindValue,
+  ResourceName,
+  ResourceServiceKindValue,
+  ResourceServiceName,
+  ResourceSlug,
   RuntimeExecutionPlan,
   RuntimePlan,
   RuntimePlanId,
@@ -71,8 +80,11 @@ type VariableKindInput = Parameters<typeof VariableKindValue.rehydrate>[0];
 type VariableExposureInput = Parameters<typeof VariableExposureValue.rehydrate>[0];
 type EnvironmentKindInput = Parameters<typeof EnvironmentKindValue.rehydrate>[0];
 type DeploymentStatusInput = Parameters<typeof DeploymentStatusValue.rehydrate>[0];
+type DestinationKindInput = Parameters<typeof DestinationKindValue.rehydrate>[0];
 type DeploymentPhaseInput = Parameters<typeof DeploymentPhaseValue.rehydrate>[0];
 type LogLevelInput = Parameters<typeof LogLevelValue.rehydrate>[0];
+type ResourceKindInput = Parameters<typeof ResourceKindValue.rehydrate>[0];
+type ResourceServiceKindInput = Parameters<typeof ResourceServiceKindValue.rehydrate>[0];
 
 export interface SerializedSourceDescriptor extends Record<string, unknown> {
   kind: SourceKindInput;
@@ -137,6 +149,11 @@ export interface SerializedDeploymentLog extends Record<string, unknown> {
   phase: DeploymentPhaseInput;
   level: LogLevelInput;
   message: string;
+}
+
+export interface SerializedResourceService extends Record<string, unknown> {
+  name: string;
+  kind: ResourceServiceKindInput;
 }
 
 export type RepositoryExecutor = Kysely<Database> | Transaction<Database>;
@@ -407,6 +424,16 @@ export function rehydrateDeploymentTarget(row: Selectable<Database["servers"]>) 
   };
 }
 
+export function rehydrateDestination(row: Selectable<Database["destinations"]>) {
+  return {
+    id: DestinationId.rehydrate(row.id),
+    serverId: DeploymentTargetId.rehydrate(row.server_id),
+    name: DestinationName.rehydrate(row.name),
+    kind: DestinationKindValue.rehydrate(row.kind as DestinationKindInput),
+    createdAt: CreatedAt.rehydrate(normalizeTimestamp(row.created_at) ?? row.created_at),
+  };
+}
+
 export function rehydrateEnvironmentRow(
   environmentRow: Selectable<Database["environments"]>,
   variables: EnvironmentVariableRow[],
@@ -438,6 +465,38 @@ export function rehydrateEnvironmentRow(
   };
 }
 
+export function serializeResourceServices(
+  services: Array<{
+    name: ResourceServiceName;
+    kind: ResourceServiceKindValue;
+  }>,
+): SerializedResourceService[] {
+  return services.map((service) => ({
+    name: service.name.value,
+    kind: service.kind.value,
+  }));
+}
+
+export function rehydrateResourceRow(row: Selectable<Database["resources"]>) {
+  const services = (row.services ?? []) as unknown as SerializedResourceService[];
+
+  return {
+    id: ResourceId.rehydrate(row.id),
+    projectId: ProjectId.rehydrate(row.project_id),
+    environmentId: EnvironmentId.rehydrate(row.environment_id),
+    ...(row.destination_id ? { destinationId: DestinationId.rehydrate(row.destination_id) } : {}),
+    name: ResourceName.rehydrate(row.name),
+    slug: ResourceSlug.rehydrate(row.slug),
+    kind: ResourceKindValue.rehydrate(row.kind as ResourceKindInput),
+    services: services.map((service) => ({
+      name: ResourceServiceName.rehydrate(service.name),
+      kind: ResourceServiceKindValue.rehydrate(service.kind),
+    })),
+    createdAt: CreatedAt.rehydrate(normalizeTimestamp(row.created_at) ?? row.created_at),
+    ...(row.description ? { description: DescriptionText.rehydrate(row.description) } : {}),
+  };
+}
+
 export function rehydrateDeploymentRow(row: Selectable<Database["deployments"]>) {
   const startedAt = normalizeTimestamp(row.started_at);
   const finishedAt = normalizeTimestamp(row.finished_at);
@@ -446,7 +505,9 @@ export function rehydrateDeploymentRow(row: Selectable<Database["deployments"]>)
     id: DeploymentId.rehydrate(row.id),
     projectId: ProjectId.rehydrate(row.project_id),
     environmentId: EnvironmentId.rehydrate(row.environment_id),
+    resourceId: ResourceId.rehydrate(row.resource_id),
     serverId: DeploymentTargetId.rehydrate(row.server_id),
+    destinationId: DestinationId.rehydrate(row.destination_id),
     status: DeploymentStatusValue.rehydrate(row.status as DeploymentStatusInput),
     runtimePlan: rehydrateRuntimePlan(row.runtime_plan),
     environmentSnapshot: rehydrateEnvironmentSnapshot(row.environment_snapshot),

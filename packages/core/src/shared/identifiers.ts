@@ -85,6 +85,27 @@ export class DeploymentTargetId extends IdentifierValue {
   }
 }
 
+const destinationIdBrand: unique symbol = Symbol("DestinationId");
+export class DestinationId extends IdentifierValue {
+  private [destinationIdBrand]!: void;
+
+  private constructor(value: string) {
+    super(value);
+  }
+
+  static create(value: string): Result<DestinationId> {
+    return createIdentifierValue(
+      value,
+      "Destination ID",
+      (normalized) => new DestinationId(normalized),
+    );
+  }
+
+  static rehydrate(value: string): DestinationId {
+    return new DestinationId(value.trim());
+  }
+}
+
 const deploymentIdBrand: unique symbol = Symbol("DeploymentId");
 export class DeploymentId extends IdentifierValue {
   private [deploymentIdBrand]!: void;
@@ -137,6 +158,23 @@ export class WorkloadId extends IdentifierValue {
 
   static rehydrate(value: string): WorkloadId {
     return new WorkloadId(value.trim());
+  }
+}
+
+const resourceIdBrand: unique symbol = Symbol("ResourceId");
+export class ResourceId extends IdentifierValue {
+  private [resourceIdBrand]!: void;
+
+  private constructor(value: string) {
+    super(value);
+  }
+
+  static create(value: string): Result<ResourceId> {
+    return createIdentifierValue(value, "Resource ID", (normalized) => new ResourceId(normalized));
+  }
+
+  static rehydrate(value: string): ResourceId {
+    return new ResourceId(value.trim());
   }
 }
 

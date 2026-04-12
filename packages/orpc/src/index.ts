@@ -23,10 +23,12 @@ import {
   ListPluginsQuery,
   ListProjectsQuery,
   ListProvidersQuery,
+  ListResourcesQuery,
   ListServersQuery,
   listDeploymentsQueryInputSchema,
   listEnvironmentsQueryInputSchema,
   listGitHubRepositoriesQueryInputSchema,
+  listResourcesQueryInputSchema,
   PromoteEnvironmentCommand,
   promoteEnvironmentCommandInputSchema,
   type Query,
@@ -55,6 +57,7 @@ import {
   listPluginsResponseSchema,
   listProjectsResponseSchema,
   listProvidersResponseSchema,
+  listResourcesResponseSchema,
   listServersResponseSchema,
   promoteEnvironmentResponseSchema,
   registerServerResponseSchema,
@@ -394,6 +397,16 @@ export const createEnvironmentProcedure = base
     executeCommand(context, CreateEnvironmentCommand.create(input)),
   );
 
+export const listResourcesProcedure = base
+  .route({
+    method: "GET",
+    path: "/resources",
+    successStatus: 200,
+  })
+  .input(listResourcesQueryInputSchema)
+  .output(listResourcesResponseSchema)
+  .handler(async ({ input, context }) => executeQuery(context, ListResourcesQuery.create(input)));
+
 export const showEnvironmentProcedure = base
   .route({
     method: "GET",
@@ -544,6 +557,9 @@ export const yunduOrpcRouter = {
     promote: promoteEnvironmentProcedure,
     diff: diffEnvironmentsProcedure,
   },
+  resources: {
+    list: listResourcesProcedure,
+  },
   deployments: {
     list: listDeploymentsProcedure,
     create: createDeploymentProcedure,
@@ -678,6 +694,7 @@ export function mountYunduOrpcRoutes(
     "/api/environments/:environmentId/variables/:key",
     "/api/environments/:environmentId/promote",
     "/api/environments/:environmentId/diff/:otherEnvironmentId",
+    "/api/resources",
     "/api/deployments",
     "/api/deployments/:deploymentId/logs",
     "/api/deployments/:deploymentId/rollback",

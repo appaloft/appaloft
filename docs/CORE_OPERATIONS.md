@@ -41,11 +41,12 @@ to an explicit application operation.
 
 ## Business Capability Model
 
-The current Yundu core is organized into five capability groups:
+The current Yundu core is organized into six capability groups:
 
 - Projects
 - Deployment Targets
 - Environments
+- Resources
 - Deployments
 - System operations
 
@@ -128,10 +129,42 @@ Core next operations expected here:
 - list environment change history
 - inspect effective precedence resolution
 
+## Resources
+
+Business meaning:
+- a `Resource` is the deployable unit inside a project environment
+- applications, backend services, databases, workers, static sites, external services, and Docker
+  Compose stacks are modeled as resources
+- a Docker Compose stack is one resource that may contain multiple named services
+- deployments belong to one resource
+- destinations and deployment targets / servers remain runtime placement, not the project
+  organization layer
+
+Implemented operations:
+
+| Capability | Kind | Operation Key | Message | Schema | CLI | oRPC / HTTP |
+| --- | --- | --- | --- | --- | --- | --- |
+| List resources | Query | `resources.list` | `ListResourcesQuery` | `ListResourcesQueryInput` | `yundu resource list` | `GET /api/resources` |
+
+Current boundary:
+- resources are persisted and can be listed by project or environment
+- deployment creation resolves or bootstraps a resource and destination before creating the
+  deployment record
+- provider-backed dependency resources remain `ResourceInstance`; they are not the same aggregate
+  as project resources
+
+Core next operations expected here:
+- create resource
+- show resource details
+- update resource profile/source
+- declare compose-stack services from compose metadata
+- archive resource
+
 ## Deployments
 
 Business meaning:
-- deployment is the execution record of a runtime plan against a project, environment, and target
+- deployment is the execution record of a runtime plan against a project, environment, resource,
+  destination, and target/server
 - the write side owns runtime plan creation, execution state, snapshot capture, and rollback intent
 
 Implemented operations:
@@ -146,10 +179,10 @@ Implemented operations:
 Current boundary:
 - deployment source is currently supplied as `sourceLocator` when the deployment command is
   created
-- `projectId`, `serverId`, and `environmentId` may be omitted when the active deployment-context
-  defaults policy can resolve or bootstrap them
+- `projectId`, `resourceId`, `destinationId`, `serverId`, and `environmentId` may be omitted when the active
+  deployment-context defaults policy can resolve or bootstrap them
   - current self-hosted embedded profile reuses or creates a local default project, local-shell
-    deployment target, and local environment
+    deployment target, local destination, local environment, and local resource
   - contexts that do not allow implicit ownership, such as future cloud/hosted flows, must still
     require explicit identifiers
 - deployment method is now also supplied explicitly at command input time
@@ -166,10 +199,10 @@ Current boundary:
   - application services apply config bootstrap and default-context bootstrap as ordered strategies
     in the same deployment-context bootstrap layer
   - the config strategy validates provider keys through the provider registry
-  - configured projects, environments, and deployment targets are reused or created through the
-    normal repositories before the runtime plan is built
-  - if the command explicitly supplies `projectId`, `environmentId`, or `serverId`, those explicit
-    identifiers still win for the deployment selection
+  - configured projects, environments, deployment targets, destinations, and resources are reused
+    or created through the normal repositories before the runtime plan is built
+  - if the command explicitly supplies `projectId`, `environmentId`, `destinationId`, or
+    `serverId`, those explicit identifiers still win for the deployment selection
 - detect and plan happen inside the deployment write flow
 
 Core next operations expected here:

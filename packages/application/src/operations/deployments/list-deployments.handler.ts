@@ -25,7 +25,12 @@ export class ListDeploymentsQueryHandler
     return ok(
       await this.queryService.execute(
         context,
-        query.projectId ? { projectId: query.projectId } : undefined,
+        query.projectId || query.resourceId
+          ? {
+              ...(query.projectId ? { projectId: query.projectId } : {}),
+              ...(query.resourceId ? { resourceId: query.resourceId } : {}),
+            }
+          : undefined,
       ),
     );
   }

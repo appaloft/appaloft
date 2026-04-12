@@ -7,6 +7,10 @@ import {
   type DeploymentSelectionSpec,
   type DeploymentStatus,
   type DeploymentTargetState,
+  type Destination,
+  type DestinationKind,
+  type DestinationMutationSpec,
+  type DestinationSelectionSpec,
   type DomainEvent,
   type EnvironmentKind,
   type EnvironmentMutationSpec,
@@ -19,6 +23,11 @@ import {
   type Project,
   type ProjectMutationSpec,
   type ProjectSelectionSpec,
+  type Resource,
+  type ResourceKind,
+  type ResourceMutationSpec,
+  type ResourceSelectionSpec,
+  type ResourceServiceKind,
   type Result,
   type RollbackPlan,
   type RuntimePlan,
@@ -101,6 +110,15 @@ export interface ServerRepository {
   upsert(context: RepositoryContext, server: Server, spec: ServerMutationSpec): Promise<void>;
 }
 
+export interface DestinationRepository {
+  findOne(context: RepositoryContext, spec: DestinationSelectionSpec): Promise<Destination | null>;
+  upsert(
+    context: RepositoryContext,
+    destination: Destination,
+    spec: DestinationMutationSpec,
+  ): Promise<void>;
+}
+
 export interface EnvironmentRepository {
   findOne(
     context: RepositoryContext,
@@ -111,6 +129,11 @@ export interface EnvironmentRepository {
     environment: EnvironmentProfile,
     spec: EnvironmentMutationSpec,
   ): Promise<void>;
+}
+
+export interface ResourceRepository {
+  findOne(context: RepositoryContext, spec: ResourceSelectionSpec): Promise<Resource | null>;
+  upsert(context: RepositoryContext, resource: Resource, spec: ResourceMutationSpec): Promise<void>;
 }
 
 export interface DeploymentRepository {
@@ -156,6 +179,25 @@ export interface EnvironmentSummary {
   }>;
 }
 
+export interface ResourceSummary {
+  id: string;
+  projectId: string;
+  environmentId: string;
+  destinationId?: string;
+  name: string;
+  slug: string;
+  kind: ResourceKind;
+  description?: string;
+  createdAt: string;
+  services: Array<{
+    name: string;
+    kind: ResourceServiceKind;
+  }>;
+  deploymentCount: number;
+  lastDeploymentId?: string;
+  lastDeploymentStatus?: DeploymentStatus;
+}
+
 export interface DeploymentLogSummary {
   timestamp: string;
   source: DeploymentLogSource;
@@ -191,7 +233,9 @@ export interface DeploymentSummary {
   id: string;
   projectId: string;
   environmentId: string;
+  resourceId: string;
   serverId: string;
+  destinationId: string;
   status: DeploymentStatus;
   runtimePlan: {
     id: string;
@@ -261,8 +305,24 @@ export interface EnvironmentReadModel {
   findById(context: RepositoryContext, id: string): Promise<EnvironmentSummary | null>;
 }
 
+export interface ResourceReadModel {
+  list(
+    context: RepositoryContext,
+    input?: {
+      projectId?: string;
+      environmentId?: string;
+    },
+  ): Promise<ResourceSummary[]>;
+}
+
 export interface DeploymentReadModel {
-  list(context: RepositoryContext, projectId?: string): Promise<DeploymentSummary[]>;
+  list(
+    context: RepositoryContext,
+    input?: {
+      projectId?: string;
+      resourceId?: string;
+    },
+  ): Promise<DeploymentSummary[]>;
   findLogs(context: RepositoryContext, id: string): Promise<DeploymentLogSummary[]>;
 }
 
@@ -297,18 +357,35 @@ export interface DeploymentConfiguredEnvironment {
   kind?: EnvironmentKind;
 }
 
+export interface DeploymentConfiguredResource {
+  name: string;
+  kind?: ResourceKind;
+  description?: string;
+  services?: Array<{
+    name: string;
+    kind: ResourceServiceKind;
+  }>;
+}
+
+export interface DeploymentConfiguredDestination {
+  name?: string;
+  kind?: DestinationKind;
+}
+
 export interface DeploymentConfiguredTarget {
   key?: string;
   name?: string;
   providerKey: string;
   host?: string;
   port?: number;
+  destination?: DeploymentConfiguredDestination;
 }
 
 export interface DeploymentConfigSnapshot {
   configFilePath?: string;
   project?: DeploymentConfiguredProject;
   environment?: DeploymentConfiguredEnvironment;
+  resource?: DeploymentConfiguredResource;
   targets?: DeploymentConfiguredTarget[];
   deployment?: Partial<RequestedDeploymentConfig> & {
     targetKey?: string;
@@ -357,10 +434,30 @@ export type EnvironmentContextDefault =
       preset: "local-environment";
     };
 
+export type ResourceContextDefault =
+  | {
+      mode: "required";
+    }
+  | {
+      mode: "reuse-or-create";
+      preset: "local-resource";
+    };
+
+export type DestinationContextDefault =
+  | {
+      mode: "required";
+    }
+  | {
+      mode: "reuse-or-create";
+      preset: "local-destination";
+    };
+
 export interface DeploymentContextDefaultsDecision {
   project: ProjectContextDefault;
   server: ServerContextDefault;
+  destination: DestinationContextDefault;
   environment: EnvironmentContextDefault;
+  resource: ResourceContextDefault;
 }
 
 export interface DeploymentContextDefaultsPolicy {
@@ -372,8 +469,19 @@ export interface DeploymentContextDefaultsFactoryPort {
   createLocalProject(): Result<Project>;
   localServerSelection(): Result<ServerSelectionSpec>;
   createLocalServer(): Result<Server>;
+  localDestinationSelection(server: Server): Result<DestinationSelectionSpec>;
+  createLocalDestination(server: Server): Result<Destination>;
   localEnvironmentSelection(project: Project): Result<EnvironmentSelectionSpec>;
   createLocalEnvironment(project: Project): Result<EnvironmentProfile>;
+  localResourceSelection(
+    project: Project,
+    environment: EnvironmentProfile,
+  ): Result<ResourceSelectionSpec>;
+  createLocalResource(
+    project: Project,
+    environment: EnvironmentProfile,
+    destination: Destination,
+  ): Result<Resource>;
 }
 
 export interface SourceDetector {

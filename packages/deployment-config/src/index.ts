@@ -1,4 +1,9 @@
-import { environmentKinds } from "@yundu/core";
+import {
+  destinationKinds,
+  environmentKinds,
+  resourceKinds,
+  resourceServiceKinds,
+} from "@yundu/core";
 import { z } from "zod";
 
 export const yunduDeploymentConfigFileNames = [
@@ -34,6 +39,25 @@ export const yunduDeploymentEnvironmentConfigSchema = z
   })
   .describe("Environment bootstrap settings.");
 
+export const yunduDeploymentResourceServiceConfigSchema = z
+  .object({
+    name: nonEmptyStringSchema.describe("Service name inside a compose-stack resource."),
+    kind: z.enum(resourceServiceKinds).describe("Service role inside the resource."),
+  })
+  .describe("Service entry inside a resource.");
+
+export const yunduDeploymentResourceConfigSchema = z
+  .object({
+    name: nonEmptyStringSchema.describe("Resource name to reuse or create."),
+    kind: z.enum(resourceKinds).optional().describe("Resource kind. Defaults to application."),
+    description: z.string().trim().min(1).optional().describe("Optional resource description."),
+    services: z
+      .array(yunduDeploymentResourceServiceConfigSchema)
+      .optional()
+      .describe("Services contained by a compose-stack resource."),
+  })
+  .describe("Resource bootstrap settings.");
+
 const targetBaseSchema = z.object({
   key: z
     .string()
@@ -49,6 +73,13 @@ const targetBaseSchema = z.object({
     .optional()
     .describe("Target host. Local shell defaults to 127.0.0.1 when omitted."),
   port: z.number().int().positive().optional().describe("Target management port."),
+  destination: z
+    .object({
+      name: z.string().trim().min(1).optional(),
+      kind: z.enum(destinationKinds).optional(),
+    })
+    .optional()
+    .describe("Deployment destination or isolation boundary on the selected server."),
 });
 
 export const yunduDeploymentTargetConfigSchema = z
@@ -88,6 +119,7 @@ export const yunduDeploymentConfigSchema = z
     $schema: z.string().trim().min(1).optional(),
     project: yunduDeploymentProjectConfigSchema.optional(),
     environment: yunduDeploymentEnvironmentConfigSchema.optional(),
+    resource: yunduDeploymentResourceConfigSchema.optional(),
     targets: z.array(yunduDeploymentTargetConfigSchema).optional(),
     servers: z
       .array(yunduDeploymentTargetConfigSchema)

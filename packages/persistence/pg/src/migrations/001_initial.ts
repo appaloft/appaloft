@@ -24,6 +24,18 @@ export const initialMigration = {
       .execute();
 
     await db.schema
+      .createTable("destinations")
+      .addColumn("id", "text", (column) => column.primaryKey())
+      .addColumn("server_id", "text", (column) =>
+        column.notNull().references("servers.id").onDelete("cascade"),
+      )
+      .addColumn("name", "text", (column) => column.notNull())
+      .addColumn("kind", "text", (column) => column.notNull())
+      .addColumn("created_at", "timestamptz", (column) => column.notNull())
+      .addUniqueConstraint("destinations_server_name_unique", ["server_id", "name"])
+      .execute();
+
+    await db.schema
       .createTable("environments")
       .addColumn("id", "text", (column) => column.primaryKey())
       .addColumn("project_id", "text", (column) =>
@@ -58,6 +70,31 @@ export const initialMigration = {
       .execute();
 
     await db.schema
+      .createTable("resources")
+      .addColumn("id", "text", (column) => column.primaryKey())
+      .addColumn("project_id", "text", (column) =>
+        column.notNull().references("projects.id").onDelete("cascade"),
+      )
+      .addColumn("environment_id", "text", (column) =>
+        column.notNull().references("environments.id").onDelete("cascade"),
+      )
+      .addColumn("destination_id", "text", (column) =>
+        column.references("destinations.id").onDelete("set null"),
+      )
+      .addColumn("name", "text", (column) => column.notNull())
+      .addColumn("slug", "text", (column) => column.notNull())
+      .addColumn("kind", "text", (column) => column.notNull())
+      .addColumn("description", "text")
+      .addColumn("services", "jsonb", (column) => column.notNull().defaultTo("[]"))
+      .addColumn("created_at", "timestamptz", (column) => column.notNull())
+      .addUniqueConstraint("resources_environment_slug_unique", [
+        "project_id",
+        "environment_id",
+        "slug",
+      ])
+      .execute();
+
+    await db.schema
       .createTable("deployments")
       .addColumn("id", "text", (column) => column.primaryKey())
       .addColumn("project_id", "text", (column) =>
@@ -66,8 +103,14 @@ export const initialMigration = {
       .addColumn("environment_id", "text", (column) =>
         column.notNull().references("environments.id").onDelete("cascade"),
       )
+      .addColumn("resource_id", "text", (column) =>
+        column.notNull().references("resources.id").onDelete("cascade"),
+      )
       .addColumn("server_id", "text", (column) =>
         column.notNull().references("servers.id").onDelete("cascade"),
+      )
+      .addColumn("destination_id", "text", (column) =>
+        column.notNull().references("destinations.id").onDelete("cascade"),
       )
       .addColumn("status", "text", (column) => column.notNull())
       .addColumn("runtime_plan", "jsonb", (column) => column.notNull())
@@ -106,8 +149,10 @@ export const initialMigration = {
     await db.schema.dropTable("provider_job_logs").ifExists().execute();
     await db.schema.dropTable("audit_logs").ifExists().execute();
     await db.schema.dropTable("deployments").ifExists().execute();
+    await db.schema.dropTable("resources").ifExists().execute();
     await db.schema.dropTable("environment_variables").ifExists().execute();
     await db.schema.dropTable("environments").ifExists().execute();
+    await db.schema.dropTable("destinations").ifExists().execute();
     await db.schema.dropTable("servers").ifExists().execute();
     await db.schema.dropTable("projects").ifExists().execute();
   },

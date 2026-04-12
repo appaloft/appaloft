@@ -6,6 +6,7 @@ import { envCommand } from "./environment.js";
 import { pluginsCommand, providersCommand } from "./integrations.js";
 import { doctorCommand, initCommand, serveCommand, versionCommand } from "./lifecycle.js";
 import { projectCommand } from "./project.js";
+import { resourceCommand } from "./resource.js";
 import { serverCommand } from "./server.js";
 
 export const mainCommand = EffectCommand.make("yundu").pipe(
@@ -17,6 +18,7 @@ export const mainCommand = EffectCommand.make("yundu").pipe(
     doctorCommand,
     dbCommand,
     projectCommand,
+    resourceCommand,
     serverCommand,
     deploymentsCommand,
     deployCommand,

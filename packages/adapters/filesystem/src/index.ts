@@ -281,6 +281,14 @@ function toConfiguredTarget(target: YunduDeploymentTargetConfig): DeploymentConf
     ...(target.name ? { name: target.name } : {}),
     ...(target.host ? { host: target.host } : {}),
     ...(target.port ? { port: target.port } : {}),
+    ...(target.destination
+      ? {
+          destination: {
+            ...(target.destination.name ? { name: target.destination.name } : {}),
+            ...(target.destination.kind ? { kind: target.destination.kind } : {}),
+          },
+        }
+      : {}),
   };
 }
 
@@ -307,6 +315,16 @@ function toDeploymentConfigSnapshot(
           environment: {
             name: config.environment.name,
             ...(config.environment.kind ? { kind: config.environment.kind } : {}),
+          },
+        }
+      : {}),
+    ...(config.resource
+      ? {
+          resource: {
+            name: config.resource.name,
+            ...(config.resource.kind ? { kind: config.resource.kind } : {}),
+            ...(config.resource.description ? { description: config.resource.description } : {}),
+            ...(config.resource.services ? { services: config.resource.services } : {}),
           },
         }
       : {}),

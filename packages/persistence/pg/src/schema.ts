@@ -19,12 +19,37 @@ export interface ServersTable {
   created_at: TimestampColumn;
 }
 
+export interface DestinationsTable {
+  id: string;
+  server_id: string;
+  name: string;
+  kind: string;
+  created_at: TimestampColumn;
+}
+
 export interface EnvironmentsTable {
   id: string;
   project_id: string;
   name: string;
   kind: string;
   parent_environment_id: string | null;
+  created_at: TimestampColumn;
+}
+
+export interface ResourcesTable {
+  id: string;
+  project_id: string;
+  environment_id: string;
+  destination_id: string | null;
+  name: string;
+  slug: string;
+  kind: string;
+  description: string | null;
+  services: ColumnType<
+    Record<string, unknown>[],
+    Record<string, unknown>[],
+    Record<string, unknown>[]
+  >;
   created_at: TimestampColumn;
 }
 
@@ -44,7 +69,9 @@ export interface DeploymentsTable {
   id: string;
   project_id: string;
   environment_id: string;
+  resource_id: string;
   server_id: string;
+  destination_id: string;
   status: string;
   runtime_plan: ColumnType<
     Record<string, unknown>,
@@ -82,7 +109,9 @@ export interface ProviderJobLogsTable {
 export interface Database {
   projects: ProjectsTable;
   servers: ServersTable;
+  destinations: DestinationsTable;
   environments: EnvironmentsTable;
+  resources: ResourcesTable;
   environment_variables: EnvironmentVariablesTable;
   deployments: DeploymentsTable;
   audit_logs: AuditLogsTable;

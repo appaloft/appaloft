@@ -1,21 +1,19 @@
 import { inject, injectable } from "tsyringe";
 import { type ExecutionContext, toRepositoryContext } from "../../execution-context";
-import { type DeploymentReadModel } from "../../ports";
+import { type ResourceReadModel } from "../../ports";
 import { tokens } from "../../tokens";
 
 @injectable()
-export class ListDeploymentsQueryService {
-  constructor(
-    @inject(tokens.deploymentReadModel) private readonly readModel: DeploymentReadModel,
-  ) {}
+export class ListResourcesQueryService {
+  constructor(@inject(tokens.resourceReadModel) private readonly readModel: ResourceReadModel) {}
 
   async execute(
     context: ExecutionContext,
     input?: {
       projectId?: string;
-      resourceId?: string;
+      environmentId?: string;
     },
-  ): Promise<{ items: Awaited<ReturnType<DeploymentReadModel["list"]>> }> {
+  ): Promise<{ items: Awaited<ReturnType<ResourceReadModel["list"]>> }> {
     return { items: await this.readModel.list(toRepositoryContext(context), input) };
   }
 }
