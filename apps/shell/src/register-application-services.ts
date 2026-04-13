@@ -28,6 +28,7 @@ import {
   RuntimePlanResolutionInputBuilder,
   SetEnvironmentVariableUseCase,
   ShowEnvironmentQueryService,
+  TestServerConnectivityUseCase,
   tokens,
   UnsetEnvironmentVariableUseCase,
 } from "@yundu/application";
@@ -39,6 +40,7 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(tokens.listResourcesQueryService, ListResourcesQueryService);
   container.registerSingleton(tokens.registerServerUseCase, RegisterServerUseCase);
   container.registerSingleton(tokens.listServersQueryService, ListServersQueryService);
+  container.registerSingleton(tokens.testServerConnectivityUseCase, TestServerConnectivityUseCase);
   container.registerSingleton(tokens.createEnvironmentUseCase, CreateEnvironmentUseCase);
   container.registerSingleton(tokens.listEnvironmentsQueryService, ListEnvironmentsQueryService);
   container.registerSingleton(tokens.showEnvironmentQueryService, ShowEnvironmentQueryService);

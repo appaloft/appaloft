@@ -14,6 +14,7 @@ import {
   type RollbackDeploymentCommandInput,
   type SetEnvironmentVariableCommandInput,
   type ShowEnvironmentQueryInput,
+  type TestServerConnectivityCommandInput,
   type UnsetEnvironmentVariableCommandInput,
 } from "@yundu/application/schemas";
 import {
@@ -34,6 +35,7 @@ import {
   type PromoteEnvironmentResponse,
   type RegisterServerResponse,
   type RollbackDeploymentResponse,
+  type TestServerConnectivityResponse,
 } from "@yundu/contracts";
 
 type YunduClientContext = Record<never, never>;
@@ -55,6 +57,12 @@ export type YunduOrpcClientContract = {
       YunduClientContext,
       RegisterServerCommandInput,
       RegisterServerResponse,
+      YunduClientError
+    >;
+    testConnectivity: Client<
+      YunduClientContext,
+      TestServerConnectivityCommandInput,
+      TestServerConnectivityResponse,
       YunduClientError
     >;
   };

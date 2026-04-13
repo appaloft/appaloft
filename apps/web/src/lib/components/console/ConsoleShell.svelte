@@ -2,7 +2,7 @@
   import { browser } from "$app/environment";
   import { goto } from "$app/navigation";
   import { page } from "$app/state";
-  import { ChevronUp, FolderOpen, Gauge, GitBranch, Package, Play, Rocket, ServerCrash, UserRound } from "@lucide/svelte";
+  import { ChevronUp, FolderOpen, Gauge, GitBranch, Package, Play, Rocket, Server, ServerCrash, UserRound } from "@lucide/svelte";
   import type { Snippet } from "svelte";
 
   import { API_BASE, readErrorMessage, request } from "$lib/api/client";
@@ -57,8 +57,8 @@
   const navigationItems = [
     { href: "/", labelKey: i18nKeys.console.nav.home, icon: Gauge },
     { href: "/projects", labelKey: i18nKeys.console.nav.projects, icon: FolderOpen },
+    { href: "/servers", labelKey: i18nKeys.console.nav.servers, icon: Server },
     { href: "/deployments", labelKey: i18nKeys.console.nav.deployments, icon: Rocket },
-    { href: "/deploy", labelKey: i18nKeys.console.nav.deploy, icon: Play },
   ] as const;
 
   let { title, description, children }: Props = $props();
@@ -143,6 +143,10 @@
       void goto(path);
     }
   }
+
+  function isNavigationActive(href: string): boolean {
+    return href === "/" ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);
+  }
 </script>
 
 <SidebarProvider>
@@ -173,7 +177,7 @@
             {#each navigationItems as item (item.href)}
               <SidebarMenuItem>
                 <SidebarMenuButton
-                  isActive={pathname === item.href}
+                  isActive={isNavigationActive(item.href)}
                   tooltipContent={$t(item.labelKey)}
                 >
                   {#snippet child({ props })}
@@ -198,7 +202,7 @@
                 <SidebarMenuItem>
                   <SidebarMenuButton tooltipContent={project.name}>
                     {#snippet child({ props })}
-                      <a href={`/projects?projectId=${project.id}`} {...props}>
+                      <a href={`/projects/${project.id}`} {...props}>
                         <FolderOpen class="size-4" />
                         <span>{project.name}</span>
                       </a>
@@ -258,10 +262,6 @@
           <DropdownMenuItem onclick={() => navigateTo("/deployments")}>
             <Rocket class="size-4" />
             {$t(i18nKeys.console.deployments.records)}
-          </DropdownMenuItem>
-          <DropdownMenuItem onclick={() => navigateTo("/deploy")}>
-            <Play class="size-4" />
-            {$t(i18nKeys.common.actions.newDeployment)}
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuLabel>{$t(i18nKeys.common.language.label)}</DropdownMenuLabel>

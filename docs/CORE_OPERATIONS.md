@@ -97,12 +97,12 @@ Implemented operations:
 | --- | --- | --- | --- | --- | --- | --- |
 | Register deployment target | Command | `servers.register` | `RegisterServerCommand` | `RegisterServerCommandInput` | `yundu server register` | `POST /api/servers` |
 | List deployment targets | Query | `servers.list` | `ListServersQuery` | `ListServersQueryInput` | `yundu server list` | `GET /api/servers` |
+| Test deployment target connectivity | Command | `servers.test-connectivity` | `TestServerConnectivityCommand` | `TestServerConnectivityCommandInput` | `yundu server test <serverId>` | `POST /api/servers/{serverId}/connectivity-tests` |
 
 Core next operations expected here:
 - show server details
 - update server profile
 - deactivate server
-- run connectivity check
 
 ## Environments
 

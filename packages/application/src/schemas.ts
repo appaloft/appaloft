@@ -12,4 +12,5 @@ export * from "./operations/environments/unset-environment-variable.schema";
 export * from "./operations/projects/create-project.schema";
 export * from "./operations/resources/list-resources.schema";
 export * from "./operations/servers/register-server.schema";
+export * from "./operations/servers/test-server-connectivity.schema";
 export * from "./operations/system/list-github-repositories.schema";

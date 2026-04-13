@@ -112,6 +112,25 @@ export const listServersResponseSchema = z.object({
   items: z.array(serverSummarySchema),
 });
 
+export const serverConnectivityCheckSchema = z.object({
+  name: z.string(),
+  status: z.enum(["passed", "failed", "skipped"]),
+  message: z.string(),
+  durationMs: z.number(),
+  metadata: z.record(z.string(), z.string()).optional(),
+});
+
+export const testServerConnectivityResponseSchema = z.object({
+  serverId: z.string(),
+  name: z.string(),
+  host: z.string(),
+  port: z.number(),
+  providerKey: z.string(),
+  checkedAt: z.string(),
+  status: z.enum(["healthy", "degraded", "unreachable"]),
+  checks: z.array(serverConnectivityCheckSchema),
+});
+
 export const environmentVariableSchema = z.object({
   key: z.string(),
   value: z.string(),
@@ -403,6 +422,8 @@ export type ServerSummary = z.infer<typeof serverSummarySchema>;
 export type RegisterServerInput = z.infer<typeof registerServerInputSchema>;
 export type RegisterServerResponse = z.infer<typeof registerServerResponseSchema>;
 export type ListServersResponse = z.infer<typeof listServersResponseSchema>;
+export type ServerConnectivityCheck = z.infer<typeof serverConnectivityCheckSchema>;
+export type TestServerConnectivityResponse = z.infer<typeof testServerConnectivityResponseSchema>;
 export type EnvironmentSummary = z.infer<typeof environmentSummarySchema>;
 export type ResourceSummary = z.infer<typeof resourceSummarySchema>;
 export type CreateEnvironmentInput = z.infer<typeof createEnvironmentInputSchema>;

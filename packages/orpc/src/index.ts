@@ -41,6 +41,8 @@ import {
   ShowEnvironmentQuery,
   setEnvironmentVariableCommandInputSchema,
   showEnvironmentQueryInputSchema,
+  TestServerConnectivityCommand,
+  testServerConnectivityCommandInputSchema,
   UnsetEnvironmentVariableCommand,
   unsetEnvironmentVariableCommandInputSchema,
 } from "@yundu/application";
@@ -62,6 +64,7 @@ import {
   promoteEnvironmentResponseSchema,
   registerServerResponseSchema,
   rollbackDeploymentResponseSchema,
+  testServerConnectivityResponseSchema,
 } from "@yundu/contracts";
 import { type DomainError, type Result } from "@yundu/core";
 import { resolveYunduLocaleFromHeaders, translateDomainError } from "@yundu/i18n";
@@ -391,6 +394,18 @@ export const registerServerProcedure = base
     executeCommand(context, RegisterServerCommand.create(input)),
   );
 
+export const testServerConnectivityProcedure = base
+  .route({
+    method: "POST",
+    path: "/servers/{serverId}/connectivity-tests",
+    successStatus: 200,
+  })
+  .input(testServerConnectivityCommandInputSchema)
+  .output(testServerConnectivityResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, TestServerConnectivityCommand.create(input)),
+  );
+
 export const listEnvironmentsProcedure = base
   .route({
     method: "GET",
@@ -565,6 +580,7 @@ export const yunduOrpcRouter = {
   servers: {
     list: listServersProcedure,
     create: registerServerProcedure,
+    testConnectivity: testServerConnectivityProcedure,
   },
   environments: {
     list: listEnvironmentsProcedure,
@@ -706,6 +722,7 @@ export function mountYunduOrpcRoutes(
   const routes = [
     "/api/projects",
     "/api/servers",
+    "/api/servers/:serverId/connectivity-tests",
     "/api/environments",
     "/api/environments/:environmentId",
     "/api/environments/:environmentId/variables",

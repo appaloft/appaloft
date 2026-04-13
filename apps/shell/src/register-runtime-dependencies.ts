@@ -9,6 +9,7 @@ import {
   InMemoryExecutionBackend,
   LocalExecutionBackend,
   RoutingExecutionBackend,
+  RuntimeServerConnectivityChecker,
   SshExecutionBackend,
 } from "@yundu/adapter-runtime";
 import {
@@ -150,6 +151,9 @@ export function registerRuntimeDependencies(
     ),
   });
   container.registerInstance(tokens.deploymentProgressReporter, input.deploymentProgressReporter);
+  container.register(tokens.serverConnectivityChecker, {
+    useFactory: instanceCachingFactory(() => new RuntimeServerConnectivityChecker()),
+  });
 
   container.register(tokens.projectRepository, {
     useFactory: instanceCachingFactory(() => new PgProjectRepository(input.database.db)),

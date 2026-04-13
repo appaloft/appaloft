@@ -53,6 +53,7 @@ import { i18nKeys } from "@yundu/i18n";
 import { LocalExecutionBackend } from "./local-execution";
 import { SshExecutionBackend } from "./ssh-execution";
 
+export { RuntimeServerConnectivityChecker } from "./server-connectivity";
 export { SshExecutionBackend } from "./ssh-execution";
 
 function resolvePackageManager(source: SourceDescriptor): "npm" | "bun" | "pnpm" {
