@@ -95,7 +95,7 @@ docker build -t yundu-all-in-one:local .
 
 - binary 只是分发形态，不代表内嵌数据库
 - PostgreSQL 仍然是 Hosted 与标准生产环境的主后端
-- PGlite 适用于嵌入式、单实例、文件落盘场景，默认可放在 `.yundu/data`
+- PGlite 适用于嵌入式、单实例、文件落盘场景，默认写入平台用户数据目录；只有在需要便携的项目内状态时才设置 `YUNDU_DATA_DIR=.yundu/data`
 - `yundu-binary-bundle` 现在会打出单个 Bun 编译可执行文件，并把 web static 与 PGlite runtime 资源一起嵌进去
 
 ## 目录概览

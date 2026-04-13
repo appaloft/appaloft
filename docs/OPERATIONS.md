@@ -6,9 +6,13 @@ Embedded PGlite is the default local development mode:
 
 ```bash
 export YUNDU_DATABASE_DRIVER=pglite
-export YUNDU_DATA_DIR=.yundu/data
-export YUNDU_PGLITE_DATA_DIR=.yundu/data/pglite
 ```
+
+When `YUNDU_DATA_DIR` is not set, Yundu stores embedded data in the platform user data directory:
+`~/Library/Application Support/Yundu/data` on macOS, `$XDG_DATA_HOME/yundu/data` or
+`~/.local/share/yundu/data` on Linux, and `%APPDATA%\Yundu\data` on Windows. Set
+`YUNDU_DATA_DIR=.yundu/data` and `YUNDU_PGLITE_DATA_DIR=.yundu/data/pglite` only when you
+intentionally want portable workspace-local state.
 
 External PostgreSQL:
 
@@ -157,11 +161,14 @@ Binary distribution does not imply embedded storage by default. Embedded mode is
 
 ## Embedded PGlite
 
-- suited for portable installs that keep Yundu state inside the workspace, for example `.yundu/data/pglite`
+- stores data in the platform user data directory by default
+- can be made portable by setting `YUNDU_DATA_DIR=.yundu/data` and
+  `YUNDU_PGLITE_DATA_DIR=.yundu/data/pglite`
 - suited for single-instance operation
 - not the recommended backend for multi-process hosted control planes
 - keep backups by copying the embedded data directory while the app is stopped
-- the binary bundle launcher defaults to `pglite` and writes data to `$PWD/.yundu/data` unless overridden
+- the binary bundle launcher defaults to `pglite` and follows the same user-level data directory
+  default unless overridden
 - a fully self-contained binary can still target external PostgreSQL by setting `YUNDU_DATABASE_DRIVER=postgres`
 
 ## Local Manual Validation

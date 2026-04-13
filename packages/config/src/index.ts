@@ -1,6 +1,8 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
+type ConfigEnv = Record<string, string | undefined>;
+
 export interface AppConfig {
   appName: string;
   appVersion: string;
@@ -30,11 +32,11 @@ export interface AppConfig {
 
 export interface ConfigSource<TValue> {
   flags?: Partial<TValue>;
-  env?: Record<string, string | undefined>;
+  env?: ConfigEnv;
   configFilePath?: string;
 }
 
-const defaults: AppConfig = {
+const defaults: Omit<AppConfig, "dataDir" | "pgliteDataDir"> = {
   appName: "Yundu",
   appVersion: "0.1.0",
   runtimeMode: "self-hosted",
@@ -46,8 +48,6 @@ const defaults: AppConfig = {
   webOrigin: "http://localhost:4173",
   databaseDriver: "pglite",
   databaseUrl: "postgres://postgres:postgres@localhost:5432/yundu",
-  dataDir: resolve(".yundu/data"),
-  pgliteDataDir: resolve(".yundu/data/pglite"),
   logLevel: "info",
   environment: "development",
   otelEnabled: false,
@@ -56,6 +56,31 @@ const defaults: AppConfig = {
   secretMask: "****",
   enabledSystemPlugins: [],
 };
+
+function defaultUserDataRoot(env: ConfigEnv): string | undefined {
+  if (process.platform === "darwin") {
+    return env.HOME ? join(env.HOME, "Library", "Application Support", "Yundu") : undefined;
+  }
+
+  if (process.platform === "win32") {
+    if (env.APPDATA) {
+      return join(env.APPDATA, "Yundu");
+    }
+
+    return env.USERPROFILE ? join(env.USERPROFILE, "AppData", "Roaming", "Yundu") : undefined;
+  }
+
+  if (env.XDG_DATA_HOME) {
+    return join(env.XDG_DATA_HOME, "yundu");
+  }
+
+  return env.HOME ? join(env.HOME, ".local", "share", "yundu") : undefined;
+}
+
+function defaultDataDir(env: ConfigEnv): string {
+  const userDataRoot = defaultUserDataRoot(env);
+  return userDataRoot ? join(userDataRoot, "data") : resolve(".yundu/data");
+}
 
 function readConfigFile(configFilePath?: string): Partial<AppConfig> {
   if (!configFilePath) {
@@ -74,6 +99,7 @@ function readConfigFile(configFilePath?: string): Partial<AppConfig> {
 export function resolveConfig(source: ConfigSource<AppConfig> = {}): AppConfig {
   const env = source.env ?? process.env;
   const fileConfig = readConfigFile(source.configFilePath);
+  const builtInDataDir = defaultDataDir(env);
   const otelEnabledFromEnv = env.YUNDU_OTEL_ENABLED ? env.YUNDU_OTEL_ENABLED === "true" : undefined;
   const explicitDatabaseDriver =
     source.flags?.databaseDriver ??
@@ -84,7 +110,7 @@ export function resolveConfig(source: ConfigSource<AppConfig> = {}): AppConfig {
   const databaseDriver =
     explicitDatabaseDriver ?? (configuredDatabaseUrl ? "postgres" : defaults.databaseDriver);
   const dataDir = resolve(
-    source.flags?.dataDir ?? env.YUNDU_DATA_DIR ?? fileConfig.dataDir ?? defaults.dataDir,
+    source.flags?.dataDir ?? env.YUNDU_DATA_DIR ?? fileConfig.dataDir ?? builtInDataDir,
   );
   const pgliteDataDir = resolve(
     source.flags?.pgliteDataDir ??
