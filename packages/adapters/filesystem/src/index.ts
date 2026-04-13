@@ -22,6 +22,7 @@ import {
   SourceLocator,
 } from "@yundu/core";
 import {
+  domainsFromDeploymentConfig,
   healthCheckPathFromDeploymentConfig,
   parseYunduDeploymentConfig,
   providerKeyFromTargetConfig,
@@ -299,6 +300,7 @@ function toDeploymentConfigSnapshot(
   const targets = targetsFromDeploymentConfig(config).map((target) => toConfiguredTarget(target));
   const healthCheckPath = healthCheckPathFromDeploymentConfig(config);
   const targetKey = targetKeyFromDeploymentConfig(config);
+  const domains = domainsFromDeploymentConfig(config);
 
   return {
     configFilePath,
@@ -344,6 +346,10 @@ function toDeploymentConfigSnapshot(
               : {}),
             ...(config.deployment.port ? { port: config.deployment.port } : {}),
             ...(healthCheckPath ? { healthCheckPath } : {}),
+            ...(config.deployment.proxy ? { proxyKind: config.deployment.proxy } : {}),
+            ...(domains ? { domains } : {}),
+            ...(config.deployment.pathPrefix ? { pathPrefix: config.deployment.pathPrefix } : {}),
+            ...(config.deployment.tlsMode ? { tlsMode: config.deployment.tlsMode } : {}),
             ...(targetKey ? { targetKey } : {}),
           },
         }

@@ -1,8 +1,10 @@
 import {
   destinationKinds,
+  edgeProxyKinds,
   environmentKinds,
   resourceKinds,
   resourceServiceKinds,
+  tlsModes,
 } from "@yundu/core";
 import { z } from "zod";
 
@@ -111,6 +113,19 @@ export const yunduDeploymentRuntimeConfigSchema = z
     port: z.number().int().positive().optional().describe("Application port."),
     healthCheckPath: z.string().trim().min(1).optional(),
     healthPath: z.string().trim().min(1).optional().describe("Alias for healthCheckPath."),
+    proxy: z
+      .enum(edgeProxyKinds)
+      .optional()
+      .describe(
+        "Edge proxy to configure for public domains. Defaults to traefik when domains are set.",
+      ),
+    domain: z.string().trim().min(1).optional().describe("Single public domain alias."),
+    domains: z
+      .array(z.string().trim().min(1))
+      .optional()
+      .describe("Public domains for access routing."),
+    pathPrefix: z.string().trim().min(1).optional().describe("Public route path prefix."),
+    tlsMode: z.enum(tlsModes).optional().describe("TLS handling for the public access route."),
   })
   .describe("Deployment command defaults.");
 
@@ -145,6 +160,15 @@ export function healthCheckPathFromDeploymentConfig(
   config: YunduDeploymentConfig,
 ): string | undefined {
   return config.deployment?.healthCheckPath ?? config.deployment?.healthPath;
+}
+
+export function domainsFromDeploymentConfig(config: YunduDeploymentConfig): string[] | undefined {
+  const domains = [
+    ...(config.deployment?.domain ? [config.deployment.domain] : []),
+    ...(config.deployment?.domains ?? []),
+  ];
+
+  return domains.length > 0 ? [...new Set(domains)] : undefined;
 }
 
 export function targetsFromDeploymentConfig(

@@ -1,3 +1,4 @@
+import { edgeProxyKinds, tlsModes } from "@yundu/core";
 import { z } from "zod";
 
 import { nonEmptyTrimmedString } from "../shared-schema";
@@ -18,6 +19,10 @@ export const createDeploymentCommandInputSchema = z.object({
   startCommand: z.string().trim().min(1).optional(),
   port: z.number().int().positive().optional(),
   healthCheckPath: z.string().trim().min(1).optional(),
+  proxyKind: z.enum(edgeProxyKinds).optional(),
+  domains: z.array(z.string().trim().min(1)).optional(),
+  pathPrefix: z.string().trim().min(1).optional(),
+  tlsMode: z.enum(tlsModes).optional(),
 });
 
 export type CreateDeploymentCommandInput = z.input<typeof createDeploymentCommandInputSchema>;

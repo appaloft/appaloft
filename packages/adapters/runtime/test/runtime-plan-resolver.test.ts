@@ -156,4 +156,43 @@ describe("DefaultRuntimePlanResolver", () => {
       }),
     );
   });
+
+  test("adds access routes when public domains are requested", async () => {
+    ensureReflectMetadata();
+    const { DefaultRuntimePlanResolver } = await import("../src");
+    const resolver = new DefaultRuntimePlanResolver();
+    const context = createTestExecutionContext();
+
+    const result = await resolver.resolve(context, {
+      id: "plan_3",
+      source: {
+        kind: "docker-image",
+        locator: "docker://ghcr.io/example/app:latest",
+        displayName: "app",
+      },
+      server: {
+        id: "srv_3",
+        providerKey: "generic-ssh",
+      },
+      environmentSnapshot: createEnvironmentSnapshot("snap_3"),
+      detectedReasoning: ["detected docker image"],
+      requestedDeployment: {
+        method: "prebuilt-image",
+        port: 4312,
+        domains: ["api.example.com"],
+      },
+      generatedAt: "2026-01-01T00:00:00.000Z",
+    });
+
+    expect(result.isOk()).toBe(true);
+    const plan = result._unsafeUnwrap();
+
+    const [route] = plan.execution.accessRoutes;
+
+    expect(route?.domains).toEqual(["api.example.com"]);
+    expect(route?.proxyKind).toBe("traefik");
+    expect(route?.pathPrefix).toBe("/");
+    expect(route?.tlsMode).toBe("auto");
+    expect(route?.targetPort).toBe(4312);
+  });
 });

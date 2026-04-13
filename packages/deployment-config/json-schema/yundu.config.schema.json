@@ -42,6 +42,60 @@
       "additionalProperties": false,
       "description": "Environment bootstrap settings."
     },
+    "resource": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Resource name to reuse or create."
+        },
+        "kind": {
+          "description": "Resource kind. Defaults to application.",
+          "type": "string",
+          "enum": [
+            "application",
+            "service",
+            "database",
+            "cache",
+            "compose-stack",
+            "worker",
+            "static-site",
+            "external"
+          ]
+        },
+        "description": {
+          "description": "Optional resource description.",
+          "type": "string",
+          "minLength": 1
+        },
+        "services": {
+          "description": "Services contained by a compose-stack resource.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Service name inside a compose-stack resource."
+              },
+              "kind": {
+                "type": "string",
+                "enum": ["web", "api", "worker", "database", "cache", "service"],
+                "description": "Service role inside the resource."
+              }
+            },
+            "required": ["name", "kind"],
+            "additionalProperties": false,
+            "description": "Service entry inside a resource."
+          }
+        }
+      },
+      "required": ["name"],
+      "additionalProperties": false,
+      "description": "Resource bootstrap settings."
+    },
     "targets": {
       "type": "array",
       "items": {
@@ -69,6 +123,21 @@
                 "type": "integer",
                 "exclusiveMinimum": 0,
                 "maximum": 9007199254740991
+              },
+              "destination": {
+                "description": "Deployment destination or isolation boundary on the selected server.",
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": ["docker", "compose", "host-process", "generic"]
+                  }
+                },
+                "additionalProperties": false
               },
               "providerKey": {
                 "type": "string",
@@ -102,6 +171,21 @@
                 "type": "integer",
                 "exclusiveMinimum": 0,
                 "maximum": 9007199254740991
+              },
+              "destination": {
+                "description": "Deployment destination or isolation boundary on the selected server.",
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": ["docker", "compose", "host-process", "generic"]
+                  }
+                },
+                "additionalProperties": false
               },
               "provider": {
                 "type": "string",
@@ -145,6 +229,21 @@
                 "exclusiveMinimum": 0,
                 "maximum": 9007199254740991
               },
+              "destination": {
+                "description": "Deployment destination or isolation boundary on the selected server.",
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": ["docker", "compose", "host-process", "generic"]
+                  }
+                },
+                "additionalProperties": false
+              },
               "providerKey": {
                 "type": "string",
                 "minLength": 1,
@@ -177,6 +276,21 @@
                 "type": "integer",
                 "exclusiveMinimum": 0,
                 "maximum": 9007199254740991
+              },
+              "destination": {
+                "description": "Deployment destination or isolation boundary on the selected server.",
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": ["docker", "compose", "host-process", "generic"]
+                  }
+                },
+                "additionalProperties": false
               },
               "provider": {
                 "type": "string",
@@ -235,6 +349,34 @@
           "description": "Alias for healthCheckPath.",
           "type": "string",
           "minLength": 1
+        },
+        "proxy": {
+          "description": "Edge proxy to configure for public domains. Defaults to traefik when domains are set.",
+          "type": "string",
+          "enum": ["none", "traefik", "caddy"]
+        },
+        "domain": {
+          "description": "Single public domain alias.",
+          "type": "string",
+          "minLength": 1
+        },
+        "domains": {
+          "description": "Public domains for access routing.",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "pathPrefix": {
+          "description": "Public route path prefix.",
+          "type": "string",
+          "minLength": 1
+        },
+        "tlsMode": {
+          "description": "TLS handling for the public access route.",
+          "type": "string",
+          "enum": ["auto", "disabled"]
         }
       },
       "additionalProperties": false,

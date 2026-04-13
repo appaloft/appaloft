@@ -314,6 +314,17 @@ export const runtimePlanSchema = z.object({
     image: z.string().optional(),
     dockerfilePath: z.string().optional(),
     composeFile: z.string().optional(),
+    accessRoutes: z
+      .array(
+        z.object({
+          proxyKind: z.enum(["none", "traefik", "caddy"]),
+          domains: z.array(z.string()),
+          pathPrefix: z.string(),
+          tlsMode: z.enum(["auto", "disabled"]),
+          targetPort: z.number().int().positive().optional(),
+        }),
+      )
+      .optional(),
     metadata: z.record(z.string(), z.string()).optional(),
   }),
   target: z.object({
@@ -375,6 +386,10 @@ export const createDeploymentInputSchema = z.object({
   startCommand: z.string().optional(),
   port: z.number().int().positive().optional(),
   healthCheckPath: z.string().optional(),
+  proxyKind: z.enum(["none", "traefik", "caddy"]).optional(),
+  domains: z.array(z.string()).optional(),
+  pathPrefix: z.string().optional(),
+  tlsMode: z.enum(["auto", "disabled"]).optional(),
 });
 
 export const createDeploymentResponseSchema = z.object({

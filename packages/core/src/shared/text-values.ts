@@ -975,6 +975,70 @@ export class HealthCheckPathText extends NonEmptyTextValue {
   }
 }
 
+function validateRoutePathPrefix(value: string): Result<string> {
+  return validateRequiredText(value, "Route path prefix").andThen((normalized) => {
+    if (!normalized.startsWith("/")) {
+      return err(domainError.validation("Route path prefix must start with /"));
+    }
+
+    return ok(normalized);
+  });
+}
+
+function validatePublicDomainName(value: string): Result<string> {
+  const normalized = value.trim().toLowerCase();
+
+  if (!normalized) {
+    return err(domainError.validation("Public domain name is required"));
+  }
+
+  if (normalized.includes("://") || normalized.includes("/") || normalized.includes(":")) {
+    return err(domainError.validation("Public domain name must not include scheme, path, or port"));
+  }
+
+  if (
+    !/^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9][a-z0-9-]{0,61}[a-z0-9]$/.test(normalized)
+  ) {
+    return err(domainError.validation("Public domain name must be a valid DNS hostname"));
+  }
+
+  return ok(normalized);
+}
+
+const routePathPrefixBrand: unique symbol = Symbol("RoutePathPrefix");
+export class RoutePathPrefix extends NonEmptyTextValue {
+  private [routePathPrefixBrand]!: void;
+
+  private constructor(value: string) {
+    super(value);
+  }
+
+  static create(value: string): Result<RoutePathPrefix> {
+    return validateRoutePathPrefix(value).map((normalized) => new RoutePathPrefix(normalized));
+  }
+
+  static rehydrate(value: string): RoutePathPrefix {
+    return new RoutePathPrefix(rehydrateRequiredText(value));
+  }
+}
+
+const publicDomainNameBrand: unique symbol = Symbol("PublicDomainName");
+export class PublicDomainName extends NonEmptyTextValue {
+  private [publicDomainNameBrand]!: void;
+
+  private constructor(value: string) {
+    super(value);
+  }
+
+  static create(value: string): Result<PublicDomainName> {
+    return validatePublicDomainName(value).map((normalized) => new PublicDomainName(normalized));
+  }
+
+  static rehydrate(value: string): PublicDomainName {
+    return new PublicDomainName(rehydrateRequiredText(value).toLowerCase());
+  }
+}
+
 const errorCodeBrand: unique symbol = Symbol("ErrorCodeText");
 export class ErrorCodeText extends NonEmptyTextValue {
   private [errorCodeBrand]!: void;

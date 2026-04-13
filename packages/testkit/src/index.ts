@@ -488,6 +488,19 @@ export class MemoryDeploymentReadModel implements DeploymentReadModel {
               ...(deployment.runtimePlan.execution.composeFile
                 ? { composeFile: deployment.runtimePlan.execution.composeFile }
                 : {}),
+              ...(deployment.runtimePlan.execution.accessRoutes.length > 0
+                ? {
+                    accessRoutes: deployment.runtimePlan.execution.accessRoutes.map((route) => ({
+                      proxyKind: route.proxyKind,
+                      domains: route.domains,
+                      pathPrefix: route.pathPrefix,
+                      tlsMode: route.tlsMode,
+                      ...(typeof route.targetPort === "number"
+                        ? { targetPort: route.targetPort }
+                        : {}),
+                    })),
+                  }
+                : {}),
               ...(deployment.runtimePlan.execution.metadata
                 ? { metadata: deployment.runtimePlan.execution.metadata }
                 : {}),

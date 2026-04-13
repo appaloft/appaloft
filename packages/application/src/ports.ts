@@ -12,6 +12,7 @@ import {
   type DestinationMutationSpec,
   type DestinationSelectionSpec,
   type DomainEvent,
+  type EdgeProxyKind,
   type EnvironmentKind,
   type EnvironmentMutationSpec,
   type EnvironmentProfile,
@@ -37,6 +38,7 @@ import {
   type SourceDescriptor,
   type SourceKind,
   type TargetKind,
+  type TlsMode,
   type VariableExposure,
   type VariableKind,
 } from "@yundu/core";
@@ -285,6 +287,13 @@ export interface DeploymentSummary {
       image?: string;
       dockerfilePath?: string;
       composeFile?: string;
+      accessRoutes?: Array<{
+        proxyKind: EdgeProxyKind;
+        domains: string[];
+        pathPrefix: string;
+        tlsMode: TlsMode;
+        targetPort?: number;
+      }>;
       metadata?: Record<string, string>;
     };
     target: {
@@ -372,6 +381,10 @@ export interface RequestedDeploymentConfig {
   startCommand?: string;
   port?: number;
   healthCheckPath?: string;
+  proxyKind?: EdgeProxyKind;
+  domains?: string[];
+  pathPrefix?: string;
+  tlsMode?: TlsMode;
 }
 
 export interface DeploymentConfiguredProject {

@@ -13,8 +13,10 @@ import {
   type buildStrategyKinds,
   DeploymentLogSourceValue,
   type DeploymentPhaseValue,
+  type EdgeProxyKindValue,
   type ExecutionStatusValue,
   type ExecutionStrategyKindValue,
+  type edgeProxyKinds,
   type executionStrategyKinds,
   type LogLevelValue,
   type PackagingModeValue,
@@ -22,7 +24,9 @@ import {
   type SourceKindValue,
   type sourceKinds,
   type TargetKindValue,
+  type TlsModeValue,
   type targetKinds,
+  type tlsModes,
 } from "../shared/state-machine";
 import { type GeneratedAt, type OccurredAt } from "../shared/temporal";
 import {
@@ -36,6 +40,8 @@ import {
   type MessageText,
   type PlanStepText,
   type ProviderKey,
+  type PublicDomainName,
+  type RoutePathPrefix,
   type SourceLocator,
 } from "../shared/text-values";
 import { ValueObject } from "../shared/value-object";
@@ -65,7 +71,16 @@ export interface RuntimeExecutionPlanState {
   image?: ImageReference;
   dockerfilePath?: FilePathText;
   composeFile?: FilePathText;
+  accessRoutes?: AccessRoute[];
   metadata?: Record<string, string>;
+}
+
+export interface AccessRouteState {
+  proxyKind: EdgeProxyKindValue;
+  domains: PublicDomainName[];
+  pathPrefix: RoutePathPrefix;
+  tlsMode: TlsModeValue;
+  targetPort?: PortNumber;
 }
 
 export interface RuntimePlanState {
@@ -198,6 +213,58 @@ export class DeploymentTargetDescriptor extends ValueObject<DeploymentTargetDesc
   }
 }
 
+export class AccessRoute extends ValueObject<AccessRouteState> {
+  private constructor(state: AccessRouteState) {
+    super(state);
+  }
+
+  static create(input: AccessRouteState): Result<AccessRoute> {
+    if (input.proxyKind.value === "none" && input.domains.length > 0) {
+      return err(domainError.validation("Disabled access routes cannot declare domains"));
+    }
+
+    if (input.proxyKind.value !== "none" && input.domains.length === 0) {
+      return err(domainError.validation("Access routes require at least one domain"));
+    }
+
+    return ok(new AccessRoute(input));
+  }
+
+  static rehydrate(state: AccessRouteState): AccessRoute {
+    return new AccessRoute(state);
+  }
+
+  get proxyKind(): (typeof edgeProxyKinds)[number] {
+    return this.state.proxyKind.value;
+  }
+
+  get domains(): string[] {
+    return this.state.domains.map((domain) => domain.value);
+  }
+
+  get pathPrefix(): string {
+    return this.state.pathPrefix.value;
+  }
+
+  get tlsMode(): (typeof tlsModes)[number] {
+    return this.state.tlsMode.value;
+  }
+
+  get targetPort(): number | undefined {
+    return this.state.targetPort?.value;
+  }
+
+  toState(): AccessRouteState {
+    return {
+      proxyKind: this.state.proxyKind,
+      domains: [...this.state.domains],
+      pathPrefix: this.state.pathPrefix,
+      tlsMode: this.state.tlsMode,
+      ...(this.state.targetPort ? { targetPort: this.state.targetPort } : {}),
+    };
+  }
+}
+
 export class RuntimeExecutionPlan extends ValueObject<RuntimeExecutionPlanState> {
   private constructor(state: RuntimeExecutionPlanState) {
     super(state);
@@ -251,6 +318,10 @@ export class RuntimeExecutionPlan extends ValueObject<RuntimeExecutionPlanState>
     return this.state.composeFile?.value;
   }
 
+  get accessRoutes(): AccessRoute[] {
+    return [...(this.state.accessRoutes ?? [])];
+  }
+
   get metadata(): Record<string, string> | undefined {
     return this.state.metadata ? { ...this.state.metadata } : undefined;
   }
@@ -262,6 +333,13 @@ export class RuntimeExecutionPlan extends ValueObject<RuntimeExecutionPlanState>
         ...(this.state.metadata ?? {}),
         ...metadata,
       },
+    });
+  }
+
+  withAccessRoutes(accessRoutes: AccessRoute[]): RuntimeExecutionPlan {
+    return RuntimeExecutionPlan.rehydrate({
+      ...this.state,
+      accessRoutes: [...accessRoutes],
     });
   }
 
@@ -277,6 +355,7 @@ export class RuntimeExecutionPlan extends ValueObject<RuntimeExecutionPlanState>
       ...(this.state.image ? { image: this.state.image } : {}),
       ...(this.state.dockerfilePath ? { dockerfilePath: this.state.dockerfilePath } : {}),
       ...(this.state.composeFile ? { composeFile: this.state.composeFile } : {}),
+      ...(this.state.accessRoutes ? { accessRoutes: [...this.state.accessRoutes] } : {}),
       ...(this.state.metadata ? { metadata: { ...this.state.metadata } } : {}),
     };
   }

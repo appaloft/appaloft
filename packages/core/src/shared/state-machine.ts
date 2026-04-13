@@ -5,12 +5,14 @@ import {
   deploymentStatuses,
   deploymentTargetCredentialKinds,
   destinationKinds,
+  edgeProxyKinds,
   environmentKinds,
   executionStrategyKinds,
   logLevels,
   packagingModes,
   sourceKinds,
   targetKinds,
+  tlsModes,
   variableExposures,
   variableKinds,
 } from "./enums";
@@ -25,12 +27,14 @@ export {
   deploymentStatuses,
   deploymentTargetCredentialKinds,
   destinationKinds,
+  edgeProxyKinds,
   environmentKinds,
   executionStrategyKinds,
   logLevels,
   packagingModes,
   sourceKinds,
   targetKinds,
+  tlsModes,
   variableExposures,
   variableKinds,
 };
@@ -149,6 +153,45 @@ export class TargetKindValue extends EnumValueObject<(typeof targetKinds)[number
 
   static rehydrate(value: (typeof targetKinds)[number]): TargetKindValue {
     return new TargetKindValue(value);
+  }
+}
+
+const edgeProxyKindBrand: unique symbol = Symbol("EdgeProxyKindValue");
+export class EdgeProxyKindValue extends EnumValueObject<(typeof edgeProxyKinds)[number]> {
+  private [edgeProxyKindBrand]!: void;
+
+  private constructor(value: (typeof edgeProxyKinds)[number]) {
+    super(value);
+  }
+
+  static create(value: string): Result<EdgeProxyKindValue> {
+    return createEnumValue(
+      value,
+      edgeProxyKinds,
+      "Edge proxy kind",
+      (validated) => new EdgeProxyKindValue(validated),
+    );
+  }
+
+  static rehydrate(value: (typeof edgeProxyKinds)[number]): EdgeProxyKindValue {
+    return new EdgeProxyKindValue(value);
+  }
+}
+
+const tlsModeBrand: unique symbol = Symbol("TlsModeValue");
+export class TlsModeValue extends EnumValueObject<(typeof tlsModes)[number]> {
+  private [tlsModeBrand]!: void;
+
+  private constructor(value: (typeof tlsModes)[number]) {
+    super(value);
+  }
+
+  static create(value: string): Result<TlsModeValue> {
+    return createEnumValue(value, tlsModes, "TLS mode", (validated) => new TlsModeValue(validated));
+  }
+
+  static rehydrate(value: (typeof tlsModes)[number]): TlsModeValue {
+    return new TlsModeValue(value);
   }
 }
 

@@ -53,6 +53,10 @@ export class RuntimePlanResolutionInputBuilder {
           ...(input.command.healthCheckPath
             ? { healthCheckPath: input.command.healthCheckPath }
             : {}),
+          ...(input.command.proxyKind ? { proxyKind: input.command.proxyKind } : {}),
+          ...(input.command.domains ? { domains: input.command.domains } : {}),
+          ...(input.command.pathPrefix ? { pathPrefix: input.command.pathPrefix } : {}),
+          ...(input.command.tlsMode ? { tlsMode: input.command.tlsMode } : {}),
         },
         generatedAt: generatedAt.value,
       });

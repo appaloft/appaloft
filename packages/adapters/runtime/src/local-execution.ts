@@ -30,6 +30,11 @@ import {
   type Result,
   type RollbackPlan,
 } from "@yundu/core";
+import {
+  createProxyBootstrapPlan,
+  dockerNetworkFlagForAccessRoutes,
+} from "./proxy-bootstrap";
+import { dockerLabelFlagsForAccessRoutes } from "./proxy-labels";
 
 type LogPhase = "detect" | "plan" | "package" | "deploy" | "verify" | "rollback";
 type LogLevel = "debug" | "info" | "warn" | "error";
@@ -1050,6 +1055,96 @@ export class LocalExecutionBackend implements ExecutionBackend {
       message: "Docker package is ready",
     });
 
+    const accessRoutes = state.runtimePlan.execution.accessRoutes ?? [];
+    const proxyBootstrap = createProxyBootstrapPlan(accessRoutes);
+    if (proxyBootstrap) {
+      const proxyMessage = `Ensure ${proxyBootstrap.displayName} edge proxy on Docker network ${proxyBootstrap.networkName}`;
+      logs.push(phaseLog("deploy", proxyMessage));
+      this.report(context, {
+        deploymentId: state.id.value,
+        phase: "deploy",
+        status: "running",
+        message: proxyMessage,
+      });
+
+      const network = runSyncCommand({
+        command: proxyBootstrap.networkCommand,
+        cwd: workdir,
+        env,
+      });
+      this.pushCommandOutput(logs, {
+        context,
+        deploymentId: state.id.value,
+        phase: "deploy",
+        output: network.stdout,
+        level: "info",
+        stream: "stdout",
+      });
+      this.pushCommandOutput(logs, {
+        context,
+        deploymentId: state.id.value,
+        phase: "deploy",
+        output: network.stderr,
+        level: "warn",
+        stream: "stderr",
+      });
+
+      const proxy = runSyncCommand({
+        command: proxyBootstrap.containerCommand,
+        cwd: workdir,
+        env,
+      });
+      this.pushCommandOutput(logs, {
+        context,
+        deploymentId: state.id.value,
+        phase: "deploy",
+        output: proxy.stdout,
+        level: "info",
+        stream: "stdout",
+      });
+      this.pushCommandOutput(logs, {
+        context,
+        deploymentId: state.id.value,
+        phase: "deploy",
+        output: proxy.stderr,
+        level: "warn",
+        stream: "stderr",
+      });
+
+      if (network.failed || proxy.failed) {
+        const message = `${proxyBootstrap.displayName} edge proxy failed to start`;
+        this.report(context, {
+          deploymentId: state.id.value,
+          phase: "deploy",
+          status: "failed",
+          level: "error",
+          message,
+        });
+        return ok({
+          deployment: this.applyFailure(deployment, {
+            logs: [
+              ...logs,
+              phaseLog("deploy", message, "error"),
+            ],
+            errorCode: "edge_proxy_start_failed",
+            retryable: true,
+            metadata: {
+              proxyKind: proxyBootstrap.kind,
+              containerName: proxyBootstrap.containerName,
+              networkName: proxyBootstrap.networkName,
+            },
+          }).deployment,
+        });
+      }
+
+      this.report(context, {
+        deploymentId: state.id.value,
+        phase: "deploy",
+        status: "succeeded",
+        message: `${proxyBootstrap.displayName} edge proxy is ready`,
+      });
+    }
+
     runSyncCommand({
       command: `docker rm -f ${containerName}`,
       cwd: workdir,
@@ -1063,7 +1158,23 @@ export class LocalExecutionBackend implements ExecutionBackend {
       )
       .map(([key, value]) => `-e ${key}=${JSON.stringify(value)}`)
       .join(" ");
-    const runCommand = `docker run -d --rm --name ${containerName} -p ${port}:${port} ${envFlags} ${image}`;
+    const labelFlags = dockerLabelFlagsForAccessRoutes({
+      deploymentId: state.id.value,
+      port,
+      accessRoutes,
+      quote: JSON.stringify,
+    });
+    const networkFlag = dockerNetworkFlagForAccessRoutes(accessRoutes);
+    const runCommand = [
+      `docker run -d --rm --name ${containerName}`,
+      networkFlag,
+      `-p ${port}:${port}`,
+      envFlags,
+      labelFlags,
+      image,
+    ]
+      .filter(Boolean)
+      .join(" ");
     logs.push(phaseLog("deploy", runCommand));
     this.report(context, {
       deploymentId: state.id.value,

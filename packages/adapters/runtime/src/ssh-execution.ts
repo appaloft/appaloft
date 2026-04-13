@@ -33,6 +33,11 @@ import {
   type Result,
   type RollbackPlan,
 } from "@yundu/core";
+import {
+  createProxyBootstrapPlan,
+  dockerNetworkFlagForAccessRoutes,
+} from "./proxy-bootstrap";
+import { dockerLabelFlagsForAccessRoutes } from "./proxy-labels";
 
 type LogPhase = "detect" | "plan" | "package" | "deploy" | "verify" | "rollback";
 type LogLevel = "debug" | "info" | "warn" | "error";
@@ -706,6 +711,90 @@ export class SshExecutionBackend implements ExecutionBackend {
         return err(domainError.validation("Docker image is required for SSH docker execution"));
       }
 
+      const accessRoutes = state.runtimePlan.execution.accessRoutes ?? [];
+      const proxyBootstrap = createProxyBootstrapPlan(accessRoutes);
+      if (proxyBootstrap) {
+        const proxyMessage = `Ensure ${proxyBootstrap.displayName} edge proxy on Docker network ${proxyBootstrap.networkName}`;
+        logs.push(phaseLog("deploy", proxyMessage));
+        this.report(context, {
+          deploymentId: state.id.value,
+          phase: "deploy",
+          status: "running",
+          message: proxyMessage,
+        });
+
+        const network = this.runRemoteCommand({
+          target,
+          command: proxyBootstrap.networkCommand,
+          cwd: runtimeDir,
+          env,
+        });
+        this.pushCommandOutput(logs, {
+          context,
+          deploymentId: state.id.value,
+          phase: "deploy",
+          output: network.stdout,
+          level: "info",
+          stream: "stdout",
+        });
+        this.pushCommandOutput(logs, {
+          context,
+          deploymentId: state.id.value,
+          phase: "deploy",
+          output: network.stderr,
+          level: "warn",
+          stream: "stderr",
+        });
+
+        const proxy = this.runRemoteCommand({
+          target,
+          command: proxyBootstrap.containerCommand,
+          cwd: runtimeDir,
+          env,
+        });
+        this.pushCommandOutput(logs, {
+          context,
+          deploymentId: state.id.value,
+          phase: "deploy",
+          output: proxy.stdout,
+          level: "info",
+          stream: "stdout",
+        });
+        this.pushCommandOutput(logs, {
+          context,
+          deploymentId: state.id.value,
+          phase: "deploy",
+          output: proxy.stderr,
+          level: "warn",
+          stream: "stderr",
+        });
+
+        if (network.failed || proxy.failed) {
+          const message = `${proxyBootstrap.displayName} edge proxy failed to start`;
+          logs.push(phaseLog("deploy", message, "error"));
+          return ok({
+            deployment: this.applyFailure(deployment, {
+              logs,
+              errorCode: "ssh_edge_proxy_start_failed",
+              retryable: true,
+              metadata: {
+                host: target.host,
+                proxyKind: proxyBootstrap.kind,
+                containerName: proxyBootstrap.containerName,
+                networkName: proxyBootstrap.networkName,
+              },
+            }),
+          });
+        }
+
+        this.report(context, {
+          deploymentId: state.id.value,
+          phase: "deploy",
+          status: "succeeded",
+          message: `${proxyBootstrap.displayName} edge proxy is ready`,
+        });
+      }
+
       const envFlags = Object.entries(env)
         .filter((entry): entry is [string, string] => typeof entry[1] === "string")
         .filter(
@@ -716,9 +805,25 @@ export class SshExecutionBackend implements ExecutionBackend {
         )
         .map(([key, value]) => `-e ${shellQuote(`${key}=${value}`)}`)
         .join(" ");
+      const labelFlags = dockerLabelFlagsForAccessRoutes({
+        deploymentId: state.id.value,
+        port,
+        accessRoutes,
+        quote: shellQuote,
+      });
+      const networkFlag = dockerNetworkFlagForAccessRoutes(accessRoutes);
       const runCommand = [
         `docker rm -f ${shellQuote(containerName)} >/dev/null 2>&1 || true`,
-        `docker run -d --rm --name ${shellQuote(containerName)} -p ${port}:${port} ${envFlags} ${shellQuote(image)}`,
+        [
+          `docker run -d --rm --name ${shellQuote(containerName)}`,
+          networkFlag,
+          `-p ${port}:${port}`,
+          envFlags,
+          labelFlags,
+          shellQuote(image),
+        ]
+          .filter(Boolean)
+          .join(" "),
       ].join(" && ");
       logs.push(phaseLog("deploy", `Start SSH container ${containerName}`));
       const run = this.runRemoteCommand({

@@ -29,6 +29,10 @@ export class CreateDeploymentCommandHandler
       ...(command.startCommand ? { startCommand: command.startCommand } : {}),
       ...(command.port ? { port: command.port } : {}),
       ...(command.healthCheckPath ? { healthCheckPath: command.healthCheckPath } : {}),
+      ...(command.proxyKind ? { proxyKind: command.proxyKind } : {}),
+      ...(command.domains ? { domains: command.domains } : {}),
+      ...(command.pathPrefix ? { pathPrefix: command.pathPrefix } : {}),
+      ...(command.tlsMode ? { tlsMode: command.tlsMode } : {}),
     });
   }
 }
