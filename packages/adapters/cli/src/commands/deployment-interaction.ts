@@ -12,7 +12,13 @@ import {
   type ResourceSummary,
   type ServerSummary,
 } from "@yundu/application";
-import { domainError, type EnvironmentKind, environmentKinds } from "@yundu/core";
+import {
+  domainError,
+  type EdgeProxyKind,
+  type EnvironmentKind,
+  environmentKinds,
+  type TlsMode,
+} from "@yundu/core";
 import { Effect } from "effect";
 
 import { type CliInteraction, effectCliInteraction } from "../interaction.js";
@@ -37,6 +43,10 @@ interface DeploymentPromptSeed {
   startCommand?: string;
   port?: number;
   healthCheckPath?: string;
+  proxyKind?: EdgeProxyKind;
+  domains?: string[];
+  pathPrefix?: string;
+  tlsMode?: TlsMode;
 }
 
 interface ResolvedReference {
@@ -417,6 +427,10 @@ function resolveAdvancedDeploymentConfig(input: {
       input.seed.startCommand ||
       input.seed.port ||
       input.seed.healthCheckPath ||
+      input.seed.proxyKind ||
+      input.seed.domains ||
+      input.seed.pathPrefix ||
+      input.seed.tlsMode ||
       (yield* input.interaction.confirm({
         message: "Advanced config?",
         defaultValue: false,
@@ -485,6 +499,10 @@ function resolveAdvancedDeploymentConfig(input: {
       ...(startCommand ? { startCommand } : {}),
       ...(Number.isInteger(port) && port > 0 ? { port } : {}),
       ...(healthCheckPath ? { healthCheckPath } : {}),
+      ...(input.seed.proxyKind ? { proxyKind: input.seed.proxyKind } : {}),
+      ...(input.seed.domains ? { domains: input.seed.domains } : {}),
+      ...(input.seed.pathPrefix ? { pathPrefix: input.seed.pathPrefix } : {}),
+      ...(input.seed.tlsMode ? { tlsMode: input.seed.tlsMode } : {}),
     };
   });
 }

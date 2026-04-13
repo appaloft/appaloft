@@ -1,4 +1,5 @@
 import {
+  AccessRoute,
   BuildStrategyKindValue,
   CommandText,
   DeploymentTargetDescriptor,
@@ -6,6 +7,7 @@ import {
   DeploymentLogSourceValue,
   DeploymentPhaseValue,
   DetectSummary,
+  EdgeProxyKindValue,
   ErrorCodeText,
   ExecutionStrategyKindValue,
   ExitCode,
@@ -23,11 +25,15 @@ import {
   PlanStepText,
   PortNumber,
   ProviderKey,
+  PublicDomainName,
+  RoutePathPrefix,
   RuntimeExecutionPlan,
   RuntimePlan,
   RuntimePlanId,
+  safeTry,
   SourceDescriptor,
   TargetKindValue,
+  TlsModeValue,
   domainError,
   err,
   ok,
@@ -95,6 +101,75 @@ function normalizeDockerImage(locator: string): string {
   return locator.replace(/^docker:\/\//, "").replace(/^image:\/\//, "");
 }
 
+function createAccessRoutes(input: {
+  requestedDeployment: RequestedDeploymentConfig;
+  fallbackPort?: number;
+}): Result<AccessRoute[]> {
+  const domains = input.requestedDeployment.domains ?? [];
+  const proxyKind = input.requestedDeployment.proxyKind ?? (domains.length > 0 ? "traefik" : "none");
+
+  if (proxyKind === "none") {
+    return domains.length > 0
+      ? err(domainError.validation("Access routing domains require an enabled proxy"))
+      : ok([]);
+  }
+
+  if (domains.length === 0) {
+    return err(domainError.validation("Access routing requires at least one domain"));
+  }
+
+  return safeTry(function* () {
+    const publicDomains: PublicDomainName[] = [];
+    for (const domain of domains) {
+      publicDomains.push(yield* PublicDomainName.create(domain));
+    }
+
+    const route = yield* AccessRoute.create({
+      proxyKind: EdgeProxyKindValue.rehydrate(proxyKind),
+      domains: publicDomains,
+      pathPrefix: yield* RoutePathPrefix.create(input.requestedDeployment.pathPrefix ?? "/"),
+      tlsMode: TlsModeValue.rehydrate(input.requestedDeployment.tlsMode ?? "auto"),
+      ...(input.fallbackPort ? { targetPort: PortNumber.rehydrate(input.fallbackPort) } : {}),
+    });
+
+    return ok([route]);
+  });
+}
+
+function withRequestedAccessRoutes(input: {
+  requestedDeployment: RequestedDeploymentConfig;
+  buildStrategy: BuildStrategyKindValue;
+  packagingMode: PackagingModeValue;
+  execution: RuntimeExecutionPlan;
+  steps: PlanStepText[];
+}): Result<{
+  buildStrategy: BuildStrategyKindValue;
+  packagingMode: PackagingModeValue;
+  execution: RuntimeExecutionPlan;
+  steps: PlanStepText[];
+}> {
+  return createAccessRoutes({
+    requestedDeployment: input.requestedDeployment,
+    ...(input.execution.port ? { fallbackPort: input.execution.port } : {}),
+  }).andThen((accessRoutes) => {
+    if (accessRoutes.length > 0 && input.execution.kind !== "docker-container") {
+      return err(
+        domainError.validation(
+          "Access routing is currently supported for Docker container deployments",
+        ),
+      );
+    }
+
+    return ok({
+      buildStrategy: input.buildStrategy,
+      packagingMode: input.packagingMode,
+      execution:
+        accessRoutes.length > 0 ? input.execution.withAccessRoutes(accessRoutes) : input.execution,
+      steps: input.steps,
+    });
+  });
+}
+
 function chooseStrategies(input: {
   source: SourceDescriptor;
   requestedDeployment: RequestedDeploymentConfig;
@@ -133,7 +208,8 @@ function chooseStrategies(input: {
         : {}),
       ...(requestedDeployment.port ? { port: PortNumber.rehydrate(requestedDeployment.port) } : {}),
     });
-    return ok({
+    return withRequestedAccessRoutes({
+      requestedDeployment,
       buildStrategy: BuildStrategyKindValue.rehydrate("compose-deploy"),
       packagingMode: PackagingModeValue.rehydrate("compose-bundle"),
       execution,
@@ -155,7 +231,8 @@ function chooseStrategies(input: {
         : {}),
       ...(requestedDeployment.port ? { port: PortNumber.rehydrate(requestedDeployment.port) } : {}),
     });
-    return ok({
+    return withRequestedAccessRoutes({
+      requestedDeployment,
       buildStrategy: BuildStrategyKindValue.rehydrate("prebuilt-image"),
       packagingMode: PackagingModeValue.rehydrate("all-in-one-docker"),
       execution,
@@ -178,7 +255,8 @@ function chooseStrategies(input: {
         : {}),
       ...(requestedDeployment.port ? { port: PortNumber.rehydrate(requestedDeployment.port) } : {}),
     });
-    return ok({
+    return withRequestedAccessRoutes({
+      requestedDeployment,
       buildStrategy: BuildStrategyKindValue.rehydrate("dockerfile"),
       packagingMode: PackagingModeValue.rehydrate("all-in-one-docker"),
       execution,
@@ -234,7 +312,8 @@ function chooseStrategies(input: {
       ...(requestedDeployment.port ? { port: PortNumber.rehydrate(requestedDeployment.port) } : {}),
     });
 
-    return ok({
+    return withRequestedAccessRoutes({
+      requestedDeployment,
       buildStrategy: BuildStrategyKindValue.rehydrate("workspace-commands"),
       packagingMode: PackagingModeValue.rehydrate("host-process-runtime"),
       execution,

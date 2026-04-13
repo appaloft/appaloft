@@ -190,6 +190,15 @@ Current boundary:
   - current values: `auto`, `dockerfile`, `docker-compose`, `prebuilt-image`, `workspace-commands`
 - command-driven deployments may also carry `installCommand`, `buildCommand`, `startCommand`,
   `port`, and `healthCheckPath`
+- command-driven deployments may carry access routing hints: `proxyKind`, `domains`,
+  `pathPrefix`, and `tlsMode`
+  - when domains are supplied and `proxyKind` is omitted, runtime planning defaults to `traefik`
+  - `proxyKind: none` means no public proxy route is configured
+  - current runtime adapter support applies access routes to Docker container deployments
+  - for Docker container deployments with access routes, runtime adapters ensure a shared
+    edge-proxy container and a `yundu-edge` Docker network before starting the app container
+  - Caddy support targets compatible Docker-label-based Caddy proxy deployments; generic Nginx
+    config generation is not a current deployment capability
 - command-driven deployments may carry `configFilePath`; local adapters may also discover
   `yundu.json`, `yundu.config.json`, or `.yundu.json` beside the local source
 - deployment config is a bootstrap hint, not a replacement aggregate:

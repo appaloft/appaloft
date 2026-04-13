@@ -27,6 +27,10 @@ export class CreateDeploymentCommand extends Command<{ id: string }> {
     public readonly startCommand?: string,
     public readonly port?: number,
     public readonly healthCheckPath?: string,
+    public readonly proxyKind?: CreateDeploymentCommandInput["proxyKind"],
+    public readonly domains?: string[],
+    public readonly pathPrefix?: string,
+    public readonly tlsMode?: CreateDeploymentCommandInput["tlsMode"],
   ) {
     super();
   }
@@ -48,6 +52,10 @@ export class CreateDeploymentCommand extends Command<{ id: string }> {
           parsed.startCommand,
           parsed.port,
           parsed.healthCheckPath,
+          parsed.proxyKind,
+          parsed.domains,
+          parsed.pathPrefix,
+          parsed.tlsMode,
         ),
     );
   }

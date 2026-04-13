@@ -100,6 +100,19 @@ export class PgDeploymentReadModel implements DeploymentReadModel {
                 ...(runtimePlan.execution.composeFile
                   ? { composeFile: runtimePlan.execution.composeFile }
                   : {}),
+                ...(runtimePlan.execution.accessRoutes?.length
+                  ? {
+                      accessRoutes: runtimePlan.execution.accessRoutes.map((route) => ({
+                        proxyKind: route.proxyKind,
+                        domains: route.domains,
+                        pathPrefix: route.pathPrefix,
+                        tlsMode: route.tlsMode,
+                        ...(typeof route.targetPort === "number"
+                          ? { targetPort: route.targetPort }
+                          : {}),
+                      })),
+                    }
+                  : {}),
                 ...(runtimePlan.execution.metadata
                   ? { metadata: runtimePlan.execution.metadata }
                   : {}),

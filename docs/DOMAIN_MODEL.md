@@ -68,6 +68,7 @@ Implemented now:
 Owns:
 - `DeploymentTarget`
 - `Destination`
+- access route intent for proxy/domain exposure
 - target capability and provider-facing endpoint metadata
 - deployment placement / isolation boundaries on a target
 
@@ -75,12 +76,16 @@ Implemented now:
 - `DeploymentTarget`
 - optional deployment target credential state for local SSH agent or SSH private key access
 - `Destination`
+- runtime-plan access routes with `none`, `traefik`, and `caddy` proxy kinds
 
 Transport compatibility note:
 - CLI / HTTP still expose `server` naming for backward compatibility
 - the core domain term is `DeploymentTarget`
-- `Destination` is the concrete place a resource deploys to on a target/server; proxy and domain
-  routing are not yet modeled as aggregates
+- `Destination` is the concrete place a resource deploys to on a target/server
+- access routes express public-domain intent; Traefik and Caddy label/config generation belongs in
+  runtime adapters, not in core aggregates
+- runtime adapters may ensure the shared edge proxy and Docker network when a runtime plan carries
+  access routes
 
 ### Workload Delivery
 
@@ -254,7 +259,8 @@ Rules:
 Current scope:
 - persisted and bootstrapped as a default local destination
 - deployment config may declare a target-local destination
-- proxy/domain routing remains a future access-layer model
+- proxy/domain routing is modeled as access-route intent on runtime plans; standalone persisted
+  access-route aggregates remain future work
 
 ### Workload
 

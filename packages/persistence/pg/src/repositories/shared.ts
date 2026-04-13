@@ -1,5 +1,6 @@
 import { type RepositoryContext } from "@yundu/application";
 import {
+  AccessRoute,
   BuildStrategyKindValue,
   CommandText,
   ConfigKey,
@@ -23,6 +24,7 @@ import {
   DestinationName,
   DetectSummary,
   DisplayNameText,
+  EdgeProxyKindValue,
   EnvironmentConfigSet,
   EnvironmentConfigSnapshot,
   EnvironmentConfigSnapshotEntry,
@@ -48,12 +50,14 @@ import {
   ProjectName,
   ProjectSlug,
   ProviderKey,
+  PublicDomainName,
   ResourceId,
   ResourceKindValue,
   ResourceName,
   ResourceServiceKindValue,
   ResourceServiceName,
   ResourceSlug,
+  RoutePathPrefix,
   RuntimeExecutionPlan,
   RuntimePlan,
   RuntimePlanId,
@@ -65,6 +69,7 @@ import {
   SshPublicKeyText,
   StartedAt,
   TargetKindValue,
+  TlsModeValue,
   UpdatedAt,
   VariableExposureValue,
   VariableKindValue,
@@ -79,6 +84,8 @@ type BuildStrategyInput = Parameters<typeof BuildStrategyKindValue.rehydrate>[0]
 type PackagingModeInput = Parameters<typeof PackagingModeValue.rehydrate>[0];
 type ExecutionStrategyInput = Parameters<typeof ExecutionStrategyKindValue.rehydrate>[0];
 type TargetKindInput = Parameters<typeof TargetKindValue.rehydrate>[0];
+type EdgeProxyKindInput = Parameters<typeof EdgeProxyKindValue.rehydrate>[0];
+type TlsModeInput = Parameters<typeof TlsModeValue.rehydrate>[0];
 type ConfigScopeInput = Parameters<typeof ConfigScopeValue.rehydrate>[0];
 type VariableKindInput = Parameters<typeof VariableKindValue.rehydrate>[0];
 type VariableExposureInput = Parameters<typeof VariableExposureValue.rehydrate>[0];
@@ -111,6 +118,13 @@ export interface SerializedRuntimeExecutionPlan extends Record<string, unknown> 
   image?: string;
   dockerfilePath?: string;
   composeFile?: string;
+  accessRoutes?: Array<{
+    proxyKind: EdgeProxyKindInput;
+    domains: string[];
+    pathPrefix: string;
+    tlsMode: TlsModeInput;
+    targetPort?: number;
+  }>;
   metadata?: Record<string, string>;
 }
 
@@ -227,6 +241,17 @@ export function serializeRuntimePlan(plan: RuntimePlanType): SerializedRuntimePl
       ...(plan.execution.image ? { image: plan.execution.image } : {}),
       ...(plan.execution.dockerfilePath ? { dockerfilePath: plan.execution.dockerfilePath } : {}),
       ...(plan.execution.composeFile ? { composeFile: plan.execution.composeFile } : {}),
+      ...(plan.execution.accessRoutes.length > 0
+        ? {
+            accessRoutes: plan.execution.accessRoutes.map((route) => ({
+              proxyKind: route.proxyKind,
+              domains: route.domains,
+              pathPrefix: route.pathPrefix,
+              tlsMode: route.tlsMode,
+              ...(typeof route.targetPort === "number" ? { targetPort: route.targetPort } : {}),
+            })),
+          }
+        : {}),
       ...(plan.execution.metadata ? { metadata: plan.execution.metadata } : {}),
     },
     target: {
@@ -281,6 +306,21 @@ export function rehydrateRuntimePlan(raw: unknown): RuntimePlan {
         : {}),
       ...(execution.composeFile
         ? { composeFile: FilePathText.rehydrate(execution.composeFile) }
+        : {}),
+      ...(execution.accessRoutes
+        ? {
+            accessRoutes: execution.accessRoutes.map((route) =>
+              AccessRoute.rehydrate({
+                proxyKind: EdgeProxyKindValue.rehydrate(route.proxyKind),
+                domains: route.domains.map((domain) => PublicDomainName.rehydrate(domain)),
+                pathPrefix: RoutePathPrefix.rehydrate(route.pathPrefix),
+                tlsMode: TlsModeValue.rehydrate(route.tlsMode),
+                ...(typeof route.targetPort === "number"
+                  ? { targetPort: PortNumber.rehydrate(route.targetPort) }
+                  : {}),
+              }),
+            ),
+          }
         : {}),
       ...(execution.metadata ? { metadata: execution.metadata } : {}),
     }),

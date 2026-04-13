@@ -54,6 +54,14 @@ export const targetKinds = ["single-server", "future-multi-server", "future-k8s"
 
 export type TargetKind = (typeof targetKinds)[number];
 
+export const edgeProxyKinds = ["none", "traefik", "caddy"] as const;
+
+export type EdgeProxyKind = (typeof edgeProxyKinds)[number];
+
+export const tlsModes = ["auto", "disabled"] as const;
+
+export type TlsMode = (typeof tlsModes)[number];
+
 export const deploymentTargetCredentialKinds = ["local-ssh-agent", "ssh-private-key"] as const;
 
 export type DeploymentTargetCredentialKind = (typeof deploymentTargetCredentialKinds)[number];

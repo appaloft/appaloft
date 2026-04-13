@@ -139,6 +139,10 @@ function mergeConfigIntoCommand(
     startCommand: input.startCommand ?? deployment?.startCommand,
     port: input.port ?? deployment?.port,
     healthCheckPath: input.healthCheckPath ?? deployment?.healthCheckPath,
+    proxyKind: input.proxyKind ?? deployment?.proxyKind,
+    domains: input.domains ?? deployment?.domains,
+    pathPrefix: input.pathPrefix ?? deployment?.pathPrefix,
+    tlsMode: input.tlsMode ?? deployment?.tlsMode,
   };
 }
 
