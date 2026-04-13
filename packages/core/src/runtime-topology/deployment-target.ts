@@ -2,13 +2,23 @@ import { AggregateRoot } from "../shared/entity";
 import { type DeploymentTargetId } from "../shared/identifiers";
 import { type PortNumber } from "../shared/numeric-values";
 import { ok, type Result } from "../shared/result";
-import { TargetKindValue } from "../shared/state-machine";
-import { type CreatedAt } from "../shared/temporal";
+import { type DeploymentTargetCredentialKindValue, TargetKindValue } from "../shared/state-machine";
+import { type CreatedAt, type UpdatedAt } from "../shared/temporal";
 import {
   type DeploymentTargetName,
+  type DeploymentTargetUsername,
   type HostAddress,
   type ProviderKey,
+  type SshPrivateKeyText,
+  type SshPublicKeyText,
 } from "../shared/text-values";
+
+export interface DeploymentTargetCredentialState {
+  kind: DeploymentTargetCredentialKindValue;
+  username?: DeploymentTargetUsername;
+  publicKey?: SshPublicKeyText;
+  privateKey?: SshPrivateKeyText;
+}
 
 export interface DeploymentTargetState {
   id: DeploymentTargetId;
@@ -17,6 +27,7 @@ export interface DeploymentTargetState {
   port: PortNumber;
   providerKey: ProviderKey;
   targetKind: TargetKindValue;
+  credential?: DeploymentTargetCredentialState;
   createdAt: CreatedAt;
 }
 
@@ -53,6 +64,21 @@ export class DeploymentTarget extends AggregateRoot<DeploymentTargetState> {
     });
 
     return ok(deploymentTarget);
+  }
+
+  configureCredential(input: {
+    credential: DeploymentTargetCredentialState;
+    configuredAt: UpdatedAt;
+  }): Result<void> {
+    this.state.credential = input.credential;
+    this.recordDomainEvent("deployment_target.credential_configured", input.configuredAt, {
+      kind: input.credential.kind.value,
+      usernameConfigured: Boolean(input.credential.username),
+      publicKeyConfigured: Boolean(input.credential.publicKey),
+      privateKeyConfigured: Boolean(input.credential.privateKey),
+    });
+
+    return ok(undefined);
   }
 
   static rehydrate(state: DeploymentTargetState): DeploymentTarget {

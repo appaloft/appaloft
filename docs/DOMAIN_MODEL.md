@@ -73,6 +73,7 @@ Owns:
 
 Implemented now:
 - `DeploymentTarget`
+- optional deployment target credential state for local SSH agent or SSH private key access
 - `Destination`
 
 Transport compatibility note:

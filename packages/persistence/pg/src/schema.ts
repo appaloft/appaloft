@@ -16,6 +16,10 @@ export interface ServersTable {
   host: string;
   port: number;
   provider_key: string;
+  credential_kind: string | null;
+  credential_username: string | null;
+  credential_public_key: string | null;
+  credential_private_key: string | null;
   created_at: TimestampColumn;
 }
 

@@ -221,6 +221,7 @@ export function registerRuntimeDependencies(
             dependencyContainer.resolve(tokens.logger),
             dependencyContainer.resolve(tokens.deploymentProgressReporter),
             dependencyContainer.resolve(tokens.integrationAuthPort),
+            dependencyContainer.resolve(tokens.serverRepository),
           ),
           new InMemoryExecutionBackend(
             dependencyContainer.resolve(tokens.deploymentProgressReporter),

@@ -34,6 +34,16 @@ export class PgServerReadModel implements ServerReadModel {
               host: row.host,
               port: row.port,
               providerKey: row.provider_key,
+              ...(row.credential_kind
+                ? {
+                    credential: {
+                      kind: row.credential_kind as "local-ssh-agent" | "ssh-private-key",
+                      ...(row.credential_username ? { username: row.credential_username } : {}),
+                      publicKeyConfigured: Boolean(row.credential_public_key),
+                      privateKeyConfigured: Boolean(row.credential_private_key),
+                    },
+                  }
+                : {}),
               createdAt: normalizeTimestamp(row.created_at) ?? row.created_at,
             })),
           ),

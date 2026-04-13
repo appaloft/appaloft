@@ -96,6 +96,7 @@ Implemented operations:
 | Capability | Kind | Operation Key | Message | Schema | CLI | oRPC / HTTP |
 | --- | --- | --- | --- | --- | --- | --- |
 | Register deployment target | Command | `servers.register` | `RegisterServerCommand` | `RegisterServerCommandInput` | `yundu server register` | `POST /api/servers` |
+| Configure deployment target credential | Command | `servers.configure-credential` | `ConfigureServerCredentialCommand` | `ConfigureServerCredentialCommandInput` | `yundu server credential <serverId>` | `POST /api/servers/{serverId}/credentials` |
 | List deployment targets | Query | `servers.list` | `ListServersQuery` | `ListServersQueryInput` | `yundu server list` | `GET /api/servers` |
 | Test deployment target connectivity | Command | `servers.test-connectivity` | `TestServerConnectivityCommand` | `TestServerConnectivityCommandInput` | `yundu server test <serverId>` | `POST /api/servers/{serverId}/connectivity-tests` |
 

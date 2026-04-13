@@ -3,6 +3,7 @@ import {
   configScopes,
   deploymentLogSources,
   deploymentStatuses,
+  deploymentTargetCredentialKinds,
   destinationKinds,
   environmentKinds,
   executionStrategyKinds,
@@ -22,6 +23,7 @@ export {
   configScopes,
   deploymentLogSources,
   deploymentStatuses,
+  deploymentTargetCredentialKinds,
   destinationKinds,
   environmentKinds,
   executionStrategyKinds,
@@ -147,6 +149,34 @@ export class TargetKindValue extends EnumValueObject<(typeof targetKinds)[number
 
   static rehydrate(value: (typeof targetKinds)[number]): TargetKindValue {
     return new TargetKindValue(value);
+  }
+}
+
+const deploymentTargetCredentialKindBrand: unique symbol = Symbol(
+  "DeploymentTargetCredentialKindValue",
+);
+export class DeploymentTargetCredentialKindValue extends EnumValueObject<
+  (typeof deploymentTargetCredentialKinds)[number]
+> {
+  private [deploymentTargetCredentialKindBrand]!: void;
+
+  private constructor(value: (typeof deploymentTargetCredentialKinds)[number]) {
+    super(value);
+  }
+
+  static create(value: string): Result<DeploymentTargetCredentialKindValue> {
+    return createEnumValue(
+      value,
+      deploymentTargetCredentialKinds,
+      "Deployment target credential kind",
+      (validated) => new DeploymentTargetCredentialKindValue(validated),
+    );
+  }
+
+  static rehydrate(
+    value: (typeof deploymentTargetCredentialKinds)[number],
+  ): DeploymentTargetCredentialKindValue {
+    return new DeploymentTargetCredentialKindValue(value);
   }
 }
 

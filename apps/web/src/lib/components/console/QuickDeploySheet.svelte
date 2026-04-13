@@ -19,9 +19,11 @@
   import type { TranslationKey } from "@yundu/i18n";
   import type {
     AuthSessionResponse,
+    ConfigureServerCredentialInput,
     EnvironmentSummary,
     GitHubRepositorySummary,
     ProjectSummary,
+    RegisterServerInput,
     ResourceSummary,
     ServerSummary,
   } from "@yundu/contracts";
@@ -49,6 +51,7 @@
 
   type SourceKind = "local-folder" | "github" | "remote-git" | "docker-image" | "compose";
   type DraftMode = "existing" | "new";
+  type ServerCredentialKind = "local-ssh-agent" | "ssh-private-key";
   type EnvironmentKind = EnvironmentSummary["kind"];
   type DeploymentStepKey = "source" | "project" | "server" | "environment" | "variables" | "review";
   type SummaryRow = {
@@ -209,6 +212,10 @@
   let serverHost = $state(browser ? (page.url.searchParams.get("serverHost") ?? "127.0.0.1") : "127.0.0.1");
   let serverPort = $state(browser ? (page.url.searchParams.get("serverPort") ?? "22") : "22");
   let serverProviderKey = $state(browser ? (page.url.searchParams.get("serverProvider") ?? "local-shell") : "local-shell");
+  let serverCredentialKind = $state<ServerCredentialKind>("local-ssh-agent");
+  let serverCredentialUsername = $state("");
+  let serverCredentialPublicKey = $state("");
+  let serverCredentialPrivateKey = $state("");
   let environmentName = $state(browser ? (page.url.searchParams.get("environmentName") ?? "local") : "local");
   let environmentKind = $state<EnvironmentKind>(
     parseEnvironmentKind(browser ? page.url.searchParams.get("environmentKind") : null),
@@ -238,8 +245,11 @@
     mutationFn: (input: { name: string; description?: string }) => orpcClient.projects.create(input),
   }));
   const registerServerMutation = createMutation(() => ({
-    mutationFn: (input: { name: string; host: string; port?: number; providerKey: string }) =>
-      orpcClient.servers.create(input),
+    mutationFn: (input: RegisterServerInput) => orpcClient.servers.create(input),
+  }));
+  const configureServerCredentialMutation = createMutation(() => ({
+    mutationFn: (input: ConfigureServerCredentialInput) =>
+      orpcClient.servers.configureCredential(input),
   }));
   const createEnvironmentMutation = createMutation(() => ({
     mutationFn: (input: {
@@ -339,6 +349,7 @@
   const deployPending = $derived(
     createProjectMutation.isPending ||
       registerServerMutation.isPending ||
+      configureServerCredentialMutation.isPending ||
       createEnvironmentMutation.isPending ||
       setEnvironmentVariableMutation.isPending ||
       createDeploymentMutation.isPending,
@@ -552,6 +563,25 @@
     return serverName.trim() && serverHost.trim()
       ? `${serverName.trim()} · ${serverProviderTitle} · ${serverHost.trim()}`
       : "待创建服务器";
+  });
+  const serverCredentialSummary = $derived.by(() => {
+    if (serverMode === "existing") {
+      if (!selectedServer?.credential) {
+        return "未配置 SSH 凭据";
+      }
+
+      return selectedServer.credential.kind === "ssh-private-key"
+        ? `SSH 私钥${selectedServer.credential.username ? ` · ${selectedServer.credential.username}` : ""}`
+        : `本机 SSH agent${selectedServer.credential.username ? ` · ${selectedServer.credential.username}` : ""}`;
+    }
+
+    if (serverProviderKey !== "generic-ssh") {
+      return "本机或提供商默认凭据";
+    }
+
+    return serverCredentialKind === "ssh-private-key"
+      ? `SSH 私钥${serverCredentialUsername.trim() ? ` · ${serverCredentialUsername.trim()}` : ""}`
+      : `本机 SSH agent${serverCredentialUsername.trim() ? ` · ${serverCredentialUsername.trim()}` : ""}`;
   });
   const environmentSummary = $derived.by(() => {
     if (!environmentContextEnabled) {
@@ -936,9 +966,19 @@
             Boolean(selectedGitHubRepository || githubLocator.trim()),
         );
       case "server":
-        return serverMode === "existing"
-          ? Boolean(selectedServerId)
-          : Boolean(serverName.trim() && serverHost.trim());
+        if (serverMode === "existing") {
+          return Boolean(selectedServerId);
+        }
+
+        if (!serverName.trim() || !serverHost.trim()) {
+          return false;
+        }
+
+        if (serverProviderKey !== "generic-ssh") {
+          return true;
+        }
+
+        return serverCredentialKind === "local-ssh-agent" || Boolean(serverCredentialPrivateKey.trim());
       case "project":
         return !projectContextEnabled || (projectMode === "existing" ? Boolean(selectedProjectId) : Boolean(projectName.trim()));
       case "environment":
@@ -1052,6 +1092,28 @@
     }
   }
 
+  function newServerCredential(): ConfigureServerCredentialInput["credential"] | undefined {
+    if (serverProviderKey !== "generic-ssh") {
+      return undefined;
+    }
+
+    const username = serverCredentialUsername.trim();
+
+    if (serverCredentialKind === "local-ssh-agent") {
+      return {
+        kind: "local-ssh-agent",
+        ...(username ? { username } : {}),
+      };
+    }
+
+    return {
+      kind: "ssh-private-key",
+      ...(username ? { username } : {}),
+      ...(serverCredentialPublicKey.trim() ? { publicKey: serverCredentialPublicKey.trim() } : {}),
+      privateKey: serverCredentialPrivateKey.trim(),
+    };
+  }
+
   async function refreshWorkspaceData(): Promise<void> {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ["projects"] }),
@@ -1107,6 +1169,16 @@
           throw new Error("请填写服务器名称和主机地址。");
         }
 
+        const credential = newServerCredential();
+        if (
+          serverProviderKey === "generic-ssh" &&
+          serverCredentialKind === "ssh-private-key" &&
+          credential?.kind === "ssh-private-key" &&
+          !credential.privateKey
+        ) {
+          throw new Error("请填写 SSH 私钥，或切换为本机 SSH agent。");
+        }
+
         const createdServer = await registerServerMutation.mutateAsync({
           name: serverName.trim(),
           host: serverHost.trim(),
@@ -1115,6 +1187,14 @@
         });
         serverId = createdServer.id;
         selectedServerId = serverId;
+
+        if (credential) {
+          await configureServerCredentialMutation.mutateAsync({
+            serverId,
+            credential,
+          });
+        }
+
         await serversQuery.refetch();
       }
 
@@ -1484,6 +1564,9 @@
                       }}
                     >
                       {server.name} · {server.host}
+                      {#if server.credential}
+                        · {server.credential.kind === "ssh-private-key" ? "SSH key" : "SSH agent"}
+                      {/if}
                     </Button>
                   {/each}
                 {:else}
@@ -1529,6 +1612,74 @@
                     {/each}
                   </div>
                 </div>
+                {#if serverProviderKey === "generic-ssh"}
+                  <div class="space-y-3 rounded-md border px-3 py-3">
+                    <div class="space-y-1">
+                      <p class="text-sm font-medium">SSH 登录凭据</p>
+                      <p class="text-xs text-muted-foreground">
+                        云服务器先把公钥放进 authorized_keys；Yundu 连接服务器时使用对应的私钥，或使用当前机器的 SSH agent。
+                      </p>
+                    </div>
+                    <div class="grid gap-2 sm:grid-cols-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={serverCredentialKind === "local-ssh-agent" ? "default" : "outline"}
+                        onclick={() => {
+                          serverCredentialKind = "local-ssh-agent";
+                        }}
+                      >
+                        本机 SSH agent
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={serverCredentialKind === "ssh-private-key" ? "default" : "outline"}
+                        onclick={() => {
+                          serverCredentialKind = "ssh-private-key";
+                        }}
+                      >
+                        粘贴 SSH 私钥
+                      </Button>
+                    </div>
+                    <div class="space-y-2">
+                      <label class="text-xs font-medium text-muted-foreground" for="server-ssh-username">
+                        登录用户
+                      </label>
+                      <Input
+                        id="server-ssh-username"
+                        bind:value={serverCredentialUsername}
+                        placeholder="root 或 ubuntu"
+                      />
+                    </div>
+                    {#if serverCredentialKind === "ssh-private-key"}
+                      <div class="space-y-2">
+                        <label class="text-xs font-medium text-muted-foreground" for="server-ssh-private-key">
+                          私钥
+                        </label>
+                        <Textarea
+                          id="server-ssh-private-key"
+                          class="font-mono text-xs"
+                          bind:value={serverCredentialPrivateKey}
+                          placeholder={"-----BEGIN OPENSSH PRIVATE KEY-----\n...\n-----END OPENSSH PRIVATE KEY-----"}
+                          rows={6}
+                        />
+                      </div>
+                      <div class="space-y-2">
+                        <label class="text-xs font-medium text-muted-foreground" for="server-ssh-public-key">
+                          公钥（可选）
+                        </label>
+                        <Textarea
+                          id="server-ssh-public-key"
+                          class="font-mono text-xs"
+                          bind:value={serverCredentialPublicKey}
+                          placeholder="ssh-ed25519 AAAA..."
+                          rows={3}
+                        />
+                      </div>
+                    {/if}
+                  </div>
+                {/if}
               </div>
             {/if}
           </div>
@@ -1662,6 +1813,7 @@
                 <div class="rounded-md border px-3 py-3">
                   <p class="text-xs text-muted-foreground">{$t(i18nKeys.common.domain.server)}</p>
                   <p class="mt-1 truncate font-medium">{serverSummary}</p>
+                  <p class="mt-1 truncate text-xs text-muted-foreground">{serverCredentialSummary}</p>
                 </div>
                 <div class="rounded-md border px-3 py-3">
                   <p class="text-xs text-muted-foreground">{$t(i18nKeys.common.domain.environment)}</p>

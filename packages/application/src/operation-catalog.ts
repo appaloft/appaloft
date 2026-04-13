@@ -13,6 +13,7 @@ import { unsetEnvironmentVariableCommandInputSchema } from "./operations/environ
 import { createProjectCommandInputSchema } from "./operations/projects/create-project.command";
 import { listProjectsQueryInputSchema } from "./operations/projects/list-projects.query";
 import { listResourcesQueryInputSchema } from "./operations/resources/list-resources.query";
+import { configureServerCredentialCommandInputSchema } from "./operations/servers/configure-server-credential.command";
 import { listServersQueryInputSchema } from "./operations/servers/list-servers.query";
 import { registerServerCommandInputSchema } from "./operations/servers/register-server.command";
 import { testServerConnectivityCommandInputSchema } from "./operations/servers/test-server-connectivity.command";
@@ -89,6 +90,20 @@ export const operationCatalog = [
     transports: {
       cli: "yundu server register",
       orpc: { method: "POST", path: "/api/servers" },
+    },
+  },
+  {
+    key: "servers.configure-credential",
+    kind: "command",
+    domain: "servers",
+    messageName: "ConfigureServerCredentialCommand",
+    handlerName: "ConfigureServerCredentialCommandHandler",
+    serviceName: "ConfigureServerCredentialUseCase",
+    inputSchema: configureServerCredentialCommandInputSchema,
+    serviceToken: tokens.configureServerCredentialUseCase,
+    transports: {
+      cli: "yundu server credential <serverId>",
+      orpc: { method: "POST", path: "/api/servers/{serverId}/credentials" },
     },
   },
   {

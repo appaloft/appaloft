@@ -1,5 +1,6 @@
 import { type Client, type ORPCError } from "@orpc/client";
 import {
+  type ConfigureServerCredentialCommandInput,
   type CreateDeploymentCommandInput,
   type CreateEnvironmentCommandInput,
   type CreateProjectCommandInput,
@@ -57,6 +58,12 @@ export type YunduOrpcClientContract = {
       YunduClientContext,
       RegisterServerCommandInput,
       RegisterServerResponse,
+      YunduClientError
+    >;
+    configureCredential: Client<
+      YunduClientContext,
+      ConfigureServerCredentialCommandInput,
+      null,
       YunduClientError
     >;
     testConnectivity: Client<

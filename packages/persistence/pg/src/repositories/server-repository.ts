@@ -56,6 +56,10 @@ class KyselyServerMutationVisitor
         host: spec.state.host.value,
         port: spec.state.port.value,
         provider_key: spec.state.providerKey.value,
+        credential_kind: spec.state.credential?.kind.value ?? null,
+        credential_username: spec.state.credential?.username?.value ?? null,
+        credential_public_key: spec.state.credential?.publicKey?.value ?? null,
+        credential_private_key: spec.state.credential?.privateKey?.value ?? null,
         created_at: spec.state.createdAt.value,
       },
     };
@@ -91,6 +95,10 @@ export class PgServerRepository implements ServerRepository {
               host: mutation.values.host,
               port: mutation.values.port,
               provider_key: mutation.values.provider_key,
+              credential_kind: mutation.values.credential_kind,
+              credential_username: mutation.values.credential_username,
+              credential_public_key: mutation.values.credential_public_key,
+              credential_private_key: mutation.values.credential_private_key,
             }),
           )
           .execute();

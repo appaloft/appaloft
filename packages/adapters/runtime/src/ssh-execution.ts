@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, rmSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import {
   deploymentProgressSteps,
@@ -8,12 +8,16 @@ import {
   type ExecutionBackend,
   type ExecutionContext,
   type IntegrationAuthPort,
+  type ServerRepository,
   reportDeploymentProgress,
+  toRepositoryContext,
 } from "@yundu/application";
 import {
   DeploymentLogEntry,
   DeploymentLogSourceValue,
   DeploymentPhaseValue,
+  DeploymentTargetByIdSpec,
+  DeploymentTargetId,
   ErrorCodeText,
   ExecutionResult,
   ExecutionStatusValue,
@@ -95,6 +99,10 @@ function withGitHubAccessToken(locator: string, accessToken: string): string {
 
 function hostForHealthCheck(sshHost: string): string {
   return sshHost.includes("@") ? (sshHost.split("@").pop() ?? sshHost) : sshHost;
+}
+
+function hostWithUsername(host: string, username?: string): string {
+  return username && !host.includes("@") ? `${username}@${host}` : host;
 }
 
 async function waitForHealth(url: string): Promise<{ ok: boolean; reason?: string }> {
@@ -201,6 +209,7 @@ function deploymentEnv(deployment: Deployment, port?: number): NodeJS.ProcessEnv
 interface SshTarget {
   host: string;
   port: string;
+  identityFile?: string;
 }
 
 interface PreparedSshSource {
@@ -216,6 +225,7 @@ export class SshExecutionBackend implements ExecutionBackend {
     private readonly logger: AppLogger,
     private readonly progressReporter: DeploymentProgressReporter,
     private readonly integrationAuthPort?: IntegrationAuthPort,
+    private readonly serverRepository?: ServerRepository,
   ) {}
 
   private report(
@@ -298,22 +308,75 @@ export class SshExecutionBackend implements ExecutionBackend {
     return deployment;
   }
 
-  private targetFor(deployment: Deployment): Result<SshTarget> {
-    const metadata = deployment.toState().runtimePlan.target.metadata ?? {};
-    const host = metadata.serverHost;
-    const port = metadata.serverPort ?? "22";
+  private writePrivateKey(runtimeDir: string, privateKey: string): string {
+    const sshDir = resolve(runtimeDir, "ssh");
+    const identityFile = resolve(sshDir, "id_deployment_target");
+    mkdirSync(sshDir, { recursive: true });
+    writeFileSync(identityFile, privateKey.endsWith("\n") ? privateKey : `${privateKey}\n`, {
+      mode: 0o600,
+    });
+    chmodSync(identityFile, 0o600);
+    return identityFile;
+  }
+
+  private cleanupPrivateKey(target: SshTarget): void {
+    if (target.identityFile) {
+      rmSync(dirname(target.identityFile), { recursive: true, force: true });
+    }
+  }
+
+  private async targetFor(
+    context: ExecutionContext,
+    deployment: Deployment,
+    runtimeDir: string,
+  ): Promise<Result<SshTarget>> {
+    const state = deployment.toState();
+    const planTarget = state.runtimePlan.target;
+    const metadata = planTarget.metadata ?? {};
+    let host = metadata.serverHost;
+    let port = metadata.serverPort ?? "22";
+    let username: string | undefined;
+    let identityFile: string | undefined;
+
+    const serverId = planTarget.serverIds[0];
+    if (this.serverRepository && serverId) {
+      const server = await this.serverRepository.findOne(
+        toRepositoryContext(context),
+        DeploymentTargetByIdSpec.create(DeploymentTargetId.rehydrate(serverId)),
+      );
+      const serverState = server?.toState();
+
+      if (serverState) {
+        host = serverState.host.value;
+        port = String(serverState.port.value);
+        username = serverState.credential?.username?.value;
+        if (
+          serverState.credential?.kind.value === "ssh-private-key" &&
+          serverState.credential.privateKey
+        ) {
+          identityFile = this.writePrivateKey(runtimeDir, serverState.credential.privateKey.value);
+        }
+      }
+    }
 
     if (!host) {
       return err(domainError.validation("SSH deployment target is missing server host metadata"));
     }
 
-    return ok({ host, port });
+    return ok({
+      host: hostWithUsername(host, username),
+      port,
+      ...(identityFile ? { identityFile } : {}),
+    });
   }
 
   private sshArgs(target: SshTarget): string[] {
     return [
       "-p",
       target.port,
+      ...(target.identityFile
+        ? ["-i", target.identityFile, "-o", "IdentitiesOnly=yes"]
+        : []),
       "-o",
       "BatchMode=yes",
       "-o",
@@ -530,14 +593,15 @@ export class SshExecutionBackend implements ExecutionBackend {
       );
     }
 
-    const targetResult = this.targetFor(deployment);
+    const runtimeDir = this.runtimeDirectory(state.id.value);
+    mkdirSync(runtimeDir, { recursive: true });
+
+    const targetResult = await this.targetFor(context, deployment, runtimeDir);
     if (targetResult.isErr()) {
       return targetResult.map(() => ({ deployment }));
     }
     const target = targetResult._unsafeUnwrap();
-    const runtimeDir = this.runtimeDirectory(state.id.value);
     const remoteRoot = `/tmp/yundu-deployments/${sanitizeName(state.id.value)}`;
-    mkdirSync(runtimeDir, { recursive: true });
 
     const port = state.runtimePlan.execution.port ?? 3000;
     const env = deploymentEnv(deployment, port);
@@ -774,6 +838,8 @@ export class SshExecutionBackend implements ExecutionBackend {
           retryable: true,
         }),
       });
+    } finally {
+      this.cleanupPrivateKey(target);
     }
   }
 
@@ -785,7 +851,10 @@ export class SshExecutionBackend implements ExecutionBackend {
     void plan;
     const state = deployment.toState();
     const metadata = state.runtimePlan.execution.metadata ?? {};
-    const targetResult = this.targetFor(deployment);
+    const runtimeDir = this.runtimeDirectory(state.id.value);
+    mkdirSync(runtimeDir, { recursive: true });
+
+    const targetResult = await this.targetFor(context, deployment, runtimeDir);
     if (targetResult.isErr()) {
       return targetResult.map(() => ({ deployment }));
     }
@@ -794,13 +863,17 @@ export class SshExecutionBackend implements ExecutionBackend {
     const logs: DeploymentLogEntry[] = [];
     const env = deploymentEnv(deployment);
 
-    if (metadata.containerName) {
-      this.runRemoteCommand({
-        target,
-        command: `docker rm -f ${shellQuote(metadata.containerName)}`,
-        cwd: this.runtimeDirectory(state.id.value),
-        env,
-      });
+    try {
+      if (metadata.containerName) {
+        this.runRemoteCommand({
+          target,
+          command: `docker rm -f ${shellQuote(metadata.containerName)}`,
+          cwd: runtimeDir,
+          env,
+        });
+      }
+    } finally {
+      this.cleanupPrivateKey(target);
     }
 
     logs.push(

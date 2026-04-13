@@ -12,9 +12,11 @@ import {
   DeploymentLogSourceValue,
   DeploymentPhaseValue,
   DeploymentStatusValue,
+  DeploymentTargetCredentialKindValue,
   DeploymentTargetDescriptor,
   DeploymentTargetId,
   DeploymentTargetName,
+  DeploymentTargetUsername,
   DescriptionText,
   DestinationId,
   DestinationKindValue,
@@ -59,6 +61,8 @@ import {
   SourceDescriptor,
   SourceKindValue,
   SourceLocator,
+  SshPrivateKeyText,
+  SshPublicKeyText,
   StartedAt,
   TargetKindValue,
   UpdatedAt,
@@ -85,6 +89,9 @@ type DeploymentPhaseInput = Parameters<typeof DeploymentPhaseValue.rehydrate>[0]
 type LogLevelInput = Parameters<typeof LogLevelValue.rehydrate>[0];
 type ResourceKindInput = Parameters<typeof ResourceKindValue.rehydrate>[0];
 type ResourceServiceKindInput = Parameters<typeof ResourceServiceKindValue.rehydrate>[0];
+type DeploymentTargetCredentialKindInput = Parameters<
+  typeof DeploymentTargetCredentialKindValue.rehydrate
+>[0];
 
 export interface SerializedSourceDescriptor extends Record<string, unknown> {
   kind: SourceKindInput;
@@ -420,6 +427,24 @@ export function rehydrateDeploymentTarget(row: Selectable<Database["servers"]>) 
     port: PortNumber.rehydrate(row.port),
     providerKey: ProviderKey.rehydrate(row.provider_key),
     targetKind: TargetKindValue.rehydrate("single-server"),
+    ...(row.credential_kind
+      ? {
+          credential: {
+            kind: DeploymentTargetCredentialKindValue.rehydrate(
+              row.credential_kind as DeploymentTargetCredentialKindInput,
+            ),
+            ...(row.credential_username
+              ? { username: DeploymentTargetUsername.rehydrate(row.credential_username) }
+              : {}),
+            ...(row.credential_public_key
+              ? { publicKey: SshPublicKeyText.rehydrate(row.credential_public_key) }
+              : {}),
+            ...(row.credential_private_key
+              ? { privateKey: SshPrivateKeyText.rehydrate(row.credential_private_key) }
+              : {}),
+          },
+        }
+      : {}),
     createdAt: CreatedAt.rehydrate(normalizeTimestamp(row.created_at) ?? row.created_at),
   };
 }
