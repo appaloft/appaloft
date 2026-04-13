@@ -2,8 +2,10 @@ import { resolve } from "node:path";
 
 type ChildProcess = ReturnType<typeof Bun.spawn>;
 
-const dataDir = resolve(Bun.env.YUNDU_DATA_DIR ?? ".yundu/data");
-const pgliteDataDir = resolve(Bun.env.YUNDU_PGLITE_DATA_DIR ?? `${dataDir}/pglite`);
+const configuredDataDir = Bun.env.YUNDU_DATA_DIR ? resolve(Bun.env.YUNDU_DATA_DIR) : undefined;
+const configuredPgliteDataDir = Bun.env.YUNDU_PGLITE_DATA_DIR
+  ? resolve(Bun.env.YUNDU_PGLITE_DATA_DIR)
+  : undefined;
 const webPort = Bun.env.YUNDU_DEV_WEB_PORT ?? "3001";
 const backendPort = Bun.env.YUNDU_DEV_BACKEND_PORT ?? "3002";
 const webHost = Bun.env.YUNDU_DEV_WEB_HOST ?? "localhost";
@@ -65,11 +67,11 @@ spawnProcess(
     ...Bun.env,
     YUNDU_HTTP_HOST: backendHost,
     YUNDU_HTTP_PORT: backendPort,
-    YUNDU_DATA_DIR: dataDir,
-    YUNDU_PGLITE_DATA_DIR: pgliteDataDir,
     YUNDU_WEB_ORIGIN: webOrigin,
     YUNDU_BETTER_AUTH_URL: webOrigin,
     BETTER_AUTH_TRUSTED_ORIGINS: trustedOrigins,
+    ...(configuredDataDir ? { YUNDU_DATA_DIR: configuredDataDir } : {}),
+    ...(configuredPgliteDataDir ? { YUNDU_PGLITE_DATA_DIR: configuredPgliteDataDir } : {}),
   },
 );
 

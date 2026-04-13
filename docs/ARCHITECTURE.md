@@ -41,13 +41,13 @@ flowchart LR
   API --> Targets["User-owned Servers"]
 ```
 
-Portable embedded mode:
+Local embedded mode:
 
 ```mermaid
 flowchart LR
   Dev["Developer"] --> CLI["CLI / Optional Local Serve"]
   CLI --> API["Single local Yundu process"]
-  API --> PG["PGlite data dir (.yundu/data/pglite)"]
+  API --> PG["PGlite data dir (user data dir by default)"]
   API --> Targets["User-owned Servers"]
 ```
 
@@ -221,7 +221,7 @@ Important:
 
 - binary mode is only a distribution choice
 - PostgreSQL remains the main hosted and production backend
-- PGlite is an embedded option for portable, single-instance installs
+- PGlite is an embedded option for single-instance installs and defaults to platform user-level storage
 - release artifacts currently map to `yundu-backend`, `yundu-web-static`, `Dockerfile`, and `docker-compose.selfhost.yml`
 - hosted auth is optional and additive; self-hosted/local mode can remain anonymous
 

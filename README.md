@@ -97,7 +97,8 @@ Important:
 
 - optional binary distribution is only a packaging form
 - PostgreSQL remains the primary hosted/production backend
-- PGlite is supported for embedded single-instance installs with on-disk data under `.yundu/data`
+- PGlite is supported for embedded single-instance installs and defaults to the platform user data
+  directory; set `YUNDU_DATA_DIR=.yundu/data` only when you want portable workspace-local state
 - hosted auth and tenant features are additive, not mandatory for local/self-hosted use
 - `yundu-binary-bundle` now packages a single Bun-compiled executable with embedded web console assets and embedded PGlite runtime assets
 

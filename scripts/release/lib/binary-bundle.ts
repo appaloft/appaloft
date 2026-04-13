@@ -111,7 +111,27 @@ set -eu
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 
 export YUNDU_DATABASE_DRIVER="\${YUNDU_DATABASE_DRIVER:-pglite}"
-export YUNDU_DATA_DIR="\${YUNDU_DATA_DIR:-$PWD/.yundu/data}"
+if [ -z "\${YUNDU_DATA_DIR:-}" ]; then
+	case "$(uname -s 2>/dev/null || echo unknown)" in
+		Darwin)
+			if [ -n "\${HOME:-}" ]; then
+				YUNDU_DATA_DIR="$HOME/Library/Application Support/Yundu/data"
+			else
+				YUNDU_DATA_DIR="$PWD/.yundu/data"
+			fi
+			;;
+		*)
+			if [ -n "\${XDG_DATA_HOME:-}" ]; then
+				YUNDU_DATA_DIR="$XDG_DATA_HOME/yundu/data"
+			elif [ -n "\${HOME:-}" ]; then
+				YUNDU_DATA_DIR="$HOME/.local/share/yundu/data"
+			else
+				YUNDU_DATA_DIR="$PWD/.yundu/data"
+			fi
+			;;
+	esac
+	export YUNDU_DATA_DIR
+fi
 export YUNDU_PGLITE_DATA_DIR="\${YUNDU_PGLITE_DATA_DIR:-$YUNDU_DATA_DIR/pglite}"
 
 exec "$SCRIPT_DIR/yundu" "$@"
@@ -131,7 +151,7 @@ The binary embeds:
 
 Default runtime behavior:
 - YUNDU_DATABASE_DRIVER defaults to pglite
-- YUNDU_DATA_DIR defaults to $PWD/.yundu/data
+- YUNDU_DATA_DIR defaults to the platform user data directory
 - YUNDU_PGLITE_DATA_DIR defaults to $YUNDU_DATA_DIR/pglite
 
 Optional overrides:
