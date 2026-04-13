@@ -9,6 +9,7 @@ import { initialMigration } from "./migrations/001_initial";
 import { betterAuthMigration } from "./migrations/002_better_auth";
 import { destinationBackfillMigration } from "./migrations/003_destination_backfill";
 import { legacyDeploymentResourcesMigration } from "./migrations/004_legacy_deployment_resources";
+import { serverCredentialsMigration } from "./migrations/005_server_credentials";
 import { PgliteDialect } from "./pglite-dialect";
 import { type Database } from "./schema";
 
@@ -97,6 +98,7 @@ class StaticMigrationProvider implements MigrationProvider {
       "002_better_auth": betterAuthMigration,
       "003_destination_backfill": destinationBackfillMigration,
       "004_legacy_deployment_resources": legacyDeploymentResourcesMigration,
+      "005_server_credentials": serverCredentialsMigration,
     };
   }
 }

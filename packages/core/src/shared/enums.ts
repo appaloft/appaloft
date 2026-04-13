@@ -54,6 +54,10 @@ export const targetKinds = ["single-server", "future-multi-server", "future-k8s"
 
 export type TargetKind = (typeof targetKinds)[number];
 
+export const deploymentTargetCredentialKinds = ["local-ssh-agent", "ssh-private-key"] as const;
+
+export type DeploymentTargetCredentialKind = (typeof deploymentTargetCredentialKinds)[number];
+
 export const destinationKinds = ["docker", "compose", "host-process", "generic"] as const;
 
 export type DestinationKind = (typeof destinationKinds)[number];

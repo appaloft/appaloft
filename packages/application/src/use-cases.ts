@@ -20,6 +20,7 @@ export * from "./operations/environments/unset-environment-variable.use-case";
 export * from "./operations/projects/create-project.use-case";
 export * from "./operations/projects/list-projects.query-service";
 export * from "./operations/resources/list-resources.query-service";
+export * from "./operations/servers/configure-server-credential.use-case";
 export * from "./operations/servers/list-servers.query-service";
 export * from "./operations/servers/register-server.use-case";
 export * from "./operations/servers/test-server-connectivity.use-case";

@@ -1,4 +1,5 @@
 import {
+  ConfigureServerCredentialUseCase,
   CreateDeploymentUseCase,
   CreateEnvironmentUseCase,
   CreateProjectUseCase,
@@ -39,6 +40,10 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(tokens.listProjectsQueryService, ListProjectsQueryService);
   container.registerSingleton(tokens.listResourcesQueryService, ListResourcesQueryService);
   container.registerSingleton(tokens.registerServerUseCase, RegisterServerUseCase);
+  container.registerSingleton(
+    tokens.configureServerCredentialUseCase,
+    ConfigureServerCredentialUseCase,
+  );
   container.registerSingleton(tokens.listServersQueryService, ListServersQueryService);
   container.registerSingleton(tokens.testServerConnectivityUseCase, TestServerConnectivityUseCase);
   container.registerSingleton(tokens.createEnvironmentUseCase, CreateEnvironmentUseCase);

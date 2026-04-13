@@ -508,6 +508,79 @@ export class HostAddress extends NonEmptyTextValue {
   }
 }
 
+const deploymentTargetUsernameBrand: unique symbol = Symbol("DeploymentTargetUsername");
+export class DeploymentTargetUsername extends NonEmptyTextValue {
+  private [deploymentTargetUsernameBrand]!: void;
+
+  private constructor(value: string) {
+    super(value);
+  }
+
+  static create(value: string): Result<DeploymentTargetUsername> {
+    return createRequiredTextValue(
+      value,
+      "Deployment target username",
+      (normalized) => new DeploymentTargetUsername(normalized),
+    );
+  }
+
+  static rehydrate(value: string): DeploymentTargetUsername {
+    return new DeploymentTargetUsername(rehydrateRequiredText(value));
+  }
+
+  static fromOptional(value?: string): DeploymentTargetUsername | undefined {
+    const normalized = validateOptionalText(value);
+    return normalized ? new DeploymentTargetUsername(normalized) : undefined;
+  }
+}
+
+const sshPublicKeyTextBrand: unique symbol = Symbol("SshPublicKeyText");
+export class SshPublicKeyText extends NonEmptyTextValue {
+  private [sshPublicKeyTextBrand]!: void;
+
+  private constructor(value: string) {
+    super(value);
+  }
+
+  static create(value: string): Result<SshPublicKeyText> {
+    return createRequiredTextValue(
+      value,
+      "SSH public key",
+      (normalized) => new SshPublicKeyText(normalized),
+    );
+  }
+
+  static rehydrate(value: string): SshPublicKeyText {
+    return new SshPublicKeyText(rehydrateRequiredText(value));
+  }
+
+  static fromOptional(value?: string): SshPublicKeyText | undefined {
+    const normalized = validateOptionalText(value);
+    return normalized ? new SshPublicKeyText(normalized) : undefined;
+  }
+}
+
+const sshPrivateKeyTextBrand: unique symbol = Symbol("SshPrivateKeyText");
+export class SshPrivateKeyText extends NonEmptyTextValue {
+  private [sshPrivateKeyTextBrand]!: void;
+
+  private constructor(value: string) {
+    super(value);
+  }
+
+  static create(value: string): Result<SshPrivateKeyText> {
+    return createRequiredTextValue(
+      value,
+      "SSH private key",
+      (normalized) => new SshPrivateKeyText(normalized),
+    );
+  }
+
+  static rehydrate(value: string): SshPrivateKeyText {
+    return new SshPrivateKeyText(rehydrateRequiredText(value));
+  }
+}
+
 const aliasTextBrand: unique symbol = Symbol("AliasText");
 export class AliasText extends NonEmptyTextValue {
   private [aliasTextBrand]!: void;

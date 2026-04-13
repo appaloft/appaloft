@@ -5,9 +5,11 @@ import {
   type AppLogger,
   type Command,
   type CommandBus,
+  ConfigureServerCredentialCommand,
   CreateDeploymentCommand,
   CreateEnvironmentCommand,
   CreateProjectCommand,
+  configureServerCredentialCommandInputSchema,
   createDeploymentCommandInputSchema,
   createEnvironmentCommandInputSchema,
   createProjectCommandInputSchema,
@@ -394,6 +396,18 @@ export const registerServerProcedure = base
     executeCommand(context, RegisterServerCommand.create(input)),
   );
 
+export const configureServerCredentialProcedure = base
+  .route({
+    method: "POST",
+    path: "/servers/{serverId}/credentials",
+    successStatus: 200,
+  })
+  .input(configureServerCredentialCommandInputSchema)
+  .output(emptyResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, ConfigureServerCredentialCommand.create(input)),
+  );
+
 export const testServerConnectivityProcedure = base
   .route({
     method: "POST",
@@ -580,6 +594,7 @@ export const yunduOrpcRouter = {
   servers: {
     list: listServersProcedure,
     create: registerServerProcedure,
+    configureCredential: configureServerCredentialProcedure,
     testConnectivity: testServerConnectivityProcedure,
   },
   environments: {
@@ -722,6 +737,7 @@ export function mountYunduOrpcRoutes(
   const routes = [
     "/api/projects",
     "/api/servers",
+    "/api/servers/:serverId/credentials",
     "/api/servers/:serverId/connectivity-tests",
     "/api/environments",
     "/api/environments/:environmentId",

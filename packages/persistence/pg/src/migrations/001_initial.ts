@@ -20,6 +20,10 @@ export const initialMigration = {
       .addColumn("host", "text", (column) => column.notNull())
       .addColumn("port", "integer", (column) => column.notNull())
       .addColumn("provider_key", "text", (column) => column.notNull())
+      .addColumn("credential_kind", "text")
+      .addColumn("credential_username", "text")
+      .addColumn("credential_public_key", "text")
+      .addColumn("credential_private_key", "text")
       .addColumn("created_at", "timestamptz", (column) => column.notNull())
       .execute();
 

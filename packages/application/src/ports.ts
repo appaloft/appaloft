@@ -159,6 +159,12 @@ export interface ServerSummary {
   host: string;
   port: number;
   providerKey: string;
+  credential?: {
+    kind: "local-ssh-agent" | "ssh-private-key";
+    username?: string;
+    publicKeyConfigured: boolean;
+    privateKeyConfigured: boolean;
+  };
   createdAt: string;
 }
 

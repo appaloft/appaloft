@@ -94,6 +94,14 @@ export const serverSummarySchema = z.object({
   host: z.string(),
   port: z.number(),
   providerKey: z.string(),
+  credential: z
+    .object({
+      kind: z.enum(["local-ssh-agent", "ssh-private-key"]),
+      username: z.string().optional(),
+      publicKeyConfigured: z.boolean(),
+      privateKeyConfigured: z.boolean(),
+    })
+    .optional(),
   createdAt: z.string(),
 });
 
@@ -102,6 +110,22 @@ export const registerServerInputSchema = z.object({
   host: z.string().min(1),
   port: z.number().int().positive().optional(),
   providerKey: z.string().min(1),
+});
+
+export const configureServerCredentialInputSchema = z.object({
+  serverId: z.string().min(1),
+  credential: z.discriminatedUnion("kind", [
+    z.object({
+      kind: z.literal("local-ssh-agent"),
+      username: z.string().min(1).optional(),
+    }),
+    z.object({
+      kind: z.literal("ssh-private-key"),
+      username: z.string().min(1).optional(),
+      publicKey: z.string().min(1).optional(),
+      privateKey: z.string().min(1),
+    }),
+  ]),
 });
 
 export const registerServerResponseSchema = z.object({
@@ -420,6 +444,7 @@ export type CreateProjectResponse = z.infer<typeof createProjectResponseSchema>;
 export type ListProjectsResponse = z.infer<typeof listProjectsResponseSchema>;
 export type ServerSummary = z.infer<typeof serverSummarySchema>;
 export type RegisterServerInput = z.infer<typeof registerServerInputSchema>;
+export type ConfigureServerCredentialInput = z.infer<typeof configureServerCredentialInputSchema>;
 export type RegisterServerResponse = z.infer<typeof registerServerResponseSchema>;
 export type ListServersResponse = z.infer<typeof listServersResponseSchema>;
 export type ServerConnectivityCheck = z.infer<typeof serverConnectivityCheckSchema>;

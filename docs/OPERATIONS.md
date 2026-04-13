@@ -187,8 +187,10 @@ other remote git sources are cloned into the runtime directory, then the prepare
 uploaded to the SSH host and built there. For `prebuilt-image` plans, Yundu skips git/source
 materialization and runs the image directly on the SSH host.
 
-The SSH target must already allow non-interactive SSH from the machine running Yundu and have Docker
-installed. The server `host` may include a user, for example `root@203.0.113.10`.
+The SSH target must have Docker installed. For authentication, a target can either use the local SSH
+agent/config available to the Yundu process or store an SSH private key on the server record. The
+server `host` may include a user, for example `root@203.0.113.10`; alternatively set the login user
+on the credential. The stored public key is descriptive, while the private key is what SSH uses.
 
 Quick smoke against the included Express demo:
 
@@ -229,6 +231,7 @@ deployments need the git URL to be accessible from the local git environment.
 
 ```bash
 bun run --cwd apps/shell src/index.ts server register --name ssh-demo --host root@<server-ip> --provider generic-ssh
+bun run --cwd apps/shell src/index.ts server credential <serverId> --kind ssh-private-key --username root --private-key-file ~/.ssh/yundu_demo
 
 bun run --cwd apps/shell src/index.ts deploy https://github.com/nichenqin/yundu-express-hello.git \
   --project <projectId> \

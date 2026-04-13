@@ -21,6 +21,7 @@ export const tokens = {
   createProjectUseCase: Symbol.for("yundu.create_project_use_case"),
   listProjectsQueryService: Symbol.for("yundu.list_projects_query_service"),
   registerServerUseCase: Symbol.for("yundu.register_server_use_case"),
+  configureServerCredentialUseCase: Symbol.for("yundu.configure_server_credential_use_case"),
   listServersQueryService: Symbol.for("yundu.list_servers_query_service"),
   testServerConnectivityUseCase: Symbol.for("yundu.test_server_connectivity_use_case"),
   createEnvironmentUseCase: Symbol.for("yundu.create_environment_use_case"),

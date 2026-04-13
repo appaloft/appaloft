@@ -1,4 +1,7 @@
 import { spawnSync } from "node:child_process";
+import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
   type ExecutionContext,
   type ServerConnectivityCheck,
@@ -17,8 +20,17 @@ interface ProcessCheckInput {
   metadata?: Record<string, string>;
 }
 
+interface PreparedSshArgs {
+  args: string[];
+  cleanup(): void;
+}
+
 function hostForTcp(host: string): string {
   return host.includes("@") ? (host.split("@").pop() ?? host) : host;
+}
+
+function hostWithUsername(host: string, username?: string): string {
+  return username && !host.includes("@") ? `${username}@${host}` : host;
 }
 
 function trimOutput(stdout: string | Buffer | undefined, stderr: string | Buffer | undefined): string {
@@ -122,19 +134,62 @@ function resolveOverallStatus(
   return "unreachable";
 }
 
-function sshArgs(server: DeploymentTargetState, remoteCommand: string): string[] {
-  return [
+function prepareSshArgs(server: DeploymentTargetState, remoteCommand: string): PreparedSshArgs {
+  const credential = server.credential;
+  let tempDir: string | undefined;
+  let identityArgs: string[] = [];
+
+  if (credential?.kind.value === "ssh-private-key" && credential.privateKey) {
+    tempDir = mkdtempSync(join(tmpdir(), "yundu-ssh-"));
+    const identityFile = join(tempDir, "id_deployment_target");
+    writeFileSync(
+      identityFile,
+      credential.privateKey.value.endsWith("\n")
+        ? credential.privateKey.value
+        : `${credential.privateKey.value}\n`,
+      { mode: 0o600 },
+    );
+    chmodSync(identityFile, 0o600);
+    identityArgs = ["-i", identityFile, "-o", "IdentitiesOnly=yes"];
+  }
+
+  return {
+    args: [
     "-p",
     String(server.port.value),
+    ...identityArgs,
     "-o",
     "BatchMode=yes",
     "-o",
     "ConnectTimeout=5",
     "-o",
     "StrictHostKeyChecking=accept-new",
-    server.host.value,
+    hostWithUsername(server.host.value, credential?.username?.value),
     remoteCommand,
-  ];
+    ],
+    cleanup(): void {
+      if (tempDir) {
+        rmSync(tempDir, { recursive: true, force: true });
+      }
+    },
+  };
+}
+
+function sshProcessCheck(
+  server: DeploymentTargetState,
+  remoteCommand: string,
+  input: Omit<ProcessCheckInput, "command" | "args">,
+): ServerConnectivityCheck {
+  const prepared = prepareSshArgs(server, remoteCommand);
+  try {
+    return processCheck({
+      ...input,
+      command: "ssh",
+      args: prepared.args,
+    });
+  } finally {
+    prepared.cleanup();
+  }
 }
 
 export class RuntimeServerConnectivityChecker implements ServerConnectivityChecker {
@@ -167,10 +222,8 @@ export class RuntimeServerConnectivityChecker implements ServerConnectivityCheck
       );
     } else if (server.providerKey.value === "generic-ssh") {
       checks.push(
-        processCheck({
+        sshProcessCheck(server, "printf yundu-connectivity", {
           name: "ssh",
-          command: "ssh",
-          args: sshArgs(server, "printf yundu-connectivity"),
           timeoutMs: 8000,
           successMessage: "SSH connection succeeded",
           failureMessage: "SSH connection failed",
@@ -181,10 +234,8 @@ export class RuntimeServerConnectivityChecker implements ServerConnectivityCheck
         }),
       );
       checks.push(
-        processCheck({
+        sshProcessCheck(server, "docker version --format '{{.Server.Version}}'", {
           name: "docker",
-          command: "ssh",
-          args: sshArgs(server, "docker version --format '{{.Server.Version}}'"),
           timeoutMs: 8000,
           successMessage: "Remote Docker daemon is available",
           failureMessage: "Remote Docker daemon is not available",
