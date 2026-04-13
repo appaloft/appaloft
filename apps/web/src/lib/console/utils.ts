@@ -2,6 +2,8 @@ import {
   type DeploymentSummary,
   type EnvironmentSummary,
   type ProjectSummary,
+  type ResourceSummary,
+  type ServerSummary,
 } from "@yundu/contracts";
 
 export function readSessionIdentity(session: unknown): string | null {
@@ -89,4 +91,29 @@ export function findEnvironment(
   environmentId: string,
 ): EnvironmentSummary | null {
   return environments.find((environment) => environment.id === environmentId) ?? null;
+}
+
+export function findDeployment(
+  deployments: DeploymentSummary[],
+  deploymentId: string,
+): DeploymentSummary | null {
+  return deployments.find((deployment) => deployment.id === deploymentId) ?? null;
+}
+
+export function findResource(
+  resources: ResourceSummary[],
+  resourceId: string,
+): ResourceSummary | null {
+  return resources.find((resource) => resource.id === resourceId) ?? null;
+}
+
+export function findServer(servers: ServerSummary[], serverId: string): ServerSummary | null {
+  return servers.find((server) => server.id === serverId) ?? null;
+}
+
+export function latestProjectDeployment(
+  project: ProjectSummary,
+  deployments: DeploymentSummary[],
+): DeploymentSummary | null {
+  return deployments.find((deployment) => deployment.projectId === project.id) ?? null;
 }

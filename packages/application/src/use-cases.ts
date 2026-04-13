@@ -22,6 +22,7 @@ export * from "./operations/projects/list-projects.query-service";
 export * from "./operations/resources/list-resources.query-service";
 export * from "./operations/servers/list-servers.query-service";
 export * from "./operations/servers/register-server.use-case";
+export * from "./operations/servers/test-server-connectivity.use-case";
 export * from "./operations/system/db-migrate.use-case";
 export * from "./operations/system/db-status.query-service";
 export * from "./operations/system/doctor.query-service";

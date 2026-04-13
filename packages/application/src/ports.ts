@@ -162,6 +162,27 @@ export interface ServerSummary {
   createdAt: string;
 }
 
+export type ServerConnectivityStatus = "passed" | "failed" | "skipped";
+
+export interface ServerConnectivityCheck {
+  name: string;
+  status: ServerConnectivityStatus;
+  message: string;
+  durationMs: number;
+  metadata?: Record<string, string>;
+}
+
+export interface ServerConnectivityResult {
+  serverId: string;
+  name: string;
+  host: string;
+  port: number;
+  providerKey: string;
+  checkedAt: string;
+  status: "healthy" | "degraded" | "unreachable";
+  checks: ServerConnectivityCheck[];
+}
+
 export interface EnvironmentSummary {
   id: string;
   projectId: string;
@@ -400,6 +421,15 @@ export interface DeploymentConfigReader {
       configFilePath?: string;
     },
   ): Promise<Result<DeploymentConfigSnapshot | null>>;
+}
+
+export interface ServerConnectivityChecker {
+  test(
+    context: ExecutionContext,
+    input: {
+      server: DeploymentTargetState;
+    },
+  ): Promise<Result<ServerConnectivityResult>>;
 }
 
 export interface DeploymentContextDefaultsPolicyInput {

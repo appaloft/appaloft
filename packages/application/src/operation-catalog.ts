@@ -15,6 +15,7 @@ import { listProjectsQueryInputSchema } from "./operations/projects/list-project
 import { listResourcesQueryInputSchema } from "./operations/resources/list-resources.query";
 import { listServersQueryInputSchema } from "./operations/servers/list-servers.query";
 import { registerServerCommandInputSchema } from "./operations/servers/register-server.command";
+import { testServerConnectivityCommandInputSchema } from "./operations/servers/test-server-connectivity.command";
 import { listGitHubRepositoriesQueryInputSchema } from "./operations/system/list-github-repositories.query";
 import { tokens } from "./tokens";
 
@@ -102,6 +103,20 @@ export const operationCatalog = [
     transports: {
       cli: "yundu server list",
       orpc: { method: "GET", path: "/api/servers" },
+    },
+  },
+  {
+    key: "servers.test-connectivity",
+    kind: "command",
+    domain: "servers",
+    messageName: "TestServerConnectivityCommand",
+    handlerName: "TestServerConnectivityCommandHandler",
+    serviceName: "TestServerConnectivityUseCase",
+    inputSchema: testServerConnectivityCommandInputSchema,
+    serviceToken: tokens.testServerConnectivityUseCase,
+    transports: {
+      cli: "yundu server test <serverId>",
+      orpc: { method: "POST", path: "/api/servers/{serverId}/connectivity-tests" },
     },
   },
   {

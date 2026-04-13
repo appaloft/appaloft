@@ -7,6 +7,7 @@ import {
   type ListProvidersResponse,
   type ProjectSummary,
   type ReadinessResponse,
+  type ResourceSummary,
   type ServerSummary,
   type VersionResponse,
 } from "@yundu/contracts";
@@ -76,6 +77,13 @@ export function createConsoleQueries(enabled: boolean) {
       enabled,
     }),
   );
+  const resourcesQuery = createQuery(() =>
+    queryOptions({
+      queryKey: ["resources"],
+      queryFn: () => orpcClient.resources.list({}),
+      enabled,
+    }),
+  );
   const deploymentsQuery = createQuery(() =>
     queryOptions({
       queryKey: ["deployments"],
@@ -99,6 +107,7 @@ export function createConsoleQueries(enabled: boolean) {
     projectsQuery,
     serversQuery,
     environmentsQuery,
+    resourcesQuery,
     deploymentsQuery,
     providersQuery,
   };
@@ -108,6 +117,7 @@ export type ConsoleQueryData = {
   projects: ProjectSummary[];
   servers: ServerSummary[];
   environments: EnvironmentSummary[];
+  resources: ResourceSummary[];
   deployments: DeploymentSummary[];
   providers: ProviderSummary[];
 };

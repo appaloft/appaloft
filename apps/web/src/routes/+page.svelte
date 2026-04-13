@@ -1,6 +1,6 @@
 <script lang="ts">
   import { browser } from "$app/environment";
-  import { ArrowRight, FolderOpen, Rocket, Server, ShieldCheck, Waypoints } from "@lucide/svelte";
+  import { ArrowRight, FolderOpen, Server, ShieldCheck, Waypoints } from "@lucide/svelte";
 
   import ConsoleShell from "$lib/components/console/ConsoleShell.svelte";
   import { Badge } from "$lib/components/ui/badge";
@@ -50,11 +50,6 @@
   const latestDeployment = $derived(deployments[0] ?? null);
   const latestProject = $derived(latestDeployment ? findProject(projects, latestDeployment.projectId) : null);
 
-  function requestQuickDeploy(): void {
-    if (browser) {
-      window.dispatchEvent(new CustomEvent("yundu:open-quick-deploy"));
-    }
-  }
 </script>
 
 <svelte:head>
@@ -99,10 +94,6 @@
                 </p>
               </div>
               <div class="flex flex-wrap gap-2">
-                <Button size="lg" onclick={requestQuickDeploy}>
-                  <Rocket class="size-4" />
-                  {$t(i18nKeys.common.actions.createDeployment)}
-                </Button>
                 <Button href="/projects" size="lg" variant="outline">
                   <FolderOpen class="size-4" />
                   {$t(i18nKeys.common.actions.viewProjects)}
@@ -138,10 +129,6 @@
               {$t(i18nKeys.console.home.deploymentsWithoutRecordsBody, { count: projects.length })}
             </p>
           </div>
-          <Button class="bg-amber-950 text-white hover:bg-amber-900" onclick={requestQuickDeploy}>
-            <Rocket class="size-4" />
-            {$t(i18nKeys.common.actions.createDeployment)}
-          </Button>
         </section>
       {/if}
 
