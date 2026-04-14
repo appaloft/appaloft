@@ -42,6 +42,31 @@ export const domainError = {
     message: string,
     details?: Record<string, string | number | boolean | null>,
   ): DomainError => createError("conflict", "user", message, details),
+  resourceContextMismatch: (
+    message: string,
+    details?: Record<string, string | number | boolean | null>,
+  ): DomainError => createError("resource_context_mismatch", "user", message, details),
+  resourceSlugConflict: (
+    message: string,
+    details?: Record<string, string | number | boolean | null>,
+  ): DomainError => createError("resource_slug_conflict", "user", message, details),
+  deploymentNotRedeployable: (
+    message: string,
+    details?: Record<string, string | number | boolean | null>,
+  ): DomainError => createError("deployment_not_redeployable", "user", message, details),
+  domainBindingProxyRequired: (
+    details?: Record<string, string | number | boolean | null>,
+  ): DomainError =>
+    createError(
+      "domain_binding_proxy_required",
+      "user",
+      "Durable domain bindings require an edge proxy",
+      details,
+    ),
+  domainBindingContextMismatch: (
+    message: string,
+    details?: Record<string, string | number | boolean | null>,
+  ): DomainError => createError("domain_binding_context_mismatch", "user", message, details),
   infra: (
     message: string,
     details?: Record<string, string | number | boolean | null>,

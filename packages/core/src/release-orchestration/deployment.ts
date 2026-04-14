@@ -127,6 +127,16 @@ export class Deployment extends AggregateRoot<DeploymentState> {
     });
   }
 
+  cancel(at: FinishedAt, logs: DeploymentLogEntry[] = []): Result<void> {
+    return this.state.status.cancel().map((nextStatus) => {
+      this.state.status = nextStatus;
+      this.appendLogs(logs);
+      this.state.finishedAt = at;
+      this.recordDomainEvent("deployment.canceled", at, {});
+      return undefined;
+    });
+  }
+
   appendLogs(logs: DeploymentLogEntry[]): void {
     this.state.logs.push(...logs);
   }
@@ -177,6 +187,10 @@ export class Deployment extends AggregateRoot<DeploymentState> {
       ],
       generatedAt: input.generatedAt,
     });
+  }
+
+  canStartNewDeployment(): boolean {
+    return this.state.status.canStartNewDeployment();
   }
 
   toState(): DeploymentState {

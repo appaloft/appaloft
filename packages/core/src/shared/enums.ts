@@ -14,12 +14,27 @@ export const sourceKinds = [
   "local-folder",
   "local-git",
   "remote-git",
+  "git-public",
+  "git-github-app",
+  "git-deploy-key",
   "zip-artifact",
+  "dockerfile-inline",
+  "docker-compose-inline",
   "docker-image",
   "compose",
 ] as const;
 
 export type SourceKind = (typeof sourceKinds)[number];
+
+export const runtimePlanStrategies = [
+  "auto",
+  "dockerfile",
+  "docker-compose",
+  "prebuilt-image",
+  "workspace-commands",
+] as const;
+
+export type RuntimePlanStrategy = (typeof runtimePlanStrategies)[number];
 
 export const buildStrategyKinds = [
   "dockerfile",
@@ -57,6 +72,10 @@ export type TargetKind = (typeof targetKinds)[number];
 export const edgeProxyKinds = ["none", "traefik", "caddy"] as const;
 
 export type EdgeProxyKind = (typeof edgeProxyKinds)[number];
+
+export const edgeProxyStatuses = ["pending", "starting", "ready", "failed", "disabled"] as const;
+
+export type EdgeProxyStatus = (typeof edgeProxyStatuses)[number];
 
 export const tlsModes = ["auto", "disabled"] as const;
 
@@ -101,6 +120,7 @@ export const deploymentStatuses = [
   "running",
   "succeeded",
   "failed",
+  "canceled",
   "rolled-back",
 ] as const;
 

@@ -534,6 +534,27 @@ export class DeploymentTargetUsername extends NonEmptyTextValue {
   }
 }
 
+const sshCredentialNameBrand: unique symbol = Symbol("SshCredentialName");
+export class SshCredentialName extends NonEmptyTextValue {
+  private [sshCredentialNameBrand]!: void;
+
+  private constructor(value: string) {
+    super(value);
+  }
+
+  static create(value: string): Result<SshCredentialName> {
+    return createRequiredTextValue(
+      value,
+      "SSH credential name",
+      (normalized) => new SshCredentialName(normalized),
+    );
+  }
+
+  static rehydrate(value: string): SshCredentialName {
+    return new SshCredentialName(rehydrateRequiredText(value));
+  }
+}
+
 const sshPublicKeyTextBrand: unique symbol = Symbol("SshPublicKeyText");
 export class SshPublicKeyText extends NonEmptyTextValue {
   private [sshPublicKeyTextBrand]!: void;
