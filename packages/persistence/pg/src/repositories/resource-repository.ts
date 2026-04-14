@@ -20,6 +20,8 @@ import { type Database } from "../schema";
 import {
   rehydrateResourceRow,
   resolveRepositoryExecutor,
+  type SerializedResourceRuntimeProfile,
+  type SerializedResourceSourceBinding,
   serializeResourceServices,
 } from "./shared";
 
@@ -54,6 +56,35 @@ class KyselyResourceMutationVisitor
     }>
 {
   visitUpsertResource(spec: UpsertResourceSpec) {
+    const sourceBinding = spec.state.sourceBinding
+      ? ({
+          kind: spec.state.sourceBinding.kind.value,
+          locator: spec.state.sourceBinding.locator.value,
+          displayName: spec.state.sourceBinding.displayName.value,
+          ...(spec.state.sourceBinding.metadata
+            ? { metadata: { ...spec.state.sourceBinding.metadata } }
+            : {}),
+        } satisfies SerializedResourceSourceBinding)
+      : null;
+    const runtimeProfile = spec.state.runtimeProfile
+      ? ({
+          strategy: spec.state.runtimeProfile.strategy.value,
+          ...(spec.state.runtimeProfile.installCommand
+            ? { installCommand: spec.state.runtimeProfile.installCommand.value }
+            : {}),
+          ...(spec.state.runtimeProfile.buildCommand
+            ? { buildCommand: spec.state.runtimeProfile.buildCommand.value }
+            : {}),
+          ...(spec.state.runtimeProfile.startCommand
+            ? { startCommand: spec.state.runtimeProfile.startCommand.value }
+            : {}),
+          ...(spec.state.runtimeProfile.port ? { port: spec.state.runtimeProfile.port.value } : {}),
+          ...(spec.state.runtimeProfile.healthCheckPath
+            ? { healthCheckPath: spec.state.runtimeProfile.healthCheckPath.value }
+            : {}),
+        } satisfies SerializedResourceRuntimeProfile)
+      : null;
+
     return {
       values: {
         id: spec.state.id.value,
@@ -65,6 +96,8 @@ class KyselyResourceMutationVisitor
         kind: spec.state.kind.value,
         description: spec.state.description?.value ?? null,
         services: serializeResourceServices(spec.state.services),
+        source_binding: sourceBinding,
+        runtime_profile: runtimeProfile,
         created_at: spec.state.createdAt.value,
       },
     };
@@ -102,6 +135,8 @@ export class PgResourceRepository implements ResourceRepository {
               destination_id: mutation.values.destination_id ?? null,
               description: mutation.values.description ?? null,
               services: mutation.values.services as unknown as Record<string, unknown>[],
+              source_binding: mutation.values.source_binding,
+              runtime_profile: mutation.values.runtime_profile,
             }),
           )
           .execute();

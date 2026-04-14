@@ -2,6 +2,7 @@ import { type RepositoryContext } from "@yundu/application";
 import {
   AccessRoute,
   BuildStrategyKindValue,
+  CertificatePolicyValue,
   CommandText,
   ConfigKey,
   ConfigScopeValue,
@@ -24,7 +25,14 @@ import {
   DestinationName,
   DetectSummary,
   DisplayNameText,
+  DomainBindingId,
+  DomainBindingStatusValue,
+  DomainVerificationAttemptId,
+  type DomainVerificationAttemptState,
+  DomainVerificationAttemptStatusValue,
+  DomainVerificationMethodValue,
   EdgeProxyKindValue,
+  EdgeProxyStatusValue,
   EnvironmentConfigSet,
   EnvironmentConfigSnapshot,
   EnvironmentConfigSnapshotEntry,
@@ -33,12 +41,14 @@ import {
   EnvironmentName,
   type EnvironmentConfigSnapshot as EnvironmentSnapshot,
   EnvironmentSnapshotId,
+  ErrorCodeText,
   ExecutionStrategyKindValue,
   FilePathText,
   FinishedAt,
   GeneratedAt,
   HealthCheckPathText,
   HostAddress,
+  IdempotencyKeyValue,
   ImageReference,
   LogLevelValue,
   MessageText,
@@ -61,10 +71,15 @@ import {
   RuntimeExecutionPlan,
   RuntimePlan,
   RuntimePlanId,
+  RuntimePlanStrategyValue,
   type RuntimePlan as RuntimePlanType,
+  RuntimeVerificationStep,
+  RuntimeVerificationStepKindValue,
   SourceDescriptor,
   SourceKindValue,
   SourceLocator,
+  SshCredentialId,
+  SshCredentialName,
   SshPrivateKeyText,
   SshPublicKeyText,
   StartedAt,
@@ -85,6 +100,7 @@ type PackagingModeInput = Parameters<typeof PackagingModeValue.rehydrate>[0];
 type ExecutionStrategyInput = Parameters<typeof ExecutionStrategyKindValue.rehydrate>[0];
 type TargetKindInput = Parameters<typeof TargetKindValue.rehydrate>[0];
 type EdgeProxyKindInput = Parameters<typeof EdgeProxyKindValue.rehydrate>[0];
+type EdgeProxyStatusInput = Parameters<typeof EdgeProxyStatusValue.rehydrate>[0];
 type TlsModeInput = Parameters<typeof TlsModeValue.rehydrate>[0];
 type ConfigScopeInput = Parameters<typeof ConfigScopeValue.rehydrate>[0];
 type VariableKindInput = Parameters<typeof VariableKindValue.rehydrate>[0];
@@ -96,9 +112,16 @@ type DeploymentPhaseInput = Parameters<typeof DeploymentPhaseValue.rehydrate>[0]
 type LogLevelInput = Parameters<typeof LogLevelValue.rehydrate>[0];
 type ResourceKindInput = Parameters<typeof ResourceKindValue.rehydrate>[0];
 type ResourceServiceKindInput = Parameters<typeof ResourceServiceKindValue.rehydrate>[0];
+type RuntimePlanStrategyInput = Parameters<typeof RuntimePlanStrategyValue.rehydrate>[0];
 type DeploymentTargetCredentialKindInput = Parameters<
   typeof DeploymentTargetCredentialKindValue.rehydrate
 >[0];
+type DomainBindingStatusInput = Parameters<typeof DomainBindingStatusValue.rehydrate>[0];
+type DomainVerificationMethodInput = Parameters<typeof DomainVerificationMethodValue.rehydrate>[0];
+type DomainVerificationAttemptStatusInput = Parameters<
+  typeof DomainVerificationAttemptStatusValue.rehydrate
+>[0];
+type CertificatePolicyInput = Parameters<typeof CertificatePolicyValue.rehydrate>[0];
 
 export interface SerializedSourceDescriptor extends Record<string, unknown> {
   kind: SourceKindInput;
@@ -124,6 +147,10 @@ export interface SerializedRuntimeExecutionPlan extends Record<string, unknown> 
     pathPrefix: string;
     tlsMode: TlsModeInput;
     targetPort?: number;
+  }>;
+  verificationSteps?: Array<{
+    kind: "internal-http" | "public-http";
+    label: string;
   }>;
   metadata?: Record<string, string>;
 }
@@ -175,6 +202,30 @@ export interface SerializedDeploymentLog extends Record<string, unknown> {
 export interface SerializedResourceService extends Record<string, unknown> {
   name: string;
   kind: ResourceServiceKindInput;
+}
+
+export interface SerializedResourceSourceBinding extends Record<string, unknown> {
+  kind: SourceKindInput;
+  locator: string;
+  displayName: string;
+  metadata?: Record<string, string>;
+}
+
+export interface SerializedResourceRuntimeProfile extends Record<string, unknown> {
+  strategy: RuntimePlanStrategyInput;
+  installCommand?: string;
+  buildCommand?: string;
+  startCommand?: string;
+  port?: number;
+  healthCheckPath?: string;
+}
+
+export interface SerializedDomainVerificationAttempt extends Record<string, unknown> {
+  id: string;
+  method: DomainVerificationMethodInput;
+  status: DomainVerificationAttemptStatusInput;
+  expectedTarget: string;
+  createdAt: string;
 }
 
 export type RepositoryExecutor = Kysely<Database> | Transaction<Database>;
@@ -252,6 +303,14 @@ export function serializeRuntimePlan(plan: RuntimePlanType): SerializedRuntimePl
             })),
           }
         : {}),
+      ...(plan.execution.verificationSteps.length > 0
+        ? {
+            verificationSteps: plan.execution.verificationSteps.map((step) => ({
+              kind: step.kind,
+              label: step.label,
+            })),
+          }
+        : {}),
       ...(plan.execution.metadata ? { metadata: plan.execution.metadata } : {}),
     },
     target: {
@@ -318,6 +377,16 @@ export function rehydrateRuntimePlan(raw: unknown): RuntimePlan {
                 ...(typeof route.targetPort === "number"
                   ? { targetPort: PortNumber.rehydrate(route.targetPort) }
                   : {}),
+              }),
+            ),
+          }
+        : {}),
+      ...(execution.verificationSteps
+        ? {
+            verificationSteps: execution.verificationSteps.map((step) =>
+              RuntimeVerificationStep.rehydrate({
+                kind: RuntimeVerificationStepKindValue.rehydrate(step.kind),
+                label: PlanStepText.rehydrate(step.label),
               }),
             ),
           }
@@ -473,6 +542,9 @@ export function rehydrateDeploymentTarget(row: Selectable<Database["servers"]>) 
             kind: DeploymentTargetCredentialKindValue.rehydrate(
               row.credential_kind as DeploymentTargetCredentialKindInput,
             ),
+            ...(row.credential_id
+              ? { credentialId: SshCredentialId.rehydrate(row.credential_id) }
+              : {}),
             ...(row.credential_username
               ? { username: DeploymentTargetUsername.rehydrate(row.credential_username) }
               : {}),
@@ -485,6 +557,50 @@ export function rehydrateDeploymentTarget(row: Selectable<Database["servers"]>) 
           },
         }
       : {}),
+    ...(row.edge_proxy_kind && row.edge_proxy_status
+      ? {
+          edgeProxy: {
+            kind: EdgeProxyKindValue.rehydrate(row.edge_proxy_kind as EdgeProxyKindInput),
+            status: EdgeProxyStatusValue.rehydrate(row.edge_proxy_status as EdgeProxyStatusInput),
+            ...(row.edge_proxy_last_attempt_at
+              ? {
+                  lastAttemptAt: UpdatedAt.rehydrate(
+                    normalizeTimestamp(row.edge_proxy_last_attempt_at) ??
+                      row.edge_proxy_last_attempt_at,
+                  ),
+                }
+              : {}),
+            ...(row.edge_proxy_last_succeeded_at
+              ? {
+                  lastSucceededAt: UpdatedAt.rehydrate(
+                    normalizeTimestamp(row.edge_proxy_last_succeeded_at) ??
+                      row.edge_proxy_last_succeeded_at,
+                  ),
+                }
+              : {}),
+            ...(row.edge_proxy_last_error_code
+              ? { lastErrorCode: ErrorCodeText.rehydrate(row.edge_proxy_last_error_code) }
+              : {}),
+            ...(row.edge_proxy_last_error_message
+              ? { lastErrorMessage: MessageText.rehydrate(row.edge_proxy_last_error_message) }
+              : {}),
+          },
+        }
+      : {}),
+    createdAt: CreatedAt.rehydrate(normalizeTimestamp(row.created_at) ?? row.created_at),
+  };
+}
+
+export function rehydrateSshCredential(row: Selectable<Database["ssh_credentials"]>) {
+  return {
+    id: SshCredentialId.rehydrate(row.id),
+    name: SshCredentialName.rehydrate(row.name),
+    kind: DeploymentTargetCredentialKindValue.rehydrate(
+      row.kind as DeploymentTargetCredentialKindInput,
+    ),
+    ...(row.username ? { username: DeploymentTargetUsername.rehydrate(row.username) } : {}),
+    ...(row.public_key ? { publicKey: SshPublicKeyText.rehydrate(row.public_key) } : {}),
+    privateKey: SshPrivateKeyText.rehydrate(row.private_key),
     createdAt: CreatedAt.rehydrate(normalizeTimestamp(row.created_at) ?? row.created_at),
   };
 }
@@ -542,8 +658,59 @@ export function serializeResourceServices(
   }));
 }
 
+export function serializeDomainVerificationAttempts(
+  attempts: DomainVerificationAttemptState[],
+): SerializedDomainVerificationAttempt[] {
+  return attempts.map((attempt) => ({
+    id: attempt.id.value,
+    method: attempt.method.value,
+    status: attempt.status.value,
+    expectedTarget: attempt.expectedTarget.value,
+    createdAt: attempt.createdAt.value,
+  }));
+}
+
+export function rehydrateDomainBindingRow(row: Selectable<Database["domain_bindings"]>) {
+  const verificationAttempts = (row.verification_attempts ??
+    []) as unknown as SerializedDomainVerificationAttempt[];
+
+  return {
+    id: DomainBindingId.rehydrate(row.id),
+    projectId: ProjectId.rehydrate(row.project_id),
+    environmentId: EnvironmentId.rehydrate(row.environment_id),
+    resourceId: ResourceId.rehydrate(row.resource_id),
+    serverId: DeploymentTargetId.rehydrate(row.server_id),
+    destinationId: DestinationId.rehydrate(row.destination_id),
+    domainName: PublicDomainName.rehydrate(row.domain_name),
+    pathPrefix: RoutePathPrefix.rehydrate(row.path_prefix),
+    proxyKind: EdgeProxyKindValue.rehydrate(row.proxy_kind as EdgeProxyKindInput),
+    tlsMode: TlsModeValue.rehydrate(row.tls_mode as TlsModeInput),
+    certificatePolicy: CertificatePolicyValue.rehydrate(
+      row.certificate_policy as CertificatePolicyInput,
+    ),
+    status: DomainBindingStatusValue.rehydrate(row.status as DomainBindingStatusInput),
+    verificationAttempts: verificationAttempts.map((attempt) => ({
+      id: DomainVerificationAttemptId.rehydrate(attempt.id),
+      method: DomainVerificationMethodValue.rehydrate(attempt.method),
+      status: DomainVerificationAttemptStatusValue.rehydrate(attempt.status),
+      expectedTarget: MessageText.rehydrate(attempt.expectedTarget),
+      createdAt: CreatedAt.rehydrate(attempt.createdAt),
+    })),
+    createdAt: CreatedAt.rehydrate(normalizeTimestamp(row.created_at) ?? row.created_at),
+    ...(row.idempotency_key
+      ? { idempotencyKey: IdempotencyKeyValue.rehydrate(row.idempotency_key) }
+      : {}),
+  };
+}
+
 export function rehydrateResourceRow(row: Selectable<Database["resources"]>) {
   const services = (row.services ?? []) as unknown as SerializedResourceService[];
+  const sourceBinding = row.source_binding
+    ? (row.source_binding as unknown as SerializedResourceSourceBinding)
+    : undefined;
+  const runtimeProfile = row.runtime_profile
+    ? (row.runtime_profile as unknown as SerializedResourceRuntimeProfile)
+    : undefined;
 
   return {
     id: ResourceId.rehydrate(row.id),
@@ -557,6 +724,36 @@ export function rehydrateResourceRow(row: Selectable<Database["resources"]>) {
       name: ResourceServiceName.rehydrate(service.name),
       kind: ResourceServiceKindValue.rehydrate(service.kind),
     })),
+    ...(sourceBinding
+      ? {
+          sourceBinding: {
+            kind: SourceKindValue.rehydrate(sourceBinding.kind),
+            locator: SourceLocator.rehydrate(sourceBinding.locator),
+            displayName: DisplayNameText.rehydrate(sourceBinding.displayName),
+            ...(sourceBinding.metadata ? { metadata: { ...sourceBinding.metadata } } : {}),
+          },
+        }
+      : {}),
+    ...(runtimeProfile
+      ? {
+          runtimeProfile: {
+            strategy: RuntimePlanStrategyValue.rehydrate(runtimeProfile.strategy),
+            ...(runtimeProfile.installCommand
+              ? { installCommand: CommandText.rehydrate(runtimeProfile.installCommand) }
+              : {}),
+            ...(runtimeProfile.buildCommand
+              ? { buildCommand: CommandText.rehydrate(runtimeProfile.buildCommand) }
+              : {}),
+            ...(runtimeProfile.startCommand
+              ? { startCommand: CommandText.rehydrate(runtimeProfile.startCommand) }
+              : {}),
+            ...(runtimeProfile.port ? { port: PortNumber.rehydrate(runtimeProfile.port) } : {}),
+            ...(runtimeProfile.healthCheckPath
+              ? { healthCheckPath: HealthCheckPathText.rehydrate(runtimeProfile.healthCheckPath) }
+              : {}),
+          },
+        }
+      : {}),
     createdAt: CreatedAt.rehydrate(normalizeTimestamp(row.created_at) ?? row.created_at),
     ...(row.description ? { description: DescriptionText.rehydrate(row.description) } : {}),
   };

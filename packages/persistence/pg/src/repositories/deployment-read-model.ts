@@ -113,6 +113,14 @@ export class PgDeploymentReadModel implements DeploymentReadModel {
                       })),
                     }
                   : {}),
+                ...(runtimePlan.execution.verificationSteps?.length
+                  ? {
+                      verificationSteps: runtimePlan.execution.verificationSteps.map((step) => ({
+                        kind: step.kind,
+                        label: step.label,
+                      })),
+                    }
+                  : {}),
                 ...(runtimePlan.execution.metadata
                   ? { metadata: runtimePlan.execution.metadata }
                   : {}),

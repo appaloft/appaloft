@@ -10,6 +10,10 @@ import { betterAuthMigration } from "./migrations/002_better_auth";
 import { destinationBackfillMigration } from "./migrations/003_destination_backfill";
 import { legacyDeploymentResourcesMigration } from "./migrations/004_legacy_deployment_resources";
 import { serverCredentialsMigration } from "./migrations/005_server_credentials";
+import { sshCredentialsMigration } from "./migrations/006_ssh_credentials";
+import { serverEdgeProxyMigration } from "./migrations/007_server_edge_proxy";
+import { domainBindingsMigration } from "./migrations/008_domain_bindings";
+import { resourceProfilesMigration } from "./migrations/009_resource_profiles";
 import { PgliteDialect } from "./pglite-dialect";
 import { type Database } from "./schema";
 
@@ -99,6 +103,10 @@ class StaticMigrationProvider implements MigrationProvider {
       "003_destination_backfill": destinationBackfillMigration,
       "004_legacy_deployment_resources": legacyDeploymentResourcesMigration,
       "005_server_credentials": serverCredentialsMigration,
+      "006_ssh_credentials": sshCredentialsMigration,
+      "007_server_edge_proxy": serverEdgeProxyMigration,
+      "008_domain_bindings": domainBindingsMigration,
+      "009_resource_profiles": resourceProfilesMigration,
     };
   }
 }
