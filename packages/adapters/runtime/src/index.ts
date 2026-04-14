@@ -2,6 +2,7 @@ import {
   AccessRoute,
   BuildStrategyKindValue,
   CommandText,
+  DisplayNameText,
   DeploymentTargetDescriptor,
   DeploymentLogEntry,
   DeploymentLogSourceValue,
@@ -28,10 +29,14 @@ import {
   PublicDomainName,
   RoutePathPrefix,
   RuntimeExecutionPlan,
+  RuntimeVerificationStep,
+  RuntimeVerificationStepKindValue,
   RuntimePlan,
   RuntimePlanId,
   safeTry,
   SourceDescriptor,
+  SourceKindValue,
+  SourceLocator,
   TargetKindValue,
   TlsModeValue,
   domainError,
@@ -60,6 +65,7 @@ import { LocalExecutionBackend } from "./local-execution";
 import { SshExecutionBackend } from "./ssh-execution";
 
 export { RuntimeServerConnectivityChecker } from "./server-connectivity";
+export { RuntimeDeploymentHealthChecker } from "./deployment-health";
 export { SshExecutionBackend } from "./ssh-execution";
 
 function resolvePackageManager(source: SourceDescriptor): "npm" | "bun" | "pnpm" {
@@ -101,6 +107,72 @@ function normalizeDockerImage(locator: string): string {
   return locator.replace(/^docker:\/\//, "").replace(/^image:\/\//, "");
 }
 
+function dockerContainerPort(requestedDeployment: RequestedDeploymentConfig): PortNumber {
+  return PortNumber.rehydrate(requestedDeployment.port ?? 3000);
+}
+
+function ensureSourceDescriptor(source: SourceDescriptor): SourceDescriptor {
+  const maybeSource = source as SourceDescriptor & {
+    accept?: SourceDescriptor["accept"];
+  };
+  if (typeof maybeSource.accept === "function") {
+    return source;
+  }
+
+  return SourceDescriptor.rehydrate({
+    kind: SourceKindValue.rehydrate(source.kind),
+    locator: SourceLocator.rehydrate(source.locator),
+    displayName: DisplayNameText.rehydrate(source.displayName),
+    ...(source.metadata ? { metadata: source.metadata } : {}),
+  });
+}
+
+function hasRequestedWorkspaceCommands(requestedDeployment: RequestedDeploymentConfig): boolean {
+  return Boolean(
+    requestedDeployment.startCommand ||
+      requestedDeployment.buildCommand ||
+      requestedDeployment.installCommand,
+  );
+}
+
+function workspaceMethodFromMetadata(
+  source: SourceDescriptor,
+  requestedDeployment: RequestedDeploymentConfig,
+): RequestedDeploymentConfig["method"] {
+  if (hasRequestedWorkspaceCommands(requestedDeployment)) {
+    return "workspace-commands";
+  }
+
+  if (source.metadata?.hasDockerfile === "true") {
+    return "dockerfile";
+  }
+
+  if (source.metadata?.hasPackageJson === "true") {
+    return "workspace-commands";
+  }
+
+  return "auto";
+}
+
+function autoDeploymentMethodFor(
+  source: SourceDescriptor,
+  requestedDeployment: RequestedDeploymentConfig,
+): RequestedDeploymentConfig["method"] {
+  return ensureSourceDescriptor(source).accept<RequestedDeploymentConfig["method"]>({
+    localFolder: (visited) => workspaceMethodFromMetadata(visited, requestedDeployment),
+    localGit: (visited) => workspaceMethodFromMetadata(visited, requestedDeployment),
+    remoteGit: () => "dockerfile",
+    gitPublic: () => "dockerfile",
+    gitGithubApp: () => "dockerfile",
+    gitDeployKey: () => "dockerfile",
+    zipArtifact: (visited) => workspaceMethodFromMetadata(visited, requestedDeployment),
+    dockerfileInline: () => "dockerfile",
+    dockerComposeInline: () => "docker-compose",
+    dockerImage: () => "prebuilt-image",
+    compose: () => "docker-compose",
+  });
+}
+
 function createAccessRoutes(input: {
   requestedDeployment: RequestedDeploymentConfig;
   fallbackPort?: number;
@@ -109,9 +181,27 @@ function createAccessRoutes(input: {
   const proxyKind = input.requestedDeployment.proxyKind ?? (domains.length > 0 ? "traefik" : "none");
 
   if (proxyKind === "none") {
-    return domains.length > 0
-      ? err(domainError.validation("Access routing domains require an enabled proxy"))
-      : ok([]);
+    if (domains.length > 0) {
+      return err(domainError.validation("Access routing domains require an enabled proxy"));
+    }
+
+    if (!input.fallbackPort) {
+      return ok([]);
+    }
+
+    const targetPort = input.fallbackPort;
+
+    return safeTry(function* () {
+      const route = yield* AccessRoute.create({
+        proxyKind: EdgeProxyKindValue.rehydrate("none"),
+        domains: [],
+        pathPrefix: yield* RoutePathPrefix.create(input.requestedDeployment.pathPrefix ?? "/"),
+        tlsMode: TlsModeValue.rehydrate("disabled"),
+        targetPort: PortNumber.rehydrate(targetPort),
+      });
+
+      return ok([route]);
+    });
   }
 
   if (domains.length === 0) {
@@ -136,6 +226,61 @@ function createAccessRoutes(input: {
   });
 }
 
+function hasEdgeProxyRoute(accessRoutes: AccessRoute[]): boolean {
+  return accessRoutes.some((route) => route.proxyKind !== "none");
+}
+
+function runtimeVerificationStepsFor(input: {
+  execution: RuntimeExecutionPlan;
+  accessRoutes: AccessRoute[];
+}): RuntimeVerificationStep[] {
+  if (input.execution.kind !== "docker-container") {
+    return [];
+  }
+
+  const internalStep = RuntimeVerificationStep.rehydrate({
+    kind: RuntimeVerificationStepKindValue.rehydrate("internal-http"),
+    label: PlanStepText.rehydrate("Verify internal container health"),
+  });
+
+  if (input.accessRoutes.length === 0) {
+    return [internalStep];
+  }
+
+  return [
+    internalStep,
+    RuntimeVerificationStep.rehydrate({
+      kind: RuntimeVerificationStepKindValue.rehydrate("public-http"),
+      label: PlanStepText.rehydrate("Verify public access route"),
+    }),
+  ];
+}
+
+function runtimePlanStepsFor(input: {
+  execution: RuntimeExecutionPlan;
+  accessRoutes: AccessRoute[];
+  steps: PlanStepText[];
+}): PlanStepText[] {
+  if (input.execution.kind !== "docker-container") {
+    return input.steps;
+  }
+
+  const baseSteps = input.steps.slice(0, -1);
+
+  const hasProxy = hasEdgeProxyRoute(input.accessRoutes);
+
+  if (input.accessRoutes.length === 0) {
+    return [...baseSteps, PlanStepText.rehydrate("Verify internal container health")];
+  }
+
+  return [
+    ...baseSteps,
+    ...(hasProxy ? [PlanStepText.rehydrate("Configure edge proxy")] : []),
+    PlanStepText.rehydrate("Verify internal container health"),
+    PlanStepText.rehydrate("Verify public access route"),
+  ];
+}
+
 function withRequestedAccessRoutes(input: {
   requestedDeployment: RequestedDeploymentConfig;
   buildStrategy: BuildStrategyKindValue;
@@ -153,6 +298,19 @@ function withRequestedAccessRoutes(input: {
     ...(input.execution.port ? { fallbackPort: input.execution.port } : {}),
   }).andThen((accessRoutes) => {
     if (accessRoutes.length > 0 && input.execution.kind !== "docker-container") {
+      if (!hasEdgeProxyRoute(accessRoutes)) {
+        return ok({
+          buildStrategy: input.buildStrategy,
+          packagingMode: input.packagingMode,
+          execution: input.execution,
+          steps: runtimePlanStepsFor({
+            execution: input.execution,
+            accessRoutes: [],
+            steps: input.steps,
+          }),
+        });
+      }
+
       return err(
         domainError.validation(
           "Access routing is currently supported for Docker container deployments",
@@ -160,12 +318,23 @@ function withRequestedAccessRoutes(input: {
       );
     }
 
+    const execution =
+      accessRoutes.length > 0 ? input.execution.withAccessRoutes(accessRoutes) : input.execution;
+    const verificationSteps = runtimeVerificationStepsFor({
+      execution,
+      accessRoutes,
+    });
+
     return ok({
       buildStrategy: input.buildStrategy,
       packagingMode: input.packagingMode,
       execution:
-        accessRoutes.length > 0 ? input.execution.withAccessRoutes(accessRoutes) : input.execution,
-      steps: input.steps,
+        verificationSteps.length > 0 ? execution.withVerificationSteps(verificationSteps) : execution,
+      steps: runtimePlanStepsFor({
+        execution,
+        accessRoutes,
+        steps: input.steps,
+      }),
     });
   });
 }
@@ -183,26 +352,18 @@ function chooseStrategies(input: {
   const packageManager = resolvePackageManager(source);
   const requestedMethod =
     requestedDeployment.method === "auto"
-      ? source.kind === "compose"
-        ? "docker-compose"
-        : source.kind === "docker-image"
-          ? "prebuilt-image"
-          : requestedDeployment.startCommand ||
-              requestedDeployment.buildCommand ||
-              requestedDeployment.installCommand
-            ? "workspace-commands"
-            : source.metadata?.hasDockerfile === "true"
-              ? "dockerfile"
-              : source.metadata?.hasPackageJson === "true"
-                ? "workspace-commands"
-                : "auto"
+      ? autoDeploymentMethodFor(source, requestedDeployment)
       : requestedDeployment.method;
 
   if (requestedMethod === "docker-compose") {
+    const composeFile =
+      source.kind === "docker-compose-inline"
+        ? (source.metadata?.composeFilePath ?? "docker-compose.yml")
+        : source.locator;
     const execution = RuntimeExecutionPlan.rehydrate({
       kind: ExecutionStrategyKindValue.rehydrate("docker-compose-stack"),
       workingDirectory: FilePathText.rehydrate(source.locator),
-      composeFile: FilePathText.rehydrate(source.locator),
+      composeFile: FilePathText.rehydrate(composeFile),
       ...(requestedDeployment.healthCheckPath
         ? { healthCheckPath: HealthCheckPathText.rehydrate(requestedDeployment.healthCheckPath) }
         : {}),
@@ -223,13 +384,14 @@ function chooseStrategies(input: {
   }
 
   if (requestedMethod === "prebuilt-image") {
+    const port = dockerContainerPort(requestedDeployment);
     const execution = RuntimeExecutionPlan.rehydrate({
       kind: ExecutionStrategyKindValue.rehydrate("docker-container"),
       image: ImageReference.rehydrate(normalizeDockerImage(source.locator)),
       ...(requestedDeployment.healthCheckPath
         ? { healthCheckPath: HealthCheckPathText.rehydrate(requestedDeployment.healthCheckPath) }
         : {}),
-      ...(requestedDeployment.port ? { port: PortNumber.rehydrate(requestedDeployment.port) } : {}),
+      port,
     });
     return withRequestedAccessRoutes({
       requestedDeployment,
@@ -246,6 +408,7 @@ function chooseStrategies(input: {
   }
 
   if (requestedMethod === "dockerfile") {
+    const port = dockerContainerPort(requestedDeployment);
     const execution = RuntimeExecutionPlan.rehydrate({
       kind: ExecutionStrategyKindValue.rehydrate("docker-container"),
       workingDirectory: FilePathText.rehydrate(source.locator),
@@ -253,7 +416,7 @@ function chooseStrategies(input: {
       ...(requestedDeployment.healthCheckPath
         ? { healthCheckPath: HealthCheckPathText.rehydrate(requestedDeployment.healthCheckPath) }
         : {}),
-      ...(requestedDeployment.port ? { port: PortNumber.rehydrate(requestedDeployment.port) } : {}),
+      port,
     });
     return withRequestedAccessRoutes({
       requestedDeployment,
@@ -540,6 +703,26 @@ export class InMemoryExecutionBackend implements ExecutionBackend {
     );
   }
 
+  async cancel(
+    context: ExecutionContext,
+    deployment: Deployment,
+  ): Promise<Result<{ logs: DeploymentLogEntry[] }>> {
+    const deploymentId = deployment.toState().id.value;
+    const logs = [phaseLog("deploy", "Canceled in-memory execution")];
+    this.sessions.set(deploymentId, {
+      deploymentId,
+      status: "failed",
+      logs,
+    });
+    this.report(context, {
+      deploymentId,
+      phase: "deploy",
+      status: "succeeded",
+      message: "Canceled in-memory execution",
+    });
+    return ok({ logs });
+  }
+
   async rollback(
     context: ExecutionContext,
     deployment: Deployment,
@@ -611,6 +794,21 @@ export class RoutingExecutionBackend implements ExecutionBackend {
     return await this.fallbackBackend.execute(context, deployment);
   }
 
+  async cancel(
+    context: ExecutionContext,
+    deployment: Deployment,
+  ): Promise<Result<{ logs: DeploymentLogEntry[] }>> {
+    if (deployment.toState().runtimePlan.target.providerKey === "local-shell") {
+      return await this.localBackend.cancel(context, deployment);
+    }
+
+    if (deployment.toState().runtimePlan.target.providerKey === "generic-ssh") {
+      return await this.sshBackend.cancel(context, deployment);
+    }
+
+    return await this.fallbackBackend.cancel(context, deployment);
+  }
+
   async rollback(
     context: ExecutionContext,
     deployment: Deployment,
@@ -629,3 +827,4 @@ export class RoutingExecutionBackend implements ExecutionBackend {
 }
 
 export { LocalExecutionBackend };
+export { RuntimeServerEdgeProxyBootstrapper } from "./server-edge-proxy-bootstrapper";

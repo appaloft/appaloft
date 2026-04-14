@@ -3,6 +3,7 @@ import { join, resolve } from "node:path";
 import {
   type AppLogger,
   type CommandBus,
+  type DeploymentProgressObserver,
   DoctorQuery,
   type ExecutionContext,
   type ExecutionContextFactory,
@@ -178,6 +179,14 @@ function applyCorsHeaders(
   appendVaryHeader(headers, "Access-Control-Request-Headers");
 }
 
+function encodeServerSentEvent(input: { event?: string; data: unknown }): string {
+  const lines = input.event
+    ? [`event: ${input.event}`, `data: ${JSON.stringify(input.data)}`]
+    : [`data: ${JSON.stringify(input.data)}`];
+
+  return `${lines.join("\n")}\n\n`;
+}
+
 function registerPluginRoute(app: Elysia, route: SystemPluginHttpRoute): Elysia {
   const handler = async ({
     request,
@@ -224,6 +233,7 @@ export function createHttpApp(input: {
   queryBus: QueryBus;
   logger: AppLogger;
   executionContextFactory: ExecutionContextFactory;
+  deploymentProgressObserver?: DeploymentProgressObserver;
   pluginRuntime?: SystemPluginRuntime;
   authRuntime?: AuthRuntime;
   requestContextRunner?: RequestContextRunner;
@@ -261,6 +271,76 @@ export function createHttpApp(input: {
 
     const embeddedIndex = embeddedStaticAssets["/index.html"];
     return embeddedIndex ? new Response(embeddedIndex) : null;
+  }
+
+  function deploymentProgressStream(request: Request, requestId: string): Response {
+    if (!input.deploymentProgressObserver) {
+      return new Response("Deployment progress streaming is not available", {
+        status: 503,
+      });
+    }
+
+    const encoder = new TextEncoder();
+    let unsubscribe: (() => void) | undefined;
+    let heartbeat: Timer | undefined;
+
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(
+          encoder.encode(
+            encodeServerSentEvent({
+              event: "ready",
+              data: { requestId },
+            }),
+          ),
+        );
+
+        unsubscribe = input.deploymentProgressObserver?.subscribe((context, event) => {
+          if (context.requestId !== requestId) {
+            return;
+          }
+
+          controller.enqueue(
+            encoder.encode(
+              encodeServerSentEvent({
+                event: "progress",
+                data: event,
+              }),
+            ),
+          );
+        });
+
+        heartbeat = setInterval(() => {
+          controller.enqueue(encoder.encode(": heartbeat\n\n"));
+        }, 15_000);
+
+        request.signal.addEventListener(
+          "abort",
+          () => {
+            unsubscribe?.();
+            if (heartbeat) {
+              clearInterval(heartbeat);
+            }
+            controller.close();
+          },
+          { once: true },
+        );
+      },
+      cancel() {
+        unsubscribe?.();
+        if (heartbeat) {
+          clearInterval(heartbeat);
+        }
+      },
+    });
+
+    return new Response(stream, {
+      headers: {
+        "content-type": "text/event-stream",
+        "cache-control": "no-cache, no-transform",
+        connection: "keep-alive",
+      },
+    });
   }
 
   const baseApp = new Elysia()
@@ -341,6 +421,9 @@ export function createHttpApp(input: {
       mode: input.config.runtimeMode,
     }))
     .get("/api/schemas/yundu-config.json", () => yunduDeploymentConfigJsonSchema)
+    .get("/api/deployment-progress/:requestId", ({ request, params }) =>
+      deploymentProgressStream(request, params.requestId),
+    )
     .get("/api/auth/session", async ({ request }) => {
       if (!input.authRuntime) {
         return {
@@ -390,6 +473,11 @@ export function createHttpApp(input: {
 
   app = mountYunduOrpcRoutes(app, {
     commandBus: input.commandBus,
+    ...(input.deploymentProgressObserver
+      ? {
+          deploymentProgressObserver: input.deploymentProgressObserver,
+        }
+      : {}),
     executionContextFactory: input.executionContextFactory,
     queryBus: input.queryBus,
     logger: input.logger,

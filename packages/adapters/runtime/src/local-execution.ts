@@ -33,6 +33,7 @@ import {
 import {
   createProxyBootstrapPlan,
   dockerNetworkFlagForAccessRoutes,
+  proxyBootstrapOptionsFromEnv,
 } from "./proxy-bootstrap";
 import { dockerLabelFlagsForAccessRoutes } from "./proxy-labels";
 
@@ -80,6 +81,15 @@ function withGitHubAccessToken(locator: string, accessToken: string): string {
   parsed.username = "x-access-token";
   parsed.password = accessToken;
   return parsed.toString();
+}
+
+function isRemoteGitSourceKind(kind: string): boolean {
+  return (
+    kind === "remote-git" ||
+    kind === "git-public" ||
+    kind === "git-github-app" ||
+    kind === "git-deploy-key"
+  );
 }
 
 function redactSecrets(input: string, secrets: readonly string[] = []): string {
@@ -185,6 +195,14 @@ function sanitizeName(input: string): string {
   return input.toLowerCase().replace(/[^a-z0-9_.-]/g, "-");
 }
 
+function shellQuote(input: string): string {
+  return `'${input.replaceAll("'", "'\\''")}'`;
+}
+
+function dockerRemovePublishedPortCommand(port: number): string {
+  return `docker ps --filter ${shellQuote(`publish=${port}`)} -q | while read -r container_id; do docker rm -f "$container_id"; done`;
+}
+
 function runSyncCommand(input: {
   command: string;
   cwd: string;
@@ -259,6 +277,19 @@ class LineBuffer {
   }
 }
 
+function classifyOutputLogLevel(line: string, fallback: LogLevel): LogLevel {
+  const normalized = line.toLowerCase();
+  if (/\b(error|failed|failure|fatal)\b/.test(normalized)) {
+    return "error";
+  }
+
+  if (/\b(warn|warning)\b/.test(normalized)) {
+    return "warn";
+  }
+
+  return fallback === "error" ? "error" : "info";
+}
+
 async function runStreamingCommand(input: {
   command: string;
   cwd: string;
@@ -301,14 +332,16 @@ async function runStreamingCommand(input: {
     child.stdout?.on("data", (chunk: string) => {
       stdoutText += chunk;
       for (const line of stdout.push(chunk)) {
-        input.onOutput(redactSecrets(line, input.redactions), "info", "stdout");
+        const redactedLine = redactSecrets(line, input.redactions);
+        input.onOutput(redactedLine, classifyOutputLogLevel(redactedLine, "info"), "stdout");
       }
     });
 
     child.stderr?.on("data", (chunk: string) => {
       stderrText += chunk;
       for (const line of stderr.push(chunk)) {
-        input.onOutput(redactSecrets(line, input.redactions), "warn", "stderr");
+        const redactedLine = redactSecrets(line, input.redactions);
+        input.onOutput(redactedLine, classifyOutputLogLevel(redactedLine, "info"), "stderr");
       }
     });
 
@@ -318,10 +351,12 @@ async function runStreamingCommand(input: {
 
     child.on("close", (code, signal) => {
       for (const line of stdout.flush()) {
-        input.onOutput(redactSecrets(line, input.redactions), "info", "stdout");
+        const redactedLine = redactSecrets(line, input.redactions);
+        input.onOutput(redactedLine, classifyOutputLogLevel(redactedLine, "info"), "stdout");
       }
       for (const line of stderr.flush()) {
-        input.onOutput(redactSecrets(line, input.redactions), "warn", "stderr");
+        const redactedLine = redactSecrets(line, input.redactions);
+        input.onOutput(redactedLine, classifyOutputLogLevel(redactedLine, "info"), "stderr");
       }
 
       resolveCommand({
@@ -492,7 +527,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
         deploymentId: input.deploymentId,
         phase: input.phase,
         line,
-        level: input.level,
+        level: classifyOutputLogLevel(line, input.level),
         stream: input.stream,
         persistedCount,
       });
@@ -558,7 +593,44 @@ export class LocalExecutionBackend implements ExecutionBackend {
       };
     }
 
-    if (source.kind !== "remote-git") {
+    if (source.kind === "dockerfile-inline" || source.kind === "docker-compose-inline") {
+      const content = source.metadata?.content;
+      if (!content) {
+        const message = `${source.kind} source requires inline content metadata`;
+        logs.push(phaseLog("package", message, "error"));
+        return {
+          prepared: false,
+          deployment: this.applyFailure(deployment, {
+            logs,
+            errorCode: "inline_source_content_missing",
+            retryable: false,
+            metadata: {
+              source: source.locator,
+              sourceKind: source.kind,
+            },
+          }).deployment,
+        };
+      }
+
+      const workdir = resolve(input.runtimeDir, "source");
+      const targetFile =
+        source.kind === "dockerfile-inline"
+          ? (source.metadata?.dockerfilePath ?? "Dockerfile")
+          : (source.metadata?.composeFilePath ?? "docker-compose.yml");
+      mkdirSync(resolve(workdir, dirname(targetFile)), { recursive: true });
+      await Bun.write(resolve(workdir, targetFile), content);
+
+      return {
+        prepared: true,
+        workdir,
+        metadata: {
+          sourceStrategy: source.kind,
+          sourceDir: workdir,
+        },
+      };
+    }
+
+    if (!isRemoteGitSourceKind(source.kind)) {
       return {
         prepared: true,
         workdir: input.fallbackWorkdir,
@@ -572,7 +644,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
     mkdirSync(input.runtimeDir, { recursive: true });
     rmSync(sourceDir, { recursive: true, force: true });
 
-    const accessToken = isGitHubHttpsLocator(source.locator)
+    const accessToken = source.kind === "git-github-app" && isGitHubHttpsLocator(source.locator)
       ? await this.integrationAuthPort?.getProviderAccessToken(context, "github")
       : null;
     const cloneLocator = accessToken
@@ -1056,7 +1128,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
     });
 
     const accessRoutes = state.runtimePlan.execution.accessRoutes ?? [];
-    const proxyBootstrap = createProxyBootstrapPlan(accessRoutes);
+    const proxyBootstrap = createProxyBootstrapPlan(accessRoutes, proxyBootstrapOptionsFromEnv(env));
     if (proxyBootstrap) {
       const proxyMessage = `Ensure ${proxyBootstrap.displayName} edge proxy on Docker network ${proxyBootstrap.networkName}`;
       logs.push(phaseLog("deploy", proxyMessage));
@@ -1137,11 +1209,13 @@ export class LocalExecutionBackend implements ExecutionBackend {
         });
       }
 
+      const readyMessage = `${proxyBootstrap.displayName} edge proxy is ready`;
+      logs.push(phaseLog("deploy", readyMessage));
       this.report(context, {
         deploymentId: state.id.value,
         phase: "deploy",
         status: "succeeded",
-        message: `${proxyBootstrap.displayName} edge proxy is ready`,
+        message: readyMessage,
       });
     }
 
@@ -1150,19 +1224,25 @@ export class LocalExecutionBackend implements ExecutionBackend {
       cwd: workdir,
       env,
     });
+    runSyncCommand({
+      command: dockerRemovePublishedPortCommand(port),
+      cwd: workdir,
+      env,
+    });
+    logs.push(phaseLog("deploy", `Release existing containers publishing port ${port}`));
 
     const envFlags = Object.entries(env)
       .filter((entry): entry is [string, string] => typeof entry[1] === "string")
       .filter(([key]) =>
         key === "PORT" || key.startsWith("YUNDU_") || state.environmentSnapshot.variables.some((variable) => variable.key === key),
       )
-      .map(([key, value]) => `-e ${key}=${JSON.stringify(value)}`)
+      .map(([key, value]) => `-e ${shellQuote(`${key}=${value}`)}`)
       .join(" ");
     const labelFlags = dockerLabelFlagsForAccessRoutes({
       deploymentId: state.id.value,
       port,
       accessRoutes,
-      quote: JSON.stringify,
+      quote: shellQuote,
     });
     const networkFlag = dockerNetworkFlagForAccessRoutes(accessRoutes);
     const runCommand = [
@@ -1327,7 +1407,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
 
     const workdir = preparedSource.workdir;
     const composeFile =
-      state.runtimePlan.source.kind === "remote-git" &&
+      isRemoteGitSourceKind(state.runtimePlan.source.kind) &&
       (!state.runtimePlan.execution.composeFile ||
         state.runtimePlan.execution.composeFile === state.runtimePlan.source.locator)
         ? resolve(workdir, "docker-compose.yml")
@@ -1465,6 +1545,67 @@ export class LocalExecutionBackend implements ExecutionBackend {
         }).deployment,
       });
     }
+  }
+
+  async cancel(
+    context: ExecutionContext,
+    deployment: Deployment,
+  ): Promise<Result<{ logs: DeploymentLogEntry[] }>> {
+    const state = deployment.toState();
+    const metadata = state.runtimePlan.execution.metadata ?? {};
+    const env = deploymentEnv(deployment);
+    const workdir =
+      state.runtimePlan.execution.workingDirectory ??
+      normalizeWorkingDirectory(state.runtimePlan.source.locator);
+    const logs: DeploymentLogEntry[] = [];
+
+    switch (state.runtimePlan.execution.kind) {
+      case "host-process":
+        killProcess(metadata.pid);
+        logs.push(
+          phaseLog(
+            "deploy",
+            metadata.pid ? `Stopped process ${metadata.pid}` : "No process id recorded",
+          ),
+        );
+        break;
+      case "docker-container": {
+        const containerName = metadata.containerName ?? sanitizeName(`yundu-${state.id.value}`);
+        runSyncCommand({
+          command: `docker rm -f ${shellQuote(containerName)} >/dev/null 2>&1 || true`,
+          cwd: workdir,
+          env,
+        });
+        logs.push(phaseLog("deploy", `Removed container ${containerName}`));
+        break;
+      }
+      case "docker-compose-stack":
+        if (metadata.composeFile) {
+          runSyncCommand({
+            command: `docker compose -f ${shellQuote(metadata.composeFile)} down`,
+            cwd: workdir,
+            env,
+          });
+        }
+        logs.push(
+          phaseLog(
+            "deploy",
+            metadata.composeFile
+              ? `Stopped compose stack ${metadata.composeFile}`
+              : "No compose metadata recorded",
+          ),
+        );
+        break;
+    }
+
+    this.report(context, {
+      deploymentId: state.id.value,
+      phase: "deploy",
+      status: "succeeded",
+      message: "Local deployment cancellation completed",
+    });
+
+    return ok({ logs });
   }
 
   async rollback(

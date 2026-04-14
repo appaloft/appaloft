@@ -2,6 +2,8 @@ import {
   type CreateDeploymentCommandInput,
   CreateEnvironmentCommand,
   CreateProjectCommand,
+  CreateResourceCommand,
+  type CreateResourceCommandInput,
   type EnvironmentSummary,
   ListEnvironmentsQuery,
   ListProjectsQuery,
@@ -12,13 +14,7 @@ import {
   type ResourceSummary,
   type ServerSummary,
 } from "@yundu/application";
-import {
-  domainError,
-  type EdgeProxyKind,
-  type EnvironmentKind,
-  environmentKinds,
-  type TlsMode,
-} from "@yundu/core";
+import { domainError, type EnvironmentKind, environmentKinds } from "@yundu/core";
 import { Effect } from "effect";
 
 import { type CliInteraction, effectCliInteraction } from "../interaction.js";
@@ -30,12 +26,12 @@ import {
 } from "./deployment-source.js";
 
 interface DeploymentPromptSeed {
-  configFilePath?: string;
   projectId?: string;
   serverId?: string;
   destinationId?: string;
   environmentId?: string;
   resourceId?: string;
+  resource?: ResourceDraftInput;
   sourceLocator?: string;
   deploymentMethod?: DeploymentMethod;
   installCommand?: string;
@@ -43,11 +39,13 @@ interface DeploymentPromptSeed {
   startCommand?: string;
   port?: number;
   healthCheckPath?: string;
-  proxyKind?: EdgeProxyKind;
-  domains?: string[];
-  pathPrefix?: string;
-  tlsMode?: TlsMode;
 }
+
+type ResourceDraftInput = Pick<CreateResourceCommandInput, "name"> &
+  Partial<Pick<CreateResourceCommandInput, "kind" | "description" | "services">>;
+type ResourceSourceInput = NonNullable<CreateResourceCommandInput["source"]>;
+type ResourceRuntimeProfileInput = NonNullable<CreateResourceCommandInput["runtimeProfile"]>;
+type ResourceRuntimeProfileDraftInput = Partial<ResourceRuntimeProfileInput>;
 
 interface ResolvedReference {
   id: string;
@@ -57,6 +55,7 @@ interface ResolvedReference {
 interface ResolvedOptionalReference {
   id?: string;
   label: string;
+  resource?: ResourceDraftInput;
 }
 
 const defaultProjectName = "Local Workspace";
@@ -86,6 +85,74 @@ function inferNameFromSource(sourceLocator: string): string {
   const withoutQuery = sourceLocator.split(/[?#]/)[0] ?? sourceLocator;
   const segments = withoutQuery.split(/[\\/]/).filter(Boolean);
   return slugify(segments.at(-1) ?? defaultProjectName);
+}
+
+function resourceKindForDeploymentMethod(
+  deploymentMethod: DeploymentMethod,
+): NonNullable<CreateResourceCommandInput["kind"]> {
+  return deploymentMethod === "docker-compose" ? "compose-stack" : "application";
+}
+
+function inferResourceFromSource(
+  sourceLocator: string,
+  deploymentMethod: DeploymentMethod,
+): ResourceDraftInput {
+  return {
+    name: inferNameFromSource(sourceLocator),
+    kind: resourceKindForDeploymentMethod(deploymentMethod),
+  };
+}
+
+function sourceKindForDeploymentInput(
+  sourceLocator: string,
+  deploymentMethod: DeploymentMethod,
+): ResourceSourceInput["kind"] {
+  if (deploymentMethod === "prebuilt-image") {
+    return "docker-image";
+  }
+
+  if (deploymentMethod === "docker-compose") {
+    return "compose";
+  }
+
+  if (/^(https?|ssh):\/\//.test(sourceLocator) || sourceLocator.endsWith(".git")) {
+    return "git-public";
+  }
+
+  if (sourceLocator.endsWith(".zip")) {
+    return "zip-artifact";
+  }
+
+  if (sourceLocator.startsWith("docker://") || sourceLocator.startsWith("image://")) {
+    return "docker-image";
+  }
+
+  return "local-folder";
+}
+
+function sourceBindingForDeploymentInput(
+  sourceLocator: string,
+  deploymentMethod: DeploymentMethod,
+): ResourceSourceInput {
+  return {
+    kind: sourceKindForDeploymentInput(sourceLocator, deploymentMethod),
+    locator: sourceLocator,
+    displayName: inferNameFromSource(sourceLocator),
+  };
+}
+
+function runtimeProfileFromDeploymentInput(
+  deploymentMethod: DeploymentMethod,
+  input: ResourceRuntimeProfileDraftInput,
+): ResourceRuntimeProfileInput {
+  return {
+    strategy: deploymentMethod,
+    ...(input.installCommand ? { installCommand: input.installCommand } : {}),
+    ...(input.buildCommand ? { buildCommand: input.buildCommand } : {}),
+    ...(input.startCommand ? { startCommand: input.startCommand } : {}),
+    ...(input.port ? { port: input.port } : {}),
+    ...(input.healthCheckPath ? { healthCheckPath: input.healthCheckPath } : {}),
+  };
 }
 
 function requireNonEmpty(label: string) {
@@ -131,6 +198,19 @@ function findEnvironment(
       environment.projectId === input.projectId &&
       slugify(environment.name) === slug &&
       environment.kind === input.kind,
+  );
+}
+
+function findResource(
+  resources: ResourceSummary[],
+  input: { projectId: string; environmentId: string; name: string },
+): ResourceSummary | undefined {
+  const slug = slugify(input.name);
+  return resources.find(
+    (resource) =>
+      resource.projectId === input.projectId &&
+      resource.environmentId === input.environmentId &&
+      resource.slug === slug,
   );
 }
 
@@ -192,6 +272,34 @@ function createEnvironment(input: { projectId: string; name: string; kind: Envir
   return Effect.gen(function* () {
     const cli = yield* CliRuntime;
     const message = yield* resultToEffect(CreateEnvironmentCommand.create(input));
+    const result = yield* Effect.promise(() => cli.executeCommand(message));
+    return yield* resultToEffect(result);
+  });
+}
+
+function createResource(input: {
+  projectId: string;
+  environmentId: string;
+  resource: ResourceDraftInput;
+  source: ResourceSourceInput;
+  runtimeProfile: ResourceRuntimeProfileInput;
+}) {
+  return Effect.gen(function* () {
+    const cli = yield* CliRuntime;
+    const message = yield* resultToEffect(
+      CreateResourceCommand.create({
+        projectId: input.projectId,
+        environmentId: input.environmentId,
+        name: input.resource.name,
+        kind: input.resource.kind ?? "application",
+        ...(input.resource.description ? { description: input.resource.description } : {}),
+        ...(input.resource.services && input.resource.services.length > 0
+          ? { services: input.resource.services }
+          : {}),
+        source: input.source,
+        runtimeProfile: input.runtimeProfile,
+      }),
+    );
     const result = yield* Effect.promise(() => cli.executeCommand(message));
     return yield* resultToEffect(result);
   });
@@ -370,6 +478,9 @@ function resolveResource(input: {
   seed: DeploymentPromptSeed;
   projectId: string;
   environmentId: string;
+  sourceLocator: string;
+  deploymentMethod: DeploymentMethod;
+  runtimeProfile: ResourceRuntimeProfileInput;
 }) {
   return Effect.gen(function* () {
     if (input.seed.resourceId) {
@@ -379,21 +490,61 @@ function resolveResource(input: {
       };
     }
 
+    const sourceResource =
+      input.seed.resource ?? inferResourceFromSource(input.sourceLocator, input.deploymentMethod);
+    const sourceResourceLabel = `${sourceResource.name} (${sourceResource.kind ?? "application"})`;
     const resources = (yield* listResources(input.projectId, input.environmentId)).items;
-    if (resources.length === 0) {
-      return {
-        label: "deployment default",
-      };
+
+    const createOrReuseSourceResource = (resource: NonNullable<typeof sourceResource>) =>
+      Effect.gen(function* () {
+        const existing = findResource(resources, {
+          projectId: input.projectId,
+          environmentId: input.environmentId,
+          name: resource.name,
+        });
+
+        if (existing) {
+          return {
+            id: existing.id,
+            label: `${existing.name} (${existing.kind})`,
+          };
+        }
+
+        const created = yield* createResource({
+          projectId: input.projectId,
+          environmentId: input.environmentId,
+          resource,
+          source: sourceBindingForDeploymentInput(input.sourceLocator, input.deploymentMethod),
+          runtimeProfile: input.runtimeProfile,
+        });
+        return {
+          id: created.id,
+          label: sourceResourceLabel,
+        };
+      });
+
+    if (input.seed.resource) {
+      return yield* createOrReuseSourceResource(input.seed.resource);
     }
 
+    if (resources.length === 0) {
+      return yield* createOrReuseSourceResource(sourceResource);
+    }
+
+    const sourceResourceChoice = "__source_resource__";
     const resourceId = yield* input.interaction.select<string | undefined>({
       message: "Resource",
       choices: [
-        {
-          title: "Use deployment default resource",
-          value: undefined,
-          description: "The deployment context will reuse or create its default resource.",
-        },
+        ...(sourceResource
+          ? [
+              {
+                title: `Use source as resource: ${sourceResourceLabel}`,
+                value: sourceResourceChoice,
+                description:
+                  "The deployment will reuse or create this resource by project/environment slug.",
+              },
+            ]
+          : []),
         ...resources.map((resource: ResourceSummary) => ({
           title: `${resource.name} (${resource.kind})`,
           value: resource.id,
@@ -403,16 +554,18 @@ function resolveResource(input: {
     });
     const selectedResource = resources.find((resource) => resource.id === resourceId);
 
-    return resourceId
-      ? {
-          id: resourceId,
-          label: selectedResource
-            ? `${selectedResource.name} (${selectedResource.kind})`
-            : resourceId,
-        }
-      : {
-          label: "deployment default",
-        };
+    if (resourceId === sourceResourceChoice && sourceResource) {
+      return yield* createOrReuseSourceResource(sourceResource);
+    }
+
+    if (!resourceId) {
+      return yield* createOrReuseSourceResource(sourceResource);
+    }
+
+    return {
+      id: resourceId,
+      label: selectedResource ? `${selectedResource.name} (${selectedResource.kind})` : resourceId,
+    };
   });
 }
 
@@ -427,10 +580,6 @@ function resolveAdvancedDeploymentConfig(input: {
       input.seed.startCommand ||
       input.seed.port ||
       input.seed.healthCheckPath ||
-      input.seed.proxyKind ||
-      input.seed.domains ||
-      input.seed.pathPrefix ||
-      input.seed.tlsMode ||
       (yield* input.interaction.confirm({
         message: "Advanced config?",
         defaultValue: false,
@@ -499,10 +648,6 @@ function resolveAdvancedDeploymentConfig(input: {
       ...(startCommand ? { startCommand } : {}),
       ...(Number.isInteger(port) && port > 0 ? { port } : {}),
       ...(healthCheckPath ? { healthCheckPath } : {}),
-      ...(input.seed.proxyKind ? { proxyKind: input.seed.proxyKind } : {}),
-      ...(input.seed.domains ? { domains: input.seed.domains } : {}),
-      ...(input.seed.pathPrefix ? { pathPrefix: input.seed.pathPrefix } : {}),
-      ...(input.seed.tlsMode ? { tlsMode: input.seed.tlsMode } : {}),
     };
   });
 }
@@ -556,13 +701,17 @@ export function resolveInteractiveDeploymentInput(
       seed,
       projectId: project.id,
     });
+    const advancedConfig = yield* resolveAdvancedDeploymentConfig({ interaction, seed });
+    const runtimeProfile = runtimeProfileFromDeploymentInput(deploymentMethod, advancedConfig);
     const resource = yield* resolveResource({
       interaction,
       seed,
       projectId: project.id,
       environmentId: environment.id,
+      sourceLocator: normalizedSourceLocator,
+      deploymentMethod,
+      runtimeProfile,
     });
-    const advancedConfig = yield* resolveAdvancedDeploymentConfig({ interaction, seed });
 
     yield* printDeploymentSummary({
       sourceLocator: normalizedSourceLocator,
@@ -574,15 +723,11 @@ export function resolveInteractiveDeploymentInput(
     });
 
     return {
-      ...(seed.configFilePath ? { configFilePath: seed.configFilePath } : {}),
       projectId: project.id,
       serverId: server.id,
       ...(seed.destinationId ? { destinationId: seed.destinationId } : {}),
       environmentId: environment.id,
-      ...(resource.id ? { resourceId: resource.id } : {}),
-      sourceLocator: normalizedSourceLocator,
-      deploymentMethod,
-      ...advancedConfig,
+      resourceId: resource.id,
     } satisfies CreateDeploymentCommandInput;
   });
 }
