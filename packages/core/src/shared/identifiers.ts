@@ -85,6 +85,27 @@ export class DeploymentTargetId extends IdentifierValue {
   }
 }
 
+const sshCredentialIdBrand: unique symbol = Symbol("SshCredentialId");
+export class SshCredentialId extends IdentifierValue {
+  private [sshCredentialIdBrand]!: void;
+
+  private constructor(value: string) {
+    super(value);
+  }
+
+  static create(value: string): Result<SshCredentialId> {
+    return createIdentifierValue(
+      value,
+      "SSH credential ID",
+      (normalized) => new SshCredentialId(normalized),
+    );
+  }
+
+  static rehydrate(value: string): SshCredentialId {
+    return new SshCredentialId(value.trim());
+  }
+}
+
 const destinationIdBrand: unique symbol = Symbol("DestinationId");
 export class DestinationId extends IdentifierValue {
   private [destinationIdBrand]!: void;
@@ -217,6 +238,48 @@ export class ResourceBindingId extends IdentifierValue {
 
   static rehydrate(value: string): ResourceBindingId {
     return new ResourceBindingId(value.trim());
+  }
+}
+
+const domainBindingIdBrand: unique symbol = Symbol("DomainBindingId");
+export class DomainBindingId extends IdentifierValue {
+  private [domainBindingIdBrand]!: void;
+
+  private constructor(value: string) {
+    super(value);
+  }
+
+  static create(value: string): Result<DomainBindingId> {
+    return createIdentifierValue(
+      value,
+      "Domain binding ID",
+      (normalized) => new DomainBindingId(normalized),
+    );
+  }
+
+  static rehydrate(value: string): DomainBindingId {
+    return new DomainBindingId(value.trim());
+  }
+}
+
+const domainVerificationAttemptIdBrand: unique symbol = Symbol("DomainVerificationAttemptId");
+export class DomainVerificationAttemptId extends IdentifierValue {
+  private [domainVerificationAttemptIdBrand]!: void;
+
+  private constructor(value: string) {
+    super(value);
+  }
+
+  static create(value: string): Result<DomainVerificationAttemptId> {
+    return createIdentifierValue(
+      value,
+      "Domain verification attempt ID",
+      (normalized) => new DomainVerificationAttemptId(normalized),
+    );
+  }
+
+  static rehydrate(value: string): DomainVerificationAttemptId {
+    return new DomainVerificationAttemptId(value.trim());
   }
 }
 

@@ -6,19 +6,45 @@ import {
   type ProjectId,
   type ResourceId,
 } from "../shared/identifiers";
+import { type PortNumber } from "../shared/numeric-values";
 import { err, ok, type Result } from "../shared/result";
-import { type ResourceKindValue, type ResourceServiceKindValue } from "../shared/state-machine";
+import {
+  type ResourceKindValue,
+  type ResourceServiceKindValue,
+  type RuntimePlanStrategyValue,
+  type SourceKindValue,
+} from "../shared/state-machine";
 import { type CreatedAt } from "../shared/temporal";
 import {
+  type CommandText,
   type DescriptionText,
+  type DisplayNameText,
+  type HealthCheckPathText,
   type ResourceName,
   type ResourceServiceName,
   ResourceSlug,
+  type SourceLocator,
 } from "../shared/text-values";
 
 export interface ResourceServiceState {
   name: ResourceServiceName;
   kind: ResourceServiceKindValue;
+}
+
+export interface ResourceSourceBindingState {
+  kind: SourceKindValue;
+  locator: SourceLocator;
+  displayName: DisplayNameText;
+  metadata?: Record<string, string>;
+}
+
+export interface ResourceRuntimeProfileState {
+  strategy: RuntimePlanStrategyValue;
+  installCommand?: CommandText;
+  buildCommand?: CommandText;
+  startCommand?: CommandText;
+  port?: PortNumber;
+  healthCheckPath?: HealthCheckPathText;
 }
 
 export interface ResourceState {
@@ -30,6 +56,8 @@ export interface ResourceState {
   slug: ResourceSlug;
   kind: ResourceKindValue;
   services: ResourceServiceState[];
+  sourceBinding?: ResourceSourceBindingState;
+  runtimeProfile?: ResourceRuntimeProfileState;
   createdAt: CreatedAt;
   description?: DescriptionText;
 }
@@ -51,6 +79,8 @@ export class Resource extends AggregateRoot<ResourceState> {
     name: ResourceName;
     kind: ResourceKindValue;
     services?: ResourceServiceState[];
+    sourceBinding?: ResourceSourceBindingState;
+    runtimeProfile?: ResourceRuntimeProfileState;
     createdAt: CreatedAt;
     description?: DescriptionText;
   }): Result<Resource> {
@@ -71,14 +101,65 @@ export class Resource extends AggregateRoot<ResourceState> {
         slug,
         kind: input.kind,
         services: [...services],
+        ...(input.sourceBinding
+          ? {
+              sourceBinding: {
+                ...input.sourceBinding,
+                ...(input.sourceBinding.metadata
+                  ? { metadata: { ...input.sourceBinding.metadata } }
+                  : {}),
+              },
+            }
+          : {}),
+        ...(input.runtimeProfile ? { runtimeProfile: { ...input.runtimeProfile } } : {}),
         createdAt: input.createdAt,
         ...(input.description ? { description: input.description } : {}),
       });
-      resource.recordDomainEvent("resource.created", input.createdAt, {
+      resource.recordDomainEvent("resource-created", input.createdAt, {
+        resourceId: input.id.value,
         projectId: input.projectId.value,
         environmentId: input.environmentId.value,
         ...(input.destinationId ? { destinationId: input.destinationId.value } : {}),
+        name: input.name.value,
+        slug: slug.value,
         kind: input.kind.value,
+        services: services.map((service) => ({
+          name: service.name.value,
+          kind: service.kind.value,
+        })),
+        ...(input.sourceBinding
+          ? {
+              sourceBinding: {
+                kind: input.sourceBinding.kind.value,
+                locator: input.sourceBinding.locator.value,
+                displayName: input.sourceBinding.displayName.value,
+                ...(input.sourceBinding.metadata
+                  ? { metadata: { ...input.sourceBinding.metadata } }
+                  : {}),
+              },
+            }
+          : {}),
+        ...(input.runtimeProfile
+          ? {
+              runtimeProfile: {
+                strategy: input.runtimeProfile.strategy.value,
+                ...(input.runtimeProfile.installCommand
+                  ? { installCommand: input.runtimeProfile.installCommand.value }
+                  : {}),
+                ...(input.runtimeProfile.buildCommand
+                  ? { buildCommand: input.runtimeProfile.buildCommand.value }
+                  : {}),
+                ...(input.runtimeProfile.startCommand
+                  ? { startCommand: input.runtimeProfile.startCommand.value }
+                  : {}),
+                ...(input.runtimeProfile.port ? { port: input.runtimeProfile.port.value } : {}),
+                ...(input.runtimeProfile.healthCheckPath
+                  ? { healthCheckPath: input.runtimeProfile.healthCheckPath.value }
+                  : {}),
+              },
+            }
+          : {}),
+        createdAt: input.createdAt.value,
       });
       return ok(resource);
     });
@@ -88,6 +169,17 @@ export class Resource extends AggregateRoot<ResourceState> {
     return new Resource({
       ...state,
       services: [...state.services],
+      ...(state.sourceBinding
+        ? {
+            sourceBinding: {
+              ...state.sourceBinding,
+              ...(state.sourceBinding.metadata
+                ? { metadata: { ...state.sourceBinding.metadata } }
+                : {}),
+            },
+          }
+        : {}),
+      ...(state.runtimeProfile ? { runtimeProfile: { ...state.runtimeProfile } } : {}),
     });
   }
 
@@ -102,6 +194,17 @@ export class Resource extends AggregateRoot<ResourceState> {
     return {
       ...this.state,
       services: [...this.state.services],
+      ...(this.state.sourceBinding
+        ? {
+            sourceBinding: {
+              ...this.state.sourceBinding,
+              ...(this.state.sourceBinding.metadata
+                ? { metadata: { ...this.state.sourceBinding.metadata } }
+                : {}),
+            },
+          }
+        : {}),
+      ...(this.state.runtimeProfile ? { runtimeProfile: { ...this.state.runtimeProfile } } : {}),
     };
   }
 }

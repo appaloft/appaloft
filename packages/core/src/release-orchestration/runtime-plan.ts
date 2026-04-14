@@ -46,6 +46,8 @@ import {
 } from "../shared/text-values";
 import { ValueObject } from "../shared/value-object";
 
+export const runtimeVerificationStepKinds = ["internal-http", "public-http"] as const;
+
 export interface SourceDescriptorState {
   kind: SourceKindValue;
   locator: SourceLocator;
@@ -72,6 +74,7 @@ export interface RuntimeExecutionPlanState {
   dockerfilePath?: FilePathText;
   composeFile?: FilePathText;
   accessRoutes?: AccessRoute[];
+  verificationSteps?: RuntimeVerificationStep[];
   metadata?: Record<string, string>;
 }
 
@@ -81,6 +84,11 @@ export interface AccessRouteState {
   pathPrefix: RoutePathPrefix;
   tlsMode: TlsModeValue;
   targetPort?: PortNumber;
+}
+
+export interface RuntimeVerificationStepState {
+  kind: RuntimeVerificationStepKindValue;
+  label: PlanStepText;
 }
 
 export interface RuntimePlanState {
@@ -125,6 +133,20 @@ export interface RollbackPlanState {
   generatedAt: GeneratedAt;
 }
 
+export interface SourceDescriptorVisitor<TResult> {
+  localFolder(source: SourceDescriptor): TResult;
+  localGit(source: SourceDescriptor): TResult;
+  remoteGit(source: SourceDescriptor): TResult;
+  gitPublic(source: SourceDescriptor): TResult;
+  gitGithubApp(source: SourceDescriptor): TResult;
+  gitDeployKey(source: SourceDescriptor): TResult;
+  zipArtifact(source: SourceDescriptor): TResult;
+  dockerfileInline(source: SourceDescriptor): TResult;
+  dockerComposeInline(source: SourceDescriptor): TResult;
+  dockerImage(source: SourceDescriptor): TResult;
+  compose(source: SourceDescriptor): TResult;
+}
+
 export class SourceDescriptor extends ValueObject<SourceDescriptorState> {
   private constructor(state: SourceDescriptorState) {
     super(state);
@@ -156,6 +178,36 @@ export class SourceDescriptor extends ValueObject<SourceDescriptorState> {
 
   get metadata(): Record<string, string> | undefined {
     return this.state.metadata ? { ...this.state.metadata } : undefined;
+  }
+
+  accept<TResult>(visitor: SourceDescriptorVisitor<TResult>): TResult {
+    switch (this.kind) {
+      case "local-folder":
+        return visitor.localFolder(this);
+      case "local-git":
+        return visitor.localGit(this);
+      case "remote-git":
+        return visitor.remoteGit(this);
+      case "git-public":
+        return visitor.gitPublic(this);
+      case "git-github-app":
+        return visitor.gitGithubApp(this);
+      case "git-deploy-key":
+        return visitor.gitDeployKey(this);
+      case "zip-artifact":
+        return visitor.zipArtifact(this);
+      case "dockerfile-inline":
+        return visitor.dockerfileInline(this);
+      case "docker-compose-inline":
+        return visitor.dockerComposeInline(this);
+      case "docker-image":
+        return visitor.dockerImage(this);
+      case "compose":
+        return visitor.compose(this);
+    }
+
+    const unhandled: never = this.kind;
+    return unhandled;
   }
 
   toState(): SourceDescriptorState {
@@ -265,6 +317,68 @@ export class AccessRoute extends ValueObject<AccessRouteState> {
   }
 }
 
+const runtimeVerificationStepKindBrand: unique symbol = Symbol("RuntimeVerificationStepKindValue");
+export class RuntimeVerificationStepKindValue extends ValueObject<
+  (typeof runtimeVerificationStepKinds)[number]
+> {
+  private [runtimeVerificationStepKindBrand]!: void;
+
+  private constructor(value: (typeof runtimeVerificationStepKinds)[number]) {
+    super(value);
+  }
+
+  static create(value: string): Result<RuntimeVerificationStepKindValue> {
+    const kind = runtimeVerificationStepKinds.find((item) => item === value);
+
+    if (!kind) {
+      return err(
+        domainError.validation(
+          `Runtime verification step kind must be one of ${runtimeVerificationStepKinds.join(", ")}`,
+          { value },
+        ),
+      );
+    }
+
+    return ok(new RuntimeVerificationStepKindValue(kind));
+  }
+
+  static rehydrate(
+    value: (typeof runtimeVerificationStepKinds)[number],
+  ): RuntimeVerificationStepKindValue {
+    return new RuntimeVerificationStepKindValue(value);
+  }
+
+  get value(): (typeof runtimeVerificationStepKinds)[number] {
+    return this.state;
+  }
+}
+
+export class RuntimeVerificationStep extends ValueObject<RuntimeVerificationStepState> {
+  private constructor(state: RuntimeVerificationStepState) {
+    super(state);
+  }
+
+  static create(input: RuntimeVerificationStepState): Result<RuntimeVerificationStep> {
+    return ok(new RuntimeVerificationStep(input));
+  }
+
+  static rehydrate(state: RuntimeVerificationStepState): RuntimeVerificationStep {
+    return new RuntimeVerificationStep(state);
+  }
+
+  get kind(): (typeof runtimeVerificationStepKinds)[number] {
+    return this.state.kind.value;
+  }
+
+  get label(): string {
+    return this.state.label.value;
+  }
+
+  toState(): RuntimeVerificationStepState {
+    return { ...this.state };
+  }
+}
+
 export class RuntimeExecutionPlan extends ValueObject<RuntimeExecutionPlanState> {
   private constructor(state: RuntimeExecutionPlanState) {
     super(state);
@@ -322,6 +436,10 @@ export class RuntimeExecutionPlan extends ValueObject<RuntimeExecutionPlanState>
     return [...(this.state.accessRoutes ?? [])];
   }
 
+  get verificationSteps(): RuntimeVerificationStep[] {
+    return [...(this.state.verificationSteps ?? [])];
+  }
+
   get metadata(): Record<string, string> | undefined {
     return this.state.metadata ? { ...this.state.metadata } : undefined;
   }
@@ -343,6 +461,13 @@ export class RuntimeExecutionPlan extends ValueObject<RuntimeExecutionPlanState>
     });
   }
 
+  withVerificationSteps(verificationSteps: RuntimeVerificationStep[]): RuntimeExecutionPlan {
+    return RuntimeExecutionPlan.rehydrate({
+      ...this.state,
+      verificationSteps: [...verificationSteps],
+    });
+  }
+
   toState(): RuntimeExecutionPlanState {
     return {
       kind: this.state.kind,
@@ -356,6 +481,9 @@ export class RuntimeExecutionPlan extends ValueObject<RuntimeExecutionPlanState>
       ...(this.state.dockerfilePath ? { dockerfilePath: this.state.dockerfilePath } : {}),
       ...(this.state.composeFile ? { composeFile: this.state.composeFile } : {}),
       ...(this.state.accessRoutes ? { accessRoutes: [...this.state.accessRoutes] } : {}),
+      ...(this.state.verificationSteps
+        ? { verificationSteps: [...this.state.verificationSteps] }
+        : {}),
       ...(this.state.metadata ? { metadata: { ...this.state.metadata } } : {}),
     };
   }

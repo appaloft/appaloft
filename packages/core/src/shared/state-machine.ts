@@ -6,10 +6,12 @@ import {
   deploymentTargetCredentialKinds,
   destinationKinds,
   edgeProxyKinds,
+  edgeProxyStatuses,
   environmentKinds,
   executionStrategyKinds,
   logLevels,
   packagingModes,
+  runtimePlanStrategies,
   sourceKinds,
   targetKinds,
   tlsModes,
@@ -28,10 +30,12 @@ export {
   deploymentTargetCredentialKinds,
   destinationKinds,
   edgeProxyKinds,
+  edgeProxyStatuses,
   environmentKinds,
   executionStrategyKinds,
   logLevels,
   packagingModes,
+  runtimePlanStrategies,
   sourceKinds,
   targetKinds,
   tlsModes,
@@ -134,6 +138,30 @@ export class SourceKindValue extends EnumValueObject<(typeof sourceKinds)[number
   }
 }
 
+const runtimePlanStrategyBrand: unique symbol = Symbol("RuntimePlanStrategyValue");
+export class RuntimePlanStrategyValue extends EnumValueObject<
+  (typeof runtimePlanStrategies)[number]
+> {
+  private [runtimePlanStrategyBrand]!: void;
+
+  private constructor(value: (typeof runtimePlanStrategies)[number]) {
+    super(value);
+  }
+
+  static create(value: string): Result<RuntimePlanStrategyValue> {
+    return createEnumValue(
+      value,
+      runtimePlanStrategies,
+      "Runtime plan strategy",
+      (validated) => new RuntimePlanStrategyValue(validated),
+    );
+  }
+
+  static rehydrate(value: (typeof runtimePlanStrategies)[number]): RuntimePlanStrategyValue {
+    return new RuntimePlanStrategyValue(value);
+  }
+}
+
 const targetKindBrand: unique symbol = Symbol("TargetKindValue");
 export class TargetKindValue extends EnumValueObject<(typeof targetKinds)[number]> {
   private [targetKindBrand]!: void;
@@ -175,6 +203,52 @@ export class EdgeProxyKindValue extends EnumValueObject<(typeof edgeProxyKinds)[
 
   static rehydrate(value: (typeof edgeProxyKinds)[number]): EdgeProxyKindValue {
     return new EdgeProxyKindValue(value);
+  }
+}
+
+const edgeProxyStatusBrand: unique symbol = Symbol("EdgeProxyStatusValue");
+export class EdgeProxyStatusValue extends StateMachineValueObject<
+  (typeof edgeProxyStatuses)[number]
+> {
+  private [edgeProxyStatusBrand]!: void;
+
+  private constructor(value: (typeof edgeProxyStatuses)[number]) {
+    super(value);
+  }
+
+  static create(value: string): Result<EdgeProxyStatusValue> {
+    return createEnumValue(
+      value,
+      edgeProxyStatuses,
+      "Edge proxy status",
+      (validated) => new EdgeProxyStatusValue(validated),
+    );
+  }
+
+  static rehydrate(value: (typeof edgeProxyStatuses)[number]): EdgeProxyStatusValue {
+    return new EdgeProxyStatusValue(value);
+  }
+
+  static initialForKind(kind: EdgeProxyKindValue): EdgeProxyStatusValue {
+    return kind.value === "none"
+      ? new EdgeProxyStatusValue("disabled")
+      : new EdgeProxyStatusValue("pending");
+  }
+
+  beginBootstrap(kind: EdgeProxyKindValue): Result<EdgeProxyStatusValue> {
+    if (kind.value === "none" || this.value === "disabled") {
+      return err(domainError.invariant("Disabled edge proxy cannot be bootstrapped"));
+    }
+
+    return ok(new EdgeProxyStatusValue("starting"));
+  }
+
+  markReady(): Result<EdgeProxyStatusValue> {
+    return ok(new EdgeProxyStatusValue("ready"));
+  }
+
+  markFailed(): Result<EdgeProxyStatusValue> {
+    return ok(new EdgeProxyStatusValue("failed"));
   }
 }
 
@@ -357,6 +431,22 @@ export class DeploymentStatusValue extends StateMachineValueObject<
       ["planned"],
       "Deployment must be planned before execution starts",
     ).map(() => new DeploymentStatusValue("running"));
+  }
+
+  canStartNewDeployment(): boolean {
+    return (
+      this.value === "succeeded" ||
+      this.value === "failed" ||
+      this.value === "canceled" ||
+      this.value === "rolled-back"
+    );
+  }
+
+  cancel(): Result<DeploymentStatusValue> {
+    return this.ensureCurrent(
+      ["created", "planning", "planned", "running"],
+      "Deployment must be active before cancellation",
+    ).map(() => new DeploymentStatusValue("canceled"));
   }
 
   applyExecutionResult(result: ExecutionStatusValue): Result<DeploymentStatusValue> {
