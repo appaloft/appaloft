@@ -200,7 +200,7 @@ function resolveSourceKind(locator: string): {
   metadata?: Record<string, string>;
 } {
   if (/^(https?|ssh):\/\//.test(locator) || locator.endsWith(".git")) {
-    return { kind: "remote-git" };
+    return { kind: "git-public" };
   }
 
   if (locator.endsWith(".zip")) {

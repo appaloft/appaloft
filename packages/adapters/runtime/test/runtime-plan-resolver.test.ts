@@ -155,6 +155,25 @@ describe("DefaultRuntimePlanResolver", () => {
         port: 4311,
       }),
     );
+    expect(
+      plan.execution.verificationSteps.map((step) => ({ kind: step.kind, label: step.label })),
+    ).toEqual([
+      {
+        kind: "internal-http",
+        label: "Verify internal container health",
+      },
+      {
+        kind: "public-http",
+        label: "Verify public access route",
+      },
+    ]);
+    const [route] = plan.execution.accessRoutes;
+    expect(route?.domains).toEqual([]);
+    expect(route?.proxyKind).toBe("none");
+    expect(route?.targetPort).toBe(4311);
+    expect(plan.steps).toContain("Verify internal container health");
+    expect(plan.steps).toContain("Verify public access route");
+    expect(plan.steps).not.toContain("Configure edge proxy");
   });
 
   test("adds access routes when public domains are requested", async () => {
@@ -194,5 +213,102 @@ describe("DefaultRuntimePlanResolver", () => {
     expect(route?.pathPrefix).toBe("/");
     expect(route?.tlsMode).toBe("auto");
     expect(route?.targetPort).toBe(4312);
+    expect(
+      plan.execution.verificationSteps.map((step) => ({ kind: step.kind, label: step.label })),
+    ).toEqual([
+      {
+        kind: "internal-http",
+        label: "Verify internal container health",
+      },
+      {
+        kind: "public-http",
+        label: "Verify public access route",
+      },
+    ]);
+    expect(plan.steps).toContain("Configure edge proxy");
+    expect(plan.steps).toContain("Verify internal container health");
+    expect(plan.steps).toContain("Verify public access route");
+  });
+
+  test("defaults public git sources to target-side dockerfile builds", async () => {
+    ensureReflectMetadata();
+    const { DefaultRuntimePlanResolver } = await import("../src");
+    const resolver = new DefaultRuntimePlanResolver();
+    const context = createTestExecutionContext();
+
+    const result = await resolver.resolve(context, {
+      id: "plan_4",
+      source: {
+        kind: "git-public",
+        locator: "https://github.com/example/app.git",
+        displayName: "app",
+      },
+      server: {
+        id: "srv_4",
+        providerKey: "generic-ssh",
+      },
+      environmentSnapshot: createEnvironmentSnapshot("snap_4"),
+      detectedReasoning: ["configured public git source"],
+      requestedDeployment: {
+        method: "auto",
+        port: 4313,
+      },
+      generatedAt: "2026-01-01T00:00:00.000Z",
+    });
+
+    expect(result.isOk()).toBe(true);
+    const plan = result._unsafeUnwrap();
+
+    expect(plan.source.kind).toBe("git-public");
+    expect(plan.buildStrategy).toBe("dockerfile");
+    expect(plan.execution).toEqual(
+      expect.objectContaining({
+        kind: "docker-container",
+        dockerfilePath: "Dockerfile",
+        port: 4313,
+      }),
+    );
+  });
+
+  test("plans inline compose sources as compose stacks", async () => {
+    ensureReflectMetadata();
+    const { DefaultRuntimePlanResolver } = await import("../src");
+    const resolver = new DefaultRuntimePlanResolver();
+    const context = createTestExecutionContext();
+
+    const result = await resolver.resolve(context, {
+      id: "plan_5",
+      source: {
+        kind: "docker-compose-inline",
+        locator: "inline://docker-compose.yml",
+        displayName: "compose",
+        metadata: {
+          content: "services: {}",
+          composeFilePath: "compose.yml",
+        },
+      },
+      server: {
+        id: "srv_5",
+        providerKey: "generic-ssh",
+      },
+      environmentSnapshot: createEnvironmentSnapshot("snap_5"),
+      detectedReasoning: ["configured inline compose source"],
+      requestedDeployment: {
+        method: "auto",
+      },
+      generatedAt: "2026-01-01T00:00:00.000Z",
+    });
+
+    expect(result.isOk()).toBe(true);
+    const plan = result._unsafeUnwrap();
+
+    expect(plan.source.kind).toBe("docker-compose-inline");
+    expect(plan.buildStrategy).toBe("compose-deploy");
+    expect(plan.execution).toEqual(
+      expect.objectContaining({
+        kind: "docker-compose-stack",
+        composeFile: "compose.yml",
+      }),
+    );
   });
 });

@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { chmodSync, existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import {
   deploymentProgressSteps,
@@ -29,19 +29,35 @@ import {
   domainError,
   err,
   ok,
+  type AccessRoute,
   type Deployment,
   type Result,
+  type RuntimeVerificationStep,
   type RollbackPlan,
 } from "@yundu/core";
 import {
   createProxyBootstrapPlan,
   dockerNetworkFlagForAccessRoutes,
+  proxyBootstrapOptionsFromEnv,
 } from "./proxy-bootstrap";
 import { dockerLabelFlagsForAccessRoutes } from "./proxy-labels";
 
 type LogPhase = "detect" | "plan" | "package" | "deploy" | "verify" | "rollback";
 type LogLevel = "debug" | "info" | "warn" | "error";
 type LogSource = "yundu" | "application";
+
+function classifyOutputLogLevel(line: string, fallback: LogLevel): LogLevel {
+  const normalized = line.toLowerCase();
+  if (/\b(error|failed|failure|fatal)\b/.test(normalized)) {
+    return "error";
+  }
+
+  if (/\b(warn|warning)\b/.test(normalized)) {
+    return "warn";
+  }
+
+  return fallback === "error" ? "error" : "info";
+}
 
 function phaseLog(
   phase: LogPhase,
@@ -64,6 +80,10 @@ function sanitizeName(input: string): string {
 
 function shellQuote(input: string): string {
   return `'${input.replaceAll("'", "'\\''")}'`;
+}
+
+function dockerRemovePublishedPortCommand(port: number): string {
+  return `docker ps --filter ${shellQuote(`publish=${port}`)} -q | while read -r container_id; do docker rm -f "$container_id"; done`;
 }
 
 function redactSecrets(input: string, secrets: readonly string[] = []): string {
@@ -102,8 +122,26 @@ function withGitHubAccessToken(locator: string, accessToken: string): string {
   return parsed.toString();
 }
 
-function hostForHealthCheck(sshHost: string): string {
-  return sshHost.includes("@") ? (sshHost.split("@").pop() ?? sshHost) : sshHost;
+function hasUrlCredentials(locator: string): boolean {
+  try {
+    const parsed = new URL(locator);
+    return Boolean(parsed.username || parsed.password);
+  } catch {
+    return false;
+  }
+}
+
+function isRemoteGitSourceKind(kind: string): boolean {
+  return (
+    kind === "remote-git" ||
+    kind === "git-public" ||
+    kind === "git-github-app" ||
+    kind === "git-deploy-key"
+  );
+}
+
+function isLocalWorkspaceSourceKind(kind: string): boolean {
+  return kind === "local-folder" || kind === "local-git" || kind === "compose";
 }
 
 function hostWithUsername(host: string, username?: string): string {
@@ -111,25 +149,81 @@ function hostWithUsername(host: string, username?: string): string {
 }
 
 async function waitForHealth(url: string): Promise<{ ok: boolean; reason?: string }> {
-  for (let attempt = 0; attempt < 40; attempt += 1) {
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 2_000);
+
     try {
-      const response = await fetch(url);
+      const response = await fetch(url, { signal: controller.signal });
       if (response.ok) {
         return { ok: true };
       }
     } catch (error) {
-      if (attempt === 39) {
+      if (attempt === 19) {
         return {
           ok: false,
           reason: error instanceof Error ? error.message : "unknown fetch error",
         };
       }
+    } finally {
+      clearTimeout(timeout);
     }
 
     await Bun.sleep(250);
   }
 
   return { ok: false, reason: "health check timed out" };
+}
+
+function normalizeHealthCheckPath(path: string | undefined): string {
+  if (!path || path === "/") {
+    return "/";
+  }
+
+  return path.startsWith("/") ? path : `/${path}`;
+}
+
+function joinRouteAndHealthPath(pathPrefix: string, healthPath: string): string {
+  const normalizedPrefix = pathPrefix === "/" ? "" : pathPrefix.replace(/\/+$/, "");
+  const normalizedHealthPath = normalizeHealthCheckPath(healthPath);
+
+  if (!normalizedPrefix) {
+    return normalizedHealthPath;
+  }
+
+  return normalizedHealthPath === "/" ? normalizedPrefix : `${normalizedPrefix}${normalizedHealthPath}`;
+}
+
+function publicHealthUrl(input: {
+  route: AccessRoute;
+  healthPath: string;
+  publicHost: string;
+  port: number;
+}): string {
+  if (input.route.proxyKind === "none") {
+    const path = joinRouteAndHealthPath(input.route.pathPrefix, input.healthPath);
+    return `http://${input.publicHost}:${input.route.targetPort ?? input.port}${path}`;
+  }
+
+  const scheme = input.route.tlsMode === "auto" ? "https" : "http";
+  const domain = input.route.domains[0] ?? "localhost";
+  const path = joinRouteAndHealthPath(input.route.pathPrefix, input.healthPath);
+
+  return `${scheme}://${domain}${path}`;
+}
+
+function defaultVerificationSteps(accessRoutes: AccessRoute[]): Array<RuntimeVerificationStep["kind"]> {
+  return accessRoutes.length > 0 ? ["internal-http", "public-http"] : ["internal-http"];
+}
+
+function remoteInternalHealthCheckCommand(url: string): string {
+  return [
+    "(",
+    `command -v curl >/dev/null 2>&1 && curl --fail --silent --show-error --max-time 5 ${shellQuote(url)} >/dev/null`,
+    ") || (",
+    `command -v wget >/dev/null 2>&1 && wget -q --timeout=5 --tries=1 -O /dev/null ${shellQuote(url)}`,
+    ")",
+  ].join(" ");
 }
 
 function runSyncProcess(input: {
@@ -213,6 +307,7 @@ function deploymentEnv(deployment: Deployment, port?: number): NodeJS.ProcessEnv
 
 interface SshTarget {
   host: string;
+  publicHost: string;
   port: string;
   identityFile?: string;
 }
@@ -278,15 +373,16 @@ export class SshExecutionBackend implements ExecutionBackend {
       .map((outputLine) => outputLine.trim())
       .filter((outputLine) => outputLine.length > 0)
       .slice(0, 50)) {
+      const level = classifyOutputLogLevel(line, input.level);
       this.report(input.context, {
         deploymentId: input.deploymentId,
         phase: input.phase,
         source: "application",
-        level: input.level,
+        level,
         message: line,
         stream: input.stream,
       });
-      logs.push(phaseLog(input.phase, line, input.level, "application"));
+      logs.push(phaseLog(input.phase, line, level, "application"));
     }
   }
 
@@ -370,6 +466,7 @@ export class SshExecutionBackend implements ExecutionBackend {
 
     return ok({
       host: hostWithUsername(host, username),
+      publicHost: host,
       port,
       ...(identityFile ? { identityFile } : {}),
     });
@@ -434,34 +531,125 @@ export class SshExecutionBackend implements ExecutionBackend {
       };
     }
 
-    let localWorkdir =
-      state.runtimePlan.execution.workingDirectory ?? normalizeWorkingDirectory(source.locator);
     const remoteWorkdir = `${input.remoteRoot}/source`;
 
-    if (source.kind === "remote-git") {
-      const sourceDir = resolve(input.runtimeDir, "source");
-      mkdirSync(input.runtimeDir, { recursive: true });
-      rmSync(sourceDir, { recursive: true, force: true });
+    if (isRemoteGitSourceKind(source.kind)) {
+      if (source.kind === "git-public" && hasUrlCredentials(source.locator)) {
+        const message = "Public git source cannot include embedded credentials";
+        logs.push(phaseLog("package", message, "error"));
+        return {
+          prepared: false,
+          deployment: this.applyFailure(deployment, {
+            logs,
+            errorCode: "git_public_credentials_not_allowed",
+            retryable: false,
+            metadata: {
+              source: source.locator,
+            },
+          }),
+        };
+      }
 
-      const accessToken = isGitHubHttpsLocator(source.locator)
-        ? await this.integrationAuthPort?.getProviderAccessToken(context, "github")
-        : null;
-      const cloneLocator = accessToken
-        ? withGitHubAccessToken(source.locator, accessToken)
-        : source.locator;
-      logs.push(phaseLog("package", `Clone remote git source into ${sourceDir}`));
+      let cloneLocator = source.locator;
+      const redactions: string[] = [];
+      let setupCommand = "";
+      let cloneEnv = "";
+
+      if (source.kind === "git-github-app") {
+        if (!isGitHubHttpsLocator(source.locator)) {
+          const message = "GitHub App source requires a GitHub HTTPS repository URL";
+          logs.push(phaseLog("package", message, "error"));
+          return {
+            prepared: false,
+            deployment: this.applyFailure(deployment, {
+              logs,
+              errorCode: "github_app_source_requires_github_https",
+              retryable: false,
+              metadata: {
+                source: source.locator,
+              },
+            }),
+          };
+        }
+
+        const accessToken = await this.integrationAuthPort?.getProviderAccessToken(
+          context,
+          "github",
+        );
+        if (!accessToken) {
+          const message = "GitHub App source requires a connected GitHub access token";
+          logs.push(phaseLog("package", message, "error"));
+          return {
+            prepared: false,
+            deployment: this.applyFailure(deployment, {
+              logs,
+              errorCode: "github_app_access_token_missing",
+              retryable: false,
+              metadata: {
+                source: source.locator,
+              },
+            }),
+          };
+        }
+
+        cloneLocator = withGitHubAccessToken(source.locator, accessToken);
+        redactions.push(accessToken, cloneLocator);
+      }
+
+      if (source.kind === "git-deploy-key") {
+        const deployKeyPath = source.metadata?.deployKeyPath;
+        if (!deployKeyPath) {
+          const message = "Deploy key source requires deployKeyPath metadata";
+          logs.push(phaseLog("package", message, "error"));
+          return {
+            prepared: false,
+            deployment: this.applyFailure(deployment, {
+              logs,
+              errorCode: "git_deploy_key_missing",
+              retryable: false,
+              metadata: {
+                source: source.locator,
+              },
+            }),
+          };
+        }
+
+        const deployKeyPrivateKey = readFileSync(deployKeyPath, "utf8");
+        const remoteDeployKeyPath = `${input.remoteRoot}/.ssh/git_deploy_key`;
+        const normalizedKey = deployKeyPrivateKey.endsWith("\n")
+          ? deployKeyPrivateKey
+          : `${deployKeyPrivateKey}\n`;
+        const encodedKey = Buffer.from(normalizedKey, "utf8").toString("base64");
+        setupCommand = [
+          `mkdir -p ${shellQuote(`${input.remoteRoot}/.ssh`)}`,
+          `install -m 600 /dev/null ${shellQuote(remoteDeployKeyPath)}`,
+          `printf %s ${shellQuote(encodedKey)} | base64 -d > ${shellQuote(remoteDeployKeyPath)}`,
+          `chmod 600 ${shellQuote(remoteDeployKeyPath)}`,
+        ].join(" && ");
+        cloneEnv = `GIT_SSH_COMMAND=${shellQuote(
+          `ssh -i ${remoteDeployKeyPath} -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new`,
+        )}`;
+        redactions.push(deployKeyPrivateKey, normalizedKey, encodedKey);
+      }
+
+      logs.push(phaseLog("package", `Clone git source on ${input.target.host}:${remoteWorkdir}`));
       this.report(context, {
         deploymentId: state.id.value,
         phase: "package",
         status: "running",
-        message: `Clone remote git source ${source.displayName}`,
+        message: `Clone git source ${source.displayName} on target`,
       });
-      const clone = runSyncProcess({
-        command: "git",
-        args: ["clone", "--depth", "1", cloneLocator, sourceDir],
+      const cloneCommand = [
+        `rm -rf ${shellQuote(remoteWorkdir)}`,
+        `mkdir -p ${shellQuote(remoteWorkdir)}`,
+        ...(setupCommand ? [setupCommand] : []),
+        `${cloneEnv} git clone --depth 1 ${shellQuote(cloneLocator)} ${shellQuote(remoteWorkdir)}`.trim(),
+      ].join(" && ");
+      const clone = this.runRemoteCommand({
+        target: input.target,
+        command: cloneCommand,
         cwd: input.runtimeDir,
         env: input.env,
-        redactions: accessToken ? [accessToken, cloneLocator] : [cloneLocator],
       });
       this.pushCommandOutput(logs, {
         context,
@@ -470,7 +658,7 @@ export class SshExecutionBackend implements ExecutionBackend {
         output: clone.stderr,
         level: "warn",
         stream: "stderr",
-        redactions: accessToken ? [accessToken, cloneLocator] : [cloneLocator],
+        redactions,
       });
 
       if (clone.failed) {
@@ -486,14 +674,138 @@ export class SshExecutionBackend implements ExecutionBackend {
             retryable: true,
             metadata: {
               source: source.locator,
-              sourceDir,
+              remoteWorkdir,
             },
           }),
         };
       }
 
-      localWorkdir = sourceDir;
+      this.report(context, {
+        deploymentId: state.id.value,
+        phase: "package",
+        status: "succeeded",
+        message: "Target git source workspace is ready",
+      });
+
+      return {
+        prepared: true,
+        source: {
+          kind: "workspace",
+          remoteWorkdir,
+          metadata: {
+            sourceStrategy: source.kind,
+            remoteWorkdir,
+          },
+        },
+      };
     }
+
+    if (source.kind === "dockerfile-inline" || source.kind === "docker-compose-inline") {
+      const content = source.metadata?.content;
+      if (!content) {
+        const message = `${source.kind} source requires inline content metadata`;
+        logs.push(phaseLog("package", message, "error"));
+        return {
+          prepared: false,
+          deployment: this.applyFailure(deployment, {
+            logs,
+            errorCode: "inline_source_content_missing",
+            retryable: false,
+            metadata: {
+              source: source.locator,
+              sourceKind: source.kind,
+            },
+          }),
+        };
+      }
+
+      const targetFile =
+        source.kind === "dockerfile-inline"
+          ? (source.metadata?.dockerfilePath ?? "Dockerfile")
+          : (source.metadata?.composeFilePath ?? "docker-compose.yml");
+      const remoteTargetFile = `${remoteWorkdir}/${targetFile}`;
+      logs.push(phaseLog("package", `Write ${source.kind} source to ${remoteTargetFile}`));
+      this.report(context, {
+        deploymentId: state.id.value,
+        phase: "package",
+        status: "running",
+        message: `Write ${source.kind} source on target`,
+      });
+      const writeInlineSource = this.runRemoteCommand({
+        target: input.target,
+        command: [
+          `rm -rf ${shellQuote(remoteWorkdir)}`,
+          `mkdir -p ${shellQuote(remoteWorkdir)}`,
+          `mkdir -p "$(dirname ${shellQuote(remoteTargetFile)})"`,
+          `printf %s ${shellQuote(
+            Buffer.from(content.endsWith("\n") ? content : `${content}\n`, "utf8").toString(
+              "base64",
+            ),
+          )} | base64 -d > ${shellQuote(remoteTargetFile)}`,
+        ].join(" && "),
+        cwd: input.runtimeDir,
+        env: input.env,
+      });
+
+      if (writeInlineSource.failed) {
+        const message = writeInlineSource.reason
+          ? `Inline source write failed: ${writeInlineSource.reason}`
+          : `Inline source write failed with exit code ${writeInlineSource.exitCode}`;
+        logs.push(phaseLog("package", message, "error"));
+        return {
+          prepared: false,
+          deployment: this.applyFailure(deployment, {
+            logs,
+            errorCode: "inline_source_write_failed",
+            retryable: true,
+            metadata: {
+              remoteWorkdir,
+              remoteTargetFile,
+            },
+          }),
+        };
+      }
+
+      this.report(context, {
+        deploymentId: state.id.value,
+        phase: "package",
+        status: "succeeded",
+        message: "Target inline source workspace is ready",
+      });
+
+      return {
+        prepared: true,
+        source: {
+          kind: "workspace",
+          remoteWorkdir,
+          metadata: {
+            sourceStrategy: source.kind,
+            remoteWorkdir,
+            remoteTargetFile,
+          },
+        },
+      };
+    }
+
+    if (!isLocalWorkspaceSourceKind(source.kind)) {
+      const message = `SSH source kind is not supported: ${source.kind}`;
+      logs.push(phaseLog("package", message, "error"));
+      return {
+        prepared: false,
+        deployment: this.applyFailure(deployment, {
+          logs,
+          errorCode: "ssh_source_kind_unsupported",
+          retryable: false,
+          metadata: {
+            source: source.locator,
+            sourceKind: source.kind,
+          },
+        }),
+      };
+    }
+
+    const localWorkdir =
+      state.runtimePlan.execution.workingDirectory ?? normalizeWorkingDirectory(source.locator);
 
     if (!existsSync(localWorkdir)) {
       const message = `Source working directory does not exist: ${localWorkdir}`;
@@ -511,7 +823,9 @@ export class SshExecutionBackend implements ExecutionBackend {
       };
     }
 
-    logs.push(phaseLog("package", `Upload source workspace to ${input.target.host}:${remoteWorkdir}`));
+    logs.push(
+      phaseLog("package", `Upload source workspace to ${input.target.host}:${remoteWorkdir}`),
+    );
     this.report(context, {
       deploymentId: state.id.value,
       phase: "package",
@@ -589,6 +903,10 @@ export class SshExecutionBackend implements ExecutionBackend {
     deployment: Deployment,
   ): Promise<Result<{ deployment: Deployment }>> {
     const state = deployment.toState();
+
+    if (state.runtimePlan.execution.kind === "docker-compose-stack") {
+      return this.executeDockerCompose(context, deployment);
+    }
 
     if (state.runtimePlan.execution.kind !== "docker-container") {
       return err(
@@ -712,7 +1030,10 @@ export class SshExecutionBackend implements ExecutionBackend {
       }
 
       const accessRoutes = state.runtimePlan.execution.accessRoutes ?? [];
-      const proxyBootstrap = createProxyBootstrapPlan(accessRoutes);
+      const proxyBootstrap = createProxyBootstrapPlan(
+        accessRoutes,
+        proxyBootstrapOptionsFromEnv(env),
+      );
       if (proxyBootstrap) {
         const proxyMessage = `Ensure ${proxyBootstrap.displayName} edge proxy on Docker network ${proxyBootstrap.networkName}`;
         logs.push(phaseLog("deploy", proxyMessage));
@@ -787,11 +1108,13 @@ export class SshExecutionBackend implements ExecutionBackend {
           });
         }
 
+        const readyMessage = `${proxyBootstrap.displayName} edge proxy is ready`;
+        logs.push(phaseLog("deploy", readyMessage));
         this.report(context, {
           deploymentId: state.id.value,
           phase: "deploy",
           status: "succeeded",
-          message: `${proxyBootstrap.displayName} edge proxy is ready`,
+          message: readyMessage,
         });
       }
 
@@ -812,12 +1135,17 @@ export class SshExecutionBackend implements ExecutionBackend {
         quote: shellQuote,
       });
       const networkFlag = dockerNetworkFlagForAccessRoutes(accessRoutes);
+      const hasEdgeProxyRoute = accessRoutes.some((route) => route.proxyKind !== "none");
+      const portFlag = hasEdgeProxyRoute
+        ? `-p 127.0.0.1:${port}:${port}`
+        : `-p ${port}:${port}`;
       const runCommand = [
         `docker rm -f ${shellQuote(containerName)} >/dev/null 2>&1 || true`,
+        dockerRemovePublishedPortCommand(port),
         [
           `docker run -d --rm --name ${shellQuote(containerName)}`,
           networkFlag,
-          `-p ${port}:${port}`,
+          portFlag,
           envFlags,
           labelFlags,
           shellQuote(image),
@@ -825,6 +1153,7 @@ export class SshExecutionBackend implements ExecutionBackend {
           .filter(Boolean)
           .join(" "),
       ].join(" && ");
+      logs.push(phaseLog("deploy", `Release existing SSH containers publishing port ${port}`));
       logs.push(phaseLog("deploy", `Start SSH container ${containerName}`));
       const run = this.runRemoteCommand({
         target,
@@ -866,44 +1195,141 @@ export class SshExecutionBackend implements ExecutionBackend {
         });
       }
 
-      const healthPath = state.runtimePlan.execution.healthCheckPath ?? "/";
-      const url = `http://${hostForHealthCheck(target.host)}:${port}${healthPath}`;
-      this.report(context, {
-        deploymentId: state.id.value,
-        phase: "verify",
-        status: "running",
-        message: `Checking ${url}`,
-      });
-      const health = await waitForHealth(url);
+      const healthPath = normalizeHealthCheckPath(state.runtimePlan.execution.healthCheckPath);
+      const verificationSteps =
+        state.runtimePlan.execution.verificationSteps.length > 0
+          ? state.runtimePlan.execution.verificationSteps.map((step) => step.kind)
+          : defaultVerificationSteps(accessRoutes);
+      const internalUrl = `http://127.0.0.1:${port}${healthPath}`;
+      const publicUrls = accessRoutes.map((route) =>
+        publicHealthUrl({ route, healthPath, publicHost: target.publicHost, port }),
+      );
 
-      if (!health.ok) {
-        this.runRemoteCommand({
-          target,
-          command: `docker rm -f ${shellQuote(containerName)}`,
-          cwd: runtimeDir,
-          env,
-        });
-        const message = `SSH container health check failed for ${url}${health.reason ? `: ${health.reason}` : ""}`;
-        logs.push(phaseLog("verify", message, "error"));
-        return ok({
-          deployment: this.applyFailure(deployment, {
-            logs,
-            errorCode: "ssh_docker_health_check_failed",
-            retryable: true,
-            metadata: {
-              host: target.host,
-              image,
-              containerName,
-              port: String(port),
-              url,
-              ...prepared.source.metadata,
-            },
-          }),
-        });
+      for (const step of verificationSteps) {
+        if (step === "internal-http") {
+          this.report(context, {
+            deploymentId: state.id.value,
+            phase: "verify",
+            status: "running",
+            message: `Checking remote internal container health at ${internalUrl}`,
+          });
+          const internalHealth = this.runRemoteCommand({
+            target,
+            command: remoteInternalHealthCheckCommand(internalUrl),
+            cwd: runtimeDir,
+            env,
+          });
+          this.pushCommandOutput(logs, {
+            context,
+            deploymentId: state.id.value,
+            phase: "verify",
+            output: internalHealth.stdout,
+            level: "info",
+            stream: "stdout",
+          });
+          this.pushCommandOutput(logs, {
+            context,
+            deploymentId: state.id.value,
+            phase: "verify",
+            output: internalHealth.stderr,
+            level: "warn",
+            stream: "stderr",
+          });
+
+          if (internalHealth.failed) {
+            this.runRemoteCommand({
+              target,
+              command: `docker rm -f ${shellQuote(containerName)}`,
+              cwd: runtimeDir,
+              env,
+            });
+            const message = `SSH internal container health check failed for ${internalUrl}`;
+            logs.push(phaseLog("verify", message, "error"));
+            return ok({
+              deployment: this.applyFailure(deployment, {
+                logs,
+                errorCode: "ssh_internal_health_check_failed",
+                retryable: true,
+                metadata: {
+                  host: target.host,
+                  image,
+                  containerName,
+                  port: String(port),
+                  url: internalUrl,
+                  ...prepared.source.metadata,
+                },
+              }),
+            });
+          }
+
+          logs.push(phaseLog("verify", `SSH container is reachable internally at ${internalUrl}`));
+          continue;
+        }
+
+        if (step === "public-http") {
+          if (publicUrls.length === 0) {
+            const message = "SSH public route health check requested without access routes";
+            logs.push(phaseLog("verify", message, "error"));
+            return ok({
+              deployment: this.applyFailure(deployment, {
+                logs,
+                errorCode: "ssh_public_route_missing",
+                retryable: false,
+                metadata: {
+                  host: target.host,
+                  image,
+                  containerName,
+                  port: String(port),
+                  internalUrl,
+                  ...prepared.source.metadata,
+                },
+              }),
+            });
+          }
+
+          for (const publicUrl of publicUrls) {
+            this.report(context, {
+              deploymentId: state.id.value,
+              phase: "verify",
+              status: "running",
+              message: `Checking public access route ${publicUrl}`,
+            });
+            const publicHealth = await waitForHealth(publicUrl);
+
+            if (!publicHealth.ok) {
+              this.runRemoteCommand({
+                target,
+                command: `docker rm -f ${shellQuote(containerName)}`,
+                cwd: runtimeDir,
+                env,
+              });
+              const message = `SSH public route health check failed for ${publicUrl}${
+                publicHealth.reason ? `: ${publicHealth.reason}` : ""
+              }`;
+              logs.push(phaseLog("verify", message, "error"));
+              return ok({
+                deployment: this.applyFailure(deployment, {
+                  logs,
+                  errorCode: "ssh_public_route_health_check_failed",
+                  retryable: true,
+                  metadata: {
+                    host: target.host,
+                    image,
+                    containerName,
+                    port: String(port),
+                    internalUrl,
+                    url: publicUrl,
+                    ...prepared.source.metadata,
+                  },
+                }),
+              });
+            }
+
+            logs.push(phaseLog("verify", `SSH public route is reachable at ${publicUrl}`));
+          }
+        }
       }
 
-      const message = `SSH container is reachable at ${url}`;
-      logs.push(phaseLog("verify", message));
       deployment.applyExecutionResult(
         FinishedAt.rehydrate(new Date().toISOString()),
         ExecutionResult.rehydrate({
@@ -916,7 +1342,9 @@ export class SshExecutionBackend implements ExecutionBackend {
             image,
             containerName,
             port: String(port),
-            url,
+            url: publicUrls[0] ?? internalUrl,
+            internalUrl,
+            ...(publicUrls.length > 0 ? { publicUrl: publicUrls[0] } : {}),
             ...prepared.source.metadata,
           },
         }),
@@ -946,6 +1374,215 @@ export class SshExecutionBackend implements ExecutionBackend {
     } finally {
       this.cleanupPrivateKey(target);
     }
+  }
+
+  private async executeDockerCompose(
+    context: ExecutionContext,
+    deployment: Deployment,
+  ): Promise<Result<{ deployment: Deployment }>> {
+    const state = deployment.toState();
+    const runtimeDir = this.runtimeDirectory(state.id.value);
+    mkdirSync(runtimeDir, { recursive: true });
+
+    const targetResult = await this.targetFor(context, deployment, runtimeDir);
+    if (targetResult.isErr()) {
+      return targetResult.map(() => ({ deployment }));
+    }
+    const target = targetResult._unsafeUnwrap();
+    const remoteRoot = `/tmp/yundu-deployments/${sanitizeName(state.id.value)}`;
+    const env = deploymentEnv(deployment, state.runtimePlan.execution.port);
+    const logs: DeploymentLogEntry[] = [
+      phaseLog(
+        "plan",
+        `Using SSH docker-compose-stack execution on ${target.host}:${target.port}`,
+      ),
+    ];
+
+    try {
+      const prepared = await this.prepareSshSource(context, deployment, logs, {
+        runtimeDir,
+        remoteRoot,
+        target,
+        env,
+      });
+
+      if (!prepared.prepared) {
+        return ok({ deployment: prepared.deployment });
+      }
+
+      const remoteWorkdir = prepared.source.remoteWorkdir;
+      if (!remoteWorkdir) {
+        return err(
+          domainError.validation("Docker Compose SSH deployment requires a remote workdir"),
+        );
+      }
+
+      const dockerVersion = this.runRemoteCommand({
+        target,
+        command: "docker version --format '{{.Server.Version}}'",
+        cwd: runtimeDir,
+        env,
+      });
+
+      if (dockerVersion.failed) {
+        const message = "Docker is not available on the SSH target";
+        logs.push(phaseLog("package", message, "error"));
+        return ok({
+          deployment: this.applyFailure(deployment, {
+            logs,
+            errorCode: "ssh_docker_unavailable",
+            retryable: false,
+            metadata: {
+              host: target.host,
+            },
+          }),
+        });
+      }
+
+      const composeFile = state.runtimePlan.execution.composeFile ?? "docker-compose.yml";
+      const remoteComposeFile = composeFile.startsWith("/")
+        ? composeFile
+        : `${remoteWorkdir}/${composeFile}`;
+      const upCommand = `cd ${shellQuote(remoteWorkdir)} && docker compose -f ${shellQuote(remoteComposeFile)} up -d --build`;
+      logs.push(phaseLog("deploy", `Run docker compose on SSH target with ${remoteComposeFile}`));
+      this.report(context, {
+        deploymentId: state.id.value,
+        phase: "deploy",
+        status: "running",
+        message: `Start compose stack ${remoteComposeFile}`,
+      });
+
+      const up = this.runRemoteCommand({
+        target,
+        command: upCommand,
+        cwd: runtimeDir,
+        env,
+      });
+      this.pushCommandOutput(logs, {
+        context,
+        deploymentId: state.id.value,
+        phase: "deploy",
+        output: up.stdout,
+        level: "info",
+        stream: "stdout",
+      });
+      this.pushCommandOutput(logs, {
+        context,
+        deploymentId: state.id.value,
+        phase: "deploy",
+        output: up.stderr,
+        level: "warn",
+        stream: "stderr",
+      });
+
+      if (up.failed) {
+        const message = "SSH Docker Compose deployment failed";
+        logs.push(phaseLog("deploy", message, "error"));
+        return ok({
+          deployment: this.applyFailure(deployment, {
+            logs,
+            errorCode: "ssh_docker_compose_failed",
+            retryable: true,
+            metadata: {
+              host: target.host,
+              remoteWorkdir,
+              composeFile: remoteComposeFile,
+              ...prepared.source.metadata,
+            },
+          }),
+        });
+      }
+
+      logs.push(phaseLog("verify", `SSH compose stack started from ${remoteComposeFile}`));
+      deployment.applyExecutionResult(
+        FinishedAt.rehydrate(new Date().toISOString()),
+        ExecutionResult.rehydrate({
+          exitCode: ExitCode.rehydrate(0),
+          status: ExecutionStatusValue.rehydrate("succeeded"),
+          retryable: false,
+          logs,
+          metadata: {
+            host: target.host,
+            remoteWorkdir,
+            composeFile: remoteComposeFile,
+            ...prepared.source.metadata,
+          },
+        }),
+      );
+
+      return ok({ deployment });
+    } catch (error) {
+      if (context.entrypoint !== "cli") {
+        this.logger.error("ssh_execution_backend.compose_execute_failed", {
+          deploymentId: state.id.value,
+          message: error instanceof Error ? error.message : String(error),
+        });
+      }
+      return ok({
+        deployment: this.applyFailure(deployment, {
+          logs: [
+            phaseLog(
+              "deploy",
+              error instanceof Error ? error.message : "Unknown SSH Docker Compose execution error",
+              "error",
+            ),
+          ],
+          errorCode: "ssh_docker_compose_execution_failed",
+          retryable: true,
+        }),
+      });
+    } finally {
+      this.cleanupPrivateKey(target);
+    }
+  }
+
+  async cancel(
+    context: ExecutionContext,
+    deployment: Deployment,
+  ): Promise<Result<{ logs: DeploymentLogEntry[] }>> {
+    const state = deployment.toState();
+    const metadata = state.runtimePlan.execution.metadata ?? {};
+    const runtimeDir = this.runtimeDirectory(state.id.value);
+    mkdirSync(runtimeDir, { recursive: true });
+
+    const targetResult = await this.targetFor(context, deployment, runtimeDir);
+    if (targetResult.isErr()) {
+      return targetResult.map(() => ({ logs: [] }));
+    }
+
+    const target = targetResult._unsafeUnwrap();
+    const env = deploymentEnv(deployment);
+    const containerName = metadata.containerName ?? sanitizeName(`yundu-${state.id.value}`);
+
+    try {
+      if (state.runtimePlan.execution.kind === "docker-container") {
+        this.runRemoteCommand({
+          target,
+          command: `docker rm -f ${shellQuote(containerName)} >/dev/null 2>&1 || true`,
+          cwd: runtimeDir,
+          env,
+        });
+      }
+    } finally {
+      this.cleanupPrivateKey(target);
+    }
+
+    const logs = [
+      phaseLog(
+        "deploy",
+        state.runtimePlan.execution.kind === "docker-container"
+          ? `Removed SSH container ${containerName}`
+          : "No SSH cancellation cleanup required",
+      ),
+    ];
+    this.report(context, {
+      deploymentId: state.id.value,
+      phase: "deploy",
+      status: "succeeded",
+      message: "SSH deployment cancellation completed",
+    });
+
+    return ok({ logs });
   }
 
   async rollback(

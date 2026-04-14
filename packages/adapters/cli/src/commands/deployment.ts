@@ -1,11 +1,16 @@
 import { Args, Command as EffectCommand, Options } from "@effect/cli";
 import {
+  CancelDeploymentCommand,
+  CheckDeploymentHealthCommand,
   CreateDeploymentCommand,
+  type CreateDeploymentCommandInput,
   DeploymentLogsQuery,
   ListDeploymentsQuery,
+  ReattachDeploymentCommand,
+  RedeployResourceCommand,
   RollbackDeploymentCommand,
 } from "@yundu/application";
-import { edgeProxyKinds, tlsModes } from "@yundu/core";
+import { resourceKinds } from "@yundu/core";
 import { Effect } from "effect";
 
 import {
@@ -20,37 +25,46 @@ import { deploymentMethods, normalizeCliPathOrSource } from "./deployment-source
 
 const pathOrSourceArg = Args.text({ name: "pathOrSource" }).pipe(Args.optional);
 const deploymentIdArg = Args.text({ name: "deploymentId" });
+const resourceIdArg = Args.text({ name: "resourceId" });
 
 const projectOption = Options.text("project").pipe(Options.optional);
 const serverOption = Options.text("server").pipe(Options.optional);
 const destinationOption = Options.text("destination").pipe(Options.optional);
 const environmentOption = Options.text("environment").pipe(Options.optional);
 const resourceOption = Options.text("resource").pipe(Options.optional);
-const configOption = Options.text("config").pipe(Options.optional);
+const resourceNameOption = Options.text("resource-name").pipe(Options.optional);
+const resourceKindOption = Options.choice("resource-kind", resourceKinds).pipe(Options.optional);
+const resourceDescriptionOption = Options.text("resource-description").pipe(Options.optional);
 const methodOption = Options.choice("method", deploymentMethods).pipe(Options.optional);
 const installOption = Options.text("install").pipe(Options.optional);
 const buildOption = Options.text("build").pipe(Options.optional);
 const startOption = Options.text("start").pipe(Options.optional);
 const portOption = Options.text("port").pipe(Options.optional);
 const healthPathOption = Options.text("health-path").pipe(Options.optional);
-const proxyOption = Options.choice("proxy", edgeProxyKinds).pipe(Options.optional);
-const domainsOption = Options.text("domains").pipe(Options.optional);
-const pathPrefixOption = Options.text("path-prefix").pipe(Options.optional);
-const tlsModeOption = Options.choice("tls-mode", tlsModes).pipe(Options.optional);
 const appLogLinesOption = Options.text("app-log-lines").pipe(Options.withDefault("3"));
+const forceOption = Options.boolean("force").pipe(Options.withDefault(false));
+const reasonOption = Options.text("reason").pipe(Options.optional);
 
 function parseAppLogLines(value: string): number {
   const parsed = Number(value);
   return Number.isInteger(parsed) && parsed >= 0 ? parsed : 3;
 }
 
-function parseDomains(value: string | undefined): string[] | undefined {
-  const domains = value
-    ?.split(",")
-    .map((item) => item.trim())
-    .filter((item) => item.length > 0);
+function slugifyResourceName(value: string): string {
+  return (
+    value
+      .trim()
+      .toLowerCase()
+      .replace(/\.git$/, "")
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "") || "app"
+  );
+}
 
-  return domains && domains.length > 0 ? domains : undefined;
+function inferResourceName(sourceLocator: string): string {
+  const withoutQuery = sourceLocator.split(/[?#]/)[0] ?? sourceLocator;
+  const segments = withoutQuery.split(/[\\/]/).filter(Boolean);
+  return slugifyResourceName(segments.at(-1) ?? "app");
 }
 
 export const deployCommand = EffectCommand.make(
@@ -62,81 +76,97 @@ export const deployCommand = EffectCommand.make(
     destination: destinationOption,
     environment: environmentOption,
     resource: resourceOption,
-    config: configOption,
+    resourceName: resourceNameOption,
+    resourceKind: resourceKindOption,
+    resourceDescription: resourceDescriptionOption,
     method: methodOption,
     install: installOption,
     build: buildOption,
     start: startOption,
     port: portOption,
     healthPath: healthPathOption,
-    proxy: proxyOption,
-    domains: domainsOption,
-    pathPrefix: pathPrefixOption,
-    tlsMode: tlsModeOption,
     appLogLines: appLogLinesOption,
   },
   ({
     appLogLines,
     build,
-    config,
     destination,
-    domains,
     environment,
     healthPath,
     install,
     method,
     pathOrSource,
-    pathPrefix,
     port,
     project,
-    proxy,
     resource,
+    resourceDescription,
+    resourceKind,
+    resourceName,
     server,
     start,
-    tlsMode,
   }) =>
     Effect.gen(function* () {
       const sourceLocator = optionalValue(pathOrSource);
       const deploymentMethod = optionalValue(method);
       const portValue = optionalNumber(port);
-      const configFilePath = optionalValue(config);
       const projectId = optionalValue(project);
       const serverId = optionalValue(server);
       const destinationId = optionalValue(destination);
       const environmentId = optionalValue(environment);
       const resourceId = optionalValue(resource);
+      const resourceNameValue = optionalValue(resourceName);
+      const resourceKindValue = optionalValue(resourceKind);
+      const resourceDescriptionValue = optionalValue(resourceDescription);
       const installCommand = optionalValue(install);
       const buildCommand = optionalValue(build);
       const startCommand = optionalValue(start);
       const healthCheckPath = optionalValue(healthPath);
-      const proxyKind = optionalValue(proxy);
-      const publicDomains = parseDomains(optionalValue(domains));
-      const publicPathPrefix = optionalValue(pathPrefix);
-      const publicTlsMode = optionalValue(tlsMode);
+
+      if (!sourceLocator && projectId && serverId && environmentId && resourceId) {
+        const input = {
+          projectId,
+          serverId,
+          environmentId,
+          resourceId,
+          ...(destinationId ? { destinationId } : {}),
+        } satisfies CreateDeploymentCommandInput;
+
+        return yield* runDeploymentCommand(CreateDeploymentCommand.create(input), {
+          appLogLines: parseAppLogLines(appLogLines),
+        });
+      }
+
+      const normalizedSourceLocator = sourceLocator
+        ? normalizeCliPathOrSource(sourceLocator, deploymentMethod ?? "auto")
+        : undefined;
+      const resourceSpec =
+        !resourceId && (resourceNameValue || normalizedSourceLocator)
+          ? {
+              name: resourceNameValue ?? inferResourceName(normalizedSourceLocator ?? "."),
+              kind:
+                resourceKindValue ??
+                (deploymentMethod === "docker-compose" ? "compose-stack" : "application"),
+              ...(resourceDescriptionValue ? { description: resourceDescriptionValue } : {}),
+            }
+          : undefined;
       const seed = {
-        ...(configFilePath ? { configFilePath } : {}),
         ...(projectId ? { projectId } : {}),
         ...(serverId ? { serverId } : {}),
         ...(destinationId ? { destinationId } : {}),
         ...(environmentId ? { environmentId } : {}),
         ...(resourceId ? { resourceId } : {}),
+        ...(resourceSpec ? { resource: resourceSpec } : {}),
         ...(deploymentMethod ? { deploymentMethod } : {}),
         ...(installCommand ? { installCommand } : {}),
         ...(buildCommand ? { buildCommand } : {}),
         ...(startCommand ? { startCommand } : {}),
         ...(portValue === undefined ? {} : { port: portValue }),
         ...(healthCheckPath ? { healthCheckPath } : {}),
-        ...(proxyKind ? { proxyKind } : {}),
-        ...(publicDomains ? { domains: publicDomains } : {}),
-        ...(publicPathPrefix ? { pathPrefix: publicPathPrefix } : {}),
-        ...(publicTlsMode ? { tlsMode: publicTlsMode } : {}),
       };
-      const input = sourceLocator
-        ? {
-            ...seed,
-            sourceLocator: normalizeCliPathOrSource(sourceLocator, deploymentMethod ?? "auto"),
-          }
-        : yield* resolveInteractiveDeploymentInput(seed);
+      const input = yield* resolveInteractiveDeploymentInput({
+        ...seed,
+        ...(sourceLocator ? { sourceLocator: normalizedSourceLocator ?? sourceLocator } : {}),
+      });
 
       return yield* runDeploymentCommand(CreateDeploymentCommand.create(input), {
         appLogLines: parseAppLogLines(appLogLines),
@@ -151,6 +181,49 @@ export const logsCommand = EffectCommand.make(
   },
   ({ deploymentId }) => runQuery(DeploymentLogsQuery.create({ deploymentId })),
 ).pipe(EffectCommand.withDescription("Show deployment logs"));
+
+export const healthCommand = EffectCommand.make(
+  "health",
+  {
+    deploymentId: deploymentIdArg,
+  },
+  ({ deploymentId }) => runCommand(CheckDeploymentHealthCommand.create({ deploymentId })),
+).pipe(EffectCommand.withDescription("Check deployment health"));
+
+export const cancelCommand = EffectCommand.make(
+  "cancel",
+  {
+    deploymentId: deploymentIdArg,
+    reason: reasonOption,
+  },
+  ({ deploymentId, reason }) =>
+    runCommand(
+      CancelDeploymentCommand.create({
+        deploymentId,
+        reason: optionalValue(reason),
+      }),
+    ),
+).pipe(EffectCommand.withDescription("Cancel a planned or running deployment"));
+
+export const redeployCommand = EffectCommand.make(
+  "redeploy",
+  {
+    resourceId: resourceIdArg,
+    force: forceOption,
+  },
+  ({ force, resourceId }) =>
+    runDeploymentCommand(RedeployResourceCommand.create({ resourceId, force }), {
+      appLogLines: 3,
+    }),
+).pipe(EffectCommand.withDescription("Redeploy a resource"));
+
+export const reattachCommand = EffectCommand.make(
+  "reattach",
+  {
+    deploymentId: deploymentIdArg,
+  },
+  ({ deploymentId }) => runCommand(ReattachDeploymentCommand.create({ deploymentId })),
+).pipe(EffectCommand.withDescription("Read current deployment status and logs"));
 
 const listDeploymentsCommand = EffectCommand.make(
   "list",
