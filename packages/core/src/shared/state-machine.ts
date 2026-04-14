@@ -11,6 +11,8 @@ import {
   executionStrategyKinds,
   logLevels,
   packagingModes,
+  resourceExposureModes,
+  resourceNetworkProtocols,
   runtimePlanStrategies,
   sourceKinds,
   targetKinds,
@@ -35,6 +37,8 @@ export {
   executionStrategyKinds,
   logLevels,
   packagingModes,
+  resourceExposureModes,
+  resourceNetworkProtocols,
   runtimePlanStrategies,
   sourceKinds,
   targetKinds,
@@ -773,6 +777,54 @@ export class ResourceServiceKindValue extends EnumValueObject<
     value: "web" | "api" | "worker" | "database" | "cache" | "service",
   ): ResourceServiceKindValue {
     return new ResourceServiceKindValue(value);
+  }
+}
+
+const resourceNetworkProtocolBrand: unique symbol = Symbol("ResourceNetworkProtocolValue");
+export class ResourceNetworkProtocolValue extends EnumValueObject<
+  (typeof resourceNetworkProtocols)[number]
+> {
+  private [resourceNetworkProtocolBrand]!: void;
+
+  private constructor(value: (typeof resourceNetworkProtocols)[number]) {
+    super(value);
+  }
+
+  static create(value: string): Result<ResourceNetworkProtocolValue> {
+    return createEnumValue(
+      value,
+      resourceNetworkProtocols,
+      "Resource network protocol",
+      (validated) => new ResourceNetworkProtocolValue(validated),
+    );
+  }
+
+  static rehydrate(value: (typeof resourceNetworkProtocols)[number]): ResourceNetworkProtocolValue {
+    return new ResourceNetworkProtocolValue(value);
+  }
+}
+
+const resourceExposureModeBrand: unique symbol = Symbol("ResourceExposureModeValue");
+export class ResourceExposureModeValue extends EnumValueObject<
+  (typeof resourceExposureModes)[number]
+> {
+  private [resourceExposureModeBrand]!: void;
+
+  private constructor(value: (typeof resourceExposureModes)[number]) {
+    super(value);
+  }
+
+  static create(value: string): Result<ResourceExposureModeValue> {
+    return createEnumValue(
+      value,
+      resourceExposureModes,
+      "Resource exposure mode",
+      (validated) => new ResourceExposureModeValue(validated),
+    );
+  }
+
+  static rehydrate(value: (typeof resourceExposureModes)[number]): ResourceExposureModeValue {
+    return new ResourceExposureModeValue(value);
   }
 }
 

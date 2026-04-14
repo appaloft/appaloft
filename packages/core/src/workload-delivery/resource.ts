@@ -9,7 +9,9 @@ import {
 import { type PortNumber } from "../shared/numeric-values";
 import { err, ok, type Result } from "../shared/result";
 import {
+  type ResourceExposureModeValue,
   type ResourceKindValue,
+  type ResourceNetworkProtocolValue,
   type ResourceServiceKindValue,
   type RuntimePlanStrategyValue,
   type SourceKindValue,
@@ -43,8 +45,15 @@ export interface ResourceRuntimeProfileState {
   installCommand?: CommandText;
   buildCommand?: CommandText;
   startCommand?: CommandText;
-  port?: PortNumber;
   healthCheckPath?: HealthCheckPathText;
+}
+
+export interface ResourceNetworkProfileState {
+  internalPort: PortNumber;
+  upstreamProtocol: ResourceNetworkProtocolValue;
+  exposureMode: ResourceExposureModeValue;
+  targetServiceName?: ResourceServiceName;
+  hostPort?: PortNumber;
 }
 
 export interface ResourceState {
@@ -58,6 +67,7 @@ export interface ResourceState {
   services: ResourceServiceState[];
   sourceBinding?: ResourceSourceBindingState;
   runtimeProfile?: ResourceRuntimeProfileState;
+  networkProfile?: ResourceNetworkProfileState;
   createdAt: CreatedAt;
   description?: DescriptionText;
 }
@@ -81,6 +91,7 @@ export class Resource extends AggregateRoot<ResourceState> {
     services?: ResourceServiceState[];
     sourceBinding?: ResourceSourceBindingState;
     runtimeProfile?: ResourceRuntimeProfileState;
+    networkProfile?: ResourceNetworkProfileState;
     createdAt: CreatedAt;
     description?: DescriptionText;
   }): Result<Resource> {
@@ -89,6 +100,49 @@ export class Resource extends AggregateRoot<ResourceState> {
       if (input.kind.value !== "compose-stack" && services.length > 1) {
         return err(
           domainError.validation("Only compose-stack resources can declare multiple services"),
+        );
+      }
+
+      if (
+        input.networkProfile?.targetServiceName &&
+        services.length > 0 &&
+        !services.some((service) =>
+          service.name.equals(input.networkProfile?.targetServiceName as ResourceServiceName),
+        )
+      ) {
+        return err(
+          domainError.validation("Network target service must be declared on the resource", {
+            phase: "resource-network-resolution",
+            resourceKind: input.kind.value,
+            targetServiceName: input.networkProfile.targetServiceName.value,
+          }),
+        );
+      }
+
+      if (
+        input.networkProfile &&
+        input.kind.value === "compose-stack" &&
+        services.length > 1 &&
+        !input.networkProfile.targetServiceName
+      ) {
+        return err(
+          domainError.validation("Compose stack network profiles must declare a target service", {
+            phase: "resource-network-resolution",
+            resourceKind: input.kind.value,
+            serviceCount: services.length,
+          }),
+        );
+      }
+
+      if (
+        input.networkProfile?.hostPort &&
+        input.networkProfile.exposureMode.value !== "direct-port"
+      ) {
+        return err(
+          domainError.validation("Host port is valid only for direct-port resource exposure", {
+            phase: "resource-network-resolution",
+            exposureMode: input.networkProfile.exposureMode.value,
+          }),
         );
       }
 
@@ -112,6 +166,7 @@ export class Resource extends AggregateRoot<ResourceState> {
             }
           : {}),
         ...(input.runtimeProfile ? { runtimeProfile: { ...input.runtimeProfile } } : {}),
+        ...(input.networkProfile ? { networkProfile: { ...input.networkProfile } } : {}),
         createdAt: input.createdAt,
         ...(input.description ? { description: input.description } : {}),
       });
@@ -152,9 +207,23 @@ export class Resource extends AggregateRoot<ResourceState> {
                 ...(input.runtimeProfile.startCommand
                   ? { startCommand: input.runtimeProfile.startCommand.value }
                   : {}),
-                ...(input.runtimeProfile.port ? { port: input.runtimeProfile.port.value } : {}),
                 ...(input.runtimeProfile.healthCheckPath
                   ? { healthCheckPath: input.runtimeProfile.healthCheckPath.value }
+                  : {}),
+              },
+            }
+          : {}),
+        ...(input.networkProfile
+          ? {
+              networkProfile: {
+                internalPort: input.networkProfile.internalPort.value,
+                upstreamProtocol: input.networkProfile.upstreamProtocol.value,
+                exposureMode: input.networkProfile.exposureMode.value,
+                ...(input.networkProfile.targetServiceName
+                  ? { targetServiceName: input.networkProfile.targetServiceName.value }
+                  : {}),
+                ...(input.networkProfile.hostPort
+                  ? { hostPort: input.networkProfile.hostPort.value }
                   : {}),
               },
             }
@@ -180,6 +249,7 @@ export class Resource extends AggregateRoot<ResourceState> {
           }
         : {}),
       ...(state.runtimeProfile ? { runtimeProfile: { ...state.runtimeProfile } } : {}),
+      ...(state.networkProfile ? { networkProfile: { ...state.networkProfile } } : {}),
     });
   }
 
@@ -205,6 +275,7 @@ export class Resource extends AggregateRoot<ResourceState> {
           }
         : {}),
       ...(this.state.runtimeProfile ? { runtimeProfile: { ...this.state.runtimeProfile } } : {}),
+      ...(this.state.networkProfile ? { networkProfile: { ...this.state.networkProfile } } : {}),
     };
   }
 }

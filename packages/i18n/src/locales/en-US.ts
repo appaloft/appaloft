@@ -387,6 +387,10 @@ export const enUS = {
       pageTitle: "Resources",
     },
     quickDeploy: {
+      applicationPort: "Application port",
+      applicationPortHint:
+        "The workload listens on this internal port. Reverse proxy routing targets this port.",
+      applicationPortInvalid: "Application port must be an integer between 1 and 65535.",
       chooseSourceDirectoryBrowserHint:
         "Plain browsers cannot read local paths only; enter the path manually.",
       commandPreview: "Command preview",
@@ -450,6 +454,21 @@ export const enUS = {
       step: "Step {{current}} / {{total}} · {{title}}",
       submitPending: "Submitting",
       variablePlainStorage: "Store as plain config",
+      workflowProgressDescription:
+        "Each step is a separate request. The next step starts after the current step succeeds.",
+      workflowProgressTitle: "Deployment guide progress",
+      workflowStepDeploymentsCreate: "Create deployment record",
+      workflowStepEnvironmentVariableSet: "Write environment variable",
+      workflowStepEnvironmentsCreate: "Create environment",
+      workflowStepFailed: "Failed",
+      workflowStepPending: "Pending",
+      workflowStepProjectsCreate: "Create project",
+      workflowStepResourcesCreate: "Create resource",
+      workflowStepRunning: "Running",
+      workflowStepServerCredentialConfigure: "Attach server credential",
+      workflowStepServersRegister: "Register server",
+      workflowStepSshCredentialCreate: "Save SSH credential",
+      workflowStepSucceeded: "Done",
     },
     servers: {
       connectedDeploymentsDescription: "Recent deployment records that used this server.",

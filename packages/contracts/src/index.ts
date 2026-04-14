@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+export * from "./quick-deploy-workflow";
+
 export const apiVersion = "v1";
 
 export const healthResponseSchema = z.object({
@@ -238,6 +240,24 @@ export const resourceServiceSummarySchema = z.object({
   kind: z.enum(["web", "api", "worker", "database", "cache", "service"]),
 });
 
+export const resourceNetworkProfileSchema = z
+  .object({
+    internalPort: z.number().int().positive(),
+    upstreamProtocol: z.enum(["http", "tcp"]).default("http"),
+    exposureMode: z.enum(["none", "reverse-proxy", "direct-port"]).default("reverse-proxy"),
+    targetServiceName: z.string().min(1).optional(),
+    hostPort: z.number().int().positive().optional(),
+  })
+  .superRefine((value, context) => {
+    if (value.hostPort && value.exposureMode !== "direct-port") {
+      context.addIssue({
+        code: "custom",
+        path: ["hostPort"],
+        message: "hostPort is valid only when exposureMode is direct-port",
+      });
+    }
+  });
+
 export const resourceSummarySchema = z.object({
   id: z.string(),
   projectId: z.string(),
@@ -258,6 +278,7 @@ export const resourceSummarySchema = z.object({
   description: z.string().optional(),
   createdAt: z.string(),
   services: z.array(resourceServiceSummarySchema),
+  networkProfile: resourceNetworkProfileSchema.optional(),
   deploymentCount: z.number(),
   lastDeploymentId: z.string().optional(),
   lastDeploymentStatus: z
@@ -353,10 +374,11 @@ export const createResourceInputSchema = z.object({
       installCommand: z.string().min(1).optional(),
       buildCommand: z.string().min(1).optional(),
       startCommand: z.string().min(1).optional(),
-      port: z.number().int().positive().optional(),
       healthCheckPath: z.string().min(1).optional(),
     })
+    .strict()
     .optional(),
+  networkProfile: resourceNetworkProfileSchema.optional(),
 });
 
 export const createResourceResponseSchema = z.object({

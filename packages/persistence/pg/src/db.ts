@@ -14,6 +14,7 @@ import { sshCredentialsMigration } from "./migrations/006_ssh_credentials";
 import { serverEdgeProxyMigration } from "./migrations/007_server_edge_proxy";
 import { domainBindingsMigration } from "./migrations/008_domain_bindings";
 import { resourceProfilesMigration } from "./migrations/009_resource_profiles";
+import { resourceNetworkProfileMigration } from "./migrations/010_resource_network_profile";
 import { PgliteDialect } from "./pglite-dialect";
 import { type Database } from "./schema";
 
@@ -107,6 +108,7 @@ class StaticMigrationProvider implements MigrationProvider {
       "007_server_edge_proxy": serverEdgeProxyMigration,
       "008_domain_bindings": domainBindingsMigration,
       "009_resource_profiles": resourceProfilesMigration,
+      "010_resource_network_profile": resourceNetworkProfileMigration,
     };
   }
 }

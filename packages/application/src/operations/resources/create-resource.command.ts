@@ -5,6 +5,7 @@ import { parseOperationInput, trimToUndefined } from "../shared-schema";
 import {
   type CreateResourceCommandInput,
   type CreateResourceCommandPayload,
+  type CreateResourceNetworkProfileInput,
   type CreateResourceRuntimeProfileInput,
   type CreateResourceServiceInput,
   type CreateResourceSourceBindingInput,
@@ -27,6 +28,7 @@ export class CreateResourceCommand extends Command<{ id: string }> {
     public readonly services: CreateResourceServiceInput[] = [],
     public readonly source?: CreateResourceSourceBindingInput,
     public readonly runtimeProfile?: CreateResourceRuntimeProfileInput,
+    public readonly networkProfile?: CreateResourceNetworkProfileInput,
   ) {
     super();
   }
@@ -44,6 +46,7 @@ export class CreateResourceCommand extends Command<{ id: string }> {
           parsed.services ?? [],
           parsed.source,
           parsed.runtimeProfile,
+          parsed.networkProfile,
         ),
     );
   }

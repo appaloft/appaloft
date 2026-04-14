@@ -61,9 +61,11 @@ import {
   ProjectSlug,
   ProviderKey,
   PublicDomainName,
+  ResourceExposureModeValue,
   ResourceId,
   ResourceKindValue,
   ResourceName,
+  ResourceNetworkProtocolValue,
   ResourceServiceKindValue,
   ResourceServiceName,
   ResourceSlug,
@@ -112,6 +114,8 @@ type DeploymentPhaseInput = Parameters<typeof DeploymentPhaseValue.rehydrate>[0]
 type LogLevelInput = Parameters<typeof LogLevelValue.rehydrate>[0];
 type ResourceKindInput = Parameters<typeof ResourceKindValue.rehydrate>[0];
 type ResourceServiceKindInput = Parameters<typeof ResourceServiceKindValue.rehydrate>[0];
+type ResourceNetworkProtocolInput = Parameters<typeof ResourceNetworkProtocolValue.rehydrate>[0];
+type ResourceExposureModeInput = Parameters<typeof ResourceExposureModeValue.rehydrate>[0];
 type RuntimePlanStrategyInput = Parameters<typeof RuntimePlanStrategyValue.rehydrate>[0];
 type DeploymentTargetCredentialKindInput = Parameters<
   typeof DeploymentTargetCredentialKindValue.rehydrate
@@ -216,8 +220,15 @@ export interface SerializedResourceRuntimeProfile extends Record<string, unknown
   installCommand?: string;
   buildCommand?: string;
   startCommand?: string;
-  port?: number;
   healthCheckPath?: string;
+}
+
+export interface SerializedResourceNetworkProfile extends Record<string, unknown> {
+  internalPort: number;
+  upstreamProtocol: ResourceNetworkProtocolInput;
+  exposureMode: ResourceExposureModeInput;
+  targetServiceName?: string;
+  hostPort?: number;
 }
 
 export interface SerializedDomainVerificationAttempt extends Record<string, unknown> {
@@ -711,6 +722,9 @@ export function rehydrateResourceRow(row: Selectable<Database["resources"]>) {
   const runtimeProfile = row.runtime_profile
     ? (row.runtime_profile as unknown as SerializedResourceRuntimeProfile)
     : undefined;
+  const networkProfile = row.network_profile
+    ? (row.network_profile as unknown as SerializedResourceNetworkProfile)
+    : undefined;
 
   return {
     id: ResourceId.rehydrate(row.id),
@@ -747,9 +761,29 @@ export function rehydrateResourceRow(row: Selectable<Database["resources"]>) {
             ...(runtimeProfile.startCommand
               ? { startCommand: CommandText.rehydrate(runtimeProfile.startCommand) }
               : {}),
-            ...(runtimeProfile.port ? { port: PortNumber.rehydrate(runtimeProfile.port) } : {}),
             ...(runtimeProfile.healthCheckPath
               ? { healthCheckPath: HealthCheckPathText.rehydrate(runtimeProfile.healthCheckPath) }
+              : {}),
+          },
+        }
+      : {}),
+    ...(networkProfile
+      ? {
+          networkProfile: {
+            internalPort: PortNumber.rehydrate(networkProfile.internalPort),
+            upstreamProtocol: ResourceNetworkProtocolValue.rehydrate(
+              networkProfile.upstreamProtocol,
+            ),
+            exposureMode: ResourceExposureModeValue.rehydrate(networkProfile.exposureMode),
+            ...(networkProfile.targetServiceName
+              ? {
+                  targetServiceName: ResourceServiceName.rehydrate(
+                    networkProfile.targetServiceName,
+                  ),
+                }
+              : {}),
+            ...(networkProfile.hostPort
+              ? { hostPort: PortNumber.rehydrate(networkProfile.hostPort) }
               : {}),
           },
         }

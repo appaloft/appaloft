@@ -34,6 +34,7 @@ import {
   SequenceIdGenerator,
 } from "@yundu/testkit";
 import { createExecutionContext, type ExecutionContext, toRepositoryContext } from "../src";
+import { CreateResourceCommand } from "../src/messages";
 import { CreateResourceUseCase, ListResourcesQueryService } from "../src/use-cases";
 
 function createTestContext(): ExecutionContext {
@@ -124,6 +125,27 @@ async function seedResourceContext(input?: { environmentProjectId?: string }) {
 }
 
 describe("CreateResourceUseCase", () => {
+  test("rejects runtimeProfile.port at command schema boundary", () => {
+    const command = CreateResourceCommand.create({
+      projectId: "prj_demo",
+      environmentId: "env_demo",
+      name: "web",
+      kind: "application",
+      runtimeProfile: {
+        strategy: "auto",
+        port: 3000,
+      },
+      networkProfile: {
+        internalPort: 3000,
+        upstreamProtocol: "http",
+        exposureMode: "reverse-proxy",
+      },
+    } as never);
+
+    expect(command.isErr()).toBe(true);
+    expect(command._unsafeUnwrapErr().code).toBe("validation_error");
+  });
+
   test("creates a durable resource profile and publishes resource-created", async () => {
     const { context, eventBus, repositoryContext, resources, useCase } =
       await seedResourceContext();
@@ -145,8 +167,12 @@ describe("CreateResourceUseCase", () => {
         installCommand: "bun install",
         buildCommand: "bun run build",
         startCommand: "bun run start",
-        port: 3000,
         healthCheckPath: "/health",
+      },
+      networkProfile: {
+        internalPort: 3000,
+        upstreamProtocol: "http",
+        exposureMode: "reverse-proxy",
       },
     });
 
@@ -168,7 +194,9 @@ describe("CreateResourceUseCase", () => {
     );
     expect(persistedState?.runtimeProfile?.strategy.value).toBe("workspace-commands");
     expect(persistedState?.runtimeProfile?.startCommand?.value).toBe("bun run start");
-    expect(persistedState?.runtimeProfile?.port?.value).toBe(3000);
+    expect(persistedState?.networkProfile?.internalPort.value).toBe(3000);
+    expect(persistedState?.networkProfile?.upstreamProtocol.value).toBe("http");
+    expect(persistedState?.networkProfile?.exposureMode.value).toBe("reverse-proxy");
 
     const event = resourceCreatedEvent(eventBus.events);
     expect(event.aggregateId).toBe(id);
@@ -190,8 +218,12 @@ describe("CreateResourceUseCase", () => {
         installCommand: "bun install",
         buildCommand: "bun run build",
         startCommand: "bun run start",
-        port: 3000,
         healthCheckPath: "/health",
+      },
+      networkProfile: {
+        internalPort: 3000,
+        upstreamProtocol: "http",
+        exposureMode: "reverse-proxy",
       },
       createdAt: "2026-01-01T00:00:00.000Z",
     });

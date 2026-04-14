@@ -27,6 +27,7 @@ export class CreateResourceCommandHandler
       ...(command.services.length > 0 ? { services: command.services } : {}),
       ...(command.source ? { source: command.source } : {}),
       ...(command.runtimeProfile ? { runtimeProfile: command.runtimeProfile } : {}),
+      ...(command.networkProfile ? { networkProfile: command.networkProfile } : {}),
     });
   }
 }

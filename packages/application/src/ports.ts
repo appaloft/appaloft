@@ -32,8 +32,10 @@ import {
   type ProjectMutationSpec,
   type ProjectSelectionSpec,
   type Resource,
+  type ResourceExposureMode,
   type ResourceKind,
   type ResourceMutationSpec,
+  type ResourceNetworkProtocol,
   type ResourceSelectionSpec,
   type ResourceServiceKind,
   type Result,
@@ -312,6 +314,13 @@ export interface ResourceSummary {
     name: string;
     kind: ResourceServiceKind;
   }>;
+  networkProfile?: {
+    internalPort: number;
+    upstreamProtocol: ResourceNetworkProtocol;
+    exposureMode: ResourceExposureMode;
+    targetServiceName?: string;
+    hostPort?: number;
+  };
   deploymentCount: number;
   lastDeploymentId?: string;
   lastDeploymentStatus?: DeploymentStatus;

@@ -16,9 +16,12 @@ import {
   ProjectId,
   Resource,
   ResourceByEnvironmentAndSlugSpec,
+  ResourceExposureModeValue,
   ResourceId,
   ResourceKindValue,
   ResourceName,
+  type ResourceNetworkProfileState,
+  ResourceNetworkProtocolValue,
   type ResourceRuntimeProfileState,
   ResourceServiceKindValue,
   ResourceServiceName,
@@ -207,15 +210,36 @@ export class CreateResourceUseCase {
           ...(input.runtimeProfile.startCommand
             ? { startCommand: yield* CommandText.create(input.runtimeProfile.startCommand) }
             : {}),
-          ...(input.runtimeProfile.port
-            ? { port: yield* PortNumber.create(input.runtimeProfile.port) }
-            : {}),
           ...(input.runtimeProfile.healthCheckPath
             ? {
                 healthCheckPath: yield* HealthCheckPathText.create(
                   input.runtimeProfile.healthCheckPath,
                 ),
               }
+            : {}),
+        };
+      }
+
+      const networkProfileInput = input.networkProfile;
+      let networkProfile: ResourceNetworkProfileState | undefined;
+      if (networkProfileInput) {
+        networkProfile = {
+          internalPort: yield* PortNumber.create(networkProfileInput.internalPort),
+          upstreamProtocol: yield* ResourceNetworkProtocolValue.create(
+            networkProfileInput.upstreamProtocol ?? "http",
+          ),
+          exposureMode: yield* ResourceExposureModeValue.create(
+            networkProfileInput.exposureMode ?? "reverse-proxy",
+          ),
+          ...(networkProfileInput.targetServiceName
+            ? {
+                targetServiceName: yield* ResourceServiceName.create(
+                  networkProfileInput.targetServiceName,
+                ),
+              }
+            : {}),
+          ...(networkProfileInput.hostPort
+            ? { hostPort: yield* PortNumber.create(networkProfileInput.hostPort) }
             : {}),
         };
       }
@@ -233,6 +257,7 @@ export class CreateResourceUseCase {
         services,
         ...(sourceBinding ? { sourceBinding } : {}),
         ...(runtimeProfile ? { runtimeProfile } : {}),
+        ...(networkProfile ? { networkProfile } : {}),
         createdAt,
         ...(description ? { description } : {}),
       });
