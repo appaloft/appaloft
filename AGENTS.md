@@ -67,7 +67,13 @@ This repository is a backend-core deployment platform, not a web-first CRUD app.
 - business operations exposed through CLI or HTTP must dispatch from an explicit `Command` or `Query` message
 - the human-facing and AI-facing source of truth for business operations is [docs/CORE_OPERATIONS.md](/Users/nichenqin/projects/yundu/docs/CORE_OPERATIONS.md)
 - the human-facing and AI-facing source of truth for domain boundaries and aggregate names is [docs/DOMAIN_MODEL.md](/Users/nichenqin/projects/yundu/docs/DOMAIN_MODEL.md)
-- the executable mirror of that source of truth is `packages/application/src/operation-catalog.ts`
+- agents must read [docs/decisions/README.md](/Users/nichenqin/projects/yundu/docs/decisions/README.md) and relevant ADRs before interpreting local command/event/workflow/testing specs
+- agents must read global contracts before local specs:
+  - [docs/errors/model.md](/Users/nichenqin/projects/yundu/docs/errors/model.md)
+  - [docs/errors/neverthrow-conventions.md](/Users/nichenqin/projects/yundu/docs/errors/neverthrow-conventions.md)
+  - [docs/architecture/async-lifecycle-and-acceptance.md](/Users/nichenqin/projects/yundu/docs/architecture/async-lifecycle-and-acceptance.md)
+- formal source-of-truth semantics for business operations live in `docs/decisions/**`, global contracts under `docs/errors/**` and `docs/architecture/**`, and local specs under `docs/commands/**`, `docs/events/**`, `docs/workflows/**`, and `docs/testing/**`
+- docs/ai/** contains background analysis and migration context only; it must not override ADRs, global contracts, or normative local specs
 - new business endpoints and CLI commands must map to an existing catalog entry or add one in the same change
 - new business capabilities must update both `docs/CORE_OPERATIONS.md` and `packages/application/src/operation-catalog.ts` in the same change
 - transport input parameters must reuse the matching command/query input schema, not redefine parallel transport-only input shapes
@@ -76,6 +82,18 @@ This repository is a backend-core deployment platform, not a web-first CRUD app.
 - handlers may call a use case or application service, but must not embed persistence or transport logic
 - read models stay query-shaped; aggregate repositories stay write-side oriented
 - when an operation creates complex aggregates, snapshots, runtime-plan inputs, or rollback plans, move that construction into dedicated operation-local factories/builders/services instead of assembling everything inline inside the use case
+
+## Specification And Decision Sync Rules
+
+- `AGENTS.md` defines durable repository-level working rules; task-specific session goals belong in the current prompt or a plan document, not in the permanent repository charter
+- accepted ADRs govern local specs; local specs govern implementation intent; migration notes document temporary gaps without replacing the contract
+- docs/ai/** contains background analysis and migration context only; it must not override ADRs, global contracts, or normative local specs
+- when changing command semantics, workflow branches, event semantics, async lifecycle behavior, error contracts, or test expectations, update the governing spec documents in the same change
+- command/workflow/testing changes must stay synchronized: if code or tests change behavior, update the corresponding spec and test-matrix docs; if specs change intended behavior, update code/tests in the same change when implementation work is in scope
+- if implementation temporarily diverges from the normative spec, record that only under `Current Implementation Notes And Migration Gaps`; do not weaken the normative contract in the main body to match temporary code reality
+- if a change alters command boundaries, ownership scope, lifecycle stages, readiness rules, retry semantics, durable state shape, or other cross-cutting behavior, update an existing ADR or add a new ADR in the same change before expanding local specs
+- agents should treat `docs/testing/*-test-matrix.md` and equivalent testing specs as the authoritative behavioral coverage map for command/event/workflow testing
+- if a capability also changes a normative local spec, update the corresponding command/event/workflow/testing docs in the same change
 
 ## PostgreSQL And Kysely Rules
 
@@ -136,6 +154,7 @@ This repository is a backend-core deployment platform, not a web-first CRUD app.
 - when a module still needs `node:*`, prefer the narrowest API possible and keep that dependency local to the adapter or script that truly needs it
 - TypeScript strict only
 - stable error codes and categories
+- user-facing text in `apps/web` must use `packages/i18n` keys and locale resources; do not add hardcoded UI copy in Svelte components
 - no `any` unless absolutely unavoidable
 - prefer explicit domain types over loose string bags
 - write tests where behavior or boundaries matter

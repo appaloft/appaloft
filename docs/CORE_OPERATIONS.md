@@ -41,13 +41,14 @@ to an explicit application operation.
 
 ## Business Capability Model
 
-The current Yundu core is organized into six capability groups:
+The current Yundu core is organized into seven capability groups:
 
 - Projects
 - Deployment Targets
 - Environments
 - Resources
 - Deployments
+- Routing / Domain Bindings
 - System operations
 
 Each group below lists the currently implemented business operations.
@@ -55,8 +56,10 @@ Each group below lists the currently implemented business operations.
 ## Projects
 
 Business meaning:
-- a `Project` is the top-level deployment management unit
-- environments and deployments belong to a project
+- a `Project` is the top-level workspace and resource collection boundary
+- environments and resources belong to a project
+- deployments are visible through a project as read-model rollups across resources, but deployment
+  write actions belong to a selected or newly created resource
 - projects are the unit shown in CLI, API, and Web
 
 Implemented operations:
@@ -68,9 +71,16 @@ Implemented operations:
 
 Current boundary:
 - a project is currently metadata plus deployment ownership
+- project detail surfaces should make resources the primary list and resource creation the primary
+  write affordance
+- project-level "view deployments" is a secondary rollup over resources
+- project-level "new deployment" must be labeled and implemented as Quick Deploy or another entry
+  workflow that selects or creates a resource before dispatching `deployments.create`
 - project source binding is not yet a first-class aggregate concept
 - GitHub repository import currently feeds deployment source selection, not a persisted project
   source binding
+- project/resource navigation is governed by
+  [ADR-013: Project Resource Navigation And Deployment Ownership](./decisions/ADR-013-project-resource-navigation-and-deployment-ownership.md)
 
 Core next operations expected here:
 - update project profile
@@ -98,12 +108,24 @@ Implemented operations:
 | Register deployment target | Command | `servers.register` | `RegisterServerCommand` | `RegisterServerCommandInput` | `yundu server register` | `POST /api/servers` |
 | Configure deployment target credential | Command | `servers.configure-credential` | `ConfigureServerCredentialCommand` | `ConfigureServerCredentialCommandInput` | `yundu server credential <serverId>` | `POST /api/servers/{serverId}/credentials` |
 | List deployment targets | Query | `servers.list` | `ListServersQuery` | `ListServersQueryInput` | `yundu server list` | `GET /api/servers` |
-| Test deployment target connectivity | Command | `servers.test-connectivity` | `TestServerConnectivityCommand` | `TestServerConnectivityCommandInput` | `yundu server test <serverId>` | `POST /api/servers/{serverId}/connectivity-tests` |
+| Test deployment target connectivity | Command | `servers.test-connectivity` | `TestServerConnectivityCommand` | `TestServerConnectivityCommandInput` | `yundu server test <serverId>`; `yundu server doctor <serverId>` | `POST /api/servers/{serverId}/connectivity-tests` |
+| Test draft deployment target connectivity | Command | `servers.test-draft-connectivity` | `TestServerConnectivityCommand` | `TestServerConnectivityCommandInput` | - | `POST /api/servers/connectivity-tests` |
+| Create reusable SSH credential | Command | `credentials.create-ssh` | `CreateSshCredentialCommand` | `CreateSshCredentialCommandInput` | `yundu server credential-create` | `POST /api/credentials/ssh` |
+| List reusable SSH credentials | Query | `credentials.list-ssh` | `ListSshCredentialsQuery` | `ListSshCredentialsQueryInput` | `yundu server credential-list` | `GET /api/credentials/ssh` |
+
+- server registration may carry `proxyKind`; when omitted, the deployment target records a
+  `traefik` edge-proxy intent and an asynchronous `deployment_target.registered` event handler
+  attempts proxy bootstrap
+- proxy bootstrap failure does not roll back deployment target metadata; it is recorded on the
+  server proxy status/error fields and deployment execution still performs an idempotent proxy
+  ensure when a runtime plan needs proxy-backed access
 
 Core next operations expected here:
 - show server details
 - update server profile
 - deactivate server
+- rotate reusable SSH credential
+- delete reusable SSH credential when unused
 
 ## Environments
 
@@ -138,6 +160,8 @@ Business meaning:
   Compose stacks are modeled as resources
 - a Docker Compose stack is one resource that may contain multiple named services
 - deployments belong to one resource
+- resource detail is the owner-scoped surface for new deployment, redeploy, deployment history,
+  source/runtime configuration, and resource-scoped domain/TLS actions
 - destinations and deployment targets / servers remain runtime placement, not the project
   organization layer
 
@@ -145,6 +169,7 @@ Implemented operations:
 
 | Capability | Kind | Operation Key | Message | Schema | CLI | oRPC / HTTP |
 | --- | --- | --- | --- | --- | --- | --- |
+| Create resource | Command | `resources.create` | `CreateResourceCommand` | `CreateResourceCommandInput` | `yundu resource create` | `POST /api/resources` |
 | List resources | Query | `resources.list` | `ListResourcesQuery` | `ListResourcesQueryInput` | `yundu resource list` | `GET /api/resources` |
 
 Current boundary:
@@ -153,9 +178,20 @@ Current boundary:
   deployment record
 - provider-backed dependency resources remain `ResourceInstance`; they are not the same aggregate
   as project resources
+- `resources.create` is the explicit command for creating the minimum durable resource
+  profile. It is governed by
+  [ADR-011: Resource Create Minimum Lifecycle](./decisions/ADR-011-resource-create-minimum-lifecycle.md).
+- once `resources.create` is implemented, Quick Deploy should prefer
+  `resources.create -> deployments.create(resourceId)` for new-resource flows
+- reusable source/runtime/health/access defaults are governed by
+  [ADR-012: Resource Runtime Profile And Deployment Snapshot Boundary](./decisions/ADR-012-resource-runtime-profile-and-deployment-snapshot-boundary.md)
+  and must be added through future explicit operations rather than expanding `resources.create`
+- project/resource console ownership is governed by
+  [ADR-013: Project Resource Navigation And Deployment Ownership](./decisions/ADR-013-project-resource-navigation-and-deployment-ownership.md)
+- sidebar navigation may show Project -> Resource hierarchy with latest deployment status derived
+  from read models/projections
 
 Core next operations expected here:
-- create resource
 - show resource details
 - update resource profile/source
 - declare compose-stack services from compose metadata
@@ -172,54 +208,97 @@ Implemented operations:
 
 | Capability | Kind | Operation Key | Message | Schema | CLI | oRPC / HTTP |
 | --- | --- | --- | --- | --- | --- | --- |
-| Create deployment | Command | `deployments.create` | `CreateDeploymentCommand` | `CreateDeploymentCommandInput` | `yundu deploy [path-or-source] [--config yundu.json]` | `POST /api/deployments` |
+| Create deployment | Command | `deployments.create` | `CreateDeploymentCommand` | `CreateDeploymentCommandInput` | `yundu deploy [path-or-source]` or ids-only flags | `POST /api/deployments` |
+| Cancel deployment | Command | `deployments.cancel` | `CancelDeploymentCommand` | `CancelDeploymentCommandInput` | `yundu cancel <deploymentId>` | `POST /api/deployments/{deploymentId}/cancel` |
+| Check deployment health | Command | `deployments.check-health` | `CheckDeploymentHealthCommand` | `CheckDeploymentHealthCommandInput` | `yundu health <deploymentId>` | `POST /api/deployments/{deploymentId}/health-checks` |
 | List deployments | Query | `deployments.list` | `ListDeploymentsQuery` | `ListDeploymentsQueryInput` | `yundu deployments list` | `GET /api/deployments` |
 | Read deployment logs | Query | `deployments.logs` | `DeploymentLogsQuery` | `DeploymentLogsQueryInput` | `yundu logs <deploymentId>` | `GET /api/deployments/{deploymentId}/logs` |
+| Redeploy resource | Command | `deployments.redeploy-resource` | `RedeployResourceCommand` | `RedeployResourceCommandInput` | `yundu redeploy <resourceId>` | `POST /api/resources/{resourceId}/redeploy` |
+| Reattach deployment | Command | `deployments.reattach` | `ReattachDeploymentCommand` | `ReattachDeploymentCommandInput` | `yundu reattach <deploymentId>` | `POST /api/deployments/{deploymentId}/reattach` |
 | Roll back deployment | Command | `deployments.rollback` | `RollbackDeploymentCommand` | `RollbackDeploymentCommandInput` | `yundu rollback <deploymentId>` | `POST /api/deployments/{deploymentId}/rollback` |
 
 Current boundary:
-- deployment source is currently supplied as `sourceLocator` when the deployment command is
-  created
-- `projectId`, `resourceId`, `destinationId`, `serverId`, and `environmentId` may be omitted when the active
-  deployment-context defaults policy can resolve or bootstrap them
-  - current self-hosted embedded profile reuses or creates a local default project, local-shell
-    deployment target, local destination, local environment, and local resource
-  - contexts that do not allow implicit ownership, such as future cloud/hosted flows, must still
-    require explicit identifiers
-- deployment method is now also supplied explicitly at command input time
-  - current values: `auto`, `dockerfile`, `docker-compose`, `prebuilt-image`, `workspace-commands`
-- command-driven deployments may also carry `installCommand`, `buildCommand`, `startCommand`,
-  `port`, and `healthCheckPath`
-- command-driven deployments may carry access routing hints: `proxyKind`, `domains`,
-  `pathPrefix`, and `tlsMode`
-  - when domains are supplied and `proxyKind` is omitted, runtime planning defaults to `traefik`
-  - `proxyKind: none` means no public proxy route is configured
-  - current runtime adapter support applies access routes to Docker container deployments
-  - for Docker container deployments with access routes, runtime adapters ensure a shared
-    edge-proxy container and a `yundu-edge` Docker network before starting the app container
-  - Caddy support targets compatible Docker-label-based Caddy proxy deployments; generic Nginx
-    config generation is not a current deployment capability
-- command-driven deployments may carry `configFilePath`; local adapters may also discover
-  `yundu.json`, `yundu.config.json`, or `.yundu.json` beside the local source
-- deployment config is a bootstrap hint, not a replacement aggregate:
-  - `packages/deployment-config` owns the Zod schema and generated JSON Schema for these files
-  - HTTP exposes the generated schema at `/api/schemas/yundu-config.json`
-  - filesystem adapters read JSON and infer local project metadata from Node, Python, and Java
-    project files
-  - application services apply config bootstrap and default-context bootstrap as ordered strategies
-    in the same deployment-context bootstrap layer
-  - the config strategy validates provider keys through the provider registry
-  - configured projects, environments, deployment targets, destinations, and resources are reused
-    or created through the normal repositories before the runtime plan is built
-  - if the command explicitly supplies `projectId`, `environmentId`, `destinationId`, or
-    `serverId`, those explicit identifiers still win for the deployment selection
+- `deployments.create` accepts deployment context references only: `projectId`, `environmentId`,
+  `resourceId`, `serverId`, and optional `destinationId`
+- deployment source and runtime strategy are resolved from the resource's persisted
+  `ResourceSourceBinding` and `ResourceRuntimeProfile`
+- `deployments.create` must not accept `sourceLocator`, `source`, `deploymentMethod`,
+  install/build/start commands, port, health-check path, `resource` bootstrap input, proxy,
+  domains, path prefix, or TLS mode
+- `destinationId` may still be omitted when the compatibility seam can resolve or create the
+  server default destination before context validation; strict API and automation callers should
+  prefer explicit destination selection
+- runtime access routes and direct host-port exposure are runtime plan snapshot behavior; durable
+  domain, routing, and TLS lifecycle state belongs to `domain-bindings.create` and certificate
+  commands
+- deployment config files are workflow/bootstrap inputs for creating or configuring related
+  resource/project/environment/server state before deployment admission; they are not
+  `deployments.create` input fields
 - detect and plan happen inside the deployment write flow
+- cancel moves an active deployment (`created`, `planning`, `planned`, or `running`) into the
+  `canceled` terminal state and delegates infrastructure cleanup to the execution backend when it
+  has enough runtime metadata or a deterministic fallback target
+- health check is a deployment command because it probes the runtime route for a persisted
+  deployment record; it uses the deployment's access route/runtime metadata rather than the
+  control-plane `/api/health` endpoint
+- redeploy creates a new deployment attempt for the resource from current resource profile state;
+  with `force`, the latest non-terminal deployment is canceled before the new deployment starts
+- reattach is intentionally a command because transports use it as an operational action, but it
+  does not resume a lost process; it returns the current persisted deployment status and logs so
+  the UI can reconnect to state
+- Quick Deploy is an entry workflow over explicit operations, not a separate domain command or
+  operation-catalog entry. Web QuickDeploy and CLI interactive `yundu deploy` must create/select
+  context through existing commands and queries, then dispatch `deployments.create`. See
+  [ADR-010: Quick Deploy Workflow Boundary](./decisions/ADR-010-quick-deploy-workflow-boundary.md).
+- source, runtime, health, route, domain, and TLS fields on `deployments.create` are superseded by
+  [ADR-014: Deployment Admission Uses Resource Profile](./decisions/ADR-014-deployment-admission-uses-resource-profile.md).
+  Deployment state keeps the resolved runtime plan snapshot, while durable reusable source/runtime
+  configuration belongs to the resource profile and durable domain/TLS lifecycle belongs to
+  routing/domain/certificate commands.
 
 Core next operations expected here:
 - explicit plan deployment without execution
 - show deployment details
 - stream deployment events
-- cancel deployment
+
+## Routing / Domain Bindings
+
+Business meaning:
+- runtime plan access routes are deployment snapshots, not durable domain ownership state
+- a `DomainBinding` is durable routing/domain ownership state for a project, environment,
+  resource, destination, and deployment target
+- DNS verification, certificate issuance, renewal, and domain readiness progress outside
+  `deployments.create`
+
+Implemented operations:
+
+| Capability | Kind | Operation Key | Message | Schema | CLI | oRPC / HTTP |
+| --- | --- | --- | --- | --- | --- | --- |
+| Create domain binding | Command | `domain-bindings.create` | `CreateDomainBindingCommand` | `CreateDomainBindingCommandInput` | `yundu domain-binding create <domainName>` | `POST /api/domain-bindings` |
+| List domain bindings | Query | `domain-bindings.list` | `ListDomainBindingsQuery` | `ListDomainBindingsQueryInput` | `yundu domain-binding list` | `GET /api/domain-bindings` |
+
+Current boundary:
+- `domain-bindings.create` creates durable binding state, persists the first manual verification
+  attempt, publishes `domain-binding-requested`, and returns accepted `ok({ id })`
+- `domain-binding-requested` is a request event and does not mean the domain is bound, certificate
+  issuance succeeded, or traffic is ready
+- `deployments.create` must not carry domain, proxy, path prefix, or TLS fields
+- duplicate active bindings are rejected for the same project/environment/resource/domain/path
+  owner scope
+- durable domain bindings require `proxyKind` `traefik` or `caddy`; `proxyKind: none` is rejected
+  by durable domain binding admission
+- `domain-bindings.list` exposes the read model used by CLI, API, and Web to observe accepted
+  binding records and their verification status
+- Web exposes domain binding from both the resource detail page and the standalone domain bindings
+  page; the resource detail page is the owner-scoped affordance, while the standalone page is
+  cross-resource management over the same command/query contracts
+
+Core next operations expected here:
+- verify or mark domain binding ownership
+- issue or renew certificate
+- import certificate
+- retry failed domain verification or certificate issuance attempt
+- list/show domain binding readiness state
 
 ## System Operations
 

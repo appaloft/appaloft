@@ -1,0 +1,130 @@
+# deployments.create Error Spec
+
+## Normative Contract
+
+`deployments.create` uses the shared platform error model and neverthrow conventions. This file defines only the deployment-specific error profile for command admission and post-acceptance deployment progression.
+
+Command result:
+
+```ts
+type CreateDeploymentResult = Result<{ id: string }, DomainError>;
+```
+
+Command success means request accepted. Runtime failure after acceptance persists `Deployment.status = failed`, publishes `deployment-failed`, and preserves `ok({ id })` for the original command.
+
+## Global References
+
+This spec inherits:
+
+- [ADR-001: deployments.create HTTP API Required Fields](../decisions/ADR-001-deploy-api-required-fields.md)
+- [ADR-002: Routing, Domain, And TLS Boundary](../decisions/ADR-002-routing-domain-tls-boundary.md)
+- [Error Model](./model.md)
+- [neverthrow Conventions](./neverthrow-conventions.md)
+- [Async Lifecycle And Acceptance](../architecture/async-lifecycle-and-acceptance.md)
+
+The shared documents define error shape, categories, consumer mapping, exception boundaries, retry semantics, and post-acceptance failure semantics.
+
+## Deployment Error Details
+
+Deployment-specific error details must identify the command, phase, relevant deployment context, and safe cause metadata:
+
+```ts
+type DeploymentCreateErrorDetails = {
+  commandName: "deployments.create";
+  phase:
+    | "command-validation"
+    | "config-bootstrap"
+    | "context-resolution"
+    | "redeploy-guard"
+    | "resource-source-resolution"
+    | "source-detection"
+    | "runtime-plan-resolution"
+    | "deployment-creation"
+    | "planning-transition"
+    | "execution-start-transition"
+    | "runtime-execution"
+    | "finalization"
+    | "event-publication";
+  step?: string;
+  deploymentId?: string;
+  projectId?: string;
+  environmentId?: string;
+  resourceId?: string;
+  serverId?: string;
+  destinationId?: string;
+  resourceSourceKind?: string;
+  runtimePlanStrategy?: string;
+  relatedState?: string;
+  causeCode?: string;
+  correlationId?: string;
+  causationId?: string;
+};
+```
+
+Secrets and raw environment values must not appear in details.
+
+## Admission Errors
+
+Admission errors reject the command and return `err(DomainError)`.
+
+| Error code | Phase | Retriable | Required deployment details |
+| --- | --- | --- | --- |
+| `validation_error` | `command-validation`, `config-bootstrap`, `context-resolution`, `resource-source-resolution`, `source-detection`, `runtime-plan-resolution` | No | Field/path when available, `commandName`, safe command context. |
+| `not_found` | `context-resolution` | No | Entity type, entity id, `commandName`, `phase`. |
+| `deployment_not_redeployable` | `redeploy-guard` | No | Existing deployment id, resource id, current deployment status. |
+| `conflict` | `admission-conflict` | No | Conflict subject and related state. |
+| `invariant_violation` | `planning-transition`, `execution-start-transition`, `finalization` | No | Current deployment state and attempted transition. |
+| `infra_error` | `deployment-creation`, `event-publication` | Conditional | Adapter/operation and sanitized cause. |
+| `provider_error` | `runtime-plan-resolution` | Conditional | Provider key, operation, sanitized cause. |
+
+## Post-Acceptance Deployment Failures
+
+Build, runtime execution, verification, health check, or release finalization failures after acceptance are not command admission errors.
+
+They must:
+
+1. record failed deployment/process state;
+2. include `deploymentId`, `phase`, `step`, `code`, `retriable`, and safe cause details;
+3. publish `deployment-failed` after failure state is durable;
+4. keep the original command response as `ok({ id })`;
+5. require a new deployment attempt for retry.
+
+## Consumer Requirements
+
+UI, CLI, HTTP API, background workers, and event consumers must use the shared mappings in [Error Model](./model.md). Deployment-specific consumers additionally must:
+
+- display the deployment id when present;
+- distinguish admission failure from accepted deployment failure;
+- expose latest deployment terminal state and retry eligibility from durable state/read models;
+- avoid using progress stream messages as the error contract.
+
+## Test Assertions
+
+Deployment tests must assert:
+
+- `result.isOk()` or `result.isErr()`;
+- deployment-specific `error.code`;
+- deployment-specific `phase`;
+- `deploymentId`, `resourceId`, or related context when relevant;
+- `deployment-failed` plus failed state for post-acceptance failure;
+- a new deployment id for retry.
+
+The shared neverthrow assertion style is defined in [neverthrow Conventions](./neverthrow-conventions.md).
+
+## Current Implementation Notes And Migration Gaps
+
+Current core `DomainError` has `code`, `category`, `message`, `retryable`, and optional `details`.
+
+Current implementation already uses neverthrow `Result` for command construction and `Promise<Result<{ id }, DomainError>>` for the use case.
+
+Migration gaps:
+
+- phase/step details are not yet uniformly included;
+- runtime execution is currently awaited inside `deployments.create`;
+- backend failures can currently appear either as returned `err(DomainError)` or as failed deployment execution result depending on adapter behavior;
+- Web QuickDeploy still has hardcoded local validation text;
+- no durable process-manager/outbox failure handling was confirmed for this flow.
+
+## Open Questions
+
+- None. Cross-operation error field placement is governed by [Error Model](./model.md).

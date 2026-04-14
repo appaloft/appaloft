@@ -1,0 +1,49 @@
+# Decision Records
+
+## Normative Contract
+
+This directory contains source-of-truth decision records for business-operation specs, workflow boundaries, and implementation-facing architecture choices that block command/event/error/testing alignment.
+
+These records are binding for future implementation work, agent planning, spec updates, and tests. When a local command, workflow, error, or testing spec still lists an Open Question that is answered here, the decision record wins.
+
+This directory complements the historical technical ADRs in `docs/adr/`. Use `docs/decisions/` for domain, CQRS, command, workflow, async lifecycle, and operation-boundary decisions.
+
+## Status Values
+
+| Status | Meaning |
+| --- | --- |
+| `Accepted` | The decision is active and must be followed. |
+| `Proposed` | A default rule is proposed for review; implementation may use it only after human approval or explicit adoption. |
+| `Superseded` | A newer decision record replaces this one. |
+| `Deferred` | The decision needs human approval before implementation can rely on it. |
+
+## Index
+
+| ADR | Status | Scope |
+| --- | --- | --- |
+| [ADR-001: deployments.create HTTP API Required Fields](./ADR-001-deploy-api-required-fields.md) | Accepted | Required deployment command context for strict API and local bootstrap profiles. |
+| [ADR-002: Routing, Domain, And TLS Boundary](./ADR-002-routing-domain-tls-boundary.md) | Accepted | Whether deployment routing hints belong in `deployments.create` or separate domain/certificate commands. |
+| [ADR-003: Server Connect Public Versus Internal](./ADR-003-server-connect-public-vs-internal.md) | Accepted | Whether `servers.connect` is public, internal, or both. |
+| [ADR-004: Server Readiness State Storage](./ADR-004-server-readiness-state-storage.md) | Accepted | Where connectivity, proxy, readiness, and attempt state belong. |
+| [ADR-005: Domain Binding Owner Scope](./ADR-005-domain-binding-owner-scope.md) | Accepted | First durable domain binding ownership scope. |
+| [ADR-006: Domain Verification Strategy](./ADR-006-domain-verification-strategy.md) | Accepted | Default domain ownership verification strategy. |
+| [ADR-007: Certificate Provider And Challenge Default](./ADR-007-certificate-provider-and-challenge-default.md) | Accepted | Initial certificate provider and challenge type. |
+| [ADR-008: Renewal Trigger Model](./ADR-008-renewal-trigger-model.md) | Accepted | Certificate renewal trigger ownership and scheduling model. |
+| [ADR-009: Certificates Import Command](./ADR-009-certificates-import-command.md) | Accepted | Manual certificate import is a separate command. |
+| [ADR-010: Quick Deploy Workflow Boundary](./ADR-010-quick-deploy-workflow-boundary.md) | Accepted | Whether Quick Deploy is a standalone command or an entry workflow over explicit operations. |
+| [ADR-011: Resource Create Minimum Lifecycle](./ADR-011-resource-create-minimum-lifecycle.md) | Accepted | Minimum explicit `resources.create` command boundary and lifecycle. |
+| [ADR-012: Resource Runtime Profile And Deployment Snapshot Boundary](./ADR-012-resource-runtime-profile-and-deployment-snapshot-boundary.md) | Accepted | Where reusable source/runtime/health/access configuration belongs versus deployment attempt snapshots. |
+| [ADR-013: Project Resource Navigation And Deployment Ownership](./ADR-013-project-resource-navigation-and-deployment-ownership.md) | Accepted | Project pages and navigation are resource-centered; deployment actions and history are resource-owned. |
+| [ADR-014: Deployment Admission Uses Resource Profile](./ADR-014-deployment-admission-uses-resource-profile.md) | Accepted | `deployments.create` consumes resource-owned source/runtime profile and no longer accepts source/runtime/route configuration fields. |
+
+## Authoring Rules
+
+Decision records must:
+
+- state a final decision in the `Decision` section;
+- avoid restating full command/event/error specs;
+- link to the specs they govern;
+- describe implementation requirements that follow from the decision;
+- avoid leaving unresolved options in the main body.
+
+If a decision cannot be made, write the ADR with `Status: Proposed` or `Status: Deferred`, list the candidate options, name the recommended default, and identify the exact human choice required before implementation proceeds.
