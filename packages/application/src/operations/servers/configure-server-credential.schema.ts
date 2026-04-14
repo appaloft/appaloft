@@ -17,6 +17,11 @@ export const configureServerCredentialCommandInputSchema = z.object({
       publicKey: optionalNonEmptyString,
       privateKey: nonEmptyTrimmedString("SSH private key"),
     }),
+    z.object({
+      kind: z.literal("stored-ssh-private-key"),
+      credentialId: nonEmptyTrimmedString("SSH credential id"),
+      username: optionalNonEmptyString,
+    }),
   ]),
 });
 

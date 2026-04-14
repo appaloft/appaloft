@@ -10,9 +10,13 @@ import {
 } from "@yundu/core";
 import { inject, injectable } from "tsyringe";
 
-import { type Clock, type IdGenerator, type RuntimePlanResolver } from "../../ports";
+import {
+  type Clock,
+  type IdGenerator,
+  type RequestedDeploymentConfig,
+  type RuntimePlanResolver,
+} from "../../ports";
 import { tokens } from "../../tokens";
-import { type CreateDeploymentCommandInput } from "./create-deployment.command";
 
 type RuntimePlanResolutionInput = Parameters<RuntimePlanResolver["resolve"]>[1];
 
@@ -30,7 +34,7 @@ export class RuntimePlanResolutionInputBuilder {
     server: Server;
     environmentSnapshot: EnvironmentSnapshot;
     detectedReasoning: string[];
-    command: CreateDeploymentCommandInput;
+    requestedDeployment: RequestedDeploymentConfig;
   }): Result<RuntimePlanResolutionInput> {
     const { clock, idGenerator } = this;
 
@@ -44,20 +48,7 @@ export class RuntimePlanResolutionInputBuilder {
         server: input.server.toState(),
         environmentSnapshot: input.environmentSnapshot,
         detectedReasoning: input.detectedReasoning,
-        requestedDeployment: {
-          method: input.command.deploymentMethod ?? "auto",
-          ...(input.command.installCommand ? { installCommand: input.command.installCommand } : {}),
-          ...(input.command.buildCommand ? { buildCommand: input.command.buildCommand } : {}),
-          ...(input.command.startCommand ? { startCommand: input.command.startCommand } : {}),
-          ...(input.command.port ? { port: input.command.port } : {}),
-          ...(input.command.healthCheckPath
-            ? { healthCheckPath: input.command.healthCheckPath }
-            : {}),
-          ...(input.command.proxyKind ? { proxyKind: input.command.proxyKind } : {}),
-          ...(input.command.domains ? { domains: input.command.domains } : {}),
-          ...(input.command.pathPrefix ? { pathPrefix: input.command.pathPrefix } : {}),
-          ...(input.command.tlsMode ? { tlsMode: input.command.tlsMode } : {}),
-        },
+        requestedDeployment: input.requestedDeployment,
         generatedAt: generatedAt.value,
       });
     });

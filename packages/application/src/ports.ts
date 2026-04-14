@@ -1,7 +1,9 @@
 import {
   type BuildStrategyKind,
+  type CertificatePolicy,
   type ConfigScope,
   type Deployment,
+  type DeploymentLogEntry,
   type DeploymentLogSource,
   type DeploymentMutationSpec,
   type DeploymentSelectionSpec,
@@ -11,8 +13,13 @@ import {
   type DestinationKind,
   type DestinationMutationSpec,
   type DestinationSelectionSpec,
+  type DomainBinding,
+  type DomainBindingMutationSpec,
+  type DomainBindingSelectionSpec,
+  type DomainBindingStatus,
   type DomainEvent,
   type EdgeProxyKind,
+  type EdgeProxyStatus,
   type EnvironmentKind,
   type EnvironmentMutationSpec,
   type EnvironmentProfile,
@@ -37,6 +44,9 @@ import {
   type ServerSelectionSpec,
   type SourceDescriptor,
   type SourceKind,
+  type SshCredential,
+  type SshCredentialMutationSpec,
+  type SshCredentialSelectionSpec,
   type TargetKind,
   type TlsMode,
   type VariableExposure,
@@ -112,6 +122,18 @@ export interface ServerRepository {
   upsert(context: RepositoryContext, server: Server, spec: ServerMutationSpec): Promise<void>;
 }
 
+export interface SshCredentialRepository {
+  findOne(
+    context: RepositoryContext,
+    spec: SshCredentialSelectionSpec,
+  ): Promise<SshCredential | null>;
+  upsert(
+    context: RepositoryContext,
+    credential: SshCredential,
+    spec: SshCredentialMutationSpec,
+  ): Promise<void>;
+}
+
 export interface DestinationRepository {
   findOne(context: RepositoryContext, spec: DestinationSelectionSpec): Promise<Destination | null>;
   upsert(
@@ -147,6 +169,18 @@ export interface DeploymentRepository {
   ): Promise<void>;
 }
 
+export interface DomainBindingRepository {
+  findOne(
+    context: RepositoryContext,
+    spec: DomainBindingSelectionSpec,
+  ): Promise<DomainBinding | null>;
+  upsert(
+    context: RepositoryContext,
+    domainBinding: DomainBinding,
+    spec: DomainBindingMutationSpec,
+  ): Promise<void>;
+}
+
 export interface ProjectSummary {
   id: string;
   name: string;
@@ -161,8 +195,18 @@ export interface ServerSummary {
   host: string;
   port: number;
   providerKey: string;
+  edgeProxy?: {
+    kind: EdgeProxyKind;
+    status: EdgeProxyStatus;
+    lastAttemptAt?: string;
+    lastSucceededAt?: string;
+    lastErrorCode?: string;
+    lastErrorMessage?: string;
+  };
   credential?: {
     kind: "local-ssh-agent" | "ssh-private-key";
+    credentialId?: string;
+    credentialName?: string;
     username?: string;
     publicKeyConfigured: boolean;
     privateKeyConfigured: boolean;
@@ -171,6 +215,16 @@ export interface ServerSummary {
 }
 
 export type ServerConnectivityStatus = "passed" | "failed" | "skipped";
+
+export interface SshCredentialSummary {
+  id: string;
+  name: string;
+  kind: "ssh-private-key";
+  username?: string;
+  publicKeyConfigured: boolean;
+  privateKeyConfigured: boolean;
+  createdAt: string;
+}
 
 export interface ServerConnectivityCheck {
   name: string;
@@ -189,6 +243,42 @@ export interface ServerConnectivityResult {
   checkedAt: string;
   status: "healthy" | "degraded" | "unreachable";
   checks: ServerConnectivityCheck[];
+}
+
+export interface ServerEdgeProxyBootstrapResult {
+  serverId: string;
+  kind: EdgeProxyKind;
+  status: "ready" | "failed";
+  attemptedAt: string;
+  message: string;
+  errorCode?: string;
+  metadata?: Record<string, string>;
+}
+
+export interface ServerEdgeProxyBootstrapper {
+  bootstrap(
+    context: ExecutionContext,
+    input: {
+      server: DeploymentTargetState;
+    },
+  ): Promise<Result<ServerEdgeProxyBootstrapResult>>;
+}
+
+export type DeploymentHealthCheckStatus = "passed" | "failed" | "skipped";
+
+export interface DeploymentHealthCheck {
+  name: string;
+  status: DeploymentHealthCheckStatus;
+  message: string;
+  durationMs: number;
+  metadata?: Record<string, string>;
+}
+
+export interface DeploymentHealthResult {
+  deploymentId: string;
+  checkedAt: string;
+  status: "healthy" | "degraded" | "unreachable";
+  checks: DeploymentHealthCheck[];
 }
 
 export interface EnvironmentSummary {
@@ -328,12 +418,33 @@ export interface DeploymentSummary {
   logCount: number;
 }
 
+export interface DomainBindingSummary {
+  id: string;
+  projectId: string;
+  environmentId: string;
+  resourceId: string;
+  serverId: string;
+  destinationId: string;
+  domainName: string;
+  pathPrefix: string;
+  proxyKind: EdgeProxyKind;
+  tlsMode: TlsMode;
+  certificatePolicy: CertificatePolicy;
+  status: DomainBindingStatus;
+  verificationAttemptCount: number;
+  createdAt: string;
+}
+
 export interface ProjectReadModel {
   list(context: RepositoryContext): Promise<ProjectSummary[]>;
 }
 
 export interface ServerReadModel {
   list(context: RepositoryContext): Promise<ServerSummary[]>;
+}
+
+export interface SshCredentialReadModel {
+  list(context: RepositoryContext): Promise<SshCredentialSummary[]>;
 }
 
 export interface EnvironmentReadModel {
@@ -360,6 +471,17 @@ export interface DeploymentReadModel {
     },
   ): Promise<DeploymentSummary[]>;
   findLogs(context: RepositoryContext, id: string): Promise<DeploymentLogSummary[]>;
+}
+
+export interface DomainBindingReadModel {
+  list(
+    context: RepositoryContext,
+    input?: {
+      projectId?: string;
+      environmentId?: string;
+      resourceId?: string;
+    },
+  ): Promise<DomainBindingSummary[]>;
 }
 
 export interface SourceDetectionResult {
@@ -449,6 +571,10 @@ export interface ServerConnectivityChecker {
       server: DeploymentTargetState;
     },
   ): Promise<Result<ServerConnectivityResult>>;
+}
+
+export interface DeploymentHealthChecker {
+  check(context: ExecutionContext, deployment: Deployment): Promise<Result<DeploymentHealthResult>>;
 }
 
 export interface DeploymentContextDefaultsPolicyInput {
@@ -557,6 +683,10 @@ export interface ExecutionBackend {
     context: ExecutionContext,
     deployment: Deployment,
   ): Promise<Result<{ deployment: Deployment }>>;
+  cancel(
+    context: ExecutionContext,
+    deployment: Deployment,
+  ): Promise<Result<{ logs: DeploymentLogEntry[] }>>;
   rollback(
     context: ExecutionContext,
     deployment: Deployment,

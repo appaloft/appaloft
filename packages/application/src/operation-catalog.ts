@@ -1,8 +1,14 @@
 import { type ZodTypeAny } from "zod";
+import { cancelDeploymentCommandInputSchema } from "./operations/deployments/cancel-deployment.command";
+import { checkDeploymentHealthCommandInputSchema } from "./operations/deployments/check-deployment-health.command";
 import { createDeploymentCommandInputSchema } from "./operations/deployments/create-deployment.command";
 import { deploymentLogsQueryInputSchema } from "./operations/deployments/deployment-logs.query";
 import { listDeploymentsQueryInputSchema } from "./operations/deployments/list-deployments.query";
+import { reattachDeploymentCommandInputSchema } from "./operations/deployments/reattach-deployment.command";
+import { redeployResourceCommandInputSchema } from "./operations/deployments/redeploy-resource.command";
 import { rollbackDeploymentCommandInputSchema } from "./operations/deployments/rollback-deployment.command";
+import { createDomainBindingCommandInputSchema } from "./operations/domain-bindings/create-domain-binding.command";
+import { listDomainBindingsQueryInputSchema } from "./operations/domain-bindings/list-domain-bindings.query";
 import { createEnvironmentCommandInputSchema } from "./operations/environments/create-environment.command";
 import { diffEnvironmentsQueryInputSchema } from "./operations/environments/diff-environments.query";
 import { listEnvironmentsQueryInputSchema } from "./operations/environments/list-environments.query";
@@ -12,9 +18,12 @@ import { showEnvironmentQueryInputSchema } from "./operations/environments/show-
 import { unsetEnvironmentVariableCommandInputSchema } from "./operations/environments/unset-environment-variable.command";
 import { createProjectCommandInputSchema } from "./operations/projects/create-project.command";
 import { listProjectsQueryInputSchema } from "./operations/projects/list-projects.query";
+import { createResourceCommandInputSchema } from "./operations/resources/create-resource.command";
 import { listResourcesQueryInputSchema } from "./operations/resources/list-resources.query";
 import { configureServerCredentialCommandInputSchema } from "./operations/servers/configure-server-credential.command";
+import { createSshCredentialCommandInputSchema } from "./operations/servers/create-ssh-credential.command";
 import { listServersQueryInputSchema } from "./operations/servers/list-servers.query";
+import { listSshCredentialsQueryInputSchema } from "./operations/servers/list-ssh-credentials.query";
 import { registerServerCommandInputSchema } from "./operations/servers/register-server.command";
 import { testServerConnectivityCommandInputSchema } from "./operations/servers/test-server-connectivity.command";
 import { listGitHubRepositoriesQueryInputSchema } from "./operations/system/list-github-repositories.query";
@@ -24,9 +33,11 @@ type OperationKind = "command" | "query";
 type OperationDomain =
   | "projects"
   | "servers"
+  | "credentials"
   | "environments"
   | "resources"
   | "deployments"
+  | "domain-bindings"
   | "system";
 
 export interface OperationCatalogEntry {
@@ -42,6 +53,10 @@ export interface OperationCatalogEntry {
     cli?: string;
     orpc?: {
       method: "GET" | "POST" | "DELETE";
+      path: string;
+    };
+    orpcStream?: {
+      method: "POST";
       path: string;
     };
   };
@@ -107,6 +122,34 @@ export const operationCatalog = [
     },
   },
   {
+    key: "credentials.create-ssh",
+    kind: "command",
+    domain: "credentials",
+    messageName: "CreateSshCredentialCommand",
+    handlerName: "CreateSshCredentialCommandHandler",
+    serviceName: "CreateSshCredentialUseCase",
+    inputSchema: createSshCredentialCommandInputSchema,
+    serviceToken: tokens.createSshCredentialUseCase,
+    transports: {
+      cli: "yundu server credential-create",
+      orpc: { method: "POST", path: "/api/credentials/ssh" },
+    },
+  },
+  {
+    key: "credentials.list-ssh",
+    kind: "query",
+    domain: "credentials",
+    messageName: "ListSshCredentialsQuery",
+    handlerName: "ListSshCredentialsQueryHandler",
+    serviceName: "ListSshCredentialsQueryService",
+    inputSchema: listSshCredentialsQueryInputSchema,
+    serviceToken: tokens.listSshCredentialsQueryService,
+    transports: {
+      cli: "yundu server credential-list",
+      orpc: { method: "GET", path: "/api/credentials/ssh" },
+    },
+  },
+  {
     key: "servers.list",
     kind: "query",
     domain: "servers",
@@ -130,8 +173,21 @@ export const operationCatalog = [
     inputSchema: testServerConnectivityCommandInputSchema,
     serviceToken: tokens.testServerConnectivityUseCase,
     transports: {
-      cli: "yundu server test <serverId>",
+      cli: "yundu server test <serverId>; yundu server doctor <serverId>",
       orpc: { method: "POST", path: "/api/servers/{serverId}/connectivity-tests" },
+    },
+  },
+  {
+    key: "servers.test-draft-connectivity",
+    kind: "command",
+    domain: "servers",
+    messageName: "TestServerConnectivityCommand",
+    handlerName: "TestServerConnectivityCommandHandler",
+    serviceName: "TestServerConnectivityUseCase",
+    inputSchema: testServerConnectivityCommandInputSchema,
+    serviceToken: tokens.testServerConnectivityUseCase,
+    transports: {
+      orpc: { method: "POST", path: "/api/servers/connectivity-tests" },
     },
   },
   {
@@ -146,6 +202,20 @@ export const operationCatalog = [
     transports: {
       cli: "yundu resource list",
       orpc: { method: "GET", path: "/api/resources" },
+    },
+  },
+  {
+    key: "resources.create",
+    kind: "command",
+    domain: "resources",
+    messageName: "CreateResourceCommand",
+    handlerName: "CreateResourceCommandHandler",
+    serviceName: "CreateResourceUseCase",
+    inputSchema: createResourceCommandInputSchema,
+    serviceToken: tokens.createResourceUseCase,
+    transports: {
+      cli: "yundu resource create",
+      orpc: { method: "POST", path: "/api/resources" },
     },
   },
   {
@@ -250,6 +320,34 @@ export const operationCatalog = [
     },
   },
   {
+    key: "deployments.cancel",
+    kind: "command",
+    domain: "deployments",
+    messageName: "CancelDeploymentCommand",
+    handlerName: "CancelDeploymentCommandHandler",
+    serviceName: "CancelDeploymentUseCase",
+    inputSchema: cancelDeploymentCommandInputSchema,
+    serviceToken: tokens.cancelDeploymentUseCase,
+    transports: {
+      cli: "yundu cancel <deploymentId>",
+      orpc: { method: "POST", path: "/api/deployments/{deploymentId}/cancel" },
+    },
+  },
+  {
+    key: "deployments.check-health",
+    kind: "command",
+    domain: "deployments",
+    messageName: "CheckDeploymentHealthCommand",
+    handlerName: "CheckDeploymentHealthCommandHandler",
+    serviceName: "CheckDeploymentHealthUseCase",
+    inputSchema: checkDeploymentHealthCommandInputSchema,
+    serviceToken: tokens.checkDeploymentHealthUseCase,
+    transports: {
+      cli: "yundu health <deploymentId>",
+      orpc: { method: "POST", path: "/api/deployments/{deploymentId}/health-checks" },
+    },
+  },
+  {
     key: "deployments.create",
     kind: "command",
     domain: "deployments",
@@ -261,6 +359,7 @@ export const operationCatalog = [
     transports: {
       cli: "yundu deploy [path-or-source] [--config yundu.json]",
       orpc: { method: "POST", path: "/api/deployments" },
+      orpcStream: { method: "POST", path: "/api/deployments/stream" },
     },
   },
   {
@@ -292,6 +391,34 @@ export const operationCatalog = [
     },
   },
   {
+    key: "deployments.redeploy-resource",
+    kind: "command",
+    domain: "deployments",
+    messageName: "RedeployResourceCommand",
+    handlerName: "RedeployResourceCommandHandler",
+    serviceName: "RedeployResourceUseCase",
+    inputSchema: redeployResourceCommandInputSchema,
+    serviceToken: tokens.redeployResourceUseCase,
+    transports: {
+      cli: "yundu redeploy <resourceId>",
+      orpc: { method: "POST", path: "/api/resources/{resourceId}/redeploy" },
+    },
+  },
+  {
+    key: "deployments.reattach",
+    kind: "command",
+    domain: "deployments",
+    messageName: "ReattachDeploymentCommand",
+    handlerName: "ReattachDeploymentCommandHandler",
+    serviceName: "ReattachDeploymentUseCase",
+    inputSchema: reattachDeploymentCommandInputSchema,
+    serviceToken: tokens.reattachDeploymentUseCase,
+    transports: {
+      cli: "yundu reattach <deploymentId>",
+      orpc: { method: "POST", path: "/api/deployments/{deploymentId}/reattach" },
+    },
+  },
+  {
     key: "deployments.rollback",
     kind: "command",
     domain: "deployments",
@@ -303,6 +430,34 @@ export const operationCatalog = [
     transports: {
       cli: "yundu rollback <deploymentId>",
       orpc: { method: "POST", path: "/api/deployments/{deploymentId}/rollback" },
+    },
+  },
+  {
+    key: "domain-bindings.create",
+    kind: "command",
+    domain: "domain-bindings",
+    messageName: "CreateDomainBindingCommand",
+    handlerName: "CreateDomainBindingCommandHandler",
+    serviceName: "CreateDomainBindingUseCase",
+    inputSchema: createDomainBindingCommandInputSchema,
+    serviceToken: tokens.createDomainBindingUseCase,
+    transports: {
+      cli: "yundu domain-binding create",
+      orpc: { method: "POST", path: "/api/domain-bindings" },
+    },
+  },
+  {
+    key: "domain-bindings.list",
+    kind: "query",
+    domain: "domain-bindings",
+    messageName: "ListDomainBindingsQuery",
+    handlerName: "ListDomainBindingsQueryHandler",
+    serviceName: "ListDomainBindingsQueryService",
+    inputSchema: listDomainBindingsQueryInputSchema,
+    serviceToken: tokens.listDomainBindingsQueryService,
+    transports: {
+      cli: "yundu domain-binding list",
+      orpc: { method: "GET", path: "/api/domain-bindings" },
     },
   },
   {

@@ -18,8 +18,6 @@ export class TestServerConnectivityCommandHandler
   ) {}
 
   handle(context: ExecutionContext, command: TestServerConnectivityCommand) {
-    return this.useCase.execute(context, {
-      serverId: command.serverId,
-    });
+    return this.useCase.execute(context, command.input);
   }
 }

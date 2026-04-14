@@ -1,14 +1,10 @@
 import {
   DeploymentTargetByIdSpec,
-  DeploymentTargetCredentialKindValue,
   DeploymentTargetId,
-  DeploymentTargetUsername,
   domainError,
   err,
   ok,
   type Result,
-  SshPrivateKeyText,
-  SshPublicKeyText,
   safeTry,
   UpdatedAt,
   UpsertDeploymentTargetSpec,
@@ -16,16 +12,25 @@ import {
 import { inject, injectable } from "tsyringe";
 
 import { type ExecutionContext, toRepositoryContext } from "../../execution-context";
-import { type AppLogger, type Clock, type EventBus, type ServerRepository } from "../../ports";
+import {
+  type AppLogger,
+  type Clock,
+  type EventBus,
+  type ServerRepository,
+  type SshCredentialRepository,
+} from "../../ports";
 import { tokens } from "../../tokens";
 import { publishDomainEventsAndReturn } from "../publish-domain-events";
 import { type ConfigureServerCredentialCommandInput } from "./configure-server-credential.command";
+import { resolveDeploymentTargetCredentialState } from "./deployment-target-credential-input";
 
 @injectable()
 export class ConfigureServerCredentialUseCase {
   constructor(
     @inject(tokens.serverRepository)
     private readonly serverRepository: ServerRepository,
+    @inject(tokens.sshCredentialRepository)
+    private readonly sshCredentialRepository: SshCredentialRepository,
     @inject(tokens.clock)
     private readonly clock: Clock,
     @inject(tokens.eventBus)
@@ -38,7 +43,7 @@ export class ConfigureServerCredentialUseCase {
     context: ExecutionContext,
     input: ConfigureServerCredentialCommandInput,
   ): Promise<Result<null>> {
-    const { clock, eventBus, logger, serverRepository } = this;
+    const { clock, eventBus, logger, serverRepository, sshCredentialRepository } = this;
     const repositoryContext = toRepositoryContext(context);
 
     return safeTry(async function* () {
@@ -53,18 +58,11 @@ export class ConfigureServerCredentialUseCase {
       }
 
       const configuredAt = yield* UpdatedAt.create(clock.now());
-      const credential = {
-        kind: yield* DeploymentTargetCredentialKindValue.create(input.credential.kind),
-        ...(input.credential.username
-          ? { username: yield* DeploymentTargetUsername.create(input.credential.username) }
-          : {}),
-        ...(input.credential.kind === "ssh-private-key" && input.credential.publicKey
-          ? { publicKey: yield* SshPublicKeyText.create(input.credential.publicKey) }
-          : {}),
-        ...(input.credential.kind === "ssh-private-key"
-          ? { privateKey: yield* SshPrivateKeyText.create(input.credential.privateKey) }
-          : {}),
-      };
+      const credential = yield* await resolveDeploymentTargetCredentialState({
+        credential: input.credential,
+        repositoryContext,
+        sshCredentialRepository,
+      });
 
       yield* server.configureCredential({
         credential,

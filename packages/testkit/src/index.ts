@@ -6,6 +6,9 @@ import {
   type DeploymentRepository,
   type DeploymentSummary,
   type DestinationRepository,
+  type DomainBindingReadModel,
+  type DomainBindingRepository,
+  type DomainBindingSummary,
   type EnvironmentReadModel,
   type EnvironmentRepository,
   type EnvironmentSummary,
@@ -22,6 +25,7 @@ import {
   type ServerRepository,
 } from "@yundu/application";
 import {
+  ActiveDomainBindingByOwnerAndRouteSpec,
   Deployment,
   DeploymentByIdSpec,
   type DeploymentMutationSpec,
@@ -36,11 +40,17 @@ import {
   DestinationByServerAndNameSpec,
   type DestinationMutationSpec,
   type DestinationSelectionSpec,
+  DomainBinding,
+  DomainBindingByIdempotencyKeySpec,
+  DomainBindingByIdSpec,
+  type DomainBindingMutationSpec,
+  type DomainBindingSelectionSpec,
   Environment,
   EnvironmentByIdSpec,
   EnvironmentByProjectAndNameSpec,
   type EnvironmentMutationSpec,
   type EnvironmentSelectionSpec,
+  LatestDeploymentSpec,
   Project,
   ProjectByIdSpec,
   ProjectBySlugSpec,
@@ -415,7 +425,106 @@ export class MemoryDeploymentRepository implements DeploymentRepository {
       return this.items.get(spec.id.value) ?? null;
     }
 
+    if (spec instanceof LatestDeploymentSpec) {
+      return (
+        [...this.items.values()]
+          .filter((deployment) => deployment.toState().resourceId.equals(spec.resourceId))
+          .sort((left, right) =>
+            right.toState().createdAt.value.localeCompare(left.toState().createdAt.value),
+          )[0] ?? null
+      );
+    }
+
     return null;
+  }
+}
+
+export class MemoryDomainBindingRepository implements DomainBindingRepository {
+  readonly items = new Map<string, DomainBinding>();
+
+  async upsert(
+    context: RepositoryContext,
+    domainBinding: DomainBinding,
+    spec: DomainBindingMutationSpec,
+  ): Promise<void> {
+    void context;
+    void spec;
+    this.items.set(
+      domainBinding.toState().id.value,
+      DomainBinding.rehydrate(domainBinding.toState()),
+    );
+  }
+
+  async findOne(
+    context: RepositoryContext,
+    spec: DomainBindingSelectionSpec,
+  ): Promise<DomainBinding | null> {
+    void context;
+    if (spec instanceof DomainBindingByIdSpec) {
+      return this.items.get(spec.id.value) ?? null;
+    }
+
+    if (spec instanceof DomainBindingByIdempotencyKeySpec) {
+      for (const domainBinding of this.items.values()) {
+        if (spec.isSatisfiedBy(domainBinding)) {
+          return domainBinding;
+        }
+      }
+    }
+
+    if (spec instanceof ActiveDomainBindingByOwnerAndRouteSpec) {
+      for (const domainBinding of this.items.values()) {
+        if (spec.isSatisfiedBy(domainBinding)) {
+          return domainBinding;
+        }
+      }
+    }
+
+    return null;
+  }
+}
+
+export class MemoryDomainBindingReadModel implements DomainBindingReadModel {
+  constructor(private readonly repository: MemoryDomainBindingRepository) {}
+
+  async list(
+    context: RepositoryContext,
+    input?: {
+      projectId?: string;
+      environmentId?: string;
+      resourceId?: string;
+    },
+  ) {
+    void context;
+    return [...this.repository.items.values()]
+      .map((domainBinding) => domainBinding.toState())
+      .filter((domainBinding) =>
+        input?.projectId ? domainBinding.projectId.value === input.projectId : true,
+      )
+      .filter((domainBinding) =>
+        input?.environmentId ? domainBinding.environmentId.value === input.environmentId : true,
+      )
+      .filter((domainBinding) =>
+        input?.resourceId ? domainBinding.resourceId.value === input.resourceId : true,
+      )
+      .map(
+        (domainBinding): DomainBindingSummary => ({
+          id: domainBinding.id.value,
+          projectId: domainBinding.projectId.value,
+          environmentId: domainBinding.environmentId.value,
+          resourceId: domainBinding.resourceId.value,
+          serverId: domainBinding.serverId.value,
+          destinationId: domainBinding.destinationId.value,
+          domainName: domainBinding.domainName.value,
+          pathPrefix: domainBinding.pathPrefix.value,
+          proxyKind: domainBinding.proxyKind.value,
+          tlsMode: domainBinding.tlsMode.value,
+          certificatePolicy: domainBinding.certificatePolicy.value,
+          status: domainBinding.status.value,
+          verificationAttemptCount: domainBinding.verificationAttempts.length,
+          createdAt: domainBinding.createdAt.value,
+        }),
+      );
   }
 }
 
@@ -499,6 +608,16 @@ export class MemoryDeploymentReadModel implements DeploymentReadModel {
                         ? { targetPort: route.targetPort }
                         : {}),
                     })),
+                  }
+                : {}),
+              ...(deployment.runtimePlan.execution.verificationSteps.length > 0
+                ? {
+                    verificationSteps: deployment.runtimePlan.execution.verificationSteps.map(
+                      (step) => ({
+                        kind: step.kind,
+                        label: step.label,
+                      }),
+                    ),
                   }
                 : {}),
               ...(deployment.runtimePlan.execution.metadata

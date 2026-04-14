@@ -1,25 +1,39 @@
 import { OpenAPIHandler } from "@orpc/openapi/fetch";
-import { ORPCError, os } from "@orpc/server";
+import { eventIterator, ORPCError, os } from "@orpc/server";
 import { RPCHandler } from "@orpc/server/fetch";
 import {
   type AppLogger,
+  CancelDeploymentCommand,
+  CheckDeploymentHealthCommand,
   type Command,
   type CommandBus,
   ConfigureServerCredentialCommand,
   CreateDeploymentCommand,
+  type CreateDeploymentCommandInput,
+  CreateDomainBindingCommand,
   CreateEnvironmentCommand,
   CreateProjectCommand,
+  CreateResourceCommand,
+  CreateSshCredentialCommand,
+  cancelDeploymentCommandInputSchema,
+  checkDeploymentHealthCommandInputSchema,
   configureServerCredentialCommandInputSchema,
   createDeploymentCommandInputSchema,
+  createDomainBindingCommandInputSchema,
   createEnvironmentCommandInputSchema,
   createProjectCommandInputSchema,
+  createResourceCommandInputSchema,
+  createSshCredentialCommandInputSchema,
   DeploymentLogsQuery,
+  type DeploymentProgressEvent,
+  type DeploymentProgressObserver,
   DiffEnvironmentsQuery,
   deploymentLogsQueryInputSchema,
   diffEnvironmentsQueryInputSchema,
   type ExecutionContext,
   type ExecutionContextFactory,
   ListDeploymentsQuery,
+  ListDomainBindingsQuery,
   ListEnvironmentsQuery,
   ListGitHubRepositoriesQuery,
   ListPluginsQuery,
@@ -27,16 +41,23 @@ import {
   ListProvidersQuery,
   ListResourcesQuery,
   ListServersQuery,
+  ListSshCredentialsQuery,
   listDeploymentsQueryInputSchema,
+  listDomainBindingsQueryInputSchema,
   listEnvironmentsQueryInputSchema,
   listGitHubRepositoriesQueryInputSchema,
   listResourcesQueryInputSchema,
+  listSshCredentialsQueryInputSchema,
   PromoteEnvironmentCommand,
   promoteEnvironmentCommandInputSchema,
   type Query,
   type QueryBus,
+  ReattachDeploymentCommand,
+  RedeployResourceCommand,
   RegisterServerCommand,
   RollbackDeploymentCommand,
+  reattachDeploymentCommandInputSchema,
+  redeployResourceCommandInputSchema,
   registerServerCommandInputSchema,
   rollbackDeploymentCommandInputSchema,
   SetEnvironmentVariableCommand,
@@ -49,13 +70,20 @@ import {
   unsetEnvironmentVariableCommandInputSchema,
 } from "@yundu/application";
 import {
+  cancelDeploymentResponseSchema,
+  checkDeploymentHealthResponseSchema,
   createDeploymentResponseSchema,
+  createDomainBindingResponseSchema,
   createEnvironmentResponseSchema,
   createProjectResponseSchema,
+  createResourceResponseSchema,
+  createSshCredentialResponseSchema,
   deploymentLogsResponseSchema,
+  deploymentProgressEventSchema,
   diffEnvironmentResponseSchema,
   environmentSummarySchema,
   listDeploymentsResponseSchema,
+  listDomainBindingsResponseSchema,
   listEnvironmentsResponseSchema,
   listGitHubRepositoriesResponseSchema,
   listPluginsResponseSchema,
@@ -63,7 +91,10 @@ import {
   listProvidersResponseSchema,
   listResourcesResponseSchema,
   listServersResponseSchema,
+  listSshCredentialsResponseSchema,
   promoteEnvironmentResponseSchema,
+  reattachDeploymentResponseSchema,
+  redeployResourceResponseSchema,
   registerServerResponseSchema,
   rollbackDeploymentResponseSchema,
   testServerConnectivityResponseSchema,
@@ -78,11 +109,16 @@ export interface YunduOrpcContext {
   executionContextFactory: ExecutionContextFactory;
   queryBus: QueryBus;
   logger: AppLogger;
+  deploymentProgressObserver?: DeploymentProgressObserver;
 }
 
 interface YunduOrpcRequestContext extends YunduOrpcContext {
   executionContext: ExecutionContext;
 }
+
+type DeploymentProgressStreamEvent = DeploymentProgressEvent & {
+  step: NonNullable<DeploymentProgressEvent["step"]>;
+};
 
 export interface RequestContextRunner {
   runWithRequest<T>(
@@ -253,9 +289,22 @@ function toOrpcError(error: DomainError, context: ExecutionContext) {
         },
       });
     case "conflict":
+    case "resource_slug_conflict":
+    case "deployment_not_redeployable":
       return new ORPCError("CONFLICT", {
         message,
         status: 409,
+        data: {
+          domainCode: error.code,
+          locale: context.locale,
+        },
+      });
+    case "domain_binding_proxy_required":
+    case "domain_binding_context_mismatch":
+    case "resource_context_mismatch":
+      return new ORPCError("BAD_REQUEST", {
+        message,
+        status: 400,
         data: {
           domainCode: error.code,
           locale: context.locale,
@@ -340,6 +389,104 @@ async function executeQuery<TMessage extends Query<TResult>, TResult>(
   );
 }
 
+function createDeploymentStream(
+  context: YunduOrpcRequestContext,
+  input: CreateDeploymentCommandInput,
+): AsyncGenerator<DeploymentProgressStreamEvent, { id: string }, void> {
+  if (!context.deploymentProgressObserver) {
+    throw new ORPCError("SERVICE_UNAVAILABLE", {
+      message: "Deployment progress streaming is not available",
+      status: 503,
+    });
+  }
+
+  const deploymentProgressObserver = context.deploymentProgressObserver;
+
+  return (async function* streamDeploymentProgress() {
+    const events: DeploymentProgressStreamEvent[] = [];
+    let wake: (() => void) | undefined;
+    let commandResult: { id: string } | undefined;
+    let commandError: unknown;
+    let commandDone = false;
+
+    const notify = () => {
+      const currentWake = wake;
+      wake = undefined;
+      currentWake?.();
+    };
+    const unsubscribe = deploymentProgressObserver.subscribe((eventContext, event) => {
+      if (eventContext.requestId !== context.executionContext.requestId) {
+        return;
+      }
+
+      events.push(toDeploymentProgressStreamEvent(event));
+      notify();
+    });
+    const command = executeCommand<CreateDeploymentCommand, { id: string }>(
+      context,
+      CreateDeploymentCommand.create(input),
+    )
+      .then((result) => {
+        commandResult = result;
+      })
+      .catch((error: unknown) => {
+        commandError = error;
+      })
+      .finally(() => {
+        commandDone = true;
+        notify();
+      });
+
+    try {
+      while (!commandDone || events.length > 0) {
+        const event = events.shift();
+
+        if (event) {
+          yield event;
+          continue;
+        }
+
+        await new Promise<void>((resolve) => {
+          wake = resolve;
+          if (commandDone || events.length > 0) {
+            notify();
+          }
+        });
+      }
+
+      await command;
+
+      if (commandError) {
+        throw commandError;
+      }
+
+      if (!commandResult) {
+        throw new ORPCError("INTERNAL_SERVER_ERROR", {
+          message: "Deployment stream finished without a deployment result",
+          status: 500,
+        });
+      }
+
+      return commandResult;
+    } finally {
+      unsubscribe();
+    }
+  })();
+}
+
+function toDeploymentProgressStreamEvent(
+  event: DeploymentProgressEvent,
+): DeploymentProgressStreamEvent {
+  return {
+    ...event,
+    step: event.step ?? {
+      current: 1,
+      total: 1,
+      label: event.phase,
+    },
+  };
+}
+
 function createRequestExecutionContext(
   executionContextFactory: ExecutionContextFactory,
   entrypoint: "http" | "rpc",
@@ -408,10 +555,44 @@ export const configureServerCredentialProcedure = base
     executeCommand(context, ConfigureServerCredentialCommand.create(input)),
   );
 
+export const listSshCredentialsProcedure = base
+  .route({
+    method: "GET",
+    path: "/credentials/ssh",
+    successStatus: 200,
+  })
+  .input(listSshCredentialsQueryInputSchema)
+  .output(listSshCredentialsResponseSchema)
+  .handler(async ({ context }) => executeQuery(context, ListSshCredentialsQuery.create()));
+
+export const createSshCredentialProcedure = base
+  .route({
+    method: "POST",
+    path: "/credentials/ssh",
+    successStatus: 201,
+  })
+  .input(createSshCredentialCommandInputSchema)
+  .output(createSshCredentialResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, CreateSshCredentialCommand.create(input)),
+  );
+
 export const testServerConnectivityProcedure = base
   .route({
     method: "POST",
     path: "/servers/{serverId}/connectivity-tests",
+    successStatus: 200,
+  })
+  .input(testServerConnectivityCommandInputSchema)
+  .output(testServerConnectivityResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, TestServerConnectivityCommand.create(input)),
+  );
+
+export const testDraftServerConnectivityProcedure = base
+  .route({
+    method: "POST",
+    path: "/servers/connectivity-tests",
     successStatus: 200,
   })
   .input(testServerConnectivityCommandInputSchema)
@@ -453,6 +634,42 @@ export const listResourcesProcedure = base
   .input(listResourcesQueryInputSchema)
   .output(listResourcesResponseSchema)
   .handler(async ({ input, context }) => executeQuery(context, ListResourcesQuery.create(input)));
+
+export const createResourceProcedure = base
+  .route({
+    method: "POST",
+    path: "/resources",
+    successStatus: 201,
+  })
+  .input(createResourceCommandInputSchema)
+  .output(createResourceResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, CreateResourceCommand.create(input)),
+  );
+
+export const createDomainBindingProcedure = base
+  .route({
+    method: "POST",
+    path: "/domain-bindings",
+    successStatus: 201,
+  })
+  .input(createDomainBindingCommandInputSchema)
+  .output(createDomainBindingResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, CreateDomainBindingCommand.create(input)),
+  );
+
+export const listDomainBindingsProcedure = base
+  .route({
+    method: "GET",
+    path: "/domain-bindings",
+    successStatus: 200,
+  })
+  .input(listDomainBindingsQueryInputSchema)
+  .output(listDomainBindingsResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ListDomainBindingsQuery.create(input)),
+  );
 
 export const showEnvironmentProcedure = base
   .route({
@@ -534,6 +751,64 @@ export const createDeploymentProcedure = base
     executeCommand(context, CreateDeploymentCommand.create(input)),
   );
 
+export const cancelDeploymentProcedure = base
+  .route({
+    method: "POST",
+    path: "/deployments/{deploymentId}/cancel",
+    successStatus: 200,
+  })
+  .input(cancelDeploymentCommandInputSchema)
+  .output(cancelDeploymentResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, CancelDeploymentCommand.create(input)),
+  );
+
+export const checkDeploymentHealthProcedure = base
+  .route({
+    method: "POST",
+    path: "/deployments/{deploymentId}/health-checks",
+    successStatus: 200,
+  })
+  .input(checkDeploymentHealthCommandInputSchema)
+  .output(checkDeploymentHealthResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, CheckDeploymentHealthCommand.create(input)),
+  );
+
+export const redeployResourceProcedure = base
+  .route({
+    method: "POST",
+    path: "/resources/{resourceId}/redeploy",
+    successStatus: 201,
+  })
+  .input(redeployResourceCommandInputSchema)
+  .output(redeployResourceResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, RedeployResourceCommand.create(input)),
+  );
+
+export const reattachDeploymentProcedure = base
+  .route({
+    method: "POST",
+    path: "/deployments/{deploymentId}/reattach",
+    successStatus: 200,
+  })
+  .input(reattachDeploymentCommandInputSchema)
+  .output(reattachDeploymentResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, ReattachDeploymentCommand.create(input)),
+  );
+
+export const createDeploymentStreamProcedure = base
+  .route({
+    method: "POST",
+    path: "/deployments/stream",
+    successStatus: 200,
+  })
+  .input(createDeploymentCommandInputSchema)
+  .output(eventIterator(deploymentProgressEventSchema, createDeploymentResponseSchema))
+  .handler(({ input, context }) => createDeploymentStream(context, input));
+
 export const deploymentLogsProcedure = base
   .route({
     method: "GET",
@@ -596,6 +871,13 @@ export const yunduOrpcRouter = {
     create: registerServerProcedure,
     configureCredential: configureServerCredentialProcedure,
     testConnectivity: testServerConnectivityProcedure,
+    testDraftConnectivity: testDraftServerConnectivityProcedure,
+  },
+  credentials: {
+    ssh: {
+      list: listSshCredentialsProcedure,
+      create: createSshCredentialProcedure,
+    },
   },
   environments: {
     list: listEnvironmentsProcedure,
@@ -608,11 +890,21 @@ export const yunduOrpcRouter = {
   },
   resources: {
     list: listResourcesProcedure,
+    create: createResourceProcedure,
+  },
+  domainBindings: {
+    list: listDomainBindingsProcedure,
+    create: createDomainBindingProcedure,
   },
   deployments: {
     list: listDeploymentsProcedure,
     create: createDeploymentProcedure,
+    cancel: cancelDeploymentProcedure,
+    checkHealth: checkDeploymentHealthProcedure,
+    createStream: createDeploymentStreamProcedure,
     logs: deploymentLogsProcedure,
+    reattach: reattachDeploymentProcedure,
+    redeployResource: redeployResourceProcedure,
     rollback: rollbackDeploymentProcedure,
   },
   providers: {
@@ -736,7 +1028,9 @@ export function mountYunduOrpcRoutes(
 
   const routes = [
     "/api/projects",
+    "/api/credentials/ssh",
     "/api/servers",
+    "/api/servers/connectivity-tests",
     "/api/servers/:serverId/credentials",
     "/api/servers/:serverId/connectivity-tests",
     "/api/environments",
@@ -746,8 +1040,14 @@ export function mountYunduOrpcRoutes(
     "/api/environments/:environmentId/promote",
     "/api/environments/:environmentId/diff/:otherEnvironmentId",
     "/api/resources",
+    "/api/resources/:resourceId/redeploy",
+    "/api/domain-bindings",
     "/api/deployments",
+    "/api/deployments/stream",
+    "/api/deployments/:deploymentId/cancel",
+    "/api/deployments/:deploymentId/health-checks",
     "/api/deployments/:deploymentId/logs",
+    "/api/deployments/:deploymentId/reattach",
     "/api/deployments/:deploymentId/rollback",
     "/api/providers",
     "/api/plugins",
