@@ -11,6 +11,7 @@ import {
   type DeploymentMutationSpecVisitor,
   type DeploymentSelectionSpec,
   type DeploymentSelectionSpecVisitor,
+  type LatestDeploymentSpec,
   type UpsertDeploymentSpec,
 } from "@yundu/core";
 import { type Insertable, type Kysely, type Selectable, type SelectQueryBuilder } from "kysely";
@@ -38,6 +39,17 @@ class KyselyDeploymentSelectionVisitor
     spec: DeploymentByIdSpec,
   ): DeploymentSelectionQuery {
     return query.where("id", "=", spec.id.value);
+  }
+
+  visitLatestDeployment(
+    query: DeploymentSelectionQuery,
+    spec: LatestDeploymentSpec,
+  ): DeploymentSelectionQuery {
+    return query
+      .where("resource_id", "=", spec.resourceId.value)
+      .orderBy("created_at", "desc")
+      .orderBy("id", "desc")
+      .limit(1);
   }
 }
 

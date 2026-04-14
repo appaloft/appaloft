@@ -1,6 +1,8 @@
 export * from "./deployment-read-model";
 export * from "./deployment-repository";
 export * from "./destination-repository";
+export * from "./domain-binding-read-model";
+export * from "./domain-binding-repository";
 export * from "./environment-read-model";
 export * from "./environment-repository";
 export * from "./project-read-model";
@@ -9,3 +11,5 @@ export * from "./resource-read-model";
 export * from "./resource-repository";
 export * from "./server-read-model";
 export * from "./server-repository";
+export * from "./ssh-credential-read-model";
+export * from "./ssh-credential-repository";

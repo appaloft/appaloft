@@ -16,10 +16,27 @@ export interface ServersTable {
   host: string;
   port: number;
   provider_key: string;
+  edge_proxy_kind: string | null;
+  edge_proxy_status: string | null;
+  edge_proxy_last_attempt_at: string | null;
+  edge_proxy_last_succeeded_at: string | null;
+  edge_proxy_last_error_code: string | null;
+  edge_proxy_last_error_message: string | null;
+  credential_id: string | null;
   credential_kind: string | null;
   credential_username: string | null;
   credential_public_key: string | null;
   credential_private_key: string | null;
+  created_at: TimestampColumn;
+}
+
+export interface SshCredentialsTable {
+  id: string;
+  name: string;
+  kind: string;
+  username: string | null;
+  public_key: string | null;
+  private_key: string;
   created_at: TimestampColumn;
 }
 
@@ -53,6 +70,16 @@ export interface ResourcesTable {
     Record<string, unknown>[],
     Record<string, unknown>[],
     Record<string, unknown>[]
+  >;
+  source_binding: ColumnType<
+    Record<string, unknown> | null,
+    Record<string, unknown> | null,
+    Record<string, unknown> | null
+  >;
+  runtime_profile: ColumnType<
+    Record<string, unknown> | null,
+    Record<string, unknown> | null,
+    Record<string, unknown> | null
   >;
   created_at: TimestampColumn;
 }
@@ -94,6 +121,28 @@ export interface DeploymentsTable {
   rollback_of_deployment_id: string | null;
 }
 
+export interface DomainBindingsTable {
+  id: string;
+  project_id: string;
+  environment_id: string;
+  resource_id: string;
+  server_id: string;
+  destination_id: string;
+  domain_name: string;
+  path_prefix: string;
+  proxy_kind: string;
+  tls_mode: string;
+  certificate_policy: string;
+  status: string;
+  verification_attempts: ColumnType<
+    Record<string, unknown>[],
+    Record<string, unknown>[],
+    Record<string, unknown>[]
+  >;
+  idempotency_key: string | null;
+  created_at: TimestampColumn;
+}
+
 export interface AuditLogsTable {
   id: string;
   aggregate_id: string;
@@ -113,11 +162,13 @@ export interface ProviderJobLogsTable {
 export interface Database {
   projects: ProjectsTable;
   servers: ServersTable;
+  ssh_credentials: SshCredentialsTable;
   destinations: DestinationsTable;
   environments: EnvironmentsTable;
   resources: ResourcesTable;
   environment_variables: EnvironmentVariablesTable;
   deployments: DeploymentsTable;
+  domain_bindings: DomainBindingsTable;
   audit_logs: AuditLogsTable;
   provider_job_logs: ProviderJobLogsTable;
 }
