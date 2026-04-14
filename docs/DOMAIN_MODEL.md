@@ -24,6 +24,17 @@ Runtime placement is a separate relationship:
 
 A deployment platform only becomes coherent when those boundaries are explicit.
 
+Console and navigation ownership follows the same model. `Project` is the resource collection
+boundary; `Resource` owns deploy/redeploy actions and deployment history; `Deployment` is the
+attempt record. Project-level deployment lists are read-model rollups across resources, not
+project-owned deployment write operations. See
+[ADR-013: Project Resource Navigation And Deployment Ownership](./decisions/ADR-013-project-resource-navigation-and-deployment-ownership.md).
+
+Quick Deploy is not a domain aggregate in this model. It is an entry workflow that guides source,
+project, deployment target/server, environment, resource, and deployment input collection before
+dispatching explicit operations. The final deployment write remains `deployments.create`; see
+[ADR-010: Quick Deploy Workflow Boundary](./decisions/ADR-010-quick-deploy-workflow-boundary.md).
+
 ## Core Principles
 
 - aggregate boundaries follow invariants, not UI screens
@@ -52,6 +63,11 @@ Implemented now:
 - `Project`
 - `Environment`
 
+Boundary rule:
+- Project is the top-level workspace and resource collection boundary
+- Project must not own deployment attempt actions directly
+- Project-level deployment lists are rollup read models over Resource-owned deployments
+
 ### Configuration
 
 Owns:
@@ -68,6 +84,7 @@ Implemented now:
 Owns:
 - `DeploymentTarget`
 - `Destination`
+- `DomainBinding`
 - access route intent for proxy/domain exposure
 - target capability and provider-facing endpoint metadata
 - deployment placement / isolation boundaries on a target
@@ -75,8 +92,11 @@ Owns:
 Implemented now:
 - `DeploymentTarget`
 - optional deployment target credential state for local SSH agent or SSH private key access
+- server-level edge proxy intent and bootstrap status for `none`, `traefik`, and `caddy`
 - `Destination`
 - runtime-plan access routes with `none`, `traefik`, and `caddy` proxy kinds
+- durable `DomainBinding` state for resource-scoped public domain ownership and pending
+  verification
 
 Transport compatibility note:
 - CLI / HTTP still expose `server` naming for backward compatibility
@@ -84,8 +104,12 @@ Transport compatibility note:
 - `Destination` is the concrete place a resource deploys to on a target/server
 - access routes express public-domain intent; Traefik and Caddy label/config generation belongs in
   runtime adapters, not in core aggregates
+- server registration emits a domain event; application event handlers may soft-fail while asking
+  runtime adapters to bootstrap the configured edge proxy and persist the resulting status
 - runtime adapters may ensure the shared edge proxy and Docker network when a runtime plan carries
   access routes
+- `DomainBinding` is separate from deployment runtime access-route hints; it starts a durable
+  routing/domain/TLS lifecycle and publishes `domain-binding-requested`
 
 ### Workload Delivery
 
@@ -100,6 +124,14 @@ Implemented now:
 - foundational `Resource`
 - foundational `Workload`, `SourceSpec`, `BuildSpec`, `RuntimeSpec` models in `core`
 - runtime planning still flows through `RuntimePlanResolver` and `RuntimePlan`
+
+Boundary rule:
+- reusable source binding, build commands, runtime commands, port defaults, and health policy belong
+  to the resource-side source/runtime profile language
+- `RuntimePlanStrategy` describes how a source is planned; the compatibility field name
+  `deploymentMethod` must not be treated as a `Deployment` aggregate concept
+- resource detail is the owner-scoped console surface for deploy/redeploy, deployment history,
+  source/runtime profile, domain/TLS, and resource-specific configuration actions
 
 ### Dependency Resources
 
@@ -123,6 +155,14 @@ Implemented now:
 - `Deployment`
 - `RuntimePlan`
 - `RollbackPlan`
+
+Boundary rule:
+- `Deployment` owns an accepted attempt and the immutable `RuntimePlanSnapshot` used by that
+  attempt
+- `Deployment` does not own durable source binding, runtime profile, domain binding, or certificate
+  policy
+- deployments are displayed under the Resource that owns them; global or project-level deployment
+  pages are read/query rollups
 
 ### Identity & Governance
 
@@ -158,6 +198,7 @@ Implemented now:
 - `Environment`
 - `DeploymentTarget`
 - `Destination`
+- `DomainBinding`
 - `Resource`
 - `Workload`
 - `ResourceInstance`
@@ -193,6 +234,8 @@ Implemented now:
 - `EnvironmentRepository` persists only the `Environment` aggregate root
 - `ResourceRepository` persists only the `Resource` aggregate root
 - `DeploymentRepository` persists only the `Deployment` aggregate root
+- `DomainBindingRepository` persists only the `DomainBinding` aggregate root and its owned
+  verification attempts
 - selection spec visitors own the full persistence-query translation
 - persistence adapters pass a `SelectQueryBuilder` into the selection visitor and execute the returned builder
 - repositories must not split selection-spec translation into separate intermediate clause objects
@@ -260,7 +303,48 @@ Current scope:
 - persisted and bootstrapped as a default local destination
 - deployment config may declare a target-local destination
 - proxy/domain routing is modeled as access-route intent on runtime plans; standalone persisted
-  access-route aggregates remain future work
+  access-route aggregates remain separate from durable `DomainBinding`
+
+### DomainBinding
+
+Meaning:
+- durable public domain and route ownership state for a resource placement
+- connects project/environment/resource ownership to destination/server routing and TLS readiness
+
+Rules:
+- owner scope is governed by ADR-005: project, environment, resource, destination, server, domain,
+  path prefix, proxy kind, TLS mode, and certificate policy are explicit
+- active bindings must be unique by normalized project/environment/resource/domain/path scope
+- durable bindings require an edge proxy kind; `none` is only valid for deployment runtime
+  access-route hints
+- command success means the request is accepted and pending verification, not traffic readiness
+- the first manual domain verification attempt is owned by the aggregate at creation time
+
+Current scope:
+- persisted through `DomainBindingRepository`
+- created by `domain-bindings.create`
+- publishes `domain-binding-requested`
+- records pending verification state and first manual verification attempt
+- DNS verification, certificate issuance, and domain-ready transitions remain future workflow work
+
+### SSH Credential
+
+Meaning:
+- reusable SSH login material for deployment targets
+- lets a server reference an imported or generated key instead of forcing every server flow to
+  paste private key text
+
+Rules:
+- the private key is write-side secret material and must not appear in read models
+- read models may expose whether a private key or public key is configured, plus display metadata
+  such as name and username
+- configuring a deployment target from a credential stores a server-local execution snapshot and
+  the credential reference
+
+Current scope:
+- persisted through the credential library
+- listed as masked summaries
+- usable when configuring a deployment target credential
 
 ### Workload
 
@@ -281,6 +365,8 @@ Meaning:
 - project/environment-scoped deployable unit
 - can represent an app, API service, database, cache, worker, static site, external service, or
   Docker Compose stack
+- created explicitly through the minimum `resources.create` lifecycle governed by
+  [ADR-011: Resource Create Minimum Lifecycle](./decisions/ADR-011-resource-create-minimum-lifecycle.md)
 
 Rules:
 - names are unique within a project environment
@@ -400,7 +486,8 @@ Application slices should be understood through the same contexts:
 
 - `workspace`: projects and environments
 - `workload-delivery`: project resources and workloads
-- `runtime-topology`: deployment target registration and listing
+- `runtime-topology`: deployment target registration/listing, destinations, edge proxy state, and
+  domain binding admission
 - `release-orchestration`: deployment creation, listing, logs, rollback
 - `extensibility`: providers, plugins, GitHub repository browsing, diagnostics
 

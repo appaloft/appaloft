@@ -179,7 +179,7 @@ Current mapping:
 - `prebuilt-image` -> prebuilt image + `docker-container`
 - `workspace-commands` -> command-driven build/start + `host-process`
 
-This is intentionally broader than Coolify's container-first model because Yundu needs to support
+This is intentionally broader than a container-only platform model because Yundu needs to support
 local-first validation and non-Docker targets as first-class flows.
 
 ## Domain Terminology Compatibility
