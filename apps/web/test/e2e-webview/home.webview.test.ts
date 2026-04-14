@@ -430,40 +430,25 @@ async function expectText(view: Bun.WebView, text: string): Promise<void> {
   );
 }
 
-async function expectInputValue(
-  view: Bun.WebView,
-  selector: string,
-  expectedValue: string,
-): Promise<void> {
-  const value = await waitFor(
-    () =>
-      view.evaluate<string>(
-        `(() => document.querySelector(${JSON.stringify(selector)})?.value ?? "")()`,
-      ),
-    (content) => content === expectedValue,
-    `Expected ${selector} to have value: ${expectedValue}`,
-  );
-
-  expect(value).toBe(expectedValue);
-}
-
 async function clickButtonByText(view: Bun.WebView, text: string): Promise<void> {
-  const marker = `webview-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-  const selector = `button[data-webview-target="${marker}"]`;
-  const found = await view.evaluate<boolean>(
-    `(() => {
-      const elements = Array.from(document.querySelectorAll("button"));
-      const element = elements.find((candidate) => candidate.textContent?.includes(${JSON.stringify(text)}));
-      if (!element) {
-        return false;
-      }
-      element.setAttribute("data-webview-target", ${JSON.stringify(marker)});
-      return true;
-    })()`,
+  const found = await waitFor(
+    () =>
+      view.evaluate<boolean>(
+        `(() => {
+          const elements = Array.from(document.querySelectorAll("button, a"));
+          const element = elements.find((candidate) => candidate.textContent?.includes(${JSON.stringify(text)}));
+          if (!element) {
+            return false;
+          }
+          element.click();
+          return true;
+        })()`,
+      ),
+    Boolean,
+    `Expected a button or link with text: ${text}`,
   );
 
   expect(found).toBe(true);
-  await view.click(selector);
 }
 
 beforeAll(async () => {
@@ -482,7 +467,7 @@ describe("console e2e with Bun.WebView", () => {
     await view.navigate(`${previewUrl}/`);
 
     await expectText(view, "最近部署");
-    await expectText(view, "快速部署");
+    await expectText(view, "新部署");
     await expectText(view, "查看项目");
     await expectText(view, "查看部署");
     await expectText(view, "Demo");
@@ -491,19 +476,19 @@ describe("console e2e with Bun.WebView", () => {
     await view.navigate(`${previewUrl}/projects`);
     await expectText(view, "项目");
     await expectText(view, "Demo");
-    await expectText(view, "production");
+    await expectText(view, "最近部署");
 
     await view.navigate(`${previewUrl}/deployments`);
-    await expectText(view, "来源");
+    await expectText(view, "workspace");
     await expectText(view, "Demo");
-    await expectText(view, "edge");
     await expectText(view, "production");
     await expectText(view, "succeeded");
 
-    await clickButtonByText(view, "快速部署");
+    await clickButtonByText(view, "新部署");
     await expectText(view, "本地目录");
+    await clickButtonByText(view, "GitHub 仓库");
     await expectText(view, "后端尚未配置 GitHub OAuth");
-  });
+  }, 15_000);
 
   test("shows the GitHub repository picker and fills the import wizard after auth", async () => {
     activeScenario = "github-connected";
@@ -511,15 +496,15 @@ describe("console e2e with Bun.WebView", () => {
     await using view = createWebView();
     await view.navigate(`${previewUrl}/`);
 
-    await clickButtonByText(view, "快速部署");
+    await clickButtonByText(view, "新部署");
     await clickButtonByText(view, "GitHub 仓库");
 
     await expectText(view, "acme/platform");
     await clickButtonByText(view, "acme/platform");
 
-    await expectInputValue(view, "#source-locator", "https://github.com/acme/platform.git");
-    await expectInputValue(view, "#project-name", "platform");
-    await expectText(view, "已选择仓库");
+    await expectText(view, "https://github.com/acme/platform.git");
+    await clickButtonByText(view, "下一步");
+    await expectText(view, "项目");
     await expectText(view, "octocat");
-  });
+  }, 15_000);
 });

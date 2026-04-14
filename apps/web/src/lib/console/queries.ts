@@ -2,6 +2,7 @@ import { createQuery, queryOptions } from "@tanstack/svelte-query";
 import {
   type AuthSessionResponse,
   type DeploymentSummary,
+  type DomainBindingSummary,
   type EnvironmentSummary,
   type HealthResponse,
   type ListProvidersResponse,
@@ -91,6 +92,13 @@ export function createConsoleQueries(enabled: boolean) {
       enabled,
     }),
   );
+  const domainBindingsQuery = createQuery(() =>
+    queryOptions({
+      queryKey: ["domain-bindings"],
+      queryFn: () => orpcClient.domainBindings.list({}),
+      enabled,
+    }),
+  );
   const providersQuery = createQuery(() =>
     queryOptions({
       queryKey: ["providers"],
@@ -109,6 +117,7 @@ export function createConsoleQueries(enabled: boolean) {
     environmentsQuery,
     resourcesQuery,
     deploymentsQuery,
+    domainBindingsQuery,
     providersQuery,
   };
 }
@@ -119,5 +128,6 @@ export type ConsoleQueryData = {
   environments: EnvironmentSummary[];
   resources: ResourceSummary[];
   deployments: DeploymentSummary[];
+  domainBindings: DomainBindingSummary[];
   providers: ProviderSummary[];
 };

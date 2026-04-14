@@ -13,6 +13,9 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [tailwindcss(), sveltekit()],
     server: {
+      watch: {
+        ignored: ["**/build/**", "**/.svelte-kit/output/**"],
+      },
       proxy: {
         "/api": {
           target: proxyTarget,
