@@ -10,6 +10,7 @@ import {
   DestinationId,
   DestinationKindValue,
   DestinationName,
+  EdgeProxyKindValue,
   EnvironmentByProjectAndNameSpec,
   EnvironmentId,
   EnvironmentKindValue,
@@ -105,6 +106,7 @@ export class DeploymentContextDefaultsFactory implements DeploymentContextDefaul
         providerKey,
         createdAt,
         port,
+        edgeProxyKind: EdgeProxyKindValue.rehydrate("traefik"),
       });
       return ok(server);
     });

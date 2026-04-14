@@ -3,6 +3,7 @@ import {
   DeploymentTarget,
   DeploymentTargetId,
   DeploymentTargetName,
+  EdgeProxyKindValue,
   HostAddress,
   ok,
   PortNumber,
@@ -53,6 +54,7 @@ export class RegisterServerUseCase {
       const providerKey = yield* ProviderKey.create(input.providerKey);
       const createdAt = yield* CreatedAt.create(clock.now());
       const port = yield* PortNumber.create(input.port ?? 22);
+      const edgeProxyKind = yield* EdgeProxyKindValue.create(input.proxyKind ?? "traefik");
 
       const server = yield* DeploymentTarget.register({
         id: serverId,
@@ -61,6 +63,7 @@ export class RegisterServerUseCase {
         providerKey,
         createdAt,
         port,
+        edgeProxyKind,
       });
 
       await serverRepository.upsert(

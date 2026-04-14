@@ -83,6 +83,13 @@ export class RollbackDeploymentUseCase {
       const startResult = deploymentLifecycleService.startExecution(rollbackDeployment);
       yield* startResult;
 
+      await deploymentRepository.upsert(
+        repositoryContext,
+        rollbackDeployment,
+        UpsertDeploymentSpec.fromDeployment(rollbackDeployment),
+      );
+      await publishDomainEventsAndReturn(context, eventBus, logger, rollbackDeployment, undefined);
+
       const rollbackPlanResult = rollbackPlanFactory.create(deployment);
       const rollbackPlan = yield* rollbackPlanResult;
       const rollbackExecutionResult = await executionBackend.rollback(

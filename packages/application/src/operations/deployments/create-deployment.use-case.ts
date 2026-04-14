@@ -1,4 +1,14 @@
-import { ok, type Result, safeTry, UpsertDeploymentSpec } from "@yundu/core";
+import {
+  domainError,
+  err,
+  LatestDeploymentSpec,
+  ok,
+  type Resource,
+  type Result,
+  SourceDescriptor,
+  safeTry,
+  UpsertDeploymentSpec,
+} from "@yundu/core";
 import { i18nKeys } from "@yundu/i18n";
 import { inject, injectable } from "tsyringe";
 import { deploymentProgressSteps, reportDeploymentProgress } from "../../deployment-progress";
@@ -9,6 +19,7 @@ import {
   type DeploymentRepository,
   type EventBus,
   type ExecutionBackend,
+  type RequestedDeploymentConfig,
   type RuntimePlanResolver,
   type SourceDetector,
 } from "../../ports";
@@ -21,6 +32,56 @@ import { type DeploymentContextResolver } from "./deployment-context.resolver";
 import { type DeploymentLifecycleService } from "./deployment-lifecycle.service";
 import { type DeploymentSnapshotFactory } from "./deployment-snapshot.factory";
 import { type RuntimePlanResolutionInputBuilder } from "./runtime-plan-resolution-input.builder";
+
+function createResourceSourceDescriptor(
+  resource: Resource,
+): Result<{ source: SourceDescriptor; reasoning: string[] }> {
+  const resourceState = resource.toState();
+  const sourceBinding = resourceState.sourceBinding;
+
+  if (!sourceBinding) {
+    return err(
+      domainError.validation("Resource source binding is required for deployment admission", {
+        phase: "resource-source-resolution",
+        resourceId: resourceState.id.value,
+      }),
+    );
+  }
+
+  const source = SourceDescriptor.rehydrate({
+    kind: sourceBinding.kind,
+    locator: sourceBinding.locator,
+    displayName: sourceBinding.displayName,
+    ...(sourceBinding.metadata ? { metadata: { ...sourceBinding.metadata } } : {}),
+  });
+
+  return ok({
+    source,
+    reasoning: [`Resource source binding kind: ${sourceBinding.kind.value}`],
+  });
+}
+
+function shouldEnrichSourceFromDetector(resource: Resource): boolean {
+  const sourceKind = resource.toState().sourceBinding?.kind.value;
+  return sourceKind === "local-folder" || sourceKind === "local-git" || sourceKind === "compose";
+}
+
+function requestedDeploymentFromResource(resource: Resource): RequestedDeploymentConfig {
+  const runtimeProfile = resource.toState().runtimeProfile;
+
+  return {
+    method: runtimeProfile?.strategy.value ?? "auto",
+    ...(runtimeProfile?.installCommand
+      ? { installCommand: runtimeProfile.installCommand.value }
+      : {}),
+    ...(runtimeProfile?.buildCommand ? { buildCommand: runtimeProfile.buildCommand.value } : {}),
+    ...(runtimeProfile?.startCommand ? { startCommand: runtimeProfile.startCommand.value } : {}),
+    ...(runtimeProfile?.port ? { port: runtimeProfile.port.value } : {}),
+    ...(runtimeProfile?.healthCheckPath
+      ? { healthCheckPath: runtimeProfile.healthCheckPath.value }
+      : {}),
+  };
+}
 
 @injectable()
 export class CreateDeploymentUseCase {
@@ -92,9 +153,32 @@ export class CreateDeploymentUseCase {
         effectiveInput,
       );
       const { project, server, destination, environment, resource } = yield* resolvedContextResult;
+      const latestDeployment = await deploymentRepository.findOne(
+        repositoryContext,
+        LatestDeploymentSpec.forResource(resource.toState().id),
+      );
 
-      const detectedResult = await sourceDetector.detect(context, effectiveInput.sourceLocator);
-      const detected = yield* detectedResult;
+      if (latestDeployment && !latestDeployment.canStartNewDeployment()) {
+        const latestDeploymentState = latestDeployment.toState();
+        return err(
+          domainError.deploymentNotRedeployable(
+            "Latest deployment for this resource must be succeeded or failed before redeploying",
+            {
+              deploymentId: latestDeploymentState.id.value,
+              resourceId: latestDeploymentState.resourceId.value,
+              status: latestDeploymentState.status.value,
+            },
+          ),
+        );
+      }
+
+      const resourceSourceResult = createResourceSourceDescriptor(resource);
+      const resourceSource = yield* resourceSourceResult;
+      let detected = resourceSource;
+      if (shouldEnrichSourceFromDetector(resource)) {
+        const detectedResult = await sourceDetector.detect(context, resourceSource.source.locator);
+        detected = yield* detectedResult;
+      }
       reportDeploymentProgress(deploymentProgressReporter, context, {
         phase: "detect",
         status: "succeeded",
@@ -118,20 +202,11 @@ export class CreateDeploymentUseCase {
         server,
         environmentSnapshot: snapshot,
         detectedReasoning: detected.reasoning,
-        command: effectiveInput,
+        requestedDeployment: requestedDeploymentFromResource(resource),
       });
       const runtimePlanInput = yield* runtimePlanInputResult;
       const runtimePlanResult = await runtimePlanResolver.resolve(context, runtimePlanInput);
       const runtimePlan = yield* runtimePlanResult;
-      reportDeploymentProgress(deploymentProgressReporter, context, {
-        phase: "plan",
-        status: "succeeded",
-        step: deploymentProgressSteps.plan,
-        message: context.t(i18nKeys.backend.deployment.selectedRuntimeStrategy, {
-          buildStrategy: runtimePlan.buildStrategy,
-          executionKind: runtimePlan.execution.kind,
-        }),
-      });
       const deploymentResult = deploymentFactory.create({
         project,
         server,
@@ -142,6 +217,17 @@ export class CreateDeploymentUseCase {
         environmentSnapshot: snapshot,
       });
       const deployment = yield* deploymentResult;
+      const deploymentId = deployment.toState().id.value;
+      reportDeploymentProgress(deploymentProgressReporter, context, {
+        deploymentId,
+        phase: "plan",
+        status: "succeeded",
+        step: deploymentProgressSteps.plan,
+        message: context.t(i18nKeys.backend.deployment.selectedRuntimeStrategy, {
+          buildStrategy: runtimePlan.buildStrategy,
+          executionKind: runtimePlan.execution.kind,
+        }),
+      });
 
       const prepareResult = deploymentLifecycleService.prepareForExecution(deployment);
       yield* prepareResult;
@@ -155,6 +241,13 @@ export class CreateDeploymentUseCase {
 
       const startResult = deploymentLifecycleService.startExecution(deployment);
       yield* startResult;
+
+      await deploymentRepository.upsert(
+        repositoryContext,
+        deployment,
+        UpsertDeploymentSpec.fromDeployment(deployment),
+      );
+      await publishDomainEventsAndReturn(context, eventBus, logger, deployment, undefined);
 
       const executionResult = await executionBackend.execute(context, deployment);
       const execution = yield* executionResult;

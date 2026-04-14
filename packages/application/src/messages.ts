@@ -1,4 +1,5 @@
 export * from "./deployment-messages";
+export * from "./domain-binding-messages";
 export * from "./environment-messages";
 export * from "./operation-catalog";
 export * from "./project-messages";

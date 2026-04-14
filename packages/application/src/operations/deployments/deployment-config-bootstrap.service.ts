@@ -13,6 +13,7 @@ import {
   DestinationKindValue,
   DestinationName,
   domainError,
+  EdgeProxyKindValue,
   EnvironmentByIdSpec,
   EnvironmentByProjectAndNameSpec,
   EnvironmentId,
@@ -67,12 +68,29 @@ import {
   type IdGenerator,
   type ProjectRepository,
   type ProviderRegistry,
+  type RequestedDeploymentConfig,
   type ResourceRepository,
   type ServerRepository,
 } from "../../ports";
 import { tokens } from "../../tokens";
 import { publishDomainEventsAndReturn } from "../publish-domain-events";
 import { type CreateDeploymentCommandInput } from "./create-deployment.command";
+
+type LegacyDeploymentBootstrapInput = CreateDeploymentCommandInput & {
+  configFilePath?: string | undefined;
+  sourceLocator?: string | undefined;
+  deploymentMethod?: RequestedDeploymentConfig["method"] | undefined;
+  installCommand?: string | undefined;
+  buildCommand?: string | undefined;
+  startCommand?: string | undefined;
+  port?: number | undefined;
+  healthCheckPath?: string | undefined;
+  proxyKind?: RequestedDeploymentConfig["proxyKind"] | undefined;
+  domains?: string[] | undefined;
+  pathPrefix?: string | undefined;
+  tlsMode?: RequestedDeploymentConfig["tlsMode"] | undefined;
+  resource?: DeploymentConfiguredResource | undefined;
+};
 
 function normalizeProviderKey(providerKey: string): string {
   switch (providerKey.trim()) {
@@ -126,9 +144,9 @@ function selectDeploymentTarget(
 }
 
 function mergeConfigIntoCommand(
-  input: CreateDeploymentCommandInput,
+  input: LegacyDeploymentBootstrapInput,
   config: DeploymentConfigSnapshot | null,
-): CreateDeploymentCommandInput {
+): LegacyDeploymentBootstrapInput {
   const deployment = config?.deployment;
 
   return {
@@ -143,6 +161,18 @@ function mergeConfigIntoCommand(
     domains: input.domains ?? deployment?.domains,
     pathPrefix: input.pathPrefix ?? deployment?.pathPrefix,
     tlsMode: input.tlsMode ?? deployment?.tlsMode,
+    resource: input.resource ?? config?.resource,
+  };
+}
+
+function normalizeDeploymentResourceInput(
+  resource: NonNullable<LegacyDeploymentBootstrapInput["resource"]>,
+): DeploymentConfiguredResource {
+  return {
+    name: resource.name,
+    ...(resource.kind ? { kind: resource.kind } : {}),
+    ...(resource.description ? { description: resource.description } : {}),
+    ...(resource.services ? { services: resource.services } : {}),
   };
 }
 
@@ -184,24 +214,34 @@ export class DeploymentContextBootstrapService {
     const self = this;
 
     return safeTry(async function* () {
-      const configResult = await self.deploymentConfigReader.read(context, {
-        sourceLocator: input.sourceLocator,
-        ...(input.configFilePath ? { configFilePath: input.configFilePath } : {}),
-      });
-      const config = yield* configResult;
-      const merged = mergeConfigIntoCommand(input, config);
-      const withConfig = yield* await self.applyConfigStrategy(context, merged, config);
-      const withDefaults = yield* await self.applyDefaultStrategy(context, withConfig);
+      if (input.destinationId) {
+        return ok(input);
+      }
 
-      return ok(withDefaults);
+      const destinationId = yield* await self.resolveDefaultDestination(
+        context,
+        {
+          project: { mode: "required" },
+          server: { mode: "required" },
+          destination: { mode: "reuse-or-create", preset: "local-destination" },
+          environment: { mode: "required" },
+          resource: { mode: "required" },
+        },
+        input.serverId,
+      );
+
+      return ok({
+        ...input,
+        destinationId,
+      });
     });
   }
 
   private async applyConfigStrategy(
     context: ExecutionContext,
-    input: CreateDeploymentCommandInput,
+    input: LegacyDeploymentBootstrapInput,
     config: DeploymentConfigSnapshot | null,
-  ): Promise<Result<CreateDeploymentCommandInput>> {
+  ): Promise<Result<LegacyDeploymentBootstrapInput>> {
     const self = this;
 
     return safeTry(async function* () {
@@ -241,14 +281,17 @@ export class DeploymentContextBootstrapService {
           selectedDestinationId ??
           (selectedTarget ? destinationIds.get(selectedTarget) : undefined);
       }
+      const resourceConfig = input.resource
+        ? normalizeDeploymentResourceInput(input.resource)
+        : config?.resource;
       const resourceId =
         input.resourceId ??
-        (projectId && environmentId && config?.resource
+        (projectId && environmentId && resourceConfig
           ? yield* await self.resolveConfiguredResource(
               context,
               projectId,
               environmentId,
-              config.resource,
+              resourceConfig,
               selectedDestinationId,
             )
           : undefined);
@@ -266,10 +309,10 @@ export class DeploymentContextBootstrapService {
 
   private async applyDefaultStrategy(
     context: ExecutionContext,
-    input: CreateDeploymentCommandInput,
-  ): Promise<Result<CreateDeploymentCommandInput>> {
+    input: LegacyDeploymentBootstrapInput,
+  ): Promise<Result<LegacyDeploymentBootstrapInput>> {
     const defaultsResult = this.defaultsPolicy.decide({
-      sourceLocator: input.sourceLocator,
+      sourceLocator: input.sourceLocator ?? ".",
       requestedDeploymentMethod: input.deploymentMethod ?? "auto",
     });
     const self = this;
@@ -296,13 +339,21 @@ export class DeploymentContextBootstrapService {
       const resourceId =
         input.resourceId ??
         (projectId && environmentId && destinationId
-          ? yield* await self.resolveDefaultResource(
-              context,
-              defaults,
-              projectId,
-              environmentId,
-              destinationId,
-            )
+          ? input.resource
+            ? yield* await self.resolveConfiguredResource(
+                context,
+                projectId,
+                environmentId,
+                normalizeDeploymentResourceInput(input.resource),
+                destinationId,
+              )
+            : yield* await self.resolveDefaultResource(
+                context,
+                defaults,
+                projectId,
+                environmentId,
+                destinationId,
+              )
           : undefined);
 
       return ok({
@@ -447,6 +498,7 @@ export class DeploymentContextBootstrapService {
         host,
         port,
         providerKey,
+        edgeProxyKind: EdgeProxyKindValue.rehydrate("traefik"),
         createdAt,
       });
 

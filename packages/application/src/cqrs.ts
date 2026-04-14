@@ -1,4 +1,4 @@
-import { domainError, err, type Result } from "@yundu/core";
+import { type DomainEvent, domainError, err, type Result } from "@yundu/core";
 import { i18nKeys } from "@yundu/i18n";
 import { type DependencyContainer } from "tsyringe";
 
@@ -15,7 +15,7 @@ import { type AppLogger } from "./ports";
 type MessageConstructor<TMessage, TArgs extends unknown[] = unknown[]> = new (
   ...args: TArgs
 ) => TMessage;
-type HandlerConstructor<THandler, TArgs extends unknown[] = unknown[]> = new (
+export type HandlerConstructor<THandler, TArgs extends unknown[] = unknown[]> = new (
   ...args: TArgs
 ) => THandler;
 
@@ -35,6 +35,10 @@ export interface QueryHandlerContract<TQuery extends Query<TResult>, TResult = u
   handle(context: ExecutionContext, query: TQuery): Promise<Result<TResult>>;
 }
 
+export interface EventHandlerContract<TEvent extends DomainEvent = DomainEvent> {
+  handle(context: ExecutionContext, event: TEvent): Promise<Result<void>>;
+}
+
 const commandHandlerRegistry = new WeakMap<
   object,
   HandlerConstructor<CommandHandlerContract<Command<unknown>, unknown>>
@@ -43,6 +47,7 @@ const queryHandlerRegistry = new WeakMap<
   object,
   HandlerConstructor<QueryHandlerContract<Query<unknown>, unknown>>
 >();
+const eventHandlerRegistry = new Map<string, HandlerConstructor<EventHandlerContract>[]>();
 
 export function CommandHandler<TCommand extends Command<unknown>, TArgs extends unknown[]>(
   commandType: MessageConstructor<TCommand, TArgs>,
@@ -64,6 +69,20 @@ export function QueryHandler<TQuery extends Query<unknown>, TArgs extends unknow
       target as unknown as HandlerConstructor<QueryHandlerContract<Query<unknown>, unknown>>,
     );
   };
+}
+
+export function EventHandler(eventType: string): ClassDecorator {
+  return (target): void => {
+    const handlers = eventHandlerRegistry.get(eventType) ?? [];
+    handlers.push(target as unknown as HandlerConstructor<EventHandlerContract>);
+    eventHandlerRegistry.set(eventType, handlers);
+  };
+}
+
+export function eventHandlerTypesFor(
+  eventType: string,
+): HandlerConstructor<EventHandlerContract>[] {
+  return eventHandlerRegistry.get(eventType) ?? [];
 }
 
 export class CommandBus {

@@ -1,16 +1,25 @@
-import { type Client, type ORPCError } from "@orpc/client";
+import { type AsyncIteratorClass, type Client, type ORPCError } from "@orpc/client";
 import {
+  type CancelDeploymentCommandInput,
+  type CheckDeploymentHealthCommandInput,
   type ConfigureServerCredentialCommandInput,
   type CreateDeploymentCommandInput,
+  type CreateDomainBindingCommandInput,
   type CreateEnvironmentCommandInput,
   type CreateProjectCommandInput,
+  type CreateResourceCommandInput,
+  type CreateSshCredentialCommandInput,
   type DeploymentLogsQueryInput,
   type DiffEnvironmentsQueryInput,
   type ListDeploymentsQueryInput,
+  type ListDomainBindingsQueryInput,
   type ListEnvironmentsQueryInput,
   type ListGitHubRepositoriesQueryInput,
   type ListResourcesQueryInput,
+  type ListSshCredentialsQueryInput,
   type PromoteEnvironmentCommandInput,
+  type ReattachDeploymentCommandInput,
+  type RedeployResourceCommandInput,
   type RegisterServerCommandInput,
   type RollbackDeploymentCommandInput,
   type SetEnvironmentVariableCommandInput,
@@ -19,13 +28,20 @@ import {
   type UnsetEnvironmentVariableCommandInput,
 } from "@yundu/application/schemas";
 import {
+  type CancelDeploymentResponse,
+  type CheckDeploymentHealthResponse,
   type CreateDeploymentResponse,
+  type CreateDomainBindingResponse,
   type CreateEnvironmentResponse,
   type CreateProjectResponse,
+  type CreateResourceResponse,
+  type CreateSshCredentialResponse,
   type DeploymentLogsResponse,
+  type DeploymentProgressEvent,
   type DiffEnvironmentResponse,
   type EnvironmentSummary,
   type ListDeploymentsResponse,
+  type ListDomainBindingsResponse,
   type ListEnvironmentsResponse,
   type ListGitHubRepositoriesResponse,
   type ListPluginsResponse,
@@ -33,7 +49,10 @@ import {
   type ListProvidersResponse,
   type ListResourcesResponse,
   type ListServersResponse,
+  type ListSshCredentialsResponse,
   type PromoteEnvironmentResponse,
+  type ReattachDeploymentResponse,
+  type RedeployResourceResponse,
   type RegisterServerResponse,
   type RollbackDeploymentResponse,
   type TestServerConnectivityResponse,
@@ -72,6 +91,28 @@ export type YunduOrpcClientContract = {
       TestServerConnectivityResponse,
       YunduClientError
     >;
+    testDraftConnectivity: Client<
+      YunduClientContext,
+      TestServerConnectivityCommandInput,
+      TestServerConnectivityResponse,
+      YunduClientError
+    >;
+  };
+  credentials: {
+    ssh: {
+      list: Client<
+        YunduClientContext,
+        ListSshCredentialsQueryInput,
+        ListSshCredentialsResponse,
+        YunduClientError
+      >;
+      create: Client<
+        YunduClientContext,
+        CreateSshCredentialCommandInput,
+        CreateSshCredentialResponse,
+        YunduClientError
+      >;
+    };
   };
   environments: {
     list: Client<
@@ -124,6 +165,26 @@ export type YunduOrpcClientContract = {
       ListResourcesResponse,
       YunduClientError
     >;
+    create: Client<
+      YunduClientContext,
+      CreateResourceCommandInput,
+      CreateResourceResponse,
+      YunduClientError
+    >;
+  };
+  domainBindings: {
+    list: Client<
+      YunduClientContext,
+      ListDomainBindingsQueryInput,
+      ListDomainBindingsResponse,
+      YunduClientError
+    >;
+    create: Client<
+      YunduClientContext,
+      CreateDomainBindingCommandInput,
+      CreateDomainBindingResponse,
+      YunduClientError
+    >;
   };
   deployments: {
     list: Client<
@@ -138,10 +199,40 @@ export type YunduOrpcClientContract = {
       CreateDeploymentResponse,
       YunduClientError
     >;
+    cancel: Client<
+      YunduClientContext,
+      CancelDeploymentCommandInput,
+      CancelDeploymentResponse,
+      YunduClientError
+    >;
+    checkHealth: Client<
+      YunduClientContext,
+      CheckDeploymentHealthCommandInput,
+      CheckDeploymentHealthResponse,
+      YunduClientError
+    >;
+    createStream: Client<
+      YunduClientContext,
+      CreateDeploymentCommandInput,
+      AsyncIteratorClass<DeploymentProgressEvent, CreateDeploymentResponse, void>,
+      YunduClientError
+    >;
     logs: Client<
       YunduClientContext,
       DeploymentLogsQueryInput,
       DeploymentLogsResponse,
+      YunduClientError
+    >;
+    reattach: Client<
+      YunduClientContext,
+      ReattachDeploymentCommandInput,
+      ReattachDeploymentResponse,
+      YunduClientError
+    >;
+    redeployResource: Client<
+      YunduClientContext,
+      RedeployResourceCommandInput,
+      RedeployResourceResponse,
       YunduClientError
     >;
     rollback: Client<
