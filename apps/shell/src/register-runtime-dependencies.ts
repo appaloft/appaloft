@@ -9,7 +9,9 @@ import {
   InMemoryExecutionBackend,
   LocalExecutionBackend,
   RoutingExecutionBackend,
+  RuntimeDeploymentHealthChecker,
   RuntimeServerConnectivityChecker,
+  RuntimeServerEdgeProxyBootstrapper,
   SshExecutionBackend,
 } from "@yundu/adapter-runtime";
 import {
@@ -18,7 +20,9 @@ import {
   CommandBus,
   type DeploymentProgressReporter,
   type EventBus,
+  type EventHandlerContract,
   type ExecutionContext,
+  eventHandlerTypesFor,
   type IdGenerator,
   type IntegrationAuthPort,
   QueryBus,
@@ -35,6 +39,8 @@ import {
   PgDeploymentRepository,
   PgDestinationRepository,
   PgDiagnostics,
+  PgDomainBindingReadModel,
+  PgDomainBindingRepository,
   PgEnvironmentReadModel,
   PgEnvironmentRepository,
   PgProjectReadModel,
@@ -43,6 +49,8 @@ import {
   PgResourceRepository,
   PgServerReadModel,
   PgServerRepository,
+  PgSshCredentialReadModel,
+  PgSshCredentialRepository,
 } from "@yundu/persistence-pg";
 import { createBuiltinPlugins } from "@yundu/plugin-builtins";
 import { LocalPluginHost } from "@yundu/plugin-host";
@@ -71,14 +79,61 @@ class NanoIdGenerator implements IdGenerator {
 }
 
 class InMemoryEventBus implements EventBus {
-  constructor(private readonly logger: AppLogger) {}
+  constructor(
+    private readonly container: DependencyContainer,
+    private readonly logger: AppLogger,
+  ) {}
 
-  async publish(context: ExecutionContext, events: unknown[]): Promise<void> {
+  async publish(
+    context: ExecutionContext,
+    events: Parameters<EventBus["publish"]>[1],
+  ): Promise<void> {
     if (events.length > 0) {
       this.logger.debug("event_bus.publish", {
         requestId: context.requestId,
         count: events.length,
       });
+    }
+
+    for (const event of events) {
+      for (const handlerType of eventHandlerTypesFor(event.type)) {
+        void Promise.resolve()
+          .then(async () => {
+            this.logger.debug("event_bus.dispatch", {
+              requestId: context.requestId,
+              eventType: event.type,
+              handler: handlerType.name,
+            });
+            const handler = this.container.resolve(handlerType as never) as EventHandlerContract;
+            const result = await handler.handle(context, event);
+            result.match(
+              () => {
+                this.logger.debug("event_bus.handler_succeeded", {
+                  requestId: context.requestId,
+                  eventType: event.type,
+                  handler: handlerType.name,
+                });
+              },
+              (error) => {
+                this.logger.error("event_bus.handler_failed", {
+                  requestId: context.requestId,
+                  eventType: event.type,
+                  handler: handlerType.name,
+                  errorCode: error.code,
+                  message: error.message,
+                });
+              },
+            );
+          })
+          .catch((error) => {
+            this.logger.error("event_bus.handler_unhandled_error", {
+              requestId: context.requestId,
+              eventType: event.type,
+              handler: handlerType.name,
+              message: error instanceof Error ? error.message : String(error),
+            });
+          });
+      }
     }
   }
 }
@@ -147,12 +202,19 @@ export function registerRuntimeDependencies(
   container.registerInstance(tokens.logger, input.logger);
   container.register(tokens.eventBus, {
     useFactory: instanceCachingFactory(
-      (dependencyContainer) => new InMemoryEventBus(dependencyContainer.resolve(tokens.logger)),
+      (dependencyContainer) =>
+        new InMemoryEventBus(dependencyContainer, dependencyContainer.resolve(tokens.logger)),
     ),
   });
   container.registerInstance(tokens.deploymentProgressReporter, input.deploymentProgressReporter);
   container.register(tokens.serverConnectivityChecker, {
     useFactory: instanceCachingFactory(() => new RuntimeServerConnectivityChecker()),
+  });
+  container.register(tokens.serverEdgeProxyBootstrapper, {
+    useFactory: instanceCachingFactory(() => new RuntimeServerEdgeProxyBootstrapper()),
+  });
+  container.register(tokens.deploymentHealthChecker, {
+    useFactory: instanceCachingFactory(() => new RuntimeDeploymentHealthChecker()),
   });
 
   container.register(tokens.projectRepository, {
@@ -160,6 +222,9 @@ export function registerRuntimeDependencies(
   });
   container.register(tokens.serverRepository, {
     useFactory: instanceCachingFactory(() => new PgServerRepository(input.database.db)),
+  });
+  container.register(tokens.sshCredentialRepository, {
+    useFactory: instanceCachingFactory(() => new PgSshCredentialRepository(input.database.db)),
   });
   container.register(tokens.destinationRepository, {
     useFactory: instanceCachingFactory(() => new PgDestinationRepository(input.database.db)),
@@ -173,6 +238,9 @@ export function registerRuntimeDependencies(
   container.register(tokens.deploymentRepository, {
     useFactory: instanceCachingFactory(() => new PgDeploymentRepository(input.database.db)),
   });
+  container.register(tokens.domainBindingRepository, {
+    useFactory: instanceCachingFactory(() => new PgDomainBindingRepository(input.database.db)),
+  });
   container.register(tokens.deploymentContextDefaultsPolicy, {
     useFactory: instanceCachingFactory(
       () => new ShellDeploymentContextDefaultsPolicy(input.config),
@@ -185,6 +253,9 @@ export function registerRuntimeDependencies(
   container.register(tokens.serverReadModel, {
     useFactory: instanceCachingFactory(() => new PgServerReadModel(input.database.db)),
   });
+  container.register(tokens.sshCredentialReadModel, {
+    useFactory: instanceCachingFactory(() => new PgSshCredentialReadModel(input.database.db)),
+  });
   container.register(tokens.environmentReadModel, {
     useFactory: instanceCachingFactory(
       () => new PgEnvironmentReadModel(input.database.db, input.config.secretMask),
@@ -195,6 +266,9 @@ export function registerRuntimeDependencies(
   });
   container.register(tokens.deploymentReadModel, {
     useFactory: instanceCachingFactory(() => new PgDeploymentReadModel(input.database.db)),
+  });
+  container.register(tokens.domainBindingReadModel, {
+    useFactory: instanceCachingFactory(() => new PgDomainBindingReadModel(input.database.db)),
   });
 
   container.register(tokens.sourceDetector, {

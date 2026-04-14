@@ -1,8 +1,14 @@
 import {
+  BootstrapServerEdgeProxyOnTargetRegisteredHandler,
+  CancelDeploymentUseCase,
+  CheckDeploymentHealthUseCase,
   ConfigureServerCredentialUseCase,
   CreateDeploymentUseCase,
+  CreateDomainBindingUseCase,
   CreateEnvironmentUseCase,
   CreateProjectUseCase,
+  CreateResourceUseCase,
+  CreateSshCredentialUseCase,
   DbMigrateUseCase,
   DbStatusQueryService,
   DeploymentContextBootstrapService,
@@ -15,6 +21,7 @@ import {
   DiffEnvironmentsQueryService,
   DoctorQueryService,
   ListDeploymentsQueryService,
+  ListDomainBindingsQueryService,
   ListEnvironmentsQueryService,
   ListGitHubRepositoriesQueryService,
   ListPluginsQueryService,
@@ -22,7 +29,10 @@ import {
   ListProvidersQueryService,
   ListResourcesQueryService,
   ListServersQueryService,
+  ListSshCredentialsQueryService,
   PromoteEnvironmentUseCase,
+  ReattachDeploymentUseCase,
+  RedeployResourceUseCase,
   RegisterServerUseCase,
   RollbackDeploymentUseCase,
   RollbackPlanFactory,
@@ -36,13 +46,20 @@ import {
 import { type DependencyContainer } from "tsyringe";
 
 export function registerApplicationServices(container: DependencyContainer): void {
+  container.registerSingleton(BootstrapServerEdgeProxyOnTargetRegisteredHandler);
   container.registerSingleton(tokens.createProjectUseCase, CreateProjectUseCase);
   container.registerSingleton(tokens.listProjectsQueryService, ListProjectsQueryService);
+  container.registerSingleton(tokens.createResourceUseCase, CreateResourceUseCase);
   container.registerSingleton(tokens.listResourcesQueryService, ListResourcesQueryService);
   container.registerSingleton(tokens.registerServerUseCase, RegisterServerUseCase);
   container.registerSingleton(
     tokens.configureServerCredentialUseCase,
     ConfigureServerCredentialUseCase,
+  );
+  container.registerSingleton(tokens.createSshCredentialUseCase, CreateSshCredentialUseCase);
+  container.registerSingleton(
+    tokens.listSshCredentialsQueryService,
+    ListSshCredentialsQueryService,
   );
   container.registerSingleton(tokens.listServersQueryService, ListServersQueryService);
   container.registerSingleton(tokens.testServerConnectivityUseCase, TestServerConnectivityUseCase);
@@ -73,7 +90,16 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(tokens.deploymentFactory, DeploymentFactory);
   container.registerSingleton(tokens.rollbackPlanFactory, RollbackPlanFactory);
   container.registerSingleton(tokens.deploymentLifecycleService, DeploymentLifecycleService);
+  container.registerSingleton(tokens.cancelDeploymentUseCase, CancelDeploymentUseCase);
+  container.registerSingleton(tokens.checkDeploymentHealthUseCase, CheckDeploymentHealthUseCase);
   container.registerSingleton(tokens.createDeploymentUseCase, CreateDeploymentUseCase);
+  container.registerSingleton(tokens.createDomainBindingUseCase, CreateDomainBindingUseCase);
+  container.registerSingleton(
+    tokens.listDomainBindingsQueryService,
+    ListDomainBindingsQueryService,
+  );
+  container.registerSingleton(tokens.redeployResourceUseCase, RedeployResourceUseCase);
+  container.registerSingleton(tokens.reattachDeploymentUseCase, ReattachDeploymentUseCase);
   container.registerSingleton(tokens.listDeploymentsQueryService, ListDeploymentsQueryService);
   container.registerSingleton(tokens.logsQueryService, DeploymentLogsQueryService);
   container.registerSingleton(tokens.rollbackDeploymentUseCase, RollbackDeploymentUseCase);

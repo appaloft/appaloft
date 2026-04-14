@@ -58,7 +58,11 @@ async function resolveWebStaticDir(
   config: AppConfig,
   options?: ShellRuntimeOptions,
 ): Promise<string | undefined> {
-  if (config.webStaticDir || options?.embeddedWebAssets) {
+  if (
+    config.webStaticDir ||
+    options?.embeddedWebAssets ||
+    Bun.env.YUNDU_DEV_DISABLE_LOCAL_WEB_STATIC_DIR === "true"
+  ) {
     return config.webStaticDir;
   }
 
@@ -130,6 +134,7 @@ export async function createAppComposition(
     queryBus,
     logger,
     executionContextFactory,
+    deploymentProgressObserver: deploymentProgressReporter,
     pluginRuntime,
     authRuntime,
     requestContextRunner,
