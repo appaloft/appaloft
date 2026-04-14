@@ -16,9 +16,9 @@ Project
 
 `Project` is the top-level workspace and resource collection boundary. It is not the owner of deployment actions.
 
-`Resource` is the deployable unit. New deployment, redeploy, deployment history, source/runtime configuration, resource-scoped domains, and resource-scoped environment/configuration affordances belong primarily on the resource surface.
+`Resource` is the deployable unit. New deployment, redeploy, deployment history, source/runtime/network configuration, resource-scoped domains, and resource-scoped environment/configuration affordances belong primarily on the resource surface.
 
-`Deployment` is a resource-scoped execution attempt. It is not a top-level user-managed object independent of a resource, and it must not become the owner of reusable source, runtime, domain, TLS, or health policy.
+`Deployment` is a resource-scoped execution attempt. It is not a top-level user-managed object independent of a resource, and it must not become the owner of reusable source, runtime, network, domain, TLS, or health policy.
 
 The console navigation must prefer:
 
@@ -44,7 +44,7 @@ The console currently needs a clearer product-facing model:
 - entering a project should show the resources in that project;
 - resource pages should be the owner-scoped surface for deployment actions;
 - deployment history should be viewed in the context of a resource;
-- source/runtime setup, such as GitHub, Docker image, Dockerfile, Docker Compose, command-based runtime, port, and health policy, belongs to resource lifecycle language rather than project-level deployment language;
+- source/runtime/network setup, such as GitHub, Docker image, Dockerfile, Docker Compose, command-based runtime, internal listener port, and health policy, belongs to resource lifecycle language rather than project-level deployment language;
 - project-level deployment lists can exist, but they are aggregate read views across resources.
 
 ## Options Considered
@@ -80,7 +80,7 @@ Project surfaces must prioritize resource collection:
 Resource surfaces must own deployment actions:
 
 - show resource profile and configuration status;
-- show source binding and runtime profile setup state when those operations exist;
+- show source binding, runtime profile, and network profile setup state when those operations exist;
 - show latest deployment status;
 - show deployment history for that resource;
 - provide new deployment/redeploy actions for that resource;
@@ -90,9 +90,11 @@ Resource surfaces must own deployment actions:
 Resource creation surfaces must collect resource-owned configuration in resource language:
 
 - provider/source selection such as GitHub, Docker image, Dockerfile, Docker Compose, local folder, or command-based workspace runtime belongs to resource source/runtime draft state;
+- application port selection belongs to resource network draft state and must map to `ResourceNetworkProfile.internalPort`;
 - `resources.create` remains the minimum profile command governed by ADR-011;
-- durable source/runtime persistence belongs to future resource source/runtime operations governed by ADR-012;
-- until those operations exist, the create-resource page may collect source/runtime drafts only as entry workflow draft state and then route into Quick Deploy or pass one-shot attempt overrides to `deployments.create`.
+- durable source/runtime persistence belongs to resource source/runtime operations governed by ADR-012;
+- durable network profile persistence belongs to resource network profile rules governed by ADR-015;
+- create-resource and Quick Deploy surfaces may collect source/runtime/network drafts as resource-owned input before dispatching `resources.create`; they must not pass those fields to `deployments.create`.
 
 Sidebar navigation must follow the same ownership:
 
@@ -110,7 +112,7 @@ The resource page becomes the natural place for:
 - deploy / redeploy;
 - deployment history;
 - domains and TLS;
-- source/runtime configuration;
+- source/runtime/network configuration;
 - resource lifecycle actions.
 
 Project-level deployment pages remain valid as reporting and filtering views, but project-level deployment actions must still converge on a selected or newly created resource before dispatching `deployments.create`.
@@ -130,19 +132,21 @@ Read models may denormalize latest deployment status per resource for sidebar an
 - [Project Resource Console Implementation Plan](../implementation/project-resource-console-plan.md)
 - [ADR-011: Resource Create Minimum Lifecycle](./ADR-011-resource-create-minimum-lifecycle.md)
 - [ADR-012: Resource Runtime Profile And Deployment Snapshot Boundary](./ADR-012-resource-runtime-profile-and-deployment-snapshot-boundary.md)
+- [ADR-015: Resource Network Profile](./ADR-015-resource-network-profile.md)
 
 ## Superseded Open Questions
 
 - Should "new deployment" be a primary project-page action or a resource-owned action?
 - Should project pages primarily show deployment lists or resource lists?
 - Should source selection during create-resource belong to project, deployment, or resource language?
+- Should internal application listener port belong to project, deployment, generic runtime setup, or resource network profile language?
 - Should sidebar latest status be Resource aggregate state or a read-model projection?
 
 ## Current Implementation Notes And Migration Gaps
 
 Current Web console project detail surfaces still include project-level deployment rollup and deployment actions.
 
-Current resource creation is available as a project-page affordance. A dedicated create-resource page with source/runtime draft steps does not exist yet.
+Current resource creation is available as a project-page affordance. A dedicated create-resource page with source/runtime/network draft steps does not exist yet.
 
 Current sidebar does not yet expose Project -> Resource hierarchy with latest deployment status for each resource.
 

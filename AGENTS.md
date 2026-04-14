@@ -86,6 +86,7 @@ This repository is a backend-core deployment platform, not a web-first CRUD app.
 ## Specification And Decision Sync Rules
 
 - `AGENTS.md` defines durable repository-level working rules; task-specific session goals belong in the current prompt or a plan document, not in the permanent repository charter
+- before the first formal release, do not add compatibility aliases or legacy fallback reads for newly modeled domain fields; make breaking changes directly and align specs, contracts, adapters, persistence, and tests to the canonical domain vocabulary in the same change
 - accepted ADRs govern local specs; local specs govern implementation intent; migration notes document temporary gaps without replacing the contract
 - docs/ai/** contains background analysis and migration context only; it must not override ADRs, global contracts, or normative local specs
 - when changing command semantics, workflow branches, event semantics, async lifecycle behavior, error contracts, or test expectations, update the governing spec documents in the same change

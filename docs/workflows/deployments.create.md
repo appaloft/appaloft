@@ -14,6 +14,7 @@ This workflow inherits:
 - [ADR-002: Routing, Domain, And TLS Boundary](../decisions/ADR-002-routing-domain-tls-boundary.md)
 - [ADR-010: Quick Deploy Workflow Boundary](../decisions/ADR-010-quick-deploy-workflow-boundary.md)
 - [ADR-014: Deployment Admission Uses Resource Profile](../decisions/ADR-014-deployment-admission-uses-resource-profile.md)
+- [ADR-015: Resource Network Profile](../decisions/ADR-015-resource-network-profile.md)
 - [Error Model](../errors/model.md)
 - [neverthrow Conventions](../errors/neverthrow-conventions.md)
 - [Async Lifecycle And Acceptance](../architecture/async-lifecycle-and-acceptance.md)
@@ -98,6 +99,7 @@ They may mirror phases such as detect, plan, package, deploy, verify, or rollbac
 | --- | --- |
 | Resource source binding | Entry workflow must create or select a resource with source binding before deployment admission, or command validation rejects in phase `resource-source-resolution`. |
 | Resource runtime profile | Entry workflow may create a resource with runtime profile; if omitted, deployment planning uses the resource/default runtime strategy contract. |
+| Resource network profile | Entry workflow must create or select an inbound resource with `networkProfile.internalPort`, or deployment admission rejects in phase `resource-network-resolution`. |
 | project/environment/server/destination/resource context | Entry workflow may collect/create required context; destination may use the compatibility default seam; command admission rejects if still unresolved or inconsistent. |
 | Domain/TLS intent | Entry workflow must use `domain-bindings.create` and certificate commands. It must not pass domain/TLS fields to `deployments.create`. |
 | Quick Deploy context | Collected by the Quick Deploy workflow through explicit operations; it is not a separate deployment command. |
@@ -123,6 +125,7 @@ Migration gaps:
 - `deployment-requested`, `build-requested`, `deployment-succeeded`, and `deployment-failed` are canonical workflow events;
 - Web QuickDeploy currently has local hardcoded validation and related-entity orchestration;
 - stream API currently emits `DeploymentProgressEvent`, which is a technical progress event, not a formal domain/application event.
+- deployment admission reads `networkProfile.internalPort` as the canonical resource-owned listener port and does not read `runtimeProfile.port`.
 
 ## Open Questions
 

@@ -20,6 +20,8 @@ This test matrix inherits:
 - [ADR-002: Routing, Domain, And TLS Boundary](../decisions/ADR-002-routing-domain-tls-boundary.md)
 - [ADR-010: Quick Deploy Workflow Boundary](../decisions/ADR-010-quick-deploy-workflow-boundary.md)
 - [ADR-012: Resource Runtime Profile And Deployment Snapshot Boundary](../decisions/ADR-012-resource-runtime-profile-and-deployment-snapshot-boundary.md)
+- [ADR-014: Deployment Admission Uses Resource Profile](../decisions/ADR-014-deployment-admission-uses-resource-profile.md)
+- [ADR-015: Resource Network Profile](../decisions/ADR-015-resource-network-profile.md)
 - [Error Model](../errors/model.md)
 - [neverthrow Conventions](../errors/neverthrow-conventions.md)
 - [Async Lifecycle And Acceptance](../architecture/async-lifecycle-and-acceptance.md)
@@ -67,11 +69,13 @@ Then:
 
 | Case | Input | Expected result | Expected error | Expected events | Expected state |
 | --- | --- | --- | --- | --- | --- |
-| Valid explicit context | project/server/destination/environment/resource ids; resource has source/runtime profile | `ok({ id })` | None | `deployment-requested`; later async events | Accepted deployment state exists with runtime plan snapshot |
-| Valid context with default destination seam | project/server/environment/resource ids; resource has source/runtime profile; destination omitted | `ok({ id })` when server default destination can be resolved | None | `deployment-requested`; later async events | Accepted deployment state uses resolved destination |
+| Valid explicit context | project/server/destination/environment/resource ids; resource has source/runtime/network profile | `ok({ id })` | None | `deployment-requested`; later async events | Accepted deployment state exists with runtime and network plan snapshots |
+| Valid context with default destination seam | project/server/environment/resource ids; resource has source/runtime/network profile; destination omitted | `ok({ id })` when server default destination can be resolved | None | `deployment-requested`; later async events | Accepted deployment state uses resolved destination |
 | Resource lacks source binding | Context ids resolve, but resource has no source binding | `err` | `validation_error`, phase `resource-source-resolution` | None for accepted request | No accepted deployment |
+| Inbound resource lacks network profile | Context ids resolve, but inbound resource has no internal listener port | `err` | `validation_error`, phase `resource-network-resolution` | None for accepted request | No accepted deployment |
+| Resource network profile resolves reverse-proxy target | Resource has `networkProfile.internalPort` and reverse-proxy exposure | `ok({ id })` | None | `deployment-requested`; later async events | Deployment snapshot includes resolved network target without requiring host port |
 | Incompatible resource source/strategy pair | Resource source descriptor cannot be planned by the runtime profile strategy | `err` | `validation_error` or `provider_error`, phase `runtime-plan-resolution` | None for accepted request | No accepted deployment |
-| Legacy source/runtime fields | Input includes `sourceLocator`, `source`, `deploymentMethod`, or command override fields | `err` at command schema/API boundary | `validation_error`, phase `command-validation` | None | No deployment created |
+| Legacy source/runtime/network fields | Input includes `sourceLocator`, `source`, `deploymentMethod`, command override fields, `port`, or `networkProfile` | `err` at command schema/API boundary | `validation_error`, phase `command-validation` | None | No deployment created |
 | Unresolved project/environment/server/destination/resource | Context cannot be resolved after bootstrap | `err` | `validation_error` or `not_found`, phase `context-resolution` | None | No deployment created |
 | Context mismatch | Environment/resource/destination does not match project/server context | `err` | `validation_error`, phase `context-resolution` | None | No deployment created |
 | Active latest deployment | Latest deployment for same resource is non-terminal | `err` | `deployment_not_redeployable`, phase `redeploy-guard` | None for new attempt | No new deployment created |

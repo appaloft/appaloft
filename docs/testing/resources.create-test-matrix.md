@@ -18,6 +18,7 @@ This test matrix inherits:
 
 - [ADR-011: Resource Create Minimum Lifecycle](../decisions/ADR-011-resource-create-minimum-lifecycle.md)
 - [ADR-012: Resource Runtime Profile And Deployment Snapshot Boundary](../decisions/ADR-012-resource-runtime-profile-and-deployment-snapshot-boundary.md)
+- [ADR-015: Resource Network Profile](../decisions/ADR-015-resource-network-profile.md)
 - [resources.create Command Spec](../commands/resources.create.md)
 - [resource-created Event Spec](../events/resource-created.md)
 - [Resource Lifecycle Error Spec](../errors/resources.lifecycle.md)
@@ -69,6 +70,12 @@ Then:
 | Minimal application resource | `projectId`, `environmentId`, `name` | `ok({ id })` | None | `resource-created` | Resource persisted with kind `application` and derived slug |
 | Explicit kind and description | Required fields plus `kind`, `description` | `ok({ id })` | None | `resource-created` | Resource persisted with supplied metadata |
 | Default destination supplied | Required fields plus `destinationId` | `ok({ id })` | None | `resource-created` | Resource persisted with destination reference |
+| Application with network profile | Required fields plus `networkProfile.internalPort = 3000` | `ok({ id })` | None | `resource-created` | Resource persisted with resource network profile |
+| Invalid internal listener port | Required fields plus invalid `networkProfile.internalPort` | `err` | `validation_error`, phase `resource-network-resolution` or `command-validation` | None | No resource created |
+| Reverse-proxy exposure without host port | Inbound HTTP resource with `internalPort`, default exposure | `ok({ id })` | None | `resource-created` | Resource network profile has `internalPort`; no host-published port required |
+| Direct-port host publication | `exposureMode = direct-port`, `hostPort` supplied | `ok({ id })` | None | `resource-created` | Resource network profile records explicit direct-port exposure |
+| Host port without direct exposure | `hostPort` supplied with reverse-proxy exposure | `err` | `validation_error`, phase `resource-network-resolution` | None | No resource created |
+| Compose stack ambiguous target | `kind = compose-stack`, multiple inbound services, no `targetServiceName` | `err` | `validation_error`, phase `resource-network-resolution` | None | No resource created |
 | Compose stack with multiple services | `kind = compose-stack`, multiple services | `ok({ id })` | None | `resource-created` | Services persisted |
 | Non-compose with multiple services | `kind != compose-stack`, multiple services | `err` | `invariant_violation`, phase `resource-admission` | None | No resource created |
 | Missing name | Empty or absent `name` | `err` | `validation_error`, phase `command-validation` | None | No resource created |
@@ -89,7 +96,7 @@ Then:
 | Resource created, deployment admission fails | Resource input valid; deployment input invalid | Resource `ok({ id })`; deployment `err` | Resource remains; no deployment accepted | `resources.create -> deployments.create(resourceId)` |
 | Resource created, deployment runtime fails | Resource and deployment admission valid; runtime fails later | Resource `ok`; deployment `ok` | Resource remains; deployment terminal failed | `resources.create -> deployments.create(resourceId) -> async failure state` |
 | Quick Deploy new resource path | Web/CLI draft uses new resource | Workflow submits explicit resource create before deploy | Resource id is passed to deployment | Context commands -> `resources.create -> deployments.create(resourceId)` |
-| Quick Deploy with source/runtime draft | Web/CLI draft includes source locator and runtime strategy | Resource creation remains profile-only; source/runtime draft flows to deployment as one-shot override | Resource state has no durable source/runtime profile fields | `resources.create -> deployments.create(resourceId)` |
+| Quick Deploy with source/runtime/network draft | Web/CLI draft includes source locator, runtime strategy, and internal listener port | Resource creation persists source/runtime/network profile; deployment uses resource id | Resource state owns durable source/runtime/network profile; deployment stores resolved snapshots | `resources.create -> deployments.create(resourceId)` |
 
 ## Event Matrix
 
@@ -101,7 +108,7 @@ Then:
 
 Current aggregate event name is `resource-created`.
 
-`resources.create` now owns first-deploy source/runtime profile persistence. Tests must assert source binding and runtime profile fields when the command input includes them.
+`resources.create` now owns first-deploy source/runtime/network profile persistence. Tests must assert source binding, runtime profile, and network profile fields when the command input includes them.
 
 Resource creation through deployment bootstrap is a legacy seam and should not be expanded.
 

@@ -27,6 +27,7 @@ This command inherits the shared platform contracts:
 - [ADR-012: Resource Runtime Profile And Deployment Snapshot Boundary](../decisions/ADR-012-resource-runtime-profile-and-deployment-snapshot-boundary.md)
 - [ADR-013: Project Resource Navigation And Deployment Ownership](../decisions/ADR-013-project-resource-navigation-and-deployment-ownership.md)
 - [ADR-014: Deployment Admission Uses Resource Profile](../decisions/ADR-014-deployment-admission-uses-resource-profile.md)
+- [ADR-015: Resource Network Profile](../decisions/ADR-015-resource-network-profile.md)
 - [Error Model](../errors/model.md)
 - [neverthrow Conventions](../errors/neverthrow-conventions.md)
 - [Async Lifecycle And Acceptance](../architecture/async-lifecycle-and-acceptance.md)
@@ -37,7 +38,7 @@ This file defines only the deployment-specific command semantics.
 
 Create a deployment attempt for a source, resource, environment, server, and destination. The command admits the request, prepares durable deployment state, and starts deployment progression.
 
-`deployments.create` is a deployment-attempt command. It is not the durable owner of reusable resource source, runtime, health, routing, domain, or TLS configuration. Transitional source/runtime/route fields accepted by this command mean one-shot attempt overrides and must be captured only in the resolved runtime plan snapshot.
+`deployments.create` is a deployment-attempt command. It is not the durable owner of reusable resource source, runtime, network, health, routing, domain, or TLS configuration. Deployment-specific snapshots are resolved from resource, environment, server, destination, and routing state during admission.
 
 The command's domain language is **deployment attempt admission**. It must not use `Deployment` as the owner name for source binding, runtime profile, health policy, access profile, domain binding, or TLS policy.
 
@@ -61,7 +62,7 @@ The command input is the deployment admission reference set. Source, runtime, he
 | `projectId` | Required | Existing project context. |
 | `serverId` | Required | Existing server/runtime target context. |
 | `environmentId` | Required | Existing environment context. |
-| `resourceId` | Required | Existing resource to deploy. The resource owns source/runtime profile. |
+| `resourceId` | Required | Existing resource to deploy. The resource owns source/runtime/network profile. |
 | `destinationId` | Optional | Existing destination context. If omitted, a compatibility seam may resolve or create the server default destination before context validation. |
 
 Schema validation handles shape-level constraints. Application admission handles context resolution, consistency, and deployment-specific invariants.
@@ -74,11 +75,12 @@ The command must preserve these terms:
 | --- | --- | --- |
 | Resource profile | `Resource` lifecycle commands | Durable deployable unit identity and ownership. |
 | Resource source binding | `Resource` lifecycle commands | Durable reusable source configuration. |
-| Resource runtime profile | `Resource` lifecycle commands | Durable reusable build, start, port, and health defaults. |
+| Resource runtime profile | `Resource` lifecycle commands | Durable reusable build, start, and health defaults. |
+| Resource network profile | `Resource` lifecycle commands | Durable reusable internal listener port, upstream protocol, exposure mode, and target service. |
 | Resource access profile / domain binding | Future resource access operation or `domain-bindings.create` | Durable reusable access-route/domain/TLS intent. |
-| Runtime plan snapshot | `Deployment` | Immutable resolved plan persisted on the deployment attempt. |
+| Runtime plan snapshot | `Deployment` | Immutable resolved runtime and network plan persisted on the deployment attempt. |
 
-New code must prefer `RuntimePlanStrategy` language over `deploymentMethod` and must not introduce deployment-owned source/runtime configuration.
+New code must prefer `RuntimePlanStrategy` language over `deploymentMethod` and must not introduce deployment-owned source/runtime/network configuration.
 
 ## Admission Flow
 
@@ -91,11 +93,12 @@ The command must perform or delegate these admission steps before returning acce
 5. Reject deployment when the latest deployment for the same resource is non-terminal.
 6. Resolve the source descriptor from `ResourceSourceBinding`.
 7. Resolve runtime plan configuration from `ResourceRuntimeProfile`.
-8. Create an immutable environment snapshot.
-9. Resolve the runtime plan.
-10. Create durable deployment state.
-11. Publish or record `deployment-requested`.
-12. Return `ok({ id })`.
+8. Resolve network endpoint configuration from `ResourceNetworkProfile`.
+9. Create an immutable environment snapshot.
+10. Resolve the runtime plan and network snapshot.
+11. Create durable deployment state.
+12. Publish or record `deployment-requested`.
+13. Return `ok({ id })`.
 
 Build, rollout, verify, failure recording, and retry progression belong to the async workflow owner, process manager, event handler, worker, or runtime adapter boundary. They must not be hidden inside Web/CLI/API entry logic.
 
@@ -134,6 +137,7 @@ All errors use the shared shape and category rules in [Error Model](../errors/mo
 | Error code | Phase | Retriable | Deployment-specific meaning |
 | --- | --- | --- | --- |
 | `validation_error` | `command-validation`, `config-bootstrap`, `context-resolution`, `source-detection`, `runtime-plan-resolution` | No | Input, bootstrap, context, source, or plan cannot produce an accepted deployment request. |
+| `validation_error` | `resource-network-resolution` | No | Resource network profile cannot produce a resolved deployment network snapshot. |
 | `not_found` | `context-resolution` | No | Referenced project, environment, server, destination, or resource is missing or inaccessible. |
 | `deployment_not_redeployable` | `redeploy-guard` | No | Latest deployment for the same resource is non-terminal. |
 | `conflict` | `admission-conflict` | No | A deployment-specific admission conflict not covered by redeployability. |
@@ -193,13 +197,14 @@ Migration gaps:
 - current use-case return type is `Promise<Result<{ id: string }, DomainError>>`, not public `ResultAsync`;
 - Web QuickDeploy still performs some hardcoded local validation before dispatch.
   Quick Deploy is governed by [ADR-010](../decisions/ADR-010-quick-deploy-workflow-boundary.md).
-- `source`, `sourceLocator`, `deploymentMethod`, command override, route, domain, and TLS fields have
+- `source`, `sourceLocator`, `deploymentMethod`, command override, network, route, domain, and TLS fields have
   been removed from the deployment command contract by ADR-014. Legacy code paths and historical
-  tests that relied on deployment bootstrap must migrate to `resources.create` with source/runtime
-  profile before deployment admission.
+  tests that relied on deployment bootstrap must migrate to `resources.create` with
+  source/runtime/network profile before deployment admission.
 - source descriptor and runtime plan strategy compatibility is now a resource profile planning rule;
   implementation coverage should be verified across Web, CLI, and API before removing this note.
+- resource listener port is stored as `networkProfile.internalPort`; deployment admission does not read `runtimeProfile.port`.
 
 ## Open Questions
 
-- Dedicated update operation names for resource source binding and resource runtime profile configuration remain future work under [ADR-012](../decisions/ADR-012-resource-runtime-profile-and-deployment-snapshot-boundary.md).
+- Dedicated update operation names for resource source binding, runtime profile, network profile, and access profile configuration remain future work under [ADR-012](../decisions/ADR-012-resource-runtime-profile-and-deployment-snapshot-boundary.md) and [ADR-015](../decisions/ADR-015-resource-network-profile.md).

@@ -119,6 +119,7 @@ Owns:
 - `SourceSpec`
 - `BuildSpec`
 - `RuntimeSpec`
+- `ResourceNetworkProfile`
 
 Implemented now:
 - foundational `Resource`
@@ -126,12 +127,16 @@ Implemented now:
 - runtime planning still flows through `RuntimePlanResolver` and `RuntimePlan`
 
 Boundary rule:
-- reusable source binding, build commands, runtime commands, port defaults, and health policy belong
-  to the resource-side source/runtime profile language
+- reusable source binding, build commands, runtime commands, network endpoint defaults, and health
+  policy belong to the resource-side source/runtime/network profile language
 - `RuntimePlanStrategy` describes how a source is planned; the compatibility field name
   `deploymentMethod` must not be treated as a `Deployment` aggregate concept
+- `ResourceNetworkProfile` owns the resource's internal workload endpoint: `internalPort`,
+  upstream protocol, exposure mode, and target service selection
+- the generic user-facing label `port` must map to the domain field
+  `ResourceNetworkProfile.internalPort` before dispatching a command
 - resource detail is the owner-scoped console surface for deploy/redeploy, deployment history,
-  source/runtime profile, domain/TLS, and resource-specific configuration actions
+  source/runtime/network profile, domain/TLS, and resource-specific configuration actions
 
 ### Dependency Resources
 
@@ -221,6 +226,7 @@ Implemented now:
 - `SourceSpec`
 - `BuildSpec`
 - `RuntimeSpec`
+- `ResourceNetworkProfile`
 - `EnvironmentSnapshot`
 - `RollbackPlan`
 - `ExecutionResult`
@@ -373,11 +379,18 @@ Rules:
 - compose-stack resources may contain multiple named services
 - a resource may point at a default destination
 - deployments belong to a resource, not directly to a raw source locator
+- inbound application resources must have a resource-owned network endpoint before deployment
+  admission can resolve reverse-proxy upstream targets
+- `internalPort` means the workload listener inside the runtime environment or container network;
+  it is not the server host-published port
+- direct host publication is explicit and must not be the default exposure model for HTTP
+  application resources
 
 Current scope:
 - foundational aggregate in `core`
 - persisted and listed through application read models
 - deployment creation can resolve, bootstrap, and attach a resource and destination
+- current code stores the listener port as `ResourceNetworkProfile.internalPort`, governed by [ADR-015: Resource Network Profile](./decisions/ADR-015-resource-network-profile.md)
 
 ### Release
 

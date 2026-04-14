@@ -8,14 +8,15 @@ Date: 2026-04-14
 
 Reusable source, build, runtime, health, and access-route defaults belong to the Resource side of the domain model, not to the Deployment aggregate.
 
-`deployments.create` creates one deployment attempt. It consumes the source/runtime profile owned by `Resource` and persists only the resolved deployment attempt snapshot.
+`deployments.create` creates one deployment attempt. It consumes the source/runtime/network profile owned by `Resource` and persists only the resolved deployment attempt snapshot.
 
 The target domain vocabulary is:
 
 - `SourceLocator`: an entry input pointer used to detect or resolve a source descriptor.
 - `SourceDescriptor`: the normalized source fact used by runtime planning.
 - `ResourceSourceBinding`: durable reusable source configuration owned by the resource lifecycle.
-- `ResourceRuntimeProfile`: durable reusable build, start, port, and health defaults owned by the resource lifecycle.
+- `ResourceRuntimeProfile`: durable reusable build, start, and health defaults owned by the resource lifecycle.
+- `ResourceNetworkProfile`: durable reusable workload endpoint configuration, including the internal application listener port, governed by [ADR-015](./ADR-015-resource-network-profile.md).
 - `RuntimePlanStrategy`: the planning strategy used to resolve a runtime plan from a source and runtime profile.
 - `RuntimePlanSnapshot`: the immutable resolved runtime plan persisted by the deployment attempt.
 
@@ -27,6 +28,7 @@ The target boundary is:
 Resource
   -> ResourceSourceBinding
   -> ResourceRuntimeProfile
+  -> ResourceNetworkProfile
   -> ResourceAccessProfile or DomainBinding references
 
 Deployment
@@ -35,7 +37,7 @@ Deployment
   -> RuntimePlanSnapshot
 ```
 
-`Deployment` must persist the resolved runtime plan and environment snapshot used by the attempt. It must not become the long-term source of truth for reusable source binding, build commands, start commands, port, health-check policy, domain names, proxy policy, or TLS policy.
+`Deployment` must persist the resolved runtime plan, resolved network snapshot, and environment snapshot used by the attempt. It must not become the long-term source of truth for reusable source binding, build commands, start commands, internal listener port, health-check policy, domain names, proxy policy, or TLS policy.
 
 ## Context
 
@@ -79,7 +81,7 @@ This option is superseded by [ADR-014](./ADR-014-deployment-admission-uses-resou
 
 ### Option D: Use Resource Source/Runtime Profile For Deployment Admission
 
-This lets first-deploy resource creation persist source/runtime profile and makes `deployments.create` consume that profile.
+This lets first-deploy resource creation persist source/runtime/network profile and makes `deployments.create` consume that profile.
 
 This option is accepted by [ADR-014](./ADR-014-deployment-admission-uses-resource-profile.md).
 
@@ -90,6 +92,8 @@ This option is accepted by [ADR-014](./ADR-014-deployment-admission-uses-resourc
 Reusable source configuration must be modeled by a future explicit resource source operation, for example `resources.bind-source` or `resource-source-bindings.create`.
 
 Reusable build/runtime/health configuration must be modeled by a future explicit resource runtime-profile operation, for example `resources.configure-runtime`.
+
+Reusable workload network endpoint configuration must follow [ADR-015](./ADR-015-resource-network-profile.md). The internal application listener port belongs to `ResourceNetworkProfile`, not to deployment admission.
 
 Reusable domain/routing/TLS lifecycle remains governed by ADR-002 and the routing/domain/TLS command set:
 
@@ -111,7 +115,7 @@ New domain code and new specs must use the domain terms above. They must not int
 The model separates four concepts:
 
 - Resource profile: durable deployable unit identity and ownership.
-- Resource configuration: reusable source/runtime/health/access defaults.
+- Resource configuration: reusable source/runtime/network/health/access defaults.
 - Deployment attempt: a single accepted execution request.
 - Deployment snapshot: immutable runtime plan and environment snapshot used by one attempt.
 
@@ -127,12 +131,14 @@ Future implementation must not add more reusable configuration fields to `deploy
 - [Resource Create And First Deploy Workflow Spec](../workflows/resources.create-and-first-deploy.md)
 - [resources.create Implementation Plan](../implementation/resources.create-plan.md)
 - [ADR-014: Deployment Admission Uses Resource Profile](./ADR-014-deployment-admission-uses-resource-profile.md)
+- [ADR-015: Resource Network Profile](./ADR-015-resource-network-profile.md)
 - [Core Operations](../CORE_OPERATIONS.md)
 - [Domain Model](../DOMAIN_MODEL.md)
 
 ## Superseded Open Questions
 
-- Should `deploymentMethod`, source descriptor, install/build/start commands, port, and health-check path be modeled as deployment command fields or resource configuration?
+- Should `deploymentMethod`, source descriptor, install/build/start commands, internal port, and health-check path be modeled as deployment command fields or resource configuration?
+- Should the internal application listener port stay in `ResourceRuntimeProfile` or move to `ResourceNetworkProfile`?
 - Should deployment routing/TLS fields be moved directly to `resources.create`?
 - Should `Deployment` keep reusable resource configuration, or only the resolved runtime plan snapshot for an attempt?
 
@@ -144,7 +150,9 @@ Current `DeploymentContextBootstrapService` can create or reuse resources during
 
 Current `RedeployResourceUseCase` derives redeploy input from the latest deployment runtime plan.
 
-Resource-side source binding and runtime profile persistence are being introduced through the first-deploy `resources.create` path. Dedicated update/configuration commands remain future work.
+Resource-side source binding, runtime profile, and network profile persistence are being introduced through the first-deploy `resources.create` path. Dedicated update/configuration commands remain future work.
+
+Current code still stores `port` inside `ResourceRuntimeProfile`; [ADR-015](./ADR-015-resource-network-profile.md) governs the migration to `ResourceNetworkProfile.internalPort`.
 
 ## Open Questions
 

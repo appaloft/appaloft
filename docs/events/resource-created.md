@@ -11,6 +11,7 @@ It does not mean the resource has been deployed, source binding has been configu
 This event inherits:
 
 - [ADR-011: Resource Create Minimum Lifecycle](../decisions/ADR-011-resource-create-minimum-lifecycle.md)
+- [ADR-015: Resource Network Profile](../decisions/ADR-015-resource-network-profile.md)
 - [Error Model](../errors/model.md)
 - [neverthrow Conventions](../errors/neverthrow-conventions.md)
 - [Async Lifecycle And Acceptance](../architecture/async-lifecycle-and-acceptance.md)
@@ -54,6 +55,13 @@ type ResourceCreatedPayload = {
     name: string;
     kind: "web" | "api" | "worker" | "database" | "cache" | "service";
   }>;
+  networkProfile?: {
+    internalPort: number;
+    upstreamProtocol: "http" | "tcp";
+    exposureMode: "none" | "reverse-proxy" | "direct-port";
+    targetServiceName?: string;
+    hostPort?: number;
+  };
   createdAt: string;
   correlationId?: string;
   causationId?: string;
@@ -61,6 +69,8 @@ type ResourceCreatedPayload = {
 ```
 
 Payload must not contain source credentials, environment secret values, provider credentials, or raw deployment logs.
+
+When a resource has a network profile, the event payload may include the safe network endpoint metadata needed by read-model and audit consumers. It must not include public domain/TLS state, because that lifecycle is owned by domain binding and certificate commands.
 
 ## State Progression
 
@@ -110,6 +120,8 @@ Current `Resource.create` records `resource-created` as the canonical source-of-
 Current deployment bootstrap publishes the aggregate event when it creates a resource during deployment context resolution.
 
 `resources.create` publishes this event from the explicit resource lifecycle operation after durable resource persistence.
+
+Current code includes source/runtime profile payload when present but does not yet include `networkProfile`. [ADR-015](../decisions/ADR-015-resource-network-profile.md) governs adding that payload after the write-side model migrates.
 
 ## Open Questions
 

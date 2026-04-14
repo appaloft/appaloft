@@ -31,6 +31,8 @@ The minimum command owns only profile-level resource data:
 
 Durable source binding, build configuration, runtime configuration, domain/TLS configuration, health policy, storage, auto-deploy, webhook policy, and archive/update lifecycle are future explicit operations. They must not be hidden inside the minimum `resources.create` command.
 
+First-deploy workflows may persist resource-owned source/runtime/network profile input through `resources.create` only where governed by [ADR-014](./ADR-014-deployment-admission-uses-resource-profile.md) and [ADR-015](./ADR-015-resource-network-profile.md). That exception exists to keep `deployments.create` ids-only; it must not turn deployment attempt fields back into resource-agnostic transport fields.
+
 ## Context
 
 The domain model treats `Resource` as the deployable unit inside a project environment. Deployments belong to a resource, not directly to a raw source locator.
@@ -95,11 +97,11 @@ Quick Deploy can stop creating resources through deployment admission while keep
 
 The Web resource detail page can become the owner-scoped management surface for domains, deployments, variables, and future resource configuration.
 
-Source binding and deployment remain separate:
+Source binding, network profile, and deployment remain separate:
 
 - `resources.create` creates the deployable unit;
 - `deployments.create` creates an execution attempt for a source/runtime plan;
-- future resource source/config commands persist reusable source/build/runtime policy.
+- resource source/runtime/network commands persist reusable source/build/runtime/network policy after first-deploy create-time input.
 
 ## Governed Specs
 
@@ -111,6 +113,8 @@ Source binding and deployment remain separate:
 - [resources.create Implementation Plan](../implementation/resources.create-plan.md)
 - [Quick Deploy Workflow Spec](../workflows/quick-deploy.md)
 - [ADR-010: Quick Deploy Workflow Boundary](./ADR-010-quick-deploy-workflow-boundary.md)
+- [ADR-014: Deployment Admission Uses Resource Profile](./ADR-014-deployment-admission-uses-resource-profile.md)
+- [ADR-015: Resource Network Profile](./ADR-015-resource-network-profile.md)
 - [Core Operations](../CORE_OPERATIONS.md)
 - [Domain Model](../DOMAIN_MODEL.md)
 

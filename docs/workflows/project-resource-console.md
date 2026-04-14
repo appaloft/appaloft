@@ -19,6 +19,7 @@ This workflow inherits:
 - [ADR-013: Project Resource Navigation And Deployment Ownership](../decisions/ADR-013-project-resource-navigation-and-deployment-ownership.md)
 - [ADR-011: Resource Create Minimum Lifecycle](../decisions/ADR-011-resource-create-minimum-lifecycle.md)
 - [ADR-012: Resource Runtime Profile And Deployment Snapshot Boundary](../decisions/ADR-012-resource-runtime-profile-and-deployment-snapshot-boundary.md)
+- [ADR-015: Resource Network Profile](../decisions/ADR-015-resource-network-profile.md)
 - [resources.create Command Spec](../commands/resources.create.md)
 - [deployments.create Command Spec](../commands/deployments.create.md)
 - [Quick Deploy Workflow Spec](./quick-deploy.md)
@@ -69,14 +70,14 @@ Resource detail pages must be the primary owner-scoped surface for:
 - redeploy;
 - deployment history;
 - deployment progress/status;
-- source binding and runtime profile setup;
+- source binding, runtime profile, and network profile setup;
 - domain binding and TLS affordances;
 - resource-scoped variables or configuration affordances when supported;
 - resource lifecycle actions such as archive/update when supported.
 
 Deployment history shown on the resource page must be filtered by `resourceId`.
 
-New deployment from a resource detail page must dispatch `deployments.create` with the resource id, plus allowed attempt overrides or future resource-profile-derived defaults.
+New deployment from a resource detail page must dispatch `deployments.create` with the resource id and use resource-profile-derived defaults during deployment admission.
 
 ## Resource Creation Contract
 
@@ -86,14 +87,17 @@ A dedicated create-resource page or panel may collect:
 - resource name and kind;
 - optional destination placement hint;
 - source provider/type draft such as GitHub, Docker image, Dockerfile, Docker Compose, local folder, or workspace commands;
-- runtime draft such as install/build/start commands, port, and health check.
+- runtime draft such as install/build/start commands and health check;
+- network draft such as internal listener port, upstream protocol, exposure mode, and compose target service.
 
-Only the minimum resource profile is persisted by `resources.create` until explicit resource source/runtime operations exist.
+Resource-owned source/runtime/network profile input may be persisted by `resources.create` when the create flow is part of a first-deploy workflow. Dedicated profile update commands remain future behavior slices.
 
-If the create-resource flow collects source/runtime drafts before those operations exist, it must treat them as workflow draft state and either:
+If the create-resource flow collects source/runtime/network drafts before dedicated update operations exist, it must treat them as resource-owned create input or workflow draft state and either:
 
-- continue into Quick Deploy and pass them as one-shot deployment attempt overrides; or
-- store them only after future resource source/runtime commands are accepted and implemented.
+- continue into Quick Deploy through `resources.create` and then `deployments.create(resourceId)`; or
+- store them only after future resource source/runtime/network commands are accepted and implemented.
+
+The create-resource flow must not pass source, runtime, network, route, domain, or TLS fields directly to `deployments.create`.
 
 ## Sidebar Navigation Contract
 
@@ -131,6 +135,8 @@ Current project detail page has resource listing and a create-resource affordanc
 
 Current dedicated create-resource page does not yet exist.
 
+Current contracts store the listener port as `networkProfile.internalPort`, governed by [ADR-015](../decisions/ADR-015-resource-network-profile.md).
+
 Current sidebar does not yet expose Project -> Resource hierarchy with latest deployment status.
 
 Current deployment and resource read models may need a resource summary projection or query shape to support latest deployment status efficiently.
@@ -138,4 +144,4 @@ Current deployment and resource read models may need a resource summary projecti
 ## Open Questions
 
 - Should resource latest deployment status be added to `resources.list`, a future `resources.summary` query, or a separate navigation read model?
-- Should the create-resource flow first persist only the minimum resource profile and then continue into Quick Deploy, or should it wait for resource source/runtime commands before collecting source/runtime drafts?
+- Should the create-resource flow first persist the resource with source/runtime/network create-time profile and then continue into Quick Deploy, or should it require dedicated update commands before collecting those drafts outside first deploy?
