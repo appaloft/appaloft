@@ -2,7 +2,21 @@
   import { browser } from "$app/environment";
   import { goto } from "$app/navigation";
   import { page } from "$app/state";
-  import { ChevronUp, FolderOpen, Gauge, GitBranch, Package, Play, Rocket, Server, ServerCrash, UserRound } from "@lucide/svelte";
+  import {
+    ChevronUp,
+    FolderOpen,
+    Gauge,
+    GitBranch,
+    Globe2,
+    Moon,
+    Package,
+    Play,
+    Rocket,
+    Server,
+    ServerCrash,
+    Sun,
+    UserRound,
+  } from "@lucide/svelte";
   import type { Snippet } from "svelte";
 
   import { API_BASE, readErrorMessage, request } from "$lib/api/client";
@@ -40,12 +54,15 @@
     SidebarMenu,
     SidebarMenuButton,
     SidebarMenuItem,
+    SidebarMenuSub,
+    SidebarMenuSubButton,
+    SidebarMenuSubItem,
     SidebarProvider,
     SidebarRail,
     SidebarTrigger,
   } from "$lib/components/ui/sidebar";
   import { createConsoleQueries, defaultAuthSession } from "$lib/console/queries";
-  import { initials, readSessionIdentity } from "$lib/console/utils";
+  import { deploymentBadgeVariant, initials, readSessionIdentity } from "$lib/console/utils";
   import { i18nKeys, locale, setLocale, t } from "$lib/i18n";
 
   type Props = {
@@ -58,23 +75,28 @@
     { href: "/", labelKey: i18nKeys.console.nav.home, icon: Gauge },
     { href: "/projects", labelKey: i18nKeys.console.nav.projects, icon: FolderOpen },
     { href: "/servers", labelKey: i18nKeys.console.nav.servers, icon: Server },
+    { href: "/domain-bindings", labelKey: i18nKeys.console.nav.domainBindings, icon: Globe2 },
     { href: "/deployments", labelKey: i18nKeys.console.nav.deployments, icon: Rocket },
   ] as const;
 
   let { title, description, children }: Props = $props();
   let projectSearch = $state("");
+  let colorMode = $state<"light" | "dark">("light");
+  let colorModeReady = $state(false);
 
 	const {
 		healthQuery,
 		versionQuery,
 		authSessionQuery,
 		projectsQuery,
+		deploymentsQuery,
 	} = createConsoleQueries(browser);
 
   const pathname = $derived(page.url.pathname);
   const version = $derived(versionQuery.data ?? null);
 	const authSession = $derived(authSessionQuery.data ?? defaultAuthSession);
 	const projects = $derived(projectsQuery.data?.items ?? []);
+	const deployments = $derived(deploymentsQuery.data?.items ?? []);
   const filteredProjects = $derived.by(() => {
     const query = projectSearch.trim().toLowerCase();
     if (!query) {
@@ -94,6 +116,46 @@
   const authIdentity = $derived(readSessionIdentity(authSession.session));
   const connectionError = $derived(healthQuery.error ? readErrorMessage(healthQuery.error) : "");
   const deploymentModeLabel = $derived(version?.mode ?? "self-hosted");
+  const colorModeLabel = $derived(
+    colorMode === "dark"
+      ? $t(i18nKeys.common.actions.switchToLightMode)
+      : $t(i18nKeys.common.actions.switchToDarkMode),
+  );
+  const activeDeploymentId = $derived.by(() => {
+    const match = pathname.match(/^\/deployments\/([^/]+)/);
+    return match?.[1] ? decodeURIComponent(match[1]) : "";
+  });
+  const activeProjectId = $derived.by(() => {
+    const projectMatch = pathname.match(/^\/projects\/([^/]+)/);
+    if (projectMatch?.[1]) {
+      return decodeURIComponent(projectMatch[1]);
+    }
+
+    const activeDeployment = deployments.find((deployment) => deployment.id === activeDeploymentId);
+    return activeDeployment?.projectId ?? "";
+  });
+
+  $effect(() => {
+    if (!browser) {
+      return;
+    }
+
+    const storedMode = window.localStorage.getItem("yundu:color-mode");
+    if (storedMode === "light" || storedMode === "dark") {
+      colorMode = storedMode;
+    }
+    colorModeReady = true;
+  });
+
+  $effect(() => {
+    if (!browser || !colorModeReady) {
+      return;
+    }
+
+    document.documentElement.classList.toggle("dark", colorMode === "dark");
+    document.documentElement.style.colorScheme = colorMode;
+    window.localStorage.setItem("yundu:color-mode", colorMode);
+  });
 
   $effect(() => {
     if (!browser) {
@@ -147,6 +209,14 @@
   function isNavigationActive(href: string): boolean {
     return href === "/" ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);
   }
+
+  function projectDeployments(projectId: string) {
+    return deployments.filter((deployment) => deployment.projectId === projectId).slice(0, 3);
+  }
+
+  function toggleColorMode(): void {
+    colorMode = colorMode === "dark" ? "light" : "dark";
+  }
 </script>
 
 <SidebarProvider>
@@ -199,8 +269,12 @@
           <SidebarMenu>
             {#if filteredProjects.length > 0}
               {#each filteredProjects.slice(0, 8) as project (project.id)}
+                {@const recentDeployments = projectDeployments(project.id)}
                 <SidebarMenuItem>
-                  <SidebarMenuButton tooltipContent={project.name}>
+                  <SidebarMenuButton
+                    isActive={activeDeploymentId === "" && activeProjectId === project.id}
+                    tooltipContent={project.name}
+                  >
                     {#snippet child({ props })}
                       <a href={`/projects/${project.id}`} {...props}>
                         <FolderOpen class="size-4" />
@@ -208,6 +282,31 @@
                       </a>
                     {/snippet}
                   </SidebarMenuButton>
+                  {#if recentDeployments.length > 0}
+                    <SidebarMenuSub>
+                      {#each recentDeployments as deployment (deployment.id)}
+                        <SidebarMenuSubItem>
+                          <SidebarMenuSubButton
+                            isActive={activeDeploymentId === deployment.id}
+                          >
+                            {#snippet child({ props })}
+                              <a href={`/deployments/${deployment.id}`} {...props}>
+                                <span class="min-w-0 flex-1 truncate">
+                                  {deployment.runtimePlan.source.displayName}
+                                </span>
+                                <Badge
+                                  class="h-4 shrink-0 px-1.5 text-[0.65rem]"
+                                  variant={deploymentBadgeVariant(deployment.status)}
+                                >
+                                  {deployment.status}
+                                </Badge>
+                              </a>
+                            {/snippet}
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                      {/each}
+                    </SidebarMenuSub>
+                  {/if}
                 </SidebarMenuItem>
               {/each}
             {:else}
@@ -292,6 +391,19 @@
       </div>
       <div class="flex items-center gap-2">
         <Badge variant="outline" class="hidden md:inline-flex">{deploymentModeLabel}</Badge>
+        <Button
+          aria-label={colorModeLabel}
+          title={colorModeLabel}
+          size="icon-sm"
+          variant="outline"
+          onclick={toggleColorMode}
+        >
+          {#if colorMode === "dark"}
+            <Sun class="size-4" />
+          {:else}
+            <Moon class="size-4" />
+          {/if}
+        </Button>
         <Button
           href="/deploy"
           size="sm"

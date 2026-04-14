@@ -53,6 +53,7 @@ export function deploymentBadgeVariant(
   status: DeploymentSummary["status"],
 ): "default" | "secondary" | "outline" | "destructive" {
   switch (status) {
+    case "canceled":
     case "failed":
     case "rolled-back":
       return "destructive";

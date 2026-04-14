@@ -1,6 +1,6 @@
 <script lang="ts">
   import { browser } from "$app/environment";
-  import { ArrowRight, FolderOpen, Server, ShieldCheck, Waypoints } from "@lucide/svelte";
+  import { ArrowRight, Rocket, Server, ShieldCheck, Waypoints } from "@lucide/svelte";
 
   import ConsoleShell from "$lib/components/console/ConsoleShell.svelte";
   import { Badge } from "$lib/components/ui/badge";
@@ -84,8 +84,8 @@
     <div class="space-y-6">
       {#if hasNoDeploymentBase}
         <section class="overflow-hidden rounded-lg border bg-background">
-          <div class="grid gap-0 lg:grid-cols-[1.1fr_0.9fr]">
-            <div class="space-y-5 p-6 md:p-8">
+          <div class="grid gap-0 lg:grid-cols-[0.9fr_1.1fr]">
+            <div class="space-y-5 border-b bg-muted/30 p-6 md:p-8 lg:border-b-0 lg:border-r">
               <Badge class="w-fit" variant="outline">{$t(i18nKeys.console.home.targetNeeded)}</Badge>
               <div class="max-w-2xl space-y-3">
                 <h1 class="text-2xl font-semibold md:text-3xl">{$t(i18nKeys.console.home.deploymentBaseTitle)}</h1>
@@ -93,14 +93,18 @@
                   {$t(i18nKeys.console.home.deploymentBaseBody)}
                 </p>
               </div>
-              <div class="flex flex-wrap gap-2">
-                <Button href="/projects" size="lg" variant="outline">
-                  <FolderOpen class="size-4" />
-                  {$t(i18nKeys.common.actions.viewProjects)}
+            </div>
+            <div class="space-y-5 p-6 md:p-8">
+              <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div class="space-y-1">
+                  <p class="text-sm font-medium">{$t(i18nKeys.common.actions.newDeployment)}</p>
+                  <p class="text-xs text-muted-foreground">detect -> plan -> execute -> verify -> rollback</p>
+                </div>
+                <Button href="/deploy" size="lg" class="w-fit">
+                  <Rocket class="size-4" />
+                  {$t(i18nKeys.common.actions.newDeployment)}
                 </Button>
               </div>
-            </div>
-            <div class="border-t bg-muted/40 p-6 lg:border-l lg:border-t-0">
               <div class="grid gap-3">
                 {#each [
                   $t(i18nKeys.console.home.deploymentFlowSource),
@@ -109,11 +113,11 @@
                   $t(i18nKeys.console.home.deploymentFlowCreateEnvironment),
                   $t(i18nKeys.console.home.deploymentFlowDeploymentRecord),
                 ] as step, index (step)}
-                  <div class="flex items-center gap-3 rounded-md border bg-background px-4 py-3">
-                    <span class="flex size-7 items-center justify-center rounded-md bg-primary text-xs font-medium text-primary-foreground">
+                  <div class={index === 0 ? "flex items-center gap-3 rounded-md border border-primary/40 bg-primary/[0.03] px-4 py-3" : "flex items-center gap-3 rounded-md border bg-background px-4 py-3"}>
+                    <span class={index === 0 ? "flex size-7 items-center justify-center rounded-md bg-primary text-xs font-medium text-primary-foreground" : "flex size-7 items-center justify-center rounded-md bg-muted text-xs font-medium text-muted-foreground"}>
                       {index + 1}
                     </span>
-                    <span class="text-sm font-medium">{step}</span>
+                    <span class="min-w-0 text-sm font-medium">{step}</span>
                   </div>
                 {/each}
               </div>

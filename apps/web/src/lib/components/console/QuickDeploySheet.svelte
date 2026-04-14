@@ -1,6 +1,6 @@
 <script lang="ts">
   import { browser } from "$app/environment";
-  import { afterNavigate, replaceState } from "$app/navigation";
+  import { afterNavigate, goto, replaceState } from "$app/navigation";
   import { page } from "$app/state";
   import {
     CheckCircle2,
@@ -20,15 +20,21 @@
   import type {
     AuthSessionResponse,
     ConfigureServerCredentialInput,
+    CreateDeploymentInput,
+    CreateResourceInput,
+    DeploymentProgressEvent,
     EnvironmentSummary,
     GitHubRepositorySummary,
     ProjectSummary,
     RegisterServerInput,
     ResourceSummary,
     ServerSummary,
+    SshCredentialSummary,
+    TestServerConnectivityResponse,
   } from "@yundu/contracts";
 
   import { API_BASE, readErrorMessage, request } from "$lib/api/client";
+  import DeploymentProgressDialog from "$lib/components/console/DeploymentProgressDialog.svelte";
   import { Button } from "$lib/components/ui/button";
   import {
     Card,
@@ -43,6 +49,11 @@
   import { Skeleton } from "$lib/components/ui/skeleton";
   import { Textarea } from "$lib/components/ui/textarea";
   import { Badge } from "$lib/components/ui/badge";
+  import {
+    createDeploymentWithProgress,
+    createDeploymentRequestId,
+    type DeploymentProgressDialogStatus,
+  } from "$lib/console/deployment-progress";
   import { defaultAuthSession, type ProviderSummary } from "$lib/console/queries";
   import { readSessionIdentity } from "$lib/console/utils";
   import { i18nKeys, t } from "$lib/i18n";
@@ -50,15 +61,23 @@
   import { queryClient } from "$lib/query-client";
 
   type SourceKind = "local-folder" | "github" | "remote-git" | "docker-image" | "compose";
+  type GithubSourceMode = "url" | "browser";
   type DraftMode = "existing" | "new";
   type ServerCredentialKind = "local-ssh-agent" | "ssh-private-key";
+  type ServerPrivateKeyInputMode = "saved" | "file" | "paste";
   type EnvironmentKind = EnvironmentSummary["kind"];
+  type ResourceKind = ResourceSummary["kind"];
   type DeploymentStepKey = "source" | "project" | "server" | "environment" | "variables" | "review";
   type SummaryRow = {
     label: string;
     value: string;
     mono?: boolean;
   };
+  type DeploymentMutationInput = CreateDeploymentInput;
+  type ResourceDraftInput = Pick<CreateResourceInput, "name"> &
+    Partial<Pick<CreateResourceInput, "kind" | "description" | "services">>;
+  type ResourceSourceInput = NonNullable<CreateResourceInput["source"]>;
+  type ResourceRuntimeProfileInput = NonNullable<CreateResourceInput["runtimeProfile"]>;
   type YunduDesktopBridge = {
     selectDirectory?: () => Promise<string | null | undefined>;
   };
@@ -76,7 +95,16 @@
     "preview",
     "custom",
   ] as const satisfies readonly EnvironmentKind[];
-
+  const resourceKinds = [
+    "application",
+    "service",
+    "database",
+    "cache",
+    "compose-stack",
+    "worker",
+    "static-site",
+    "external",
+  ] as const satisfies readonly ResourceKind[];
   const sourceOptions: Array<{
     key: SourceKind;
     labelKey: TranslationKey;
@@ -143,6 +171,7 @@
 
   const sourceKindKeys = sourceOptions.map((option) => option.key);
   const deploymentStepKeys = deploymentSteps.map((step) => step.key);
+  const githubSourceModes = ["url", "browser"] as const satisfies readonly GithubSourceMode[];
   const draftModeKeys = ["existing", "new"] as const;
 
   let { enabled = true }: { enabled?: boolean } = $props();
@@ -187,6 +216,16 @@
   const initialStep = parseDeploymentStep(browser ? page.url.searchParams.get("step") : null);
 
   let githubRepositorySearch = $state(browser ? (page.url.searchParams.get("repository") ?? "") : "");
+  let githubSourceMode = $state<GithubSourceMode>(
+    browser && page.url.searchParams.get("githubRepositoryId")
+      ? "browser"
+      : parseGithubSourceMode(browser ? page.url.searchParams.get("githubMode") : null),
+  );
+  let githubSourceModeTouched = $state(
+    browser
+      ? page.url.searchParams.has("githubMode") || Boolean(page.url.searchParams.get("sourceLocator"))
+      : false,
+  );
   let sourceKind = $state<SourceKind>(initialSourceKind);
   let activeStep = $state<DeploymentStepKey>(initialStep);
   let projectMode = $state<DraftMode>(parseDraftMode(browser ? page.url.searchParams.get("projectMode") : null));
@@ -194,6 +233,7 @@
   let environmentMode = $state<DraftMode>(
     parseDraftMode(browser ? page.url.searchParams.get("environmentMode") : null),
   );
+  let resourceMode = $state<DraftMode>(parseDraftMode(browser ? page.url.searchParams.get("resourceMode") : null));
   let projectContextEnabled = $state(browser ? page.url.searchParams.get("editProject") === "true" : false);
   let environmentContextEnabled = $state(
     browser ? page.url.searchParams.get("editEnvironment") === "true" : false,
@@ -216,10 +256,26 @@
   let serverCredentialUsername = $state("");
   let serverCredentialPublicKey = $state("");
   let serverCredentialPrivateKey = $state("");
+  let selectedSshCredentialId = $state("");
+  let serverPrivateKeyInputMode = $state<ServerPrivateKeyInputMode>("file");
+  let sshCredentialName = $state("");
+  let serverCredentialPrivateKeyFileName = $state("");
+  let serverCredentialPrivateKeyImportError = $state<string | null>(null);
+  let serverConnectivityResult = $state<TestServerConnectivityResponse | null>(null);
+  let serverConnectivityError = $state("");
+  let deploymentProgressDialogOpen = $state(false);
+  let deploymentProgressDialogStatus = $state<DeploymentProgressDialogStatus>("idle");
+  let deploymentProgressEvents = $state<DeploymentProgressEvent[]>([]);
+  let deploymentProgressStreamError = $state("");
+  let deploymentProgressRequestId = $state("");
+  let deploymentProgressDeploymentId = $state("");
   let environmentName = $state(browser ? (page.url.searchParams.get("environmentName") ?? "local") : "local");
   let environmentKind = $state<EnvironmentKind>(
     parseEnvironmentKind(browser ? page.url.searchParams.get("environmentKind") : null),
   );
+  let resourceName = $state(browser ? (page.url.searchParams.get("resourceName") ?? "") : "");
+  let resourceKind = $state<ResourceKind>(parseResourceKind(browser ? page.url.searchParams.get("resourceKind") : null));
+  let resourceDescription = $state(browser ? (page.url.searchParams.get("resourceDescription") ?? "") : "");
   let variableKey = $state(browser ? (page.url.searchParams.get("variableKey") ?? "") : "");
   let variableValue = $state("");
   let variableIsSecret = $state(browser ? page.url.searchParams.get("variableSecret") !== "false" : true);
@@ -234,7 +290,6 @@
   let composeLocator = $state(browser ? (page.url.searchParams.get("sourceLocator") ?? "") : "");
   let lastAppliedUrlSearch = browser ? page.url.search : "";
   let routerStateReady = $state(false);
-
   let deployFeedback = $state<{
     kind: "success" | "error";
     title: string;
@@ -251,6 +306,33 @@
     mutationFn: (input: ConfigureServerCredentialInput) =>
       orpcClient.servers.configureCredential(input),
   }));
+  const createSshCredentialMutation = createMutation(() => ({
+    mutationFn: (input: {
+      name: string;
+      kind: "ssh-private-key";
+      username?: string;
+      publicKey?: string;
+      privateKey: string;
+    }) => orpcClient.credentials.ssh.create(input),
+  }));
+  const testServerConnectivityMutation = createMutation(() => ({
+    mutationFn: (input: {
+      server: {
+        name?: string;
+        host: string;
+        providerKey: string;
+        port?: number;
+        credential?: ConfigureServerCredentialInput["credential"];
+      };
+    }) => orpcClient.servers.testDraftConnectivity(input),
+    onSuccess: (result) => {
+      serverConnectivityResult = result;
+      serverConnectivityError = "";
+    },
+    onError: (error) => {
+      serverConnectivityError = readErrorMessage(error);
+    },
+  }));
   const createEnvironmentMutation = createMutation(() => ({
     mutationFn: (input: {
       projectId: string;
@@ -258,6 +340,9 @@
       kind: EnvironmentKind;
       parentEnvironmentId?: string;
     }) => orpcClient.environments.create(input),
+  }));
+  const createResourceMutation = createMutation(() => ({
+    mutationFn: (input: CreateResourceInput) => orpcClient.resources.create(input),
   }));
   const setEnvironmentVariableMutation = createMutation(() => ({
     mutationFn: (input: {
@@ -271,14 +356,8 @@
     }) => orpcClient.environments.setVariable(input),
   }));
   const createDeploymentMutation = createMutation(() => ({
-    mutationFn: (input: {
-      projectId?: string;
-      serverId: string;
-      environmentId?: string;
-      resourceId?: string;
-      sourceLocator: string;
-      deploymentMethod?: "auto" | "dockerfile" | "docker-compose" | "prebuilt-image" | "workspace-commands";
-    }) => orpcClient.deployments.create(input),
+    mutationFn: (input: DeploymentMutationInput) =>
+      createDeploymentWithProgress(input, appendDeploymentProgressEvent),
   }));
   const resourcesQuery = createQuery(() =>
     queryOptions({
@@ -297,6 +376,13 @@
       enabled: browser && enabled,
     }),
   );
+  const sshCredentialsQuery = createQuery(() =>
+    queryOptions({
+      queryKey: ["credentials", "ssh"],
+      queryFn: () => orpcClient.credentials.ssh.list({}),
+      enabled: browser && enabled,
+    }),
+  );
 
   const authSession = $derived(authSessionQuery.data ?? defaultAuthSession);
   const projects = $derived((projectsQuery.data?.items ?? []) as ProjectSummary[]);
@@ -304,6 +390,17 @@
   const environments = $derived((environmentsQuery.data?.items ?? []) as EnvironmentSummary[]);
   const resources = $derived((resourcesQuery.data?.items ?? []) as ResourceSummary[]);
   const providers = $derived((providersQuery.data?.items ?? []) as ProviderSummary[]);
+  const sshCredentials = $derived(
+    (sshCredentialsQuery.data?.items ?? []) as SshCredentialSummary[],
+  );
+  const selectedSshCredential = $derived(
+    sshCredentials.find((credential) => credential.id === selectedSshCredentialId) ?? null,
+  );
+  const activeServerPrivateKeyInputMode = $derived(
+    serverPrivateKeyInputMode === "saved" && sshCredentials.length === 0
+      ? "file"
+      : serverPrivateKeyInputMode,
+  );
   const githubProvider = $derived(
     authSession.providers.find((provider) => provider.key === "github") ?? null,
   );
@@ -350,7 +447,10 @@
     createProjectMutation.isPending ||
       registerServerMutation.isPending ||
       configureServerCredentialMutation.isPending ||
+      createSshCredentialMutation.isPending ||
+      testServerConnectivityMutation.isPending ||
       createEnvironmentMutation.isPending ||
+      createResourceMutation.isPending ||
       setEnvironmentVariableMutation.isPending ||
       createDeploymentMutation.isPending,
   );
@@ -371,7 +471,7 @@
   const sourcePlaceholder = $derived.by(() => {
     switch (sourceKind) {
       case "github":
-        return "选择 GitHub 仓库后自动设置";
+        return "https://github.com/acme/project.git";
       case "remote-git":
         return "https://git.example.com/team/project.git";
       case "docker-image":
@@ -397,8 +497,17 @@
       segments.push(`--environment ${selectedEnvironmentId}`);
     }
 
-    if (resourceContextEnabled && selectedResourceId) {
+    if (resourceContextEnabled && resourceMode === "existing" && selectedResourceId) {
       segments.push(`--resource ${selectedResourceId}`);
+    }
+
+    if (!resourceContextEnabled) {
+      segments.push(`--resource-name ${inferredResourceInput.name}`);
+    } else if (resourceMode === "new") {
+      segments.push(`--resource-name ${editedResourceInput.name}`);
+      if (editedResourceInput.kind) {
+        segments.push(`--resource-kind ${editedResourceInput.kind}`);
+      }
     }
 
     return segments.join(" ");
@@ -417,14 +526,14 @@
     providerOptions.find((provider) => provider.key === serverProviderKey)?.title ?? serverProviderKey,
   );
   const sourceSummary = $derived.by(() => {
-    if (sourceKind === "github" && selectedGitHubRepository) {
+    if (sourceKind === "github" && githubSourceMode === "browser" && selectedGitHubRepository) {
       return selectedGitHubRepository.fullName;
     }
 
     return sourceLocator || $t(i18nKeys.console.quickDeploy.sourceNotSet);
   });
   const sourceDetailRows = $derived.by((): SummaryRow[] => {
-    if (sourceKind === "github" && selectedGitHubRepository) {
+    if (sourceKind === "github" && githubSourceMode === "browser" && selectedGitHubRepository) {
       return [
         {
           label: $t(i18nKeys.console.quickDeploy.githubRepository),
@@ -435,10 +544,8 @@
           value: selectedGitHubRepository.defaultBranch,
         },
         {
-          label: $t(i18nKeys.console.quickDeploy.repositoryVisibility),
-          value: selectedGitHubRepository.private
-            ? $t(i18nKeys.console.quickDeploy.privateRepository)
-            : $t(i18nKeys.console.quickDeploy.publicRepository),
+          label: $t(i18nKeys.console.quickDeploy.sourceAccess),
+          value: $t(i18nKeys.console.quickDeploy.sourceAccessGithubApp),
         },
         {
           label: $t(i18nKeys.console.quickDeploy.cloneUrl),
@@ -455,6 +562,14 @@
           value: sourceSummary,
           mono: true,
         },
+        {
+          label: $t(i18nKeys.console.quickDeploy.sourceAccess),
+          value: $t(
+            gitSourceKindForLocator(githubLocator.trim()) === "git-github-app"
+              ? i18nKeys.console.quickDeploy.sourceAccessGithubApp
+              : i18nKeys.console.quickDeploy.sourceAccessPublicGit,
+          ),
+        },
       ];
     }
 
@@ -464,6 +579,14 @@
           label: $t(i18nKeys.console.quickDeploy.remoteGitUrl),
           value: sourceSummary,
           mono: true,
+        },
+        {
+          label: $t(i18nKeys.console.quickDeploy.sourceAccess),
+          value: $t(
+            gitSourceKindForLocator(sourceSummary) === "git-github-app"
+              ? i18nKeys.console.quickDeploy.sourceAccessGithubApp
+              : i18nKeys.console.quickDeploy.sourceAccessPublicGit,
+          ),
         },
       ];
     }
@@ -475,6 +598,10 @@
           value: sourceSummary,
           mono: true,
         },
+        {
+          label: $t(i18nKeys.console.quickDeploy.sourceAccess),
+          value: $t(i18nKeys.console.quickDeploy.sourceAccessDockerImage),
+        },
       ];
     }
 
@@ -485,6 +612,10 @@
           value: sourceSummary,
           mono: true,
         },
+        {
+          label: $t(i18nKeys.console.quickDeploy.sourceAccess),
+          value: $t(i18nKeys.console.quickDeploy.sourceAccessCompose),
+        },
       ];
     }
 
@@ -493,6 +624,10 @@
         label: $t(i18nKeys.console.quickDeploy.localFolderPath),
         value: sourceSummary,
         mono: true,
+      },
+      {
+        label: $t(i18nKeys.console.quickDeploy.sourceAccess),
+        value: $t(i18nKeys.console.quickDeploy.sourceAccessLocalFolder),
       },
     ];
   });
@@ -512,15 +647,28 @@
       : withoutQuery;
     const segments = withoutTag.split(/[\\/]/).filter(Boolean);
     const lastSegment = segments.at(-1) ?? withoutTag;
+    const name = lastSegment.replace(/\.git$/, "").trim();
 
-    return lastSegment.replace(/\.git$/, "") || "local-resource";
+    return /[a-z0-9]/i.test(name) ? name : "local-resource";
   });
+  const inferredResourceKind = $derived.by(
+    (): ResourceKind => (sourceKind === "compose" ? "compose-stack" : "application"),
+  );
+  const inferredResourceInput = $derived.by((): ResourceDraftInput => ({
+    name: inferredSourceName,
+    kind: inferredResourceKind,
+  }));
+  const editedResourceInput = $derived.by((): ResourceDraftInput => ({
+    name: resourceName.trim() || inferredSourceName,
+    kind: resourceKind,
+    ...(resourceDescription.trim() ? { description: resourceDescription.trim() } : {}),
+  }));
   const defaultProjectSummary = $derived.by(() => {
     if (selectedProject) {
       return selectedProject.name;
     }
 
-    return projectName.trim() || inferredSourceName;
+    return "Local Workspace";
   });
   const defaultEnvironmentSummary = $derived.by(() => {
     if (selectedEnvironment) {
@@ -534,15 +682,7 @@
       return `${selectedResource.name} · ${selectedResource.kind}`;
     }
 
-    if (sourceKind === "compose") {
-      return `${inferredSourceName} · compose-stack`;
-    }
-
-    if (sourceKind === "docker-image") {
-      return `${inferredSourceName} · application`;
-    }
-
-    return `${inferredSourceName} · application`;
+    return `${inferredResourceInput.name} · ${inferredResourceInput.kind ?? "application"}`;
   });
   const projectSummary = $derived.by(() => {
     if (!projectContextEnabled) {
@@ -580,9 +720,23 @@
     }
 
     return serverCredentialKind === "ssh-private-key"
-      ? `SSH 私钥${serverCredentialUsername.trim() ? ` · ${serverCredentialUsername.trim()}` : ""}`
+      ? [
+          "SSH 私钥",
+          selectedSshCredential?.name || serverCredentialPrivateKeyFileName || sshCredentialName.trim(),
+          serverCredentialUsername.trim(),
+        ]
+          .filter(Boolean)
+          .join(" · ")
       : `本机 SSH agent${serverCredentialUsername.trim() ? ` · ${serverCredentialUsername.trim()}` : ""}`;
   });
+  const canTestServerConnectivity = $derived(
+    serverMode === "new" &&
+      serverProviderKey === "generic-ssh" &&
+      Boolean(serverHost.trim()) &&
+      (serverCredentialKind === "local-ssh-agent" ||
+        (activeServerPrivateKeyInputMode === "saved" && Boolean(selectedSshCredentialId)) ||
+        Boolean(serverCredentialPrivateKey.trim())),
+  );
   const environmentSummary = $derived.by(() => {
     if (!environmentContextEnabled) {
       return defaultEnvironmentSummary;
@@ -601,9 +755,13 @@
       return defaultResourceSummary;
     }
 
-    return selectedResource
-      ? `${selectedResource.name} · ${selectedResource.kind}`
-      : "未选择资源";
+    if (resourceMode === "existing") {
+      return selectedResource
+        ? `${selectedResource.name} · ${selectedResource.kind}`
+        : "未选择资源";
+    }
+
+    return `${editedResourceInput.name} · ${editedResourceInput.kind ?? "application"}`;
   });
   const variableSummary = $derived.by(() => {
     if (!variableContextEnabled) {
@@ -616,6 +774,7 @@
 
     return `${variableKey.trim()} · ${variableIsSecret ? "secret" : "plain-config"}`;
   });
+  const domainBindingSummary = $derived($t(i18nKeys.console.quickDeploy.domainBindingsAfterDeploy));
   const canAdvance = $derived(stepIsComplete(activeStep));
 
   const githubRepositoriesQuery = createQuery(() =>
@@ -629,6 +788,7 @@
         browser &&
         enabled &&
         sourceKind === "github" &&
+        githubSourceMode === "browser" &&
         Boolean(githubProvider?.configured) &&
         Boolean(githubProvider?.connected),
     }),
@@ -743,6 +903,18 @@
   });
 
   $effect(() => {
+    if (
+      sourceKind === "github" &&
+      githubConnected &&
+      githubSourceMode === "url" &&
+      !githubSourceModeTouched &&
+      !githubLocator.trim()
+    ) {
+      githubSourceMode = "browser";
+    }
+  });
+
+  $effect(() => {
     const requestedRepository = browser ? (page.url.searchParams.get("repository")?.trim() ?? "") : "";
     const requestedRepositoryId = browser
       ? (page.url.searchParams.get("githubRepositoryId")?.trim() ?? "")
@@ -750,6 +922,7 @@
 
     if (
       sourceKind !== "github" ||
+      githubSourceMode !== "browser" ||
       selectedGitHubRepository ||
       githubRepositories.length === 0 ||
       (!requestedRepository && !requestedRepositoryId)
@@ -782,12 +955,20 @@
       : "source";
   }
 
+  function parseGithubSourceMode(value: string | null): GithubSourceMode {
+    return githubSourceModes.includes(value as GithubSourceMode) ? (value as GithubSourceMode) : "url";
+  }
+
   function parseDraftMode(value: string | null): DraftMode {
     return draftModeKeys.includes(value as DraftMode) ? (value as DraftMode) : "new";
   }
 
   function parseEnvironmentKind(value: string | null): EnvironmentKind {
     return environmentKinds.includes(value as EnvironmentKind) ? (value as EnvironmentKind) : "local";
+  }
+
+  function parseResourceKind(value: string | null): ResourceKind {
+    return resourceKinds.includes(value as ResourceKind) ? (value as ResourceKind) : "application";
   }
 
   function setSearchParam(
@@ -824,8 +1005,11 @@
     );
 
     if (sourceKind === "github") {
-      setSearchParam(params, "repository", selectedGitHubRepository?.fullName ?? githubRepositorySearch);
-      setSearchParam(params, "githubRepositoryId", selectedGitHubRepositoryId);
+      setSearchParam(params, "githubMode", githubSourceMode, "url");
+      if (githubSourceMode === "browser") {
+        setSearchParam(params, "repository", selectedGitHubRepository?.fullName ?? githubRepositorySearch);
+        setSearchParam(params, "githubRepositoryId", selectedGitHubRepositoryId);
+      }
     }
 
     setSearchParam(params, "editProject", projectContextEnabled ? "true" : "false", "false");
@@ -853,7 +1037,14 @@
 
     setSearchParam(params, "editResource", resourceContextEnabled ? "true" : "false", "false");
     if (resourceContextEnabled) {
-      setSearchParam(params, "resourceId", selectedResourceId);
+      setSearchParam(params, "resourceMode", resourceMode, "new");
+      if (resourceMode === "existing") {
+        setSearchParam(params, "resourceId", selectedResourceId);
+      } else {
+        setSearchParam(params, "resourceName", resourceName);
+        setSearchParam(params, "resourceKind", resourceKind, "application");
+        setSearchParam(params, "resourceDescription", resourceDescription);
+      }
     }
 
     setSearchParam(params, "editVariables", variableContextEnabled ? "true" : "false", "false");
@@ -876,6 +1067,7 @@
     projectMode = parseDraftMode(params.get("projectMode"));
     serverMode = parseDraftMode(params.get("serverMode"));
     environmentMode = parseDraftMode(params.get("environmentMode"));
+    resourceMode = parseDraftMode(params.get("resourceMode"));
     projectContextEnabled = params.get("editProject") === "true";
     environmentContextEnabled = params.get("editEnvironment") === "true";
     resourceContextEnabled = params.get("editResource") === "true";
@@ -894,9 +1086,13 @@
     serverProviderKey = params.get("serverProvider") ?? "local-shell";
     environmentName = params.get("environmentName") ?? "local";
     environmentKind = parseEnvironmentKind(params.get("environmentKind"));
+    resourceName = params.get("resourceName") ?? "";
+    resourceKind = parseResourceKind(params.get("resourceKind"));
+    resourceDescription = params.get("resourceDescription") ?? "";
     variableKey = params.get("variableKey") ?? "";
     variableIsSecret = params.get("variableSecret") !== "false";
-
+    githubSourceMode = parseGithubSourceMode(params.get("githubMode"));
+    githubSourceModeTouched = params.has("githubMode") || Boolean(nextSourceLocator);
     githubRepositorySearch = params.get("repository") ?? "";
     selectedGitHubRepositoryId = params.get("githubRepositoryId") ?? "";
     selectedGitHubRepository = null;
@@ -911,6 +1107,10 @@
   function setSourceLocator(value: string): void {
     switch (sourceKind) {
       case "github":
+        if (selectedGitHubRepository && value.trim() !== selectedGitHubRepository.cloneUrl) {
+          selectedGitHubRepository = null;
+          selectedGitHubRepositoryId = "";
+        }
         githubLocator = value;
         return;
       case "remote-git":
@@ -929,23 +1129,92 @@
 
   function selectSourceKind(kind: SourceKind): void {
     sourceKind = kind;
+    if (kind === "github" && githubConnected && !githubLocator.trim()) {
+      githubSourceMode = "browser";
+      githubSourceModeTouched = false;
+    }
   }
 
-  function deploymentMethodForSource():
-    | "dockerfile"
-    | "docker-compose"
-    | "prebuilt-image"
-    | undefined {
+  function selectGithubSourceMode(mode: GithubSourceMode): void {
+    githubSourceMode = mode;
+    githubSourceModeTouched = true;
+    if (mode === "url") {
+      selectedGitHubRepository = null;
+      selectedGitHubRepositoryId = "";
+    }
+  }
+
+  function gitSourceKindForLocator(locator: string): Extract<ResourceSourceInput["kind"], "git-github-app" | "git-public"> {
+    if (!githubConnected) {
+      return "git-public";
+    }
+
+    try {
+      const url = new URL(locator);
+      const host = url.hostname.toLowerCase();
+      if ((url.protocol === "https:" || url.protocol === "http:") && (host === "github.com" || host === "www.github.com")) {
+        return "git-github-app";
+      }
+    } catch {
+      return "git-public";
+    }
+
+    return "git-public";
+  }
+
+  function resourceSourceForSource(): ResourceSourceInput {
+    const locator = sourceLocator.trim();
+
     switch (sourceKind) {
       case "github":
+      {
+        const selectedRepository =
+          githubSourceMode === "browser" ? selectedGitHubRepository : null;
+        return {
+          kind: selectedRepository ? "git-github-app" : gitSourceKindForLocator(locator),
+          locator,
+          ...(selectedRepository ? { displayName: selectedRepository.fullName } : {}),
+          ...(selectedRepository
+            ? {
+                metadata: {
+                  repositoryId: selectedRepository.id,
+                  defaultBranch: selectedRepository.defaultBranch,
+                },
+              }
+            : {}),
+        };
+      }
       case "remote-git":
-        return "dockerfile";
+        return {
+          kind: gitSourceKindForLocator(locator),
+          locator,
+        };
       case "docker-image":
-        return "prebuilt-image";
+        return {
+          kind: "docker-image",
+          locator,
+        };
       case "compose":
-        return "docker-compose";
+        return {
+          kind: "compose",
+          locator,
+        };
       default:
-        return undefined;
+        return {
+          kind: "local-folder",
+          locator,
+        };
+    }
+  }
+
+  function runtimeProfileForSource(): ResourceRuntimeProfileInput {
+    switch (sourceKind) {
+      case "docker-image":
+        return { strategy: "prebuilt-image" };
+      case "compose":
+        return { strategy: "docker-compose" };
+      default:
+        return { strategy: "auto" };
     }
   }
 
@@ -960,11 +1229,9 @@
           return true;
         }
 
-        return Boolean(
-          githubProvider?.configured &&
-            githubConnected &&
-            Boolean(selectedGitHubRepository || githubLocator.trim()),
-        );
+        return githubSourceMode === "browser"
+          ? Boolean(selectedGitHubRepository)
+          : Boolean(githubLocator.trim());
       case "server":
         if (serverMode === "existing") {
           return Boolean(selectedServerId);
@@ -978,7 +1245,11 @@
           return true;
         }
 
-        return serverCredentialKind === "local-ssh-agent" || Boolean(serverCredentialPrivateKey.trim());
+        return (
+          serverCredentialKind === "local-ssh-agent" ||
+          (activeServerPrivateKeyInputMode === "saved" && Boolean(selectedSshCredentialId)) ||
+          Boolean(serverCredentialPrivateKey.trim())
+        );
       case "project":
         return !projectContextEnabled || (projectMode === "existing" ? Boolean(selectedProjectId) : Boolean(projectName.trim()));
       case "environment":
@@ -1046,10 +1317,12 @@
 
   async function connectGitHub(): Promise<void> {
     try {
+      githubSourceMode = "browser";
       const endpoint =
         authSession.session && !githubConnected ? "/api/auth/link-social" : "/api/auth/sign-in/social";
       const callbackURL = browser ? buildDeployStateUrl() : new URL("/deploy", API_BASE);
       callbackURL.searchParams.set("source", "github");
+      callbackURL.searchParams.set("githubMode", "browser");
       callbackURL.searchParams.set("step", "source");
 
       const response = await request<{
@@ -1082,17 +1355,23 @@
 
   function applyGitHubRepository(repository: GitHubRepositorySummary): void {
     sourceKind = "github";
+    githubSourceMode = "browser";
     selectedGitHubRepositoryId = repository.id;
     selectedGitHubRepository = repository;
     githubLocator = repository.cloneUrl;
-
-    if (projectMode === "new") {
-      projectName = repository.name;
-      projectDescription = repository.description ?? "";
-    }
+    resourceName = repository.name;
+    resourceDescription = repository.description ?? "";
   }
 
-  function newServerCredential(): ConfigureServerCredentialInput["credential"] | undefined {
+  function defaultSshCredentialName(): string {
+    return (
+      sshCredentialName.trim() ||
+      serverCredentialPrivateKeyFileName ||
+      `${serverName.trim() || serverHost.trim() || "server"} SSH key`
+    );
+  }
+
+  function draftServerCredential(): ConfigureServerCredentialInput["credential"] | undefined {
     if (serverProviderKey !== "generic-ssh") {
       return undefined;
     }
@@ -1106,12 +1385,206 @@
       };
     }
 
+    if (activeServerPrivateKeyInputMode === "saved" && selectedSshCredentialId) {
+      return {
+        kind: "stored-ssh-private-key",
+        credentialId: selectedSshCredentialId,
+        ...(username ? { username } : {}),
+      };
+    }
+
+    if (!serverCredentialPrivateKey.trim()) {
+      return undefined;
+    }
+
     return {
       kind: "ssh-private-key",
       ...(username ? { username } : {}),
       ...(serverCredentialPublicKey.trim() ? { publicKey: serverCredentialPublicKey.trim() } : {}),
       privateKey: serverCredentialPrivateKey.trim(),
     };
+  }
+
+  function connectivityLabel(status: TestServerConnectivityResponse["status"]): string {
+    switch (status) {
+      case "healthy":
+        return $t(i18nKeys.common.status.healthy);
+      case "degraded":
+        return $t(i18nKeys.common.status.degraded);
+      case "unreachable":
+        return $t(i18nKeys.common.status.unreachable);
+    }
+  }
+
+  function connectivityVariant(
+    status: TestServerConnectivityResponse["status"],
+  ): "default" | "secondary" | "outline" | "destructive" {
+    switch (status) {
+      case "healthy":
+        return "default";
+      case "degraded":
+        return "secondary";
+      case "unreachable":
+        return "destructive";
+    }
+  }
+
+  function checkLabel(status: TestServerConnectivityResponse["checks"][number]["status"]): string {
+    switch (status) {
+      case "passed":
+        return $t(i18nKeys.common.status.passed);
+      case "failed":
+        return $t(i18nKeys.common.status.failed);
+      case "skipped":
+        return $t(i18nKeys.common.status.skipped);
+    }
+  }
+
+  function checkVariant(
+    status: TestServerConnectivityResponse["checks"][number]["status"],
+  ): "default" | "secondary" | "outline" | "destructive" {
+    switch (status) {
+      case "passed":
+        return "default";
+      case "failed":
+        return "destructive";
+      case "skipped":
+        return "outline";
+    }
+  }
+
+  function resetDeploymentProgressDialog(): void {
+    deploymentProgressDialogStatus = "running";
+    deploymentProgressEvents = [];
+    deploymentProgressStreamError = "";
+    deploymentProgressDeploymentId = "";
+    deploymentProgressDialogOpen = true;
+  }
+
+  function appendDeploymentProgressEvent(event: DeploymentProgressEvent): void {
+    deploymentProgressEvents = [...deploymentProgressEvents, event];
+    deploymentProgressDeploymentId = event.deploymentId ?? deploymentProgressDeploymentId;
+
+    if (event.status === "failed") {
+      deploymentProgressDialogStatus = "failed";
+    }
+  }
+
+  async function testDraftServerConnectivity(): Promise<void> {
+    serverConnectivityResult = null;
+    serverConnectivityError = "";
+
+    const host = serverHost.trim();
+    if (!host) {
+      serverConnectivityError = "请先填写服务器地址。";
+      return;
+    }
+
+    const port = Number(serverPort.trim() || "22");
+    if (!Number.isInteger(port) || port < 1 || port > 65535) {
+      serverConnectivityError = "SSH 端口必须是 1 到 65535 之间的整数。";
+      return;
+    }
+
+    const credential = draftServerCredential();
+    if (serverProviderKey === "generic-ssh" && !credential) {
+      serverConnectivityError = "请先选择 SSH agent、已保存凭据，或提供私钥。";
+      return;
+    }
+
+    try {
+      await testServerConnectivityMutation.mutateAsync({
+        server: {
+          name: serverName.trim() || host,
+          host,
+          providerKey: serverProviderKey,
+          port,
+          ...(credential ? { credential } : {}),
+        },
+      });
+    } catch (error) {
+      serverConnectivityError = serverConnectivityError || readErrorMessage(error);
+    }
+  }
+
+  async function resolveNewServerCredential(): Promise<
+    ConfigureServerCredentialInput["credential"] | undefined
+  > {
+    if (serverProviderKey !== "generic-ssh") {
+      return undefined;
+    }
+
+    const username = serverCredentialUsername.trim();
+
+    if (serverCredentialKind === "local-ssh-agent") {
+      return {
+        kind: "local-ssh-agent",
+        ...(username ? { username } : {}),
+      };
+    }
+
+    if (activeServerPrivateKeyInputMode === "saved" && selectedSshCredentialId) {
+      return {
+        kind: "stored-ssh-private-key",
+        credentialId: selectedSshCredentialId,
+        ...(username ? { username } : {}),
+      };
+    }
+
+    if (!serverCredentialPrivateKey.trim()) {
+      return {
+        kind: "ssh-private-key",
+        privateKey: "",
+      };
+    }
+
+    const createdCredential = await createSshCredentialMutation.mutateAsync({
+      name: defaultSshCredentialName(),
+      kind: "ssh-private-key",
+      ...(username ? { username } : {}),
+      ...(serverCredentialPublicKey.trim() ? { publicKey: serverCredentialPublicKey.trim() } : {}),
+      privateKey: serverCredentialPrivateKey.trim(),
+    });
+
+    selectedSshCredentialId = createdCredential.id;
+    await sshCredentialsQuery.refetch();
+
+    return {
+      kind: "stored-ssh-private-key",
+      credentialId: createdCredential.id,
+      ...(username ? { username } : {}),
+    };
+  }
+
+  async function importServerPrivateKeyFile(event: Event): Promise<void> {
+    const input = event.currentTarget as HTMLInputElement;
+    const file = input.files?.[0];
+
+    if (!file) {
+      return;
+    }
+
+    serverCredentialPrivateKeyImportError = null;
+
+    try {
+      const privateKey = (await file.text()).trim();
+
+      if (!privateKey) {
+        throw new Error("选择的私钥文件是空的。");
+      }
+
+      serverCredentialPrivateKey = privateKey;
+      serverCredentialPrivateKeyFileName = file.name;
+      selectedSshCredentialId = "";
+      serverPrivateKeyInputMode = "file";
+      sshCredentialName = sshCredentialName.trim() || file.name;
+    } catch (error) {
+      serverCredentialPrivateKeyFileName = "";
+      serverCredentialPrivateKeyImportError =
+        error instanceof Error ? error.message : "无法读取这个私钥文件。";
+    } finally {
+      input.value = "";
+    }
   }
 
   async function refreshWorkspaceData(): Promise<void> {
@@ -1126,20 +1599,13 @@
 
   async function handleQuickDeploy(): Promise<void> {
     deployFeedback = null;
+    const deploymentRequestId = createDeploymentRequestId();
+    deploymentProgressRequestId = deploymentRequestId;
+    resetDeploymentProgressDialog();
 
     try {
       if (!sourceLocator) {
         throw new Error("请先填写来源地址。");
-      }
-
-      if (sourceKind === "github") {
-        if (!githubProvider?.configured) {
-          throw new Error("后端尚未配置 GitHub OAuth。");
-        }
-
-        if (!githubConnected) {
-          throw new Error("请先连接 GitHub，再继续导入仓库。");
-        }
       }
 
       let projectId = projectContextEnabled ? selectedProjectId : undefined;
@@ -1162,6 +1628,22 @@
         throw new Error("请选择或创建一个项目。");
       }
 
+      if (!projectId) {
+        const existingProject = projects[0];
+        if (existingProject) {
+          projectId = existingProject.id;
+          selectedProjectId = projectId;
+        } else {
+          const createdProject = await createProjectMutation.mutateAsync({
+            name: projectName.trim() || "Local Workspace",
+            ...(projectDescription.trim() ? { description: projectDescription.trim() } : {}),
+          });
+          projectId = createdProject.id;
+          selectedProjectId = projectId;
+          await projectsQuery.refetch();
+        }
+      }
+
       let serverId = selectedServerId;
 
       if (serverMode === "new") {
@@ -1169,20 +1651,21 @@
           throw new Error("请填写服务器名称和主机地址。");
         }
 
-        const credential = newServerCredential();
+        const credential = await resolveNewServerCredential();
         if (
           serverProviderKey === "generic-ssh" &&
           serverCredentialKind === "ssh-private-key" &&
           credential?.kind === "ssh-private-key" &&
           !credential.privateKey
         ) {
-          throw new Error("请填写 SSH 私钥，或切换为本机 SSH agent。");
+          throw new Error("请导入或粘贴 SSH 私钥，或切换为本机 SSH agent。");
         }
 
         const createdServer = await registerServerMutation.mutateAsync({
           name: serverName.trim(),
           host: serverHost.trim(),
           providerKey: serverProviderKey,
+          proxyKind: "traefik",
           ...(serverPort.trim() ? { port: Number(serverPort) } : {}),
         });
         serverId = createdServer.id;
@@ -1227,8 +1710,69 @@
         throw new Error("请选择或创建一个环境。");
       }
 
-      if (resourceContextEnabled && !selectedResourceId) {
-        throw new Error("请选择资源，或关闭资源编辑以使用默认值。");
+      if (!environmentId) {
+        const existingEnvironment =
+          environments.find(
+            (environment) =>
+              environment.projectId === projectId &&
+              environment.name === "local" &&
+              environment.kind === "local",
+          ) ?? environments.find((environment) => environment.projectId === projectId);
+
+        if (existingEnvironment) {
+          environmentId = existingEnvironment.id;
+          selectedEnvironmentId = environmentId;
+        } else {
+          const createdEnvironment = await createEnvironmentMutation.mutateAsync({
+            projectId,
+            name: environmentName.trim() || "local",
+            kind: environmentKind,
+          });
+          environmentId = createdEnvironment.id;
+          selectedEnvironmentId = environmentId;
+          await environmentsQuery.refetch();
+        }
+      }
+
+      let deploymentResourceId: string | undefined;
+      let deploymentResource: ResourceDraftInput | undefined;
+      if (resourceContextEnabled) {
+        if (resourceMode === "existing") {
+          if (!selectedResourceId) {
+            throw new Error("请选择资源，或切换为新建资源。");
+          }
+
+          deploymentResourceId = selectedResourceId;
+        } else {
+          if (!editedResourceInput.name.trim()) {
+            throw new Error("请填写资源名。");
+          }
+
+          deploymentResource = editedResourceInput;
+        }
+      } else {
+        deploymentResource = inferredResourceInput;
+      }
+
+      if (deploymentResource && projectId && environmentId) {
+        const createdResource = await createResourceMutation.mutateAsync({
+          projectId,
+          environmentId,
+          name: deploymentResource.name.trim(),
+          kind: deploymentResource.kind ?? "application",
+          ...(deploymentResource.description?.trim()
+            ? { description: deploymentResource.description.trim() }
+            : {}),
+          ...(deploymentResource.services && deploymentResource.services.length > 0
+            ? { services: deploymentResource.services }
+            : {}),
+          source: resourceSourceForSource(),
+          runtimeProfile: runtimeProfileForSource(),
+        });
+        deploymentResourceId = createdResource.id;
+        deploymentResource = undefined;
+        selectedResourceId = createdResource.id;
+        await resourcesQuery.refetch();
       }
 
       if (variableContextEnabled && variableKey.trim()) {
@@ -1248,25 +1792,32 @@
         await environmentsQuery.refetch();
       }
 
+      if (!projectId || !environmentId || !deploymentResourceId) {
+        throw new Error("请选择或创建一个项目、环境和资源。");
+      }
+
       const deployment = await createDeploymentMutation.mutateAsync({
+        projectId,
         serverId,
-        sourceLocator,
-        ...(projectId ? { projectId } : {}),
-        ...(environmentId ? { environmentId } : {}),
-        ...(resourceContextEnabled && selectedResourceId ? { resourceId: selectedResourceId } : {}),
-        ...(deploymentMethodForSource()
-          ? { deploymentMethod: deploymentMethodForSource() }
-          : {}),
+        environmentId,
+        resourceId: deploymentResourceId,
       });
 
       await refreshWorkspaceData();
+      deploymentProgressDialogStatus = "succeeded";
+      deploymentProgressDeploymentId = deployment.id;
 
       deployFeedback = {
         kind: "success",
         title: $t(i18nKeys.console.quickDeploy.deployFeedbackSuccessTitle),
         detail: `deploymentId: ${deployment.id}`,
       };
+      setTimeout(() => {
+        void goto(`/deployments/${deployment.id}`);
+      }, 600);
     } catch (error) {
+      deploymentProgressDialogStatus = "failed";
+      deploymentProgressStreamError = readErrorMessage(error);
       deployFeedback = {
         kind: "error",
         title: $t(i18nKeys.console.quickDeploy.deployFeedbackErrorTitle),
@@ -1274,6 +1825,7 @@
       };
     }
   }
+
 </script>
 
 <div class="grid gap-5 xl:grid-cols-[minmax(0,1fr)_22rem]">
@@ -1341,8 +1893,39 @@
               {/each}
             </div>
             {#if sourceKind === "github"}
-              <div class="rounded-md border bg-muted/30 px-3 py-3 text-sm text-muted-foreground">
-                {$t(i18nKeys.console.quickDeploy.githubRepositoryAutoLocator)}
+              <div class="space-y-3">
+                <div class="grid gap-2 sm:grid-cols-2">
+                  <Button
+                    type="button"
+                    variant={githubSourceMode === "url" ? "selected" : "outline"}
+                    onclick={() => selectGithubSourceMode("url")}
+                  >
+                    {$t(i18nKeys.console.quickDeploy.githubSourceUrlMode)}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={githubSourceMode === "browser" ? "selected" : "outline"}
+                    onclick={() => selectGithubSourceMode("browser")}
+                  >
+                    {$t(i18nKeys.console.quickDeploy.githubSourceBrowserMode)}
+                  </Button>
+                </div>
+                {#if githubSourceMode === "url"}
+                  <div class="space-y-2">
+                    <label class="text-xs font-medium text-muted-foreground" for="github-source-locator">
+                      {$t(i18nKeys.console.quickDeploy.githubRepositoryUrl)}
+                    </label>
+                    <Input
+                      id="github-source-locator"
+                      value={githubLocator}
+                      oninput={(event) => setSourceLocator(event.currentTarget.value)}
+                      placeholder={sourcePlaceholder}
+                    />
+                    <p class="text-xs text-muted-foreground">
+                      {$t(i18nKeys.console.quickDeploy.githubRepositoryUrlHint)}
+                    </p>
+                  </div>
+                {/if}
               </div>
             {:else}
               <div class="space-y-2">
@@ -1388,7 +1971,7 @@
             {/if}
           </div>
 
-          {#if sourceKind === "github"}
+          {#if sourceKind === "github" && githubSourceMode === "browser"}
             <div class="space-y-3">
               <Separator />
               <div class="flex items-center justify-between gap-2">
@@ -1444,9 +2027,6 @@
                                 {repository.description ?? $t(i18nKeys.common.domain.description)}
                               </span>
                             </span>
-                            <Badge variant="outline">
-                              {repository.private ? "private" : "public"}
-                            </Badge>
                           </span>
                         </button>
                       {/each}
@@ -1468,7 +2048,7 @@
             </div>
             <div class="grid grid-cols-2 gap-2">
               <Button
-                variant={projectMode === "existing" ? "default" : "outline"}
+                variant={projectMode === "existing" ? "selected" : "outline"}
                 onclick={() => {
                   projectMode = "existing";
                 }}
@@ -1476,7 +2056,7 @@
                 {$t(i18nKeys.common.modes.useExisting)}
               </Button>
               <Button
-                variant={projectMode === "new" ? "default" : "outline"}
+                variant={projectMode === "new" ? "selected" : "outline"}
                 onclick={() => {
                   projectMode = "new";
                 }}
@@ -1491,7 +2071,7 @@
                     <Button
                       class="w-full justify-start"
                       size="sm"
-                      variant={selectedProjectId === project.id ? "default" : "ghost"}
+                      variant={selectedProjectId === project.id ? "selected" : "ghost"}
                       onclick={() => {
                         selectedProjectId = project.id;
                       }}
@@ -1535,7 +2115,7 @@
             </div>
             <div class="grid grid-cols-2 gap-2">
               <Button
-                variant={serverMode === "existing" ? "default" : "outline"}
+                variant={serverMode === "existing" ? "selected" : "outline"}
                 onclick={() => {
                   serverMode = "existing";
                 }}
@@ -1543,7 +2123,7 @@
                 {$t(i18nKeys.common.modes.useExisting)}
               </Button>
               <Button
-                variant={serverMode === "new" ? "default" : "outline"}
+                variant={serverMode === "new" ? "selected" : "outline"}
                 onclick={() => {
                   serverMode = "new";
                 }}
@@ -1558,7 +2138,7 @@
                     <Button
                       class="w-full justify-start"
                       size="sm"
-                      variant={selectedServerId === server.id ? "default" : "ghost"}
+                      variant={selectedServerId === server.id ? "selected" : "ghost"}
                       onclick={() => {
                         selectedServerId = server.id;
                       }}
@@ -1602,7 +2182,7 @@
                       <Button
                         class="justify-start"
                         size="sm"
-                        variant={serverProviderKey === provider.key ? "default" : "outline"}
+                        variant={serverProviderKey === provider.key ? "selected" : "outline"}
                         onclick={() => {
                           serverProviderKey = provider.key;
                         }}
@@ -1617,14 +2197,15 @@
                     <div class="space-y-1">
                       <p class="text-sm font-medium">SSH 登录凭据</p>
                       <p class="text-xs text-muted-foreground">
-                        云服务器先把公钥放进 authorized_keys；Yundu 连接服务器时使用对应的私钥，或使用当前机器的 SSH agent。
+                        只需要选择一种认证来源：本机 SSH agent、已保存凭据、导入 `.pem`/OpenSSH 私钥文件，或粘贴私钥内容。
+                        公钥只用于记录或核对，可以不填。
                       </p>
                     </div>
                     <div class="grid gap-2 sm:grid-cols-2">
                       <Button
                         type="button"
                         size="sm"
-                        variant={serverCredentialKind === "local-ssh-agent" ? "default" : "outline"}
+                        variant={serverCredentialKind === "local-ssh-agent" ? "selected" : "outline"}
                         onclick={() => {
                           serverCredentialKind = "local-ssh-agent";
                         }}
@@ -1634,50 +2215,241 @@
                       <Button
                         type="button"
                         size="sm"
-                        variant={serverCredentialKind === "ssh-private-key" ? "default" : "outline"}
+                        variant={serverCredentialKind === "ssh-private-key" ? "selected" : "outline"}
                         onclick={() => {
                           serverCredentialKind = "ssh-private-key";
+                          if (serverPrivateKeyInputMode === "saved" && sshCredentials.length === 0) {
+                            serverPrivateKeyInputMode = "file";
+                          }
                         }}
                       >
-                        粘贴 SSH 私钥
+                        SSH 私钥
                       </Button>
                     </div>
                     <div class="space-y-2">
                       <label class="text-xs font-medium text-muted-foreground" for="server-ssh-username">
-                        登录用户
+                        登录用户（可选）
                       </label>
                       <Input
                         id="server-ssh-username"
                         bind:value={serverCredentialUsername}
                         placeholder="root 或 ubuntu"
                       />
+                      <p class="text-xs text-muted-foreground">
+                        如果服务器地址已写成 `ubuntu@203.0.113.10`，这里可以留空。
+                      </p>
                     </div>
-                    {#if serverCredentialKind === "ssh-private-key"}
-                      <div class="space-y-2">
-                        <label class="text-xs font-medium text-muted-foreground" for="server-ssh-private-key">
-                          私钥
-                        </label>
-                        <Textarea
-                          id="server-ssh-private-key"
-                          class="font-mono text-xs"
-                          bind:value={serverCredentialPrivateKey}
-                          placeholder={"-----BEGIN OPENSSH PRIVATE KEY-----\n...\n-----END OPENSSH PRIVATE KEY-----"}
-                          rows={6}
-                        />
+                    {#if serverCredentialKind === "local-ssh-agent"}
+                      <div class="space-y-1 rounded-md border border-dashed px-3 py-2 text-xs text-muted-foreground">
+                        <p>
+                          本机 SSH agent 会使用运行 Yundu 后端这台机器上的 `SSH_AUTH_SOCK` 和已加载的 key。
+                        </p>
+                        <p>
+                          适合本地开发或桌面模式；如果 Yundu 跑在远程服务器上，就不是使用你笔记本里的 agent。
+                        </p>
                       </div>
+                    {:else}
                       <div class="space-y-2">
-                        <label class="text-xs font-medium text-muted-foreground" for="server-ssh-public-key">
-                          公钥（可选）
-                        </label>
-                        <Textarea
-                          id="server-ssh-public-key"
-                          class="font-mono text-xs"
-                          bind:value={serverCredentialPublicKey}
-                          placeholder="ssh-ed25519 AAAA..."
-                          rows={3}
-                        />
+                        <p class="text-xs font-medium text-muted-foreground">私钥来源</p>
+                        <div class="grid gap-2 sm:grid-cols-3">
+                          <Button
+                            type="button"
+                            size="sm"
+                            disabled={sshCredentials.length === 0}
+                            variant={activeServerPrivateKeyInputMode === "saved" ? "selected" : "outline"}
+                            class="h-auto flex-col items-start gap-0.5 px-3 py-2 text-left"
+                            onclick={() => {
+                              serverPrivateKeyInputMode = "saved";
+                              serverCredentialPrivateKey = "";
+                              serverCredentialPrivateKeyFileName = "";
+                              serverCredentialPrivateKeyImportError = null;
+                            }}
+                          >
+                            <span>已保存凭据</span>
+                            <span class="text-[0.7rem] font-normal opacity-75">
+                              {sshCredentials.length > 0 ? `${sshCredentials.length} 个可用` : "暂无"}
+                            </span>
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant={activeServerPrivateKeyInputMode === "file" ? "selected" : "outline"}
+                            class="h-auto flex-col items-start gap-0.5 px-3 py-2 text-left"
+                            onclick={() => {
+                              serverPrivateKeyInputMode = "file";
+                              selectedSshCredentialId = "";
+                              serverCredentialPrivateKey = "";
+                              serverCredentialPrivateKeyFileName = "";
+                              serverCredentialPrivateKeyImportError = null;
+                            }}
+                          >
+                            <span>选择私钥文件</span>
+                            <span class="text-[0.7rem] font-normal opacity-75">PEM 或 OpenSSH</span>
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant={activeServerPrivateKeyInputMode === "paste" ? "selected" : "outline"}
+                            class="h-auto flex-col items-start gap-0.5 px-3 py-2 text-left"
+                            onclick={() => {
+                              serverPrivateKeyInputMode = "paste";
+                              selectedSshCredentialId = "";
+                              serverCredentialPrivateKeyFileName = "";
+                              serverCredentialPrivateKeyImportError = null;
+                            }}
+                          >
+                            <span>粘贴私钥内容</span>
+                            <span class="text-[0.7rem] font-normal opacity-75">手动输入</span>
+                          </Button>
+                        </div>
                       </div>
+
+                      {#if activeServerPrivateKeyInputMode === "saved"}
+                        <div class="space-y-2">
+                          <p class="text-xs font-medium text-muted-foreground">选择凭据</p>
+                          <div class="grid gap-2">
+                            {#each sshCredentials as credential}
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant={selectedSshCredentialId === credential.id ? "selected" : "outline"}
+                                class="justify-start"
+                                onclick={() => {
+                                  selectedSshCredentialId = credential.id;
+                                  serverCredentialPrivateKey = "";
+                                  serverCredentialPrivateKeyFileName = "";
+                                  serverCredentialPrivateKeyImportError = null;
+                                }}
+                              >
+                                {credential.name}{credential.username ? ` · ${credential.username}` : ""}
+                              </Button>
+                            {/each}
+                          </div>
+                        </div>
+                      {:else if activeServerPrivateKeyInputMode === "file"}
+                        <div class="space-y-2">
+                          <label class="text-xs font-medium text-muted-foreground" for="server-ssh-private-key-file">
+                            私钥文件
+                          </label>
+                          <Input
+                            id="server-ssh-private-key-file"
+                            type="file"
+                            onchange={importServerPrivateKeyFile}
+                          />
+                          {#if serverCredentialPrivateKeyFileName}
+                            <p class="text-xs text-muted-foreground">
+                              已选择 {serverCredentialPrivateKeyFileName}
+                            </p>
+                          {:else if serverCredentialPrivateKeyImportError}
+                            <p class="text-xs text-destructive">{serverCredentialPrivateKeyImportError}</p>
+                          {:else}
+                            <p class="text-xs text-muted-foreground">
+                              选择云厂商下载的 `.pem` 或标准 OpenSSH 私钥文件。
+                            </p>
+                          {/if}
+                        </div>
+                      {:else}
+                        <div class="space-y-2">
+                          <label class="text-xs font-medium text-muted-foreground" for="server-ssh-private-key">
+                            私钥内容
+                          </label>
+                          <Textarea
+                            id="server-ssh-private-key"
+                            class="font-mono text-xs"
+                            bind:value={serverCredentialPrivateKey}
+                            oninput={() => {
+                              selectedSshCredentialId = "";
+                              serverCredentialPrivateKeyFileName = "";
+                              serverPrivateKeyInputMode = "paste";
+                            }}
+                            placeholder={"-----BEGIN OPENSSH PRIVATE KEY-----\n...\n-----END OPENSSH PRIVATE KEY-----"}
+                            rows={6}
+                          />
+                        </div>
+                      {/if}
+
+                      {#if activeServerPrivateKeyInputMode === "file" || activeServerPrivateKeyInputMode === "paste"}
+                        <div class="space-y-2">
+                          <label class="text-xs font-medium text-muted-foreground" for="server-ssh-credential-name">
+                            凭据名称
+                          </label>
+                          <Input
+                            id="server-ssh-credential-name"
+                            bind:value={sshCredentialName}
+                            placeholder={serverCredentialPrivateKeyFileName || `${serverName || "server"} SSH key`}
+                          />
+                          <p class="text-xs text-muted-foreground">
+                            创建服务器时会把这把私钥保存到凭据库，后续服务器可以复用。
+                          </p>
+                        </div>
+                        <div class="space-y-2">
+                          <label class="text-xs font-medium text-muted-foreground" for="server-ssh-public-key">
+                            公钥（可选）
+                          </label>
+                          <Textarea
+                            id="server-ssh-public-key"
+                            class="font-mono text-xs"
+                            bind:value={serverCredentialPublicKey}
+                            placeholder="ssh-ed25519 AAAA..."
+                            rows={3}
+                          />
+                          <p class="text-xs text-muted-foreground">
+                            SSH 连接只需要私钥；这里用于凭据库展示或人工核对。
+                          </p>
+                        </div>
+                      {/if}
                     {/if}
+                    <div class="space-y-2 border-t pt-3">
+                      <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                        <div class="space-y-1">
+                          <p class="text-xs font-medium text-muted-foreground">连接测试</p>
+                          <p class="text-xs text-muted-foreground">
+                            使用当前表单内容临时测试 SSH 和远程 Docker。当前 SSH 部署需要远程 Docker，不会创建服务器或保存新凭据。
+                          </p>
+                        </div>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          disabled={!canTestServerConnectivity || testServerConnectivityMutation.isPending}
+                          onclick={testDraftServerConnectivity}
+                        >
+                          {#if testServerConnectivityMutation.isPending}
+                            <LoaderCircle class="size-3 animate-spin" />
+                            测试中
+                          {:else}
+                            测试连接
+                          {/if}
+                        </Button>
+                      </div>
+                      {#if serverConnectivityError}
+                        <div class="rounded-md border border-destructive/30 px-3 py-2 text-xs text-destructive">
+                          {serverConnectivityError}
+                        </div>
+                      {:else if serverConnectivityResult}
+                        <div class="space-y-2 rounded-md border px-3 py-2">
+                          <div class="flex flex-wrap items-center justify-between gap-2">
+                            <p class="text-xs font-medium">连接结果</p>
+                            <Badge variant={connectivityVariant(serverConnectivityResult.status)}>
+                              {connectivityLabel(serverConnectivityResult.status)}
+                            </Badge>
+                          </div>
+                          <div class="space-y-2">
+                            {#each serverConnectivityResult.checks as check (check.name)}
+                              <div class="flex flex-col gap-1 border-t pt-2 first:border-t-0 first:pt-0">
+                                <div class="flex flex-wrap items-center justify-between gap-2">
+                                  <span class="text-xs font-medium">{check.name}</span>
+                                  <Badge variant={checkVariant(check.status)}>
+                                    {checkLabel(check.status)}
+                                  </Badge>
+                                </div>
+                                <p class="text-xs leading-5 text-muted-foreground">{check.message}</p>
+                              </div>
+                            {/each}
+                          </div>
+                        </div>
+                      {/if}
+                    </div>
                   </div>
                 {/if}
               </div>
@@ -1693,7 +2465,7 @@
             </div>
             <div class="grid grid-cols-2 gap-2">
               <Button
-                variant={environmentMode === "existing" ? "default" : "outline"}
+                variant={environmentMode === "existing" ? "selected" : "outline"}
                 onclick={() => {
                   environmentMode = "existing";
                 }}
@@ -1701,7 +2473,7 @@
                 {$t(i18nKeys.common.modes.useExisting)}
               </Button>
               <Button
-                variant={environmentMode === "new" ? "default" : "outline"}
+                variant={environmentMode === "new" ? "selected" : "outline"}
                 onclick={() => {
                   environmentMode = "new";
                 }}
@@ -1716,7 +2488,7 @@
                     <Button
                       class="w-full justify-start"
                       size="sm"
-                      variant={selectedEnvironmentId === environment.id ? "default" : "ghost"}
+                      variant={selectedEnvironmentId === environment.id ? "selected" : "ghost"}
                       onclick={() => {
                         selectedEnvironmentId = environment.id;
                       }}
@@ -1742,7 +2514,7 @@
                     {#each environmentKinds as kind (kind)}
                       <Button
                         size="sm"
-                        variant={environmentKind === kind ? "default" : "outline"}
+                        variant={environmentKind === kind ? "selected" : "outline"}
                         onclick={() => {
                           environmentKind = kind;
                         }}
@@ -1779,7 +2551,7 @@
                 </div>
               </div>
               <Button
-                variant={variableIsSecret ? "default" : "outline"}
+                variant={variableIsSecret ? "selected" : "outline"}
                 size="sm"
                 onclick={() => {
                   variableIsSecret = !variableIsSecret;
@@ -1824,6 +2596,10 @@
                   <p class="mt-1 truncate font-medium">{resourceSummary}</p>
                 </div>
                 <div class="rounded-md border px-3 py-3">
+                  <p class="text-xs text-muted-foreground">{$t(i18nKeys.common.domain.domainBindings)}</p>
+                  <p class="mt-1 truncate font-medium">{domainBindingSummary}</p>
+                </div>
+                <div class="rounded-md border px-3 py-3">
                   <p class="text-xs text-muted-foreground">{$t(i18nKeys.common.domain.variables)}</p>
                   <p class="mt-1 truncate font-medium">{variableSummary}</p>
                 </div>
@@ -1839,7 +2615,7 @@
                     <Button
                       type="button"
                       size="sm"
-                      variant={projectContextEnabled ? "default" : "outline"}
+                      variant={projectContextEnabled ? "selected" : "outline"}
                       onclick={() => {
                         projectContextEnabled = !projectContextEnabled;
                       }}
@@ -1851,7 +2627,7 @@
                     <div class="mt-3 space-y-3">
                       <div class="grid grid-cols-2 gap-2">
                         <Button
-                          variant={projectMode === "existing" ? "default" : "outline"}
+                          variant={projectMode === "existing" ? "selected" : "outline"}
                           onclick={() => {
                             projectMode = "existing";
                           }}
@@ -1859,7 +2635,7 @@
                           {$t(i18nKeys.common.modes.useExisting)}
                         </Button>
                         <Button
-                          variant={projectMode === "new" ? "default" : "outline"}
+                          variant={projectMode === "new" ? "selected" : "outline"}
                           onclick={() => {
                             projectMode = "new";
                           }}
@@ -1874,7 +2650,7 @@
                               <Button
                                 class="w-full justify-start"
                                 size="sm"
-                                variant={selectedProjectId === project.id ? "default" : "ghost"}
+                                variant={selectedProjectId === project.id ? "selected" : "ghost"}
                                 onclick={() => {
                                   selectedProjectId = project.id;
                                 }}
@@ -1905,7 +2681,7 @@
                     <Button
                       type="button"
                       size="sm"
-                      variant={environmentContextEnabled ? "default" : "outline"}
+                      variant={environmentContextEnabled ? "selected" : "outline"}
                       onclick={() => {
                         environmentContextEnabled = !environmentContextEnabled;
                       }}
@@ -1917,7 +2693,7 @@
                     <div class="mt-3 space-y-3">
                       <div class="grid grid-cols-2 gap-2">
                         <Button
-                          variant={environmentMode === "existing" ? "default" : "outline"}
+                          variant={environmentMode === "existing" ? "selected" : "outline"}
                           onclick={() => {
                             environmentMode = "existing";
                           }}
@@ -1925,7 +2701,7 @@
                           {$t(i18nKeys.common.modes.useExisting)}
                         </Button>
                         <Button
-                          variant={environmentMode === "new" ? "default" : "outline"}
+                          variant={environmentMode === "new" ? "selected" : "outline"}
                           onclick={() => {
                             environmentMode = "new";
                           }}
@@ -1940,7 +2716,7 @@
                               <Button
                                 class="w-full justify-start"
                                 size="sm"
-                                variant={selectedEnvironmentId === environment.id ? "default" : "ghost"}
+                                variant={selectedEnvironmentId === environment.id ? "selected" : "ghost"}
                                 onclick={() => {
                                   selectedEnvironmentId = environment.id;
                                 }}
@@ -1959,7 +2735,7 @@
                             {#each environmentKinds as kind (kind)}
                               <Button
                                 size="sm"
-                                variant={environmentKind === kind ? "default" : "outline"}
+                                variant={environmentKind === kind ? "selected" : "outline"}
                                 onclick={() => {
                                   environmentKind = kind;
                                 }}
@@ -1983,7 +2759,7 @@
                     <Button
                       type="button"
                       size="sm"
-                      variant={resourceContextEnabled ? "default" : "outline"}
+                      variant={resourceContextEnabled ? "selected" : "outline"}
                       onclick={() => {
                         resourceContextEnabled = !resourceContextEnabled;
                       }}
@@ -1992,26 +2768,72 @@
                     </Button>
                   </div>
                   {#if resourceContextEnabled}
-                    <div class="mt-3 max-h-44 space-y-2 overflow-auto rounded-md border p-2">
-                      {#if resourcesQuery.isPending}
-                        {#each Array.from({ length: 3 }) as _, index (index)}
-                          <Skeleton class="h-10 w-full" />
-                        {/each}
-                      {:else if resources.length > 0}
-                        {#each resources as resource (resource.id)}
-                          <Button
-                            class="w-full justify-start"
-                            size="sm"
-                            variant={selectedResourceId === resource.id ? "default" : "ghost"}
-                            onclick={() => {
-                              selectedResourceId = resource.id;
-                            }}
-                          >
-                            {resource.name} · {resource.kind}
-                          </Button>
-                        {/each}
+                    <div class="mt-3 space-y-3">
+                      <div class="grid grid-cols-2 gap-2">
+                        <Button
+                          variant={resourceMode === "existing" ? "selected" : "outline"}
+                          onclick={() => {
+                            resourceMode = "existing";
+                          }}
+                        >
+                          {$t(i18nKeys.common.modes.useExisting)}
+                        </Button>
+                        <Button
+                          variant={resourceMode === "new" ? "selected" : "outline"}
+                          onclick={() => {
+                            resourceMode = "new";
+                          }}
+                        >
+                          新建资源
+                        </Button>
+                      </div>
+                      {#if resourceMode === "existing"}
+                        <div class="max-h-44 space-y-2 overflow-auto rounded-md border p-2">
+                          {#if resourcesQuery.isPending}
+                            {#each Array.from({ length: 3 }) as _, index (index)}
+                              <Skeleton class="h-10 w-full" />
+                            {/each}
+                          {:else if resources.length > 0}
+                            {#each resources as resource (resource.id)}
+                              <Button
+                                class="w-full justify-start"
+                                size="sm"
+                                variant={selectedResourceId === resource.id ? "selected" : "ghost"}
+                                onclick={() => {
+                                  selectedResourceId = resource.id;
+                                }}
+                              >
+                                {resource.name} · {resource.kind}
+                              </Button>
+                            {/each}
+                          {:else}
+                            <p class="px-2 py-2 text-sm text-muted-foreground">暂无资源可选；可以切换为新建资源。</p>
+                          {/if}
+                        </div>
                       {:else}
-                        <p class="px-2 py-2 text-sm text-muted-foreground">暂无资源可选；关闭编辑会由部署上下文自动创建。</p>
+                        <div class="space-y-3">
+                          <div class="grid gap-3 sm:grid-cols-2">
+                            <Input bind:value={resourceName} placeholder={inferredSourceName} />
+                            <Input bind:value={resourceDescription} placeholder={$t(i18nKeys.common.domain.description)} />
+                          </div>
+                          <div class="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                            {#each resourceKinds as kind (kind)}
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant={resourceKind === kind ? "selected" : "outline"}
+                                onclick={() => {
+                                  resourceKind = kind;
+                                }}
+                              >
+                                {kind}
+                              </Button>
+                            {/each}
+                          </div>
+                          <p class="text-xs leading-5 text-muted-foreground">
+                            GitHub 仓库默认作为一个 resource；部署时会按项目和环境复用同名资源，找不到则创建。
+                          </p>
+                        </div>
                       {/if}
                     </div>
                   {/if}
@@ -2026,7 +2848,7 @@
                     <Button
                       type="button"
                       size="sm"
-                      variant={variableContextEnabled ? "default" : "outline"}
+                      variant={variableContextEnabled ? "selected" : "outline"}
                       onclick={() => {
                         variableContextEnabled = !variableContextEnabled;
                       }}
@@ -2041,7 +2863,7 @@
                         <Input bind:value={variableValue} placeholder="postgres://..." />
                       </div>
                       <Button
-                        variant={variableIsSecret ? "default" : "outline"}
+                        variant={variableIsSecret ? "selected" : "outline"}
                         size="sm"
                         onclick={() => {
                           variableIsSecret = !variableIsSecret;
@@ -2096,11 +2918,6 @@
               <span class="text-xs font-medium uppercase text-muted-foreground">
                 {$t(i18nKeys.console.quickDeploy.sourceDetails)}
               </span>
-              {#if sourceKind === "github" && selectedGitHubRepository}
-                <Badge variant="outline">
-                  {selectedGitHubRepository.private ? $t(i18nKeys.console.quickDeploy.privateRepository) : $t(i18nKeys.console.quickDeploy.publicRepository)}
-                </Badge>
-              {/if}
             </div>
             <div class="space-y-2">
               {#each sourceDetailRows as row, index (`${row.label}-${index}`)}
@@ -2128,6 +2945,10 @@
           <div class="flex items-center justify-between gap-3">
             <span class="text-muted-foreground">{$t(i18nKeys.common.domain.resource)}</span>
             <span class="font-medium">{resourceSummary}</span>
+          </div>
+          <div class="flex items-center justify-between gap-3">
+            <span class="text-muted-foreground">{$t(i18nKeys.common.domain.domainBindings)}</span>
+            <span class="min-w-0 truncate text-right font-medium">{domainBindingSummary}</span>
           </div>
           <div class="flex items-center justify-between gap-3">
             <span class="text-muted-foreground">{$t(i18nKeys.common.domain.variables)}</span>
@@ -2169,3 +2990,18 @@
       {/if}
   </aside>
 </div>
+
+<DeploymentProgressDialog
+  open={deploymentProgressDialogOpen}
+  status={deploymentProgressDialogStatus}
+  events={deploymentProgressEvents}
+  streamError={deploymentProgressStreamError}
+  requestId={deploymentProgressRequestId}
+  deploymentId={deploymentProgressDeploymentId}
+  onClose={() => {
+    deploymentProgressDialogOpen = false;
+  }}
+  onOpenDeployment={() => {
+    void goto(`/deployments/${deploymentProgressDeploymentId}`);
+  }}
+/>

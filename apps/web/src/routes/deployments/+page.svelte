@@ -42,7 +42,7 @@
   );
   const failedDeployments = $derived(
     visibleDeployments.filter((deployment) =>
-      ["failed", "rolled-back"].includes(deployment.status),
+      ["failed", "canceled", "rolled-back"].includes(deployment.status),
     ).length,
   );
 

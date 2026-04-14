@@ -129,7 +129,18 @@ export function translateDomainError(error: LocalizableDomainError, t: YunduTran
 
   switch (error.code) {
     case "conflict":
+    case "resource_slug_conflict":
       return t(i18nKeys.errors.domain.conflict, { message: error.message });
+    case "deployment_not_redeployable":
+      return t(i18nKeys.errors.domain.deploymentNotRedeployable, {
+        deploymentId: error.details?.deploymentId ?? "",
+        resourceId: error.details?.resourceId ?? "",
+        status: error.details?.status ?? "",
+      });
+    case "domain_binding_proxy_required":
+    case "domain_binding_context_mismatch":
+    case "resource_context_mismatch":
+      return t(i18nKeys.errors.domain.validation, { message: error.message });
     case "validation_error":
       return t(i18nKeys.errors.domain.validation, { message: error.message });
     case "invariant_violation":

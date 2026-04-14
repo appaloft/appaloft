@@ -1,22 +1,52 @@
 <script lang="ts">
   import { browser } from "$app/environment";
+  import { goto } from "$app/navigation";
   import { page } from "$app/state";
+  import { onDestroy } from "svelte";
   import {
+    Activity,
     ArrowLeft,
     Boxes,
+    Check,
+    CheckCircle2,
+    ChevronDown,
+    CircleDashed,
     ClipboardList,
     Clock3,
+    Copy,
+    ExternalLink,
     FileText,
     FolderOpen,
+    Link2,
+    RotateCcw,
     Rocket,
     Server,
     ShieldCheck,
+    TriangleAlert,
+    XCircle,
   } from "@lucide/svelte";
+  import { createMutation } from "@tanstack/svelte-query";
+  import type {
+    CheckDeploymentHealthResponse,
+    DeploymentProgressEvent,
+    DeploymentSummary,
+  } from "@yundu/contracts";
 
+  import { readErrorMessage } from "$lib/api/client";
   import ConsoleShell from "$lib/components/console/ConsoleShell.svelte";
+  import DeploymentProgressDialog from "$lib/components/console/DeploymentProgressDialog.svelte";
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
   import { Skeleton } from "$lib/components/ui/skeleton";
+  import {
+    createDeploymentWithProgress,
+    createDeploymentRequestId,
+    deploymentCanRedeploy,
+    latestDeploymentForResource,
+    progressEventsFromDeployment,
+    redeployInputFromDeployment,
+    type DeploymentProgressDialogStatus,
+  } from "$lib/console/deployment-progress";
   import { createConsoleQueries } from "$lib/console/queries";
   import {
     deploymentBadgeVariant,
@@ -28,9 +58,35 @@
     formatTime,
   } from "$lib/console/utils";
   import { i18nKeys, t } from "$lib/i18n";
+  import { orpcClient } from "$lib/orpc";
+  import { queryClient } from "$lib/query-client";
+
+  type RedeployMutationInput = {
+    requestId: string;
+    deployment: DeploymentSummary;
+  };
+  type AccessRoute = NonNullable<DeploymentSummary["runtimePlan"]["execution"]["accessRoutes"]>[number];
+  type AccessUrlKind = "deployment" | "domain" | "direct";
+  type AccessUrl = {
+    url: string;
+    kind: AccessUrlKind;
+  };
 
   const { projectsQuery, serversQuery, environmentsQuery, resourcesQuery, deploymentsQuery } =
     createConsoleQueries(browser);
+
+  let deploymentProgressDialogOpen = $state(false);
+  let deploymentProgressDialogStatus = $state<DeploymentProgressDialogStatus>("idle");
+  let deploymentProgressEvents = $state<DeploymentProgressEvent[]>([]);
+  let deploymentProgressStreamError = $state("");
+  let deploymentProgressRequestId = $state("");
+  let deploymentProgressDeploymentId = $state("");
+  let logsCopyState = $state<"idle" | "copied" | "failed">("idle");
+  let accessUrlCopyState = $state<"idle" | "copied" | "failed">("idle");
+  let deploymentHealthResult = $state<CheckDeploymentHealthResponse | null>(null);
+  let deploymentHealthError = $state("");
+  let logsCopyResetTimeout: ReturnType<typeof setTimeout> | undefined;
+  let accessUrlCopyResetTimeout: ReturnType<typeof setTimeout> | undefined;
 
   const deploymentId = $derived(page.params.deploymentId ?? "");
   const projects = $derived(projectsQuery.data?.items ?? []);
@@ -54,6 +110,356 @@
   const server = $derived(deployment ? findServer(servers, deployment.serverId) : null);
   const sourceMetadata = $derived(Object.entries(deployment?.runtimePlan.source.metadata ?? {}));
   const targetMetadata = $derived(Object.entries(deployment?.runtimePlan.target.metadata ?? {}));
+  const executionMetadata = $derived(deployment?.runtimePlan.execution.metadata ?? {});
+  const runtimeMetadata = $derived(
+    Object.entries(executionMetadata).filter(([key]) => !["url", "publicUrl", "internalUrl"].includes(key)),
+  );
+  const accessUrls = $derived(deployment ? deploymentAccessUrls(deployment, server?.host) : []);
+  const primaryAccessUrl = $derived(accessUrls[0] ?? null);
+  const latestResourceDeployment = $derived(
+    deployment ? latestDeploymentForResource(deployments, deployment.resourceId) : null,
+  );
+  const canRedeploy = $derived(
+    deployment
+      ? latestResourceDeployment?.id === deployment.id && deploymentCanRedeploy(deployment)
+      : false,
+  );
+  const logsCopyLabel = $derived(
+    logsCopyState === "copied"
+      ? $t(i18nKeys.console.deployments.copyLogsCopied)
+      : logsCopyState === "failed"
+        ? $t(i18nKeys.console.deployments.copyLogsFailed)
+        : $t(i18nKeys.console.deployments.copyLogs),
+  );
+  const accessUrlCopyLabel = $derived(
+    accessUrlCopyState === "copied"
+      ? $t(i18nKeys.console.deployments.accessUrlCopied)
+      : accessUrlCopyState === "failed"
+        ? $t(i18nKeys.console.deployments.accessUrlCopyFailed)
+        : $t(i18nKeys.console.deployments.copyAccessUrl),
+  );
+
+  const redeployMutation = createMutation(() => ({
+    mutationFn: ({ deployment }: RedeployMutationInput) =>
+      createDeploymentWithProgress(redeployInputFromDeployment(deployment), appendDeploymentProgressEvent),
+  }));
+  const deploymentHealthMutation = createMutation(() => ({
+    mutationFn: (inputDeploymentId: string) =>
+      orpcClient.deployments.checkHealth({
+        deploymentId: inputDeploymentId,
+      }),
+    onSuccess: (result) => {
+      deploymentHealthResult = result;
+      deploymentHealthError = "";
+    },
+    onError: (error) => {
+      deploymentHealthError = readErrorMessage(error);
+    },
+  }));
+
+  function resetDeploymentProgressDialog(requestId: string): void {
+    deploymentProgressRequestId = requestId;
+    deploymentProgressDeploymentId = "";
+    deploymentProgressEvents = [];
+    deploymentProgressStreamError = "";
+    deploymentProgressDialogStatus = "running";
+    deploymentProgressDialogOpen = true;
+  }
+
+  function appendDeploymentProgressEvent(event: DeploymentProgressEvent): void {
+    deploymentProgressEvents = [...deploymentProgressEvents, event];
+    deploymentProgressDeploymentId = event.deploymentId ?? deploymentProgressDeploymentId;
+
+    if (event.status === "failed") {
+      deploymentProgressDialogStatus = "failed";
+    }
+  }
+
+  async function handleRedeploy(): Promise<void> {
+    if (!deployment || !canRedeploy) {
+      return;
+    }
+
+    const requestId = createDeploymentRequestId();
+    resetDeploymentProgressDialog(requestId);
+
+    try {
+      const createdDeployment = await redeployMutation.mutateAsync({
+        requestId,
+        deployment,
+      });
+      await queryClient.invalidateQueries({ queryKey: ["deployments"] });
+      deploymentProgressDialogStatus = "succeeded";
+      deploymentProgressDeploymentId = createdDeployment.id;
+      setTimeout(() => {
+        void goto(`/deployments/${createdDeployment.id}`);
+      }, 600);
+    } catch (error) {
+      deploymentProgressDialogStatus = "failed";
+      deploymentProgressStreamError = readErrorMessage(error);
+    }
+  }
+
+  function handleViewProgress(): void {
+    const progressDeployment = latestResourceDeployment ?? deployment;
+
+    if (!progressDeployment) {
+      return;
+    }
+
+    deploymentProgressRequestId = "";
+    deploymentProgressDeploymentId = progressDeployment.id;
+    deploymentProgressEvents = progressEventsFromDeployment(progressDeployment);
+    deploymentProgressStreamError = "";
+    deploymentProgressDialogStatus =
+      progressDeployment.status === "failed"
+        ? "failed"
+        : progressDeployment.status === "succeeded" || progressDeployment.status === "rolled-back"
+          ? "succeeded"
+          : "running";
+    deploymentProgressDialogOpen = true;
+  }
+
+  function logLevelClass(level: DeploymentSummary["logs"][number]["level"]): string {
+    switch (level) {
+      case "error":
+        return "text-red-300";
+      case "warn":
+        return "text-amber-200";
+      case "debug":
+        return "text-zinc-500";
+      case "info":
+        return "text-zinc-200";
+    }
+  }
+
+  function logSourceLabel(log: DeploymentSummary["logs"][number]): string {
+    return log.source === "application" ? "app" : "yundu";
+  }
+
+  function logTimeLabel(timestamp: string): string {
+    return timestamp.slice(11, 19) || "--:--:--";
+  }
+
+  function normalizeAccessPath(pathPrefix: string): string {
+    if (!pathPrefix || pathPrefix === "/") {
+      return "/";
+    }
+
+    return pathPrefix.startsWith("/") ? pathPrefix : `/${pathPrefix}`;
+  }
+
+  function routeUrl(route: AccessRoute, executionPort: number | undefined, serverHost: string | undefined): AccessUrl[] {
+    const pathPrefix = normalizeAccessPath(route.pathPrefix);
+
+    if (route.domains.length > 0) {
+      const scheme = route.tlsMode === "auto" ? "https" : "http";
+      return route.domains.map((domain) => ({
+        url: `${scheme}://${domain}${pathPrefix}`,
+        kind: "domain" as const,
+      }));
+    }
+
+    const directPort = route.targetPort ?? executionPort;
+    if (route.proxyKind === "none" && serverHost && directPort) {
+      return [
+        {
+          url: `http://${serverHost}:${directPort}${pathPrefix}`,
+          kind: "direct",
+        },
+      ];
+    }
+
+    return [];
+  }
+
+  function addUniqueAccessUrl(urls: AccessUrl[], url: AccessUrl): AccessUrl[] {
+    if (urls.some((existingUrl) => existingUrl.url === url.url)) {
+      return urls;
+    }
+
+    return [...urls, url];
+  }
+
+  function deploymentAccessUrls(deployment: DeploymentSummary, serverHost: string | undefined): AccessUrl[] {
+    const metadata = deployment.runtimePlan.execution.metadata ?? {};
+    const metadataUrl = metadata.publicUrl ?? metadata.url;
+    let urls: AccessUrl[] = [];
+
+    for (const route of deployment.runtimePlan.execution.accessRoutes ?? []) {
+      for (const url of routeUrl(route, deployment.runtimePlan.execution.port, serverHost)) {
+        urls = addUniqueAccessUrl(urls, url);
+      }
+    }
+
+    if (typeof metadataUrl === "string" && metadataUrl) {
+      urls = addUniqueAccessUrl(urls, { url: metadataUrl, kind: "deployment" });
+    }
+
+    return urls;
+  }
+
+  function accessUrlKindLabel(kind: AccessUrlKind): string {
+    switch (kind) {
+      case "deployment":
+        return $t(i18nKeys.console.deployments.deploymentAccess);
+      case "domain":
+        return $t(i18nKeys.console.deployments.domainAccess);
+      case "direct":
+        return $t(i18nKeys.console.deployments.directPortAccess);
+    }
+  }
+
+  function healthLabel(status: CheckDeploymentHealthResponse["status"]): string {
+    switch (status) {
+      case "healthy":
+        return $t(i18nKeys.common.status.healthy);
+      case "degraded":
+        return $t(i18nKeys.common.status.degraded);
+      case "unreachable":
+        return $t(i18nKeys.common.status.unreachable);
+    }
+  }
+
+  function healthVariant(
+    status: CheckDeploymentHealthResponse["status"],
+  ): "default" | "secondary" | "outline" | "destructive" {
+    switch (status) {
+      case "healthy":
+        return "default";
+      case "degraded":
+        return "secondary";
+      case "unreachable":
+        return "destructive";
+    }
+  }
+
+  function healthCheckIcon(status: CheckDeploymentHealthResponse["checks"][number]["status"]) {
+    switch (status) {
+      case "passed":
+        return CheckCircle2;
+      case "failed":
+        return XCircle;
+      case "skipped":
+        return CircleDashed;
+    }
+  }
+
+  function healthCheckIconClass(
+    status: CheckDeploymentHealthResponse["checks"][number]["status"],
+  ): string {
+    switch (status) {
+      case "passed":
+        return "text-green-600";
+      case "failed":
+        return "text-destructive";
+      case "skipped":
+        return "text-muted-foreground";
+    }
+  }
+
+  function checkDeploymentHealth(): void {
+    if (!deployment) {
+      return;
+    }
+
+    deploymentHealthError = "";
+    deploymentHealthMutation.mutate(deployment.id);
+  }
+
+  function formatDeploymentLogCopyLine(log: DeploymentSummary["logs"][number]): string {
+    return [log.timestamp, log.source, log.level, log.phase, log.message].join(" ");
+  }
+
+  function formatDeploymentLogsCopyText(logs: DeploymentSummary["logs"]): string {
+    return logs.map(formatDeploymentLogCopyLine).join("\n");
+  }
+
+  function markLogsCopyState(state: "copied" | "failed"): void {
+    if (logsCopyResetTimeout) {
+      clearTimeout(logsCopyResetTimeout);
+    }
+
+    logsCopyState = state;
+    logsCopyResetTimeout = setTimeout(() => {
+      logsCopyState = "idle";
+      logsCopyResetTimeout = undefined;
+    }, 1800);
+  }
+
+  function markAccessUrlCopyState(state: "copied" | "failed"): void {
+    if (accessUrlCopyResetTimeout) {
+      clearTimeout(accessUrlCopyResetTimeout);
+    }
+
+    accessUrlCopyState = state;
+    accessUrlCopyResetTimeout = setTimeout(() => {
+      accessUrlCopyState = "idle";
+      accessUrlCopyResetTimeout = undefined;
+    }, 1800);
+  }
+
+  async function copyTextToClipboard(text: string): Promise<void> {
+    if (navigator.clipboard?.writeText) {
+      try {
+        await navigator.clipboard.writeText(text);
+        return;
+      } catch {
+        // Fall back for non-HTTPS previews or browsers with restrictive clipboard permissions.
+      }
+    }
+
+    const textArea = document.createElement("textarea");
+    textArea.value = text;
+    textArea.setAttribute("readonly", "");
+    textArea.style.position = "fixed";
+    textArea.style.left = "-9999px";
+    document.body.append(textArea);
+    textArea.select();
+
+    try {
+      if (!document.execCommand("copy")) {
+        throw new Error("Copy command failed");
+      }
+    } finally {
+      textArea.remove();
+    }
+  }
+
+  async function handleCopyDeploymentLogs(): Promise<void> {
+    if (!browser || !deployment || deployment.logs.length === 0) {
+      return;
+    }
+
+    try {
+      await copyTextToClipboard(formatDeploymentLogsCopyText(deployment.logs));
+      markLogsCopyState("copied");
+    } catch {
+      markLogsCopyState("failed");
+    }
+  }
+
+  async function handleCopyAccessUrl(): Promise<void> {
+    if (!browser || !primaryAccessUrl) {
+      return;
+    }
+
+    try {
+      await copyTextToClipboard(primaryAccessUrl.url);
+      markAccessUrlCopyState("copied");
+    } catch {
+      markAccessUrlCopyState("failed");
+    }
+  }
+
+  onDestroy(() => {
+    if (logsCopyResetTimeout) {
+      clearTimeout(logsCopyResetTimeout);
+    }
+    if (accessUrlCopyResetTimeout) {
+      clearTimeout(accessUrlCopyResetTimeout);
+    }
+  });
 </script>
 
 <svelte:head>
@@ -125,7 +531,122 @@
                 {$t(i18nKeys.common.actions.openProject)}
               </Button>
             {/if}
+            {#if canRedeploy}
+              <Button disabled={redeployMutation.isPending} onclick={handleRedeploy}>
+                {#if redeployMutation.isPending}
+                  <Rocket class="size-4 animate-pulse" />
+                  {$t(i18nKeys.common.actions.redeploying)}
+                {:else}
+                  <RotateCcw class="size-4" />
+                  {$t(i18nKeys.common.actions.redeploy)}
+                {/if}
+              </Button>
+            {:else}
+              <Button variant="outline" onclick={handleViewProgress}>
+                <Clock3 class="size-4" />
+                {$t(i18nKeys.common.actions.viewProgress)}
+              </Button>
+            {/if}
           </div>
+        </div>
+
+        <div class="mt-5 rounded-md border bg-muted/30 p-4">
+          <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div class="min-w-0 space-y-2">
+              <p class="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                <Link2 class="size-4" />
+                {$t(i18nKeys.console.deployments.accessUrlTitle)}
+              </p>
+              {#if primaryAccessUrl}
+                <a
+                  class="block break-all text-lg font-semibold text-primary underline-offset-4 hover:underline md:text-xl"
+                  href={primaryAccessUrl.url}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  {primaryAccessUrl.url}
+                </a>
+                <Badge variant="outline" class="w-fit">{accessUrlKindLabel(primaryAccessUrl.kind)}</Badge>
+              {:else}
+                <p class="text-sm leading-6 text-muted-foreground">
+                  {$t(i18nKeys.console.deployments.accessUrlEmpty)}
+                </p>
+              {/if}
+            </div>
+
+            <div class="flex shrink-0 flex-wrap gap-2">
+              {#if primaryAccessUrl}
+                <Button href={primaryAccessUrl.url} target="_blank" rel="noreferrer">
+                  <ExternalLink class="size-4" />
+                  {$t(i18nKeys.console.deployments.openAccessUrl)}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={deploymentHealthMutation.isPending}
+                  onclick={checkDeploymentHealth}
+                >
+                  <Activity class={deploymentHealthMutation.isPending ? "size-4 animate-pulse" : "size-4"} />
+                  {deploymentHealthMutation.isPending
+                    ? $t(i18nKeys.console.deployments.healthCheckRunning)
+                    : $t(i18nKeys.console.deployments.healthCheckAction)}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  aria-label={accessUrlCopyLabel}
+                  title={accessUrlCopyLabel}
+                  onclick={handleCopyAccessUrl}
+                >
+                  {#if accessUrlCopyState === "copied"}
+                    <Check class="size-4" />
+                  {:else}
+                    <Copy class="size-4" />
+                  {/if}
+                  {accessUrlCopyLabel}
+                </Button>
+              {/if}
+            </div>
+          </div>
+          {#if deploymentHealthError}
+            <div class="mt-4 rounded-md border border-destructive/30 bg-background p-4 text-sm text-destructive">
+              <div class="flex items-start gap-2">
+                <TriangleAlert class="mt-0.5 size-4" />
+                <p>{deploymentHealthError}</p>
+              </div>
+            </div>
+          {:else if deploymentHealthResult}
+            <div class="mt-4 rounded-md border bg-background p-4">
+              <div class="flex flex-wrap items-center justify-between gap-2">
+                <p class="text-sm font-medium">
+                  {$t(i18nKeys.console.deployments.healthCheckResultTitle)}
+                </p>
+                <div class="flex flex-wrap items-center gap-2">
+                  <Badge variant={healthVariant(deploymentHealthResult.status)}>
+                    {healthLabel(deploymentHealthResult.status)}
+                  </Badge>
+                  <span class="text-xs text-muted-foreground">
+                    {formatTime(deploymentHealthResult.checkedAt)}
+                  </span>
+                </div>
+              </div>
+              <div class="mt-3 space-y-2">
+                {#each deploymentHealthResult.checks as check (check.name)}
+                  {@const HealthIcon = healthCheckIcon(check.status)}
+                  <div class="rounded-md border px-3 py-2">
+                    <div class="flex flex-wrap items-center justify-between gap-2">
+                      <p class="flex min-w-0 items-center gap-2 text-sm font-medium">
+                        <HealthIcon class={`size-4 shrink-0 ${healthCheckIconClass(check.status)}`} />
+                        <span class="truncate">{check.name}</span>
+                      </p>
+                      <span class="text-xs text-muted-foreground">{check.durationMs}ms</span>
+                    </div>
+                    <p class="mt-1 break-words text-sm text-muted-foreground">{check.message}</p>
+                  </div>
+                {/each}
+              </div>
+            </div>
+          {/if}
         </div>
 
         <div class="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
@@ -160,18 +681,82 @@
         </div>
       </section>
 
+      <section class="rounded-lg border bg-background p-5">
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h2 class="flex items-center gap-2 text-lg font-semibold">
+              <FileText class="size-5 text-muted-foreground" />
+              {$t(i18nKeys.console.deployments.logsTitle)}
+            </h2>
+            <p class="mt-1 text-sm text-muted-foreground">
+              {$t(i18nKeys.console.deployments.logsDescription, {
+                count: deployment.logCount,
+              })}
+            </p>
+          </div>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            disabled={deployment.logs.length === 0}
+            aria-label={logsCopyLabel}
+            title={logsCopyLabel}
+            onclick={handleCopyDeploymentLogs}
+          >
+            {#if logsCopyState === "copied"}
+              <Check class="size-4" />
+            {:else}
+              <Copy class="size-4" />
+            {/if}
+            {logsCopyLabel}
+          </Button>
+        </div>
+
+        <div class="mt-4">
+          {#if deployment.logs.length > 0}
+            <div class="max-h-[42rem] overflow-auto rounded-md border border-zinc-800 bg-zinc-950 px-4 py-3 font-mono text-xs text-zinc-200 shadow-inner">
+              <div class="space-y-1">
+                {#each deployment.logs as log, index (`${log.timestamp}-${index}`)}
+                  <div class="grid grid-cols-[4.75rem_5rem_3.5rem_5rem_minmax(0,1fr)] gap-2 leading-5">
+                    <span class="text-zinc-600">{logTimeLabel(log.timestamp)}</span>
+                    <span class={log.source === "application" ? "text-sky-300" : "text-emerald-300"}>
+                      {logSourceLabel(log)}
+                    </span>
+                    <span class={logLevelClass(log.level)}>{log.level}</span>
+                    <span class="text-zinc-500">{log.phase}</span>
+                    <span
+                      class={`min-w-0 break-words ${logLevelClass(log.level)} ${log.source === "application" ? "pl-3" : ""}`}
+                    >
+                      {log.source === "application" ? "└ " : ""}
+                      {log.message}
+                    </span>
+                  </div>
+                {/each}
+              </div>
+            </div>
+          {:else}
+            <div class="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
+              {$t(i18nKeys.console.deployments.noLogs)}
+            </div>
+          {/if}
+        </div>
+      </section>
+
       <section class="grid gap-5 xl:grid-cols-[1fr_0.9fr]">
         <div class="space-y-5">
-          <section class="rounded-lg border bg-background p-5">
-            <div>
-              <h2 class="flex items-center gap-2 text-lg font-semibold">
-                <ClipboardList class="size-5 text-muted-foreground" />
-                {$t(i18nKeys.console.deployments.runtimePlanTitle)}
-              </h2>
-              <p class="mt-1 text-sm text-muted-foreground">
-                {$t(i18nKeys.console.deployments.runtimePlanDescription)}
-              </p>
-            </div>
+          <details class="group rounded-lg border bg-background p-5">
+            <summary class="flex cursor-pointer list-none items-start justify-between gap-4">
+              <div>
+                <h2 class="inline-flex items-center gap-2 text-lg font-semibold">
+                  <ClipboardList class="size-5 text-muted-foreground" />
+                  {$t(i18nKeys.console.deployments.runtimePlanTitle)}
+                </h2>
+                <p class="mt-1 text-sm text-muted-foreground">
+                  {$t(i18nKeys.console.deployments.runtimePlanDescription)}
+                </p>
+              </div>
+              <ChevronDown class="mt-1 size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
+            </summary>
 
             <div class="mt-4 grid gap-3 sm:grid-cols-2">
               <div class="rounded-md border px-4 py-3">
@@ -222,15 +807,18 @@
                 {/each}
               </div>
             </div>
-          </section>
+          </details>
 
-          <section class="rounded-lg border bg-background p-5">
-            <div>
-              <h2 class="text-lg font-semibold">{$t(i18nKeys.console.deployments.executionTitle)}</h2>
-              <p class="mt-1 text-sm text-muted-foreground">
-                {$t(i18nKeys.console.deployments.executionDescription)}
-              </p>
-            </div>
+          <details class="group rounded-lg border bg-background p-5">
+            <summary class="flex cursor-pointer list-none items-start justify-between gap-4">
+              <div>
+                <h2 class="inline-flex text-lg font-semibold">{$t(i18nKeys.console.deployments.executionTitle)}</h2>
+                <p class="mt-1 text-sm text-muted-foreground">
+                  {$t(i18nKeys.console.deployments.executionDescription)}
+                </p>
+              </div>
+              <ChevronDown class="mt-1 size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
+            </summary>
 
             <div class="mt-4 grid gap-3">
               {#if deployment.runtimePlan.execution.workingDirectory}
@@ -320,7 +908,7 @@
                 {/if}
               </div>
             </div>
-          </section>
+          </details>
         </div>
 
         <div class="space-y-5">
@@ -349,13 +937,16 @@
             </div>
           </section>
 
-          <section class="rounded-lg border bg-background p-5">
-            <div>
-              <h2 class="text-lg font-semibold">{$t(i18nKeys.console.deployments.snapshotTitle)}</h2>
-              <p class="mt-1 text-sm text-muted-foreground">
-                {$t(i18nKeys.console.deployments.snapshotDescription)}
-              </p>
-            </div>
+          <details class="group rounded-lg border bg-background p-5">
+            <summary class="flex cursor-pointer list-none items-start justify-between gap-4">
+              <div>
+                <h2 class="inline-flex text-lg font-semibold">{$t(i18nKeys.console.deployments.snapshotTitle)}</h2>
+                <p class="mt-1 text-sm text-muted-foreground">
+                  {$t(i18nKeys.console.deployments.snapshotDescription)}
+                </p>
+              </div>
+              <ChevronDown class="mt-1 size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
+            </summary>
             <div class="mt-4 space-y-3">
               <div class="rounded-md border px-4 py-3">
                 <p class="text-xs text-muted-foreground">{$t(i18nKeys.console.deployments.precedence)}</p>
@@ -385,59 +976,43 @@
                 </div>
               {/if}
             </div>
-          </section>
+          </details>
 
-          <section class="rounded-lg border bg-background p-5">
-            <div>
-              <h2 class="flex items-center gap-2 text-lg font-semibold">
-                <FileText class="size-5 text-muted-foreground" />
-                {$t(i18nKeys.console.deployments.logsTitle)}
-              </h2>
-              <p class="mt-1 text-sm text-muted-foreground">
-                {$t(i18nKeys.console.deployments.logsDescription, {
-                  count: deployment.logCount,
-                })}
-              </p>
-            </div>
-
-            <div class="mt-4 space-y-3">
-              {#if deployment.logs.length > 0}
-                {#each deployment.logs as log, index (`${log.timestamp}-${index}`)}
-                  <div class="rounded-md border px-4 py-3">
-                    <div class="flex flex-wrap items-center gap-2">
-                      <Badge variant={log.level === "error" ? "destructive" : "outline"}>
-                        {log.level}
-                      </Badge>
-                      <span class="text-xs text-muted-foreground">
-                        {log.phase} · {formatTime(log.timestamp)}
-                      </span>
-                    </div>
-                    <p class="mt-2 text-sm leading-6">{log.message}</p>
-                  </div>
-                {/each}
-              {:else}
-                <div class="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
-                  {$t(i18nKeys.console.deployments.noLogs)}
-                </div>
-              {/if}
-            </div>
-          </section>
-
-          {#if sourceMetadata.length > 0 || targetMetadata.length > 0}
-            <section class="rounded-lg border bg-background p-5">
-              <h2 class="text-lg font-semibold">{$t(i18nKeys.console.deployments.metadataTitle)}</h2>
+          {#if sourceMetadata.length > 0 || targetMetadata.length > 0 || runtimeMetadata.length > 0}
+            <details class="group rounded-lg border bg-background p-5">
+              <summary class="flex cursor-pointer list-none items-start justify-between gap-4">
+                <h2 class="inline-flex text-lg font-semibold">{$t(i18nKeys.console.deployments.metadataTitle)}</h2>
+                <ChevronDown class="mt-1 size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
+              </summary>
               <div class="mt-4 space-y-3">
-                {#each [...sourceMetadata, ...targetMetadata] as [key, value] (`${key}-${value}`)}
+                {#each [...sourceMetadata, ...targetMetadata, ...runtimeMetadata] as [key, value] (`${key}-${value}`)}
                   <div class="rounded-md border px-4 py-3">
                     <p class="text-xs text-muted-foreground">{key}</p>
                     <p class="mt-1 break-all text-sm font-medium">{value}</p>
                   </div>
                 {/each}
               </div>
-            </section>
+            </details>
           {/if}
         </div>
       </section>
     </div>
   {/if}
 </ConsoleShell>
+
+<DeploymentProgressDialog
+  open={deploymentProgressDialogOpen}
+  status={deploymentProgressDialogStatus}
+  events={deploymentProgressEvents}
+  streamError={deploymentProgressStreamError}
+  requestId={deploymentProgressRequestId}
+  deploymentId={deploymentProgressDeploymentId}
+  title={$t(i18nKeys.console.deployments.redeployProgressTitle)}
+  description={$t(i18nKeys.console.deployments.redeployProgressDescription)}
+  onClose={() => {
+    deploymentProgressDialogOpen = false;
+  }}
+  onOpenDeployment={() => {
+    void goto(`/deployments/${deploymentProgressDeploymentId}`);
+  }}
+/>
