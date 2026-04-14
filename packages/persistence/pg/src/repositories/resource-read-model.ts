@@ -11,6 +11,7 @@ import { type Database } from "../schema";
 import {
   normalizeTimestamp,
   resolveRepositoryExecutor,
+  type SerializedResourceNetworkProfile,
   type SerializedResourceService,
 } from "./shared";
 
@@ -62,6 +63,9 @@ export class PgResourceReadModel implements ResourceReadModel {
 
         return rows.map((row): ResourceSummary => {
           const services = (row.services ?? []) as unknown as SerializedResourceService[];
+          const networkProfile = row.network_profile
+            ? (row.network_profile as unknown as SerializedResourceNetworkProfile)
+            : undefined;
           const deployments = deploymentRows.filter(
             (deployment) => deployment.resource_id === row.id,
           );
@@ -80,6 +84,19 @@ export class PgResourceReadModel implements ResourceReadModel {
               name: service.name,
               kind: service.kind,
             })),
+            ...(networkProfile
+              ? {
+                  networkProfile: {
+                    internalPort: networkProfile.internalPort,
+                    upstreamProtocol: networkProfile.upstreamProtocol,
+                    exposureMode: networkProfile.exposureMode,
+                    ...(networkProfile.targetServiceName
+                      ? { targetServiceName: networkProfile.targetServiceName }
+                      : {}),
+                    ...(networkProfile.hostPort ? { hostPort: networkProfile.hostPort } : {}),
+                  },
+                }
+              : {}),
             deploymentCount: deployments.length,
             ...(lastDeployment
               ? {

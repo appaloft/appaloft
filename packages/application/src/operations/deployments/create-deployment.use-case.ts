@@ -66,21 +66,46 @@ function shouldEnrichSourceFromDetector(resource: Resource): boolean {
   return sourceKind === "local-folder" || sourceKind === "local-git" || sourceKind === "compose";
 }
 
-function requestedDeploymentFromResource(resource: Resource): RequestedDeploymentConfig {
-  const runtimeProfile = resource.toState().runtimeProfile;
+function resourceRequiresInternalPort(resource: Resource): boolean {
+  const resourceState = resource.toState();
+  return (
+    resourceState.kind.value === "application" ||
+    resourceState.kind.value === "service" ||
+    resourceState.kind.value === "static-site" ||
+    resourceState.kind.value === "compose-stack" ||
+    resourceState.services.some(
+      (service) => service.kind.value === "web" || service.kind.value === "api",
+    )
+  );
+}
 
-  return {
+function requestedDeploymentFromResource(resource: Resource): Result<RequestedDeploymentConfig> {
+  const resourceState = resource.toState();
+  const runtimeProfile = resourceState.runtimeProfile;
+  const internalPort = resourceState.networkProfile?.internalPort.value;
+
+  if (resourceRequiresInternalPort(resource) && !internalPort) {
+    return err(
+      domainError.validation("Resource network profile internalPort is required for deployment", {
+        phase: "resource-network-resolution",
+        resourceId: resourceState.id.value,
+        resourceKind: resourceState.kind.value,
+      }),
+    );
+  }
+
+  return ok({
     method: runtimeProfile?.strategy.value ?? "auto",
     ...(runtimeProfile?.installCommand
       ? { installCommand: runtimeProfile.installCommand.value }
       : {}),
     ...(runtimeProfile?.buildCommand ? { buildCommand: runtimeProfile.buildCommand.value } : {}),
     ...(runtimeProfile?.startCommand ? { startCommand: runtimeProfile.startCommand.value } : {}),
-    ...(runtimeProfile?.port ? { port: runtimeProfile.port.value } : {}),
+    ...(internalPort ? { port: internalPort } : {}),
     ...(runtimeProfile?.healthCheckPath
       ? { healthCheckPath: runtimeProfile.healthCheckPath.value }
       : {}),
-  };
+  });
 }
 
 @injectable()
@@ -202,7 +227,7 @@ export class CreateDeploymentUseCase {
         server,
         environmentSnapshot: snapshot,
         detectedReasoning: detected.reasoning,
-        requestedDeployment: requestedDeploymentFromResource(resource),
+        requestedDeployment: yield* requestedDeploymentFromResource(resource),
       });
       const runtimePlanInput = yield* runtimePlanInputResult;
       const runtimePlanResult = await runtimePlanResolver.resolve(context, runtimePlanInput);

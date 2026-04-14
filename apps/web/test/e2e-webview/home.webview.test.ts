@@ -487,6 +487,7 @@ describe("console e2e with Bun.WebView", () => {
     await clickButtonByText(view, "新部署");
     await expectText(view, "本地目录");
     await clickButtonByText(view, "GitHub 仓库");
+    await clickButtonByText(view, "从我的 GitHub 选择");
     await expectText(view, "后端尚未配置 GitHub OAuth");
   }, 15_000);
 

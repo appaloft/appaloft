@@ -16,13 +16,19 @@
     Waypoints,
   } from "@lucide/svelte";
   import { createMutation, createQuery, queryOptions } from "@tanstack/svelte-query";
+  import {
+    runQuickDeployWorkflow,
+    type QuickDeployServerCredential,
+    type QuickDeployWorkflowInput,
+    type QuickDeployWorkflowStep,
+    type QuickDeployWorkflowStepOutput,
+  } from "@yundu/contracts";
   import type { TranslationKey } from "@yundu/i18n";
   import type {
     AuthSessionResponse,
     ConfigureServerCredentialInput,
     CreateDeploymentInput,
     CreateResourceInput,
-    DeploymentProgressEvent,
     EnvironmentSummary,
     GitHubRepositorySummary,
     ProjectSummary,
@@ -34,7 +40,6 @@
   } from "@yundu/contracts";
 
   import { API_BASE, readErrorMessage, request } from "$lib/api/client";
-  import DeploymentProgressDialog from "$lib/components/console/DeploymentProgressDialog.svelte";
   import { Button } from "$lib/components/ui/button";
   import {
     Card,
@@ -49,11 +54,6 @@
   import { Skeleton } from "$lib/components/ui/skeleton";
   import { Textarea } from "$lib/components/ui/textarea";
   import { Badge } from "$lib/components/ui/badge";
-  import {
-    createDeploymentWithProgress,
-    createDeploymentRequestId,
-    type DeploymentProgressDialogStatus,
-  } from "$lib/console/deployment-progress";
   import { defaultAuthSession, type ProviderSummary } from "$lib/console/queries";
   import { readSessionIdentity } from "$lib/console/utils";
   import { i18nKeys, t } from "$lib/i18n";
@@ -74,10 +74,16 @@
     mono?: boolean;
   };
   type DeploymentMutationInput = CreateDeploymentInput;
+  type QuickDeployWorkflowStepStatus = "pending" | "running" | "succeeded" | "failed";
+  type QuickDeployWorkflowProgressItem = {
+    kind: QuickDeployWorkflowStep["kind"];
+    status: QuickDeployWorkflowStepStatus;
+  };
   type ResourceDraftInput = Pick<CreateResourceInput, "name"> &
     Partial<Pick<CreateResourceInput, "kind" | "description" | "services">>;
   type ResourceSourceInput = NonNullable<CreateResourceInput["source"]>;
   type ResourceRuntimeProfileInput = NonNullable<CreateResourceInput["runtimeProfile"]>;
+  type ResourceNetworkProfileInput = NonNullable<CreateResourceInput["networkProfile"]>;
   type YunduDesktopBridge = {
     selectDirectory?: () => Promise<string | null | undefined>;
   };
@@ -154,6 +160,12 @@
       title: "来源",
       description: "选择源码、仓库或镜像",
       icon: Waypoints,
+    },
+    {
+      key: "project",
+      title: "项目",
+      description: "选择已有项目或创建新项目",
+      icon: Package,
     },
     {
       key: "server",
@@ -263,12 +275,8 @@
   let serverCredentialPrivateKeyImportError = $state<string | null>(null);
   let serverConnectivityResult = $state<TestServerConnectivityResponse | null>(null);
   let serverConnectivityError = $state("");
-  let deploymentProgressDialogOpen = $state(false);
-  let deploymentProgressDialogStatus = $state<DeploymentProgressDialogStatus>("idle");
-  let deploymentProgressEvents = $state<DeploymentProgressEvent[]>([]);
-  let deploymentProgressStreamError = $state("");
-  let deploymentProgressRequestId = $state("");
-  let deploymentProgressDeploymentId = $state("");
+  let workflowProgressItems = $state<QuickDeployWorkflowProgressItem[]>([]);
+  let workflowProgressError = $state("");
   let environmentName = $state(browser ? (page.url.searchParams.get("environmentName") ?? "local") : "local");
   let environmentKind = $state<EnvironmentKind>(
     parseEnvironmentKind(browser ? page.url.searchParams.get("environmentKind") : null),
@@ -276,6 +284,7 @@
   let resourceName = $state(browser ? (page.url.searchParams.get("resourceName") ?? "") : "");
   let resourceKind = $state<ResourceKind>(parseResourceKind(browser ? page.url.searchParams.get("resourceKind") : null));
   let resourceDescription = $state(browser ? (page.url.searchParams.get("resourceDescription") ?? "") : "");
+  let resourceInternalPort = $state(browser ? (page.url.searchParams.get("resourceInternalPort") ?? "3000") : "3000");
   let variableKey = $state(browser ? (page.url.searchParams.get("variableKey") ?? "") : "");
   let variableValue = $state("");
   let variableIsSecret = $state(browser ? page.url.searchParams.get("variableSecret") !== "false" : true);
@@ -295,6 +304,7 @@
     title: string;
     detail: string;
   } | null>(null);
+  let lastCreatedDeploymentId = $state("");
 
   const createProjectMutation = createMutation(() => ({
     mutationFn: (input: { name: string; description?: string }) => orpcClient.projects.create(input),
@@ -356,19 +366,18 @@
     }) => orpcClient.environments.setVariable(input),
   }));
   const createDeploymentMutation = createMutation(() => ({
-    mutationFn: (input: DeploymentMutationInput) =>
-      createDeploymentWithProgress(input, appendDeploymentProgressEvent),
+    mutationFn: (input: DeploymentMutationInput) => orpcClient.deployments.create(input),
   }));
   const resourcesQuery = createQuery(() =>
     queryOptions({
       queryKey: [
         "resources",
-        projectContextEnabled ? selectedProjectId : "",
+        selectedProjectId,
         environmentContextEnabled ? selectedEnvironmentId : "",
       ],
       queryFn: () =>
         orpcClient.resources.list({
-          ...(projectContextEnabled && selectedProjectId ? { projectId: selectedProjectId } : {}),
+          ...(selectedProjectId ? { projectId: selectedProjectId } : {}),
           ...(environmentContextEnabled && selectedEnvironmentId
             ? { environmentId: selectedEnvironmentId }
             : {}),
@@ -485,8 +494,10 @@
   const deploymentCommandPreview = $derived.by(() => {
     const segments = [`yundu deploy ${sourceLocator || "."}`];
 
-    if (projectContextEnabled && selectedProjectId) {
+    if (projectMode === "existing" && selectedProjectId) {
       segments.push(`--project ${selectedProjectId}`);
+    } else if (projectMode === "new" && projectName.trim()) {
+      segments.push(`--project-name ${projectName.trim()}`);
     }
 
     if (selectedServerId) {
@@ -503,11 +514,13 @@
 
     if (!resourceContextEnabled) {
       segments.push(`--resource-name ${inferredResourceInput.name}`);
+      segments.push(`--port ${resourceInternalPort.trim() || "3000"}`);
     } else if (resourceMode === "new") {
       segments.push(`--resource-name ${editedResourceInput.name}`);
       if (editedResourceInput.kind) {
         segments.push(`--resource-kind ${editedResourceInput.kind}`);
       }
+      segments.push(`--port ${resourceInternalPort.trim() || "3000"}`);
     }
 
     return segments.join(" ");
@@ -679,21 +692,21 @@
   });
   const defaultResourceSummary = $derived.by(() => {
     if (selectedResource) {
-      return `${selectedResource.name} · ${selectedResource.kind}`;
+      return `${selectedResource.name} · ${selectedResource.kind}${
+        selectedResource.networkProfile?.internalPort
+          ? ` · :${selectedResource.networkProfile.internalPort}`
+          : ""
+      }`;
     }
 
-    return `${inferredResourceInput.name} · ${inferredResourceInput.kind ?? "application"}`;
+    return `${inferredResourceInput.name} · ${inferredResourceInput.kind ?? "application"} · :${resourceInternalPort.trim() || "3000"}`;
   });
   const projectSummary = $derived.by(() => {
-    if (!projectContextEnabled) {
-      return defaultProjectSummary;
-    }
-
     if (projectMode === "existing") {
-      return selectedProject?.name ?? "未选择项目";
+      return selectedProject?.name ?? (projects.length === 0 ? defaultProjectSummary : "未选择项目");
     }
 
-    return projectName.trim() || "待创建项目";
+    return projectName.trim() || (projects.length === 0 ? "Local Workspace" : "待创建项目");
   });
   const serverSummary = $derived.by(() => {
     if (serverMode === "existing") {
@@ -761,7 +774,7 @@
         : "未选择资源";
     }
 
-    return `${editedResourceInput.name} · ${editedResourceInput.kind ?? "application"}`;
+    return `${editedResourceInput.name} · ${editedResourceInput.kind ?? "application"} · :${resourceInternalPort.trim() || "3000"}`;
   });
   const variableSummary = $derived.by(() => {
     if (!variableContextEnabled) {
@@ -833,6 +846,10 @@
   });
 
   $effect(() => {
+    if (!projectsQuery.isSuccess) {
+      return;
+    }
+
     if (projects.length === 0) {
       projectMode = "new";
       selectedProjectId = "";
@@ -852,6 +869,10 @@
   });
 
   $effect(() => {
+    if (!serversQuery.isSuccess) {
+      return;
+    }
+
     if (servers.length === 0) {
       serverMode = "new";
       selectedServerId = "";
@@ -899,6 +920,22 @@
   $effect(() => {
     if (resourceContextEnabled && resourcesQuery.isSuccess && selectedResourceId && !selectedResource) {
       selectedResourceId = "";
+    }
+  });
+
+  $effect(() => {
+    if (!resourceContextEnabled || !resourcesQuery.isSuccess) {
+      return;
+    }
+
+    if (resources.length === 0) {
+      resourceMode = "new";
+      selectedResourceId = "";
+      return;
+    }
+
+    if (resourceMode === "existing" && !selectedResourceId) {
+      selectedResourceId = resources[0].id;
     }
   });
 
@@ -960,7 +997,7 @@
   }
 
   function parseDraftMode(value: string | null): DraftMode {
-    return draftModeKeys.includes(value as DraftMode) ? (value as DraftMode) : "new";
+    return draftModeKeys.includes(value as DraftMode) ? (value as DraftMode) : "existing";
   }
 
   function parseEnvironmentKind(value: string | null): EnvironmentKind {
@@ -1013,14 +1050,15 @@
     }
 
     setSearchParam(params, "editProject", projectContextEnabled ? "true" : "false", "false");
-    if (projectContextEnabled) {
-      setSearchParam(params, "projectMode", projectMode, "new");
+    setSearchParam(params, "projectMode", projectMode, "existing");
+    if (projectMode === "existing") {
       setSearchParam(params, "projectId", selectedProjectId);
+    } else {
       setSearchParam(params, "projectName", projectName);
       setSearchParam(params, "projectDescription", projectDescription);
     }
 
-    setSearchParam(params, "serverMode", serverMode, "new");
+    setSearchParam(params, "serverMode", serverMode, "existing");
     setSearchParam(params, "serverId", selectedServerId);
     setSearchParam(params, "serverName", serverName, "local-machine");
     setSearchParam(params, "serverHost", serverHost, "127.0.0.1");
@@ -1046,6 +1084,7 @@
         setSearchParam(params, "resourceDescription", resourceDescription);
       }
     }
+    setSearchParam(params, "resourceInternalPort", resourceInternalPort, "3000");
 
     setSearchParam(params, "editVariables", variableContextEnabled ? "true" : "false", "false");
     if (variableContextEnabled) {
@@ -1089,6 +1128,7 @@
     resourceName = params.get("resourceName") ?? "";
     resourceKind = parseResourceKind(params.get("resourceKind"));
     resourceDescription = params.get("resourceDescription") ?? "";
+    resourceInternalPort = params.get("resourceInternalPort") ?? "3000";
     variableKey = params.get("variableKey") ?? "";
     variableIsSecret = params.get("variableSecret") !== "false";
     githubSourceMode = parseGithubSourceMode(params.get("githubMode"));
@@ -1218,6 +1258,19 @@
     }
   }
 
+  function networkProfileForSource(): ResourceNetworkProfileInput {
+    const internalPort = Number(resourceInternalPort.trim() || "3000");
+    if (!Number.isInteger(internalPort) || internalPort < 1 || internalPort > 65535) {
+      throw new Error($t(i18nKeys.console.quickDeploy.applicationPortInvalid));
+    }
+
+    return {
+      internalPort,
+      upstreamProtocol: "http",
+      exposureMode: "reverse-proxy",
+    };
+  }
+
   function stepIsComplete(stepKey: DeploymentStepKey): boolean {
     switch (stepKey) {
       case "source":
@@ -1251,7 +1304,9 @@
           Boolean(serverCredentialPrivateKey.trim())
         );
       case "project":
-        return !projectContextEnabled || (projectMode === "existing" ? Boolean(selectedProjectId) : Boolean(projectName.trim()));
+        return projectMode === "existing"
+          ? Boolean(selectedProjectId)
+          : projects.length === 0 || Boolean(projectName.trim());
       case "environment":
         return !environmentContextEnabled || (environmentMode === "existing"
           ? Boolean(selectedEnvironmentId)
@@ -1453,20 +1508,52 @@
     }
   }
 
-  function resetDeploymentProgressDialog(): void {
-    deploymentProgressDialogStatus = "running";
-    deploymentProgressEvents = [];
-    deploymentProgressStreamError = "";
-    deploymentProgressDeploymentId = "";
-    deploymentProgressDialogOpen = true;
+  function resetWorkflowProgress(): void {
+    workflowProgressItems = [];
+    workflowProgressError = "";
   }
 
-  function appendDeploymentProgressEvent(event: DeploymentProgressEvent): void {
-    deploymentProgressEvents = [...deploymentProgressEvents, event];
-    deploymentProgressDeploymentId = event.deploymentId ?? deploymentProgressDeploymentId;
+  function setWorkflowStepStatus(
+    kind: QuickDeployWorkflowStep["kind"],
+    status: QuickDeployWorkflowStepStatus,
+  ): void {
+    const existingItem = workflowProgressItems.find((item) => item.kind === kind);
+    workflowProgressItems = existingItem
+      ? workflowProgressItems.map((item) => (item.kind === kind ? { ...item, status } : item))
+      : [...workflowProgressItems, { kind, status }];
+  }
 
-    if (event.status === "failed") {
-      deploymentProgressDialogStatus = "failed";
+  function workflowStepLabel(kind: QuickDeployWorkflowStep["kind"]): string {
+    switch (kind) {
+      case "projects.create":
+        return $t(i18nKeys.console.quickDeploy.workflowStepProjectsCreate);
+      case "servers.register":
+        return $t(i18nKeys.console.quickDeploy.workflowStepServersRegister);
+      case "credentials.ssh.create":
+        return $t(i18nKeys.console.quickDeploy.workflowStepSshCredentialCreate);
+      case "servers.configureCredential":
+        return $t(i18nKeys.console.quickDeploy.workflowStepServerCredentialConfigure);
+      case "environments.create":
+        return $t(i18nKeys.console.quickDeploy.workflowStepEnvironmentsCreate);
+      case "resources.create":
+        return $t(i18nKeys.console.quickDeploy.workflowStepResourcesCreate);
+      case "environments.setVariable":
+        return $t(i18nKeys.console.quickDeploy.workflowStepEnvironmentVariableSet);
+      case "deployments.create":
+        return $t(i18nKeys.console.quickDeploy.workflowStepDeploymentsCreate);
+    }
+  }
+
+  function workflowStepStatusLabel(status: QuickDeployWorkflowStepStatus): string {
+    switch (status) {
+      case "pending":
+        return $t(i18nKeys.console.quickDeploy.workflowStepPending);
+      case "running":
+        return $t(i18nKeys.console.quickDeploy.workflowStepRunning);
+      case "succeeded":
+        return $t(i18nKeys.console.quickDeploy.workflowStepSucceeded);
+      case "failed":
+        return $t(i18nKeys.console.quickDeploy.workflowStepFailed);
     }
   }
 
@@ -1507,9 +1594,7 @@
     }
   }
 
-  async function resolveNewServerCredential(): Promise<
-    ConfigureServerCredentialInput["credential"] | undefined
-  > {
+  async function resolveNewServerCredential(): Promise<QuickDeployServerCredential | undefined> {
     if (serverProviderKey !== "generic-ssh") {
       return undefined;
     }
@@ -1518,41 +1603,44 @@
 
     if (serverCredentialKind === "local-ssh-agent") {
       return {
-        kind: "local-ssh-agent",
-        ...(username ? { username } : {}),
+        mode: "configure",
+        credential: {
+          kind: "local-ssh-agent",
+          ...(username ? { username } : {}),
+        },
       };
     }
 
     if (activeServerPrivateKeyInputMode === "saved" && selectedSshCredentialId) {
       return {
-        kind: "stored-ssh-private-key",
-        credentialId: selectedSshCredentialId,
-        ...(username ? { username } : {}),
+        mode: "configure",
+        credential: {
+          kind: "stored-ssh-private-key",
+          credentialId: selectedSshCredentialId,
+          ...(username ? { username } : {}),
+        },
       };
     }
 
     if (!serverCredentialPrivateKey.trim()) {
       return {
-        kind: "ssh-private-key",
-        privateKey: "",
+        mode: "configure",
+        credential: {
+          kind: "ssh-private-key",
+          privateKey: "",
+        },
       };
     }
 
-    const createdCredential = await createSshCredentialMutation.mutateAsync({
-      name: defaultSshCredentialName(),
-      kind: "ssh-private-key",
-      ...(username ? { username } : {}),
-      ...(serverCredentialPublicKey.trim() ? { publicKey: serverCredentialPublicKey.trim() } : {}),
-      privateKey: serverCredentialPrivateKey.trim(),
-    });
-
-    selectedSshCredentialId = createdCredential.id;
-    await sshCredentialsQuery.refetch();
-
     return {
-      kind: "stored-ssh-private-key",
-      credentialId: createdCredential.id,
-      ...(username ? { username } : {}),
+      mode: "create-ssh-and-configure",
+      input: {
+        name: defaultSshCredentialName(),
+        kind: "ssh-private-key",
+        ...(username ? { username } : {}),
+        ...(serverCredentialPublicKey.trim() ? { publicKey: serverCredentialPublicKey.trim() } : {}),
+        privateKey: serverCredentialPrivateKey.trim(),
+      },
     };
   }
 
@@ -1597,54 +1685,109 @@
     ]);
   }
 
+  async function executeQuickDeployWorkflowStepOperation(
+    step: QuickDeployWorkflowStep,
+  ): Promise<QuickDeployWorkflowStepOutput> {
+    switch (step.kind) {
+      case "projects.create": {
+        const createdProject = await createProjectMutation.mutateAsync(step.input);
+        selectedProjectId = createdProject.id;
+        await projectsQuery.refetch();
+        return createdProject;
+      }
+      case "servers.register": {
+        const createdServer = await registerServerMutation.mutateAsync(step.input);
+        selectedServerId = createdServer.id;
+        await serversQuery.refetch();
+        return createdServer;
+      }
+      case "credentials.ssh.create": {
+        const createdCredential = await createSshCredentialMutation.mutateAsync(step.input);
+        selectedSshCredentialId = createdCredential.id;
+        await sshCredentialsQuery.refetch();
+        return createdCredential;
+      }
+      case "servers.configureCredential": {
+        await configureServerCredentialMutation.mutateAsync(step.input);
+        await serversQuery.refetch();
+        return;
+      }
+      case "environments.create": {
+        const createdEnvironment = await createEnvironmentMutation.mutateAsync(step.input);
+        selectedEnvironmentId = createdEnvironment.id;
+        await environmentsQuery.refetch();
+        return createdEnvironment;
+      }
+      case "resources.create": {
+        const createdResource = await createResourceMutation.mutateAsync(step.input);
+        selectedResourceId = createdResource.id;
+        await resourcesQuery.refetch();
+        return createdResource;
+      }
+      case "environments.setVariable": {
+        await setEnvironmentVariableMutation.mutateAsync(step.input);
+        await environmentsQuery.refetch();
+        return;
+      }
+      case "deployments.create":
+        return createDeploymentMutation.mutateAsync(step.input);
+    }
+  }
+
+  async function executeQuickDeployWorkflowStep(
+    step: QuickDeployWorkflowStep,
+  ): Promise<QuickDeployWorkflowStepOutput> {
+    setWorkflowStepStatus(step.kind, "running");
+
+    try {
+      const output = await executeQuickDeployWorkflowStepOperation(step);
+      setWorkflowStepStatus(step.kind, "succeeded");
+      return output;
+    } catch (error) {
+      setWorkflowStepStatus(step.kind, "failed");
+      workflowProgressError = readErrorMessage(error);
+      throw error;
+    }
+  }
+
   async function handleQuickDeploy(): Promise<void> {
     deployFeedback = null;
-    const deploymentRequestId = createDeploymentRequestId();
-    deploymentProgressRequestId = deploymentRequestId;
-    resetDeploymentProgressDialog();
+    lastCreatedDeploymentId = "";
+    resetWorkflowProgress();
 
     try {
       if (!sourceLocator) {
         throw new Error("请先填写来源地址。");
       }
 
-      let projectId = projectContextEnabled ? selectedProjectId : undefined;
+      let workflowProject: QuickDeployWorkflowInput["project"];
 
-      if (projectContextEnabled && projectMode === "new") {
-        if (!projectName.trim()) {
+      if (projectMode === "new") {
+        const nextProjectName = projectName.trim() || (projects.length === 0 ? "Local Workspace" : "");
+
+        if (!nextProjectName) {
           throw new Error("请填写项目名。");
         }
 
-        const createdProject = await createProjectMutation.mutateAsync({
-          name: projectName.trim(),
-          ...(projectDescription.trim() ? { description: projectDescription.trim() } : {}),
-        });
-        projectId = createdProject.id;
-        selectedProjectId = projectId;
-        await projectsQuery.refetch();
-      }
-
-      if (projectContextEnabled && !projectId) {
-        throw new Error("请选择或创建一个项目。");
-      }
-
-      if (!projectId) {
-        const existingProject = projects[0];
-        if (existingProject) {
-          projectId = existingProject.id;
-          selectedProjectId = projectId;
-        } else {
-          const createdProject = await createProjectMutation.mutateAsync({
-            name: projectName.trim() || "Local Workspace",
+        workflowProject = {
+          mode: "create",
+          input: {
+            name: nextProjectName,
             ...(projectDescription.trim() ? { description: projectDescription.trim() } : {}),
-          });
-          projectId = createdProject.id;
-          selectedProjectId = projectId;
-          await projectsQuery.refetch();
+          },
+        };
+      } else {
+        if (!selectedProjectId) {
+          throw new Error("请选择或创建一个项目。");
         }
+
+        workflowProject = {
+          mode: "existing",
+          id: selectedProjectId,
+        };
       }
 
-      let serverId = selectedServerId;
+      let workflowServer: QuickDeployWorkflowInput["server"];
 
       if (serverMode === "new") {
         if (!serverName.trim() || !serverHost.trim()) {
@@ -1655,169 +1798,174 @@
         if (
           serverProviderKey === "generic-ssh" &&
           serverCredentialKind === "ssh-private-key" &&
-          credential?.kind === "ssh-private-key" &&
-          !credential.privateKey
+          credential?.mode === "configure" &&
+          credential.credential.kind === "ssh-private-key" &&
+          !credential.credential.privateKey
         ) {
           throw new Error("请导入或粘贴 SSH 私钥，或切换为本机 SSH agent。");
         }
 
-        const createdServer = await registerServerMutation.mutateAsync({
-          name: serverName.trim(),
-          host: serverHost.trim(),
-          providerKey: serverProviderKey,
-          proxyKind: "traefik",
-          ...(serverPort.trim() ? { port: Number(serverPort) } : {}),
-        });
-        serverId = createdServer.id;
-        selectedServerId = serverId;
-
-        if (credential) {
-          await configureServerCredentialMutation.mutateAsync({
-            serverId,
-            credential,
-          });
+        workflowServer = {
+          mode: "create",
+          input: {
+            name: serverName.trim(),
+            host: serverHost.trim(),
+            providerKey: serverProviderKey,
+            proxyKind: "traefik",
+            ...(serverPort.trim() ? { port: Number(serverPort) } : {}),
+          },
+          ...(credential ? { credential } : {}),
+        };
+      } else {
+        if (!selectedServerId) {
+          throw new Error("请选择或创建一个服务器。");
         }
 
-        await serversQuery.refetch();
+        workflowServer = {
+          mode: "existing",
+          id: selectedServerId,
+        };
       }
 
-      if (!serverId) {
-        throw new Error("请选择或创建一个服务器。");
-      }
-
-      let environmentId = environmentContextEnabled ? selectedEnvironmentId : undefined;
+      let workflowEnvironment: QuickDeployWorkflowInput["environment"];
 
       if (environmentContextEnabled && environmentMode === "new") {
         if (!environmentName.trim()) {
           throw new Error("请填写环境名。");
         }
 
-        if (!projectId) {
-          throw new Error("新建环境前请先编辑并选择或创建项目。");
+        workflowEnvironment = {
+          mode: "create",
+          input: {
+            name: environmentName.trim(),
+            kind: environmentKind,
+          },
+        };
+      } else if (environmentContextEnabled) {
+        if (!selectedEnvironmentId) {
+          throw new Error("请选择或创建一个环境。");
         }
 
-        const createdEnvironment = await createEnvironmentMutation.mutateAsync({
-          projectId,
-          name: environmentName.trim(),
-          kind: environmentKind,
-        });
-        environmentId = createdEnvironment.id;
-        selectedEnvironmentId = environmentId;
-        await environmentsQuery.refetch();
-      }
-
-      if (environmentContextEnabled && !environmentId) {
-        throw new Error("请选择或创建一个环境。");
-      }
-
-      if (!environmentId) {
-        const existingEnvironment =
-          environments.find(
-            (environment) =>
-              environment.projectId === projectId &&
-              environment.name === "local" &&
-              environment.kind === "local",
-          ) ?? environments.find((environment) => environment.projectId === projectId);
+        workflowEnvironment = {
+          mode: "existing",
+          id: selectedEnvironmentId,
+        };
+      } else {
+        const projectIdForLookup = workflowProject.mode === "existing" ? workflowProject.id : undefined;
+        const existingEnvironment = projectIdForLookup
+          ? (environments.find(
+              (environment) =>
+                environment.projectId === projectIdForLookup &&
+                environment.name === "local" &&
+                environment.kind === "local",
+            ) ?? environments.find((environment) => environment.projectId === projectIdForLookup))
+          : undefined;
 
         if (existingEnvironment) {
-          environmentId = existingEnvironment.id;
-          selectedEnvironmentId = environmentId;
+          workflowEnvironment = {
+            mode: "existing",
+            id: existingEnvironment.id,
+          };
         } else {
-          const createdEnvironment = await createEnvironmentMutation.mutateAsync({
-            projectId,
-            name: environmentName.trim() || "local",
-            kind: environmentKind,
-          });
-          environmentId = createdEnvironment.id;
-          selectedEnvironmentId = environmentId;
-          await environmentsQuery.refetch();
+          workflowEnvironment = {
+            mode: "create",
+            input: {
+              name: environmentName.trim() || "local",
+              kind: environmentKind,
+            },
+          };
         }
       }
 
-      let deploymentResourceId: string | undefined;
-      let deploymentResource: ResourceDraftInput | undefined;
+      let workflowResource: QuickDeployWorkflowInput["resource"];
       if (resourceContextEnabled) {
         if (resourceMode === "existing") {
           if (!selectedResourceId) {
             throw new Error("请选择资源，或切换为新建资源。");
           }
 
-          deploymentResourceId = selectedResourceId;
+          workflowResource = {
+            mode: "existing",
+            id: selectedResourceId,
+          };
         } else {
           if (!editedResourceInput.name.trim()) {
             throw new Error("请填写资源名。");
           }
 
-          deploymentResource = editedResourceInput;
+          workflowResource = {
+            mode: "create",
+            input: {
+              name: editedResourceInput.name.trim(),
+              kind: editedResourceInput.kind ?? "application",
+              ...(editedResourceInput.description?.trim()
+                ? { description: editedResourceInput.description.trim() }
+                : {}),
+              ...(editedResourceInput.services && editedResourceInput.services.length > 0
+                ? { services: editedResourceInput.services }
+                : {}),
+              source: resourceSourceForSource(),
+              runtimeProfile: runtimeProfileForSource(),
+              networkProfile: networkProfileForSource(),
+            },
+          };
         }
       } else {
-        deploymentResource = inferredResourceInput;
+        workflowResource = {
+          mode: "create",
+          input: {
+            name: inferredResourceInput.name.trim(),
+            kind: inferredResourceInput.kind ?? "application",
+            ...(inferredResourceInput.description?.trim()
+              ? { description: inferredResourceInput.description.trim() }
+              : {}),
+            ...(inferredResourceInput.services && inferredResourceInput.services.length > 0
+              ? { services: inferredResourceInput.services }
+              : {}),
+            source: resourceSourceForSource(),
+            runtimeProfile: runtimeProfileForSource(),
+            networkProfile: networkProfileForSource(),
+          },
+        };
       }
 
-      if (deploymentResource && projectId && environmentId) {
-        const createdResource = await createResourceMutation.mutateAsync({
-          projectId,
-          environmentId,
-          name: deploymentResource.name.trim(),
-          kind: deploymentResource.kind ?? "application",
-          ...(deploymentResource.description?.trim()
-            ? { description: deploymentResource.description.trim() }
-            : {}),
-          ...(deploymentResource.services && deploymentResource.services.length > 0
-            ? { services: deploymentResource.services }
-            : {}),
-          source: resourceSourceForSource(),
-          runtimeProfile: runtimeProfileForSource(),
-        });
-        deploymentResourceId = createdResource.id;
-        deploymentResource = undefined;
-        selectedResourceId = createdResource.id;
-        await resourcesQuery.refetch();
-      }
-
-      if (variableContextEnabled && variableKey.trim()) {
-        if (!environmentId) {
-          throw new Error("设置变量前请先编辑并选择或创建环境。");
-        }
-
-        await setEnvironmentVariableMutation.mutateAsync({
-          environmentId,
-          key: variableKey.trim(),
-          value: variableValue,
-          exposure: "runtime",
-          kind: variableIsSecret ? "secret" : "plain-config",
-          isSecret: variableIsSecret,
-          scope: "environment",
-        });
-        await environmentsQuery.refetch();
-      }
-
-      if (!projectId || !environmentId || !deploymentResourceId) {
-        throw new Error("请选择或创建一个项目、环境和资源。");
-      }
-
-      const deployment = await createDeploymentMutation.mutateAsync({
-        projectId,
-        serverId,
-        environmentId,
-        resourceId: deploymentResourceId,
-      });
+      const workflowInput: QuickDeployWorkflowInput = {
+        project: workflowProject,
+        server: workflowServer,
+        environment: workflowEnvironment,
+        resource: workflowResource,
+        ...(variableContextEnabled && variableKey.trim()
+          ? {
+              environmentVariable: {
+                key: variableKey.trim(),
+                value: variableValue,
+                exposure: "runtime",
+                kind: variableIsSecret ? "secret" : "plain-config",
+                isSecret: variableIsSecret,
+                scope: "environment",
+              },
+            }
+          : {}),
+      };
+      const workflowResult = await runQuickDeployWorkflow(
+        workflowInput,
+        executeQuickDeployWorkflowStep,
+      );
+      selectedProjectId = workflowResult.projectId;
+      selectedServerId = workflowResult.serverId;
+      selectedEnvironmentId = workflowResult.environmentId;
+      selectedResourceId = workflowResult.resourceId;
 
       await refreshWorkspaceData();
-      deploymentProgressDialogStatus = "succeeded";
-      deploymentProgressDeploymentId = deployment.id;
 
       deployFeedback = {
         kind: "success",
         title: $t(i18nKeys.console.quickDeploy.deployFeedbackSuccessTitle),
-        detail: `deploymentId: ${deployment.id}`,
+        detail: `deploymentId: ${workflowResult.deploymentId}`,
       };
-      setTimeout(() => {
-        void goto(`/deployments/${deployment.id}`);
-      }, 600);
+      lastCreatedDeploymentId = workflowResult.deploymentId;
     } catch (error) {
-      deploymentProgressDialogStatus = "failed";
-      deploymentProgressStreamError = readErrorMessage(error);
+      workflowProgressError = readErrorMessage(error);
       deployFeedback = {
         kind: "error",
         title: $t(i18nKeys.console.quickDeploy.deployFeedbackErrorTitle),
@@ -2046,42 +2194,44 @@
               <Package class="size-4 text-muted-foreground" />
               <span>{$t(i18nKeys.common.domain.project)}</span>
             </div>
-            <div class="grid grid-cols-2 gap-2">
-              <Button
-                variant={projectMode === "existing" ? "selected" : "outline"}
-                onclick={() => {
-                  projectMode = "existing";
-                }}
-              >
-                {$t(i18nKeys.common.modes.useExisting)}
-              </Button>
-              <Button
-                variant={projectMode === "new" ? "selected" : "outline"}
-                onclick={() => {
-                  projectMode = "new";
-                }}
-              >
-                {$t(i18nKeys.common.modes.newProject)}
-              </Button>
-            </div>
-            {#if projectMode === "existing"}
+            {#if projects.length > 0}
+              <div class="grid grid-cols-2 gap-2">
+                <Button
+                  variant={projectMode === "existing" ? "selected" : "outline"}
+                  onclick={() => {
+                    projectMode = "existing";
+                  }}
+                >
+                  {$t(i18nKeys.common.modes.useExisting)}
+                </Button>
+                <Button
+                  variant={projectMode === "new" ? "selected" : "outline"}
+                  onclick={() => {
+                    projectMode = "new";
+                  }}
+                >
+                  {$t(i18nKeys.common.modes.newProject)}
+                </Button>
+              </div>
+            {:else}
+              <div class="rounded-md border border-dashed px-3 py-3 text-sm text-muted-foreground">
+                {$t(i18nKeys.console.quickDeploy.noProjectOptions)}
+              </div>
+            {/if}
+            {#if projectMode === "existing" && projects.length > 0}
               <div class="max-h-44 space-y-2 overflow-auto rounded-md border p-2">
-                {#if projects.length > 0}
-                  {#each projects as project (project.id)}
-                    <Button
-                      class="w-full justify-start"
-                      size="sm"
-                      variant={selectedProjectId === project.id ? "selected" : "ghost"}
-                      onclick={() => {
-                        selectedProjectId = project.id;
-                      }}
-                    >
-                      {project.name}
-                    </Button>
-                  {/each}
-                {:else}
-                  <p class="px-2 py-2 text-sm text-muted-foreground">{$t(i18nKeys.console.quickDeploy.noProjectOptions)}</p>
-                {/if}
+                {#each projects as project (project.id)}
+                  <Button
+                    class="w-full justify-start"
+                    size="sm"
+                    variant={selectedProjectId === project.id ? "selected" : "ghost"}
+                    onclick={() => {
+                      selectedProjectId = project.id;
+                    }}
+                  >
+                    {project.name}
+                  </Button>
+                {/each}
               </div>
             {:else}
               <div class="space-y-3">
@@ -2804,6 +2954,9 @@
                                 }}
                               >
                                 {resource.name} · {resource.kind}
+                                {#if resource.networkProfile?.internalPort}
+                                  · :{resource.networkProfile.internalPort}
+                                {/if}
                               </Button>
                             {/each}
                           {:else}
@@ -2835,6 +2988,28 @@
                           </p>
                         </div>
                       {/if}
+                      {#if resourceMode === "new"}
+                        <div class="space-y-2">
+                          <label class="text-xs font-medium text-muted-foreground" for="resource-internal-port">
+                            {$t(i18nKeys.console.quickDeploy.applicationPort)}
+                          </label>
+                          <Input id="resource-internal-port" bind:value={resourceInternalPort} placeholder="3000" />
+                          <p class="text-xs text-muted-foreground">
+                            {$t(i18nKeys.console.quickDeploy.applicationPortHint)}
+                          </p>
+                        </div>
+                      {/if}
+                    </div>
+                  {/if}
+                  {#if !resourceContextEnabled}
+                    <div class="mt-3 space-y-2">
+                      <label class="text-xs font-medium text-muted-foreground" for="resource-default-internal-port">
+                        {$t(i18nKeys.console.quickDeploy.applicationPort)}
+                      </label>
+                      <Input id="resource-default-internal-port" bind:value={resourceInternalPort} placeholder="3000" />
+                      <p class="text-xs text-muted-foreground">
+                        {$t(i18nKeys.console.quickDeploy.applicationPortHint)}
+                      </p>
                     </div>
                   {/if}
                 </div>
@@ -2966,6 +3141,50 @@
                 {$t(i18nKeys.common.actions.createAndDeploy)}
               {/if}
             </Button>
+            {#if workflowProgressItems.length > 0}
+              <div class="rounded-md border bg-muted/20 px-3 py-3">
+                <div class="mb-2 space-y-1">
+                  <p class="text-xs font-medium text-foreground">
+                    {$t(i18nKeys.console.quickDeploy.workflowProgressTitle)}
+                  </p>
+                  <p class="text-xs text-muted-foreground">
+                    {$t(i18nKeys.console.quickDeploy.workflowProgressDescription)}
+                  </p>
+                </div>
+                <div class="space-y-2">
+                  {#each workflowProgressItems as item (item.kind)}
+                    <div class="flex items-center justify-between gap-3 text-xs">
+                      <span class="flex min-w-0 items-center gap-2">
+                        {#if item.status === "running"}
+                          <LoaderCircle class="size-3.5 shrink-0 animate-spin text-primary" />
+                        {:else if item.status === "succeeded"}
+                          <CheckCircle2 class="size-3.5 shrink-0 text-primary" />
+                        {:else if item.status === "failed"}
+                          <ShieldCheck class="size-3.5 shrink-0 text-destructive" />
+                        {:else}
+                          <span class="size-3.5 shrink-0 rounded-full border border-muted-foreground/50"></span>
+                        {/if}
+                        <span class="truncate">{workflowStepLabel(item.kind)}</span>
+                      </span>
+                      <span
+                        class={`shrink-0 ${
+                          item.status === "failed"
+                            ? "text-destructive"
+                            : item.status === "succeeded"
+                              ? "text-primary"
+                              : "text-muted-foreground"
+                        }`}
+                      >
+                        {workflowStepStatusLabel(item.status)}
+                      </span>
+                    </div>
+                  {/each}
+                </div>
+                {#if workflowProgressError}
+                  <p class="mt-2 text-xs text-destructive">{workflowProgressError}</p>
+                {/if}
+              </div>
+            {/if}
             <pre class="overflow-x-auto rounded-md border bg-muted px-3 py-3 text-xs text-muted-foreground">{deploymentCommandPreview}</pre>
           </CardFooter>
         {/if}
@@ -2985,23 +3204,19 @@
           </CardHeader>
           <CardContent>
             <p class="text-sm text-muted-foreground">{deployFeedback.detail}</p>
+            {#if deployFeedback.kind === "success" && lastCreatedDeploymentId}
+              <Button
+                class="mt-4"
+                size="sm"
+                onclick={() => {
+                  void goto(`/deployments/${lastCreatedDeploymentId}`);
+                }}
+              >
+                {$t(i18nKeys.common.actions.viewDeployment)}
+              </Button>
+            {/if}
           </CardContent>
         </Card>
       {/if}
   </aside>
 </div>
-
-<DeploymentProgressDialog
-  open={deploymentProgressDialogOpen}
-  status={deploymentProgressDialogStatus}
-  events={deploymentProgressEvents}
-  streamError={deploymentProgressStreamError}
-  requestId={deploymentProgressRequestId}
-  deploymentId={deploymentProgressDeploymentId}
-  onClose={() => {
-    deploymentProgressDialogOpen = false;
-  }}
-  onOpenDeployment={() => {
-    void goto(`/deployments/${deploymentProgressDeploymentId}`);
-  }}
-/>

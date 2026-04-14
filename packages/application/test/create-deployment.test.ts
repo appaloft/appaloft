@@ -47,9 +47,11 @@ import {
   ProjectName,
   ProviderKey,
   Resource,
+  ResourceExposureModeValue,
   ResourceId,
   ResourceKindValue,
   ResourceName,
+  ResourceNetworkProtocolValue,
   type Result,
   type RollbackPlan,
   RuntimeExecutionPlan,
@@ -390,6 +392,11 @@ async function createDeploymentFixture(
     runtimeProfile: {
       strategy: RuntimePlanStrategyValue.rehydrate("auto"),
     },
+    networkProfile: {
+      internalPort: PortNumber.rehydrate(3000),
+      upstreamProtocol: ResourceNetworkProtocolValue.rehydrate("http"),
+      exposureMode: ResourceExposureModeValue.rehydrate("reverse-proxy"),
+    },
     createdAt: CreatedAt.rehydrate(clock.now()),
   })._unsafeUnwrap();
 
@@ -564,6 +571,11 @@ describe("CreateDeploymentUseCase", () => {
       runtimeProfile: {
         strategy: RuntimePlanStrategyValue.rehydrate("auto"),
       },
+      networkProfile: {
+        internalPort: PortNumber.rehydrate(3000),
+        upstreamProtocol: ResourceNetworkProtocolValue.rehydrate("http"),
+        exposureMode: ResourceExposureModeValue.rehydrate("reverse-proxy"),
+      },
       createdAt: CreatedAt.rehydrate(clock.now()),
     })._unsafeUnwrap();
 
@@ -695,6 +707,50 @@ describe("CreateDeploymentUseCase", () => {
     expect(error.details).toMatchObject({
       phase: "resource-source-resolution",
       resourceId: "res_demo",
+    });
+  });
+
+  test("rejects deployment admission when inbound resource has no internal port", async () => {
+    const {
+      context,
+      createDeploymentInput,
+      createDeploymentUseCase,
+      resources,
+      repositoryContext,
+    } = await createDeploymentFixture(new ExplicitContextRequiredPolicy());
+    const resourceWithoutNetworkProfile = Resource.create({
+      id: ResourceId.rehydrate("res_demo"),
+      projectId: ProjectId.rehydrate("prj_demo"),
+      environmentId: EnvironmentId.rehydrate("env_demo"),
+      destinationId: DestinationId.rehydrate("dst_demo"),
+      name: ResourceName.rehydrate("web"),
+      kind: ResourceKindValue.rehydrate("application"),
+      sourceBinding: {
+        kind: SourceKindValue.rehydrate("local-folder"),
+        locator: SourceLocator.rehydrate("."),
+        displayName: DisplayNameText.rehydrate("workspace"),
+      },
+      runtimeProfile: {
+        strategy: RuntimePlanStrategyValue.rehydrate("auto"),
+      },
+      createdAt: CreatedAt.rehydrate("2026-01-01T00:00:00.000Z"),
+    })._unsafeUnwrap();
+
+    await resources.upsert(
+      repositoryContext,
+      resourceWithoutNetworkProfile,
+      UpsertResourceSpec.fromResource(resourceWithoutNetworkProfile),
+    );
+
+    const result = await createDeploymentUseCase.execute(context, createDeploymentInput);
+
+    expect(result.isErr()).toBe(true);
+    const error = result._unsafeUnwrapErr();
+    expect(error.code).toBe("validation_error");
+    expect(error.details).toMatchObject({
+      phase: "resource-network-resolution",
+      resourceId: "res_demo",
+      resourceKind: "application",
     });
   });
 

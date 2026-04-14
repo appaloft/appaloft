@@ -113,6 +113,14 @@ export const resourceServiceKinds = [
 
 export type ResourceServiceKind = (typeof resourceServiceKinds)[number];
 
+export const resourceNetworkProtocols = ["http", "tcp"] as const;
+
+export type ResourceNetworkProtocol = (typeof resourceNetworkProtocols)[number];
+
+export const resourceExposureModes = ["none", "reverse-proxy", "direct-port"] as const;
+
+export type ResourceExposureMode = (typeof resourceExposureModes)[number];
+
 export const deploymentStatuses = [
   "created",
   "planning",

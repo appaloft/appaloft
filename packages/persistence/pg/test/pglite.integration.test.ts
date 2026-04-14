@@ -1,3 +1,4 @@
+import "reflect-metadata";
 import { describe, expect, test } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -51,9 +52,11 @@ import {
   ProjectName,
   ProviderKey,
   Resource,
+  ResourceExposureModeValue,
   ResourceId,
   ResourceKindValue,
   ResourceName,
+  ResourceNetworkProtocolValue,
   RuntimeExecutionPlan,
   RuntimePlan,
   RuntimePlanId,
@@ -96,22 +99,6 @@ function createRepositoryContext(): RepositoryContext {
   );
 }
 
-function ensureReflectMetadata(): void {
-  const reflectObject = Reflect as typeof Reflect & {
-    defineMetadata?: (...args: unknown[]) => void;
-    getMetadata?: (...args: unknown[]) => unknown;
-    getOwnMetadata?: (...args: unknown[]) => unknown;
-    hasMetadata?: (...args: unknown[]) => boolean;
-    metadata?: (_metadataKey: unknown, _metadataValue: unknown) => ClassDecorator;
-  };
-
-  reflectObject.defineMetadata ??= () => {};
-  reflectObject.getMetadata ??= () => undefined;
-  reflectObject.getOwnMetadata ??= () => undefined;
-  reflectObject.hasMetadata ??= () => false;
-  reflectObject.metadata ??= () => () => {};
-}
-
 describe("pglite persistence integration", () => {
   test("persists environments and deployments to a file-backed embedded store", async () => {
     const workspaceDir = mkdtempSync(join(tmpdir(), "yundu-pglite-"));
@@ -120,7 +107,6 @@ describe("pglite persistence integration", () => {
 
     try {
       const suffix = crypto.randomUUID().slice(0, 8);
-      ensureReflectMetadata();
       const {
         createDatabase,
         createMigrator,
@@ -181,6 +167,11 @@ describe("pglite persistence integration", () => {
         destinationId: DestinationId.rehydrate(`dst_${suffix}`),
         name: ResourceName.rehydrate("web"),
         kind: ResourceKindValue.rehydrate("application"),
+        networkProfile: {
+          internalPort: PortNumber.rehydrate(3000),
+          upstreamProtocol: ResourceNetworkProtocolValue.rehydrate("http"),
+          exposureMode: ResourceExposureModeValue.rehydrate("reverse-proxy"),
+        },
         createdAt: CreatedAt.rehydrate("2026-01-01T00:00:00.000Z"),
       })._unsafeUnwrap();
 

@@ -81,6 +81,11 @@ export interface ResourcesTable {
     Record<string, unknown> | null,
     Record<string, unknown> | null
   >;
+  network_profile: ColumnType<
+    Record<string, unknown> | null,
+    Record<string, unknown> | null,
+    Record<string, unknown> | null
+  >;
   created_at: TimestampColumn;
 }
 

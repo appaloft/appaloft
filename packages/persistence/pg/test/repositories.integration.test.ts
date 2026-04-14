@@ -1,3 +1,4 @@
+import "reflect-metadata";
 import { describe, expect, test } from "bun:test";
 import {
   createExecutionContext,
@@ -48,9 +49,11 @@ import {
   ProjectName,
   ProviderKey,
   Resource,
+  ResourceExposureModeValue,
   ResourceId,
   ResourceKindValue,
   ResourceName,
+  ResourceNetworkProtocolValue,
   RuntimeExecutionPlan,
   RuntimePlan,
   RuntimePlanId,
@@ -93,22 +96,6 @@ function createRepositoryContext(): RepositoryContext {
   );
 }
 
-function ensureReflectMetadata(): void {
-  const reflectObject = Reflect as typeof Reflect & {
-    defineMetadata?: (...args: unknown[]) => void;
-    getMetadata?: (...args: unknown[]) => unknown;
-    getOwnMetadata?: (...args: unknown[]) => unknown;
-    hasMetadata?: (...args: unknown[]) => boolean;
-    metadata?: (_metadataKey: unknown, _metadataValue: unknown) => ClassDecorator;
-  };
-
-  reflectObject.defineMetadata ??= () => {};
-  reflectObject.getMetadata ??= () => undefined;
-  reflectObject.getOwnMetadata ??= () => undefined;
-  reflectObject.hasMetadata ??= () => false;
-  reflectObject.metadata ??= () => () => {};
-}
-
 const databaseUrl = process.env.YUNDU_DATABASE_URL;
 
 describe("postgres persistence integration", () => {
@@ -122,7 +109,6 @@ describe("postgres persistence integration", () => {
 
   test("persists environments, snapshots, and masked reads against real postgres", async () => {
     const context = createRepositoryContext();
-    ensureReflectMetadata();
     const {
       createDatabase,
       createMigrator,
@@ -186,6 +172,11 @@ describe("postgres persistence integration", () => {
       destinationId: DestinationId.rehydrate(`dst_${suffix}`),
       name: ResourceName.rehydrate("web"),
       kind: ResourceKindValue.rehydrate("application"),
+      networkProfile: {
+        internalPort: PortNumber.rehydrate(3000),
+        upstreamProtocol: ResourceNetworkProtocolValue.rehydrate("http"),
+        exposureMode: ResourceExposureModeValue.rehydrate("reverse-proxy"),
+      },
       createdAt: CreatedAt.rehydrate("2026-01-01T00:00:00.000Z"),
     })._unsafeUnwrap();
 

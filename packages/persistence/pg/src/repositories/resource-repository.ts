@@ -20,6 +20,7 @@ import { type Database } from "../schema";
 import {
   rehydrateResourceRow,
   resolveRepositoryExecutor,
+  type SerializedResourceNetworkProfile,
   type SerializedResourceRuntimeProfile,
   type SerializedResourceSourceBinding,
   serializeResourceServices,
@@ -78,11 +79,23 @@ class KyselyResourceMutationVisitor
           ...(spec.state.runtimeProfile.startCommand
             ? { startCommand: spec.state.runtimeProfile.startCommand.value }
             : {}),
-          ...(spec.state.runtimeProfile.port ? { port: spec.state.runtimeProfile.port.value } : {}),
           ...(spec.state.runtimeProfile.healthCheckPath
             ? { healthCheckPath: spec.state.runtimeProfile.healthCheckPath.value }
             : {}),
         } satisfies SerializedResourceRuntimeProfile)
+      : null;
+    const networkProfile = spec.state.networkProfile
+      ? ({
+          internalPort: spec.state.networkProfile.internalPort.value,
+          upstreamProtocol: spec.state.networkProfile.upstreamProtocol.value,
+          exposureMode: spec.state.networkProfile.exposureMode.value,
+          ...(spec.state.networkProfile.targetServiceName
+            ? { targetServiceName: spec.state.networkProfile.targetServiceName.value }
+            : {}),
+          ...(spec.state.networkProfile.hostPort
+            ? { hostPort: spec.state.networkProfile.hostPort.value }
+            : {}),
+        } satisfies SerializedResourceNetworkProfile)
       : null;
 
     return {
@@ -98,6 +111,7 @@ class KyselyResourceMutationVisitor
         services: serializeResourceServices(spec.state.services),
         source_binding: sourceBinding,
         runtime_profile: runtimeProfile,
+        network_profile: networkProfile,
         created_at: spec.state.createdAt.value,
       },
     };
@@ -137,6 +151,7 @@ export class PgResourceRepository implements ResourceRepository {
               services: mutation.values.services as unknown as Record<string, unknown>[],
               source_binding: mutation.values.source_binding,
               runtime_profile: mutation.values.runtime_profile,
+              network_profile: mutation.values.network_profile,
             }),
           )
           .execute();

@@ -45,6 +45,7 @@ type ResourceDraftInput = Pick<CreateResourceCommandInput, "name"> &
   Partial<Pick<CreateResourceCommandInput, "kind" | "description" | "services">>;
 type ResourceSourceInput = NonNullable<CreateResourceCommandInput["source"]>;
 type ResourceRuntimeProfileInput = NonNullable<CreateResourceCommandInput["runtimeProfile"]>;
+type ResourceNetworkProfileInput = NonNullable<CreateResourceCommandInput["networkProfile"]>;
 type ResourceRuntimeProfileDraftInput = Partial<ResourceRuntimeProfileInput>;
 
 interface ResolvedReference {
@@ -64,6 +65,7 @@ const defaultServerName = "local-machine";
 const defaultServerHost = "127.0.0.1";
 const defaultServerPort = 22;
 const defaultServerProviderKey = "local-shell";
+const defaultApplicationInternalPort = 3000;
 
 function trimToUndefined(value: string): string | undefined {
   const trimmed = value.trim();
@@ -150,8 +152,15 @@ function runtimeProfileFromDeploymentInput(
     ...(input.installCommand ? { installCommand: input.installCommand } : {}),
     ...(input.buildCommand ? { buildCommand: input.buildCommand } : {}),
     ...(input.startCommand ? { startCommand: input.startCommand } : {}),
-    ...(input.port ? { port: input.port } : {}),
     ...(input.healthCheckPath ? { healthCheckPath: input.healthCheckPath } : {}),
+  };
+}
+
+function networkProfileFromDeploymentInput(input: { port?: number }): ResourceNetworkProfileInput {
+  return {
+    internalPort: input.port ?? defaultApplicationInternalPort,
+    upstreamProtocol: "http",
+    exposureMode: "reverse-proxy",
   };
 }
 
@@ -283,6 +292,7 @@ function createResource(input: {
   resource: ResourceDraftInput;
   source: ResourceSourceInput;
   runtimeProfile: ResourceRuntimeProfileInput;
+  networkProfile: ResourceNetworkProfileInput;
 }) {
   return Effect.gen(function* () {
     const cli = yield* CliRuntime;
@@ -298,6 +308,7 @@ function createResource(input: {
           : {}),
         source: input.source,
         runtimeProfile: input.runtimeProfile,
+        networkProfile: input.networkProfile,
       }),
     );
     const result = yield* Effect.promise(() => cli.executeCommand(message));
@@ -481,6 +492,7 @@ function resolveResource(input: {
   sourceLocator: string;
   deploymentMethod: DeploymentMethod;
   runtimeProfile: ResourceRuntimeProfileInput;
+  networkProfile: ResourceNetworkProfileInput;
 }) {
   return Effect.gen(function* () {
     if (input.seed.resourceId) {
@@ -516,6 +528,7 @@ function resolveResource(input: {
           resource,
           source: sourceBindingForDeploymentInput(input.sourceLocator, input.deploymentMethod),
           runtimeProfile: input.runtimeProfile,
+          networkProfile: input.networkProfile,
         });
         return {
           id: created.id,
@@ -586,7 +599,7 @@ function resolveAdvancedDeploymentConfig(input: {
       }));
 
     if (!shouldConfigure) {
-      return {};
+      return { port: input.seed.port ?? defaultApplicationInternalPort };
     }
 
     const installCommand =
@@ -616,22 +629,11 @@ function resolveAdvancedDeploymentConfig(input: {
     const port =
       input.seed.port ??
       Number(
-        trimToUndefined(
-          yield* input.interaction.text({
-            message: "Application port",
-            defaultValue: "",
-            validate: (value) => {
-              const trimmed = value.trim();
-              if (!trimmed) {
-                return null;
-              }
-
-              return Number.isInteger(Number(trimmed)) && Number(trimmed) > 0
-                ? null
-                : "Application port must be a positive integer";
-            },
-          }),
-        ) ?? Number.NaN,
+        yield* input.interaction.text({
+          message: "Application port",
+          defaultValue: String(defaultApplicationInternalPort),
+          validate: requirePositiveInteger("Application port"),
+        }),
       );
     const healthCheckPath =
       input.seed.healthCheckPath ??
@@ -703,6 +705,7 @@ export function resolveInteractiveDeploymentInput(
     });
     const advancedConfig = yield* resolveAdvancedDeploymentConfig({ interaction, seed });
     const runtimeProfile = runtimeProfileFromDeploymentInput(deploymentMethod, advancedConfig);
+    const networkProfile = networkProfileFromDeploymentInput(advancedConfig);
     const resource = yield* resolveResource({
       interaction,
       seed,
@@ -711,6 +714,7 @@ export function resolveInteractiveDeploymentInput(
       sourceLocator: normalizedSourceLocator,
       deploymentMethod,
       runtimeProfile,
+      networkProfile,
     });
 
     yield* printDeploymentSummary({

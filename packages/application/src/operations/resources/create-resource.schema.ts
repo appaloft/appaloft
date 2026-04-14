@@ -1,5 +1,7 @@
 import {
+  resourceExposureModes,
   resourceKinds,
+  resourceNetworkProtocols,
   resourceServiceKinds,
   runtimePlanStrategies,
   sourceKinds,
@@ -20,14 +22,33 @@ export const createResourceSourceBindingInputSchema = z.object({
   metadata: z.record(z.string(), z.string()).optional(),
 });
 
-export const createResourceRuntimeProfileInputSchema = z.object({
-  strategy: z.enum(runtimePlanStrategies).default("auto"),
-  installCommand: z.string().trim().min(1).optional(),
-  buildCommand: z.string().trim().min(1).optional(),
-  startCommand: z.string().trim().min(1).optional(),
-  port: z.number().int().positive().optional(),
-  healthCheckPath: z.string().trim().min(1).optional(),
-});
+export const createResourceRuntimeProfileInputSchema = z
+  .object({
+    strategy: z.enum(runtimePlanStrategies).default("auto"),
+    installCommand: z.string().trim().min(1).optional(),
+    buildCommand: z.string().trim().min(1).optional(),
+    startCommand: z.string().trim().min(1).optional(),
+    healthCheckPath: z.string().trim().min(1).optional(),
+  })
+  .strict();
+
+export const createResourceNetworkProfileInputSchema = z
+  .object({
+    internalPort: z.number().int().positive(),
+    upstreamProtocol: z.enum(resourceNetworkProtocols).default("http"),
+    exposureMode: z.enum(resourceExposureModes).default("reverse-proxy"),
+    targetServiceName: z.string().trim().min(1).optional(),
+    hostPort: z.number().int().positive().optional(),
+  })
+  .superRefine((value, context) => {
+    if (value.hostPort && value.exposureMode !== "direct-port") {
+      context.addIssue({
+        code: "custom",
+        path: ["hostPort"],
+        message: "hostPort is valid only when exposureMode is direct-port",
+      });
+    }
+  });
 
 export const createResourceCommandInputSchema = z.object({
   projectId: nonEmptyTrimmedString("Project id"),
@@ -39,6 +60,7 @@ export const createResourceCommandInputSchema = z.object({
   services: z.array(createResourceServiceInputSchema).optional(),
   source: createResourceSourceBindingInputSchema.optional(),
   runtimeProfile: createResourceRuntimeProfileInputSchema.optional(),
+  networkProfile: createResourceNetworkProfileInputSchema.optional(),
 });
 
 export type CreateResourceCommandInput = z.input<typeof createResourceCommandInputSchema>;
@@ -49,4 +71,7 @@ export type CreateResourceSourceBindingInput = z.output<
 >;
 export type CreateResourceRuntimeProfileInput = z.output<
   typeof createResourceRuntimeProfileInputSchema
+>;
+export type CreateResourceNetworkProfileInput = z.output<
+  typeof createResourceNetworkProfileInputSchema
 >;
