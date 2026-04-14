@@ -34,7 +34,8 @@ This directory complements the historical technical ADRs in `docs/adr/`. Use `do
 | [ADR-011: Resource Create Minimum Lifecycle](./ADR-011-resource-create-minimum-lifecycle.md) | Accepted | Minimum explicit `resources.create` command boundary and lifecycle. |
 | [ADR-012: Resource Runtime Profile And Deployment Snapshot Boundary](./ADR-012-resource-runtime-profile-and-deployment-snapshot-boundary.md) | Accepted | Where reusable source/runtime/health/access configuration belongs versus deployment attempt snapshots. |
 | [ADR-013: Project Resource Navigation And Deployment Ownership](./ADR-013-project-resource-navigation-and-deployment-ownership.md) | Accepted | Project pages and navigation are resource-centered; deployment actions and history are resource-owned. |
-| [ADR-014: Deployment Admission Uses Resource Profile](./ADR-014-deployment-admission-uses-resource-profile.md) | Accepted | `deployments.create` consumes resource-owned source/runtime profile and no longer accepts source/runtime/route configuration fields. |
+| [ADR-014: Deployment Admission Uses Resource Profile](./ADR-014-deployment-admission-uses-resource-profile.md) | Accepted | `deployments.create` consumes resource-owned source/runtime/network profile and no longer accepts source/runtime/network/route configuration fields. |
+| [ADR-015: Resource Network Profile](./ADR-015-resource-network-profile.md) | Accepted | Resource-owned network endpoint and port semantics for deployment planning, reverse proxy targets, and snapshots. |
 
 ## Authoring Rules
 

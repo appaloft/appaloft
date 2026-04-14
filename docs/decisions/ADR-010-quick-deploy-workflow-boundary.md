@@ -116,6 +116,16 @@ Web QuickDeploy and CLI interactive deploy must dispatch existing commands and q
 
 Transport input collection may maintain local draft state, but final writes must use command/query schemas from the operation catalog.
 
+Quick Deploy may use a shared, side-effect-free workflow program that yields explicit operation steps and receives step results from an entry-specific executor. The shared program may sequence `projects.create`, `servers.register`, credential configuration, `environments.create`, `resources.create`, environment variable updates, and `deployments.create`; it must not call HTTP clients, CommandBus, QueryBus, service methods, repositories, prompts, or UI APIs directly.
+
+Web, CLI, and future backend convenience surfaces may reuse that workflow program by supplying their own executor:
+
+- Web executors call typed HTTP/oRPC client methods.
+- CLI executors dispatch command/query messages through the CLI runtime and CommandBus/QueryBus.
+- Backend convenience executors dispatch explicit commands through application buses or services only at the adapter/application boundary accepted for that surface.
+
+Web QuickDeploy must call the normal `deployments.create` operation for the final deployment admission step. It must not call `deployments.createStream` as the workflow executor because stream progress represents deployment execution observation, not Quick Deploy prerequisite sequencing.
+
 Workflow preflight errors may be shown in Web or CLI, but stable business errors come from the underlying command results and must follow the global error model.
 
 If a future implementation adds a backend workflow API for Quick Deploy, that API must either:
@@ -133,11 +143,15 @@ The second option is required if the workflow needs resumability, delayed user i
 
 ## Current Implementation Notes And Migration Gaps
 
-Web QuickDeploy currently orchestrates related entity creation and local validation inside `QuickDeploySheet.svelte`.
+Web QuickDeploy uses the shared Quick Deploy workflow program for command sequencing and supplies a Web executor that calls typed oRPC/HTTP methods. UI-local draft collection and validation remain in `QuickDeploySheet.svelte`.
+
+Web QuickDeploy displays per-step workflow progress from the shared workflow executor. It no longer uses the deployment progress stream dialog as the workflow progress UI.
 
 CLI interactive deploy currently resolves prompts and creates/selects project, server, environment, and resource context in `deployment-interaction.ts`, then dispatches `CreateDeploymentCommand`.
 
-`resources.create` is not yet a first-class operation, so resource bootstrap still flows through `deployments.create.resource` when a new resource is inferred or entered during deploy.
+CLI interactive deploy has not yet been fully migrated to the shared workflow program. It still follows this ADR by dispatching explicit commands through the CLI runtime rather than hiding service calls in prompt code.
+
+`resources.create` is now a first-class operation for new first-deploy resources. Deployment bootstrap compatibility remains only for legacy/default deployment bootstrap paths.
 
 Web QuickDeploy has UI-local validation and draft orchestration that should be extracted or kept behind a clear workflow boundary as the surface grows.
 

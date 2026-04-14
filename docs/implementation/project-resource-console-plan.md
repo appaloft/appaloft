@@ -9,6 +9,7 @@ This document is an implementation-planning contract for aligning the Web consol
 - [ADR-013: Project Resource Navigation And Deployment Ownership](../decisions/ADR-013-project-resource-navigation-and-deployment-ownership.md)
 - [ADR-011: Resource Create Minimum Lifecycle](../decisions/ADR-011-resource-create-minimum-lifecycle.md)
 - [ADR-012: Resource Runtime Profile And Deployment Snapshot Boundary](../decisions/ADR-012-resource-runtime-profile-and-deployment-snapshot-boundary.md)
+- [ADR-015: Resource Network Profile](../decisions/ADR-015-resource-network-profile.md)
 - [ADR-010: Quick Deploy Workflow Boundary](../decisions/ADR-010-quick-deploy-workflow-boundary.md)
 
 ## Governed Specs
@@ -35,11 +36,11 @@ Expected Web implementation scope:
   - make new deployment/redeploy primary resource-scoped actions;
   - show deployment history filtered by resource;
   - expose resource-scoped domain/TLS actions where available;
-  - prepare a future place for source/runtime profile configuration.
+  - prepare a future place for source/runtime/network profile configuration.
 - create-resource flow:
   - provide a dedicated route or panel for resource creation;
-  - use resource language for source/runtime drafts;
-  - persist only the minimum resource profile through `resources.create` until resource source/runtime operations exist;
+  - use resource language for source/runtime/network drafts;
+  - persist resource-owned source/runtime/network profile through `resources.create` when the flow is part of first deploy;
   - optionally continue into Quick Deploy when the user chooses create-and-deploy.
 - sidebar:
   - display Project -> Resource hierarchy;
@@ -88,6 +89,7 @@ Required coverage follows [Project Resource Console Test Matrix](../testing/proj
 - resource detail new deployment dispatches with `resourceId`;
 - resource detail deployment history filters by `resourceId`;
 - project-level new deployment enters Quick Deploy or resource selection;
+- create-resource and Quick Deploy map generic port fields to `networkProfile.internalPort`;
 - sidebar resource status is projection/read-model state.
 
 ## Migration Seams And Legacy Edges
@@ -97,6 +99,8 @@ Existing project-level deployment UI can remain as a rollup view while resource-
 If latest deployment status is not available through a stable read model in the first Code Round, the UI may show a neutral resource state and record the projection gap here.
 
 If a dedicated create-resource route is too large for the first Web Code Round, the existing project-page create-resource affordance may remain, but it must use resource language and should navigate to resource detail after creation when feasible.
+
+Current contracts expose the listener port as `networkProfile.internalPort`, governed by [ADR-015](../decisions/ADR-015-resource-network-profile.md).
 
 ## Current Implementation Notes And Migration Gaps
 

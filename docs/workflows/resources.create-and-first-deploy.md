@@ -23,6 +23,7 @@ This workflow inherits:
 - [ADR-012: Resource Runtime Profile And Deployment Snapshot Boundary](../decisions/ADR-012-resource-runtime-profile-and-deployment-snapshot-boundary.md)
 - [ADR-013: Project Resource Navigation And Deployment Ownership](../decisions/ADR-013-project-resource-navigation-and-deployment-ownership.md)
 - [ADR-014: Deployment Admission Uses Resource Profile](../decisions/ADR-014-deployment-admission-uses-resource-profile.md)
+- [ADR-015: Resource Network Profile](../decisions/ADR-015-resource-network-profile.md)
 - [resources.create Command Spec](../commands/resources.create.md)
 - [resource-created Event Spec](../events/resource-created.md)
 - [Resource Lifecycle Error Spec](../errors/resources.lifecycle.md)
@@ -39,7 +40,7 @@ user or automation intent
   -> collect/select project
   -> collect/select environment
   -> collect optional destination
-  -> collect resource profile, source binding, and runtime profile
+  -> collect resource profile, source binding, runtime profile, and network profile
   -> resources.create
   -> observe resource id/read model
   -> deployments.create(resourceId)
@@ -48,9 +49,11 @@ user or automation intent
 
 `resources.create` success is complete when resource state is persisted. Deployment still requires `deployments.create`.
 
-Source binding and runtime profile are resource-owned inputs for first-deploy resource creation. Access-route/domain/TLS defaults remain separate domain binding and certificate concerns.
+Source binding, runtime profile, and network profile are resource-owned inputs for first-deploy resource creation. Access-route/domain/TLS defaults remain separate domain binding and certificate concerns.
 
 The workflow must distinguish source selection from runtime planning. A selected source locator or source descriptor identifies what will be deployed. A runtime plan strategy describes how that source should be planned. The compatibility input name `deploymentMethod` may exist only at CLI/UI entry boundaries and must map to resource `RuntimePlanStrategy` before `resources.create`.
+
+The workflow must distinguish the resource internal listener port from host exposure. A collected application "port" is `ResourceNetworkProfile.internalPort`. It is not `deployments.create.port`, and it is not a server host-published port unless an explicit `direct-port` exposure mode is accepted.
 
 ## Entry Differences
 
@@ -103,11 +106,13 @@ Current deployment bootstrap can create resources during `deployments.create` ad
 
 Current Web QuickDeploy and CLI interactive deploy create/select a resource explicitly when project and environment context is available, then pass `resourceId` to `deployments.create`.
 
-Deployment bootstrap compatibility remains available when a caller intentionally uses deployment defaults or cannot yet supply explicit resource context.
+Deployment bootstrap remains available only where it is explicitly treated as first-class bootstrap behavior, not as a compatibility alias for resource creation.
 
-Deployment source/runtime values now belong to `resources.create` input in new first-deploy flows. Legacy deployment bootstrap paths still need cleanup where they remain.
+Deployment source/runtime/network values now belong to `resources.create` input in new first-deploy flows. Any remaining deployment bootstrap paths must be reviewed and either removed or documented as explicit bootstrap behavior.
 
 Current CLI entry code still exposes `--method` as a user-facing compatibility option. It maps to resource `RuntimePlanStrategy` before `resources.create`; it must not reach `deployments.create`.
+
+Current Web/CLI entry code may expose generic port wording, but it must dispatch `networkProfile.internalPort` as governed by [ADR-015](../decisions/ADR-015-resource-network-profile.md).
 
 Current Web project detail still needs a fuller ADR-013 alignment pass: resource list should become
 the primary page body, project-level deployment actions should become secondary rollups or Quick
@@ -115,4 +120,4 @@ Deploy entrypoints, and resource detail should own deployment history/actions.
 
 ## Open Questions
 
-- Exact operation names for resource source binding, runtime profile, and access profile configuration remain open under [ADR-012](../decisions/ADR-012-resource-runtime-profile-and-deployment-snapshot-boundary.md).
+- Exact operation names for resource source binding, runtime profile, network profile, and access profile configuration remain open under [ADR-012](../decisions/ADR-012-resource-runtime-profile-and-deployment-snapshot-boundary.md) and [ADR-015](../decisions/ADR-015-resource-network-profile.md).

@@ -27,6 +27,7 @@ This command inherits:
 - [ADR-012: Resource Runtime Profile And Deployment Snapshot Boundary](../decisions/ADR-012-resource-runtime-profile-and-deployment-snapshot-boundary.md)
 - [ADR-013: Project Resource Navigation And Deployment Ownership](../decisions/ADR-013-project-resource-navigation-and-deployment-ownership.md)
 - [ADR-014: Deployment Admission Uses Resource Profile](../decisions/ADR-014-deployment-admission-uses-resource-profile.md)
+- [ADR-015: Resource Network Profile](../decisions/ADR-015-resource-network-profile.md)
 - [Error Model](../errors/model.md)
 - [neverthrow Conventions](../errors/neverthrow-conventions.md)
 - [Async Lifecycle And Acceptance](../architecture/async-lifecycle-and-acceptance.md)
@@ -42,6 +43,7 @@ It is not:
 - a source binding command;
 - a domain binding or certificate command;
 - a runtime profile configuration command;
+- a network profile configuration command;
 - a health policy configuration command;
 - an access-route profile command;
 - an environment variable command;
@@ -60,7 +62,8 @@ It is not:
 | `destinationId` | Optional | Default destination placement hint for future deployments. |
 | `services` | Optional | Declared resource services. Multiple services are allowed only for `compose-stack`. |
 | `source` | Optional | Durable source binding for first-deploy workflows. |
-| `runtimeProfile` | Optional | Durable runtime plan strategy, command defaults, port, and health-check defaults for future deployments. |
+| `runtimeProfile` | Optional | Durable runtime plan strategy, command defaults, and health-check defaults for future deployments. |
+| `networkProfile` | Optional | Durable workload endpoint profile for first-deploy workflows and future deployments. |
 
 Allowed `kind` values are the platform `ResourceKind` values:
 
@@ -94,7 +97,7 @@ The command must:
 6. Derive the resource slug from `name`.
 7. Reject when an existing resource already owns the same slug in the same project/environment.
 8. Validate service declarations.
-9. Normalize optional source binding and runtime profile through value objects.
+9. Normalize optional source binding, runtime profile, and network profile through value objects.
 10. Create the `Resource` aggregate.
 11. Persist through the resource repository.
 12. Publish or record `resource-created`.
@@ -119,7 +122,27 @@ Names are unique by derived slug within `(projectId, environmentId)`.
 
 `source` is a `ResourceSourceBinding`. It must include source kind and locator, may include display name and metadata, and is the source used by `deployments.create` to resolve the deployment attempt source descriptor.
 
-`runtimeProfile` is a `ResourceRuntimeProfile`. It must use the domain term `RuntimePlanStrategy` and may include reusable install/build/start commands, runtime port, and health-check path.
+`runtimeProfile` is a `ResourceRuntimeProfile`. It must use the domain term `RuntimePlanStrategy` and may include reusable install/build/start commands and health-check defaults.
+
+`networkProfile` is a `ResourceNetworkProfile` governed by [ADR-015](../decisions/ADR-015-resource-network-profile.md). It owns the workload endpoint used by deployment planning and reverse-proxy upstream resolution.
+
+The minimum network profile fields are:
+
+| Field | Requirement | Meaning |
+| --- | --- | --- |
+| `internalPort` | Conditionally required | Port the workload listens on inside the runtime environment or container network. |
+| `upstreamProtocol` | Optional | Defaults to `http` for HTTP application resources. |
+| `exposureMode` | Optional | Defaults to `reverse-proxy` for HTTP application resources; may be `none` for workers/internal resources. |
+| `targetServiceName` | Conditionally required | Required for compose stacks when more than one service could receive inbound traffic. |
+| `hostPort` | Conditional | Valid only for explicit `direct-port` exposure. |
+
+For an HTTP application, API service, or any resource service that expects inbound traffic, `internalPort` must be available before the first `deployments.create` admission. It may be supplied during first-deploy `resources.create`, or inferred and persisted by a deterministic source/runtime planner before deployment admission.
+
+`internalPort` must not be modeled as a deployment command input. The UI/CLI may label the field as "port", but command schemas and domain state must map it to resource network profile language.
+
+Web, CLI, API, automation, and future MCP entrypoints must support `networkProfile.internalPort` for user-created inbound application resources.
+
+`hostPort` is not the same concept as `internalPort`. Reverse-proxy exposure must target the destination-local workload endpoint and must not require a stable host-published port.
 
 Durable access-route defaults, domain bindings, and certificate lifecycle are separate resource/domain lifecycle concerns governed by [ADR-012](../decisions/ADR-012-resource-runtime-profile-and-deployment-snapshot-boundary.md), [ADR-014](../decisions/ADR-014-deployment-admission-uses-resource-profile.md), and [ADR-002](../decisions/ADR-002-routing-domain-tls-boundary.md). They must not be hidden inside `deployments.create`.
 
@@ -142,6 +165,7 @@ All errors use [Resource Lifecycle Error Spec](../errors/resources.lifecycle.md)
 | `resource_context_mismatch` | `context-resolution` | No | Environment or destination does not belong to the supplied project/environment context. |
 | `resource_slug_conflict` | `resource-admission` | No | A resource with the same slug already exists in the project/environment. |
 | `invariant_violation` | `resource-admission` | No | Resource aggregate rule rejected the requested state, such as invalid multi-service declaration. |
+| `validation_error` | `resource-network-resolution` | No | Network profile input is missing or invalid for a resource that requires an inbound endpoint. |
 | `infra_error` | `resource-persistence` or `event-publication` | Conditional | Resource state or event could not be safely recorded. |
 
 ## Handler Boundary
@@ -155,6 +179,7 @@ It must not:
 - call runtime adapters;
 - create deployments;
 - configure source binding, domains, certificates, environment variables, or server state;
+- publish host ports or configure reverse-proxy routes;
 - update read models directly.
 
 ## Workflow Relationship
@@ -172,10 +197,10 @@ write affordance because the project is a resource collection boundary. New depl
 deployment history actions must be resource-scoped or explicitly modeled as Quick Deploy entry
 workflows that select or create a resource before dispatching deployment admission.
 
-A dedicated resource creation page may collect source/runtime drafts such as GitHub, Docker image,
+A dedicated resource creation page may collect source/runtime/network drafts such as GitHub, Docker image,
 Dockerfile, Docker Compose, or workspace command choices. Those drafts belong to resource
-source/runtime profile language and may be persisted by `resources.create` when the resource is
-created for a first-deploy workflow.
+source/runtime/network profile language and may be persisted by `resources.create` when the resource
+is created for a first-deploy workflow.
 
 ## Current Implementation Notes And Migration Gaps
 
@@ -183,15 +208,17 @@ Current code has a `Resource` aggregate that records `resource-created`, a resou
 
 Current deployment bootstrap can create resources internally through deployment context resolution.
 
-`resources.create` command/schema/handler/use case, operation catalog entry, API/oRPC route, CLI command, Web project-page create entrypoint, Web Quick Deploy new-resource call path, CLI interactive deploy new-resource call path, source/runtime profile persistence, and command-level use-case tests are implemented.
+`resources.create` command/schema/handler/use case, operation catalog entry, API/oRPC route, CLI command, Web Quick Deploy new-resource call path, CLI interactive deploy new-resource call path, source/runtime/network profile persistence, and command-level use-case tests are implemented.
 
 Focused transport/UI contract tests beyond typecheck are still pending.
 
-Dedicated source/runtime update operations and reusable access-profile operations do not exist yet and must be added as separate future behavior slices.
+Dedicated source/runtime/network update operations and reusable access-profile operations do not exist yet and must be added as separate future behavior slices.
 
 Dedicated resource create page and Project -> Resource sidebar navigation are governed by ADR-013
 and are not fully implemented yet.
 
+Current code stores and reads `networkProfile.internalPort` as the only resource listener-port field.
+
 ## Open Questions
 
-- Exact operation names for resource source binding and resource runtime profile configuration are governed by [ADR-012](../decisions/ADR-012-resource-runtime-profile-and-deployment-snapshot-boundary.md).
+- Exact operation names for resource source binding, runtime profile, network profile, and access profile configuration are governed by [ADR-012](../decisions/ADR-012-resource-runtime-profile-and-deployment-snapshot-boundary.md) and [ADR-015](../decisions/ADR-015-resource-network-profile.md).

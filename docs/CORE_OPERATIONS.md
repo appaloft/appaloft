@@ -161,7 +161,7 @@ Business meaning:
 - a Docker Compose stack is one resource that may contain multiple named services
 - deployments belong to one resource
 - resource detail is the owner-scoped surface for new deployment, redeploy, deployment history,
-  source/runtime configuration, and resource-scoped domain/TLS actions
+  source/runtime/network configuration, and resource-scoped domain/TLS actions
 - destinations and deployment targets / servers remain runtime placement, not the project
   organization layer
 
@@ -183,9 +183,11 @@ Current boundary:
   [ADR-011: Resource Create Minimum Lifecycle](./decisions/ADR-011-resource-create-minimum-lifecycle.md).
 - once `resources.create` is implemented, Quick Deploy should prefer
   `resources.create -> deployments.create(resourceId)` for new-resource flows
-- reusable source/runtime/health/access defaults are governed by
+- reusable source/runtime/network/health/access defaults are governed by
   [ADR-012: Resource Runtime Profile And Deployment Snapshot Boundary](./decisions/ADR-012-resource-runtime-profile-and-deployment-snapshot-boundary.md)
-  and must be added through future explicit operations rather than expanding `resources.create`
+  and [ADR-015: Resource Network Profile](./decisions/ADR-015-resource-network-profile.md)
+- application listener port belongs to resource network profile language as `internalPort`; UI/CLI
+  may display it as "port", but deployment admission must consume it from resource state
 - project/resource console ownership is governed by
   [ADR-013: Project Resource Navigation And Deployment Ownership](./decisions/ADR-013-project-resource-navigation-and-deployment-ownership.md)
 - sidebar navigation may show Project -> Resource hierarchy with latest deployment status derived
@@ -194,6 +196,7 @@ Current boundary:
 Core next operations expected here:
 - show resource details
 - update resource profile/source
+- configure resource network profile
 - declare compose-stack services from compose metadata
 - archive resource
 
@@ -221,10 +224,10 @@ Current boundary:
 - `deployments.create` accepts deployment context references only: `projectId`, `environmentId`,
   `resourceId`, `serverId`, and optional `destinationId`
 - deployment source and runtime strategy are resolved from the resource's persisted
-  `ResourceSourceBinding` and `ResourceRuntimeProfile`
+  `ResourceSourceBinding`, `ResourceRuntimeProfile`, and `ResourceNetworkProfile`
 - `deployments.create` must not accept `sourceLocator`, `source`, `deploymentMethod`,
-  install/build/start commands, port, health-check path, `resource` bootstrap input, proxy,
-  domains, path prefix, or TLS mode
+  install/build/start commands, port/internalPort, health-check path, `resource` bootstrap input,
+  proxy, domains, path prefix, or TLS mode
 - `destinationId` may still be omitted when the compatibility seam can resolve or create the
   server default destination before context validation; strict API and automation callers should
   prefer explicit destination selection
@@ -250,11 +253,12 @@ Current boundary:
   operation-catalog entry. Web QuickDeploy and CLI interactive `yundu deploy` must create/select
   context through existing commands and queries, then dispatch `deployments.create`. See
   [ADR-010: Quick Deploy Workflow Boundary](./decisions/ADR-010-quick-deploy-workflow-boundary.md).
-- source, runtime, health, route, domain, and TLS fields on `deployments.create` are superseded by
+- source, runtime, network, health, route, domain, and TLS fields on `deployments.create` are superseded by
   [ADR-014: Deployment Admission Uses Resource Profile](./decisions/ADR-014-deployment-admission-uses-resource-profile.md).
-  Deployment state keeps the resolved runtime plan snapshot, while durable reusable source/runtime
-  configuration belongs to the resource profile and durable domain/TLS lifecycle belongs to
-  routing/domain/certificate commands.
+  [ADR-015: Resource Network Profile](./decisions/ADR-015-resource-network-profile.md) governs
+  resource-owned network endpoint semantics. Deployment state keeps the resolved runtime and
+  network plan snapshot, while durable reusable source/runtime/network configuration belongs to the
+  resource profile and durable domain/TLS lifecycle belongs to routing/domain/certificate commands.
 
 Core next operations expected here:
 - explicit plan deployment without execution

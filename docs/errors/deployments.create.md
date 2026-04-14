@@ -18,6 +18,8 @@ This spec inherits:
 
 - [ADR-001: deployments.create HTTP API Required Fields](../decisions/ADR-001-deploy-api-required-fields.md)
 - [ADR-002: Routing, Domain, And TLS Boundary](../decisions/ADR-002-routing-domain-tls-boundary.md)
+- [ADR-014: Deployment Admission Uses Resource Profile](../decisions/ADR-014-deployment-admission-uses-resource-profile.md)
+- [ADR-015: Resource Network Profile](../decisions/ADR-015-resource-network-profile.md)
 - [Error Model](./model.md)
 - [neverthrow Conventions](./neverthrow-conventions.md)
 - [Async Lifecycle And Acceptance](../architecture/async-lifecycle-and-acceptance.md)
@@ -37,6 +39,7 @@ type DeploymentCreateErrorDetails = {
     | "context-resolution"
     | "redeploy-guard"
     | "resource-source-resolution"
+    | "resource-network-resolution"
     | "source-detection"
     | "runtime-plan-resolution"
     | "deployment-creation"
@@ -54,6 +57,10 @@ type DeploymentCreateErrorDetails = {
   destinationId?: string;
   resourceSourceKind?: string;
   runtimePlanStrategy?: string;
+  internalPort?: number;
+  exposureMode?: "none" | "reverse-proxy" | "direct-port";
+  upstreamProtocol?: "http" | "tcp";
+  targetServiceName?: string;
   relatedState?: string;
   causeCode?: string;
   correlationId?: string;
@@ -69,7 +76,7 @@ Admission errors reject the command and return `err(DomainError)`.
 
 | Error code | Phase | Retriable | Required deployment details |
 | --- | --- | --- | --- |
-| `validation_error` | `command-validation`, `config-bootstrap`, `context-resolution`, `resource-source-resolution`, `source-detection`, `runtime-plan-resolution` | No | Field/path when available, `commandName`, safe command context. |
+| `validation_error` | `command-validation`, `config-bootstrap`, `context-resolution`, `resource-source-resolution`, `resource-network-resolution`, `source-detection`, `runtime-plan-resolution` | No | Field/path when available, `commandName`, safe command context. |
 | `not_found` | `context-resolution` | No | Entity type, entity id, `commandName`, `phase`. |
 | `deployment_not_redeployable` | `redeploy-guard` | No | Existing deployment id, resource id, current deployment status. |
 | `conflict` | `admission-conflict` | No | Conflict subject and related state. |
@@ -124,6 +131,7 @@ Migration gaps:
 - backend failures can currently appear either as returned `err(DomainError)` or as failed deployment execution result depending on adapter behavior;
 - Web QuickDeploy still has hardcoded local validation text;
 - no durable process-manager/outbox failure handling was confirmed for this flow.
+- resource listener port is represented as `networkProfile.internalPort`; `runtimeProfile.port` is not part of the command or resource contract.
 
 ## Open Questions
 

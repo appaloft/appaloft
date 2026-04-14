@@ -14,6 +14,7 @@ Project/resource console tests must verify that the Web information architecture
 This test matrix inherits:
 
 - [ADR-013: Project Resource Navigation And Deployment Ownership](../decisions/ADR-013-project-resource-navigation-and-deployment-ownership.md)
+- [ADR-015: Resource Network Profile](../decisions/ADR-015-resource-network-profile.md)
 - [Project Resource Console Workflow Spec](../workflows/project-resource-console.md)
 - [Project Resource Console Implementation Plan](../implementation/project-resource-console-plan.md)
 - [resources.create Command Spec](../commands/resources.create.md)
@@ -28,7 +29,7 @@ This test matrix inherits:
 | --- | --- |
 | Web project page | Resource list is primary; create-resource is primary; project deployment rollup is secondary. |
 | Web resource page | Resource detail owns deployment actions and deployment history. |
-| Web create-resource page | Source/runtime drafts use resource language and do not bypass resource commands. |
+| Web create-resource page | Source/runtime/network drafts use resource language and do not bypass resource commands. |
 | Sidebar/navigation | Project nodes expand to resource nodes with latest deployment status projection. |
 | Query/read model | Resource summaries expose enough status for lists/navigation without mutating write state. |
 | API/oRPC | Entry actions still dispatch command/query contracts rather than UI-local business logic. |
@@ -78,7 +79,8 @@ Then:
 | Case | Draft input | Expected command sequence | Expected state |
 | --- | --- | --- | --- |
 | Minimum resource | Project, environment, name | `resources.create` | Resource profile persisted |
-| Source/runtime draft before resource profile ops | Project, environment, name, GitHub/Docker/Dockerfile/Compose/runtime draft | `resources.create`; optional continue to Quick Deploy with attempt overrides | Resource profile persisted; source/runtime draft not persisted as resource config unless future commands exist |
+| Source/runtime/network draft | Project, environment, name, GitHub/Docker/Dockerfile/Compose/runtime draft, internal listener port | `resources.create`; optional continue to Quick Deploy | Resource profile persisted with source/runtime/network profile when supplied; deployment uses `resourceId` |
+| Generic port field | User enters application port on create-resource page | `resources.create(networkProfile.internalPort)` | Port is stored as resource network profile input, not deployment input |
 | Continue into first deploy | Resource draft plus deploy intent | `resources.create -> deployments.create(resourceId)` | Resource exists; deployment accepted or rejected by deployment command |
 
 ## Sidebar Matrix
@@ -98,7 +100,9 @@ Resource detail and deployment pages already have some resource-aware behavior, 
 
 Sidebar Project -> Resource hierarchy with latest deployment status is not yet implemented.
 
+Current contracts expose listener port as `networkProfile.internalPort`, governed by [ADR-015](../decisions/ADR-015-resource-network-profile.md).
+
 ## Open Questions
 
 - Which read model should own latest deployment status for resource navigation?
-- Should dedicated create-resource flow immediately offer a "create and deploy" continuation before resource source/runtime profile commands exist?
+- Should dedicated create-resource flow immediately offer a "create and deploy" continuation before dedicated resource source/runtime/network update commands exist?
