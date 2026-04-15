@@ -8,7 +8,7 @@ Date: 2026-04-14
 
 Quick Deploy is an entry workflow, not a standalone domain command and not a separate operation-catalog business operation.
 
-Quick Deploy may guide a user through selecting or creating the context needed for the first deployment, including source, project, deployment target/server, credential, environment, resource, environment variable, and runtime access-route hints. Each write in that guided flow must still dispatch an explicit command owned by the relevant business operation.
+Quick Deploy may guide a user through selecting or creating the context needed for the first deployment, including source, project, deployment target/server, credential, environment, resource, resource network input, environment variable, and optional follow-up domain binding. Each write in that guided flow must still dispatch an explicit command owned by the relevant business operation.
 
 The final deployment write in Quick Deploy must be `deployments.create`. The `deployments.create` command remains the source-of-truth command for deployment admission and keeps the acceptance semantics defined by its command spec: success means the deployment request is accepted and a deployment id is available, not that runtime execution has completed.
 
@@ -29,7 +29,8 @@ The product needs a fast path from a new user's intent to a first accepted deplo
 - create or select an environment;
 - select, infer, or create a deployable resource;
 - optionally set first environment variables;
-- carry runtime access-route hints;
+- collect resource network input such as `internalPort`;
+- optionally offer a follow-up durable domain binding entrypoint;
 - dispatch the first deployment.
 
 Those steps cross multiple aggregate and operation boundaries. Modeling the whole flow as a single domain command would hide distinct business operations, make partial failure semantics unclear, and create a parallel path that Web, CLI, API, and automation could drift from.
@@ -85,7 +86,8 @@ Quick Deploy must not:
 - get its own operation-catalog entry unless it becomes a durable workflow/process operation governed by a new ADR;
 - hide domain rules inside Web components or CLI prompt helpers;
 - create domain bindings or certificates as hidden side effects of deployment;
-- treat routing hints as durable domain ownership;
+- collect generated-domain provider settings or pass routing hints into `deployments.create`;
+- treat generated default access routes as durable domain ownership;
 - change deployment admission or async lifecycle semantics.
 
 ## Consequences
@@ -107,6 +109,7 @@ Future durable onboarding can be added without reinterpreting the current Quick 
 - [Quick Deploy Workflow Spec](../workflows/quick-deploy.md)
 - [deployments.create Test Matrix](../testing/deployments.create-test-matrix.md)
 - [Quick Deploy Test Matrix](../testing/quick-deploy-test-matrix.md)
+- [ADR-017: Default Access Domain And Proxy Routing](./ADR-017-default-access-domain-and-proxy-routing.md)
 - [Core Operations](../CORE_OPERATIONS.md)
 - [Domain Model](../DOMAIN_MODEL.md)
 

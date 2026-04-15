@@ -4,6 +4,7 @@ export * from "./deployment-messages";
 export * from "./deployment-progress";
 export * from "./domain-binding-handlers";
 export * from "./domain-binding-messages";
+export * from "./edge-proxy-provider-registry";
 export * from "./environment-handlers";
 export * from "./environment-messages";
 export * from "./execution-context";

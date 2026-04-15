@@ -6,26 +6,28 @@ Date: 2026-04-14
 
 ## Decision
 
-`deployments.create` owns runtime access-route intent for the deployment attempt. It does not own long-lived domain binding, DNS ownership, certificate issuance, or certificate renewal as hidden side effects.
+Routing, domain ownership, generated default access, and TLS lifecycle are separate from deployment command input.
 
-The following fields remain valid deployment command hints for runtime plan creation and deployment snapshotting:
+`deployments.create` must not accept public routing/domain/TLS fields such as:
 
 - `proxyKind`;
 - `domains`;
 - `pathPrefix`;
-- `tlsMode`.
+- `tlsMode`;
+- generated access-domain provider settings;
+- certificate policy.
 
-These fields describe desired access routes for the deployment runtime plan. They do not create a persisted `DomainBinding`, `Certificate`, or routing aggregate by themselves.
+Deployment attempts may still carry an immutable resolved access-route snapshot. That snapshot is derived from resource, server, domain binding, certificate, and default access domain policy state during deployment planning/execution. It is not submitted by the caller as deployment command input.
 
-Separate routing/domain/certificate commands are required before the platform treats domain ownership, certificate lifecycle, or route mutation as durable business objects independent of a deployment attempt.
+Durable custom domains must use `domain-bindings.create`. Certificate issuance, renewal, and import must use certificate commands. Generated default access domains are governed by [ADR-017](./ADR-017-default-access-domain-and-proxy-routing.md) and must be provided through provider-neutral ports/adapters instead of deployment input.
 
-Future commands may include:
+Future routing commands may include:
 
-- `routing.bind-domain`;
-- `routing.update-route`;
-- `routing.remove-route`;
-- `certificates.issue`;
-- `certificates.renew`;
+- `resource-access.configure-default-route`;
+- `domain-bindings.update-route`;
+- `domain-bindings.remove`;
+- `certificates.issue-or-renew`;
+- `certificates.import`.
 
 Those commands must not be inferred from `deployments.create` without an explicit operation-catalog entry and spec.
 
@@ -33,32 +35,62 @@ Those commands must not be inferred from `deployments.create` without an explici
 
 - [deployments.create Command Spec](../commands/deployments.create.md)
 - [deployments.create Workflow Spec](../workflows/deployments.create.md)
+- [Default Access Domain And Proxy Routing Workflow Spec](../workflows/default-access-domain-and-proxy-routing.md)
+- [Routing Domain And TLS Workflow Spec](../workflows/routing-domain-and-tls.md)
 - [Core Operations](../CORE_OPERATIONS.md)
 - [Domain Model](../DOMAIN_MODEL.md)
 
 ## Implementation Requirements
 
-Runtime plan resolution may convert `proxyKind`, `domains`, `pathPrefix`, and `tlsMode` into access routes, runtime labels, network requirements, proxy container requirements, and deployment runtime metadata.
+Deployment route snapshots may contain generated or durable access routes, runtime labels/config intent, network requirements, proxy container requirements, and public verification metadata.
 
-Deployment persistence must snapshot the access-route intent needed to inspect, verify, reattach, or roll back the deployment attempt.
+Route snapshots must be resolved from:
 
-Runtime adapters may ensure shared proxy infrastructure, route labels, Docker networks, or equivalent provider-specific runtime configuration when a runtime plan requires proxy-backed access.
+- `ResourceNetworkProfile`;
+- ready or pending durable `DomainBinding` state when explicitly allowed;
+- configured default access domain policy;
+- selected deployment target/server public address and proxy readiness;
+- certificate/TLS state when TLS is required.
+
+Runtime adapters may ensure shared proxy infrastructure, route labels, Docker networks, Caddy/Traefik config, or equivalent provider-specific runtime configuration when a runtime plan requires proxy-backed access.
 
 Deployment creation must not:
 
-- mutate a future domain-binding aggregate;
-- issue or renew certificates as an implicit domain command;
+- accept domain/proxy/TLS fields in the command schema;
+- mutate a domain-binding aggregate as an implicit side effect;
+- issue or renew certificates as an implicit side effect;
 - change DNS ownership records as a hidden side effect;
+- know provider-specific generated-domain brands or suffixes in core/application code;
 - make route ownership decisions that outlive the deployment attempt.
 
-When a future product requirement needs persistent domains, certificates, route reuse across deployments, custom TLS renewal, or domain validation, that work must be modeled through explicit commands and specs.
+When a product requirement needs persistent custom domains, certificates, route reuse across deployments, custom TLS renewal, or domain validation, that work must be modeled through explicit commands and specs.
 
 ## Consequences
 
-Initial deployment flows can expose applications through direct host-port routes or proxy-backed access routes without blocking on a full domain/certificate bounded context.
+Initial deployment flows can expose applications through generated provider-backed routes when policy, proxy readiness, and resource network profile are available.
 
-The routing boundary remains clear: deployment attempts can carry runtime access intent, while durable domain and certificate lifecycle remain future explicit operations.
+The routing boundary remains clear:
+
+- deployment attempts carry resolved snapshots;
+- resources own source/runtime/network profile;
+- `DomainBinding` owns durable custom domain state;
+- certificate workflows own TLS state;
+- provider adapters own concrete generated-domain behavior.
 
 ## Superseded Open Questions
 
-- Should routing/domain/TLS hints remain part of deployment or move to a separate routing/domain binding command?
+- Should routing/domain/TLS hints remain part of deployment or move to separate routing/domain binding commands?
+- Should generated default access domains be represented as durable domain bindings?
+- Should provider-specific generated-domain services be part of core/application domain language?
+
+## Current Implementation Notes And Migration Gaps
+
+Current runtime adapters can still consume runtime-plan access routes and generate proxy labels/config.
+
+Current adapter-facing deployment config still contains route hint fields that must be replaced by resolved route snapshots from resource/domain/default-access state.
+
+Current `domain-bindings.create` implements the durable custom-domain admission segment, but DNS verification, certificate issuance, and domain readiness are still future workflow work.
+
+## Open Questions
+
+- None for the routing/domain/TLS boundary. Operator-facing configuration command names for default access policy remain future behavior governed by ADR-017.

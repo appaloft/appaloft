@@ -162,18 +162,47 @@ describe("DefaultRuntimePlanResolver", () => {
         kind: "internal-http",
         label: "Verify internal container health",
       },
-      {
-        kind: "public-http",
-        label: "Verify public access route",
-      },
     ]);
+    expect(plan.execution.accessRoutes).toEqual([]);
+    expect(plan.steps).toContain("Verify internal container health");
+    expect(plan.steps).not.toContain("Verify public access route");
+    expect(plan.steps).not.toContain("Configure edge proxy");
+  });
+
+  test("adds a direct-port access route only when the resource exposure mode is direct-port", async () => {
+    ensureReflectMetadata();
+    const { DefaultRuntimePlanResolver } = await import("../src");
+    const resolver = new DefaultRuntimePlanResolver();
+    const context = createTestExecutionContext();
+
+    const result = await resolver.resolve(context, {
+      id: "plan_direct_port",
+      source: {
+        kind: "docker-image",
+        locator: "docker://ghcr.io/example/app:latest",
+        displayName: "app",
+      },
+      server: {
+        id: "srv_direct",
+        providerKey: "generic-ssh",
+      },
+      environmentSnapshot: createEnvironmentSnapshot("snap_direct"),
+      detectedReasoning: ["configured docker image"],
+      requestedDeployment: {
+        method: "prebuilt-image",
+        port: 4314,
+        exposureMode: "direct-port",
+      },
+      generatedAt: "2026-01-01T00:00:00.000Z",
+    });
+
+    expect(result.isOk()).toBe(true);
+    const plan = result._unsafeUnwrap();
     const [route] = plan.execution.accessRoutes;
+
     expect(route?.domains).toEqual([]);
     expect(route?.proxyKind).toBe("none");
-    expect(route?.targetPort).toBe(4311);
-    expect(plan.steps).toContain("Verify internal container health");
-    expect(plan.steps).toContain("Verify public access route");
-    expect(plan.steps).not.toContain("Configure edge proxy");
+    expect(route?.targetPort).toBe(4314);
   });
 
   test("adds access routes when public domains are requested", async () => {

@@ -1,5 +1,6 @@
 import {
   createReadModelSpanName,
+  projectResourceAccessSummary,
   type RepositoryContext,
   type ResourceReadModel,
   type ResourceSummary,
@@ -13,6 +14,7 @@ import {
   resolveRepositoryExecutor,
   type SerializedResourceNetworkProfile,
   type SerializedResourceService,
+  type SerializedRuntimePlan,
 } from "./shared";
 
 type ResourceSummaryItem = Awaited<ReturnType<ResourceReadModel["list"]>>[number];
@@ -51,7 +53,7 @@ export class PgResourceReadModel implements ResourceReadModel {
           rows.length > 0
             ? await executor
                 .selectFrom("deployments")
-                .select(["id", "resource_id", "status", "created_at"])
+                .select(["id", "resource_id", "status", "runtime_plan", "created_at"])
                 .where(
                   "resource_id",
                   "in",
@@ -70,6 +72,38 @@ export class PgResourceReadModel implements ResourceReadModel {
             (deployment) => deployment.resource_id === row.id,
           );
           const lastDeployment = deployments[0];
+          const accessSummary = projectResourceAccessSummary(
+            deployments.map((deployment) => {
+              const runtimePlan = deployment.runtime_plan as unknown as SerializedRuntimePlan;
+              return {
+                id: deployment.id,
+                status: deployment.status as NonNullable<
+                  ResourceSummaryItem["lastDeploymentStatus"]
+                >,
+                createdAt: normalizeTimestamp(deployment.created_at) ?? deployment.created_at,
+                runtimePlan: {
+                  execution: {
+                    ...(runtimePlan.execution.accessRoutes
+                      ? {
+                          accessRoutes: runtimePlan.execution.accessRoutes.map((route) => ({
+                            proxyKind: route.proxyKind,
+                            domains: route.domains,
+                            pathPrefix: route.pathPrefix,
+                            tlsMode: route.tlsMode,
+                            ...(typeof route.targetPort === "number"
+                              ? { targetPort: route.targetPort }
+                              : {}),
+                          })),
+                        }
+                      : {}),
+                    ...(runtimePlan.execution.metadata
+                      ? { metadata: runtimePlan.execution.metadata }
+                      : {}),
+                  },
+                },
+              };
+            }),
+          );
 
           return {
             id: row.id,
@@ -106,6 +140,7 @@ export class PgResourceReadModel implements ResourceReadModel {
                   >,
                 }
               : {}),
+            ...(accessSummary ? { accessSummary } : {}),
             createdAt: normalizeTimestamp(row.created_at) ?? row.created_at,
           };
         });

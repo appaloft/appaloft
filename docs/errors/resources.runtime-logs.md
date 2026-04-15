@@ -11,7 +11,7 @@ must not rely on message text or runtime-native stderr as the contract.
 
 This spec inherits:
 
-- [ADR-017: Resource Runtime Log Observation](../decisions/ADR-017-resource-runtime-log-observation.md)
+- [ADR-018: Resource Runtime Log Observation](../decisions/ADR-018-resource-runtime-log-observation.md)
 - [resources.runtime-logs Query Spec](../queries/resources.runtime-logs.md)
 - [Resource Runtime Log Observation Workflow Spec](../workflows/resource-runtime-log-observation.md)
 - [Error Model](./model.md)

@@ -243,6 +243,46 @@ export const resourceNetworkProfileSchema = z
     }
   });
 
+export const resourceAccessRouteSummarySchema = z.object({
+  url: z.string(),
+  hostname: z.string(),
+  scheme: z.enum(["http", "https"]),
+  providerKey: z.string().optional(),
+  deploymentId: z.string(),
+  deploymentStatus: z.enum([
+    "created",
+    "planning",
+    "planned",
+    "running",
+    "succeeded",
+    "failed",
+    "canceled",
+    "rolled-back",
+  ]),
+  pathPrefix: z.string(),
+  proxyKind: z.enum(["none", "traefik", "caddy"]),
+  targetPort: z.number().int().positive().optional(),
+  updatedAt: z.string(),
+});
+
+export const plannedResourceAccessRouteSummarySchema = z.object({
+  url: z.string(),
+  hostname: z.string(),
+  scheme: z.enum(["http", "https"]),
+  providerKey: z.string().optional(),
+  pathPrefix: z.string(),
+  proxyKind: z.enum(["none", "traefik", "caddy"]),
+  targetPort: z.number().int().positive(),
+});
+
+export const resourceAccessSummarySchema = z.object({
+  plannedGeneratedAccessRoute: plannedResourceAccessRouteSummarySchema.optional(),
+  latestGeneratedAccessRoute: resourceAccessRouteSummarySchema.optional(),
+  latestDurableDomainRoute: resourceAccessRouteSummarySchema.optional(),
+  proxyRouteStatus: z.enum(["unknown", "ready", "not-ready", "failed"]).optional(),
+  lastRouteRealizationDeploymentId: z.string().optional(),
+});
+
 export const resourceSummarySchema = z.object({
   id: z.string(),
   projectId: z.string(),
@@ -278,6 +318,7 @@ export const resourceSummarySchema = z.object({
       "rolled-back",
     ])
     .optional(),
+  accessSummary: resourceAccessSummarySchema.optional(),
 });
 
 export const deploymentResourceInputSchema = z.object({
@@ -372,6 +413,57 @@ export const createResourceResponseSchema = z.object({
 
 export const listResourcesResponseSchema = z.object({
   items: z.array(resourceSummarySchema),
+});
+
+export const proxyConfigurationRouteViewSchema = z.object({
+  hostname: z.string(),
+  scheme: z.enum(["http", "https"]),
+  url: z.string(),
+  pathPrefix: z.string(),
+  tlsMode: z.enum(["auto", "disabled"]),
+  targetPort: z.number().int().positive().optional(),
+  source: z.enum(["generated-default", "domain-binding", "deployment-snapshot"]),
+});
+
+export const proxyConfigurationSectionSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  format: z.enum(["docker-labels", "file", "command", "yaml", "json", "text"]),
+  language: z.string().optional(),
+  readonly: z.literal(true),
+  redacted: z.boolean(),
+  content: z.string(),
+  source: z.enum(["provider-rendered", "snapshot", "diagnostic"]),
+});
+
+export const proxyConfigurationWarningSchema = z.object({
+  code: z.string(),
+  message: z.string(),
+  details: z
+    .record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()]))
+    .optional(),
+});
+
+export const proxyConfigurationDiagnosticsSchema = z.object({
+  providerKey: z.string(),
+  routeCount: z.number(),
+  networkName: z.string().optional(),
+  metadata: z.record(z.string(), z.string()).optional(),
+});
+
+export const proxyConfigurationViewSchema = z.object({
+  resourceId: z.string(),
+  deploymentId: z.string().optional(),
+  providerKey: z.string(),
+  routeScope: z.enum(["planned", "latest", "deployment-snapshot"]),
+  status: z.enum(["not-configured", "planned", "applied", "stale", "failed"]),
+  generatedAt: z.string(),
+  lastAppliedDeploymentId: z.string().optional(),
+  stale: z.boolean(),
+  routes: z.array(proxyConfigurationRouteViewSchema),
+  sections: z.array(proxyConfigurationSectionSchema),
+  warnings: z.array(proxyConfigurationWarningSchema),
+  diagnostics: proxyConfigurationDiagnosticsSchema.optional(),
 });
 
 export const createDomainBindingInputSchema = z.object({
@@ -748,6 +840,11 @@ export type ListSshCredentialsResponse = z.infer<typeof listSshCredentialsRespon
 export type ServerConnectivityCheck = z.infer<typeof serverConnectivityCheckSchema>;
 export type TestServerConnectivityResponse = z.infer<typeof testServerConnectivityResponseSchema>;
 export type EnvironmentSummary = z.infer<typeof environmentSummarySchema>;
+export type ResourceAccessRouteSummary = z.infer<typeof resourceAccessRouteSummarySchema>;
+export type PlannedResourceAccessRouteSummary = z.infer<
+  typeof plannedResourceAccessRouteSummarySchema
+>;
+export type ResourceAccessSummary = z.infer<typeof resourceAccessSummarySchema>;
 export type ResourceSummary = z.infer<typeof resourceSummarySchema>;
 export type CreateResourceInput = z.infer<typeof createResourceInputSchema>;
 export type CreateResourceResponse = z.infer<typeof createResourceResponseSchema>;
@@ -776,6 +873,7 @@ export type ResourceRuntimeLogsResponse = z.infer<typeof resourceRuntimeLogsResp
 export type ResourceRuntimeLogsStreamResponse = z.infer<
   typeof resourceRuntimeLogsStreamResponseSchema
 >;
+export type ProxyConfigurationView = z.infer<typeof proxyConfigurationViewSchema>;
 export type ListProvidersResponse = z.infer<typeof listProvidersResponseSchema>;
 export type ListPluginsResponse = z.infer<typeof listPluginsResponseSchema>;
 export type ListGitHubRepositoriesInput = z.infer<typeof listGitHubRepositoriesInputSchema>;

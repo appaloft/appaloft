@@ -67,7 +67,7 @@ create/select project
   -> create/configure credential when needed
   -> create/select resource with source/runtime/network profile
   -> deployments.create
-  -> observe deployment progress, status, and logs
+  -> observe deployment progress, status, logs, and generated access route when policy allows it
   -> observe resource runtime logs when an application instance is running
   -> optionally domain-bindings.create
   -> optionally certificates.issue-or-renew
@@ -90,6 +90,8 @@ flowchart TD
   Deployment["Deployment Attempt"]
   DomainBinding["DomainBinding"]
   Certificate["Certificate"]
+  AccessPolicy["Default Access Domain Policy"]
+  Proxy["Edge Proxy State"]
 
   Project --> Environment
   Project --> Resource
@@ -99,6 +101,9 @@ flowchart TD
   Credential --> Target
   Destination --> Deployment
   Target --> Deployment
+  Target --> Proxy
+  AccessPolicy --> Deployment
+  Proxy --> Deployment
   Resource --> DomainBinding
   Destination --> DomainBinding
   Target --> DomainBinding
@@ -144,15 +149,16 @@ flowchart TD
 
 | Behavior | Type | Operation | Owner | Main relationship | Governing docs |
 | --- | --- | --- | --- | --- | --- |
-| Create resource | Command | `resources.create` | Resource | Creates deployable unit with source/runtime/network profile when supplied. | [resources.create](./commands/resources.create.md), [ADR-011](./decisions/ADR-011-resource-create-minimum-lifecycle.md), [ADR-012](./decisions/ADR-012-resource-runtime-profile-and-deployment-snapshot-boundary.md), [ADR-015](./decisions/ADR-015-resource-network-profile.md) |
+| Create resource | Command | `resources.create` | Resource | Creates deployable unit with source/runtime/network profile when supplied. | [resources.create](./commands/resources.create.md), [ADR-011](./decisions/ADR-011-resource-create-minimum-lifecycle.md), [ADR-012](./decisions/ADR-012-resource-runtime-profile-and-deployment-snapshot-boundary.md), [ADR-015](./decisions/ADR-015-resource-network-profile.md), [ADR-017](./decisions/ADR-017-default-access-domain-and-proxy-routing.md) |
 | List resources | Query | `resources.list` | Resource read model | Lets workflows select deployable units and lets project pages show resources. | [Project Resource Console](./workflows/project-resource-console.md), [ADR-013](./decisions/ADR-013-project-resource-navigation-and-deployment-ownership.md) |
-| Read resource runtime logs | Active query | `resources.runtime-logs` | Resource runtime observation | Tails or streams application stdout/stderr for a resource-owned runtime instance through an injected runtime log reader port. | [resources.runtime-logs](./queries/resources.runtime-logs.md), [Resource Runtime Log Observation](./workflows/resource-runtime-log-observation.md), [ADR-017](./decisions/ADR-017-resource-runtime-log-observation.md) |
+| Read resource runtime logs | Active query | `resources.runtime-logs` | Resource runtime observation | Tails or streams application stdout/stderr for a resource-owned runtime instance through an injected runtime log reader port. | [resources.runtime-logs](./queries/resources.runtime-logs.md), [Resource Runtime Log Observation](./workflows/resource-runtime-log-observation.md), [ADR-018](./decisions/ADR-018-resource-runtime-log-observation.md) |
+| Preview resource proxy configuration | Active query | `resources.proxy-configuration.preview` | Resource access/runtime topology read model | Shows read-only provider-rendered proxy configuration for planned, latest, or deployment-snapshot resource routes. | [resources.proxy-configuration.preview](./queries/resources.proxy-configuration.preview.md), [ADR-019](./decisions/ADR-019-edge-proxy-provider-and-observable-configuration.md), [Edge Proxy Provider And Route Realization](./workflows/edge-proxy-provider-and-route-realization.md) |
 
 ### Deployment
 
 | Behavior | Type | Operation | Owner | Main relationship | Governing docs |
 | --- | --- | --- | --- | --- | --- |
-| Create deployment | Command | `deployments.create` | Deployment attempt | Accepts an attempt for an existing project/environment/resource/server/destination context. | [deployments.create](./commands/deployments.create.md), [ADR-001](./decisions/ADR-001-deploy-api-required-fields.md), [ADR-014](./decisions/ADR-014-deployment-admission-uses-resource-profile.md), [ADR-016](./decisions/ADR-016-deployment-command-surface-reset.md) |
+| Create deployment | Command | `deployments.create` | Deployment attempt | Accepts an attempt for an existing project/environment/resource/server/destination context. | [deployments.create](./commands/deployments.create.md), [ADR-001](./decisions/ADR-001-deploy-api-required-fields.md), [ADR-014](./decisions/ADR-014-deployment-admission-uses-resource-profile.md), [ADR-016](./decisions/ADR-016-deployment-command-surface-reset.md), [ADR-017](./decisions/ADR-017-default-access-domain-and-proxy-routing.md) |
 | List deployments | Query | `deployments.list` | Deployment read model | Observes deployment attempts across project/resource filters. | [Core Operations](./CORE_OPERATIONS.md) |
 | Read deployment logs | Query | `deployments.logs` | Deployment read model/log projection | Observes logs for one deployment attempt. | [Core Operations](./CORE_OPERATIONS.md) |
 | Deployment progress stream | Transport observation | tied to `deployments.create` | Deployment progress projection | Shows progress for accepted deployment creation. Not a separate business command. | [Quick Deploy Workflow](./workflows/quick-deploy.md), [ADR-016](./decisions/ADR-016-deployment-command-surface-reset.md) |
@@ -165,6 +171,9 @@ flowchart TD
 | List domain bindings | Query | `domain-bindings.list` | DomainBinding read model | Observes accepted domain binding records and verification state. | [Routing Domain TLS Workflow](./workflows/routing-domain-and-tls.md) |
 | Issue or renew certificate | Accepted candidate command | `certificates.issue-or-renew` | Certificate lifecycle | Requests provider-managed certificate issuance/renewal after domain ownership context exists. | [certificates.issue-or-renew](./commands/certificates.issue-or-renew.md), [ADR-007](./decisions/ADR-007-certificate-provider-and-challenge-default.md), [ADR-008](./decisions/ADR-008-renewal-trigger-model.md) |
 | Import certificate | Accepted candidate command | `certificates.import` | Certificate lifecycle | Imports operator-supplied certificate/key material through a separate security boundary. | [ADR-009](./decisions/ADR-009-certificates-import-command.md), [certificates.import plan](./implementation/certificates.import-plan.md) |
+| Configure default access domain policy | Accepted candidate command | `default-access-domain-policies.configure` | Default access policy | Configures provider-neutral generated access domain policy before Web/CLI/API expose policy editing. | [default-access-domain-policies.configure](./commands/default-access-domain-policies.configure.md), [ADR-017](./decisions/ADR-017-default-access-domain-and-proxy-routing.md), [Default Access Domain And Proxy Routing](./workflows/default-access-domain-and-proxy-routing.md) |
+| Resolve generated access route | Internal capability | no public operation | Resource access/runtime topology | Resolves provider-neutral generated access hostnames from resource, server, proxy readiness, and policy state. | [ADR-017](./decisions/ADR-017-default-access-domain-and-proxy-routing.md), [Default Access Domain And Proxy Routing](./workflows/default-access-domain-and-proxy-routing.md) |
+| Realize edge proxy route | Internal capability | no public operation | Edge proxy provider/runtime topology | Converts route snapshots into provider-produced proxy ensure/route plans and executes them idempotently. | [ADR-019](./decisions/ADR-019-edge-proxy-provider-and-observable-configuration.md), [Edge Proxy Provider And Route Realization](./workflows/edge-proxy-provider-and-route-realization.md) |
 
 ### System
 
@@ -186,9 +195,11 @@ Workflows coordinate commands and queries. They do not own aggregate invariants.
 | Quick Deploy | Entry workflow | Select/create project, server, credential, environment, resource, optional variable, then deploy. | `deployments.create` | [Quick Deploy](./workflows/quick-deploy.md), [ADR-010](./decisions/ADR-010-quick-deploy-workflow-boundary.md) |
 | Resource create and first deploy | Entry workflow | `resources.create -> deployments.create` after context selection. | `deployments.create` | [Resource Create And First Deploy](./workflows/resources.create-and-first-deploy.md) |
 | Server bootstrap and proxy | Async/process workflow | `servers.register -> server-connected -> proxy-bootstrap-requested -> proxy-installed/proxy-install-failed -> server-ready` | server readiness state | [Server Bootstrap And Proxy](./workflows/server-bootstrap-and-proxy.md), [ADR-003](./decisions/ADR-003-server-connect-public-vs-internal.md), [ADR-004](./decisions/ADR-004-server-readiness-state-storage.md) |
+| Default access domain and proxy routing | Internal workflow | `resource network profile + server proxy readiness + default access provider -> generated route snapshot -> edge proxy provider route realization` | generated access route snapshot/read-model state | [Default Access Domain And Proxy Routing](./workflows/default-access-domain-and-proxy-routing.md), [ADR-017](./decisions/ADR-017-default-access-domain-and-proxy-routing.md), [ADR-019](./decisions/ADR-019-edge-proxy-provider-and-observable-configuration.md) |
+| Edge proxy provider and route realization | Internal workflow | `proxy intent + route snapshot -> EdgeProxyProvider -> ensure/render/apply/config-view` | proxy route realization and observable config | [Edge Proxy Provider And Route Realization](./workflows/edge-proxy-provider-and-route-realization.md), [ADR-019](./decisions/ADR-019-edge-proxy-provider-and-observable-configuration.md) |
 | Routing/domain/TLS | Async/process workflow | `domain-bindings.create -> domain-binding-requested -> domain-bound -> certificate-requested -> certificate-issued/certificate-issuance-failed -> domain-ready` | domain readiness state | [Routing Domain And TLS](./workflows/routing-domain-and-tls.md), ADR-002 through ADR-009 |
 | Project/resource console | UI workflow | Project list/detail surfaces query projects/resources/deployments and route owner-scoped actions to resources. | varies by selected action | [Project Resource Console](./workflows/project-resource-console.md), [ADR-013](./decisions/ADR-013-project-resource-navigation-and-deployment-ownership.md) |
-| Resource runtime log observation | UI/read workflow | Resource detail resolves a resource runtime log query and renders bounded or streaming line events. | `resources.runtime-logs` | [Resource Runtime Log Observation](./workflows/resource-runtime-log-observation.md), [ADR-017](./decisions/ADR-017-resource-runtime-log-observation.md) |
+| Resource runtime log observation | UI/read workflow | Resource detail resolves a resource runtime log query and renders bounded or streaming line events. | `resources.runtime-logs` | [Resource Runtime Log Observation](./workflows/resource-runtime-log-observation.md), [ADR-018](./decisions/ADR-018-resource-runtime-log-observation.md) |
 
 ## Event And Async Progression Map
 

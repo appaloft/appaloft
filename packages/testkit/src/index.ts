@@ -17,6 +17,7 @@ import {
   type IdGenerator,
   type ProjectReadModel,
   type ProjectRepository,
+  projectResourceAccessSummary,
   type RepositoryContext,
   type ResourceReadModel,
   type ResourceRepository,
@@ -374,8 +375,36 @@ export class MemoryResourceReadModel implements ResourceReadModel {
       .map((resource): ResourceSummary => {
         const deployments = [...(this.deployments?.items.values() ?? [])]
           .map((deployment) => deployment.toState())
-          .filter((deployment) => deployment.resourceId.equals(resource.id));
+          .filter((deployment) => deployment.resourceId.equals(resource.id))
+          .sort((left, right) => right.createdAt.value.localeCompare(left.createdAt.value));
         const lastDeployment = deployments[0];
+        const accessSummary = projectResourceAccessSummary(
+          deployments.map((deployment) => ({
+            id: deployment.id.value,
+            status: deployment.status.value,
+            createdAt: deployment.createdAt.value,
+            runtimePlan: {
+              execution: {
+                ...(deployment.runtimePlan.execution.accessRoutes.length > 0
+                  ? {
+                      accessRoutes: deployment.runtimePlan.execution.accessRoutes.map((route) => ({
+                        proxyKind: route.proxyKind,
+                        domains: route.domains,
+                        pathPrefix: route.pathPrefix,
+                        tlsMode: route.tlsMode,
+                        ...(typeof route.targetPort === "number"
+                          ? { targetPort: route.targetPort }
+                          : {}),
+                      })),
+                    }
+                  : {}),
+                ...(deployment.runtimePlan.execution.metadata
+                  ? { metadata: deployment.runtimePlan.execution.metadata }
+                  : {}),
+              },
+            },
+          })),
+        );
 
         return {
           id: resource.id.value,
@@ -390,6 +419,21 @@ export class MemoryResourceReadModel implements ResourceReadModel {
             name: service.name.value,
             kind: service.kind.value,
           })),
+          ...(resource.networkProfile
+            ? {
+                networkProfile: {
+                  internalPort: resource.networkProfile.internalPort.value,
+                  upstreamProtocol: resource.networkProfile.upstreamProtocol.value,
+                  exposureMode: resource.networkProfile.exposureMode.value,
+                  ...(resource.networkProfile.targetServiceName
+                    ? { targetServiceName: resource.networkProfile.targetServiceName.value }
+                    : {}),
+                  ...(resource.networkProfile.hostPort
+                    ? { hostPort: resource.networkProfile.hostPort.value }
+                    : {}),
+                },
+              }
+            : {}),
           deploymentCount: deployments.length,
           ...(lastDeployment
             ? {
@@ -397,6 +441,7 @@ export class MemoryResourceReadModel implements ResourceReadModel {
                 lastDeploymentStatus: lastDeployment.status.value,
               }
             : {}),
+          ...(accessSummary ? { accessSummary } : {}),
           createdAt: resource.createdAt.value,
         };
       });

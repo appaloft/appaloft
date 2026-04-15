@@ -18,6 +18,7 @@ This workflow inherits:
 - [ADR-013: Project Resource Navigation And Deployment Ownership](../decisions/ADR-013-project-resource-navigation-and-deployment-ownership.md)
 - [ADR-014: Deployment Admission Uses Resource Profile](../decisions/ADR-014-deployment-admission-uses-resource-profile.md)
 - [ADR-015: Resource Network Profile](../decisions/ADR-015-resource-network-profile.md)
+- [ADR-017: Default Access Domain And Proxy Routing](../decisions/ADR-017-default-access-domain-and-proxy-routing.md)
 - [Error Model](../errors/model.md)
 - [neverthrow Conventions](../errors/neverthrow-conventions.md)
 - [Async Lifecycle And Acceptance](../architecture/async-lifecycle-and-acceptance.md)
@@ -44,6 +45,8 @@ It may collect or create enough context for a first deployment:
 When Quick Deploy collects source/runtime/health values, those values are entry-flow draft fields for `resources.create` or a future resource profile update command. They must not be submitted to `deployments.create`.
 
 When Quick Deploy collects domain/TLS intent, it must sequence an explicit `domain-bindings.create` or certificate command after the required resource, server, and destination context exists. It must not submit domain/TLS intent to `deployments.create`.
+
+When generated default access is enabled by platform policy, Quick Deploy may display the generated URL after the resource access summary projection is available. It must not collect concrete generated-domain provider fields from the user and must not send generated domain/proxy/TLS fields to `deployments.create`.
 
 When Quick Deploy is launched from a project page, the workflow must still select or create a
 resource before deployment admission. Project context may prefill `projectId`, but it must not make
@@ -161,6 +164,7 @@ user intent
 | First variable | Web/CLI workflow | `environments.set-variable` | Persist environment-scoped variable before deployment snapshot if the user supplies it. |
 | Domain/TLS context | Web/CLI workflow | `domain-bindings.create`; certificate commands when in scope | Bind domains through explicit routing/domain/TLS commands, not through deployment admission. |
 | Deployment admission | Application command | `deployments.create` | Dispatch ids-only deployment admission and accept or reject the deployment request according to the command spec. |
+| Generated access observation | Web/CLI workflow | `ResourceAccessSummary` after route snapshot resolution | Display generated access URL and proxy route status when policy/provider resolved one. |
 | Progress observation | Web/CLI workflow | deployment progress stream during the final deployment command; deployment read/progress queries after acceptance | Observe durable state or technical progress without treating progress events as Quick Deploy workflow steps. |
 
 ## Entry Differences
@@ -257,6 +261,8 @@ Current Web and CLI Quick Deploy auto-generate new-resource names with a short r
 The shared workflow module is available for Web and future CLI/backend reuse. CLI migration remains a follow-up implementation task.
 
 Quick Deploy domain/TLS input has been removed from the deployment flow. Resource-scoped domain binding remains available through the domain binding surfaces and should become the owner-scoped follow-up action after deployment.
+
+Generated default access URL display is not yet aligned with ADR-017 as a provider-neutral route snapshot/read-model surface.
 
 Current Web and CLI entry fields may still use user-facing "method" wording. Entry workflows must map that wording to `ResourceRuntimeProfile.strategy` before dispatching `resources.create`; `deployments.create` must not receive `deploymentMethod`.
 

@@ -17,6 +17,7 @@ The target domain vocabulary is:
 - `ResourceSourceBinding`: durable reusable source configuration owned by the resource lifecycle.
 - `ResourceRuntimeProfile`: durable reusable build, start, and health defaults owned by the resource lifecycle.
 - `ResourceNetworkProfile`: durable reusable workload endpoint configuration, including the internal application listener port, governed by [ADR-015](./ADR-015-resource-network-profile.md).
+- `DefaultAccessDomainPolicy`: provider-neutral policy for generated default public access, governed by [ADR-017](./ADR-017-default-access-domain-and-proxy-routing.md).
 - `RuntimePlanStrategy`: the planning strategy used to resolve a runtime plan from a source and runtime profile.
 - `RuntimePlanSnapshot`: the immutable resolved runtime plan persisted by the deployment attempt.
 
@@ -100,7 +101,8 @@ Reusable domain/routing/TLS lifecycle remains governed by ADR-002 and the routin
 - durable domains belong to `domain-bindings.create`;
 - certificate lifecycle belongs to certificate commands;
 - proxy bootstrap belongs to server/proxy lifecycle commands and events;
-- deployment runtime access-route hints may remain one-shot attempt overrides until a resource access-profile operation is accepted.
+- generated default access is resolved through provider-neutral policy/adapters governed by ADR-017;
+- deployment route snapshots are resolved from resource, domain binding, server/proxy, and default access policy state.
 
 `deployments.create` must not keep source, runtime, health, route, domain, or TLS configuration fields as public command input. Its deployment-specific input is the deployment context id set governed by [ADR-014](./ADR-014-deployment-admission-uses-resource-profile.md).
 
@@ -132,6 +134,7 @@ Future implementation must not add more reusable configuration fields to `deploy
 - [resources.create Implementation Plan](../implementation/resources.create-plan.md)
 - [ADR-014: Deployment Admission Uses Resource Profile](./ADR-014-deployment-admission-uses-resource-profile.md)
 - [ADR-015: Resource Network Profile](./ADR-015-resource-network-profile.md)
+- [ADR-017: Default Access Domain And Proxy Routing](./ADR-017-default-access-domain-and-proxy-routing.md)
 - [Core Operations](../CORE_OPERATIONS.md)
 - [Domain Model](../DOMAIN_MODEL.md)
 
@@ -144,7 +147,7 @@ Future implementation must not add more reusable configuration fields to `deploy
 
 ## Current Implementation Notes And Migration Gaps
 
-Current `CreateDeploymentCommand` still accepts the transitional runtime/source/route fields until the ADR-014 implementation completes.
+Current `CreateDeploymentCommand` has moved to the ids-only command shape governed by ADR-014.
 
 Current `DeploymentContextBootstrapService` can create or reuse resources during deployment admission.
 
@@ -152,7 +155,9 @@ Public redeploy behavior is removed from the v1 deployment command surface by [A
 
 Resource-side source binding, runtime profile, and network profile persistence are being introduced through the first-deploy `resources.create` path. Dedicated update/configuration commands remain future work.
 
-Current code still stores `port` inside `ResourceRuntimeProfile`; [ADR-015](./ADR-015-resource-network-profile.md) governs the migration to `ResourceNetworkProfile.internalPort`.
+Current code stores the resource listener port as `ResourceNetworkProfile.internalPort`.
+
+Generated default access policy/provider resolution remains future implementation work governed by ADR-017.
 
 ## Open Questions
 

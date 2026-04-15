@@ -17,7 +17,7 @@ This test matrix inherits:
 - [ADR-013: Project Resource Navigation And Deployment Ownership](../decisions/ADR-013-project-resource-navigation-and-deployment-ownership.md)
 - [ADR-016: Deployment Command Surface Reset](../decisions/ADR-016-deployment-command-surface-reset.md)
 - [ADR-015: Resource Network Profile](../decisions/ADR-015-resource-network-profile.md)
-- [ADR-017: Resource Runtime Log Observation](../decisions/ADR-017-resource-runtime-log-observation.md)
+- [ADR-018: Resource Runtime Log Observation](../decisions/ADR-018-resource-runtime-log-observation.md)
 - [Project Resource Console Workflow Spec](../workflows/project-resource-console.md)
 - [Project Resource Console Implementation Plan](../implementation/project-resource-console-plan.md)
 - [resources.create Command Spec](../commands/resources.create.md)

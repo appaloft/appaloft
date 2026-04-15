@@ -1,4 +1,5 @@
 export * from "./operations/deployments/create-deployment.use-case";
+export * from "./operations/deployments/default-access-domain-runtime-plan.resolver";
 export * from "./operations/deployments/deployment.factory";
 export * from "./operations/deployments/deployment-config-bootstrap.service";
 export * from "./operations/deployments/deployment-context.resolver";
@@ -21,6 +22,8 @@ export * from "./operations/projects/create-project.use-case";
 export * from "./operations/projects/list-projects.query-service";
 export * from "./operations/resources/create-resource.use-case";
 export * from "./operations/resources/list-resources.query-service";
+export * from "./operations/resources/resource-access-summary.projector";
+export * from "./operations/resources/resource-proxy-configuration-preview.query-service";
 export * from "./operations/resources/resource-runtime-logs.query-service";
 export * from "./operations/servers/configure-server-credential.use-case";
 export * from "./operations/servers/create-ssh-credential.use-case";

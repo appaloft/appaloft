@@ -117,7 +117,7 @@ Workers, background jobs, databases, caches, and external resources may use `exp
 
 For `compose-stack`, `targetServiceName` is required when the stack has more than one service that could receive inbound traffic. A future compose-service profile may replace this field, but the first v1 rule must not leave the proxy upstream ambiguous.
 
-Domain binding and certificate lifecycle remain separate commands governed by ADR-002. `ResourceNetworkProfile` does not own public domain names, path prefixes, certificate policy, or TLS issuance state. It only defines the resource endpoint that those later commands can route to.
+Generated default access, domain binding, and certificate lifecycle remain separate concerns governed by ADR-017 and ADR-002. `ResourceNetworkProfile` does not own public domain names, generated-domain provider settings, path prefixes, certificate policy, or TLS issuance state. It only defines the resource endpoint that those later workflows can route to.
 
 Health policy remains a distinct resource/runtime concern. When a health check targets the default HTTP endpoint, it must use `ResourceNetworkProfile.internalPort` as the default network target unless the future health-policy command overrides it explicitly.
 
@@ -154,6 +154,7 @@ The v1 user-facing path must expose `internalPort`. It may keep `direct-port` an
 - [resources.create Implementation Plan](../implementation/resources.create-plan.md)
 - [ADR-012: Resource Runtime Profile And Deployment Snapshot Boundary](./ADR-012-resource-runtime-profile-and-deployment-snapshot-boundary.md)
 - [ADR-014: Deployment Admission Uses Resource Profile](./ADR-014-deployment-admission-uses-resource-profile.md)
+- [ADR-017: Default Access Domain And Proxy Routing](./ADR-017-default-access-domain-and-proxy-routing.md)
 - [Domain Model](../DOMAIN_MODEL.md)
 
 ## Superseded Open Questions

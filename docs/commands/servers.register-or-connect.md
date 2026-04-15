@@ -16,6 +16,7 @@ This command family inherits:
 
 - [ADR-003: Server Connect Public Versus Internal](../decisions/ADR-003-server-connect-public-vs-internal.md)
 - [ADR-004: Server Readiness State Storage](../decisions/ADR-004-server-readiness-state-storage.md)
+- [ADR-019: Edge Proxy Provider And Observable Configuration](../decisions/ADR-019-edge-proxy-provider-and-observable-configuration.md)
 - [Error Model](../errors/model.md)
 - [neverthrow Conventions](../errors/neverthrow-conventions.md)
 - [Async Lifecycle And Acceptance](../architecture/async-lifecycle-and-acceptance.md)
@@ -43,7 +44,8 @@ If only one public command exists in a transitional implementation, the source-o
 | `host` | Required | Host or address used by runtime providers. |
 | `providerKey` | Required | Provider/runtime adapter key such as local shell or generic SSH. |
 | `port` | Optional | Provider connection port. Defaults to provider policy, typically SSH port `22`. |
-| `proxyKind` | Optional | `none`, `traefik`, or `caddy`. Defaults to `traefik` unless entry workflow explicitly disables proxy. |
+| `edgeProxyMode` | Optional | `disabled` or `provider`. Defaults to configured platform policy. |
+| `edgeProxyProviderKey` | Conditional | Required when `edgeProxyMode = provider` and no server/default provider can be resolved. Opaque provider registry key. |
 | credential input | Optional workflow input | Credential creation/configuration belongs to credential commands unless the register schema is explicitly expanded. |
 
 ### `servers.connect`
@@ -59,7 +61,7 @@ If only one public command exists in a transitional implementation, the source-o
 | Field | Requirement | Meaning |
 | --- | --- | --- |
 | `serverId` | Required | Connected server id. |
-| `proxyKind` | Required | `traefik` or `caddy`; `none` must not create a bootstrap attempt. |
+| `edgeProxyProviderKey` | Required | Opaque edge proxy provider registry key; disabled/no-proxy targets must not create a bootstrap attempt. |
 | `attemptId` | Required | Idempotency key for the proxy bootstrap attempt. |
 | `causationId` | Required when event-driven | Event id or command id that requested bootstrap. |
 
@@ -70,7 +72,7 @@ If only one public command exists in a transitional implementation, the source-o
 - required input shape;
 - provider key format and support at the application boundary;
 - port validity;
-- proxy kind validity;
+- edge proxy mode/provider support;
 - duplicate server registration policy.
 
 `servers.connect` must synchronously validate:
@@ -84,8 +86,8 @@ If only one public command exists in a transitional implementation, the source-o
 
 - server existence;
 - server is connected;
-- proxy kind is not `none`;
-- requested proxy kind matches the server proxy intent;
+- edge proxy provider is required and registered;
+- requested provider key matches the server proxy intent;
 - duplicate attempt handling.
 
 Admission failures return `err(DomainError)`.
@@ -99,12 +101,12 @@ servers.register
   -> server registered
   -> servers.connect, process-manager initiated or explicitly requested
   -> server-connected
-  -> proxy-bootstrap-requested, when proxyKind is traefik or caddy
+  -> proxy-bootstrap-requested, when edge proxy provider is required
   -> proxy-installed | proxy-install-failed
   -> server-ready, when connectivity and required proxy state are satisfied
 ```
 
-For `proxyKind = none`:
+For `edgeProxyMode = disabled`:
 
 ```text
 servers.register
@@ -149,8 +151,8 @@ A server is ready when:
 - server metadata is registered;
 - provider connectivity requirements are satisfied;
 - required credentials are usable for the provider;
-- if `proxyKind = none`, proxy status is `disabled` and no proxy bootstrap is required;
-- if `proxyKind = traefik | caddy`, edge proxy status is `ready`;
+- if edge proxy is disabled, proxy status is `disabled` and no proxy bootstrap is required;
+- if edge proxy is provider-backed, edge proxy status is `ready`;
 - readiness is durably visible through the server read model.
 
 Proxy bootstrap failure must not delete server metadata. It prevents readiness for proxy-backed deployments until a successful retry or explicit proxy disable/update.
@@ -161,7 +163,7 @@ Server/proxy-specific dedupe keys:
 
 - registration: provider key + host + port, or a caller-supplied idempotency key when added;
 - connect attempt: `serverId + attemptId`;
-- proxy bootstrap attempt: `serverId + proxyKind + attemptId`;
+- proxy bootstrap attempt: `serverId + edgeProxyProviderKey + attemptId`;
 - events: exact event id when available, otherwise semantic keys from the event specs.
 
 Duplicate registration returns the existing server id or a stable `conflict` according to product policy.
@@ -191,6 +193,8 @@ Current code has `servers.register`, `servers.configure-credential`, `servers.te
 Current `servers.register` persists a `DeploymentTarget` and emits `deployment_target.registered`. When `proxyKind` is omitted, it defaults to `traefik`.
 
 Current proxy bootstrap is driven by `BootstrapServerEdgeProxyOnTargetRegisteredHandler`, which consumes `deployment_target.registered`. It marks edge proxy status `starting`, calls the runtime bootstrapper, then marks proxy `ready` or `failed`.
+
+Current code still exposes `proxyKind` values as the provider-selection field. ADR-019 makes that a migration seam; the target contract uses provider mode and opaque provider keys.
 
 Current connectivity testing returns a diagnostic `ServerConnectivityResult`; it does not promote a durable connected/server-ready lifecycle state.
 

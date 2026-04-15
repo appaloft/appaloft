@@ -1,4 +1,4 @@
-# ADR-017: Resource Runtime Log Observation
+# ADR-018: Resource Runtime Log Observation
 
 Status: Accepted
 

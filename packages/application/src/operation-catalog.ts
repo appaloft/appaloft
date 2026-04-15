@@ -15,6 +15,7 @@ import { createProjectCommandInputSchema } from "./operations/projects/create-pr
 import { listProjectsQueryInputSchema } from "./operations/projects/list-projects.query";
 import { createResourceCommandInputSchema } from "./operations/resources/create-resource.command";
 import { listResourcesQueryInputSchema } from "./operations/resources/list-resources.query";
+import { resourceProxyConfigurationPreviewQueryInputSchema } from "./operations/resources/resource-proxy-configuration-preview.query";
 import { resourceRuntimeLogsQueryInputSchema } from "./operations/resources/resource-runtime-logs.query";
 import { configureServerCredentialCommandInputSchema } from "./operations/servers/configure-server-credential.command";
 import { createSshCredentialCommandInputSchema } from "./operations/servers/create-ssh-credential.command";
@@ -227,6 +228,20 @@ export const operationCatalog = [
       cli: "yundu resource logs <resourceId>",
       orpc: { method: "GET", path: "/api/resources/{resourceId}/runtime-logs" },
       orpcStream: { method: "GET", path: "/api/resources/{resourceId}/runtime-logs/stream" },
+    },
+  },
+  {
+    key: "resources.proxy-configuration.preview",
+    kind: "query",
+    domain: "resources",
+    messageName: "ResourceProxyConfigurationPreviewQuery",
+    handlerName: "ResourceProxyConfigurationPreviewQueryHandler",
+    serviceName: "ResourceProxyConfigurationPreviewQueryService",
+    inputSchema: resourceProxyConfigurationPreviewQueryInputSchema,
+    serviceToken: tokens.resourceProxyConfigurationPreviewQueryService,
+    transports: {
+      cli: "yundu resource proxy-config <resourceId>",
+      orpc: { method: "GET", path: "/api/resources/{resourceId}/proxy-configuration" },
     },
   },
   {

@@ -19,6 +19,8 @@ This workflow inherits:
 
 - [ADR-003: Server Connect Public Versus Internal](../decisions/ADR-003-server-connect-public-vs-internal.md)
 - [ADR-004: Server Readiness State Storage](../decisions/ADR-004-server-readiness-state-storage.md)
+- [ADR-017: Default Access Domain And Proxy Routing](../decisions/ADR-017-default-access-domain-and-proxy-routing.md)
+- [ADR-019: Edge Proxy Provider And Observable Configuration](../decisions/ADR-019-edge-proxy-provider-and-observable-configuration.md)
 - [Error Model](../errors/model.md)
 - [neverthrow Conventions](../errors/neverthrow-conventions.md)
 - [Async Lifecycle And Acceptance](../architecture/async-lifecycle-and-acceptance.md)
@@ -32,12 +34,12 @@ servers.register
   -> server metadata persisted
   -> servers.connect
   -> server-connected
-  -> proxy-bootstrap-requested, if proxyKind is traefik or caddy
+  -> proxy-bootstrap-requested, if edge proxy provider is required
   -> proxy-installed
   -> server-ready
 ```
 
-For `proxyKind = none`:
+For disabled edge proxy:
 
 ```text
 servers.register
@@ -110,6 +112,8 @@ Server readiness:
 - `not_ready` when required connectivity or proxy bootstrap fails;
 - `failed` or equivalent terminal failure state includes phase and retriable flag.
 
+Generated default access routes require proxy readiness when the selected resource uses reverse-proxy exposure. A connected server with failed proxy bootstrap is still not ready for generated proxy-backed routes.
+
 ## Event / State Mapping
 
 | Event | Meaning | State impact |
@@ -150,6 +154,12 @@ API must expose strict command inputs and read-model status; it must not prompt.
 
 Diagnostic draft connectivity checks do not mutate lifecycle state.
 
+Generated-domain provider selection is not part of server registration input. Server/installation configuration may select the concrete provider adapter, but core/application server commands see only provider-neutral proxy readiness and route eligibility state.
+
+Edge proxy provider selection is resolved through the provider registry and composition-root configuration. Server registration may record provider intent or a provider key, but command handlers and process managers must not branch on concrete proxy products to render bootstrap commands, labels, logs, or diagnostics.
+
+Proxy bootstrap must use the provider contract defined by [Edge Proxy Provider And Route Realization](./edge-proxy-provider-and-route-realization.md). The provider renders the ensure plan; runtime execution runs it locally or over SSH.
+
 ## Current Implementation Notes And Migration Gaps
 
 Current `servers.register` persists a `DeploymentTarget` and publishes `deployment_target.registered`.
@@ -163,6 +173,8 @@ Current server read model exposes edge proxy fields but no top-level readiness s
 Current event bus dispatch is in-memory and fire-and-forget; handler failures are logged and not returned to the original command.
 
 Current proxy bootstrap started/succeeded/failed aggregate events are recorded by aggregate methods but not published by the current bootstrap handler after state changes.
+
+Current runtime bootstrap code still contains concrete proxy branches and must migrate behind edge proxy provider packages governed by ADR-019.
 
 ## Open Questions
 

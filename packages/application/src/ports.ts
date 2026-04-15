@@ -267,6 +267,158 @@ export interface ServerEdgeProxyBootstrapper {
   ): Promise<Result<ServerEdgeProxyBootstrapResult>>;
 }
 
+export interface EdgeProxyProviderCapabilities {
+  ensureProxy: boolean;
+  dockerLabels: boolean;
+  configurationView: boolean;
+  runtimeLogs: boolean;
+}
+
+export interface EdgeProxyProviderSelectionInput {
+  proxyKind?: EdgeProxyKind;
+  providerKey?: string;
+}
+
+export interface EdgeProxyExecutionContext {
+  correlationId: string;
+  causationId?: string;
+  server?: DeploymentTargetState;
+  resource?: ResourceSummary;
+  deployment?: DeploymentSummary;
+}
+
+export interface EdgeProxyEnsureInput {
+  proxyKind: EdgeProxyKind;
+  httpPort?: number;
+  httpsPort?: number;
+}
+
+export interface EdgeProxyEnsurePlan {
+  providerKey: string;
+  proxyKind: EdgeProxyKind;
+  displayName: string;
+  networkName: string;
+  networkCommand: string;
+  containerName: string;
+  containerCommand: string;
+  metadata?: Record<string, string>;
+}
+
+export interface EdgeProxyRouteInput {
+  proxyKind: EdgeProxyKind;
+  domains: string[];
+  pathPrefix: string;
+  tlsMode: TlsMode;
+  targetPort?: number;
+  providerKey?: string;
+}
+
+export interface ProxyRouteRealizationInput {
+  deploymentId: string;
+  port: number;
+  accessRoutes: EdgeProxyRouteInput[];
+}
+
+export interface ProxyRouteRealizationPlan {
+  providerKey: string;
+  networkName?: string;
+  labels: string[];
+  metadata?: Record<string, string>;
+}
+
+export type ProxyConfigurationRouteScope = "planned" | "latest" | "deployment-snapshot";
+export type ProxyConfigurationStatus =
+  | "not-configured"
+  | "planned"
+  | "applied"
+  | "stale"
+  | "failed";
+
+export interface ProxyConfigurationRouteView {
+  hostname: string;
+  scheme: "http" | "https";
+  url: string;
+  pathPrefix: string;
+  tlsMode: TlsMode;
+  targetPort?: number;
+  source: "generated-default" | "domain-binding" | "deployment-snapshot";
+}
+
+export interface ProxyConfigurationSection {
+  id: string;
+  title: string;
+  format: "docker-labels" | "file" | "command" | "yaml" | "json" | "text";
+  language?: string;
+  readonly: true;
+  redacted: boolean;
+  content: string;
+  source: "provider-rendered" | "snapshot" | "diagnostic";
+}
+
+export interface ProxyConfigurationWarning {
+  code: string;
+  message: string;
+  details?: Record<string, string | number | boolean | null>;
+}
+
+export interface ProxyConfigurationDiagnostics {
+  providerKey: string;
+  routeCount: number;
+  networkName?: string;
+  metadata?: Record<string, string>;
+}
+
+export interface ProxyConfigurationView {
+  resourceId: string;
+  deploymentId?: string;
+  providerKey: string;
+  routeScope: ProxyConfigurationRouteScope;
+  status: ProxyConfigurationStatus;
+  generatedAt: string;
+  lastAppliedDeploymentId?: string;
+  stale: boolean;
+  routes: ProxyConfigurationRouteView[];
+  sections: ProxyConfigurationSection[];
+  warnings: ProxyConfigurationWarning[];
+  diagnostics?: ProxyConfigurationDiagnostics;
+}
+
+export interface ProxyConfigurationViewInput {
+  resourceId: string;
+  deploymentId?: string;
+  routeScope: ProxyConfigurationRouteScope;
+  status: ProxyConfigurationStatus;
+  generatedAt: string;
+  lastAppliedDeploymentId?: string;
+  stale: boolean;
+  accessRoutes: EdgeProxyRouteInput[];
+  port: number;
+  includeDiagnostics: boolean;
+}
+
+export interface EdgeProxyProvider {
+  key: string;
+  displayName: string;
+  capabilities: EdgeProxyProviderCapabilities;
+  ensureProxy(
+    context: EdgeProxyExecutionContext,
+    input: EdgeProxyEnsureInput,
+  ): Promise<Result<EdgeProxyEnsurePlan, DomainError>>;
+  realizeRoutes(
+    context: EdgeProxyExecutionContext,
+    input: ProxyRouteRealizationInput,
+  ): Promise<Result<ProxyRouteRealizationPlan, DomainError>>;
+  renderConfigurationView(
+    context: EdgeProxyExecutionContext,
+    input: ProxyConfigurationViewInput,
+  ): Promise<Result<ProxyConfigurationView, DomainError>>;
+}
+
+export interface EdgeProxyProviderRegistry {
+  resolve(key: string): Result<EdgeProxyProvider, DomainError>;
+  defaultFor(input: EdgeProxyProviderSelectionInput): Result<EdgeProxyProvider | null, DomainError>;
+}
+
 export type DeploymentHealthCheckStatus = "passed" | "failed" | "skipped";
 
 export interface DeploymentHealthCheck {
@@ -325,6 +477,38 @@ export interface ResourceSummary {
   deploymentCount: number;
   lastDeploymentId?: string;
   lastDeploymentStatus?: DeploymentStatus;
+  accessSummary?: ResourceAccessSummary;
+}
+
+export interface ResourceAccessRouteSummary {
+  url: string;
+  hostname: string;
+  scheme: "http" | "https";
+  providerKey?: string;
+  deploymentId: string;
+  deploymentStatus: DeploymentStatus;
+  pathPrefix: string;
+  proxyKind: EdgeProxyKind;
+  targetPort?: number;
+  updatedAt: string;
+}
+
+export interface PlannedResourceAccessRouteSummary {
+  url: string;
+  hostname: string;
+  scheme: "http" | "https";
+  providerKey?: string;
+  pathPrefix: string;
+  proxyKind: EdgeProxyKind;
+  targetPort: number;
+}
+
+export interface ResourceAccessSummary {
+  plannedGeneratedAccessRoute?: PlannedResourceAccessRouteSummary;
+  latestGeneratedAccessRoute?: ResourceAccessRouteSummary;
+  latestDurableDomainRoute?: ResourceAccessRouteSummary;
+  proxyRouteStatus?: "unknown" | "ready" | "not-ready" | "failed";
+  lastRouteRealizationDeploymentId?: string;
 }
 
 export interface DeploymentLogSummary {
@@ -588,10 +772,67 @@ export interface RequestedDeploymentConfig {
   startCommand?: string;
   port?: number;
   healthCheckPath?: string;
+  exposureMode?: ResourceExposureMode;
+  upstreamProtocol?: ResourceNetworkProtocol;
+  accessContext?: RequestedDeploymentAccessContext;
+  accessRouteMetadata?: Record<string, string>;
   proxyKind?: EdgeProxyKind;
   domains?: string[];
   pathPrefix?: string;
   tlsMode?: TlsMode;
+}
+
+export interface RequestedDeploymentAccessContext {
+  projectId: string;
+  environmentId: string;
+  resourceId: string;
+  resourceSlug: string;
+  destinationId?: string;
+  exposureMode: ResourceExposureMode;
+  upstreamProtocol: ResourceNetworkProtocol;
+  routePurpose: "default-resource-access";
+}
+
+export type DefaultAccessRoutePurpose = "default-resource-access" | "preview-access";
+
+export interface DefaultAccessDomainRequest {
+  publicAddress: string;
+  projectId: string;
+  environmentId: string;
+  resourceId: string;
+  resourceSlug: string;
+  serverId: string;
+  destinationId?: string;
+  deploymentId?: string;
+  routePurpose: DefaultAccessRoutePurpose;
+  correlationId: string;
+  causationId?: string;
+}
+
+export interface GeneratedAccessDomain {
+  hostname: string;
+  scheme: "http" | "https";
+  providerKey: string;
+  expiresAt?: string;
+  metadata?: Record<string, string>;
+}
+
+export type DefaultAccessDomainGeneration =
+  | {
+      kind: "generated";
+      domain: GeneratedAccessDomain;
+    }
+  | {
+      kind: "disabled";
+      reason: string;
+      providerKey?: string;
+    };
+
+export interface DefaultAccessDomainProvider {
+  generate(
+    context: ExecutionContext,
+    input: DefaultAccessDomainRequest,
+  ): Promise<Result<DefaultAccessDomainGeneration, DomainError>>;
 }
 
 export interface DeploymentConfiguredProject {

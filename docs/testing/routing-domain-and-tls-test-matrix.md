@@ -25,6 +25,7 @@ This test matrix inherits:
 - [ADR-007: Certificate Provider And Challenge Default](../decisions/ADR-007-certificate-provider-and-challenge-default.md)
 - [ADR-008: Renewal Trigger Model](../decisions/ADR-008-renewal-trigger-model.md)
 - [ADR-009: Certificates Import Command](../decisions/ADR-009-certificates-import-command.md)
+- [ADR-017: Default Access Domain And Proxy Routing](../decisions/ADR-017-default-access-domain-and-proxy-routing.md)
 - [Error Model](../errors/model.md)
 - [neverthrow Conventions](../errors/neverthrow-conventions.md)
 - [Async Lifecycle And Acceptance](../architecture/async-lifecycle-and-acceptance.md)
@@ -70,10 +71,10 @@ Then:
 
 | Case | Input | Expected result | Expected error | Expected event | Expected state | Retriable |
 | --- | --- | --- | --- | --- | --- | --- |
-| Create binding with TLS auto | Valid context, `domainName`, `proxyKind = traefik`, `tlsMode = auto` | `ok({ id })` | None | `domain-binding-requested` | Binding requested/pending verification | No |
+| Create binding with TLS auto | Valid context, `domainName`, proxy-capable target, `tlsMode = auto` | `ok({ id })` | None | `domain-binding-requested` | Binding requested/pending verification | No |
 | Create binding with TLS disabled | Valid context, `tlsMode = disabled` | `ok({ id })` | None | `domain-binding-requested` | Binding requested/pending verification | No |
 | Create binding with invalid domain | Domain includes scheme, path, or port | `err` | `validation_error`, phase `command-validation` | None | No binding created | No |
-| Create binding with `proxyKind = none` | Durable binding requested without proxy | `err` | `domain_binding_proxy_required`, phase `domain-binding-admission` | None | No binding created | No |
+| Create binding without proxy-capable target | Durable binding requested without an eligible edge proxy provider | `err` | `domain_binding_proxy_required`, phase `domain-binding-admission` | None | No binding created | No |
 | Duplicate binding | Same normalized domain/path/scope already active | `err` | `conflict`, phase `domain-binding-admission` | None | No duplicate binding | No |
 | Context mismatch | Resource/server/destination/environment/project mismatch | `err` | `domain_binding_context_mismatch`, phase `context-resolution` | None | No binding created | No |
 | Issue certificate | Bound domain with TLS auto | `ok({ certificateId, attemptId })` | None | `certificate-requested` | Certificate attempt requested | No |
@@ -119,8 +120,9 @@ Then:
 | Case | Input | Expected result |
 | --- | --- | --- |
 | `deployments.create` with `domains` | Deployment command carries domain/TLS fields | Command schema rejects the input; no `DomainBinding` is created. |
-| `deployments.create` with `proxyKind = none` | Deployment command carries proxy route fields | Command schema rejects the input; no durable domain/certificate state is created. |
+| `deployments.create` with edge proxy route fields | Deployment command carries proxy route fields | Command schema rejects the input; no durable domain/certificate state is created. |
 | `domain-bindings.create` with same domain | Durable binding command creates binding lifecycle state | Domain event chain starts independently of deployment attempt. |
+| Generated default access route | Default access policy resolves a generated hostname | No `DomainBinding` is created unless an explicit command is dispatched. |
 
 ## Entry Surface Matrix
 
@@ -147,13 +149,15 @@ Tests must prove:
 
 ## Current Implementation Notes And Migration Gaps
 
-Existing tests cover runtime access-route value objects, runtime plan access routes, Traefik/Caddy labels, proxy bootstrap plan generation, and deployment public health URL derivation.
+Existing tests cover runtime access-route value objects, runtime plan access routes, concrete proxy labels, proxy bootstrap plan generation, and deployment public health URL derivation.
 
-Current tests also cover `domain-bindings.create` admission, first verification attempt persistence, `domain-binding-requested` event payload, idempotency key reuse, duplicate active owner-scope rejection, `proxyKind = none` rejection, context mismatch rejection, domain/path/proxy/TLS value-object validation, and `domain-bindings.list` query-service read-model output.
+Current tests also cover `domain-bindings.create` admission, first verification attempt persistence, `domain-binding-requested` event payload, idempotency key reuse, duplicate active owner-scope rejection, `proxyKind = none` rejection, context mismatch rejection, domain/path/proxy/TLS value-object validation, and `domain-bindings.list` query-service read-model output. `proxyKind` assertions are now migration coverage; target tests should assert proxy-capable provider eligibility.
 
 Current Web implementation includes both a standalone `/domain-bindings` surface and a resource-scoped `/resources/:resourceId` surface, but resource-scoped browser/e2e coverage is not implemented yet.
 
 Current tests do not yet cover the DNS verification workflow, `domain-bound`, certificate issuance, `domain-ready`, event replay handling beyond the create event, resource-scoped browser/e2e behavior, or certificate/domain readiness read-model projection.
+
+Generated default access routing tests are governed by [Default Access Domain And Proxy Routing Test Matrix](./default-access-domain-and-proxy-routing-test-matrix.md) and must remain separate from durable domain binding readiness tests.
 
 ## Open Questions
 

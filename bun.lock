@@ -45,6 +45,9 @@
         "@yundu/plugin-builtins": "workspace:*",
         "@yundu/plugin-host": "workspace:*",
         "@yundu/provider-aliyun": "workspace:*",
+        "@yundu/provider-default-access-domain-sslip": "workspace:*",
+        "@yundu/provider-edge-proxy-caddy": "workspace:*",
+        "@yundu/provider-edge-proxy-traefik": "workspace:*",
         "@yundu/provider-generic-ssh": "workspace:*",
         "@yundu/provider-local-shell": "workspace:*",
         "@yundu/provider-tencent": "workspace:*",
@@ -278,6 +281,27 @@
       "name": "@yundu/provider-core",
       "dependencies": {
         "@yundu/application": "workspace:*",
+      },
+    },
+    "packages/providers/default-access-domain-sslip": {
+      "name": "@yundu/provider-default-access-domain-sslip",
+      "dependencies": {
+        "@yundu/application": "workspace:*",
+        "@yundu/core": "workspace:*",
+      },
+    },
+    "packages/providers/edge-proxy-caddy": {
+      "name": "@yundu/provider-edge-proxy-caddy",
+      "dependencies": {
+        "@yundu/application": "workspace:*",
+        "@yundu/core": "workspace:*",
+      },
+    },
+    "packages/providers/edge-proxy-traefik": {
+      "name": "@yundu/provider-edge-proxy-traefik",
+      "dependencies": {
+        "@yundu/application": "workspace:*",
+        "@yundu/core": "workspace:*",
       },
     },
     "packages/providers/generic-ssh": {
@@ -827,6 +851,12 @@
     "@yundu/provider-aliyun": ["@yundu/provider-aliyun@workspace:packages/providers/aliyun"],
 
     "@yundu/provider-core": ["@yundu/provider-core@workspace:packages/providers/core"],
+
+    "@yundu/provider-default-access-domain-sslip": ["@yundu/provider-default-access-domain-sslip@workspace:packages/providers/default-access-domain-sslip"],
+
+    "@yundu/provider-edge-proxy-caddy": ["@yundu/provider-edge-proxy-caddy@workspace:packages/providers/edge-proxy-caddy"],
+
+    "@yundu/provider-edge-proxy-traefik": ["@yundu/provider-edge-proxy-traefik@workspace:packages/providers/edge-proxy-traefik"],
 
     "@yundu/provider-generic-ssh": ["@yundu/provider-generic-ssh@workspace:packages/providers/generic-ssh"],
 

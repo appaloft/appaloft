@@ -18,18 +18,23 @@ import {
   type AppLogger,
   type Clock,
   CommandBus,
+  type DefaultAccessDomainGeneration,
+  type DefaultAccessDomainProvider,
+  DefaultAccessDomainRuntimePlanResolver,
   type DeploymentProgressReporter,
   type EventBus,
   type EventHandlerContract,
   type ExecutionContext,
   eventHandlerTypesFor,
   type IdGenerator,
+  InMemoryEdgeProxyProviderRegistry,
   type IntegrationAuthPort,
   QueryBus,
   tokens,
 } from "@yundu/application";
 import { type AuthRuntime } from "@yundu/auth-better";
 import { type AppConfig } from "@yundu/config";
+import { type DomainError, ok, type Result } from "@yundu/core";
 import { InMemoryIntegrationRegistry } from "@yundu/integration-core";
 import { createGitHubRepositoryBrowser, githubIntegration } from "@yundu/integration-github";
 import { gitlabIntegration } from "@yundu/integration-gitlab";
@@ -56,6 +61,9 @@ import { createBuiltinPlugins } from "@yundu/plugin-builtins";
 import { LocalPluginHost } from "@yundu/plugin-host";
 import { aliyunProvider } from "@yundu/provider-aliyun";
 import { InMemoryProviderRegistry } from "@yundu/provider-core";
+import { SslipDefaultAccessDomainProvider } from "@yundu/provider-default-access-domain-sslip";
+import { caddyEdgeProxyProvider } from "@yundu/provider-edge-proxy-caddy";
+import { traefikEdgeProxyProvider } from "@yundu/provider-edge-proxy-traefik";
 import { genericSshProvider } from "@yundu/provider-generic-ssh";
 import { localShellProvider } from "@yundu/provider-local-shell";
 import { tencentProvider } from "@yundu/provider-tencent";
@@ -180,6 +188,21 @@ class RequestScopedIntegrationAuthPort implements IntegrationAuthPort {
   }
 }
 
+class DisabledDefaultAccessDomainProvider implements DefaultAccessDomainProvider {
+  constructor(
+    private readonly reason: string,
+    private readonly providerKey?: string,
+  ) {}
+
+  async generate(): Promise<Result<DefaultAccessDomainGeneration, DomainError>> {
+    return ok({
+      kind: "disabled",
+      reason: this.reason,
+      ...(this.providerKey ? { providerKey: this.providerKey } : {}),
+    });
+  }
+}
+
 export interface RegisterRuntimeDependenciesInput {
   config: AppConfig;
   logger: AppLogger;
@@ -211,7 +234,12 @@ export function registerRuntimeDependencies(
     useFactory: instanceCachingFactory(() => new RuntimeServerConnectivityChecker()),
   });
   container.register(tokens.serverEdgeProxyBootstrapper, {
-    useFactory: instanceCachingFactory(() => new RuntimeServerEdgeProxyBootstrapper()),
+    useFactory: instanceCachingFactory(
+      (dependencyContainer) =>
+        new RuntimeServerEdgeProxyBootstrapper(
+          dependencyContainer.resolve(tokens.edgeProxyProviderRegistry),
+        ),
+    ),
   });
   container.register(tokens.projectRepository, {
     useFactory: instanceCachingFactory(() => new PgProjectRepository(input.database.db)),
@@ -273,8 +301,35 @@ export function registerRuntimeDependencies(
   container.register(tokens.deploymentConfigReader, {
     useFactory: instanceCachingFactory(() => new FileSystemDeploymentConfigReader()),
   });
+  container.register(tokens.defaultAccessDomainProvider, {
+    useFactory: instanceCachingFactory(() => {
+      const config = input.config.defaultAccessDomain;
+      if (config.mode === "disabled") {
+        return new DisabledDefaultAccessDomainProvider("policy-disabled", config.providerKey);
+      }
+
+      if (config.providerKey === "sslip") {
+        return new SslipDefaultAccessDomainProvider({
+          providerKey: config.providerKey,
+          zone: config.zone,
+          scheme: config.scheme,
+        });
+      }
+
+      input.logger.warn("default_access_domain_provider_unknown", {
+        providerKey: config.providerKey,
+      });
+      return new DisabledDefaultAccessDomainProvider("unknown-provider", config.providerKey);
+    }),
+  });
   container.register(tokens.runtimePlanResolver, {
-    useFactory: instanceCachingFactory(() => new DefaultRuntimePlanResolver()),
+    useFactory: instanceCachingFactory(
+      (dependencyContainer) =>
+        new DefaultAccessDomainRuntimePlanResolver(
+          new DefaultRuntimePlanResolver(),
+          dependencyContainer.resolve(tokens.defaultAccessDomainProvider),
+        ),
+    ),
   });
   container.register(tokens.executionBackend, {
     useFactory: instanceCachingFactory(
@@ -285,6 +340,7 @@ export function registerRuntimeDependencies(
             dependencyContainer.resolve(tokens.logger),
             dependencyContainer.resolve(tokens.deploymentProgressReporter),
             dependencyContainer.resolve(tokens.integrationAuthPort),
+            dependencyContainer.resolve(tokens.edgeProxyProviderRegistry),
           ),
           new SshExecutionBackend(
             join(input.config.dataDir, "runtime"),
@@ -292,6 +348,7 @@ export function registerRuntimeDependencies(
             dependencyContainer.resolve(tokens.deploymentProgressReporter),
             dependencyContainer.resolve(tokens.integrationAuthPort),
             dependencyContainer.resolve(tokens.serverRepository),
+            dependencyContainer.resolve(tokens.edgeProxyProviderRegistry),
           ),
           new InMemoryExecutionBackend(
             dependencyContainer.resolve(tokens.deploymentProgressReporter),
@@ -301,6 +358,12 @@ export function registerRuntimeDependencies(
   });
   container.register(tokens.resourceRuntimeLogReader, {
     useFactory: instanceCachingFactory(() => new RuntimeResourceRuntimeLogReader()),
+  });
+  container.register(tokens.edgeProxyProviderRegistry, {
+    useFactory: instanceCachingFactory(
+      () =>
+        new InMemoryEdgeProxyProviderRegistry([traefikEdgeProxyProvider, caddyEdgeProxyProvider]),
+    ),
   });
 
   container.register(tokens.providerRegistry, {

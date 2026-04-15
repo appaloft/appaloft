@@ -12,7 +12,7 @@ systemd, file tailing, or a provider API.
 
 This workflow inherits:
 
-- [ADR-017: Resource Runtime Log Observation](../decisions/ADR-017-resource-runtime-log-observation.md)
+- [ADR-018: Resource Runtime Log Observation](../decisions/ADR-018-resource-runtime-log-observation.md)
 - [ADR-013: Project Resource Navigation And Deployment Ownership](../decisions/ADR-013-project-resource-navigation-and-deployment-ownership.md)
 - [resources.runtime-logs Query Spec](../queries/resources.runtime-logs.md)
 - [Resource Runtime Logs Error Spec](../errors/resources.runtime-logs.md)

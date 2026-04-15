@@ -89,6 +89,28 @@ export const domainError = {
     message: string,
     details?: Record<string, string | number | boolean | null>,
   ): DomainError => createError("domain_binding_context_mismatch", "user", message, details),
+  proxyProviderUnavailable: (
+    message: string,
+    details?: Record<string, string | number | boolean | null>,
+    retryable = true,
+  ): DomainError =>
+    createError("proxy_provider_unavailable", "provider", message, details, retryable),
+  proxyConfigurationRenderFailed: (
+    message: string,
+    details?: Record<string, string | number | boolean | null>,
+    retryable = true,
+  ): DomainError =>
+    createError("proxy_configuration_render_failed", "provider", message, details, retryable),
+  proxyRouteNotResolved: (
+    message: string,
+    details?: Record<string, string | number | boolean | null>,
+    retryable = true,
+  ): DomainError =>
+    createError("proxy_route_not_resolved", "provider", message, details, retryable),
+  resourceNetworkProfileMissing: (
+    message: string,
+    details?: Record<string, string | number | boolean | null>,
+  ): DomainError => createError("resource_network_profile_missing", "user", message, details),
   infra: (
     message: string,
     details?: Record<string, string | number | boolean | null>,

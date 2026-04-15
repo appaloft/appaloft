@@ -50,7 +50,7 @@ type DeploymentFailedPayload = {
   exitCode: number;
   errorCode?: string;
   retriable: boolean;
-  failurePhase?: "detect" | "plan" | "build" | "deploy" | "verify" | "rollback";
+  failurePhase?: "detect" | "plan" | "build" | "deploy" | "proxy-route-realization" | "verify" | "rollback";
   correlationId?: string;
   causationId?: string;
 };

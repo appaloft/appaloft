@@ -13,6 +13,7 @@ This event inherits:
 - [ADR-002: Routing, Domain, And TLS Boundary](../decisions/ADR-002-routing-domain-tls-boundary.md)
 - [ADR-005: Domain Binding Owner Scope](../decisions/ADR-005-domain-binding-owner-scope.md)
 - [ADR-006: Domain Verification Strategy](../decisions/ADR-006-domain-verification-strategy.md)
+- [ADR-017: Default Access Domain And Proxy Routing](../decisions/ADR-017-default-access-domain-and-proxy-routing.md)
 - [Error Model](../errors/model.md)
 - [Async Lifecycle And Acceptance](../architecture/async-lifecycle-and-acceptance.md)
 
@@ -50,7 +51,7 @@ type DomainBindingRequestedPayload = {
   destinationId: string;
   domainName: string;
   pathPrefix: string;
-  proxyKind: "traefik" | "caddy";
+  edgeProxyProviderKey?: string;
   tlsMode: "auto" | "disabled";
   certificatePolicy: "auto" | "manual" | "disabled";
   verificationAttemptId: string;
@@ -98,6 +99,8 @@ Retry must create or select a new verification attempt according to the workflow
 Current code now records `domain-binding-requested` from the `DomainBinding` aggregate after `domain-bindings.create` persists binding state and the first manual verification attempt.
 
 Deployment runtime access routes currently carry `domains`, but those routes do not publish this event and do not create durable domain binding state.
+
+Generated default access routes do not publish this event and do not create durable domain binding state.
 
 No event consumer/process manager for domain verification, route realization, or downstream certificate progression is implemented yet.
 

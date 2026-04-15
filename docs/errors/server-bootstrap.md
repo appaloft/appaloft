@@ -12,6 +12,8 @@ This spec inherits:
 
 - [ADR-003: Server Connect Public Versus Internal](../decisions/ADR-003-server-connect-public-vs-internal.md)
 - [ADR-004: Server Readiness State Storage](../decisions/ADR-004-server-readiness-state-storage.md)
+- [ADR-017: Default Access Domain And Proxy Routing](../decisions/ADR-017-default-access-domain-and-proxy-routing.md)
+- [ADR-019: Edge Proxy Provider And Observable Configuration](../decisions/ADR-019-edge-proxy-provider-and-observable-configuration.md)
 - [Error Model](./model.md)
 - [neverthrow Conventions](./neverthrow-conventions.md)
 - [Async Lifecycle And Acceptance](../architecture/async-lifecycle-and-acceptance.md)
@@ -45,7 +47,8 @@ type ServerBootstrapErrorDetails = {
   relatedEntityId?: string;
   relatedState?: string;
   serverId?: string;
-  proxyKind?: "none" | "traefik" | "caddy";
+  edgeProxyMode?: "disabled" | "provider";
+  edgeProxyProviderKey?: string;
   attemptId?: string;
   correlationId?: string;
   causationId?: string;
@@ -74,10 +77,11 @@ Admission errors reject the command and return `err(DomainError)`.
 | --- | --- | --- |
 | Connectivity check fails | No `server-connected`; record failed connect attempt with `phase = connect`. | Depends on check failure. |
 | Readiness not achieved | No `server-ready`; record failure with `phase = server-ready` and related state. | Depends on missing gate. |
-| Proxy kind unsupported | `proxy-install-failed` with `errorCode = edge_proxy_kind_unsupported`. | No unless provider capability changes are expected. |
-| Provider unsupported for proxy | `proxy-install-failed` with `errorCode = edge_proxy_provider_unsupported`. | No unless provider adapter is expected to be installed later. |
+| Edge proxy provider key unsupported | `proxy-install-failed` with `errorCode = edge_proxy_provider_unsupported`. | No unless provider capability changes are expected. |
+| Edge proxy provider unavailable | `proxy-install-failed` with `errorCode = proxy_provider_unavailable`. | Conditional if provider registration is expected to be fixed. |
 | Proxy network preparation fails | `proxy-install-failed` with `failurePhase = proxy-network`. | Usually yes if Docker/provider can recover. |
 | Proxy container start fails | `proxy-install-failed` with `failurePhase = proxy-container`. | Usually yes unless configuration is invalid. |
+| Generated access route requires proxy but proxy is failed | Deployment route resolution or execution records `phase = proxy-readiness`; server edge proxy state remains failed. | Depends on proxy failure. |
 | Event handler crashes before terminal state | Persist event-processing failure or retryable attempt state; do not publish terminal success/failure until state is known. | Yes |
 | Duplicate event consumed | No new side effect; return `ok`. | Not applicable |
 
@@ -118,7 +122,7 @@ Server/proxy tests must assert:
 - structured `Result` shape for admission errors;
 - server/proxy-specific `error.code`;
 - server/proxy-specific `phase`;
-- `serverId`, `proxyKind`, and `attemptId` when relevant;
+- `serverId`, `edgeProxyProviderKey`, and `attemptId` when relevant;
 - no `server-connected` on failed connectivity;
 - `proxy-install-failed` plus failed edge proxy state for proxy failure;
 - new attempt id for proxy retry.
@@ -134,6 +138,8 @@ Current proxy bootstrapper returns `Result<ServerEdgeProxyBootstrapResult>`, and
 Current connectivity testing returns a `ServerConnectivityResult` with `healthy`, `degraded`, or `unreachable`, but does not persist a connectivity attempt or server lifecycle status.
 
 Current event handler records proxy failure on the server aggregate but does not publish the pulled `deployment_target.edge_proxy_bootstrap_failed` event after marking failure.
+
+Current errors may still include `proxyKind`; ADR-019 treats that as provider-selection migration data. Target error details use provider-neutral mode/key fields.
 
 ## Open Questions
 

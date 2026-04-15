@@ -4,7 +4,7 @@
 
 Routing/domain/TLS workflows use the shared platform error model and neverthrow conventions. This file defines only the routing, domain binding, certificate, and domain readiness error profile.
 
-Deployment runtime access-route errors stay within deployment planning/execution unless the caller uses explicit domain binding or certificate commands.
+Generated default access and deployment route snapshot errors stay within deployment/access-route planning and execution unless the caller uses explicit domain binding or certificate commands.
 
 ## Global References
 
@@ -16,6 +16,7 @@ This spec inherits:
 - [ADR-007: Certificate Provider And Challenge Default](../decisions/ADR-007-certificate-provider-and-challenge-default.md)
 - [ADR-008: Renewal Trigger Model](../decisions/ADR-008-renewal-trigger-model.md)
 - [ADR-009: Certificates Import Command](../decisions/ADR-009-certificates-import-command.md)
+- [ADR-017: Default Access Domain And Proxy Routing](../decisions/ADR-017-default-access-domain-and-proxy-routing.md)
 - [Error Model](./model.md)
 - [neverthrow Conventions](./neverthrow-conventions.md)
 - [Async Lifecycle And Acceptance](../architecture/async-lifecycle-and-acceptance.md)
@@ -68,7 +69,7 @@ type RoutingDomainTlsErrorDetails = {
   resourceId?: string;
   serverId?: string;
   destinationId?: string;
-  proxyKind?: "traefik" | "caddy";
+  edgeProxyProviderKey?: string;
   tlsMode?: "auto" | "disabled";
   providerKey?: string;
   relatedState?: string;
@@ -138,9 +139,11 @@ Tests must assert:
 
 Current code has runtime access-route validation through `AccessRoute`, `PublicDomainName`, `RoutePathPrefix`, and `TlsModeValue`.
 
-Current runtime planning rejects proxy-backed access routes without domains and rejects domains when `proxyKind = none`.
+Current runtime planning rejects proxy-backed access routes without domains and rejects domains when `proxyKind = none`. `proxyKind` is provider-selection migration data; target errors use `edgeProxyProviderKey` and proxy-capability phases.
 
 Current runtime adapters can generate Traefik/Caddy labels and public health URLs from deployment runtime plans.
+
+Generated default access route provider errors are governed by ADR-017 and deployment/access-route workflow specs; they must not be represented as durable domain binding verification failures unless a `DomainBinding` exists.
 
 Current `domain-bindings.create` returns structured errors for validation, missing context, active binding conflict, `domain_binding_proxy_required`, and `domain_binding_context_mismatch`.
 

@@ -186,7 +186,7 @@ function createAccessRoutes(input: {
       return err(domainError.validation("Access routing domains require an enabled proxy"));
     }
 
-    if (!input.fallbackPort) {
+    if (input.requestedDeployment.exposureMode !== "direct-port" || !input.fallbackPort) {
       return ok([]);
     }
 
@@ -225,6 +225,26 @@ function createAccessRoutes(input: {
 
     return ok([route]);
   });
+}
+
+function executionMetadataFor(
+  requestedDeployment: RequestedDeploymentConfig,
+): Record<string, string> {
+  return {
+    ...(requestedDeployment.exposureMode
+      ? { "resource.exposureMode": requestedDeployment.exposureMode }
+      : {}),
+    ...(requestedDeployment.upstreamProtocol
+      ? { "resource.upstreamProtocol": requestedDeployment.upstreamProtocol }
+      : {}),
+    ...(requestedDeployment.accessContext?.resourceId
+      ? { "resource.id": requestedDeployment.accessContext.resourceId }
+      : {}),
+    ...(requestedDeployment.accessContext?.resourceSlug
+      ? { "resource.slug": requestedDeployment.accessContext.resourceSlug }
+      : {}),
+    ...(requestedDeployment.accessRouteMetadata ?? {}),
+  };
 }
 
 function hasEdgeProxyRoute(accessRoutes: AccessRoute[]): boolean {
@@ -319,8 +339,13 @@ function withRequestedAccessRoutes(input: {
       );
     }
 
+    const metadata = executionMetadataFor(input.requestedDeployment);
+    const executionWithMetadata =
+      Object.keys(metadata).length > 0 ? input.execution.withMetadata(metadata) : input.execution;
     const execution =
-      accessRoutes.length > 0 ? input.execution.withAccessRoutes(accessRoutes) : input.execution;
+      accessRoutes.length > 0
+        ? executionWithMetadata.withAccessRoutes(accessRoutes)
+        : executionWithMetadata;
     const verificationSteps = runtimeVerificationStepsFor({
       execution,
       accessRoutes,

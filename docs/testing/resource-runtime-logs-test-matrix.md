@@ -9,7 +9,7 @@ runtime-agnostic, stream-capable, cancellable, and separate from deployment-atte
 
 This test matrix inherits:
 
-- [ADR-017: Resource Runtime Log Observation](../decisions/ADR-017-resource-runtime-log-observation.md)
+- [ADR-018: Resource Runtime Log Observation](../decisions/ADR-018-resource-runtime-log-observation.md)
 - [resources.runtime-logs Query Spec](../queries/resources.runtime-logs.md)
 - [Resource Runtime Log Observation Workflow Spec](../workflows/resource-runtime-log-observation.md)
 - [Resource Runtime Logs Error Spec](../errors/resources.runtime-logs.md)

@@ -116,12 +116,15 @@ Implemented operations:
 | Create reusable SSH credential | Command | `credentials.create-ssh` | `CreateSshCredentialCommand` | `CreateSshCredentialCommandInput` | `yundu server credential-create` | `POST /api/credentials/ssh` |
 | List reusable SSH credentials | Query | `credentials.list-ssh` | `ListSshCredentialsQuery` | `ListSshCredentialsQueryInput` | `yundu server credential-list` | `GET /api/credentials/ssh` |
 
-- server registration may carry `proxyKind`; when omitted, the deployment target records a
-  `traefik` edge-proxy intent and an asynchronous `deployment_target.registered` event handler
+- server registration may carry edge proxy intent/provider selection; when omitted, the deployment
+  target records the configured default edge proxy intent and an asynchronous lifecycle path
   attempts proxy bootstrap
 - proxy bootstrap failure does not roll back deployment target metadata; it is recorded on the
   server proxy status/error fields and deployment execution still performs an idempotent proxy
   ensure when a runtime plan needs proxy-backed access
+- generated default access routes require proxy readiness and a usable target public address, but
+  the generated-domain provider is selected by infrastructure configuration and dependency
+  injection, not by core/application command input
 
 Core next operations expected here:
 - show server details
@@ -164,8 +167,8 @@ Business meaning:
 - a Docker Compose stack is one resource that may contain multiple named services
 - deployments belong to one resource
 - resource detail is the owner-scoped surface for new deployment, deployment history,
-  source/runtime/network configuration, resource runtime logs, and resource-scoped domain/TLS
-  actions
+  source/runtime/network configuration, generated access, proxy configuration, resource runtime
+  logs, and resource-scoped domain/TLS actions
 - destinations and deployment targets / servers remain runtime placement, not the project
   organization layer
 
@@ -176,6 +179,7 @@ Implemented operations:
 | Create resource | Command | `resources.create` | `CreateResourceCommand` | `CreateResourceCommandInput` | `yundu resource create` | `POST /api/resources` |
 | List resources | Query | `resources.list` | `ListResourcesQuery` | `ListResourcesQueryInput` | `yundu resource list` | `GET /api/resources` |
 | Read resource runtime logs | Query | `resources.runtime-logs` | `ResourceRuntimeLogsQuery` | `ResourceRuntimeLogsQueryInput` | `yundu resource logs <resourceId>` | `GET /api/resources/{resourceId}/runtime-logs`; stream: `GET /api/resources/{resourceId}/runtime-logs/stream` |
+| Preview resource proxy configuration | Query | `resources.proxy-configuration.preview` | `ResourceProxyConfigurationPreviewQuery` | `ResourceProxyConfigurationPreviewQueryInput` | `yundu resource proxy-config <resourceId>` | `GET /api/resources/{resourceId}/proxy-configuration` |
 
 Current boundary:
 - resources are persisted and can be listed by project or environment
@@ -193,14 +197,22 @@ Current boundary:
   and [ADR-015: Resource Network Profile](./decisions/ADR-015-resource-network-profile.md)
 - application listener port belongs to resource network profile language as `internalPort`; UI/CLI
   may display it as "port", but deployment admission must consume it from resource state
+- reverse-proxy resources can be eligible for generated default access routes when the configured
+  default access domain policy is enabled; the resource still owns only the internal endpoint, not
+  concrete generated-domain or edge-proxy provider behavior
 - project/resource console ownership is governed by
   [ADR-013: Project Resource Navigation And Deployment Ownership](./decisions/ADR-013-project-resource-navigation-and-deployment-ownership.md)
 - sidebar navigation may show Project -> Resource hierarchy with latest deployment status derived
   from read models/projections
 - application runtime logs are resource-owned observation governed by
-  [ADR-017: Resource Runtime Log Observation](./decisions/ADR-017-resource-runtime-log-observation.md);
+  [ADR-018: Resource Runtime Log Observation](./decisions/ADR-018-resource-runtime-log-observation.md);
   `resources.runtime-logs` is the active bounded and stream-capable query surface for runtime
   stdout/stderr observation through an injected runtime log reader
+- edge proxy provider behavior is resource-observable through
+  `resources.proxy-configuration.preview`, governed by
+  [ADR-019: Edge Proxy Provider And Observable Configuration](./decisions/ADR-019-edge-proxy-provider-and-observable-configuration.md);
+  Web/API/CLI must display provider-rendered sections from the query instead of reconstructing
+  proxy labels, files, or route manifests locally
 
 Core next operations expected here:
 - show resource details
@@ -241,6 +253,11 @@ Current boundary:
 - runtime access routes and direct host-port exposure are runtime plan snapshot behavior; durable
   domain, routing, and TLS lifecycle state belongs to `domain-bindings.create` and certificate
   commands
+- generated default access routes are resolved from resource network profile, server/proxy
+  readiness, durable domain binding state, and provider-neutral default access policy; they are not
+  `deployments.create` input fields
+- reverse-proxy deployments must use `ResourceNetworkProfile.internalPort` as the upstream target
+  and must not require public exposure of the application port on the SSH server
 - deployment config files are workflow/bootstrap inputs for creating or configuring related
   resource/project/environment/server state before deployment admission; they are not
   `deployments.create` input fields
@@ -258,6 +275,8 @@ Current boundary:
   resource-owned network endpoint semantics. Deployment state keeps the resolved runtime and
   network plan snapshot, while durable reusable source/runtime/network configuration belongs to the
   resource profile and durable domain/TLS lifecycle belongs to routing/domain/certificate commands.
+  [ADR-017: Default Access Domain And Proxy Routing](./decisions/ADR-017-default-access-domain-and-proxy-routing.md)
+  governs generated access domains and per-deployment proxy route realization.
 
 Core next operations expected here:
 - explicit plan deployment without execution
@@ -288,8 +307,12 @@ Current boundary:
 - `deployments.create` must not carry domain, proxy, path prefix, or TLS fields
 - duplicate active bindings are rejected for the same project/environment/resource/domain/path
   owner scope
-- durable domain bindings require `proxyKind` `traefik` or `caddy`; `proxyKind: none` is rejected
-  by durable domain binding admission
+- durable domain bindings require a target edge proxy provider that supports durable domain routes;
+  no-proxy targets are rejected by durable domain binding admission
+- generated default access routes are not durable domain bindings and are governed by
+  [ADR-017](./decisions/ADR-017-default-access-domain-and-proxy-routing.md)
+- generated default access policy editing must become the public command
+  `default-access-domain-policies.configure` before Web/CLI/API expose it
 - `domain-bindings.list` exposes the read model used by CLI, API, and Web to observe accepted
   binding records and their verification status
 - Web exposes domain binding from both the resource detail page and the standalone domain bindings
@@ -297,6 +320,8 @@ Current boundary:
   cross-resource management over the same command/query contracts
 
 Core next operations expected here:
+- configure default access domain policy
+- preview/show resource proxy configuration
 - verify or mark domain binding ownership
 - issue or renew certificate
 - import certificate

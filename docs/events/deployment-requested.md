@@ -19,7 +19,7 @@ Publish after:
 1. command input is valid;
 2. deployment context is resolved;
 3. the active deployment guard passes;
-4. source and runtime plan admission succeeds;
+4. source, runtime, network, and access-route snapshot admission succeeds;
 5. durable deployment state is created.
 
 If runtime plan resolution remains part of admission, this event is published after the plan is persisted. If admission is later split earlier, the event timing must be updated in this spec.
@@ -49,8 +49,16 @@ type DeploymentRequestedPayload = {
   resourceId: string;
   serverId: string;
   destinationId: string;
-  sourceLocator: string;
-  deploymentMethod: "auto" | "dockerfile" | "docker-compose" | "prebuilt-image" | "workspace-commands";
+  sourceSnapshot: {
+    kind: string;
+    locator: string;
+  };
+  runtimeStrategy: "auto" | "dockerfile" | "docker-compose" | "prebuilt-image" | "workspace-commands";
+  accessRouteSnapshot?: {
+    routeSource: "generated-default" | "domain-binding" | "none";
+    hostnames: string[];
+    providerKey?: string;
+  };
   requestedAt: string;
   correlationId?: string;
   causationId?: string;
@@ -89,3 +97,5 @@ Consumer failure is an event-processing failure, not a deployment success or dep
 ## Current Implementation Notes And Migration Gaps
 
 The current code does not publish `deployment-requested`. The closest current moment is after a `Deployment` aggregate is created and before execution starts, but current code immediately continues to runtime execution inside the same use case.
+
+Current event payloads and runtime plan data still use compatibility naming around deployment method and access routes; canonical payload language should use resource-owned runtime strategy and provider-neutral access route snapshots.

@@ -35,6 +35,13 @@
       "@yundu/adapter-packaging": ["./packages/adapters/packaging/src/index.ts"],
       "@yundu/provider-core": ["./packages/providers/core/src/index.ts"],
       "@yundu/provider-generic-ssh": ["./packages/providers/generic-ssh/src/index.ts"],
+      "@yundu/provider-default-access-domain-sslip": [
+        "./packages/providers/default-access-domain-sslip/src/index.ts"
+      ],
+      "@yundu/provider-edge-proxy-caddy": ["./packages/providers/edge-proxy-caddy/src/index.ts"],
+      "@yundu/provider-edge-proxy-traefik": [
+        "./packages/providers/edge-proxy-traefik/src/index.ts"
+      ],
       "@yundu/provider-aliyun": ["./packages/providers/aliyun/src/index.ts"],
       "@yundu/provider-tencent": ["./packages/providers/tencent/src/index.ts"],
       "@yundu/integration-core": ["./packages/integrations/core/src/index.ts"],
