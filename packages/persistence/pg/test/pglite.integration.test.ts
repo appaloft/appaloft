@@ -295,4 +295,48 @@ describe("pglite persistence integration", () => {
       rmSync(workspaceDir, { recursive: true, force: true });
     }
   }, 15000);
+
+  test("backfills legacy server edge proxy intent during migration", async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), "yundu-pglite-migration-"));
+    const pgliteDataDir = join(workspaceDir, ".yundu", "data", "pglite");
+
+    try {
+      const { createDatabase, createMigrator } = await import("../src/index");
+      const database = await createDatabase({
+        driver: "pglite",
+        pgliteDataDir,
+      });
+      const migrator = createMigrator(database.db);
+      const legacyMigrationResult = await migrator.migrateTo("010_resource_network_profile");
+      expect(legacyMigrationResult.error).toBeUndefined();
+
+      await database.db
+        .insertInto("servers")
+        .values({
+          id: "srv_legacy_proxy",
+          name: "legacy-proxy",
+          host: "127.0.0.1",
+          port: 22,
+          provider_key: "generic-ssh",
+          created_at: "2026-01-01T00:00:00.000Z",
+        })
+        .execute();
+
+      const latestMigrationResult = await migrator.migrateToLatest();
+      expect(latestMigrationResult.error).toBeUndefined();
+
+      const server = await database.db
+        .selectFrom("servers")
+        .select(["edge_proxy_kind", "edge_proxy_status"])
+        .where("id", "=", "srv_legacy_proxy")
+        .executeTakeFirstOrThrow();
+
+      expect(server.edge_proxy_kind).toBe("traefik");
+      expect(server.edge_proxy_status).toBe("pending");
+
+      await database.close();
+    } finally {
+      rmSync(workspaceDir, { recursive: true, force: true });
+    }
+  }, 15000);
 });

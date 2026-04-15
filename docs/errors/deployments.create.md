@@ -94,6 +94,8 @@ Admission errors reject the command and return `err(DomainError)`.
 | `provider_error` | `runtime-plan-resolution` | Conditional | Provider key, operation, sanitized cause. |
 | `default_access_route_unavailable` | `default-access-policy-resolution`, `default-access-domain-generation`, `proxy-readiness`, `route-snapshot-resolution` | Conditional | Generated default access route is required but cannot be resolved before safe acceptance. |
 
+If the selected target has no edge proxy intent, or explicitly disables the proxy, generated default access is optional and the deployment may proceed without `default_access_route_unavailable`. That path must not create a direct host-port fallback.
+
 ## Post-Acceptance Deployment Failures
 
 Build, runtime execution, proxy route realization, public route verification, health check, or release finalization failures after acceptance are not command admission errors.

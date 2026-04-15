@@ -1,4 +1,4 @@
-import { type DomainError, domainError, err, ok, type Result, type RuntimePlan } from "@yundu/core";
+import { type DomainError, err, ok, type Result, type RuntimePlan } from "@yundu/core";
 import { type ExecutionContext } from "../../execution-context";
 import {
   type DefaultAccessDomainProvider,
@@ -37,28 +37,45 @@ function providerMetadata(input: GeneratedAccessDomain): Record<string, string> 
   return metadata;
 }
 
-function edgeProxyKindFor(
-  input: RuntimePlanResolverInput,
-): Result<NonNullable<RequestedDeploymentConfig["proxyKind"]>> {
+type EdgeProxyRouteResolution =
+  | {
+      kind: "enabled";
+      proxyKind: NonNullable<RequestedDeploymentConfig["proxyKind"]>;
+    }
+  | {
+      kind: "disabled";
+      reason: string;
+    };
+
+function edgeProxyRouteResolution(input: RuntimePlanResolverInput): EdgeProxyRouteResolution {
   const edgeProxy = input.server.edgeProxy;
 
-  if (!edgeProxy || edgeProxy.kind.value === "none" || edgeProxy.status.value === "disabled") {
-    return err(
-      domainError.validation("Default access routes require an enabled edge proxy", {
-        phase: "proxy-readiness",
-        serverId: input.server.id.value,
-      }),
-    );
+  if (!edgeProxy) {
+    return {
+      kind: "disabled",
+      reason: "edge-proxy-missing",
+    };
   }
 
-  return ok(edgeProxy.kind.value);
+  if (edgeProxy.kind.value === "none" || edgeProxy.status.value === "disabled") {
+    return {
+      kind: "disabled",
+      reason: "edge-proxy-disabled",
+    };
+  }
+
+  return {
+    kind: "enabled",
+    proxyKind: edgeProxy.kind.value,
+  };
 }
 
 function enrichRequestedDeployment(
   input: RuntimePlanResolverInput,
   generated: GeneratedAccessDomain,
+  proxyKind: NonNullable<RequestedDeploymentConfig["proxyKind"]>,
 ): Result<RequestedDeploymentConfig> {
-  return edgeProxyKindFor(input).map((proxyKind) => ({
+  return ok({
     ...input.requestedDeployment,
     proxyKind,
     domains: [generated.hostname],
@@ -68,7 +85,24 @@ function enrichRequestedDeployment(
       ...(input.requestedDeployment.accessRouteMetadata ?? {}),
       ...providerMetadata(generated),
     },
-  }));
+  });
+}
+
+function withoutDefaultAccessRoute(
+  input: RuntimePlanResolverInput,
+  reason: string,
+): RuntimePlanResolverInput {
+  return {
+    ...input,
+    requestedDeployment: {
+      ...input.requestedDeployment,
+      accessRouteMetadata: {
+        ...(input.requestedDeployment.accessRouteMetadata ?? {}),
+        "access.routeSource": "none",
+        "access.policyDisabledReason": reason,
+      },
+    },
+  };
 }
 
 export class DefaultAccessDomainRuntimePlanResolver implements RuntimePlanResolver {
@@ -88,6 +122,14 @@ export class DefaultAccessDomainRuntimePlanResolver implements RuntimePlanResolv
     const accessContext = input.requestedDeployment.accessContext;
     if (!accessContext) {
       return this.inner.resolve(context, input);
+    }
+
+    const edgeProxyResolution = edgeProxyRouteResolution(input);
+    if (edgeProxyResolution.kind === "disabled") {
+      return this.inner.resolve(
+        context,
+        withoutDefaultAccessRoute(input, edgeProxyResolution.reason),
+      );
     }
 
     const generatedResult = await this.provider.generate(context, {
@@ -122,7 +164,11 @@ export class DefaultAccessDomainRuntimePlanResolver implements RuntimePlanResolv
       });
     }
 
-    const requestedDeploymentResult = enrichRequestedDeployment(input, generated.domain);
+    const requestedDeploymentResult = enrichRequestedDeployment(
+      input,
+      generated.domain,
+      edgeProxyResolution.proxyKind,
+    );
     if (requestedDeploymentResult.isErr()) {
       return err(requestedDeploymentResult.error);
     }
