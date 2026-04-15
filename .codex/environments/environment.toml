@@ -6,6 +6,6 @@ name = "yundu"
 script = ""
 
 [[actions]]
-name = "打包二进制"
-icon = "run"
-command = "bun run package:binary-bundle"
+name = "开发 desktop"
+icon = "tool"
+command = "bun run desktop:dev"
