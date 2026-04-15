@@ -5,8 +5,8 @@ import {
   type DeploymentSummary,
 } from "@yundu/contracts";
 
-import { API_BASE } from "$lib/api/client";
-import { orpcClient } from "$lib/orpc";
+import { API_BASE, request } from "$lib/api/client";
+import { i18nKeys, translate } from "$lib/i18n";
 
 export type DeploymentProgressDialogStatus = "idle" | "running" | "succeeded" | "failed";
 
@@ -59,6 +59,12 @@ export function createDeploymentRequestId(): string {
   return `deploy_${Date.now()}_${Math.random().toString(36).slice(2)}`;
 }
 
+type CreateDeploymentProgressStreamOptions = {
+  requestId?: string;
+  onRequestId?: (requestId: string) => void;
+  onStreamError?: (message: string) => void;
+};
+
 export function groupDeploymentProgressEvents(
   events: DeploymentProgressEvent[],
 ): DeploymentProgressSection[] {
@@ -105,8 +111,9 @@ export function latestDeploymentForResource(
 export async function createDeploymentWithProgress(
   input: CreateDeploymentInput,
   onEvent: (event: DeploymentProgressEvent) => void,
+  options: CreateDeploymentProgressStreamOptions = {},
 ): Promise<CreateDeploymentResponse> {
-  const stream = await orpcClient.deployments.createStream(input);
+  const stream = createDeploymentProgressStream(input, options);
   let result = await stream.next();
 
   while (!result.done) {
@@ -115,6 +122,93 @@ export async function createDeploymentWithProgress(
   }
 
   return result.value;
+}
+
+export async function* createDeploymentProgressStream(
+  input: CreateDeploymentInput,
+  options: CreateDeploymentProgressStreamOptions = {},
+): AsyncGenerator<DeploymentProgressEvent, CreateDeploymentResponse, void> {
+  const requestId = options.requestId ?? createDeploymentRequestId();
+  options.onRequestId?.(requestId);
+
+  if (typeof EventSource === "undefined") {
+    return await createDeploymentRequest(input, requestId);
+  }
+
+  const source = new EventSource(
+    `${API_BASE}/api/deployment-progress/${encodeURIComponent(requestId)}`,
+    { withCredentials: true },
+  );
+  const events: DeploymentProgressEvent[] = [];
+  let wake: (() => void) | undefined;
+  let commandDone = false;
+
+  const notify = () => {
+    const currentWake = wake;
+    wake = undefined;
+    currentWake?.();
+  };
+
+  const waitForEventOrCommand = () =>
+    new Promise<void>((resolve) => {
+      wake = resolve;
+      if (commandDone || events.length > 0) {
+        notify();
+      }
+    });
+
+  const progressListener = (message: Event) => {
+    try {
+      events.push(JSON.parse((message as MessageEvent<string>).data) as DeploymentProgressEvent);
+      notify();
+    } catch {
+      options.onStreamError?.(translate(i18nKeys.console.deployments.progressParseError));
+    }
+  };
+
+  source.addEventListener("progress", progressListener);
+
+  try {
+    source.onerror = () => {
+      options.onStreamError?.(translate(i18nKeys.console.deployments.progressStreamDisconnected));
+      source.close();
+    };
+
+    const command = createDeploymentRequest(input, requestId).finally(() => {
+      commandDone = true;
+      notify();
+    });
+
+    while (!commandDone || events.length > 0) {
+      const event = events.shift();
+
+      if (event) {
+        yield event;
+        continue;
+      }
+
+      await waitForEventOrCommand();
+    }
+
+    return await command;
+  } finally {
+    source.removeEventListener("progress", progressListener);
+    source.close();
+  }
+}
+
+function createDeploymentRequest(
+  input: CreateDeploymentInput,
+  requestId: string,
+): Promise<CreateDeploymentResponse> {
+  return request<CreateDeploymentResponse>("/api/deployments", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-request-id": requestId,
+    },
+    body: JSON.stringify(input),
+  });
 }
 
 function deploymentIsNewer(candidate: DeploymentSummary, current: DeploymentSummary): boolean {
