@@ -160,6 +160,8 @@ Generated reverse-proxy routing requires:
 - edge proxy is ready or can be idempotently ensured during deployment execution;
 - proxy bootstrap failures are represented through server/proxy lifecycle state.
 
+When the selected target has no edge proxy intent, or explicitly disables the edge proxy, generated default access is treated as unavailable for that attempt and deployment planning continues without a generated public URL. This is not a direct-port fallback and must not publish a host port.
+
 The workflow must not silently change a proxy-backed deployment into a public direct-port deployment.
 
 ## Deployment Runtime Realization
