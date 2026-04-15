@@ -152,6 +152,21 @@ function isLocalWorkspaceSourceKind(kind: string): boolean {
   return kind === "local-folder" || kind === "local-git" || kind === "compose";
 }
 
+function sourceBaseDirectory(metadata?: Record<string, string>): string | undefined {
+  const baseDirectory = metadata?.baseDirectory?.replace(/^\/+/, "").replace(/\/+$/, "");
+  return baseDirectory ? baseDirectory : undefined;
+}
+
+function localSourceWorkdir(root: string, metadata?: Record<string, string>): string {
+  const baseDirectory = sourceBaseDirectory(metadata);
+  return baseDirectory ? resolve(root, baseDirectory) : root;
+}
+
+function remoteSourceWorkdir(root: string, metadata?: Record<string, string>): string {
+  const baseDirectory = sourceBaseDirectory(metadata);
+  return baseDirectory ? `${root}/${baseDirectory}` : root;
+}
+
 function hostWithUsername(host: string, username?: string): string {
   return username && !host.includes("@") ? `${username}@${host}` : host;
 }
@@ -540,7 +555,8 @@ export class SshExecutionBackend implements ExecutionBackend {
       };
     }
 
-    const remoteWorkdir = `${input.remoteRoot}/source`;
+    const remoteSourceRoot = `${input.remoteRoot}/source`;
+    const remoteWorkdir = remoteSourceWorkdir(remoteSourceRoot, source.metadata);
 
     if (isRemoteGitSourceKind(source.kind)) {
       if (source.kind === "git-public" && hasUrlCredentials(source.locator)) {
@@ -641,18 +657,23 @@ export class SshExecutionBackend implements ExecutionBackend {
         redactions.push(deployKeyPrivateKey, normalizedKey, encodedKey);
       }
 
-      logs.push(phaseLog("package", `Clone git source on ${input.target.host}:${remoteWorkdir}`));
+      logs.push(
+        phaseLog("package", `Clone git source on ${input.target.host}:${remoteSourceRoot}`),
+      );
       this.report(context, {
         deploymentId: state.id.value,
         phase: "package",
         status: "running",
         message: `Clone git source ${source.displayName} on target`,
       });
+      const branchOption = source.metadata?.gitRef
+        ? `--branch ${shellQuote(source.metadata.gitRef)} `
+        : "";
       const cloneCommand = [
-        `rm -rf ${shellQuote(remoteWorkdir)}`,
-        `mkdir -p ${shellQuote(remoteWorkdir)}`,
+        `rm -rf ${shellQuote(remoteSourceRoot)}`,
+        `mkdir -p ${shellQuote(remoteSourceRoot)}`,
         ...(setupCommand ? [setupCommand] : []),
-        `${cloneEnv} git clone --depth 1 ${shellQuote(cloneLocator)} ${shellQuote(remoteWorkdir)}`.trim(),
+        `${cloneEnv} git clone --depth 1 ${branchOption}${shellQuote(cloneLocator)} ${shellQuote(remoteSourceRoot)}`.trim(),
       ].join(" && ");
       const clone = this.runRemoteCommand({
         target: input.target,
@@ -683,7 +704,7 @@ export class SshExecutionBackend implements ExecutionBackend {
             retryable: true,
             metadata: {
               source: source.locator,
-              remoteWorkdir,
+              remoteWorkdir: remoteSourceRoot,
             },
           }),
         };
@@ -704,6 +725,10 @@ export class SshExecutionBackend implements ExecutionBackend {
           metadata: {
             sourceStrategy: source.kind,
             remoteWorkdir,
+            ...(source.metadata?.gitRef ? { gitRef: source.metadata.gitRef } : {}),
+            ...(source.metadata?.baseDirectory
+              ? { baseDirectory: source.metadata.baseDirectory }
+              : {}),
           },
         },
       };
@@ -732,7 +757,7 @@ export class SshExecutionBackend implements ExecutionBackend {
         source.kind === "dockerfile-inline"
           ? (source.metadata?.dockerfilePath ?? "Dockerfile")
           : (source.metadata?.composeFilePath ?? "docker-compose.yml");
-      const remoteTargetFile = `${remoteWorkdir}/${targetFile}`;
+      const remoteTargetFile = `${remoteSourceRoot}/${targetFile}`;
       logs.push(phaseLog("package", `Write ${source.kind} source to ${remoteTargetFile}`));
       this.report(context, {
         deploymentId: state.id.value,
@@ -743,8 +768,8 @@ export class SshExecutionBackend implements ExecutionBackend {
       const writeInlineSource = this.runRemoteCommand({
         target: input.target,
         command: [
-          `rm -rf ${shellQuote(remoteWorkdir)}`,
-          `mkdir -p ${shellQuote(remoteWorkdir)}`,
+          `rm -rf ${shellQuote(remoteSourceRoot)}`,
+          `mkdir -p ${shellQuote(remoteSourceRoot)}`,
           `mkdir -p "$(dirname ${shellQuote(remoteTargetFile)})"`,
           `printf %s ${shellQuote(
             Buffer.from(content.endsWith("\n") ? content : `${content}\n`, "utf8").toString(
@@ -768,7 +793,7 @@ export class SshExecutionBackend implements ExecutionBackend {
             errorCode: "inline_source_write_failed",
             retryable: true,
             metadata: {
-              remoteWorkdir,
+            remoteWorkdir: remoteSourceRoot,
               remoteTargetFile,
             },
           }),
@@ -813,8 +838,10 @@ export class SshExecutionBackend implements ExecutionBackend {
       };
     }
 
-    const localWorkdir =
-      state.runtimePlan.execution.workingDirectory ?? normalizeWorkingDirectory(source.locator);
+    const localWorkdir = localSourceWorkdir(
+      state.runtimePlan.execution.workingDirectory ?? normalizeWorkingDirectory(source.locator),
+      source.metadata,
+    );
 
     if (!existsSync(localWorkdir)) {
       const message = `Source working directory does not exist: ${localWorkdir}`;
@@ -902,6 +929,9 @@ export class SshExecutionBackend implements ExecutionBackend {
         metadata: {
           sourceStrategy: source.kind === "remote-git" ? "remote-git" : "local-workspace",
           remoteWorkdir,
+          ...(source.metadata?.baseDirectory
+            ? { baseDirectory: source.metadata.baseDirectory }
+            : {}),
         },
       },
     };

@@ -148,6 +148,11 @@ Implemented now:
 Boundary rule:
 - reusable source binding, build commands, runtime commands, network endpoint defaults, and health
   policy belong to the resource-side source/runtime/network profile language
+- source binding is a discriminated resource configuration model. Git repository identity, Git
+  ref, source base directory, local-folder source roots, Docker image tags/digests, and artifact
+  extraction roots are source-side concerns; Dockerfile path, Compose file path, static publish
+  directory, build target, and command defaults are runtime profile concerns; internal listener
+  ports and exposure modes are network profile concerns.
 - `RuntimePlanStrategy` describes how a source is planned; the compatibility field name
   `deploymentMethod` must not be treated as a `Deployment` aggregate concept
 - `ResourceNetworkProfile` owns the resource's internal workload endpoint: `internalPort`,

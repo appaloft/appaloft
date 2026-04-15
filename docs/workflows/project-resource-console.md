@@ -92,7 +92,10 @@ A dedicated create-resource page or panel may collect:
 - resource name and kind;
 - optional destination placement hint;
 - source provider/type draft such as GitHub, Docker image, Dockerfile, Docker Compose, local folder, or workspace commands;
-- runtime draft such as install/build/start commands and health check;
+- source variant fields such as Git ref, source base directory, local-folder base directory,
+  Docker image tag or digest, artifact extraction root, and provider repository identity;
+- runtime draft such as Dockerfile path, Docker Compose file path, static publish directory,
+  install/build/start commands, Docker build target, and health check;
 - network draft such as internal listener port, upstream protocol, exposure mode, and compose target service.
 
 Resource-owned source/runtime/network profile input may be persisted by `resources.create` when the create flow is part of a first-deploy workflow. Dedicated profile update commands remain future behavior slices.

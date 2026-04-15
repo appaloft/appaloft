@@ -54,6 +54,24 @@ Source binding, runtime profile, and network profile are resource-owned inputs f
 
 The workflow must distinguish source selection from runtime planning. A selected source locator or source descriptor identifies what will be deployed. A runtime plan strategy describes how that source should be planned. The compatibility input name `deploymentMethod` may exist only at CLI/UI entry boundaries and must map to resource `RuntimePlanStrategy` before `resources.create`.
 
+Source selection is variant-specific. Entry workflows may let a user paste a compact address such as
+a GitHub tree URL, a local folder path, a Docker image reference, or a Compose file path, but the
+workflow must normalize that draft before dispatching `resources.create`:
+
+- Git repository drafts produce a cloneable repository locator plus `gitRef`, optional `commitSha`,
+  optional `baseDirectory`, and provider/repository metadata when available.
+- GitHub tree URLs such as
+  `https://github.com/coollabsio/coolify-examples/tree/v4.x/bun` are not persisted as clone
+  locators. They normalize to the repository locator plus `gitRef = "v4.x"` and
+  `baseDirectory = "/bun"` when provider lookup proves that split.
+- Local folder drafts produce a local path locator plus optional source-root-relative
+  `baseDirectory`.
+- Docker image drafts produce image identity fields such as `imageName`, `imageTag`, or
+  `imageDigest`, and use a prebuilt-image runtime strategy.
+- Dockerfile, Docker Compose, static, and workspace-command choices produce runtime profile fields
+  such as `dockerfilePath`, `dockerComposeFilePath`, `publishDirectory`, or command defaults. Those
+  fields are combined with the source binding's `baseDirectory` during plan resolution.
+
 The workflow must distinguish the resource internal listener port from host exposure. A collected application "port" is `ResourceNetworkProfile.internalPort`. It is not `deployments.create.port`, and it is not a server host-published port unless an explicit `direct-port` exposure mode is accepted.
 
 When generated default access policy is enabled, the first deployment may produce a provider-neutral generated access URL. The workflow displays it through `ResourceAccessSummary` after route snapshot/read-model state exists; it does not collect generated-domain provider settings during resource creation.
@@ -116,6 +134,13 @@ Deployment source/runtime/network values now belong to `resources.create` input 
 Current CLI entry code still exposes `--method` as a user-facing compatibility option. It maps to resource `RuntimePlanStrategy` before `resources.create`; it must not reach `deployments.create`.
 
 Current Web/CLI entry code may expose generic port wording, but it must dispatch `networkProfile.internalPort` as governed by [ADR-015](../decisions/ADR-015-resource-network-profile.md).
+
+Current `resources.create` normalizes common GitHub tree URLs into repository locator, `gitRef`,
+`baseDirectory`, and `originalLocator`. Deployment admission rejects legacy resources that still
+carry raw GitHub tree locators so runtime adapters do not clone browser URLs.
+
+Provider-backed disambiguation for slash-containing Git refs and typed runtime-profile fields for
+Dockerfile/Compose/static paths remain future work.
 
 Generated default access route display and route snapshot persistence are governed by [ADR-017](../decisions/ADR-017-default-access-domain-and-proxy-routing.md) and are not yet implemented as the first-class `ResourceAccessSummary` read-model surface.
 

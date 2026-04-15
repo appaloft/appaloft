@@ -79,6 +79,44 @@ No deployment, domain binding, certificate, environment variable, server, or des
 
 No access-route profile, domain, or TLS policy is added to resource state in this plan.
 
+Source binding must evolve from generic `metadata: Record<string, string>` into source-kind-specific
+value objects and schemas. The implementation plan must add a parser/normalizer at entry or
+application boundary that produces explicit source variant fields before persistence:
+
+- Core owns the normalized source value objects. They accept explicit canonical fields and enforce
+  pure invariants only. They do not call provider APIs, inspect Git remotes, read the filesystem, or
+  infer ambiguous branch/path splits from a raw URL.
+- Application/integration code owns raw locator normalization. That layer can parse GitHub browser
+  URLs, call provider branch/tag lookup, inspect local workspaces, and then create the core value
+  objects from canonical fields.
+- Git source: cloneable repository locator, provider/repository identity where available, optional
+  `gitRef`, optional `commitSha`, optional `baseDirectory`, and `originalLocator` when the user
+  pasted a browser URL or compact locator.
+- GitHub tree URL import: parse URLs such as
+  `https://github.com/coollabsio/coolify-examples/tree/v4.x/bun` into repository locator,
+  `gitRef = "v4.x"`, and `baseDirectory = "/bun"` by verifying the longest valid branch or tag
+  prefix through provider lookup when available.
+- Local folder source: local folder locator plus optional source-root-relative `baseDirectory`.
+- Docker image source: image name plus either tag or digest, with digest taking precedence and tag
+  and digest conflicts rejected.
+- Zip/inline/Compose variants: source identity fields plus file-path metadata needed to materialize
+  the source, without leaking shell paths or secrets.
+
+Runtime profile must own strategy-specific planning fields:
+
+- `strategy`;
+- install/build/start commands;
+- health-check defaults;
+- Dockerfile path for `dockerfile`;
+- Docker Compose file path and custom compose commands for `docker-compose`;
+- static publish directory for static plans;
+- Docker build target/build-argument policy when that behavior enters scope.
+
+Runtime plan resolution must combine `ResourceSourceBinding.baseDirectory` with runtime-profile
+file paths. For example, a Git source with `baseDirectory = "/bun"` and Dockerfile path
+`/Dockerfile` resolves to a build context rooted at `bun` and a Dockerfile inside that context.
+Adapters must not pass the original GitHub tree URL to `git clone`.
+
 `networkProfile` must hold the reusable workload endpoint state governed by [ADR-015](../decisions/ADR-015-resource-network-profile.md):
 
 - `internalPort`;
@@ -120,6 +158,12 @@ Required tests:
 - CLI create command dispatches through `CommandBus`;
 - Web create affordance dispatches typed client call and refreshes resource list/detail;
 - Quick Deploy new-resource path calls `resources.create` before `deployments.create(resourceId)`;
+- source variant normalizer parses GitHub tree URLs into repository locator, `gitRef`, and
+  `baseDirectory`, including branch names containing slashes when provider lookup is available;
+- source variant validation rejects ambiguous Git ref/path splits, invalid base directories,
+  uncloneable deep Git locators, Docker image tag/digest conflicts, and path traversal;
+- runtime profile tests assert Dockerfile path, Docker Compose path, static publish directory, and
+  command defaults are strategy-specific planning fields rather than source locator suffixes;
 - Quick Deploy auto-generated resource names include a short random suffix before `resources.create`;
 - Quick Deploy maps a generic "port" field to `networkProfile.internalPort`;
 - deployment bootstrap compatibility path remains covered until removed.
@@ -146,6 +190,11 @@ Moving proxy, domain, path prefix, and TLS defaults out of `deployments.create` 
 
 Resource runtime profile implementation must use runtime plan strategy terminology. The existing CLI `--method` flag is an entry-workflow alias and must map to `RuntimePlanStrategy` before dispatching `resources.create`.
 
+Resource source/runtime variant implementation must use explicit domain value objects for repository
+locators, Git refs, source base directories, Docker image names/tags/digests, Dockerfile paths,
+Compose file paths, and static publish directories. Generic metadata may remain only as a migration
+storage detail until typed state is introduced.
+
 Resource network profile implementation must use `internalPort` terminology. Existing Web/CLI "port" labels are entry-workflow aliases and must map to `ResourceNetworkProfile.internalPort` before dispatching `resources.create`.
 
 ## Migration Seams And Legacy Edges
@@ -167,6 +216,17 @@ Current code has `resources.create` command/schema/handler/use case, operation c
 Resource creation remains available through deployment bootstrap/default paths until those flows are explicitly removed or recast as first-class bootstrap behavior.
 
 Current code persists and reads `networkProfile.internalPort` as the only resource listener-port field.
+
+Current code has normalized core source value objects, command/schema fields for Git ref,
+source base directory, original locator, repository identity, and Docker image tag/digest identity.
+`resources.create` normalizes common GitHub `/tree/<ref>/<path>` URLs, and deployment admission
+rejects legacy raw GitHub tree locators before runtime planning.
+
+Current GitHub tree URL normalization handles the common single-segment ref form, such as
+`/tree/v4.x/bun`, and callers may supply explicit `gitRef` and `baseDirectory` for slash-containing
+refs. Provider-backed disambiguation for slash-containing Git refs remains future integration work.
+Dockerfile paths, Compose paths, static publish directories, build targets, and richer runtime
+profile variant fields are still pending typed resource runtime-profile implementation.
 
 ## Open Questions
 

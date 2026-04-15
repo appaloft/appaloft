@@ -94,6 +94,16 @@ function isRemoteGitSourceKind(kind: string): boolean {
   );
 }
 
+function sourceBaseDirectory(metadata?: Record<string, string>): string | undefined {
+  const baseDirectory = metadata?.baseDirectory?.replace(/^\/+/, "").replace(/\/+$/, "");
+  return baseDirectory ? baseDirectory : undefined;
+}
+
+function sourceWorkdir(root: string, metadata?: Record<string, string>): string {
+  const baseDirectory = sourceBaseDirectory(metadata);
+  return baseDirectory ? resolve(root, baseDirectory) : root;
+}
+
 function redactSecrets(input: string, secrets: readonly string[] = []): string {
   return secrets.reduce(
     (text, secret) => (secret.length > 0 ? text.replaceAll(secret, "[redacted]") : text),
@@ -642,9 +652,12 @@ export class LocalExecutionBackend implements ExecutionBackend {
     if (!isRemoteGitSourceKind(source.kind)) {
       return {
         prepared: true,
-        workdir: input.fallbackWorkdir,
+        workdir: sourceWorkdir(input.fallbackWorkdir, source.metadata),
         metadata: {
           sourceStrategy: "local-workspace",
+          ...(source.metadata?.baseDirectory
+            ? { baseDirectory: source.metadata.baseDirectory }
+            : {}),
         },
       };
     }
@@ -668,9 +681,17 @@ export class LocalExecutionBackend implements ExecutionBackend {
       message: `Clone remote git source ${source.displayName}`,
     });
 
+    const cloneArgs = [
+      "clone",
+      "--depth",
+      "1",
+      ...(source.metadata?.gitRef ? ["--branch", source.metadata.gitRef] : []),
+      cloneLocator,
+      sourceDir,
+    ];
     const clone = runSyncProcess({
       command: "git",
-      args: ["clone", "--depth", "1", cloneLocator, sourceDir],
+      args: cloneArgs,
       cwd: input.runtimeDir,
       env: input.env,
       redactions: accessToken ? [accessToken, cloneLocator] : [cloneLocator],
@@ -730,10 +751,12 @@ export class LocalExecutionBackend implements ExecutionBackend {
 
     return {
       prepared: true,
-      workdir: sourceDir,
+      workdir: sourceWorkdir(sourceDir, source.metadata),
       metadata: {
         sourceStrategy: "remote-git",
         sourceDir,
+        ...(source.metadata?.gitRef ? { gitRef: source.metadata.gitRef } : {}),
+        ...(source.metadata?.baseDirectory ? { baseDirectory: source.metadata.baseDirectory } : {}),
       },
     };
   }

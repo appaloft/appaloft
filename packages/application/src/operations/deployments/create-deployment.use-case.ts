@@ -4,6 +4,7 @@ import {
   LatestDeploymentSpec,
   ok,
   type Resource,
+  ResourceSourceBinding,
   type Result,
   SourceDescriptor,
   safeTry,
@@ -48,16 +49,23 @@ function createResourceSourceDescriptor(
     );
   }
 
+  const normalizedBinding = ResourceSourceBinding.create(sourceBinding);
+  if (normalizedBinding.isErr()) {
+    return err(normalizedBinding.error);
+  }
+  const normalizedSourceBinding = normalizedBinding.value.toState();
+  const metadata = ResourceSourceBinding.metadataFromState(normalizedSourceBinding);
+
   const source = SourceDescriptor.rehydrate({
-    kind: sourceBinding.kind,
-    locator: sourceBinding.locator,
-    displayName: sourceBinding.displayName,
-    ...(sourceBinding.metadata ? { metadata: { ...sourceBinding.metadata } } : {}),
+    kind: normalizedSourceBinding.kind,
+    locator: normalizedSourceBinding.locator,
+    displayName: normalizedSourceBinding.displayName,
+    ...(metadata ? { metadata } : {}),
   });
 
   return ok({
     source,
-    reasoning: [`Resource source binding kind: ${sourceBinding.kind.value}`],
+    reasoning: [`Resource source binding kind: ${normalizedSourceBinding.kind.value}`],
   });
 }
 

@@ -195,6 +195,11 @@ Current boundary:
 - reusable source/runtime/network/health/access defaults are governed by
   [ADR-012: Resource Runtime Profile And Deployment Snapshot Boundary](./decisions/ADR-012-resource-runtime-profile-and-deployment-snapshot-boundary.md)
   and [ADR-015: Resource Network Profile](./decisions/ADR-015-resource-network-profile.md)
+- source configuration is variant-specific resource profile state. Git repository/ref/base
+  directory, local-folder base directory, Docker image tag/digest, artifact extraction root, and
+  provider repository identity belong to `ResourceSourceBinding`; Dockerfile path, Docker Compose
+  path, static publish directory, build target, command defaults, and health-check defaults belong
+  to `ResourceRuntimeProfile`; listener ports and exposure belong to `ResourceNetworkProfile`.
 - application listener port belongs to resource network profile language as `internalPort`; UI/CLI
   may display it as "port", but deployment admission must consume it from resource state
 - reverse-proxy resources can be eligible for generated default access routes when the configured

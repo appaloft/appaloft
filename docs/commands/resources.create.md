@@ -125,7 +125,60 @@ Names are unique by derived slug within `(projectId, environmentId)`.
 
 `source` is a `ResourceSourceBinding`. It must include source kind and locator, may include display name and metadata, and is the source used by `deployments.create` to resolve the deployment attempt source descriptor.
 
+`source` is a source-kind-specific contract. `kind` is the discriminator and determines which
+metadata fields are meaningful. Source metadata is not a free-form string bag in the normative
+contract; implementation may store it as string metadata during migration, but callers and tests
+must treat the following fields as the canonical resource source profile:
+
+Core stores source data through value objects for normalized source variants. These value objects
+validate source invariants that can be decided without provider or filesystem access. Entry layers
+and application/integration services perform raw locator normalization before command dispatch when
+that normalization needs provider branch/tag lookup, Git hosting URL knowledge, local directory
+inspection, or Docker registry behavior.
+
+| Source kind | Canonical source fields | Notes |
+| --- | --- | --- |
+| `remote-git`, `git-public`, `git-github-app`, `git-deploy-key`, `local-git` | `locator`, optional `gitRef`, optional `commitSha`, optional `baseDirectory`, optional provider/repository identity fields such as `repositoryId`, `repositoryFullName`, `defaultBranch`, and `originalLocator` | `locator` is the cloneable repository or local Git locator. `baseDirectory` is source-root selection inside the checked-out tree. Secret tokens, deploy keys, and access material must be referenced through provider/credential ids, not stored in metadata. |
+| `local-folder` | `locator`, optional `baseDirectory`, optional `originalLocator` | `locator` points to the selected local workspace root. `baseDirectory` is relative to that root and is not a host absolute path. |
+| `docker-image` | `locator`, optional `imageName`, optional `imageTag`, optional `imageDigest`, optional `originalLocator` | Tags and digests are source identity for prebuilt images. They do not belong to Git metadata or deployment input. |
+| `compose` | `locator`, optional `baseDirectory`, optional `composeFilePath`, optional `originalLocator` | For source-tree compose deployments, `baseDirectory` selects the source root and `runtimeProfile.dockerComposeFilePath` selects the compose file used for planning. Existing `compose` locators may still point directly at a compose manifest during migration. |
+| `dockerfile-inline`, `docker-compose-inline` | `locator`, optional file path metadata, optional `originalLocator` | Inline content must be materialized by the runtime adapter. File path metadata is only the target path inside the materialized source tree. |
+| `zip-artifact` | `locator`, optional `baseDirectory`, optional `originalLocator` | `baseDirectory` applies after extraction. |
+
+GitHub tree URLs are accepted only as entry convenience locators. Before command dispatch or inside
+command validation, they must normalize to a cloneable repository locator plus explicit source
+metadata. For the example
+`https://github.com/coollabsio/coolify-examples/tree/v4.x/bun`, the canonical resource source is:
+
+```ts
+source: {
+  kind: "git-public",
+  locator: "https://github.com/coollabsio/coolify-examples",
+  metadata: {
+    gitRef: "v4.x",
+    baseDirectory: "/bun",
+    originalLocator: "https://github.com/coollabsio/coolify-examples/tree/v4.x/bun"
+  }
+}
+```
+
+When a Git ref may contain slashes, entrypoints with provider access must resolve the longest valid
+branch or tag prefix and store the remaining path as `baseDirectory`. If that lookup is unavailable
+and the split is ambiguous, the entrypoint must ask for or require explicit `gitRef` and
+`baseDirectory` rather than guessing.
+
+`baseDirectory` must be normalized as a source-root-relative path using `/` for the repository or
+workspace root. It must not contain `..`, shell metacharacters, a URL, or a host absolute filesystem
+path. Runtime adapters may strip the leading `/` when materializing filesystem commands.
+
 `runtimeProfile` is a `ResourceRuntimeProfile`. It must use the domain term `RuntimePlanStrategy` and may include reusable install/build/start commands and health-check defaults.
+
+`runtimeProfile` owns strategy-specific planning fields, not source identity. Dockerfile path,
+Docker Compose file path, static publish directory, Docker build target, install/build/start
+commands, and health-check defaults belong to runtime profile language. They are combined with
+`source.metadata.baseDirectory` during runtime plan resolution. A prebuilt `docker-image` source
+must use `RuntimePlanStrategy = "prebuilt-image"` and must not require Dockerfile or Compose path
+fields.
 
 `networkProfile` is a `ResourceNetworkProfile` governed by [ADR-015](../decisions/ADR-015-resource-network-profile.md). It owns the workload endpoint used by deployment planning and reverse-proxy upstream resolution.
 
@@ -166,6 +219,7 @@ All errors use [Resource Lifecycle Error Spec](../errors/resources.lifecycle.md)
 | Error code | Phase | Retriable | Meaning |
 | --- | --- | --- | --- |
 | `validation_error` | `command-validation` | No | Input shape, resource name, kind, description, service name, or service kind is invalid. |
+| `validation_error` | `resource-source-resolution` | No | Source kind, locator normalization, Git ref/base directory split, image tag/digest, or source-variant metadata is invalid or ambiguous. |
 | `not_found` | `context-resolution` | No | Project, environment, or destination is missing. |
 | `resource_context_mismatch` | `context-resolution` | No | Environment or destination does not belong to the supplied project/environment context. |
 | `resource_slug_conflict` | `resource-admission` | No | A resource with the same slug already exists in the project/environment. |
@@ -223,6 +277,16 @@ Dedicated resource create page and Project -> Resource sidebar navigation are go
 and are not fully implemented yet.
 
 Current code stores and reads `networkProfile.internalPort` as the only resource listener-port field.
+
+Current code has core source value objects and command fields for Git ref, source base directory,
+original locator, repository identity, Docker image name, Docker image tag, and Docker image digest.
+`resources.create` normalizes common GitHub `/tree/<ref>/<path>` URLs before persistence and rejects
+invalid source base directories and Docker image tag/digest conflicts.
+
+Current GitHub tree URL normalization handles common single-segment refs; callers should supply
+explicit `gitRef` and `baseDirectory` for slash-containing branch or tag names until provider-backed
+disambiguation is implemented. Dockerfile path, Docker Compose file path, static publish directory,
+and build target are still pending typed runtime-profile fields.
 
 Generated default access policy and route read-model state are not yet implemented as first-class resource access state.
 

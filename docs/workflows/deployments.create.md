@@ -101,7 +101,9 @@ They may mirror phases such as detect, plan, package, deploy, verify, or rollbac
 | Missing data | Workflow contract |
 | --- | --- |
 | Resource source binding | Entry workflow must create or select a resource with source binding before deployment admission, or command validation rejects in phase `resource-source-resolution`. |
+| Resource source variant metadata | Entry workflow must normalize deep Git URLs, Git refs, source base directories, local-folder subdirectories, Docker image tag/digest identity, and artifact extraction roots into `ResourceSourceBinding` before deployment admission. Deployment admission must not guess source variants from raw UI URLs. |
 | Resource runtime profile | Entry workflow may create a resource with runtime profile; if omitted, deployment planning uses the resource/default runtime strategy contract. |
+| Strategy-specific build file paths | Entry workflow must persist Dockerfile path, Docker Compose file path, static publish directory, and command defaults as resource runtime profile fields. Deployment admission combines these fields with the source binding base directory during runtime plan resolution. |
 | Resource network profile | Entry workflow must create or select an inbound resource with `networkProfile.internalPort`, or deployment admission rejects in phase `resource-network-resolution`. |
 | project/environment/server/destination/resource context | Entry workflow may collect/create required context; destination may use the compatibility default seam; command admission rejects if still unresolved or inconsistent. |
 | Generated default access | Entry workflow does not collect provider-specific generated-domain settings. Deployment route resolution uses configured policy and the provider-neutral default access domain port. |
@@ -131,6 +133,9 @@ Migration gaps:
 - Web QuickDeploy currently has local hardcoded validation and related-entity orchestration;
 - stream API currently emits `DeploymentProgressEvent`, which is a technical progress event, not a formal domain/application event.
 - deployment admission reads `networkProfile.internalPort` as the canonical resource-owned listener port and does not read `runtimeProfile.port`.
+- current deployment/runtime paths use typed source `baseDirectory` for Git/local source workdirs and
+  reject legacy raw GitHub tree URLs before clone; typed runtime-profile Dockerfile/Compose/static
+  path fields are still pending.
 - generated default access route resolution and provider injection are not yet implemented as a distinct workflow; current runtime adapters still consume runtime-plan access routes directly.
 
 ## Open Questions

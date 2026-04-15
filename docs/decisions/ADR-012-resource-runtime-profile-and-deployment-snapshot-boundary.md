@@ -14,7 +14,8 @@ The target domain vocabulary is:
 
 - `SourceLocator`: an entry input pointer used to detect or resolve a source descriptor.
 - `SourceDescriptor`: the normalized source fact used by runtime planning.
-- `ResourceSourceBinding`: durable reusable source configuration owned by the resource lifecycle.
+- `ResourceSourceBinding`: durable reusable, source-kind-specific configuration owned by the
+  resource lifecycle.
 - `ResourceRuntimeProfile`: durable reusable build, start, and health defaults owned by the resource lifecycle.
 - `ResourceNetworkProfile`: durable reusable workload endpoint configuration, including the internal application listener port, governed by [ADR-015](./ADR-015-resource-network-profile.md).
 - `DefaultAccessDomainPolicy`: provider-neutral policy for generated default public access, governed by [ADR-017](./ADR-017-default-access-domain-and-proxy-routing.md).
@@ -90,6 +91,63 @@ This option is accepted by [ADR-014](./ADR-014-deployment-admission-uses-resourc
 
 `resources.create` owns the durable resource profile. When a first-deploy workflow creates a resource, it may persist the resource source binding and runtime profile required for deployment planning.
 
+Resource source configuration is a discriminated variant model. The source kind determines which
+source fields are meaningful; entrypoints must not persist a single opaque URL as the only contract
+when the URL contains additional source-selection semantics.
+
+The core domain owns value objects for normalized source identity and source-tree selection. Those
+value objects validate pure domain invariants such as cloneable repository locator shape, safe
+source-root-relative base directories, Docker image tag/digest exclusivity, and absence of secret
+material in stored source metadata.
+
+Provider-aware or environment-aware conversion from a user-entered locator into normalized source
+state belongs outside the aggregate. Web, CLI, API, application services, and integration adapters
+may parse convenience locators, query provider branch/tag APIs, inspect local workspaces, or detect
+files. They must dispatch `resources.create` with canonical source fields. `Resource` and
+`ResourceSourceBinding` must not reach out to GitHub, the filesystem, Docker, or any provider to
+guess meaning from a raw string.
+
+The initial source variants are:
+
+| Source kind | Durable source binding fields | Runtime profile relationship |
+| --- | --- | --- |
+| Git sources (`remote-git`, `git-public`, `git-github-app`, `git-deploy-key`, `local-git`) | Repository or local Git locator, provider/repository identity when available, optional `gitRef`, optional `commitSha`, optional `baseDirectory`, and non-secret credential/provider references. | Runtime strategy selects how the checked-out source tree is planned. Dockerfile, Compose, static, or workspace command details belong to runtime profile fields. |
+| Local folder | Local path locator plus optional `baseDirectory` relative to that folder. | Runtime strategy and build/start/static/compose/Dockerfile fields describe how that folder is planned. |
+| Docker image | Image repository/name plus tag or digest parsed from the image reference. Tags and digests are source identity, not Git metadata. | Runtime strategy is `prebuilt-image`; build commands, Dockerfile path, and Compose path do not apply. |
+| Dockerfile or Compose inline/source file variants | Locator or inline content pointer plus file-path metadata needed to materialize the supplied file. | Runtime strategy is `dockerfile` or `docker-compose`; source tree base directory applies only when the file is attached to a source tree. |
+| Zip artifact | Artifact locator plus optional extraction/base directory metadata. | Runtime strategy determines whether extracted content is planned as Dockerfile, static, or workspace commands. |
+
+GitHub browser URLs with a `tree` path are accepted only as entry convenience locators. For example,
+`https://github.com/coollabsio/coolify-examples/tree/v4.x/bun` must normalize before persistence to
+repository source plus source-selection metadata:
+
+```ts
+{
+  kind: "git-public",
+  locator: "https://github.com/coollabsio/coolify-examples",
+  metadata: {
+    gitRef: "v4.x",
+    baseDirectory: "/bun",
+    originalLocator: "https://github.com/coollabsio/coolify-examples/tree/v4.x/bun"
+  }
+}
+```
+
+When a Git branch or tag name can contain slashes, entrypoints must prefer a provider-backed branch
+or tag lookup and choose the longest valid ref prefix before assigning the remaining path to
+`baseDirectory`. If the ref/path split cannot be proven, non-interactive callers must provide
+explicit `gitRef` and `baseDirectory` fields or receive a validation error instead of guessing.
+
+`baseDirectory` is the source-tree root used by detection and build/runtime planning. It is a
+resource source binding field because Git, local folder, and artifact sources can all have a
+source-root selection before any runtime strategy is chosen.
+
+Strategy-specific file paths are runtime profile fields. Dockerfile path, Docker Compose file path,
+static publish directory, Docker build target, install/build/start commands, and health-check
+defaults describe how the normalized source tree is planned. They must be combined with the
+source binding's `baseDirectory` during runtime plan resolution, not stored as deployment attempt
+input.
+
 Reusable source configuration must be modeled by a future explicit resource source operation, for example `resources.bind-source` or `resource-source-bindings.create`.
 
 Reusable build/runtime/health configuration must be modeled by a future explicit resource runtime-profile operation, for example `resources.configure-runtime`.
@@ -156,6 +214,12 @@ Public redeploy behavior is removed from the v1 deployment command surface by [A
 Resource-side source binding, runtime profile, and network profile persistence are being introduced through the first-deploy `resources.create` path. Dedicated update/configuration commands remain future work.
 
 Current code stores the resource listener port as `ResourceNetworkProfile.internalPort`.
+
+Current code has explicit source value objects and command/schema fields for the initial Git and
+Docker image source variants. Runtime planning still carries source variant values through source
+descriptor metadata, and strategy-specific runtime-profile fields such as Dockerfile path, Compose
+path, static publish directory, and build target still need explicit value objects before dedicated
+update operations are exposed.
 
 Generated default access policy/provider resolution remains future implementation work governed by ADR-017.
 

@@ -51,6 +51,7 @@ import {
   ResourceKindValue,
   ResourceName,
   ResourceNetworkProtocolValue,
+  ResourceSlug,
   type Result,
   type RollbackPlan,
   RuntimeExecutionPlan,
@@ -670,6 +671,59 @@ describe("CreateDeploymentUseCase", () => {
     expect(error.details).toMatchObject({
       phase: "resource-source-resolution",
       resourceId: "res_demo",
+    });
+  });
+
+  test("rejects deployment admission when resource keeps an unnormalized GitHub tree URL", async () => {
+    const {
+      context,
+      createDeploymentInput,
+      createDeploymentUseCase,
+      resources,
+      repositoryContext,
+    } = await createDeploymentFixture(new ExplicitContextRequiredPolicy());
+    const legacyResource = Resource.rehydrate({
+      id: ResourceId.rehydrate("res_demo"),
+      projectId: ProjectId.rehydrate("prj_demo"),
+      environmentId: EnvironmentId.rehydrate("env_demo"),
+      destinationId: DestinationId.rehydrate("dst_demo"),
+      name: ResourceName.rehydrate("web"),
+      slug: ResourceSlug.rehydrate("web"),
+      kind: ResourceKindValue.rehydrate("application"),
+      services: [],
+      sourceBinding: {
+        kind: SourceKindValue.rehydrate("git-public"),
+        locator: SourceLocator.rehydrate(
+          "https://github.com/coollabsio/coolify-examples/tree/v4.x/bun",
+        ),
+        displayName: DisplayNameText.rehydrate("coollabsio/coolify-examples"),
+      },
+      runtimeProfile: {
+        strategy: RuntimePlanStrategyValue.rehydrate("dockerfile"),
+      },
+      networkProfile: {
+        internalPort: PortNumber.rehydrate(3000),
+        upstreamProtocol: ResourceNetworkProtocolValue.rehydrate("http"),
+        exposureMode: ResourceExposureModeValue.rehydrate("reverse-proxy"),
+      },
+      createdAt: CreatedAt.rehydrate("2026-01-01T00:00:00.000Z"),
+    });
+
+    await resources.upsert(
+      repositoryContext,
+      legacyResource,
+      UpsertResourceSpec.fromResource(legacyResource),
+    );
+
+    const result = await createDeploymentUseCase.execute(context, createDeploymentInput);
+
+    expect(result.isErr()).toBe(true);
+    const error = result._unsafeUnwrapErr();
+    expect(error.code).toBe("validation_error");
+    expect(error.details).toMatchObject({
+      phase: "resource-source-resolution",
+      sourceKind: "git-public",
+      sourceLocator: "https://github.com/coollabsio/coolify-examples/tree/v4.x/bun",
     });
   });
 
