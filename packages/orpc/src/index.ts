@@ -3,8 +3,6 @@ import { eventIterator, ORPCError, os } from "@orpc/server";
 import { RPCHandler } from "@orpc/server/fetch";
 import {
   type AppLogger,
-  CancelDeploymentCommand,
-  CheckDeploymentHealthCommand,
   type Command,
   type CommandBus,
   ConfigureServerCredentialCommand,
@@ -15,8 +13,6 @@ import {
   CreateProjectCommand,
   CreateResourceCommand,
   CreateSshCredentialCommand,
-  cancelDeploymentCommandInputSchema,
-  checkDeploymentHealthCommandInputSchema,
   configureServerCredentialCommandInputSchema,
   createDeploymentCommandInputSchema,
   createDomainBindingCommandInputSchema,
@@ -52,14 +48,8 @@ import {
   promoteEnvironmentCommandInputSchema,
   type Query,
   type QueryBus,
-  ReattachDeploymentCommand,
-  RedeployResourceCommand,
   RegisterServerCommand,
-  RollbackDeploymentCommand,
-  reattachDeploymentCommandInputSchema,
-  redeployResourceCommandInputSchema,
   registerServerCommandInputSchema,
-  rollbackDeploymentCommandInputSchema,
   SetEnvironmentVariableCommand,
   ShowEnvironmentQuery,
   setEnvironmentVariableCommandInputSchema,
@@ -70,8 +60,6 @@ import {
   unsetEnvironmentVariableCommandInputSchema,
 } from "@yundu/application";
 import {
-  cancelDeploymentResponseSchema,
-  checkDeploymentHealthResponseSchema,
   createDeploymentResponseSchema,
   createDomainBindingResponseSchema,
   createEnvironmentResponseSchema,
@@ -93,10 +81,7 @@ import {
   listServersResponseSchema,
   listSshCredentialsResponseSchema,
   promoteEnvironmentResponseSchema,
-  reattachDeploymentResponseSchema,
-  redeployResourceResponseSchema,
   registerServerResponseSchema,
-  rollbackDeploymentResponseSchema,
   testServerConnectivityResponseSchema,
 } from "@yundu/contracts";
 import { type DomainError, type Result } from "@yundu/core";
@@ -751,54 +736,6 @@ export const createDeploymentProcedure = base
     executeCommand(context, CreateDeploymentCommand.create(input)),
   );
 
-export const cancelDeploymentProcedure = base
-  .route({
-    method: "POST",
-    path: "/deployments/{deploymentId}/cancel",
-    successStatus: 200,
-  })
-  .input(cancelDeploymentCommandInputSchema)
-  .output(cancelDeploymentResponseSchema)
-  .handler(async ({ input, context }) =>
-    executeCommand(context, CancelDeploymentCommand.create(input)),
-  );
-
-export const checkDeploymentHealthProcedure = base
-  .route({
-    method: "POST",
-    path: "/deployments/{deploymentId}/health-checks",
-    successStatus: 200,
-  })
-  .input(checkDeploymentHealthCommandInputSchema)
-  .output(checkDeploymentHealthResponseSchema)
-  .handler(async ({ input, context }) =>
-    executeCommand(context, CheckDeploymentHealthCommand.create(input)),
-  );
-
-export const redeployResourceProcedure = base
-  .route({
-    method: "POST",
-    path: "/resources/{resourceId}/redeploy",
-    successStatus: 201,
-  })
-  .input(redeployResourceCommandInputSchema)
-  .output(redeployResourceResponseSchema)
-  .handler(async ({ input, context }) =>
-    executeCommand(context, RedeployResourceCommand.create(input)),
-  );
-
-export const reattachDeploymentProcedure = base
-  .route({
-    method: "POST",
-    path: "/deployments/{deploymentId}/reattach",
-    successStatus: 200,
-  })
-  .input(reattachDeploymentCommandInputSchema)
-  .output(reattachDeploymentResponseSchema)
-  .handler(async ({ input, context }) =>
-    executeCommand(context, ReattachDeploymentCommand.create(input)),
-  );
-
 export const createDeploymentStreamProcedure = base
   .route({
     method: "POST",
@@ -818,18 +755,6 @@ export const deploymentLogsProcedure = base
   .input(deploymentLogsQueryInputSchema)
   .output(deploymentLogsResponseSchema)
   .handler(async ({ input, context }) => executeQuery(context, DeploymentLogsQuery.create(input)));
-
-export const rollbackDeploymentProcedure = base
-  .route({
-    method: "POST",
-    path: "/deployments/{deploymentId}/rollback",
-    successStatus: 200,
-  })
-  .input(rollbackDeploymentCommandInputSchema)
-  .output(rollbackDeploymentResponseSchema)
-  .handler(async ({ input, context }) =>
-    executeCommand(context, RollbackDeploymentCommand.create(input)),
-  );
 
 export const listProvidersProcedure = base
   .route({
@@ -899,13 +824,8 @@ export const yunduOrpcRouter = {
   deployments: {
     list: listDeploymentsProcedure,
     create: createDeploymentProcedure,
-    cancel: cancelDeploymentProcedure,
-    checkHealth: checkDeploymentHealthProcedure,
     createStream: createDeploymentStreamProcedure,
     logs: deploymentLogsProcedure,
-    reattach: reattachDeploymentProcedure,
-    redeployResource: redeployResourceProcedure,
-    rollback: rollbackDeploymentProcedure,
   },
   providers: {
     list: listProvidersProcedure,
@@ -1040,15 +960,10 @@ export function mountYunduOrpcRoutes(
     "/api/environments/:environmentId/promote",
     "/api/environments/:environmentId/diff/:otherEnvironmentId",
     "/api/resources",
-    "/api/resources/:resourceId/redeploy",
     "/api/domain-bindings",
     "/api/deployments",
     "/api/deployments/stream",
-    "/api/deployments/:deploymentId/cancel",
-    "/api/deployments/:deploymentId/health-checks",
     "/api/deployments/:deploymentId/logs",
-    "/api/deployments/:deploymentId/reattach",
-    "/api/deployments/:deploymentId/rollback",
     "/api/providers",
     "/api/plugins",
     "/api/integrations/github/repositories",

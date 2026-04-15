@@ -242,11 +242,7 @@ export const enUS = {
         "The deployment progress connection was interrupted. The deployment request may still be running in the background.",
       progressTitle: "Deployment progress",
       progressWaiting: "Waiting for deployment progress...",
-      redeployProgressDescription:
-        "Shows the phases, Yundu logs, and application output for this redeploy.",
-      redeployProgressTitle: "Redeploy progress",
       records: "Deployment records",
-      rollbackOf: "Rollback of",
       runtimePlanDescription: "The executable plan generated from detect and plan.",
       runtimePlanTitle: "Runtime plan",
       snapshotDescription:

@@ -108,7 +108,7 @@ New domain code and new specs must use the domain terms above. They must not int
 
 `SourceDescriptor.kind` and `RuntimePlanStrategy` are not synonyms. A runtime planner may derive a default strategy from the source descriptor, but an explicit strategy override must be validated against the source descriptor and rejected as a command-admission error when the pair cannot produce a valid runtime plan.
 
-`redeploy-resource` must prefer the resource-side durable profile plus explicit redeploy overrides when those overrides are accepted by a future command. Existing latest deployment snapshots remain a migration fallback only for resources that predate profile persistence.
+Any future redeploy command must prefer the resource-side durable profile plus explicit redeploy overrides accepted by that command. Existing latest deployment snapshots may be used only as a migration fallback for resources that predate profile persistence.
 
 ## Consequences
 
@@ -148,7 +148,7 @@ Current `CreateDeploymentCommand` still accepts the transitional runtime/source/
 
 Current `DeploymentContextBootstrapService` can create or reuse resources during deployment admission.
 
-Current `RedeployResourceUseCase` derives redeploy input from the latest deployment runtime plan.
+Public redeploy behavior is removed from the v1 deployment command surface by [ADR-016](./ADR-016-deployment-command-surface-reset.md). Any future redeploy behavior must rebuild its own command spec, workflow, test matrix, and resource-profile snapshot rules before re-entering the public Web/API/CLI surface.
 
 Resource-side source binding, runtime profile, and network profile persistence are being introduced through the first-deploy `resources.create` path. Dedicated update/configuration commands remain future work.
 

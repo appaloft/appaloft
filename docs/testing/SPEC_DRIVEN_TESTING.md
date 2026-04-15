@@ -18,7 +18,7 @@
 | oRPC/HTTP contract | Command/query spec | route maps to message, error mapping, response schema |
 | CLI workflow | Workflow + command spec | input collection, final command payload, stable error code |
 | Web workflow | Workflow + command spec | UI gating vs command behavior, no domain rule drift |
-| E2E | End-to-end workflow spec | user-visible result, persisted state, logs, rollback/reattach |
+| E2E | End-to-end workflow spec | user-visible result, persisted state, logs, progress visibility |
 
 ## Command Test Matrix Template
 
@@ -94,7 +94,7 @@ code or mapped `domainCode` when available.
 - Command use case: `deployments.create rejects non-terminal latest deployment`
 - Event handler: `deployment_target.registered records proxy bootstrap failure without deleting server`
 - Workflow: `quick deploy submits CreateDeploymentCommand after creating selected context records`
-- E2E: `cli-http deploy flow persists logs and supports rollback`
+- E2E: `cli-http deploy flow persists logs and progress visibility`
 
 ## Mapping Docs To Tests
 

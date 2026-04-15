@@ -9,7 +9,6 @@ import {
   InMemoryExecutionBackend,
   LocalExecutionBackend,
   RoutingExecutionBackend,
-  RuntimeDeploymentHealthChecker,
   RuntimeServerConnectivityChecker,
   RuntimeServerEdgeProxyBootstrapper,
   SshExecutionBackend,
@@ -213,10 +212,6 @@ export function registerRuntimeDependencies(
   container.register(tokens.serverEdgeProxyBootstrapper, {
     useFactory: instanceCachingFactory(() => new RuntimeServerEdgeProxyBootstrapper()),
   });
-  container.register(tokens.deploymentHealthChecker, {
-    useFactory: instanceCachingFactory(() => new RuntimeDeploymentHealthChecker()),
-  });
-
   container.register(tokens.projectRepository, {
     useFactory: instanceCachingFactory(() => new PgProjectRepository(input.database.db)),
   });

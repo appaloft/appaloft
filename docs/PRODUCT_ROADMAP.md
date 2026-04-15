@@ -23,6 +23,7 @@ The key product direction from this review:
 ## Inputs
 
 - Yundu source of truth:
+  - [`docs/BUSINESS_OPERATION_MAP.md`](./BUSINESS_OPERATION_MAP.md)
   - [`docs/CORE_OPERATIONS.md`](./CORE_OPERATIONS.md)
   - [`docs/DOMAIN_MODEL.md`](./DOMAIN_MODEL.md)
   - [`docs/RESOURCES.md`](./RESOURCES.md)
@@ -81,9 +82,10 @@ Yundu already has a stronger domain foundation than a generic UI-only implementa
 
 - Projects, environments, resources, destinations, deployment targets, deployments, releases, and
   rollback plans are modeled in core.
-- Implemented operations include project create/list, environment create/list/show/set/unset/diff
-  /promote, resource list, server/register/credential/connectivity operations, deployment create,
-  cancel, health check, list, logs, redeploy, reattach, and rollback.
+- Implemented active public operations include project create/list, environment
+  create/list/show/set/unset/diff/promote, resource create/list, server/register/credential/
+  connectivity operations, deployment create/list/logs, domain-binding create/list, and system
+  provider/plugin/GitHub repository/doctor/database operations.
 - Source kinds already include local folder/git, remote git, public git, GitHub App, deploy key,
   zip artifact, inline Dockerfile, inline Docker Compose, Docker image, and compose.
 - Runtime planning now maps explicit deployment methods:
@@ -94,8 +96,8 @@ Yundu already has a stronger domain foundation than a generic UI-only implementa
 - Static site and buildpack concepts exist in enums/value objects, but there is no complete
   static-artifact or buildpack runtime path yet.
 - The web console is currently much narrower than the domain/API surface: it has quick deployment,
-  project/server/deployment pages, deployment logs/details/health checks, but not the full resource
-  configuration surface.
+  project/server/resource/deployment/domain-binding pages and deployment logs/details, but not the
+  full resource configuration surface.
 
 ## Roadmap Table
 
@@ -109,7 +111,7 @@ Yundu already has a stronger domain foundation than a generic UI-only implementa
 | Environment variables and secrets | Build/runtime variables, shared variables, preview variables, secret handling, and Compose interpolation are production requirements. | Yundu environment config exists with scopes and deployment snapshots; web quick deploy has variable input. | Resource-specific, preview-specific, and shared variable surfaces are incomplete. | P1 | Production | Add resource env var operations/read models, secret masking, build/runtime exposure controls, `.env` paste/import, and preview scope later. |
 | Healthcheck policy | Health checks need durable HTTP/CMD policy, expected response semantics, interval, timeout, retries, and start period. | Yundu can check deployment health after deployment using persisted route/runtime metadata. | Healthcheck policy is not yet a resource config with full HTTP/CMD semantics. | P1 | Production | Add resource healthcheck config and pass it into runtime plans. Start with HTTP path/code/timeout; add CMD later. |
 | Persistent storage | Stateful workloads need Docker volumes, bind mounts, destination paths, and backup relationship metadata. | Resource binding concepts exist, but resource storage operations are not implemented. | Stateful apps/databases cannot safely preserve data through resource-level config. | P1 | Production | Add persistent storage config: named volume, bind mount, destination path, file/directory mode, secret-safe read models, and adapter implementation. |
-| Rollback retention | Rollback needs retained artifact/image references and a user-visible candidate list. | Yundu has rollback operation and rollback plans. | Rollback UX and retention policy are not yet resource-level configuration. | P1 | Production | Store last successful artifacts/runtime image refs and rollback retention policy. Show rollback candidates with commit, time, and route metadata. |
+| Rollback retention | Rollback needs retained artifact/image references and a user-visible candidate list. | Yundu has rollback plan concepts, but public rollback command behavior is rebuild-required under ADR-016. | Rollback UX, retention policy, and command semantics are not yet resource-level configuration. | P1 | Production | Store last successful artifacts/runtime image refs and rollback retention policy. Rebuild rollback as a spec-driven behavior before exposing it. |
 | Auto deploy and webhooks | Push-to-deploy and signed webhooks are expected deployment automation capabilities. | No durable webhook operation surface yet. | Push-to-deploy and external CI/CD integrations are missing. | P1 | Production | Add integration webhook endpoints and resource-level auto-deploy policy. Start with GitHub App/push, then generic signed deploy webhook. |
 | Static resource front-end UX | Static site deployment needs base/publish directory, web server, and domain routing inputs. | Web quick deploy has resource kind choices but no static deployment path. | Users cannot explicitly deploy static assets or understand output directory requirements. | P1 | Core | Add a "Static site" deployment flow with build command optionality, publish directory required, framework presets for Vite/SvelteKit/Next static, and generated command preview. |
 | Databases and dependency resources | Databases, backups, and explicit binding injection are first-class self-hosted PaaS expectations. | `ResourceInstance` and `ResourceBinding` are modeled but provisioning commands are future. | No database provisioning, binding injection, or restore/backup workflow. | P1 | Production | Add minimal Postgres and Redis provisioning/binding first. Make connection injection explicit instead of plain env vars. |
@@ -187,9 +189,9 @@ The web console should eventually show these items on a resource detail page:
 | Routing | Domains, path prefix, TLS mode, proxy kind, target port, redirect direction, force HTTPS, and generated direct host-port fallback. |
 | Environment | Effective variables, secret masking, build/runtime exposure, shared variable references, and preview overrides when previews exist. |
 | Storage | Volumes/bind mounts, source/destination paths, mount type, backup relationship, and warning when data is not persistent. |
-| Deployments | History with status, trigger, duration, commit/message, logs, rollback candidate, and reattach/redeploy actions. |
+| Deployments | History with status, trigger, duration, commit/message, logs, current attempt progress, and rebuild-required future rollback/redeploy affordances. |
 | Health | Health policy, latest check result, internal/public check status, and failure reason. |
-| Operations | Start, stop, restart, redeploy, rollback, clone/move, archive/delete, and danger-zone destructive actions. |
+| Operations | Future start, stop, restart, redeploy, rollback, clone/move, archive/delete, and danger-zone destructive actions after they are positioned in the business operation map and governed by specs. |
 | Automation | Auto deploy state, signed webhook URLs, preview deployment settings, scheduled tasks, and notification/log-drain hooks. |
 
 The UI should not ask users to pick "public vs private" as the primary mental model when they are

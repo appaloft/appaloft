@@ -8,6 +8,10 @@ These records are binding for future implementation work, agent planning, spec u
 
 This directory complements the historical technical ADRs in `docs/adr/`. Use `docs/decisions/` for domain, CQRS, command, workflow, async lifecycle, and operation-boundary decisions.
 
+Before adding or rebuilding a business behavior, locate the behavior in
+[Business Operation Map](../BUSINESS_OPERATION_MAP.md). If the behavior is absent or marked
+rebuild-required there, update the operation map and required ADR before local specs or code.
+
 ## Status Values
 
 | Status | Meaning |
@@ -36,6 +40,7 @@ This directory complements the historical technical ADRs in `docs/adr/`. Use `do
 | [ADR-013: Project Resource Navigation And Deployment Ownership](./ADR-013-project-resource-navigation-and-deployment-ownership.md) | Accepted | Project pages and navigation are resource-centered; deployment actions and history are resource-owned. |
 | [ADR-014: Deployment Admission Uses Resource Profile](./ADR-014-deployment-admission-uses-resource-profile.md) | Accepted | `deployments.create` consumes resource-owned source/runtime/network profile and no longer accepts source/runtime/network/route configuration fields. |
 | [ADR-015: Resource Network Profile](./ADR-015-resource-network-profile.md) | Accepted | Resource-owned network endpoint and port semantics for deployment planning, reverse proxy targets, and snapshots. |
+| [ADR-016: Deployment Command Surface Reset](./ADR-016-deployment-command-surface-reset.md) | Accepted | v1 keeps `deployments.create` as the only public deployment write command until cancel, health check, redeploy, reattach, and rollback are rebuilt from specs. |
 
 ## Authoring Rules
 

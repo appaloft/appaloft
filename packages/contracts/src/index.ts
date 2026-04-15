@@ -201,21 +201,6 @@ export const testServerConnectivityResponseSchema = z.object({
   checks: z.array(serverConnectivityCheckSchema),
 });
 
-export const deploymentHealthCheckSchema = z.object({
-  name: z.string(),
-  status: z.enum(["passed", "failed", "skipped"]),
-  message: z.string(),
-  durationMs: z.number(),
-  metadata: z.record(z.string(), z.string()).optional(),
-});
-
-export const checkDeploymentHealthResponseSchema = z.object({
-  deploymentId: z.string(),
-  checkedAt: z.string(),
-  status: z.enum(["healthy", "degraded", "unreachable"]),
-  checks: z.array(deploymentHealthCheckSchema),
-});
-
 export const environmentVariableSchema = z.object({
   key: z.string(),
   value: z.string(),
@@ -640,48 +625,6 @@ export const createDeploymentResponseSchema = z.object({
   id: z.string(),
 });
 
-export const cancelDeploymentInputSchema = z.object({
-  deploymentId: z.string().min(1),
-  reason: z.string().min(1).optional(),
-});
-
-export const cancelDeploymentResponseSchema = z.object({
-  id: z.string(),
-  status: z.literal("canceled"),
-});
-
-export const redeployResourceInputSchema = z.object({
-  resourceId: z.string().min(1),
-  force: z.boolean().optional(),
-});
-
-export const redeployResourceResponseSchema = z.object({
-  id: z.string(),
-});
-
-export const reattachDeploymentInputSchema = z.object({
-  deploymentId: z.string().min(1),
-});
-
-export const reattachDeploymentResponseSchema = z.object({
-  id: z.string(),
-  status: z.enum([
-    "created",
-    "planning",
-    "planned",
-    "running",
-    "succeeded",
-    "failed",
-    "canceled",
-    "rolled-back",
-  ]),
-  logs: z.array(deploymentLogEntrySchema),
-});
-
-export const rollbackDeploymentResponseSchema = z.object({
-  id: z.string(),
-});
-
 export const listDeploymentsResponseSchema = z.object({
   items: z.array(deploymentSummarySchema),
 });
@@ -750,7 +693,6 @@ export type CreateSshCredentialResponse = z.infer<typeof createSshCredentialResp
 export type ListSshCredentialsResponse = z.infer<typeof listSshCredentialsResponseSchema>;
 export type ServerConnectivityCheck = z.infer<typeof serverConnectivityCheckSchema>;
 export type TestServerConnectivityResponse = z.infer<typeof testServerConnectivityResponseSchema>;
-export type CheckDeploymentHealthResponse = z.infer<typeof checkDeploymentHealthResponseSchema>;
 export type EnvironmentSummary = z.infer<typeof environmentSummarySchema>;
 export type ResourceSummary = z.infer<typeof resourceSummarySchema>;
 export type CreateResourceInput = z.infer<typeof createResourceInputSchema>;
@@ -772,13 +714,6 @@ export type DeploymentProgressEvent = z.infer<typeof deploymentProgressEventSche
 export type DeploymentResourceInput = z.infer<typeof deploymentResourceInputSchema>;
 export type CreateDeploymentInput = z.infer<typeof createDeploymentInputSchema>;
 export type CreateDeploymentResponse = z.infer<typeof createDeploymentResponseSchema>;
-export type CancelDeploymentInput = z.infer<typeof cancelDeploymentInputSchema>;
-export type CancelDeploymentResponse = z.infer<typeof cancelDeploymentResponseSchema>;
-export type RedeployResourceInput = z.infer<typeof redeployResourceInputSchema>;
-export type RedeployResourceResponse = z.infer<typeof redeployResourceResponseSchema>;
-export type ReattachDeploymentInput = z.infer<typeof reattachDeploymentInputSchema>;
-export type ReattachDeploymentResponse = z.infer<typeof reattachDeploymentResponseSchema>;
-export type RollbackDeploymentResponse = z.infer<typeof rollbackDeploymentResponseSchema>;
 export type ListDeploymentsResponse = z.infer<typeof listDeploymentsResponseSchema>;
 export type DeploymentLogsResponse = z.infer<typeof deploymentLogsResponseSchema>;
 export type ListProvidersResponse = z.infer<typeof listProvidersResponseSchema>;

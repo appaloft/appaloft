@@ -5,6 +5,8 @@
 > This file is the domain-model source of truth for Yundu.
 > If a package layout, aggregate name, or application slice conflicts with this file, this file wins.
 > [CORE_OPERATIONS.md](/Users/nichenqin/projects/yundu/docs/CORE_OPERATIONS.md) defines the business surface.
+> [BUSINESS_OPERATION_MAP.md](/Users/nichenqin/projects/yundu/docs/BUSINESS_OPERATION_MAP.md)
+> defines how commands, queries, workflows, events, and rebuild gates relate to each other.
 > This file defines the domain boundaries and ubiquitous language underneath that surface.
 
 ## Design Goal
@@ -25,9 +27,10 @@ Runtime placement is a separate relationship:
 A deployment platform only becomes coherent when those boundaries are explicit.
 
 Console and navigation ownership follows the same model. `Project` is the resource collection
-boundary; `Resource` owns deploy/redeploy actions and deployment history; `Deployment` is the
-attempt record. Project-level deployment lists are read-model rollups across resources, not
-project-owned deployment write operations. See
+boundary; `Resource` owns new deployment actions and deployment history; `Deployment` is the attempt
+record. Public redeploy behavior is rebuild-required under ADR-016 until reintroduced by specs.
+Project-level deployment lists are read-model rollups across resources, not project-owned
+deployment write operations. See
 [ADR-013: Project Resource Navigation And Deployment Ownership](./decisions/ADR-013-project-resource-navigation-and-deployment-ownership.md).
 
 Quick Deploy is not a domain aggregate in this model. It is an entry workflow that guides source,
@@ -135,7 +138,7 @@ Boundary rule:
   upstream protocol, exposure mode, and target service selection
 - the generic user-facing label `port` must map to the domain field
   `ResourceNetworkProfile.internalPort` before dispatching a command
-- resource detail is the owner-scoped console surface for deploy/redeploy, deployment history,
+- resource detail is the owner-scoped console surface for new deployment, deployment history,
   source/runtime/network profile, domain/TLS, and resource-specific configuration actions
 
 ### Dependency Resources

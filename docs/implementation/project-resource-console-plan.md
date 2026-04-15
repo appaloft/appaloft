@@ -75,7 +75,7 @@ The minimal Code Round deliverable is:
 
 - project detail page treats resources as the primary list;
 - project-level new deployment opens Quick Deploy/resource selection instead of looking project-owned;
-- resource detail page exposes deployment history and resource-scoped deploy/redeploy action;
+- resource detail page exposes deployment history and resource-scoped new deployment action;
 - sidebar or navigation uses Project -> Resource hierarchy when the current layout supports it;
 - latest deployment status is read-model derived or clearly deferred in migration notes;
 - tests or Web checks cover project/resource navigation and resource-owned deployment actions.

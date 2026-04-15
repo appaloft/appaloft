@@ -1,7 +1,5 @@
 import {
   BootstrapServerEdgeProxyOnTargetRegisteredHandler,
-  CancelDeploymentUseCase,
-  CheckDeploymentHealthUseCase,
   ConfigureServerCredentialUseCase,
   CreateDeploymentUseCase,
   CreateDomainBindingUseCase,
@@ -31,11 +29,7 @@ import {
   ListServersQueryService,
   ListSshCredentialsQueryService,
   PromoteEnvironmentUseCase,
-  ReattachDeploymentUseCase,
-  RedeployResourceUseCase,
   RegisterServerUseCase,
-  RollbackDeploymentUseCase,
-  RollbackPlanFactory,
   RuntimePlanResolutionInputBuilder,
   SetEnvironmentVariableUseCase,
   ShowEnvironmentQueryService,
@@ -88,21 +82,15 @@ export function registerApplicationServices(container: DependencyContainer): voi
   );
   container.registerSingleton(tokens.deploymentContextResolver, DeploymentContextResolver);
   container.registerSingleton(tokens.deploymentFactory, DeploymentFactory);
-  container.registerSingleton(tokens.rollbackPlanFactory, RollbackPlanFactory);
   container.registerSingleton(tokens.deploymentLifecycleService, DeploymentLifecycleService);
-  container.registerSingleton(tokens.cancelDeploymentUseCase, CancelDeploymentUseCase);
-  container.registerSingleton(tokens.checkDeploymentHealthUseCase, CheckDeploymentHealthUseCase);
   container.registerSingleton(tokens.createDeploymentUseCase, CreateDeploymentUseCase);
   container.registerSingleton(tokens.createDomainBindingUseCase, CreateDomainBindingUseCase);
   container.registerSingleton(
     tokens.listDomainBindingsQueryService,
     ListDomainBindingsQueryService,
   );
-  container.registerSingleton(tokens.redeployResourceUseCase, RedeployResourceUseCase);
-  container.registerSingleton(tokens.reattachDeploymentUseCase, ReattachDeploymentUseCase);
   container.registerSingleton(tokens.listDeploymentsQueryService, ListDeploymentsQueryService);
   container.registerSingleton(tokens.logsQueryService, DeploymentLogsQueryService);
-  container.registerSingleton(tokens.rollbackDeploymentUseCase, RollbackDeploymentUseCase);
   container.registerSingleton(tokens.providersQueryService, ListProvidersQueryService);
   container.registerSingleton(tokens.pluginsQueryService, ListPluginsQueryService);
   container.registerSingleton(

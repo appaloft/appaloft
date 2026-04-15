@@ -1,32 +1,20 @@
 import { Args, Command as EffectCommand, Options } from "@effect/cli";
 import {
-  CancelDeploymentCommand,
-  CheckDeploymentHealthCommand,
   CreateDeploymentCommand,
   type CreateDeploymentCommandInput,
   DeploymentLogsQuery,
   ListDeploymentsQuery,
-  ReattachDeploymentCommand,
-  RedeployResourceCommand,
-  RollbackDeploymentCommand,
 } from "@yundu/application";
 import { createQuickDeployGeneratedResourceName } from "@yundu/contracts";
 import { resourceKinds } from "@yundu/core";
 import { Effect } from "effect";
 
-import {
-  optionalNumber,
-  optionalValue,
-  runCommand,
-  runDeploymentCommand,
-  runQuery,
-} from "../runtime.js";
+import { optionalNumber, optionalValue, runDeploymentCommand, runQuery } from "../runtime.js";
 import { resolveInteractiveDeploymentInput } from "./deployment-interaction.js";
 import { deploymentMethods, normalizeCliPathOrSource } from "./deployment-source.js";
 
 const pathOrSourceArg = Args.text({ name: "pathOrSource" }).pipe(Args.optional);
 const deploymentIdArg = Args.text({ name: "deploymentId" });
-const resourceIdArg = Args.text({ name: "resourceId" });
 
 const projectOption = Options.text("project").pipe(Options.optional);
 const serverOption = Options.text("server").pipe(Options.optional);
@@ -43,9 +31,6 @@ const startOption = Options.text("start").pipe(Options.optional);
 const portOption = Options.text("port").pipe(Options.optional);
 const healthPathOption = Options.text("health-path").pipe(Options.optional);
 const appLogLinesOption = Options.text("app-log-lines").pipe(Options.withDefault("3"));
-const forceOption = Options.boolean("force").pipe(Options.withDefault(false));
-const reasonOption = Options.text("reason").pipe(Options.optional);
-
 function parseAppLogLines(value: string): number {
   const parsed = Number(value);
   return Number.isInteger(parsed) && parsed >= 0 ? parsed : 3;
@@ -172,49 +157,6 @@ export const logsCommand = EffectCommand.make(
   ({ deploymentId }) => runQuery(DeploymentLogsQuery.create({ deploymentId })),
 ).pipe(EffectCommand.withDescription("Show deployment logs"));
 
-export const healthCommand = EffectCommand.make(
-  "health",
-  {
-    deploymentId: deploymentIdArg,
-  },
-  ({ deploymentId }) => runCommand(CheckDeploymentHealthCommand.create({ deploymentId })),
-).pipe(EffectCommand.withDescription("Check deployment health"));
-
-export const cancelCommand = EffectCommand.make(
-  "cancel",
-  {
-    deploymentId: deploymentIdArg,
-    reason: reasonOption,
-  },
-  ({ deploymentId, reason }) =>
-    runCommand(
-      CancelDeploymentCommand.create({
-        deploymentId,
-        reason: optionalValue(reason),
-      }),
-    ),
-).pipe(EffectCommand.withDescription("Cancel a planned or running deployment"));
-
-export const redeployCommand = EffectCommand.make(
-  "redeploy",
-  {
-    resourceId: resourceIdArg,
-    force: forceOption,
-  },
-  ({ force, resourceId }) =>
-    runDeploymentCommand(RedeployResourceCommand.create({ resourceId, force }), {
-      appLogLines: 3,
-    }),
-).pipe(EffectCommand.withDescription("Redeploy a resource"));
-
-export const reattachCommand = EffectCommand.make(
-  "reattach",
-  {
-    deploymentId: deploymentIdArg,
-  },
-  ({ deploymentId }) => runCommand(ReattachDeploymentCommand.create({ deploymentId })),
-).pipe(EffectCommand.withDescription("Read current deployment status and logs"));
-
 const listDeploymentsCommand = EffectCommand.make(
   "list",
   {
@@ -234,11 +176,3 @@ export const deploymentsCommand = EffectCommand.make("deployments").pipe(
   EffectCommand.withDescription("Deployment queries"),
   EffectCommand.withSubcommands([listDeploymentsCommand]),
 );
-
-export const rollbackCommand = EffectCommand.make(
-  "rollback",
-  {
-    deploymentId: deploymentIdArg,
-  },
-  ({ deploymentId }) => runCommand(RollbackDeploymentCommand.create({ deploymentId })),
-).pipe(EffectCommand.withDescription("Rollback a deployment"));

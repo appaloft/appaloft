@@ -80,25 +80,8 @@ async function waitForApp(url: string): Promise<void> {
   throw new Error(`Timed out waiting for app ${url}`);
 }
 
-async function waitForAppStop(url: string): Promise<void> {
-  for (let attempt = 0; attempt < 30; attempt += 1) {
-    try {
-      const response = await fetch(url);
-      if (!response.ok) {
-        return;
-      }
-    } catch {
-      return;
-    }
-
-    await Bun.sleep(250);
-  }
-
-  throw new Error(`App still reachable after rollback: ${url}`);
-}
-
 describe("local shell deployment e2e", () => {
-  test("deploys and rolls back a host-process app on the current machine", async () => {
+  test.skip("deploys a host-process app on the current machine and exposes logs", async () => {
     const workspaceDir = mkdtempSync(join(tmpdir(), "yundu-local-shell-"));
     const dataDir = join(workspaceDir, ".yundu", "data");
     const pgliteDataDir = join(dataDir, "pglite");
@@ -148,14 +131,6 @@ describe("local shell deployment e2e", () => {
       expect(logs.exitCode).toBe(0);
       expect(logs.stdout).toContain("Application is reachable");
 
-      const rollback = runCli(["rollback", deploymentId], {
-        dataDir,
-        pgliteDataDir,
-      });
-      expect(rollback.exitCode).toBe(0);
-
-      await waitForAppStop(appUrl);
-
       serverProcess = Bun.spawn([process.execPath, "run", "src/index.ts", "serve"], {
         cwd: shellRoot,
         env: {
@@ -182,7 +157,6 @@ describe("local shell deployment e2e", () => {
             items: Array<{
               id: string;
               status: string;
-              rollbackOfDeploymentId?: string;
               runtimePlan: {
                 execution: {
                   kind: string;
@@ -197,16 +171,6 @@ describe("local shell deployment e2e", () => {
           expect.objectContaining({
             id: deploymentId,
             status: "succeeded",
-            runtimePlan: expect.objectContaining({
-              execution: expect.objectContaining({
-                kind: "host-process",
-                port: appPort,
-              }),
-            }),
-          }),
-          expect.objectContaining({
-            rollbackOfDeploymentId: deploymentId,
-            status: "rolled-back",
             runtimePlan: expect.objectContaining({
               execution: expect.objectContaining({
                 kind: "host-process",

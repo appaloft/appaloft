@@ -58,7 +58,7 @@ Each resource item should expose:
 - environment context;
 - latest deployment status when available;
 - primary navigation to the resource detail page;
-- resource-scoped create deployment or redeploy shortcut only when the selected resource can accept it.
+- resource-scoped create deployment shortcut only when the selected resource can accept it.
 
 Latest deployment status is a read-model/projection field. It must not become a Resource aggregate invariant unless a future ADR promotes it.
 
@@ -67,7 +67,7 @@ Latest deployment status is a read-model/projection field. It must not become a 
 Resource detail pages must be the primary owner-scoped surface for:
 
 - new deployment;
-- redeploy;
+- future redeploy only after it is reintroduced under ADR-016;
 - deployment history;
 - deployment progress/status;
 - source binding, runtime profile, and network profile setup;

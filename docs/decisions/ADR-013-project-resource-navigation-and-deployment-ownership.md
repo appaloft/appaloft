@@ -16,7 +16,7 @@ Project
 
 `Project` is the top-level workspace and resource collection boundary. It is not the owner of deployment actions.
 
-`Resource` is the deployable unit. New deployment, redeploy, deployment history, source/runtime/network configuration, resource-scoped domains, and resource-scoped environment/configuration affordances belong primarily on the resource surface.
+`Resource` is the deployable unit. New deployment, deployment history, source/runtime/network configuration, resource-scoped domains, and resource-scoped environment/configuration affordances belong primarily on the resource surface. Public redeploy behavior is not part of the v1 deployment command surface unless reintroduced by a later accepted ADR and local specs.
 
 `Deployment` is a resource-scoped execution attempt. It is not a top-level user-managed object independent of a resource, and it must not become the owner of reusable source, runtime, network, domain, TLS, or health policy.
 
@@ -83,7 +83,8 @@ Resource surfaces must own deployment actions:
 - show source binding, runtime profile, and network profile setup state when those operations exist;
 - show latest deployment status;
 - show deployment history for that resource;
-- provide new deployment/redeploy actions for that resource;
+- provide new deployment actions for that resource;
+- provide redeploy actions only after a future redeploy command is accepted and implemented under ADR-016;
 - provide resource-scoped domain binding and TLS affordances;
 - provide resource-scoped environment/configuration affordances when the configuration belongs to the resource.
 
@@ -109,7 +110,8 @@ The project page becomes a management surface for a group of resources rather th
 
 The resource page becomes the natural place for:
 
-- deploy / redeploy;
+- new deployment;
+- future redeploy only after it is reintroduced under ADR-016;
 - deployment history;
 - domains and TLS;
 - source/runtime/network configuration;
@@ -133,6 +135,7 @@ Read models may denormalize latest deployment status per resource for sidebar an
 - [ADR-011: Resource Create Minimum Lifecycle](./ADR-011-resource-create-minimum-lifecycle.md)
 - [ADR-012: Resource Runtime Profile And Deployment Snapshot Boundary](./ADR-012-resource-runtime-profile-and-deployment-snapshot-boundary.md)
 - [ADR-015: Resource Network Profile](./ADR-015-resource-network-profile.md)
+- [ADR-016: Deployment Command Surface Reset](./ADR-016-deployment-command-surface-reset.md)
 
 ## Superseded Open Questions
 
