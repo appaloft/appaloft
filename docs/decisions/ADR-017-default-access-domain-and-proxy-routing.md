@@ -163,7 +163,7 @@ servers.register
   -> server-ready, when all readiness gates pass
 ```
 
-The default access domain policy does not install the proxy by itself. It requires the selected deployment target to have proxy intent and proxy readiness, or it produces a structured route-resolution failure.
+The default access domain policy does not install the proxy by itself. If the selected deployment target has no proxy intent, or explicitly disables the proxy, generated default access is skipped for that attempt and the deployment may proceed without a public generated URL. If a proxy-backed route has been selected but proxy readiness or route realization fails, the deployment must produce a structured route-resolution or runtime failure.
 
 If proxy bootstrap fails, the server may remain connected but not ready for proxy-backed deployments. Deployments that require generated proxy routes must reject admission or persist a post-acceptance failure according to where the failure is detected. They must not silently publish direct host ports as a fallback.
 
