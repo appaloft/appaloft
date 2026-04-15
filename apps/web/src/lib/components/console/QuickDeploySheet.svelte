@@ -5,7 +5,7 @@
   import {
     CheckCircle2,
     FolderOpen,
-    GitBranch,
+    GitFork,
     LoaderCircle,
     Package,
     Play,
@@ -25,6 +25,7 @@
     type QuickDeployWorkflowStepOutput,
   } from "@yundu/contracts";
   import type { TranslationKey } from "@yundu/i18n";
+  import type { Component } from "svelte";
   import type {
     AuthSessionResponse,
     ConfigureServerCredentialInput,
@@ -42,16 +43,11 @@
   } from "@yundu/contracts";
 
   import { API_BASE, readErrorMessage, request } from "$lib/api/client";
+  import DockerIcon from "$lib/components/console/DockerIcon.svelte";
+  import GitHubIcon from "$lib/components/console/GitHubIcon.svelte";
+  import ResourceSourceOption from "$lib/components/console/ResourceSourceOption.svelte";
   import ServerRegistrationForm from "$lib/components/console/ServerRegistrationForm.svelte";
   import { Button } from "$lib/components/ui/button";
-  import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardFooter,
-    CardHeader,
-    CardTitle,
-  } from "$lib/components/ui/card";
   import { Input } from "$lib/components/ui/input";
   import { Separator } from "$lib/components/ui/separator";
   import { Skeleton } from "$lib/components/ui/skeleton";
@@ -71,12 +67,13 @@
     isServerRegistrationDraftComplete,
     type DraftServerConnectivityInput,
   } from "$lib/console/server-registration";
-  import { readSessionIdentity } from "$lib/console/utils";
+  import { deploymentDetailHref, readSessionIdentity } from "$lib/console/utils";
   import { i18nKeys, t } from "$lib/i18n";
   import { orpcClient } from "$lib/orpc";
   import { queryClient } from "$lib/query-client";
 
   type SourceKind = "local-folder" | "github" | "remote-git" | "docker-image" | "compose";
+  type SourceOptionIcon = Component<{ class?: string }>;
   type GithubSourceMode = "url" | "browser";
   type DraftMode = "existing" | "new";
   type EnvironmentKind = EnvironmentSummary["kind"];
@@ -128,7 +125,7 @@
     key: SourceKind;
     labelKey: TranslationKey;
     hintKey: TranslationKey;
-    icon: typeof FolderOpen;
+    icon: SourceOptionIcon;
   }> = [
     {
       key: "local-folder",
@@ -140,19 +137,19 @@
       key: "github",
       labelKey: i18nKeys.console.quickDeploy.sourceGithub,
       hintKey: i18nKeys.console.quickDeploy.sourceGithubHint,
-      icon: GitBranch,
+      icon: GitHubIcon,
     },
     {
       key: "remote-git",
       labelKey: i18nKeys.console.quickDeploy.sourceRemoteGit,
       hintKey: i18nKeys.console.quickDeploy.sourceRemoteGitHint,
-      icon: GitBranch,
+      icon: GitFork,
     },
     {
       key: "docker-image",
       labelKey: i18nKeys.console.quickDeploy.sourceDockerImage,
       hintKey: i18nKeys.console.quickDeploy.sourceDockerImageHint,
-      icon: Package,
+      icon: DockerIcon,
     },
     {
       key: "compose",
@@ -1462,6 +1459,19 @@
     lastCreatedDeploymentId = event.deploymentId ?? lastCreatedDeploymentId;
   }
 
+  function lastCreatedDeploymentHref(): string {
+    if (!selectedProjectId || !selectedEnvironmentId || !selectedResourceId) {
+      return `/deployments/${encodeURIComponent(lastCreatedDeploymentId)}`;
+    }
+
+    return deploymentDetailHref({
+      id: lastCreatedDeploymentId,
+      projectId: selectedProjectId,
+      environmentId: selectedEnvironmentId,
+      resourceId: selectedResourceId,
+    });
+  }
+
   function deploymentProgressPhaseLabel(phase: DeploymentProgressEvent["phase"]): string {
     switch (phase) {
       case "detect":
@@ -1828,13 +1838,13 @@
 
 <div class="grid gap-5 xl:grid-cols-[minmax(0,1fr)_22rem]">
   <div class="space-y-5">
-      <Card>
-        <CardHeader>
-          <CardTitle>{$t(i18nKeys.console.quickDeploy.deploymentEntryTitle, { stepTitle: activeStepDetails.title })}</CardTitle>
-          <CardDescription>{activeStepDetails.description}</CardDescription>
-        </CardHeader>
-        <CardContent class="space-y-6">
-          <div class="flex flex-wrap items-center gap-1.5 rounded-md border bg-muted/20 px-2 py-2">
+      <section class="space-y-6">
+        <div class="space-y-2">
+          <h2 class="text-lg font-semibold">{$t(i18nKeys.console.quickDeploy.deploymentEntryTitle, { stepTitle: activeStepDetails.title })}</h2>
+          <p class="text-sm text-muted-foreground">{activeStepDetails.description}</p>
+        </div>
+        <div class="space-y-6">
+          <div class="flex flex-wrap items-center gap-1.5 bg-muted/20 px-2 py-2">
             {#each deploymentSteps as step, index (step.key)}
               <button
                 type="button"
@@ -1871,23 +1881,21 @@
               <Waypoints class="size-4 text-muted-foreground" />
               <span>{$t(i18nKeys.common.domain.source)}</span>
             </div>
-            <div class="grid gap-2">
+            <div
+              class="grid gap-3 sm:grid-cols-2 xl:grid-cols-5"
+              role="radiogroup"
+              aria-label={$t(i18nKeys.common.domain.source)}
+            >
               {#each sourceOptions as option (option.key)}
-                <button
-                  type="button"
-                  class={`flex items-start gap-3 rounded-md border px-3 py-3 text-left transition-colors ${
-                    sourceKind === option.key ? "border-primary bg-primary/5" : "hover:bg-muted/50"
-                  }`}
-                  onclick={() => {
+                <ResourceSourceOption
+                  selected={sourceKind === option.key}
+                  label={$t(option.labelKey)}
+                  description={$t(option.hintKey)}
+                  icon={option.icon}
+                  onselect={() => {
                     selectSourceKind(option.key);
                   }}
-                >
-                  <option.icon class="mt-0.5 size-4 text-muted-foreground" />
-                  <span class="space-y-1">
-                    <span class="block text-sm font-medium">{$t(option.labelKey)}</span>
-                    <span class="block text-xs text-muted-foreground">{$t(option.hintKey)}</span>
-                  </span>
-                </button>
+                />
               {/each}
             </div>
             {#if sourceKind === "github"}
@@ -1984,25 +1992,25 @@
                 {/if}
               </div>
               {#if authIdentity}
-                <div class="rounded-md border bg-muted/40 px-3 py-3 text-sm">
+                <div class="bg-muted/30 px-3 py-3 text-sm">
                   <span class="text-muted-foreground">{$t(i18nKeys.console.quickDeploy.currentIdentity)}</span>
                   <span class="ml-2 font-medium">{authIdentity}</span>
                 </div>
               {/if}
 
               {#if !githubProvider?.configured}
-                <div class="rounded-md border border-dashed px-3 py-3 text-sm text-muted-foreground">
+                <div class="bg-muted/25 px-3 py-3 text-sm text-muted-foreground">
                   {$t(i18nKeys.console.quickDeploy.githubOAuthNotConfigured)}
                 </div>
               {:else if !githubConnected}
                 <Button variant="outline" class="w-full" onclick={connectGitHub}>
-                  <GitBranch class="size-4" />
+                  <GitHubIcon class="size-4" />
                   {$t(i18nKeys.common.actions.connectGitHub)}
                 </Button>
               {:else}
                 <div class="space-y-3">
                   <Input bind:value={githubRepositorySearch} placeholder={$t(i18nKeys.console.quickDeploy.githubRepositorySearch)} />
-                  <div class="max-h-64 space-y-2 overflow-auto rounded-md border p-2">
+                  <div class="max-h-64 space-y-2 overflow-auto bg-muted/20 p-2">
                     {#if githubRepositoriesQuery.isPending}
                       {#each Array.from({ length: 4 }) as _, index (index)}
                         <Skeleton class="h-14 w-full" />
@@ -2011,9 +2019,9 @@
                       {#each githubRepositories as repository (repository.id)}
                         <button
                           type="button"
-                          class={`w-full rounded-md border px-3 py-3 text-left transition-colors ${
+                          class={`w-full px-3 py-3 text-left transition-colors ${
                             selectedGitHubRepositoryId === repository.id
-                              ? "border-primary bg-primary/5"
+                              ? "bg-primary/5 ring-1 ring-primary/40"
                               : "hover:bg-muted/50"
                           }`}
                           onclick={() => applyGitHubRepository(repository)}
@@ -2064,12 +2072,12 @@
                 </Button>
               </div>
             {:else}
-              <div class="rounded-md border border-dashed px-3 py-3 text-sm text-muted-foreground">
+              <div class="bg-muted/25 px-3 py-3 text-sm text-muted-foreground">
                 {$t(i18nKeys.console.quickDeploy.noProjectOptions)}
               </div>
             {/if}
             {#if projectMode === "existing" && projects.length > 0}
-              <div class="max-h-44 space-y-2 overflow-auto rounded-md border p-2">
+              <div class="max-h-44 space-y-2 overflow-auto bg-muted/20 p-2">
                 {#each projects as project (project.id)}
                   <Button
                     class="w-full justify-start"
@@ -2132,7 +2140,7 @@
               </Button>
             </div>
             {#if serverMode === "existing"}
-              <div class="max-h-44 space-y-2 overflow-auto rounded-md border p-2">
+              <div class="max-h-44 space-y-2 overflow-auto bg-muted/20 p-2">
                 {#if servers.length > 0}
                   {#each servers as server (server.id)}
                     <Button
@@ -2192,7 +2200,7 @@
               </Button>
             </div>
             {#if environmentMode === "existing"}
-              <div class="max-h-44 space-y-2 overflow-auto rounded-md border p-2">
+              <div class="max-h-44 space-y-2 overflow-auto bg-muted/20 p-2">
                 {#if filteredEnvironments.length > 0}
                   {#each filteredEnvironments as environment (environment.id)}
                     <Button
@@ -2284,39 +2292,39 @@
                 </p>
               </div>
               <div class="grid gap-3 text-sm md:grid-cols-2">
-                <div class="rounded-md border px-3 py-3">
+                <div class="bg-muted/25 px-3 py-3">
                   <p class="text-xs text-muted-foreground">{$t(i18nKeys.common.domain.source)}</p>
                   <p class="mt-1 truncate font-medium">{$t(selectedSourceOption.labelKey)} · {sourceSummary}</p>
                 </div>
-                <div class="rounded-md border px-3 py-3">
+                <div class="bg-muted/25 px-3 py-3">
                   <p class="text-xs text-muted-foreground">{$t(i18nKeys.common.domain.project)}</p>
                   <p class="mt-1 truncate font-medium">{projectSummary}</p>
                 </div>
-                <div class="rounded-md border px-3 py-3">
+                <div class="bg-muted/25 px-3 py-3">
                   <p class="text-xs text-muted-foreground">{$t(i18nKeys.common.domain.server)}</p>
                   <p class="mt-1 truncate font-medium">{serverSummary}</p>
                   <p class="mt-1 truncate text-xs text-muted-foreground">{serverCredentialSummary}</p>
                 </div>
-                <div class="rounded-md border px-3 py-3">
+                <div class="bg-muted/25 px-3 py-3">
                   <p class="text-xs text-muted-foreground">{$t(i18nKeys.common.domain.environment)}</p>
                   <p class="mt-1 truncate font-medium">{environmentSummary}</p>
                 </div>
-                <div class="rounded-md border px-3 py-3">
+                <div class="bg-muted/25 px-3 py-3">
                   <p class="text-xs text-muted-foreground">{$t(i18nKeys.common.domain.resource)}</p>
                   <p class="mt-1 truncate font-medium">{resourceSummary}</p>
                 </div>
-                <div class="rounded-md border px-3 py-3">
+                <div class="bg-muted/25 px-3 py-3">
                   <p class="text-xs text-muted-foreground">{$t(i18nKeys.common.domain.domainBindings)}</p>
                   <p class="mt-1 truncate font-medium">{domainBindingSummary}</p>
                 </div>
-                <div class="rounded-md border px-3 py-3">
+                <div class="bg-muted/25 px-3 py-3">
                   <p class="text-xs text-muted-foreground">{$t(i18nKeys.common.domain.variables)}</p>
                   <p class="mt-1 truncate font-medium">{variableSummary}</p>
                 </div>
               </div>
 
               <div class="space-y-3">
-                <div class="rounded-md border px-3 py-3">
+                <div class="bg-muted/25 px-3 py-3">
                   <div class="flex items-center justify-between gap-3">
                     <div>
                       <p class="text-sm font-medium">{$t(i18nKeys.common.domain.project)}</p>
@@ -2354,7 +2362,7 @@
                         </Button>
                       </div>
                       {#if projectMode === "existing"}
-                        <div class="max-h-44 space-y-2 overflow-auto rounded-md border p-2">
+                        <div class="max-h-44 space-y-2 overflow-auto bg-muted/20 p-2">
                           {#if projects.length > 0}
                             {#each projects as project (project.id)}
                               <Button
@@ -2382,7 +2390,7 @@
                   {/if}
                 </div>
 
-                <div class="rounded-md border px-3 py-3">
+                <div class="bg-muted/25 px-3 py-3">
                   <div class="flex items-center justify-between gap-3">
                     <div>
                       <p class="text-sm font-medium">{$t(i18nKeys.common.domain.environment)}</p>
@@ -2420,7 +2428,7 @@
                         </Button>
                       </div>
                       {#if environmentMode === "existing"}
-                        <div class="max-h-44 space-y-2 overflow-auto rounded-md border p-2">
+                        <div class="max-h-44 space-y-2 overflow-auto bg-muted/20 p-2">
                           {#if filteredEnvironments.length > 0}
                             {#each filteredEnvironments as environment (environment.id)}
                               <Button
@@ -2460,7 +2468,7 @@
                   {/if}
                 </div>
 
-                <div class="rounded-md border px-3 py-3">
+                <div class="bg-muted/25 px-3 py-3">
                   <div class="flex items-center justify-between gap-3">
                     <div>
                       <p class="text-sm font-medium">{$t(i18nKeys.common.domain.resource)}</p>
@@ -2498,7 +2506,7 @@
                         </Button>
                       </div>
                       {#if resourceMode === "existing"}
-                        <div class="max-h-44 space-y-2 overflow-auto rounded-md border p-2">
+                        <div class="max-h-44 space-y-2 overflow-auto bg-muted/20 p-2">
                           {#if resourcesQuery.isPending}
                             {#each Array.from({ length: 3 }) as _, index (index)}
                               <Skeleton class="h-10 w-full" />
@@ -2574,7 +2582,7 @@
                   {/if}
                 </div>
 
-                <div class="rounded-md border px-3 py-3">
+                <div class="bg-muted/25 px-3 py-3">
                   <div class="flex items-center justify-between gap-3">
                     <div>
                       <p class="text-sm font-medium">{$t(i18nKeys.common.domain.variables)}</p>
@@ -2612,8 +2620,8 @@
               </div>
             </div>
           {/if}
-        </CardContent>
-        <CardFooter class="flex flex-col gap-3 border-t sm:flex-row sm:items-center sm:justify-between">
+        </div>
+        <div class="flex flex-col gap-3 border-t pt-4 sm:flex-row sm:items-center sm:justify-between">
           <p class="text-xs text-muted-foreground">
             {$t(i18nKeys.console.quickDeploy.step, { current: currentStepIndex + 1, total: deploymentSteps.length, title: activeStepDetails.title })}
           </p>
@@ -2632,23 +2640,23 @@
               </Button>
             {/if}
           </div>
-        </CardFooter>
-      </Card>
+        </div>
+      </section>
 
   </div>
 
   <aside class="space-y-5 xl:sticky xl:top-5 xl:self-start">
-      <Card>
-        <CardHeader>
-          <CardTitle>{$t(i18nKeys.console.quickDeploy.currentSummary)}</CardTitle>
-          <CardDescription>{$t(i18nKeys.console.quickDeploy.currentSummaryDescription)}</CardDescription>
-        </CardHeader>
-        <CardContent class="space-y-3 text-sm">
+      <section class="space-y-4 border-y py-4">
+        <div class="space-y-2">
+          <h2 class="text-lg font-semibold">{$t(i18nKeys.console.quickDeploy.currentSummary)}</h2>
+          <p class="text-sm text-muted-foreground">{$t(i18nKeys.console.quickDeploy.currentSummaryDescription)}</p>
+        </div>
+        <div class="space-y-3 text-sm">
           <div class="flex items-center justify-between gap-3">
             <span class="text-muted-foreground">{$t(i18nKeys.console.quickDeploy.sourceType)}</span>
             <span class="font-medium">{$t(selectedSourceOption.labelKey)}</span>
           </div>
-          <div class="rounded-md border bg-muted/20 px-3 py-3">
+          <div class="bg-muted/20 px-3 py-3">
             <div class="mb-2 flex items-center justify-between gap-3">
               <span class="text-xs font-medium uppercase text-muted-foreground">
                 {$t(i18nKeys.console.quickDeploy.sourceDetails)}
@@ -2689,9 +2697,9 @@
             <span class="text-muted-foreground">{$t(i18nKeys.common.domain.variables)}</span>
             <span class="font-medium">{variableSummary}</span>
           </div>
-        </CardContent>
+        </div>
         {#if activeStep === "review"}
-          <CardFooter class="flex-col items-stretch gap-3">
+          <div class="flex flex-col items-stretch gap-3">
             <Button class="w-full" disabled={deployPending} onclick={handleQuickDeploy}>
               {#if deployPending}
                 <LoaderCircle class="size-4 animate-spin" />
@@ -2702,7 +2710,7 @@
               {/if}
             </Button>
             {#if workflowProgressItems.length > 0}
-              <div class="rounded-md border bg-muted/20 px-3 py-3">
+              <div class="bg-muted/20 px-3 py-3">
                 <div class="mb-2 space-y-1">
                   <p class="text-xs font-medium text-foreground">
                     {$t(i18nKeys.console.quickDeploy.workflowProgressTitle)}
@@ -2741,7 +2749,7 @@
                   {/each}
                 </div>
                 {#if workflowDeploymentProgressSections.length > 0}
-                  <div class="mt-3 max-h-56 overflow-auto rounded-md border bg-background px-3 py-2">
+                  <div class="mt-3 max-h-56 overflow-auto bg-background/60 px-3 py-2">
                     <div class="space-y-3">
                       {#each workflowDeploymentProgressSections as section (section.phase)}
                         <div class="space-y-1.5">
@@ -2776,24 +2784,24 @@
                 {/if}
               </div>
             {/if}
-            <pre class="overflow-x-auto rounded-md border bg-muted px-3 py-3 text-xs text-muted-foreground">{deploymentCommandPreview}</pre>
-          </CardFooter>
+            <pre class="overflow-x-auto bg-muted px-3 py-3 text-xs text-muted-foreground">{deploymentCommandPreview}</pre>
+          </div>
         {/if}
-      </Card>
+      </section>
 
       {#if deployFeedback}
-        <Card class={deployFeedback.kind === "success" ? "border-primary/30" : "border-destructive/30"}>
-          <CardHeader>
-            <CardTitle class="flex items-center gap-2 text-base">
+        <section class={deployFeedback.kind === "success" ? "space-y-3 border-y py-4" : "space-y-3 border-y border-destructive/30 py-4"}>
+          <div>
+            <h2 class="flex items-center gap-2 text-base font-semibold">
               {#if deployFeedback.kind === "success"}
                 <CheckCircle2 class="size-4" />
               {:else}
                 <ShieldCheck class="size-4" />
               {/if}
               {deployFeedback.title}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
+            </h2>
+          </div>
+          <div>
             <p class="text-sm text-muted-foreground">{deployFeedback.detail}</p>
             {#if deployFeedback.kind === "success" && lastCreatedDeploymentId}
               <div class="mt-4 flex flex-wrap gap-2">
@@ -2811,15 +2819,15 @@
                 <Button
                   size="sm"
                   onclick={() => {
-                    void goto(`/deployments/${lastCreatedDeploymentId}`);
+                    void goto(lastCreatedDeploymentHref());
                   }}
                 >
                   {$t(i18nKeys.common.actions.viewDeployment)}
                 </Button>
               </div>
             {/if}
-          </CardContent>
-        </Card>
+          </div>
+        </section>
       {/if}
   </aside>
 </div>

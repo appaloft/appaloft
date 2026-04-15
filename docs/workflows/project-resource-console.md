@@ -100,10 +100,18 @@ A dedicated create-resource page or panel may collect:
 
 Resource-owned source/runtime/network profile input may be persisted by `resources.create` when the create flow is part of a first-deploy workflow. Dedicated profile update commands remain future behavior slices.
 
-If the create-resource flow collects source/runtime/network drafts before dedicated update operations exist, it must treat them as resource-owned create input or workflow draft state and either:
+If the project-scoped create-resource flow collects source/runtime/network drafts before dedicated
+update operations exist, it must treat them as resource-owned create input and continue as a
+first-deploy workflow:
 
-- continue into Quick Deploy through `resources.create` and then `deployments.create(resourceId)`; or
-- store them only after future resource source/runtime/network commands are accepted and implemented.
+```text
+resources.create
+  -> deployments.create(resourceId)
+```
+
+This Web entry uses a deploy action after collecting an existing project, environment, server, and
+optional destination. It is not labeled as project-level "new deployment" and it does not call
+`deployments.create` until `resources.create` returns a resource id.
 
 The create-resource flow must not pass source, runtime, network, route, domain, or TLS fields directly to `deployments.create`.
 
@@ -130,8 +138,8 @@ Allowed entry differences:
 
 | Entry | Contract |
 | --- | --- |
-| Project page create resource | Dispatches `resources.create` or navigates to dedicated create-resource flow with project context prefilled. |
-| Project page new deployment | Opens Quick Deploy or requires resource selection before deployment admission. |
+| Project page create resource | Navigates to a dedicated project-scoped first-deploy flow with project context prefilled. |
+| Project page new deployment | Must not be a direct project-owned write action. If reintroduced, it opens Quick Deploy or requires resource selection before deployment admission. |
 | Resource page new deployment | Dispatches `deployments.create` with the selected `resourceId` after collecting allowed attempt inputs. |
 | Resource page deployment history | Queries deployments filtered by resource. |
 | Sidebar resource item | Navigates to resource detail and displays read-model status. |
@@ -139,17 +147,20 @@ Allowed entry differences:
 
 ## Current Implementation Notes And Migration Gaps
 
-Current project detail page has resource listing and a create-resource affordance, but deployment rollups/actions still need an ADR-013 alignment pass.
+Current project detail page treats resources as the primary list, keeps deployment history as a
+rollup, and does not expose a direct project-level new-deployment mutation.
 
-Current dedicated create-resource page does not yet exist.
+Current dedicated create-resource page collects resource source/runtime/network draft fields plus
+server/destination deployment target fields, then sequences `resources.create ->
+deployments.create(resourceId)`.
 
 Current contracts store the listener port as `networkProfile.internalPort`, governed by [ADR-015](../decisions/ADR-015-resource-network-profile.md).
 
-Current sidebar does not yet expose Project -> Resource hierarchy with latest deployment status.
+Current sidebar exposes a Project -> Resource hierarchy with latest deployment status derived from
+read-model deployment data.
 
 Current deployment and resource read models may need a resource summary projection or query shape to support latest deployment status efficiently.
 
 ## Open Questions
 
 - Should resource latest deployment status be added to `resources.list`, a future `resources.summary` query, or a separate navigation read model?
-- Should the create-resource flow first persist the resource with source/runtime/network create-time profile and then continue into Quick Deploy, or should it require dedicated update commands before collecting those drafts outside first deploy?

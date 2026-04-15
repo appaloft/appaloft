@@ -3,23 +3,17 @@
   import { ArrowRight, Rocket, Server, ShieldCheck, Waypoints } from "@lucide/svelte";
 
   import ConsoleShell from "$lib/components/console/ConsoleShell.svelte";
+  import DeploymentStatusBadge from "$lib/components/console/DeploymentStatusBadge.svelte";
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
-  import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
-  } from "$lib/components/ui/card";
   import { Skeleton } from "$lib/components/ui/skeleton";
   import { createConsoleQueries } from "$lib/console/queries";
   import {
-    countProjectDeployments,
     countProjectEnvironments,
-    deploymentBadgeVariant,
+    countProjectResources,
     findProject,
     formatTime,
+    projectDetailHref,
   } from "$lib/console/utils";
   import { i18nKeys, t } from "$lib/i18n";
 
@@ -29,6 +23,7 @@
     projectsQuery,
     serversQuery,
     environmentsQuery,
+    resourcesQuery,
     deploymentsQuery,
   } = createConsoleQueries(browser);
 
@@ -37,12 +32,14 @@
   const projects = $derived(projectsQuery.data?.items ?? []);
   const servers = $derived(serversQuery.data?.items ?? []);
   const environments = $derived(environmentsQuery.data?.items ?? []);
+  const resources = $derived(resourcesQuery.data?.items ?? []);
   const deployments = $derived(deploymentsQuery.data?.items ?? []);
   const pageLoading = $derived(
     versionQuery.isPending ||
       projectsQuery.isPending ||
       serversQuery.isPending ||
       environmentsQuery.isPending ||
+      resourcesQuery.isPending ||
       deploymentsQuery.isPending,
   );
   const hasNoDeploymentBase = $derived(projects.length === 0 && deployments.length === 0);
@@ -59,33 +56,30 @@
 <ConsoleShell title={$t(i18nKeys.console.home.pageTitle)} description={$t(i18nKeys.console.home.pageDescription)}>
   {#if pageLoading}
     <div class="space-y-6">
-      <div class="grid gap-4 md:grid-cols-4">
+      <div class="grid border-y md:grid-cols-4 md:divide-x">
         {#each Array.from({ length: 4 }) as _, index (index)}
-          <Card>
-            <CardHeader class="space-y-3">
-              <Skeleton class="h-4 w-20" />
-              <Skeleton class="h-8 w-16" />
-            </CardHeader>
-          </Card>
+          <div class="space-y-3 px-0 py-4 md:px-4">
+            <Skeleton class="h-4 w-20" />
+            <Skeleton class="h-8 w-16" />
+          </div>
         {/each}
       </div>
-      <Card>
-        <CardHeader>
+      <section class="space-y-4">
+        <div class="space-y-3">
           <Skeleton class="h-5 w-40" />
           <Skeleton class="h-4 w-64" />
-        </CardHeader>
-        <CardContent class="space-y-3">
+        </div>
+        <div class="space-y-3">
           <Skeleton class="h-20 w-full" />
           <Skeleton class="h-20 w-full" />
-        </CardContent>
-      </Card>
+        </div>
+      </section>
     </div>
   {:else}
-    <div class="space-y-6">
+    <div class="space-y-8">
       {#if hasNoDeploymentBase}
-        <section class="overflow-hidden rounded-lg border bg-background">
-          <div class="grid gap-0 lg:grid-cols-[0.9fr_1.1fr]">
-            <div class="space-y-5 border-b bg-muted/30 p-6 md:p-8 lg:border-b-0 lg:border-r">
+        <section class="grid gap-8 border-y py-6 lg:grid-cols-[0.9fr_1.1fr]">
+            <div class="space-y-5">
               <Badge class="w-fit" variant="outline">{$t(i18nKeys.console.home.targetNeeded)}</Badge>
               <div class="max-w-2xl space-y-3">
                 <h1 class="text-2xl font-semibold md:text-3xl">{$t(i18nKeys.console.home.deploymentBaseTitle)}</h1>
@@ -94,7 +88,7 @@
                 </p>
               </div>
             </div>
-            <div class="space-y-5 p-6 md:p-8">
+            <div class="space-y-5 lg:border-l lg:pl-8">
               <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div class="space-y-1">
                   <p class="text-sm font-medium">{$t(i18nKeys.common.actions.newDeployment)}</p>
@@ -113,7 +107,7 @@
                   $t(i18nKeys.console.home.deploymentFlowCreateEnvironment),
                   $t(i18nKeys.console.home.deploymentFlowDeploymentRecord),
                 ] as step, index (step)}
-                  <div class={index === 0 ? "flex items-center gap-3 rounded-md border border-primary/40 bg-primary/[0.03] px-4 py-3" : "flex items-center gap-3 rounded-md border bg-background px-4 py-3"}>
+                  <div class={index === 0 ? "flex items-center gap-3 bg-primary/[0.05] px-4 py-3" : "flex items-center gap-3 bg-muted/30 px-4 py-3"}>
                     <span class={index === 0 ? "flex size-7 items-center justify-center rounded-md bg-primary text-xs font-medium text-primary-foreground" : "flex size-7 items-center justify-center rounded-md bg-muted text-xs font-medium text-muted-foreground"}>
                       {index + 1}
                     </span>
@@ -122,10 +116,9 @@
                 {/each}
               </div>
             </div>
-          </div>
         </section>
       {:else if hasProjectsWithoutDeployments}
-        <section class="flex flex-col gap-4 rounded-lg border border-amber-300/70 bg-amber-50/70 p-5 md:flex-row md:items-center md:justify-between">
+        <section class="flex flex-col gap-4 bg-amber-50/70 px-4 py-5 md:flex-row md:items-center md:justify-between">
           <div class="space-y-2">
             <Badge class="w-fit border-amber-400 text-amber-900" variant="outline">{$t(i18nKeys.console.deployments.noFilteredDeployments)}</Badge>
             <h1 class="text-xl font-semibold text-amber-950">{$t(i18nKeys.console.home.deploymentsWithoutRecordsTitle)}</h1>
@@ -136,60 +129,47 @@
         </section>
       {/if}
 
-      <section class="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardHeader class="pb-2">
-            <CardDescription>{$t(i18nKeys.common.domain.projects)}</CardDescription>
-            <CardTitle class="text-2xl">{projects.length}</CardTitle>
-          </CardHeader>
-          <CardContent>
+      <section class="grid border-y md:grid-cols-4 md:divide-x">
+        <div class="space-y-3 px-0 py-4 md:px-4">
+          <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">{$t(i18nKeys.common.domain.projects)}</p>
+          <p class="text-2xl font-semibold">{projects.length}</p>
             <Button href="/projects" variant="ghost" class="px-0">
               {$t(i18nKeys.common.actions.viewProjects)}
               <ArrowRight class="size-4" />
             </Button>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader class="pb-2">
-            <CardDescription>{$t(i18nKeys.common.domain.deployments)}</CardDescription>
-            <CardTitle class="text-2xl">{deployments.length}</CardTitle>
-          </CardHeader>
-          <CardContent>
+        </div>
+        <div class="space-y-3 border-t px-0 py-4 md:border-t-0 md:px-4">
+          <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">{$t(i18nKeys.common.domain.deployments)}</p>
+          <p class="text-2xl font-semibold">{deployments.length}</p>
             <Button href="/deployments" variant="ghost" class="px-0">
               {$t(i18nKeys.common.actions.viewDeployments)}
               <ArrowRight class="size-4" />
             </Button>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader class="pb-2">
-            <CardDescription>{$t(i18nKeys.common.domain.servers)}</CardDescription>
-            <CardTitle class="text-2xl">{servers.length}</CardTitle>
-          </CardHeader>
-          <CardContent class="text-sm text-muted-foreground">
+        </div>
+        <div class="space-y-3 border-t px-0 py-4 md:border-t-0 md:px-4">
+          <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">{$t(i18nKeys.common.domain.servers)}</p>
+          <p class="text-2xl font-semibold">{servers.length}</p>
+          <p class="text-sm text-muted-foreground">
             {servers.length > 0 ? $t(i18nKeys.console.home.serverAvailableTarget) : $t(i18nKeys.console.home.serverCreatedDuringDeployment)}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader class="pb-2">
-            <CardDescription>{$t(i18nKeys.common.domain.environments)}</CardDescription>
-            <CardTitle class="text-2xl">{environments.length}</CardTitle>
-          </CardHeader>
-          <CardContent class="text-sm text-muted-foreground">
+          </p>
+        </div>
+        <div class="space-y-3 border-t px-0 py-4 md:border-t-0 md:px-4">
+          <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">{$t(i18nKeys.common.domain.environments)}</p>
+          <p class="text-2xl font-semibold">{environments.length}</p>
+          <p class="text-sm text-muted-foreground">
             {environments.length > 0 ? $t(i18nKeys.console.home.environmentSnapshotEntry) : $t(i18nKeys.console.home.environmentCreatedDuringDeployment)}
-          </CardContent>
-        </Card>
+          </p>
+        </div>
       </section>
 
-      <section class="grid gap-6 lg:grid-cols-[1fr_1fr]">
-        <Card>
-          <CardHeader>
-            <CardTitle>{$t(i18nKeys.console.home.latestDeploymentTitle)}</CardTitle>
-            <CardDescription>{$t(i18nKeys.console.home.latestDeploymentDescription)}</CardDescription>
-          </CardHeader>
-          <CardContent>
+      <section class="grid gap-8 lg:grid-cols-[1fr_1fr]">
+        <section class="space-y-4">
+          <div>
+            <h2 class="text-lg font-semibold">{$t(i18nKeys.console.home.latestDeploymentTitle)}</h2>
+            <p class="mt-1 text-sm text-muted-foreground">{$t(i18nKeys.console.home.latestDeploymentDescription)}</p>
+          </div>
             {#if latestDeployment}
-              <div class="space-y-4 rounded-md border p-4">
+              <div class="border-y py-4">
                 <div class="flex items-start justify-between gap-3">
                   <div>
                     <p class="font-medium">{latestDeployment.runtimePlan.source.displayName}</p>
@@ -197,9 +177,7 @@
                       {latestProject?.name ?? latestDeployment.projectId} · {formatTime(latestDeployment.createdAt)}
                     </p>
                   </div>
-                  <Badge variant={deploymentBadgeVariant(latestDeployment.status)}>
-                    {latestDeployment.status}
-                  </Badge>
+                  <DeploymentStatusBadge status={latestDeployment.status} />
                 </div>
                 <Button href="/deployments" variant="outline">
                   {$t(i18nKeys.common.actions.openDeployments)}
@@ -207,24 +185,23 @@
                 </Button>
               </div>
             {:else}
-              <div class="rounded-md border border-dashed p-5 text-sm text-muted-foreground">
+              <div class="border-y bg-muted/25 px-4 py-6 text-sm text-muted-foreground">
                 {$t(i18nKeys.console.home.latestDeploymentEmpty)}
               </div>
             {/if}
-          </CardContent>
-        </Card>
+        </section>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>{$t(i18nKeys.console.home.projectRelationsTitle)}</CardTitle>
-            <CardDescription>{$t(i18nKeys.console.home.projectRelationsDescription)}</CardDescription>
-          </CardHeader>
-          <CardContent class="space-y-3">
+        <section class="space-y-4">
+          <div>
+            <h2 class="text-lg font-semibold">{$t(i18nKeys.console.home.projectRelationsTitle)}</h2>
+            <p class="mt-1 text-sm text-muted-foreground">{$t(i18nKeys.console.home.projectRelationsDescription)}</p>
+          </div>
             {#if projects.length > 0}
+              <div class="divide-y border-y">
               {#each projects.slice(0, 3) as project (project.id)}
                 <a
-                  href={`/projects?projectId=${project.id}`}
-                  class="flex items-center justify-between gap-3 rounded-md border px-4 py-3 transition-colors hover:bg-muted/50"
+                  href={projectDetailHref(project.id)}
+                  class="flex items-center justify-between gap-3 py-3 transition-colors hover:bg-muted/35 sm:px-3"
                 >
                   <span>
                     <span class="block text-sm font-medium">{project.name}</span>
@@ -232,35 +209,35 @@
                   </span>
                   <span class="flex flex-wrap justify-end gap-2 text-xs text-muted-foreground">
                     <span>{countProjectEnvironments(project, environments)} {$t(i18nKeys.common.domain.environments)}</span>
-                    <span>{countProjectDeployments(project, deployments)} {$t(i18nKeys.common.domain.deployments)}</span>
+                    <span>{countProjectResources(project, resources)} {$t(i18nKeys.common.domain.resources)}</span>
                   </span>
                 </a>
               {/each}
+              </div>
             {:else}
-              <div class="rounded-md border border-dashed p-5 text-sm text-muted-foreground">
+              <div class="border-y bg-muted/25 px-4 py-6 text-sm text-muted-foreground">
                 {$t(i18nKeys.console.home.projectRelationsEmpty)}
               </div>
             {/if}
-          </CardContent>
-        </Card>
+        </section>
       </section>
 
-      <section class="grid gap-4 md:grid-cols-3">
-        <div class="rounded-lg border bg-background p-4">
+      <section class="grid border-y md:grid-cols-3 md:divide-x">
+        <div class="px-0 py-4 md:px-4">
           <div class="flex items-center gap-2 text-sm font-medium">
             <ShieldCheck class="size-4 text-muted-foreground" />
             {$t(i18nKeys.console.home.readinessCard)}
           </div>
           <p class="mt-3 text-sm text-muted-foreground">{readiness?.status ?? "unknown"}</p>
         </div>
-        <div class="rounded-lg border bg-background p-4">
+        <div class="border-t px-0 py-4 md:border-t-0 md:px-4">
           <div class="flex items-center gap-2 text-sm font-medium">
             <Waypoints class="size-4 text-muted-foreground" />
             {$t(i18nKeys.console.home.modeCard)}
           </div>
           <p class="mt-3 text-sm text-muted-foreground">{version?.mode ?? "self-hosted"}</p>
         </div>
-        <div class="rounded-lg border bg-background p-4">
+        <div class="border-t px-0 py-4 md:border-t-0 md:px-4">
           <div class="flex items-center gap-2 text-sm font-medium">
             <Server class="size-4 text-muted-foreground" />
             {$t(i18nKeys.console.home.databaseCard)}

@@ -17,20 +17,17 @@
     Sun,
     UserRound,
   } from "@lucide/svelte";
+  import type { DeploymentSummary, ResourceSummary } from "@yundu/contracts";
   import type { Snippet } from "svelte";
 
   import { API_BASE, readErrorMessage, request } from "$lib/api/client";
   import yunduLogoMark from "$lib/assets/yundu-logo-mark.svg";
+  import ResourceStatusDot from "$lib/components/console/ResourceStatusDot.svelte";
+  import SidebarResourceStatus from "$lib/components/console/SidebarResourceStatus.svelte";
   import { Avatar, AvatarFallback } from "$lib/components/ui/avatar";
   import { Badge } from "$lib/components/ui/badge";
+  import * as Breadcrumb from "$lib/components/ui/breadcrumb";
   import { Button } from "$lib/components/ui/button";
-  import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
-  } from "$lib/components/ui/card";
   import {
     DropdownMenu,
     DropdownMenuContent,
@@ -62,12 +59,24 @@
     SidebarTrigger,
   } from "$lib/components/ui/sidebar";
   import { createConsoleQueries, defaultAuthSession } from "$lib/console/queries";
-  import { deploymentBadgeVariant, initials, readSessionIdentity } from "$lib/console/utils";
+  import {
+    initials,
+    latestResourceDeploymentStatus,
+    projectDetailHref,
+    readSessionIdentity,
+    resourceDetailHref,
+  } from "$lib/console/utils";
   import { i18nKeys, locale, setLocale, t } from "$lib/i18n";
+
+  type BreadcrumbItem = {
+    label: string;
+    href?: string;
+  };
 
   type Props = {
     title: string;
     description: string;
+    breadcrumbs?: BreadcrumbItem[];
     children: Snippet;
   };
 
@@ -79,7 +88,7 @@
     { href: "/deployments", labelKey: i18nKeys.console.nav.deployments, icon: Rocket },
   ] as const;
 
-  let { title, description, children }: Props = $props();
+  let { title, description, breadcrumbs = [], children }: Props = $props();
   let projectSearch = $state("");
   let colorMode = $state<"light" | "dark">("light");
   let colorModeReady = $state(false);
@@ -89,13 +98,15 @@
 		versionQuery,
 		authSessionQuery,
 		projectsQuery,
-		deploymentsQuery,
+    resourcesQuery,
+    deploymentsQuery,
 	} = createConsoleQueries(browser);
 
   const pathname = $derived(page.url.pathname);
   const version = $derived(versionQuery.data ?? null);
 	const authSession = $derived(authSessionQuery.data ?? defaultAuthSession);
 	const projects = $derived(projectsQuery.data?.items ?? []);
+  const resources = $derived(resourcesQuery.data?.items ?? []);
 	const deployments = $derived(deploymentsQuery.data?.items ?? []);
   const filteredProjects = $derived.by(() => {
     const query = projectSearch.trim().toLowerCase();
@@ -103,11 +114,23 @@
       return projects;
     }
 
-    return projects.filter((project) =>
-      [project.name, project.slug, project.description ?? ""].some((value) =>
-        value.toLowerCase().includes(query),
-      ),
-    );
+    return projects.filter((project) => {
+      const projectMatches = [project.name, project.slug, project.description ?? ""].some(
+        (value) => value.toLowerCase().includes(query),
+      );
+
+      if (projectMatches) {
+        return true;
+      }
+
+      return resources.some(
+        (resource) =>
+          resource.projectId === project.id &&
+          [resource.name, resource.slug, resource.description ?? "", resource.kind].some((value) =>
+            value.toLowerCase().includes(query),
+          ),
+      );
+    });
   });
   const githubProvider = $derived(
     authSession.providers.find((provider) => provider.key === "github") ?? null,
@@ -122,13 +145,22 @@
       : $t(i18nKeys.common.actions.switchToDarkMode),
   );
   const activeDeploymentId = $derived.by(() => {
-    const match = pathname.match(/^\/deployments\/([^/]+)/);
+    const match = pathname.match(/\/deployments\/([^/]+)/);
+    return match?.[1] ? decodeURIComponent(match[1]) : "";
+  });
+  const activeResourceId = $derived.by(() => {
+    const match = pathname.match(/\/resources\/([^/]+)/);
     return match?.[1] ? decodeURIComponent(match[1]) : "";
   });
   const activeProjectId = $derived.by(() => {
     const projectMatch = pathname.match(/^\/projects\/([^/]+)/);
     if (projectMatch?.[1]) {
       return decodeURIComponent(projectMatch[1]);
+    }
+
+    const activeResource = resources.find((resource) => resource.id === activeResourceId);
+    if (activeResource) {
+      return activeResource.projectId;
     }
 
     const activeDeployment = deployments.find((deployment) => deployment.id === activeDeploymentId);
@@ -210,8 +242,12 @@
     return href === "/" ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);
   }
 
-  function projectDeployments(projectId: string) {
-    return deployments.filter((deployment) => deployment.projectId === projectId).slice(0, 3);
+  function projectResources(projectId: string): ResourceSummary[] {
+    return resources.filter((resource) => resource.projectId === projectId);
+  }
+
+  function resourceDeploymentStatus(resource: ResourceSummary): DeploymentSummary["status"] | undefined {
+    return latestResourceDeploymentStatus(resource, deployments);
   }
 
   function toggleColorMode(): void {
@@ -222,7 +258,7 @@
 <SidebarProvider>
   <Sidebar variant="inset" collapsible="icon">
     <SidebarHeader class="gap-3">
-      <a class="flex items-center gap-3 rounded-md border bg-background px-3 py-2" href="/">
+      <a class="flex items-center gap-3 px-2 py-2" href="/">
         <Avatar size="sm">
           <img src={yunduLogoMark} alt="yundu" class="size-full object-cover" />
           <AvatarFallback>{initials("Yundu")}</AvatarFallback>
@@ -269,37 +305,42 @@
           <SidebarMenu>
             {#if filteredProjects.length > 0}
               {#each filteredProjects.slice(0, 8) as project (project.id)}
-                {@const recentDeployments = projectDeployments(project.id)}
+                {@const childResources = projectResources(project.id)}
+                {@const projectIsActive = activeDeploymentId === "" && activeProjectId === project.id}
                 <SidebarMenuItem>
                   <SidebarMenuButton
-                    isActive={activeDeploymentId === "" && activeProjectId === project.id}
+                    class={[
+                      "relative !bg-transparent !shadow-none data-[active=true]:!bg-transparent data-[active=true]:!text-sidebar-foreground data-[active=true]:!shadow-none data-[active=true]:hover:!bg-transparent [&[data-active=true]_svg]:!text-sidebar-foreground",
+                      projectIsActive
+                        ? "before:absolute before:top-1.5 before:bottom-1.5 before:left-0 before:w-0.5 before:rounded-full before:bg-sidebar-primary"
+                        : "",
+                    ]}
+                    isActive={projectIsActive}
                     tooltipContent={project.name}
                   >
                     {#snippet child({ props })}
-                      <a href={`/projects/${project.id}`} {...props}>
+                      <a href={projectDetailHref(project.id)} {...props}>
                         <FolderOpen class="size-4" />
                         <span>{project.name}</span>
                       </a>
                     {/snippet}
                   </SidebarMenuButton>
-                  {#if recentDeployments.length > 0}
-                    <SidebarMenuSub>
-                      {#each recentDeployments as deployment (deployment.id)}
+                  {#if childResources.length > 0}
+                    <SidebarMenuSub class="!mx-0 !ml-2 !translate-x-0 !border-l-0 !px-0 !py-1">
+                      {#each childResources.slice(0, 8) as resource (resource.id)}
+                        {@const latestStatus = resourceDeploymentStatus(resource)}
                         <SidebarMenuSubItem>
                           <SidebarMenuSubButton
-                            isActive={activeDeploymentId === deployment.id}
+                            class="h-7 !translate-x-0 px-1.5 text-sidebar-foreground/80 data-[active=true]:!bg-sidebar-primary/5 data-[active=true]:!text-sidebar-foreground data-[active=true]:!shadow-none data-[active=true]:hover:!bg-sidebar-primary/10"
+                            isActive={activeResourceId === resource.id}
                           >
                             {#snippet child({ props })}
-                              <a href={`/deployments/${deployment.id}`} {...props}>
+                              <a href={resourceDetailHref(resource)} {...props}>
+                                <ResourceStatusDot status={latestStatus} class="shrink-0" />
                                 <span class="min-w-0 flex-1 truncate">
-                                  {deployment.runtimePlan.source.displayName}
+                                  {resource.name}
                                 </span>
-                                <Badge
-                                  class="h-4 shrink-0 px-1.5 text-[0.65rem]"
-                                  variant={deploymentBadgeVariant(deployment.status)}
-                                >
-                                  {deployment.status}
-                                </Badge>
+                                <SidebarResourceStatus status={latestStatus} />
                               </a>
                             {/snippet}
                           </SidebarMenuSubButton>
@@ -329,7 +370,7 @@
     <SidebarFooter>
       <DropdownMenu>
         <DropdownMenuTrigger
-          class="flex w-full items-center gap-2 rounded-md border bg-background px-2 py-2 text-left text-sm transition-colors hover:bg-muted/50 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0"
+          class="flex w-full items-center gap-2 px-2 py-2 text-left text-sm transition-colors hover:bg-muted/50 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0"
         >
           <Avatar size="sm">
             <AvatarFallback>{initials(authIdentity ?? "Yundu")}</AvatarFallback>
@@ -385,7 +426,28 @@
       <div class="flex min-w-0 items-center gap-3">
         <SidebarTrigger />
         <div class="min-w-0">
-          <p class="truncate text-sm font-medium">{title}</p>
+          {#if breadcrumbs.length > 0}
+            <Breadcrumb.Root class="min-w-0">
+              <Breadcrumb.List class="flex-nowrap gap-1 overflow-hidden sm:gap-1.5">
+                {#each breadcrumbs as item, index (`${item.label}-${index}`)}
+                  <Breadcrumb.Item class="min-w-0">
+                    {#if item.href && index < breadcrumbs.length - 1}
+                      <Breadcrumb.Link class="truncate" href={item.href}>
+                        {item.label}
+                      </Breadcrumb.Link>
+                    {:else}
+                      <Breadcrumb.Page class="truncate">{item.label}</Breadcrumb.Page>
+                    {/if}
+                  </Breadcrumb.Item>
+                  {#if index < breadcrumbs.length - 1}
+                    <Breadcrumb.Separator class="shrink-0" />
+                  {/if}
+                {/each}
+              </Breadcrumb.List>
+            </Breadcrumb.Root>
+          {:else}
+            <p class="truncate text-sm font-medium">{title}</p>
+          {/if}
           <p class="truncate text-xs text-muted-foreground">{description}</p>
         </div>
       </div>
@@ -417,24 +479,24 @@
 
     <main class="flex-1 p-4 md:p-6">
       {#if connectionError}
-        <Card class="border-destructive/30">
-          <CardHeader>
-            <CardTitle class="flex items-center gap-2">
+        <section class="space-y-4 border-y py-5">
+          <div class="space-y-2">
+            <h2 class="flex items-center gap-2 text-lg font-semibold">
               <ServerCrash class="size-5" />
               {$t(i18nKeys.errors.web.backendUnavailable)}
-            </CardTitle>
-            <CardDescription>
+            </h2>
+            <p class="text-sm text-muted-foreground">
               {$t(i18nKeys.errors.web.backendUnavailableDescription)}
-            </CardDescription>
-          </CardHeader>
-          <CardContent class="space-y-4">
-            <pre class="overflow-x-auto rounded-md border bg-muted px-3 py-3 text-xs text-muted-foreground">{connectionError}</pre>
+            </p>
+          </div>
+          <div class="space-y-4">
+            <pre class="overflow-x-auto bg-muted px-3 py-3 text-xs text-muted-foreground">{connectionError}</pre>
             <div class="flex flex-wrap gap-2">
               <Button variant="outline" onclick={openHealthCheck}>{$t(i18nKeys.common.actions.checkHealth)}</Button>
               <Badge variant="outline">yundu db migrate && yundu serve</Badge>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </section>
       {:else}
         {@render children()}
       {/if}

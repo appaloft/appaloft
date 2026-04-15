@@ -116,7 +116,7 @@
       void handleCreateServer();
     }}
   >
-    <section class="rounded-lg border bg-background p-5 md:p-6">
+    <section class="space-y-6">
       <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div class="max-w-2xl space-y-2">
           <Badge class="w-fit" variant="outline">
@@ -134,7 +134,7 @@
         </Button>
       </div>
 
-      <div class="mt-6">
+      <div>
         <ServerRegistrationForm
           bind:draft={draft}
           bind:connectivityResult={connectivityResult}
@@ -154,7 +154,7 @@
           <p class="mt-1 text-xs leading-5">{submitError}</p>
         </div>
       {:else if createdServerId}
-        <div class="mt-4 rounded-md border border-primary/25 bg-muted/35 px-3 py-2 text-sm">
+        <div class="mt-4 bg-muted/35 px-3 py-2 text-sm">
           <div class="flex items-start gap-2">
             <CheckCircle2 class="mt-0.5 size-4 text-primary" />
             <div>
