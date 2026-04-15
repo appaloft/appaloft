@@ -151,6 +151,8 @@ All errors use the shared shape and category rules in [Error Model](../errors/mo
 | `default_access_route_unavailable` | `default-access-policy-resolution`, `default-access-domain-generation`, `proxy-readiness` | Conditional | A required generated access route cannot be resolved before acceptance. |
 | `proxy_route_realization_failed` | `proxy-route-realization`, `public-route-verification` | Yes | Runtime adapter failed to materialize or verify the resolved route after acceptance; represented as workflow failure. |
 
+Missing or explicitly disabled edge proxy intent makes generated default access unavailable rather than required. The command may continue without a generated route, and it must not publish a direct host-port fallback.
+
 Runtime/build/deploy/verify failures after acceptance are workflow failures and must be represented by deployment state plus `deployment-failed`.
 
 ## Handler Boundary

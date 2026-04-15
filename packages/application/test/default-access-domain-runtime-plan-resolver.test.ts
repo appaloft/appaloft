@@ -176,4 +176,58 @@ describe("DefaultAccessDomainRuntimePlanResolver", () => {
       }),
     );
   });
+
+  test("skips generated default access when the server has no enabled edge proxy", async () => {
+    const inner = new CapturingRuntimePlanResolver();
+    const provider = new StaticDefaultAccessDomainProvider();
+    const resolver = new DefaultAccessDomainRuntimePlanResolver(inner, provider);
+    const context = createExecutionContext({
+      entrypoint: "system",
+      requestId: "req_default_access_no_proxy",
+    });
+    const serverWithoutProxy = createServer();
+    delete serverWithoutProxy.edgeProxy;
+
+    const result = await resolver.resolve(context, {
+      id: "plan_demo",
+      source: SourceDescriptor.rehydrate({
+        kind: SourceKindValue.rehydrate("git-public"),
+        locator: SourceLocator.rehydrate("https://example.test/demo.git"),
+        displayName: DisplayNameText.rehydrate("demo"),
+      }),
+      server: serverWithoutProxy,
+      environmentSnapshot: createEnvironmentSnapshot("snap_demo"),
+      detectedReasoning: ["detected git source"],
+      requestedDeployment: {
+        method: "dockerfile",
+        port: 3000,
+        exposureMode: "reverse-proxy",
+        upstreamProtocol: "http",
+        accessContext: {
+          projectId: "prj_demo",
+          environmentId: "env_demo",
+          resourceId: "res_demo",
+          resourceSlug: "web",
+          destinationId: "dst_demo",
+          exposureMode: "reverse-proxy",
+          upstreamProtocol: "http",
+          routePurpose: "default-resource-access",
+        },
+      },
+      generatedAt: "2026-01-01T00:00:00.000Z",
+    });
+
+    expect(result.isOk()).toBe(true);
+    expect(provider.request).toBeUndefined();
+    expect(inner.capturedInput?.requestedDeployment).toEqual(
+      expect.objectContaining({
+        accessRouteMetadata: {
+          "access.routeSource": "none",
+          "access.policyDisabledReason": "edge-proxy-missing",
+        },
+      }),
+    );
+    expect(inner.capturedInput?.requestedDeployment.domains).toBeUndefined();
+    expect(inner.capturedInput?.requestedDeployment.proxyKind).toBeUndefined();
+  });
 });
