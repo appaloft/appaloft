@@ -1,5 +1,6 @@
 <script lang="ts">
   import { browser } from "$app/environment";
+  import { goto } from "$app/navigation";
   import { page } from "$app/state";
   import { onDestroy, untrack } from "svelte";
   import { createMutation } from "@tanstack/svelte-query";
@@ -25,18 +26,25 @@
 
   import { readErrorMessage } from "$lib/api/client";
   import ConsoleShell from "$lib/components/console/ConsoleShell.svelte";
+  import DeploymentTable from "$lib/components/console/DeploymentTable.svelte";
+  import DeploymentStatusBadge from "$lib/components/console/DeploymentStatusBadge.svelte";
+  import ResourceProfileSummary from "$lib/components/console/ResourceProfileSummary.svelte";
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
+  import * as Dialog from "$lib/components/ui/dialog";
   import { Input } from "$lib/components/ui/input";
+  import * as Select from "$lib/components/ui/select";
   import { Skeleton } from "$lib/components/ui/skeleton";
+  import * as Tabs from "$lib/components/ui/tabs";
   import { createConsoleQueries } from "$lib/console/queries";
   import {
-    deploymentBadgeVariant,
     findEnvironment,
     findProject,
     findResource,
     findServer,
     formatTime,
+    projectDetailHref,
+    resourceNewDeploymentHref,
   } from "$lib/console/utils";
   import { i18nKeys, t } from "$lib/i18n";
   import { orpcClient } from "$lib/orpc";
@@ -46,6 +54,9 @@
     next(): Promise<IteratorResult<ResourceRuntimeLogEvent, unknown>>;
     return?: () => Promise<IteratorResult<ResourceRuntimeLogEvent, unknown>>;
   };
+  type ResourceDetailTab = "deployments" | "access" | "logs" | "settings";
+
+  const resourceDetailTabs = ["deployments", "access", "logs", "settings"] as const;
 
   const {
     projectsQuery,
@@ -90,16 +101,10 @@
       resource?.accessSummary?.plannedGeneratedAccessRoute ??
       null,
   );
-  const generatedAccessStatus = $derived(
-    resource?.accessSummary?.latestGeneratedAccessRoute
-      ? (resource.accessSummary.proxyRouteStatus ?? "unknown")
-      : resource?.accessSummary?.plannedGeneratedAccessRoute
-        ? "not-ready"
-        : "unknown",
-  );
   const defaultDestinationId = $derived(
     resource?.destinationId ?? latestDeployment?.destinationId ?? "",
   );
+  const activeTab = $derived(parseResourceDetailTab(page.url.searchParams.get("tab")));
 
   let serverId = $state("");
   let destinationId = $state("");
@@ -110,6 +115,7 @@
   let certificatePolicy = $state<NonNullable<CreateDomainBindingInput["certificatePolicy"]>>(
     "auto",
   );
+  let domainBindingDialogOpen = $state(false);
   let createFeedback = $state<{
     kind: "success" | "error";
     title: string;
@@ -127,6 +133,17 @@
   let proxyConfigurationError = $state<string | null>(null);
 
   const selectedServer = $derived(findServer(servers, serverId));
+  const primaryDomainBinding = $derived(
+    resourceDomainBindings.find((binding) => binding.status === "ready") ??
+      resourceDomainBindings.find((binding) => binding.status === "bound") ??
+      resourceDomainBindings[0] ??
+      null,
+  );
+  const primaryAccessHref = $derived(
+    primaryDomainBinding ? domainBindingHref(primaryDomainBinding) : (generatedAccessRoute?.url ?? ""),
+  );
+  const shouldShowServerField = $derived(!latestDeployment?.serverId);
+  const shouldShowDestinationField = $derived(!defaultDestinationId);
   const canCreateBinding = $derived(
     Boolean(
       resource &&
@@ -147,6 +164,7 @@
         detail: result.id,
       };
       domainName = "";
+      domainBindingDialogOpen = false;
       void queryClient.invalidateQueries({ queryKey: ["domain-bindings"] });
     },
     onError: (error) => {
@@ -379,6 +397,65 @@
     });
   }
 
+  function openDomainBindingDialog(): void {
+    createFeedback = null;
+    domainBindingDialogOpen = true;
+  }
+
+  function domainBindingHref(binding: DomainBindingSummary): string {
+    const normalizedPath = binding.pathPrefix.startsWith("/")
+      ? binding.pathPrefix
+      : `/${binding.pathPrefix}`;
+    const path = normalizedPath === "/" ? "" : normalizedPath;
+    const protocol = binding.tlsMode === "disabled" ? "http" : "https";
+    return `${protocol}://${binding.domainName}${path}`;
+  }
+
+  function resourceDeploymentHref(): string {
+    if (!resource) {
+      return "/deploy";
+    }
+
+    return resourceNewDeploymentHref(resource);
+  }
+
+  function parseResourceDetailTab(value: string | null): ResourceDetailTab {
+    return resourceDetailTabs.includes(value as ResourceDetailTab)
+      ? (value as ResourceDetailTab)
+      : "deployments";
+  }
+
+  function resourceTabHref(tab: ResourceDetailTab): string {
+    const params = new URLSearchParams(page.url.searchParams);
+
+    if (tab === "deployments") {
+      params.delete("tab");
+    } else {
+      params.set("tab", tab);
+    }
+
+    const search = params.toString();
+    return `${page.url.pathname}${search ? `?${search}` : ""}`;
+  }
+
+  function selectResourceTab(tab: ResourceDetailTab, event: MouseEvent): void {
+    event.preventDefault();
+    void goto(resourceTabHref(tab), { noScroll: true, keepFocus: true });
+  }
+
+  function resourceTabLabel(tab: ResourceDetailTab): string {
+    switch (tab) {
+      case "deployments":
+        return $t(i18nKeys.common.domain.deployments);
+      case "access":
+        return $t(i18nKeys.console.resources.accessTab);
+      case "logs":
+        return $t(i18nKeys.console.resources.logsTab);
+      case "settings":
+        return $t(i18nKeys.console.resources.settingsTab);
+    }
+  }
+
   function domainBindingStatusLabel(status: DomainBindingSummary["status"]): string {
     switch (status) {
       case "requested":
@@ -412,38 +489,6 @@
       case "pending_verification":
       case "requested":
         return "secondary";
-    }
-  }
-
-  function accessRouteStatusLabel(
-    status: NonNullable<ResourceSummary["accessSummary"]>["proxyRouteStatus"],
-  ): string {
-    switch (status) {
-      case "ready":
-        return $t(i18nKeys.common.status.ready);
-      case "not-ready":
-        return $t(i18nKeys.common.status.notReady);
-      case "failed":
-        return $t(i18nKeys.common.status.failed);
-      case "unknown":
-      case undefined:
-        return $t(i18nKeys.common.status.unknown);
-    }
-  }
-
-  function accessRouteStatusVariant(
-    status: NonNullable<ResourceSummary["accessSummary"]>["proxyRouteStatus"],
-  ): "default" | "secondary" | "outline" | "destructive" {
-    switch (status) {
-      case "ready":
-        return "default";
-      case "failed":
-        return "destructive";
-      case "not-ready":
-        return "secondary";
-      case "unknown":
-      case undefined:
-        return "outline";
     }
   }
 
@@ -486,6 +531,16 @@
 <ConsoleShell
   title={resource?.name ?? $t(i18nKeys.console.resources.pageTitle)}
   description={$t(i18nKeys.console.resources.detailDescription)}
+  breadcrumbs={[
+    { label: $t(i18nKeys.console.nav.home), href: "/" },
+    { label: $t(i18nKeys.console.projects.pageTitle), href: "/projects" },
+    {
+      label: project?.name ?? $t(i18nKeys.common.domain.project),
+      href: project ? projectDetailHref(project.id) : undefined,
+    },
+    { label: environment?.name ?? $t(i18nKeys.common.domain.environment) },
+    { label: resource?.name ?? $t(i18nKeys.common.domain.resource) },
+  ]}
 >
   {#if pageLoading}
     <div class="space-y-5">
@@ -496,7 +551,7 @@
       </div>
     </div>
   {:else if !resource}
-    <section class="rounded-lg border bg-background p-6 md:p-8">
+    <section class="space-y-5 py-2">
       <Badge class="w-fit" variant="outline">{$t(i18nKeys.errors.backend.notFound)}</Badge>
       <div class="mt-4 max-w-2xl space-y-3">
         <h1 class="text-2xl font-semibold md:text-3xl">
@@ -514,17 +569,15 @@
       </div>
     </section>
   {:else}
-    <div class="space-y-5">
-      <section class="rounded-lg border bg-background p-5">
+    <div class="space-y-8">
+      <section class="space-y-6">
         <div class="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
           <div class="max-w-3xl space-y-3">
             <div class="flex flex-wrap items-center gap-2">
               <Badge variant="outline">{$t(i18nKeys.common.domain.resource)}</Badge>
               <Badge variant="secondary">{resource.kind}</Badge>
               {#if resource.lastDeploymentStatus}
-                <Badge variant={deploymentBadgeVariant(resource.lastDeploymentStatus)}>
-                  {resource.lastDeploymentStatus}
-                </Badge>
+                <DeploymentStatusBadge status={resource.lastDeploymentStatus} />
               {/if}
             </div>
             <div class="space-y-2">
@@ -539,12 +592,26 @@
           </div>
 
           <div class="flex flex-wrap gap-2">
+            {#if primaryAccessHref}
+              <Button href={primaryAccessHref} target="_blank" rel="noreferrer" variant="outline">
+                {$t(i18nKeys.console.resources.openGeneratedAccess)}
+                <ArrowRight class="size-4" />
+              </Button>
+            {/if}
+            <Button onclick={openDomainBindingDialog}>
+              <Globe2 class="size-4" />
+              {$t(i18nKeys.common.actions.bindDomain)}
+            </Button>
             {#if project}
-              <Button href={`/projects/${project.id}`} variant="outline">
+              <Button href={projectDetailHref(project.id)} variant="outline">
                 <ArrowLeft class="size-4" />
                 {$t(i18nKeys.common.actions.openProject)}
               </Button>
             {/if}
+            <Button href={resourceDeploymentHref()}>
+              <Plus class="size-4" />
+              {$t(i18nKeys.common.actions.newDeployment)}
+            </Button>
             <Button href={`/deployments?projectId=${resource.projectId}`} variant="outline">
               {$t(i18nKeys.common.actions.viewDeployments)}
               <ArrowRight class="size-4" />
@@ -552,23 +619,23 @@
           </div>
         </div>
 
-        <div class="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <div class="rounded-md border px-4 py-3">
-            <p class="flex items-center gap-2 text-sm text-muted-foreground">
+        <div class="grid border-y sm:grid-cols-2 lg:grid-cols-4 lg:divide-x">
+          <div class="px-0 py-4 lg:px-4">
+            <p class="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
               <Boxes class="size-4" />
               {$t(i18nKeys.common.domain.deployments)}
             </p>
             <p class="mt-2 text-2xl font-semibold">{resourceDeployments.length}</p>
           </div>
-          <div class="rounded-md border px-4 py-3">
-            <p class="flex items-center gap-2 text-sm text-muted-foreground">
+          <div class="border-t px-0 py-4 sm:border-t-0 lg:px-4">
+            <p class="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
               <Globe2 class="size-4" />
               {$t(i18nKeys.common.domain.domainBindings)}
             </p>
             <p class="mt-2 text-2xl font-semibold">{resourceDomainBindings.length}</p>
           </div>
-          <div class="rounded-md border px-4 py-3">
-            <p class="flex items-center gap-2 text-sm text-muted-foreground">
+          <div class="border-t px-0 py-4 lg:border-t-0 lg:px-4">
+            <p class="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
               <Server class="size-4" />
               {$t(i18nKeys.common.domain.server)}
             </p>
@@ -576,8 +643,8 @@
               {(selectedServer?.name ?? latestDeployment?.serverId ?? serverId) || "-"}
             </p>
           </div>
-          <div class="rounded-md border px-4 py-3">
-            <p class="flex items-center gap-2 text-sm text-muted-foreground">
+          <div class="border-t px-0 py-4 sm:border-t-0 lg:px-4">
+            <p class="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
               <Route class="size-4" />
               {$t(i18nKeys.common.domain.destination)}
             </p>
@@ -586,144 +653,232 @@
             </p>
           </div>
         </div>
-
-        <div class="mt-5 rounded-md border px-4 py-3">
-          <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <div class="min-w-0 space-y-1">
-              <div class="flex flex-wrap items-center gap-2">
-                <Globe2 class="size-4 text-muted-foreground" />
-                <h2 class="font-semibold">{$t(i18nKeys.console.resources.generatedAccessTitle)}</h2>
-                <Badge variant={accessRouteStatusVariant(generatedAccessStatus)}>
-                  {accessRouteStatusLabel(generatedAccessStatus)}
-                </Badge>
-              </div>
-              <p class="text-sm text-muted-foreground">
-                {$t(i18nKeys.console.resources.generatedAccessDescription)}
-              </p>
-            </div>
-
-            {#if generatedAccessRoute}
-              <Button
-                href={generatedAccessRoute.url}
-                target="_blank"
-                rel="noreferrer"
-                variant="outline"
-              >
-                {$t(i18nKeys.console.resources.openGeneratedAccess)}
-                <ArrowRight class="size-4" />
-              </Button>
-            {/if}
-          </div>
-
-          {#if generatedAccessRoute}
-            <div class="mt-3 grid gap-3 lg:grid-cols-[1fr_auto_auto]">
-              <a
-                class="truncate rounded-md border bg-muted/40 px-3 py-2 text-sm font-medium text-primary underline-offset-4 hover:underline"
-                href={generatedAccessRoute.url}
-                target="_blank"
-                rel="noreferrer"
-              >
-                {generatedAccessRoute.url}
-              </a>
-              <div class="rounded-md border bg-background px-3 py-2 text-sm">
-                <span class="text-muted-foreground">{$t(i18nKeys.common.domain.proxy)}</span>
-                <span class="ml-2 font-medium">{generatedAccessRoute.proxyKind}</span>
-              </div>
-              <div class="rounded-md border bg-background px-3 py-2 text-sm">
-                <span class="text-muted-foreground">{$t(i18nKeys.common.domain.port)}</span>
-                <span class="ml-2 font-medium">{generatedAccessRoute.targetPort ?? "-"}</span>
-              </div>
-            </div>
-          {:else}
-            <div class="mt-3 rounded-md border border-dashed p-3 text-sm text-muted-foreground">
-              {$t(i18nKeys.console.resources.generatedAccessEmpty)}
-            </div>
-          {/if}
-        </div>
       </section>
 
-      <section class="rounded-lg border bg-background p-5">
-        <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-          <div class="flex items-start gap-3">
-            <div class="rounded-md border bg-muted p-2">
-              <Route class="size-4" />
-            </div>
-            <div>
-              <div class="flex flex-wrap items-center gap-2">
+      <Tabs.Root value={activeTab} class="space-y-5">
+        <Tabs.List
+          class="h-auto w-full justify-start gap-6 overflow-x-auto rounded-none border-b bg-transparent p-0"
+        >
+          {#each resourceDetailTabs as tab (tab)}
+            <Tabs.Trigger
+              value={tab}
+              class="h-11 flex-none rounded-none border-x-0 border-t-0 border-b-2 border-transparent bg-transparent px-0 py-0 shadow-none data-[state=active]:border-foreground data-[state=active]:bg-transparent data-[state=active]:shadow-none"
+              onclick={(event) => selectResourceTab(tab, event)}
+            >
+              {resourceTabLabel(tab)}
+            </Tabs.Trigger>
+          {/each}
+        </Tabs.List>
+
+        <Tabs.Content value="deployments" class="mt-0 space-y-4">
+          <section class="space-y-4">
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div>
                 <h2 class="text-lg font-semibold">
-                  {$t(i18nKeys.console.resources.proxyConfigurationTitle)}
+                  {$t(i18nKeys.console.resources.deploymentsTitle)}
                 </h2>
-                {#if proxyConfiguration}
-                  <Badge variant={proxyConfigurationStatusVariant(proxyConfiguration.status)}>
-                    {proxyConfigurationStatusLabel(proxyConfiguration.status)}
-                  </Badge>
-                {/if}
+                <p class="mt-1 text-sm text-muted-foreground">
+                  {$t(i18nKeys.console.resources.deploymentsDescription)}
+                </p>
               </div>
-              <p class="mt-1 text-sm text-muted-foreground">
-                {$t(i18nKeys.console.resources.proxyConfigurationDescription)}
-              </p>
-            </div>
-          </div>
-          <Button
-            variant="outline"
-            onclick={refreshProxyConfiguration}
-            disabled={proxyConfigurationLoading}
-          >
-            <RefreshCw class={["size-4", proxyConfigurationLoading ? "animate-spin" : ""]} />
-            {$t(i18nKeys.console.resources.proxyConfigurationRefresh)}
-          </Button>
-        </div>
-
-        {#if proxyConfigurationError}
-          <div class="mt-4 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
-            {proxyConfigurationError}
-          </div>
-        {/if}
-
-        <div class="mt-4 space-y-3">
-          {#if proxyConfigurationLoading}
-            <div class="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
-              {$t(i18nKeys.console.resources.proxyConfigurationLoading)}
-            </div>
-          {:else if !proxyConfiguration || proxyConfiguration.sections.length === 0}
-            <div class="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
-              {$t(i18nKeys.console.resources.proxyConfigurationEmpty)}
-            </div>
-          {:else}
-            <div class="grid gap-3 md:grid-cols-3">
-              <div class="rounded-md border bg-muted/30 px-3 py-2 text-sm">
-                <span class="text-muted-foreground">{$t(i18nKeys.common.domain.proxy)}</span>
-                <span class="ml-2 font-medium">{proxyConfiguration.providerKey}</span>
-              </div>
-              <div class="rounded-md border bg-muted/30 px-3 py-2 text-sm">
-                <span class="text-muted-foreground">{$t(i18nKeys.common.domain.resources)}</span>
-                <span class="ml-2 font-medium">{proxyConfiguration.routes.length}</span>
-              </div>
-              <div class="rounded-md border bg-muted/30 px-3 py-2 text-sm">
-                <span class="text-muted-foreground">
-                  {$t(i18nKeys.console.resources.proxyConfigurationGeneratedAt)}
-                </span>
-                <span class="ml-2 font-medium">{formatTime(proxyConfiguration.generatedAt)}</span>
-              </div>
+              <Button href={resourceDeploymentHref()}>
+                <Plus class="size-4" />
+                {$t(i18nKeys.common.actions.newDeployment)}
+              </Button>
             </div>
 
-            {#each proxyConfiguration.sections as section (section.id)}
-              <article class="rounded-md border">
-                <div class="flex flex-wrap items-center justify-between gap-2 border-b px-4 py-3">
-                  <h3 class="font-medium">{section.title}</h3>
-                  <Badge variant="outline">{section.format}</Badge>
+            <div>
+              {#if resourceDeployments.length > 0}
+                <DeploymentTable
+                  deployments={resourceDeployments}
+                  {servers}
+                  showProject={false}
+                  showEnvironment={false}
+                  showResource={false}
+                  showServer
+                />
+              {:else}
+                <div class="border-y bg-muted/25 px-4 py-6 text-sm text-muted-foreground">
+                  {$t(i18nKeys.console.resources.noDeployments)}
                 </div>
-                <pre class="max-h-80 overflow-auto p-4 text-xs"><code>{section.content}</code></pre>
-              </article>
-            {/each}
-          {/if}
-        </div>
-      </section>
+              {/if}
+            </div>
+          </section>
+        </Tabs.Content>
 
-      <section class="rounded-lg border bg-background p-5">
+        <Tabs.Content value="access" class="mt-0 space-y-8">
+          <section class="space-y-4">
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <h2 class="text-lg font-semibold">
+                  {$t(i18nKeys.console.resources.domainBindingsTitle)}
+                </h2>
+                <p class="mt-1 text-sm text-muted-foreground">
+                  {$t(i18nKeys.console.resources.domainBindingsDescription)}
+                </p>
+              </div>
+            </div>
+
+            <div class="space-y-3">
+              {#if resourceDomainBindings.length > 0}
+                {#each resourceDomainBindings as binding (binding.id)}
+                  {@const server = findServer(servers, binding.serverId)}
+                  <article class="border-y py-3">
+                    <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                      <div class="min-w-0 space-y-2">
+                        <div class="flex flex-wrap items-center gap-2">
+                          <Globe2 class="size-4 text-muted-foreground" />
+                          <a
+                            class="truncate font-medium text-primary underline-offset-4 hover:underline"
+                            href={domainBindingHref(binding)}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            {binding.domainName}
+                          </a>
+                          <Badge variant={domainBindingStatusVariant(binding.status)}>
+                            {domainBindingStatusLabel(binding.status)}
+                          </Badge>
+                        </div>
+                        <p class="text-sm text-muted-foreground">
+                          {binding.pathPrefix} · {binding.proxyKind} · {$t(
+                            i18nKeys.common.domain.tls,
+                          )}
+                          {" "}
+                          {binding.tlsMode}
+                        </p>
+                      </div>
+                      <p class="text-xs text-muted-foreground">{formatTime(binding.createdAt)}</p>
+                    </div>
+                    <div class="mt-3 grid gap-3 sm:grid-cols-3">
+                      <div class="bg-muted/25 px-3 py-2">
+                        <p class="text-xs text-muted-foreground">
+                          {$t(i18nKeys.common.domain.server)}
+                        </p>
+                        <p class="mt-1 truncate text-sm font-medium">
+                          {server?.name ?? binding.serverId}
+                        </p>
+                      </div>
+                      <div class="bg-muted/25 px-3 py-2">
+                        <p class="text-xs text-muted-foreground">
+                          {$t(i18nKeys.common.domain.destination)}
+                        </p>
+                        <p class="mt-1 truncate text-sm font-medium">{binding.destinationId}</p>
+                      </div>
+                      <div class="bg-muted/25 px-3 py-2">
+                        <p class="text-xs text-muted-foreground">
+                          {$t(i18nKeys.console.domainBindings.verificationAttempts, {
+                            count: binding.verificationAttemptCount,
+                          })}
+                        </p>
+                        <p class="mt-1 truncate text-sm font-medium">
+                          {binding.certificatePolicy}
+                        </p>
+                      </div>
+                    </div>
+                  </article>
+                {/each}
+              {:else}
+                <div class="bg-muted/25 px-4 py-6 text-sm text-muted-foreground">
+                  {$t(i18nKeys.console.resources.noDomainBindings)}
+                </div>
+              {/if}
+            </div>
+          </section>
+
+          <section class="space-y-4 border-t pt-6">
+            <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+              <div class="flex items-start gap-3">
+                <div class="bg-muted p-2">
+                  <Route class="size-4" />
+                </div>
+                <div>
+                  <div class="flex flex-wrap items-center gap-2">
+                    <h2 class="text-lg font-semibold">
+                      {$t(i18nKeys.console.resources.proxyConfigurationTitle)}
+                    </h2>
+                    {#if proxyConfiguration}
+                      <Badge variant={proxyConfigurationStatusVariant(proxyConfiguration.status)}>
+                        {proxyConfigurationStatusLabel(proxyConfiguration.status)}
+                      </Badge>
+                    {/if}
+                  </div>
+                  <p class="mt-1 text-sm text-muted-foreground">
+                    {$t(i18nKeys.console.resources.proxyConfigurationDescription)}
+                  </p>
+                </div>
+              </div>
+              <Button
+                variant="outline"
+                onclick={refreshProxyConfiguration}
+                disabled={proxyConfigurationLoading}
+              >
+                <RefreshCw class={["size-4", proxyConfigurationLoading ? "animate-spin" : ""]} />
+                {$t(i18nKeys.console.resources.proxyConfigurationRefresh)}
+              </Button>
+            </div>
+
+            {#if proxyConfigurationError}
+              <div class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+                {proxyConfigurationError}
+              </div>
+            {/if}
+
+            <div class="space-y-3">
+              {#if proxyConfigurationLoading}
+                <div class="bg-muted/25 px-4 py-4 text-sm text-muted-foreground">
+                  {$t(i18nKeys.console.resources.proxyConfigurationLoading)}
+                </div>
+              {:else if !proxyConfiguration || proxyConfiguration.sections.length === 0}
+                <div class="bg-muted/25 px-4 py-4 text-sm text-muted-foreground">
+                  {$t(i18nKeys.console.resources.proxyConfigurationEmpty)}
+                </div>
+              {:else}
+                <div class="grid gap-3 md:grid-cols-3">
+                  <div class="bg-muted/30 px-3 py-2 text-sm">
+                    <span class="text-muted-foreground">{$t(i18nKeys.common.domain.proxy)}</span>
+                    <span class="ml-2 font-medium">{proxyConfiguration.providerKey}</span>
+                  </div>
+                  <div class="bg-muted/30 px-3 py-2 text-sm">
+                    <span class="text-muted-foreground">{$t(i18nKeys.common.domain.resources)}</span>
+                    <span class="ml-2 font-medium">{proxyConfiguration.routes.length}</span>
+                  </div>
+                  <div class="bg-muted/30 px-3 py-2 text-sm">
+                    <span class="text-muted-foreground">
+                      {$t(i18nKeys.console.resources.proxyConfigurationGeneratedAt)}
+                    </span>
+                    <span class="ml-2 font-medium">{formatTime(proxyConfiguration.generatedAt)}</span>
+                  </div>
+                </div>
+
+                {#each proxyConfiguration.sections as section (section.id)}
+                  <article class="bg-muted/20">
+                    <div class="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
+                      <h3 class="font-medium">{section.title}</h3>
+                      <Badge variant="outline">{section.format}</Badge>
+                    </div>
+                    <pre class="max-h-80 overflow-auto p-4 text-xs"><code>{section.content}</code></pre>
+                  </article>
+                {/each}
+              {/if}
+            </div>
+          </section>
+        </Tabs.Content>
+
+        <Tabs.Content value="settings" class="mt-0 space-y-5">
+          <ResourceProfileSummary
+            {resource}
+            projectName={project?.name ?? resource.projectId}
+            environmentName={environment?.name ?? resource.environmentId}
+            destinationId={defaultDestinationId}
+          />
+        </Tabs.Content>
+
+        <Tabs.Content value="logs" class="mt-0 space-y-5">
+      <section class="space-y-4">
         <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
           <div class="flex items-start gap-3">
-            <div class="rounded-md border bg-muted p-2">
+            <div class="bg-muted p-2">
               <Terminal class="size-4" />
             </div>
             <div>
@@ -784,61 +939,29 @@
         </div>
       </section>
 
-      <section class="grid gap-5 xl:grid-cols-[0.9fr_1.1fr]">
-        <section class="rounded-lg border bg-background p-5">
-          <div class="flex items-start gap-3">
-            <div class="rounded-md border bg-muted p-2">
-              <Plus class="size-4" />
+        </Tabs.Content>
+      </Tabs.Root>
+
+      <Dialog.Root bind:open={domainBindingDialogOpen}>
+        <Dialog.Content closeLabel={$t(i18nKeys.common.actions.close)}>
+          <Dialog.Header>
+            <Dialog.Title>{$t(i18nKeys.console.domainBindings.resourceScopedTitle)}</Dialog.Title>
+            <Dialog.Description>
+              {$t(i18nKeys.console.domainBindings.resourceScopedDescription)}
+            </Dialog.Description>
+          </Dialog.Header>
+
+          <form class="space-y-5 px-5 pb-5" onsubmit={createResourceDomainBinding}>
+            <div class="flex flex-wrap gap-x-4 gap-y-1 border-y py-3 text-xs text-muted-foreground">
+              <span>{$t(i18nKeys.common.domain.resource)}: {resource.name}</span>
+              <span>
+                {$t(i18nKeys.common.domain.server)}:
+                {selectedServer?.name ?? latestDeployment?.serverId ?? "-"}
+              </span>
+              <span>{$t(i18nKeys.common.domain.destination)}: {destinationId || "-"}</span>
             </div>
-            <div>
-              <h2 class="text-lg font-semibold">
-                {$t(i18nKeys.console.domainBindings.resourceScopedTitle)}
-              </h2>
-              <p class="mt-1 text-sm text-muted-foreground">
-                {$t(i18nKeys.console.domainBindings.resourceScopedDescription)}
-              </p>
-            </div>
-          </div>
 
-          <form class="mt-5 space-y-4" onsubmit={createResourceDomainBinding}>
-            <div class="grid gap-3 sm:grid-cols-2">
-              <div class="rounded-md border px-3 py-2">
-                <p class="text-xs text-muted-foreground">{$t(i18nKeys.common.domain.project)}</p>
-                <p class="mt-1 truncate text-sm font-medium">{project?.name ?? resource.projectId}</p>
-              </div>
-              <div class="rounded-md border px-3 py-2">
-                <p class="text-xs text-muted-foreground">
-                  {$t(i18nKeys.common.domain.environment)}
-                </p>
-                <p class="mt-1 truncate text-sm font-medium">
-                  {environment?.name ?? resource.environmentId}
-                </p>
-              </div>
-
-              <label class="space-y-1.5 text-sm font-medium">
-                <span>{$t(i18nKeys.common.domain.server)}</span>
-                <select
-                  bind:value={serverId}
-                  class="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-                >
-                  {#if servers.length === 0}
-                    <option value="">{$t(i18nKeys.console.domainBindings.noServerOptions)}</option>
-                  {/if}
-                  {#each servers as server (server.id)}
-                    <option value={server.id}>{server.name}</option>
-                  {/each}
-                </select>
-              </label>
-
-              <label class="space-y-1.5 text-sm font-medium">
-                <span>{$t(i18nKeys.common.domain.destination)}</span>
-                <Input
-                  bind:value={destinationId}
-                  autocomplete="off"
-                  placeholder={$t(i18nKeys.console.domainBindings.formDestinationPlaceholder)}
-                />
-              </label>
-
+            <div class="grid gap-4">
               <label class="space-y-1.5 text-sm font-medium">
                 <span>{$t(i18nKeys.common.domain.domainName)}</span>
                 <Input
@@ -852,29 +975,51 @@
                 <span>{$t(i18nKeys.common.domain.pathPrefix)}</span>
                 <Input bind:value={pathPrefix} autocomplete="off" placeholder="/" />
               </label>
+            </div>
 
-              <label class="space-y-1.5 text-sm font-medium">
-                <span>{$t(i18nKeys.common.domain.proxy)}</span>
-                <select
-                  bind:value={proxyKind}
-                  class="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-                >
-                  <option value="traefik">traefik</option>
-                  <option value="caddy">caddy</option>
-                </select>
-              </label>
-
+            <div class="grid gap-4">
               <label class="space-y-1.5 text-sm font-medium">
                 <span>{$t(i18nKeys.common.domain.tls)}</span>
-                <select
-                  bind:value={tlsMode}
-                  class="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-                >
-                  <option value="auto">auto</option>
-                  <option value="disabled">disabled</option>
-                </select>
+                <Select.Root bind:value={tlsMode} type="single">
+                  <Select.Trigger class="w-full">{tlsMode}</Select.Trigger>
+                  <Select.Content>
+                    <Select.Item value="auto">auto</Select.Item>
+                    <Select.Item value="disabled">disabled</Select.Item>
+                  </Select.Content>
+                </Select.Root>
               </label>
             </div>
+
+            {#if shouldShowServerField || shouldShowDestinationField}
+              <div class="grid gap-4 sm:grid-cols-2">
+                {#if shouldShowServerField}
+                  <label class="space-y-1.5 text-sm font-medium">
+                    <span>{$t(i18nKeys.common.domain.server)}</span>
+                    <Select.Root bind:value={serverId} type="single">
+                      <Select.Trigger class="w-full">
+                        {selectedServer?.name ?? $t(i18nKeys.console.domainBindings.noServerOptions)}
+                      </Select.Trigger>
+                      <Select.Content>
+                        {#each servers as server (server.id)}
+                          <Select.Item value={server.id}>{server.name}</Select.Item>
+                        {/each}
+                      </Select.Content>
+                    </Select.Root>
+                  </label>
+                {/if}
+
+                {#if shouldShowDestinationField}
+                  <label class="space-y-1.5 text-sm font-medium">
+                    <span>{$t(i18nKeys.common.domain.destination)}</span>
+                    <Input
+                      bind:value={destinationId}
+                      autocomplete="off"
+                      placeholder={$t(i18nKeys.console.domainBindings.formDestinationPlaceholder)}
+                    />
+                  </label>
+                {/if}
+              </div>
+            {/if}
 
             {#if createFeedback}
               <div
@@ -890,87 +1035,29 @@
               </div>
             {/if}
 
-            <Button type="submit" disabled={!canCreateBinding || createDomainBindingMutation.isPending}>
-              <Globe2 class="size-4" />
-              {createDomainBindingMutation.isPending
-                ? $t(i18nKeys.console.domainBindings.formSubmitting)
-                : $t(i18nKeys.console.domainBindings.formSubmit)}
-            </Button>
+            <Dialog.Footer>
+              <Button
+                type="button"
+                variant="outline"
+                onclick={() => {
+                  domainBindingDialogOpen = false;
+                }}
+              >
+                {$t(i18nKeys.common.actions.close)}
+              </Button>
+              <Button
+                type="submit"
+                disabled={!canCreateBinding || createDomainBindingMutation.isPending}
+              >
+                <Globe2 class="size-4" />
+                {createDomainBindingMutation.isPending
+                  ? $t(i18nKeys.console.domainBindings.formSubmitting)
+                  : $t(i18nKeys.common.actions.bindDomain)}
+              </Button>
+            </Dialog.Footer>
           </form>
-        </section>
-
-        <section class="rounded-lg border bg-background p-5">
-          <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-              <h2 class="text-lg font-semibold">
-                {$t(i18nKeys.console.resources.domainBindingsTitle)}
-              </h2>
-              <p class="mt-1 text-sm text-muted-foreground">
-                {$t(i18nKeys.console.resources.domainBindingsDescription)}
-              </p>
-            </div>
-            <Button href="/domain-bindings" variant="outline">
-              {$t(i18nKeys.common.domain.domainBindings)}
-              <ArrowRight class="size-4" />
-            </Button>
-          </div>
-
-          <div class="mt-4 space-y-3">
-            {#if resourceDomainBindings.length > 0}
-              {#each resourceDomainBindings as binding (binding.id)}
-                {@const server = findServer(servers, binding.serverId)}
-                <article class="rounded-md border px-4 py-3">
-                  <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                    <div class="min-w-0 space-y-2">
-                      <div class="flex flex-wrap items-center gap-2">
-                        <Globe2 class="size-4 text-muted-foreground" />
-                        <h3 class="truncate font-medium">{binding.domainName}</h3>
-                        <Badge variant={domainBindingStatusVariant(binding.status)}>
-                          {domainBindingStatusLabel(binding.status)}
-                        </Badge>
-                      </div>
-                      <p class="text-sm text-muted-foreground">
-                        {binding.pathPrefix} · {binding.proxyKind} · {$t(i18nKeys.common.domain.tls)}
-                        {" "}
-                        {binding.tlsMode}
-                      </p>
-                    </div>
-                    <p class="text-xs text-muted-foreground">{formatTime(binding.createdAt)}</p>
-                  </div>
-                  <div class="mt-3 grid gap-3 sm:grid-cols-3">
-                    <div class="rounded-md border bg-background px-3 py-2">
-                      <p class="text-xs text-muted-foreground">
-                        {$t(i18nKeys.common.domain.server)}
-                      </p>
-                      <p class="mt-1 truncate text-sm font-medium">
-                        {server?.name ?? binding.serverId}
-                      </p>
-                    </div>
-                    <div class="rounded-md border bg-background px-3 py-2">
-                      <p class="text-xs text-muted-foreground">
-                        {$t(i18nKeys.common.domain.destination)}
-                      </p>
-                      <p class="mt-1 truncate text-sm font-medium">{binding.destinationId}</p>
-                    </div>
-                    <div class="rounded-md border bg-background px-3 py-2">
-                      <p class="text-xs text-muted-foreground">
-                        {$t(i18nKeys.console.domainBindings.verificationAttempts, {
-                          count: binding.verificationAttemptCount,
-                        })}
-                      </p>
-                      <p class="mt-1 truncate text-sm font-medium">{binding.certificatePolicy}</p>
-                    </div>
-                  </div>
-                </article>
-              {/each}
-            {:else}
-              <div class="rounded-md border border-dashed p-5 text-sm text-muted-foreground">
-                {$t(i18nKeys.console.resources.noDomainBindings)}
-              </div>
-            {/if}
-          </div>
-        </section>
-      </section>
+        </Dialog.Content>
+      </Dialog.Root>
     </div>
   {/if}
 </ConsoleShell>

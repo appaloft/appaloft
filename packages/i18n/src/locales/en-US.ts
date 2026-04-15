@@ -6,10 +6,13 @@ export const enUS = {
       backToDeployments: "Back to deployments",
       backToProjects: "Back to projects",
       backToServers: "Back to servers",
+      bindDomain: "Bind domain",
       checkHealth: "Check /api/health",
       close: "Close",
       connectGitHub: "Connect GitHub",
       createAndDeploy: "Create and deploy",
+      deploy: "Deploy",
+      deploying: "Deploying",
       createDeployment: "Create deployment",
       createResource: "Create resource",
       createServer: "Create server",
@@ -47,6 +50,7 @@ export const enUS = {
       deployments: "Deployments",
       description: "Description",
       destination: "Destination",
+      exposure: "Exposure",
       domainBinding: "Domain binding",
       domainBindings: "Domain bindings",
       domainName: "Domain name",
@@ -62,6 +66,7 @@ export const enUS = {
       project: "Project",
       projects: "Projects",
       provider: "Provider",
+      protocol: "Protocol",
       proxy: "Proxy",
       pathPrefix: "Path prefix",
       readiness: "Readiness",
@@ -70,6 +75,7 @@ export const enUS = {
       server: "Server",
       servers: "Servers",
       services: "Services",
+      slug: "Slug",
       source: "Source",
       startedAt: "Started",
       status: "Status",
@@ -218,6 +224,10 @@ export const enUS = {
         "The current list does not include this deployment. It may have been removed or not returned by the backend.",
       notFoundTitle: "Deployment not found.",
       openAccessUrl: "Open URL",
+      overviewTab: "Overview",
+      logsTab: "Logs",
+      snapshotTab: "Environment snapshot",
+      timelineTab: "Timeline",
       packagingMode: "Packaging mode",
       pageDescription: "Deployment records and project relationships",
       pageDescriptionForProject: "Deployments for {{projectName}}",
@@ -312,6 +322,7 @@ export const enUS = {
       focusLabel: "Project index",
       focusTitle: "Confirm which projects are carrying deployment flow.",
       lastDeployment: "Latest deployment",
+      latestResource: "Latest resource",
       noDeploymentShort: "No deployment yet",
       noDescription: "No description.",
       noEnvironment:
@@ -321,13 +332,33 @@ export const enUS = {
       noProjectDeploymentTitle: "This project has no deployments.",
       noProjectSelected: "No project selected",
       noProjectSelectedDescription: "Environments and deployment records are grouped by project.",
+      noPublicAccess: "No public access URL yet.",
       noResources:
         "This project has no resources yet. Resources appear after deployment context resolution.",
+      noResourcesShort: "No resources yet",
+      projectsWithResources: "With resources",
+      publicAccessDescription: "Default access URLs created by resource deployments.",
+      publicAccessTitle: "Public access",
       createResourceDescription:
-        "Create a durable resource profile before binding domains or starting a deployment.",
+        "Define the resource source and network, then start the first deployment in the current project, environment, and server.",
+      createResourceDeploymentPartialError:
+        "Resource {{resourceId}} was created, but deployment creation failed: {{message}}",
       createResourceErrorTitle: "Unable to create resource",
+      createResourceIdentityDescription:
+        "Bind the resource to a project and environment, then save its stable name and type.",
+      createResourceIdentityTitle: "Resource identity",
       createResourceNamePlaceholder: "api, worker, web",
-      createResourceSuccessTitle: "Resource created",
+      createResourceReviewDescription:
+        "This first saves the resource profile, then creates one deployment.",
+      createResourceReviewTitle: "Review deployment",
+      createResourceRuntimeDescription:
+        "Turn the source into a runtime strategy and default access port.",
+      createResourceRuntimeTitle: "Runtime and network",
+      createResourceSourceDescription:
+        "Choose a Git or Docker source. This source becomes the profile used by later deployments.",
+      createResourceSourceRequired: "Enter a resource source first.",
+      createResourceSourceTitle: "Source",
+      createResourceSuccessTitle: "Resource created and deployment started",
       createResourceTitle: "Create resource",
       notFoundBody:
         "The current list does not include this project. It may have been removed or not returned by the backend.",
@@ -373,20 +404,55 @@ export const enUS = {
       verificationAttempts: "{{count}} verification attempts",
     },
     resources: {
+      accessTab: "Access",
+      applicationProfileDescription:
+        "Entry resources focus on listener port, protocol, and default routing.",
+      applicationProfileTitle: "Application entry",
+      composeProfileDescription:
+        "Compose resources group multiple services and choose a target service for traffic.",
+      composeProfileTitle: "Compose stack",
+      composeServicesDescription:
+        "Service boundaries from the compose file and the current traffic target.",
+      composeServicesTitle: "Compose services",
+      dataProfileDescription:
+        "Data resources focus on placement context and internal access boundaries.",
+      dataProfileTitle: "Data service",
       detailDescription: "Resource configuration, domain bindings, and deployment relationships",
+      deploymentsDescription:
+        "Deployment attempts for this resource, newest first, with source and status context.",
+      deploymentsTitle: "Deployments",
       domainBindingsDescription:
         "These bindings belong to the current resource. DNS, certificate, and readiness progression attach to them.",
       domainBindingsTitle: "Domain bindings",
-      generatedAccessDescription:
-        "After deployment, the resource shows the URL generated by the default access domain policy.",
-      generatedAccessEmpty: "This resource has no generated default access URL yet.",
-      generatedAccessTitle: "Default access URL",
+      externalProfileDescription:
+        "External resources keep project ownership and access context without a Yundu runtime.",
+      externalProfileTitle: "External resource",
+      logsTab: "Logs",
+      networkProfileDescription: "Internal port, protocol, exposure mode, and destination context.",
+      networkProfileTitle: "Network profile",
+      newDeploymentContextTitle: "Current resource context",
+      newDeploymentDescription:
+        "Create one deployment from this resource's existing project, environment, source, and network profile.",
+      newDeploymentErrorTitle: "Unable to create deployment",
+      newDeploymentNoSourceSnapshot:
+        "No source snapshot is visible yet. The deployment still uses the source saved on the resource profile.",
+      newDeploymentSourceDescription:
+        "Source, runtime strategy, and network port come from the resource profile and are not entered again here.",
+      newDeploymentSourceTitle: "Resource source",
+      newDeploymentSuccessTitle: "Deployment created",
+      newDeploymentTargetDescription:
+        "Choose only the server and destination for this deployment attempt.",
+      newDeploymentTargetTitle: "Deployment target",
       openGeneratedAccess: "Open access URL",
       noDomainBindings: "This resource has no durable domain bindings yet.",
+      noDeployments: "This resource has no deployments yet.",
+      noServices: "This resource does not declare services.",
       notFoundBody:
         "The current list does not include this resource. It may not have been created by deployment context yet, or it was not returned by the backend.",
       notFoundTitle: "Resource not found.",
       pageTitle: "Resources",
+      profileDescription: "Stable project, environment, kind, and slug identity.",
+      profileTitle: "Resource profile",
       proxyConfigurationDescription:
         "Provider-rendered route configuration for the resource's edge proxy.",
       proxyConfigurationEmpty: "No proxy configuration is available for this resource yet.",
@@ -407,6 +473,13 @@ export const enUS = {
       runtimeLogsStopFollow: "Stop",
       runtimeLogsStreamDisconnected: "Runtime log stream disconnected.",
       runtimeLogsTitle: "Runtime logs",
+      serviceTopologyDescription: "Declared service boundaries inside this resource.",
+      serviceTopologyTitle: "Service topology",
+      settingsTab: "Settings",
+      targetServiceName: "Target service",
+      workerProfileDescription:
+        "Worker resources focus on background execution and deployment state, not public entry.",
+      workerProfileTitle: "Background worker",
     },
     quickDeploy: {
       applicationPort: "Application port",
@@ -428,8 +501,10 @@ export const enUS = {
       firstVariable: "First variable",
       cloneUrl: "Clone URL",
       composeManifest: "Compose manifest",
+      composeManifestPlaceholder: "./deploy/docker-compose.yml",
       defaultBranch: "Default branch",
       dockerImage: "Docker image",
+      dockerImagePlaceholder: "ghcr.io/acme/app:latest",
       githubOAuthNotConfigured: "GitHub OAuth is not configured on the backend.",
       githubOnlyLoginWhenNeeded: "Login is triggered only when importing from GitHub.",
       githubRepository: "GitHub repository",
@@ -439,14 +514,17 @@ export const enUS = {
       githubRepositoryUrl: "GitHub URL",
       githubRepositoryUrlHint:
         "Paste any GitHub repository URL, or connect GitHub to browse repositories and use private repositories you can access.",
+      githubRepositoryUrlPlaceholder: "https://github.com/acme/app.git",
       githubSourceBrowserMode: "Choose from my GitHub",
       githubSourceUrlMode: "Enter GitHub URL",
       localFolderPath: "Local path",
+      localFolderPlaceholder: ".",
       noEnvironmentOptions: "No environments available.",
       noProjectOptions: "No projects available.",
       noRepositoryResults: "No repository results.",
       noServerOptions: "No servers available.",
       remoteGitUrl: "Git URL",
+      remoteGitUrlPlaceholder: "https://git.example.com/acme/app.git",
       reviewBody:
         "Submission only needs a source and server. Project, environment, resource, and variables use the current detected values unless you edit them.",
       reviewDeployment: "Review deployment",
