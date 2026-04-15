@@ -278,7 +278,9 @@
       name: browser ? (page.url.searchParams.get("serverName") ?? "local-machine") : "local-machine",
       host: browser ? (page.url.searchParams.get("serverHost") ?? "127.0.0.1") : "127.0.0.1",
       port: browser ? (page.url.searchParams.get("serverPort") ?? "22") : "22",
-      providerKey: browser ? (page.url.searchParams.get("serverProvider") ?? "local-shell") : "local-shell",
+      providerKey: browser
+        ? (page.url.searchParams.get("serverProvider") ?? "generic-ssh")
+        : "generic-ssh",
     }),
   );
   let serverConnectivityResult = $state<TestServerConnectivityResponse | null>(null);
@@ -1046,7 +1048,7 @@
     setSearchParam(params, "serverName", serverDraft.name, "local-machine");
     setSearchParam(params, "serverHost", serverDraft.host, "127.0.0.1");
     setSearchParam(params, "serverPort", serverDraft.port, "22");
-    setSearchParam(params, "serverProvider", serverDraft.providerKey, "local-shell");
+    setSearchParam(params, "serverProvider", serverDraft.providerKey, "generic-ssh");
 
     setSearchParam(params, "editEnvironment", environmentContextEnabled ? "true" : "false", "false");
     if (environmentContextEnabled) {
@@ -1108,7 +1110,7 @@
     serverDraft.name = params.get("serverName") ?? "local-machine";
     serverDraft.host = params.get("serverHost") ?? "127.0.0.1";
     serverDraft.port = params.get("serverPort") ?? "22";
-    serverDraft.providerKey = params.get("serverProvider") ?? "local-shell";
+    serverDraft.providerKey = params.get("serverProvider") ?? "generic-ssh";
     environmentName = params.get("environmentName") ?? "local";
     environmentKind = parseEnvironmentKind(params.get("environmentKind"));
     resourceName = params.get("resourceName") ?? "";
