@@ -9,7 +9,6 @@ export const toolNameSchema = z.enum([
   "plan_deployment",
   "deploy_release",
   "stream_logs",
-  "rollback_release",
 ]);
 
 export const toolContractSchema = z.object({
@@ -67,12 +66,6 @@ export const toolContracts = [
     description: "Read deployment logs.",
     cliCommand: "yundu logs <deployment-id>",
     httpRoute: "GET /api/deployments/:deploymentId/logs",
-  },
-  {
-    name: "rollback_release",
-    description: "Trigger a rollback.",
-    cliCommand: "yundu rollback <deployment-id>",
-    httpRoute: "POST /api/deployments/:deploymentId/rollback",
   },
 ] as const;
 

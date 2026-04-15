@@ -108,9 +108,9 @@ collect source/runtime/network draft
   -> deployments.create(projectId, environmentId, resourceId, serverId, destinationId?)
 ```
 
-Deployment history, new deployment, and redeploy affordances belong on the resource surface. Project pages may expose resource lists and Quick Deploy entrypoints, but they must not imply deployments are project-owned.
+Deployment history and new deployment affordances belong on the resource surface. Redeploy is absent from the v1 public deployment command surface until reintroduced under ADR-016. Project pages may expose resource lists and Quick Deploy entrypoints, but they must not imply deployments are project-owned.
 
-Existing deployments remain valid because their runtime and network plan snapshots already record the attempt state. Existing resources without source/runtime/network profile require a migration path or profile configuration before strict redeploy can be fully reliable.
+Existing deployments remain valid because their runtime and network plan snapshots already record the attempt state. Existing resources without source/runtime/network profile require a migration path or profile configuration before future redeploy behavior can be reliable.
 
 ## Governed Specs
 
@@ -122,6 +122,7 @@ Existing deployments remain valid because their runtime and network plan snapsho
 - [Deployments Create Test Matrix](../testing/deployments.create-test-matrix.md)
 - [resources.create Implementation Plan](../implementation/resources.create-plan.md)
 - [ADR-015: Resource Network Profile](./ADR-015-resource-network-profile.md)
+- [ADR-016: Deployment Command Surface Reset](./ADR-016-deployment-command-surface-reset.md)
 
 ## Superseded Open Questions
 
@@ -134,7 +135,7 @@ Existing deployments remain valid because their runtime and network plan snapsho
 
 Current command/schema/API/CLI/Web deployment admission paths are migrated to ids-only `deployments.create` for the new resource-profile flow.
 
-Historical resources may still lack source/runtime/network profile values and need profile backfill or an explicit configuration step before strict redeploy is reliable.
+Historical resources may still lack source/runtime/network profile values and need profile backfill or an explicit configuration step before any future redeploy command is reliable.
 
 Existing deployment config bootstrap can still create or infer deployment context and must be narrowed to a compatibility seam.
 

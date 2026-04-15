@@ -4,11 +4,11 @@ Use when the user has not selected a concrete behavior.
 
 ## Candidate Behaviors
 
-| Candidate | Command / Operation | Why It Matches | Governing Docs |
+| Candidate | Operation-map position/state | Command / Operation | Why It Matches | Governing Docs |
 | --- | --- | --- | --- |
-| 1 |  |  |  |
-| 2 |  |  |  |
-| 3 |  |  |  |
+| 1 |  |  |  |  |
+| 2 |  |  |  |  |
+| 3 |  |  |  |  |
 
 ## Recommendation
 

@@ -4,12 +4,14 @@
 
 - Round type:
 - Target behavior:
+- Operation-map position/state:
 - Governing ADRs/global contracts/local specs/implementation plan read:
 - Fully aligned with spec:
 
 ## Changed
 
 - Changed docs:
+- Changed business operation map:
 - Changed code modules:
 - Changed tests:
 - Changed entrypoints (Web/API/CLI):
@@ -33,6 +35,7 @@
 ## Alignment
 
 - Spec alignment:
+- Operation-map alignment:
 - Workflow alignment:
 - Error alignment:
 - Test alignment:

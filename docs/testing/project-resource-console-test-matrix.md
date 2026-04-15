@@ -5,7 +5,8 @@
 Project/resource console tests must verify that the Web information architecture follows resource ownership:
 
 - Project pages list resources as the primary child objects.
-- Resource pages own new deployment, redeploy, and deployment history actions.
+- Resource pages own new deployment and deployment history actions.
+- Resource pages must not expose redeploy until a future redeploy command is reintroduced under ADR-016.
 - Project-level deployment views are read-model rollups.
 - Sidebar resource status is read-model/projection state, not write-side Resource aggregate state.
 
@@ -14,6 +15,7 @@ Project/resource console tests must verify that the Web information architecture
 This test matrix inherits:
 
 - [ADR-013: Project Resource Navigation And Deployment Ownership](../decisions/ADR-013-project-resource-navigation-and-deployment-ownership.md)
+- [ADR-016: Deployment Command Surface Reset](../decisions/ADR-016-deployment-command-surface-reset.md)
 - [ADR-015: Resource Network Profile](../decisions/ADR-015-resource-network-profile.md)
 - [Project Resource Console Workflow Spec](../workflows/project-resource-console.md)
 - [Project Resource Console Implementation Plan](../implementation/project-resource-console-plan.md)
@@ -70,8 +72,8 @@ Then:
 | --- | --- | --- | --- | --- |
 | Resource detail | Resource exists | Resource profile, latest status, and deployment history are shown | Resource query/read model plus deployment history filtered by `resourceId` | Latest status derived from deployments |
 | New deployment from resource | Resource exists and can deploy | New deployment action is resource-scoped | Dispatch `deployments.create` with `resourceId` | Deployment attempt belongs to resource |
-| Redeploy from resource | Latest deployment terminal | Redeploy action is resource-scoped | Dispatch `deployments.redeploy-resource` or equivalent command with `resourceId` | New deployment attempt id |
-| Active deployment | Latest deployment non-terminal | New deployment/redeploy is blocked or explains active state | No deployment command until guard can pass | Latest status remains read-model projection |
+| Redeploy absent in v1 | Latest deployment terminal | No public redeploy action is exposed | No redeploy command is dispatched | Existing deployments remain readable |
+| Active deployment | Latest deployment non-terminal | New deployment is blocked or explains active state | No deployment command until guard can pass | Latest status remains read-model projection |
 | Domain binding from resource | Resource has placement context | Domain/TLS action preloads resource context | Dispatch `domain-bindings.create` with resource ownership fields | Domain binding belongs to resource |
 
 ## Create Resource Matrix

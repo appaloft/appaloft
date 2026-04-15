@@ -1,7 +1,5 @@
 import { type AsyncIteratorClass, type Client, type ORPCError } from "@orpc/client";
 import {
-  type CancelDeploymentCommandInput,
-  type CheckDeploymentHealthCommandInput,
   type ConfigureServerCredentialCommandInput,
   type CreateDeploymentCommandInput,
   type CreateDomainBindingCommandInput,
@@ -18,18 +16,13 @@ import {
   type ListResourcesQueryInput,
   type ListSshCredentialsQueryInput,
   type PromoteEnvironmentCommandInput,
-  type ReattachDeploymentCommandInput,
-  type RedeployResourceCommandInput,
   type RegisterServerCommandInput,
-  type RollbackDeploymentCommandInput,
   type SetEnvironmentVariableCommandInput,
   type ShowEnvironmentQueryInput,
   type TestServerConnectivityCommandInput,
   type UnsetEnvironmentVariableCommandInput,
 } from "@yundu/application/schemas";
 import {
-  type CancelDeploymentResponse,
-  type CheckDeploymentHealthResponse,
   type CreateDeploymentResponse,
   type CreateDomainBindingResponse,
   type CreateEnvironmentResponse,
@@ -51,10 +44,7 @@ import {
   type ListServersResponse,
   type ListSshCredentialsResponse,
   type PromoteEnvironmentResponse,
-  type ReattachDeploymentResponse,
-  type RedeployResourceResponse,
   type RegisterServerResponse,
-  type RollbackDeploymentResponse,
   type TestServerConnectivityResponse,
 } from "@yundu/contracts";
 
@@ -199,18 +189,6 @@ export type YunduOrpcClientContract = {
       CreateDeploymentResponse,
       YunduClientError
     >;
-    cancel: Client<
-      YunduClientContext,
-      CancelDeploymentCommandInput,
-      CancelDeploymentResponse,
-      YunduClientError
-    >;
-    checkHealth: Client<
-      YunduClientContext,
-      CheckDeploymentHealthCommandInput,
-      CheckDeploymentHealthResponse,
-      YunduClientError
-    >;
     createStream: Client<
       YunduClientContext,
       CreateDeploymentCommandInput,
@@ -221,24 +199,6 @@ export type YunduOrpcClientContract = {
       YunduClientContext,
       DeploymentLogsQueryInput,
       DeploymentLogsResponse,
-      YunduClientError
-    >;
-    reattach: Client<
-      YunduClientContext,
-      ReattachDeploymentCommandInput,
-      ReattachDeploymentResponse,
-      YunduClientError
-    >;
-    redeployResource: Client<
-      YunduClientContext,
-      RedeployResourceCommandInput,
-      RedeployResourceResponse,
-      YunduClientError
-    >;
-    rollback: Client<
-      YunduClientContext,
-      RollbackDeploymentCommandInput,
-      RollbackDeploymentResponse,
       YunduClientError
     >;
   };

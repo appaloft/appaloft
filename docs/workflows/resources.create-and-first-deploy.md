@@ -61,7 +61,7 @@ The workflow must distinguish the resource internal listener port from host expo
 | --- | --- |
 | Web resource page | May create a resource from a project/environment context, then show the resource detail page. |
 | Web project page | Must treat resource list and create-resource as primary. New deployment from a project page must enter Quick Deploy or another entry workflow that selects or creates a resource before deployment admission. |
-| Web resource detail page | Owns resource-scoped new deployment, redeploy, deployment history, source/runtime configuration, and domain/TLS affordances. |
+| Web resource detail page | Owns resource-scoped new deployment, deployment history, source/runtime configuration, and domain/TLS affordances. Redeploy is absent until reintroduced under ADR-016. |
 | Web QuickDeploy | May collect a resource draft and call `resources.create` before `deployments.create`. |
 | CLI resource command | Must dispatch `resources.create` for explicit resource creation. |
 | CLI interactive deploy | May call `resources.create` before `deployments.create` when the user chooses a new resource. |

@@ -4,13 +4,10 @@
   import { page } from "$app/state";
   import { onDestroy } from "svelte";
   import {
-    Activity,
     ArrowLeft,
     Boxes,
     Check,
-    CheckCircle2,
     ChevronDown,
-    CircleDashed,
     ClipboardList,
     Clock3,
     Copy,
@@ -18,33 +15,18 @@
     FileText,
     FolderOpen,
     Link2,
-    RotateCcw,
-    Rocket,
     Server,
     ShieldCheck,
-    TriangleAlert,
-    XCircle,
   } from "@lucide/svelte";
-  import { createMutation } from "@tanstack/svelte-query";
-  import type {
-    CheckDeploymentHealthResponse,
-    DeploymentProgressEvent,
-    DeploymentSummary,
-  } from "@yundu/contracts";
+  import type { DeploymentProgressEvent, DeploymentSummary } from "@yundu/contracts";
 
-  import { readErrorMessage } from "$lib/api/client";
   import ConsoleShell from "$lib/components/console/ConsoleShell.svelte";
   import DeploymentProgressDialog from "$lib/components/console/DeploymentProgressDialog.svelte";
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
   import { Skeleton } from "$lib/components/ui/skeleton";
   import {
-    createDeploymentWithProgress,
-    createDeploymentRequestId,
-    deploymentCanRedeploy,
-    latestDeploymentForResource,
     progressEventsFromDeployment,
-    redeployInputFromDeployment,
     type DeploymentProgressDialogStatus,
   } from "$lib/console/deployment-progress";
   import { createConsoleQueries } from "$lib/console/queries";
@@ -58,13 +40,7 @@
     formatTime,
   } from "$lib/console/utils";
   import { i18nKeys, t } from "$lib/i18n";
-  import { orpcClient } from "$lib/orpc";
-  import { queryClient } from "$lib/query-client";
 
-  type RedeployMutationInput = {
-    requestId: string;
-    deployment: DeploymentSummary;
-  };
   type AccessRoute = NonNullable<DeploymentSummary["runtimePlan"]["execution"]["accessRoutes"]>[number];
   type AccessUrlKind = "deployment" | "domain" | "direct";
   type AccessUrl = {
@@ -83,8 +59,6 @@
   let deploymentProgressDeploymentId = $state("");
   let logsCopyState = $state<"idle" | "copied" | "failed">("idle");
   let accessUrlCopyState = $state<"idle" | "copied" | "failed">("idle");
-  let deploymentHealthResult = $state<CheckDeploymentHealthResponse | null>(null);
-  let deploymentHealthError = $state("");
   let logsCopyResetTimeout: ReturnType<typeof setTimeout> | undefined;
   let accessUrlCopyResetTimeout: ReturnType<typeof setTimeout> | undefined;
 
@@ -116,14 +90,6 @@
   );
   const accessUrls = $derived(deployment ? deploymentAccessUrls(deployment, server?.host) : []);
   const primaryAccessUrl = $derived(accessUrls[0] ?? null);
-  const latestResourceDeployment = $derived(
-    deployment ? latestDeploymentForResource(deployments, deployment.resourceId) : null,
-  );
-  const canRedeploy = $derived(
-    deployment
-      ? latestResourceDeployment?.id === deployment.id && deploymentCanRedeploy(deployment)
-      : false,
-  );
   const logsCopyLabel = $derived(
     logsCopyState === "copied"
       ? $t(i18nKeys.console.deployments.copyLogsCopied)
@@ -139,69 +105,8 @@
         : $t(i18nKeys.console.deployments.copyAccessUrl),
   );
 
-  const redeployMutation = createMutation(() => ({
-    mutationFn: ({ deployment }: RedeployMutationInput) =>
-      createDeploymentWithProgress(redeployInputFromDeployment(deployment), appendDeploymentProgressEvent),
-  }));
-  const deploymentHealthMutation = createMutation(() => ({
-    mutationFn: (inputDeploymentId: string) =>
-      orpcClient.deployments.checkHealth({
-        deploymentId: inputDeploymentId,
-      }),
-    onSuccess: (result) => {
-      deploymentHealthResult = result;
-      deploymentHealthError = "";
-    },
-    onError: (error) => {
-      deploymentHealthError = readErrorMessage(error);
-    },
-  }));
-
-  function resetDeploymentProgressDialog(requestId: string): void {
-    deploymentProgressRequestId = requestId;
-    deploymentProgressDeploymentId = "";
-    deploymentProgressEvents = [];
-    deploymentProgressStreamError = "";
-    deploymentProgressDialogStatus = "running";
-    deploymentProgressDialogOpen = true;
-  }
-
-  function appendDeploymentProgressEvent(event: DeploymentProgressEvent): void {
-    deploymentProgressEvents = [...deploymentProgressEvents, event];
-    deploymentProgressDeploymentId = event.deploymentId ?? deploymentProgressDeploymentId;
-
-    if (event.status === "failed") {
-      deploymentProgressDialogStatus = "failed";
-    }
-  }
-
-  async function handleRedeploy(): Promise<void> {
-    if (!deployment || !canRedeploy) {
-      return;
-    }
-
-    const requestId = createDeploymentRequestId();
-    resetDeploymentProgressDialog(requestId);
-
-    try {
-      const createdDeployment = await redeployMutation.mutateAsync({
-        requestId,
-        deployment,
-      });
-      await queryClient.invalidateQueries({ queryKey: ["deployments"] });
-      deploymentProgressDialogStatus = "succeeded";
-      deploymentProgressDeploymentId = createdDeployment.id;
-      setTimeout(() => {
-        void goto(`/deployments/${createdDeployment.id}`);
-      }, 600);
-    } catch (error) {
-      deploymentProgressDialogStatus = "failed";
-      deploymentProgressStreamError = readErrorMessage(error);
-    }
-  }
-
   function handleViewProgress(): void {
-    const progressDeployment = latestResourceDeployment ?? deployment;
+    const progressDeployment = deployment;
 
     if (!progressDeployment) {
       return;
@@ -308,63 +213,6 @@
       case "direct":
         return $t(i18nKeys.console.deployments.directPortAccess);
     }
-  }
-
-  function healthLabel(status: CheckDeploymentHealthResponse["status"]): string {
-    switch (status) {
-      case "healthy":
-        return $t(i18nKeys.common.status.healthy);
-      case "degraded":
-        return $t(i18nKeys.common.status.degraded);
-      case "unreachable":
-        return $t(i18nKeys.common.status.unreachable);
-    }
-  }
-
-  function healthVariant(
-    status: CheckDeploymentHealthResponse["status"],
-  ): "default" | "secondary" | "outline" | "destructive" {
-    switch (status) {
-      case "healthy":
-        return "default";
-      case "degraded":
-        return "secondary";
-      case "unreachable":
-        return "destructive";
-    }
-  }
-
-  function healthCheckIcon(status: CheckDeploymentHealthResponse["checks"][number]["status"]) {
-    switch (status) {
-      case "passed":
-        return CheckCircle2;
-      case "failed":
-        return XCircle;
-      case "skipped":
-        return CircleDashed;
-    }
-  }
-
-  function healthCheckIconClass(
-    status: CheckDeploymentHealthResponse["checks"][number]["status"],
-  ): string {
-    switch (status) {
-      case "passed":
-        return "text-green-600";
-      case "failed":
-        return "text-destructive";
-      case "skipped":
-        return "text-muted-foreground";
-    }
-  }
-
-  function checkDeploymentHealth(): void {
-    if (!deployment) {
-      return;
-    }
-
-    deploymentHealthError = "";
-    deploymentHealthMutation.mutate(deployment.id);
   }
 
   function formatDeploymentLogCopyLine(log: DeploymentSummary["logs"][number]): string {
@@ -504,11 +352,6 @@
             <div class="flex flex-wrap items-center gap-2">
               <Badge variant={deploymentBadgeVariant(deployment.status)}>{deployment.status}</Badge>
               <Badge variant="outline">{deployment.runtimePlan.source.kind}</Badge>
-              {#if deployment.rollbackOfDeploymentId}
-                <Badge variant="secondary">
-                  {$t(i18nKeys.console.deployments.rollbackOf)} {deployment.rollbackOfDeploymentId}
-                </Badge>
-              {/if}
             </div>
             <div class="space-y-2">
               <h1 class="text-2xl font-semibold md:text-3xl">
@@ -531,22 +374,10 @@
                 {$t(i18nKeys.common.actions.openProject)}
               </Button>
             {/if}
-            {#if canRedeploy}
-              <Button disabled={redeployMutation.isPending} onclick={handleRedeploy}>
-                {#if redeployMutation.isPending}
-                  <Rocket class="size-4 animate-pulse" />
-                  {$t(i18nKeys.common.actions.redeploying)}
-                {:else}
-                  <RotateCcw class="size-4" />
-                  {$t(i18nKeys.common.actions.redeploy)}
-                {/if}
-              </Button>
-            {:else}
-              <Button variant="outline" onclick={handleViewProgress}>
-                <Clock3 class="size-4" />
-                {$t(i18nKeys.common.actions.viewProgress)}
-              </Button>
-            {/if}
+            <Button variant="outline" onclick={handleViewProgress}>
+              <Clock3 class="size-4" />
+              {$t(i18nKeys.common.actions.viewProgress)}
+            </Button>
           </div>
         </div>
 
@@ -583,17 +414,6 @@
                 <Button
                   type="button"
                   variant="outline"
-                  disabled={deploymentHealthMutation.isPending}
-                  onclick={checkDeploymentHealth}
-                >
-                  <Activity class={deploymentHealthMutation.isPending ? "size-4 animate-pulse" : "size-4"} />
-                  {deploymentHealthMutation.isPending
-                    ? $t(i18nKeys.console.deployments.healthCheckRunning)
-                    : $t(i18nKeys.console.deployments.healthCheckAction)}
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
                   aria-label={accessUrlCopyLabel}
                   title={accessUrlCopyLabel}
                   onclick={handleCopyAccessUrl}
@@ -608,45 +428,6 @@
               {/if}
             </div>
           </div>
-          {#if deploymentHealthError}
-            <div class="mt-4 rounded-md border border-destructive/30 bg-background p-4 text-sm text-destructive">
-              <div class="flex items-start gap-2">
-                <TriangleAlert class="mt-0.5 size-4" />
-                <p>{deploymentHealthError}</p>
-              </div>
-            </div>
-          {:else if deploymentHealthResult}
-            <div class="mt-4 rounded-md border bg-background p-4">
-              <div class="flex flex-wrap items-center justify-between gap-2">
-                <p class="text-sm font-medium">
-                  {$t(i18nKeys.console.deployments.healthCheckResultTitle)}
-                </p>
-                <div class="flex flex-wrap items-center gap-2">
-                  <Badge variant={healthVariant(deploymentHealthResult.status)}>
-                    {healthLabel(deploymentHealthResult.status)}
-                  </Badge>
-                  <span class="text-xs text-muted-foreground">
-                    {formatTime(deploymentHealthResult.checkedAt)}
-                  </span>
-                </div>
-              </div>
-              <div class="mt-3 space-y-2">
-                {#each deploymentHealthResult.checks as check (check.name)}
-                  {@const HealthIcon = healthCheckIcon(check.status)}
-                  <div class="rounded-md border px-3 py-2">
-                    <div class="flex flex-wrap items-center justify-between gap-2">
-                      <p class="flex min-w-0 items-center gap-2 text-sm font-medium">
-                        <HealthIcon class={`size-4 shrink-0 ${healthCheckIconClass(check.status)}`} />
-                        <span class="truncate">{check.name}</span>
-                      </p>
-                      <span class="text-xs text-muted-foreground">{check.durationMs}ms</span>
-                    </div>
-                    <p class="mt-1 break-words text-sm text-muted-foreground">{check.message}</p>
-                  </div>
-                {/each}
-              </div>
-            </div>
-          {/if}
         </div>
 
         <div class="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
@@ -1007,8 +788,8 @@
   streamError={deploymentProgressStreamError}
   requestId={deploymentProgressRequestId}
   deploymentId={deploymentProgressDeploymentId}
-  title={$t(i18nKeys.console.deployments.redeployProgressTitle)}
-  description={$t(i18nKeys.console.deployments.redeployProgressDescription)}
+  title={$t(i18nKeys.console.deployments.progressTitle)}
+  description={$t(i18nKeys.console.deployments.progressDescription)}
   onClose={() => {
     deploymentProgressDialogOpen = false;
   }}

@@ -65,15 +65,19 @@ This repository is a backend-core deployment platform, not a web-first CRUD app.
 ## CQRS Rules
 
 - business operations exposed through CLI or HTTP must dispatch from an explicit `Command` or `Query` message
+- the human-facing and AI-facing source of truth for business operation relationships, workflow sequencing, event progression, and rebuild gates is [docs/BUSINESS_OPERATION_MAP.md](/Users/nichenqin/projects/yundu/docs/BUSINESS_OPERATION_MAP.md)
 - the human-facing and AI-facing source of truth for business operations is [docs/CORE_OPERATIONS.md](/Users/nichenqin/projects/yundu/docs/CORE_OPERATIONS.md)
 - the human-facing and AI-facing source of truth for domain boundaries and aggregate names is [docs/DOMAIN_MODEL.md](/Users/nichenqin/projects/yundu/docs/DOMAIN_MODEL.md)
 - agents must read [docs/decisions/README.md](/Users/nichenqin/projects/yundu/docs/decisions/README.md) and relevant ADRs before interpreting local command/event/workflow/testing specs
+- agents must locate a requested behavior in [docs/BUSINESS_OPERATION_MAP.md](/Users/nichenqin/projects/yundu/docs/BUSINESS_OPERATION_MAP.md) before adding or changing ADRs, local specs, operation catalog entries, Web/API/CLI entrypoints, or code
 - agents must read global contracts before local specs:
   - [docs/errors/model.md](/Users/nichenqin/projects/yundu/docs/errors/model.md)
   - [docs/errors/neverthrow-conventions.md](/Users/nichenqin/projects/yundu/docs/errors/neverthrow-conventions.md)
   - [docs/architecture/async-lifecycle-and-acceptance.md](/Users/nichenqin/projects/yundu/docs/architecture/async-lifecycle-and-acceptance.md)
 - formal source-of-truth semantics for business operations live in `docs/decisions/**`, global contracts under `docs/errors/**` and `docs/architecture/**`, and local specs under `docs/commands/**`, `docs/events/**`, `docs/workflows/**`, and `docs/testing/**`
 - docs/ai/** contains background analysis and migration context only; it must not override ADRs, global contracts, or normative local specs
+- if a behavior is absent from `docs/BUSINESS_OPERATION_MAP.md`, add or position it there in a Spec Round before writing local specs or implementation code
+- if a behavior is marked rebuild-required in `docs/BUSINESS_OPERATION_MAP.md`, do not implement it directly; first update the governing ADR/specs/test matrix/implementation plan, then expose it through `CORE_OPERATIONS.md` and `operation-catalog.ts` during Code Round
 - new business endpoints and CLI commands must map to an existing catalog entry or add one in the same change
 - new business capabilities must update both `docs/CORE_OPERATIONS.md` and `packages/application/src/operation-catalog.ts` in the same change
 - transport input parameters must reuse the matching command/query input schema, not redefine parallel transport-only input shapes

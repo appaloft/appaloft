@@ -121,6 +121,8 @@ flowchart TD
 
 - the human-facing and AI-facing business capability contract lives in
   [CORE_OPERATIONS.md](/Users/nichenqin/projects/yundu/docs/CORE_OPERATIONS.md)
+- the human-facing and AI-facing business operation relationship map lives in
+  [BUSINESS_OPERATION_MAP.md](/Users/nichenqin/projects/yundu/docs/BUSINESS_OPERATION_MAP.md)
 - the human-facing and AI-facing domain boundary contract lives in
   [DOMAIN_MODEL.md](/Users/nichenqin/projects/yundu/docs/DOMAIN_MODEL.md)
 - the executable mirror of that contract lives in

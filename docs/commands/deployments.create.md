@@ -180,8 +180,8 @@ Not allowed:
 
 Project-level deployment lists are read-model rollups. Project-level "new deployment" entrypoints
 must behave as Quick Deploy or another entry workflow that selects or creates a resource before
-dispatching `deployments.create`. Resource-level new deployment and redeploy entrypoints are the
-preferred owner-scoped surfaces.
+dispatching `deployments.create`. Resource-level new deployment entrypoints are the preferred
+owner-scoped surfaces.
 
 ## Current Implementation Notes And Migration Gaps
 
@@ -197,6 +197,9 @@ Migration gaps:
 - current use-case return type is `Promise<Result<{ id: string }, DomainError>>`, not public `ResultAsync`;
 - Web QuickDeploy still performs some hardcoded local validation before dispatch.
   Quick Deploy is governed by [ADR-010](../decisions/ADR-010-quick-deploy-workflow-boundary.md).
+- ADR-016 removes cancel, manual deployment health check, redeploy, reattach, and rollback from the
+  public deployment write command surface until they are rebuilt through source-of-truth specs and
+  implementation plans.
 - `source`, `sourceLocator`, `deploymentMethod`, command override, network, route, domain, and TLS fields have
   been removed from the deployment command contract by ADR-014. Legacy code paths and historical
   tests that relied on deployment bootstrap must migrate to `resources.create` with

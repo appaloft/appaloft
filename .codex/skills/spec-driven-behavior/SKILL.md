@@ -20,28 +20,32 @@ Always read governing documents before implementation:
 1. `AGENTS.md`
 2. `docs/decisions/README.md`
 3. Relevant ADRs from `docs/decisions/`
-4. Global contracts:
+4. `docs/BUSINESS_OPERATION_MAP.md`
+5. `docs/CORE_OPERATIONS.md`
+6. `docs/DOMAIN_MODEL.md`
+7. Global contracts:
    - `docs/errors/model.md`
    - `docs/errors/neverthrow-conventions.md`
    - `docs/architecture/async-lifecycle-and-acceptance.md`
-5. Relevant local specs:
+8. Relevant local specs:
    - `docs/commands/**`
    - `docs/events/**`
    - `docs/workflows/**`
    - `docs/errors/**`
    - `docs/testing/**`
-6. When present:
+9. When present:
    - `docs/implementation/**`
-   - `docs/CORE_OPERATIONS.md`
    - `packages/application/src/operation-catalog.ts`
 
-Use ADRs, global contracts, local specs, implementation plans, `docs/CORE_OPERATIONS.md`, and `packages/application/src/operation-catalog.ts` as governing sources. Use `docs/ai/**` only as background analysis; it must not override accepted ADRs, global contracts, local specs, or implementation plans.
+Use ADRs, `docs/BUSINESS_OPERATION_MAP.md`, global contracts, local specs, implementation plans, `docs/CORE_OPERATIONS.md`, and `packages/application/src/operation-catalog.ts` as governing sources. Use `docs/ai/**` only as background analysis; it must not override accepted ADRs, the business operation map, global contracts, local specs, or implementation plans.
+
+Before adding or changing a behavior, locate it in `docs/BUSINESS_OPERATION_MAP.md`. If the behavior is absent, add or position it there during Spec Round before writing local specs or code. If the behavior is marked rebuild-required, do not implement it directly; first update or create the governing ADR, local specs, test matrix, and implementation plan.
 
 Local specs use Normative Contract style. Read the main body as the target contract. Read `Current Implementation Notes And Migration Gaps` only as migration context. Read `Open Questions` only to identify decisions that still need ADR/user confirmation.
 
 ## v1 Closure Target
 
-Yundu's current product target is a self-hosted deployment platform v1 similar in closure needs to Coolify/Dokku-class tools:
+Yundu's current product target is a self-hosted deployment platform v1 with these closure needs:
 
 - zero-to-SSH-server setup;
 - application deployment;
@@ -59,7 +63,7 @@ Use when the user has not specified a concrete behavior, command, or business op
 
 Do this:
 
-- read `docs/CORE_OPERATIONS.md`, `packages/application/src/operation-catalog.ts`, and `docs/commands/**`;
+- read `docs/BUSINESS_OPERATION_MAP.md`, `docs/CORE_OPERATIONS.md`, `packages/application/src/operation-catalog.ts`, and `docs/commands/**`;
 - search for user terms across command specs, workflow specs, event specs, and operation catalog entries;
 - list the most relevant candidate behaviors;
 - include each candidate's command name, workflow/spec paths, and a one-line rationale;
@@ -78,6 +82,7 @@ This is the default round.
 Do this:
 
 - update ADRs first when boundaries or lifecycle rules change;
+- update `docs/BUSINESS_OPERATION_MAP.md` first when a behavior is new, absent, repositioned, or rebuild-required;
 - keep spec bodies source-of-truth / Normative Contract style;
 - place current implementation gaps only in `Current Implementation Notes And Migration Gaps`;
 - place undecided issues only in `Open Questions`;
@@ -103,6 +108,7 @@ Follow repository CQRS rules:
 - application handlers delegate to use cases or application services and do not contain persistence or transport logic;
 - query handlers delegate to query services/read models and do not read persistence directly from transports;
 - new business capabilities update both `docs/CORE_OPERATIONS.md` and `packages/application/src/operation-catalog.ts` in the same change;
+- new or changed behaviors must already be positioned in `docs/BUSINESS_OPERATION_MAP.md`;
 - neverthrow boundaries follow `docs/errors/neverthrow-conventions.md`.
 
 Default Code Round closure includes the Web UI, HTTP/oRPC API, and read/query surface needed for a user to observe the result of the behavior. Do not treat a write-side command as complete if the only way to confirm it worked is by inspecting persistence manually. If Web, API, CLI, or query/read model coverage is intentionally deferred, record that explicitly in the final gaps and in the relevant migration notes.
@@ -131,6 +137,7 @@ Do this:
 
 - verify whether the current behavior completed Post-Implementation Sync;
 - rank candidates by v1 minimum-loop value, not just implementation ease;
+- start candidate discovery from `docs/BUSINESS_OPERATION_MAP.md`;
 - prefer behaviors with Accepted ADRs, global-contract coverage, local specs, implementation plans, and a verifiable minimal deliverable;
 - identify blockers that require Spec Round before Code Round;
 - recommend exactly one next behavior and list backup candidates.
@@ -192,10 +199,12 @@ Read governing documents in source-of-truth order:
 - `AGENTS.md`;
 - `docs/decisions/README.md`;
 - relevant ADRs;
+- `docs/BUSINESS_OPERATION_MAP.md`;
+- `docs/CORE_OPERATIONS.md`;
+- `docs/DOMAIN_MODEL.md`;
 - global error/neverthrow/async contracts;
 - local command/event/workflow/error/testing specs;
 - implementation plan;
-- `docs/CORE_OPERATIONS.md`;
 - `packages/application/src/operation-catalog.ts`.
 
 Use `rg` and `rg --files` first for discovery.
@@ -207,6 +216,7 @@ Build and share or use a behavior change map before edits when the task is non-t
 Include:
 
 - governed ADRs;
+- operation-map position and state;
 - governed global contracts;
 - relevant command specs;
 - relevant event specs;
@@ -272,7 +282,7 @@ If Code Round:
 
 If Next Behavior Selection:
 
-- inspect `docs/PRODUCT_ROADMAP.md`, `docs/CORE_OPERATIONS.md`, operation catalog, ADRs, local specs, and implementation plans;
+- inspect `docs/BUSINESS_OPERATION_MAP.md`, `docs/PRODUCT_ROADMAP.md`, `docs/CORE_OPERATIONS.md`, operation catalog, ADRs, local specs, and implementation plans;
 - prefer behaviors on the v1 loop: SSH server setup, app deployment, basic access path, domain/TLS, status/error/event visibility;
 - choose Code Round only when ADR/spec/plan readiness is sufficient;
 - otherwise recommend Spec Round.
@@ -290,6 +300,7 @@ The final response must include:
 
 - round type;
 - target behavior;
+- operation-map position and state;
 - changed docs;
 - changed code modules;
 - changed tests;
@@ -319,6 +330,7 @@ Do not resolve these boundary questions by only changing a local spec or impleme
 
 When a behavior changes, check and synchronize:
 
+- business operation map;
 - command spec and command implementation;
 - query spec/read model/projection when the behavior has observable state;
 - event specs and event publisher/consumer behavior;

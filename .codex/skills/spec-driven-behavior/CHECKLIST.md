@@ -7,6 +7,7 @@ Use this checklist after the behavior is identified.
 - [ ] `AGENTS.md` read
 - [ ] `docs/decisions/README.md` read
 - [ ] Relevant ADRs read
+- [ ] `docs/BUSINESS_OPERATION_MAP.md` read and behavior located
 - [ ] `docs/errors/model.md` read
 - [ ] `docs/errors/neverthrow-conventions.md` read
 - [ ] `docs/architecture/async-lifecycle-and-acceptance.md` read
@@ -16,6 +17,7 @@ Use this checklist after the behavior is identified.
 ## Behavior Change Map
 
 - Behavior:
+- Operation-map position/state:
 - Command/query:
 - Current round:
 - Requested/allowed file scope:
@@ -49,6 +51,8 @@ Use this checklist after the behavior is identified.
 ## Round Gate
 
 - [ ] Defaulted to Spec Round when governance is incomplete
+- [ ] Behavior is positioned in `docs/BUSINESS_OPERATION_MAP.md`
+- [ ] Rebuild-required behavior has ADR/spec/test matrix/implementation plan before Code Round
 - [ ] Code Round explicitly allowed by the prompt
 - [ ] Accepted ADRs present, or no ADR-needed boundary change
 - [ ] Global contracts cover error/neverthrow/async concerns
@@ -74,6 +78,7 @@ Use this checklist after the behavior is identified.
 ## Post-Implementation Sync
 
 - [ ] Command/query code aligns with spec
+- [ ] Business operation map still matches the implemented behavior state
 - [ ] Workflow/process behavior aligns with spec
 - [ ] Error mapping aligns with error spec and neverthrow conventions
 - [ ] Tests align with test matrix

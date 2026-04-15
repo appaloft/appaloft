@@ -1,5 +1,3 @@
-export * from "./operations/deployments/cancel-deployment.use-case";
-export * from "./operations/deployments/check-deployment-health.use-case";
 export * from "./operations/deployments/create-deployment.use-case";
 export * from "./operations/deployments/deployment.factory";
 export * from "./operations/deployments/deployment-config-bootstrap.service";
@@ -9,10 +7,6 @@ export * from "./operations/deployments/deployment-lifecycle.service";
 export * from "./operations/deployments/deployment-logs.query-service";
 export * from "./operations/deployments/deployment-snapshot.factory";
 export * from "./operations/deployments/list-deployments.query-service";
-export * from "./operations/deployments/reattach-deployment.use-case";
-export * from "./operations/deployments/redeploy-resource.use-case";
-export * from "./operations/deployments/rollback-deployment.use-case";
-export * from "./operations/deployments/rollback-plan.factory";
 export * from "./operations/deployments/runtime-plan-resolution-input.builder";
 export * from "./operations/domain-bindings/create-domain-binding.use-case";
 export * from "./operations/domain-bindings/list-domain-bindings.query-service";

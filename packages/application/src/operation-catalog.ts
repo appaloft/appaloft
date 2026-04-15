@@ -1,12 +1,7 @@
 import { type ZodTypeAny } from "zod";
-import { cancelDeploymentCommandInputSchema } from "./operations/deployments/cancel-deployment.command";
-import { checkDeploymentHealthCommandInputSchema } from "./operations/deployments/check-deployment-health.command";
 import { createDeploymentCommandInputSchema } from "./operations/deployments/create-deployment.command";
 import { deploymentLogsQueryInputSchema } from "./operations/deployments/deployment-logs.query";
 import { listDeploymentsQueryInputSchema } from "./operations/deployments/list-deployments.query";
-import { reattachDeploymentCommandInputSchema } from "./operations/deployments/reattach-deployment.command";
-import { redeployResourceCommandInputSchema } from "./operations/deployments/redeploy-resource.command";
-import { rollbackDeploymentCommandInputSchema } from "./operations/deployments/rollback-deployment.command";
 import { createDomainBindingCommandInputSchema } from "./operations/domain-bindings/create-domain-binding.command";
 import { listDomainBindingsQueryInputSchema } from "./operations/domain-bindings/list-domain-bindings.query";
 import { createEnvironmentCommandInputSchema } from "./operations/environments/create-environment.command";
@@ -320,34 +315,6 @@ export const operationCatalog = [
     },
   },
   {
-    key: "deployments.cancel",
-    kind: "command",
-    domain: "deployments",
-    messageName: "CancelDeploymentCommand",
-    handlerName: "CancelDeploymentCommandHandler",
-    serviceName: "CancelDeploymentUseCase",
-    inputSchema: cancelDeploymentCommandInputSchema,
-    serviceToken: tokens.cancelDeploymentUseCase,
-    transports: {
-      cli: "yundu cancel <deploymentId>",
-      orpc: { method: "POST", path: "/api/deployments/{deploymentId}/cancel" },
-    },
-  },
-  {
-    key: "deployments.check-health",
-    kind: "command",
-    domain: "deployments",
-    messageName: "CheckDeploymentHealthCommand",
-    handlerName: "CheckDeploymentHealthCommandHandler",
-    serviceName: "CheckDeploymentHealthUseCase",
-    inputSchema: checkDeploymentHealthCommandInputSchema,
-    serviceToken: tokens.checkDeploymentHealthUseCase,
-    transports: {
-      cli: "yundu health <deploymentId>",
-      orpc: { method: "POST", path: "/api/deployments/{deploymentId}/health-checks" },
-    },
-  },
-  {
     key: "deployments.create",
     kind: "command",
     domain: "deployments",
@@ -388,48 +355,6 @@ export const operationCatalog = [
     transports: {
       cli: "yundu logs <deploymentId>",
       orpc: { method: "GET", path: "/api/deployments/{deploymentId}/logs" },
-    },
-  },
-  {
-    key: "deployments.redeploy-resource",
-    kind: "command",
-    domain: "deployments",
-    messageName: "RedeployResourceCommand",
-    handlerName: "RedeployResourceCommandHandler",
-    serviceName: "RedeployResourceUseCase",
-    inputSchema: redeployResourceCommandInputSchema,
-    serviceToken: tokens.redeployResourceUseCase,
-    transports: {
-      cli: "yundu redeploy <resourceId>",
-      orpc: { method: "POST", path: "/api/resources/{resourceId}/redeploy" },
-    },
-  },
-  {
-    key: "deployments.reattach",
-    kind: "command",
-    domain: "deployments",
-    messageName: "ReattachDeploymentCommand",
-    handlerName: "ReattachDeploymentCommandHandler",
-    serviceName: "ReattachDeploymentUseCase",
-    inputSchema: reattachDeploymentCommandInputSchema,
-    serviceToken: tokens.reattachDeploymentUseCase,
-    transports: {
-      cli: "yundu reattach <deploymentId>",
-      orpc: { method: "POST", path: "/api/deployments/{deploymentId}/reattach" },
-    },
-  },
-  {
-    key: "deployments.rollback",
-    kind: "command",
-    domain: "deployments",
-    messageName: "RollbackDeploymentCommand",
-    handlerName: "RollbackDeploymentCommandHandler",
-    serviceName: "RollbackDeploymentUseCase",
-    inputSchema: rollbackDeploymentCommandInputSchema,
-    serviceToken: tokens.rollbackDeploymentUseCase,
-    transports: {
-      cli: "yundu rollback <deploymentId>",
-      orpc: { method: "POST", path: "/api/deployments/{deploymentId}/rollback" },
     },
   },
   {

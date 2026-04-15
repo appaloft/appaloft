@@ -7,12 +7,11 @@ import {
   ConfigScopeValue,
   ConfigValueText,
   CreatedAt,
-  Deployment,
+  type Deployment,
   DeploymentByIdSpec,
   DeploymentId,
   DeploymentLogEntry,
   DeploymentPhaseValue,
-  DeploymentStatusValue,
   DeploymentTarget,
   DeploymentTargetDescriptor,
   DeploymentTargetId,
@@ -61,10 +60,8 @@ import {
   SourceDescriptor,
   SourceKindValue,
   SourceLocator,
-  StartedAt,
   TargetKindValue,
   UpdatedAt,
-  UpsertDeploymentSpec,
   UpsertDeploymentTargetSpec,
   UpsertDestinationSpec,
   UpsertEnvironmentSpec,
@@ -103,7 +100,6 @@ import {
   type SourceDetector,
 } from "../src/ports";
 import {
-  CancelDeploymentUseCase,
   CreateDeploymentUseCase,
   DeploymentContextBootstrapService,
   DeploymentContextDefaultsFactory,
@@ -111,8 +107,6 @@ import {
   DeploymentFactory,
   DeploymentLifecycleService,
   DeploymentSnapshotFactory,
-  ReattachDeploymentUseCase,
-  RedeployResourceUseCase,
   RuntimePlanResolutionInputBuilder,
 } from "../src/use-cases";
 
@@ -447,16 +441,7 @@ async function createDeploymentFixture(
     new DeploymentFactory(clock, idGenerator),
     new DeploymentLifecycleService(clock),
   );
-  const cancelDeploymentUseCase = new CancelDeploymentUseCase(
-    deployments,
-    eventBus,
-    logger,
-    clock,
-    new HermeticExecutionBackend(),
-  );
-
   return {
-    cancelDeploymentUseCase,
     clock,
     context,
     createDeploymentUseCase,
@@ -473,28 +458,6 @@ async function createDeploymentFixture(
       resourceId: "res_demo",
     },
   };
-}
-
-async function replaceDeploymentWithRunningCopy(input: {
-  deployment: Deployment;
-  repository: MemoryDeploymentRepository;
-  repositoryContext: ReturnType<typeof toRepositoryContext>;
-}): Promise<Deployment> {
-  const state = input.deployment.toState();
-  const { finishedAt: _finishedAt, ...stateWithoutFinishedAt } = state;
-  const runningDeployment = Deployment.rehydrate({
-    ...stateWithoutFinishedAt,
-    status: DeploymentStatusValue.rehydrate("running"),
-    startedAt: StartedAt.rehydrate("2026-01-01T00:01:00.000Z"),
-  });
-
-  await input.repository.upsert(
-    input.repositoryContext,
-    runningDeployment,
-    UpsertDeploymentSpec.fromDeployment(runningDeployment),
-  );
-
-  return runningDeployment;
 }
 
 describe("CreateDeploymentUseCase", () => {
@@ -996,99 +959,5 @@ describe("CreateDeploymentUseCase", () => {
     expect(deployment?.toState().serverId.value).toBe("srv_0003");
     expect(deployment?.toState().destinationId.value).toBe("dst_0004");
     expect(deployment?.toState().resourceId.value).toBe("res_0005");
-  });
-
-  test("cancels active deployments and reattaches to persisted status", async () => {
-    const {
-      cancelDeploymentUseCase,
-      clock,
-      context,
-      createDeploymentUseCase,
-      createDeploymentInput,
-      deployments,
-      repositoryContext,
-    } = await createDeploymentFixture();
-
-    const created = await createDeploymentUseCase.execute(context, createDeploymentInput);
-    expect(created.isOk()).toBe(true);
-    const deploymentId = created._unsafeUnwrap().id;
-    const succeededDeployment = await deployments.findOne(
-      repositoryContext,
-      DeploymentByIdSpec.create(DeploymentId.rehydrate(deploymentId)),
-    );
-    expect(succeededDeployment).not.toBeNull();
-    await replaceDeploymentWithRunningCopy({
-      deployment: succeededDeployment as Deployment,
-      repository: deployments,
-      repositoryContext,
-    });
-
-    clock.set("2026-01-01T00:05:00.000Z");
-    const canceled = await cancelDeploymentUseCase.execute(context, {
-      deploymentId,
-      reason: "stale planned deployment",
-    });
-    expect(canceled.isOk()).toBe(true);
-
-    const reattached = await new ReattachDeploymentUseCase(deployments).execute(context, {
-      deploymentId,
-    });
-    expect(reattached.isOk()).toBe(true);
-    expect(reattached._unsafeUnwrap().status).toBe("canceled");
-    expect(reattached._unsafeUnwrap().logs.map((log) => log.message)).toEqual(
-      expect.arrayContaining([
-        "Hermetic cancellation completed",
-        "Deployment canceled: stale planned deployment",
-      ]),
-    );
-  });
-
-  test("force redeploy cancels the active latest deployment before creating a replacement", async () => {
-    const {
-      cancelDeploymentUseCase,
-      clock,
-      context,
-      createDeploymentUseCase,
-      createDeploymentInput,
-      deployments,
-      repositoryContext,
-    } = await createDeploymentFixture();
-
-    const created = await createDeploymentUseCase.execute(context, createDeploymentInput);
-    expect(created.isOk()).toBe(true);
-    const deploymentId = created._unsafeUnwrap().id;
-    const latestDeployment = await deployments.findOne(
-      repositoryContext,
-      DeploymentByIdSpec.create(DeploymentId.rehydrate(deploymentId)),
-    );
-    expect(latestDeployment).not.toBeNull();
-    const runningDeployment = await replaceDeploymentWithRunningCopy({
-      deployment: latestDeployment as Deployment,
-      repository: deployments,
-      repositoryContext,
-    });
-
-    clock.set("2026-01-01T00:05:00.000Z");
-    const redeployed = await new RedeployResourceUseCase(
-      deployments,
-      createDeploymentUseCase,
-      cancelDeploymentUseCase,
-    ).execute(context, {
-      resourceId: runningDeployment.toState().resourceId.value,
-      force: true,
-    });
-
-    expect(redeployed.isOk()).toBe(true);
-    expect(deployments.items.size).toBe(2);
-    const canceledDeployment = await deployments.findOne(
-      repositoryContext,
-      DeploymentByIdSpec.create(DeploymentId.rehydrate(deploymentId)),
-    );
-    const replacementDeployment = await deployments.findOne(
-      repositoryContext,
-      DeploymentByIdSpec.create(DeploymentId.rehydrate(redeployed._unsafeUnwrap().id)),
-    );
-    expect(canceledDeployment?.toState().status.value).toBe("canceled");
-    expect(replacementDeployment?.toState().status.value).toBe("succeeded");
   });
 });

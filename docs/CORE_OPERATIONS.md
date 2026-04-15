@@ -6,6 +6,9 @@
 > If a transport, UI flow, or local shortcut conflicts with this document, this document wins.
 > The executable mirror of this document is
 > [`packages/application/src/operation-catalog.ts`](/Users/nichenqin/projects/yundu/packages/application/src/operation-catalog.ts).
+> Use [BUSINESS_OPERATION_MAP.md](/Users/nichenqin/projects/yundu/docs/BUSINESS_OPERATION_MAP.md)
+> to understand operation relationships, workflow sequencing, and rebuild gates before adding or
+> changing a behavior.
 
 ## Why This File Exists
 
@@ -160,7 +163,7 @@ Business meaning:
   Compose stacks are modeled as resources
 - a Docker Compose stack is one resource that may contain multiple named services
 - deployments belong to one resource
-- resource detail is the owner-scoped surface for new deployment, redeploy, deployment history,
+- resource detail is the owner-scoped surface for new deployment, deployment history,
   source/runtime/network configuration, and resource-scoped domain/TLS actions
 - destinations and deployment targets / servers remain runtime placement, not the project
   organization layer
@@ -212,15 +215,13 @@ Implemented operations:
 | Capability | Kind | Operation Key | Message | Schema | CLI | oRPC / HTTP |
 | --- | --- | --- | --- | --- | --- | --- |
 | Create deployment | Command | `deployments.create` | `CreateDeploymentCommand` | `CreateDeploymentCommandInput` | `yundu deploy [path-or-source]` or ids-only flags | `POST /api/deployments` |
-| Cancel deployment | Command | `deployments.cancel` | `CancelDeploymentCommand` | `CancelDeploymentCommandInput` | `yundu cancel <deploymentId>` | `POST /api/deployments/{deploymentId}/cancel` |
-| Check deployment health | Command | `deployments.check-health` | `CheckDeploymentHealthCommand` | `CheckDeploymentHealthCommandInput` | `yundu health <deploymentId>` | `POST /api/deployments/{deploymentId}/health-checks` |
 | List deployments | Query | `deployments.list` | `ListDeploymentsQuery` | `ListDeploymentsQueryInput` | `yundu deployments list` | `GET /api/deployments` |
 | Read deployment logs | Query | `deployments.logs` | `DeploymentLogsQuery` | `DeploymentLogsQueryInput` | `yundu logs <deploymentId>` | `GET /api/deployments/{deploymentId}/logs` |
-| Redeploy resource | Command | `deployments.redeploy-resource` | `RedeployResourceCommand` | `RedeployResourceCommandInput` | `yundu redeploy <resourceId>` | `POST /api/resources/{resourceId}/redeploy` |
-| Reattach deployment | Command | `deployments.reattach` | `ReattachDeploymentCommand` | `ReattachDeploymentCommandInput` | `yundu reattach <deploymentId>` | `POST /api/deployments/{deploymentId}/reattach` |
-| Roll back deployment | Command | `deployments.rollback` | `RollbackDeploymentCommand` | `RollbackDeploymentCommandInput` | `yundu rollback <deploymentId>` | `POST /api/deployments/{deploymentId}/rollback` |
 
 Current boundary:
+- `deployments.create` is the only public deployment write command for the v1 operation surface.
+  This reset is governed by
+  [ADR-016: Deployment Command Surface Reset](./decisions/ADR-016-deployment-command-surface-reset.md).
 - `deployments.create` accepts deployment context references only: `projectId`, `environmentId`,
   `resourceId`, `serverId`, and optional `destinationId`
 - deployment source and runtime strategy are resolved from the resource's persisted
@@ -238,17 +239,9 @@ Current boundary:
   resource/project/environment/server state before deployment admission; they are not
   `deployments.create` input fields
 - detect and plan happen inside the deployment write flow
-- cancel moves an active deployment (`created`, `planning`, `planned`, or `running`) into the
-  `canceled` terminal state and delegates infrastructure cleanup to the execution backend when it
-  has enough runtime metadata or a deterministic fallback target
-- health check is a deployment command because it probes the runtime route for a persisted
-  deployment record; it uses the deployment's access route/runtime metadata rather than the
-  control-plane `/api/health` endpoint
-- redeploy creates a new deployment attempt for the resource from current resource profile state;
-  with `force`, the latest non-terminal deployment is canceled before the new deployment starts
-- reattach is intentionally a command because transports use it as an operational action, but it
-  does not resume a lost process; it returns the current persisted deployment status and logs so
-  the UI can reconnect to state
+- cancel, manual deployment health check, redeploy, reattach, and rollback are not public
+  operations in the v1 surface. They must be reintroduced only after new source-of-truth specs,
+  test matrices, implementation plans, and Web/API/CLI contracts are accepted.
 - Quick Deploy is an entry workflow over explicit operations, not a separate domain command or
   operation-catalog entry. Web QuickDeploy and CLI interactive `yundu deploy` must create/select
   context through existing commands and queries, then dispatch `deployments.create`. See
@@ -343,23 +336,26 @@ Web:
 - it must not hide business rules in components
 
 Future MCP / AI tools:
-- tools such as `create_project`, `create_environment`, `plan_deployment`, `deploy_release`,
-  `rollback_release` must map back to these operations or to future operations added here
+- tools such as `create_project`, `create_environment`, `plan_deployment`, and
+  `deploy_release` must map back to these operations or to future operations added here
 
 ## Authoring Checklist For New Business Capabilities
 
 Before adding a new CLI command, API endpoint, or UI workflow:
 
 1. Decide whether it is a `Command` or `Query`.
-2. Add the operation to this file.
-3. Add the executable mirror entry to
+2. Locate the behavior in
+   [BUSINESS_OPERATION_MAP.md](/Users/nichenqin/projects/yundu/docs/BUSINESS_OPERATION_MAP.md) and
+   update the map first if the behavior is absent or rebuild-required.
+3. Add the operation to this file when it becomes a public command/query.
+4. Add the executable mirror entry to
    [`packages/application/src/operation-catalog.ts`](/Users/nichenqin/projects/yundu/packages/application/src/operation-catalog.ts).
-4. Create the vertical slice files:
+5. Create the vertical slice files:
    - `*.schema.ts`
    - `*.command.ts` or `*.query.ts`
    - `*.handler.ts`
    - `*.use-case.ts` or `*.query-service.ts`
-5. Map CLI and oRPC / HTTP to that operation.
-6. Add tests at the transport and application levels.
+6. Map CLI and oRPC / HTTP to that operation.
+7. Add tests at the transport and application levels.
 
 If a capability is not listed here, it is not part of the agreed Yundu business surface yet.
