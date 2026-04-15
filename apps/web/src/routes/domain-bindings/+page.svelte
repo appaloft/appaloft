@@ -236,8 +236,8 @@
       <Skeleton class="h-80 w-full" />
     </div>
   {:else}
-    <div class="space-y-5">
-      <section class="rounded-lg border bg-background p-5">
+    <div class="space-y-8">
+      <section class="space-y-6">
         <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div class="max-w-3xl space-y-3">
             <Badge class="w-fit" variant="outline">
@@ -252,14 +252,14 @@
               </p>
             </div>
           </div>
-          <div class="grid grid-cols-2 gap-3 text-center md:min-w-72">
-            <div class="rounded-md border px-3 py-2">
+          <div class="grid grid-cols-2 divide-x border-y text-center md:min-w-72">
+            <div class="px-3 py-3">
               <p class="text-xl font-semibold">{domainBindings.length}</p>
               <p class="mt-1 text-xs text-muted-foreground">
                 {$t(i18nKeys.common.domain.domainBindings)}
               </p>
             </div>
-            <div class="rounded-md border px-3 py-2">
+            <div class="px-3 py-3">
               <p class="text-xl font-semibold">
                 {domainBindings.filter((binding) => binding.status === "ready").length}
               </p>
@@ -270,9 +270,9 @@
       </section>
 
       <section class="grid gap-5 xl:grid-cols-[0.9fr_1.1fr]">
-        <section class="rounded-lg border bg-background p-5">
+        <section class="space-y-4">
           <div class="flex items-start gap-3">
-            <div class="rounded-md border bg-muted p-2">
+            <div class="bg-muted p-2">
               <Plus class="size-4" />
             </div>
             <div>
@@ -423,7 +423,7 @@
           </form>
         </section>
 
-        <section class="rounded-lg border bg-background p-5">
+        <section class="space-y-4">
           <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <h2 class="text-lg font-semibold">
@@ -444,14 +444,15 @@
             </select>
           </div>
 
-          <div class="mt-4 space-y-3">
+          <div>
             {#if visibleDomainBindings.length > 0}
+              <div class="divide-y border-y">
               {#each visibleDomainBindings as binding (binding.id)}
                 {@const project = findProject(projects, binding.projectId)}
                 {@const environment = findEnvironment(environments, binding.environmentId)}
                 {@const resource = findResource(resources, binding.resourceId)}
                 {@const server = findServer(servers, binding.serverId)}
-                <article class="rounded-md border px-4 py-3">
+                <article class="py-4 sm:px-3">
                   <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                     <div class="min-w-0 space-y-2">
                       <div class="flex flex-wrap items-center gap-2">
@@ -469,7 +470,7 @@
                   </div>
 
                   <div class="mt-3 grid gap-3 sm:grid-cols-3">
-                    <div class="rounded-md border bg-background px-3 py-2">
+                    <div class="bg-muted/25 px-3 py-2">
                       <p class="flex items-center gap-2 text-xs text-muted-foreground">
                         <Route class="size-3.5" />
                         {$t(i18nKeys.common.domain.resource)}
@@ -478,7 +479,7 @@
                         {resource?.name ?? binding.resourceId}
                       </p>
                     </div>
-                    <div class="rounded-md border bg-background px-3 py-2">
+                    <div class="bg-muted/25 px-3 py-2">
                       <p class="flex items-center gap-2 text-xs text-muted-foreground">
                         <ShieldCheck class="size-3.5" />
                         {$t(i18nKeys.common.domain.server)}
@@ -487,7 +488,7 @@
                         {server?.name ?? binding.serverId}
                       </p>
                     </div>
-                    <div class="rounded-md border bg-background px-3 py-2">
+                    <div class="bg-muted/25 px-3 py-2">
                       <p class="text-xs text-muted-foreground">
                         {$t(i18nKeys.console.domainBindings.verificationAttempts, {
                           count: binding.verificationAttemptCount,
@@ -501,8 +502,9 @@
                   </div>
                 </article>
               {/each}
+              </div>
             {:else}
-              <div class="rounded-md border border-dashed p-5">
+              <div class="border-y bg-muted/25 px-4 py-6">
                 <div class="flex items-start gap-3">
                   <Globe2 class="mt-0.5 size-4 text-muted-foreground" />
                   <div class="space-y-1">

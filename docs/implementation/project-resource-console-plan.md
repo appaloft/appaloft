@@ -45,7 +45,8 @@ Expected Web implementation scope:
   - provide a dedicated route or panel for resource creation;
   - use resource language for source/runtime/network drafts;
   - persist resource-owned source/runtime/network profile through `resources.create` when the flow is part of first deploy;
-  - optionally continue into Quick Deploy when the user chooses create-and-deploy.
+  - submit through a deploy action that sequences `resources.create -> deployments.create(resourceId)`
+    with the selected existing project, environment, server, and optional destination.
 - sidebar:
   - display Project -> Resource hierarchy;
   - show latest deployment status per resource from a read model/projection;
@@ -80,7 +81,10 @@ Likely touched modules in Code Round:
 The minimal Code Round deliverable is:
 
 - project detail page treats resources as the primary list;
-- project-level new deployment opens Quick Deploy/resource selection instead of looking project-owned;
+- project-level new deployment is absent or opens Quick Deploy/resource selection instead of looking
+  project-owned;
+- project-scoped create-resource flow can create the resource and immediately create the first
+  deployment with the returned `resourceId`;
 - resource detail page exposes deployment history and resource-scoped new deployment action;
 - sidebar or navigation uses Project -> Resource hierarchy when the current layout supports it;
 - latest deployment status is read-model derived or clearly deferred in migration notes;
@@ -95,6 +99,8 @@ Required coverage follows [Project Resource Console Test Matrix](../testing/proj
 - resource detail new deployment dispatches with `resourceId`;
 - resource detail deployment history filters by `resourceId`;
 - project-level new deployment enters Quick Deploy or resource selection;
+- project-scoped create-resource deploy action sequences `resources.create ->
+  deployments.create(resourceId)`;
 - create-resource and Quick Deploy map generic port fields to `networkProfile.internalPort`;
 - sidebar resource status is projection/read-model state.
 

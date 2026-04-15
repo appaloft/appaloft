@@ -95,6 +95,41 @@ const apiResponses: Record<ApiScenario, Record<string, unknown>> = {
         ],
       },
     },
+    "/api/rpc/resources/list": {
+      json: {
+        items: [
+          {
+            id: "res_demo",
+            projectId: "prj_demo",
+            environmentId: "env_demo",
+            destinationId: "dst_demo",
+            name: "workspace",
+            slug: "workspace",
+            kind: "application",
+            services: [
+              {
+                name: "web",
+                kind: "web",
+              },
+            ],
+            deploymentCount: 1,
+            lastDeploymentId: "dep_demo",
+            lastDeploymentStatus: "succeeded",
+            networkProfile: {
+              internalPort: 3000,
+              upstreamProtocol: "http",
+              exposureMode: "reverse-proxy",
+            },
+            createdAt: "2026-01-01T00:00:00.000Z",
+          },
+        ],
+      },
+    },
+    "/api/rpc/domain-bindings/list": {
+      json: {
+        items: [],
+      },
+    },
     "/api/rpc/deployments/list": {
       json: {
         items: [
@@ -102,7 +137,9 @@ const apiResponses: Record<ApiScenario, Record<string, unknown>> = {
             id: "dep_demo",
             projectId: "prj_demo",
             environmentId: "env_demo",
+            resourceId: "res_demo",
             serverId: "srv_demo",
+            destinationId: "dst_demo",
             status: "succeeded",
             runtimePlan: {
               id: "plan_demo",
@@ -223,6 +260,16 @@ const apiResponses: Record<ApiScenario, Record<string, unknown>> = {
       },
     },
     "/api/rpc/deployments/list": {
+      json: {
+        items: [],
+      },
+    },
+    "/api/rpc/resources/list": {
+      json: {
+        items: [],
+      },
+    },
+    "/api/rpc/domain-bindings/list": {
       json: {
         items: [],
       },
@@ -476,7 +523,8 @@ describe("console e2e with Bun.WebView", () => {
     await view.navigate(`${previewUrl}/projects`);
     await expectText(view, "项目");
     await expectText(view, "Demo");
-    await expectText(view, "最近部署");
+    await expectText(view, "已有资源");
+    await expectText(view, "workspace");
 
     await view.navigate(`${previewUrl}/deployments`);
     await expectText(view, "workspace");

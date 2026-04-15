@@ -80,7 +80,7 @@ When generated default access policy is enabled, the first deployment may produc
 
 | Entrypoint | Contract |
 | --- | --- |
-| Web resource page | May create a resource from a project/environment context, then show the resource detail page. |
+| Web project create-resource page | Collects project, environment, source/runtime/network draft fields, server, and optional destination, then sequences `resources.create -> deployments.create(resourceId)`. |
 | Web project page | Must treat resource list and create-resource as primary. New deployment from a project page must enter Quick Deploy or another entry workflow that selects or creates a resource before deployment admission. |
 | Web resource detail page | Owns resource-scoped new deployment, deployment history, source/runtime configuration, and domain/TLS affordances. Redeploy is absent until reintroduced under ADR-016. |
 | Web QuickDeploy | May collect a resource draft and call `resources.create` before `deployments.create`. |

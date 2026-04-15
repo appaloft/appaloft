@@ -234,7 +234,7 @@
     </div>
   </div>
   {#if draft.providerKey === "generic-ssh"}
-    <div class="space-y-3 rounded-md border px-3 py-3">
+    <div class="space-y-3 bg-muted/20 px-3 py-3">
       <div class="space-y-1">
         <p class="text-sm font-medium">{$t(i18nKeys.console.serverForm.sshCredentialTitle)}</p>
         <p class="text-xs leading-5 text-muted-foreground">
@@ -283,7 +283,7 @@
         </p>
       </div>
       {#if draft.credentialKind === "local-ssh-agent"}
-        <div class="space-y-1 rounded-md border border-dashed px-3 py-2 text-xs leading-5 text-muted-foreground">
+        <div class="space-y-1 bg-muted/25 px-3 py-2 text-xs leading-5 text-muted-foreground">
           <p>{$t(i18nKeys.console.serverForm.localSshAgentDescriptionOne)}</p>
           <p>{$t(i18nKeys.console.serverForm.localSshAgentDescriptionTwo)}</p>
         </div>
@@ -501,7 +501,7 @@
             {connectivityError}
           </div>
         {:else if connectivityResult}
-          <div class="space-y-2 rounded-md border px-3 py-2">
+          <div class="space-y-2 bg-muted/25 px-3 py-2">
             <div class="flex flex-wrap items-center justify-between gap-2">
               <p class="text-xs font-medium">{$t(i18nKeys.console.serverForm.connectivityResultTitle)}</p>
               <Badge variant={connectivityVariant(connectivityResult.status)}>
