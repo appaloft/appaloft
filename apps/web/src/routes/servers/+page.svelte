@@ -57,6 +57,9 @@
         </p>
       </div>
       <div class="mt-6 flex flex-wrap gap-2">
+        <Button href="/servers/new">
+          {$t(i18nKeys.common.actions.createServer)}
+        </Button>
         <Button href="/projects" variant="outline">
           {$t(i18nKeys.common.actions.viewProjects)}
         </Button>
@@ -77,20 +80,25 @@
             {$t(i18nKeys.console.servers.focusDescription)}
           </p>
         </div>
-        <div class="grid grid-cols-3 gap-3 text-center md:min-w-80">
-          <div class="rounded-md border px-3 py-2">
-            <p class="text-xl font-semibold">{servers.length}</p>
-            <p class="mt-1 text-xs text-muted-foreground">{$t(i18nKeys.common.domain.servers)}</p>
-          </div>
-          <div class="rounded-md border px-3 py-2">
-            <p class="text-xl font-semibold">{activeServers}</p>
-            <p class="mt-1 text-xs text-muted-foreground">{$t(i18nKeys.common.status.connected)}</p>
-          </div>
-          <div class="rounded-md border px-3 py-2">
-            <p class="text-xl font-semibold">{deployments.length}</p>
-            <p class="mt-1 text-xs text-muted-foreground">
-              {$t(i18nKeys.common.domain.deployments)}
-            </p>
+        <div class="space-y-3 md:min-w-80">
+          <Button class="w-full" href="/servers/new">
+            {$t(i18nKeys.common.actions.createServer)}
+          </Button>
+          <div class="grid grid-cols-3 gap-3 text-center">
+            <div class="rounded-md border px-3 py-2">
+              <p class="text-xl font-semibold">{servers.length}</p>
+              <p class="mt-1 text-xs text-muted-foreground">{$t(i18nKeys.common.domain.servers)}</p>
+            </div>
+            <div class="rounded-md border px-3 py-2">
+              <p class="text-xl font-semibold">{activeServers}</p>
+              <p class="mt-1 text-xs text-muted-foreground">{$t(i18nKeys.common.status.connected)}</p>
+            </div>
+            <div class="rounded-md border px-3 py-2">
+              <p class="text-xl font-semibold">{deployments.length}</p>
+              <p class="mt-1 text-xs text-muted-foreground">
+                {$t(i18nKeys.common.domain.deployments)}
+              </p>
+            </div>
           </div>
         </div>
       </section>
