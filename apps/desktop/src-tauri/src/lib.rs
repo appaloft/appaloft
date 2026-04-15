@@ -5,7 +5,9 @@ use std::{
     time::{Duration, Instant},
 };
 
-use tauri::{AppHandle, Manager, RunEvent, WebviewUrl, WebviewWindowBuilder};
+use tauri::{
+    webview::NewWindowResponse, AppHandle, Manager, RunEvent, WebviewUrl, WebviewWindowBuilder,
+};
 use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_shell::{
     process::{CommandChild, CommandEvent},
@@ -124,16 +126,36 @@ fn start_backend(app: &tauri::App) -> DesktopResult<String> {
     Ok(base_url)
 }
 
+#[allow(deprecated)]
+fn open_external_http_url(app: &AppHandle, url: &tauri::Url) -> DesktopResult<()> {
+    if !matches!(url.scheme(), "http" | "https") {
+        return Err(boxed_error(format!(
+            "Refusing to open unsupported external URL: {url}"
+        )));
+    }
+
+    app.shell().open(url.as_str(), None)?;
+    Ok(())
+}
+
 fn create_main_window(app: &tauri::App, base_url: &str) -> DesktopResult<()> {
     let url = base_url
         .parse()
         .map_err(|error| boxed_error(format!("Invalid backend URL {base_url}: {error}")))?;
+    let app_handle = app.handle().clone();
 
     WebviewWindowBuilder::new(app, "main", WebviewUrl::External(url))
         .title("Yundu")
         .inner_size(1280.0, 840.0)
         .min_inner_size(960.0, 640.0)
         .initialization_script(SELECT_DIRECTORY_BRIDGE)
+        .on_new_window(move |url, _features| {
+            if let Err(error) = open_external_http_url(&app_handle, &url) {
+                eprintln!("failed to open external URL {url}: {error}");
+            }
+
+            NewWindowResponse::Deny
+        })
         .build()?;
 
     Ok(())
