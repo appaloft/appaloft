@@ -382,6 +382,15 @@ export const enUS = {
         "The current list does not include this resource. It may not have been created by deployment context yet, or it was not returned by the backend.",
       notFoundTitle: "Resource not found.",
       pageTitle: "Resources",
+      runtimeLogsDescription:
+        "Read the latest application output through the configured runtime log reader.",
+      runtimeLogsEmpty: "No runtime log lines are available.",
+      runtimeLogsLoading: "Loading runtime logs...",
+      runtimeLogsRefresh: "Refresh",
+      runtimeLogsStartFollow: "Follow",
+      runtimeLogsStopFollow: "Stop",
+      runtimeLogsStreamDisconnected: "Runtime log stream disconnected.",
+      runtimeLogsTitle: "Runtime logs",
     },
     quickDeploy: {
       applicationPort: "Application port",

@@ -1,9 +1,20 @@
-import { Command as EffectCommand, Options } from "@effect/cli";
-import { CreateResourceCommand, ListResourcesQuery } from "@yundu/application";
+import { Args, Command as EffectCommand, Options } from "@effect/cli";
+import {
+  CreateResourceCommand,
+  ListResourcesQuery,
+  ResourceRuntimeLogsQuery,
+} from "@yundu/application";
 import { resourceKinds } from "@yundu/core";
 
-import { optionalNumber, optionalValue, runCommand, runQuery } from "../runtime.js";
+import {
+  optionalNumber,
+  optionalValue,
+  runCommand,
+  runQuery,
+  runResourceRuntimeLogsQuery,
+} from "../runtime.js";
 
+const resourceIdArg = Args.text({ name: "resourceId" });
 const projectOption = Options.text("project").pipe(Options.optional);
 const environmentOption = Options.text("environment").pipe(Options.optional);
 const createProjectOption = Options.text("project");
@@ -14,6 +25,10 @@ const destinationOption = Options.text("destination").pipe(Options.optional);
 const descriptionOption = Options.text("description").pipe(Options.optional);
 const internalPortOption = Options.text("internal-port").pipe(Options.optional);
 const portOption = Options.text("port").pipe(Options.optional);
+const deploymentOption = Options.text("deployment").pipe(Options.optional);
+const serviceOption = Options.text("service").pipe(Options.optional);
+const tailOption = Options.text("tail").pipe(Options.withDefault("100"));
+const followOption = Options.boolean("follow").pipe(Options.withDefault(false));
 
 const listCommand = EffectCommand.make(
   "list",
@@ -66,7 +81,28 @@ const createCommand = EffectCommand.make(
   },
 ).pipe(EffectCommand.withDescription("Create a resource"));
 
+const logsCommand = EffectCommand.make(
+  "logs",
+  {
+    resourceId: resourceIdArg,
+    deployment: deploymentOption,
+    service: serviceOption,
+    tail: tailOption,
+    follow: followOption,
+  },
+  ({ deployment, follow, resourceId, service, tail }) =>
+    runResourceRuntimeLogsQuery(
+      ResourceRuntimeLogsQuery.create({
+        resourceId,
+        deploymentId: optionalValue(deployment),
+        serviceName: optionalValue(service),
+        tailLines: Number(tail),
+        follow,
+      }),
+    ),
+).pipe(EffectCommand.withDescription("Show resource runtime logs"));
+
 export const resourceCommand = EffectCommand.make("resource").pipe(
   EffectCommand.withDescription("Resource operations"),
-  EffectCommand.withSubcommands([createCommand, listCommand]),
+  EffectCommand.withSubcommands([createCommand, listCommand, logsCommand]),
 );

@@ -17,6 +17,7 @@ import {
   type ListSshCredentialsQueryInput,
   type PromoteEnvironmentCommandInput,
   type RegisterServerCommandInput,
+  type ResourceRuntimeLogsQueryInput,
   type SetEnvironmentVariableCommandInput,
   type ShowEnvironmentQueryInput,
   type TestServerConnectivityCommandInput,
@@ -45,6 +46,9 @@ import {
   type ListSshCredentialsResponse,
   type PromoteEnvironmentResponse,
   type RegisterServerResponse,
+  type ResourceRuntimeLogEvent,
+  type ResourceRuntimeLogsResponse,
+  type ResourceRuntimeLogsStreamResponse,
   type TestServerConnectivityResponse,
 } from "@yundu/contracts";
 
@@ -159,6 +163,18 @@ export type YunduOrpcClientContract = {
       YunduClientContext,
       CreateResourceCommandInput,
       CreateResourceResponse,
+      YunduClientError
+    >;
+    logs: Client<
+      YunduClientContext,
+      ResourceRuntimeLogsQueryInput,
+      ResourceRuntimeLogsResponse,
+      YunduClientError
+    >;
+    logsStream: Client<
+      YunduClientContext,
+      ResourceRuntimeLogsQueryInput,
+      AsyncIteratorClass<ResourceRuntimeLogEvent, ResourceRuntimeLogsStreamResponse, void>,
       YunduClientError
     >;
   };

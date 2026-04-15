@@ -66,6 +66,7 @@ import { SshExecutionBackend } from "./ssh-execution";
 
 export { RuntimeServerConnectivityChecker } from "./server-connectivity";
 export { RuntimeDeploymentHealthChecker } from "./deployment-health";
+export { RuntimeResourceRuntimeLogReader } from "./resource-runtime-logs";
 export { SshExecutionBackend } from "./ssh-execution";
 
 function resolvePackageManager(source: SourceDescriptor): "npm" | "bun" | "pnpm" {

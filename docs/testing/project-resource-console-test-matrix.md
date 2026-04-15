@@ -17,10 +17,13 @@ This test matrix inherits:
 - [ADR-013: Project Resource Navigation And Deployment Ownership](../decisions/ADR-013-project-resource-navigation-and-deployment-ownership.md)
 - [ADR-016: Deployment Command Surface Reset](../decisions/ADR-016-deployment-command-surface-reset.md)
 - [ADR-015: Resource Network Profile](../decisions/ADR-015-resource-network-profile.md)
+- [ADR-017: Resource Runtime Log Observation](../decisions/ADR-017-resource-runtime-log-observation.md)
 - [Project Resource Console Workflow Spec](../workflows/project-resource-console.md)
 - [Project Resource Console Implementation Plan](../implementation/project-resource-console-plan.md)
 - [resources.create Command Spec](../commands/resources.create.md)
 - [deployments.create Command Spec](../commands/deployments.create.md)
+- [resources.runtime-logs Query Spec](../queries/resources.runtime-logs.md)
+- [Resource Runtime Logs Test Matrix](./resource-runtime-logs-test-matrix.md)
 - [Quick Deploy Workflow Spec](../workflows/quick-deploy.md)
 - [Resource Create And First Deploy Workflow Spec](../workflows/resources.create-and-first-deploy.md)
 - [Spec-Driven Testing](./SPEC_DRIVEN_TESTING.md)
@@ -72,6 +75,7 @@ Then:
 | --- | --- | --- | --- | --- |
 | Resource detail | Resource exists | Resource profile, latest status, and deployment history are shown | Resource query/read model plus deployment history filtered by `resourceId` | Latest status derived from deployments |
 | New deployment from resource | Resource exists and can deploy | New deployment action is resource-scoped | Dispatch `deployments.create` with `resourceId` | Deployment attempt belongs to resource |
+| Runtime logs from resource | Resource has observable runtime instance | Runtime logs are shown as resource-owned application logs | Query `resources.runtime-logs` with `resourceId`; optional follow stream | Runtime logs remain separate from `deployments.logs` |
 | Redeploy absent in v1 | Latest deployment terminal | No public redeploy action is exposed | No redeploy command is dispatched | Existing deployments remain readable |
 | Active deployment | Latest deployment non-terminal | New deployment is blocked or explains active state | No deployment command until guard can pass | Latest status remains read-model projection |
 | Domain binding from resource | Resource has placement context | Domain/TLS action preloads resource context | Dispatch `domain-bindings.create` with resource ownership fields | Domain binding belongs to resource |

@@ -13,6 +13,7 @@ export * from "./operations/environments/unset-environment-variable.schema";
 export * from "./operations/projects/create-project.schema";
 export * from "./operations/resources/create-resource.schema";
 export * from "./operations/resources/list-resources.schema";
+export * from "./operations/resources/resource-runtime-logs.schema";
 export * from "./operations/servers/configure-server-credential.schema";
 export * from "./operations/servers/create-ssh-credential.schema";
 export * from "./operations/servers/list-ssh-credentials.schema";

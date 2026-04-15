@@ -1,6 +1,7 @@
 <script lang="ts">
   import { browser } from "$app/environment";
   import { page } from "$app/state";
+  import { onDestroy, untrack } from "svelte";
   import { createMutation } from "@tanstack/svelte-query";
   import {
     ArrowLeft,
@@ -8,11 +9,17 @@
     Boxes,
     Globe2,
     Plus,
+    RefreshCw,
     Route,
     Server,
-    ShieldCheck,
+    Terminal,
   } from "@lucide/svelte";
-  import type { CreateDomainBindingInput, DomainBindingSummary } from "@yundu/contracts";
+  import type {
+    CreateDomainBindingInput,
+    DomainBindingSummary,
+    ResourceRuntimeLogEvent,
+    ResourceRuntimeLogLine,
+  } from "@yundu/contracts";
 
   import { readErrorMessage } from "$lib/api/client";
   import ConsoleShell from "$lib/components/console/ConsoleShell.svelte";
@@ -32,6 +39,11 @@
   import { i18nKeys, t } from "$lib/i18n";
   import { orpcClient } from "$lib/orpc";
   import { queryClient } from "$lib/query-client";
+
+  type RuntimeLogClientStream = {
+    next(): Promise<IteratorResult<ResourceRuntimeLogEvent, unknown>>;
+    return?: () => Promise<IteratorResult<ResourceRuntimeLogEvent, unknown>>;
+  };
 
   const {
     projectsQuery,
@@ -89,6 +101,12 @@
     title: string;
     detail: string;
   } | null>(null);
+  let runtimeLogResourceId = $state("");
+  let runtimeLogs = $state<ResourceRuntimeLogLine[]>([]);
+  let runtimeLogsLoading = $state(false);
+  let runtimeLogsError = $state<string | null>(null);
+  let runtimeLogsFollowing = $state(false);
+  let runtimeLogStream = $state<RuntimeLogClientStream | null>(null);
 
   const selectedServer = $derived(findServer(servers, serverId));
   const canCreateBinding = $derived(
@@ -124,6 +142,121 @@
 
   let defaultedResourceId = $state("");
 
+  function appendRuntimeLogLine(line: ResourceRuntimeLogLine): void {
+    runtimeLogs = [...runtimeLogs, line].slice(-500);
+  }
+
+  function handleRuntimeLogEvent(event: ResourceRuntimeLogEvent): void {
+    switch (event.kind) {
+      case "line":
+        appendRuntimeLogLine(event.line);
+        break;
+      case "error":
+        runtimeLogsError = event.error.message;
+        stopRuntimeLogFollow();
+        break;
+      case "closed":
+        stopRuntimeLogFollow();
+        break;
+      case "heartbeat":
+        break;
+    }
+  }
+
+  function stopRuntimeLogFollow(): void {
+    const stream = runtimeLogStream;
+    runtimeLogStream = null;
+    runtimeLogsFollowing = false;
+    void stream?.return?.();
+  }
+
+  async function loadRuntimeLogs(currentResourceId: string): Promise<void> {
+    runtimeLogResourceId = currentResourceId;
+    runtimeLogsLoading = true;
+    runtimeLogsError = null;
+
+    try {
+      const result = await orpcClient.resources.logs({
+        resourceId: currentResourceId,
+        tailLines: 100,
+        follow: false,
+      });
+
+      if (runtimeLogResourceId === currentResourceId) {
+        runtimeLogs = result.logs;
+      }
+    } catch (error) {
+      if (runtimeLogResourceId === currentResourceId) {
+        runtimeLogsError = readErrorMessage(error);
+      }
+    } finally {
+      if (runtimeLogResourceId === currentResourceId) {
+        runtimeLogsLoading = false;
+      }
+    }
+  }
+
+  async function consumeRuntimeLogStream(currentResourceId: string): Promise<void> {
+    try {
+      const stream = await orpcClient.resources.logsStream({
+        resourceId: currentResourceId,
+        tailLines: 100,
+        follow: true,
+      });
+
+      if (!runtimeLogsFollowing || runtimeLogResourceId !== currentResourceId) {
+        await stream.return?.();
+        return;
+      }
+
+      runtimeLogStream = stream;
+      let result = await stream.next();
+
+      while (
+        runtimeLogsFollowing &&
+        runtimeLogResourceId === currentResourceId &&
+        !result.done
+      ) {
+        handleRuntimeLogEvent(result.value);
+
+        if (!runtimeLogsFollowing || runtimeLogResourceId !== currentResourceId) {
+          break;
+        }
+
+        result = await stream.next();
+      }
+    } catch (error) {
+      if (runtimeLogResourceId === currentResourceId) {
+        runtimeLogsError = readErrorMessage(error);
+      }
+    } finally {
+      if (runtimeLogResourceId === currentResourceId) {
+        runtimeLogStream = null;
+        runtimeLogsFollowing = false;
+      }
+    }
+  }
+
+  function startRuntimeLogFollow(): void {
+    if (!browser || !resource || runtimeLogsFollowing) {
+      return;
+    }
+
+    runtimeLogResourceId = resource.id;
+    runtimeLogsError = null;
+    runtimeLogsFollowing = true;
+    void consumeRuntimeLogStream(resource.id);
+  }
+
+  function refreshRuntimeLogs(): void {
+    if (!resource) {
+      return;
+    }
+
+    stopRuntimeLogFollow();
+    void loadRuntimeLogs(resource.id);
+  }
+
   $effect(() => {
     if (!browser || !resource) {
       return;
@@ -143,6 +276,30 @@
     }
 
     serverId = latestDeployment?.serverId ?? servers[0]?.id ?? "";
+  });
+
+  $effect(() => {
+    const currentResourceId = resource?.id ?? "";
+
+    if (!browser) {
+      return;
+    }
+
+    untrack(() => {
+      stopRuntimeLogFollow();
+
+      if (!currentResourceId) {
+        runtimeLogs = [];
+        runtimeLogResourceId = "";
+        return;
+      }
+
+      void loadRuntimeLogs(currentResourceId);
+    });
+  });
+
+  onDestroy(() => {
+    stopRuntimeLogFollow();
   });
 
   function createResourceDomainBinding(event: SubmitEvent): void {
@@ -310,6 +467,70 @@
               {(resource.destinationId ?? latestDeployment?.destinationId ?? destinationId) || "-"}
             </p>
           </div>
+        </div>
+      </section>
+
+      <section class="rounded-lg border bg-background p-5">
+        <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+          <div class="flex items-start gap-3">
+            <div class="rounded-md border bg-muted p-2">
+              <Terminal class="size-4" />
+            </div>
+            <div>
+              <h2 class="text-lg font-semibold">
+                {$t(i18nKeys.console.resources.runtimeLogsTitle)}
+              </h2>
+              <p class="mt-1 text-sm text-muted-foreground">
+                {$t(i18nKeys.console.resources.runtimeLogsDescription)}
+              </p>
+            </div>
+          </div>
+          <div class="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              onclick={refreshRuntimeLogs}
+              disabled={runtimeLogsLoading || runtimeLogsFollowing}
+            >
+              <RefreshCw class={["size-4", runtimeLogsLoading ? "animate-spin" : ""]} />
+              {$t(i18nKeys.console.resources.runtimeLogsRefresh)}
+            </Button>
+            <Button
+              variant={runtimeLogsFollowing ? "secondary" : "default"}
+              onclick={runtimeLogsFollowing ? stopRuntimeLogFollow : startRuntimeLogFollow}
+            >
+              <Terminal class="size-4" />
+              {runtimeLogsFollowing
+                ? $t(i18nKeys.console.resources.runtimeLogsStopFollow)
+                : $t(i18nKeys.console.resources.runtimeLogsStartFollow)}
+            </Button>
+          </div>
+        </div>
+
+        {#if runtimeLogsError}
+          <div class="mt-4 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+            {runtimeLogsError}
+          </div>
+        {/if}
+
+        <div class="mt-4 max-h-96 overflow-auto rounded-md border bg-zinc-950 p-3 font-mono text-xs text-zinc-100">
+          {#if runtimeLogsLoading}
+            <p class="text-zinc-400">{$t(i18nKeys.console.resources.runtimeLogsLoading)}</p>
+          {:else if runtimeLogs.length === 0}
+            <p class="text-zinc-400">{$t(i18nKeys.console.resources.runtimeLogsEmpty)}</p>
+          {:else}
+            <div class="space-y-1">
+              {#each runtimeLogs as line, index (`${line.sequence ?? index}-${line.timestamp ?? ""}-${line.message}`)}
+                <div class="grid gap-2 sm:grid-cols-[10rem_1fr]">
+                  <span class="truncate text-zinc-500">
+                    {line.timestamp ? formatTime(line.timestamp) : line.stream}
+                  </span>
+                  <span class={["break-words", line.masked ? "text-amber-200" : "text-zinc-100"]}>
+                    {line.message}
+                  </span>
+                </div>
+              {/each}
+            </div>
+          {/if}
         </div>
       </section>
 

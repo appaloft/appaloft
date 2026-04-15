@@ -9,6 +9,7 @@ import {
   InMemoryExecutionBackend,
   LocalExecutionBackend,
   RoutingExecutionBackend,
+  RuntimeResourceRuntimeLogReader,
   RuntimeServerConnectivityChecker,
   RuntimeServerEdgeProxyBootstrapper,
   SshExecutionBackend,
@@ -297,6 +298,9 @@ export function registerRuntimeDependencies(
           ),
         ),
     ),
+  });
+  container.register(tokens.resourceRuntimeLogReader, {
+    useFactory: instanceCachingFactory(() => new RuntimeResourceRuntimeLogReader()),
   });
 
   container.register(tokens.providerRegistry, {

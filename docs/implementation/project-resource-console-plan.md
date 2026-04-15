@@ -11,6 +11,7 @@ This document is an implementation-planning contract for aligning the Web consol
 - [ADR-012: Resource Runtime Profile And Deployment Snapshot Boundary](../decisions/ADR-012-resource-runtime-profile-and-deployment-snapshot-boundary.md)
 - [ADR-015: Resource Network Profile](../decisions/ADR-015-resource-network-profile.md)
 - [ADR-010: Quick Deploy Workflow Boundary](../decisions/ADR-010-quick-deploy-workflow-boundary.md)
+- [ADR-017: Resource Runtime Log Observation](../decisions/ADR-017-resource-runtime-log-observation.md)
 
 ## Governed Specs
 
@@ -18,6 +19,8 @@ This document is an implementation-planning contract for aligning the Web consol
 - [Project Resource Console Test Matrix](../testing/project-resource-console-test-matrix.md)
 - [resources.create Command Spec](../commands/resources.create.md)
 - [deployments.create Command Spec](../commands/deployments.create.md)
+- [resources.runtime-logs Query Spec](../queries/resources.runtime-logs.md)
+- [Resource Runtime Log Observation Workflow Spec](../workflows/resource-runtime-log-observation.md)
 - [Quick Deploy Workflow Spec](../workflows/quick-deploy.md)
 - [Resource Create And First Deploy Workflow Spec](../workflows/resources.create-and-first-deploy.md)
 - [Core Operations](../CORE_OPERATIONS.md)
@@ -36,6 +39,7 @@ Expected Web implementation scope:
   - make new deployment/redeploy primary resource-scoped actions;
   - show deployment history filtered by resource;
   - expose resource-scoped domain/TLS actions where available;
+  - expose resource runtime logs through `resources.runtime-logs` once the query is active;
   - prepare a future place for source/runtime/network profile configuration.
 - create-resource flow:
   - provide a dedicated route or panel for resource creation;
@@ -68,6 +72,8 @@ Likely touched modules in Code Round:
 - `packages/i18n/src/locales/zh-CN.ts`;
 - `packages/orpc` and `packages/contracts` only if a new resource summary query is required;
 - `packages/application/src/operation-catalog.ts` only if a new query/operation is introduced.
+- `packages/application/src/operations/resources/**` and runtime log reader adapters when
+  `resources.runtime-logs` enters Code Round.
 
 ## Minimal Deliverable
 
@@ -101,6 +107,10 @@ If latest deployment status is not available through a stable read model in the 
 If a dedicated create-resource route is too large for the first Web Code Round, the existing project-page create-resource affordance may remain, but it must use resource language and should navigate to resource detail after creation when feasible.
 
 Current contracts expose the listener port as `networkProfile.internalPort`, governed by [ADR-015](../decisions/ADR-015-resource-network-profile.md).
+
+Resource runtime logs are governed by [ADR-017](../decisions/ADR-017-resource-runtime-log-observation.md)
+and remain future until `resources.runtime-logs` is active in Core Operations and the operation
+catalog.
 
 ## Current Implementation Notes And Migration Gaps
 

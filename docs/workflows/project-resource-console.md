@@ -20,8 +20,11 @@ This workflow inherits:
 - [ADR-011: Resource Create Minimum Lifecycle](../decisions/ADR-011-resource-create-minimum-lifecycle.md)
 - [ADR-012: Resource Runtime Profile And Deployment Snapshot Boundary](../decisions/ADR-012-resource-runtime-profile-and-deployment-snapshot-boundary.md)
 - [ADR-015: Resource Network Profile](../decisions/ADR-015-resource-network-profile.md)
+- [ADR-017: Resource Runtime Log Observation](../decisions/ADR-017-resource-runtime-log-observation.md)
 - [resources.create Command Spec](../commands/resources.create.md)
 - [deployments.create Command Spec](../commands/deployments.create.md)
+- [resources.runtime-logs Query Spec](../queries/resources.runtime-logs.md)
+- [Resource Runtime Log Observation Workflow Spec](./resource-runtime-log-observation.md)
 - [Quick Deploy Workflow Spec](./quick-deploy.md)
 - [Resource Create And First Deploy Workflow Spec](./resources.create-and-first-deploy.md)
 - [Project Resource Console Implementation Plan](../implementation/project-resource-console-plan.md)
@@ -70,6 +73,8 @@ Resource detail pages must be the primary owner-scoped surface for:
 - future redeploy only after it is reintroduced under ADR-016;
 - deployment history;
 - deployment progress/status;
+- application runtime logs through `resources.runtime-logs` when an observable runtime instance
+  exists;
 - source binding, runtime profile, and network profile setup;
 - domain binding and TLS affordances;
 - resource-scoped variables or configuration affordances when supported;

@@ -139,7 +139,11 @@ Boundary rule:
 - the generic user-facing label `port` must map to the domain field
   `ResourceNetworkProfile.internalPort` before dispatching a command
 - resource detail is the owner-scoped console surface for new deployment, deployment history,
-  source/runtime/network profile, domain/TLS, and resource-specific configuration actions
+  source/runtime/network profile, application runtime logs, domain/TLS, and resource-specific
+  configuration actions
+- application runtime log observation belongs to the resource surface and is performed through an
+  application-layer runtime log reader port; Docker, PM2, systemd, file-tail, and provider log
+  mechanisms are adapter details and must not leak into core aggregates
 
 ### Dependency Resources
 
@@ -171,6 +175,9 @@ Boundary rule:
   policy
 - deployments are displayed under the Resource that owns them; global or project-level deployment
   pages are read/query rollups
+- deployment logs are attempt/progress records; application runtime logs are resource-owned
+  observation and must not be treated as Deployment aggregate state unless a future ADR introduces
+  persisted runtime log archival
 
 ### Identity & Governance
 

@@ -17,6 +17,7 @@ import {
   type DomainBindingMutationSpec,
   type DomainBindingSelectionSpec,
   type DomainBindingStatus,
+  type DomainError,
   type DomainEvent,
   type EdgeProxyKind,
   type EdgeProxyStatus,
@@ -334,6 +335,81 @@ export interface DeploymentLogSummary {
   message: string;
   masked?: boolean;
 }
+
+export type ResourceRuntimeLogStreamName = "stdout" | "stderr" | "unknown";
+
+export interface ResourceRuntimeLogLine {
+  resourceId: string;
+  deploymentId?: string;
+  serviceName?: string;
+  runtimeKind?: string;
+  runtimeInstanceId?: string;
+  stream?: ResourceRuntimeLogStreamName;
+  timestamp?: string;
+  sequence?: number;
+  cursor?: string;
+  message: string;
+  masked: boolean;
+}
+
+export type ResourceRuntimeLogEvent =
+  | {
+      kind: "line";
+      line: ResourceRuntimeLogLine;
+    }
+  | {
+      kind: "heartbeat";
+      at: string;
+    }
+  | {
+      kind: "closed";
+      reason: "completed" | "cancelled" | "source-ended";
+    }
+  | {
+      kind: "error";
+      error: DomainError;
+    };
+
+export interface ResourceRuntimeLogRequest {
+  serviceName?: string;
+  tailLines: number;
+  since?: string;
+  cursor?: string;
+  follow: boolean;
+}
+
+export interface ResourceRuntimeLogContext {
+  resource: ResourceSummary;
+  deployment: DeploymentSummary;
+  redactions: readonly string[];
+}
+
+export interface ResourceRuntimeLogStream extends AsyncIterable<ResourceRuntimeLogEvent> {
+  close(): Promise<void>;
+}
+
+export interface ResourceRuntimeLogReader {
+  open(
+    context: ExecutionContext,
+    logContext: ResourceRuntimeLogContext,
+    request: ResourceRuntimeLogRequest,
+    signal: AbortSignal,
+  ): Promise<Result<ResourceRuntimeLogStream>>;
+}
+
+export type ResourceRuntimeLogsResult =
+  | {
+      mode: "bounded";
+      resourceId: string;
+      deploymentId?: string;
+      logs: ResourceRuntimeLogLine[];
+    }
+  | {
+      mode: "stream";
+      resourceId: string;
+      deploymentId?: string;
+      stream: ResourceRuntimeLogStream;
+    };
 
 export interface EnvironmentDiffSummary {
   key: string;

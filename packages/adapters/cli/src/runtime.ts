@@ -7,9 +7,11 @@ import {
   type DeploymentProgressObserver,
   type ExecutionContextFactory,
   type QueryBus,
+  type ResourceRuntimeLogLine,
+  type ResourceRuntimeLogsResult,
 } from "@yundu/application";
 import { createCliLogRenderer } from "@yundu/cli-logging";
-import { type DomainError, type Result } from "@yundu/core";
+import { type DomainError, domainError, type Result } from "@yundu/core";
 import { Context, Effect, Layer, Option } from "effect";
 
 export interface CliProgram {
@@ -113,6 +115,37 @@ export const resultToEffect = <T>(result: Result<T>): Effect.Effect<T, DomainErr
     (error) => Effect.fail(error as DomainError),
   );
 
+function printRuntimeLogLine(line: ResourceRuntimeLogLine): void {
+  const timestamp = line.timestamp ? `[${line.timestamp}] ` : "";
+  const stream = line.stream && line.stream !== "unknown" ? `${line.stream} ` : "";
+  process.stdout.write(`${timestamp}${stream}${line.message}\n`);
+}
+
+function isDomainError(value: unknown): value is DomainError {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const record = value as Record<string, unknown>;
+  return (
+    typeof record.code === "string" &&
+    typeof record.category === "string" &&
+    typeof record.message === "string" &&
+    typeof record.retryable === "boolean"
+  );
+}
+
+function runtimeLogErrorFromUnknown(error: unknown): DomainError {
+  if (isDomainError(error)) {
+    return error;
+  }
+
+  return domainError.infra("Runtime log stream failed", {
+    phase: "cli-runtime-log-stream",
+    message: error instanceof Error ? error.message : String(error),
+  });
+}
+
 const runLoggedCommand = <T>(
   message: Result<AppCommand<T>>,
   options: {
@@ -168,6 +201,47 @@ export const runQuery = <T>(
     const output = yield* resultToEffect(result);
 
     yield* print(output);
+  });
+
+export const runResourceRuntimeLogsQuery = (
+  message: Result<AppQuery<ResourceRuntimeLogsResult>>,
+): Effect.Effect<void, DomainError, CliRuntime> =>
+  Effect.gen(function* () {
+    const cli = yield* CliRuntime;
+    const query = yield* resultToEffect(message);
+    const result = yield* Effect.promise(() => cli.executeQuery(query));
+    const output = yield* resultToEffect(result);
+
+    if (output.mode === "bounded") {
+      for (const line of output.logs) {
+        printRuntimeLogLine(line);
+      }
+      return;
+    }
+
+    yield* Effect.tryPromise({
+      try: async () => {
+        try {
+          for await (const event of output.stream) {
+            if (event.kind === "line") {
+              printRuntimeLogLine(event.line);
+              continue;
+            }
+
+            if (event.kind === "error") {
+              throw event.error;
+            }
+
+            if (event.kind === "closed") {
+              break;
+            }
+          }
+        } finally {
+          await output.stream.close();
+        }
+      },
+      catch: runtimeLogErrorFromUnknown,
+    });
   });
 
 export const printCliError = (error: unknown) =>
