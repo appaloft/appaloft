@@ -12,6 +12,7 @@ export const enUS = {
       createAndDeploy: "Create and deploy",
       createDeployment: "Create deployment",
       createResource: "Create resource",
+      createServer: "Create server",
       creating: "Creating",
       newDeployment: "New deployment",
       next: "Next",
@@ -466,6 +467,50 @@ export const enUS = {
       workflowStepSshCredentialCreate: "Save SSH credential",
       workflowStepSucceeded: "Done",
     },
+    serverForm: {
+      choosePrivateKeyFile: "Choose private key file",
+      connectivityDraftDescription:
+        "Temporarily checks SSH and remote Docker with this form data. It does not create a server or save new credentials.",
+      connectivityDraftTitle: "Connection test",
+      connectivityResultTitle: "Connection result",
+      connectivityTestPending: "Testing",
+      credentialRequired: "Choose SSH agent, a saved credential, or provide a private key first.",
+      hostRequired: "Enter a server host first.",
+      localSshAgent: "Local SSH agent",
+      localSshAgentDescriptionOne:
+        "Local SSH agent uses SSH_AUTH_SOCK and loaded keys on the machine running the Yundu backend.",
+      localSshAgentDescriptionTwo:
+        "Use this for local development or desktop mode. When Yundu runs on a remote server, it is not using the agent from your laptop.",
+      manualInput: "Manual input",
+      pastePrivateKey: "Paste private key",
+      portInvalid: "SSH port must be an integer between 1 and 65535.",
+      privateKeyContent: "Private key content",
+      privateKeyFile: "Private key file",
+      privateKeyFileEmpty: "The selected private key file is empty.",
+      privateKeyFileHint: "Choose a cloud-provider .pem file or standard OpenSSH private key.",
+      privateKeyFileKind: "PEM or OpenSSH",
+      privateKeyFileReadFailed: "Unable to read this private key file.",
+      privateKeyFileSelected: "Selected {{fileName}}",
+      privateKeySource: "Private key source",
+      savedCredential: "Saved credential",
+      savedCredentialAvailable: "{{count}} available",
+      savedCredentialUnavailable: "None yet",
+      selectCredential: "Select credential",
+      sshCredentialDescription:
+        "Choose one authentication source: local SSH agent, saved credential, imported .pem/OpenSSH private key file, or pasted private key content. The public key is optional metadata.",
+      sshCredentialName: "Credential name",
+      sshCredentialNameHint:
+        "Creating a server saves this private key to the credential library so later servers can reuse it.",
+      sshCredentialTitle: "SSH login credential",
+      sshPort: "SSH port",
+      sshPrivateKey: "SSH private key",
+      sshPublicKey: "Public key (optional)",
+      sshPublicKeyHint:
+        "SSH connection only needs the private key; this is for credential-library display or manual verification.",
+      sshUsername: "Login user (optional)",
+      sshUsernameHint:
+        "If the server host already includes a user, such as ubuntu@203.0.113.10, this can stay empty.",
+    },
     servers: {
       connectedDeploymentsDescription: "Recent deployment records that used this server.",
       connectedDeploymentsTitle: "Related deployments",
@@ -474,6 +519,19 @@ export const enUS = {
       connectivityLastResult: "Latest result",
       connectivityNoResult: "No connectivity result yet.",
       connectivityTitle: "Connectivity test",
+      createCredentialValidationError:
+        "Complete the SSH credential choice before creating this server.",
+      createDescription:
+        "Register a deployment target through the same command used by Quick Deploy.",
+      createErrorTitle: "Unable to create server",
+      createFormDescription:
+        "Register metadata first. If the target uses SSH, attach a credential immediately after the server id is accepted.",
+      createFormTitle: "Server registration",
+      createSuccessDescription:
+        "Server metadata has been accepted. Connectivity and proxy readiness continue through the server bootstrap workflow.",
+      createSuccessTitle: "Server registered",
+      createTitle: "Create server",
+      createValidationError: "Enter a name, host, and valid SSH port before creating this server.",
       description: "Deployment targets, providers, and runtime health checks",
       detailDescription: "Server details, related deployments, and connectivity test",
       emptyBody:

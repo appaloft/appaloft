@@ -20,7 +20,6 @@
     createQuickDeployGeneratedResourceName,
     normalizeQuickDeployGeneratedNameBase,
     runQuickDeployWorkflow,
-    type QuickDeployServerCredential,
     type QuickDeployWorkflowInput,
     type QuickDeployWorkflowStep,
     type QuickDeployWorkflowStepOutput,
@@ -43,6 +42,7 @@
   } from "@yundu/contracts";
 
   import { API_BASE, readErrorMessage, request } from "$lib/api/client";
+  import ServerRegistrationForm from "$lib/components/console/ServerRegistrationForm.svelte";
   import { Button } from "$lib/components/ui/button";
   import {
     Card,
@@ -63,6 +63,14 @@
     progressSourceLabel,
   } from "$lib/console/deployment-progress";
   import { defaultAuthSession, type ProviderSummary } from "$lib/console/queries";
+  import {
+    createQuickDeployServerCredential,
+    createRegisterServerInput,
+    createServerRegistrationDraft,
+    fallbackServerProviderOptions,
+    isServerRegistrationDraftComplete,
+    type DraftServerConnectivityInput,
+  } from "$lib/console/server-registration";
   import { readSessionIdentity } from "$lib/console/utils";
   import { i18nKeys, t } from "$lib/i18n";
   import { orpcClient } from "$lib/orpc";
@@ -71,8 +79,6 @@
   type SourceKind = "local-folder" | "github" | "remote-git" | "docker-image" | "compose";
   type GithubSourceMode = "url" | "browser";
   type DraftMode = "existing" | "new";
-  type ServerCredentialKind = "local-ssh-agent" | "ssh-private-key";
-  type ServerPrivateKeyInputMode = "saved" | "file" | "paste";
   type EnvironmentKind = EnvironmentSummary["kind"];
   type ResourceKind = ResourceSummary["kind"];
   type DeploymentStepKey = "source" | "project" | "server" | "environment" | "variables" | "review";
@@ -267,21 +273,17 @@
 
   let projectName = $state(browser ? (page.url.searchParams.get("projectName") ?? "") : "");
   let projectDescription = $state(browser ? (page.url.searchParams.get("projectDescription") ?? "") : "");
-  let serverName = $state(browser ? (page.url.searchParams.get("serverName") ?? "local-machine") : "local-machine");
-  let serverHost = $state(browser ? (page.url.searchParams.get("serverHost") ?? "127.0.0.1") : "127.0.0.1");
-  let serverPort = $state(browser ? (page.url.searchParams.get("serverPort") ?? "22") : "22");
-  let serverProviderKey = $state(browser ? (page.url.searchParams.get("serverProvider") ?? "local-shell") : "local-shell");
-  let serverCredentialKind = $state<ServerCredentialKind>("local-ssh-agent");
-  let serverCredentialUsername = $state("");
-  let serverCredentialPublicKey = $state("");
-  let serverCredentialPrivateKey = $state("");
-  let selectedSshCredentialId = $state("");
-  let serverPrivateKeyInputMode = $state<ServerPrivateKeyInputMode>("file");
-  let sshCredentialName = $state("");
-  let serverCredentialPrivateKeyFileName = $state("");
-  let serverCredentialPrivateKeyImportError = $state<string | null>(null);
+  let serverDraft = $state(
+    createServerRegistrationDraft({
+      name: browser ? (page.url.searchParams.get("serverName") ?? "local-machine") : "local-machine",
+      host: browser ? (page.url.searchParams.get("serverHost") ?? "127.0.0.1") : "127.0.0.1",
+      port: browser ? (page.url.searchParams.get("serverPort") ?? "22") : "22",
+      providerKey: browser ? (page.url.searchParams.get("serverProvider") ?? "local-shell") : "local-shell",
+    }),
+  );
   let serverConnectivityResult = $state<TestServerConnectivityResponse | null>(null);
   let serverConnectivityError = $state("");
+  let serverConnectivityTestPending = $state(false);
   let workflowProgressItems = $state<QuickDeployWorkflowProgressItem[]>([]);
   let workflowProgressError = $state("");
   let deploymentCreateInFlight = $state(false);
@@ -335,24 +337,6 @@
       publicKey?: string;
       privateKey: string;
     }) => orpcClient.credentials.ssh.create(input),
-  }));
-  const testServerConnectivityMutation = createMutation(() => ({
-    mutationFn: (input: {
-      server: {
-        name?: string;
-        host: string;
-        providerKey: string;
-        port?: number;
-        credential?: ConfigureServerCredentialInput["credential"];
-      };
-    }) => orpcClient.servers.testDraftConnectivity(input),
-    onSuccess: (result) => {
-      serverConnectivityResult = result;
-      serverConnectivityError = "";
-    },
-    onError: (error) => {
-      serverConnectivityError = readErrorMessage(error);
-    },
   }));
   const createEnvironmentMutation = createMutation(() => ({
     mutationFn: (input: {
@@ -411,12 +395,8 @@
     (sshCredentialsQuery.data?.items ?? []) as SshCredentialSummary[],
   );
   const selectedSshCredential = $derived(
-    sshCredentials.find((credential) => credential.id === selectedSshCredentialId) ?? null,
-  );
-  const activeServerPrivateKeyInputMode = $derived(
-    serverPrivateKeyInputMode === "saved" && sshCredentials.length === 0
-      ? "file"
-      : serverPrivateKeyInputMode,
+    sshCredentials.find((credential) => credential.id === serverDraft.selectedSshCredentialId) ??
+      null,
   );
   const githubProvider = $derived(
     authSession.providers.find((provider) => provider.key === "github") ?? null,
@@ -443,29 +423,14 @@
     return environments;
   });
   const providerOptions = $derived(
-    providers.length > 0
-      ? providers
-      : [
-          {
-            key: "local-shell",
-            title: "Local Shell",
-            category: "deploy-target" as const,
-            capabilities: ["local-command", "docker-host", "docker-compose", "single-server"],
-          },
-          {
-            key: "generic-ssh",
-            title: "Generic SSH",
-            category: "deploy-target" as const,
-            capabilities: ["ssh", "single-server"],
-          },
-        ],
+    providers.length > 0 ? providers : fallbackServerProviderOptions,
   );
   const deployPending = $derived(
     createProjectMutation.isPending ||
       registerServerMutation.isPending ||
       configureServerCredentialMutation.isPending ||
       createSshCredentialMutation.isPending ||
-      testServerConnectivityMutation.isPending ||
+      serverConnectivityTestPending ||
       createEnvironmentMutation.isPending ||
       createResourceMutation.isPending ||
       setEnvironmentVariableMutation.isPending ||
@@ -547,7 +512,8 @@
     sourceOptions.find((option) => option.key === sourceKind) ?? sourceOptions[0],
   );
   const serverProviderTitle = $derived(
-    providerOptions.find((provider) => provider.key === serverProviderKey)?.title ?? serverProviderKey,
+    providerOptions.find((provider) => provider.key === serverDraft.providerKey)?.title ??
+      serverDraft.providerKey,
   );
   const sourceSummary = $derived.by(() => {
     if (sourceKind === "github" && githubSourceMode === "browser" && selectedGitHubRepository) {
@@ -724,8 +690,8 @@
       return selectedServer ? `${selectedServer.name} · ${selectedServer.host}` : "未选择服务器";
     }
 
-    return serverName.trim() && serverHost.trim()
-      ? `${serverName.trim()} · ${serverProviderTitle} · ${serverHost.trim()}`
+    return serverDraft.name.trim() && serverDraft.host.trim()
+      ? `${serverDraft.name.trim()} · ${serverProviderTitle} · ${serverDraft.host.trim()}`
       : "待创建服务器";
   });
   const serverCredentialSummary = $derived.by(() => {
@@ -739,28 +705,22 @@
         : `本机 SSH agent${selectedServer.credential.username ? ` · ${selectedServer.credential.username}` : ""}`;
     }
 
-    if (serverProviderKey !== "generic-ssh") {
+    if (serverDraft.providerKey !== "generic-ssh") {
       return "本机或提供商默认凭据";
     }
 
-    return serverCredentialKind === "ssh-private-key"
+    return serverDraft.credentialKind === "ssh-private-key"
       ? [
           "SSH 私钥",
-          selectedSshCredential?.name || serverCredentialPrivateKeyFileName || sshCredentialName.trim(),
-          serverCredentialUsername.trim(),
+          selectedSshCredential?.name ||
+            serverDraft.credentialPrivateKeyFileName ||
+            serverDraft.sshCredentialName.trim(),
+          serverDraft.credentialUsername.trim(),
         ]
           .filter(Boolean)
           .join(" · ")
-      : `本机 SSH agent${serverCredentialUsername.trim() ? ` · ${serverCredentialUsername.trim()}` : ""}`;
+      : `本机 SSH agent${serverDraft.credentialUsername.trim() ? ` · ${serverDraft.credentialUsername.trim()}` : ""}`;
   });
-  const canTestServerConnectivity = $derived(
-    serverMode === "new" &&
-      serverProviderKey === "generic-ssh" &&
-      Boolean(serverHost.trim()) &&
-      (serverCredentialKind === "local-ssh-agent" ||
-        (activeServerPrivateKeyInputMode === "saved" && Boolean(selectedSshCredentialId)) ||
-        Boolean(serverCredentialPrivateKey.trim())),
-  );
   const environmentSummary = $derived.by(() => {
     if (!environmentContextEnabled) {
       return defaultEnvironmentSummary;
@@ -922,9 +882,9 @@
   $effect(() => {
     if (
       providerOptions.length > 0 &&
-      !providerOptions.some((provider) => provider.key === serverProviderKey)
+      !providerOptions.some((provider) => provider.key === serverDraft.providerKey)
     ) {
-      serverProviderKey = providerOptions[0].key;
+      serverDraft.providerKey = providerOptions[0].key;
     }
   });
 
@@ -1083,10 +1043,10 @@
 
     setSearchParam(params, "serverMode", serverMode, "existing");
     setSearchParam(params, "serverId", selectedServerId);
-    setSearchParam(params, "serverName", serverName, "local-machine");
-    setSearchParam(params, "serverHost", serverHost, "127.0.0.1");
-    setSearchParam(params, "serverPort", serverPort, "22");
-    setSearchParam(params, "serverProvider", serverProviderKey, "local-shell");
+    setSearchParam(params, "serverName", serverDraft.name, "local-machine");
+    setSearchParam(params, "serverHost", serverDraft.host, "127.0.0.1");
+    setSearchParam(params, "serverPort", serverDraft.port, "22");
+    setSearchParam(params, "serverProvider", serverDraft.providerKey, "local-shell");
 
     setSearchParam(params, "editEnvironment", environmentContextEnabled ? "true" : "false", "false");
     if (environmentContextEnabled) {
@@ -1145,10 +1105,10 @@
 
     projectName = params.get("projectName") ?? "";
     projectDescription = params.get("projectDescription") ?? "";
-    serverName = params.get("serverName") ?? "local-machine";
-    serverHost = params.get("serverHost") ?? "127.0.0.1";
-    serverPort = params.get("serverPort") ?? "22";
-    serverProviderKey = params.get("serverProvider") ?? "local-shell";
+    serverDraft.name = params.get("serverName") ?? "local-machine";
+    serverDraft.host = params.get("serverHost") ?? "127.0.0.1";
+    serverDraft.port = params.get("serverPort") ?? "22";
+    serverDraft.providerKey = params.get("serverProvider") ?? "local-shell";
     environmentName = params.get("environmentName") ?? "local";
     environmentKind = parseEnvironmentKind(params.get("environmentKind"));
     resourceName = params.get("resourceName") ?? "";
@@ -1318,19 +1278,7 @@
           return Boolean(selectedServerId);
         }
 
-        if (!serverName.trim() || !serverHost.trim()) {
-          return false;
-        }
-
-        if (serverProviderKey !== "generic-ssh") {
-          return true;
-        }
-
-        return (
-          serverCredentialKind === "local-ssh-agent" ||
-          (activeServerPrivateKeyInputMode === "saved" && Boolean(selectedSshCredentialId)) ||
-          Boolean(serverCredentialPrivateKey.trim())
-        );
+        return isServerRegistrationDraftComplete(serverDraft, sshCredentials);
       case "project":
         return projectMode === "existing"
           ? Boolean(selectedProjectId)
@@ -1447,96 +1395,6 @@
     resourceDescription = repository.description ?? "";
   }
 
-  function defaultSshCredentialName(): string {
-    return (
-      sshCredentialName.trim() ||
-      serverCredentialPrivateKeyFileName ||
-      `${serverName.trim() || serverHost.trim() || "server"} SSH key`
-    );
-  }
-
-  function draftServerCredential(): ConfigureServerCredentialInput["credential"] | undefined {
-    if (serverProviderKey !== "generic-ssh") {
-      return undefined;
-    }
-
-    const username = serverCredentialUsername.trim();
-
-    if (serverCredentialKind === "local-ssh-agent") {
-      return {
-        kind: "local-ssh-agent",
-        ...(username ? { username } : {}),
-      };
-    }
-
-    if (activeServerPrivateKeyInputMode === "saved" && selectedSshCredentialId) {
-      return {
-        kind: "stored-ssh-private-key",
-        credentialId: selectedSshCredentialId,
-        ...(username ? { username } : {}),
-      };
-    }
-
-    if (!serverCredentialPrivateKey.trim()) {
-      return undefined;
-    }
-
-    return {
-      kind: "ssh-private-key",
-      ...(username ? { username } : {}),
-      ...(serverCredentialPublicKey.trim() ? { publicKey: serverCredentialPublicKey.trim() } : {}),
-      privateKey: serverCredentialPrivateKey.trim(),
-    };
-  }
-
-  function connectivityLabel(status: TestServerConnectivityResponse["status"]): string {
-    switch (status) {
-      case "healthy":
-        return $t(i18nKeys.common.status.healthy);
-      case "degraded":
-        return $t(i18nKeys.common.status.degraded);
-      case "unreachable":
-        return $t(i18nKeys.common.status.unreachable);
-    }
-  }
-
-  function connectivityVariant(
-    status: TestServerConnectivityResponse["status"],
-  ): "default" | "secondary" | "outline" | "destructive" {
-    switch (status) {
-      case "healthy":
-        return "default";
-      case "degraded":
-        return "secondary";
-      case "unreachable":
-        return "destructive";
-    }
-  }
-
-  function checkLabel(status: TestServerConnectivityResponse["checks"][number]["status"]): string {
-    switch (status) {
-      case "passed":
-        return $t(i18nKeys.common.status.passed);
-      case "failed":
-        return $t(i18nKeys.common.status.failed);
-      case "skipped":
-        return $t(i18nKeys.common.status.skipped);
-    }
-  }
-
-  function checkVariant(
-    status: TestServerConnectivityResponse["checks"][number]["status"],
-  ): "default" | "secondary" | "outline" | "destructive" {
-    switch (status) {
-      case "passed":
-        return "default";
-      case "failed":
-        return "destructive";
-      case "skipped":
-        return "outline";
-    }
-  }
-
   function resetWorkflowProgress(): void {
     workflowProgressItems = [];
     workflowProgressError = "";
@@ -1639,122 +1497,8 @@
     return timestamp.slice(11, 19) || "--:--:--";
   }
 
-  async function testDraftServerConnectivity(): Promise<void> {
-    serverConnectivityResult = null;
-    serverConnectivityError = "";
-
-    const host = serverHost.trim();
-    if (!host) {
-      serverConnectivityError = "请先填写服务器地址。";
-      return;
-    }
-
-    const port = Number(serverPort.trim() || "22");
-    if (!Number.isInteger(port) || port < 1 || port > 65535) {
-      serverConnectivityError = "SSH 端口必须是 1 到 65535 之间的整数。";
-      return;
-    }
-
-    const credential = draftServerCredential();
-    if (serverProviderKey === "generic-ssh" && !credential) {
-      serverConnectivityError = "请先选择 SSH agent、已保存凭据，或提供私钥。";
-      return;
-    }
-
-    try {
-      await testServerConnectivityMutation.mutateAsync({
-        server: {
-          name: serverName.trim() || host,
-          host,
-          providerKey: serverProviderKey,
-          port,
-          ...(credential ? { credential } : {}),
-        },
-      });
-    } catch (error) {
-      serverConnectivityError = serverConnectivityError || readErrorMessage(error);
-    }
-  }
-
-  async function resolveNewServerCredential(): Promise<QuickDeployServerCredential | undefined> {
-    if (serverProviderKey !== "generic-ssh") {
-      return undefined;
-    }
-
-    const username = serverCredentialUsername.trim();
-
-    if (serverCredentialKind === "local-ssh-agent") {
-      return {
-        mode: "configure",
-        credential: {
-          kind: "local-ssh-agent",
-          ...(username ? { username } : {}),
-        },
-      };
-    }
-
-    if (activeServerPrivateKeyInputMode === "saved" && selectedSshCredentialId) {
-      return {
-        mode: "configure",
-        credential: {
-          kind: "stored-ssh-private-key",
-          credentialId: selectedSshCredentialId,
-          ...(username ? { username } : {}),
-        },
-      };
-    }
-
-    if (!serverCredentialPrivateKey.trim()) {
-      return {
-        mode: "configure",
-        credential: {
-          kind: "ssh-private-key",
-          privateKey: "",
-        },
-      };
-    }
-
-    return {
-      mode: "create-ssh-and-configure",
-      input: {
-        name: defaultSshCredentialName(),
-        kind: "ssh-private-key",
-        ...(username ? { username } : {}),
-        ...(serverCredentialPublicKey.trim() ? { publicKey: serverCredentialPublicKey.trim() } : {}),
-        privateKey: serverCredentialPrivateKey.trim(),
-      },
-    };
-  }
-
-  async function importServerPrivateKeyFile(event: Event): Promise<void> {
-    const input = event.currentTarget as HTMLInputElement;
-    const file = input.files?.[0];
-
-    if (!file) {
-      return;
-    }
-
-    serverCredentialPrivateKeyImportError = null;
-
-    try {
-      const privateKey = (await file.text()).trim();
-
-      if (!privateKey) {
-        throw new Error("选择的私钥文件是空的。");
-      }
-
-      serverCredentialPrivateKey = privateKey;
-      serverCredentialPrivateKeyFileName = file.name;
-      selectedSshCredentialId = "";
-      serverPrivateKeyInputMode = "file";
-      sshCredentialName = sshCredentialName.trim() || file.name;
-    } catch (error) {
-      serverCredentialPrivateKeyFileName = "";
-      serverCredentialPrivateKeyImportError =
-        error instanceof Error ? error.message : "无法读取这个私钥文件。";
-    } finally {
-      input.value = "";
-    }
+  function testDraftServerConnectivity(input: DraftServerConnectivityInput) {
+    return orpcClient.servers.testDraftConnectivity(input);
   }
 
   async function refreshWorkspaceData(): Promise<void> {
@@ -1785,7 +1529,7 @@
       }
       case "credentials.ssh.create": {
         const createdCredential = await createSshCredentialMutation.mutateAsync(step.input);
-        selectedSshCredentialId = createdCredential.id;
+        serverDraft.selectedSshCredentialId = createdCredential.id;
         await sshCredentialsQuery.refetch();
         return createdCredential;
       }
@@ -1878,30 +1622,20 @@
       let workflowServer: QuickDeployWorkflowInput["server"];
 
       if (serverMode === "new") {
-        if (!serverName.trim() || !serverHost.trim()) {
-          throw new Error("请填写服务器名称和主机地址。");
+        const registerInput = createRegisterServerInput(serverDraft);
+        if (!registerInput) {
+          throw new Error($t(i18nKeys.console.servers.createValidationError));
         }
 
-        const credential = await resolveNewServerCredential();
-        if (
-          serverProviderKey === "generic-ssh" &&
-          serverCredentialKind === "ssh-private-key" &&
-          credential?.mode === "configure" &&
-          credential.credential.kind === "ssh-private-key" &&
-          !credential.credential.privateKey
-        ) {
-          throw new Error("请导入或粘贴 SSH 私钥，或切换为本机 SSH agent。");
+        if (!isServerRegistrationDraftComplete(serverDraft, sshCredentials)) {
+          throw new Error($t(i18nKeys.console.servers.createCredentialValidationError));
         }
+
+        const credential = createQuickDeployServerCredential(serverDraft, sshCredentials);
 
         workflowServer = {
           mode: "create",
-          input: {
-            name: serverName.trim(),
-            host: serverHost.trim(),
-            providerKey: serverProviderKey,
-            proxyKind: "traefik",
-            ...(serverPort.trim() ? { port: Number(serverPort) } : {}),
-          },
+          input: registerInput,
           ...(credential ? { credential } : {}),
         };
       } else {
@@ -2392,305 +2126,15 @@
                 {/if}
               </div>
             {:else}
-              <div class="space-y-3">
-                <div class="grid gap-3 sm:grid-cols-2">
-                  <div class="space-y-2">
-                    <label class="text-xs font-medium text-muted-foreground" for="server-name">
-                      {$t(i18nKeys.common.domain.name)}
-                    </label>
-                    <Input id="server-name" bind:value={serverName} placeholder="edge-1" />
-                  </div>
-                  <div class="space-y-2">
-                    <label class="text-xs font-medium text-muted-foreground" for="server-port">
-                      SSH 端口
-                    </label>
-                    <Input id="server-port" bind:value={serverPort} placeholder="22" />
-                  </div>
-                </div>
-                <div class="space-y-2">
-                  <label class="text-xs font-medium text-muted-foreground" for="server-host">
-                      {$t(i18nKeys.common.domain.server)}
-                  </label>
-                  <Input id="server-host" bind:value={serverHost} placeholder="203.0.113.10" />
-                </div>
-                <div class="space-y-2">
-                  <p class="text-xs font-medium text-muted-foreground">{$t(i18nKeys.common.domain.provider)}</p>
-                  <div class="grid gap-2">
-                    {#each providerOptions as provider (provider.key)}
-                      <Button
-                        class="justify-start"
-                        size="sm"
-                        variant={serverProviderKey === provider.key ? "selected" : "outline"}
-                        onclick={() => {
-                          serverProviderKey = provider.key;
-                        }}
-                      >
-                        {provider.title}
-                      </Button>
-                    {/each}
-                  </div>
-                </div>
-                {#if serverProviderKey === "generic-ssh"}
-                  <div class="space-y-3 rounded-md border px-3 py-3">
-                    <div class="space-y-1">
-                      <p class="text-sm font-medium">SSH 登录凭据</p>
-                      <p class="text-xs text-muted-foreground">
-                        只需要选择一种认证来源：本机 SSH agent、已保存凭据、导入 `.pem`/OpenSSH 私钥文件，或粘贴私钥内容。
-                        公钥只用于记录或核对，可以不填。
-                      </p>
-                    </div>
-                    <div class="grid gap-2 sm:grid-cols-2">
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant={serverCredentialKind === "local-ssh-agent" ? "selected" : "outline"}
-                        onclick={() => {
-                          serverCredentialKind = "local-ssh-agent";
-                        }}
-                      >
-                        本机 SSH agent
-                      </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant={serverCredentialKind === "ssh-private-key" ? "selected" : "outline"}
-                        onclick={() => {
-                          serverCredentialKind = "ssh-private-key";
-                          if (serverPrivateKeyInputMode === "saved" && sshCredentials.length === 0) {
-                            serverPrivateKeyInputMode = "file";
-                          }
-                        }}
-                      >
-                        SSH 私钥
-                      </Button>
-                    </div>
-                    <div class="space-y-2">
-                      <label class="text-xs font-medium text-muted-foreground" for="server-ssh-username">
-                        登录用户（可选）
-                      </label>
-                      <Input
-                        id="server-ssh-username"
-                        bind:value={serverCredentialUsername}
-                        placeholder="root 或 ubuntu"
-                      />
-                      <p class="text-xs text-muted-foreground">
-                        如果服务器地址已写成 `ubuntu@203.0.113.10`，这里可以留空。
-                      </p>
-                    </div>
-                    {#if serverCredentialKind === "local-ssh-agent"}
-                      <div class="space-y-1 rounded-md border border-dashed px-3 py-2 text-xs text-muted-foreground">
-                        <p>
-                          本机 SSH agent 会使用运行 Yundu 后端这台机器上的 `SSH_AUTH_SOCK` 和已加载的 key。
-                        </p>
-                        <p>
-                          适合本地开发或桌面模式；如果 Yundu 跑在远程服务器上，就不是使用你笔记本里的 agent。
-                        </p>
-                      </div>
-                    {:else}
-                      <div class="space-y-2">
-                        <p class="text-xs font-medium text-muted-foreground">私钥来源</p>
-                        <div class="grid gap-2 sm:grid-cols-3">
-                          <Button
-                            type="button"
-                            size="sm"
-                            disabled={sshCredentials.length === 0}
-                            variant={activeServerPrivateKeyInputMode === "saved" ? "selected" : "outline"}
-                            class="h-auto flex-col items-start gap-0.5 px-3 py-2 text-left"
-                            onclick={() => {
-                              serverPrivateKeyInputMode = "saved";
-                              serverCredentialPrivateKey = "";
-                              serverCredentialPrivateKeyFileName = "";
-                              serverCredentialPrivateKeyImportError = null;
-                            }}
-                          >
-                            <span>已保存凭据</span>
-                            <span class="text-[0.7rem] font-normal opacity-75">
-                              {sshCredentials.length > 0 ? `${sshCredentials.length} 个可用` : "暂无"}
-                            </span>
-                          </Button>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant={activeServerPrivateKeyInputMode === "file" ? "selected" : "outline"}
-                            class="h-auto flex-col items-start gap-0.5 px-3 py-2 text-left"
-                            onclick={() => {
-                              serverPrivateKeyInputMode = "file";
-                              selectedSshCredentialId = "";
-                              serverCredentialPrivateKey = "";
-                              serverCredentialPrivateKeyFileName = "";
-                              serverCredentialPrivateKeyImportError = null;
-                            }}
-                          >
-                            <span>选择私钥文件</span>
-                            <span class="text-[0.7rem] font-normal opacity-75">PEM 或 OpenSSH</span>
-                          </Button>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant={activeServerPrivateKeyInputMode === "paste" ? "selected" : "outline"}
-                            class="h-auto flex-col items-start gap-0.5 px-3 py-2 text-left"
-                            onclick={() => {
-                              serverPrivateKeyInputMode = "paste";
-                              selectedSshCredentialId = "";
-                              serverCredentialPrivateKeyFileName = "";
-                              serverCredentialPrivateKeyImportError = null;
-                            }}
-                          >
-                            <span>粘贴私钥内容</span>
-                            <span class="text-[0.7rem] font-normal opacity-75">手动输入</span>
-                          </Button>
-                        </div>
-                      </div>
-
-                      {#if activeServerPrivateKeyInputMode === "saved"}
-                        <div class="space-y-2">
-                          <p class="text-xs font-medium text-muted-foreground">选择凭据</p>
-                          <div class="grid gap-2">
-                            {#each sshCredentials as credential}
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant={selectedSshCredentialId === credential.id ? "selected" : "outline"}
-                                class="justify-start"
-                                onclick={() => {
-                                  selectedSshCredentialId = credential.id;
-                                  serverCredentialPrivateKey = "";
-                                  serverCredentialPrivateKeyFileName = "";
-                                  serverCredentialPrivateKeyImportError = null;
-                                }}
-                              >
-                                {credential.name}{credential.username ? ` · ${credential.username}` : ""}
-                              </Button>
-                            {/each}
-                          </div>
-                        </div>
-                      {:else if activeServerPrivateKeyInputMode === "file"}
-                        <div class="space-y-2">
-                          <label class="text-xs font-medium text-muted-foreground" for="server-ssh-private-key-file">
-                            私钥文件
-                          </label>
-                          <Input
-                            id="server-ssh-private-key-file"
-                            type="file"
-                            onchange={importServerPrivateKeyFile}
-                          />
-                          {#if serverCredentialPrivateKeyFileName}
-                            <p class="text-xs text-muted-foreground">
-                              已选择 {serverCredentialPrivateKeyFileName}
-                            </p>
-                          {:else if serverCredentialPrivateKeyImportError}
-                            <p class="text-xs text-destructive">{serverCredentialPrivateKeyImportError}</p>
-                          {:else}
-                            <p class="text-xs text-muted-foreground">
-                              选择云厂商下载的 `.pem` 或标准 OpenSSH 私钥文件。
-                            </p>
-                          {/if}
-                        </div>
-                      {:else}
-                        <div class="space-y-2">
-                          <label class="text-xs font-medium text-muted-foreground" for="server-ssh-private-key">
-                            私钥内容
-                          </label>
-                          <Textarea
-                            id="server-ssh-private-key"
-                            class="font-mono text-xs"
-                            bind:value={serverCredentialPrivateKey}
-                            oninput={() => {
-                              selectedSshCredentialId = "";
-                              serverCredentialPrivateKeyFileName = "";
-                              serverPrivateKeyInputMode = "paste";
-                            }}
-                            placeholder={"-----BEGIN OPENSSH PRIVATE KEY-----\n...\n-----END OPENSSH PRIVATE KEY-----"}
-                            rows={6}
-                          />
-                        </div>
-                      {/if}
-
-                      {#if activeServerPrivateKeyInputMode === "file" || activeServerPrivateKeyInputMode === "paste"}
-                        <div class="space-y-2">
-                          <label class="text-xs font-medium text-muted-foreground" for="server-ssh-credential-name">
-                            凭据名称
-                          </label>
-                          <Input
-                            id="server-ssh-credential-name"
-                            bind:value={sshCredentialName}
-                            placeholder={serverCredentialPrivateKeyFileName || `${serverName || "server"} SSH key`}
-                          />
-                          <p class="text-xs text-muted-foreground">
-                            创建服务器时会把这把私钥保存到凭据库，后续服务器可以复用。
-                          </p>
-                        </div>
-                        <div class="space-y-2">
-                          <label class="text-xs font-medium text-muted-foreground" for="server-ssh-public-key">
-                            公钥（可选）
-                          </label>
-                          <Textarea
-                            id="server-ssh-public-key"
-                            class="font-mono text-xs"
-                            bind:value={serverCredentialPublicKey}
-                            placeholder="ssh-ed25519 AAAA..."
-                            rows={3}
-                          />
-                          <p class="text-xs text-muted-foreground">
-                            SSH 连接只需要私钥；这里用于凭据库展示或人工核对。
-                          </p>
-                        </div>
-                      {/if}
-                    {/if}
-                    <div class="space-y-2 border-t pt-3">
-                      <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                        <div class="space-y-1">
-                          <p class="text-xs font-medium text-muted-foreground">连接测试</p>
-                          <p class="text-xs text-muted-foreground">
-                            使用当前表单内容临时测试 SSH 和远程 Docker。当前 SSH 部署需要远程 Docker，不会创建服务器或保存新凭据。
-                          </p>
-                        </div>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          disabled={!canTestServerConnectivity || testServerConnectivityMutation.isPending}
-                          onclick={testDraftServerConnectivity}
-                        >
-                          {#if testServerConnectivityMutation.isPending}
-                            <LoaderCircle class="size-3 animate-spin" />
-                            测试中
-                          {:else}
-                            测试连接
-                          {/if}
-                        </Button>
-                      </div>
-                      {#if serverConnectivityError}
-                        <div class="rounded-md border border-destructive/30 px-3 py-2 text-xs text-destructive">
-                          {serverConnectivityError}
-                        </div>
-                      {:else if serverConnectivityResult}
-                        <div class="space-y-2 rounded-md border px-3 py-2">
-                          <div class="flex flex-wrap items-center justify-between gap-2">
-                            <p class="text-xs font-medium">连接结果</p>
-                            <Badge variant={connectivityVariant(serverConnectivityResult.status)}>
-                              {connectivityLabel(serverConnectivityResult.status)}
-                            </Badge>
-                          </div>
-                          <div class="space-y-2">
-                            {#each serverConnectivityResult.checks as check (check.name)}
-                              <div class="flex flex-col gap-1 border-t pt-2 first:border-t-0 first:pt-0">
-                                <div class="flex flex-wrap items-center justify-between gap-2">
-                                  <span class="text-xs font-medium">{check.name}</span>
-                                  <Badge variant={checkVariant(check.status)}>
-                                    {checkLabel(check.status)}
-                                  </Badge>
-                                </div>
-                                <p class="text-xs leading-5 text-muted-foreground">{check.message}</p>
-                              </div>
-                            {/each}
-                          </div>
-                        </div>
-                      {/if}
-                    </div>
-                  </div>
-                {/if}
-              </div>
+              <ServerRegistrationForm
+                bind:draft={serverDraft}
+                bind:connectivityResult={serverConnectivityResult}
+                bind:connectivityError={serverConnectivityError}
+                bind:testPending={serverConnectivityTestPending}
+                providers={providerOptions}
+                {sshCredentials}
+                testConnectivity={testDraftServerConnectivity}
+              />
             {/if}
           </div>
 
