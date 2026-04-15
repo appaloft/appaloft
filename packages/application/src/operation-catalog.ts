@@ -15,6 +15,7 @@ import { createProjectCommandInputSchema } from "./operations/projects/create-pr
 import { listProjectsQueryInputSchema } from "./operations/projects/list-projects.query";
 import { createResourceCommandInputSchema } from "./operations/resources/create-resource.command";
 import { listResourcesQueryInputSchema } from "./operations/resources/list-resources.query";
+import { resourceRuntimeLogsQueryInputSchema } from "./operations/resources/resource-runtime-logs.query";
 import { configureServerCredentialCommandInputSchema } from "./operations/servers/configure-server-credential.command";
 import { createSshCredentialCommandInputSchema } from "./operations/servers/create-ssh-credential.command";
 import { listServersQueryInputSchema } from "./operations/servers/list-servers.query";
@@ -51,7 +52,7 @@ export interface OperationCatalogEntry {
       path: string;
     };
     orpcStream?: {
-      method: "POST";
+      method: "GET" | "POST";
       path: string;
     };
   };
@@ -211,6 +212,21 @@ export const operationCatalog = [
     transports: {
       cli: "yundu resource create",
       orpc: { method: "POST", path: "/api/resources" },
+    },
+  },
+  {
+    key: "resources.runtime-logs",
+    kind: "query",
+    domain: "resources",
+    messageName: "ResourceRuntimeLogsQuery",
+    handlerName: "ResourceRuntimeLogsQueryHandler",
+    serviceName: "ResourceRuntimeLogsQueryService",
+    inputSchema: resourceRuntimeLogsQueryInputSchema,
+    serviceToken: tokens.resourceRuntimeLogsQueryService,
+    transports: {
+      cli: "yundu resource logs <resourceId>",
+      orpc: { method: "GET", path: "/api/resources/{resourceId}/runtime-logs" },
+      orpcStream: { method: "GET", path: "/api/resources/{resourceId}/runtime-logs/stream" },
     },
   },
   {

@@ -41,6 +41,7 @@ rebuild-required there, update the operation map and required ADR before local s
 | [ADR-014: Deployment Admission Uses Resource Profile](./ADR-014-deployment-admission-uses-resource-profile.md) | Accepted | `deployments.create` consumes resource-owned source/runtime/network profile and no longer accepts source/runtime/network/route configuration fields. |
 | [ADR-015: Resource Network Profile](./ADR-015-resource-network-profile.md) | Accepted | Resource-owned network endpoint and port semantics for deployment planning, reverse proxy targets, and snapshots. |
 | [ADR-016: Deployment Command Surface Reset](./ADR-016-deployment-command-surface-reset.md) | Accepted | v1 keeps `deployments.create` as the only public deployment write command until cancel, health check, redeploy, reattach, and rollback are rebuilt from specs. |
+| [ADR-017: Resource Runtime Log Observation](./ADR-017-resource-runtime-log-observation.md) | Accepted | Application runtime logs are resource-owned observation through an injected runtime log reader port, not a Docker-specific deployment-log concern. |
 
 ## Authoring Rules
 

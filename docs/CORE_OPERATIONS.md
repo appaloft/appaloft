@@ -164,7 +164,8 @@ Business meaning:
 - a Docker Compose stack is one resource that may contain multiple named services
 - deployments belong to one resource
 - resource detail is the owner-scoped surface for new deployment, deployment history,
-  source/runtime/network configuration, and resource-scoped domain/TLS actions
+  source/runtime/network configuration, resource runtime logs, and resource-scoped domain/TLS
+  actions
 - destinations and deployment targets / servers remain runtime placement, not the project
   organization layer
 
@@ -174,6 +175,7 @@ Implemented operations:
 | --- | --- | --- | --- | --- | --- | --- |
 | Create resource | Command | `resources.create` | `CreateResourceCommand` | `CreateResourceCommandInput` | `yundu resource create` | `POST /api/resources` |
 | List resources | Query | `resources.list` | `ListResourcesQuery` | `ListResourcesQueryInput` | `yundu resource list` | `GET /api/resources` |
+| Read resource runtime logs | Query | `resources.runtime-logs` | `ResourceRuntimeLogsQuery` | `ResourceRuntimeLogsQueryInput` | `yundu resource logs <resourceId>` | `GET /api/resources/{resourceId}/runtime-logs`; stream: `GET /api/resources/{resourceId}/runtime-logs/stream` |
 
 Current boundary:
 - resources are persisted and can be listed by project or environment
@@ -195,6 +197,10 @@ Current boundary:
   [ADR-013: Project Resource Navigation And Deployment Ownership](./decisions/ADR-013-project-resource-navigation-and-deployment-ownership.md)
 - sidebar navigation may show Project -> Resource hierarchy with latest deployment status derived
   from read models/projections
+- application runtime logs are resource-owned observation governed by
+  [ADR-017: Resource Runtime Log Observation](./decisions/ADR-017-resource-runtime-log-observation.md);
+  `resources.runtime-logs` is the active bounded and stream-capable query surface for runtime
+  stdout/stderr observation through an injected runtime log reader
 
 Core next operations expected here:
 - show resource details

@@ -634,6 +634,60 @@ export const deploymentLogsResponseSchema = z.object({
   logs: z.array(deploymentLogEntrySchema),
 });
 
+export const resourceRuntimeLogLineSchema = z.object({
+  resourceId: z.string(),
+  deploymentId: z.string().optional(),
+  serviceName: z.string().optional(),
+  runtimeKind: z.string().optional(),
+  runtimeInstanceId: z.string().optional(),
+  stream: z.enum(["stdout", "stderr", "unknown"]).optional(),
+  timestamp: z.string().optional(),
+  sequence: z.number().optional(),
+  cursor: z.string().optional(),
+  message: z.string(),
+  masked: z.boolean(),
+});
+
+export const domainErrorResponseSchema = z.object({
+  code: z.string(),
+  category: z.enum(["user", "infra", "provider", "retryable"]),
+  message: z.string(),
+  retryable: z.boolean(),
+  details: z
+    .record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()]))
+    .optional(),
+});
+
+export const resourceRuntimeLogEventSchema = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("line"),
+    line: resourceRuntimeLogLineSchema,
+  }),
+  z.object({
+    kind: z.literal("heartbeat"),
+    at: z.string(),
+  }),
+  z.object({
+    kind: z.literal("closed"),
+    reason: z.enum(["completed", "cancelled", "source-ended"]),
+  }),
+  z.object({
+    kind: z.literal("error"),
+    error: domainErrorResponseSchema,
+  }),
+]);
+
+export const resourceRuntimeLogsResponseSchema = z.object({
+  resourceId: z.string(),
+  deploymentId: z.string().optional(),
+  logs: z.array(resourceRuntimeLogLineSchema),
+});
+
+export const resourceRuntimeLogsStreamResponseSchema = z.object({
+  resourceId: z.string(),
+  deploymentId: z.string().optional(),
+});
+
 export const providerDescriptorSchema = z.object({
   key: z.string(),
   title: z.string(),
@@ -716,6 +770,12 @@ export type CreateDeploymentInput = z.infer<typeof createDeploymentInputSchema>;
 export type CreateDeploymentResponse = z.infer<typeof createDeploymentResponseSchema>;
 export type ListDeploymentsResponse = z.infer<typeof listDeploymentsResponseSchema>;
 export type DeploymentLogsResponse = z.infer<typeof deploymentLogsResponseSchema>;
+export type ResourceRuntimeLogLine = z.infer<typeof resourceRuntimeLogLineSchema>;
+export type ResourceRuntimeLogEvent = z.infer<typeof resourceRuntimeLogEventSchema>;
+export type ResourceRuntimeLogsResponse = z.infer<typeof resourceRuntimeLogsResponseSchema>;
+export type ResourceRuntimeLogsStreamResponse = z.infer<
+  typeof resourceRuntimeLogsStreamResponseSchema
+>;
 export type ListProvidersResponse = z.infer<typeof listProvidersResponseSchema>;
 export type ListPluginsResponse = z.infer<typeof listPluginsResponseSchema>;
 export type ListGitHubRepositoriesInput = z.infer<typeof listGitHubRepositoriesInputSchema>;

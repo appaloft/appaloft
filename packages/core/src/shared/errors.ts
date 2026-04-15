@@ -46,6 +46,28 @@ export const domainError = {
     message: string,
     details?: Record<string, string | number | boolean | null>,
   ): DomainError => createError("resource_context_mismatch", "user", message, details),
+  resourceRuntimeLogsContextMismatch: (
+    message: string,
+    details?: Record<string, string | number | boolean | null>,
+  ): DomainError => createError("resource_runtime_logs_context_mismatch", "user", message, details),
+  resourceRuntimeLogsUnavailable: (
+    message: string,
+    details?: Record<string, string | number | boolean | null>,
+  ): DomainError => createError("resource_runtime_logs_unavailable", "user", message, details),
+  resourceRuntimeLogsNotConfigured: (
+    message: string,
+    details?: Record<string, string | number | boolean | null>,
+  ): DomainError =>
+    createError("resource_runtime_logs_not_configured", "provider", message, details, true),
+  resourceRuntimeLogStreamFailed: (
+    message: string,
+    details?: Record<string, string | number | boolean | null>,
+  ): DomainError =>
+    createError("resource_runtime_log_stream_failed", "retryable", message, details, true),
+  resourceRuntimeLogCancelled: (
+    message: string,
+    details?: Record<string, string | number | boolean | null>,
+  ): DomainError => createError("resource_runtime_log_cancelled", "user", message, details),
   resourceSlugConflict: (
     message: string,
     details?: Record<string, string | number | boolean | null>,

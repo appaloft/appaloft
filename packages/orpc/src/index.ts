@@ -49,7 +49,12 @@ import {
   type Query,
   type QueryBus,
   RegisterServerCommand,
+  type ResourceRuntimeLogEvent,
+  ResourceRuntimeLogsQuery,
+  type ResourceRuntimeLogsQueryInput,
+  type ResourceRuntimeLogsResult,
   registerServerCommandInputSchema,
+  resourceRuntimeLogsQueryInputSchema,
   SetEnvironmentVariableCommand,
   ShowEnvironmentQuery,
   setEnvironmentVariableCommandInputSchema,
@@ -82,6 +87,9 @@ import {
   listSshCredentialsResponseSchema,
   promoteEnvironmentResponseSchema,
   registerServerResponseSchema,
+  resourceRuntimeLogEventSchema,
+  resourceRuntimeLogsResponseSchema,
+  resourceRuntimeLogsStreamResponseSchema,
   testServerConnectivityResponseSchema,
 } from "@yundu/contracts";
 import { type DomainError, type Result } from "@yundu/core";
@@ -459,6 +467,51 @@ function createDeploymentStream(
   })();
 }
 
+function createResourceRuntimeLogStream(
+  context: YunduOrpcRequestContext,
+  input: ResourceRuntimeLogsQueryInput,
+): AsyncGenerator<ResourceRuntimeLogEvent, { resourceId: string; deploymentId?: string }, void> {
+  const streamResult = (result: ResourceRuntimeLogsResult) => ({
+    resourceId: result.resourceId,
+    ...(result.deploymentId ? { deploymentId: result.deploymentId } : {}),
+  });
+
+  return (async function* streamResourceRuntimeLogs() {
+    const result: ResourceRuntimeLogsResult = await executeQuery(
+      context,
+      ResourceRuntimeLogsQuery.create({
+        ...input,
+        follow: true,
+      }),
+    );
+
+    if (result.mode === "bounded") {
+      for (const line of result.logs) {
+        yield {
+          kind: "line",
+          line,
+        };
+      }
+
+      return streamResult(result);
+    }
+
+    try {
+      for await (const event of result.stream) {
+        yield event;
+
+        if (event.kind === "closed" || event.kind === "error") {
+          break;
+        }
+      }
+
+      return streamResult(result);
+    } finally {
+      await result.stream.close();
+    }
+  })();
+}
+
 function toDeploymentProgressStreamEvent(
   event: DeploymentProgressEvent,
 ): DeploymentProgressStreamEvent {
@@ -756,6 +809,47 @@ export const deploymentLogsProcedure = base
   .output(deploymentLogsResponseSchema)
   .handler(async ({ input, context }) => executeQuery(context, DeploymentLogsQuery.create(input)));
 
+export const resourceRuntimeLogsProcedure = base
+  .route({
+    method: "GET",
+    path: "/resources/{resourceId}/runtime-logs",
+    successStatus: 200,
+  })
+  .input(resourceRuntimeLogsQueryInputSchema)
+  .output(resourceRuntimeLogsResponseSchema)
+  .handler(async ({ input, context }) => {
+    const result: ResourceRuntimeLogsResult = await executeQuery(
+      context,
+      ResourceRuntimeLogsQuery.create({
+        ...input,
+        follow: false,
+      }),
+    );
+
+    if (result.mode !== "bounded") {
+      throw new ORPCError("INTERNAL_SERVER_ERROR", {
+        message: "Runtime log query returned a stream for a bounded request",
+        status: 500,
+      });
+    }
+
+    return {
+      resourceId: result.resourceId,
+      deploymentId: result.deploymentId,
+      logs: result.logs,
+    };
+  });
+
+export const resourceRuntimeLogsStreamProcedure = base
+  .route({
+    method: "GET",
+    path: "/resources/{resourceId}/runtime-logs/stream",
+    successStatus: 200,
+  })
+  .input(resourceRuntimeLogsQueryInputSchema)
+  .output(eventIterator(resourceRuntimeLogEventSchema, resourceRuntimeLogsStreamResponseSchema))
+  .handler(({ input, context }) => createResourceRuntimeLogStream(context, input));
+
 export const listProvidersProcedure = base
   .route({
     method: "GET",
@@ -816,6 +910,8 @@ export const yunduOrpcRouter = {
   resources: {
     list: listResourcesProcedure,
     create: createResourceProcedure,
+    logs: resourceRuntimeLogsProcedure,
+    logsStream: resourceRuntimeLogsStreamProcedure,
   },
   domainBindings: {
     list: listDomainBindingsProcedure,

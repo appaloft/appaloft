@@ -68,6 +68,7 @@ create/select project
   -> create/select resource with source/runtime/network profile
   -> deployments.create
   -> observe deployment progress, status, and logs
+  -> observe resource runtime logs when an application instance is running
   -> optionally domain-bindings.create
   -> optionally certificates.issue-or-renew
   -> observe domain readiness
@@ -145,6 +146,7 @@ flowchart TD
 | --- | --- | --- | --- | --- | --- |
 | Create resource | Command | `resources.create` | Resource | Creates deployable unit with source/runtime/network profile when supplied. | [resources.create](./commands/resources.create.md), [ADR-011](./decisions/ADR-011-resource-create-minimum-lifecycle.md), [ADR-012](./decisions/ADR-012-resource-runtime-profile-and-deployment-snapshot-boundary.md), [ADR-015](./decisions/ADR-015-resource-network-profile.md) |
 | List resources | Query | `resources.list` | Resource read model | Lets workflows select deployable units and lets project pages show resources. | [Project Resource Console](./workflows/project-resource-console.md), [ADR-013](./decisions/ADR-013-project-resource-navigation-and-deployment-ownership.md) |
+| Read resource runtime logs | Active query | `resources.runtime-logs` | Resource runtime observation | Tails or streams application stdout/stderr for a resource-owned runtime instance through an injected runtime log reader port. | [resources.runtime-logs](./queries/resources.runtime-logs.md), [Resource Runtime Log Observation](./workflows/resource-runtime-log-observation.md), [ADR-017](./decisions/ADR-017-resource-runtime-log-observation.md) |
 
 ### Deployment
 
@@ -186,6 +188,7 @@ Workflows coordinate commands and queries. They do not own aggregate invariants.
 | Server bootstrap and proxy | Async/process workflow | `servers.register -> server-connected -> proxy-bootstrap-requested -> proxy-installed/proxy-install-failed -> server-ready` | server readiness state | [Server Bootstrap And Proxy](./workflows/server-bootstrap-and-proxy.md), [ADR-003](./decisions/ADR-003-server-connect-public-vs-internal.md), [ADR-004](./decisions/ADR-004-server-readiness-state-storage.md) |
 | Routing/domain/TLS | Async/process workflow | `domain-bindings.create -> domain-binding-requested -> domain-bound -> certificate-requested -> certificate-issued/certificate-issuance-failed -> domain-ready` | domain readiness state | [Routing Domain And TLS](./workflows/routing-domain-and-tls.md), ADR-002 through ADR-009 |
 | Project/resource console | UI workflow | Project list/detail surfaces query projects/resources/deployments and route owner-scoped actions to resources. | varies by selected action | [Project Resource Console](./workflows/project-resource-console.md), [ADR-013](./decisions/ADR-013-project-resource-navigation-and-deployment-ownership.md) |
+| Resource runtime log observation | UI/read workflow | Resource detail resolves a resource runtime log query and renders bounded or streaming line events. | `resources.runtime-logs` | [Resource Runtime Log Observation](./workflows/resource-runtime-log-observation.md), [ADR-017](./decisions/ADR-017-resource-runtime-log-observation.md) |
 
 ## Event And Async Progression Map
 

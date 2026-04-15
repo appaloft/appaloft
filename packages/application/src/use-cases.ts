@@ -21,6 +21,7 @@ export * from "./operations/projects/create-project.use-case";
 export * from "./operations/projects/list-projects.query-service";
 export * from "./operations/resources/create-resource.use-case";
 export * from "./operations/resources/list-resources.query-service";
+export * from "./operations/resources/resource-runtime-logs.query-service";
 export * from "./operations/servers/configure-server-credential.use-case";
 export * from "./operations/servers/create-ssh-credential.use-case";
 export * from "./operations/servers/list-servers.query-service";
