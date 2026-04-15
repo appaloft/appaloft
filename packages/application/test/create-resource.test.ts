@@ -262,6 +262,101 @@ describe("CreateResourceUseCase", () => {
     });
   });
 
+  test("normalizes GitHub tree URL source into repository ref and base directory", async () => {
+    const { context, eventBus, repositoryContext, resources, useCase } =
+      await seedResourceContext();
+
+    const originalLocator = "https://github.com/coollabsio/coolify-examples/tree/v4.x/bun";
+    const result = await useCase.execute(context, {
+      projectId: "prj_demo",
+      environmentId: "env_demo",
+      destinationId: "dst_demo",
+      name: "Bun Example",
+      kind: "application",
+      source: {
+        kind: "git-public",
+        locator: originalLocator,
+      },
+      runtimeProfile: {
+        strategy: "dockerfile",
+      },
+      networkProfile: {
+        internalPort: 3000,
+      },
+    });
+
+    expect(result.isOk()).toBe(true);
+    const persisted = await resources.findOne(
+      repositoryContext,
+      ResourceByIdSpec.create(ResourceId.rehydrate(result._unsafeUnwrap().id)),
+    );
+    const sourceBinding = persisted?.toState().sourceBinding;
+    expect(sourceBinding?.locator.value).toBe("https://github.com/coollabsio/coolify-examples");
+    expect(sourceBinding?.gitRef?.value).toBe("v4.x");
+    expect(sourceBinding?.baseDirectory?.value).toBe("/bun");
+    expect(sourceBinding?.originalLocator?.value).toBe(originalLocator);
+
+    const event = resourceCreatedEvent(eventBus.events);
+    expect(event.payload).toMatchObject({
+      sourceBinding: {
+        kind: "git-public",
+        locator: "https://github.com/coollabsio/coolify-examples",
+        metadata: {
+          gitRef: "v4.x",
+          baseDirectory: "/bun",
+          originalLocator,
+        },
+      },
+    });
+  });
+
+  test("rejects invalid source base directory", async () => {
+    const { context, eventBus, useCase } = await seedResourceContext();
+
+    const result = await useCase.execute(context, {
+      projectId: "prj_demo",
+      environmentId: "env_demo",
+      name: "web",
+      kind: "application",
+      source: {
+        kind: "local-folder",
+        locator: ".",
+        baseDirectory: "../secrets",
+      },
+    });
+
+    expect(result.isErr()).toBe(true);
+    const error = result._unsafeUnwrapErr();
+    expect(error.code).toBe("validation_error");
+    expect(error.details?.phase).toBe("resource-source-resolution");
+    expect(eventBus.events).toHaveLength(0);
+  });
+
+  test("rejects docker image sources with both tag and digest", async () => {
+    const { context, eventBus, useCase } = await seedResourceContext();
+
+    const result = await useCase.execute(context, {
+      projectId: "prj_demo",
+      environmentId: "env_demo",
+      name: "web",
+      kind: "application",
+      source: {
+        kind: "docker-image",
+        locator:
+          "ghcr.io/acme/web:latest@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      },
+      runtimeProfile: {
+        strategy: "prebuilt-image",
+      },
+    });
+
+    expect(result.isErr()).toBe(true);
+    const error = result._unsafeUnwrapErr();
+    expect(error.code).toBe("validation_error");
+    expect(error.details?.phase).toBe("resource-source-resolution");
+    expect(eventBus.events).toHaveLength(0);
+  });
+
   test("rejects environment and project context mismatch", async () => {
     const { context, eventBus, useCase } = await seedResourceContext({
       environmentProjectId: "prj_other",

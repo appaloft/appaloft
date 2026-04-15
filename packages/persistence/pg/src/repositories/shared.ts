@@ -25,6 +25,9 @@ import {
   DestinationName,
   DetectSummary,
   DisplayNameText,
+  DockerImageDigest,
+  DockerImageName,
+  DockerImageTag,
   DomainBindingId,
   DomainBindingStatusValue,
   DomainVerificationAttemptId,
@@ -46,6 +49,8 @@ import {
   FilePathText,
   FinishedAt,
   GeneratedAt,
+  GitCommitShaText,
+  GitRefText,
   HealthCheckPathText,
   HostAddress,
   IdempotencyKeyValue,
@@ -77,9 +82,13 @@ import {
   type RuntimePlan as RuntimePlanType,
   RuntimeVerificationStep,
   RuntimeVerificationStepKindValue,
+  SourceBaseDirectory,
   SourceDescriptor,
   SourceKindValue,
   SourceLocator,
+  SourceOriginalLocator,
+  SourceRepositoryFullName,
+  SourceRepositoryId,
   SshCredentialId,
   SshCredentialName,
   SshPrivateKeyText,
@@ -212,6 +221,16 @@ export interface SerializedResourceSourceBinding extends Record<string, unknown>
   kind: SourceKindInput;
   locator: string;
   displayName: string;
+  gitRef?: string;
+  commitSha?: string;
+  baseDirectory?: string;
+  originalLocator?: string;
+  repositoryId?: string;
+  repositoryFullName?: string;
+  defaultBranch?: string;
+  imageName?: string;
+  imageTag?: string;
+  imageDigest?: string;
   metadata?: Record<string, string>;
 }
 
@@ -744,6 +763,78 @@ export function rehydrateResourceRow(row: Selectable<Database["resources"]>) {
             kind: SourceKindValue.rehydrate(sourceBinding.kind),
             locator: SourceLocator.rehydrate(sourceBinding.locator),
             displayName: DisplayNameText.rehydrate(sourceBinding.displayName),
+            ...((sourceBinding.gitRef ?? sourceBinding.metadata?.gitRef)
+              ? {
+                  gitRef: GitRefText.rehydrate(
+                    sourceBinding.gitRef ?? sourceBinding.metadata?.gitRef ?? "",
+                  ),
+                }
+              : {}),
+            ...((sourceBinding.commitSha ?? sourceBinding.metadata?.commitSha)
+              ? {
+                  commitSha: GitCommitShaText.rehydrate(
+                    sourceBinding.commitSha ?? sourceBinding.metadata?.commitSha ?? "",
+                  ),
+                }
+              : {}),
+            ...((sourceBinding.baseDirectory ?? sourceBinding.metadata?.baseDirectory)
+              ? {
+                  baseDirectory: SourceBaseDirectory.rehydrate(
+                    sourceBinding.baseDirectory ?? sourceBinding.metadata?.baseDirectory ?? "/",
+                  ),
+                }
+              : {}),
+            ...((sourceBinding.originalLocator ?? sourceBinding.metadata?.originalLocator)
+              ? {
+                  originalLocator: SourceOriginalLocator.rehydrate(
+                    sourceBinding.originalLocator ?? sourceBinding.metadata?.originalLocator ?? "",
+                  ),
+                }
+              : {}),
+            ...((sourceBinding.repositoryId ?? sourceBinding.metadata?.repositoryId)
+              ? {
+                  repositoryId: SourceRepositoryId.rehydrate(
+                    sourceBinding.repositoryId ?? sourceBinding.metadata?.repositoryId ?? "",
+                  ),
+                }
+              : {}),
+            ...((sourceBinding.repositoryFullName ?? sourceBinding.metadata?.repositoryFullName)
+              ? {
+                  repositoryFullName: SourceRepositoryFullName.rehydrate(
+                    sourceBinding.repositoryFullName ??
+                      sourceBinding.metadata?.repositoryFullName ??
+                      "",
+                  ),
+                }
+              : {}),
+            ...((sourceBinding.defaultBranch ?? sourceBinding.metadata?.defaultBranch)
+              ? {
+                  defaultBranch: GitRefText.rehydrate(
+                    sourceBinding.defaultBranch ?? sourceBinding.metadata?.defaultBranch ?? "",
+                  ),
+                }
+              : {}),
+            ...((sourceBinding.imageName ?? sourceBinding.metadata?.imageName)
+              ? {
+                  imageName: DockerImageName.rehydrate(
+                    sourceBinding.imageName ?? sourceBinding.metadata?.imageName ?? "",
+                  ),
+                }
+              : {}),
+            ...((sourceBinding.imageTag ?? sourceBinding.metadata?.imageTag)
+              ? {
+                  imageTag: DockerImageTag.rehydrate(
+                    sourceBinding.imageTag ?? sourceBinding.metadata?.imageTag ?? "",
+                  ),
+                }
+              : {}),
+            ...((sourceBinding.imageDigest ?? sourceBinding.metadata?.imageDigest)
+              ? {
+                  imageDigest: DockerImageDigest.rehydrate(
+                    sourceBinding.imageDigest ?? sourceBinding.metadata?.imageDigest ?? "",
+                  ),
+                }
+              : {}),
             ...(sourceBinding.metadata ? { metadata: { ...sourceBinding.metadata } } : {}),
           },
         }

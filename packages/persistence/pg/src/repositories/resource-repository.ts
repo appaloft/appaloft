@@ -12,6 +12,7 @@ import {
   type ResourceMutationSpecVisitor,
   type ResourceSelectionSpec,
   type ResourceSelectionSpecVisitor,
+  ResourceSourceBinding,
   type UpsertResourceSpec,
 } from "@yundu/core";
 import { type Insertable, type Kysely, type Selectable, type SelectQueryBuilder } from "kysely";
@@ -57,14 +58,45 @@ class KyselyResourceMutationVisitor
     }>
 {
   visitUpsertResource(spec: UpsertResourceSpec) {
+    const sourceBindingMetadata = spec.state.sourceBinding
+      ? ResourceSourceBinding.metadataFromState(spec.state.sourceBinding)
+      : undefined;
     const sourceBinding = spec.state.sourceBinding
       ? ({
           kind: spec.state.sourceBinding.kind.value,
           locator: spec.state.sourceBinding.locator.value,
           displayName: spec.state.sourceBinding.displayName.value,
-          ...(spec.state.sourceBinding.metadata
-            ? { metadata: { ...spec.state.sourceBinding.metadata } }
+          ...(spec.state.sourceBinding.gitRef
+            ? { gitRef: spec.state.sourceBinding.gitRef.value }
             : {}),
+          ...(spec.state.sourceBinding.commitSha
+            ? { commitSha: spec.state.sourceBinding.commitSha.value }
+            : {}),
+          ...(spec.state.sourceBinding.baseDirectory
+            ? { baseDirectory: spec.state.sourceBinding.baseDirectory.value }
+            : {}),
+          ...(spec.state.sourceBinding.originalLocator
+            ? { originalLocator: spec.state.sourceBinding.originalLocator.value }
+            : {}),
+          ...(spec.state.sourceBinding.repositoryId
+            ? { repositoryId: spec.state.sourceBinding.repositoryId.value }
+            : {}),
+          ...(spec.state.sourceBinding.repositoryFullName
+            ? { repositoryFullName: spec.state.sourceBinding.repositoryFullName.value }
+            : {}),
+          ...(spec.state.sourceBinding.defaultBranch
+            ? { defaultBranch: spec.state.sourceBinding.defaultBranch.value }
+            : {}),
+          ...(spec.state.sourceBinding.imageName
+            ? { imageName: spec.state.sourceBinding.imageName.value }
+            : {}),
+          ...(spec.state.sourceBinding.imageTag
+            ? { imageTag: spec.state.sourceBinding.imageTag.value }
+            : {}),
+          ...(spec.state.sourceBinding.imageDigest
+            ? { imageDigest: spec.state.sourceBinding.imageDigest.value }
+            : {}),
+          ...(sourceBindingMetadata ? { metadata: sourceBindingMetadata } : {}),
         } satisfies SerializedResourceSourceBinding)
       : null;
     const runtimeProfile = spec.state.runtimeProfile

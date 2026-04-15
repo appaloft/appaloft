@@ -71,6 +71,16 @@ Then:
 | Explicit kind and description | Required fields plus `kind`, `description` | `ok({ id })` | None | `resource-created` | Resource persisted with supplied metadata |
 | Default destination supplied | Required fields plus `destinationId` | `ok({ id })` | None | `resource-created` | Resource persisted with destination reference |
 | Application with network profile | Required fields plus `networkProfile.internalPort = 3000` | `ok({ id })` | None | `resource-created` | Resource persisted with resource network profile |
+| Git repository root source | Required fields plus `source.kind = git-public`, cloneable repository `locator` | `ok({ id })` | None | `resource-created` | Resource source binding records repository locator; no deployment input source fields |
+| GitHub tree URL normalized | Entry draft `https://github.com/coollabsio/coolify-examples/tree/v4.x/bun` normalized before command dispatch | `ok({ id })` | None | `resource-created` | Source binding persists repository locator, `gitRef = v4.x`, `baseDirectory = /bun`, and `originalLocator` |
+| Ambiguous Git ref/path split | Deep Git URL contains slash-containing ref and provider lookup cannot prove split | `err` | `validation_error`, phase `resource-source-resolution` | None | No resource created |
+| Local folder with base directory | `source.kind = local-folder`, local folder locator, `baseDirectory = /apps/api` | `ok({ id })` | None | `resource-created` | Source binding records selected folder and source-root-relative base directory |
+| Invalid source base directory | Source metadata has `baseDirectory` with `..`, URL, shell metacharacter, or host absolute path semantics | `err` | `validation_error`, phase `resource-source-resolution` | None | No resource created |
+| Docker image tag source | `source.kind = docker-image`, image name plus tag metadata, `runtimeProfile.strategy = prebuilt-image` | `ok({ id })` | None | `resource-created` | Source binding records image name/tag; runtime profile records prebuilt image strategy |
+| Docker image digest source | `source.kind = docker-image`, image name plus digest metadata | `ok({ id })` | None | `resource-created` | Source binding records digest identity; tag is absent or ignored |
+| Docker image tag and digest conflict | Docker image source includes both tag and digest as competing identity values | `err` | `validation_error`, phase `resource-source-resolution` | None | No resource created |
+| Dockerfile path with source tree | Git or local source plus `runtimeProfile.strategy = dockerfile` and Dockerfile path | `ok({ id })` | None | `resource-created` | Source binding owns base directory; runtime profile owns Dockerfile path |
+| Compose file path with source tree | Git or local source plus `runtimeProfile.strategy = docker-compose` and Compose file path | `ok({ id })` | None | `resource-created` | Source binding owns base directory; runtime profile owns Compose file path |
 | Invalid internal listener port | Required fields plus invalid `networkProfile.internalPort` | `err` | `validation_error`, phase `resource-network-resolution` or `command-validation` | None | No resource created |
 | Reverse-proxy exposure without host port | Inbound HTTP resource with `internalPort`, default exposure | `ok({ id })` | None | `resource-created` | Resource network profile has `internalPort`; no host-published port required |
 | Direct-port host publication | `exposureMode = direct-port`, `hostPort` supplied | `ok({ id })` | None | `resource-created` | Resource network profile records explicit direct-port exposure |
@@ -97,6 +107,7 @@ Then:
 | Resource created, deployment runtime fails | Resource and deployment admission valid; runtime fails later | Resource `ok`; deployment `ok` | Resource remains; deployment terminal failed | `resources.create -> deployments.create(resourceId) -> async failure state` |
 | Quick Deploy new resource path | Web/CLI draft uses new resource | Workflow submits explicit resource create before deploy | Resource id is passed to deployment | Context commands -> `resources.create -> deployments.create(resourceId)` |
 | Quick Deploy with source/runtime/network draft | Web/CLI draft includes source locator, runtime strategy, and internal listener port | Resource creation persists source/runtime/network profile; deployment uses resource id | Resource state owns durable source/runtime/network profile; deployment stores resolved snapshots | `resources.create -> deployments.create(resourceId)` |
+| Quick Deploy with source variant draft | Web/CLI draft includes deep Git URL, local base directory, Docker image tag/digest, Dockerfile path, or Compose path | Resource creation persists normalized variant fields; deployment uses resource id | Resource state owns source variant identity and runtime strategy-specific file/command fields | Entry normalization -> `resources.create -> deployments.create(resourceId)` |
 
 ## Event Matrix
 
@@ -109,6 +120,11 @@ Then:
 Current aggregate event name is `resource-created`.
 
 `resources.create` now owns first-deploy source/runtime/network profile persistence. Tests must assert source binding, runtime profile, and network profile fields when the command input includes them.
+
+Source variant tests are normative even while implementation still stores some values in generic
+metadata. Assertions should treat `gitRef`, `baseDirectory`, Docker image tag/digest, Dockerfile
+path, Compose file path, and `originalLocator` as typed contract fields once the source variant
+schema is implemented.
 
 Resource creation through deployment bootstrap is a legacy seam and should not be expanded.
 

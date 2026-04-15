@@ -58,10 +58,41 @@ project, environment, and resource-owned source/runtime/network draft state wher
 Quick Deploy must use the ADR-012 domain language while collecting draft values:
 
 - source selection produces a source locator and, when needed, a resource source binding draft;
+- source selection is variant-specific: Git, local folder, Docker image, Compose, Dockerfile,
+  static, zip, and inline source drafts may expose different fields, but they must normalize into
+  resource source/runtime/network profile input before any write command is dispatched;
 - runtime selection produces a runtime plan strategy hint, not a deployment-owned method;
 - build/start/health values are runtime profile drafts;
 - listener port, upstream protocol, exposure mode, and compose target service are network profile drafts;
 - domain/path/TLS values belong to durable domain binding/certificate commands and must not become deployment-owned state.
+
+For Git sources, Quick Deploy may accept repository browser URLs as user input. A URL that points to
+a repository subpath, such as a GitHub `/tree/<ref>/<path>` URL, must be parsed as a convenience
+source locator and normalized to:
+
+- the repository clone locator in `source.locator`;
+- `source.metadata.gitRef` for the selected branch, tag, or commit-ish when provided;
+- `source.metadata.baseDirectory` for the source-tree subdirectory;
+- `source.metadata.originalLocator` for traceability.
+
+The normalized resource source for
+`https://github.com/coollabsio/coolify-examples/tree/v4.x/bun` is repository
+`https://github.com/coollabsio/coolify-examples`, `gitRef = "v4.x"`, and
+`baseDirectory = "/bun"`.
+
+When provider branch/tag lookup is available, Quick Deploy must resolve ambiguous slash-containing
+refs by selecting the longest valid ref prefix and treating the remaining path as `baseDirectory`.
+When lookup is not available, Quick Deploy must require explicit ref/path fields before dispatch or
+reject the draft as ambiguous.
+
+For Docker image sources, Quick Deploy must parse the image reference into image name plus either a
+tag or digest. A digest takes precedence over a tag. Those fields belong to source identity and must
+map to `ResourceSourceBinding`, while the runtime strategy maps to `prebuilt-image`.
+
+For local folder sources, Quick Deploy may collect a source-root `baseDirectory` that is relative to
+the selected folder. Dockerfile path, Docker Compose file path, publish directory, Docker build
+target, and workspace command fields are runtime profile drafts because they describe how to plan
+the chosen source tree.
 
 ## Workflow Boundary
 
@@ -154,6 +185,7 @@ user intent
 | Step | Owner | Command/query | Required behavior |
 | --- | --- | --- | --- |
 | Source selection | Web/CLI workflow | Source/provider queries as needed | Produce a `ResourceSourceBinding` draft and optional provider metadata. |
+| Source variant normalization | Web/CLI workflow | Local draft parser; provider branch/tag lookup when available | Convert deep Git URLs, local folder base directories, Docker image tags/digests, and build-file paths into resource source/runtime profile fields. |
 | Network draft | Web/CLI workflow | Local draft validation; optional source/runtime detection | Produce a `ResourceNetworkProfile` draft with `internalPort` for inbound resources. |
 | Project context | Web/CLI workflow | `projects.list`; optional `projects.create` | Select or create the project before deployment admission. |
 | Server context | Web/CLI workflow | `servers.list`; optional `servers.register` | Select or register the deployment target/server before deployment admission. |
@@ -267,6 +299,18 @@ Generated default access URL display is not yet aligned with ADR-017 as a provid
 Current Web and CLI entry fields may still use user-facing "method" wording. Entry workflows must map that wording to `ResourceRuntimeProfile.strategy` before dispatching `resources.create`; `deployments.create` must not receive `deploymentMethod`.
 
 Current Web and CLI entry fields may still expose a generic "port" label. Entry workflows must map that value to `ResourceNetworkProfile.internalPort`; `deployments.create` must not receive `port`.
+
+Current Web and CLI entry fields may still accept Git URLs as a single raw input, but
+`resources.create` normalizes common GitHub tree URLs into repository locator, `gitRef`,
+`baseDirectory`, and `originalLocator` before persistence. Docker image tag/digest identity is
+typed on the source binding.
+
+Provider-backed disambiguation for slash-containing Git refs and user-facing typed fields for
+Dockerfile path, Docker Compose path, static publish directory, and build target remain follow-up
+work.
+
+Until provider-backed disambiguation exists, callers should supply explicit `gitRef` and
+`baseDirectory` when a GitHub tree URL uses a slash-containing branch or tag name.
 
 ## Open Questions
 

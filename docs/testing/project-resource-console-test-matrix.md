@@ -86,6 +86,7 @@ Then:
 | --- | --- | --- | --- |
 | Minimum resource | Project, environment, name | `resources.create` | Resource profile persisted |
 | Source/runtime/network draft | Project, environment, name, GitHub/Docker/Dockerfile/Compose/runtime draft, internal listener port | `resources.create`; optional continue to Quick Deploy | Resource profile persisted with source/runtime/network profile when supplied; deployment uses `resourceId` |
+| Source variant draft | Deep Git URL, Git branch/base directory, local folder base directory, Docker image tag/digest, Dockerfile path, or Compose path | Variant normalizer -> `resources.create`; optional continue to Quick Deploy | Source identity lands in `ResourceSourceBinding`; strategy-specific file/command settings land in `ResourceRuntimeProfile` |
 | Generic port field | User enters application port on create-resource page | `resources.create(networkProfile.internalPort)` | Port is stored as resource network profile input, not deployment input |
 | Continue into first deploy | Resource draft plus deploy intent | `resources.create -> deployments.create(resourceId)` | Resource exists; deployment accepted or rejected by deployment command |
 

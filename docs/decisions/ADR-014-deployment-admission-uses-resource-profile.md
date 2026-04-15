@@ -18,7 +18,9 @@ The public deployment admission input is limited to deployment context reference
 
 The deployment use case must load the `Resource` aggregate and resolve the deployment attempt snapshot from the resource-owned profile:
 
-- `ResourceSourceBinding` provides the source locator and source identity;
+- `ResourceSourceBinding` provides the source locator, source identity, source-kind-specific
+  metadata such as Git ref/base directory or Docker image tag/digest, and non-secret provider or
+  credential references;
 - `ResourceRuntimeProfile` provides the runtime plan strategy, command defaults, and health-check defaults;
 - `ResourceNetworkProfile` provides the internal workload listener port, upstream protocol, exposure mode, and service target needed for runtime/proxy planning;
 - default generated access and durable domain routes are resolved from provider-neutral access policy and domain binding state governed by ADR-017 and ADR-002;
@@ -89,6 +91,11 @@ This option is accepted.
 The use case may use `SourceDetector` against the resource source binding locator when detection enriches the resolved `SourceDescriptor`, but the locator still belongs to the resource profile, not to the deployment command.
 
 If a resource lacks a source binding and no legacy migration seam is explicitly in scope, `deployments.create` must reject admission with `validation_error` in phase `resource-source-resolution`.
+
+If a resource source binding contains only an unnormalized entry locator that cannot be directly
+cloned or materialized, such as a GitHub `/tree/<ref>/<path>` browser URL, `deployments.create` must
+reject admission with `validation_error` in phase `resource-source-resolution` instead of guessing
+repository, ref, and base-directory semantics during deployment admission.
 
 If a resource needs inbound traffic and lacks a resolvable `ResourceNetworkProfile.internalPort`, `deployments.create` must reject admission with `validation_error` in phase `resource-network-resolution`.
 

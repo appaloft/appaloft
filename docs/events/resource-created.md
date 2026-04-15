@@ -4,7 +4,8 @@
 
 `resource-created` means a `Resource` aggregate has been persisted and can be referenced by later commands.
 
-It does not mean the resource has been deployed, source binding has been configured, routing is ready, variables are set, or the resource is healthy.
+It does not mean the resource has been deployed, source binding has been verified or materialized,
+routing is ready, variables are set, or the resource is healthy.
 
 ## Global References
 
@@ -55,6 +56,36 @@ type ResourceCreatedPayload = {
     name: string;
     kind: "web" | "api" | "worker" | "database" | "cache" | "service";
   }>;
+  sourceBinding?: {
+    kind: string;
+    locator: string;
+    displayName: string;
+    metadata?: {
+      gitRef?: string;
+      commitSha?: string;
+      baseDirectory?: string;
+      originalLocator?: string;
+      repositoryId?: string;
+      repositoryFullName?: string;
+      defaultBranch?: string;
+      imageName?: string;
+      imageTag?: string;
+      imageDigest?: string;
+      dockerfilePath?: string;
+      dockerComposeFilePath?: string;
+      [key: string]: string | undefined;
+    };
+  };
+  runtimeProfile?: {
+    strategy: "auto" | "dockerfile" | "docker-compose" | "prebuilt-image" | "workspace-commands";
+    installCommand?: string;
+    buildCommand?: string;
+    startCommand?: string;
+    healthCheckPath?: string;
+    dockerfilePath?: string;
+    dockerComposeFilePath?: string;
+    publishDirectory?: string;
+  };
   networkProfile?: {
     internalPort: number;
     upstreamProtocol: "http" | "tcp";
@@ -69,6 +100,11 @@ type ResourceCreatedPayload = {
 ```
 
 Payload must not contain source credentials, environment secret values, provider credentials, or raw deployment logs.
+
+When a resource is created with first-deploy source/runtime profile input, the event payload may
+include non-secret source variant and runtime profile metadata for projections and audit. It must
+not include provider access tokens, deploy key material, private registry credentials, or local file
+contents.
 
 When a resource has a network profile, the event payload may include the safe network endpoint metadata needed by read-model and audit consumers. It must not include public domain/TLS state, because that lifecycle is owned by domain binding and certificate commands.
 
@@ -121,7 +157,9 @@ Current deployment bootstrap publishes the aggregate event when it creates a res
 
 `resources.create` publishes this event from the explicit resource lifecycle operation after durable resource persistence.
 
-Current code includes source/runtime profile payload when present but does not yet include `networkProfile`. [ADR-015](../decisions/ADR-015-resource-network-profile.md) governs adding that payload after the write-side model migrates.
+Current code includes source/runtime/network profile payload when present. Source variant fields are
+created from typed source value objects, while the event payload still projects those fields under
+safe `sourceBinding.metadata` for read-model and audit consumers.
 
 ## Open Questions
 

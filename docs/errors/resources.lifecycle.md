@@ -26,6 +26,7 @@ type ResourceLifecycleErrorDetails = {
     | "command-validation"
     | "context-resolution"
     | "resource-admission"
+    | "resource-source-resolution"
     | "resource-network-resolution"
     | "resource-persistence"
     | "event-publication"
@@ -37,6 +38,15 @@ type ResourceLifecycleErrorDetails = {
   resourceId?: string;
   resourceSlug?: string;
   resourceKind?: string;
+  sourceKind?: string;
+  sourceLocator?: string;
+  gitRef?: string;
+  baseDirectory?: string;
+  dockerfilePath?: string;
+  dockerComposeFilePath?: string;
+  imageName?: string;
+  imageTag?: string;
+  imageDigest?: string;
   internalPort?: number;
   exposureMode?: "none" | "reverse-proxy" | "direct-port";
   upstreamProtocol?: "http" | "tcp";
@@ -62,6 +72,7 @@ Admission errors reject `resources.create` and return `err(DomainError)`.
 | `resource_context_mismatch` | `application` | `context-resolution` | No | Environment or destination does not match the supplied project/environment context. |
 | `resource_slug_conflict` | `conflict` | `resource-admission` | No | A resource with the same slug already exists in the same project/environment. |
 | `invariant_violation` | `domain` | `resource-admission` | No | Resource aggregate rule rejected the requested state. |
+| `validation_error` | `resource-source-resolution` | No | Source variant metadata is invalid, such as an uncloneable deep Git URL, ambiguous Git ref/base-directory split, invalid source-relative path, or invalid Docker image tag/digest pair. |
 | `validation_error` | `validation` | `resource-network-resolution` | No | Resource network profile is missing, invalid, or ambiguous for an inbound resource endpoint. |
 | `infra_error` | `infra` | `resource-persistence` | Conditional | Persistence failed before the resource could be safely created. |
 | `infra_error` | `infra` | `event-publication` | Conditional | Event publication or outbox recording failed before command success could be safely returned. |
@@ -86,6 +97,7 @@ Resource consumers additionally must:
 
 - show duplicate resource-name failures as slug conflicts;
 - distinguish missing project/environment/destination from context mismatch;
+- distinguish invalid source variant configuration from runtime-plan failure;
 - distinguish invalid resource listener port from deployment runtime failure;
 - avoid retry affordances for validation, not-found, conflict, and invariant errors;
 - expose `resourceId`, `projectId`, `environmentId`, and `resourceSlug` in structured debug/test contexts when available.
@@ -100,6 +112,8 @@ Tests must assert:
 - `error.retriable`;
 - `phase`;
 - related entity ids and resource slug when relevant;
+- source variant fields such as `sourceKind`, `gitRef`, `baseDirectory`, `imageTag`, or
+  `imageDigest` when a source profile error is relevant;
 - `internalPort`, `exposureMode`, and `targetServiceName` when a network profile error is relevant;
 - no resource persisted on admission failure;
 - no duplicate `resource-created` effect on duplicate event consumption.
@@ -113,6 +127,10 @@ Current resource creation can happen inside deployment bootstrap, where errors a
 `resources.create` command-level error mapping is implemented for validation, not found, context mismatch, slug conflict, invariant, and infra failures. Transport and UI tests for those mappings are still pending.
 
 Current code stores listener port under `networkProfile.internalPort`. [ADR-015](../decisions/ADR-015-resource-network-profile.md) governs resource network profile error phases.
+
+Current code does not yet have typed source variant validation for `resource-source-resolution`.
+Until implemented, many invalid source variant cases may be accepted as generic source metadata and
+fail later during source detection, Git clone, Docker image pull, or runtime plan resolution.
 
 ## Open Questions
 

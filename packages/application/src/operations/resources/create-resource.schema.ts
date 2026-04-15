@@ -19,6 +19,16 @@ export const createResourceSourceBindingInputSchema = z.object({
   kind: z.enum(sourceKinds),
   locator: nonEmptyTrimmedString("Source locator"),
   displayName: nonEmptyTrimmedString("Source display name").optional(),
+  gitRef: nonEmptyTrimmedString("Git ref").optional(),
+  commitSha: nonEmptyTrimmedString("Git commit SHA").optional(),
+  baseDirectory: nonEmptyTrimmedString("Source base directory").optional(),
+  originalLocator: nonEmptyTrimmedString("Original source locator").optional(),
+  repositoryId: nonEmptyTrimmedString("Repository id").optional(),
+  repositoryFullName: nonEmptyTrimmedString("Repository full name").optional(),
+  defaultBranch: nonEmptyTrimmedString("Default branch").optional(),
+  imageName: nonEmptyTrimmedString("Docker image name").optional(),
+  imageTag: nonEmptyTrimmedString("Docker image tag").optional(),
+  imageDigest: nonEmptyTrimmedString("Docker image digest").optional(),
   metadata: z.record(z.string(), z.string()).optional(),
 });
 

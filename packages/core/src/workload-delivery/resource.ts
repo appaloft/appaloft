@@ -14,30 +14,25 @@ import {
   type ResourceNetworkProtocolValue,
   type ResourceServiceKindValue,
   type RuntimePlanStrategyValue,
-  type SourceKindValue,
 } from "../shared/state-machine";
 import { type CreatedAt } from "../shared/temporal";
 import {
   type CommandText,
   type DescriptionText,
-  type DisplayNameText,
   type HealthCheckPathText,
   type ResourceName,
   type ResourceServiceName,
   ResourceSlug,
-  type SourceLocator,
 } from "../shared/text-values";
+import {
+  cloneResourceSourceBindingState,
+  ResourceSourceBinding,
+  type ResourceSourceBindingState,
+} from "./source-binding";
 
 export interface ResourceServiceState {
   name: ResourceServiceName;
   kind: ResourceServiceKindValue;
-}
-
-export interface ResourceSourceBindingState {
-  kind: SourceKindValue;
-  locator: SourceLocator;
-  displayName: DisplayNameText;
-  metadata?: Record<string, string>;
 }
 
 export interface ResourceRuntimeProfileState {
@@ -97,6 +92,14 @@ export class Resource extends AggregateRoot<ResourceState> {
   }): Result<Resource> {
     return ResourceSlug.fromName(input.name).andThen((slug) => {
       const services = input.services ?? [];
+      const sourceBinding = input.sourceBinding
+        ? ResourceSourceBinding.create(input.sourceBinding)
+        : ok(undefined);
+      if (sourceBinding.isErr()) {
+        return err(sourceBinding.error);
+      }
+      const normalizedSourceBinding = sourceBinding.value?.toState();
+
       if (input.kind.value !== "compose-stack" && services.length > 1) {
         return err(
           domainError.validation("Only compose-stack resources can declare multiple services"),
@@ -155,14 +158,9 @@ export class Resource extends AggregateRoot<ResourceState> {
         slug,
         kind: input.kind,
         services: [...services],
-        ...(input.sourceBinding
+        ...(normalizedSourceBinding
           ? {
-              sourceBinding: {
-                ...input.sourceBinding,
-                ...(input.sourceBinding.metadata
-                  ? { metadata: { ...input.sourceBinding.metadata } }
-                  : {}),
-              },
+              sourceBinding: cloneResourceSourceBindingState(normalizedSourceBinding),
             }
           : {}),
         ...(input.runtimeProfile ? { runtimeProfile: { ...input.runtimeProfile } } : {}),
@@ -182,14 +180,16 @@ export class Resource extends AggregateRoot<ResourceState> {
           name: service.name.value,
           kind: service.kind.value,
         })),
-        ...(input.sourceBinding
+        ...(normalizedSourceBinding
           ? {
               sourceBinding: {
-                kind: input.sourceBinding.kind.value,
-                locator: input.sourceBinding.locator.value,
-                displayName: input.sourceBinding.displayName.value,
-                ...(input.sourceBinding.metadata
-                  ? { metadata: { ...input.sourceBinding.metadata } }
+                kind: normalizedSourceBinding.kind.value,
+                locator: normalizedSourceBinding.locator.value,
+                displayName: normalizedSourceBinding.displayName.value,
+                ...(ResourceSourceBinding.metadataFromState(normalizedSourceBinding)
+                  ? {
+                      metadata: ResourceSourceBinding.metadataFromState(normalizedSourceBinding),
+                    }
                   : {}),
               },
             }
@@ -241,10 +241,7 @@ export class Resource extends AggregateRoot<ResourceState> {
       ...(state.sourceBinding
         ? {
             sourceBinding: {
-              ...state.sourceBinding,
-              ...(state.sourceBinding.metadata
-                ? { metadata: { ...state.sourceBinding.metadata } }
-                : {}),
+              ...cloneResourceSourceBindingState(state.sourceBinding),
             },
           }
         : {}),
@@ -267,10 +264,7 @@ export class Resource extends AggregateRoot<ResourceState> {
       ...(this.state.sourceBinding
         ? {
             sourceBinding: {
-              ...this.state.sourceBinding,
-              ...(this.state.sourceBinding.metadata
-                ? { metadata: { ...this.state.sourceBinding.metadata } }
-                : {}),
+              ...cloneResourceSourceBindingState(this.state.sourceBinding),
             },
           }
         : {}),

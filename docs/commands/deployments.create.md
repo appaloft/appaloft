@@ -140,6 +140,7 @@ All errors use the shared shape and category rules in [Error Model](../errors/mo
 | Error code | Phase | Retriable | Deployment-specific meaning |
 | --- | --- | --- | --- |
 | `validation_error` | `command-validation`, `config-bootstrap`, `context-resolution`, `source-detection`, `runtime-plan-resolution` | No | Input, bootstrap, context, source, or plan cannot produce an accepted deployment request. |
+| `validation_error` | `resource-source-resolution` | No | Resource source binding or source variant metadata cannot produce a cloneable/materializable source descriptor. |
 | `validation_error` | `resource-network-resolution` | No | Resource network profile cannot produce a resolved deployment network snapshot. |
 | `not_found` | `context-resolution` | No | Referenced project, environment, server, destination, or resource is missing or inaccessible. |
 | `deployment_not_redeployable` | `redeploy-guard` | No | Latest deployment for the same resource is non-terminal. |
@@ -211,6 +212,10 @@ Migration gaps:
   source/runtime/network profile before deployment admission.
 - source descriptor and runtime plan strategy compatibility is now a resource profile planning rule;
   implementation coverage should be verified across Web, CLI, and API before removing this note.
+- resource source variant normalization is typed for the initial Git and Docker image fields;
+  deployment admission rejects legacy raw GitHub tree URLs before runtime adapters can clone them.
+  Provider-backed disambiguation for slash-containing Git refs and typed runtime-profile file paths
+  remain future work.
 - resource listener port is stored as `networkProfile.internalPort`; deployment admission does not read `runtimeProfile.port`.
 - generated default access routing is governed by ADR-017, but the current runtime adapter path still contains adapter-facing requested deployment route fields that must be replaced by provider-neutral route resolution.
 
