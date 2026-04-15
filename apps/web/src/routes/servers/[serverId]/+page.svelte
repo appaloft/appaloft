@@ -5,7 +5,6 @@
   import {
     Activity,
     ArrowLeft,
-    ArrowRight,
     CheckCircle2,
     CircleDashed,
     Network,
@@ -17,14 +16,13 @@
 
   import { readErrorMessage } from "$lib/api/client";
   import ConsoleShell from "$lib/components/console/ConsoleShell.svelte";
+  import DeploymentTable from "$lib/components/console/DeploymentTable.svelte";
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
   import { Skeleton } from "$lib/components/ui/skeleton";
   import { createConsoleQueries } from "$lib/console/queries";
   import { orpcClient } from "$lib/orpc";
   import {
-    deploymentBadgeVariant,
-    findProject,
     findServer,
     formatTime,
   } from "$lib/console/utils";
@@ -136,7 +134,7 @@
       </div>
     </div>
   {:else if !server}
-    <section class="rounded-lg border bg-background p-6 md:p-8">
+    <section class="space-y-5 py-2">
       <Badge class="w-fit" variant="outline">{$t(i18nKeys.errors.backend.notFound)}</Badge>
       <div class="mt-4 max-w-2xl space-y-3">
         <h1 class="text-2xl font-semibold md:text-3xl">
@@ -154,8 +152,8 @@
       </div>
     </section>
   {:else}
-    <div class="space-y-5">
-      <section class="rounded-lg border bg-background p-5">
+    <div class="space-y-8">
+      <section class="space-y-6">
         <div class="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
           <div class="max-w-3xl space-y-3">
             <div class="flex flex-wrap items-center gap-2">
@@ -185,23 +183,23 @@
           </div>
         </div>
 
-        <div class="mt-5 grid gap-3 sm:grid-cols-3">
-          <div class="rounded-md border px-4 py-3">
-            <p class="flex items-center gap-2 text-sm text-muted-foreground">
+        <div class="grid border-y sm:grid-cols-3 sm:divide-x">
+          <div class="px-0 py-4 sm:px-4">
+            <p class="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
               <Network class="size-4" />
               {$t(i18nKeys.common.domain.provider)}
             </p>
             <p class="mt-2 truncate font-semibold">{server.providerKey}</p>
           </div>
-          <div class="rounded-md border px-4 py-3">
-            <p class="flex items-center gap-2 text-sm text-muted-foreground">
+          <div class="border-t px-0 py-4 sm:border-t-0 sm:px-4">
+            <p class="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
               <Server class="size-4" />
               {$t(i18nKeys.common.domain.host)}
             </p>
             <p class="mt-2 truncate font-semibold">{server.host}</p>
           </div>
-          <div class="rounded-md border px-4 py-3">
-            <p class="flex items-center gap-2 text-sm text-muted-foreground">
+          <div class="border-t px-0 py-4 sm:border-t-0 sm:px-4">
+            <p class="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
               <CircleDashed class="size-4" />
               {$t(i18nKeys.common.domain.port)}
             </p>
@@ -211,7 +209,7 @@
       </section>
 
       <section class="grid gap-5 xl:grid-cols-[0.9fr_1.1fr]">
-        <section class="rounded-lg border bg-background p-5">
+        <section class="space-y-4">
           <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 class="text-lg font-semibold">{$t(i18nKeys.console.servers.connectivityTitle)}</h2>
@@ -226,9 +224,9 @@
             {/if}
           </div>
 
-          <div class="mt-4 space-y-3">
+          <div class="space-y-3">
             {#if connectivityMutation.isPending}
-              <div class="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
+              <div class="bg-muted/25 px-4 py-4 text-sm text-muted-foreground">
                 {$t(i18nKeys.common.actions.testConnectivity)}...
               </div>
             {:else if connectivityError}
@@ -239,7 +237,7 @@
                 </div>
               </div>
             {:else if connectivityResult}
-              <div class="rounded-md border px-4 py-3">
+              <div class="bg-muted/25 px-4 py-3">
                 <div class="flex flex-wrap items-center justify-between gap-2">
                   <p class="text-sm font-medium">
                     {$t(i18nKeys.console.servers.connectivityLastResult)}
@@ -250,7 +248,7 @@
                 </div>
               </div>
               {#each connectivityResult.checks as check (check.name)}
-                <div class="rounded-md border px-4 py-3">
+                <div class="bg-muted/25 px-4 py-3">
                   <div class="flex flex-wrap items-center justify-between gap-2">
                     <p class="flex items-center gap-2 text-sm font-medium">
                       {#if check.status === "passed"}
@@ -269,14 +267,14 @@
                 </div>
               {/each}
             {:else}
-              <div class="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
+              <div class="bg-muted/25 px-4 py-4 text-sm text-muted-foreground">
                 {$t(i18nKeys.console.servers.connectivityNoResult)}
               </div>
             {/if}
           </div>
         </section>
 
-        <section class="rounded-lg border bg-background p-5">
+        <section class="space-y-4">
           <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 class="text-lg font-semibold">
@@ -289,32 +287,16 @@
             <Badge variant="outline">{serverDeployments.length}</Badge>
           </div>
 
-          <div class="mt-4 space-y-3">
+          <div>
             {#if serverDeployments.length > 0}
-              {#each serverDeployments.slice(0, 8) as deployment (deployment.id)}
-                {@const project = findProject(projects, deployment.projectId)}
-                <a
-                  href={`/deployments/${deployment.id}`}
-                  class="group block rounded-md border px-4 py-3 transition-colors hover:bg-muted/45"
-                >
-                  <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                    <div class="min-w-0 space-y-1">
-                      <p class="truncate font-medium">{deployment.runtimePlan.source.displayName}</p>
-                      <p class="truncate text-sm text-muted-foreground">
-                        {project?.name ?? deployment.projectId} · {formatTime(deployment.createdAt)}
-                      </p>
-                    </div>
-                    <div class="flex items-center gap-2">
-                      <Badge variant={deploymentBadgeVariant(deployment.status)}>
-                        {deployment.status}
-                      </Badge>
-                      <ArrowRight class="size-4 text-muted-foreground transition-colors group-hover:text-foreground" />
-                    </div>
-                  </div>
-                </a>
-              {/each}
+              <DeploymentTable
+                deployments={serverDeployments.slice(0, 8)}
+                {projects}
+                showEnvironment={false}
+                showServer={false}
+              />
             {:else}
-              <div class="rounded-md border border-dashed p-5">
+              <div class="border-y bg-muted/25 px-4 py-6">
                 <div class="flex items-start gap-3">
                   <Server class="mt-0.5 size-4 text-muted-foreground" />
                   <div class="space-y-2">

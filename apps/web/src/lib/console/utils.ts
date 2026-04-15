@@ -49,24 +49,58 @@ export function initials(value: string | null | undefined): string {
     .join("");
 }
 
-export function deploymentBadgeVariant(
-  status: DeploymentSummary["status"],
-): "default" | "secondary" | "outline" | "destructive" {
-  switch (status) {
-    case "canceled":
-    case "failed":
-    case "rolled-back":
-      return "destructive";
-    case "running":
-    case "created":
-    case "planning":
-    case "planned":
-      return "secondary";
-    case "succeeded":
-      return "default";
-    default:
-      return "outline";
+export function deploymentStatusLabel(status: DeploymentSummary["status"] | undefined): string {
+  return status ?? "no-deployment";
+}
+
+export function latestResourceDeployment(
+  resource: ResourceSummary,
+  deployments: DeploymentSummary[],
+): DeploymentSummary | null {
+  if (resource.lastDeploymentId) {
+    const matchingDeployment = deployments.find(
+      (deployment) => deployment.id === resource.lastDeploymentId,
+    );
+
+    if (matchingDeployment) {
+      return matchingDeployment;
+    }
   }
+
+  return deployments.find((deployment) => deployment.resourceId === resource.id) ?? null;
+}
+
+export function latestResourceDeploymentStatus(
+  resource: ResourceSummary,
+  deployments: DeploymentSummary[],
+): DeploymentSummary["status"] | undefined {
+  return resource.lastDeploymentStatus ?? latestResourceDeployment(resource, deployments)?.status;
+}
+
+export function projectDetailHref(projectId: string): string {
+  return `/projects/${encodeURIComponent(projectId)}`;
+}
+
+export function projectCreateResourceHref(projectId: string): string {
+  return `/projects/${encodeURIComponent(projectId)}/resources/new`;
+}
+
+export function resourceDetailHref(
+  resource: Pick<ResourceSummary, "id" | "projectId" | "environmentId">,
+): string {
+  return `/projects/${encodeURIComponent(resource.projectId)}/environments/${encodeURIComponent(resource.environmentId)}/resources/${encodeURIComponent(resource.id)}`;
+}
+
+export function deploymentDetailHref(
+  deployment: Pick<DeploymentSummary, "id" | "projectId" | "environmentId" | "resourceId">,
+): string {
+  return `/projects/${encodeURIComponent(deployment.projectId)}/environments/${encodeURIComponent(deployment.environmentId)}/resources/${encodeURIComponent(deployment.resourceId)}/deployments/${encodeURIComponent(deployment.id)}`;
+}
+
+export function resourceNewDeploymentHref(
+  resource: Pick<ResourceSummary, "id" | "projectId" | "environmentId">,
+): string {
+  return `/projects/${encodeURIComponent(resource.projectId)}/environments/${encodeURIComponent(resource.environmentId)}/resources/${encodeURIComponent(resource.id)}/deployments/new`;
 }
 
 export function countProjectDeployments(
@@ -81,6 +115,13 @@ export function countProjectEnvironments(
   environments: EnvironmentSummary[],
 ): number {
   return environments.filter((environment) => environment.projectId === project.id).length;
+}
+
+export function countProjectResources(
+  project: ProjectSummary,
+  resources: ResourceSummary[],
+): number {
+  return resources.filter((resource) => resource.projectId === project.id).length;
 }
 
 export function findProject(projects: ProjectSummary[], projectId: string): ProjectSummary | null {

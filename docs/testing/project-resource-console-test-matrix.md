@@ -65,7 +65,7 @@ Then:
 | Case | Input/read state | Expected primary UI result | Expected command/query behavior | Expected absence |
 | --- | --- | --- | --- | --- |
 | Project with resources | Project has multiple resources | Resource list is prominent; each resource links to detail | `resources.list` filtered by project/environment context or equivalent query | No direct project-owned deployment mutation |
-| Project with no resources | Project has environments but no resources | Empty resource state plus create-resource action | Create action dispatches `resources.create` or navigates to create-resource flow | No hidden `deployments.create(resource)` bootstrap as primary path |
+| Project with no resources | Project has environments but no resources | Empty resource state plus create-resource/deploy action | Create action navigates to project-scoped create-resource first-deploy flow | No hidden `deployments.create(resource)` bootstrap as primary path |
 | Project all deployments | Project has deployments across resources | Project deployment view is labeled as rollup/all deployments | Deployment query filters by project and displays resource context | No new deployment command without resource selection |
 | Project new deployment shortcut | User clicks project-level shortcut | Opens Quick Deploy or resource selection | Workflow eventually selects/creates resource before `deployments.create` | No direct project-owned deployment command |
 
@@ -85,8 +85,9 @@ Then:
 | Case | Draft input | Expected command sequence | Expected state |
 | --- | --- | --- | --- |
 | Minimum resource | Project, environment, name | `resources.create` | Resource profile persisted |
-| Source/runtime/network draft | Project, environment, name, GitHub/Docker/Dockerfile/Compose/runtime draft, internal listener port | `resources.create`; optional continue to Quick Deploy | Resource profile persisted with source/runtime/network profile when supplied; deployment uses `resourceId` |
+| Source/runtime/network draft | Project, environment, name, GitHub/Docker/Dockerfile/Compose/runtime draft, internal listener port | `resources.create` as part of first-deploy workflow | Resource profile persisted with source/runtime/network profile when supplied; deployment uses `resourceId` |
 | Generic port field | User enters application port on create-resource page | `resources.create(networkProfile.internalPort)` | Port is stored as resource network profile input, not deployment input |
+| Project-scoped deploy action | Project, environment, source/runtime/network draft, server, optional destination | `resources.create -> deployments.create(resourceId)` | Resource persists first; deployment is accepted or rejected by deployment command |
 | Continue into first deploy | Resource draft plus deploy intent | `resources.create -> deployments.create(resourceId)` | Resource exists; deployment accepted or rejected by deployment command |
 
 ## Sidebar Matrix

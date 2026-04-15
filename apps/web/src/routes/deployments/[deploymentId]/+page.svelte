@@ -7,8 +7,6 @@
     ArrowLeft,
     Boxes,
     Check,
-    ChevronDown,
-    ClipboardList,
     Clock3,
     Copy,
     ExternalLink,
@@ -21,23 +19,27 @@
   import type { DeploymentProgressEvent, DeploymentSummary } from "@yundu/contracts";
 
   import ConsoleShell from "$lib/components/console/ConsoleShell.svelte";
+  import DeploymentStatusBadge from "$lib/components/console/DeploymentStatusBadge.svelte";
   import DeploymentProgressDialog from "$lib/components/console/DeploymentProgressDialog.svelte";
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
   import { Skeleton } from "$lib/components/ui/skeleton";
+  import * as Tabs from "$lib/components/ui/tabs";
   import {
     progressEventsFromDeployment,
     type DeploymentProgressDialogStatus,
   } from "$lib/console/deployment-progress";
   import { createConsoleQueries } from "$lib/console/queries";
   import {
-    deploymentBadgeVariant,
+    deploymentDetailHref,
     findDeployment,
     findEnvironment,
     findProject,
     findResource,
     findServer,
     formatTime,
+    projectDetailHref,
+    resourceDetailHref,
   } from "$lib/console/utils";
   import { i18nKeys, t } from "$lib/i18n";
 
@@ -47,6 +49,9 @@
     url: string;
     kind: AccessUrlKind;
   };
+  type DeploymentDetailTab = "overview" | "logs" | "timeline" | "snapshot";
+
+  const deploymentDetailTabs = ["overview", "logs", "timeline", "snapshot"] as const;
 
   const { projectsQuery, serversQuery, environmentsQuery, resourcesQuery, deploymentsQuery } =
     createConsoleQueries(browser);
@@ -82,14 +87,9 @@
   );
   const resource = $derived(deployment ? findResource(resources, deployment.resourceId) : null);
   const server = $derived(deployment ? findServer(servers, deployment.serverId) : null);
-  const sourceMetadata = $derived(Object.entries(deployment?.runtimePlan.source.metadata ?? {}));
-  const targetMetadata = $derived(Object.entries(deployment?.runtimePlan.target.metadata ?? {}));
-  const executionMetadata = $derived(deployment?.runtimePlan.execution.metadata ?? {});
-  const runtimeMetadata = $derived(
-    Object.entries(executionMetadata).filter(([key]) => !["url", "publicUrl", "internalUrl"].includes(key)),
-  );
   const accessUrls = $derived(deployment ? deploymentAccessUrls(deployment, server?.host) : []);
   const primaryAccessUrl = $derived(accessUrls[0] ?? null);
+  const activeTab = $derived(parseDeploymentDetailTab(page.url.searchParams.get("tab")));
   const logsCopyLabel = $derived(
     logsCopyState === "copied"
       ? $t(i18nKeys.console.deployments.copyLogsCopied)
@@ -123,6 +123,16 @@
           ? "succeeded"
           : "running";
     deploymentProgressDialogOpen = true;
+  }
+
+  function deploymentProgressHref(): string {
+    const progressDeployment = deployments.find(
+      (candidate) => candidate.id === deploymentProgressDeploymentId,
+    );
+
+    return progressDeployment
+      ? deploymentDetailHref(progressDeployment)
+      : `/deployments/${encodeURIComponent(deploymentProgressDeploymentId)}`;
   }
 
   function logLevelClass(level: DeploymentSummary["logs"][number]["level"]): string {
@@ -308,6 +318,43 @@
       clearTimeout(accessUrlCopyResetTimeout);
     }
   });
+
+  function parseDeploymentDetailTab(value: string | null): DeploymentDetailTab {
+    return deploymentDetailTabs.includes(value as DeploymentDetailTab)
+      ? (value as DeploymentDetailTab)
+      : "overview";
+  }
+
+  function deploymentTabHref(tab: DeploymentDetailTab): string {
+    const params = new URLSearchParams(page.url.searchParams);
+
+    if (tab === "overview") {
+      params.delete("tab");
+    } else {
+      params.set("tab", tab);
+    }
+
+    const search = params.toString();
+    return `${page.url.pathname}${search ? `?${search}` : ""}`;
+  }
+
+  function selectDeploymentTab(tab: DeploymentDetailTab, event: MouseEvent): void {
+    event.preventDefault();
+    void goto(deploymentTabHref(tab), { noScroll: true, keepFocus: true });
+  }
+
+  function deploymentTabLabel(tab: DeploymentDetailTab): string {
+    switch (tab) {
+      case "overview":
+        return $t(i18nKeys.console.deployments.overviewTab);
+      case "logs":
+        return $t(i18nKeys.console.deployments.logsTab);
+      case "timeline":
+        return $t(i18nKeys.console.deployments.timelineTab);
+      case "snapshot":
+        return $t(i18nKeys.console.deployments.snapshotTab);
+    }
+  }
 </script>
 
 <svelte:head>
@@ -317,6 +364,20 @@
 <ConsoleShell
   title={deployment?.runtimePlan.source.displayName ?? $t(i18nKeys.console.deployments.pageTitle)}
   description={$t(i18nKeys.console.deployments.detailDescription)}
+  breadcrumbs={[
+    { label: $t(i18nKeys.console.nav.home), href: "/" },
+    { label: $t(i18nKeys.console.projects.pageTitle), href: "/projects" },
+    {
+      label: project?.name ?? $t(i18nKeys.common.domain.project),
+      href: project ? projectDetailHref(project.id) : undefined,
+    },
+    { label: environment?.name ?? $t(i18nKeys.common.domain.environment) },
+    {
+      label: resource?.name ?? $t(i18nKeys.common.domain.resource),
+      href: resource ? resourceDetailHref(resource) : undefined,
+    },
+    { label: deployment?.runtimePlan.source.displayName ?? $t(i18nKeys.common.domain.deployment) },
+  ]}
 >
   {#if pageLoading}
     <div class="space-y-5">
@@ -327,7 +388,7 @@
       </div>
     </div>
   {:else if !deployment}
-    <section class="rounded-lg border bg-background p-6 md:p-8">
+    <section class="space-y-5 py-2">
       <Badge class="w-fit" variant="outline">{$t(i18nKeys.errors.backend.notFound)}</Badge>
       <div class="mt-4 max-w-2xl space-y-3">
         <h1 class="text-2xl font-semibold md:text-3xl">
@@ -345,12 +406,12 @@
       </div>
     </section>
   {:else}
-    <div class="space-y-5">
-      <section class="rounded-lg border bg-background p-5">
+    <div class="space-y-8">
+      <section class="space-y-6">
         <div class="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
           <div class="max-w-3xl space-y-3">
             <div class="flex flex-wrap items-center gap-2">
-              <Badge variant={deploymentBadgeVariant(deployment.status)}>{deployment.status}</Badge>
+              <DeploymentStatusBadge status={deployment.status} />
               <Badge variant="outline">{deployment.runtimePlan.source.kind}</Badge>
             </div>
             <div class="space-y-2">
@@ -369,9 +430,15 @@
               {$t(i18nKeys.common.actions.backToDeployments)}
             </Button>
             {#if project}
-              <Button href={`/projects/${project.id}`} variant="outline">
+              <Button href={projectDetailHref(project.id)} variant="outline">
                 <FolderOpen class="size-4" />
                 {$t(i18nKeys.common.actions.openProject)}
+              </Button>
+            {/if}
+            {#if resource}
+              <Button href={resourceDetailHref(resource)} variant="outline">
+                <Boxes class="size-4" />
+                {$t(i18nKeys.common.actions.openResource)}
               </Button>
             {/if}
             <Button variant="outline" onclick={handleViewProgress}>
@@ -381,363 +448,231 @@
           </div>
         </div>
 
-        <div class="mt-5 rounded-md border bg-muted/30 p-4">
-          <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div class="min-w-0 space-y-2">
-              <p class="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                <Link2 class="size-4" />
-                {$t(i18nKeys.console.deployments.accessUrlTitle)}
-              </p>
-              {#if primaryAccessUrl}
-                <a
-                  class="block break-all text-lg font-semibold text-primary underline-offset-4 hover:underline md:text-xl"
-                  href={primaryAccessUrl.url}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  {primaryAccessUrl.url}
-                </a>
-                <Badge variant="outline" class="w-fit">{accessUrlKindLabel(primaryAccessUrl.kind)}</Badge>
-              {:else}
-                <p class="text-sm leading-6 text-muted-foreground">
-                  {$t(i18nKeys.console.deployments.accessUrlEmpty)}
-                </p>
-              {/if}
-            </div>
-
-            <div class="flex shrink-0 flex-wrap gap-2">
-              {#if primaryAccessUrl}
-                <Button href={primaryAccessUrl.url} target="_blank" rel="noreferrer">
-                  <ExternalLink class="size-4" />
-                  {$t(i18nKeys.console.deployments.openAccessUrl)}
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  aria-label={accessUrlCopyLabel}
-                  title={accessUrlCopyLabel}
-                  onclick={handleCopyAccessUrl}
-                >
-                  {#if accessUrlCopyState === "copied"}
-                    <Check class="size-4" />
-                  {:else}
-                    <Copy class="size-4" />
-                  {/if}
-                  {accessUrlCopyLabel}
-                </Button>
-              {/if}
-            </div>
-          </div>
-        </div>
-
-        <div class="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <div class="rounded-md border px-4 py-3">
-            <p class="flex items-center gap-2 text-sm text-muted-foreground">
-              <FolderOpen class="size-4" />
-              {$t(i18nKeys.common.domain.project)}
-            </p>
-            <p class="mt-2 truncate font-medium">{project?.name ?? deployment.projectId}</p>
-          </div>
-          <div class="rounded-md border px-4 py-3">
-            <p class="flex items-center gap-2 text-sm text-muted-foreground">
-              <ShieldCheck class="size-4" />
-              {$t(i18nKeys.common.domain.environment)}
-            </p>
-            <p class="mt-2 truncate font-medium">{environment?.name ?? deployment.environmentId}</p>
-          </div>
-          <div class="rounded-md border px-4 py-3">
-            <p class="flex items-center gap-2 text-sm text-muted-foreground">
-              <Boxes class="size-4" />
-              {$t(i18nKeys.common.domain.resource)}
-            </p>
-            <p class="mt-2 truncate font-medium">{resource?.name ?? deployment.resourceId}</p>
-          </div>
-          <div class="rounded-md border px-4 py-3">
-            <p class="flex items-center gap-2 text-sm text-muted-foreground">
-              <Server class="size-4" />
-              {$t(i18nKeys.common.domain.server)}
-            </p>
-            <p class="mt-2 truncate font-medium">{server?.name ?? deployment.serverId}</p>
-          </div>
-        </div>
       </section>
 
-      <section class="rounded-lg border bg-background p-5">
-        <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <h2 class="flex items-center gap-2 text-lg font-semibold">
-              <FileText class="size-5 text-muted-foreground" />
-              {$t(i18nKeys.console.deployments.logsTitle)}
-            </h2>
-            <p class="mt-1 text-sm text-muted-foreground">
-              {$t(i18nKeys.console.deployments.logsDescription, {
-                count: deployment.logCount,
-              })}
-            </p>
-          </div>
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            disabled={deployment.logs.length === 0}
-            aria-label={logsCopyLabel}
-            title={logsCopyLabel}
-            onclick={handleCopyDeploymentLogs}
-          >
-            {#if logsCopyState === "copied"}
-              <Check class="size-4" />
-            {:else}
-              <Copy class="size-4" />
-            {/if}
-            {logsCopyLabel}
-          </Button>
-        </div>
+      <Tabs.Root value={activeTab} class="space-y-5">
+        <Tabs.List
+          class="h-auto w-full justify-start gap-6 overflow-x-auto rounded-none border-b bg-transparent p-0"
+        >
+          {#each deploymentDetailTabs as tab (tab)}
+            <Tabs.Trigger
+              value={tab}
+              class="h-11 flex-none rounded-none border-x-0 border-t-0 border-b-2 border-transparent bg-transparent px-0 py-0 shadow-none data-[state=active]:border-foreground data-[state=active]:bg-transparent data-[state=active]:shadow-none"
+              onclick={(event) => selectDeploymentTab(tab, event)}
+            >
+              {deploymentTabLabel(tab)}
+            </Tabs.Trigger>
+          {/each}
+        </Tabs.List>
 
-        <div class="mt-4">
-          {#if deployment.logs.length > 0}
-            <div class="max-h-[42rem] overflow-auto rounded-md border border-zinc-800 bg-zinc-950 px-4 py-3 font-mono text-xs text-zinc-200 shadow-inner">
-              <div class="space-y-1">
-                {#each deployment.logs as log, index (`${log.timestamp}-${index}`)}
-                  <div class="grid grid-cols-[4.75rem_5rem_3.5rem_5rem_minmax(0,1fr)] gap-2 leading-5">
-                    <span class="text-zinc-600">{logTimeLabel(log.timestamp)}</span>
-                    <span class={log.source === "application" ? "text-sky-300" : "text-emerald-300"}>
-                      {logSourceLabel(log)}
-                    </span>
-                    <span class={logLevelClass(log.level)}>{log.level}</span>
-                    <span class="text-zinc-500">{log.phase}</span>
-                    <span
-                      class={`min-w-0 break-words ${logLevelClass(log.level)} ${log.source === "application" ? "pl-3" : ""}`}
-                    >
-                      {log.source === "application" ? "└ " : ""}
-                      {log.message}
-                    </span>
-                  </div>
-                {/each}
+        <Tabs.Content value="overview" class="mt-0 space-y-5">
+          <section class="rounded-md border bg-background p-4">
+            <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div class="min-w-0 space-y-2">
+                <p class="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                  <Link2 class="size-4" />
+                  {$t(i18nKeys.console.deployments.accessUrlTitle)}
+                </p>
+                {#if primaryAccessUrl}
+                  <a
+                    class="block break-all text-lg font-semibold text-primary underline-offset-4 hover:underline md:text-xl"
+                    href={primaryAccessUrl.url}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    {primaryAccessUrl.url}
+                  </a>
+                  <Badge variant="outline" class="w-fit">
+                    {accessUrlKindLabel(primaryAccessUrl.kind)}
+                  </Badge>
+                {:else}
+                  <p class="text-sm leading-6 text-muted-foreground">
+                    {$t(i18nKeys.console.deployments.accessUrlEmpty)}
+                  </p>
+                {/if}
+              </div>
+
+              <div class="flex shrink-0 flex-wrap gap-2">
+                {#if primaryAccessUrl}
+                  <Button href={primaryAccessUrl.url} target="_blank" rel="noreferrer">
+                    <ExternalLink class="size-4" />
+                    {$t(i18nKeys.console.deployments.openAccessUrl)}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    aria-label={accessUrlCopyLabel}
+                    title={accessUrlCopyLabel}
+                    onclick={handleCopyAccessUrl}
+                  >
+                    {#if accessUrlCopyState === "copied"}
+                      <Check class="size-4" />
+                    {:else}
+                      <Copy class="size-4" />
+                    {/if}
+                    {accessUrlCopyLabel}
+                  </Button>
+                {/if}
               </div>
             </div>
-          {:else}
-            <div class="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
-              {$t(i18nKeys.console.deployments.noLogs)}
-            </div>
-          {/if}
-        </div>
-      </section>
+          </section>
 
-      <section class="grid gap-5 xl:grid-cols-[1fr_0.9fr]">
-        <div class="space-y-5">
-          <details class="group rounded-lg border bg-background p-5">
-            <summary class="flex cursor-pointer list-none items-start justify-between gap-4">
+          <section class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            <div class="rounded-md border bg-background p-4">
+              <p class="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                <FolderOpen class="size-4" />
+                {$t(i18nKeys.common.domain.project)}
+              </p>
+              <p class="mt-2 truncate font-medium">{project?.name ?? deployment.projectId}</p>
+            </div>
+            <div class="rounded-md border bg-background p-4">
+              <p class="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                <ShieldCheck class="size-4" />
+                {$t(i18nKeys.common.domain.environment)}
+              </p>
+              <p class="mt-2 truncate font-medium">
+                {environment?.name ?? deployment.environmentId}
+              </p>
+            </div>
+            <div class="rounded-md border bg-background p-4">
+              <p class="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                <Boxes class="size-4" />
+                {$t(i18nKeys.common.domain.resource)}
+              </p>
+              <p class="mt-2 truncate font-medium">{resource?.name ?? deployment.resourceId}</p>
+            </div>
+            <div class="rounded-md border bg-background p-4">
+              <p class="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                <Server class="size-4" />
+                {$t(i18nKeys.common.domain.server)}
+              </p>
+              <p class="mt-2 truncate font-medium">{server?.name ?? deployment.serverId}</p>
+            </div>
+          </section>
+
+          <section class="rounded-md border bg-background p-4">
+            <h2 class="text-lg font-semibold">{$t(i18nKeys.common.domain.source)}</h2>
+            <div class="mt-4 grid gap-3 md:grid-cols-[10rem_minmax(0,1fr)]">
+              <div class="rounded-md bg-muted/30 px-3 py-2">
+                <p class="text-xs text-muted-foreground">{$t(i18nKeys.common.domain.kind)}</p>
+                <p class="mt-1 truncate text-sm font-medium">{deployment.runtimePlan.source.kind}</p>
+              </div>
+              <div class="rounded-md bg-muted/30 px-3 py-2">
+                <p class="text-xs text-muted-foreground">{$t(i18nKeys.common.domain.source)}</p>
+                <p class="mt-1 break-all text-sm font-medium">
+                  {deployment.runtimePlan.source.locator}
+                </p>
+              </div>
+            </div>
+          </section>
+        </Tabs.Content>
+
+        <Tabs.Content value="logs" class="mt-0 space-y-4">
+          <section class="space-y-4">
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div>
-                <h2 class="inline-flex items-center gap-2 text-lg font-semibold">
-                  <ClipboardList class="size-5 text-muted-foreground" />
-                  {$t(i18nKeys.console.deployments.runtimePlanTitle)}
+                <h2 class="flex items-center gap-2 text-lg font-semibold">
+                  <FileText class="size-5 text-muted-foreground" />
+                  {$t(i18nKeys.console.deployments.logsTitle)}
                 </h2>
                 <p class="mt-1 text-sm text-muted-foreground">
-                  {$t(i18nKeys.console.deployments.runtimePlanDescription)}
+                  {$t(i18nKeys.console.deployments.logsDescription, {
+                    count: deployment.logCount,
+                  })}
                 </p>
               </div>
-              <ChevronDown class="mt-1 size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
-            </summary>
-
-            <div class="mt-4 grid gap-3 sm:grid-cols-2">
-              <div class="rounded-md border px-4 py-3">
-                <p class="text-xs text-muted-foreground">
-                  {$t(i18nKeys.console.deployments.buildStrategy)}
-                </p>
-                <p class="mt-1 font-medium">{deployment.runtimePlan.buildStrategy}</p>
-              </div>
-              <div class="rounded-md border px-4 py-3">
-                <p class="text-xs text-muted-foreground">
-                  {$t(i18nKeys.console.deployments.packagingMode)}
-                </p>
-                <p class="mt-1 font-medium">{deployment.runtimePlan.packagingMode}</p>
-              </div>
-              <div class="rounded-md border px-4 py-3">
-                <p class="text-xs text-muted-foreground">
-                  {$t(i18nKeys.console.deployments.executionKind)}
-                </p>
-                <p class="mt-1 font-medium">{deployment.runtimePlan.execution.kind}</p>
-              </div>
-              <div class="rounded-md border px-4 py-3">
-                <p class="text-xs text-muted-foreground">
-                  {$t(i18nKeys.console.deployments.generatedAt)}
-                </p>
-                <p class="mt-1 font-medium">{formatTime(deployment.runtimePlan.generatedAt)}</p>
-              </div>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={deployment.logs.length === 0}
+                aria-label={logsCopyLabel}
+                title={logsCopyLabel}
+                onclick={handleCopyDeploymentLogs}
+              >
+                {#if logsCopyState === "copied"}
+                  <Check class="size-4" />
+                {:else}
+                  <Copy class="size-4" />
+                {/if}
+                {logsCopyLabel}
+              </Button>
             </div>
 
-            <div class="mt-4 rounded-md border px-4 py-3">
-              <p class="text-xs text-muted-foreground">
-                {$t(i18nKeys.console.deployments.detectSummary)}
-              </p>
-              <p class="mt-2 text-sm leading-6">{deployment.runtimePlan.detectSummary}</p>
-            </div>
-
-            <div class="mt-4 space-y-3">
-              <h3 class="text-sm font-medium">{$t(i18nKeys.console.deployments.planSteps)}</h3>
-              <div class="space-y-2">
-                {#each deployment.runtimePlan.steps as step, index (`${deployment.id}-${index}`)}
-                  <div class="flex gap-3 rounded-md border px-4 py-3">
-                    <span
-                      class="flex size-7 shrink-0 items-center justify-center rounded-md bg-muted text-xs font-medium"
-                    >
-                      {index + 1}
-                    </span>
-                    <p class="text-sm leading-6">{step}</p>
-                  </div>
-                {/each}
+            {#if deployment.logs.length > 0}
+              <div class="max-h-[42rem] overflow-auto rounded-md border border-zinc-800 bg-zinc-950 px-4 py-3 font-mono text-xs text-zinc-200 shadow-inner">
+                <div class="space-y-1">
+                  {#each deployment.logs as log, index (`${log.timestamp}-${index}`)}
+                    <div class="grid grid-cols-[4.75rem_5rem_3.5rem_5rem_minmax(0,1fr)] gap-2 leading-5">
+                      <span class="text-zinc-600">{logTimeLabel(log.timestamp)}</span>
+                      <span class={log.source === "application" ? "text-sky-300" : "text-emerald-300"}>
+                        {logSourceLabel(log)}
+                      </span>
+                      <span class={logLevelClass(log.level)}>{log.level}</span>
+                      <span class="text-zinc-500">{log.phase}</span>
+                      <span
+                        class={`min-w-0 break-words ${logLevelClass(log.level)} ${log.source === "application" ? "pl-3" : ""}`}
+                      >
+                        {log.source === "application" ? "└ " : ""}
+                        {log.message}
+                      </span>
+                    </div>
+                  {/each}
+                </div>
               </div>
-            </div>
-          </details>
-
-          <details class="group rounded-lg border bg-background p-5">
-            <summary class="flex cursor-pointer list-none items-start justify-between gap-4">
-              <div>
-                <h2 class="inline-flex text-lg font-semibold">{$t(i18nKeys.console.deployments.executionTitle)}</h2>
-                <p class="mt-1 text-sm text-muted-foreground">
-                  {$t(i18nKeys.console.deployments.executionDescription)}
-                </p>
+            {:else}
+              <div class="rounded-md border bg-muted/25 px-4 py-4 text-sm text-muted-foreground">
+                {$t(i18nKeys.console.deployments.noLogs)}
               </div>
-              <ChevronDown class="mt-1 size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
-            </summary>
+            {/if}
+          </section>
+        </Tabs.Content>
 
-            <div class="mt-4 grid gap-3">
-              {#if deployment.runtimePlan.execution.workingDirectory}
-                <div class="rounded-md border px-4 py-3">
-                  <p class="text-xs text-muted-foreground">
-                    {$t(i18nKeys.console.deployments.workingDirectory)}
-                  </p>
-                  <p class="mt-1 break-all text-sm font-medium">
-                    {deployment.runtimePlan.execution.workingDirectory}
-                  </p>
-                </div>
-              {/if}
-              {#if deployment.runtimePlan.execution.installCommand}
-                <div class="rounded-md border px-4 py-3">
-                  <p class="text-xs text-muted-foreground">
-                    {$t(i18nKeys.console.deployments.installCommand)}
-                  </p>
-                  <p class="mt-1 break-all font-mono text-sm">
-                    {deployment.runtimePlan.execution.installCommand}
-                  </p>
-                </div>
-              {/if}
-              {#if deployment.runtimePlan.execution.buildCommand}
-                <div class="rounded-md border px-4 py-3">
-                  <p class="text-xs text-muted-foreground">
-                    {$t(i18nKeys.console.deployments.buildCommand)}
-                  </p>
-                  <p class="mt-1 break-all font-mono text-sm">
-                    {deployment.runtimePlan.execution.buildCommand}
-                  </p>
-                </div>
-              {/if}
-              {#if deployment.runtimePlan.execution.startCommand}
-                <div class="rounded-md border px-4 py-3">
-                  <p class="text-xs text-muted-foreground">
-                    {$t(i18nKeys.console.deployments.startCommand)}
-                  </p>
-                  <p class="mt-1 break-all font-mono text-sm">
-                    {deployment.runtimePlan.execution.startCommand}
-                  </p>
-                </div>
-              {/if}
-              <div class="grid gap-3 sm:grid-cols-2">
-                {#if deployment.runtimePlan.execution.port}
-                  <div class="rounded-md border px-4 py-3">
-                    <p class="text-xs text-muted-foreground">{$t(i18nKeys.common.domain.port)}</p>
-                    <p class="mt-1 font-medium">{deployment.runtimePlan.execution.port}</p>
-                  </div>
-                {/if}
-                {#if deployment.runtimePlan.execution.healthCheckPath}
-                  <div class="rounded-md border px-4 py-3">
-                    <p class="text-xs text-muted-foreground">
-                      {$t(i18nKeys.console.deployments.healthCheckPath)}
-                    </p>
-                    <p class="mt-1 break-all font-medium">
-                      {deployment.runtimePlan.execution.healthCheckPath}
-                    </p>
-                  </div>
-                {/if}
-                {#if deployment.runtimePlan.execution.image}
-                  <div class="rounded-md border px-4 py-3">
-                    <p class="text-xs text-muted-foreground">
-                      {$t(i18nKeys.console.deployments.dockerImage)}
-                    </p>
-                    <p class="mt-1 break-all font-medium">{deployment.runtimePlan.execution.image}</p>
-                  </div>
-                {/if}
-                {#if deployment.runtimePlan.execution.dockerfilePath}
-                  <div class="rounded-md border px-4 py-3">
-                    <p class="text-xs text-muted-foreground">
-                      {$t(i18nKeys.console.deployments.dockerfilePath)}
-                    </p>
-                    <p class="mt-1 break-all font-medium">
-                      {deployment.runtimePlan.execution.dockerfilePath}
-                    </p>
-                  </div>
-                {/if}
-                {#if deployment.runtimePlan.execution.composeFile}
-                  <div class="rounded-md border px-4 py-3">
-                    <p class="text-xs text-muted-foreground">
-                      {$t(i18nKeys.console.deployments.composeFile)}
-                    </p>
-                    <p class="mt-1 break-all font-medium">
-                      {deployment.runtimePlan.execution.composeFile}
-                    </p>
-                  </div>
-                {/if}
-              </div>
-            </div>
-          </details>
-        </div>
-
-        <div class="space-y-5">
-          <section class="rounded-lg border bg-background p-5">
+        <Tabs.Content value="timeline" class="mt-0 space-y-4">
+          <section class="rounded-md border bg-background p-4">
             <h2 class="flex items-center gap-2 text-lg font-semibold">
               <Clock3 class="size-5 text-muted-foreground" />
               {$t(i18nKeys.console.deployments.timelineTitle)}
             </h2>
-            <div class="mt-4 grid gap-3">
-              <div class="rounded-md border px-4 py-3">
+            <div class="mt-4 grid gap-3 md:grid-cols-3">
+              <div class="rounded-md bg-muted/30 px-4 py-3">
                 <p class="text-xs text-muted-foreground">{$t(i18nKeys.common.domain.createdAt)}</p>
                 <p class="mt-1 font-medium">{formatTime(deployment.createdAt)}</p>
               </div>
-              {#if deployment.startedAt}
-                <div class="rounded-md border px-4 py-3">
-                  <p class="text-xs text-muted-foreground">{$t(i18nKeys.common.domain.startedAt)}</p>
-                  <p class="mt-1 font-medium">{formatTime(deployment.startedAt)}</p>
-                </div>
-              {/if}
-              {#if deployment.finishedAt}
-                <div class="rounded-md border px-4 py-3">
-                  <p class="text-xs text-muted-foreground">{$t(i18nKeys.common.domain.finishedAt)}</p>
-                  <p class="mt-1 font-medium">{formatTime(deployment.finishedAt)}</p>
-                </div>
-              {/if}
+              <div class="rounded-md bg-muted/30 px-4 py-3">
+                <p class="text-xs text-muted-foreground">{$t(i18nKeys.common.domain.startedAt)}</p>
+                <p class="mt-1 font-medium">
+                  {deployment.startedAt ? formatTime(deployment.startedAt) : "-"}
+                </p>
+              </div>
+              <div class="rounded-md bg-muted/30 px-4 py-3">
+                <p class="text-xs text-muted-foreground">{$t(i18nKeys.common.domain.finishedAt)}</p>
+                <p class="mt-1 font-medium">
+                  {deployment.finishedAt ? formatTime(deployment.finishedAt) : "-"}
+                </p>
+              </div>
             </div>
           </section>
+        </Tabs.Content>
 
-          <details class="group rounded-lg border bg-background p-5">
-            <summary class="flex cursor-pointer list-none items-start justify-between gap-4">
-              <div>
-                <h2 class="inline-flex text-lg font-semibold">{$t(i18nKeys.console.deployments.snapshotTitle)}</h2>
-                <p class="mt-1 text-sm text-muted-foreground">
-                  {$t(i18nKeys.console.deployments.snapshotDescription)}
-                </p>
-              </div>
-              <ChevronDown class="mt-1 size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
-            </summary>
-            <div class="mt-4 space-y-3">
-              <div class="rounded-md border px-4 py-3">
-                <p class="text-xs text-muted-foreground">{$t(i18nKeys.console.deployments.precedence)}</p>
-                <p class="mt-1 break-words text-sm font-medium">
-                  {deployment.environmentSnapshot.precedence.join(" / ")}
-                </p>
-              </div>
+        <Tabs.Content value="snapshot" class="mt-0 space-y-4">
+          <section class="rounded-md border bg-background p-4">
+            <h2 class="text-lg font-semibold">{$t(i18nKeys.console.deployments.snapshotTitle)}</h2>
+            <p class="mt-1 text-sm text-muted-foreground">
+              {$t(i18nKeys.console.deployments.snapshotDescription)}
+            </p>
+
+            <div class="mt-4 rounded-md bg-muted/30 px-4 py-3">
+              <p class="text-xs text-muted-foreground">{$t(i18nKeys.console.deployments.precedence)}</p>
+              <p class="mt-1 break-words text-sm font-medium">
+                {deployment.environmentSnapshot.precedence.join(" / ")}
+              </p>
+            </div>
+
+            <div class="mt-4 divide-y rounded-md border">
               {#if deployment.environmentSnapshot.variables.length > 0}
                 {#each deployment.environmentSnapshot.variables as variable (variable.key)}
-                  <div class="rounded-md border px-4 py-3">
+                  <div class="px-4 py-3">
                     <div class="flex flex-wrap items-center justify-between gap-2">
                       <p class="font-medium">{variable.key}</p>
                       <Badge variant={variable.isSecret ? "secondary" : "outline"}>
@@ -752,31 +687,14 @@
                   </div>
                 {/each}
               {:else}
-                <div class="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
+                <div class="px-4 py-4 text-sm text-muted-foreground">
                   {$t(i18nKeys.console.deployments.noSnapshotVariables)}
                 </div>
               {/if}
             </div>
-          </details>
-
-          {#if sourceMetadata.length > 0 || targetMetadata.length > 0 || runtimeMetadata.length > 0}
-            <details class="group rounded-lg border bg-background p-5">
-              <summary class="flex cursor-pointer list-none items-start justify-between gap-4">
-                <h2 class="inline-flex text-lg font-semibold">{$t(i18nKeys.console.deployments.metadataTitle)}</h2>
-                <ChevronDown class="mt-1 size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
-              </summary>
-              <div class="mt-4 space-y-3">
-                {#each [...sourceMetadata, ...targetMetadata, ...runtimeMetadata] as [key, value] (`${key}-${value}`)}
-                  <div class="rounded-md border px-4 py-3">
-                    <p class="text-xs text-muted-foreground">{key}</p>
-                    <p class="mt-1 break-all text-sm font-medium">{value}</p>
-                  </div>
-                {/each}
-              </div>
-            </details>
-          {/if}
-        </div>
-      </section>
+          </section>
+        </Tabs.Content>
+      </Tabs.Root>
     </div>
   {/if}
 </ConsoleShell>
@@ -794,6 +712,6 @@
     deploymentProgressDialogOpen = false;
   }}
   onOpenDeployment={() => {
-    void goto(`/deployments/${deploymentProgressDeploymentId}`);
+    void goto(deploymentProgressHref());
   }}
 />
