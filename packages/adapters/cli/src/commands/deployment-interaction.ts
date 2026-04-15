@@ -14,6 +14,10 @@ import {
   type ResourceSummary,
   type ServerSummary,
 } from "@yundu/application";
+import {
+  createQuickDeployGeneratedResourceName,
+  normalizeQuickDeployGeneratedNameBase,
+} from "@yundu/contracts";
 import { domainError, type EnvironmentKind, environmentKinds } from "@yundu/core";
 import { Effect } from "effect";
 
@@ -73,20 +77,17 @@ function trimToUndefined(value: string): string | undefined {
 }
 
 function slugify(value: string): string {
-  return (
-    value
-      .trim()
-      .toLowerCase()
-      .replace(/\.git$/, "")
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "") || "app"
-  );
+  return normalizeQuickDeployGeneratedNameBase(value);
 }
 
 function inferNameFromSource(sourceLocator: string): string {
   const withoutQuery = sourceLocator.split(/[?#]/)[0] ?? sourceLocator;
   const segments = withoutQuery.split(/[\\/]/).filter(Boolean);
   return slugify(segments.at(-1) ?? defaultProjectName);
+}
+
+function inferGeneratedResourceNameFromSource(sourceLocator: string): string {
+  return createQuickDeployGeneratedResourceName(inferNameFromSource(sourceLocator));
 }
 
 function resourceKindForDeploymentMethod(
@@ -100,7 +101,7 @@ function inferResourceFromSource(
   deploymentMethod: DeploymentMethod,
 ): ResourceDraftInput {
   return {
-    name: inferNameFromSource(sourceLocator),
+    name: inferGeneratedResourceNameFromSource(sourceLocator),
     kind: resourceKindForDeploymentMethod(deploymentMethod),
   };
 }

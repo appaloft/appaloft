@@ -17,6 +17,8 @@
   } from "@lucide/svelte";
   import { createMutation, createQuery, queryOptions } from "@tanstack/svelte-query";
   import {
+    createQuickDeployGeneratedResourceName,
+    normalizeQuickDeployGeneratedNameBase,
     runQuickDeployWorkflow,
     type QuickDeployServerCredential,
     type QuickDeployWorkflowInput,
@@ -28,6 +30,7 @@
     AuthSessionResponse,
     ConfigureServerCredentialInput,
     CreateDeploymentInput,
+    DeploymentProgressEvent,
     CreateResourceInput,
     EnvironmentSummary,
     GitHubRepositorySummary,
@@ -54,6 +57,11 @@
   import { Skeleton } from "$lib/components/ui/skeleton";
   import { Textarea } from "$lib/components/ui/textarea";
   import { Badge } from "$lib/components/ui/badge";
+  import {
+    createDeploymentWithProgress,
+    groupDeploymentProgressEvents,
+    progressSourceLabel,
+  } from "$lib/console/deployment-progress";
   import { defaultAuthSession, type ProviderSummary } from "$lib/console/queries";
   import { readSessionIdentity } from "$lib/console/utils";
   import { i18nKeys, t } from "$lib/i18n";
@@ -73,7 +81,6 @@
     value: string;
     mono?: boolean;
   };
-  type DeploymentMutationInput = CreateDeploymentInput;
   type QuickDeployWorkflowStepStatus = "pending" | "running" | "succeeded" | "failed";
   type QuickDeployWorkflowProgressItem = {
     kind: QuickDeployWorkflowStep["kind"];
@@ -277,11 +284,15 @@
   let serverConnectivityError = $state("");
   let workflowProgressItems = $state<QuickDeployWorkflowProgressItem[]>([]);
   let workflowProgressError = $state("");
+  let deploymentCreateInFlight = $state(false);
+  let workflowDeploymentProgressEvents = $state<DeploymentProgressEvent[]>([]);
   let environmentName = $state(browser ? (page.url.searchParams.get("environmentName") ?? "local") : "local");
   let environmentKind = $state<EnvironmentKind>(
     parseEnvironmentKind(browser ? page.url.searchParams.get("environmentKind") : null),
   );
   let resourceName = $state(browser ? (page.url.searchParams.get("resourceName") ?? "") : "");
+  let generatedResourceName = $state(browser ? (page.url.searchParams.get("generatedResourceName") ?? "") : "");
+  let generatedResourceNameBase = $state("");
   let resourceKind = $state<ResourceKind>(parseResourceKind(browser ? page.url.searchParams.get("resourceKind") : null));
   let resourceDescription = $state(browser ? (page.url.searchParams.get("resourceDescription") ?? "") : "");
   let resourceInternalPort = $state(browser ? (page.url.searchParams.get("resourceInternalPort") ?? "3000") : "3000");
@@ -364,9 +375,6 @@
       isSecret?: boolean;
       scope?: "defaults" | "system" | "organization" | "project" | "environment" | "deployment";
     }) => orpcClient.environments.setVariable(input),
-  }));
-  const createDeploymentMutation = createMutation(() => ({
-    mutationFn: (input: DeploymentMutationInput) => orpcClient.deployments.create(input),
   }));
   const resourcesQuery = createQuery(() =>
     queryOptions({
@@ -461,7 +469,7 @@
       createEnvironmentMutation.isPending ||
       createResourceMutation.isPending ||
       setEnvironmentVariableMutation.isPending ||
-      createDeploymentMutation.isPending,
+      deploymentCreateInFlight,
   );
   const sourceLocator = $derived.by(() => {
     switch (sourceKind) {
@@ -532,6 +540,9 @@
     ),
   );
   const activeStepDetails = $derived(deploymentSteps[currentStepIndex] ?? deploymentSteps[0]);
+  const workflowDeploymentProgressSections = $derived(
+    groupDeploymentProgressEvents(workflowDeploymentProgressEvents),
+  );
   const selectedSourceOption = $derived(
     sourceOptions.find((option) => option.key === sourceKind) ?? sourceOptions[0],
   );
@@ -668,11 +679,11 @@
     (): ResourceKind => (sourceKind === "compose" ? "compose-stack" : "application"),
   );
   const inferredResourceInput = $derived.by((): ResourceDraftInput => ({
-    name: inferredSourceName,
+    name: generatedResourceName || normalizeQuickDeployGeneratedNameBase(inferredSourceName),
     kind: inferredResourceKind,
   }));
   const editedResourceInput = $derived.by((): ResourceDraftInput => ({
-    name: resourceName.trim() || inferredSourceName,
+    name: resourceName.trim() || generatedResourceName || normalizeQuickDeployGeneratedNameBase(inferredSourceName),
     kind: resourceKind,
     ...(resourceDescription.trim() ? { description: resourceDescription.trim() } : {}),
   }));
@@ -940,6 +951,18 @@
   });
 
   $effect(() => {
+    const baseName = normalizeQuickDeployGeneratedNameBase(inferredSourceName);
+    if (
+      generatedResourceNameBase !== baseName ||
+      !generatedResourceName ||
+      !generatedResourceName.startsWith(`${baseName}-`)
+    ) {
+      generatedResourceNameBase = baseName;
+      generatedResourceName = createQuickDeployGeneratedResourceName(baseName);
+    }
+  });
+
+  $effect(() => {
     if (
       sourceKind === "github" &&
       githubConnected &&
@@ -1080,9 +1103,12 @@
         setSearchParam(params, "resourceId", selectedResourceId);
       } else {
         setSearchParam(params, "resourceName", resourceName);
+        setSearchParam(params, "generatedResourceName", generatedResourceName);
         setSearchParam(params, "resourceKind", resourceKind, "application");
         setSearchParam(params, "resourceDescription", resourceDescription);
       }
+    } else {
+      setSearchParam(params, "generatedResourceName", generatedResourceName);
     }
     setSearchParam(params, "resourceInternalPort", resourceInternalPort, "3000");
 
@@ -1126,6 +1152,8 @@
     environmentName = params.get("environmentName") ?? "local";
     environmentKind = parseEnvironmentKind(params.get("environmentKind"));
     resourceName = params.get("resourceName") ?? "";
+    generatedResourceName = params.get("generatedResourceName") ?? "";
+    generatedResourceNameBase = "";
     resourceKind = parseResourceKind(params.get("resourceKind"));
     resourceDescription = params.get("resourceDescription") ?? "";
     resourceInternalPort = params.get("resourceInternalPort") ?? "3000";
@@ -1414,7 +1442,8 @@
     selectedGitHubRepositoryId = repository.id;
     selectedGitHubRepository = repository;
     githubLocator = repository.cloneUrl;
-    resourceName = repository.name;
+    generatedResourceNameBase = normalizeQuickDeployGeneratedNameBase(repository.name);
+    generatedResourceName = createQuickDeployGeneratedResourceName(generatedResourceNameBase);
     resourceDescription = repository.description ?? "";
   }
 
@@ -1511,6 +1540,7 @@
   function resetWorkflowProgress(): void {
     workflowProgressItems = [];
     workflowProgressError = "";
+    workflowDeploymentProgressEvents = [];
   }
 
   function setWorkflowStepStatus(
@@ -1555,6 +1585,58 @@
       case "failed":
         return $t(i18nKeys.console.quickDeploy.workflowStepFailed);
     }
+  }
+
+  function appendWorkflowDeploymentProgressEvent(event: DeploymentProgressEvent): void {
+    workflowDeploymentProgressEvents = [...workflowDeploymentProgressEvents, event];
+    lastCreatedDeploymentId = event.deploymentId ?? lastCreatedDeploymentId;
+  }
+
+  function deploymentProgressPhaseLabel(phase: DeploymentProgressEvent["phase"]): string {
+    switch (phase) {
+      case "detect":
+        return $t(i18nKeys.console.deployments.progressPhaseDetect);
+      case "plan":
+        return $t(i18nKeys.console.deployments.progressPhasePlan);
+      case "package":
+        return $t(i18nKeys.console.deployments.progressPhasePackage);
+      case "deploy":
+        return $t(i18nKeys.console.deployments.progressPhaseDeploy);
+      case "verify":
+        return $t(i18nKeys.console.deployments.progressPhaseVerify);
+      case "rollback":
+        return $t(i18nKeys.console.deployments.progressPhaseRollback);
+    }
+  }
+
+  function deploymentProgressStatusLabel(status?: DeploymentProgressEvent["status"]): string {
+    switch (status) {
+      case "running":
+        return $t(i18nKeys.console.deployments.progressStatusRunning);
+      case "succeeded":
+        return $t(i18nKeys.console.deployments.progressStatusSucceeded);
+      case "failed":
+        return $t(i18nKeys.common.status.failed);
+      default:
+        return $t(i18nKeys.console.deployments.progressStatusLog);
+    }
+  }
+
+  function deploymentProgressLevelClass(level: DeploymentProgressEvent["level"]): string {
+    switch (level) {
+      case "error":
+        return "text-destructive";
+      case "warn":
+        return "text-amber-600";
+      case "debug":
+        return "text-muted-foreground";
+      case "info":
+        return "text-foreground";
+    }
+  }
+
+  function deploymentProgressTimeLabel(timestamp: string): string {
+    return timestamp.slice(11, 19) || "--:--:--";
   }
 
   async function testDraftServerConnectivity(): Promise<void> {
@@ -1729,8 +1811,14 @@
         await environmentsQuery.refetch();
         return;
       }
-      case "deployments.create":
-        return createDeploymentMutation.mutateAsync(step.input);
+      case "deployments.create": {
+        deploymentCreateInFlight = true;
+        try {
+          return await createDeploymentWithProgress(step.input, appendWorkflowDeploymentProgressEvent);
+        } finally {
+          deploymentCreateInFlight = false;
+        }
+      }
     }
   }
 
@@ -2966,7 +3054,7 @@
                       {:else}
                         <div class="space-y-3">
                           <div class="grid gap-3 sm:grid-cols-2">
-                            <Input bind:value={resourceName} placeholder={inferredSourceName} />
+                            <Input bind:value={resourceName} placeholder={generatedResourceName || inferredSourceName} />
                             <Input bind:value={resourceDescription} placeholder={$t(i18nKeys.common.domain.description)} />
                           </div>
                           <div class="grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -3180,6 +3268,37 @@
                     </div>
                   {/each}
                 </div>
+                {#if workflowDeploymentProgressSections.length > 0}
+                  <div class="mt-3 max-h-56 overflow-auto rounded-md border bg-background px-3 py-2">
+                    <div class="space-y-3">
+                      {#each workflowDeploymentProgressSections as section (section.phase)}
+                        <div class="space-y-1.5">
+                          <div class="flex flex-wrap items-center gap-2 text-xs font-medium">
+                            <span class="text-primary">
+                              [{section.step?.current ?? "-"} / {section.step?.total ?? "-"}]
+                            </span>
+                            <span>{deploymentProgressPhaseLabel(section.phase)}</span>
+                            {#if section.status}
+                              <span class="text-muted-foreground">·</span>
+                              <span>{deploymentProgressStatusLabel(section.status)}</span>
+                            {/if}
+                          </div>
+                          <div class="space-y-1 font-mono text-[11px] leading-5">
+                            {#each section.events as event, index (`${event.timestamp}-${section.phase}-${index}`)}
+                              <div class="grid grid-cols-[3.75rem_4.75rem_minmax(0,1fr)] gap-2">
+                                <span class="text-muted-foreground">{deploymentProgressTimeLabel(event.timestamp)}</span>
+                                <span class="text-muted-foreground">{progressSourceLabel(event)}</span>
+                                <span class={`min-w-0 break-words ${deploymentProgressLevelClass(event.level)}`}>
+                                  {event.message}
+                                </span>
+                              </div>
+                            {/each}
+                          </div>
+                        </div>
+                      {/each}
+                    </div>
+                  </div>
+                {/if}
                 {#if workflowProgressError}
                   <p class="mt-2 text-xs text-destructive">{workflowProgressError}</p>
                 {/if}
