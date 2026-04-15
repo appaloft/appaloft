@@ -116,6 +116,7 @@
   let deploymentProgressStreamError = $state("");
   let deploymentProgressDeploymentId = $state("");
   let deploymentProgressResourceId = $state("");
+  let deploymentProgressRequestId = $state("");
   let feedback = $state<{
     kind: "success" | "error";
     title: string;
@@ -198,6 +199,7 @@
     deploymentProgressStreamError = "";
     deploymentProgressDeploymentId = "";
     deploymentProgressResourceId = "";
+    deploymentProgressRequestId = "";
 
     let createdResourceId = "";
 
@@ -230,6 +232,14 @@
       const deployment = await createDeploymentWithProgress(
         deploymentInput,
         appendDeploymentProgressEvent,
+        {
+          onRequestId: (requestId) => {
+            deploymentProgressRequestId = requestId;
+          },
+          onStreamError: (message) => {
+            deploymentProgressStreamError = message;
+          },
+        },
       );
 
       deploymentProgressDeploymentId = deployment.id;
@@ -898,6 +908,7 @@
   events={deploymentProgressEvents}
   streamError={deploymentProgressStreamError}
   deploymentId={deploymentProgressDeploymentId}
+  requestId={deploymentProgressRequestId}
   title={$t(i18nKeys.console.deployments.progressTitle)}
   description={$t(i18nKeys.console.deployments.progressDescription)}
   onClose={() => {
