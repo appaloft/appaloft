@@ -28,6 +28,7 @@ This command inherits the shared platform contracts:
 - [ADR-013: Project Resource Navigation And Deployment Ownership](../decisions/ADR-013-project-resource-navigation-and-deployment-ownership.md)
 - [ADR-014: Deployment Admission Uses Resource Profile](../decisions/ADR-014-deployment-admission-uses-resource-profile.md)
 - [ADR-015: Resource Network Profile](../decisions/ADR-015-resource-network-profile.md)
+- [ADR-017: Default Access Domain And Proxy Routing](../decisions/ADR-017-default-access-domain-and-proxy-routing.md)
 - [Error Model](../errors/model.md)
 - [neverthrow Conventions](../errors/neverthrow-conventions.md)
 - [Async Lifecycle And Acceptance](../architecture/async-lifecycle-and-acceptance.md)
@@ -38,7 +39,7 @@ This file defines only the deployment-specific command semantics.
 
 Create a deployment attempt for a source, resource, environment, server, and destination. The command admits the request, prepares durable deployment state, and starts deployment progression.
 
-`deployments.create` is a deployment-attempt command. It is not the durable owner of reusable resource source, runtime, network, health, routing, domain, or TLS configuration. Deployment-specific snapshots are resolved from resource, environment, server, destination, and routing state during admission.
+`deployments.create` is a deployment-attempt command. It is not the durable owner of reusable resource source, runtime, network, health, generated access, routing, domain, or TLS configuration. Deployment-specific snapshots are resolved from resource, environment, server, destination, default access policy, and routing state during admission/planning.
 
 The command's domain language is **deployment attempt admission**. It must not use `Deployment` as the owner name for source binding, runtime profile, health policy, access profile, domain binding, or TLS policy.
 
@@ -77,6 +78,7 @@ The command must preserve these terms:
 | Resource source binding | `Resource` lifecycle commands | Durable reusable source configuration. |
 | Resource runtime profile | `Resource` lifecycle commands | Durable reusable build, start, and health defaults. |
 | Resource network profile | `Resource` lifecycle commands | Durable reusable internal listener port, upstream protocol, exposure mode, and target service. |
+| Generated access route | Default access domain provider and route resolver | Provider-neutral convenience route resolved from policy, server public address, proxy readiness, and resource network profile. |
 | Resource access profile / domain binding | Future resource access operation or `domain-bindings.create` | Durable reusable access-route/domain/TLS intent. |
 | Runtime plan snapshot | `Deployment` | Immutable resolved runtime and network plan persisted on the deployment attempt. |
 
@@ -95,10 +97,11 @@ The command must perform or delegate these admission steps before returning acce
 7. Resolve runtime plan configuration from `ResourceRuntimeProfile`.
 8. Resolve network endpoint configuration from `ResourceNetworkProfile`.
 9. Create an immutable environment snapshot.
-10. Resolve the runtime plan and network snapshot.
-11. Create durable deployment state.
-12. Publish or record `deployment-requested`.
-13. Return `ok({ id })`.
+10. Resolve default generated and durable access route snapshots from resource/domain/server/policy state when the resource requires public reverse-proxy access.
+11. Resolve the runtime plan and network/access snapshots.
+12. Create durable deployment state.
+13. Publish or record `deployment-requested`.
+14. Return `ok({ id })`.
 
 Build, rollout, verify, failure recording, and retry progression belong to the async workflow owner, process manager, event handler, worker, or runtime adapter boundary. They must not be hidden inside Web/CLI/API entry logic.
 
@@ -144,6 +147,8 @@ All errors use the shared shape and category rules in [Error Model](../errors/mo
 | `invariant_violation` | `planning-transition`, `execution-start-transition`, `finalization` | No | Deployment state transition was attempted out of order. |
 | `infra_error` | `deployment-creation`, `event-publication` | Conditional | Persistence or infrastructure failure before the request can be safely accepted. |
 | `provider_error` | `runtime-plan-resolution` | Conditional | Provider/runtime boundary rejects the plan before acceptance. |
+| `default_access_route_unavailable` | `default-access-policy-resolution`, `default-access-domain-generation`, `proxy-readiness` | Conditional | A required generated access route cannot be resolved before acceptance. |
+| `proxy_route_realization_failed` | `proxy-route-realization`, `public-route-verification` | Yes | Runtime adapter failed to materialize or verify the resolved route after acceptance; represented as workflow failure. |
 
 Runtime/build/deploy/verify failures after acceptance are workflow failures and must be represented by deployment state plus `deployment-failed`.
 
@@ -207,6 +212,7 @@ Migration gaps:
 - source descriptor and runtime plan strategy compatibility is now a resource profile planning rule;
   implementation coverage should be verified across Web, CLI, and API before removing this note.
 - resource listener port is stored as `networkProfile.internalPort`; deployment admission does not read `runtimeProfile.port`.
+- generated default access routing is governed by ADR-017, but the current runtime adapter path still contains adapter-facing requested deployment route fields that must be replaced by provider-neutral route resolution.
 
 ## Open Questions
 

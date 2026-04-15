@@ -21,6 +21,7 @@ This test matrix inherits:
 
 - [ADR-003: Server Connect Public Versus Internal](../decisions/ADR-003-server-connect-public-vs-internal.md)
 - [ADR-004: Server Readiness State Storage](../decisions/ADR-004-server-readiness-state-storage.md)
+- [ADR-017: Default Access Domain And Proxy Routing](../decisions/ADR-017-default-access-domain-and-proxy-routing.md)
 - [Error Model](../errors/model.md)
 - [neverthrow Conventions](../errors/neverthrow-conventions.md)
 - [Async Lifecycle And Acceptance](../architecture/async-lifecycle-and-acceptance.md)
@@ -66,26 +67,27 @@ Then:
 
 | Case | Input | Expected result | Expected error | Expected event | Expected state | Retriable |
 | --- | --- | --- | --- | --- | --- | --- |
-| Register with default proxy | `name`, `host`, `providerKey`; no `proxyKind` | `ok({ id })` | None | Registration accepted event; connect workflow can start | Server registered; edge proxy pending | No |
-| Register with proxy disabled | `proxyKind = none` | `ok({ id })` | None | Registration accepted event; connect workflow can start | Server registered; edge proxy disabled | No |
+| Register with default proxy | `name`, `host`, `providerKey`; no edge proxy override | `ok({ id })` | None | Registration accepted event; connect workflow can start | Server registered; edge proxy pending/provider-backed | No |
+| Register with proxy disabled | `edgeProxyMode = disabled` | `ok({ id })` | None | Registration accepted event; connect workflow can start | Server registered; edge proxy disabled | No |
 | Register with invalid input | Missing name/host/provider | `err` | `validation_error`, phase `register` | None | No server created | No |
 | Duplicate registration | Same provider/host/port or idempotency key | Existing id or `err` per policy | `conflict` if rejected | No duplicate lifecycle event | No duplicate server | No |
 | Connect existing server | Valid `serverId`, usable credentials | `ok({ id })` | None | `server-connected` | Server connected | No |
 | Connect missing server | Unknown `serverId` | `err` | `not_found`, phase `connect` | None | No state change | No |
 | Connect unreachable server | Connectivity probes fail after connect attempt accepted | Accepted attempt result or persisted failed attempt | Async connect failure with phase `connect` | No `server-connected` | Server not ready | Depends |
 | Diagnostic draft connectivity | Draft server input | Diagnostic result | None unless schema invalid | None | No persisted lifecycle state | No |
-| Bootstrap proxy for connected server | `serverId`, proxy kind, attempt id | `ok({ serverId, attemptId })` | None | `proxy-bootstrap-requested` | Edge proxy starting | No |
-| Bootstrap proxy with kind none | `proxyKind = none` | `err` or no-op per command policy | `validation_error` or invariant, phase `proxy-bootstrap` | None | Edge proxy disabled | No |
+| Bootstrap proxy for connected server | `serverId`, edge proxy provider key, attempt id | `ok({ serverId, attemptId })` | None | `proxy-bootstrap-requested` | Edge proxy starting | No |
+| Bootstrap proxy when disabled | `edgeProxyMode = disabled` | `err` or no-op per command policy | `validation_error` or invariant, phase `proxy-bootstrap` | None | Edge proxy disabled | No |
 
 ## Event Matrix
 
 | Case | Given event | Existing state | Expected result | Expected follow-up event | Expected state | Retriable |
 | --- | --- | --- | --- | --- | --- | --- |
-| Server connected, proxy required | `server-connected` | Server proxy kind `traefik` or `caddy` | `ok` | `proxy-bootstrap-requested` | Connected, proxy attempt requested | No |
+| Server connected, proxy required | `server-connected` | Server edge proxy provider is required | `ok` | `proxy-bootstrap-requested` | Connected, proxy attempt requested | No |
 | Server connected, proxy disabled | `server-connected` | Edge proxy disabled | `ok` | `server-ready` | Ready | No |
 | Duplicate server connected | Same event or attempt repeated | Proxy bootstrap already requested/ready | `ok` | None | No duplicate attempt | No |
 | Proxy bootstrap requested succeeds | `proxy-bootstrap-requested` | Connected server; bootstrapper returns ready | `ok` | `proxy-installed` | Edge proxy ready | No |
 | Proxy bootstrap requested fails | `proxy-bootstrap-requested` | Connected server; bootstrapper returns failed | `ok` | `proxy-install-failed` | Edge proxy failed; server not ready | Depends on error |
+| Generated route requires ready proxy | Deployment route resolver checks server state | Edge proxy failed or not ready | `err` or deployment failure according to detection phase | None or deployment failure event | Server remains not ready for proxy-backed access | Depends |
 | Proxy bootstrap duplicate after ready | Same attempt event | Edge proxy ready for attempt | `ok` | None | Remains ready | No |
 | Proxy bootstrap duplicate after failed | Same attempt event | Attempt already failed | `ok` | None | Remains failed | Retry requires new attempt |
 | Proxy installed | `proxy-installed` | Connectivity still valid | `ok` | `server-ready` | Server ready | No |
@@ -164,9 +166,9 @@ if (result.isErr()) {
 ## Server/Proxy Event Assertion Example
 
 ```md
-Given a connected server with proxyKind = traefik.
+Given a connected server with edgeProxyProviderKey resolved.
 When the process manager handles server-connected.
-Then proxy-bootstrap-requested is emitted with serverId, proxyKind, attemptId, correlationId, and causationId.
+Then proxy-bootstrap-requested is emitted with serverId, edgeProxyProviderKey, attemptId, correlationId, and causationId.
 And server-ready is not emitted until proxy-installed is handled.
 ```
 

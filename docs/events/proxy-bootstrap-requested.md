@@ -6,6 +6,8 @@
 
 It is a request event. It does not mean the proxy was installed successfully.
 
+Generated default access routes depend on this workflow when the selected resource uses reverse-proxy exposure.
+
 ## Event Type
 
 Application orchestration event.
@@ -15,11 +17,11 @@ Application orchestration event.
 Publish after:
 
 1. `server-connected` exists for the server;
-2. server proxy kind is `traefik` or `caddy`;
+2. server edge proxy provider is required and registered;
 3. no ready proxy state already satisfies the request;
 4. a new proxy bootstrap attempt id is allocated.
 
-Do not publish this event for `proxyKind = none`.
+Do not publish this event for disabled/no-proxy targets.
 
 ## Publisher
 
@@ -39,7 +41,7 @@ Expected consumers:
 ```ts
 type ProxyBootstrapRequestedPayload = {
   serverId: string;
-  proxyKind: "traefik" | "caddy";
+  edgeProxyProviderKey: string;
   attemptId: string;
   requestedAt: string;
   providerKey: string;
@@ -61,7 +63,7 @@ connected -> proxy_bootstrapping
 edgeProxy.status: pending|failed -> starting
 ```
 
-If the proxy is already ready for the same server/proxy kind, duplicate handling must be a no-op.
+If the proxy is already ready for the same server/provider key, duplicate handling must be a no-op.
 
 ## Follow-Up Actions
 
@@ -71,7 +73,7 @@ Failed handling publishes `proxy-install-failed`.
 
 ## Idempotency
 
-Consumers must dedupe by `(serverId, proxyKind, attemptId)`.
+Consumers must dedupe by `(serverId, edgeProxyProviderKey, attemptId)`.
 
 Duplicate event consumption must not run duplicate bootstrap commands for an already completed attempt.
 
@@ -90,7 +92,7 @@ Worker crashes before terminal status must leave a retryable async-processing st
 Logs and traces must include:
 
 - `serverId`;
-- `proxyKind`;
+- `edgeProxyProviderKey`;
 - `attemptId`;
 - `phase = proxy-bootstrap`;
 - `correlationId`;
@@ -101,6 +103,8 @@ Logs and traces must include:
 Current code does not publish `proxy-bootstrap-requested`. Current proxy bootstrap starts from `deployment_target.registered`.
 
 Current edge proxy state can move from `pending` to `starting` through `beginEdgeProxyBootstrap`, but there is no explicit attempt id.
+
+Current runtime state still exposes `proxyKind`; ADR-019 treats that as provider-selection migration data. The target event payload uses `edgeProxyProviderKey`.
 
 ## Open Questions
 

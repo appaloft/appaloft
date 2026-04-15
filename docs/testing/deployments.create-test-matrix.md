@@ -22,6 +22,7 @@ This test matrix inherits:
 - [ADR-012: Resource Runtime Profile And Deployment Snapshot Boundary](../decisions/ADR-012-resource-runtime-profile-and-deployment-snapshot-boundary.md)
 - [ADR-014: Deployment Admission Uses Resource Profile](../decisions/ADR-014-deployment-admission-uses-resource-profile.md)
 - [ADR-015: Resource Network Profile](../decisions/ADR-015-resource-network-profile.md)
+- [ADR-017: Default Access Domain And Proxy Routing](../decisions/ADR-017-default-access-domain-and-proxy-routing.md)
 - [Error Model](../errors/model.md)
 - [neverthrow Conventions](../errors/neverthrow-conventions.md)
 - [Async Lifecycle And Acceptance](../architecture/async-lifecycle-and-acceptance.md)
@@ -74,6 +75,9 @@ Then:
 | Resource lacks source binding | Context ids resolve, but resource has no source binding | `err` | `validation_error`, phase `resource-source-resolution` | None for accepted request | No accepted deployment |
 | Inbound resource lacks network profile | Context ids resolve, but inbound resource has no internal listener port | `err` | `validation_error`, phase `resource-network-resolution` | None for accepted request | No accepted deployment |
 | Resource network profile resolves reverse-proxy target | Resource has `networkProfile.internalPort` and reverse-proxy exposure | `ok({ id })` | None | `deployment-requested`; later async events | Deployment snapshot includes resolved network target without requiring host port |
+| Generated default access route resolves | Resource reverse-proxy profile, server proxy ready, default access policy enabled | `ok({ id })` | None | `deployment-requested`; later route realization/progress | Deployment snapshot includes provider-neutral generated access route metadata; `ResourceAccessSummary` projects current generated URL |
+| Generated access provider unavailable before acceptance | Generated route is required but provider cannot return a hostname before safe acceptance | `err` | provider/default access error, phase `default-access-domain-generation` | None | No accepted deployment |
+| Proxy not ready for generated route | Resource reverse-proxy profile, policy enabled, server edge proxy failed/not ready | `err` or post-acceptance failure according to detection phase | `proxy_not_ready` or proxy error, phase `proxy-readiness` | No success event for accepted route | No direct host-port fallback |
 | Incompatible resource source/strategy pair | Resource source descriptor cannot be planned by the runtime profile strategy | `err` | `validation_error` or `provider_error`, phase `runtime-plan-resolution` | None for accepted request | No accepted deployment |
 | Legacy source/runtime/network fields | Input includes `sourceLocator`, `source`, `deploymentMethod`, command override fields, `port`, or `networkProfile` | `err` at command schema/API boundary | `validation_error`, phase `command-validation` | None | No deployment created |
 | Unresolved project/environment/server/destination/resource | Context cannot be resolved after bootstrap | `err` | `validation_error` or `not_found`, phase `context-resolution` | None | No deployment created |
@@ -150,6 +154,8 @@ Current event names are still `deployment.started` and `deployment.finished`. Te
 - `deployment.finished/status=failed` -> `deployment-failed`.
 
 `deployment-requested` and `build-requested` are canonical events and may not exist in current test fixtures yet.
+
+Generated default access route tests are governed by [Default Access Domain And Proxy Routing Test Matrix](./default-access-domain-and-proxy-routing-test-matrix.md) and are not implemented yet.
 
 ## Open Questions
 

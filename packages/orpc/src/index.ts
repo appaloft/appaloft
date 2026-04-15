@@ -49,11 +49,13 @@ import {
   type Query,
   type QueryBus,
   RegisterServerCommand,
+  ResourceProxyConfigurationPreviewQuery,
   type ResourceRuntimeLogEvent,
   ResourceRuntimeLogsQuery,
   type ResourceRuntimeLogsQueryInput,
   type ResourceRuntimeLogsResult,
   registerServerCommandInputSchema,
+  resourceProxyConfigurationPreviewQueryInputSchema,
   resourceRuntimeLogsQueryInputSchema,
   SetEnvironmentVariableCommand,
   ShowEnvironmentQuery,
@@ -86,6 +88,7 @@ import {
   listServersResponseSchema,
   listSshCredentialsResponseSchema,
   promoteEnvironmentResponseSchema,
+  proxyConfigurationViewSchema,
   registerServerResponseSchema,
   resourceRuntimeLogEventSchema,
   resourceRuntimeLogsResponseSchema,
@@ -850,6 +853,18 @@ export const resourceRuntimeLogsStreamProcedure = base
   .output(eventIterator(resourceRuntimeLogEventSchema, resourceRuntimeLogsStreamResponseSchema))
   .handler(({ input, context }) => createResourceRuntimeLogStream(context, input));
 
+export const resourceProxyConfigurationPreviewProcedure = base
+  .route({
+    method: "GET",
+    path: "/resources/{resourceId}/proxy-configuration",
+    successStatus: 200,
+  })
+  .input(resourceProxyConfigurationPreviewQueryInputSchema)
+  .output(proxyConfigurationViewSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ResourceProxyConfigurationPreviewQuery.create(input)),
+  );
+
 export const listProvidersProcedure = base
   .route({
     method: "GET",
@@ -910,6 +925,7 @@ export const yunduOrpcRouter = {
   resources: {
     list: listResourcesProcedure,
     create: createResourceProcedure,
+    proxyConfiguration: resourceProxyConfigurationPreviewProcedure,
     logs: resourceRuntimeLogsProcedure,
     logsStream: resourceRuntimeLogsStreamProcedure,
   },

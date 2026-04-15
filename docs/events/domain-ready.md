@@ -68,7 +68,7 @@ type DomainReadyPayload = {
   resourceId: string;
   serverId: string;
   destinationId: string;
-  proxyKind: "traefik" | "caddy";
+  edgeProxyProviderKey?: string;
   tlsMode: "auto" | "disabled";
   certificateId?: string;
   readyAt: string;

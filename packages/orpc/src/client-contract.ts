@@ -17,6 +17,7 @@ import {
   type ListSshCredentialsQueryInput,
   type PromoteEnvironmentCommandInput,
   type RegisterServerCommandInput,
+  type ResourceProxyConfigurationPreviewQueryInput,
   type ResourceRuntimeLogsQueryInput,
   type SetEnvironmentVariableCommandInput,
   type ShowEnvironmentQueryInput,
@@ -45,6 +46,7 @@ import {
   type ListServersResponse,
   type ListSshCredentialsResponse,
   type PromoteEnvironmentResponse,
+  type ProxyConfigurationView,
   type RegisterServerResponse,
   type ResourceRuntimeLogEvent,
   type ResourceRuntimeLogsResponse,
@@ -163,6 +165,12 @@ export type YunduOrpcClientContract = {
       YunduClientContext,
       CreateResourceCommandInput,
       CreateResourceResponse,
+      YunduClientError
+    >;
+    proxyConfiguration: Client<
+      YunduClientContext,
+      ResourceProxyConfigurationPreviewQueryInput,
+      ProxyConfigurationView,
       YunduClientError
     >;
     logs: Client<

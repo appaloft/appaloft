@@ -5,6 +5,7 @@ import {
   deploymentProgressSteps,
   type AppLogger,
   type DeploymentProgressReporter,
+  type EdgeProxyProviderRegistry,
   type ExecutionBackend,
   type ExecutionContext,
   type IntegrationAuthPort,
@@ -36,11 +37,12 @@ import {
   type RollbackPlan,
 } from "@yundu/core";
 import {
-  createProxyBootstrapPlan,
-  dockerNetworkFlagForAccessRoutes,
+  createEdgeProxyEnsurePlan,
+  createProxyRouteRealizationPlan,
+  dockerLabelFlagsForProxyPlan,
+  dockerNetworkFlagForProxyPlan,
   proxyBootstrapOptionsFromEnv,
-} from "./proxy-bootstrap";
-import { dockerLabelFlagsForAccessRoutes } from "./proxy-labels";
+} from "./edge-proxy-plans";
 
 type LogPhase = "detect" | "plan" | "package" | "deploy" | "verify" | "rollback";
 type LogLevel = "debug" | "info" | "warn" | "error";
@@ -84,6 +86,12 @@ function shellQuote(input: string): string {
 
 function dockerRemovePublishedPortCommand(port: number): string {
   return `docker ps --filter ${shellQuote(`publish=${port}`)} -q | while read -r container_id; do docker rm -f "$container_id"; done`;
+}
+
+function dockerPublishedPortFlag(port: number, metadata?: Record<string, string>): string {
+  return metadata?.["resource.exposureMode"] === "direct-port"
+    ? `-p ${port}:${port}`
+    : `-p 127.0.0.1:${port}:${port}`;
 }
 
 function redactSecrets(input: string, secrets: readonly string[] = []): string {
@@ -326,6 +334,7 @@ export class SshExecutionBackend implements ExecutionBackend {
     private readonly progressReporter: DeploymentProgressReporter,
     private readonly integrationAuthPort?: IntegrationAuthPort,
     private readonly serverRepository?: ServerRepository,
+    private readonly edgeProxyProviderRegistry?: EdgeProxyProviderRegistry,
   ) {}
 
   private report(
@@ -1030,10 +1039,33 @@ export class SshExecutionBackend implements ExecutionBackend {
       }
 
       const accessRoutes = state.runtimePlan.execution.accessRoutes ?? [];
-      const proxyBootstrap = createProxyBootstrapPlan(
-        accessRoutes,
-        proxyBootstrapOptionsFromEnv(env),
-      );
+      const proxyBootstrapResult = this.edgeProxyProviderRegistry
+        ? await createEdgeProxyEnsurePlan({
+            providerRegistry: this.edgeProxyProviderRegistry,
+            context: {
+              correlationId: context.requestId,
+            },
+            accessRoutes,
+            options: proxyBootstrapOptionsFromEnv(env),
+          })
+        : ok(null);
+      if (proxyBootstrapResult.isErr()) {
+        const message = "Edge proxy provider could not render an ensure plan";
+        logs.push(phaseLog("deploy", message, "error"));
+        return ok({
+          deployment: this.applyFailure(deployment, {
+            logs,
+            errorCode: proxyBootstrapResult.error.code,
+            retryable: proxyBootstrapResult.error.retryable,
+            metadata: {
+              host: target.host,
+              message: proxyBootstrapResult.error.message,
+            },
+          }),
+        });
+      }
+
+      const proxyBootstrap = proxyBootstrapResult.value;
       if (proxyBootstrap) {
         const proxyMessage = `Ensure ${proxyBootstrap.displayName} edge proxy on Docker network ${proxyBootstrap.networkName}`;
         logs.push(phaseLog("deploy", proxyMessage));
@@ -1100,7 +1132,8 @@ export class SshExecutionBackend implements ExecutionBackend {
               retryable: true,
               metadata: {
                 host: target.host,
-                proxyKind: proxyBootstrap.kind,
+                proxyKind: proxyBootstrap.proxyKind,
+                providerKey: proxyBootstrap.providerKey,
                 containerName: proxyBootstrap.containerName,
                 networkName: proxyBootstrap.networkName,
               },
@@ -1118,6 +1151,33 @@ export class SshExecutionBackend implements ExecutionBackend {
         });
       }
 
+      const proxyRoutePlanResult = this.edgeProxyProviderRegistry
+        ? await createProxyRouteRealizationPlan({
+            providerRegistry: this.edgeProxyProviderRegistry,
+            context: {
+              correlationId: context.requestId,
+            },
+            deploymentId: state.id.value,
+            port,
+            accessRoutes,
+          })
+        : ok(null);
+      if (proxyRoutePlanResult.isErr()) {
+        const message = "Edge proxy route configuration could not be rendered";
+        logs.push(phaseLog("deploy", message, "error"));
+        return ok({
+          deployment: this.applyFailure(deployment, {
+            logs,
+            errorCode: proxyRoutePlanResult.error.code,
+            retryable: proxyRoutePlanResult.error.retryable,
+            metadata: {
+              host: target.host,
+              message: proxyRoutePlanResult.error.message,
+            },
+          }),
+        });
+      }
+
       const envFlags = Object.entries(env)
         .filter((entry): entry is [string, string] => typeof entry[1] === "string")
         .filter(
@@ -1128,17 +1188,12 @@ export class SshExecutionBackend implements ExecutionBackend {
         )
         .map(([key, value]) => `-e ${shellQuote(`${key}=${value}`)}`)
         .join(" ");
-      const labelFlags = dockerLabelFlagsForAccessRoutes({
-        deploymentId: state.id.value,
-        port,
-        accessRoutes,
+      const labelFlags = dockerLabelFlagsForProxyPlan({
+        plan: proxyRoutePlanResult.value,
         quote: shellQuote,
       });
-      const networkFlag = dockerNetworkFlagForAccessRoutes(accessRoutes);
-      const hasEdgeProxyRoute = accessRoutes.some((route) => route.proxyKind !== "none");
-      const portFlag = hasEdgeProxyRoute
-        ? `-p 127.0.0.1:${port}:${port}`
-        : `-p ${port}:${port}`;
+      const networkFlag = dockerNetworkFlagForProxyPlan(proxyRoutePlanResult.value);
+      const portFlag = dockerPublishedPortFlag(port, state.runtimePlan.execution.metadata);
       const runCommand = [
         `docker rm -f ${shellQuote(containerName)} >/dev/null 2>&1 || true`,
         dockerRemovePublishedPortCommand(port),

@@ -82,7 +82,8 @@ function resourceRequiresInternalPort(resource: Resource): boolean {
 function requestedDeploymentFromResource(resource: Resource): Result<RequestedDeploymentConfig> {
   const resourceState = resource.toState();
   const runtimeProfile = resourceState.runtimeProfile;
-  const internalPort = resourceState.networkProfile?.internalPort.value;
+  const networkProfile = resourceState.networkProfile;
+  const internalPort = networkProfile?.internalPort.value;
 
   if (resourceRequiresInternalPort(resource) && !internalPort) {
     return err(
@@ -102,6 +103,24 @@ function requestedDeploymentFromResource(resource: Resource): Result<RequestedDe
     ...(runtimeProfile?.buildCommand ? { buildCommand: runtimeProfile.buildCommand.value } : {}),
     ...(runtimeProfile?.startCommand ? { startCommand: runtimeProfile.startCommand.value } : {}),
     ...(internalPort ? { port: internalPort } : {}),
+    ...(networkProfile
+      ? {
+          exposureMode: networkProfile.exposureMode.value,
+          upstreamProtocol: networkProfile.upstreamProtocol.value,
+          accessContext: {
+            projectId: resourceState.projectId.value,
+            environmentId: resourceState.environmentId.value,
+            resourceId: resourceState.id.value,
+            resourceSlug: resourceState.slug.value,
+            ...(resourceState.destinationId
+              ? { destinationId: resourceState.destinationId.value }
+              : {}),
+            exposureMode: networkProfile.exposureMode.value,
+            upstreamProtocol: networkProfile.upstreamProtocol.value,
+            routePurpose: "default-resource-access",
+          },
+        }
+      : {}),
     ...(runtimeProfile?.healthCheckPath
       ? { healthCheckPath: runtimeProfile.healthCheckPath.value }
       : {}),

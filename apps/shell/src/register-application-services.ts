@@ -30,6 +30,7 @@ import {
   ListSshCredentialsQueryService,
   PromoteEnvironmentUseCase,
   RegisterServerUseCase,
+  ResourceProxyConfigurationPreviewQueryService,
   ResourceRuntimeLogsQueryService,
   RuntimePlanResolutionInputBuilder,
   SetEnvironmentVariableUseCase,
@@ -95,6 +96,10 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(
     tokens.resourceRuntimeLogsQueryService,
     ResourceRuntimeLogsQueryService,
+  );
+  container.registerSingleton(
+    tokens.resourceProxyConfigurationPreviewQueryService,
+    ResourceProxyConfigurationPreviewQueryService,
   );
   container.registerSingleton(tokens.providersQueryService, ListProvidersQueryService);
   container.registerSingleton(tokens.pluginsQueryService, ListPluginsQueryService);

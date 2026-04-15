@@ -28,6 +28,7 @@ This command inherits:
 - [ADR-013: Project Resource Navigation And Deployment Ownership](../decisions/ADR-013-project-resource-navigation-and-deployment-ownership.md)
 - [ADR-014: Deployment Admission Uses Resource Profile](../decisions/ADR-014-deployment-admission-uses-resource-profile.md)
 - [ADR-015: Resource Network Profile](../decisions/ADR-015-resource-network-profile.md)
+- [ADR-017: Default Access Domain And Proxy Routing](../decisions/ADR-017-default-access-domain-and-proxy-routing.md)
 - [Error Model](../errors/model.md)
 - [neverthrow Conventions](../errors/neverthrow-conventions.md)
 - [Async Lifecycle And Acceptance](../architecture/async-lifecycle-and-acceptance.md)
@@ -146,7 +147,9 @@ Web, CLI, API, automation, and future MCP entrypoints must support `networkProfi
 
 `hostPort` is not the same concept as `internalPort`. Reverse-proxy exposure must target the destination-local workload endpoint and must not require a stable host-published port.
 
-Durable access-route defaults, domain bindings, and certificate lifecycle are separate resource/domain lifecycle concerns governed by [ADR-012](../decisions/ADR-012-resource-runtime-profile-and-deployment-snapshot-boundary.md), [ADR-014](../decisions/ADR-014-deployment-admission-uses-resource-profile.md), and [ADR-002](../decisions/ADR-002-routing-domain-tls-boundary.md). They must not be hidden inside `deployments.create`.
+When `networkProfile.exposureMode = "reverse-proxy"`, the resource becomes eligible for generated default access routes if the selected server/target is proxy-ready and the configured default access domain policy is enabled. The resource owns only the upstream endpoint; it does not own concrete generated-domain provider settings.
+
+Durable access-route defaults, generated default access, domain bindings, and certificate lifecycle are separate resource/domain lifecycle concerns governed by [ADR-012](../decisions/ADR-012-resource-runtime-profile-and-deployment-snapshot-boundary.md), [ADR-014](../decisions/ADR-014-deployment-admission-uses-resource-profile.md), [ADR-017](../decisions/ADR-017-default-access-domain-and-proxy-routing.md), and [ADR-002](../decisions/ADR-002-routing-domain-tls-boundary.md). They must not be hidden inside `deployments.create`.
 
 ## Events
 
@@ -220,6 +223,8 @@ Dedicated resource create page and Project -> Resource sidebar navigation are go
 and are not fully implemented yet.
 
 Current code stores and reads `networkProfile.internalPort` as the only resource listener-port field.
+
+Generated default access policy and route read-model state are not yet implemented as first-class resource access state.
 
 ## Open Questions
 

@@ -37,6 +37,9 @@ export const tokens = {
   createResourceUseCase: Symbol.for("yundu.create_resource_use_case"),
   listResourcesQueryService: Symbol.for("yundu.list_resources_query_service"),
   resourceRuntimeLogsQueryService: Symbol.for("yundu.resource_runtime_logs_query_service"),
+  resourceProxyConfigurationPreviewQueryService: Symbol.for(
+    "yundu.resource_proxy_configuration_preview_query_service",
+  ),
   setEnvironmentVariableUseCase: Symbol.for("yundu.set_environment_variable_use_case"),
   unsetEnvironmentVariableUseCase: Symbol.for("yundu.unset_environment_variable_use_case"),
   diffEnvironmentsQueryService: Symbol.for("yundu.diff_environments_query_service"),
@@ -60,6 +63,8 @@ export const tokens = {
   dbMigrateUseCase: Symbol.for("yundu.db_migrate_use_case"),
   sourceDetector: Symbol.for("yundu.source_detector"),
   runtimePlanResolver: Symbol.for("yundu.runtime_plan_resolver"),
+  defaultAccessDomainProvider: Symbol.for("yundu.default_access_domain_provider"),
+  edgeProxyProviderRegistry: Symbol.for("yundu.edge_proxy_provider_registry"),
   executionBackend: Symbol.for("yundu.execution_backend"),
   resourceRuntimeLogReader: Symbol.for("yundu.resource_runtime_log_reader"),
   providerRegistry: Symbol.for("yundu.provider_registry"),

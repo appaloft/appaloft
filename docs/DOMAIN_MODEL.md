@@ -88,31 +88,47 @@ Owns:
 - `DeploymentTarget`
 - `Destination`
 - `DomainBinding`
-- access route intent for proxy/domain exposure
+- edge proxy intent and readiness state
+- provider-neutral generated access domain policy and resolved route snapshots
 - target capability and provider-facing endpoint metadata
 - deployment placement / isolation boundaries on a target
 
 Implemented now:
 - `DeploymentTarget`
 - optional deployment target credential state for local SSH agent or SSH private key access
-- server-level edge proxy intent and bootstrap status for `none`, `traefik`, and `caddy`
+- server-level edge proxy intent and bootstrap status for disabled or provider-backed edge proxy
+  modes
 - `Destination`
-- runtime-plan access routes with `none`, `traefik`, and `caddy` proxy kinds
+- runtime-plan access routes with proxy route intent and provider-facing route metadata
 - durable `DomainBinding` state for resource-scoped public domain ownership and pending
   verification
+
+Accepted target model:
+- generated default access domains are resolved through a provider-neutral application port and
+  concrete infrastructure adapters governed by [ADR-017](./decisions/ADR-017-default-access-domain-and-proxy-routing.md)
+- concrete generated-domain provider packages live under `packages/providers/default-access-domain-*`
+- concrete generated-domain services must not appear in core/application domain types or command
+  schemas
+- edge proxy providers are selected behind application ports and provider registries governed by
+  [ADR-019](./decisions/ADR-019-edge-proxy-provider-and-observable-configuration.md)
+- concrete edge proxy provider packages live under `packages/providers/edge-proxy-*`
+- proxy bootstrap, route realization, generated labels/config files, logs, and diagnostics belong
+  to concrete edge proxy providers and runtime executors, not command handlers or Web/CLI code
+- edge proxy is not a standalone aggregate root in v1; `DeploymentTarget` owns edge proxy intent,
+  current status, and readiness summary
 
 Transport compatibility note:
 - CLI / HTTP still expose `server` naming for backward compatibility
 - the core domain term is `DeploymentTarget`
 - `Destination` is the concrete place a resource deploys to on a target/server
-- access routes express public-domain intent; Traefik and Caddy label/config generation belongs in
-  runtime adapters, not in core aggregates
+- access routes express public-domain intent; provider-specific labels, files, commands, and route
+  manifests are rendered by concrete edge proxy providers, not core aggregates
 - server registration emits a domain event; application event handlers may soft-fail while asking
   runtime adapters to bootstrap the configured edge proxy and persist the resulting status
-- runtime adapters may ensure the shared edge proxy and Docker network when a runtime plan carries
-  access routes
-- `DomainBinding` is separate from deployment runtime access-route hints; it starts a durable
-  routing/domain/TLS lifecycle and publishes `domain-binding-requested`
+- runtime adapters execute provider-produced shared edge proxy and route realization plans when a
+  runtime plan carries access routes
+- `DomainBinding` is separate from generated default access and deployment route snapshots; it
+  starts a durable routing/domain/TLS lifecycle and publishes `domain-binding-requested`
 
 ### Workload Delivery
 
@@ -139,11 +155,18 @@ Boundary rule:
 - the generic user-facing label `port` must map to the domain field
   `ResourceNetworkProfile.internalPort` before dispatching a command
 - resource detail is the owner-scoped console surface for new deployment, deployment history,
-  source/runtime/network profile, application runtime logs, domain/TLS, and resource-specific
-  configuration actions
+  source/runtime/network profile, generated access routes, proxy configuration, application runtime
+  logs, domain/TLS, and resource-specific configuration actions
 - application runtime log observation belongs to the resource surface and is performed through an
   application-layer runtime log reader port; Docker, PM2, systemd, file-tail, and provider log
   mechanisms are adapter details and must not leak into core aggregates
+- generated default access routes target `ResourceNetworkProfile.internalPort` through the selected
+  deployment target's proxy; generated route providers are infrastructure adapters, not resource
+  aggregate logic
+- current generated access URL/status is exposed through a resource-scoped read-model projection
+  such as `ResourceAccessSummary`; it is not persisted as `Resource` aggregate state
+- full generated proxy configuration is exposed through a resource-scoped read/query view such as
+  `ProxyConfigurationView`; it is operator-facing read-model output, not `Resource` aggregate state
 
 ### Dependency Resources
 
@@ -171,8 +194,9 @@ Implemented now:
 Boundary rule:
 - `Deployment` owns an accepted attempt and the immutable `RuntimePlanSnapshot` used by that
   attempt
-- `Deployment` does not own durable source binding, runtime profile, domain binding, or certificate
-  policy
+- `Deployment` does not own durable source binding, runtime profile, network profile, generated
+  access policy, domain binding, or certificate policy
+- deployment snapshots may record resolved generated or durable access routes used by that attempt
 - deployments are displayed under the Resource that owns them; global or project-level deployment
   pages are read/query rollups
 - deployment logs are attempt/progress records; application runtime logs are resource-owned
@@ -297,12 +321,16 @@ Meaning:
 Rules:
 - one target has one provider family
 - unhealthy/draining targets should not accept new deployments
+- proxy-backed generated access requires target proxy readiness and a usable public address or host
+- target proxy bootstrap state is a readiness gate, not a standalone proxy aggregate
 
 Current scope:
 - single-node target metadata
 - current transport compatibility name: `server`
 - may be reused or created from deployment config after provider-key validation in the application
   layer; provider SDK specifics remain outside the aggregate
+- owns current edge proxy intent/status summary for server readiness and proxy-backed deployment
+  admission/read-model display
 
 ### Destination
 
@@ -318,8 +346,8 @@ Rules:
 Current scope:
 - persisted and bootstrapped as a default local destination
 - deployment config may declare a target-local destination
-- proxy/domain routing is modeled as access-route intent on runtime plans; standalone persisted
-  access-route aggregates remain separate from durable `DomainBinding`
+- proxy/domain routing is modeled as resolved access-route snapshots on runtime plans; standalone
+  persisted access-route aggregates remain separate from durable `DomainBinding`
 
 ### DomainBinding
 
@@ -395,6 +423,8 @@ Rules:
   it is not the server host-published port
 - direct host publication is explicit and must not be the default exposure model for HTTP
   application resources
+- generated default access routes target `ResourceNetworkProfile.internalPort` through the selected
+  deployment target's edge proxy and do not require public host publication of the application port
 
 Current scope:
 - foundational aggregate in `core`
@@ -424,6 +454,8 @@ Rules:
 - state transitions are ordered
 - terminal state appears once
 - rollback references prior successful execution
+- generated and durable access routes are copied into the runtime plan snapshot for the attempt;
+  they are not command input
 
 Current scope:
 - state machine for plan -> run -> verify -> rollback

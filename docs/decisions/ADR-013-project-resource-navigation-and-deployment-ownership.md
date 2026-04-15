@@ -86,6 +86,7 @@ Resource surfaces must own deployment actions:
 - provide new deployment actions for that resource;
 - provide redeploy actions only after a future redeploy command is accepted and implemented under ADR-016;
 - provide resource-scoped domain binding and TLS affordances;
+- show generated default access route status when ADR-017 route snapshots/read models are available;
 - provide resource-scoped environment/configuration affordances when the configuration belongs to the resource.
 
 Resource creation surfaces must collect resource-owned configuration in resource language:
@@ -95,6 +96,7 @@ Resource creation surfaces must collect resource-owned configuration in resource
 - `resources.create` remains the minimum profile command governed by ADR-011;
 - durable source/runtime persistence belongs to resource source/runtime operations governed by ADR-012;
 - durable network profile persistence belongs to resource network profile rules governed by ADR-015;
+- generated default access display belongs to provider-neutral access route rules governed by ADR-017;
 - create-resource and Quick Deploy surfaces may collect source/runtime/network drafts as resource-owned input before dispatching `resources.create`; they must not pass those fields to `deployments.create`.
 
 Sidebar navigation must follow the same ownership:
@@ -114,6 +116,7 @@ The resource page becomes the natural place for:
 - future redeploy only after it is reintroduced under ADR-016;
 - deployment history;
 - domains and TLS;
+- generated default access route status;
 - source/runtime/network configuration;
 - resource lifecycle actions.
 

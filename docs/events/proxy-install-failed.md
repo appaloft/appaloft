@@ -4,7 +4,7 @@
 
 `proxy-install-failed` means an edge proxy bootstrap attempt reached terminal failure and the server proxy state has been durably recorded as failed.
 
-It does not delete server metadata and it does not mean the server is unreachable. It means the server is not ready for proxy-backed deployments.
+It does not delete server metadata and it does not mean the server is unreachable. It means the server is not ready for proxy-backed deployments, including generated default access routes.
 
 ## Event Type
 
@@ -37,7 +37,7 @@ Expected consumers:
 ```ts
 type ProxyInstallFailedPayload = {
   serverId: string;
-  proxyKind: "traefik" | "caddy";
+  edgeProxyProviderKey: string;
   attemptId: string;
   failedAt: string;
   errorCode: string;
@@ -79,7 +79,7 @@ Retry must not be raw replay of the old `proxy-bootstrap-requested` event.
 
 ## Idempotency
 
-Consumers must dedupe by `(serverId, proxyKind, attemptId)`.
+Consumers must dedupe by `(serverId, edgeProxyProviderKey, attemptId)`.
 
 Duplicate failure events must not schedule duplicate retries or duplicate notifications.
 
@@ -100,7 +100,7 @@ If failure is non-retriable, the read model must show terminal proxy failure unt
 Logs and traces must include:
 
 - `serverId`;
-- `proxyKind`;
+- `edgeProxyProviderKey`;
 - `attemptId`;
 - `phase = proxy-bootstrap`;
 - `failurePhase`;
@@ -116,6 +116,8 @@ Current code records `deployment_target.edge_proxy_bootstrap_failed` when `markE
 Runtime bootstrapper failure codes currently include examples such as `edge_proxy_kind_unsupported`, `edge_proxy_provider_unsupported`, `edge_proxy_network_failed`, and `edge_proxy_start_failed`.
 
 The current event handler marks failure but does not publish pulled aggregate events after the mark. The target canonical event is `proxy-install-failed`.
+
+Current runtime state still exposes `proxyKind`; ADR-019 treats that as provider-selection migration data. The target event payload uses `edgeProxyProviderKey`.
 
 ## Open Questions
 

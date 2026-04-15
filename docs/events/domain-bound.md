@@ -55,7 +55,7 @@ type DomainBoundPayload = {
   resourceId: string;
   serverId: string;
   destinationId: string;
-  proxyKind: "traefik" | "caddy";
+  edgeProxyProviderKey?: string;
   tlsMode: "auto" | "disabled";
   certificatePolicy: "auto" | "manual" | "disabled";
   boundAt: string;

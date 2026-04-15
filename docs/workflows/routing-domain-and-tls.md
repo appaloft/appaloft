@@ -2,7 +2,7 @@
 
 ## Normative Contract
 
-Routing/domain/TLS is a durable lifecycle workflow separate from deployment runtime access-route hints.
+Routing/domain/TLS is a durable lifecycle workflow separate from deployment route snapshots and generated default access routes.
 
 ```text
 create durable domain binding
@@ -12,7 +12,7 @@ create durable domain binding
   -> mark domain ready when all gates pass
 ```
 
-`deployments.create` may continue to carry runtime access-route intent for one deployment attempt. It must not create durable domain bindings or issue certificates as hidden side effects.
+`deployments.create` must not carry domain/proxy/TLS input. It may persist resolved generated or durable route snapshots for one deployment attempt. It must not create durable domain bindings or issue certificates as hidden side effects.
 
 ## Global References
 
@@ -24,6 +24,7 @@ This workflow inherits:
 - [ADR-007: Certificate Provider And Challenge Default](../decisions/ADR-007-certificate-provider-and-challenge-default.md)
 - [ADR-008: Renewal Trigger Model](../decisions/ADR-008-renewal-trigger-model.md)
 - [ADR-009: Certificates Import Command](../decisions/ADR-009-certificates-import-command.md)
+- [ADR-017: Default Access Domain And Proxy Routing](../decisions/ADR-017-default-access-domain-and-proxy-routing.md)
 - [Error Model](../errors/model.md)
 - [neverthrow Conventions](../errors/neverthrow-conventions.md)
 - [Async Lifecycle And Acceptance](../architecture/async-lifecycle-and-acceptance.md)
@@ -175,18 +176,13 @@ Route/proxy realization retry is a new route attempt or process-manager attempt.
 
 Previous failed attempts remain historical state and must not be erased by retry.
 
-## Relationship To Deployment Runtime Access Routes
+## Relationship To Generated Access And Deployment Route Snapshots
 
-Deployment runtime access routes remain part of runtime plan resolution:
+Generated default access routes are convenience routes resolved from provider-neutral platform policy. They are not durable domain bindings, and they do not prove domain ownership.
 
-- `proxyKind`;
-- `domains`;
-- `pathPrefix`;
-- `tlsMode`.
+Deployment route snapshots may shape Docker labels, edge proxy requirements, public health URLs, and deployment runtime metadata for one deployment attempt. They must be derived from resource/domain/default-access state rather than submitted through `deployments.create`.
 
-Those fields may shape Docker labels, edge proxy requirements, public health URLs, and deployment runtime metadata for one deployment attempt.
-
-Durable domain binding and certificate lifecycle must use `domain-bindings.create`, `certificates.issue-or-renew`, and their event flows.
+Durable domain binding and certificate lifecycle must use `domain-bindings.create`, `certificates.issue-or-renew`, `certificates.import`, and their event flows.
 
 ## Entry Boundaries
 
@@ -206,7 +202,7 @@ Automation and future MCP tools must dispatch the same command semantics rather 
 
 Current code supports deployment runtime access routes in runtime plans and persistence snapshots.
 
-Current runtime planning defaults `proxyKind` to `traefik` when domains are supplied and rejects domains with `proxyKind = none`.
+Current adapter-facing runtime planning still contains explicit route-hint fields; target implementation must replace them with resource/domain/default-access route resolution.
 
 Current runtime adapters generate Traefik/Caddy labels and can ensure edge proxy containers/networks for deployment runtime access routes.
 

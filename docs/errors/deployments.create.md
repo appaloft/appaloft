@@ -20,6 +20,7 @@ This spec inherits:
 - [ADR-002: Routing, Domain, And TLS Boundary](../decisions/ADR-002-routing-domain-tls-boundary.md)
 - [ADR-014: Deployment Admission Uses Resource Profile](../decisions/ADR-014-deployment-admission-uses-resource-profile.md)
 - [ADR-015: Resource Network Profile](../decisions/ADR-015-resource-network-profile.md)
+- [ADR-017: Default Access Domain And Proxy Routing](../decisions/ADR-017-default-access-domain-and-proxy-routing.md)
 - [Error Model](./model.md)
 - [neverthrow Conventions](./neverthrow-conventions.md)
 - [Async Lifecycle And Acceptance](../architecture/async-lifecycle-and-acceptance.md)
@@ -40,9 +41,15 @@ type DeploymentCreateErrorDetails = {
     | "redeploy-guard"
     | "resource-source-resolution"
     | "resource-network-resolution"
+    | "default-access-policy-resolution"
+    | "default-access-domain-generation"
+    | "proxy-readiness"
+    | "route-snapshot-resolution"
     | "source-detection"
     | "runtime-plan-resolution"
     | "deployment-creation"
+    | "proxy-route-realization"
+    | "public-route-verification"
     | "planning-transition"
     | "execution-start-transition"
     | "runtime-execution"
@@ -61,6 +68,8 @@ type DeploymentCreateErrorDetails = {
   exposureMode?: "none" | "reverse-proxy" | "direct-port";
   upstreamProtocol?: "http" | "tcp";
   targetServiceName?: string;
+  accessRouteSource?: "generated-default" | "domain-binding" | "none";
+  accessRouteProviderKey?: string;
   relatedState?: string;
   causeCode?: string;
   correlationId?: string;
@@ -83,10 +92,11 @@ Admission errors reject the command and return `err(DomainError)`.
 | `invariant_violation` | `planning-transition`, `execution-start-transition`, `finalization` | No | Current deployment state and attempted transition. |
 | `infra_error` | `deployment-creation`, `event-publication` | Conditional | Adapter/operation and sanitized cause. |
 | `provider_error` | `runtime-plan-resolution` | Conditional | Provider key, operation, sanitized cause. |
+| `default_access_route_unavailable` | `default-access-policy-resolution`, `default-access-domain-generation`, `proxy-readiness`, `route-snapshot-resolution` | Conditional | Generated default access route is required but cannot be resolved before safe acceptance. |
 
 ## Post-Acceptance Deployment Failures
 
-Build, runtime execution, verification, health check, or release finalization failures after acceptance are not command admission errors.
+Build, runtime execution, proxy route realization, public route verification, health check, or release finalization failures after acceptance are not command admission errors.
 
 They must:
 
@@ -132,6 +142,7 @@ Migration gaps:
 - Web QuickDeploy still has hardcoded local validation text;
 - no durable process-manager/outbox failure handling was confirmed for this flow.
 - resource listener port is represented as `networkProfile.internalPort`; `runtimeProfile.port` is not part of the command or resource contract.
+- generated default access and proxy route realization errors are not yet uniformly represented with ADR-017 phases.
 
 ## Open Questions
 

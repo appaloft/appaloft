@@ -60,7 +60,7 @@ Required lifecycle progression:
 registered -> connecting -> connected
 ```
 
-If `proxyKind = none`, this event may allow the process manager to mark the server ready. If `proxyKind = traefik | caddy`, it must trigger proxy bootstrap before `server-ready`.
+If edge proxy is disabled, this event may allow the process manager to mark the server ready. If edge proxy is provider-backed, it must trigger proxy bootstrap before `server-ready`.
 
 ## Follow-Up Actions
 

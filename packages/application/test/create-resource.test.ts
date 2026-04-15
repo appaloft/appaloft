@@ -3,21 +3,29 @@ import "reflect-metadata";
 import { describe, expect, test } from "bun:test";
 import {
   CreatedAt,
+  DeploymentTarget,
   DeploymentTargetId,
+  DeploymentTargetName,
   Destination,
   DestinationId,
   DestinationKindValue,
   DestinationName,
   type DomainEvent,
+  EdgeProxyKindValue,
   Environment,
   EnvironmentId,
   EnvironmentKindValue,
   EnvironmentName,
+  HostAddress,
+  ok,
+  PortNumber,
   Project,
   ProjectId,
   ProjectName,
+  ProviderKey,
   ResourceByIdSpec,
   ResourceId,
+  UpsertDeploymentTargetSpec,
   UpsertDestinationSpec,
   UpsertEnvironmentSpec,
   UpsertProjectSpec,
@@ -30,12 +38,36 @@ import {
   MemoryProjectRepository,
   MemoryResourceReadModel,
   MemoryResourceRepository,
+  MemoryServerRepository,
   NoopLogger,
   SequenceIdGenerator,
 } from "@yundu/testkit";
 import { createExecutionContext, type ExecutionContext, toRepositoryContext } from "../src";
 import { CreateResourceCommand } from "../src/messages";
+import { type DefaultAccessDomainProvider } from "../src/ports";
 import { CreateResourceUseCase, ListResourcesQueryService } from "../src/use-cases";
+
+class DisabledDefaultAccessDomainProvider implements DefaultAccessDomainProvider {
+  async generate() {
+    return ok({
+      kind: "disabled" as const,
+      reason: "test-disabled",
+    });
+  }
+}
+
+class StaticDefaultAccessDomainProvider implements DefaultAccessDomainProvider {
+  async generate() {
+    return ok({
+      kind: "generated" as const,
+      domain: {
+        hostname: "web-demo.203.0.113.10.example.test",
+        scheme: "http" as const,
+        providerKey: "test-provider",
+      },
+    });
+  }
+}
 
 function createTestContext(): ExecutionContext {
   return createExecutionContext({
@@ -116,6 +148,7 @@ async function seedResourceContext(input?: { environmentProjectId?: string }) {
 
   return {
     context,
+    destinations,
     eventBus,
     repositoryContext,
     resources,
@@ -302,7 +335,12 @@ describe("CreateResourceUseCase", () => {
     });
     expect(result.isOk()).toBe(true);
 
-    const queryService = new ListResourcesQueryService(readModel);
+    const queryService = new ListResourcesQueryService(
+      readModel,
+      new MemoryDestinationRepository(),
+      new MemoryServerRepository(),
+      new DisabledDefaultAccessDomainProvider(),
+    );
     const listed = await queryService.execute(context, {
       projectId: "prj_demo",
       environmentId: "env_demo",
@@ -315,6 +353,61 @@ describe("CreateResourceUseCase", () => {
       slug: "worker",
       kind: "worker",
       deploymentCount: 0,
+    });
+  });
+
+  test("lists planned generated access route before the first deployment", async () => {
+    const { context, destinations, readModel, repositoryContext, useCase } =
+      await seedResourceContext();
+    const servers = new MemoryServerRepository();
+    const server = DeploymentTarget.register({
+      id: DeploymentTargetId.rehydrate("srv_demo"),
+      name: DeploymentTargetName.rehydrate("demo"),
+      host: HostAddress.rehydrate("203.0.113.10"),
+      port: PortNumber.rehydrate(22),
+      providerKey: ProviderKey.rehydrate("generic-ssh"),
+      edgeProxyKind: EdgeProxyKindValue.rehydrate("traefik"),
+      createdAt: CreatedAt.rehydrate("2026-01-01T00:00:00.000Z"),
+    })._unsafeUnwrap();
+    await servers.upsert(
+      repositoryContext,
+      server,
+      UpsertDeploymentTargetSpec.fromDeploymentTarget(server),
+    );
+
+    const result = await useCase.execute(context, {
+      projectId: "prj_demo",
+      environmentId: "env_demo",
+      destinationId: "dst_demo",
+      name: "web",
+      kind: "application",
+      networkProfile: {
+        internalPort: 3000,
+        upstreamProtocol: "http",
+        exposureMode: "reverse-proxy",
+      },
+    });
+    expect(result.isOk()).toBe(true);
+
+    const queryService = new ListResourcesQueryService(
+      readModel,
+      destinations,
+      servers,
+      new StaticDefaultAccessDomainProvider(),
+    );
+    const listed = await queryService.execute(context, {
+      projectId: "prj_demo",
+      environmentId: "env_demo",
+    });
+
+    expect(listed.items[0]?.accessSummary?.plannedGeneratedAccessRoute).toEqual({
+      url: "http://web-demo.203.0.113.10.example.test",
+      hostname: "web-demo.203.0.113.10.example.test",
+      scheme: "http",
+      providerKey: "test-provider",
+      pathPrefix: "/",
+      proxyKind: "traefik",
+      targetPort: 3000,
     });
   });
 });

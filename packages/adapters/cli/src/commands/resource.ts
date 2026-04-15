@@ -2,6 +2,7 @@ import { Args, Command as EffectCommand, Options } from "@effect/cli";
 import {
   CreateResourceCommand,
   ListResourcesQuery,
+  ResourceProxyConfigurationPreviewQuery,
   ResourceRuntimeLogsQuery,
 } from "@yundu/application";
 import { resourceKinds } from "@yundu/core";
@@ -27,6 +28,10 @@ const internalPortOption = Options.text("internal-port").pipe(Options.optional);
 const portOption = Options.text("port").pipe(Options.optional);
 const deploymentOption = Options.text("deployment").pipe(Options.optional);
 const serviceOption = Options.text("service").pipe(Options.optional);
+const routeScopeOption = Options.choice("scope", ["planned", "latest", "deployment-snapshot"]).pipe(
+  Options.withDefault("latest"),
+);
+const diagnosticsOption = Options.boolean("diagnostics").pipe(Options.withDefault(false));
 const tailOption = Options.text("tail").pipe(Options.withDefault("100"));
 const followOption = Options.boolean("follow").pipe(Options.withDefault(false));
 
@@ -102,7 +107,26 @@ const logsCommand = EffectCommand.make(
     ),
 ).pipe(EffectCommand.withDescription("Show resource runtime logs"));
 
+const proxyConfigCommand = EffectCommand.make(
+  "proxy-config",
+  {
+    resourceId: resourceIdArg,
+    deployment: deploymentOption,
+    scope: routeScopeOption,
+    diagnostics: diagnosticsOption,
+  },
+  ({ deployment, diagnostics, resourceId, scope }) =>
+    runQuery(
+      ResourceProxyConfigurationPreviewQuery.create({
+        resourceId,
+        deploymentId: optionalValue(deployment),
+        routeScope: scope,
+        includeDiagnostics: diagnostics,
+      }),
+    ),
+).pipe(EffectCommand.withDescription("Show resource proxy configuration"));
+
 export const resourceCommand = EffectCommand.make("resource").pipe(
   EffectCommand.withDescription("Resource operations"),
-  EffectCommand.withSubcommands([createCommand, listCommand, logsCommand]),
+  EffectCommand.withSubcommands([createCommand, listCommand, logsCommand, proxyConfigCommand]),
 );

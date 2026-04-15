@@ -17,8 +17,10 @@
   import type {
     CreateDomainBindingInput,
     DomainBindingSummary,
+    ProxyConfigurationView,
     ResourceRuntimeLogEvent,
     ResourceRuntimeLogLine,
+    ResourceSummary,
   } from "@yundu/contracts";
 
   import { readErrorMessage } from "$lib/api/client";
@@ -83,6 +85,18 @@
   const resourceDomainBindings = $derived(
     resource ? domainBindings.filter((binding) => binding.resourceId === resource.id) : [],
   );
+  const generatedAccessRoute = $derived(
+    resource?.accessSummary?.latestGeneratedAccessRoute ??
+      resource?.accessSummary?.plannedGeneratedAccessRoute ??
+      null,
+  );
+  const generatedAccessStatus = $derived(
+    resource?.accessSummary?.latestGeneratedAccessRoute
+      ? (resource.accessSummary.proxyRouteStatus ?? "unknown")
+      : resource?.accessSummary?.plannedGeneratedAccessRoute
+        ? "not-ready"
+        : "unknown",
+  );
   const defaultDestinationId = $derived(
     resource?.destinationId ?? latestDeployment?.destinationId ?? "",
   );
@@ -107,6 +121,10 @@
   let runtimeLogsError = $state<string | null>(null);
   let runtimeLogsFollowing = $state(false);
   let runtimeLogStream = $state<RuntimeLogClientStream | null>(null);
+  let proxyConfigurationResourceId = $state("");
+  let proxyConfiguration = $state<ProxyConfigurationView | null>(null);
+  let proxyConfigurationLoading = $state(false);
+  let proxyConfigurationError = $state<string | null>(null);
 
   const selectedServer = $derived(findServer(servers, serverId));
   const canCreateBinding = $derived(
@@ -257,6 +275,40 @@
     void loadRuntimeLogs(resource.id);
   }
 
+  async function loadProxyConfiguration(currentResourceId: string): Promise<void> {
+    proxyConfigurationResourceId = currentResourceId;
+    proxyConfigurationLoading = true;
+    proxyConfigurationError = null;
+
+    try {
+      const result = await orpcClient.resources.proxyConfiguration({
+        resourceId: currentResourceId,
+        routeScope: "latest",
+        includeDiagnostics: true,
+      });
+
+      if (proxyConfigurationResourceId === currentResourceId) {
+        proxyConfiguration = result;
+      }
+    } catch (error) {
+      if (proxyConfigurationResourceId === currentResourceId) {
+        proxyConfigurationError = readErrorMessage(error);
+      }
+    } finally {
+      if (proxyConfigurationResourceId === currentResourceId) {
+        proxyConfigurationLoading = false;
+      }
+    }
+  }
+
+  function refreshProxyConfiguration(): void {
+    if (!resource) {
+      return;
+    }
+
+    void loadProxyConfiguration(resource.id);
+  }
+
   $effect(() => {
     if (!browser || !resource) {
       return;
@@ -291,10 +343,13 @@
       if (!currentResourceId) {
         runtimeLogs = [];
         runtimeLogResourceId = "";
+        proxyConfiguration = null;
+        proxyConfigurationResourceId = "";
         return;
       }
 
       void loadRuntimeLogs(currentResourceId);
+      void loadProxyConfiguration(currentResourceId);
     });
   });
 
@@ -357,6 +412,69 @@
       case "pending_verification":
       case "requested":
         return "secondary";
+    }
+  }
+
+  function accessRouteStatusLabel(
+    status: NonNullable<ResourceSummary["accessSummary"]>["proxyRouteStatus"],
+  ): string {
+    switch (status) {
+      case "ready":
+        return $t(i18nKeys.common.status.ready);
+      case "not-ready":
+        return $t(i18nKeys.common.status.notReady);
+      case "failed":
+        return $t(i18nKeys.common.status.failed);
+      case "unknown":
+      case undefined:
+        return $t(i18nKeys.common.status.unknown);
+    }
+  }
+
+  function accessRouteStatusVariant(
+    status: NonNullable<ResourceSummary["accessSummary"]>["proxyRouteStatus"],
+  ): "default" | "secondary" | "outline" | "destructive" {
+    switch (status) {
+      case "ready":
+        return "default";
+      case "failed":
+        return "destructive";
+      case "not-ready":
+        return "secondary";
+      case "unknown":
+      case undefined:
+        return "outline";
+    }
+  }
+
+  function proxyConfigurationStatusLabel(status: ProxyConfigurationView["status"]): string {
+    switch (status) {
+      case "not-configured":
+        return $t(i18nKeys.console.resources.proxyConfigurationStatusNotConfigured);
+      case "planned":
+        return $t(i18nKeys.console.resources.proxyConfigurationStatusPlanned);
+      case "applied":
+        return $t(i18nKeys.console.resources.proxyConfigurationStatusApplied);
+      case "stale":
+        return $t(i18nKeys.console.resources.proxyConfigurationStatusStale);
+      case "failed":
+        return $t(i18nKeys.common.status.failed);
+    }
+  }
+
+  function proxyConfigurationStatusVariant(
+    status: ProxyConfigurationView["status"],
+  ): "default" | "secondary" | "outline" | "destructive" {
+    switch (status) {
+      case "applied":
+        return "default";
+      case "failed":
+        return "destructive";
+      case "planned":
+      case "stale":
+        return "secondary";
+      case "not-configured":
+        return "outline";
     }
   }
 </script>
@@ -467,6 +585,138 @@
               {(resource.destinationId ?? latestDeployment?.destinationId ?? destinationId) || "-"}
             </p>
           </div>
+        </div>
+
+        <div class="mt-5 rounded-md border px-4 py-3">
+          <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div class="min-w-0 space-y-1">
+              <div class="flex flex-wrap items-center gap-2">
+                <Globe2 class="size-4 text-muted-foreground" />
+                <h2 class="font-semibold">{$t(i18nKeys.console.resources.generatedAccessTitle)}</h2>
+                <Badge variant={accessRouteStatusVariant(generatedAccessStatus)}>
+                  {accessRouteStatusLabel(generatedAccessStatus)}
+                </Badge>
+              </div>
+              <p class="text-sm text-muted-foreground">
+                {$t(i18nKeys.console.resources.generatedAccessDescription)}
+              </p>
+            </div>
+
+            {#if generatedAccessRoute}
+              <Button
+                href={generatedAccessRoute.url}
+                target="_blank"
+                rel="noreferrer"
+                variant="outline"
+              >
+                {$t(i18nKeys.console.resources.openGeneratedAccess)}
+                <ArrowRight class="size-4" />
+              </Button>
+            {/if}
+          </div>
+
+          {#if generatedAccessRoute}
+            <div class="mt-3 grid gap-3 lg:grid-cols-[1fr_auto_auto]">
+              <a
+                class="truncate rounded-md border bg-muted/40 px-3 py-2 text-sm font-medium text-primary underline-offset-4 hover:underline"
+                href={generatedAccessRoute.url}
+                target="_blank"
+                rel="noreferrer"
+              >
+                {generatedAccessRoute.url}
+              </a>
+              <div class="rounded-md border bg-background px-3 py-2 text-sm">
+                <span class="text-muted-foreground">{$t(i18nKeys.common.domain.proxy)}</span>
+                <span class="ml-2 font-medium">{generatedAccessRoute.proxyKind}</span>
+              </div>
+              <div class="rounded-md border bg-background px-3 py-2 text-sm">
+                <span class="text-muted-foreground">{$t(i18nKeys.common.domain.port)}</span>
+                <span class="ml-2 font-medium">{generatedAccessRoute.targetPort ?? "-"}</span>
+              </div>
+            </div>
+          {:else}
+            <div class="mt-3 rounded-md border border-dashed p-3 text-sm text-muted-foreground">
+              {$t(i18nKeys.console.resources.generatedAccessEmpty)}
+            </div>
+          {/if}
+        </div>
+      </section>
+
+      <section class="rounded-lg border bg-background p-5">
+        <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+          <div class="flex items-start gap-3">
+            <div class="rounded-md border bg-muted p-2">
+              <Route class="size-4" />
+            </div>
+            <div>
+              <div class="flex flex-wrap items-center gap-2">
+                <h2 class="text-lg font-semibold">
+                  {$t(i18nKeys.console.resources.proxyConfigurationTitle)}
+                </h2>
+                {#if proxyConfiguration}
+                  <Badge variant={proxyConfigurationStatusVariant(proxyConfiguration.status)}>
+                    {proxyConfigurationStatusLabel(proxyConfiguration.status)}
+                  </Badge>
+                {/if}
+              </div>
+              <p class="mt-1 text-sm text-muted-foreground">
+                {$t(i18nKeys.console.resources.proxyConfigurationDescription)}
+              </p>
+            </div>
+          </div>
+          <Button
+            variant="outline"
+            onclick={refreshProxyConfiguration}
+            disabled={proxyConfigurationLoading}
+          >
+            <RefreshCw class={["size-4", proxyConfigurationLoading ? "animate-spin" : ""]} />
+            {$t(i18nKeys.console.resources.proxyConfigurationRefresh)}
+          </Button>
+        </div>
+
+        {#if proxyConfigurationError}
+          <div class="mt-4 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+            {proxyConfigurationError}
+          </div>
+        {/if}
+
+        <div class="mt-4 space-y-3">
+          {#if proxyConfigurationLoading}
+            <div class="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
+              {$t(i18nKeys.console.resources.proxyConfigurationLoading)}
+            </div>
+          {:else if !proxyConfiguration || proxyConfiguration.sections.length === 0}
+            <div class="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
+              {$t(i18nKeys.console.resources.proxyConfigurationEmpty)}
+            </div>
+          {:else}
+            <div class="grid gap-3 md:grid-cols-3">
+              <div class="rounded-md border bg-muted/30 px-3 py-2 text-sm">
+                <span class="text-muted-foreground">{$t(i18nKeys.common.domain.proxy)}</span>
+                <span class="ml-2 font-medium">{proxyConfiguration.providerKey}</span>
+              </div>
+              <div class="rounded-md border bg-muted/30 px-3 py-2 text-sm">
+                <span class="text-muted-foreground">{$t(i18nKeys.common.domain.resources)}</span>
+                <span class="ml-2 font-medium">{proxyConfiguration.routes.length}</span>
+              </div>
+              <div class="rounded-md border bg-muted/30 px-3 py-2 text-sm">
+                <span class="text-muted-foreground">
+                  {$t(i18nKeys.console.resources.proxyConfigurationGeneratedAt)}
+                </span>
+                <span class="ml-2 font-medium">{formatTime(proxyConfiguration.generatedAt)}</span>
+              </div>
+            </div>
+
+            {#each proxyConfiguration.sections as section (section.id)}
+              <article class="rounded-md border">
+                <div class="flex flex-wrap items-center justify-between gap-2 border-b px-4 py-3">
+                  <h3 class="font-medium">{section.title}</h3>
+                  <Badge variant="outline">{section.format}</Badge>
+                </div>
+                <pre class="max-h-80 overflow-auto p-4 text-xs"><code>{section.content}</code></pre>
+              </article>
+            {/each}
+          {/if}
         </div>
       </section>
 

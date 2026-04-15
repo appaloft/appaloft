@@ -20,7 +20,7 @@ This workflow inherits:
 - [ADR-011: Resource Create Minimum Lifecycle](../decisions/ADR-011-resource-create-minimum-lifecycle.md)
 - [ADR-012: Resource Runtime Profile And Deployment Snapshot Boundary](../decisions/ADR-012-resource-runtime-profile-and-deployment-snapshot-boundary.md)
 - [ADR-015: Resource Network Profile](../decisions/ADR-015-resource-network-profile.md)
-- [ADR-017: Resource Runtime Log Observation](../decisions/ADR-017-resource-runtime-log-observation.md)
+- [ADR-018: Resource Runtime Log Observation](../decisions/ADR-018-resource-runtime-log-observation.md)
 - [resources.create Command Spec](../commands/resources.create.md)
 - [deployments.create Command Spec](../commands/deployments.create.md)
 - [resources.runtime-logs Query Spec](../queries/resources.runtime-logs.md)

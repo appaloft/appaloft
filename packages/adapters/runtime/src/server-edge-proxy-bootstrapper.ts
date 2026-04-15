@@ -4,15 +4,15 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   type ExecutionContext,
+  type EdgeProxyProviderRegistry,
   type ServerEdgeProxyBootstrapper,
   type ServerEdgeProxyBootstrapResult,
 } from "@yundu/application";
 import { ok, type DeploymentTargetState, type Result } from "@yundu/core";
 import {
-  type EdgeProxyRuntimeKind,
-  createProxyBootstrapPlanForKind,
+  createEdgeProxyEnsurePlanForSelection,
   proxyBootstrapOptionsFromEnv,
-} from "./proxy-bootstrap";
+} from "./edge-proxy-plans";
 
 interface CommandResult {
   failed: boolean;
@@ -107,7 +107,7 @@ function runSshCommand(server: DeploymentTargetState, command: string): CommandR
 
 function failedResult(input: {
   server: DeploymentTargetState;
-  kind: EdgeProxyRuntimeKind;
+  kind: ServerEdgeProxyBootstrapResult["kind"];
   attemptedAt: string;
   message: string;
   errorCode: string;
@@ -125,22 +125,23 @@ function failedResult(input: {
 }
 
 export class RuntimeServerEdgeProxyBootstrapper implements ServerEdgeProxyBootstrapper {
+  constructor(private readonly edgeProxyProviderRegistry: EdgeProxyProviderRegistry) {}
+
   async bootstrap(
     context: ExecutionContext,
     input: {
       server: DeploymentTargetState;
     },
   ): Promise<Result<ServerEdgeProxyBootstrapResult>> {
-    void context;
     const { server } = input;
     const attemptedAt = new Date().toISOString();
     const kind = server.edgeProxy?.kind.value;
 
-    if (kind !== "traefik" && kind !== "caddy") {
+    if (!kind || kind === "none" || (kind !== "traefik" && kind !== "caddy")) {
       return ok(
         failedResult({
           server,
-          kind: "traefik",
+          kind: kind ?? "none",
           attemptedAt,
           message: "No supported edge proxy kind is configured",
           errorCode: "edge_proxy_kind_unsupported",
@@ -148,7 +149,29 @@ export class RuntimeServerEdgeProxyBootstrapper implements ServerEdgeProxyBootst
       );
     }
 
-    const plan = createProxyBootstrapPlanForKind(kind, proxyBootstrapOptionsFromEnv(process.env));
+    const planResult = await createEdgeProxyEnsurePlanForSelection({
+      providerRegistry: this.edgeProxyProviderRegistry,
+      context: {
+        correlationId: context.requestId,
+        server,
+      },
+      proxyKind: kind,
+      options: proxyBootstrapOptionsFromEnv(process.env),
+    });
+    if (planResult.isErr() || !planResult.value) {
+      const error = planResult.isErr() ? planResult.error : undefined;
+      return ok(
+        failedResult({
+          server,
+          kind,
+          attemptedAt,
+          message: error?.message ?? "Edge proxy provider could not render an ensure plan",
+          errorCode: error?.code ?? "proxy_provider_unavailable",
+        }),
+      );
+    }
+
+    const plan = planResult.value;
     const runCommand =
       server.providerKey.value === "local-shell"
         ? runLocalCommand
@@ -201,11 +224,12 @@ export class RuntimeServerEdgeProxyBootstrapper implements ServerEdgeProxyBootst
       kind,
       status: "ready",
       attemptedAt,
-      message: `${plan.displayName} edge proxy is ready`,
-      metadata: {
-        containerName: plan.containerName,
-        networkName: plan.networkName,
-      },
-    });
+        message: `${plan.displayName} edge proxy is ready`,
+        metadata: {
+          containerName: plan.containerName,
+          networkName: plan.networkName,
+          providerKey: plan.providerKey,
+        },
+      });
   }
 }

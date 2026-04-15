@@ -320,6 +320,7 @@
     detail: string;
   } | null>(null);
   let lastCreatedDeploymentId = $state("");
+  let lastGeneratedAccessUrl = $state("");
 
   const createProjectMutation = createMutation(() => ({
     mutationFn: (input: { name: string; description?: string }) => orpcClient.projects.create(input),
@@ -409,13 +410,20 @@
     browser &&
       typeof (window as WindowWithYunduDesktopBridge).yunduDesktop?.selectDirectory === "function",
   );
-  const selectedProject = $derived(projects.find((project) => project.id === selectedProjectId) ?? null);
+  const selectedProject = $derived(
+    projects.find((project) => project.id === selectedProjectId) ?? null,
+  );
   const selectedServer = $derived(servers.find((server) => server.id === selectedServerId) ?? null);
   const selectedEnvironment = $derived(
     environments.find((environment) => environment.id === selectedEnvironmentId) ?? null,
   );
   const selectedResource = $derived(
     resources.find((resource) => resource.id === selectedResourceId) ?? null,
+  );
+  const selectedResourceAccessRoute = $derived(
+    selectedResource?.accessSummary?.latestGeneratedAccessRoute ??
+      selectedResource?.accessSummary?.plannedGeneratedAccessRoute ??
+      null,
   );
   const filteredEnvironments = $derived.by(() => {
     if (projectMode === "existing" && selectedProjectId) {
@@ -760,7 +768,9 @@
 
     return `${variableKey.trim()} · ${variableIsSecret ? "secret" : "plain-config"}`;
   });
-  const domainBindingSummary = $derived($t(i18nKeys.console.quickDeploy.domainBindingsAfterDeploy));
+  const domainBindingSummary = $derived(
+    selectedResourceAccessRoute?.url ?? $t(i18nKeys.console.quickDeploy.domainBindingsAfterDeploy),
+  );
   const canAdvance = $derived(stepIsComplete(activeStep));
 
   const githubRepositoriesQuery = createQuery(() =>
@@ -1781,15 +1791,31 @@
       selectedResourceId = workflowResult.resourceId;
 
       await refreshWorkspaceData();
+      const refreshedResources = await orpcClient.resources.list({
+        projectId: workflowResult.projectId,
+        environmentId: workflowResult.environmentId,
+      });
+      const refreshedResource = refreshedResources.items.find(
+        (candidate) => candidate.id === workflowResult.resourceId,
+      );
+      lastGeneratedAccessUrl =
+        refreshedResource?.accessSummary?.latestGeneratedAccessRoute?.url ??
+        refreshedResource?.accessSummary?.plannedGeneratedAccessRoute?.url ??
+        "";
 
       deployFeedback = {
         kind: "success",
         title: $t(i18nKeys.console.quickDeploy.deployFeedbackSuccessTitle),
-        detail: `deploymentId: ${workflowResult.deploymentId}`,
+        detail:
+          lastGeneratedAccessUrl ||
+          $t(i18nKeys.console.quickDeploy.deploymentIdDetail, {
+            deploymentId: workflowResult.deploymentId,
+          }),
       };
       lastCreatedDeploymentId = workflowResult.deploymentId;
     } catch (error) {
       workflowProgressError = readErrorMessage(error);
+      lastGeneratedAccessUrl = "";
       deployFeedback = {
         kind: "error",
         title: $t(i18nKeys.console.quickDeploy.deployFeedbackErrorTitle),
@@ -2770,15 +2796,27 @@
           <CardContent>
             <p class="text-sm text-muted-foreground">{deployFeedback.detail}</p>
             {#if deployFeedback.kind === "success" && lastCreatedDeploymentId}
-              <Button
-                class="mt-4"
-                size="sm"
-                onclick={() => {
-                  void goto(`/deployments/${lastCreatedDeploymentId}`);
-                }}
-              >
-                {$t(i18nKeys.common.actions.viewDeployment)}
-              </Button>
+              <div class="mt-4 flex flex-wrap gap-2">
+                {#if lastGeneratedAccessUrl}
+                  <Button
+                    href={lastGeneratedAccessUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    size="sm"
+                    variant="outline"
+                  >
+                    {$t(i18nKeys.console.resources.openGeneratedAccess)}
+                  </Button>
+                {/if}
+                <Button
+                  size="sm"
+                  onclick={() => {
+                    void goto(`/deployments/${lastCreatedDeploymentId}`);
+                  }}
+                >
+                  {$t(i18nKeys.common.actions.viewDeployment)}
+                </Button>
+              </div>
             {/if}
           </CardContent>
         </Card>

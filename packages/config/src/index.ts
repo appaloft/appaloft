@@ -3,6 +3,13 @@ import { join, resolve } from "node:path";
 
 type ConfigEnv = Record<string, string | undefined>;
 
+export interface DefaultAccessDomainConfig {
+  mode: "disabled" | "provider";
+  providerKey: string;
+  zone: string;
+  scheme: "http" | "https";
+}
+
 export interface AppConfig {
   appName: string;
   appVersion: string;
@@ -26,6 +33,7 @@ export interface AppConfig {
   otelServiceName: string;
   otelExporterEndpoint: string;
   secretMask: string;
+  defaultAccessDomain: DefaultAccessDomainConfig;
   enabledSystemPlugins: string[];
   configFilePath?: string;
 }
@@ -54,6 +62,12 @@ const defaults: Omit<AppConfig, "dataDir" | "pgliteDataDir"> = {
   otelServiceName: "yundu-backend",
   otelExporterEndpoint: "http://localhost:4318/v1/traces",
   secretMask: "****",
+  defaultAccessDomain: {
+    mode: "provider",
+    providerKey: "sslip",
+    zone: "sslip.io",
+    scheme: "http",
+  },
   enabledSystemPlugins: [],
 };
 
@@ -129,6 +143,16 @@ export function resolveConfig(source: ConfigSource<AppConfig> = {}): AppConfig {
   )
     .map((plugin) => plugin.trim())
     .filter((plugin) => plugin.length > 0);
+  const defaultAccessDomain =
+    source.flags?.defaultAccessDomain ??
+    fileConfig.defaultAccessDomain ??
+    defaults.defaultAccessDomain;
+  const defaultAccessDomainMode =
+    (env.YUNDU_DEFAULT_ACCESS_DOMAIN_MODE as DefaultAccessDomainConfig["mode"] | undefined) ??
+    defaultAccessDomain.mode;
+  const defaultAccessDomainScheme =
+    (env.YUNDU_DEFAULT_ACCESS_DOMAIN_SCHEME as DefaultAccessDomainConfig["scheme"] | undefined) ??
+    defaultAccessDomain.scheme;
 
   return {
     appName: source.flags?.appName ?? env.YUNDU_APP_NAME ?? fileConfig.appName ?? defaults.appName,
@@ -217,6 +241,18 @@ export function resolveConfig(source: ConfigSource<AppConfig> = {}): AppConfig {
       env.YUNDU_SECRET_MASK ??
       fileConfig.secretMask ??
       defaults.secretMask,
+    defaultAccessDomain: {
+      mode: defaultAccessDomainMode,
+      providerKey:
+        env.YUNDU_DEFAULT_ACCESS_DOMAIN_PROVIDER ??
+        defaultAccessDomain.providerKey ??
+        defaults.defaultAccessDomain.providerKey,
+      zone:
+        env.YUNDU_DEFAULT_ACCESS_DOMAIN_ZONE ??
+        defaultAccessDomain.zone ??
+        defaults.defaultAccessDomain.zone,
+      scheme: defaultAccessDomainScheme,
+    },
     enabledSystemPlugins,
     ...(source.configFilePath ? { configFilePath: source.configFilePath } : {}),
   };

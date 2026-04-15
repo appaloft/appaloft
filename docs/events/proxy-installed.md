@@ -4,7 +4,7 @@
 
 `proxy-installed` means the required edge proxy for a server is installed, running, and durably recorded as ready for the bootstrap attempt.
 
-It does not mean every deployment routed through the proxy is healthy.
+It does not mean every deployment routed through the proxy is healthy. It only satisfies the server/proxy readiness gate that generated default access and durable domain routes depend on.
 
 ## Event Type
 
@@ -37,7 +37,7 @@ Expected consumers:
 ```ts
 type ProxyInstalledPayload = {
   serverId: string;
-  proxyKind: "traefik" | "caddy";
+  edgeProxyProviderKey: string;
   attemptId: string;
   installedAt: string;
   providerKey: string;
@@ -69,7 +69,7 @@ The follow-up action must be idempotent and must verify that server connectivity
 
 ## Idempotency
 
-Consumers must dedupe by `(serverId, proxyKind, attemptId)`.
+Consumers must dedupe by `(serverId, edgeProxyProviderKey, attemptId)`.
 
 Duplicate `proxy-installed` must not repeatedly mark ready, duplicate notifications, or restart the proxy.
 
@@ -90,7 +90,7 @@ If a later verification finds the proxy unhealthy, it must be represented as a n
 Logs and traces must include:
 
 - `serverId`;
-- `proxyKind`;
+- `edgeProxyProviderKey`;
 - `attemptId`;
 - `phase = proxy-bootstrap`;
 - `correlationId`;
@@ -102,6 +102,8 @@ Logs and traces must include:
 Current code records `deployment_target.edge_proxy_bootstrap_succeeded` when `markEdgeProxyReady` is called. It stores `edgeProxy.status = ready` and `lastSucceededAt`.
 
 The current event handler marks ready but does not publish pulled aggregate events after the mark. The target canonical event is `proxy-installed`.
+
+Current runtime state still exposes `proxyKind`; ADR-019 treats that as provider-selection migration data. The target event payload uses `edgeProxyProviderKey`.
 
 ## Open Questions
 

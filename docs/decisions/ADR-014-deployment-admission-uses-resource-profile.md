@@ -21,6 +21,7 @@ The deployment use case must load the `Resource` aggregate and resolve the deplo
 - `ResourceSourceBinding` provides the source locator and source identity;
 - `ResourceRuntimeProfile` provides the runtime plan strategy, command defaults, and health-check defaults;
 - `ResourceNetworkProfile` provides the internal workload listener port, upstream protocol, exposure mode, and service target needed for runtime/proxy planning;
+- default generated access and durable domain routes are resolved from provider-neutral access policy and domain binding state governed by ADR-017 and ADR-002;
 - `Deployment` persists only the immutable resolved runtime plan snapshot and environment snapshot for the accepted attempt.
 
 Command success still means request accepted and returns `ok({ id })`. It does not mean execution, verification, routing, or health has completed.
@@ -123,6 +124,7 @@ Existing deployments remain valid because their runtime and network plan snapsho
 - [resources.create Implementation Plan](../implementation/resources.create-plan.md)
 - [ADR-015: Resource Network Profile](./ADR-015-resource-network-profile.md)
 - [ADR-016: Deployment Command Surface Reset](./ADR-016-deployment-command-surface-reset.md)
+- [ADR-017: Default Access Domain And Proxy Routing](./ADR-017-default-access-domain-and-proxy-routing.md)
 
 ## Superseded Open Questions
 
@@ -139,7 +141,9 @@ Historical resources may still lack source/runtime/network profile values and ne
 
 Existing deployment config bootstrap can still create or infer deployment context and must be narrowed to a compatibility seam.
 
-Current code still stores `port` under `ResourceRuntimeProfile`. [ADR-015](./ADR-015-resource-network-profile.md) governs the migration to `ResourceNetworkProfile.internalPort`.
+Current code stores resource listener port under `ResourceNetworkProfile.internalPort`.
+
+Generated default access routing and provider-neutral route resolution are not yet implemented as first-class route snapshot inputs governed by ADR-017.
 
 ## Open Questions
 

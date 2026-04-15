@@ -11,7 +11,7 @@ This document is an implementation-planning contract for aligning the Web consol
 - [ADR-012: Resource Runtime Profile And Deployment Snapshot Boundary](../decisions/ADR-012-resource-runtime-profile-and-deployment-snapshot-boundary.md)
 - [ADR-015: Resource Network Profile](../decisions/ADR-015-resource-network-profile.md)
 - [ADR-010: Quick Deploy Workflow Boundary](../decisions/ADR-010-quick-deploy-workflow-boundary.md)
-- [ADR-017: Resource Runtime Log Observation](../decisions/ADR-017-resource-runtime-log-observation.md)
+- [ADR-018: Resource Runtime Log Observation](../decisions/ADR-018-resource-runtime-log-observation.md)
 
 ## Governed Specs
 
@@ -108,7 +108,7 @@ If a dedicated create-resource route is too large for the first Web Code Round, 
 
 Current contracts expose the listener port as `networkProfile.internalPort`, governed by [ADR-015](../decisions/ADR-015-resource-network-profile.md).
 
-Resource runtime logs are governed by [ADR-017](../decisions/ADR-017-resource-runtime-log-observation.md)
+Resource runtime logs are governed by [ADR-018](../decisions/ADR-018-resource-runtime-log-observation.md)
 and remain future until `resources.runtime-logs` is active in Core Operations and the operation
 catalog.
 

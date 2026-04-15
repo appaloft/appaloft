@@ -6,6 +6,7 @@ import {
   deploymentProgressSteps,
   type AppLogger,
   type DeploymentProgressReporter,
+  type EdgeProxyProviderRegistry,
   type ExecutionBackend,
   type ExecutionContext,
   type IntegrationAuthPort,
@@ -31,11 +32,12 @@ import {
   type RollbackPlan,
 } from "@yundu/core";
 import {
-  createProxyBootstrapPlan,
-  dockerNetworkFlagForAccessRoutes,
+  createEdgeProxyEnsurePlan,
+  createProxyRouteRealizationPlan,
+  dockerLabelFlagsForProxyPlan,
+  dockerNetworkFlagForProxyPlan,
   proxyBootstrapOptionsFromEnv,
-} from "./proxy-bootstrap";
-import { dockerLabelFlagsForAccessRoutes } from "./proxy-labels";
+} from "./edge-proxy-plans";
 
 type LogPhase = "detect" | "plan" | "package" | "deploy" | "verify" | "rollback";
 type LogLevel = "debug" | "info" | "warn" | "error";
@@ -201,6 +203,12 @@ function shellQuote(input: string): string {
 
 function dockerRemovePublishedPortCommand(port: number): string {
   return `docker ps --filter ${shellQuote(`publish=${port}`)} -q | while read -r container_id; do docker rm -f "$container_id"; done`;
+}
+
+function dockerPublishedPortFlag(port: number, metadata?: Record<string, string>): string {
+  return metadata?.["resource.exposureMode"] === "direct-port"
+    ? `-p ${port}:${port}`
+    : `-p 127.0.0.1:${port}:${port}`;
 }
 
 function runSyncCommand(input: {
@@ -449,6 +457,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
     private readonly logger: AppLogger,
     private readonly progressReporter: DeploymentProgressReporter,
     private readonly integrationAuthPort?: IntegrationAuthPort,
+    private readonly edgeProxyProviderRegistry?: EdgeProxyProviderRegistry,
   ) {}
 
   private report(
@@ -1128,7 +1137,32 @@ export class LocalExecutionBackend implements ExecutionBackend {
     });
 
     const accessRoutes = state.runtimePlan.execution.accessRoutes ?? [];
-    const proxyBootstrap = createProxyBootstrapPlan(accessRoutes, proxyBootstrapOptionsFromEnv(env));
+    const proxyBootstrapResult = this.edgeProxyProviderRegistry
+      ? await createEdgeProxyEnsurePlan({
+          providerRegistry: this.edgeProxyProviderRegistry,
+          context: {
+            correlationId: context.requestId,
+          },
+          accessRoutes,
+          options: proxyBootstrapOptionsFromEnv(env),
+        })
+      : ok(null);
+    if (proxyBootstrapResult.isErr()) {
+      const message = "Edge proxy provider could not render an ensure plan";
+      logs.push(phaseLog("deploy", message, "error"));
+      return ok({
+        deployment: this.applyFailure(deployment, {
+          logs,
+          errorCode: proxyBootstrapResult.error.code,
+          retryable: proxyBootstrapResult.error.retryable,
+          metadata: {
+            message: proxyBootstrapResult.error.message,
+          },
+        }).deployment,
+      });
+    }
+
+    const proxyBootstrap = proxyBootstrapResult.value;
     if (proxyBootstrap) {
       const proxyMessage = `Ensure ${proxyBootstrap.displayName} edge proxy on Docker network ${proxyBootstrap.networkName}`;
       logs.push(phaseLog("deploy", proxyMessage));
@@ -1201,7 +1235,8 @@ export class LocalExecutionBackend implements ExecutionBackend {
             errorCode: "edge_proxy_start_failed",
             retryable: true,
             metadata: {
-              proxyKind: proxyBootstrap.kind,
+              proxyKind: proxyBootstrap.proxyKind,
+              providerKey: proxyBootstrap.providerKey,
               containerName: proxyBootstrap.containerName,
               networkName: proxyBootstrap.networkName,
             },
@@ -1231,6 +1266,32 @@ export class LocalExecutionBackend implements ExecutionBackend {
     });
     logs.push(phaseLog("deploy", `Release existing containers publishing port ${port}`));
 
+    const proxyRoutePlanResult = this.edgeProxyProviderRegistry
+      ? await createProxyRouteRealizationPlan({
+          providerRegistry: this.edgeProxyProviderRegistry,
+          context: {
+            correlationId: context.requestId,
+          },
+          deploymentId: state.id.value,
+          port,
+          accessRoutes,
+        })
+      : ok(null);
+    if (proxyRoutePlanResult.isErr()) {
+      const message = "Edge proxy route configuration could not be rendered";
+      logs.push(phaseLog("deploy", message, "error"));
+      return ok({
+        deployment: this.applyFailure(deployment, {
+          logs,
+          errorCode: proxyRoutePlanResult.error.code,
+          retryable: proxyRoutePlanResult.error.retryable,
+          metadata: {
+            message: proxyRoutePlanResult.error.message,
+          },
+        }).deployment,
+      });
+    }
+
     const envFlags = Object.entries(env)
       .filter((entry): entry is [string, string] => typeof entry[1] === "string")
       .filter(([key]) =>
@@ -1238,17 +1299,15 @@ export class LocalExecutionBackend implements ExecutionBackend {
       )
       .map(([key, value]) => `-e ${shellQuote(`${key}=${value}`)}`)
       .join(" ");
-    const labelFlags = dockerLabelFlagsForAccessRoutes({
-      deploymentId: state.id.value,
-      port,
-      accessRoutes,
+    const labelFlags = dockerLabelFlagsForProxyPlan({
+      plan: proxyRoutePlanResult.value,
       quote: shellQuote,
     });
-    const networkFlag = dockerNetworkFlagForAccessRoutes(accessRoutes);
+    const networkFlag = dockerNetworkFlagForProxyPlan(proxyRoutePlanResult.value);
     const runCommand = [
       `docker run -d --rm --name ${containerName}`,
       networkFlag,
-      `-p ${port}:${port}`,
+      dockerPublishedPortFlag(port, state.runtimePlan.execution.metadata),
       envFlags,
       labelFlags,
       image,

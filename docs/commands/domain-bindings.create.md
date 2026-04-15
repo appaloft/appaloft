@@ -4,7 +4,7 @@
 
 `domain-bindings.create` is the source-of-truth command for creating a durable domain binding.
 
-A domain binding is a long-lived routing business object. It binds a public domain name and optional path prefix to a project/environment/resource placement policy. It is not the same thing as a deployment runtime access-route hint.
+A domain binding is a long-lived routing business object. It binds a public domain name and optional path prefix to a project/environment/resource placement policy. It is not the same thing as a deployment route snapshot or generated default access route.
 
 Command success means the domain binding request has been accepted and a binding id is available. It does not mean DNS ownership is verified, certificate issuance has completed, or the domain is ready for traffic.
 
@@ -27,6 +27,7 @@ This command inherits:
 - [ADR-002: Routing, Domain, And TLS Boundary](../decisions/ADR-002-routing-domain-tls-boundary.md)
 - [ADR-005: Domain Binding Owner Scope](../decisions/ADR-005-domain-binding-owner-scope.md)
 - [ADR-006: Domain Verification Strategy](../decisions/ADR-006-domain-verification-strategy.md)
+- [ADR-017: Default Access Domain And Proxy Routing](../decisions/ADR-017-default-access-domain-and-proxy-routing.md)
 - [Error Model](../errors/model.md)
 - [neverthrow Conventions](../errors/neverthrow-conventions.md)
 - [Async Lifecycle And Acceptance](../architecture/async-lifecycle-and-acceptance.md)
@@ -38,7 +39,8 @@ Create a durable domain binding for a resource or route owner so future deployme
 It is not:
 
 - a deployment command;
-- a deployment runtime access-route hint;
+- a deployment route snapshot;
+- a generated default access route;
 - a certificate issuance command;
 - a DNS provider adapter call;
 - a Web wizard step;
@@ -65,7 +67,7 @@ CLI and API remain strict operation entrypoints. CLI may collect missing values 
 | `destinationId` | Required | Destination on the server for route placement. |
 | `domainName` | Required | Public DNS hostname. Must not include scheme, path, or port. |
 | `pathPrefix` | Optional | Route path prefix. Defaults to `/`. |
-| `proxyKind` | Required | `traefik` or `caddy`. Durable domain bindings do not use `none`. |
+| `edgeProxyProviderKey` | Optional | Opaque provider key. When omitted, the binding uses the target/server's resolved edge proxy provider. |
 | `tlsMode` | Optional | `auto` or `disabled`. Defaults to `auto`. |
 | `certificatePolicy` | Optional | `auto`, `manual`, or `disabled`. Defaults from `tlsMode`. |
 | `idempotencyKey` | Optional but recommended | Caller-supplied dedupe key for repeated create attempts. |
@@ -76,11 +78,11 @@ The command must:
 
 1. Validate command input.
 2. Normalize and validate `domainName`.
-3. Validate `pathPrefix`, `proxyKind`, and `tlsMode`.
+3. Validate `pathPrefix`, optional edge proxy provider key, and `tlsMode`.
 4. Resolve project, environment, resource, server, and destination.
 5. Reject cross-project/environment/destination mismatches.
 6. Reject duplicate active bindings for the same normalized `domainName`, `pathPrefix`, and environment/resource scope.
-7. Reject `proxyKind = none` for durable domain bindings.
+7. Reject durable bindings when the target resolves to no edge proxy provider or to a provider that does not support durable domain routes.
 8. Persist a durable binding in `requested` or `pending_verification`.
 9. Allocate and persist the first domain verification attempt id according to ADR-006.
 10. Publish or record `domain-binding-requested` with the verification attempt id.
@@ -120,10 +122,10 @@ All errors use [Error Model](../errors/model.md). Command-specific codes and pha
 
 | Error code | Phase | Retriable | Meaning |
 | --- | --- | --- | --- |
-| `validation_error` | `command-validation` | No | Input shape, domain name, path prefix, proxy kind, or TLS mode is invalid. |
+| `validation_error` | `command-validation` | No | Input shape, domain name, path prefix, edge proxy provider key, or TLS mode is invalid. |
 | `not_found` | `context-resolution` | No | Project, environment, resource, server, or destination is missing. |
 | `conflict` | `domain-binding-admission` | No | Active binding already owns the same normalized domain/path/scope. |
-| `domain_binding_proxy_required` | `domain-binding-admission` | No | Durable binding requested with `proxyKind = none`. |
+| `domain_binding_proxy_required` | `domain-binding-admission` | No | Durable binding requested for a no-proxy target or unsupported edge proxy provider. |
 | `domain_binding_context_mismatch` | `context-resolution` | No | Resource, environment, server, destination, or project relationship is inconsistent. |
 | `infra_error` | `domain-binding-persistence` or `event-publication` | Conditional | Binding could not be safely persisted or event recorded. |
 
@@ -144,21 +146,25 @@ It must not:
 
 ## Relationship To deployments.create
 
-`deployments.create` must not carry `proxyKind`, `domains`, `pathPrefix`, or `tlsMode`.
+`deployments.create` must not carry edge proxy provider keys, domains, path prefix, or TLS mode.
 
 `domain-bindings.create` creates durable domain ownership and readiness state. Future deployment admission may reuse a ready domain binding, but deployment creation must not implicitly create one.
+
+Generated default access routes are governed by [ADR-017](../decisions/ADR-017-default-access-domain-and-proxy-routing.md). They may provide a convenience public URL without creating a `DomainBinding`.
 
 ## Current Implementation Notes And Migration Gaps
 
 Current code models routing as runtime-plan `accessRoutes` with `proxyKind`, `domains`, `pathPrefix`, and `tlsMode`.
 
-Current runtime adapters generate Traefik/Caddy Docker labels and can ensure an edge proxy container/network for proxy-backed access routes.
+Generated default access routes and their provider-neutral route snapshots are not yet implemented as distinct state from durable `DomainBinding`.
+
+Current runtime adapters generate concrete proxy Docker labels and can ensure an edge proxy container/network for proxy-backed access routes. ADR-019 moves those provider-specific decisions behind edge proxy provider packages.
 
 Current persistence snapshots deployment access routes on deployment runtime plan/read model data; those snapshots remain separate from durable domain bindings.
 
 Current code now includes a first-class `DomainBinding` aggregate, repository port, PostgreSQL/PGlite persistence, `domain-bindings.create` command schema/message/handler/use case, operation catalog entry, oRPC/OpenAPI create route, CLI create command, `domain-bindings.list` read/query surface, a standalone Web console create/list entrypoint, and a resource-scoped Web detail-page entrypoint.
 
-Current `domain-bindings.create` persists the binding in `pending_verification`, allocates the first manual verification attempt, publishes `domain-binding-requested`, returns `ok({ id })`, rejects `proxyKind = none`, detects active owner-scope duplicates, and supports idempotency key reuse.
+Current `domain-bindings.create` persists the binding in `pending_verification`, allocates the first manual verification attempt, publishes `domain-binding-requested`, returns `ok({ id })`, rejects `proxyKind = none`, detects active owner-scope duplicates, and supports idempotency key reuse. The `proxyKind` field is now provider-selection migration data; the target command resolves edge proxy provider eligibility through server/target state and optional `edgeProxyProviderKey`.
 
 The follow-up `domain-bound`, certificate issuance, and `domain-ready` process-manager chain is not implemented yet.
 

@@ -24,6 +24,7 @@ This workflow inherits:
 - [ADR-013: Project Resource Navigation And Deployment Ownership](../decisions/ADR-013-project-resource-navigation-and-deployment-ownership.md)
 - [ADR-014: Deployment Admission Uses Resource Profile](../decisions/ADR-014-deployment-admission-uses-resource-profile.md)
 - [ADR-015: Resource Network Profile](../decisions/ADR-015-resource-network-profile.md)
+- [ADR-017: Default Access Domain And Proxy Routing](../decisions/ADR-017-default-access-domain-and-proxy-routing.md)
 - [resources.create Command Spec](../commands/resources.create.md)
 - [resource-created Event Spec](../events/resource-created.md)
 - [Resource Lifecycle Error Spec](../errors/resources.lifecycle.md)
@@ -49,11 +50,13 @@ user or automation intent
 
 `resources.create` success is complete when resource state is persisted. Deployment still requires `deployments.create`.
 
-Source binding, runtime profile, and network profile are resource-owned inputs for first-deploy resource creation. Access-route/domain/TLS defaults remain separate domain binding and certificate concerns.
+Source binding, runtime profile, and network profile are resource-owned inputs for first-deploy resource creation. Generated default access is resolved from platform policy, server/proxy readiness, and resource network state during deployment planning/execution. Durable custom domain/TLS defaults remain separate domain binding and certificate concerns.
 
 The workflow must distinguish source selection from runtime planning. A selected source locator or source descriptor identifies what will be deployed. A runtime plan strategy describes how that source should be planned. The compatibility input name `deploymentMethod` may exist only at CLI/UI entry boundaries and must map to resource `RuntimePlanStrategy` before `resources.create`.
 
 The workflow must distinguish the resource internal listener port from host exposure. A collected application "port" is `ResourceNetworkProfile.internalPort`. It is not `deployments.create.port`, and it is not a server host-published port unless an explicit `direct-port` exposure mode is accepted.
+
+When generated default access policy is enabled, the first deployment may produce a provider-neutral generated access URL. The workflow displays it through `ResourceAccessSummary` after route snapshot/read-model state exists; it does not collect generated-domain provider settings during resource creation.
 
 ## Entry Differences
 
@@ -113,6 +116,8 @@ Deployment source/runtime/network values now belong to `resources.create` input 
 Current CLI entry code still exposes `--method` as a user-facing compatibility option. It maps to resource `RuntimePlanStrategy` before `resources.create`; it must not reach `deployments.create`.
 
 Current Web/CLI entry code may expose generic port wording, but it must dispatch `networkProfile.internalPort` as governed by [ADR-015](../decisions/ADR-015-resource-network-profile.md).
+
+Generated default access route display and route snapshot persistence are governed by [ADR-017](../decisions/ADR-017-default-access-domain-and-proxy-routing.md) and are not yet implemented as the first-class `ResourceAccessSummary` read-model surface.
 
 Current Web project detail still needs a fuller ADR-013 alignment pass: resource list should become
 the primary page body, project-level deployment actions should become secondary rollups or Quick

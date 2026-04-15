@@ -14,7 +14,7 @@ DNS-01, wildcard certificates, and provider-specific managed certificates are de
 
 ## Context
 
-ADR-002 separates durable certificate lifecycle from deployment runtime access-route hints. Runtime proxy behavior can expose TLS routes, but a platform-owned `Certificate` lifecycle needs explicit provider and challenge semantics.
+ADR-002 separates durable certificate lifecycle from deployment route snapshots and generated default access routes. Runtime proxy behavior can expose TLS routes, but a platform-owned `Certificate` lifecycle needs explicit provider and challenge semantics.
 
 HTTP-01 aligns with proxy-backed public domains and avoids requiring DNS provider write permissions for the first implementation. DNS-01 remains important for wildcard domains and environments where HTTP challenge cannot be routed reliably.
 

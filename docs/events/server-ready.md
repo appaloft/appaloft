@@ -6,6 +6,8 @@
 
 It does not mean every future deployment on that server will succeed.
 
+For reverse-proxy resources, this readiness is the server-side gate for generated default access routes. It does not guarantee that a specific deployment's route realization or public health verification has succeeded.
+
 ## Event Type
 
 Domain lifecycle event for server readiness, published as an application event through the application layer or outbox.
@@ -19,7 +21,7 @@ server-connected
   -> server-ready
 ```
 
-when `proxyKind = none`, or:
+when edge proxy is disabled, or:
 
 ```text
 server-connected
@@ -28,7 +30,7 @@ server-connected
   -> server-ready
 ```
 
-when `proxyKind = traefik | caddy`.
+when edge proxy is provider-backed.
 
 ## Publisher
 
@@ -52,7 +54,8 @@ type ServerReadyPayload = {
   host: string;
   port: number;
   readyAt: string;
-  proxyKind: "none" | "traefik" | "caddy";
+  edgeProxyMode: "disabled" | "provider";
+  edgeProxyProviderKey?: string;
   edgeProxyStatus: "disabled" | "ready";
   connectivityAttemptId?: string;
   proxyBootstrapAttemptId?: string;
@@ -70,8 +73,8 @@ A server is ready only when:
 - server metadata is registered;
 - provider connectivity requirements are satisfied;
 - required credentials are usable;
-- `proxyKind = none` maps to `edgeProxy.status = disabled`; or
-- `proxyKind = traefik | caddy` maps to `edgeProxy.status = ready`.
+- disabled edge proxy maps to `edgeProxy.status = disabled`; or
+- provider-backed edge proxy maps to `edgeProxy.status = ready`.
 
 If proxy bootstrap fails, the server is not ready for proxy-backed deployments.
 
@@ -104,7 +107,8 @@ Logs and traces must include:
 
 - `serverId`;
 - `providerKey`;
-- `proxyKind`;
+- `edgeProxyMode`;
+- `edgeProxyProviderKey`;
 - `edgeProxyStatus`;
 - `phase = server-ready`;
 - `correlationId`;
@@ -115,6 +119,8 @@ Logs and traces must include:
 Current code has no first-class `server-ready` event or top-level server readiness state.
 
 Current read models expose edge proxy kind/status fields, which can support a derived readiness view, but connectivity status is not persisted as part of server lifecycle.
+
+Current runtime state still exposes `proxyKind`; ADR-019 treats that as provider-selection migration data. The target event payload uses provider-neutral edge proxy mode/key fields.
 
 ## Open Questions
 

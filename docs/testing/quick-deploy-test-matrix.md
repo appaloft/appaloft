@@ -15,6 +15,7 @@ This test matrix inherits:
 - [ADR-012: Resource Runtime Profile And Deployment Snapshot Boundary](../decisions/ADR-012-resource-runtime-profile-and-deployment-snapshot-boundary.md)
 - [ADR-014: Deployment Admission Uses Resource Profile](../decisions/ADR-014-deployment-admission-uses-resource-profile.md)
 - [ADR-015: Resource Network Profile](../decisions/ADR-015-resource-network-profile.md)
+- [ADR-017: Default Access Domain And Proxy Routing](../decisions/ADR-017-default-access-domain-and-proxy-routing.md)
 - [deployments.create Command Spec](../commands/deployments.create.md)
 - [resources.create Command Spec](../commands/resources.create.md)
 - [Quick Deploy Workflow Spec](../workflows/quick-deploy.md)
@@ -74,6 +75,8 @@ Then:
 | Source/runtime/network draft supplied | Web or CLI | Source locator/source descriptor plus runtime plan strategy hint and internal listener port | Deployment request accepted when compatible | None | Context commands -> `resources.create(source, runtimeProfile, networkProfile)` -> `deployments.create(resourceId)` | Resource owns source/runtime/network profile; deployment carries resolved runtime and network snapshots | Deployment retry creates new attempt |
 | Missing resource port for inbound app | Web or CLI | HTTP application draft with no `networkProfile.internalPort` and no deterministic inference | Workflow fails before or during deployment admission | `validation_error`, phase `resource-network-resolution` or entry preflight equivalent | Context commands may already be persisted; no accepted deployment | Resource remains if already created; deployment not accepted | No for same invalid draft |
 | Generic UI/CLI port label | Web or CLI | User enters port value | Workflow maps value to `networkProfile.internalPort` | None | `resources.create(networkProfile.internalPort)` -> `deployments.create(resourceId)` | No deployment command input named `port` | Per deployment |
+| Generated default access route available | Web or CLI | New inbound resource, selected proxy-ready server, default access policy enabled | Workflow shows generated access URL after `ResourceAccessSummary` is available | None | Context commands -> `resources.create` -> `deployments.create` -> route observation | Deployment has provider-neutral generated route metadata; resource access projection shows current URL; no domain binding is created | Per route/deployment |
+| Generated access route unavailable | Web or CLI | Policy enabled but provider/proxy cannot resolve route | Workflow surfaces structured route/proxy error from deployment/read-model state | Provider/proxy error with phase from ADR-017 workflow | Context commands may persist; deployment may reject or fail according to detection phase | No direct host-port fallback | Depends |
 | Incompatible source/runtime draft | Web or CLI | Source descriptor cannot be planned by selected runtime plan strategy | Workflow fails at final deployment admission | `validation_error` or `provider_error`, phase `runtime-plan-resolution` | Context commands may already be persisted; no accepted deployment | Context remains; no deployment accepted | Per deployment error |
 | Missing source in CLI TTY | CLI interactive | No source arg | Prompt completes then deployment accepted | None if prompt supplies source | Prompt source -> context operations -> `deployments.create` | Same as accepted deployment path | Depends on failed step |
 | Missing source outside CLI TTY | CLI non-interactive | No source arg | Workflow rejected before dispatch | `validation_error`, phase `input-collection` or transport equivalent | None | No mutation | No |
@@ -123,6 +126,8 @@ Current CLI interactive deploy orchestration lives in `deployment-interaction.ts
 Current Web QuickDeploy and CLI interactive deploy call `resources.create` before `deployments.create(resourceId)` when creating a new first-deploy resource.
 
 Current Web and CLI Quick Deploy flows call `resources.create` with source/runtime profile and `networkProfile.internalPort` before ids-only `deployments.create` when they create a new resource.
+
+Generated default access URL display and route status assertions are governed by [Default Access Domain And Proxy Routing Test Matrix](./default-access-domain-and-proxy-routing-test-matrix.md) and should use `ResourceAccessSummary` as the first formal read-model assertion target.
 
 Current contracts store the listener port as `networkProfile.internalPort`. `runtimeProfile.port` must be rejected by schemas that no longer include it.
 
