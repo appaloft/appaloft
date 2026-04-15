@@ -1,3 +1,5 @@
+import { customAlphabet } from "nanoid";
+
 import {
   type ConfigureServerCredentialInput,
   type CreateDeploymentInput,
@@ -14,6 +16,13 @@ import {
   type RegisterServerResponse,
   type SetEnvironmentVariableInput,
 } from "./index";
+
+const generatedNameAlphabet = "abcdefghijklmnopqrstuvwxyz0123456789";
+const generatedResourceNameSuffixLength = 6;
+const generateQuickDeployNameSuffix = customAlphabet(
+  generatedNameAlphabet,
+  generatedResourceNameSuffixLength,
+);
 
 export type QuickDeployReference<CreateInput> =
   | {
@@ -131,6 +140,32 @@ export type QuickDeployWorkflowStepOutput =
 export type QuickDeployWorkflowExecutor = (
   step: QuickDeployWorkflowStep,
 ) => QuickDeployWorkflowStepOutput | Promise<QuickDeployWorkflowStepOutput>;
+
+export function normalizeQuickDeployGeneratedNameBase(value: string, fallback = "app"): string {
+  return (
+    value
+      .trim()
+      .toLowerCase()
+      .replace(/\.git$/, "")
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "") || fallback
+  );
+}
+
+export function createQuickDeployGeneratedNameSuffix(length = generatedResourceNameSuffixLength) {
+  if (length === generatedResourceNameSuffixLength) {
+    return generateQuickDeployNameSuffix();
+  }
+
+  return customAlphabet(generatedNameAlphabet, length)();
+}
+
+export function createQuickDeployGeneratedResourceName(
+  baseName: string,
+  suffix = createQuickDeployGeneratedNameSuffix(),
+): string {
+  return `${normalizeQuickDeployGeneratedNameBase(baseName)}-${suffix}`;
+}
 
 export function* quickDeployWorkflow(
   input: QuickDeployWorkflowInput,

@@ -10,6 +10,7 @@ import {
   RedeployResourceCommand,
   RollbackDeploymentCommand,
 } from "@yundu/application";
+import { createQuickDeployGeneratedResourceName } from "@yundu/contracts";
 import { resourceKinds } from "@yundu/core";
 import { Effect } from "effect";
 
@@ -50,21 +51,10 @@ function parseAppLogLines(value: string): number {
   return Number.isInteger(parsed) && parsed >= 0 ? parsed : 3;
 }
 
-function slugifyResourceName(value: string): string {
-  return (
-    value
-      .trim()
-      .toLowerCase()
-      .replace(/\.git$/, "")
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "") || "app"
-  );
-}
-
 function inferResourceName(sourceLocator: string): string {
   const withoutQuery = sourceLocator.split(/[?#]/)[0] ?? sourceLocator;
   const segments = withoutQuery.split(/[\\/]/).filter(Boolean);
-  return slugifyResourceName(segments.at(-1) ?? "app");
+  return createQuickDeployGeneratedResourceName(segments.at(-1) ?? "app");
 }
 
 export const deployCommand = EffectCommand.make(

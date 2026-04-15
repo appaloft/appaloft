@@ -1,12 +1,23 @@
 import { describe, expect, test } from "bun:test";
 
 import {
+  createQuickDeployGeneratedResourceName,
+  normalizeQuickDeployGeneratedNameBase,
   type QuickDeployWorkflowStep,
   type QuickDeployWorkflowStepOutput,
   runQuickDeployWorkflow,
 } from "../src/index";
 
 describe("quick deploy workflow", () => {
+  test("generates resource names from source names with a random suffix", () => {
+    expect(normalizeQuickDeployGeneratedNameBase("Render Examples / Bun Docker.git")).toBe(
+      "render-examples-bun-docker",
+    );
+    expect(createQuickDeployGeneratedResourceName("bun-docker", "a1b2c3")).toBe(
+      "bun-docker-a1b2c3",
+    );
+  });
+
   test("threads created context ids into later workflow steps", async () => {
     const steps: QuickDeployWorkflowStep[] = [];
 

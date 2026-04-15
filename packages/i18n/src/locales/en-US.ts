@@ -455,9 +455,9 @@ export const enUS = {
       submitPending: "Submitting",
       variablePlainStorage: "Store as plain config",
       workflowProgressDescription:
-        "Each step is a separate request. The next step starts after the current step succeeds.",
+        "Preparing the runtime plan, starting the workload, and verifying health.",
       workflowProgressTitle: "Deployment guide progress",
-      workflowStepDeploymentsCreate: "Create deployment record",
+      workflowStepDeploymentsCreate: "Run deployment",
       workflowStepEnvironmentVariableSet: "Write environment variable",
       workflowStepEnvironmentsCreate: "Create environment",
       workflowStepFailed: "Failed",

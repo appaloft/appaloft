@@ -120,6 +120,7 @@ Required tests:
 - CLI create command dispatches through `CommandBus`;
 - Web create affordance dispatches typed client call and refreshes resource list/detail;
 - Quick Deploy new-resource path calls `resources.create` before `deployments.create(resourceId)`;
+- Quick Deploy auto-generated resource names include a short random suffix before `resources.create`;
 - Quick Deploy maps a generic "port" field to `networkProfile.internalPort`;
 - deployment bootstrap compatibility path remains covered until removed.
 
