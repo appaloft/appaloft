@@ -29,6 +29,8 @@ This command inherits:
 - [ADR-014: Deployment Admission Uses Resource Profile](../decisions/ADR-014-deployment-admission-uses-resource-profile.md)
 - [ADR-015: Resource Network Profile](../decisions/ADR-015-resource-network-profile.md)
 - [ADR-017: Default Access Domain And Proxy Routing](../decisions/ADR-017-default-access-domain-and-proxy-routing.md)
+- [ADR-021: Docker/OCI Workload Substrate](../decisions/ADR-021-docker-oci-workload-substrate.md)
+- [ADR-023: Runtime Orchestration Target Boundary](../decisions/ADR-023-runtime-orchestration-target-boundary.md)
 - [Error Model](../errors/model.md)
 - [neverthrow Conventions](../errors/neverthrow-conventions.md)
 - [Async Lifecycle And Acceptance](../architecture/async-lifecycle-and-acceptance.md)
@@ -172,6 +174,18 @@ workspace root. It must not contain `..`, shell metacharacters, a URL, or a host
 path. Runtime adapters may strip the leading `/` when materializing filesystem commands.
 
 `runtimeProfile` is a `ResourceRuntimeProfile`. It must use the domain term `RuntimePlanStrategy` and may include reusable install/build/start commands and health-check defaults.
+
+For v1, `RuntimePlanStrategy` is governed by
+[ADR-021: Docker/OCI Workload Substrate](../decisions/ADR-021-docker-oci-workload-substrate.md).
+Every strategy must produce, pull, or reference an OCI/Docker image artifact, or materialize a
+Docker Compose project whose runnable services use OCI/Docker images. Buildpack-style `auto`,
+static, and workspace-command plans are image production strategies; they must not become
+long-lived host-process execution plans.
+
+`runtimeProfile` does not configure the runtime orchestration target. Kubernetes namespace,
+manifest, Helm, Swarm stack, replica, ingress-class, pull-secret, node selector, and similar
+orchestrator-specific settings require future target/profile specs and must not be stored as loose
+runtime profile fields.
 
 `runtimeProfile` owns strategy-specific planning fields, not source identity. Dockerfile path,
 Docker Compose file path, static publish directory, Docker build target, install/build/start

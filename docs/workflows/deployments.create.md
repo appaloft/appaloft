@@ -16,6 +16,8 @@ This workflow inherits:
 - [ADR-014: Deployment Admission Uses Resource Profile](../decisions/ADR-014-deployment-admission-uses-resource-profile.md)
 - [ADR-015: Resource Network Profile](../decisions/ADR-015-resource-network-profile.md)
 - [ADR-017: Default Access Domain And Proxy Routing](../decisions/ADR-017-default-access-domain-and-proxy-routing.md)
+- [ADR-021: Docker/OCI Workload Substrate](../decisions/ADR-021-docker-oci-workload-substrate.md)
+- [ADR-023: Runtime Orchestration Target Boundary](../decisions/ADR-023-runtime-orchestration-target-boundary.md)
 - [Error Model](../errors/model.md)
 - [neverthrow Conventions](../errors/neverthrow-conventions.md)
 - [Async Lifecycle And Acceptance](../architecture/async-lifecycle-and-acceptance.md)
@@ -32,9 +34,12 @@ user intent
   -> command admission
   -> resolve resource network/access snapshots from resource, server, domain, and default access policy state
   -> deployment-requested
-  -> build-requested, when build/package work is required
+  -> runtime target backend is selected from deployment target, destination, provider key, and capabilities
+  -> build-requested, when an image build/package artifact is required
+  -> Docker/OCI image is built, pulled, or otherwise resolved
   -> deployment-started
-  -> runtime adapter materializes proxy route config when the snapshot contains generated or durable access routes
+  -> runtime target backend starts replacement workload(s)
+  -> runtime target backend or edge proxy provider materializes route config when the snapshot contains generated or durable access routes
   -> deployment-succeeded | deployment-failed
   -> read model / progress view / notifications update from durable state and events
 ```
@@ -95,6 +100,53 @@ API must not prompt or define transport-only deployment input shapes.
 Progress streams are technical/UI progress, not domain events.
 
 They may mirror phases such as detect, plan, package, deploy, verify, or rollback, but durable state and formal events remain the source of truth.
+
+## Docker/OCI Runtime Substrate
+
+The v1 workflow uses Docker/OCI images and containers behind provider-neutral command and read
+contracts.
+
+Entry workflows may offer Dockerfile, Docker Compose, prebuilt image, static, auto/buildpack-style,
+or workspace-command choices. Those choices must normalize to resource source/runtime/network
+profile fields, and deployment planning must convert them into one of these runtime artifact paths:
+
+- build an OCI/Docker image for this deployment attempt;
+- pull or use a prebuilt OCI/Docker image;
+- materialize a Docker Compose project with resource/deployment-scoped identity.
+
+Within those artifact paths, runtime work is planned as typed command specs before execution.
+Examples include Docker image build, Docker container run, Docker Compose up/down, Docker inspect,
+Docker logs, process invocation, and shell-script leaves for user-authored workspace commands.
+Adapter code renders those specs to local shell, SSH shell, or another executor-specific form only
+at the execution boundary. Workflow logic must not branch on ad-hoc rendered command strings.
+
+No v1 entry workflow may treat `workspace-commands`, static hosting, PM2, systemd, or raw host
+processes as a long-lived deployment substrate. Such runtimes require a future ADR before they can
+be public deployment strategies.
+
+The runtime adapter may perform an internal safe-replacement or rollback-to-previous-container
+sequence when a rollout fails, but public rollback remains absent under ADR-016 until rebuilt
+through its own command, workflow, error, test, and implementation specs.
+
+## Runtime Orchestration Target Boundary
+
+Runtime target selection is an internal step after deployment context resolution. It is governed by
+[Deployment Runtime Target Abstraction](./deployment-runtime-target-abstraction.md).
+
+The workflow must select a runtime target backend from the deployment target, destination, provider
+key, target kind, and required capabilities. Entry workflows must not collect orchestrator-specific
+fields for `deployments.create`.
+
+Allowed target backend progression:
+
+- v1 active: single-server Docker/Compose through local shell or generic SSH.
+- future: Docker Swarm backend after Swarm target/readiness/registry/log/health/cleanup specs.
+- future: Kubernetes backend after cluster target/readiness/placement/secret/route/log/health/cleanup specs.
+
+Target-specific render/apply artifacts such as Docker shell commands, Swarm stack definitions,
+Kubernetes manifests, Helm values, kubeconfig clients, or provider API responses belong to adapter
+packages. Read surfaces may expose sanitized summaries, but command and workflow contracts remain
+provider-neutral.
 
 ## Missing Input Behavior
 
@@ -157,6 +209,12 @@ Migration gaps:
 - current deployment/runtime paths use typed source `baseDirectory` for Git/local source workdirs and
   reject legacy raw GitHub tree URLs before clone; typed runtime-profile Dockerfile/Compose/static
   path fields are still pending.
+- runtime Docker build/run/Compose execution uses typed command specs with adapter renderers for
+  local and generic SSH runtime adapters. Legacy workspace command text remains a shell-script leaf
+  until runtime profile command fields are remodeled as typed command steps.
+- runtime target execution selection remains single-server, but local-shell and generic-SSH are now
+  selected through a target kind/provider/capability registry; admission-time unsupported-target
+  checks are still pending before Swarm or Kubernetes are added.
 - generated default access route resolution and provider injection are not yet implemented as a distinct workflow; current runtime adapters still consume runtime-plan access routes directly.
 
 ## Open Questions

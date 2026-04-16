@@ -10,6 +10,7 @@ runtime-agnostic, stream-capable, cancellable, and separate from deployment-atte
 This test matrix inherits:
 
 - [ADR-018: Resource Runtime Log Observation](../decisions/ADR-018-resource-runtime-log-observation.md)
+- [ADR-021: Docker/OCI Workload Substrate](../decisions/ADR-021-docker-oci-workload-substrate.md)
 - [resources.runtime-logs Query Spec](../queries/resources.runtime-logs.md)
 - [Resource Runtime Log Observation Workflow Spec](../workflows/resource-runtime-log-observation.md)
 - [Resource Runtime Logs Error Spec](../errors/resources.runtime-logs.md)
@@ -23,7 +24,7 @@ This test matrix inherits:
 | Query schema | Input validation, tail limits, optional follow/cursor/service fields. |
 | Query handler/service | Resolves resource/deployment context and delegates to injected port. |
 | Runtime log reader fake | Async iterable line, heartbeat, error, close, and cancellation behavior. |
-| Runtime adapter | Backend-specific normalization without leaking Docker/PM2/systemd types. |
+| Runtime adapter | Backend-specific normalization without leaking Docker/Compose or future runtime-native types. |
 | HTTP/oRPC | Bounded read and stream serialization reuse query schema. |
 | CLI | Tail and follow behavior, Ctrl-C cancellation, structured errors. |
 | Web resource page | Incremental rendering, reconnect/error state, no deployment-log confusion. |
@@ -47,7 +48,7 @@ Then:
 - Stream events:
 - Cancellation behavior:
 - Error mapping:
-- Expected absence of Docker/PM2/systemd leakage:
+- Expected absence of Docker/Compose/future runtime leakage:
 ```
 
 ## Query And Service Matrix
@@ -79,9 +80,7 @@ Then:
 | Backend | Expected adapter behavior | Must not expose |
 | --- | --- | --- |
 | Docker | May call Docker API or `docker logs --tail --follow`; for generic-SSH targets it may run the same Docker log command through SSH with resolved server credentials; normalize to line events. | Container id as public input, Docker-specific event type in query output, local-only assumptions for remote targets. |
-| PM2 | May call PM2 API or `pm2 logs --raw`; normalize process output. | PM2 process object as public input/output. |
-| systemd | May call journal API or `journalctl`; normalize journal entries. | systemd unit object as public input/output. |
-| File tail | May watch a configured log file; normalize appended lines. | Host filesystem path as public input. |
+| Future PM2/systemd/file-tail readers | May be added only after workload runtime semantics are accepted by ADR; normalize process output. | Runtime-native process/unit/path object as public input/output. |
 | Provider API | May call provider log endpoint; normalize provider records. | Provider-native event shape in query output. |
 
 ## Entrypoint Matrix
@@ -106,7 +105,8 @@ reused as proof that runtime application log streaming works.
 
 Additional adapter/transport/browser tests should cover runtime reader cancellation, oRPC streaming
 iteration, and Web stream stop-on-navigation behavior. Runtime adapter tests cover local Docker
-output draining and generic-SSH Docker/Compose command construction. Web verification covers lazy
+output draining, bounded process timeout cleanup, and generic-SSH Docker/Compose command
+construction, including no SSH ControlMaster reuse for bounded reads. Web verification covers lazy
 runtime-log loading for the logs tab, duplicate-tail avoidance when follow starts, and silent normal
 stream cancellation when follow stops.
 

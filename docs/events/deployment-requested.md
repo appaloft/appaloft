@@ -20,7 +20,9 @@ Publish after:
 2. deployment context is resolved;
 3. the active deployment guard passes;
 4. source, runtime, network, and access-route snapshot admission succeeds;
-5. durable deployment state is created.
+5. the selected deployment target/destination has a runtime target backend with the required
+   capabilities;
+6. durable deployment state is created.
 
 If runtime plan resolution remains part of admission, this event is published after the plan is persisted. If admission is later split earlier, the event timing must be updated in this spec.
 
@@ -54,6 +56,12 @@ type DeploymentRequestedPayload = {
     locator: string;
   };
   runtimeStrategy: "auto" | "dockerfile" | "docker-compose" | "prebuilt-image" | "workspace-commands";
+  runtimeArtifactIntent: "build-image" | "prebuilt-image" | "compose-project";
+  runtimeTarget: {
+    targetKind: string;
+    providerKey: string;
+    backendKey?: string;
+  };
   accessRouteSnapshot?: {
     routeSource: "generated-default" | "domain-binding" | "none";
     hostnames: string[];
@@ -98,4 +106,8 @@ Consumer failure is an event-processing failure, not a deployment success or dep
 
 The current code does not publish `deployment-requested`. The closest current moment is after a `Deployment` aggregate is created and before execution starts, but current code immediately continues to runtime execution inside the same use case.
 
-Current event payloads and runtime plan data still use compatibility naming around deployment method and access routes; canonical payload language should use resource-owned runtime strategy and provider-neutral access route snapshots.
+Current event payloads and runtime plan data still use compatibility naming around deployment method and access routes; canonical payload language should use resource-owned runtime strategy, Docker/OCI artifact intent, and provider-neutral access route snapshots.
+
+Runtime target backend identity is not yet present in current events. ADR-023 requires future
+payloads/read models to expose only safe target kind/provider/backend summaries, not Docker, Swarm,
+or Kubernetes API objects.

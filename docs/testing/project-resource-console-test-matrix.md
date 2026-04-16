@@ -20,6 +20,7 @@ This test matrix inherits:
 - [ADR-015: Resource Network Profile](../decisions/ADR-015-resource-network-profile.md)
 - [ADR-018: Resource Runtime Log Observation](../decisions/ADR-018-resource-runtime-log-observation.md)
 - [ADR-020: Resource Health Observation](../decisions/ADR-020-resource-health-observation.md)
+- [ADR-022: Operator Terminal Session Boundary](../decisions/ADR-022-operator-terminal-session-boundary.md)
 - [Project Resource Console Workflow Spec](../workflows/project-resource-console.md)
 - [Project Resource Console Implementation Plan](../implementation/project-resource-console-plan.md)
 - [resources.create Command Spec](../commands/resources.create.md)
@@ -27,9 +28,11 @@ This test matrix inherits:
 - [resources.diagnostic-summary Query Spec](../queries/resources.diagnostic-summary.md)
 - [resources.health Query Spec](../queries/resources.health.md)
 - [resources.runtime-logs Query Spec](../queries/resources.runtime-logs.md)
+- [terminal-sessions.open Command Spec](../commands/terminal-sessions.open.md)
 - [Resource Diagnostic Summary Test Matrix](./resource-diagnostic-summary-test-matrix.md)
 - [Resource Health Test Matrix](./resource-health-test-matrix.md)
 - [Resource Runtime Logs Test Matrix](./resource-runtime-logs-test-matrix.md)
+- [Operator Terminal Session Test Matrix](./operator-terminal-session-test-matrix.md)
 - [Quick Deploy Workflow Spec](../workflows/quick-deploy.md)
 - [Resource Create And First Deploy Workflow Spec](../workflows/resources.create-and-first-deploy.md)
 - [Spec-Driven Testing](./SPEC_DRIVEN_TESTING.md)
@@ -90,6 +93,7 @@ Then:
 | Access URL from resource | Resource has ready domain binding or resource access summary | Access URL appears in the first/default resource tab | Resource read model/access summary is used | URL is not hidden only on deployment detail or a later access tab |
 | New deployment from resource | Resource exists and can deploy | New deployment action is resource-scoped | Dispatch `deployments.create` with `resourceId` | Deployment attempt belongs to resource |
 | Runtime logs from resource | Resource has observable runtime instance | Runtime logs are shown as resource-owned application logs | Query `resources.runtime-logs` with `resourceId`; optional follow stream | Runtime logs remain separate from `deployments.logs` |
+| Terminal from resource | Resource has observable deployment workspace and terminal access is enabled | Terminal is offered from an operational tab/action, not the default overview | Dispatch `terminal-sessions.open` with resource scope and attach returned transport | Terminal starts in resolved deployment workspace, not a resource-name directory |
 | Diagnostic summary from resource | Access, proxy, or runtime logs are missing/unavailable | Copyable diagnostic summary is offered from the resource surface | Query `resources.diagnostic-summary` with `resourceId` and optional `deploymentId` | Summary includes stable ids and source-specific errors |
 | Redeploy absent in v1 | Latest deployment terminal | No public redeploy action is exposed | No redeploy command is dispatched | Existing deployments remain readable |
 | Active deployment | Latest deployment non-terminal | New deployment is blocked or explains active state | No deployment command until guard can pass | Latest status remains read-model projection |
@@ -134,6 +138,10 @@ browser tests for these affordances do not exist yet.
 
 `resources.health` exists. Current status UI uses unknown only for loading/unobserved health,
 instead of latest deployment status.
+
+Resource/server terminal sessions are specified but not implemented; terminal UI coverage belongs to
+the operator terminal session matrix before the project/resource console can claim terminal
+alignment.
 
 ## Open Questions
 

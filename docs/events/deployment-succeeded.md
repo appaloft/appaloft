@@ -8,6 +8,9 @@ It does not mean every event consumer, notification, audit projection, or downst
 
 `deployment-succeeded` is the canonical terminal success event for the target model.
 
+For v1, success requires the Docker/OCI runtime artifact to be running according to the selected
+runtime target backend's rollout strategy and required deployment-time verification to pass.
+
 ## Event Type
 
 Domain event for the `Deployment` aggregate, with optional integration-event copies published through an outbox.
@@ -46,6 +49,12 @@ type DeploymentSucceededPayload = {
   serverId: string;
   destinationId: string;
   runtimePlanId: string;
+  runtimeArtifactKind?: "image" | "compose-project";
+  runtimeTarget?: {
+    targetKind: string;
+    providerKey: string;
+    backendKey?: string;
+  };
   finishedAt: string;
   exitCode: number;
   correlationId?: string;
@@ -93,3 +102,7 @@ type CurrentDeploymentFinishedPayload = {
 ```
 
 For now, `deployment-succeeded` can be treated as a canonical projection of `deployment.finished/status=succeeded`. The implementation should eventually split this into a first-class event or a stable derived event contract.
+
+Current success events do not include runtime target backend identity. ADR-023 requires future
+payloads/read models to expose only safe target summaries and not raw Docker, Swarm, or Kubernetes
+provider objects.

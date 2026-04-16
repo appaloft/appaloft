@@ -92,6 +92,7 @@ Owns:
 - provider-neutral generated access domain policy and resolved route snapshots
 - target capability and provider-facing endpoint metadata
 - deployment placement / isolation boundaries on a target
+- runtime orchestration target shape and provider capability selection
 
 Implemented now:
 - `DeploymentTarget`
@@ -121,6 +122,9 @@ Transport compatibility note:
 - CLI / HTTP still expose `server` naming for backward compatibility
 - the core domain term is `DeploymentTarget`
 - `Destination` is the concrete place a resource deploys to on a target/server
+- `DeploymentTarget.targetKind` describes the target shape, such as `single-server` or the future
+  `orchestrator-cluster`; concrete runtime providers are selected by provider key and capabilities
+  rather than provider-specific fields on deployment commands
 - access routes express public-domain intent; provider-specific labels, files, commands, and route
   manifests are rendered by concrete edge proxy providers, not core aggregates
 - server registration emits a domain event; application event handlers may soft-fail while asking
@@ -155,6 +159,18 @@ Boundary rule:
   ports and exposure modes are network profile concerns.
 - `RuntimePlanStrategy` describes how a source is planned; the compatibility field name
   `deploymentMethod` must not be treated as a `Deployment` aggregate concept
+- v1 runtime planning is Docker/OCI-backed. A runtime strategy must produce, pull, or reference an
+  OCI/Docker image artifact, or materialize a Docker Compose project whose runnable services use
+  OCI/Docker images. Auto/buildpack-style and workspace-command strategies are image production
+  strategies, not direct long-lived host-process execution.
+- Docker/OCI is the workload artifact substrate; runtime orchestration target selection is a
+  separate boundary governed by
+  [ADR-023](./decisions/ADR-023-runtime-orchestration-target-boundary.md). Future Docker Swarm or
+  Kubernetes backends must consume the same resource source/runtime/network/access contracts instead
+  of adding orchestrator-specific input fields to Resource or Deployment commands.
+- runtime command composition belongs to the runtime plan language as typed command specs. Rendered
+  shell strings are adapter execution artifacts for local shell, SSH shell, or another executor,
+  and must not become the domain object that workflow logic branches on.
 - `ResourceNetworkProfile` owns the resource's internal workload endpoint: `internalPort`,
   upstream protocol, exposure mode, and target service selection
 - the generic user-facing label `port` must map to the domain field
@@ -163,8 +179,10 @@ Boundary rule:
   source/runtime/network profile, generated access routes, proxy configuration, application runtime
   logs, diagnostic summary, domain/TLS, and resource-specific configuration actions
 - application runtime log observation belongs to the resource surface and is performed through an
-  application-layer runtime log reader port; Docker, PM2, systemd, file-tail, and provider log
-  mechanisms are adapter details and must not leak into core aggregates
+  application-layer runtime log reader port. Docker/Compose is the v1 deployment-backed reader
+  substrate under ADR-021; future PM2, systemd, file-tail, and provider log mechanisms are adapter
+  details that require ADR coverage before they become public workload runtime strategies, and must
+  not leak into core aggregates
 - current resource health observation belongs to the resource surface and is performed through
   application-layer read/query ports that inspect runtime/container/process state, configured
   health policy, proxy route state, and public access state. `ResourceHealthSummary` is a read
@@ -208,6 +226,16 @@ Implemented now:
 Boundary rule:
 - `Deployment` owns an accepted attempt and the immutable `RuntimePlanSnapshot` used by that
   attempt
+- v1 deployment snapshots must include enough provider-neutral runtime artifact and placement
+  identity to inspect, verify, clean up, and eventually roll back Docker/OCI-backed runtime
+  instances without exposing Docker-native fields as aggregate invariants
+- deployment execution is routed to a runtime target backend selected from the deployment target,
+  destination, provider key, and backend capabilities. Single-server Docker/Compose is the active
+  v1 backend; Docker Swarm and Kubernetes are future orchestration backends behind the same
+  `deployments.create` command.
+- deployment runtime command steps should be represented as typed specs when they are persisted or
+  handed between planning and execution. Shell command text is allowed only as a user-authored
+  shell-script leaf or as an adapter-rendered execution/display value.
 - `Deployment` does not own durable source binding, runtime profile, network profile, generated
   access policy, domain binding, or certificate policy
 - deployment snapshots may record resolved generated or durable access routes used by that attempt
@@ -219,6 +247,9 @@ Boundary rule:
 - deployment logs are attempt/progress records; application runtime logs are resource-owned
   observation and must not be treated as Deployment aggregate state unless a future ADR introduces
   persisted runtime log archival
+- public rollback remains absent under ADR-016, but rollback plans in the v1 model are expected to
+  reference prior deployment snapshots and Docker/OCI runtime artifact identity rather than
+  reconstructing host-process command state
 
 ### Identity & Governance
 
@@ -340,6 +371,9 @@ Rules:
 - unhealthy/draining targets should not accept new deployments
 - proxy-backed generated access requires target proxy readiness and a usable public address or host
 - target proxy bootstrap state is a readiness gate, not a standalone proxy aggregate
+- target kind describes placement shape, not vendor-specific execution details
+- runtime target provider capabilities decide whether the target can execute single-server
+  Docker/Compose now or future cluster orchestration such as Docker Swarm or Kubernetes
 
 Current scope:
 - single-node target metadata
@@ -348,6 +382,9 @@ Current scope:
   layer; provider SDK specifics remain outside the aggregate
 - owns current edge proxy intent/status summary for server readiness and proxy-backed deployment
   admission/read-model display
+- current code includes provisional future target-kind values; they must be replaced with the
+  canonical target model from ADR-023 before cluster targets become public or persisted by new
+  features
 
 ### Destination
 
@@ -365,6 +402,9 @@ Current scope:
 - deployment config may declare a target-local destination
 - proxy/domain routing is modeled as resolved access-route snapshots on runtime plans; standalone
   persisted access-route aggregates remain separate from durable `DomainBinding`
+- future cluster backends may map a destination to a namespace-like or placement-isolation concept,
+  but Kubernetes namespaces, Swarm stack names, and rendered manifests remain adapter-owned unless
+  a future Spec Round introduces provider-neutral placement value objects
 
 ### DomainBinding
 

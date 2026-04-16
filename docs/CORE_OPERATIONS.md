@@ -116,6 +116,7 @@ Implemented operations:
 | Repair deployment target edge proxy | Command | `servers.bootstrap-proxy` | `BootstrapServerProxyCommand` | `BootstrapServerProxyCommandInput` | `yundu server proxy repair <serverId>` | `POST /api/servers/{serverId}/edge-proxy/bootstrap` |
 | Create reusable SSH credential | Command | `credentials.create-ssh` | `CreateSshCredentialCommand` | `CreateSshCredentialCommandInput` | `yundu server credential-create` | `POST /api/credentials/ssh` |
 | List reusable SSH credentials | Query | `credentials.list-ssh` | `ListSshCredentialsQuery` | `ListSshCredentialsQueryInput` | `yundu server credential-list` | `GET /api/credentials/ssh` |
+| Open deployment target terminal | Command | `terminal-sessions.open` | `OpenTerminalSessionCommand` | `OpenTerminalSessionCommandInput` | `yundu server terminal <serverId>` | `POST /api/terminal-sessions`; attach: `WS /api/terminal-sessions/{sessionId}/attach` |
 
 - server registration may carry edge proxy intent/provider selection; when omitted, the deployment
   target records the configured default edge proxy intent and an asynchronous lifecycle path
@@ -189,6 +190,7 @@ Implemented operations:
 | Preview resource proxy configuration | Query | `resources.proxy-configuration.preview` | `ResourceProxyConfigurationPreviewQuery` | `ResourceProxyConfigurationPreviewQueryInput` | `yundu resource proxy-config <resourceId>` | `GET /api/resources/{resourceId}/proxy-configuration` |
 | Read resource diagnostic summary | Query | `resources.diagnostic-summary` | `ResourceDiagnosticSummaryQuery` | `ResourceDiagnosticSummaryQueryInput` | `yundu resource diagnose <resourceId>` | `GET /api/resources/{resourceId}/diagnostic-summary` |
 | Read resource health | Query | `resources.health` | `ResourceHealthQuery` | `ResourceHealthQueryInput` | `yundu resource health <resourceId>` | `GET /api/resources/{resourceId}/health` |
+| Open resource terminal | Command | `terminal-sessions.open` | `OpenTerminalSessionCommand` | `OpenTerminalSessionCommandInput` | `yundu resource terminal <resourceId>` | `POST /api/terminal-sessions`; attach: `WS /api/terminal-sessions/{sessionId}/attach` |
 
 Current boundary:
 - resources are persisted and can be listed by project or environment
@@ -272,6 +274,15 @@ Current boundary:
   `resourceId`, `serverId`, and optional `destinationId`
 - deployment source and runtime strategy are resolved from the resource's persisted
   `ResourceSourceBinding`, `ResourceRuntimeProfile`, and `ResourceNetworkProfile`
+- v1 deployment runtime execution is Docker/OCI-backed. Every accepted runtime plan must build,
+  pull, or otherwise reference an OCI/Docker image artifact, or materialize a Docker Compose project
+  whose runnable services are backed by OCI/Docker images. This substrate rule is governed by
+  [ADR-021: Docker/OCI Workload Substrate](./decisions/ADR-021-docker-oci-workload-substrate.md).
+- Docker/OCI is the workload artifact substrate, not a permanent single-node-only orchestration
+  boundary. Runtime target backend selection is internal to `deployments.create` and is governed by
+  [ADR-023: Runtime Orchestration Target Boundary](./decisions/ADR-023-runtime-orchestration-target-boundary.md).
+  The active v1 target backend is single-server Docker/Compose; Docker Swarm and Kubernetes remain
+  future backend targets that must not add provider-specific fields to deployment admission.
 - `deployments.create` must not accept `sourceLocator`, `source`, `deploymentMethod`,
   install/build/start commands, port/internalPort, health-check path, `resource` bootstrap input,
   proxy, domains, path prefix, or TLS mode
@@ -294,6 +305,8 @@ Current boundary:
   resource/project/environment/server state before deployment admission; they are not
   `deployments.create` input fields
 - detect and plan happen inside the deployment write flow
+- build/package work produces or resolves the Docker/OCI image artifact used by one deployment
+  attempt. Prebuilt image deployments may skip build work but still snapshot image identity.
 - cancel, manual deployment health check, redeploy, reattach, and rollback are not public
   operations in the v1 surface. They must be reintroduced only after new source-of-truth specs,
   test matrices, implementation plans, and Web/API/CLI contracts are accepted.

@@ -13,6 +13,7 @@ This document is an implementation-planning contract for aligning the Web consol
 - [ADR-010: Quick Deploy Workflow Boundary](../decisions/ADR-010-quick-deploy-workflow-boundary.md)
 - [ADR-018: Resource Runtime Log Observation](../decisions/ADR-018-resource-runtime-log-observation.md)
 - [ADR-020: Resource Health Observation](../decisions/ADR-020-resource-health-observation.md)
+- [ADR-022: Operator Terminal Session Boundary](../decisions/ADR-022-operator-terminal-session-boundary.md)
 
 ## Governed Specs
 
@@ -26,6 +27,8 @@ This document is an implementation-planning contract for aligning the Web consol
 - [Resource Diagnostic Summary Workflow Spec](../workflows/resource-diagnostic-summary.md)
 - [Resource Health Observation Workflow Spec](../workflows/resource-health-observation.md)
 - [Resource Runtime Log Observation Workflow Spec](../workflows/resource-runtime-log-observation.md)
+- [Operator Terminal Session Workflow Spec](../workflows/operator-terminal-session.md)
+- [terminal-sessions.open Command Spec](../commands/terminal-sessions.open.md)
 - [Quick Deploy Workflow Spec](../workflows/quick-deploy.md)
 - [Resource Create And First Deploy Workflow Spec](../workflows/resources.create-and-first-deploy.md)
 - [Core Operations](../CORE_OPERATIONS.md)
@@ -58,6 +61,8 @@ Expected Web implementation scope:
     deployment detail snapshots, and make it visible on the first/default resource tab;
   - prepare current resource health display through `resources.health` or a compact health projection;
   - expose resource runtime logs through `resources.runtime-logs` once the query is active;
+  - reserve resource terminal access for a later operational tab/action backed by
+    `terminal-sessions.open`;
   - expose a copyable diagnostic summary through `resources.diagnostic-summary` once the query is
     active;
   - prepare a future place for source/runtime/network profile configuration.
@@ -98,6 +103,9 @@ Likely touched modules in Code Round:
 - `packages/application/src/operation-catalog.ts` only if a new query/operation is introduced.
 - `packages/application/src/operations/resources/**` and runtime log reader adapters when
   `resources.runtime-logs` enters Code Round.
+- terminal session modules listed in
+  [Operator Terminal Session Implementation Plan](./operator-terminal-session-plan.md) when
+  `terminal-sessions.open` enters Code Round.
 
 ## Minimal Deliverable
 
@@ -173,6 +181,10 @@ Resource health is governed by [Resource Health Observation](../workflows/resour
 `resources.health` is active. Latest deployment status is only contextual deployment history and
 must not be described as current health.
 
+Resource/server terminal sessions are governed by
+[ADR-022](../decisions/ADR-022-operator-terminal-session-boundary.md) and remain future until
+`terminal-sessions.open`, the terminal transport, CLI command, and Web affordances are implemented.
+
 ## Current Implementation Notes And Migration Gaps
 
 Project detail has some resource listing and create-resource behavior.
@@ -188,6 +200,8 @@ completion do not yet expose the action directly.
 Resource detail exposes the resource-level access URL from domain binding or access summary state.
 The access URL should be visible on the first/default resource tab and must not be duplicated as a
 header primary action.
+
+Resource/server terminal UI is not implemented yet.
 
 ## Open Questions
 

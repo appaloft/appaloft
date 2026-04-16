@@ -6,6 +6,9 @@
 
 It does not mean the rollout has completed successfully.
 
+For v1, runtime rollout means the Docker/OCI image artifact has been resolved and the selected
+runtime target backend has started, or is starting, the replacement workload(s) for the resource.
+
 ## Event Type
 
 Domain event for the `Deployment` aggregate, with optional integration-event copies published through an outbox.
@@ -43,6 +46,12 @@ type DeploymentStartedPayload = {
   serverId: string;
   destinationId: string;
   runtimePlanId: string;
+  runtimeArtifactKind?: "image" | "compose-project";
+  runtimeTarget?: {
+    targetKind: string;
+    providerKey: string;
+    backendKey?: string;
+  };
   startedAt: string;
   correlationId?: string;
   causationId?: string;
@@ -85,3 +94,7 @@ Consumer failure must be tracked as event-processing failure. It must not be con
 Current code records `deployment.started` with an empty payload when `Deployment.start(...)` transitions the aggregate to `running`. The use case persists the aggregate and publishes pulled events before calling the execution backend.
 
 The target spec uses `deployment-started` as the canonical public name. Implementation can either rename/split the event or expose a stable projection from current `deployment.started`.
+
+Current events do not include runtime target backend identity. ADR-023 requires future event
+payloads to expose only safe target summaries and to keep Docker, Swarm, and Kubernetes API objects
+inside adapter diagnostics.

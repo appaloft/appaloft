@@ -19,6 +19,8 @@ This workflow inherits:
 - [ADR-014: Deployment Admission Uses Resource Profile](../decisions/ADR-014-deployment-admission-uses-resource-profile.md)
 - [ADR-015: Resource Network Profile](../decisions/ADR-015-resource-network-profile.md)
 - [ADR-017: Default Access Domain And Proxy Routing](../decisions/ADR-017-default-access-domain-and-proxy-routing.md)
+- [ADR-021: Docker/OCI Workload Substrate](../decisions/ADR-021-docker-oci-workload-substrate.md)
+- [ADR-023: Runtime Orchestration Target Boundary](../decisions/ADR-023-runtime-orchestration-target-boundary.md)
 - [Error Model](../errors/model.md)
 - [neverthrow Conventions](../errors/neverthrow-conventions.md)
 - [Async Lifecycle And Acceptance](../architecture/async-lifecycle-and-acceptance.md)
@@ -69,6 +71,13 @@ Quick Deploy must use the ADR-012 domain language while collecting draft values:
   static, zip, and inline source drafts may expose different fields, but they must normalize into
   resource source/runtime/network profile input before any write command is dispatched;
 - runtime selection produces a runtime plan strategy hint, not a deployment-owned method;
+- runtime selection must resolve to a Docker/OCI-backed deployment substrate for v1. Dockerfile,
+  Docker Compose, prebuilt image, static, auto/buildpack-style, and workspace-command choices are
+  all image or Compose artifact planning choices, not separate host-process runtime substrates;
+- runtime target selection is not a Quick Deploy draft field. Quick Deploy selects or creates a
+  deployment target/server and optional destination; `deployments.create` then resolves the
+  registered runtime target backend. Kubernetes, Swarm, Helm, namespace, manifest, ingress-class,
+  and replica settings must not be collected as deployment command fields.
 - build/start/health values are runtime profile drafts;
 - listener port, upstream protocol, exposure mode, and compose target service are network profile drafts;
 - domain/path/TLS values belong to durable domain binding/certificate commands and must not become deployment-owned state.

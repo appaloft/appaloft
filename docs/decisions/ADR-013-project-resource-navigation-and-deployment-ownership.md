@@ -165,6 +165,8 @@ must not trust sidebar/read-model status as the sole invariant guard.
 - [resources.diagnostic-summary Query Spec](../queries/resources.diagnostic-summary.md)
 - [Resource Health Observation Workflow Spec](../workflows/resource-health-observation.md)
 - [resources.health Query Spec](../queries/resources.health.md)
+- [Operator Terminal Session Workflow Spec](../workflows/operator-terminal-session.md)
+- [terminal-sessions.open Command Spec](../commands/terminal-sessions.open.md)
 - [Project Resource Console Workflow Spec](../workflows/project-resource-console.md)
 - [Project Resource Console Test Matrix](../testing/project-resource-console-test-matrix.md)
 - [Resource Diagnostic Summary Test Matrix](../testing/resource-diagnostic-summary-test-matrix.md)
@@ -175,6 +177,7 @@ must not trust sidebar/read-model status as the sole invariant guard.
 - [ADR-015: Resource Network Profile](./ADR-015-resource-network-profile.md)
 - [ADR-016: Deployment Command Surface Reset](./ADR-016-deployment-command-surface-reset.md)
 - [ADR-020: Resource Health Observation](./ADR-020-resource-health-observation.md)
+- [ADR-022: Operator Terminal Session Boundary](./ADR-022-operator-terminal-session-boundary.md)
 
 ## Superseded Open Questions
 
@@ -203,6 +206,10 @@ compact resource health.
 The resource-scoped diagnostic summary query now exists and resource detail can copy its canonical
 JSON payload. Deployment detail and Quick Deploy completion do not yet expose the affordance
 directly.
+
+Operator terminal sessions are specified as accepted candidate behavior, but the resource detail
+terminal affordance, server terminal affordance, terminal command, transport, and runtime adapter
+are not implemented yet.
 
 ## Open Questions
 

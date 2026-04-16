@@ -20,43 +20,97 @@
 | Web workflow | Workflow + command spec | UI gating vs command behavior, no domain rule drift |
 | E2E | End-to-end workflow spec | user-visible result, persisted state, logs, progress visibility |
 
+## Test Case IDs And Automation Priority
+
+Behavior test matrices must use stable test case ids for every matrix row that represents a required
+behavior assertion. Summary tables such as `Test Layers` or reference lists do not need ids.
+
+Use an id format that stays readable inside test names:
+
+- command admission: `<OPERATION>-ADM-###`
+- workflow or guided entry flow: `<OPERATION>-WF-###`
+- async progression: `<OPERATION>-ASYNC-###`
+- event handling: `<OPERATION>-EVT-###`
+- read/query behavior: `<OPERATION>-QRY-###`
+- entrypoint behavior: `<OPERATION>-ENTRY-###`
+
+Examples: `DEP-CREATE-ADM-001`, `QUICK-DEPLOY-WF-001`, `RES-CREATE-ENTRY-001`.
+
+Each matrix row must also declare the preferred automation level:
+
+- `e2e-preferred`: execute the real CLI command or HTTP/oRPC API against a composed runtime when
+  the behavior crosses an entrypoint, command/query dispatch, persistence/read model, workflow, or
+  observable user result. Browser automation is optional unless the Web workflow itself is the
+  behavior under test.
+- `integration`: exercise the command/query bus, use case, process manager, persistence adapter, or
+  transport contract without a full external runtime.
+- `unit`: exercise value objects, aggregates, pure planners, normalizers, renderers, and other
+  deterministic boundaries.
+- `contract`: assert route/schema/error mapping for API/oRPC, CLI serialization, or provider port
+  contracts.
+
+Prefer the highest useful executable chain first. For deployment and workflow behaviors, that is
+usually a CLI or HTTP/oRPC e2e test that proves the command or workflow can be executed end to end
+and observed through a read/query surface. Add integration and unit tests underneath it for branch
+coverage, rare failures, pure domain rules, and fast diagnostics.
+
+## Test Name Binding
+
+Automated tests that implement a behavior matrix row must include the matrix id in the test name.
+Use the bracketed id at the start of the test name:
+
+```ts
+test("[QUICK-DEPLOY-WF-001] accepts an existing-context quick deploy through the CLI", async () => {
+  // ...
+});
+```
+
+One matrix row must map to at least one automated test with the same id in its name before the row
+can be considered covered. Prefer one primary matrix id per test. If an executable e2e test proves a
+broad chain while lower-level tests cover branches, keep the e2e test id tied to the matrix row it
+primarily proves and use additional numbered tests for branch-specific matrix rows.
+
+When a Code Round changes a behavior matrix, Post-Implementation Sync must report any new or changed
+matrix id that lacks a matching automated test name as missing coverage. Existing unnumbered tests
+are migration gaps until they are renamed or linked by adding the matching matrix id.
+
 ## Command Test Matrix Template
 
-| Case | Given | Command input | Expected Result | Expected state | Expected events | Expected errors |
-| --- | --- | --- | --- | --- | --- | --- |
-| happy path | | | `ok(...)` | | | |
-| validation failure | | | `err(...)` | no mutation | no event | code/category/details |
-| not found | | | `err(...)` | no mutation | no event | `not_found` |
-| conflict | | | `err(...)` | unchanged | no event | `conflict` or specific code |
-| async accepted | | | accepted result | pending state | requested event | none |
-| async failure | | | accepted or final failure per spec | failed state | failed event | phase/step error |
-| idempotent retry | existing state | same input | stable result | no duplicate effect | no duplicate event or deduped | none |
+| Test ID | Preferred automation | Case | Given | Command input | Expected Result | Expected state | Expected events | Expected errors |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `<OP>-ADM-001` | e2e-preferred or integration | happy path | | | `ok(...)` | | | |
+| `<OP>-ADM-002` | integration | validation failure | | | `err(...)` | no mutation | no event | code/category/details |
+| `<OP>-ADM-003` | integration | not found | | | `err(...)` | no mutation | no event | `not_found` |
+| `<OP>-ADM-004` | integration | conflict | | | `err(...)` | unchanged | no event | `conflict` or specific code |
+| `<OP>-ASYNC-001` | e2e-preferred or integration | async accepted | | | accepted result | pending state | requested event | none |
+| `<OP>-ASYNC-002` | integration | async failure | | | accepted or final failure per spec | failed state | failed event | phase/step error |
+| `<OP>-ASYNC-003` | integration | idempotent retry | existing state | same input | stable result | no duplicate effect | no duplicate event or deduped | none |
 
 ## Event Flow Test Matrix Template
 
-| Case | Given event | Existing state | Handler action | Expected state | Expected follow-up events | Expected error |
-| --- | --- | --- | --- | --- | --- | --- |
-| success | | | | | | |
-| duplicate event | same event twice | | | unchanged or idempotent | none/deduped | none |
-| missing aggregate | aggregate absent | | skip or error per spec | unchanged | none | code if error |
-| retriable failure | dependency unavailable | | record retryable failure | retrying/failed | failure event if any | retryable code |
-| permanent failure | invalid dependency state | | record terminal failure | failed | failure event if any | non-retryable code |
+| Test ID | Preferred automation | Case | Given event | Existing state | Handler action | Expected state | Expected follow-up events | Expected error |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `<OP>-EVT-001` | integration | success | | | | | | |
+| `<OP>-EVT-002` | integration | duplicate event | same event twice | | | unchanged or idempotent | none/deduped | none |
+| `<OP>-EVT-003` | integration | missing aggregate | aggregate absent | | skip or error per spec | unchanged | none | code if error |
+| `<OP>-EVT-004` | integration | retriable failure | dependency unavailable | | record retryable failure | retrying/failed | failure event if any | retryable code |
+| `<OP>-EVT-005` | integration | permanent failure | invalid dependency state | | record terminal failure | failed | failure event if any | non-retryable code |
 
 ## Async Workflow Test Matrix Template
 
-| Phase | Trigger | Owner | Sync result | Async state | Failure state | Retry behavior |
-| --- | --- | --- | --- | --- | --- | --- |
-| request accepted | command | command handler | | | | |
-| planned | aggregate/use case | process manager | | | | |
-| running | process manager | runtime adapter | | | | |
-| verification | runtime adapter | process manager | | | | |
-| completed | runtime adapter | aggregate | | | | |
-| failed | runtime adapter/event handler | aggregate | | | | |
+| Test ID | Preferred automation | Phase | Trigger | Owner | Sync result | Async state | Failure state | Retry behavior |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `<OP>-ASYNC-001` | e2e-preferred or integration | request accepted | command | command handler | | | | |
+| `<OP>-ASYNC-002` | integration | planned | aggregate/use case | process manager | | | | |
+| `<OP>-ASYNC-003` | integration | running | process manager | runtime adapter | | | | |
+| `<OP>-ASYNC-004` | e2e-preferred or integration | verification | runtime adapter | process manager | | | | |
+| `<OP>-ASYNC-005` | e2e-preferred or integration | completed | runtime adapter | aggregate | | | | |
+| `<OP>-ASYNC-006` | integration | failed | runtime adapter/event handler | aggregate | | | | |
 
 ## Given / When / Then Template
 
 ```ts
-test("operation: scenario", async () => {
+test("[OP-ADM-001] operation: scenario", async () => {
   // Given: named domain state, not implementation trivia.
 
   // When: dispatch the command/event through the intended boundary.
@@ -90,11 +144,11 @@ code or mapped `domainCode` when available.
 
 ## Naming Convention
 
-- Aggregate rule: `DeploymentStatusValue transitions running deployment to failed on failed execution`
-- Command use case: `deployments.create rejects non-terminal latest deployment`
-- Event handler: `deployment_target.registered records proxy bootstrap failure without deleting server`
-- Workflow: `quick deploy submits CreateDeploymentCommand after creating selected context records`
-- E2E: `cli-http deploy flow persists logs and progress visibility`
+- Aggregate rule: `[DEP-CREATE-ASYNC-006] DeploymentStatusValue transitions running deployment to failed on failed execution`
+- Command use case: `[DEP-CREATE-ADM-021] deployments.create rejects non-terminal latest deployment`
+- Event handler: `[SERVER-BOOTSTRAP-EVT-002] deployment_target.registered records proxy bootstrap failure without deleting server`
+- Workflow: `[QUICK-DEPLOY-WF-001] quick deploy submits CreateDeploymentCommand after creating selected context records`
+- E2E: `[QUICK-DEPLOY-WF-001] cli quick deploy persists deployment and progress visibility`
 
 ## Mapping Docs To Tests
 
@@ -103,6 +157,8 @@ For every command/event spec:
 - Add a `Tests` section in the spec.
 - Link existing tests that already cover the behavior.
 - Mark missing tests as `Missing coverage`.
+- Use the matrix ids from the governing `docs/testing/**` file when naming or linking tests.
+- Keep matrix ids stable when wording changes; allocate a new id when a materially new behavior row is added.
 - When a behavior changes, update the spec first or in the same change as tests and code.
 
 ## Anti-Patterns

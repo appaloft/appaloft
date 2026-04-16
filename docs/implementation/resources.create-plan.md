@@ -12,6 +12,7 @@ Implementation must preserve the source-of-truth behavior in the governed ADR an
 - [ADR-010: Quick Deploy Workflow Boundary](../decisions/ADR-010-quick-deploy-workflow-boundary.md)
 - [ADR-012: Resource Runtime Profile And Deployment Snapshot Boundary](../decisions/ADR-012-resource-runtime-profile-and-deployment-snapshot-boundary.md)
 - [ADR-015: Resource Network Profile](../decisions/ADR-015-resource-network-profile.md)
+- [ADR-021: Docker/OCI Workload Substrate](../decisions/ADR-021-docker-oci-workload-substrate.md)
 
 ## Governed Specs
 
@@ -112,6 +113,11 @@ Runtime profile must own strategy-specific planning fields:
 - static publish directory for static plans;
 - Docker build target/build-argument policy when that behavior enters scope.
 
+Runtime profile strategy values must be compatible with the Docker/OCI-backed v1 substrate. `auto`,
+static, Dockerfile, Docker Compose, prebuilt-image, and workspace-command strategies are image or
+Compose artifact planning strategies. They must not be modeled as direct long-lived host-process
+execution.
+
 Runtime plan resolution must combine `ResourceSourceBinding.baseDirectory` with runtime-profile
 file paths. For example, a Git source with `baseDirectory = "/bun"` and Dockerfile path
 `/Dockerfile` resolves to a build context rooted at `bun` and a Dockerfile inside that context.
@@ -164,6 +170,8 @@ Required tests:
   uncloneable deep Git locators, Docker image tag/digest conflicts, and path traversal;
 - runtime profile tests assert Dockerfile path, Docker Compose path, static publish directory, and
   command defaults are strategy-specific planning fields rather than source locator suffixes;
+- runtime profile tests assert `auto` and `workspace-commands` resolve to Docker/OCI artifact intent
+  during deployment planning rather than host-process runtime execution;
 - Quick Deploy auto-generated resource names include a short random suffix before `resources.create`;
 - Quick Deploy maps a generic "port" field to `networkProfile.internalPort`;
 - deployment bootstrap compatibility path remains covered until removed.
@@ -189,6 +197,9 @@ Moving `source`, `sourceLocator`, `deploymentMethod`, command overrides, port, a
 Moving proxy, domain, path prefix, and TLS defaults out of `deployments.create` remains governed by [ADR-002](../decisions/ADR-002-routing-domain-tls-boundary.md) and the routing/domain/TLS command set.
 
 Resource runtime profile implementation must use runtime plan strategy terminology. The existing CLI `--method` flag is an entry-workflow alias and must map to `RuntimePlanStrategy` before dispatching `resources.create`.
+
+Resource runtime profile implementation must also honor ADR-021: strategy values describe how the
+source becomes a Docker/OCI image artifact or Compose project for v1 deployment execution.
 
 Resource source/runtime variant implementation must use explicit domain value objects for repository
 locators, Git refs, source base directories, Docker image names/tags/digests, Dockerfile paths,

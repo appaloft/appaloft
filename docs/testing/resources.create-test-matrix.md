@@ -19,6 +19,8 @@ This test matrix inherits:
 - [ADR-011: Resource Create Minimum Lifecycle](../decisions/ADR-011-resource-create-minimum-lifecycle.md)
 - [ADR-012: Resource Runtime Profile And Deployment Snapshot Boundary](../decisions/ADR-012-resource-runtime-profile-and-deployment-snapshot-boundary.md)
 - [ADR-015: Resource Network Profile](../decisions/ADR-015-resource-network-profile.md)
+- [ADR-021: Docker/OCI Workload Substrate](../decisions/ADR-021-docker-oci-workload-substrate.md)
+- [ADR-023: Runtime Orchestration Target Boundary](../decisions/ADR-023-runtime-orchestration-target-boundary.md)
 - [resources.create Command Spec](../commands/resources.create.md)
 - [resource-created Event Spec](../events/resource-created.md)
 - [Resource Lifecycle Error Spec](../errors/resources.lifecycle.md)
@@ -81,6 +83,9 @@ Then:
 | Docker image tag and digest conflict | Docker image source includes both tag and digest as competing identity values | `err` | `validation_error`, phase `resource-source-resolution` | None | No resource created |
 | Dockerfile path with source tree | Git or local source plus `runtimeProfile.strategy = dockerfile` and Dockerfile path | `ok({ id })` | None | `resource-created` | Source binding owns base directory; runtime profile owns Dockerfile path |
 | Compose file path with source tree | Git or local source plus `runtimeProfile.strategy = docker-compose` and Compose file path | `ok({ id })` | None | `resource-created` | Source binding owns base directory; runtime profile owns Compose file path |
+| Auto strategy creates image plan | Buildable source plus `runtimeProfile.strategy = auto` | `ok({ id })` | None | `resource-created` | Runtime profile records an image-producing planner strategy, not host-process execution |
+| Workspace commands create image plan | Buildable source plus `runtimeProfile.strategy = workspace-commands` | `ok({ id })` | None | `resource-created` | Runtime profile records command defaults that will be packaged into a Docker/OCI image during deployment planning |
+| Orchestrator-specific runtime profile fields | Runtime profile input includes Kubernetes namespace, manifest, Helm values, Swarm stack fields, replica count, ingress class, or pull-secret fields | `err` | `validation_error`, phase `command-validation` or `resource-admission` | None | Resource runtime profile remains provider-neutral; orchestrator placement belongs to future target/profile specs |
 | HTTP health check policy | Runtime profile includes enabled HTTP health policy with path, expected status, interval, timeout, retries, and start period | `ok({ id })` | None | `resource-created` | Runtime profile persists reusable health check policy and mirrors HTTP path for current runtime adapters |
 | Invalid internal listener port | Required fields plus invalid `networkProfile.internalPort` | `err` | `validation_error`, phase `resource-network-resolution` or `command-validation` | None | No resource created |
 | Reverse-proxy exposure without host port | Inbound HTTP resource with `internalPort`, default exposure | `ok({ id })` | None | `resource-created` | Resource network profile has `internalPort`; no host-published port required |

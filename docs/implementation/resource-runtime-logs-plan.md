@@ -11,6 +11,7 @@ replace ADRs, query specs, workflow specs, error specs, or test matrices.
 - [ADR-012: Resource Runtime Profile And Deployment Snapshot Boundary](../decisions/ADR-012-resource-runtime-profile-and-deployment-snapshot-boundary.md)
 - [ADR-013: Project Resource Navigation And Deployment Ownership](../decisions/ADR-013-project-resource-navigation-and-deployment-ownership.md)
 - [ADR-016: Deployment Command Surface Reset](../decisions/ADR-016-deployment-command-surface-reset.md)
+- [ADR-021: Docker/OCI Workload Substrate](../decisions/ADR-021-docker-oci-workload-substrate.md)
 
 ## Governed Specs
 
@@ -51,15 +52,15 @@ The query service must:
 
 ## Expected Adapter Scope
 
-Add a fake or local runtime log reader first so the application/API/Web contracts can be exercised
-without requiring Docker or PM2.
+Add a fake or Docker-compatible runtime log reader first so the application/API/Web contracts can
+be exercised without depending on a live remote Docker target in every test.
 
 Runtime adapter implementations must own backend-specific logic. Possible adapters:
 
 - Docker log reader: Docker API or `docker logs --tail <n> --follow`;
-- PM2 log reader: PM2 API or `pm2 logs --raw --lines <n>`;
-- local process/file log reader: reads/tails a known file or child process stream;
-- provider log reader: provider API.
+- Docker Compose log reader: Compose/Docker API or `docker compose logs --tail <n> --follow`;
+- future PM2, systemd, provider API, or file-tail readers only after the corresponding runtime
+  semantics are accepted by ADR.
 
 Every adapter must implement the same `ResourceRuntimeLogReader` port and must close backend
 resources on abort/cancel.
@@ -80,7 +81,8 @@ CLI exposes:
 - `--service <name>`;
 - optional `--deployment <deploymentId>`.
 
-Transports must not define Docker-specific, PM2-specific, or provider-specific input fields.
+Transports must not define Docker-specific, Compose-specific, PM2-specific, or provider-specific
+input fields.
 
 ## Expected Web Scope
 
@@ -121,8 +123,9 @@ The minimal Code Round deliverable is:
 - tests covering query context resolution, adapter delegation, streaming, cancellation, and error
   mapping.
 
-If PM2 or Docker support is deferred, record the runtime adapter gap here and keep the public
-contract runtime-agnostic.
+If Docker or Docker Compose support is deferred, record the runtime adapter gap here and keep the
+public contract normalized. PM2, systemd, provider API, and file-tail readers remain future adapter
+work, not v1 workload substrate requirements.
 
 ## Required Tests
 
@@ -154,8 +157,9 @@ No runtime application log archival or persistent search is required for the fir
 
 - `ResourceRuntimeLogsQuery`, schema, handler, and query service;
 - injected `ResourceRuntimeLogReader` port and token;
-- runtime adapter reader for host-process file logs, local Docker container logs, local Docker
-  Compose logs, and generic-SSH Docker/Compose logs with short-lived SSH connection reuse;
+- runtime adapter reader for local Docker container logs, local Docker Compose logs, and
+  generic-SSH Docker/Compose logs with bounded process timeouts, no SSH ControlMaster reuse for
+  bounded reads, and short-lived SSH connection reuse for follow-mode streams;
 - bounded and streaming oRPC procedures;
 - CLI `yundu resource logs <resourceId>`;
 - Web resource detail runtime log panel that lazy-loads on the logs tab, avoids duplicate bounded
@@ -166,12 +170,14 @@ No runtime application log archival or persistent search is required for the fir
 `deployments.logs` remains implemented for deployment-attempt logs and is still a separate active
 operation.
 
-PM2, systemd/journalctl, provider-native API, and remote SSH file-tail reader implementations remain
-future adapter work behind the same application port. Runtime application log archival or persistent
-search is still out of scope for the first implementation.
+Host-process file tailing remains a legacy/diagnostic reader capability. PM2,
+systemd/journalctl, provider-native API, and remote SSH file-tail reader implementations remain
+future adapter work behind the same application port and require ADR coverage before becoming
+public workload runtime strategies. Runtime application log archival or persistent search is still
+out of scope for the first implementation.
 
 ## Open Questions
 
-- Should the next runtime reader be PM2, systemd/journalctl, or remote SSH file tailing beyond
-  Docker/Compose logs?
+- Should any non-Docker reader be promoted from diagnostic adapter capability to public workload
+  runtime support through a future ADR?
 - Should stream reconnect/cursor support be added before persistent runtime log archival is modeled?

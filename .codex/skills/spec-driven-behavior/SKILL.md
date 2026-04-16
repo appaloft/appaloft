@@ -98,7 +98,7 @@ Do this:
 
 - implement the smallest coherent behavior slice;
 - keep command/query/event/workflow/error/read-model/tests/Web/API/CLI aligned with the governing specs;
-- update tests in the same change when behavior or boundaries are touched;
+- update tests in the same change when behavior or boundaries are touched, using the test case ids from the governing test matrix in automated test names;
 - update migration notes when implementation intentionally does not fully reach the spec yet.
 
 Follow repository CQRS rules:
@@ -111,7 +111,9 @@ Follow repository CQRS rules:
 - new or changed behaviors must already be positioned in `docs/BUSINESS_OPERATION_MAP.md`;
 - neverthrow boundaries follow `docs/errors/neverthrow-conventions.md`.
 
-Default Code Round closure includes the Web UI, HTTP/oRPC API, and read/query surface needed for a user to observe the result of the behavior. Do not treat a write-side command as complete if the only way to confirm it worked is by inspecting persistence manually. If Web, API, CLI, or query/read model coverage is intentionally deferred, record that explicitly in the final gaps and in the relevant migration notes.
+Default Code Round closure includes an executable user-facing chain and the read/query surface needed for a user to observe the result of the behavior. Prefer a real CLI command or HTTP/oRPC API call for this e2e/acceptance chain; browser automation is required only when the Web workflow itself is the behavior under test. Do not treat a write-side command as complete if the only way to confirm it worked is by inspecting persistence manually. If Web, API, CLI, or query/read model coverage is intentionally deferred, record that explicitly in the final gaps and in the relevant migration notes.
+
+For changed commands and workflows, the behavior test matrix must enumerate scenario coverage across happy path, validation, lifecycle transitions, workflow branches, error mapping, emitted events, read/query observability, and Web/API/CLI entrypoints where applicable. Each required matrix row must have a stable test case id and preferred automation level. Mark entrypoint-to-read-model chains as `e2e-preferred` when they can be executed through CLI or HTTP/oRPC, and add integration/unit tests underneath for branch coverage and pure domain behavior.
 
 When a behavior is owned by a specific aggregate or resource, Web closure should include an owner-scoped affordance on the relevant detail page, not only a standalone admin page, unless the governing spec explicitly makes the operation global-only.
 
@@ -161,7 +163,7 @@ Check:
 - code aligns with command/query spec;
 - code aligns with workflow spec;
 - error mapping aligns with error spec and neverthrow conventions;
-- tests align with the test matrix;
+- tests align with the test matrix, including matrix ids and matching automated test names;
 - Web/API/CLI entrypoints dispatch through the intended command/query schemas and buses;
 - migration gaps are updated;
 - Open Questions are resolved, still valid, or need ADR escalation.
@@ -222,7 +224,7 @@ Include:
 - relevant event specs;
 - relevant workflow specs;
 - relevant error specs;
-- relevant testing specs/test matrix;
+- relevant testing specs/test matrix, including test case ids and preferred automation levels;
 - implementation plan;
 - related code modules;
 - related read models/projections and query handlers;
@@ -248,7 +250,7 @@ Before code changes, decide whether the task first needs:
 
 - a new or updated ADR;
 - a new or updated command/event/workflow/error spec;
-- a new or updated test matrix;
+- a new or updated test matrix with stable case ids and preferred automation levels;
 - a new or updated implementation plan.
 
 Enter Code Round only if the candidate behavior has:
@@ -275,8 +277,10 @@ If Code Round:
 - implement the smallest behavior slice across core/application/adapters/transports;
 - keep CLI as a frontend-like input collection flow, not an afterthought;
 - keep Web/API/CLI differences at the entry boundary and converge on shared command/query semantics;
-- include the read/query path and Web UI needed for a minimal closed loop unless the governing spec explicitly scopes them out;
+- include the read/query path and relevant user-facing entrypoint needed for a minimal closed loop unless the governing spec explicitly scopes them out;
 - update tests according to the behavior test matrix;
+- prefer executable e2e/acceptance tests through CLI or HTTP/oRPC for complete command/workflow chains, then add integration and unit tests for branch coverage, pure domain rules, and fast diagnostics;
+- include the governing test case id in every automated test name that implements a matrix row, for example `test("[QUICK-DEPLOY-WF-001] accepts existing-context quick deploy through CLI", ...)`;
 - update docs only when behavior meaning, gaps, or coverage changed.
 - run Post-Implementation Sync for the same behavior before final output.
 
@@ -290,6 +294,7 @@ If Next Behavior Selection:
 If Post-Implementation Sync:
 
 - compare implementation, tests, entrypoints, and migration notes against the governing specs;
+- verify every new or changed test matrix row has a stable id, preferred automation level, and matching automated test name when implemented;
 - report ready/not-ready and blockers without starting the next behavior.
 
 ### Step 6. Output
@@ -304,6 +309,7 @@ The final response must include:
 - changed docs;
 - changed code modules;
 - changed tests;
+- covered or missing test matrix ids;
 - changed Web/API/CLI entrypoints;
 - governed ADRs;
 - remaining migration gaps;
@@ -336,7 +342,7 @@ When a behavior changes, check and synchronize:
 - event specs and event publisher/consumer behavior;
 - workflow spec and process manager/worker behavior;
 - error spec and neverthrow return shape;
-- testing spec/test matrix and actual tests;
+- testing spec/test matrix ids, preferred automation levels, and actual tests with matching names;
 - Web entrypoint;
 - HTTP API/oRPC route and input schema;
 - CLI command/interactive flow;
