@@ -2,6 +2,9 @@ import {
   BootstrapServerEdgeProxyOnTargetRegisteredHandler,
   BootstrapServerProxyCommandHandler,
   BootstrapServerProxyUseCase,
+  type CertificateProviderSelection,
+  type CertificateProviderSelectionInput,
+  type CertificateProviderSelectionPolicy,
   ConfigureServerCredentialUseCase,
   ConfirmDomainBindingOwnershipUseCase,
   CreateDeploymentUseCase,
@@ -21,6 +24,12 @@ import {
   DeploymentSnapshotFactory,
   DiffEnvironmentsQueryService,
   DoctorQueryService,
+  type ExecutionContext,
+  IssueCertificateOnCertificateRequestedHandler,
+  IssueOrRenewCertificateCommandHandler,
+  IssueOrRenewCertificateUseCase,
+  ListCertificatesQueryHandler,
+  ListCertificatesQueryService,
   ListDeploymentsQueryService,
   ListDomainBindingsQueryService,
   ListEnvironmentsQueryService,
@@ -46,12 +55,33 @@ import {
   tokens,
   UnsetEnvironmentVariableUseCase,
 } from "@yundu/application";
+import { type DomainError, ok, type Result } from "@yundu/core";
 import { type DependencyContainer } from "tsyringe";
+
+class ShellCertificateProviderSelectionPolicy implements CertificateProviderSelectionPolicy {
+  async select(
+    context: ExecutionContext,
+    input: CertificateProviderSelectionInput,
+  ): Promise<Result<CertificateProviderSelection, DomainError>> {
+    void context;
+    return ok({
+      providerKey: input.providerKey ?? "acme",
+      challengeType: input.challengeType ?? "http-01",
+    });
+  }
+}
 
 export function registerApplicationServices(container: DependencyContainer): void {
   container.registerSingleton(BootstrapServerEdgeProxyOnTargetRegisteredHandler);
   container.registerSingleton(MarkDomainReadyOnDomainBoundHandler);
+  container.registerSingleton(IssueCertificateOnCertificateRequestedHandler);
   container.registerSingleton(BootstrapServerProxyCommandHandler);
+  container.registerSingleton(IssueOrRenewCertificateCommandHandler);
+  container.registerSingleton(ListCertificatesQueryHandler);
+  container.registerSingleton(
+    tokens.certificateProviderSelectionPolicy,
+    ShellCertificateProviderSelectionPolicy,
+  );
   container.registerSingleton(tokens.createProjectUseCase, CreateProjectUseCase);
   container.registerSingleton(tokens.listProjectsQueryService, ListProjectsQueryService);
   container.registerSingleton(tokens.createResourceUseCase, CreateResourceUseCase);
@@ -105,6 +135,11 @@ export function registerApplicationServices(container: DependencyContainer): voi
     tokens.listDomainBindingsQueryService,
     ListDomainBindingsQueryService,
   );
+  container.registerSingleton(
+    tokens.issueOrRenewCertificateUseCase,
+    IssueOrRenewCertificateUseCase,
+  );
+  container.registerSingleton(tokens.listCertificatesQueryService, ListCertificatesQueryService);
   container.registerSingleton(tokens.listDeploymentsQueryService, ListDeploymentsQueryService);
   container.registerSingleton(tokens.logsQueryService, DeploymentLogsQueryService);
   container.registerSingleton(

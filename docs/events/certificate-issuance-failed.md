@@ -96,7 +96,12 @@ Consumers must dedupe by `(certificateId, attemptId)`.
 
 ## Current Implementation Notes And Migration Gaps
 
-Current code has no durable certificate attempt state, provider integration, or certificate failure event.
+Current code records failed or retry-scheduled certificate attempt state and publishes
+`certificate-issuance-failed` from the `certificate-requested` event handler when injected provider
+issuance or secret storage fails.
+
+Current code does not yet implement a real ACME adapter, retry scheduler, provider-specific
+challenge validation details, or certificate-backed domain readiness.
 
 ## Open Questions
 

@@ -18,7 +18,11 @@ This event inherits:
 
 ## Event Type
 
-Application event for certificate lifecycle orchestration.
+First-class application event for certificate lifecycle orchestration.
+
+This event is an internal behavior entrypoint at the same specification level as commands and
+queries. It is not a user-facing CLI/API entrypoint; it is consumed by event handlers, workers, or
+process managers after a command or another process manager has published it.
 
 ## Trigger
 
@@ -48,7 +52,7 @@ type CertificateRequestedPayload = {
   attemptId: string;
   reason: "issue" | "renew" | "replace";
   providerKey: string;
-  challengeType: "http-01" | "dns-01";
+  challengeType: string;
   requestedAt: string;
   correlationId?: string;
   causationId?: string;
@@ -89,7 +93,14 @@ Provider worker failure before state persistence leaves the attempt retryable or
 
 ## Current Implementation Notes And Migration Gaps
 
-Current code has no durable certificate attempt state and no certificate provider worker. Runtime proxy behavior may rely on Traefik/Caddy behavior, but the platform does not own this event today.
+Current code has durable certificate request state, a certificate attempt model, `certificates.issue-or-renew`, `certificates.list`, PostgreSQL/PGlite persistence, CLI/API entrypoints, and `certificate-requested` publication after attempt persistence.
+
+The current provider-worker slice implements a provider-neutral `certificate-requested` event
+handler that consumes the event, calls injected certificate provider and secret-store ports, records
+issued or failed attempt state, and publishes `certificate-issued` or
+`certificate-issuance-failed`. The first implementation is still provider-port driven and does not
+ship a real ACME adapter, ACME account model, challenge token serving, or certificate-backed
+`domain-ready`.
 
 ## Open Questions
 

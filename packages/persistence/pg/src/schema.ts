@@ -148,6 +148,25 @@ export interface DomainBindingsTable {
   created_at: TimestampColumn;
 }
 
+export interface CertificatesTable {
+  id: string;
+  domain_binding_id: string;
+  domain_name: string;
+  status: string;
+  provider_key: string;
+  challenge_type: string;
+  issued_at: string | null;
+  expires_at: string | null;
+  fingerprint: string | null;
+  secret_ref: string | null;
+  attempts: ColumnType<
+    Record<string, unknown>[],
+    Record<string, unknown>[],
+    Record<string, unknown>[]
+  >;
+  created_at: TimestampColumn;
+}
+
 export interface AuditLogsTable {
   id: string;
   aggregate_id: string;
@@ -174,6 +193,7 @@ export interface Database {
   environment_variables: EnvironmentVariablesTable;
   deployments: DeploymentsTable;
   domain_bindings: DomainBindingsTable;
+  certificates: CertificatesTable;
   audit_logs: AuditLogsTable;
   provider_job_logs: ProviderJobLogsTable;
 }

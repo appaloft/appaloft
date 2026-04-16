@@ -283,6 +283,48 @@ export class DomainVerificationAttemptId extends IdentifierValue {
   }
 }
 
+const certificateIdBrand: unique symbol = Symbol("CertificateId");
+export class CertificateId extends IdentifierValue {
+  private [certificateIdBrand]!: void;
+
+  private constructor(value: string) {
+    super(value);
+  }
+
+  static create(value: string): Result<CertificateId> {
+    return createIdentifierValue(
+      value,
+      "Certificate ID",
+      (normalized) => new CertificateId(normalized),
+    );
+  }
+
+  static rehydrate(value: string): CertificateId {
+    return new CertificateId(value.trim());
+  }
+}
+
+const certificateAttemptIdBrand: unique symbol = Symbol("CertificateAttemptId");
+export class CertificateAttemptId extends IdentifierValue {
+  private [certificateAttemptIdBrand]!: void;
+
+  private constructor(value: string) {
+    super(value);
+  }
+
+  static create(value: string): Result<CertificateAttemptId> {
+    return createIdentifierValue(
+      value,
+      "Certificate attempt ID",
+      (normalized) => new CertificateAttemptId(normalized),
+    );
+  }
+
+  static rehydrate(value: string): CertificateAttemptId {
+    return new CertificateAttemptId(value.trim());
+  }
+}
+
 const organizationIdBrand: unique symbol = Symbol("OrganizationId");
 export class OrganizationId extends IdentifierValue {
   private [organizationIdBrand]!: void;

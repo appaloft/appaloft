@@ -32,6 +32,9 @@ import {
   diffEnvironmentsQueryInputSchema,
   type ExecutionContext,
   type ExecutionContextFactory,
+  IssueOrRenewCertificateCommand,
+  issueOrRenewCertificateCommandInputSchema,
+  ListCertificatesQuery,
   ListDeploymentsQuery,
   ListDomainBindingsQuery,
   ListEnvironmentsQuery,
@@ -42,6 +45,7 @@ import {
   ListResourcesQuery,
   ListServersQuery,
   ListSshCredentialsQuery,
+  listCertificatesQueryInputSchema,
   listDeploymentsQueryInputSchema,
   listDomainBindingsQueryInputSchema,
   listEnvironmentsQueryInputSchema,
@@ -89,6 +93,8 @@ import {
   deploymentProgressEventSchema,
   diffEnvironmentResponseSchema,
   environmentSummarySchema,
+  issueOrRenewCertificateResponseSchema,
+  listCertificatesResponseSchema,
   listDeploymentsResponseSchema,
   listDomainBindingsResponseSchema,
   listEnvironmentsResponseSchema,
@@ -300,6 +306,7 @@ function toOrpcError(error: DomainError, context: ExecutionContext) {
         },
       });
     case "conflict":
+    case "certificate_attempt_conflict":
     case "resource_slug_conflict":
     case "deployment_not_redeployable":
       return new ORPCError("CONFLICT", {
@@ -312,6 +319,7 @@ function toOrpcError(error: DomainError, context: ExecutionContext) {
       });
     case "domain_binding_proxy_required":
     case "domain_binding_context_mismatch":
+    case "certificate_not_allowed":
     case "resource_context_mismatch":
     case "terminal_session_context_mismatch":
     case "terminal_session_workspace_unavailable":
@@ -766,6 +774,30 @@ export const listDomainBindingsProcedure = base
     executeQuery(context, ListDomainBindingsQuery.create(input)),
   );
 
+export const issueOrRenewCertificateProcedure = base
+  .route({
+    method: "POST",
+    path: "/certificates/issue-or-renew",
+    successStatus: 202,
+  })
+  .input(issueOrRenewCertificateCommandInputSchema)
+  .output(issueOrRenewCertificateResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, IssueOrRenewCertificateCommand.create(input)),
+  );
+
+export const listCertificatesProcedure = base
+  .route({
+    method: "GET",
+    path: "/certificates",
+    successStatus: 200,
+  })
+  .input(listCertificatesQueryInputSchema)
+  .output(listCertificatesResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ListCertificatesQuery.create(input)),
+  );
+
 export const showEnvironmentProcedure = base
   .route({
     method: "GET",
@@ -1028,6 +1060,10 @@ export const yunduOrpcRouter = {
     create: createDomainBindingProcedure,
     confirmOwnership: confirmDomainBindingOwnershipProcedure,
   },
+  certificates: {
+    list: listCertificatesProcedure,
+    issueOrRenew: issueOrRenewCertificateProcedure,
+  },
   deployments: {
     list: listDeploymentsProcedure,
     create: createDeploymentProcedure,
@@ -1172,6 +1208,8 @@ export function mountYunduOrpcRoutes(
     "/api/terminal-sessions",
     "/api/domain-bindings",
     "/api/domain-bindings/:domainBindingId/ownership-confirmations",
+    "/api/certificates",
+    "/api/certificates/issue-or-renew",
     "/api/deployments",
     "/api/deployments/stream",
     "/api/deployments/:deploymentId/logs",

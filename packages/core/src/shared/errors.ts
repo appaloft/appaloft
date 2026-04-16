@@ -148,6 +148,25 @@ export const domainError = {
     message: string,
     details?: Record<string, string | number | boolean | null>,
   ): DomainError => createError("domain_verification_not_pending", "user", message, details),
+  certificateNotAllowed: (
+    message: string,
+    details?: Record<string, string | number | boolean | null>,
+  ): DomainError => createError("certificate_not_allowed", "user", message, details),
+  certificateAttemptConflict: (
+    message: string,
+    details?: Record<string, string | number | boolean | null>,
+  ): DomainError => createError("certificate_attempt_conflict", "user", message, details),
+  certificateProviderUnavailable: (
+    message: string,
+    details?: Record<string, string | number | boolean | null>,
+    retryable = true,
+  ): DomainError =>
+    createError("certificate_provider_unavailable", "provider", message, details, retryable),
+  certificateStorageFailed: (
+    message: string,
+    details?: Record<string, string | number | boolean | null>,
+    retryable = true,
+  ): DomainError => createError("certificate_storage_failed", "infra", message, details, retryable),
   proxyProviderUnavailable: (
     message: string,
     details?: Record<string, string | number | boolean | null>,

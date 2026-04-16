@@ -1,5 +1,12 @@
 import {
   type AppLogger,
+  type CertificateProviderIssueInput,
+  type CertificateProviderIssueResult,
+  type CertificateProviderPort,
+  type CertificateReadModel,
+  type CertificateRepository,
+  type CertificateSecretStore,
+  type CertificateSummary,
   type Clock,
   type DeploymentLogSummary,
   type DeploymentReadModel,
@@ -27,6 +34,12 @@ import {
 } from "@yundu/application";
 import {
   ActiveDomainBindingByOwnerAndRouteSpec,
+  Certificate,
+  CertificateByAttemptIdempotencyKeySpec,
+  CertificateByDomainBindingIdSpec,
+  CertificateByIdSpec,
+  type CertificateMutationSpec,
+  type CertificateSelectionSpec,
   Deployment,
   DeploymentByIdSpec,
   type DeploymentMutationSpec,
@@ -46,12 +59,14 @@ import {
   DomainBindingByIdSpec,
   type DomainBindingMutationSpec,
   type DomainBindingSelectionSpec,
+  type DomainError,
   Environment,
   EnvironmentByIdSpec,
   EnvironmentByProjectAndNameSpec,
   type EnvironmentMutationSpec,
   type EnvironmentSelectionSpec,
   LatestDeploymentSpec,
+  ok,
   Project,
   ProjectByIdSpec,
   ProjectBySlugSpec,
@@ -62,6 +77,7 @@ import {
   ResourceByIdSpec,
   type ResourceMutationSpec,
   type ResourceSelectionSpec,
+  type Result,
 } from "@yundu/core";
 
 export class FixedClock implements Clock {
@@ -99,6 +115,42 @@ export class NoopLogger implements AppLogger {
   info(): void {}
   warn(): void {}
   error(): void {}
+}
+
+export class FakeCertificateProvider implements CertificateProviderPort {
+  readonly inputs: CertificateProviderIssueInput[] = [];
+
+  constructor(private result: Result<CertificateProviderIssueResult, DomainError>) {}
+
+  setResult(result: Result<CertificateProviderIssueResult, DomainError>): void {
+    this.result = result;
+  }
+
+  async issue(
+    context: ExecutionContext,
+    input: CertificateProviderIssueInput,
+  ): Promise<Result<CertificateProviderIssueResult, DomainError>> {
+    void context;
+    this.inputs.push(input);
+    return this.result;
+  }
+}
+
+export class FakeCertificateSecretStore implements CertificateSecretStore {
+  readonly stored: CertificateProviderIssueResult[] = [];
+
+  constructor(private secretRefPrefix = "secret") {}
+
+  async store(
+    context: ExecutionContext,
+    material: CertificateProviderIssueResult,
+  ): Promise<Result<{ secretRef: string }, DomainError>> {
+    void context;
+    this.stored.push(material);
+    return ok({
+      secretRef: `${this.secretRefPrefix}://${material.certificateId}/${material.attemptId}`,
+    });
+  }
 }
 
 export class MemoryProjectRepository implements ProjectRepository {
@@ -584,6 +636,112 @@ export class MemoryDomainBindingReadModel implements DomainBindingReadModel {
           createdAt: domainBinding.createdAt.value,
         }),
       );
+  }
+}
+
+export class MemoryCertificateRepository implements CertificateRepository {
+  readonly items = new Map<string, Certificate>();
+
+  async upsert(
+    context: RepositoryContext,
+    certificate: Certificate,
+    spec: CertificateMutationSpec,
+  ): Promise<void> {
+    void context;
+    void spec;
+    this.items.set(certificate.toState().id.value, Certificate.rehydrate(certificate.toState()));
+  }
+
+  async findOne(
+    context: RepositoryContext,
+    spec: CertificateSelectionSpec,
+  ): Promise<Certificate | null> {
+    void context;
+    if (spec instanceof CertificateByIdSpec) {
+      return this.items.get(spec.id.value) ?? null;
+    }
+
+    if (spec instanceof CertificateByDomainBindingIdSpec) {
+      for (const certificate of this.items.values()) {
+        if (spec.isSatisfiedBy(certificate)) {
+          return certificate;
+        }
+      }
+    }
+
+    if (spec instanceof CertificateByAttemptIdempotencyKeySpec) {
+      for (const certificate of this.items.values()) {
+        if (spec.isSatisfiedBy(certificate)) {
+          return certificate;
+        }
+      }
+    }
+
+    return null;
+  }
+}
+
+export class MemoryCertificateReadModel implements CertificateReadModel {
+  constructor(private readonly repository: MemoryCertificateRepository) {}
+
+  async list(
+    context: RepositoryContext,
+    input?: {
+      domainBindingId?: string;
+    },
+  ): Promise<CertificateSummary[]> {
+    void context;
+    return [...this.repository.items.values()]
+      .map((certificate) => certificate.toState())
+      .filter((certificate) =>
+        input?.domainBindingId ? certificate.domainBindingId.value === input.domainBindingId : true,
+      )
+      .map((certificate): CertificateSummary => {
+        const latestAttempt = certificate.attempts[certificate.attempts.length - 1];
+
+        return {
+          id: certificate.id.value,
+          domainBindingId: certificate.domainBindingId.value,
+          domainName: certificate.domainName.value,
+          status: certificate.status.value,
+          providerKey: certificate.providerKey.value,
+          challengeType: certificate.challengeType.value,
+          ...(certificate.issuedAt ? { issuedAt: certificate.issuedAt.value } : {}),
+          ...(certificate.expiresAt ? { expiresAt: certificate.expiresAt.value } : {}),
+          ...(certificate.fingerprint ? { fingerprint: certificate.fingerprint.value } : {}),
+          ...(latestAttempt
+            ? {
+                latestAttempt: {
+                  id: latestAttempt.id.value,
+                  status: latestAttempt.status.value,
+                  reason: latestAttempt.reason.value,
+                  providerKey: latestAttempt.providerKey.value,
+                  challengeType: latestAttempt.challengeType.value,
+                  requestedAt: latestAttempt.requestedAt.value,
+                  ...(latestAttempt.issuedAt ? { issuedAt: latestAttempt.issuedAt.value } : {}),
+                  ...(latestAttempt.expiresAt ? { expiresAt: latestAttempt.expiresAt.value } : {}),
+                  ...(latestAttempt.failedAt ? { failedAt: latestAttempt.failedAt.value } : {}),
+                  ...(latestAttempt.failureCode
+                    ? { errorCode: latestAttempt.failureCode.value }
+                    : {}),
+                  ...(latestAttempt.failurePhase
+                    ? { failurePhase: latestAttempt.failurePhase.value }
+                    : {}),
+                  ...(latestAttempt.failureMessage
+                    ? { failureMessage: latestAttempt.failureMessage.value }
+                    : {}),
+                  ...(latestAttempt.retriable === undefined
+                    ? {}
+                    : { retriable: latestAttempt.retriable }),
+                  ...(latestAttempt.retryAfter
+                    ? { retryAfter: latestAttempt.retryAfter.value }
+                    : {}),
+                },
+              }
+            : {}),
+          createdAt: certificate.createdAt.value,
+        };
+      });
   }
 }
 

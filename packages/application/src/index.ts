@@ -1,3 +1,5 @@
+export * from "./certificate-handlers";
+export * from "./certificate-messages";
 export * from "./cqrs";
 export * from "./deployment-handlers";
 export * from "./deployment-messages";

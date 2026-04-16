@@ -718,6 +718,56 @@ export const listDomainBindingsResponseSchema = z.object({
   items: z.array(domainBindingSummarySchema),
 });
 
+export const issueOrRenewCertificateInputSchema = z.object({
+  domainBindingId: z.string().min(1),
+  certificateId: z.string().min(1).optional(),
+  reason: z.enum(["issue", "renew", "replace"]).default("issue"),
+  providerKey: z.string().min(1).optional(),
+  challengeType: z.string().min(1).optional(),
+  idempotencyKey: z.string().min(1).optional(),
+  causationId: z.string().min(1).optional(),
+});
+
+export const issueOrRenewCertificateResponseSchema = z.object({
+  certificateId: z.string(),
+  attemptId: z.string(),
+});
+
+export const certificateAttemptSummarySchema = z.object({
+  id: z.string(),
+  status: z.enum(["requested", "issuing", "issued", "failed", "retry_scheduled"]),
+  reason: z.enum(["issue", "renew", "replace"]),
+  providerKey: z.string(),
+  challengeType: z.string(),
+  requestedAt: z.string(),
+  issuedAt: z.string().optional(),
+  expiresAt: z.string().optional(),
+  failedAt: z.string().optional(),
+  errorCode: z.string().optional(),
+  failurePhase: z.string().optional(),
+  failureMessage: z.string().optional(),
+  retriable: z.boolean().optional(),
+  retryAfter: z.string().optional(),
+});
+
+export const certificateSummarySchema = z.object({
+  id: z.string(),
+  domainBindingId: z.string(),
+  domainName: z.string(),
+  status: z.enum(["pending", "issuing", "active", "renewing", "failed", "expired", "disabled"]),
+  providerKey: z.string(),
+  challengeType: z.string(),
+  issuedAt: z.string().optional(),
+  expiresAt: z.string().optional(),
+  fingerprint: z.string().optional(),
+  latestAttempt: certificateAttemptSummarySchema.optional(),
+  createdAt: z.string(),
+});
+
+export const listCertificatesResponseSchema = z.object({
+  items: z.array(certificateSummarySchema),
+});
+
 export const createEnvironmentInputSchema = z.object({
   projectId: z.string(),
   name: z.string().min(1),
@@ -1372,6 +1422,11 @@ export type ConfirmDomainBindingOwnershipResponse = z.infer<
   typeof confirmDomainBindingOwnershipResponseSchema
 >;
 export type ListDomainBindingsResponse = z.infer<typeof listDomainBindingsResponseSchema>;
+export type IssueOrRenewCertificateInput = z.infer<typeof issueOrRenewCertificateInputSchema>;
+export type IssueOrRenewCertificateResponse = z.infer<typeof issueOrRenewCertificateResponseSchema>;
+export type CertificateAttemptSummary = z.infer<typeof certificateAttemptSummarySchema>;
+export type CertificateSummary = z.infer<typeof certificateSummarySchema>;
+export type ListCertificatesResponse = z.infer<typeof listCertificatesResponseSchema>;
 export type SetEnvironmentVariableInput = z.infer<typeof setEnvironmentVariableInputSchema>;
 export type PromoteEnvironmentInput = z.infer<typeof promoteEnvironmentInputSchema>;
 export type PromoteEnvironmentResponse = z.infer<typeof promoteEnvironmentResponseSchema>;

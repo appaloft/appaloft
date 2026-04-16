@@ -18,6 +18,10 @@ import {
 } from "@yundu/adapter-runtime";
 import {
   type AppLogger,
+  type CertificateProviderIssueInput,
+  type CertificateProviderIssueResult,
+  type CertificateProviderPort,
+  type CertificateSecretStore,
   type Clock,
   CommandBus,
   type DefaultAccessDomainGeneration,
@@ -36,12 +40,14 @@ import {
 } from "@yundu/application";
 import { type AuthRuntime } from "@yundu/auth-better";
 import { type AppConfig } from "@yundu/config";
-import { type DomainError, ok, type Result } from "@yundu/core";
+import { type DomainError, domainError, err, ok, type Result } from "@yundu/core";
 import { InMemoryIntegrationRegistry } from "@yundu/integration-core";
 import { createGitHubRepositoryBrowser, githubIntegration } from "@yundu/integration-github";
 import { gitlabIntegration } from "@yundu/integration-gitlab";
 import {
   type DatabaseConnection,
+  PgCertificateReadModel,
+  PgCertificateRepository,
   PgDeploymentReadModel,
   PgDeploymentRepository,
   PgDestinationRepository,
@@ -85,6 +91,40 @@ const generateIdSuffix = customAlphabet("0123456789abcdefghijklmnopqrstuvwxyz", 
 class NanoIdGenerator implements IdGenerator {
   next(prefix: string): string {
     return `${prefix}_${generateIdSuffix()}`;
+  }
+}
+
+class UnavailableCertificateProvider implements CertificateProviderPort {
+  async issue(
+    context: ExecutionContext,
+    input: CertificateProviderIssueInput,
+  ): Promise<Result<CertificateProviderIssueResult, DomainError>> {
+    void context;
+    return err(
+      domainError.certificateProviderUnavailable(
+        "Certificate provider is not configured",
+        {
+          phase: "provider-request",
+          providerKey: input.providerKey,
+          certificateId: input.certificateId,
+          attemptId: input.attemptId,
+          domainBindingId: input.domainBindingId,
+        },
+        true,
+      ),
+    );
+  }
+}
+
+class InMemoryCertificateSecretStore implements CertificateSecretStore {
+  async store(
+    context: ExecutionContext,
+    material: CertificateProviderIssueResult,
+  ): Promise<Result<{ secretRef: string }, DomainError>> {
+    void context;
+    return ok({
+      secretRef: `memory://${material.certificateId}/${material.attemptId}`,
+    });
   }
 }
 
@@ -272,6 +312,15 @@ export function registerRuntimeDependencies(
   container.register(tokens.domainBindingRepository, {
     useFactory: instanceCachingFactory(() => new PgDomainBindingRepository(input.database.db)),
   });
+  container.register(tokens.certificateRepository, {
+    useFactory: instanceCachingFactory(() => new PgCertificateRepository(input.database.db)),
+  });
+  container.register(tokens.certificateProvider, {
+    useFactory: instanceCachingFactory(() => new UnavailableCertificateProvider()),
+  });
+  container.register(tokens.certificateSecretStore, {
+    useFactory: instanceCachingFactory(() => new InMemoryCertificateSecretStore()),
+  });
   container.register(tokens.deploymentContextDefaultsPolicy, {
     useFactory: instanceCachingFactory(
       () => new ShellDeploymentContextDefaultsPolicy(input.config),
@@ -300,6 +349,9 @@ export function registerRuntimeDependencies(
   });
   container.register(tokens.domainBindingReadModel, {
     useFactory: instanceCachingFactory(() => new PgDomainBindingReadModel(input.database.db)),
+  });
+  container.register(tokens.certificateReadModel, {
+    useFactory: instanceCachingFactory(() => new PgCertificateReadModel(input.database.db)),
   });
 
   container.register(tokens.sourceDetector, {
