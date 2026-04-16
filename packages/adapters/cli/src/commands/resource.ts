@@ -2,6 +2,8 @@ import { Args, Command as EffectCommand, Options } from "@effect/cli";
 import {
   CreateResourceCommand,
   ListResourcesQuery,
+  ResourceDiagnosticSummaryQuery,
+  ResourceHealthQuery,
   ResourceProxyConfigurationPreviewQuery,
   ResourceRuntimeLogsQuery,
 } from "@yundu/application";
@@ -32,7 +34,22 @@ const routeScopeOption = Options.choice("scope", ["planned", "latest", "deployme
   Options.withDefault("latest"),
 );
 const diagnosticsOption = Options.boolean("diagnostics").pipe(Options.withDefault(false));
+const liveOption = Options.boolean("live").pipe(Options.withDefault(false));
+const includeChecksOption = Options.boolean("checks").pipe(Options.withDefault(true));
+const publicAccessProbeOption = Options.boolean("public-access-probe").pipe(
+  Options.withDefault(false),
+);
+const runtimeProbeOption = Options.boolean("runtime-probe").pipe(Options.withDefault(false));
 const tailOption = Options.text("tail").pipe(Options.withDefault("100"));
+const diagnosticTailOption = Options.text("tail").pipe(Options.withDefault("20"));
+const includeDeploymentLogsOption = Options.boolean("deployment-logs").pipe(
+  Options.withDefault(true),
+);
+const includeRuntimeLogsOption = Options.boolean("runtime-logs").pipe(Options.withDefault(false));
+const includeProxyConfigurationOption = Options.boolean("proxy-configuration").pipe(
+  Options.withDefault(false),
+);
+const jsonOption = Options.boolean("json").pipe(Options.withDefault(true));
 const followOption = Options.boolean("follow").pipe(Options.withDefault(false));
 
 const listCommand = EffectCommand.make(
@@ -126,7 +143,64 @@ const proxyConfigCommand = EffectCommand.make(
     ),
 ).pipe(EffectCommand.withDescription("Show resource proxy configuration"));
 
+const diagnoseCommand = EffectCommand.make(
+  "diagnose",
+  {
+    resourceId: resourceIdArg,
+    deployment: deploymentOption,
+    deploymentLogs: includeDeploymentLogsOption,
+    runtimeLogs: includeRuntimeLogsOption,
+    proxyConfiguration: includeProxyConfigurationOption,
+    tail: diagnosticTailOption,
+    json: jsonOption,
+  },
+  ({ deployment, deploymentLogs, json, proxyConfiguration, resourceId, runtimeLogs, tail }) => {
+    void json;
+    return runQuery(
+      ResourceDiagnosticSummaryQuery.create({
+        resourceId,
+        deploymentId: optionalValue(deployment),
+        includeDeploymentLogTail: deploymentLogs,
+        includeRuntimeLogTail: runtimeLogs,
+        includeProxyConfiguration: proxyConfiguration,
+        tailLines: Number(tail),
+      }),
+    );
+  },
+).pipe(EffectCommand.withDescription("Copy resource diagnostic summary context"));
+
+const healthCommand = EffectCommand.make(
+  "health",
+  {
+    resourceId: resourceIdArg,
+    live: liveOption,
+    checks: includeChecksOption,
+    publicAccessProbe: publicAccessProbeOption,
+    runtimeProbe: runtimeProbeOption,
+    json: jsonOption,
+  },
+  ({ checks, json, live, publicAccessProbe, resourceId, runtimeProbe }) => {
+    void json;
+    return runQuery(
+      ResourceHealthQuery.create({
+        resourceId,
+        mode: live ? "live" : "cached",
+        includeChecks: checks,
+        includePublicAccessProbe: publicAccessProbe,
+        includeRuntimeProbe: runtimeProbe,
+      }),
+    );
+  },
+).pipe(EffectCommand.withDescription("Show current resource health"));
+
 export const resourceCommand = EffectCommand.make("resource").pipe(
   EffectCommand.withDescription("Resource operations"),
-  EffectCommand.withSubcommands([createCommand, listCommand, logsCommand, proxyConfigCommand]),
+  EffectCommand.withSubcommands([
+    createCommand,
+    listCommand,
+    logsCommand,
+    healthCommand,
+    proxyConfigCommand,
+    diagnoseCommand,
+  ]),
 );

@@ -588,16 +588,21 @@ function resolveAdvancedDeploymentConfig(input: {
   seed: DeploymentPromptSeed;
 }) {
   return Effect.gen(function* () {
-    const shouldConfigure =
+    const canPrompt = Boolean(process.stdin.isTTY && process.stdout.isTTY);
+    const hasSeedAdvancedConfig = Boolean(
       input.seed.installCommand ||
-      input.seed.buildCommand ||
-      input.seed.startCommand ||
-      input.seed.port ||
-      input.seed.healthCheckPath ||
-      (yield* input.interaction.confirm({
-        message: "Advanced config?",
-        defaultValue: false,
-      }));
+        input.seed.buildCommand ||
+        input.seed.startCommand ||
+        input.seed.port ||
+        input.seed.healthCheckPath,
+    );
+    const shouldConfigure =
+      hasSeedAdvancedConfig ||
+      (canPrompt &&
+        (yield* input.interaction.confirm({
+          message: "Advanced config?",
+          defaultValue: false,
+        })));
 
     if (!shouldConfigure) {
       return { port: input.seed.port ?? defaultApplicationInternalPort };
@@ -605,45 +610,55 @@ function resolveAdvancedDeploymentConfig(input: {
 
     const installCommand =
       input.seed.installCommand ??
-      trimToUndefined(
-        yield* input.interaction.text({
-          message: "Install command",
-          defaultValue: "",
-        }),
-      );
+      (canPrompt
+        ? trimToUndefined(
+            yield* input.interaction.text({
+              message: "Install command",
+              defaultValue: "",
+            }),
+          )
+        : undefined);
     const buildCommand =
       input.seed.buildCommand ??
-      trimToUndefined(
-        yield* input.interaction.text({
-          message: "Build command",
-          defaultValue: "",
-        }),
-      );
+      (canPrompt
+        ? trimToUndefined(
+            yield* input.interaction.text({
+              message: "Build command",
+              defaultValue: "",
+            }),
+          )
+        : undefined);
     const startCommand =
       input.seed.startCommand ??
-      trimToUndefined(
-        yield* input.interaction.text({
-          message: "Start command",
-          defaultValue: "",
-        }),
-      );
+      (canPrompt
+        ? trimToUndefined(
+            yield* input.interaction.text({
+              message: "Start command",
+              defaultValue: "",
+            }),
+          )
+        : undefined);
     const port =
       input.seed.port ??
-      Number(
-        yield* input.interaction.text({
-          message: "Application port",
-          defaultValue: String(defaultApplicationInternalPort),
-          validate: requirePositiveInteger("Application port"),
-        }),
-      );
+      (canPrompt
+        ? Number(
+            yield* input.interaction.text({
+              message: "Application port",
+              defaultValue: String(defaultApplicationInternalPort),
+              validate: requirePositiveInteger("Application port"),
+            }),
+          )
+        : defaultApplicationInternalPort);
     const healthCheckPath =
       input.seed.healthCheckPath ??
-      trimToUndefined(
-        yield* input.interaction.text({
-          message: "Health check path",
-          defaultValue: "",
-        }),
-      );
+      (canPrompt
+        ? trimToUndefined(
+            yield* input.interaction.text({
+              message: "Health check path",
+              defaultValue: "",
+            }),
+          )
+        : undefined);
 
     return {
       ...(installCommand ? { installCommand } : {}),
