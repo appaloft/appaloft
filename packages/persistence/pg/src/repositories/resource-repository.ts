@@ -24,6 +24,7 @@ import {
   type SerializedResourceNetworkProfile,
   type SerializedResourceRuntimeProfile,
   type SerializedResourceSourceBinding,
+  serializeHealthCheckPolicy,
   serializeResourceServices,
 } from "./shared";
 
@@ -113,6 +114,9 @@ class KyselyResourceMutationVisitor
             : {}),
           ...(spec.state.runtimeProfile.healthCheckPath
             ? { healthCheckPath: spec.state.runtimeProfile.healthCheckPath.value }
+            : {}),
+          ...(spec.state.runtimeProfile.healthCheck
+            ? { healthCheck: serializeHealthCheckPolicy(spec.state.runtimeProfile.healthCheck) }
             : {}),
         } satisfies SerializedResourceRuntimeProfile)
       : null;

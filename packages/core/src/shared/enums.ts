@@ -121,6 +121,18 @@ export const resourceExposureModes = ["none", "reverse-proxy", "direct-port"] as
 
 export type ResourceExposureMode = (typeof resourceExposureModes)[number];
 
+export const healthCheckTypes = ["http", "command"] as const;
+
+export type HealthCheckType = (typeof healthCheckTypes)[number];
+
+export const healthCheckHttpMethods = ["GET", "HEAD", "POST", "OPTIONS"] as const;
+
+export type HealthCheckHttpMethod = (typeof healthCheckHttpMethods)[number];
+
+export const healthCheckSchemes = ["http", "https"] as const;
+
+export type HealthCheckScheme = (typeof healthCheckSchemes)[number];
+
 export const deploymentStatuses = [
   "created",
   "planning",

@@ -31,11 +31,16 @@ export const tokens = {
   listSshCredentialsQueryService: Symbol.for("yundu.list_ssh_credentials_query_service"),
   listServersQueryService: Symbol.for("yundu.list_servers_query_service"),
   testServerConnectivityUseCase: Symbol.for("yundu.test_server_connectivity_use_case"),
+  bootstrapServerProxyUseCase: Symbol.for("yundu.bootstrap_server_proxy_use_case"),
   createEnvironmentUseCase: Symbol.for("yundu.create_environment_use_case"),
   listEnvironmentsQueryService: Symbol.for("yundu.list_environments_query_service"),
   showEnvironmentQueryService: Symbol.for("yundu.show_environment_query_service"),
   createResourceUseCase: Symbol.for("yundu.create_resource_use_case"),
   listResourcesQueryService: Symbol.for("yundu.list_resources_query_service"),
+  resourceDiagnosticSummaryQueryService: Symbol.for(
+    "yundu.resource_diagnostic_summary_query_service",
+  ),
+  resourceHealthQueryService: Symbol.for("yundu.resource_health_query_service"),
   resourceRuntimeLogsQueryService: Symbol.for("yundu.resource_runtime_logs_query_service"),
   resourceProxyConfigurationPreviewQueryService: Symbol.for(
     "yundu.resource_proxy_configuration_preview_query_service",

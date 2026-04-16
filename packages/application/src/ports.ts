@@ -272,6 +272,7 @@ export interface EdgeProxyProviderCapabilities {
   dockerLabels: boolean;
   configurationView: boolean;
   runtimeLogs: boolean;
+  diagnostics: boolean;
 }
 
 export interface EdgeProxyProviderSelectionInput {
@@ -302,6 +303,29 @@ export interface EdgeProxyEnsurePlan {
   containerName: string;
   containerCommand: string;
   metadata?: Record<string, string>;
+}
+
+export interface EdgeProxyDiagnosticCheckPlan {
+  name: string;
+  command: string;
+  timeoutMs: number;
+  successMessage: string;
+  failureMessage: string;
+  metadata?: Record<string, string>;
+}
+
+export interface EdgeProxyDiagnosticsPlan {
+  providerKey: string;
+  proxyKind: EdgeProxyKind;
+  displayName: string;
+  checks: EdgeProxyDiagnosticCheckPlan[];
+  metadata?: Record<string, string>;
+}
+
+export interface EdgeProxyDiagnosticsInput {
+  proxyKind: EdgeProxyKind;
+  httpPort?: number;
+  httpsPort?: number;
 }
 
 export interface EdgeProxyRouteInput {
@@ -404,6 +428,10 @@ export interface EdgeProxyProvider {
     context: EdgeProxyExecutionContext,
     input: EdgeProxyEnsureInput,
   ): Promise<Result<EdgeProxyEnsurePlan, DomainError>>;
+  diagnoseProxy(
+    context: EdgeProxyExecutionContext,
+    input: EdgeProxyDiagnosticsInput,
+  ): Promise<Result<EdgeProxyDiagnosticsPlan, DomainError>>;
   realizeRoutes(
     context: EdgeProxyExecutionContext,
     input: ProxyRouteRealizationInput,
@@ -511,6 +539,130 @@ export interface ResourceAccessSummary {
   lastRouteRealizationDeploymentId?: string;
 }
 
+export type ResourceHealthOverall =
+  | "healthy"
+  | "degraded"
+  | "unhealthy"
+  | "starting"
+  | "stopped"
+  | "not-deployed"
+  | "unknown";
+
+export type ResourceRuntimeLifecycle =
+  | "not-deployed"
+  | "starting"
+  | "running"
+  | "restarting"
+  | "degraded"
+  | "stopped"
+  | "exited"
+  | "unknown";
+
+export type ResourceRuntimeHealth = "healthy" | "unhealthy" | "unknown" | "not-configured";
+
+export type ResourceHealthSource =
+  | "deployment"
+  | "runtime"
+  | "health-policy"
+  | "health-check"
+  | "proxy"
+  | "public-access"
+  | "domain-binding";
+
+export interface ResourceHealthSourceError {
+  source: ResourceHealthSource;
+  code: string;
+  category: string;
+  phase: string;
+  retriable: boolean;
+  relatedEntityId?: string;
+  relatedState?: string;
+  message?: string;
+}
+
+export interface ResourceHealthDeploymentContext {
+  id: string;
+  status: DeploymentStatus;
+  createdAt: string;
+  startedAt?: string;
+  finishedAt?: string;
+  serverId: string;
+  destinationId: string;
+  lastError?: {
+    timestamp: string;
+    phase: DeploymentLogSummary["phase"];
+    message: string;
+  };
+}
+
+export interface ResourceRuntimeHealthSection {
+  lifecycle: ResourceRuntimeLifecycle;
+  health: ResourceRuntimeHealth;
+  observedAt?: string;
+  runtimeKind?: ExecutionStrategyKind;
+  reasonCode?: string;
+  message?: string;
+}
+
+export interface ResourceHealthPolicySection {
+  status: "configured" | "not-configured" | "unsupported";
+  enabled: boolean;
+  type?: "http" | "command";
+  path?: string;
+  port?: number;
+  expectedStatusCode?: number;
+  intervalSeconds?: number;
+  timeoutSeconds?: number;
+  retries?: number;
+  startPeriodSeconds?: number;
+  reasonCode?: string;
+}
+
+export interface ResourcePublicAccessHealthSection {
+  status: "ready" | "not-ready" | "failed" | "unknown" | "not-configured";
+  url?: string;
+  kind?: "durable-domain" | "generated-latest" | "generated-planned";
+  reasonCode?: string;
+  phase?: string;
+}
+
+export interface ResourceProxyHealthSection {
+  status: "ready" | "not-ready" | "failed" | "unknown" | "not-configured";
+  providerKey?: string;
+  lastRouteRealizationDeploymentId?: string;
+  reasonCode?: string;
+}
+
+export interface ResourceHealthCheck {
+  name: string;
+  target: "runtime" | "container" | "command" | "public-access" | "proxy-route";
+  status: "passed" | "failed" | "skipped" | "unknown";
+  observedAt: string;
+  durationMs?: number;
+  statusCode?: number;
+  exitCode?: number;
+  message?: string;
+  reasonCode?: string;
+  phase?: string;
+  retriable?: boolean;
+  metadata?: Record<string, string>;
+}
+
+export interface ResourceHealthSummary {
+  schemaVersion: "resources.health/v1";
+  resourceId: string;
+  generatedAt: string;
+  observedAt?: string;
+  overall: ResourceHealthOverall;
+  latestDeployment?: ResourceHealthDeploymentContext;
+  runtime: ResourceRuntimeHealthSection;
+  healthPolicy: ResourceHealthPolicySection;
+  publicAccess: ResourcePublicAccessHealthSection;
+  proxy: ResourceProxyHealthSection;
+  checks: ResourceHealthCheck[];
+  sourceErrors: ResourceHealthSourceError[];
+}
+
 export interface DeploymentLogSummary {
   timestamp: string;
   source: DeploymentLogSource;
@@ -595,6 +747,172 @@ export type ResourceRuntimeLogsResult =
       stream: ResourceRuntimeLogStream;
     };
 
+export type ResourceDiagnosticSectionStatus =
+  | "available"
+  | "empty"
+  | "not-configured"
+  | "not-requested"
+  | "unavailable"
+  | "failed"
+  | "unknown";
+
+export type ResourceDiagnosticSource =
+  | "deployment"
+  | "access"
+  | "proxy"
+  | "deployment-logs"
+  | "runtime-logs"
+  | "system"
+  | "copy";
+
+export interface ResourceDiagnosticSourceError {
+  source: ResourceDiagnosticSource;
+  code: string;
+  category: string;
+  phase: string;
+  retryable: boolean;
+  relatedEntityId?: string;
+  relatedState?: string;
+  message?: string;
+}
+
+export interface ResourceDiagnosticFocus {
+  resourceId: string;
+  requestedDeploymentId?: string;
+  deploymentId?: string;
+}
+
+export interface ResourceDiagnosticContext {
+  projectId: string;
+  environmentId: string;
+  resourceName: string;
+  resourceSlug: string;
+  resourceKind: ResourceKind;
+  destinationId?: string;
+  serverId?: string;
+  runtimeStrategy?: ExecutionStrategyKind;
+  buildStrategy?: BuildStrategyKind;
+  packagingMode?: PackagingMode;
+  targetKind?: TargetKind;
+  targetProviderKey?: string;
+  services: Array<{
+    name: string;
+    kind: ResourceServiceKind;
+  }>;
+  networkProfile?: ResourceSummary["networkProfile"];
+}
+
+export interface ResourceDiagnosticDeployment {
+  id: string;
+  status: DeploymentStatus;
+  lifecyclePhase: DeploymentStatus;
+  runtimePlanId: string;
+  sourceKind: SourceKind;
+  sourceDisplayName: string;
+  serverId: string;
+  destinationId: string;
+  createdAt: string;
+  startedAt?: string;
+  finishedAt?: string;
+  logCount: number;
+  lastError?: {
+    timestamp: string;
+    phase: DeploymentLogSummary["phase"];
+    message: string;
+  };
+}
+
+export interface ResourceDiagnosticAccess {
+  status: ResourceDiagnosticSectionStatus;
+  generatedUrl?: string;
+  durableUrl?: string;
+  plannedUrl?: string;
+  proxyRouteStatus?: ResourceAccessSummary["proxyRouteStatus"];
+  lastRouteRealizationDeploymentId?: string;
+  reasonCode?: string;
+  phase?: string;
+}
+
+export interface ResourceDiagnosticProxySectionSummary {
+  id: string;
+  title: string;
+  format: ProxyConfigurationSection["format"];
+  redacted: boolean;
+  source: ProxyConfigurationSection["source"];
+}
+
+export interface ResourceDiagnosticProxy {
+  status: ResourceDiagnosticSectionStatus;
+  providerKey?: string;
+  proxyRouteStatus?: ResourceAccessSummary["proxyRouteStatus"];
+  configurationIncluded: boolean;
+  configurationStatus?: ProxyConfigurationStatus;
+  configurationGeneratedAt?: string;
+  routeCount?: number;
+  sectionCount?: number;
+  sections?: ResourceDiagnosticProxySectionSummary[];
+  warnings?: ProxyConfigurationWarning[];
+  reasonCode?: string;
+  phase?: string;
+}
+
+export interface ResourceDiagnosticLogLine {
+  timestamp?: string;
+  source?: DeploymentLogSource;
+  phase?: DeploymentLogSummary["phase"];
+  level?: LogLevel;
+  stream?: ResourceRuntimeLogStreamName;
+  serviceName?: string;
+  message: string;
+  masked: boolean;
+}
+
+export interface ResourceDiagnosticLogSection {
+  status: ResourceDiagnosticSectionStatus;
+  tailLimit: number;
+  lineCount: number;
+  lines: ResourceDiagnosticLogLine[];
+  reasonCode?: string;
+  phase?: string;
+}
+
+export interface ResourceDiagnosticSystem {
+  entrypoint: ExecutionContext["entrypoint"];
+  requestId: string;
+  locale: ExecutionContext["locale"];
+  readinessStatus?: DiagnosticsStatus["status"];
+  databaseDriver?: string;
+  databaseMode?: string;
+}
+
+export interface ResourceDiagnosticRedaction {
+  policy: "deployment-environment-secrets";
+  masked: boolean;
+  maskedValueCount: number;
+}
+
+export interface ResourceDiagnosticCopyPayload {
+  json: string;
+  markdown?: string;
+  plainText?: string;
+}
+
+export interface ResourceDiagnosticSummary {
+  schemaVersion: "resources.diagnostic-summary/v1";
+  generatedAt: string;
+  focus: ResourceDiagnosticFocus;
+  context: ResourceDiagnosticContext;
+  deployment?: ResourceDiagnosticDeployment;
+  access: ResourceDiagnosticAccess;
+  proxy: ResourceDiagnosticProxy;
+  deploymentLogs: ResourceDiagnosticLogSection;
+  runtimeLogs: ResourceDiagnosticLogSection;
+  system: ResourceDiagnosticSystem;
+  sourceErrors: ResourceDiagnosticSourceError[];
+  redaction: ResourceDiagnosticRedaction;
+  copy: ResourceDiagnosticCopyPayload;
+}
+
 export interface EnvironmentDiffSummary {
   key: string;
   exposure: VariableExposure;
@@ -642,6 +960,7 @@ export interface DeploymentSummary {
       buildCommand?: string;
       startCommand?: string;
       healthCheckPath?: string;
+      healthCheck?: RequestedDeploymentHealthCheck;
       port?: number;
       image?: string;
       dockerfilePath?: string;
@@ -772,6 +1091,7 @@ export interface RequestedDeploymentConfig {
   startCommand?: string;
   port?: number;
   healthCheckPath?: string;
+  healthCheck?: RequestedDeploymentHealthCheck;
   exposureMode?: ResourceExposureMode;
   upstreamProtocol?: ResourceNetworkProtocol;
   accessContext?: RequestedDeploymentAccessContext;
@@ -780,6 +1100,27 @@ export interface RequestedDeploymentConfig {
   domains?: string[];
   pathPrefix?: string;
   tlsMode?: TlsMode;
+}
+
+export interface RequestedDeploymentHealthCheck {
+  enabled: boolean;
+  type: "http" | "command";
+  intervalSeconds: number;
+  timeoutSeconds: number;
+  retries: number;
+  startPeriodSeconds: number;
+  http?: {
+    method: "GET" | "HEAD" | "POST" | "OPTIONS";
+    scheme: "http" | "https";
+    host: string;
+    port?: number;
+    path: string;
+    expectedStatusCode: number;
+    expectedResponseText?: string;
+  };
+  command?: {
+    command: string;
+  };
 }
 
 export interface RequestedDeploymentAccessContext {

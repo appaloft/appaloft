@@ -1,4 +1,6 @@
 import {
+  healthCheckHttpMethods,
+  healthCheckSchemes,
   resourceExposureModes,
   resourceKinds,
   resourceNetworkProtocols,
@@ -39,6 +41,38 @@ export const createResourceRuntimeProfileInputSchema = z
     buildCommand: z.string().trim().min(1).optional(),
     startCommand: z.string().trim().min(1).optional(),
     healthCheckPath: z.string().trim().min(1).optional(),
+    healthCheck: z
+      .object({
+        enabled: z.boolean().default(true),
+        type: z.literal("http").default("http"),
+        intervalSeconds: z.number().int().positive().default(5),
+        timeoutSeconds: z.number().int().positive().default(5),
+        retries: z.number().int().positive().default(10),
+        startPeriodSeconds: z.number().int().nonnegative().default(5),
+        http: z
+          .object({
+            method: z.enum(healthCheckHttpMethods).default("GET"),
+            scheme: z.enum(healthCheckSchemes).default("http"),
+            host: z.string().trim().min(1).default("localhost"),
+            port: z.number().int().positive().max(65535).optional(),
+            path: z.string().trim().min(1).default("/"),
+            expectedStatusCode: z.number().int().min(100).max(599).default(200),
+            expectedResponseText: z.string().trim().min(1).optional(),
+          })
+          .strict()
+          .optional(),
+      })
+      .strict()
+      .superRefine((value, context) => {
+        if (value.type === "http" && !value.http) {
+          context.addIssue({
+            code: "custom",
+            path: ["http"],
+            message: "HTTP health checks require http configuration",
+          });
+        }
+      })
+      .optional(),
   })
   .strict();
 

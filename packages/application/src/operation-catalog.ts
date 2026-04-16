@@ -15,8 +15,11 @@ import { createProjectCommandInputSchema } from "./operations/projects/create-pr
 import { listProjectsQueryInputSchema } from "./operations/projects/list-projects.query";
 import { createResourceCommandInputSchema } from "./operations/resources/create-resource.command";
 import { listResourcesQueryInputSchema } from "./operations/resources/list-resources.query";
+import { resourceDiagnosticSummaryQueryInputSchema } from "./operations/resources/resource-diagnostic-summary.query";
+import { resourceHealthQueryInputSchema } from "./operations/resources/resource-health.query";
 import { resourceProxyConfigurationPreviewQueryInputSchema } from "./operations/resources/resource-proxy-configuration-preview.query";
 import { resourceRuntimeLogsQueryInputSchema } from "./operations/resources/resource-runtime-logs.query";
+import { bootstrapServerProxyCommandInputSchema } from "./operations/servers/bootstrap-server-proxy.command";
 import { configureServerCredentialCommandInputSchema } from "./operations/servers/configure-server-credential.command";
 import { createSshCredentialCommandInputSchema } from "./operations/servers/create-ssh-credential.command";
 import { listServersQueryInputSchema } from "./operations/servers/list-servers.query";
@@ -188,6 +191,20 @@ export const operationCatalog = [
     },
   },
   {
+    key: "servers.bootstrap-proxy",
+    kind: "command",
+    domain: "servers",
+    messageName: "BootstrapServerProxyCommand",
+    handlerName: "BootstrapServerProxyCommandHandler",
+    serviceName: "BootstrapServerProxyUseCase",
+    inputSchema: bootstrapServerProxyCommandInputSchema,
+    serviceToken: tokens.bootstrapServerProxyUseCase,
+    transports: {
+      cli: "yundu server proxy repair <serverId>",
+      orpc: { method: "POST", path: "/api/servers/{serverId}/edge-proxy/bootstrap" },
+    },
+  },
+  {
     key: "resources.list",
     kind: "query",
     domain: "resources",
@@ -228,6 +245,34 @@ export const operationCatalog = [
       cli: "yundu resource logs <resourceId>",
       orpc: { method: "GET", path: "/api/resources/{resourceId}/runtime-logs" },
       orpcStream: { method: "GET", path: "/api/resources/{resourceId}/runtime-logs/stream" },
+    },
+  },
+  {
+    key: "resources.diagnostic-summary",
+    kind: "query",
+    domain: "resources",
+    messageName: "ResourceDiagnosticSummaryQuery",
+    handlerName: "ResourceDiagnosticSummaryQueryHandler",
+    serviceName: "ResourceDiagnosticSummaryQueryService",
+    inputSchema: resourceDiagnosticSummaryQueryInputSchema,
+    serviceToken: tokens.resourceDiagnosticSummaryQueryService,
+    transports: {
+      cli: "yundu resource diagnose <resourceId>",
+      orpc: { method: "GET", path: "/api/resources/{resourceId}/diagnostic-summary" },
+    },
+  },
+  {
+    key: "resources.health",
+    kind: "query",
+    domain: "resources",
+    messageName: "ResourceHealthQuery",
+    handlerName: "ResourceHealthQueryHandler",
+    serviceName: "ResourceHealthQueryService",
+    inputSchema: resourceHealthQueryInputSchema,
+    serviceToken: tokens.resourceHealthQueryService,
+    transports: {
+      cli: "yundu resource health <resourceId>",
+      orpc: { method: "GET", path: "/api/resources/{resourceId}/health" },
     },
   },
   {

@@ -1,5 +1,7 @@
 import {
   BootstrapServerEdgeProxyOnTargetRegisteredHandler,
+  BootstrapServerProxyCommandHandler,
+  BootstrapServerProxyUseCase,
   ConfigureServerCredentialUseCase,
   CreateDeploymentUseCase,
   CreateDomainBindingUseCase,
@@ -30,6 +32,8 @@ import {
   ListSshCredentialsQueryService,
   PromoteEnvironmentUseCase,
   RegisterServerUseCase,
+  ResourceDiagnosticSummaryQueryService,
+  ResourceHealthQueryService,
   ResourceProxyConfigurationPreviewQueryService,
   ResourceRuntimeLogsQueryService,
   RuntimePlanResolutionInputBuilder,
@@ -43,6 +47,7 @@ import { type DependencyContainer } from "tsyringe";
 
 export function registerApplicationServices(container: DependencyContainer): void {
   container.registerSingleton(BootstrapServerEdgeProxyOnTargetRegisteredHandler);
+  container.registerSingleton(BootstrapServerProxyCommandHandler);
   container.registerSingleton(tokens.createProjectUseCase, CreateProjectUseCase);
   container.registerSingleton(tokens.listProjectsQueryService, ListProjectsQueryService);
   container.registerSingleton(tokens.createResourceUseCase, CreateResourceUseCase);
@@ -59,6 +64,7 @@ export function registerApplicationServices(container: DependencyContainer): voi
   );
   container.registerSingleton(tokens.listServersQueryService, ListServersQueryService);
   container.registerSingleton(tokens.testServerConnectivityUseCase, TestServerConnectivityUseCase);
+  container.registerSingleton(tokens.bootstrapServerProxyUseCase, BootstrapServerProxyUseCase);
   container.registerSingleton(tokens.createEnvironmentUseCase, CreateEnvironmentUseCase);
   container.registerSingleton(tokens.listEnvironmentsQueryService, ListEnvironmentsQueryService);
   container.registerSingleton(tokens.showEnvironmentQueryService, ShowEnvironmentQueryService);
@@ -93,6 +99,11 @@ export function registerApplicationServices(container: DependencyContainer): voi
   );
   container.registerSingleton(tokens.listDeploymentsQueryService, ListDeploymentsQueryService);
   container.registerSingleton(tokens.logsQueryService, DeploymentLogsQueryService);
+  container.registerSingleton(
+    tokens.resourceDiagnosticSummaryQueryService,
+    ResourceDiagnosticSummaryQueryService,
+  );
+  container.registerSingleton(tokens.resourceHealthQueryService, ResourceHealthQueryService);
   container.registerSingleton(
     tokens.resourceRuntimeLogsQueryService,
     ResourceRuntimeLogsQueryService,

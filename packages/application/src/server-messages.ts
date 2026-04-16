@@ -1,3 +1,4 @@
+export * from "./operations/servers/bootstrap-server-proxy.command";
 export * from "./operations/servers/configure-server-credential.command";
 export * from "./operations/servers/create-ssh-credential.command";
 export * from "./operations/servers/list-servers.query";

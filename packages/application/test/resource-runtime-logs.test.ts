@@ -3,7 +3,12 @@ import "reflect-metadata";
 import { describe, expect, test } from "bun:test";
 import { ok, type Result } from "@yundu/core";
 
-import { createExecutionContext, type ExecutionContext, type toRepositoryContext } from "../src";
+import {
+  type AppSpan,
+  createExecutionContext,
+  type ExecutionContext,
+  type toRepositoryContext,
+} from "../src";
 import { ResourceRuntimeLogsQuery } from "../src/messages";
 import {
   type DeploymentLogSummary,
@@ -93,10 +98,76 @@ class RecordingRuntimeLogReader implements ResourceRuntimeLogReader {
   }
 }
 
-function createTestContext(): ExecutionContext {
+interface RecordedSpan {
+  attributes: Record<string, boolean | number | string | undefined>;
+  errors: Array<Error | { message: string; name?: string; stack?: string }>;
+  events: Array<{
+    attributes?: Record<string, boolean | number | string | undefined>;
+    name: string;
+  }>;
+  name: string;
+  status?: {
+    message?: string;
+    status: "error" | "ok";
+  };
+}
+
+class RecordingAppSpan implements AppSpan {
+  constructor(private readonly recorded: RecordedSpan) {}
+
+  addEvent(name: string, attributes?: Record<string, boolean | number | string | undefined>): void {
+    this.recorded.events.push({
+      name,
+      ...(attributes ? { attributes } : {}),
+    });
+  }
+
+  recordError(error: Error | { message: string; name?: string; stack?: string }): void {
+    this.recorded.errors.push(error);
+  }
+
+  setAttribute(name: string, value: boolean | number | string): void {
+    this.recorded.attributes[name] = value;
+  }
+
+  setAttributes(attributes: Record<string, boolean | number | string | undefined>): void {
+    Object.assign(this.recorded.attributes, attributes);
+  }
+
+  setStatus(status: "error" | "ok", message?: string): void {
+    this.recorded.status = {
+      status,
+      ...(message ? { message } : {}),
+    };
+  }
+}
+
+class RecordingAppTracer {
+  readonly spans: RecordedSpan[] = [];
+
+  async startActiveSpan<T>(
+    name: string,
+    options: {
+      attributes?: Record<string, boolean | number | string | undefined>;
+    },
+    callback: (span: AppSpan) => Promise<T> | T,
+  ): Promise<T> {
+    const recorded: RecordedSpan = {
+      attributes: { ...(options.attributes ?? {}) },
+      errors: [],
+      events: [],
+      name,
+    };
+    this.spans.push(recorded);
+    return callback(new RecordingAppSpan(recorded));
+  }
+}
+
+function createTestContext(input?: { tracer?: RecordingAppTracer }): ExecutionContext {
   return createExecutionContext({
     requestId: "req_resource_runtime_logs_test",
     entrypoint: "system",
+    ...(input?.tracer ? { tracer: input.tracer } : {}),
   });
 }
 
@@ -258,6 +329,40 @@ describe("ResourceRuntimeLogsQueryService", () => {
       serviceName: "web",
       tailLines: 50,
     });
+  });
+
+  test("records runtime log open and bounded collection spans", async () => {
+    const tracer = new RecordingAppTracer();
+    const context = createTestContext({ tracer });
+    const { service } = createService();
+    const query = ResourceRuntimeLogsQuery.create({
+      resourceId: "res_web",
+      tailLines: 50,
+      follow: false,
+    })._unsafeUnwrap();
+
+    const result = await service.execute(context, query);
+
+    expect(result.isOk()).toBe(true);
+    expect(tracer.spans.map((span) => span.name)).toEqual([
+      "yundu.runtime_logs.open",
+      "yundu.runtime_logs.collect_bounded",
+    ]);
+    expect(tracer.spans[0]?.attributes).toMatchObject({
+      "yundu.resource.id": "res_web",
+      "yundu.deployment.id": "dep_web",
+      "yundu.runtime.kind": "host-process",
+      "yundu.runtime_logs.follow": false,
+      "yundu.runtime_logs.tail_lines": 50,
+      "yundu.runtime_logs.service_name": "web",
+      "yundu.target.provider_key": "local-shell",
+    });
+    expect(tracer.spans[0]?.status).toEqual({ status: "ok" });
+    expect(tracer.spans[1]?.attributes).toMatchObject({
+      "yundu.runtime_logs.close_reason": "source-ended",
+      "yundu.runtime_logs.line_count": 1,
+    });
+    expect(tracer.spans[1]?.status).toEqual({ status: "ok" });
   });
 
   test("returns a stream result for follow requests", async () => {

@@ -51,7 +51,17 @@ import {
   GeneratedAt,
   GitCommitShaText,
   GitRefText,
+  HealthCheckExpectedStatusCode,
+  HealthCheckHostText,
+  HealthCheckHttpMethodValue,
+  HealthCheckIntervalSeconds,
   HealthCheckPathText,
+  HealthCheckResponseText,
+  HealthCheckRetryCount,
+  HealthCheckSchemeValue,
+  HealthCheckStartPeriodSeconds,
+  HealthCheckTimeoutSeconds,
+  HealthCheckTypeValue,
   HostAddress,
   IdempotencyKeyValue,
   ImageReference,
@@ -150,6 +160,7 @@ export interface SerializedRuntimeExecutionPlan extends Record<string, unknown> 
   buildCommand?: string;
   startCommand?: string;
   healthCheckPath?: string;
+  healthCheck?: SerializedHealthCheckPolicy;
   port?: number;
   image?: string;
   dockerfilePath?: string;
@@ -166,6 +177,27 @@ export interface SerializedRuntimeExecutionPlan extends Record<string, unknown> 
     label: string;
   }>;
   metadata?: Record<string, string>;
+}
+
+export interface SerializedHealthCheckPolicy extends Record<string, unknown> {
+  enabled: boolean;
+  type: "http" | "command";
+  intervalSeconds: number;
+  timeoutSeconds: number;
+  retries: number;
+  startPeriodSeconds: number;
+  http?: {
+    method: "GET" | "HEAD" | "POST" | "OPTIONS";
+    scheme: "http" | "https";
+    host: string;
+    port?: number;
+    path: string;
+    expectedStatusCode: number;
+    expectedResponseText?: string;
+  };
+  command?: {
+    command: string;
+  };
 }
 
 export interface SerializedDeploymentTargetDescriptor extends Record<string, unknown> {
@@ -240,6 +272,7 @@ export interface SerializedResourceRuntimeProfile extends Record<string, unknown
   buildCommand?: string;
   startCommand?: string;
   healthCheckPath?: string;
+  healthCheck?: SerializedHealthCheckPolicy;
 }
 
 export interface SerializedResourceNetworkProfile extends Record<string, unknown> {
@@ -296,6 +329,87 @@ export function normalizeTimestamp(value: string | Date | null | undefined): str
   return value instanceof Date ? value.toISOString() : value;
 }
 
+export function serializeHealthCheckPolicy(policy: {
+  enabled: boolean;
+  type: { value: "http" | "command" };
+  intervalSeconds: { value: number };
+  timeoutSeconds: { value: number };
+  retries: { value: number };
+  startPeriodSeconds: { value: number };
+  http?: {
+    method: { value: "GET" | "HEAD" | "POST" | "OPTIONS" };
+    scheme: { value: "http" | "https" };
+    host: { value: string };
+    port?: { value: number };
+    path: { value: string };
+    expectedStatusCode: { value: number };
+    expectedResponseText?: { value: string };
+  };
+  command?: {
+    command: { value: string };
+  };
+}): SerializedHealthCheckPolicy {
+  return {
+    enabled: policy.enabled,
+    type: policy.type.value,
+    intervalSeconds: policy.intervalSeconds.value,
+    timeoutSeconds: policy.timeoutSeconds.value,
+    retries: policy.retries.value,
+    startPeriodSeconds: policy.startPeriodSeconds.value,
+    ...(policy.http
+      ? {
+          http: {
+            method: policy.http.method.value,
+            scheme: policy.http.scheme.value,
+            host: policy.http.host.value,
+            ...(policy.http.port ? { port: policy.http.port.value } : {}),
+            path: policy.http.path.value,
+            expectedStatusCode: policy.http.expectedStatusCode.value,
+            ...(policy.http.expectedResponseText
+              ? { expectedResponseText: policy.http.expectedResponseText.value }
+              : {}),
+          },
+        }
+      : {}),
+    ...(policy.command ? { command: { command: policy.command.command.value } } : {}),
+  };
+}
+
+function rehydrateHealthCheckPolicy(policy: SerializedHealthCheckPolicy) {
+  return {
+    enabled: policy.enabled,
+    type: HealthCheckTypeValue.rehydrate(policy.type),
+    intervalSeconds: HealthCheckIntervalSeconds.rehydrate(policy.intervalSeconds),
+    timeoutSeconds: HealthCheckTimeoutSeconds.rehydrate(policy.timeoutSeconds),
+    retries: HealthCheckRetryCount.rehydrate(policy.retries),
+    startPeriodSeconds: HealthCheckStartPeriodSeconds.rehydrate(policy.startPeriodSeconds),
+    ...(policy.http
+      ? {
+          http: {
+            method: HealthCheckHttpMethodValue.rehydrate(policy.http.method),
+            scheme: HealthCheckSchemeValue.rehydrate(policy.http.scheme),
+            host: HealthCheckHostText.rehydrate(policy.http.host),
+            ...(policy.http.port ? { port: PortNumber.rehydrate(policy.http.port) } : {}),
+            path: HealthCheckPathText.rehydrate(policy.http.path),
+            expectedStatusCode: HealthCheckExpectedStatusCode.rehydrate(
+              policy.http.expectedStatusCode,
+            ),
+            ...(policy.http.expectedResponseText
+              ? {
+                  expectedResponseText: HealthCheckResponseText.rehydrate(
+                    policy.http.expectedResponseText,
+                  ),
+                }
+              : {}),
+          },
+        }
+      : {}),
+    ...(policy.command
+      ? { command: { command: CommandText.rehydrate(policy.command.command) } }
+      : {}),
+  };
+}
+
 export function serializeRuntimePlan(plan: RuntimePlanType): SerializedRuntimePlan {
   return {
     id: plan.id,
@@ -317,6 +431,9 @@ export function serializeRuntimePlan(plan: RuntimePlanType): SerializedRuntimePl
       ...(plan.execution.startCommand ? { startCommand: plan.execution.startCommand } : {}),
       ...(plan.execution.healthCheckPath
         ? { healthCheckPath: plan.execution.healthCheckPath }
+        : {}),
+      ...(plan.execution.healthCheck
+        ? { healthCheck: serializeHealthCheckPolicy(plan.execution.healthCheck) }
         : {}),
       ...(typeof plan.execution.port === "number" ? { port: plan.execution.port } : {}),
       ...(plan.execution.image ? { image: plan.execution.image } : {}),
@@ -387,6 +504,9 @@ export function rehydrateRuntimePlan(raw: unknown): RuntimePlan {
         : {}),
       ...(execution.healthCheckPath
         ? { healthCheckPath: HealthCheckPathText.rehydrate(execution.healthCheckPath) }
+        : {}),
+      ...(execution.healthCheck
+        ? { healthCheck: rehydrateHealthCheckPolicy(execution.healthCheck) }
         : {}),
       ...(typeof execution.port === "number" ? { port: PortNumber.rehydrate(execution.port) } : {}),
       ...(execution.image ? { image: ImageReference.rehydrate(execution.image) } : {}),
@@ -854,6 +974,9 @@ export function rehydrateResourceRow(row: Selectable<Database["resources"]>) {
               : {}),
             ...(runtimeProfile.healthCheckPath
               ? { healthCheckPath: HealthCheckPathText.rehydrate(runtimeProfile.healthCheckPath) }
+              : {}),
+            ...(runtimeProfile.healthCheck
+              ? { healthCheck: rehydrateHealthCheckPolicy(runtimeProfile.healthCheck) }
               : {}),
           },
         }

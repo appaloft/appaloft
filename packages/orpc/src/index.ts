@@ -3,6 +3,8 @@ import { eventIterator, ORPCError, os } from "@orpc/server";
 import { RPCHandler } from "@orpc/server/fetch";
 import {
   type AppLogger,
+  BootstrapServerProxyCommand,
+  bootstrapServerProxyCommandInputSchema,
   type Command,
   type CommandBus,
   ConfigureServerCredentialCommand,
@@ -49,12 +51,16 @@ import {
   type Query,
   type QueryBus,
   RegisterServerCommand,
+  ResourceDiagnosticSummaryQuery,
+  ResourceHealthQuery,
   ResourceProxyConfigurationPreviewQuery,
   type ResourceRuntimeLogEvent,
   ResourceRuntimeLogsQuery,
   type ResourceRuntimeLogsQueryInput,
   type ResourceRuntimeLogsResult,
   registerServerCommandInputSchema,
+  resourceDiagnosticSummaryQueryInputSchema,
+  resourceHealthQueryInputSchema,
   resourceProxyConfigurationPreviewQueryInputSchema,
   resourceRuntimeLogsQueryInputSchema,
   SetEnvironmentVariableCommand,
@@ -67,6 +73,7 @@ import {
   unsetEnvironmentVariableCommandInputSchema,
 } from "@yundu/application";
 import {
+  bootstrapServerProxyResponseSchema,
   createDeploymentResponseSchema,
   createDomainBindingResponseSchema,
   createEnvironmentResponseSchema,
@@ -90,6 +97,8 @@ import {
   promoteEnvironmentResponseSchema,
   proxyConfigurationViewSchema,
   registerServerResponseSchema,
+  resourceDiagnosticSummarySchema,
+  resourceHealthSummarySchema,
   resourceRuntimeLogEventSchema,
   resourceRuntimeLogsResponseSchema,
   resourceRuntimeLogsStreamResponseSchema,
@@ -642,6 +651,18 @@ export const testDraftServerConnectivityProcedure = base
     executeCommand(context, TestServerConnectivityCommand.create(input)),
   );
 
+export const bootstrapServerProxyProcedure = base
+  .route({
+    method: "POST",
+    path: "/servers/{serverId}/edge-proxy/bootstrap",
+    successStatus: 200,
+  })
+  .input(bootstrapServerProxyCommandInputSchema)
+  .output(bootstrapServerProxyResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, BootstrapServerProxyCommand.create(input)),
+  );
+
 export const listEnvironmentsProcedure = base
   .route({
     method: "GET",
@@ -853,6 +874,28 @@ export const resourceRuntimeLogsStreamProcedure = base
   .output(eventIterator(resourceRuntimeLogEventSchema, resourceRuntimeLogsStreamResponseSchema))
   .handler(({ input, context }) => createResourceRuntimeLogStream(context, input));
 
+export const resourceDiagnosticSummaryProcedure = base
+  .route({
+    method: "GET",
+    path: "/resources/{resourceId}/diagnostic-summary",
+    successStatus: 200,
+  })
+  .input(resourceDiagnosticSummaryQueryInputSchema)
+  .output(resourceDiagnosticSummarySchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ResourceDiagnosticSummaryQuery.create(input)),
+  );
+
+export const resourceHealthProcedure = base
+  .route({
+    method: "GET",
+    path: "/resources/{resourceId}/health",
+    successStatus: 200,
+  })
+  .input(resourceHealthQueryInputSchema)
+  .output(resourceHealthSummarySchema)
+  .handler(async ({ input, context }) => executeQuery(context, ResourceHealthQuery.create(input)));
+
 export const resourceProxyConfigurationPreviewProcedure = base
   .route({
     method: "GET",
@@ -906,6 +949,7 @@ export const yunduOrpcRouter = {
     configureCredential: configureServerCredentialProcedure,
     testConnectivity: testServerConnectivityProcedure,
     testDraftConnectivity: testDraftServerConnectivityProcedure,
+    bootstrapProxy: bootstrapServerProxyProcedure,
   },
   credentials: {
     ssh: {
@@ -925,6 +969,8 @@ export const yunduOrpcRouter = {
   resources: {
     list: listResourcesProcedure,
     create: createResourceProcedure,
+    diagnosticSummary: resourceDiagnosticSummaryProcedure,
+    health: resourceHealthProcedure,
     proxyConfiguration: resourceProxyConfigurationPreviewProcedure,
     logs: resourceRuntimeLogsProcedure,
     logsStream: resourceRuntimeLogsStreamProcedure,
@@ -1065,6 +1111,7 @@ export function mountYunduOrpcRoutes(
     "/api/servers/connectivity-tests",
     "/api/servers/:serverId/credentials",
     "/api/servers/:serverId/connectivity-tests",
+    "/api/servers/:serverId/edge-proxy/bootstrap",
     "/api/environments",
     "/api/environments/:environmentId",
     "/api/environments/:environmentId/variables",
@@ -1072,6 +1119,7 @@ export function mountYunduOrpcRoutes(
     "/api/environments/:environmentId/promote",
     "/api/environments/:environmentId/diff/:otherEnvironmentId",
     "/api/resources",
+    "/api/resources/:resourceId/diagnostic-summary",
     "/api/domain-bindings",
     "/api/deployments",
     "/api/deployments/stream",

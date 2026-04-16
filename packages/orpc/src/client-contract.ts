@@ -1,5 +1,6 @@
 import { type AsyncIteratorClass, type Client, type ORPCError } from "@orpc/client";
 import {
+  type BootstrapServerProxyCommandInput,
   type ConfigureServerCredentialCommandInput,
   type CreateDeploymentCommandInput,
   type CreateDomainBindingCommandInput,
@@ -17,6 +18,8 @@ import {
   type ListSshCredentialsQueryInput,
   type PromoteEnvironmentCommandInput,
   type RegisterServerCommandInput,
+  type ResourceDiagnosticSummaryQueryInput,
+  type ResourceHealthQueryInput,
   type ResourceProxyConfigurationPreviewQueryInput,
   type ResourceRuntimeLogsQueryInput,
   type SetEnvironmentVariableCommandInput,
@@ -25,6 +28,7 @@ import {
   type UnsetEnvironmentVariableCommandInput,
 } from "@yundu/application/schemas";
 import {
+  type BootstrapServerProxyResponse,
   type CreateDeploymentResponse,
   type CreateDomainBindingResponse,
   type CreateEnvironmentResponse,
@@ -48,6 +52,8 @@ import {
   type PromoteEnvironmentResponse,
   type ProxyConfigurationView,
   type RegisterServerResponse,
+  type ResourceDiagnosticSummary,
+  type ResourceHealthSummary,
   type ResourceRuntimeLogEvent,
   type ResourceRuntimeLogsResponse,
   type ResourceRuntimeLogsStreamResponse,
@@ -91,6 +97,12 @@ export type YunduOrpcClientContract = {
       YunduClientContext,
       TestServerConnectivityCommandInput,
       TestServerConnectivityResponse,
+      YunduClientError
+    >;
+    bootstrapProxy: Client<
+      YunduClientContext,
+      BootstrapServerProxyCommandInput,
+      BootstrapServerProxyResponse,
       YunduClientError
     >;
   };
@@ -165,6 +177,18 @@ export type YunduOrpcClientContract = {
       YunduClientContext,
       CreateResourceCommandInput,
       CreateResourceResponse,
+      YunduClientError
+    >;
+    diagnosticSummary: Client<
+      YunduClientContext,
+      ResourceDiagnosticSummaryQueryInput,
+      ResourceDiagnosticSummary,
+      YunduClientError
+    >;
+    health: Client<
+      YunduClientContext,
+      ResourceHealthQueryInput,
+      ResourceHealthSummary,
       YunduClientError
     >;
     proxyConfiguration: Client<

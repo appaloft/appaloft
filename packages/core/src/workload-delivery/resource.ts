@@ -6,9 +6,19 @@ import {
   type ProjectId,
   type ResourceId,
 } from "../shared/identifiers";
-import { type PortNumber } from "../shared/numeric-values";
+import {
+  type HealthCheckExpectedStatusCode,
+  type HealthCheckIntervalSeconds,
+  type HealthCheckRetryCount,
+  type HealthCheckStartPeriodSeconds,
+  type HealthCheckTimeoutSeconds,
+  type PortNumber,
+} from "../shared/numeric-values";
 import { err, ok, type Result } from "../shared/result";
 import {
+  type HealthCheckHttpMethodValue,
+  type HealthCheckSchemeValue,
+  type HealthCheckTypeValue,
   type ResourceExposureModeValue,
   type ResourceKindValue,
   type ResourceNetworkProtocolValue,
@@ -19,7 +29,9 @@ import { type CreatedAt } from "../shared/temporal";
 import {
   type CommandText,
   type DescriptionText,
+  type HealthCheckHostText,
   type HealthCheckPathText,
+  type HealthCheckResponseText,
   type ResourceName,
   type ResourceServiceName,
   ResourceSlug,
@@ -35,12 +47,38 @@ export interface ResourceServiceState {
   kind: ResourceServiceKindValue;
 }
 
+export interface ResourceHealthCheckHttpPolicyState {
+  method: HealthCheckHttpMethodValue;
+  scheme: HealthCheckSchemeValue;
+  host: HealthCheckHostText;
+  port?: PortNumber;
+  path: HealthCheckPathText;
+  expectedStatusCode: HealthCheckExpectedStatusCode;
+  expectedResponseText?: HealthCheckResponseText;
+}
+
+export interface ResourceHealthCheckCommandPolicyState {
+  command: CommandText;
+}
+
+export interface ResourceHealthCheckPolicyState {
+  enabled: boolean;
+  type: HealthCheckTypeValue;
+  intervalSeconds: HealthCheckIntervalSeconds;
+  timeoutSeconds: HealthCheckTimeoutSeconds;
+  retries: HealthCheckRetryCount;
+  startPeriodSeconds: HealthCheckStartPeriodSeconds;
+  http?: ResourceHealthCheckHttpPolicyState;
+  command?: ResourceHealthCheckCommandPolicyState;
+}
+
 export interface ResourceRuntimeProfileState {
   strategy: RuntimePlanStrategyValue;
   installCommand?: CommandText;
   buildCommand?: CommandText;
   startCommand?: CommandText;
   healthCheckPath?: HealthCheckPathText;
+  healthCheck?: ResourceHealthCheckPolicyState;
 }
 
 export interface ResourceNetworkProfileState {
@@ -65,6 +103,56 @@ export interface ResourceState {
   networkProfile?: ResourceNetworkProfileState;
   createdAt: CreatedAt;
   description?: DescriptionText;
+}
+
+function cloneResourceHealthCheckPolicyState(
+  policy: ResourceHealthCheckPolicyState,
+): ResourceHealthCheckPolicyState {
+  return {
+    ...policy,
+    ...(policy.http ? { http: { ...policy.http } } : {}),
+    ...(policy.command ? { command: { ...policy.command } } : {}),
+  };
+}
+
+function cloneResourceRuntimeProfileState(
+  profile: ResourceRuntimeProfileState,
+): ResourceRuntimeProfileState {
+  return {
+    ...profile,
+    ...(profile.healthCheck
+      ? { healthCheck: cloneResourceHealthCheckPolicyState(profile.healthCheck) }
+      : {}),
+  };
+}
+
+function serializedHealthCheckPolicy(
+  policy: ResourceHealthCheckPolicyState,
+): Record<string, unknown> {
+  return {
+    enabled: policy.enabled,
+    type: policy.type.value,
+    intervalSeconds: policy.intervalSeconds.value,
+    timeoutSeconds: policy.timeoutSeconds.value,
+    retries: policy.retries.value,
+    startPeriodSeconds: policy.startPeriodSeconds.value,
+    ...(policy.http
+      ? {
+          http: {
+            method: policy.http.method.value,
+            scheme: policy.http.scheme.value,
+            host: policy.http.host.value,
+            ...(policy.http.port ? { port: policy.http.port.value } : {}),
+            path: policy.http.path.value,
+            expectedStatusCode: policy.http.expectedStatusCode.value,
+            ...(policy.http.expectedResponseText
+              ? { expectedResponseText: policy.http.expectedResponseText.value }
+              : {}),
+          },
+        }
+      : {}),
+    ...(policy.command ? { command: { command: policy.command.command.value } } : {}),
+  };
 }
 
 export interface ResourceVisitor<TContext, TResult> {
@@ -163,7 +251,9 @@ export class Resource extends AggregateRoot<ResourceState> {
               sourceBinding: cloneResourceSourceBindingState(normalizedSourceBinding),
             }
           : {}),
-        ...(input.runtimeProfile ? { runtimeProfile: { ...input.runtimeProfile } } : {}),
+        ...(input.runtimeProfile
+          ? { runtimeProfile: cloneResourceRuntimeProfileState(input.runtimeProfile) }
+          : {}),
         ...(input.networkProfile ? { networkProfile: { ...input.networkProfile } } : {}),
         createdAt: input.createdAt,
         ...(input.description ? { description: input.description } : {}),
@@ -210,6 +300,9 @@ export class Resource extends AggregateRoot<ResourceState> {
                 ...(input.runtimeProfile.healthCheckPath
                   ? { healthCheckPath: input.runtimeProfile.healthCheckPath.value }
                   : {}),
+                ...(input.runtimeProfile.healthCheck
+                  ? { healthCheck: serializedHealthCheckPolicy(input.runtimeProfile.healthCheck) }
+                  : {}),
               },
             }
           : {}),
@@ -245,7 +338,9 @@ export class Resource extends AggregateRoot<ResourceState> {
             },
           }
         : {}),
-      ...(state.runtimeProfile ? { runtimeProfile: { ...state.runtimeProfile } } : {}),
+      ...(state.runtimeProfile
+        ? { runtimeProfile: cloneResourceRuntimeProfileState(state.runtimeProfile) }
+        : {}),
       ...(state.networkProfile ? { networkProfile: { ...state.networkProfile } } : {}),
     });
   }
@@ -268,7 +363,9 @@ export class Resource extends AggregateRoot<ResourceState> {
             },
           }
         : {}),
-      ...(this.state.runtimeProfile ? { runtimeProfile: { ...this.state.runtimeProfile } } : {}),
+      ...(this.state.runtimeProfile
+        ? { runtimeProfile: cloneResourceRuntimeProfileState(this.state.runtimeProfile) }
+        : {}),
       ...(this.state.networkProfile ? { networkProfile: { ...this.state.networkProfile } } : {}),
     };
   }

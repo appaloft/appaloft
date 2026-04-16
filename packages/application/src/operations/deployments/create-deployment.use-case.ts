@@ -4,6 +4,7 @@ import {
   LatestDeploymentSpec,
   ok,
   type Resource,
+  type ResourceHealthCheckPolicyState,
   ResourceSourceBinding,
   type Result,
   SourceDescriptor,
@@ -21,6 +22,7 @@ import {
   type EventBus,
   type ExecutionBackend,
   type RequestedDeploymentConfig,
+  type RequestedDeploymentHealthCheck,
   type RuntimePlanResolver,
   type SourceDetector,
 } from "../../ports";
@@ -87,6 +89,35 @@ function resourceRequiresInternalPort(resource: Resource): boolean {
   );
 }
 
+function requestedHealthCheck(
+  policy: ResourceHealthCheckPolicyState,
+): RequestedDeploymentHealthCheck {
+  return {
+    enabled: policy.enabled,
+    type: policy.type.value,
+    intervalSeconds: policy.intervalSeconds.value,
+    timeoutSeconds: policy.timeoutSeconds.value,
+    retries: policy.retries.value,
+    startPeriodSeconds: policy.startPeriodSeconds.value,
+    ...(policy.http
+      ? {
+          http: {
+            method: policy.http.method.value,
+            scheme: policy.http.scheme.value,
+            host: policy.http.host.value,
+            ...(policy.http.port ? { port: policy.http.port.value } : {}),
+            path: policy.http.path.value,
+            expectedStatusCode: policy.http.expectedStatusCode.value,
+            ...(policy.http.expectedResponseText
+              ? { expectedResponseText: policy.http.expectedResponseText.value }
+              : {}),
+          },
+        }
+      : {}),
+    ...(policy.command ? { command: { command: policy.command.command.value } } : {}),
+  };
+}
+
 function requestedDeploymentFromResource(resource: Resource): Result<RequestedDeploymentConfig> {
   const resourceState = resource.toState();
   const runtimeProfile = resourceState.runtimeProfile;
@@ -131,6 +162,9 @@ function requestedDeploymentFromResource(resource: Resource): Result<RequestedDe
       : {}),
     ...(runtimeProfile?.healthCheckPath
       ? { healthCheckPath: runtimeProfile.healthCheckPath.value }
+      : {}),
+    ...(runtimeProfile?.healthCheck
+      ? { healthCheck: requestedHealthCheck(runtimeProfile.healthCheck) }
       : {}),
   });
 }

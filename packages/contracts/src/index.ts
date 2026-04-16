@@ -201,6 +201,11 @@ export const testServerConnectivityResponseSchema = z.object({
   checks: z.array(serverConnectivityCheckSchema),
 });
 
+export const bootstrapServerProxyResponseSchema = z.object({
+  serverId: z.string().min(1),
+  attemptId: z.string().min(1),
+});
+
 export const environmentVariableSchema = z.object({
   key: z.string(),
   value: z.string(),
@@ -283,6 +288,130 @@ export const resourceAccessSummarySchema = z.object({
   lastRouteRealizationDeploymentId: z.string().optional(),
 });
 
+export const resourceHealthOverallSchema = z.enum([
+  "healthy",
+  "degraded",
+  "unhealthy",
+  "starting",
+  "stopped",
+  "not-deployed",
+  "unknown",
+]);
+
+export const resourceHealthSourceErrorSchema = z.object({
+  source: z.enum([
+    "deployment",
+    "runtime",
+    "health-policy",
+    "health-check",
+    "proxy",
+    "public-access",
+    "domain-binding",
+  ]),
+  code: z.string(),
+  category: z.string(),
+  phase: z.string(),
+  retriable: z.boolean(),
+  relatedEntityId: z.string().optional(),
+  relatedState: z.string().optional(),
+  message: z.string().optional(),
+});
+
+export const resourceHealthCheckSchema = z.object({
+  name: z.string(),
+  target: z.enum(["runtime", "container", "command", "public-access", "proxy-route"]),
+  status: z.enum(["passed", "failed", "skipped", "unknown"]),
+  observedAt: z.string(),
+  durationMs: z.number().optional(),
+  statusCode: z.number().optional(),
+  exitCode: z.number().optional(),
+  message: z.string().optional(),
+  reasonCode: z.string().optional(),
+  phase: z.string().optional(),
+  retriable: z.boolean().optional(),
+  metadata: z.record(z.string(), z.string()).optional(),
+});
+
+export const resourceHealthDeploymentContextSchema = z.object({
+  id: z.string(),
+  status: z.enum([
+    "created",
+    "planning",
+    "planned",
+    "running",
+    "succeeded",
+    "failed",
+    "canceled",
+    "rolled-back",
+  ]),
+  createdAt: z.string(),
+  startedAt: z.string().optional(),
+  finishedAt: z.string().optional(),
+  serverId: z.string(),
+  destinationId: z.string(),
+  lastError: z
+    .object({
+      timestamp: z.string(),
+      phase: z.enum(["detect", "plan", "package", "deploy", "verify", "rollback"]),
+      message: z.string(),
+    })
+    .optional(),
+});
+
+export const resourceHealthSummarySchema = z.object({
+  schemaVersion: z.literal("resources.health/v1"),
+  resourceId: z.string(),
+  generatedAt: z.string(),
+  observedAt: z.string().optional(),
+  overall: resourceHealthOverallSchema,
+  latestDeployment: resourceHealthDeploymentContextSchema.optional(),
+  runtime: z.object({
+    lifecycle: z.enum([
+      "not-deployed",
+      "starting",
+      "running",
+      "restarting",
+      "degraded",
+      "stopped",
+      "exited",
+      "unknown",
+    ]),
+    health: z.enum(["healthy", "unhealthy", "unknown", "not-configured"]),
+    observedAt: z.string().optional(),
+    runtimeKind: z.enum(["docker-container", "docker-compose-stack", "host-process"]).optional(),
+    reasonCode: z.string().optional(),
+    message: z.string().optional(),
+  }),
+  healthPolicy: z.object({
+    status: z.enum(["configured", "not-configured", "unsupported"]),
+    enabled: z.boolean(),
+    type: z.enum(["http", "command"]).optional(),
+    path: z.string().optional(),
+    port: z.number().optional(),
+    expectedStatusCode: z.number().optional(),
+    intervalSeconds: z.number().optional(),
+    timeoutSeconds: z.number().optional(),
+    retries: z.number().optional(),
+    startPeriodSeconds: z.number().optional(),
+    reasonCode: z.string().optional(),
+  }),
+  publicAccess: z.object({
+    status: z.enum(["ready", "not-ready", "failed", "unknown", "not-configured"]),
+    url: z.string().optional(),
+    kind: z.enum(["durable-domain", "generated-latest", "generated-planned"]).optional(),
+    reasonCode: z.string().optional(),
+    phase: z.string().optional(),
+  }),
+  proxy: z.object({
+    status: z.enum(["ready", "not-ready", "failed", "unknown", "not-configured"]),
+    providerKey: z.string().optional(),
+    lastRouteRealizationDeploymentId: z.string().optional(),
+    reasonCode: z.string().optional(),
+  }),
+  checks: z.array(resourceHealthCheckSchema),
+  sourceErrors: z.array(resourceHealthSourceErrorSchema),
+});
+
 export const resourceSummarySchema = z.object({
   id: z.string(),
   projectId: z.string(),
@@ -345,6 +474,38 @@ export const deploymentResourceInputSchema = z.object({
     )
     .optional(),
 });
+
+export const resourceHealthCheckPolicySchema = z
+  .object({
+    enabled: z.boolean().default(true),
+    type: z.literal("http").default("http"),
+    intervalSeconds: z.number().int().positive().default(5),
+    timeoutSeconds: z.number().int().positive().default(5),
+    retries: z.number().int().positive().default(10),
+    startPeriodSeconds: z.number().int().nonnegative().default(5),
+    http: z
+      .object({
+        method: z.enum(["GET", "HEAD", "POST", "OPTIONS"]).default("GET"),
+        scheme: z.enum(["http", "https"]).default("http"),
+        host: z.string().min(1).default("localhost"),
+        port: z.number().int().positive().max(65535).optional(),
+        path: z.string().min(1).default("/"),
+        expectedStatusCode: z.number().int().min(100).max(599).default(200),
+        expectedResponseText: z.string().min(1).optional(),
+      })
+      .strict()
+      .optional(),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (value.type === "http" && !value.http) {
+      context.addIssue({
+        code: "custom",
+        path: ["http"],
+        message: "HTTP health checks require http configuration",
+      });
+    }
+  });
 
 export const createResourceInputSchema = z.object({
   projectId: z.string().min(1),
@@ -411,6 +572,7 @@ export const createResourceInputSchema = z.object({
       buildCommand: z.string().min(1).optional(),
       startCommand: z.string().min(1).optional(),
       healthCheckPath: z.string().min(1).optional(),
+      healthCheck: resourceHealthCheckPolicySchema.optional(),
     })
     .strict()
     .optional(),
@@ -644,6 +806,7 @@ export const runtimePlanSchema = z.object({
     buildCommand: z.string().optional(),
     startCommand: z.string().optional(),
     healthCheckPath: z.string().optional(),
+    healthCheck: resourceHealthCheckPolicySchema.optional(),
     port: z.number().int().positive().optional(),
     image: z.string().optional(),
     dockerfilePath: z.string().optional(),
@@ -790,6 +953,231 @@ export const resourceRuntimeLogsStreamResponseSchema = z.object({
   deploymentId: z.string().optional(),
 });
 
+export const resourceDiagnosticSectionStatusSchema = z.enum([
+  "available",
+  "empty",
+  "not-configured",
+  "not-requested",
+  "unavailable",
+  "failed",
+  "unknown",
+]);
+
+export const resourceDiagnosticSourceErrorSchema = z.object({
+  source: z.enum([
+    "deployment",
+    "access",
+    "proxy",
+    "deployment-logs",
+    "runtime-logs",
+    "system",
+    "copy",
+  ]),
+  code: z.string(),
+  category: z.string(),
+  phase: z.string(),
+  retryable: z.boolean(),
+  relatedEntityId: z.string().optional(),
+  relatedState: z.string().optional(),
+  message: z.string().optional(),
+});
+
+export const resourceDiagnosticFocusSchema = z.object({
+  resourceId: z.string(),
+  requestedDeploymentId: z.string().optional(),
+  deploymentId: z.string().optional(),
+});
+
+export const resourceDiagnosticContextSchema = z.object({
+  projectId: z.string(),
+  environmentId: z.string(),
+  resourceName: z.string(),
+  resourceSlug: z.string(),
+  resourceKind: z.enum([
+    "application",
+    "service",
+    "database",
+    "cache",
+    "compose-stack",
+    "worker",
+    "static-site",
+    "external",
+  ]),
+  destinationId: z.string().optional(),
+  serverId: z.string().optional(),
+  runtimeStrategy: z.enum(["docker-container", "docker-compose-stack", "host-process"]).optional(),
+  buildStrategy: z
+    .enum([
+      "dockerfile",
+      "compose-deploy",
+      "buildpack",
+      "static-artifact",
+      "prebuilt-image",
+      "workspace-commands",
+    ])
+    .optional(),
+  packagingMode: z
+    .enum([
+      "split-deploy",
+      "all-in-one-docker",
+      "compose-bundle",
+      "host-process-runtime",
+      "optional-future-binary",
+    ])
+    .optional(),
+  targetKind: z.enum(["single-server", "future-multi-server", "future-k8s"]).optional(),
+  targetProviderKey: z.string().optional(),
+  services: z.array(resourceServiceSummarySchema),
+  networkProfile: resourceNetworkProfileSchema.optional(),
+});
+
+export const resourceDiagnosticDeploymentSchema = z.object({
+  id: z.string(),
+  status: z.enum([
+    "created",
+    "planning",
+    "planned",
+    "running",
+    "succeeded",
+    "failed",
+    "canceled",
+    "rolled-back",
+  ]),
+  lifecyclePhase: z.enum([
+    "created",
+    "planning",
+    "planned",
+    "running",
+    "succeeded",
+    "failed",
+    "canceled",
+    "rolled-back",
+  ]),
+  runtimePlanId: z.string(),
+  sourceKind: z.enum([
+    "local-folder",
+    "local-git",
+    "remote-git",
+    "git-public",
+    "git-github-app",
+    "git-deploy-key",
+    "zip-artifact",
+    "dockerfile-inline",
+    "docker-compose-inline",
+    "docker-image",
+    "compose",
+  ]),
+  sourceDisplayName: z.string(),
+  serverId: z.string(),
+  destinationId: z.string(),
+  createdAt: z.string(),
+  startedAt: z.string().optional(),
+  finishedAt: z.string().optional(),
+  logCount: z.number(),
+  lastError: z
+    .object({
+      timestamp: z.string(),
+      phase: z.enum(["detect", "plan", "package", "deploy", "verify", "rollback"]),
+      message: z.string(),
+    })
+    .optional(),
+});
+
+export const resourceDiagnosticAccessSchema = z.object({
+  status: resourceDiagnosticSectionStatusSchema,
+  generatedUrl: z.string().optional(),
+  durableUrl: z.string().optional(),
+  plannedUrl: z.string().optional(),
+  proxyRouteStatus: z.enum(["unknown", "ready", "not-ready", "failed"]).optional(),
+  lastRouteRealizationDeploymentId: z.string().optional(),
+  reasonCode: z.string().optional(),
+  phase: z.string().optional(),
+});
+
+export const resourceDiagnosticProxySchema = z.object({
+  status: resourceDiagnosticSectionStatusSchema,
+  providerKey: z.string().optional(),
+  proxyRouteStatus: z.enum(["unknown", "ready", "not-ready", "failed"]).optional(),
+  configurationIncluded: z.boolean(),
+  configurationStatus: z
+    .enum(["not-configured", "planned", "applied", "stale", "failed"])
+    .optional(),
+  configurationGeneratedAt: z.string().optional(),
+  routeCount: z.number().optional(),
+  sectionCount: z.number().optional(),
+  sections: z
+    .array(
+      z.object({
+        id: z.string(),
+        title: z.string(),
+        format: z.enum(["docker-labels", "file", "command", "yaml", "json", "text"]),
+        redacted: z.boolean(),
+        source: z.enum(["provider-rendered", "snapshot", "diagnostic"]),
+      }),
+    )
+    .optional(),
+  warnings: z.array(proxyConfigurationWarningSchema).optional(),
+  reasonCode: z.string().optional(),
+  phase: z.string().optional(),
+});
+
+export const resourceDiagnosticLogLineSchema = z.object({
+  timestamp: z.string().optional(),
+  source: z.enum(["yundu", "application"]).optional(),
+  phase: z.enum(["detect", "plan", "package", "deploy", "verify", "rollback"]).optional(),
+  level: z.enum(["debug", "info", "warn", "error"]).optional(),
+  stream: z.enum(["stdout", "stderr", "unknown"]).optional(),
+  serviceName: z.string().optional(),
+  message: z.string(),
+  masked: z.boolean(),
+});
+
+export const resourceDiagnosticLogSectionSchema = z.object({
+  status: resourceDiagnosticSectionStatusSchema,
+  tailLimit: z.number(),
+  lineCount: z.number(),
+  lines: z.array(resourceDiagnosticLogLineSchema),
+  reasonCode: z.string().optional(),
+  phase: z.string().optional(),
+});
+
+export const resourceDiagnosticSystemSchema = z.object({
+  entrypoint: z.enum(["cli", "http", "rpc", "system"]),
+  requestId: z.string(),
+  locale: z.string(),
+  readinessStatus: z.enum(["ready", "degraded"]).optional(),
+  databaseDriver: z.string().optional(),
+  databaseMode: z.string().optional(),
+});
+
+export const resourceDiagnosticRedactionSchema = z.object({
+  policy: z.literal("deployment-environment-secrets"),
+  masked: z.boolean(),
+  maskedValueCount: z.number(),
+});
+
+export const resourceDiagnosticCopyPayloadSchema = z.object({
+  json: z.string(),
+  markdown: z.string().optional(),
+  plainText: z.string().optional(),
+});
+
+export const resourceDiagnosticSummarySchema = z.object({
+  schemaVersion: z.literal("resources.diagnostic-summary/v1"),
+  generatedAt: z.string(),
+  focus: resourceDiagnosticFocusSchema,
+  context: resourceDiagnosticContextSchema,
+  deployment: resourceDiagnosticDeploymentSchema.optional(),
+  access: resourceDiagnosticAccessSchema,
+  proxy: resourceDiagnosticProxySchema,
+  deploymentLogs: resourceDiagnosticLogSectionSchema,
+  runtimeLogs: resourceDiagnosticLogSectionSchema,
+  system: resourceDiagnosticSystemSchema,
+  sourceErrors: z.array(resourceDiagnosticSourceErrorSchema),
+  redaction: resourceDiagnosticRedactionSchema,
+  copy: resourceDiagnosticCopyPayloadSchema,
+});
+
 export const providerDescriptorSchema = z.object({
   key: z.string(),
   title: z.string(),
@@ -849,12 +1237,15 @@ export type CreateSshCredentialResponse = z.infer<typeof createSshCredentialResp
 export type ListSshCredentialsResponse = z.infer<typeof listSshCredentialsResponseSchema>;
 export type ServerConnectivityCheck = z.infer<typeof serverConnectivityCheckSchema>;
 export type TestServerConnectivityResponse = z.infer<typeof testServerConnectivityResponseSchema>;
+export type BootstrapServerProxyResponse = z.infer<typeof bootstrapServerProxyResponseSchema>;
 export type EnvironmentSummary = z.infer<typeof environmentSummarySchema>;
 export type ResourceAccessRouteSummary = z.infer<typeof resourceAccessRouteSummarySchema>;
 export type PlannedResourceAccessRouteSummary = z.infer<
   typeof plannedResourceAccessRouteSummarySchema
 >;
 export type ResourceAccessSummary = z.infer<typeof resourceAccessSummarySchema>;
+export type ResourceHealthOverall = z.infer<typeof resourceHealthOverallSchema>;
+export type ResourceHealthSummary = z.infer<typeof resourceHealthSummarySchema>;
 export type ResourceSummary = z.infer<typeof resourceSummarySchema>;
 export type CreateResourceInput = z.infer<typeof createResourceInputSchema>;
 export type CreateResourceResponse = z.infer<typeof createResourceResponseSchema>;
@@ -883,6 +1274,7 @@ export type ResourceRuntimeLogsResponse = z.infer<typeof resourceRuntimeLogsResp
 export type ResourceRuntimeLogsStreamResponse = z.infer<
   typeof resourceRuntimeLogsStreamResponseSchema
 >;
+export type ResourceDiagnosticSummary = z.infer<typeof resourceDiagnosticSummarySchema>;
 export type ProxyConfigurationView = z.infer<typeof proxyConfigurationViewSchema>;
 export type ListProvidersResponse = z.infer<typeof listProvidersResponseSchema>;
 export type ListPluginsResponse = z.infer<typeof listPluginsResponseSchema>;

@@ -996,6 +996,53 @@ export class HealthCheckPathText extends NonEmptyTextValue {
   }
 }
 
+const healthCheckHostBrand: unique symbol = Symbol("HealthCheckHostText");
+export class HealthCheckHostText extends NonEmptyTextValue {
+  private [healthCheckHostBrand]!: void;
+
+  private constructor(value: string) {
+    super(value);
+  }
+
+  static create(value: string): Result<HealthCheckHostText> {
+    return createRequiredTextValue(
+      value,
+      "Health check host",
+      (normalized) => new HealthCheckHostText(normalized),
+    );
+  }
+
+  static rehydrate(value: string): HealthCheckHostText {
+    return new HealthCheckHostText(rehydrateRequiredText(value));
+  }
+}
+
+const healthCheckResponseTextBrand: unique symbol = Symbol("HealthCheckResponseText");
+export class HealthCheckResponseText extends NonEmptyTextValue {
+  private [healthCheckResponseTextBrand]!: void;
+
+  private constructor(value: string) {
+    super(value);
+  }
+
+  static create(value: string): Result<HealthCheckResponseText> {
+    return createRequiredTextValue(
+      value,
+      "Health check response text",
+      (normalized) => new HealthCheckResponseText(normalized),
+    );
+  }
+
+  static rehydrate(value: string): HealthCheckResponseText {
+    return new HealthCheckResponseText(rehydrateRequiredText(value));
+  }
+
+  static fromOptional(value?: string): HealthCheckResponseText | undefined {
+    const normalized = validateOptionalText(value);
+    return normalized ? new HealthCheckResponseText(normalized) : undefined;
+  }
+}
+
 function validateRoutePathPrefix(value: string): Result<string> {
   return validateRequiredText(value, "Route path prefix").andThen((normalized) => {
     if (!normalized.startsWith("/")) {
