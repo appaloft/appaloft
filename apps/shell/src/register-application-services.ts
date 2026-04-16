@@ -30,6 +30,7 @@ import {
   ListResourcesQueryService,
   ListServersQueryService,
   ListSshCredentialsQueryService,
+  OpenTerminalSessionUseCase,
   PromoteEnvironmentUseCase,
   RegisterServerUseCase,
   ResourceDiagnosticSummaryQueryService,
@@ -108,6 +109,7 @@ export function registerApplicationServices(container: DependencyContainer): voi
     tokens.resourceRuntimeLogsQueryService,
     ResourceRuntimeLogsQueryService,
   );
+  container.registerSingleton(tokens.openTerminalSessionUseCase, OpenTerminalSessionUseCase);
   container.registerSingleton(
     tokens.resourceProxyConfigurationPreviewQueryService,
     ResourceProxyConfigurationPreviewQueryService,

@@ -40,3 +40,4 @@ export * from "./operations/system/doctor.query-service";
 export * from "./operations/system/list-github-repositories.query-service";
 export * from "./operations/system/list-plugins.query-service";
 export * from "./operations/system/list-providers.query-service";
+export * from "./operations/terminal-sessions/open-terminal-session.use-case";

@@ -31,6 +31,7 @@
   import DeploymentTable from "$lib/components/console/DeploymentTable.svelte";
   import ResourceProfileSummary from "$lib/components/console/ResourceProfileSummary.svelte";
   import ResourceStatusDot from "$lib/components/console/ResourceStatusDot.svelte";
+  import TerminalSessionPanel from "$lib/components/console/TerminalSessionPanel.svelte";
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
   import { Input } from "$lib/components/ui/input";
@@ -62,7 +63,7 @@
     typeof globalThis & {
       yunduDesktop?: YunduDesktopBridge;
     };
-  type ResourceDetailTab = "settings" | "deployments" | "logs";
+  type ResourceDetailTab = "settings" | "deployments" | "logs" | "terminal";
   type ResourceAccessSummary = NonNullable<ResourceSummary["accessSummary"]>;
   type ResourceAccessRoute =
     | NonNullable<ResourceAccessSummary["latestGeneratedAccessRoute"]>
@@ -74,10 +75,9 @@
     | "generated-latest"
     | "generated-planned";
   type ResourceAccessStatus = NonNullable<ResourceAccessSummary["proxyRouteStatus"]>;
-  type ResourceSettingsSection = "access" | "profile" | "domains" | "health" | "proxy" | "diagnostics";
-  const resourceDetailTabs = ["settings", "deployments", "logs"] as const;
+  type ResourceSettingsSection = "profile" | "domains" | "health" | "proxy" | "diagnostics";
+  const resourceDetailTabs = ["settings", "deployments", "logs", "terminal"] as const;
   const resourceSettingsSections = [
-    "access",
     "profile",
     "domains",
     "health",
@@ -697,7 +697,7 @@
   function parseResourceSettingsSection(value: string | null): ResourceSettingsSection {
     return resourceSettingsSections.includes(value as ResourceSettingsSection)
       ? (value as ResourceSettingsSection)
-      : "access";
+      : "profile";
   }
 
   function resourceTabHref(tab: ResourceDetailTab): string {
@@ -727,6 +727,8 @@
         return $t(i18nKeys.console.resources.logsTab);
       case "settings":
         return $t(i18nKeys.console.resources.settingsTab);
+      case "terminal":
+        return $t(i18nKeys.console.terminal.title);
     }
   }
 
@@ -734,7 +736,7 @@
     const params = new URLSearchParams(page.url.searchParams);
     params.delete("tab");
 
-    if (section === "access") {
+    if (section === "profile") {
       params.delete("section");
     } else {
       params.set("section", section);
@@ -751,8 +753,6 @@
 
   function resourceSettingsSectionLabel(section: ResourceSettingsSection): string {
     switch (section) {
-      case "access":
-        return $t(i18nKeys.console.resources.accessUrlTitle);
       case "profile":
         return $t(i18nKeys.console.resources.profileTitle);
       case "domains":
@@ -1164,20 +1164,20 @@
         </Tabs.Content>
 
         <Tabs.Content value="settings" class="mt-0">
-          <div class="grid gap-6 lg:grid-cols-[12rem_minmax(0,1fr)]">
-            <aside class="border-b pb-3 lg:border-b-0 lg:border-r lg:pb-0 lg:pr-4">
+          <div class="grid gap-6 lg:grid-cols-[10.5rem_minmax(0,1fr)]">
+            <aside class="border-b pb-3 lg:border-b-0 lg:border-r lg:pb-0 lg:pr-3">
               <nav aria-label={$t(i18nKeys.console.resources.settingsTab)}>
-                <div role="tablist" class="flex gap-2 overflow-x-auto lg:flex-col">
+                <div role="tablist" class="flex gap-1 overflow-x-auto lg:flex-col">
                   {#each resourceSettingsSections as section (section)}
                     <a
                       href={resourceSettingsSectionHref(section)}
                       role="tab"
                       aria-selected={activeSettingsSection === section}
                       class={[
-                        "rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                        "flex min-h-9 items-center whitespace-nowrap rounded-md border border-transparent px-2.5 py-2 text-sm font-medium transition-colors",
                         activeSettingsSection === section
-                          ? "bg-muted text-foreground"
-                          : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                          ? "border-border bg-muted/60 text-foreground shadow-xs"
+                          : "text-muted-foreground hover:bg-muted/50 hover:text-foreground",
                       ]}
                       onclick={(event) => selectResourceSettingsSection(section, event)}
                     >
@@ -1189,83 +1189,82 @@
             </aside>
 
             <div class="space-y-8">
-              {#if activeSettingsSection === "access"}
-              <section id="resource-overview-access" class="rounded-md border bg-background p-4">
-                <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                  <div class="min-w-0 space-y-2">
-                    <p class="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                      <Link2 class="size-4" />
-                      {$t(i18nKeys.console.resources.accessUrlTitle)}
-                    </p>
-                    {#if primaryAccessHref}
-                      <a
-                        class="block break-all text-lg font-semibold text-primary underline-offset-4 hover:underline md:text-xl"
-                        href={primaryAccessHref}
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        {primaryAccessHref}
-                      </a>
-                      <div class="flex flex-wrap items-center gap-2">
-                        {#if primaryAccessKind}
-                          <Badge variant="outline">{resourceAccessKindLabel(primaryAccessKind)}</Badge>
-                        {/if}
-                        {#if primaryDomainBinding}
-                          <Badge variant={domainBindingStatusVariant(primaryDomainBinding.status)}>
-                            {domainBindingStatusLabel(primaryDomainBinding.status)}
-                          </Badge>
-                        {:else}
-                          <Badge
-                            variant={resourceAccessStatusVariant(
-                              resource?.accessSummary?.proxyRouteStatus,
-                            )}
-                          >
-                            {resourceAccessStatusLabel(resource?.accessSummary?.proxyRouteStatus)}
-                          </Badge>
-                        {/if}
-                        {#if primaryAccessRoute?.targetPort}
-                          <Badge variant="secondary">
-                            {$t(i18nKeys.common.domain.port)} {primaryAccessRoute.targetPort}
-                          </Badge>
-                        {/if}
-                      </div>
-                    {:else}
-                      <p class="text-sm leading-6 text-muted-foreground">
-                        {$t(i18nKeys.console.resources.accessUrlEmpty)}
-                      </p>
-                    {/if}
-                    <p class="text-xs leading-5 text-muted-foreground">
-                      {$t(i18nKeys.console.resources.accessUrlDescription)}
-                    </p>
-                  </div>
-
-                  {#if primaryAccessHref}
-                    <Button
-                      type="button"
-                      variant="outline"
-                      aria-label={accessUrlCopyLabel}
-                      title={accessUrlCopyLabel}
-                      onclick={handleCopyAccessUrl}
-                    >
-                      {#if accessUrlCopyState === "copied"}
-                        <Check class="size-4" />
-                      {:else}
-                        <Copy class="size-4" />
-                      {/if}
-                      {accessUrlCopyLabel}
-                    </Button>
-                  {/if}
-                </div>
-              </section>
-
-              {:else if activeSettingsSection === "profile"}
-              <div id="resource-overview-profile">
+              {#if activeSettingsSection === "profile"}
+              <div id="resource-overview-profile" class="space-y-4">
                 <ResourceProfileSummary
                   {resource}
                   projectName={project?.name ?? resource.projectId}
                   environmentName={environment?.name ?? resource.environmentId}
                   destinationId={defaultDestinationId}
                 />
+
+                <section id="resource-overview-access" class="rounded-md border bg-background p-4">
+                  <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                    <div class="min-w-0 space-y-2">
+                      <p class="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                        <Link2 class="size-4" />
+                        {$t(i18nKeys.console.resources.accessUrlTitle)}
+                      </p>
+                      {#if primaryAccessHref}
+                        <a
+                          class="block break-all text-lg font-semibold text-primary underline-offset-4 hover:underline md:text-xl"
+                          href={primaryAccessHref}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          {primaryAccessHref}
+                        </a>
+                        <div class="flex flex-wrap items-center gap-2">
+                          {#if primaryAccessKind}
+                            <Badge variant="outline">{resourceAccessKindLabel(primaryAccessKind)}</Badge>
+                          {/if}
+                          {#if primaryDomainBinding}
+                            <Badge variant={domainBindingStatusVariant(primaryDomainBinding.status)}>
+                              {domainBindingStatusLabel(primaryDomainBinding.status)}
+                            </Badge>
+                          {:else}
+                            <Badge
+                              variant={resourceAccessStatusVariant(
+                                resource?.accessSummary?.proxyRouteStatus,
+                              )}
+                            >
+                              {resourceAccessStatusLabel(resource?.accessSummary?.proxyRouteStatus)}
+                            </Badge>
+                          {/if}
+                          {#if primaryAccessRoute?.targetPort}
+                            <Badge variant="secondary">
+                              {$t(i18nKeys.common.domain.port)} {primaryAccessRoute.targetPort}
+                            </Badge>
+                          {/if}
+                        </div>
+                      {:else}
+                        <p class="text-sm leading-6 text-muted-foreground">
+                          {$t(i18nKeys.console.resources.accessUrlEmpty)}
+                        </p>
+                      {/if}
+                      <p class="text-xs leading-5 text-muted-foreground">
+                        {$t(i18nKeys.console.resources.accessUrlDescription)}
+                      </p>
+                    </div>
+
+                    {#if primaryAccessHref}
+                      <Button
+                        type="button"
+                        variant="outline"
+                        aria-label={accessUrlCopyLabel}
+                        title={accessUrlCopyLabel}
+                        onclick={handleCopyAccessUrl}
+                      >
+                        {#if accessUrlCopyState === "copied"}
+                          <Check class="size-4" />
+                        {:else}
+                          <Copy class="size-4" />
+                        {/if}
+                        {accessUrlCopyLabel}
+                      </Button>
+                    {/if}
+                  </div>
+                </section>
               </div>
 
               {:else if activeSettingsSection === "domains"}
@@ -1702,6 +1701,18 @@
                 {/if}
               </div>
           </section>
+        </Tabs.Content>
+
+        <Tabs.Content value="terminal" class="mt-0">
+          <TerminalSessionPanel
+            title={$t(i18nKeys.console.terminal.resourceTitle)}
+            description={$t(i18nKeys.console.terminal.resourceDescription)}
+            disabled={resourceDeployments.length === 0}
+            scope={{
+              kind: "resource",
+              resourceId: resource.id,
+            }}
+          />
         </Tabs.Content>
       </Tabs.Root>
 

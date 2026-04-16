@@ -46,6 +46,8 @@ import {
   listGitHubRepositoriesQueryInputSchema,
   listResourcesQueryInputSchema,
   listSshCredentialsQueryInputSchema,
+  OpenTerminalSessionCommand,
+  openTerminalSessionCommandInputSchema,
   PromoteEnvironmentCommand,
   promoteEnvironmentCommandInputSchema,
   type Query,
@@ -102,6 +104,7 @@ import {
   resourceRuntimeLogEventSchema,
   resourceRuntimeLogsResponseSchema,
   resourceRuntimeLogsStreamResponseSchema,
+  terminalSessionDescriptorSchema,
   testServerConnectivityResponseSchema,
 } from "@yundu/contracts";
 import { type DomainError, type Result } from "@yundu/core";
@@ -307,6 +310,10 @@ function toOrpcError(error: DomainError, context: ExecutionContext) {
     case "domain_binding_proxy_required":
     case "domain_binding_context_mismatch":
     case "resource_context_mismatch":
+    case "terminal_session_context_mismatch":
+    case "terminal_session_workspace_unavailable":
+    case "terminal_session_policy_denied":
+    case "terminal_session_not_found":
       return new ORPCError("BAD_REQUEST", {
         message,
         status: 400,
@@ -341,6 +348,17 @@ function toOrpcError(error: DomainError, context: ExecutionContext) {
         return new ORPCError("SERVICE_UNAVAILABLE", {
           message,
           status: 503,
+          data: {
+            domainCode: error.code,
+            locale: context.locale,
+          },
+        });
+      }
+
+      if (error.category === "timeout") {
+        return new ORPCError("GATEWAY_TIMEOUT", {
+          message,
+          status: 504,
           data: {
             domainCode: error.code,
             locale: context.locale,
@@ -908,6 +926,18 @@ export const resourceProxyConfigurationPreviewProcedure = base
     executeQuery(context, ResourceProxyConfigurationPreviewQuery.create(input)),
   );
 
+export const openTerminalSessionProcedure = base
+  .route({
+    method: "POST",
+    path: "/terminal-sessions",
+    successStatus: 201,
+  })
+  .input(openTerminalSessionCommandInputSchema)
+  .output(terminalSessionDescriptorSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, OpenTerminalSessionCommand.create(input)),
+  );
+
 export const listProvidersProcedure = base
   .route({
     method: "GET",
@@ -974,6 +1004,9 @@ export const yunduOrpcRouter = {
     proxyConfiguration: resourceProxyConfigurationPreviewProcedure,
     logs: resourceRuntimeLogsProcedure,
     logsStream: resourceRuntimeLogsStreamProcedure,
+  },
+  terminalSessions: {
+    open: openTerminalSessionProcedure,
   },
   domainBindings: {
     list: listDomainBindingsProcedure,
@@ -1120,6 +1153,7 @@ export function mountYunduOrpcRoutes(
     "/api/environments/:environmentId/diff/:otherEnvironmentId",
     "/api/resources",
     "/api/resources/:resourceId/diagnostic-summary",
+    "/api/terminal-sessions",
     "/api/domain-bindings",
     "/api/deployments",
     "/api/deployments/stream",

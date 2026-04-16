@@ -6,3 +6,4 @@ export * from "./project-messages";
 export * from "./resource-messages";
 export * from "./server-messages";
 export * from "./system-messages";
+export * from "./terminal-session-messages";

@@ -5,6 +5,7 @@ import {
   CreateSshCredentialCommand,
   ListServersQuery,
   ListSshCredentialsQuery,
+  OpenTerminalSessionCommand,
   RegisterServerCommand,
   TestServerConnectivityCommand,
 } from "@yundu/application";
@@ -29,6 +30,8 @@ const privateKeyFileOption = Options.text("private-key-file").pipe(Options.optio
 const requiredPrivateKeyFileOption = Options.text("private-key-file");
 const credentialIdOption = Options.text("credential-id").pipe(Options.optional);
 const serverIdArg = Args.text({ name: "serverId" });
+const rowsOption = Options.text("rows").pipe(Options.withDefault("24"));
+const colsOption = Options.text("cols").pipe(Options.withDefault("80"));
 
 const registerCommand = EffectCommand.make(
   "register",
@@ -173,6 +176,26 @@ const proxyCommand = EffectCommand.make("proxy").pipe(
   EffectCommand.withSubcommands([proxyRepairCommand]),
 );
 
+const terminalCommand = EffectCommand.make(
+  "terminal",
+  {
+    serverId: serverIdArg,
+    rows: rowsOption,
+    cols: colsOption,
+  },
+  ({ cols, rows, serverId }) =>
+    runCommand(
+      OpenTerminalSessionCommand.create({
+        scope: {
+          kind: "server",
+          serverId,
+        },
+        initialRows: Number(rows),
+        initialCols: Number(cols),
+      }),
+    ),
+).pipe(EffectCommand.withDescription("Open a server terminal session"));
+
 export const serverCommand = EffectCommand.make("server").pipe(
   EffectCommand.withDescription("Server operations"),
   EffectCommand.withSubcommands([
@@ -183,6 +206,7 @@ export const serverCommand = EffectCommand.make("server").pipe(
     credentialListCommand,
     testCommand,
     doctorCommand,
+    terminalCommand,
     proxyCommand,
   ]),
 );

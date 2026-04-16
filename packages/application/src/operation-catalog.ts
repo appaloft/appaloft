@@ -27,6 +27,7 @@ import { listSshCredentialsQueryInputSchema } from "./operations/servers/list-ss
 import { registerServerCommandInputSchema } from "./operations/servers/register-server.command";
 import { testServerConnectivityCommandInputSchema } from "./operations/servers/test-server-connectivity.command";
 import { listGitHubRepositoriesQueryInputSchema } from "./operations/system/list-github-repositories.query";
+import { openTerminalSessionCommandInputSchema } from "./operations/terminal-sessions/open-terminal-session.command";
 import { tokens } from "./tokens";
 
 type OperationKind = "command" | "query";
@@ -38,7 +39,8 @@ type OperationDomain =
   | "resources"
   | "deployments"
   | "domain-bindings"
-  | "system";
+  | "system"
+  | "terminal-sessions";
 
 export interface OperationCatalogEntry {
   key: string;
@@ -245,6 +247,20 @@ export const operationCatalog = [
       cli: "yundu resource logs <resourceId>",
       orpc: { method: "GET", path: "/api/resources/{resourceId}/runtime-logs" },
       orpcStream: { method: "GET", path: "/api/resources/{resourceId}/runtime-logs/stream" },
+    },
+  },
+  {
+    key: "terminal-sessions.open",
+    kind: "command",
+    domain: "terminal-sessions",
+    messageName: "OpenTerminalSessionCommand",
+    handlerName: "OpenTerminalSessionCommandHandler",
+    serviceName: "OpenTerminalSessionUseCase",
+    inputSchema: openTerminalSessionCommandInputSchema,
+    serviceToken: tokens.openTerminalSessionUseCase,
+    transports: {
+      cli: "yundu server terminal <serverId>; yundu resource terminal <resourceId>",
+      orpc: { method: "POST", path: "/api/terminal-sessions" },
     },
   },
   {

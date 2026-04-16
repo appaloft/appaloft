@@ -21,6 +21,8 @@ export * from "./server-handlers";
 export * from "./server-messages";
 export * from "./system-handlers";
 export * from "./system-messages";
+export * from "./terminal-session-handlers";
+export * from "./terminal-session-messages";
 export * from "./tokens";
 export * from "./use-cases";
 export * from "./workspace";
