@@ -154,6 +154,12 @@ Minimum tests:
 - application route resolver: policy disabled, policy enabled, provider failure, missing public address, durable binding precedence;
 - deployment admission: ids-only command resolves generated route from resource/server/policy state;
 - runtime adapter: proxy route targets `networkProfile.internalPort` and does not require public host application port;
+- runtime adapter: two reverse-proxy resources can use the same `internalPort` without one deployment
+  cleaning up the other's runtime instance;
+- runtime adapter: a new deployment attempt for the same resource uses resource-scoped replacement
+  rather than port-scoped replacement;
+- runtime adapter: direct-port host-port collisions fail or reject the conflicting deployment
+  without stopping the existing resource runtime;
 - edge proxy provider contract: concrete provider renders ensure plan, route realization plan, and configuration view from provider-neutral input;
 - proxy configuration query: planned/latest/deployment-snapshot views are read-only and redacted;
 - read model: planned generated route is exposed for persisted resources before first deployment, and realized generated route is exposed from deployment snapshots after deployment;
@@ -181,6 +187,10 @@ The minimal deliverable is complete when:
 Runtime adapter route hint fields such as `domains`, `proxyKind`, `pathPrefix`, and `tlsMode` remain an adapter-facing migration seam. They are populated by the default access route resolver instead of transport command input, but durable domain binding precedence has not yet been wired into the same resolver.
 
 Existing proxy label/config generation is reused behind the route snapshot boundary. Reverse-proxy deployments bind workload ports to loopback for local health and proxy access rather than requiring a stable public host application port.
+
+Reverse-proxy runtime cleanup is resource-scoped. Deployments must not remove all containers or
+processes that publish the same application `internalPort`, because same-port resources are valid
+under proxy routing.
 
 Existing proxy label/config generation is still runtime-adapter owned. ADR-019 requires wrapping or moving it behind concrete edge proxy provider packages.
 

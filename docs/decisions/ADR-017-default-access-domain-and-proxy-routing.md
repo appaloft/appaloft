@@ -70,7 +70,8 @@ The port input may include only platform concepts:
 - resource id;
 - resource slug/name;
 - destination id;
-- deployment id or attempt id when a deployment-scoped route is needed;
+- deployment id or attempt id only when a provider policy explicitly requires a
+  deployment-scoped route;
 - requested route purpose;
 - correlation id and causation id.
 
@@ -136,6 +137,12 @@ This projection is query/read-model state, not `Resource` aggregate state. It is
 
 `latestGeneratedAccessRoute` is the post-deployment realized route derived from the latest relevant deployment snapshot.
 
+Generated default access should prefer stable resource-scoped hostnames for v1. Repeated
+deployments of the same resource should keep the same generated hostname when resource, target,
+destination, and route path policy are unchanged. Deployment-scoped generated hostnames are allowed
+only when the configured provider policy requires them, and the route scope must be explicit in the
+read model.
+
 Deployment snapshots still keep the immutable generated or durable route data used by one attempt. The resource access summary chooses the latest relevant route for resource detail, Quick Deploy completion, CLI output, and API reads.
 
 ## Resource Network And Proxy Relationship
@@ -145,6 +152,15 @@ Generated default access requires a resource endpoint.
 For HTTP application resources, the upstream target is `ResourceNetworkProfile.internalPort` with `upstreamProtocol = "http"` and `exposureMode = "reverse-proxy"`.
 
 Reverse-proxy exposure must not require a stable host-published application port. The edge proxy publishes public ingress ports such as 80/443. The resource workload should be reachable by the proxy through the destination-local runtime network and the resolved internal port.
+
+Two resources on the same deployment target may use the same `ResourceNetworkProfile.internalPort`
+under reverse-proxy exposure. Runtime adapters must isolate their workload instances and route
+metadata by resource/deployment identity. They must not clean up, replace, or route by scanning all
+containers/processes that publish the same internal application port.
+
+Runtime adapters may expose the workload on a private loopback or runtime-local ephemeral host port
+for internal health checks when their execution model requires it. That host port is not a public
+route, not a durable domain binding, and not the edge proxy upstream contract.
 
 `hostPort` is valid only for explicit `direct-port` exposure. It is not the default path for application resources and must not be used as a substitute for proxy routing.
 
@@ -188,7 +204,7 @@ Generated default access routes and durable domain bindings are different object
 
 | Concern | Owner |
 | --- | --- |
-| Generated convenience hostname | Default access domain provider and deployment/resource access snapshot. |
+| Generated convenience hostname | Default access domain provider and resource access summary, with deployment snapshots as immutable history. |
 | Durable custom domain ownership | `DomainBinding` aggregate. |
 | Certificate issuance/renewal | Certificate workflow and provider adapter. |
 | Proxy installation readiness | `DeploymentTarget` edge proxy state. |

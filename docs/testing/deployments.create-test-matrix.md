@@ -8,6 +8,14 @@ Deployment-specific canonical assertions:
 
 - command success means request accepted;
 - post-acceptance runtime failure persists failed state and keeps the original command `ok({ id })`;
+- Docker runtime verification failures persist actionable container diagnostics, including container
+  state and recent application logs when the container started or exited before verification;
+- HTTP verification failures persist the last observed HTTP status or fetch error instead of only a
+  generic timeout;
+- reverse-proxy deployments allow different resources to share the same `internalPort` on the same
+  target without stopping each other;
+- direct-port deployments treat the host port as the collision boundary and must fail or reject a
+  collision without removing another resource;
 - terminal events are `deployment-succeeded` and `deployment-failed`;
 - `build-requested` is emitted when build/package work is required;
 - retry creates a new deployment attempt.
@@ -78,6 +86,7 @@ Then:
 | Resource has Docker image tag/digest | Context ids resolve; resource source is a Docker image with tag or digest and runtime strategy is `prebuilt-image` | `ok({ id })` | None | `deployment-requested`; later async events | Deployment snapshot uses prebuilt image identity |
 | Inbound resource lacks network profile | Context ids resolve, but inbound resource has no internal listener port | `err` | `validation_error`, phase `resource-network-resolution` | None for accepted request | No accepted deployment |
 | Resource network profile resolves reverse-proxy target | Resource has `networkProfile.internalPort` and reverse-proxy exposure | `ok({ id })` | None | `deployment-requested`; later async events | Deployment snapshot includes resolved network target without requiring host port |
+| Two reverse-proxy resources share internal port | Two resources on the same server/destination both have `networkProfile.internalPort = 3000` and reverse-proxy exposure | Both deployments can be accepted when each latest attempt is terminal | None | Separate `deployment-requested` events | Runtime plan snapshots keep separate resource/deployment identity and do not require a unique host port |
 | Generated default access route resolves | Resource reverse-proxy profile, server proxy ready, default access policy enabled | `ok({ id })` | None | `deployment-requested`; later route realization/progress | Deployment snapshot includes provider-neutral generated access route metadata; `ResourceAccessSummary` projects current generated URL |
 | Generated access provider unavailable before acceptance | Generated route is required but provider cannot return a hostname before safe acceptance | `err` | provider/default access error, phase `default-access-domain-generation` | None | No accepted deployment |
 | Proxy not ready for generated route | Resource reverse-proxy profile, policy enabled, server edge proxy failed/not ready | `err` or post-acceptance failure according to detection phase | `proxy_not_ready` or proxy error, phase `proxy-readiness` | No success event for accepted route | No direct host-port fallback |
@@ -86,6 +95,7 @@ Then:
 | Unresolved project/environment/server/destination/resource | Context cannot be resolved after bootstrap | `err` | `validation_error` or `not_found`, phase `context-resolution` | None | No deployment created |
 | Context mismatch | Environment/resource/destination does not match project/server context | `err` | `validation_error`, phase `context-resolution` | None | No deployment created |
 | Active latest deployment | Latest deployment for same resource is non-terminal | `err` | `deployment_not_redeployable`, phase `redeploy-guard` | None for new attempt | No new deployment created |
+| Direct host-port collision | Different resource already owns the same effective direct `hostPort` on the same server/destination | `err` when safely detected before acceptance, otherwise accepted attempt later fails | `conflict`, phase `admission-conflict`, or failed deployment with phase `runtime-execution` | No success event for the conflicting attempt | Existing resource runtime is not removed to free the port |
 | Invalid runtime plan | Plan has no executable steps or invalid VO state | `err` | `validation_error` or `invariant_violation` | None for accepted request | No accepted deployment |
 
 ## Async Progression Matrix
@@ -96,6 +106,10 @@ Then:
 | Prebuilt image | Accepted request with prebuilt image plan | `ok({ id })` | `deployment-requested -> deployment-started -> terminal event` | Accepted -> running -> terminal |
 | Runtime success | Runtime rollout succeeds | `ok({ id })` | `deployment-succeeded` | Terminal `succeeded` |
 | Runtime failure, retriable | Runtime rollout fails after acceptance with retriable error | `ok({ id })` | `deployment-failed`; retry scheduling event/job if modeled | Terminal `failed`; retry creates new attempt |
+| Docker container exits before health check | Docker run command returns a container id, but the container exits before internal or public verification passes | `ok({ id })` | `deployment-failed` | Terminal `failed`; deployment logs include Docker inspect state and recent container logs before cleanup |
+| Reverse-proxy same internal port | Two accepted deployments for different resources both listen on port `3000` inside their containers/processes | `ok({ id })` for each accepted attempt | Each attempt has its own terminal event | Both resources may remain running; runtime cleanup is scoped to resource identity, not `publish=3000` or `internalPort=3000` |
+| Same resource replacement | A resource has a terminal deployment and a new deployment for the same resource is accepted | `ok({ id })` | New attempt emits its own terminal event | Runtime may replace the previous instance for the same resource after the new attempt starts successfully according to adapter strategy |
+| Direct-port collision after acceptance | Runtime cannot bind requested direct host port because another resource already owns it | Original command remains `ok({ id })` | `deployment-failed` | Conflicting attempt is failed; existing resource runtime remains untouched |
 | Runtime failure, permanent | Runtime rollout fails after acceptance with non-retriable error | `ok({ id })` | `deployment-failed` | Terminal `failed`; no retry |
 | Worker crash before state persistence | Worker cannot persist outcome | Original accepted command remains `ok({ id })` | No terminal event until recovery | Process state records retryable processing error |
 
@@ -159,6 +173,11 @@ Current event names are still `deployment.started` and `deployment.finished`. Te
 `deployment-requested` and `build-requested` are canonical events and may not exist in current test fixtures yet.
 
 Generated default access route tests are governed by [Default Access Domain And Proxy Routing Test Matrix](./default-access-domain-and-proxy-routing-test-matrix.md) and are not implemented yet.
+
+Runtime adapter helper tests cover the command construction needed for resource-scoped Docker
+cleanup, loopback ephemeral health-check port publication, and direct-port publication. A real
+Docker or SSH end-to-end assertion for two reverse-proxy resources sharing the same `internalPort`
+is still needed.
 
 ## Open Questions
 

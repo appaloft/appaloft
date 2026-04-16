@@ -10,6 +10,14 @@ Server registration and server connection are distinct lifecycle concerns.
 
 Draft connectivity checks may exist for UX preflight, but they must not mutate server lifecycle state or publish `server-connected`.
 
+`servers.test-connectivity` must include edge proxy diagnostics when the target has provider-backed
+edge proxy intent and the runtime adapter can execute diagnostics for the target provider. The
+diagnostic must be provider-rendered through the edge proxy provider contract, then executed by the
+runtime adapter locally or over SSH. It may perform bounded temporary Docker probes, but it must
+clean them up and must not persist lifecycle state, publish readiness events, or silently repair the
+server. Provider-owned proxy repair is performed only by lifecycle bootstrap/repair operations such
+as `servers.bootstrap-proxy`, or by idempotent provider ensure during accepted deployment execution.
+
 ## Global References
 
 This command family inherits:
@@ -29,8 +37,8 @@ This file defines only server/proxy command responsibilities and lifecycle seman
 | --- | --- | --- | --- |
 | `servers.register` | Web, CLI, API, automation | User-intent command | Server metadata is persisted and lifecycle bootstrap can begin. |
 | `servers.connect` | Process manager, API/CLI when explicitly requested | Lifecycle command | Connectivity verification request is accepted or completed according to command mode. |
-| `servers.test-connectivity` | Web, CLI, API | Diagnostic/preflight command | Connectivity result is returned to the caller; no lifecycle state is changed. |
-| `servers.bootstrap-proxy` | Process manager/worker | System command for edge proxy bootstrap | Proxy bootstrap attempt is accepted for a connected server. |
+| `servers.test-connectivity` | Web, CLI, API | Diagnostic/preflight command | Connectivity and provider-rendered proxy diagnostic results are returned to the caller; no lifecycle state is changed. |
+| `servers.bootstrap-proxy` | Process manager, worker, CLI/API explicit repair | Lifecycle command for edge proxy bootstrap or repair | New proxy bootstrap attempt is accepted for an operable server. |
 
 If only one public command exists in a transitional implementation, the source-of-truth model still treats register, connect, and proxy bootstrap as separate responsibilities.
 
@@ -61,9 +69,10 @@ If only one public command exists in a transitional implementation, the source-o
 | Field | Requirement | Meaning |
 | --- | --- | --- |
 | `serverId` | Required | Connected server id. |
-| `edgeProxyProviderKey` | Required | Opaque edge proxy provider registry key; disabled/no-proxy targets must not create a bootstrap attempt. |
-| `attemptId` | Required | Idempotency key for the proxy bootstrap attempt. |
+| `edgeProxyProviderKey` | Optional for public callers; required for event-driven internal calls when already resolved | Opaque edge proxy provider registry key. Public entrypoints normally resolve it from server proxy intent and provider registry. Disabled/no-proxy targets must not create a bootstrap attempt. |
+| `attemptId` | Must be omitted by public repair callers; required for event-driven internal calls when already allocated | Idempotency key for the proxy bootstrap attempt. Public repair/retry allocates a new attempt id. Internal event-driven calls pass the already allocated attempt id. |
 | `causationId` | Required when event-driven | Event id or command id that requested bootstrap. |
+| `reason` | Optional | Safe operator/system reason such as `repair`, `retry`, `post-connect`, or `doctor-follow-up`. |
 
 ## Synchronous Admission
 
@@ -85,7 +94,8 @@ If only one public command exists in a transitional implementation, the source-o
 `servers.bootstrap-proxy` must synchronously validate:
 
 - server existence;
-- server is connected;
+- server is connected or otherwise operable enough for the selected runtime executor according to
+  provider policy;
 - edge proxy provider is required and registered;
 - requested provider key matches the server proxy intent;
 - duplicate attempt handling.
@@ -131,6 +141,11 @@ type BootstrapServerProxyResult = Result<
 ```
 
 Lifecycle failures after async acceptance are represented in server/proxy state and events according to the shared async lifecycle contract.
+
+`servers.bootstrap-proxy` may be invoked by `yundu server proxy repair <serverId>` as an
+operator action after `server doctor` reports a proxy problem. The operation must not mutate user
+workload containers. It may create, verify, replace, or restart only provider-owned proxy
+infrastructure and provider-owned networks or volumes rendered by the selected edge proxy provider.
 
 ## Event Contract
 
@@ -188,7 +203,14 @@ Command handlers must not:
 
 ## Current Implementation Notes And Migration Gaps
 
-Current code has `servers.register`, `servers.configure-credential`, `servers.test-connectivity`, and `servers.test-draft-connectivity`. A concrete `servers.connect` lifecycle command and `servers.bootstrap-proxy` command are not yet confirmed as separate operation-catalog entries.
+Current code has `servers.register`, `servers.configure-credential`, `servers.test-connectivity`,
+`servers.test-draft-connectivity`, and public `servers.bootstrap-proxy` operation-catalog entries.
+A concrete `servers.connect` lifecycle command is not yet implemented as an operation-catalog entry.
+
+Current `servers.bootstrap-proxy` is exposed through CLI and HTTP/oRPC, allocates a new `pxy_*`
+attempt id for public repair calls, publishes canonical `proxy-bootstrap-requested` plus terminal
+`proxy-installed` or `proxy-install-failed` events, and executes the existing provider-backed proxy
+bootstrapper synchronously during the command.
 
 Current `servers.register` persists a `DeploymentTarget` and emits `deployment_target.registered`. When `proxyKind` is omitted, it defaults to `traefik`.
 
@@ -198,11 +220,18 @@ Current code still exposes `proxyKind` values as the provider-selection field. A
 
 Current connectivity testing returns a diagnostic `ServerConnectivityResult`; it does not promote a durable connected/server-ready lifecycle state.
 
+Current `servers.test-connectivity` includes provider-rendered edge proxy diagnostics for local and
+generic SSH targets when an edge proxy provider registry is available. Traefik diagnostics include
+container image compatibility, Docker provider log scanning, and a bounded Docker-label route probe.
+Failed provider-rendered edge proxy diagnostic checks include safe `repairCommand` metadata pointing
+to `yundu server proxy repair <serverId>`.
+
 Current aggregate records `deployment_target.edge_proxy_bootstrap_started`, `deployment_target.edge_proxy_bootstrap_succeeded`, and `deployment_target.edge_proxy_bootstrap_failed`, but the current bootstrap event handler does not publish pulled events after marking started/succeeded/failed.
 
 Current server state has persisted edge proxy fields, but no first-class persisted top-level server lifecycle status such as `registered`, `connected`, or `ready`.
 
+The accepted operation key for explicit proxy repair/retry is `servers.bootstrap-proxy`. Human-facing CLI text may use `server proxy repair` because the action repairs provider-owned proxy infrastructure, but the business operation remains the lifecycle bootstrap command and must create a new attempt id.
+
 ## Open Questions
 
 - Should duplicate registration return the existing server id or a `conflict` error?
-- What is the explicit operation key for proxy bootstrap retry: `servers.bootstrap-proxy`, `servers.retry-proxy-bootstrap`, or another name?

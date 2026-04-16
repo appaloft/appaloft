@@ -43,10 +43,19 @@ type ProxyInstalledPayload = {
   providerKey: string;
   containerName?: string;
   networkName?: string;
+  image?: string;
+  httpPort?: number;
+  httpsPort?: number;
+  runtimeMetadata?: Record<string, string>;
   correlationId?: string;
   causationId?: string;
 };
 ```
+
+Runtime metadata must be safe, provider-owned, and non-secret. It may include image name, exposed
+ports, provider-managed container name, provider-managed network name, and compatibility version.
+It must not include raw command output, private addresses that are not already visible in the server
+read model, environment variables, or credential material.
 
 ## State Progression
 
@@ -107,4 +116,4 @@ Current runtime state still exposes `proxyKind`; ADR-019 treats that as provider
 
 ## Open Questions
 
-- Should `proxy-installed` include runtime metadata such as image name and exposed ports, or should those remain only in worker logs?
+- None. Safe provider-owned runtime metadata belongs on the event payload; raw command output and secret-bearing diagnostics remain in worker logs only.

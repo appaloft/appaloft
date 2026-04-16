@@ -39,6 +39,7 @@ type DeploymentCreateErrorDetails = {
     | "config-bootstrap"
     | "context-resolution"
     | "redeploy-guard"
+    | "admission-conflict"
     | "resource-source-resolution"
     | "resource-network-resolution"
     | "default-access-policy-resolution"
@@ -65,6 +66,8 @@ type DeploymentCreateErrorDetails = {
   resourceSourceKind?: string;
   runtimePlanStrategy?: string;
   internalPort?: number;
+  hostPort?: number;
+  publishedHostPort?: number;
   exposureMode?: "none" | "reverse-proxy" | "direct-port";
   upstreamProtocol?: "http" | "tcp";
   targetServiceName?: string;
@@ -96,6 +99,16 @@ Admission errors reject the command and return `err(DomainError)`.
 
 If the selected target has no edge proxy intent, or explicitly disables the proxy, generated default access is optional and the deployment may proceed without `default_access_route_unavailable`. That path must not create a direct host-port fallback.
 
+For direct-port resources, an effective host-port collision that is safely detectable before
+acceptance may return `conflict` in phase `admission-conflict` with `hostPort`, `resourceId`,
+`serverId`, and `destinationId`. If the collision is discovered by the runtime after acceptance,
+the deployment must be marked failed with phase `runtime-execution` or `public-route-verification`
+and safe details including `internalPort`, `hostPort`, and the conflicting runtime reason when
+available.
+
+For reverse-proxy resources, another resource using the same `internalPort` is not an admission
+conflict and must not be reported as a host-port conflict.
+
 ## Post-Acceptance Deployment Failures
 
 Build, runtime execution, proxy route realization, public route verification, health check, or release finalization failures after acceptance are not command admission errors.
@@ -125,6 +138,8 @@ Deployment tests must assert:
 - deployment-specific `error.code`;
 - deployment-specific `phase`;
 - `deploymentId`, `resourceId`, or related context when relevant;
+- `internalPort`, `hostPort`, or `publishedHostPort` when a runtime port mapping or direct-port
+  conflict is the relevant failure context;
 - `deployment-failed` plus failed state for post-acceptance failure;
 - a new deployment id for retry.
 

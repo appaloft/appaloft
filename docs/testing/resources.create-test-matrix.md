@@ -81,6 +81,7 @@ Then:
 | Docker image tag and digest conflict | Docker image source includes both tag and digest as competing identity values | `err` | `validation_error`, phase `resource-source-resolution` | None | No resource created |
 | Dockerfile path with source tree | Git or local source plus `runtimeProfile.strategy = dockerfile` and Dockerfile path | `ok({ id })` | None | `resource-created` | Source binding owns base directory; runtime profile owns Dockerfile path |
 | Compose file path with source tree | Git or local source plus `runtimeProfile.strategy = docker-compose` and Compose file path | `ok({ id })` | None | `resource-created` | Source binding owns base directory; runtime profile owns Compose file path |
+| HTTP health check policy | Runtime profile includes enabled HTTP health policy with path, expected status, interval, timeout, retries, and start period | `ok({ id })` | None | `resource-created` | Runtime profile persists reusable health check policy and mirrors HTTP path for current runtime adapters |
 | Invalid internal listener port | Required fields plus invalid `networkProfile.internalPort` | `err` | `validation_error`, phase `resource-network-resolution` or `command-validation` | None | No resource created |
 | Reverse-proxy exposure without host port | Inbound HTTP resource with `internalPort`, default exposure | `ok({ id })` | None | `resource-created` | Resource network profile has `internalPort`; no host-published port required |
 | Direct-port host publication | `exposureMode = direct-port`, `hostPort` supplied | `ok({ id })` | None | `resource-created` | Resource network profile records explicit direct-port exposure |
@@ -119,7 +120,7 @@ Then:
 
 Current aggregate event name is `resource-created`.
 
-`resources.create` now owns first-deploy source/runtime/network profile persistence. Tests must assert source binding, runtime profile, and network profile fields when the command input includes them.
+`resources.create` now owns first-deploy source/runtime/network profile persistence. Tests must assert source binding, runtime profile, health check policy, and network profile fields when the command input includes them.
 
 Source variant tests are normative even while implementation still stores some values in generic
 metadata. Assertions should treat `gitRef`, `baseDirectory`, Docker image tag/digest, Dockerfile

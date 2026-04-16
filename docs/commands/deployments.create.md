@@ -155,6 +155,29 @@ Missing or explicitly disabled edge proxy intent makes generated default access 
 
 Runtime/build/deploy/verify failures after acceptance are workflow failures and must be represented by deployment state plus `deployment-failed`.
 
+## Runtime Port Isolation
+
+`ResourceNetworkProfile.internalPort` is the workload listener port inside the runtime boundary. It
+is not a globally unique server host port.
+
+For `reverse-proxy` exposure:
+
+- multiple resources on the same server/destination may use the same `internalPort`;
+- route realization must target the resource's resolved `internalPort` through the selected runtime
+  network or equivalent routing fabric;
+- runtime adapters may publish a private loopback or runtime-local ephemeral host port for internal
+  health checks, but that mapping is not public access state;
+- cleanup and replacement must be scoped to the same resource/workload identity, not to every
+  workload that exposes the same `internalPort`.
+
+For `direct-port` exposure:
+
+- `hostPort` is the server placement collision boundary;
+- if the requested effective host port is already owned by another resource on the same
+  server/destination, the attempt must reject admission when safely detectable or persist a
+  post-acceptance runtime failure;
+- the runtime must not stop another resource to free the host port.
+
 ## Handler Boundary
 
 The command handler owns command dispatch and use-case delegation only. It must not own:
@@ -219,6 +242,9 @@ Migration gaps:
   Provider-backed disambiguation for slash-containing Git refs and typed runtime-profile file paths
   remain future work.
 - resource listener port is stored as `networkProfile.internalPort`; deployment admission does not read `runtimeProfile.port`.
+- runtime adapter behavior treats reverse-proxy `internalPort` as a workload-local listener rather
+  than a globally unique host port; same-port reverse-proxy resources require resource-scoped
+  cleanup/replacement.
 - generated default access routing is governed by ADR-017, but the current runtime adapter path still contains adapter-facing requested deployment route fields that must be replaced by provider-neutral route resolution.
 
 ## Open Questions

@@ -169,6 +169,10 @@ Tests must assert:
 
 Runtime adapters execute provider-produced plans. Concrete provider rendering now lives in provider packages.
 
+The query selects the edge proxy provider from the route `proxyKind`; generated default-access
+domain provider keys such as `sslip` are access-domain metadata and must not override edge proxy
+provider selection.
+
 The query is active through API/oRPC, CLI, and Web resource detail. A dedicated provider route projection is still future work.
 
 ## Open Questions

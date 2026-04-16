@@ -8,7 +8,8 @@ Project/resource console tests must verify that the Web information architecture
 - Resource pages own new deployment and deployment history actions.
 - Resource pages must not expose redeploy until a future redeploy command is reintroduced under ADR-016.
 - Project-level deployment views are read-model rollups.
-- Sidebar resource status is read-model/projection state, not write-side Resource aggregate state.
+- Sidebar/resource status is current resource health when available; latest deployment status is
+  contextual history or migration fallback, not write-side Resource aggregate state.
 
 ## Global References
 
@@ -18,11 +19,16 @@ This test matrix inherits:
 - [ADR-016: Deployment Command Surface Reset](../decisions/ADR-016-deployment-command-surface-reset.md)
 - [ADR-015: Resource Network Profile](../decisions/ADR-015-resource-network-profile.md)
 - [ADR-018: Resource Runtime Log Observation](../decisions/ADR-018-resource-runtime-log-observation.md)
+- [ADR-020: Resource Health Observation](../decisions/ADR-020-resource-health-observation.md)
 - [Project Resource Console Workflow Spec](../workflows/project-resource-console.md)
 - [Project Resource Console Implementation Plan](../implementation/project-resource-console-plan.md)
 - [resources.create Command Spec](../commands/resources.create.md)
 - [deployments.create Command Spec](../commands/deployments.create.md)
+- [resources.diagnostic-summary Query Spec](../queries/resources.diagnostic-summary.md)
+- [resources.health Query Spec](../queries/resources.health.md)
 - [resources.runtime-logs Query Spec](../queries/resources.runtime-logs.md)
+- [Resource Diagnostic Summary Test Matrix](./resource-diagnostic-summary-test-matrix.md)
+- [Resource Health Test Matrix](./resource-health-test-matrix.md)
 - [Resource Runtime Logs Test Matrix](./resource-runtime-logs-test-matrix.md)
 - [Quick Deploy Workflow Spec](../workflows/quick-deploy.md)
 - [Resource Create And First Deploy Workflow Spec](../workflows/resources.create-and-first-deploy.md)
@@ -33,9 +39,9 @@ This test matrix inherits:
 | Layer | Focus |
 | --- | --- |
 | Web project page | Resource list is primary; create-resource is primary; project deployment rollup is secondary. |
-| Web resource page | Resource detail owns deployment actions and deployment history. |
+| Web resource page | Resource detail defaults to configuration/overview, owns deployment actions, deployment history, current health, and access URL display. |
 | Web create-resource page | Source/runtime/network drafts use resource language and do not bypass resource commands. |
-| Sidebar/navigation | Project nodes expand to resource nodes with latest deployment status projection. |
+| Sidebar/navigation | Project nodes expand to resource nodes with compact resource health projection, using unknown health until the projection exists. |
 | Query/read model | Resource summaries expose enough status for lists/navigation without mutating write state. |
 | API/oRPC | Entry actions still dispatch command/query contracts rather than UI-local business logic. |
 
@@ -47,6 +53,7 @@ Given:
 - Resources:
 - Deployments:
 - Latest deployment projection:
+- Resource health projection:
 - Entry surface:
 
 When:
@@ -73,12 +80,21 @@ Then:
 
 | Case | Input/read state | Expected primary UI result | Expected command/query behavior | Expected state/projection |
 | --- | --- | --- | --- | --- |
-| Resource detail | Resource exists | Resource profile, latest status, and deployment history are shown | Resource query/read model plus deployment history filtered by `resourceId` | Latest status derived from deployments |
+| Resource detail | Resource exists | Resource profile, current health or fallback status, and deployment history are shown | Resource query/read model plus deployment history filtered by `resourceId` | Current status derives from health projection when available |
+| Resource detail default tab | Resource exists | Configuration/overview is the first selected tab; deployment history and logs are later tabs | Resource read model drives basic configuration and access URL | Deployment history is not the default application page |
+| Configuration section tabs | Resource detail configuration tab is open | Left configuration navigation selects one subsection and replaces the right-side content panel | Section state is encoded in nested route/query state, not a hash anchor | The page does not scroll through one long configuration document |
+| Single-panel top tabs | Deployment or runtime logs tab is open | The tab renders its single panel directly without an inner sidebar | No extra navigation state is needed | Redundant one-item sidebars are not shown |
+| Compact header actions | Resource exists with access URL, project, deployments, and domain placement | Header shows compact health and primary new-deployment action only | No command/query dispatched for removed navigation actions | Header does not expose open project, view deployments, open access URL, bind-domain, or diagnostic-copy as primary buttons |
+| Resource health preferred | Resource has health projection and latest deployment status | Current health is shown as resource status; latest deployment is contextual | Query/read compact resource health or `resources.health` when implemented | Health status derives from resource observation, not deployment attempt |
+| Deployment success but inaccessible | Latest deployment succeeded, public access or runtime health fails | Resource status shows degraded/unhealthy/unknown rather than succeeded | Health projection/query reports failing source | Deployment success remains historical context |
+| Access URL from resource | Resource has ready domain binding or resource access summary | Access URL appears in the first/default resource tab | Resource read model/access summary is used | URL is not hidden only on deployment detail or a later access tab |
 | New deployment from resource | Resource exists and can deploy | New deployment action is resource-scoped | Dispatch `deployments.create` with `resourceId` | Deployment attempt belongs to resource |
 | Runtime logs from resource | Resource has observable runtime instance | Runtime logs are shown as resource-owned application logs | Query `resources.runtime-logs` with `resourceId`; optional follow stream | Runtime logs remain separate from `deployments.logs` |
+| Diagnostic summary from resource | Access, proxy, or runtime logs are missing/unavailable | Copyable diagnostic summary is offered from the resource surface | Query `resources.diagnostic-summary` with `resourceId` and optional `deploymentId` | Summary includes stable ids and source-specific errors |
 | Redeploy absent in v1 | Latest deployment terminal | No public redeploy action is exposed | No redeploy command is dispatched | Existing deployments remain readable |
 | Active deployment | Latest deployment non-terminal | New deployment is blocked or explains active state | No deployment command until guard can pass | Latest status remains read-model projection |
-| Domain binding from resource | Resource has placement context | Domain/TLS action preloads resource context | Dispatch `domain-bindings.create` with resource ownership fields | Domain binding belongs to resource |
+| Domain binding from resource | Resource has placement context | Configuration tab exposes an inline domain/TLS form with resource context | Dispatch `domain-bindings.create` with resource ownership fields | Domain binding belongs to resource and does not require a modal for the normal path |
+| Resource health detail density | Resource health includes runtime, health policy, proxy, access, checks, and source errors | Header shows one compact health control; expanded UI shows human-level runtime/policy details only | Raw checks/errors remain diagnostic data | Internal check names and error codes are not prominent main content |
 
 ## Create Resource Matrix
 
@@ -95,10 +111,12 @@ Then:
 
 | Case | Read model state | Expected navigation result | Expected status behavior |
 | --- | --- | --- | --- |
-| Project with resources | Project and resources exist | Sidebar shows project group with resource children | Resource child status comes from latest deployment projection |
+| Project with resources | Project and resources exist | Sidebar shows project group with resource children | Resource child status uses compact resource health |
 | No deployment yet | Resource has no deployments | Resource child shows neutral/no-deployment state | No inferred failed/succeeded state |
-| Latest deployment running | Latest deployment for resource non-terminal | Resource child shows running/pending state | Status is informational only |
-| Latest deployment failed | Latest deployment terminal failed | Resource child shows failed state and links to resource/deployment context | No write-side mutation from navigation |
+| Health projection available | Resource has compact health status | Resource child shows health status | Latest deployment status is secondary/contextual |
+| Health projection query pending | Resource exists while `resources.health` is loading | Resource child shows unknown health | Latest deployment status is not used as current health |
+| Latest deployment running | Latest deployment for resource non-terminal | Resource child uses `resources.health` and may show `starting` | Deployment status remains contextual only |
+| Latest deployment failed | Latest deployment terminal failed | Resource child uses `resources.health` and links to resource/deployment context | No write-side mutation from navigation |
 
 ## Current Implementation Notes And Migration Gaps
 
@@ -106,11 +124,19 @@ Project detail currently has some resource list and create-resource behavior, bu
 
 Resource detail and deployment pages already have some resource-aware behavior, but deployment history and primary actions should be reviewed against this matrix during the next Web Code Round.
 
-Sidebar Project -> Resource hierarchy with latest deployment status is not yet implemented.
+Sidebar Project -> Resource hierarchy uses compact `resources.health` queries. Unknown is now a
+loading/unobserved health state, not a deployment-status fallback.
 
 Current contracts expose listener port as `networkProfile.internalPort`, governed by [ADR-015](../decisions/ADR-015-resource-network-profile.md).
 
+Resource detail exposes a resource-level access URL and diagnostic summary affordance, but dedicated
+browser tests for these affordances do not exist yet.
+
+`resources.health` exists. Current status UI uses unknown only for loading/unobserved health,
+instead of latest deployment status.
+
 ## Open Questions
 
-- Which read model should own latest deployment status for resource navigation?
+- Which read model should own compact resource health and latest deployment context for resource
+  navigation?
 - Should dedicated create-resource flow immediately offer a "create and deploy" continuation before dedicated resource source/runtime/network update commands exist?

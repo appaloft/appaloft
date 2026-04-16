@@ -90,9 +90,10 @@ Once a stream is open:
 Web must:
 
 - render lines incrementally without waiting for stream completion;
+- avoid duplicating already rendered bounded-tail lines when follow mode starts;
 - avoid treating log text as deployment readiness;
 - display structured stream errors by code/phase;
-- stop the stream on navigation away or user pause.
+- stop the stream on navigation away or user pause without rendering normal cancellation as an error.
 
 CLI must:
 
@@ -108,10 +109,14 @@ HTTP/oRPC must:
 
 ## Current Implementation Notes And Migration Gaps
 
-No resource runtime log workflow is currently exposed in Web, CLI, or HTTP/oRPC.
+Resource runtime log observation is exposed through the resource detail Web panel, CLI
+`resource logs`, bounded oRPC reads, and streaming oRPC reads.
 
-Deployment pages currently display deployment-attempt logs, which are not the same as live resource
-runtime logs.
+The runtime reader supports host-process file logs, local Docker/Compose logs, and generic-SSH
+Docker/Compose logs from deployment runtime metadata, with short-lived SSH connection reuse for
+successive bounded/follow reads. The Web panel lazy-loads runtime logs when the logs tab is opened,
+then starts follow mode without re-appending the already visible bounded tail. Deployment pages still
+display deployment-attempt logs, which are not the same as live resource runtime logs.
 
 ## Open Questions
 

@@ -66,7 +66,8 @@ Then:
 
 | Case | Input/state | Expected result | Expected error | Expected route snapshot | Expected runtime behavior | Retriable |
 | --- | --- | --- | --- | --- | --- | --- |
-| Generated route enabled | Resource has `internalPort`, target has public address, proxy ready, policy enabled | `deployments.create` accepted | None | Generated hostname with opaque provider key | Proxy route config targets `internalPort` | Per deployment |
+| Generated route enabled | Resource has `internalPort`, target has public address, proxy ready, policy enabled | `deployments.create` accepted | None | Generated hostname with opaque provider key | Proxy route config targets `internalPort` | Resource-scoped unless provider requires deployment scope |
+| Same internal port across resources | Two reverse-proxy resources on the same target both use `internalPort = 3000` | Both deployment attempts can succeed when routes are distinct | None | Each resource has its own generated or durable route snapshot | Runtime/proxy config isolates routes by resource/deployment identity and does not stop the first resource | Per route realization |
 | Policy disabled | Resource has `internalPort`, proxy ready, policy disabled | Deployment accepted without generated public URL | None | No generated route | No proxy route unless durable binding exists | No |
 | Durable binding exists | Ready domain binding exists for same resource/path | Deployment accepted | None | Durable binding route takes precedence | Proxy config uses durable hostname | Per route realization |
 | Provider unavailable before acceptance | Provider returns retriable error before deployment can safely be accepted | Command may reject when route is required by policy | Provider error with phase `default-access-domain-generation` | No generated route | No deployment when route is required | Yes |
@@ -84,6 +85,7 @@ Then:
 | --- | --- | --- | --- | --- | --- | --- |
 | Persisted resource before first deploy | Resource has `destinationId`, `internalPort`, reverse-proxy exposure, target public address, proxy intent, policy enabled | Resource query succeeds | None | `plannedGeneratedAccessRoute` is present; `latestGeneratedAccessRoute` is absent | Resource detail and Quick Deploy review/completion can display planned URL as not-ready | Query retry only |
 | Persisted resource after deploy | Latest deployment snapshot contains generated route | Resource query succeeds | None | `latestGeneratedAccessRoute` is preferred over planned route | Resource detail and Quick Deploy completion link to realized URL | Query retry only |
+| Repeated deployment same resource | Same resource, target, destination, and path policy deploys again | `deployments.create` accepted | None | Same generated hostname is preferred for the resource | New deployment snapshot records the route it used | Resource-scoped unless provider requires deployment scope |
 | New resource draft not persisted | Entry workflow has source/network draft but no resource id | No resource access summary exists yet | None | No `ResourceAccessSummary` projection | Entry may show draft values but must not claim a realized route | No |
 | Provider disabled before first deploy | Resource is persisted but provider returns disabled | Resource query succeeds | None | No planned generated route | UI shows no generated access URL and may point to domain binding workflow | No |
 
@@ -95,6 +97,7 @@ Then:
 | Provider-specific suffix | Suffix appears only in provider adapter/config/log output, not in core/application enum names, command schemas, or error codes. |
 | Generated hostname includes uniqueness | Provider output is unique enough for the resource/deployment purpose and stable for the persisted snapshot. |
 | Duplicate deployment replay | Replaying the same accepted attempt uses the persisted route snapshot and does not generate a different hostname. |
+| Stable resource hostname | Repeated deployments of the same resource keep the same generated hostname unless resource, target, destination, path policy, or provider scope policy changes. |
 | Provider failure mapping | Provider errors map to structured `DomainError` with code, category, phase, retriable, and correlation ids. |
 | Provider package boundary | Concrete generated-domain providers live under `packages/providers/default-access-domain-*` and are registered through DI. |
 
@@ -116,6 +119,10 @@ Then:
 | Reverse-proxy route | Workload joins the proxy routing fabric or equivalent runtime network. |
 | Upstream target | Proxy config targets resolved `internalPort`, not a deployment command `port`. |
 | Public host port | Application container does not require stable public `0.0.0.0:<internalPort>` publication when reverse proxy is used. |
+| Private health port | Runtime may use a loopback-only or runtime-local ephemeral host port for health checks, and tests must treat it as diagnostic metadata rather than a public route. |
+| Same internal port isolation | Deploying another resource with the same `internalPort` does not remove, replace, or hijack the first resource's runtime instance or proxy route. |
+| Same resource replacement | A new terminal deployment attempt for the same resource may replace the previous runtime instance for that resource without affecting other resources on the same `internalPort`. |
+| Direct-port collision | A direct-port host-port conflict fails or rejects the conflicting deployment and preserves the resource that already owns the host port. |
 | Proxy install idempotency | Runtime adapter can ensure proxy/network more than once without duplicating containers/routes. |
 | Route config idempotency | Re-running route realization for the same deployment does not create duplicate proxy route definitions. |
 | Public route verification | Verification uses generated/durable public URL only after route config is realized. |
@@ -139,11 +146,13 @@ Provider-neutral default access domain generation is covered by the concrete pro
 
 Application route resolver enrichment is covered by a focused test that asserts provider-neutral metadata and no deployment command input widening.
 
-Runtime adapter planning now has focused coverage for reverse-proxy deployments not creating direct public host-port routes, and direct-port exposure still creating direct routes.
+Runtime adapter helper coverage now covers reverse-proxy deployments not creating direct public
+host-port routes, reverse-proxy resources sharing the same `internalPort`, resource-scoped runtime
+cleanup command construction, and direct-port exposure still creating direct routes.
 
 `ResourceAccessSummary` projection has focused coverage for selecting the latest generated route from deployment snapshots, and `resources.list` has focused coverage for exposing a planned generated route before the first deployment.
 
-Remaining gaps: policy-disabled behavior, provider injection through shell composition, durable-domain precedence over generated routes, persistence-backed planned-route projection, and an end-to-end Web/CLI assertion.
+Remaining gaps: policy-disabled behavior, provider injection through shell composition, durable-domain precedence over generated routes, persistence-backed planned-route projection, a real Docker/SSH same-`internalPort` e2e assertion, and an end-to-end Web/CLI assertion.
 
 Web typecheck covers the resource detail and Quick Deploy generated URL surfaces, but there is not yet a browser/e2e assertion for those screens.
 

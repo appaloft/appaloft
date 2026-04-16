@@ -18,7 +18,9 @@ This test matrix inherits:
 - [ADR-017: Default Access Domain And Proxy Routing](../decisions/ADR-017-default-access-domain-and-proxy-routing.md)
 - [deployments.create Command Spec](../commands/deployments.create.md)
 - [resources.create Command Spec](../commands/resources.create.md)
+- [resources.diagnostic-summary Query Spec](../queries/resources.diagnostic-summary.md)
 - [Quick Deploy Workflow Spec](../workflows/quick-deploy.md)
+- [Resource Diagnostic Summary Test Matrix](./resource-diagnostic-summary-test-matrix.md)
 - [resources.create Test Matrix](./resources.create-test-matrix.md)
 - [deployments.create Test Matrix](./deployments.create-test-matrix.md)
 - [Spec-Driven Testing](./SPEC_DRIVEN_TESTING.md)
@@ -72,7 +74,8 @@ Then:
 | User-supplied duplicate resource name | Web or CLI | User explicitly enters a name whose slug already exists in the project/environment | Workflow fails at `resources.create` | `resource_slug_conflict`, phase `resource-admission` | `resources.create` returns `err`; no deployment command | Existing resource remains; no accepted deployment | No for same invalid name |
 | First variable supplied | Web or CLI | Environment variable key/value | Deployment request accepted | None | `environments.set-variable` before `deployments.create` | Variable is included in deployment snapshot after acceptance | Retry from persisted environment state |
 | Domain/TLS requested | Web or CLI | Domain/proxy/path/TLS draft | Domain binding command accepted after context exists | None | Context commands -> `resources.create` if needed -> `domain-bindings.create` | Domain binding state progresses independently from deployment attempt | Domain/certificate retry rules |
-| Source/runtime/network draft supplied | Web or CLI | Source locator/source descriptor plus runtime plan strategy hint and internal listener port | Deployment request accepted when compatible | None | Context commands -> `resources.create(source, runtimeProfile, networkProfile)` -> `deployments.create(resourceId)` | Resource owns source/runtime/network profile; deployment carries resolved runtime and network snapshots | Deployment retry creates new attempt |
+| Source/runtime/network draft supplied | Web or CLI | Source locator/source descriptor plus runtime plan strategy hint, optional health check policy, and internal listener port | Deployment request accepted when compatible | None | Context commands -> `resources.create(source, runtimeProfile.healthCheck, networkProfile)` -> `deployments.create(resourceId)` | Resource owns source/runtime/network profile; deployment carries resolved runtime, health check, and network snapshots | Deployment retry creates new attempt |
+| New HTTP health check policy | Web QuickDeploy or create-resource | Enable HTTP health check with path, expected status, interval, timeout, retries, and start period | Deployment request accepted when compatible | None | `resources.create(runtimeProfile.healthCheck)` -> `deployments.create(resourceId)` | Resource runtime profile owns reusable health policy; runtime plan mirrors policy for deployment verification | Per deployment |
 | GitHub tree URL source | Web or CLI | `https://github.com/coollabsio/coolify-examples/tree/v4.x/bun` | Deployment request accepted when repository/ref/path are valid | None | Source variant normalization -> context commands -> `resources.create(source.locator = repository, source.metadata.gitRef = v4.x, source.metadata.baseDirectory = /bun)` -> `deployments.create(resourceId)` | Resource owns repository source plus base directory; runtime clones repository and uses the base directory during detection/planning | Per deployment |
 | Slash-containing Git ref | Web or CLI with provider lookup | Deep Git URL whose branch or tag contains slashes | Deployment request accepted only when provider lookup proves the longest valid ref prefix | None or `validation_error`, phase `resource-source-resolution` | Provider branch/tag lookup before `resources.create` | No guessed ref/path split is persisted | No for ambiguous draft |
 | Local folder base directory | Web or CLI | Local folder plus source-root subdirectory | Deployment request accepted when path is valid | None | `resources.create(source.kind = local-folder, baseDirectory)` -> `deployments.create(resourceId)` | Resource owns local source root and base directory separately from runtime strategy | Per deployment |
@@ -84,6 +87,8 @@ Then:
 | Generated default access route available | Web or CLI | New inbound resource, selected proxy-ready server, default access policy enabled | Workflow shows generated access URL after `ResourceAccessSummary` is available | None | Context commands -> `resources.create` -> `deployments.create` -> route observation | Deployment has provider-neutral generated route metadata; resource access projection shows current URL; no domain binding is created | Per route/deployment |
 | Generated access skipped without proxy intent | Web or CLI | Policy enabled but selected server has no edge proxy intent or proxy disabled | Workflow continues without generated access URL | None | Context commands -> `resources.create` -> `deployments.create` | Deployment has no generated route metadata and does not publish a host-port fallback | Per deployment |
 | Generated access route unavailable | Web or CLI | Policy enabled but provider/proxy cannot resolve route | Workflow surfaces structured route/proxy error from deployment/read-model state | Provider/proxy error with phase from ADR-017 workflow | Context commands may persist; deployment may reject or fail according to detection phase | No direct host-port fallback | Depends |
+| Copy diagnostic after accepted deployment | Web or CLI | Workflow has `resourceId` and `deploymentId` | Copyable diagnostic summary is available | None unless the query itself fails | Context commands -> `deployments.create` -> `resources.diagnostic-summary` | Summary includes stable ids plus access/proxy/log section statuses | No |
+| Copy diagnostic when access/logs unavailable | Web desktop or CLI | Deployment accepted/succeeded but access or runtime logs are missing | Diagnostic summary still returns `ok` with source errors | Source errors for access/log/proxy sections | `resources.diagnostic-summary` after deployment result/read-model refresh | User can report bug without screenshot-only context | No |
 | Incompatible source/runtime draft | Web or CLI | Source descriptor cannot be planned by selected runtime plan strategy | Workflow fails at final deployment admission | `validation_error` or `provider_error`, phase `runtime-plan-resolution` | Context commands may already be persisted; no accepted deployment | Context remains; no deployment accepted | Per deployment error |
 | Missing source in CLI TTY | CLI interactive | No source arg | Prompt completes then deployment accepted | None if prompt supplies source | Prompt source -> context operations -> `deployments.create` | Same as accepted deployment path | Depends on failed step |
 | Missing source outside CLI TTY | CLI non-interactive | No source arg | Workflow rejected before dispatch | `validation_error`, phase `input-collection` or transport equivalent | None | No mutation | No |
@@ -132,17 +137,33 @@ Current CLI interactive deploy orchestration lives in `deployment-interaction.ts
 
 Current Web QuickDeploy and CLI interactive deploy call `resources.create` before `deployments.create(resourceId)` when creating a new first-deploy resource.
 
-Current Web and CLI Quick Deploy flows call `resources.create` with source/runtime profile and `networkProfile.internalPort` before ids-only `deployments.create` when they create a new resource.
+Current Web QuickDeploy and create-resource flows call `resources.create` with source/runtime profile, `runtimeProfile.healthCheck`, and `networkProfile.internalPort` before ids-only `deployments.create` when they create a new resource. Current CLI Quick Deploy exposes the path-only health-check subset.
 
 Generated default access URL display and route status assertions are governed by [Default Access Domain And Proxy Routing Test Matrix](./default-access-domain-and-proxy-routing-test-matrix.md) and should use `ResourceAccessSummary` as the first formal read-model assertion target.
+
+Diagnostic summary assertions are governed by
+[Resource Diagnostic Summary Test Matrix](./resource-diagnostic-summary-test-matrix.md). Quick
+Deploy completion should call `resources.diagnostic-summary` once resource/deployment ids are known
+and copy stable ids/source errors when access, proxy, deployment logs, or runtime logs are
+unavailable.
 
 Current contracts store the listener port as `networkProfile.internalPort`. `runtimeProfile.port` must be rejected by schemas that no longer include it.
 
 Current CLI still exposes `--method` as a user-facing compatibility option. Tests should assert that it maps to resource `RuntimePlanStrategy`, not deployment command input.
 
+CLI non-TTY Quick Deploy must not prompt for omitted optional advanced fields once source and
+context flags are supplied. It should use provided flags plus defaults, then dispatch
+`resources.create` and `deployments.create`.
+
 Current Web and CLI do not yet expose all source variant fields as typed drafts. Initial tests may
 cover the parser/normalizer as a unit before full UI coverage, but the workflow contract requires
 Web and CLI parity before deep Git URL support is considered complete.
+
+`apps/shell/test/e2e/quick-deploy-ssh.test.ts` is the workflow-named executable e2e harness for
+the real SSH/Docker path. It is opt-in through environment variables because it mutates a real SSH
+target, while still using embedded PGlite for Yundu state. Its successful path must exercise the
+Traefik-backed generated public route so proxy image compatibility and Docker label discovery are
+covered by a real deployment.
 
 ## Open Questions
 

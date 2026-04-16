@@ -60,6 +60,8 @@ Then:
 | Provider resolves | Provider key registered | Provider returned | None | Application receives provider through registry/DI. |
 | Provider missing | Provider key not registered | `err` | `proxy_provider_unavailable`, phase `proxy-provider-resolution` | No concrete fallback switch is used. |
 | Provider renders ensure plan | Connected server requires proxy | Ensure plan returned | None | Plan includes only executable provider output, not aggregate mutations. |
+| Provider ensure plan detects incompatible installed proxy | Target already has a provider-owned proxy container with an older or unsupported image | Ensure plan recreates the provider-owned proxy | None | Plan readiness guard includes the expected provider image so stale proxy containers are replaced. |
+| Provider renders diagnostic plan | Existing target requests connectivity diagnostics for a provider-backed proxy | Diagnostic command plan returned | None | Plan includes provider-owned compatibility checks and any bounded route probe scripts; runtime executor, not command handler, runs them. |
 | Provider renders route plan | Resource route targets `internalPort` | Route realization plan returned | None | Target port comes from resource network snapshot. |
 | Provider renders config view | Planned or realized route exists | Read-only sections returned | None | Section content may be provider-specific; wrapper stays provider-neutral. |
 | Provider render fails | Provider cannot render safe config | `err` | `proxy_configuration_render_failed` | Error contains code, phase, retriable, provider key. |
@@ -109,7 +111,9 @@ Existing runtime tests assert concrete proxy bootstrap plans and route labels. T
 
 Provider package tests own concrete proxy label syntax. Runtime adapter tests should assert execution of provider-produced plans, not product-specific label generation.
 
-Application and provider tests cover the query service and provider-rendered sections. Broader API/Web/CLI regression coverage remains a follow-up.
+Application and provider tests cover the query service, provider-rendered sections, and the guard
+that generated default-access domain provider keys such as `sslip` do not override edge proxy
+provider selection. Broader API/Web/CLI regression coverage remains a follow-up.
 
 ## Open Questions
 

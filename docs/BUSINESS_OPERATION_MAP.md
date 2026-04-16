@@ -68,7 +68,9 @@ create/select project
   -> create/select resource with source/runtime/network profile
   -> deployments.create
   -> observe deployment progress, status, logs, and generated access route when policy allows it
+  -> observe current resource health and access/proxy state
   -> observe resource runtime logs when an application instance is running
+  -> copy resource diagnostic summary when access, logs, or proxy state need support/debug context
   -> optionally domain-bindings.create
   -> optionally certificates.issue-or-renew
   -> observe domain readiness
@@ -142,8 +144,9 @@ flowchart TD
 | Create reusable SSH credential | Command | `credentials.create-ssh` | Credential | Stores reusable target access material. | [Core Operations](./CORE_OPERATIONS.md) |
 | List reusable SSH credentials | Query | `credentials.list-ssh` | Credential read model | Lets workflows select existing access material. | [Core Operations](./CORE_OPERATIONS.md) |
 | List deployment targets | Query | `servers.list` | DeploymentTarget read model | Lets workflows select target/server context. | [Core Operations](./CORE_OPERATIONS.md) |
-| Test target connectivity | Command | `servers.test-connectivity` | DeploymentTarget/application service | Validates connectivity for an existing target. | [Server Bootstrap Workflow](./workflows/server-bootstrap-and-proxy.md) |
+| Test target connectivity | Command | `servers.test-connectivity` | DeploymentTarget/application service | Validates connectivity and provider-rendered proxy diagnostics for an existing target without mutating lifecycle state. | [Server Bootstrap Workflow](./workflows/server-bootstrap-and-proxy.md) |
 | Test draft target connectivity | Command | `servers.test-draft-connectivity` | Application service | Validates credentials before target persistence. | [Server Bootstrap Workflow](./workflows/server-bootstrap-and-proxy.md) |
+| Repair target edge proxy | Command | `servers.bootstrap-proxy` | DeploymentTarget proxy lifecycle | Starts a new provider-backed proxy bootstrap attempt for an existing connected/operable target. | [Server Bootstrap Workflow](./workflows/server-bootstrap-and-proxy.md), [server proxy repair plan](./implementation/server-proxy-bootstrap-repair-plan.md) |
 
 ### Resource And Workload Delivery
 
@@ -153,12 +156,14 @@ flowchart TD
 | List resources | Query | `resources.list` | Resource read model | Lets workflows select deployable units and lets project pages show resources. | [Project Resource Console](./workflows/project-resource-console.md), [ADR-013](./decisions/ADR-013-project-resource-navigation-and-deployment-ownership.md) |
 | Read resource runtime logs | Active query | `resources.runtime-logs` | Resource runtime observation | Tails or streams application stdout/stderr for a resource-owned runtime instance through an injected runtime log reader port. | [resources.runtime-logs](./queries/resources.runtime-logs.md), [Resource Runtime Log Observation](./workflows/resource-runtime-log-observation.md), [ADR-018](./decisions/ADR-018-resource-runtime-log-observation.md) |
 | Preview resource proxy configuration | Active query | `resources.proxy-configuration.preview` | Resource access/runtime topology read model | Shows read-only provider-rendered proxy configuration for planned, latest, or deployment-snapshot resource routes. | [resources.proxy-configuration.preview](./queries/resources.proxy-configuration.preview.md), [ADR-019](./decisions/ADR-019-edge-proxy-provider-and-observable-configuration.md), [Edge Proxy Provider And Route Realization](./workflows/edge-proxy-provider-and-route-realization.md) |
+| Read resource diagnostic summary | Active query | `resources.diagnostic-summary` | Resource observation/read model | Produces a copyable support/debug payload with stable ids, deployment/access/proxy/log statuses, source errors, and safe local/system context when access or logs are missing. | [resources.diagnostic-summary](./queries/resources.diagnostic-summary.md), [Resource Diagnostic Summary](./workflows/resource-diagnostic-summary.md), [Resource Diagnostic Summary Test Matrix](./testing/resource-diagnostic-summary-test-matrix.md), [Resource Diagnostic Summary Implementation Plan](./implementation/resource-diagnostic-summary-plan.md) |
+| Read resource health | Active query | `resources.health` | Resource health observation | Produces the current resource health summary from latest deployment/runtime context, configured health policy, proxy route, and public access observations. | [ADR-020](./decisions/ADR-020-resource-health-observation.md), [resources.health](./queries/resources.health.md), [Resource Health Observation](./workflows/resource-health-observation.md), [Resource Health Test Matrix](./testing/resource-health-test-matrix.md), [Resource Health Implementation Plan](./implementation/resource-health-plan.md) |
 
 ### Deployment
 
 | Behavior | Type | Operation | Owner | Main relationship | Governing docs |
 | --- | --- | --- | --- | --- | --- |
-| Create deployment | Command | `deployments.create` | Deployment attempt | Accepts an attempt for an existing project/environment/resource/server/destination context. | [deployments.create](./commands/deployments.create.md), [ADR-001](./decisions/ADR-001-deploy-api-required-fields.md), [ADR-014](./decisions/ADR-014-deployment-admission-uses-resource-profile.md), [ADR-016](./decisions/ADR-016-deployment-command-surface-reset.md), [ADR-017](./decisions/ADR-017-default-access-domain-and-proxy-routing.md) |
+| Create deployment | Command | `deployments.create` | Deployment attempt | Accepts an attempt for an existing project/environment/resource/server/destination context. | [deployments.create](./commands/deployments.create.md), [ADR-001](./decisions/ADR-001-deploy-api-required-fields.md), [ADR-014](./decisions/ADR-014-deployment-admission-uses-resource-profile.md), [ADR-015](./decisions/ADR-015-resource-network-profile.md), [ADR-016](./decisions/ADR-016-deployment-command-surface-reset.md), [ADR-017](./decisions/ADR-017-default-access-domain-and-proxy-routing.md) |
 | List deployments | Query | `deployments.list` | Deployment read model | Observes deployment attempts across project/resource filters. | [Core Operations](./CORE_OPERATIONS.md) |
 | Read deployment logs | Query | `deployments.logs` | Deployment read model/log projection | Observes logs for one deployment attempt. | [Core Operations](./CORE_OPERATIONS.md) |
 | Deployment progress stream | Transport observation | tied to `deployments.create` | Deployment progress projection | Shows progress for accepted deployment creation. Not a separate business command. | [Quick Deploy Workflow](./workflows/quick-deploy.md), [ADR-016](./decisions/ADR-016-deployment-command-surface-reset.md) |
@@ -200,6 +205,8 @@ Workflows coordinate commands and queries. They do not own aggregate invariants.
 | Routing/domain/TLS | Async/process workflow | `domain-bindings.create -> domain-binding-requested -> domain-bound -> certificate-requested -> certificate-issued/certificate-issuance-failed -> domain-ready` | domain readiness state | [Routing Domain And TLS](./workflows/routing-domain-and-tls.md), ADR-002 through ADR-009 |
 | Project/resource console | UI workflow | Project list/detail surfaces query projects/resources/deployments and route owner-scoped actions to resources. | varies by selected action | [Project Resource Console](./workflows/project-resource-console.md), [ADR-013](./decisions/ADR-013-project-resource-navigation-and-deployment-ownership.md) |
 | Resource runtime log observation | UI/read workflow | Resource detail resolves a resource runtime log query and renders bounded or streaming line events. | `resources.runtime-logs` | [Resource Runtime Log Observation](./workflows/resource-runtime-log-observation.md), [ADR-018](./decisions/ADR-018-resource-runtime-log-observation.md) |
+| Resource diagnostic summary | UI/read workflow | Resource detail, deployment detail, or Quick Deploy completion resolves a copyable support/debug summary for one resource and optional deployment. | `resources.diagnostic-summary` | [Resource Diagnostic Summary](./workflows/resource-diagnostic-summary.md), [Resource Diagnostic Summary Test Matrix](./testing/resource-diagnostic-summary-test-matrix.md) |
+| Resource health observation | UI/read workflow | Resource detail, project resource lists, sidebar, CLI, and API resolve current resource health from runtime, health policy, proxy, and public-access observations. | `resources.health` | [Resource Health Observation](./workflows/resource-health-observation.md), [ADR-020](./decisions/ADR-020-resource-health-observation.md), [Resource Health Test Matrix](./testing/resource-health-test-matrix.md) |
 
 ## Event And Async Progression Map
 
@@ -233,7 +240,7 @@ ADR-016 removes these from the public v1 deployment write surface:
 | Behavior | Former or expected operation | Required path before implementation |
 | --- | --- | --- |
 | Cancel deployment | `deployments.cancel` | Add/update ADR if lifecycle semantics change, update this map, then command/event/workflow/error/testing specs, implementation plan, and Code Round. |
-| Manual deployment health check | `deployments.check-health` or future health operation | Decide whether this belongs to deployment, resource health policy, or read-model verification before specs. |
+| Manual deployment health check | `deployments.check-health` | Superseded as a public target by resource-owned `resources.health`; do not implement deployment-scoped health until a later ADR defines an attempt-specific use case distinct from current resource health. |
 | Redeploy resource | `deployments.redeploy-resource` or future equivalent | Define resource profile snapshot reuse, active-deployment guard, retry/new-attempt semantics, and Web/API/CLI affordance. |
 | Reattach deployment | `deployments.reattach` or future reconnect/read operation | Decide whether this is a query, progress stream reconnect, or command before implementation. |
 | Rollback deployment | `deployments.rollback` or future release rollback command | Define release/artifact retention, rollback attempt creation, state transitions, events, errors, and operator UX before implementation. |

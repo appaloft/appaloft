@@ -110,6 +110,25 @@ They may mirror phases such as detect, plan, package, deploy, verify, or rollbac
 | Domain/TLS intent | Entry workflow must use `domain-bindings.create` and certificate commands. It must not pass domain/TLS fields to `deployments.create`. |
 | Quick Deploy context | Collected by the Quick Deploy workflow through explicit operations; it is not a separate deployment command. |
 
+## Runtime Port Behavior
+
+For reverse-proxy resources, `networkProfile.internalPort` is the upstream workload listener inside
+the runtime boundary. It is legal for two resources on the same deployment target to listen on the
+same `internalPort` because the runtime/proxy fabric must distinguish them by resource/deployment
+identity and routing metadata.
+
+Runtime adapters must not implement reverse-proxy rollout by globally removing workloads that
+publish the same application port. A new deployment attempt may replace an older runtime instance
+only for the same resource after the redeploy guard allows a new terminal attempt.
+
+If an adapter needs a host-side port for health checks, it may allocate a private loopback or
+runtime-local ephemeral port and discover that mapping after start. That port is not a public access
+route and must not be shown as the resource's generated URL.
+
+For direct-port resources, the effective host port is a placement constraint. A direct-port
+collision with another resource on the same target/destination is a conflict or runtime failure, not
+authorization to stop the other resource.
+
 ## State And Event Points
 
 | Stage | Deployment event/state |
@@ -133,6 +152,8 @@ Migration gaps:
 - Web QuickDeploy currently has local hardcoded validation and related-entity orchestration;
 - stream API currently emits `DeploymentProgressEvent`, which is a technical progress event, not a formal domain/application event.
 - deployment admission reads `networkProfile.internalPort` as the canonical resource-owned listener port and does not read `runtimeProfile.port`.
+- runtime execution paths must preserve the distinction between `internalPort`, optional private
+  health-check mappings, and public direct `hostPort`.
 - current deployment/runtime paths use typed source `baseDirectory` for Git/local source workdirs and
   reject legacy raw GitHub tree URLs before clone; typed runtime-profile Dockerfile/Compose/static
   path fields are still pending.

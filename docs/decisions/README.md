@@ -44,6 +44,7 @@ rebuild-required there, update the operation map and required ADR before local s
 | [ADR-017: Default Access Domain And Proxy Routing](./ADR-017-default-access-domain-and-proxy-routing.md) | Accepted | Provider-neutral generated access domains, proxy routing, and per-deployment route realization. |
 | [ADR-018: Resource Runtime Log Observation](./ADR-018-resource-runtime-log-observation.md) | Accepted | Application runtime logs are resource-owned observation through an injected runtime log reader port, not a Docker-specific deployment-log concern. |
 | [ADR-019: Edge Proxy Provider And Observable Configuration](./ADR-019-edge-proxy-provider-and-observable-configuration.md) | Accepted | Provider-neutral edge proxy provider boundary and read-only proxy configuration visibility. |
+| [ADR-020: Resource Health Observation](./ADR-020-resource-health-observation.md) | Accepted | Current resource health is a resource-owned observation from runtime, health policy, proxy, and access signals, not latest deployment status. |
 
 ## Authoring Rules
 

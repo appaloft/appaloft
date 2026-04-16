@@ -105,9 +105,11 @@ Tests must assert:
 
 ## Current Implementation Notes And Migration Gaps
 
-No resource runtime log query or adapter error mapping exists yet.
+`resources.runtime-logs` maps synchronous context/runtime resolution failures to `DomainError`
+results and maps backend process stream failures to `resource_runtime_log_stream_failed`.
 
-Existing deployment log errors do not cover runtime log open/stream phases.
+Existing deployment log errors remain deployment-attempt specific and do not replace runtime log
+open/stream phase errors.
 
 ## Open Questions
 
