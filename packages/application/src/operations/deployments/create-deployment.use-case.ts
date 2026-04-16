@@ -19,6 +19,8 @@ import {
   type AppLogger,
   type DeploymentProgressReporter,
   type DeploymentRepository,
+  type DomainRouteBindingCandidate,
+  type DomainRouteBindingReader,
   type EventBus,
   type ExecutionBackend,
   type RequestedDeploymentConfig,
@@ -169,6 +171,50 @@ function requestedDeploymentFromResource(resource: Resource): Result<RequestedDe
   });
 }
 
+function requestedDeploymentWithDurableDomainBindings(
+  requestedDeployment: RequestedDeploymentConfig,
+  bindings: DomainRouteBindingCandidate[],
+): RequestedDeploymentConfig {
+  if (
+    requestedDeployment.accessContext?.exposureMode !== "reverse-proxy" ||
+    (requestedDeployment.domains?.length ?? 0) > 0
+  ) {
+    return requestedDeployment;
+  }
+
+  const primaryBinding = bindings
+    .filter((binding) => binding.proxyKind !== "none")
+    .sort((left, right) => right.createdAt.localeCompare(left.createdAt))[0];
+
+  if (!primaryBinding) {
+    return requestedDeployment;
+  }
+
+  const domains = bindings
+    .filter(
+      (binding) =>
+        binding.proxyKind === primaryBinding.proxyKind &&
+        binding.pathPrefix === primaryBinding.pathPrefix &&
+        binding.tlsMode === primaryBinding.tlsMode,
+    )
+    .map((binding) => binding.domainName);
+
+  return {
+    ...requestedDeployment,
+    proxyKind: primaryBinding.proxyKind,
+    domains,
+    pathPrefix: primaryBinding.pathPrefix,
+    tlsMode: primaryBinding.tlsMode,
+    accessRouteMetadata: {
+      ...(requestedDeployment.accessRouteMetadata ?? {}),
+      "access.routeSource": "durable-domain-binding",
+      "access.domainBindingId": primaryBinding.id,
+      "access.hostname": primaryBinding.domainName,
+      "access.scheme": primaryBinding.tlsMode === "auto" ? "https" : "http",
+    },
+  };
+}
+
 @injectable()
 export class CreateDeploymentUseCase {
   constructor(
@@ -198,6 +244,8 @@ export class CreateDeploymentUseCase {
     private readonly deploymentFactory: DeploymentFactory,
     @inject(tokens.deploymentLifecycleService)
     private readonly deploymentLifecycleService: DeploymentLifecycleService,
+    @inject(tokens.domainRouteBindingReader)
+    private readonly domainRouteBindingReader?: DomainRouteBindingReader,
   ) {}
 
   async execute(
@@ -210,6 +258,7 @@ export class CreateDeploymentUseCase {
       deploymentContextResolver,
       deploymentLifecycleService,
       deploymentRepository,
+      domainRouteBindingReader,
       deploymentSnapshotFactory,
       eventBus,
       executionBackend,
@@ -283,12 +332,26 @@ export class CreateDeploymentUseCase {
       });
       const snapshotResult = deploymentSnapshotFactory.create(environment);
       const snapshot = yield* snapshotResult;
+      const requestedDeploymentBase = yield* requestedDeploymentFromResource(resource);
+      const routeBindings = domainRouteBindingReader
+        ? await domainRouteBindingReader.listDeployableBindings(repositoryContext, {
+            projectId: project.toState().id.value,
+            environmentId: environment.toState().id.value,
+            resourceId: resource.toState().id.value,
+            serverId: server.toState().id.value,
+            destinationId: destination.toState().id.value,
+          })
+        : [];
+      const requestedDeployment = requestedDeploymentWithDurableDomainBindings(
+        requestedDeploymentBase,
+        routeBindings,
+      );
       const runtimePlanInputResult = runtimePlanResolutionInputBuilder.build({
         source: detected.source,
         server,
         environmentSnapshot: snapshot,
         detectedReasoning: detected.reasoning,
-        requestedDeployment: yield* requestedDeploymentFromResource(resource),
+        requestedDeployment,
       });
       const runtimePlanInput = yield* runtimePlanInputResult;
       const runtimePlanResult = await runtimePlanResolver.resolve(context, runtimePlanInput);

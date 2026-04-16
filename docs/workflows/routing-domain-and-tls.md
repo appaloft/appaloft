@@ -33,6 +33,89 @@ This workflow inherits:
 
 ## End-To-End Workflow
 
+This is a first-class workflow, not a single command. The user-facing route from "I have a domain"
+to "the service is reachable" crosses user-owned external setup, Yundu commands, Yundu events,
+provider adapters, runtime route realization, and public read/query surfaces.
+
+### Actor Responsibilities
+
+| Actor | Responsibilities | Success Signal | Failure Branch |
+| --- | --- | --- | --- |
+| User/operator | Acquire or choose a domain, decide which resource owns it, configure DNS to point at the Yundu edge address, provide manual ownership evidence for the v1 flow, and retry after fixing DNS/provider/proxy issues. | The requested hostname resolves to the Yundu edge and the user can open the service URL. | DNS missing/wrong, ownership evidence absent, or user selects the wrong project/resource/server/destination. |
+| Yundu | Admit commands, persist domain binding/certificate/deployment state, publish events after durable transitions, serve HTTP-01 tokens, select provider adapters through ports, realize proxy routes during deployment/redeploy, expose status through domain/certificate/resource read models, and record retryable failures without hiding them in logs only. | `domain-bindings.list`, `certificates.list`, and `resources.list` converge on `ready` state and a durable route URL tied to the latest realized deployment. | Admission `err(DomainError)`, `certificate-issuance-failed`, `domain-route-realization-failed`, or resource access summary reports no ready durable route. |
+| DNS provider/registrar | Host the public DNS records selected by the user, such as `A`, `AAAA`, or `CNAME` to the Yundu edge address. | DNS queries return the edge address before challenge/traffic checks. | Propagation delay, wrong record, stale record, or provider outage. |
+| Certificate authority/provider | Validate HTTP-01 challenge when TLS is required and issue certificate material through the provider adapter. | `certificate-issued` and an active certificate with expiry/fingerprint metadata. | Challenge validation failure, account/config error, rate limit, unavailable provider, or storage failure. |
+| Edge proxy provider/runtime | Render route configuration, attach labels/config, reload or auto-activate the proxy, and route public requests to the deployed workload. | Deployment finishes with a route snapshot containing the durable domain and public route checks pass when enabled. | Route render failure, reload command failure, proxy unavailable, or public route health check failure. |
+
+### Success Path
+
+```mermaid
+sequenceDiagram
+  autonumber
+  actor User
+  participant DNS as DNS provider
+  participant Yundu
+  participant Proxy as Edge proxy/runtime
+  participant CA as Certificate provider
+  participant Service
+
+  User->>DNS: Create A/CNAME for app.example.com to Yundu edge
+  User->>Yundu: domain-bindings.create(app.example.com, resource, tlsMode)
+  Yundu-->>User: accepted domainBindingId and expected verification target
+  Yundu-->>Yundu: domain-binding-requested
+  User->>Yundu: domain-bindings.confirm-ownership(domainBindingId)
+  Yundu-->>Yundu: domain-bound
+  alt TLS disabled
+    Yundu-->>Yundu: domain-ready
+  else TLS auto
+    Yundu-->>Yundu: certificates.issue-or-renew(reason=issue)
+    Yundu-->>Yundu: certificate-requested
+    CA->>Yundu: request HTTP-01 token serving
+    Yundu-->>CA: /.well-known/acme-challenge/{token}
+    CA-->>Yundu: certificate material
+    Yundu-->>Yundu: certificate-issued
+    Yundu-->>Yundu: domain-ready
+  end
+  User->>Yundu: deployments.create or redeploy resource
+  Yundu->>Proxy: realize durable domain route
+  Proxy->>Service: route app.example.com traffic
+  Yundu-->>User: resources.list latestDurableDomainRoute
+  User->>Service: open app.example.com
+```
+
+### Failure Branches
+
+```mermaid
+flowchart TD
+  A["User chooses domain and target resource"] --> B["DNS points to Yundu edge"]
+  B --> C["domain-bindings.create"]
+  C -->|admission error| C1["Return DomainError; no event"]
+  C --> D["domain-binding-requested"]
+  D --> E["domain-bindings.confirm-ownership"]
+  E -->|ownership/DNS not valid| E1["Remain pending or failed verification; no domain-bound"]
+  E --> F["domain-bound"]
+  F --> G{"TLS required?"}
+  G -->|no| H["domain-ready"]
+  G -->|yes| I["certificate-requested"]
+  I -->|provider/challenge/storage failure| I1["certificate-issuance-failed; failed or retry_scheduled attempt"]
+  I --> J["certificate-issued"]
+  J --> H
+  H --> K["deployments.create/redeploy realizes route"]
+  K -->|render/reload/public check failure| K1["domain-route-realization-failed; binding not_ready"]
+  K --> L["resources.list exposes latestDurableDomainRoute"]
+  L --> M["User reaches service via domain"]
+```
+
+### Test Domain Strategy
+
+Automated tests do not buy real domains and do not depend on public DNS propagation. They use:
+
+- `.example`/`.test` hostnames for command and read-model e2e because the assertion is command/event/read surface convergence;
+- injected fake certificate providers and fake ACME clients for CA behavior;
+- local HTTP-01 token stores for challenge serving;
+- an opt-in Docker proxy e2e that sends requests to `127.0.0.1` with the `Host` header set to the
+  test domain, proving proxy routing without registering a public domain.
+
 ```text
 domain-bindings.create
   -> domain-binding-requested
@@ -212,6 +295,12 @@ For TLS-disabled bindings, no certificate gate remains after route readiness is 
 For TLS auto or certificate-policy auto bindings, route readiness alone is not sufficient. The binding remains `bound` until certificate issuance completes. `certificate-requested` is consumed by the certificate worker through provider-neutral ports; `certificate-issued` records active certificate state and drives certificate-backed `domain-ready`; `certificate-issuance-failed` records failed or retry-scheduled attempt state.
 
 The route readiness baseline does not create a separate public command. It is an event/process-manager continuation from `domain-bound` and a query/read-model projection for resources and domain bindings.
+
+Deployment planning must include deployable durable domain bindings for the same
+project/environment/resource/server/destination in the runtime access-route snapshot. This is what
+turns a confirmed binding into proxy configuration on the next deployment or redeploy. Bindings in
+`requested`, `pending_verification`, or `failed` must not be used for route realization. Bindings in
+`not_ready` may be included so a redeploy can act as the route retry attempt.
 
 When a durable domain route or certificate-backed proxy configuration changes, route readiness must
 use the edge proxy provider reload behavior governed by

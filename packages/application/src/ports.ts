@@ -205,6 +205,29 @@ export interface DomainRouteFailureCandidateReader {
   ): Promise<DomainRouteFailureCandidate[]>;
 }
 
+export interface DomainRouteBindingCandidate {
+  id: string;
+  domainName: string;
+  pathPrefix: string;
+  proxyKind: EdgeProxyKind;
+  tlsMode: TlsMode;
+  status: DomainBindingStatus;
+  createdAt: string;
+}
+
+export interface DomainRouteBindingReader {
+  listDeployableBindings(
+    context: RepositoryContext,
+    input: {
+      projectId: string;
+      environmentId: string;
+      resourceId: string;
+      serverId: string;
+      destinationId: string;
+    },
+  ): Promise<DomainRouteBindingCandidate[]>;
+}
+
 export interface CertificateRepository {
   findOne(context: RepositoryContext, spec: CertificateSelectionSpec): Promise<Certificate | null>;
   upsert(

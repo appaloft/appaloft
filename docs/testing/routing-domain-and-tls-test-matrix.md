@@ -16,6 +16,19 @@ domain-bindings.create
 
 Tests must distinguish deployment runtime plan access-route snapshots from durable domain binding and certificate lifecycle state.
 
+Workflow-level tests must prove the cross-operation path, not only isolated command success. The
+minimal v1 workflow path is:
+
+```text
+resource/deployment context exists
+  -> domain-bindings.create
+  -> domain-bindings.confirm-ownership
+  -> domain-ready when gates pass
+  -> deployments.create or redeploy realizes the durable route
+  -> resources.list exposes latestDurableDomainRoute
+  -> optional proxy e2e reaches the service with Host-header domain routing
+```
+
 ## Global References
 
 This test matrix inherits:
@@ -117,6 +130,13 @@ Then:
 | ROUTE-TLS-READMODEL-005 | integration | Certificate terminal list projection | `certificate-requested` handler recorded issued or failed attempt state | `certificates.list` returns certificate `active` with latest attempt `issued`, expiry/fingerprint metadata when issued, or `failed`/`retry_scheduled` with safe failure metadata when issuance failed |
 | ROUTE-TLS-READMODEL-006 | integration | Certificate-backed durable HTTPS route projection | TLS-auto binding consumed `certificate-issued`, published `domain-ready`, and a latest succeeded reverse-proxy deployment exists | `resources.list` exposes `accessSummary.latestDurableDomainRoute` as `https://<domain>` while preserving generated access when present |
 | ROUTE-TLS-READMODEL-007 | integration | Route failure binding list projection | Active binding consumed route realization failure and published `domain-route-realization-failed` | `domain-bindings.list` returns `status = not_ready` and safe route failure metadata without exposing provider secrets |
+
+## Workflow Matrix
+
+| Test ID | Preferred automation | Case | Input | Expected result |
+| --- | --- | --- | --- | --- |
+| ROUTE-TLS-WORKFLOW-001 | e2e-preferred | CLI durable domain binding realized on redeploy | CLI creates a deployment context, creates and confirms a TLS-disabled durable binding, then redeploys the resource | The redeployment runtime plan contains the durable domain access route, `domain-bindings.list` reports `ready`, and `resources.list` exposes `latestDurableDomainRoute` for the redeployment |
+| ROUTE-TLS-WORKFLOW-002 | e2e-preferred, opt-in Docker | Durable domain reaches service through proxy | Docker/proxy e2e creates and confirms a TLS-disabled durable binding, redeploys the resource, then calls the proxy on `127.0.0.1` with `Host: <domain>` | The proxy returns the deployed service health/body for the durable domain without requiring public DNS registration |
 
 ## HTTP Challenge Serving Matrix
 
@@ -237,6 +257,11 @@ Current tests also cover `ROUTE-TLS-EVT-008` and `ROUTE-TLS-READMODEL-006` for
 Current route failure tests cover `ROUTE-TLS-EVT-012`, `ROUTE-TLS-READMODEL-007`, and
 `ROUTE-TLS-ASYNC-003` for route failure process-manager handling, durable binding `not_ready`
 state, and safe read-model projection.
+
+Current workflow tests cover `ROUTE-TLS-WORKFLOW-001` through the default CLI e2e chain. The
+`ROUTE-TLS-WORKFLOW-002` proxy reachability test is opt-in through `YUNDU_E2E_PROXY_DOCKER=true`
+because it needs Docker and host ports; it proves routing with a local Host header rather than a
+public DNS purchase.
 
 Current tests cover `ROUTE-TLS-CHALLENGE-001`, `ROUTE-TLS-CHALLENGE-002`, and
 `ROUTE-TLS-CHALLENGE-003` for HTTP-01 challenge token serving through the HTTP adapter and injected
