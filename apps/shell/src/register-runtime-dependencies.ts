@@ -51,6 +51,7 @@ import {
   type DatabaseConnection,
   PgCertificateReadModel,
   PgCertificateRepository,
+  PgCertificateRetryCandidateReader,
   PgDeploymentReadModel,
   PgDeploymentRepository,
   PgDestinationRepository,
@@ -391,6 +392,11 @@ export function registerRuntimeDependencies(
   });
   container.register(tokens.certificateRepository, {
     useFactory: instanceCachingFactory(() => new PgCertificateRepository(input.database.db)),
+  });
+  container.register(tokens.certificateRetryCandidateReader, {
+    useFactory: instanceCachingFactory(
+      () => new PgCertificateRetryCandidateReader(input.database.db),
+    ),
   });
   container.register(tokens.certificateSecretStore, {
     useFactory: instanceCachingFactory(() => new InMemoryCertificateSecretStore()),

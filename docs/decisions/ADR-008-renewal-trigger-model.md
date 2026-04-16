@@ -37,6 +37,19 @@ The scheduler/process manager must:
 - persist renewal attempt state before publishing `certificate-requested`;
 - record failures through `certificate-issuance-failed`.
 
+Retry scheduling for failed certificate attempts follows the same process-manager model:
+
+- scan durable certificate state for the latest `retry_scheduled` attempt;
+- skip certificates that already have a newer in-flight attempt;
+- respect explicit `retryAfter` when present;
+- when `retryAfter` is absent, use the configured scheduler retry delay from the failed attempt's
+  failure time;
+- dispatch `certificates.issue-or-renew` with the same reason, provider key, challenge type, and
+  certificate id as the failed attempt;
+- create a new attempt id through the command/use-case path;
+- use an idempotency key derived from the previous failed attempt so repeated scheduler ticks do
+  not duplicate the same retry request.
+
 The default renewal window should be a configurable policy. Until a policy is finalized, specs and tests should avoid hardcoding a specific number of days except inside test fixtures.
 
 Domain readiness does not expire solely because time passes. Readiness may move to degraded or not-ready only when certificate expiry, failed renewal, route verification failure, explicit revalidation policy, or an operator command records a durable state transition.
@@ -64,7 +77,9 @@ Future durable timer/event infrastructure can supersede the scheduler trigger wi
 
 ## Current Implementation Notes And Migration Gaps
 
-Current code has no durable certificate state, renewal window policy, scheduler integration for certificate renewal, or certificate attempt store.
+Current code has durable certificate state, certificate attempts, provider-worker failure mapping,
+and a retry scheduler for due `retry_scheduled` attempts. Renewal-window scanning remains a later
+scheduler slice.
 
 ## Superseded Open Questions
 

@@ -267,6 +267,26 @@ Route/proxy realization retry is a new route attempt or process-manager attempt.
 
 Previous failed attempts remain historical state and must not be erased by retry.
 
+## Certificate Retry Scheduler
+
+The certificate retry scheduler is an internal process capability, not a public command.
+
+It must:
+
+- scan durable certificate state for the latest `retry_scheduled` attempt;
+- skip candidates whose `retryAfter` is in the future;
+- apply the configured default retry delay when a retryable failure has no explicit `retryAfter`;
+- skip certificates with any newer in-flight attempt for the same reason;
+- dispatch `certificates.issue-or-renew` with the failed attempt's reason, provider key, challenge
+  type, certificate id, and domain binding id;
+- create a new attempt id through the command/use-case path;
+- use a stable idempotency key derived from the failed attempt id so repeated scheduler ticks do not
+  create duplicate retries.
+
+The scheduler must not replay `certificate-requested` or `certificate-issuance-failed` events as the
+retry mechanism. It may run from a shell timer, hosted worker, cron job, or future durable scheduler
+adapter, but each execution observes and mutates state only through application ports/use cases.
+
 ## Relationship To Generated Access And Deployment Route Snapshots
 
 Generated default access routes are convenience routes resolved from provider-neutral platform policy. They are not durable domain bindings, and they do not prove domain ownership.
@@ -341,8 +361,8 @@ Current code includes a real ACME provider adapter package that can be enabled t
 shell certificate-provider configuration. The default shell profile remains unavailable so tests and
 local development do not contact a real CA by accident.
 
-Outbox/inbox workflow, DNS-provider verification, route realization failure state, and retry
-scheduler execution are not implemented yet.
+Outbox/inbox workflow, DNS-provider verification, route realization failure state, and
+renewal-window scheduling are not implemented yet.
 
 ## Open Questions
 

@@ -126,6 +126,12 @@ describe("resolveConfig", () => {
         challengeTokenTtlSeconds: 600,
       },
     });
+    expect(config.certificateRetryScheduler).toEqual({
+      enabled: true,
+      intervalSeconds: 300,
+      defaultRetryDelaySeconds: 300,
+      batchSize: 25,
+    });
   });
 
   test("allows enabling ACME certificate provider through environment", () => {
@@ -152,6 +158,24 @@ describe("resolveConfig", () => {
         skipChallengeVerification: true,
         challengeTokenTtlSeconds: 120,
       },
+    });
+  });
+
+  test("allows configuring the certificate retry scheduler through environment", () => {
+    const config = resolveConfig({
+      env: {
+        YUNDU_CERTIFICATE_RETRY_SCHEDULER_ENABLED: "false",
+        YUNDU_CERTIFICATE_RETRY_SCHEDULER_INTERVAL_SECONDS: "30",
+        YUNDU_CERTIFICATE_RETRY_DEFAULT_DELAY_SECONDS: "45",
+        YUNDU_CERTIFICATE_RETRY_SCHEDULER_BATCH_SIZE: "7",
+      },
+    });
+
+    expect(config.certificateRetryScheduler).toEqual({
+      enabled: false,
+      intervalSeconds: 30,
+      defaultRetryDelaySeconds: 45,
+      batchSize: 7,
     });
   });
 });

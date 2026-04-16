@@ -100,8 +100,10 @@ Current code records failed or retry-scheduled certificate attempt state and pub
 `certificate-issuance-failed` from the `certificate-requested` event handler when injected provider
 issuance or secret storage fails.
 
-Current code does not yet implement a real ACME adapter, retry scheduler, provider-specific
-challenge validation details, or certificate-backed domain readiness.
+Current code includes HTTP-01 challenge token serving, a real ACME adapter, certificate-backed
+domain readiness, and retry scheduler execution for retriable `retry_scheduled` attempts.
+Provider-specific validation failure branches remain covered by the provider failure contract and
+need broader branch coverage.
 
 ## Open Questions
 

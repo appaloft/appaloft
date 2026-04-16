@@ -7,6 +7,7 @@ import { createHttpApp } from "@yundu/adapter-http-elysia";
 import {
   type AppLogger,
   type CertificateHttpChallengeTokenStore,
+  type CertificateRetryScheduler,
   type CommandBus,
   type ExecutionContext,
   type IdGenerator,
@@ -25,6 +26,7 @@ import {
 import { createDatabase, createMigrator, type PgliteRuntimeAssets } from "@yundu/persistence-pg";
 import { type LocalPluginHost } from "@yundu/plugin-host";
 import { container, type DependencyContainer } from "tsyringe";
+import { createCertificateRetrySchedulerRunner } from "./certificate-retry-scheduler-runner";
 import { ShellDeploymentProgressReporter } from "./deployment-progress-reporter";
 import { registerApplicationServices } from "./register-application-services";
 import { registerRuntimeDependencies } from "./register-runtime-dependencies";
@@ -136,6 +138,16 @@ export async function createAppComposition(
     childContainer,
     tokens.certificateHttpChallengeTokenStore,
   );
+  const certificateRetryScheduler = resolveToken<CertificateRetryScheduler>(
+    childContainer,
+    tokens.certificateRetryScheduler,
+  );
+  const certificateRetrySchedulerRunner = createCertificateRetrySchedulerRunner({
+    config: config.certificateRetryScheduler,
+    scheduler: certificateRetryScheduler,
+    executionContextFactory,
+    logger,
+  });
   const webStaticDir = await resolveWebStaticDir(config, options);
 
   const httpApp = createHttpApp({
@@ -172,6 +184,8 @@ export async function createAppComposition(
       port: config.httpPort,
       webOrigin: config.webOrigin,
     });
+
+    certificateRetrySchedulerRunner.start();
   };
 
   const cliProgram = createCliProgram({
@@ -191,6 +205,7 @@ export async function createAppComposition(
     cliProgram,
     startServer,
     async shutdown(): Promise<void> {
+      certificateRetrySchedulerRunner.stop();
       serverHandle?.stop?.();
       await telemetry.shutdown();
       await database.close();
