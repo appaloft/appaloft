@@ -70,10 +70,13 @@ function ensureReflectMetadata(): void {
 async function createReader(
   serverRepository: ServerRepository | undefined,
   spawnProcess: ReturnType<typeof createSpawn>,
+  options?: {
+    boundedProcessTimeoutMs?: number;
+  },
 ) {
   ensureReflectMetadata();
   const { RuntimeResourceRuntimeLogReader } = await import("../src");
-  return new RuntimeResourceRuntimeLogReader(serverRepository, spawnProcess);
+  return new RuntimeResourceRuntimeLogReader(serverRepository, spawnProcess, options);
 }
 
 class RecordingAppSpan implements AppSpan {
@@ -160,6 +163,31 @@ function createSpawn(calls: SpawnCall[], stdoutLines: string[] = ["ready\n"]) {
       stderr: createTextStream([]),
       exited: Promise.resolve(0),
       kill() {},
+    };
+  };
+}
+
+function createHangingSpawn(input: { calls: SpawnCall[]; killed: { value: boolean } }) {
+  return (
+    args: string[],
+    options: {
+      cwd?: string;
+      stdout: "pipe";
+      stderr: "pipe";
+    },
+  ) => {
+    input.calls.push({
+      args,
+      ...(options.cwd ? { cwd: options.cwd } : {}),
+    });
+
+    return {
+      stdout: new ReadableStream<Uint8Array>(),
+      stderr: new ReadableStream<Uint8Array>(),
+      exited: new Promise<number>(() => {}),
+      kill() {
+        input.killed.value = true;
+      },
     };
   };
 }
@@ -364,6 +392,7 @@ describe("RuntimeResourceRuntimeLogReader", () => {
     expect(calls[0]?.args).toContain("2222");
     expect(calls[0]?.args).toContain("IdentitiesOnly=yes");
     expect(calls[0]?.args).toContain("deployer@203.0.113.10");
+    expect(calls[0]?.args).toContain("ControlMaster=auto");
     expect(calls[0]?.args.at(-1)).toBe(
       "docker logs --tail '25' --follow 'yundu-dep_web'",
     );
@@ -390,8 +419,60 @@ describe("RuntimeResourceRuntimeLogReader", () => {
 
     expect(calls[0]?.args[0]).toBe("ssh");
     expect(calls[0]?.args).not.toContain("--follow");
+    expect(calls[0]?.args).not.toContain("ControlMaster=auto");
+    expect(calls[0]?.args.some((arg) => arg.startsWith("ControlPath="))).toBe(false);
     expect(calls[0]?.args.at(-1)).toBe(
       "cd '/srv/app' && docker compose -f '/srv/app/compose.yml' logs --no-color --tail '25' 'web'",
     );
+  });
+
+  test("times out bounded process logs and kills the backend process", async () => {
+    const calls: SpawnCall[] = [];
+    const killed = { value: false };
+    const tracer = new RecordingAppTracer();
+    const reader = await createReader(undefined, createHangingSpawn({ calls, killed }), {
+      boundedProcessTimeoutMs: 1,
+    });
+    const result = await reader.open(
+      createTestExecutionContext({ tracer }),
+      logContext(),
+      request(),
+      new AbortController().signal,
+    );
+
+    expect(result.isOk()).toBe(true);
+    const events = await collectEvents(result._unsafeUnwrap());
+    const error = events.at(-1);
+
+    expect(calls[0]?.args).toEqual([
+      "docker",
+      "logs",
+      "--tail",
+      "25",
+      "yundu-dep_web",
+    ]);
+    expect(killed.value).toBe(true);
+    expect(error).toEqual({
+      kind: "error",
+      error: expect.objectContaining({
+        code: "timeout",
+        category: "timeout",
+        retryable: true,
+        details: expect.objectContaining({
+          adapter: "docker_logs",
+          phase: "runtime-log-stream",
+          step: "process-timeout",
+          timeoutMs: 1,
+        }),
+      }),
+    });
+    expect(tracer.spans[0]?.status).toEqual({
+      status: "error",
+      message: "Runtime log process timed out after 1ms",
+    });
+    expect(tracer.spans[0]?.attributes).toMatchObject({
+      "yundu.runtime_logs.close_reason": "timeout",
+      "yundu.runtime_logs.timeout_ms": 1,
+    });
   });
 });

@@ -41,12 +41,25 @@ type RuntimeLogSubprocess = Pick<
   "stdout" | "stderr" | "exited" | "kill"
 >;
 type RuntimeLogSpawn = (args: string[], options: RuntimeLogSpawnOptions) => RuntimeLogSubprocess;
+type RuntimeLogProcessOutcome =
+  | {
+      kind: "exited";
+      exitCode: number;
+    }
+  | {
+      kind: "timeout";
+    };
+type RuntimeResourceRuntimeLogReaderOptions = {
+  boundedProcessTimeoutMs?: number;
+};
 type SshRuntimeLogTarget = {
   host: string;
   port: string;
   identityFile?: string;
   cleanup(): Promise<void>;
 };
+
+const defaultBoundedProcessTimeoutMs = 10_000;
 
 class RuntimeLogLineBuffer {
   private pending = "";
@@ -300,6 +313,45 @@ function createStreamFailure(
   };
 }
 
+function createStreamTimeoutFailure(input: {
+  context: ResourceRuntimeLogContext;
+  command: RuntimeLogCommandKind;
+  timeoutMs: number;
+}): ResourceRuntimeLogEvent {
+  return {
+    kind: "error",
+    error: domainError.timeout("Runtime log process timed out", {
+      phase: "runtime-log-stream",
+      step: "process-timeout",
+      resourceId: input.context.resource.id,
+      deploymentId: input.context.deployment.id,
+      runtimeKind: runtimeKind(input.context),
+      adapter: input.command,
+      timeoutMs: input.timeoutMs,
+    }),
+  };
+}
+
+function createProcessTimeout(timeoutMs: number): {
+  cancel(): void;
+  promise: Promise<RuntimeLogProcessOutcome>;
+} {
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  return {
+    promise: new Promise<RuntimeLogProcessOutcome>((resolve) => {
+      timeout = setTimeout(() => {
+        resolve({ kind: "timeout" });
+      }, timeoutMs);
+    }),
+    cancel() {
+      if (timeout) {
+        clearTimeout(timeout);
+        timeout = undefined;
+      }
+    },
+  };
+}
+
 async function readProcessStream(input: {
   stream: ReadableStream<Uint8Array> | null | undefined;
   name: ResourceRuntimeLogStreamName;
@@ -370,6 +422,7 @@ function createProcessRuntimeLogStream(input: {
   request: ResourceRuntimeLogRequest;
   signal: AbortSignal;
   spawnProcess: RuntimeLogSpawn;
+  boundedProcessTimeoutMs: number;
   cleanupBackend?: () => void | Promise<void>;
 }): ResourceRuntimeLogStream {
   const queue = new RuntimeLogEventQueue();
@@ -382,11 +435,14 @@ function createProcessRuntimeLogStream(input: {
   const stream = new QueueResourceRuntimeLogStream(queue, () => {
     subprocess.kill();
   });
+  const timeoutMs = input.boundedProcessTimeoutMs;
   const nextSequence = () => {
     sequence += 1;
     return sequence;
   };
+  let closeRequested = false;
   const abort = () => {
+    closeRequested = true;
     void stream.close();
   };
 
@@ -398,26 +454,57 @@ function createProcessRuntimeLogStream(input: {
       attributes: createRuntimeLogProcessTraceAttributes(input),
     },
     async (span) => {
+      const processDone = Promise.all([
+        subprocess.exited,
+        readProcessStream({
+          stream: subprocess.stdout,
+          name: "stdout",
+          queue,
+          context: input.context,
+          nextSequence,
+        }),
+        readProcessStream({
+          stream: subprocess.stderr,
+          name: "stderr",
+          queue,
+          context: input.context,
+          nextSequence,
+        }),
+      ]).then(([exitCode]): RuntimeLogProcessOutcome => ({ kind: "exited", exitCode }));
+      const processTimeout = input.request.follow ? undefined : createProcessTimeout(timeoutMs);
+
       try {
-        const [exitCode] = await Promise.all([
-          subprocess.exited,
-          readProcessStream({
-            stream: subprocess.stdout,
-            name: "stdout",
-            queue,
-            context: input.context,
-            nextSequence,
-          }),
-          readProcessStream({
-            stream: subprocess.stderr,
-            name: "stderr",
-            queue,
-            context: input.context,
-            nextSequence,
-          }),
-        ]);
+        const outcome = processTimeout
+          ? await Promise.race([processDone, processTimeout.promise])
+          : await processDone;
 
         span.setAttribute(yunduTraceAttributes.runtimeLogLineCount, sequence);
+
+        if (outcome.kind === "timeout") {
+          subprocess.kill();
+          void processDone.catch(() => undefined);
+
+          if (input.signal.aborted || closeRequested) {
+            span.setAttribute(yunduTraceAttributes.runtimeLogCloseReason, "cancelled");
+            span.setStatus("ok");
+            stream.complete("cancelled");
+            return;
+          }
+
+          span.setAttributes({
+            [yunduTraceAttributes.runtimeLogCloseReason]: "timeout",
+            [yunduTraceAttributes.runtimeLogTimeoutMs]: timeoutMs,
+          });
+          span.setStatus("error", `Runtime log process timed out after ${timeoutMs}ms`);
+          stream.fail(
+            createStreamTimeoutFailure({
+              context: input.context,
+              command: input.command,
+              timeoutMs,
+            }),
+          );
+          return;
+        }
 
         if (input.signal.aborted) {
           span.setAttribute(yunduTraceAttributes.runtimeLogCloseReason, "cancelled");
@@ -425,6 +512,8 @@ function createProcessRuntimeLogStream(input: {
           stream.complete("cancelled");
           return;
         }
+
+        const exitCode = outcome.exitCode;
 
         if (exitCode === 0) {
           span.setAttribute(yunduTraceAttributes.runtimeLogCloseReason, "source-ended");
@@ -456,6 +545,7 @@ function createProcessRuntimeLogStream(input: {
           ),
         );
       } finally {
+        processTimeout?.cancel();
         input.signal.removeEventListener("abort", abort);
         await input.cleanupBackend?.();
       }
@@ -522,7 +612,12 @@ async function writeSshIdentityFile(privateKey: string): Promise<{
   };
 }
 
-function sshArgs(target: SshRuntimeLogTarget): string[] {
+function sshArgs(
+  target: SshRuntimeLogTarget,
+  options: {
+    reuseConnection: boolean;
+  },
+): string[] {
   return [
     "-p",
     target.port,
@@ -541,12 +636,16 @@ function sshArgs(target: SshRuntimeLogTarget): string[] {
     "NumberOfPasswordPrompts=0",
     "-o",
     "StrictHostKeyChecking=accept-new",
-    "-o",
-    "ControlMaster=auto",
-    "-o",
-    "ControlPersist=120s",
-    "-o",
-    `ControlPath=${sshControlPath(target)}`,
+    ...(options.reuseConnection
+      ? [
+          "-o",
+          "ControlMaster=auto",
+          "-o",
+          "ControlPersist=120s",
+          "-o",
+          `ControlPath=${sshControlPath(target)}`,
+        ]
+      : []),
     target.host,
   ];
 }
@@ -701,11 +800,17 @@ async function createFileRuntimeLogStream(input: {
 }
 
 export class RuntimeResourceRuntimeLogReader implements ResourceRuntimeLogReader {
+  private readonly boundedProcessTimeoutMs: number;
+
   constructor(
     private readonly serverRepository?: ServerRepository,
     private readonly spawnProcess: RuntimeLogSpawn = (args, options) =>
       Bun.spawn(args, options),
-  ) {}
+    options: RuntimeResourceRuntimeLogReaderOptions = {},
+  ) {
+    this.boundedProcessTimeoutMs =
+      options.boundedProcessTimeoutMs ?? defaultBoundedProcessTimeoutMs;
+  }
 
   async open(
     context: ExecutionContext,
@@ -762,7 +867,7 @@ export class RuntimeResourceRuntimeLogReader implements ResourceRuntimeLogReader
             createProcessRuntimeLogStream({
               args: [
                 "ssh",
-                ...sshArgs(sshTarget),
+                ...sshArgs(sshTarget, { reuseConnection: request.follow }),
                 dockerLogsCommand({
                   containerName,
                   request,
@@ -774,6 +879,7 @@ export class RuntimeResourceRuntimeLogReader implements ResourceRuntimeLogReader
               request,
               signal,
               spawnProcess: this.spawnProcess,
+              boundedProcessTimeoutMs: this.boundedProcessTimeoutMs,
               cleanupBackend: sshTarget.cleanup,
             }),
           );
@@ -795,6 +901,7 @@ export class RuntimeResourceRuntimeLogReader implements ResourceRuntimeLogReader
             request,
             signal,
             spawnProcess: this.spawnProcess,
+            boundedProcessTimeoutMs: this.boundedProcessTimeoutMs,
           }),
         );
       }
@@ -824,7 +931,7 @@ export class RuntimeResourceRuntimeLogReader implements ResourceRuntimeLogReader
             createProcessRuntimeLogStream({
               args: [
                 "ssh",
-                ...sshArgs(sshTarget),
+                ...sshArgs(sshTarget, { reuseConnection: request.follow }),
                 remoteCommandWithCwd(
                   dockerComposeLogsCommand({
                     composeFile,
@@ -839,6 +946,7 @@ export class RuntimeResourceRuntimeLogReader implements ResourceRuntimeLogReader
               request,
               signal,
               spawnProcess: this.spawnProcess,
+              boundedProcessTimeoutMs: this.boundedProcessTimeoutMs,
               cleanupBackend: sshTarget.cleanup,
             }),
           );
@@ -865,6 +973,7 @@ export class RuntimeResourceRuntimeLogReader implements ResourceRuntimeLogReader
             request,
             signal,
             spawnProcess: this.spawnProcess,
+            boundedProcessTimeoutMs: this.boundedProcessTimeoutMs,
           }),
         );
       }
