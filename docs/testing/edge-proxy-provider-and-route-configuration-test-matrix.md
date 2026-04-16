@@ -26,6 +26,7 @@ This test matrix inherits:
 | Application boundary | Command/query/process code imports only provider-neutral ports, not concrete provider packages. |
 | Server bootstrap | Proxy bootstrap consumes provider ensure plan and records ready/failed state. |
 | Deployment route realization | Runtime execution consumes provider route plan and targets resource `internalPort`. |
+| Proxy reload | Runtime applies provider-produced reload plans after route/certificate config changes and before public route verification. |
 | Query/read model | `resources.proxy-configuration.preview` returns read-only planned/latest/snapshot config. |
 | Web/API/CLI | Entry points display query output and do not reimplement provider rendering. |
 | Migration guard | Concrete proxy product switches are not the authoritative route/bootstrap selection path after migration. |
@@ -65,6 +66,7 @@ Then:
 | EDGE-PROXY-PROVIDER-006 | contract | Provider renders route plan | Resource route targets `internalPort` | Route realization plan returned | None | Target port comes from resource network snapshot. |
 | EDGE-PROXY-PROVIDER-007 | contract | Provider renders config view | Planned or realized route exists | Read-only sections returned | None | Section content may be provider-specific; wrapper stays provider-neutral. |
 | EDGE-PROXY-PROVIDER-008 | contract | Provider render fails | Provider cannot render safe config | `err` | `proxy_configuration_render_failed` | Error contains code, phase, retriable, provider key. |
+| EDGE-PROXY-PROVIDER-009 | contract | Provider renders reload plan | Route realization changes provider-owned configuration | Reload plan returned | None | Plan uses `automatic` or provider-produced `command` reload steps; application code does not hardcode reload commands. |
 
 ## Server Bootstrap Matrix
 
@@ -83,6 +85,15 @@ Then:
 | EDGE-PROXY-ROUTE-002 | integration | Durable domain route | Ready domain binding route exists | Route plan applied | Provider-specific route uses durable hostname/path | Deployment continues or succeeds | Per deployment |
 | EDGE-PROXY-ROUTE-003 | integration | Duplicate route realization | Same deployment and route are realized again | Idempotent no duplicate | Same desired config | No duplicate route state | No |
 | EDGE-PROXY-ROUTE-004 | integration | Route realization fails after acceptance | Runtime executor fails | Deployment failure/degraded route state | Config not marked applied | `deployment-failed` or degraded status | Yes |
+
+## Proxy Reload Matrix
+
+| Test ID | Preferred automation | Case | Input/state | Expected result | Expected state | Retriable |
+| --- | --- | --- | --- | --- | --- | --- |
+| EDGE-PROXY-RELOAD-001 | contract | Automatic provider reload | Provider watches Docker labels or dynamic config | Provider reload plan declares `automatic` reload | Runtime records reload/activation observability and does not execute a concrete reload command | No |
+| EDGE-PROXY-RELOAD-002 | integration | Command provider reload succeeds | Provider route plan includes a command reload step | Runtime executes the provider command after applying route config | Route realization continues to public verification/success | No |
+| EDGE-PROXY-RELOAD-003 | integration | Command provider reload fails | Provider reload command exits non-zero | Deployment or route realization is failed/degraded with phase `proxy-reload` | Route is not marked ready | Yes when provider marks failure retryable |
+| EDGE-PROXY-RELOAD-004 | integration | Certificate-backed route activation | Certificate-backed route config changes after `certificate-issued` | Provider reload is applied before `domain-ready` or public route readiness | Domain route is not marked ready until reload/activation succeeds | Conditional |
 
 ## Proxy Configuration Query Matrix
 
@@ -111,7 +122,8 @@ Existing runtime tests assert concrete proxy bootstrap plans and route labels. T
 
 Provider package tests own concrete proxy label syntax. Runtime adapter tests should assert execution of provider-produced plans, not product-specific label generation.
 
-Application and provider tests cover the query service, provider-rendered sections, and the guard
+Application and provider tests cover the query service, provider-rendered sections, provider-owned
+reload plans, and the guard
 that generated default-access domain provider keys such as `sslip` do not override edge proxy
 provider selection. Broader API/Web/CLI regression coverage remains a follow-up.
 

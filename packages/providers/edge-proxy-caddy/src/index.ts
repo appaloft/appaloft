@@ -10,6 +10,8 @@ import {
   type ProxyConfigurationRouteView,
   type ProxyConfigurationView,
   type ProxyConfigurationViewInput,
+  type ProxyReloadInput,
+  type ProxyReloadPlan,
   type ProxyRouteRealizationInput,
   type ProxyRouteRealizationPlan,
 } from "@yundu/application";
@@ -21,6 +23,7 @@ const caddyImage = "lucaslorentz/caddy-docker-proxy:2.9-alpine";
 const capabilities: EdgeProxyProviderCapabilities = {
   ensureProxy: true,
   dockerLabels: true,
+  reloadProxy: true,
   configurationView: true,
   runtimeLogs: false,
   diagnostics: true,
@@ -219,6 +222,49 @@ export class CaddyEdgeProxyProvider implements EdgeProxyProvider {
       ...(labels.length > 0 ? { networkName: caddyEdgeNetworkName } : {}),
       metadata: {
         routeCount: String(providerRoutes.length),
+      },
+    });
+  }
+
+  async reloadProxy(
+    _context: EdgeProxyExecutionContext,
+    input: ProxyReloadInput,
+  ): Promise<Result<ProxyReloadPlan, DomainError>> {
+    if (input.proxyKind !== "caddy") {
+      return err(
+        domainError.proxyProviderUnavailable("Caddy does not support this proxy kind", {
+          phase: "proxy-reload-plan-render",
+          providerKey: this.key,
+          proxyKind: input.proxyKind,
+        }),
+      );
+    }
+
+    const routeCount = input.accessRoutes.filter((route) => route.proxyKind === "caddy").length;
+
+    return ok({
+      providerKey: this.key,
+      proxyKind: "caddy",
+      displayName: this.displayName,
+      required: routeCount > 0,
+      steps:
+        routeCount > 0
+          ? [
+              {
+                name: "caddy-docker-provider-reload",
+                mode: "automatic",
+                successMessage:
+                  "Caddy Docker proxy watches container label changes and activates routes automatically",
+                metadata: {
+                  routeCount: String(routeCount),
+                  reason: input.reason,
+                },
+              },
+            ]
+          : [],
+      metadata: {
+        routeCount: String(routeCount),
+        routeLabelCount: String(input.routePlan.labels.length),
       },
     });
   }

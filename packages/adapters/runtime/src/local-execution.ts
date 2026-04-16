@@ -34,9 +34,11 @@ import {
 } from "@yundu/core";
 import {
   createEdgeProxyEnsurePlan,
+  createProxyReloadPlan,
   createProxyRouteRealizationPlan,
   proxyBootstrapOptionsFromEnv,
 } from "./edge-proxy-plans";
+import { executeProxyReloadPlan } from "./proxy-reload-execution";
 import {
   dockerPublishedPortCommand,
   parseDockerPublishedHostPort,
@@ -1655,6 +1657,105 @@ export class LocalExecutionBackend implements ExecutionBackend {
       status: "succeeded",
       message: `Container ${containerName} started`,
     });
+
+    const proxyReloadPlanResult = this.edgeProxyProviderRegistry
+      ? await createProxyReloadPlan({
+          providerRegistry: this.edgeProxyProviderRegistry,
+          context: {
+            correlationId: context.requestId,
+          },
+          deploymentId: state.id.value,
+          accessRoutes,
+          routePlan: proxyRoutePlanResult.value,
+          reason: "route-realization",
+        })
+      : ok(null);
+    if (proxyReloadPlanResult.isErr()) {
+      const message = "Edge proxy reload plan could not be rendered";
+      logs.push(phaseLog("deploy", message, "error"));
+      return ok({
+        deployment: this.applyFailure(deployment, {
+          logs,
+          errorCode: proxyReloadPlanResult.error.code,
+          retryable: proxyReloadPlanResult.error.retryable,
+          metadata: {
+            message: proxyReloadPlanResult.error.message,
+          },
+        }).deployment,
+      });
+    }
+
+    const proxyReloadPlan = proxyReloadPlanResult.value;
+    if (proxyReloadPlan?.required) {
+      this.report(context, {
+        deploymentId: state.id.value,
+        phase: "deploy",
+        status: "running",
+        message: `Reload ${proxyReloadPlan.displayName} edge proxy`,
+      });
+      const reload = executeProxyReloadPlan({
+        plan: proxyReloadPlan,
+        runCommand: (step) =>
+          runSyncCommand({
+            command: step.command ?? "",
+            cwd: workdir,
+            env,
+          }),
+      });
+
+      for (const entry of reload.logs) {
+        logs.push(phaseLog("deploy", entry.message, entry.stderr ? "warn" : "info"));
+        this.pushCommandOutput(logs, {
+          context,
+          deploymentId: state.id.value,
+          phase: "deploy",
+          output: entry.stdout ?? "",
+          level: "info",
+          stream: "stdout",
+        });
+        this.pushCommandOutput(logs, {
+          context,
+          deploymentId: state.id.value,
+          phase: "deploy",
+          output: entry.stderr ?? "",
+          level: "warn",
+          stream: "stderr",
+        });
+      }
+
+      if (reload.status === "failed") {
+        this.report(context, {
+          deploymentId: state.id.value,
+          phase: "deploy",
+          status: "failed",
+          level: "error",
+          message: reload.message,
+        });
+        return ok({
+          deployment: this.applyFailure(deployment, {
+            logs: [
+              ...logs,
+              phaseLog("deploy", reload.message, "error"),
+            ],
+            errorCode: reload.errorCode,
+            retryable: reload.retryable,
+            metadata: {
+              providerKey: proxyReloadPlan.providerKey,
+              proxyKind: proxyReloadPlan.proxyKind,
+              stepName: reload.stepName,
+              phase: "proxy-reload",
+            },
+          }).deployment,
+        });
+      }
+
+      this.report(context, {
+        deploymentId: state.id.value,
+        phase: "deploy",
+        status: "succeeded",
+        message: `${proxyReloadPlan.displayName} edge proxy reload is complete`,
+      });
+    }
 
     const healthPath = state.runtimePlan.execution.healthCheckPath ?? "/";
     const publishedPortResult = runSyncCommand({

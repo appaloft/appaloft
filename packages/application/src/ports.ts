@@ -372,6 +372,7 @@ export interface ServerEdgeProxyBootstrapper {
 export interface EdgeProxyProviderCapabilities {
   ensureProxy: boolean;
   dockerLabels: boolean;
+  reloadProxy: boolean;
   configurationView: boolean;
   runtimeLogs: boolean;
   diagnostics: boolean;
@@ -449,6 +450,41 @@ export interface ProxyRouteRealizationPlan {
   providerKey: string;
   networkName?: string;
   labels: string[];
+  metadata?: Record<string, string>;
+}
+
+export type ProxyReloadReason =
+  | "route-realization"
+  | "certificate-issued"
+  | "certificate-renewal"
+  | "manual-repair";
+
+export type ProxyReloadMode = "automatic" | "command";
+
+export interface ProxyReloadStepPlan {
+  name: string;
+  mode: ProxyReloadMode;
+  command?: string;
+  timeoutMs?: number;
+  successMessage: string;
+  failureMessage?: string;
+  metadata?: Record<string, string>;
+}
+
+export interface ProxyReloadInput {
+  proxyKind: EdgeProxyKind;
+  deploymentId: string;
+  accessRoutes: EdgeProxyRouteInput[];
+  routePlan: ProxyRouteRealizationPlan;
+  reason: ProxyReloadReason;
+}
+
+export interface ProxyReloadPlan {
+  providerKey: string;
+  proxyKind: EdgeProxyKind;
+  displayName: string;
+  required: boolean;
+  steps: ProxyReloadStepPlan[];
   metadata?: Record<string, string>;
 }
 
@@ -538,6 +574,10 @@ export interface EdgeProxyProvider {
     context: EdgeProxyExecutionContext,
     input: ProxyRouteRealizationInput,
   ): Promise<Result<ProxyRouteRealizationPlan, DomainError>>;
+  reloadProxy(
+    context: EdgeProxyExecutionContext,
+    input: ProxyReloadInput,
+  ): Promise<Result<ProxyReloadPlan, DomainError>>;
   renderConfigurationView(
     context: EdgeProxyExecutionContext,
     input: ProxyConfigurationViewInput,

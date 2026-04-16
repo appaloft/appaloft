@@ -12,6 +12,7 @@ deployment target proxy intent
   -> ensure shared proxy infrastructure
   -> render route realization plan
   -> runtime adapter executes provider-produced plan
+  -> runtime adapter applies provider-produced reload plan when required
   -> capture route realization snapshot/read model
   -> expose provider-rendered read-only configuration view
 ```
@@ -49,6 +50,7 @@ It produces:
 
 - proxy ensure plans;
 - route realization plans;
+- proxy reload plans;
 - provider-rendered configuration sections;
 - progress/log events or deployment progress entries;
 - route realization status in read models/snapshots.
@@ -101,10 +103,37 @@ For every accepted deployment attempt with reverse-proxy routes:
 2. Resolve edge proxy provider.
 3. Ask the provider to render a route realization plan.
 4. Execute the provider-produced plan through the runtime adapter.
-5. Record progress and final route realization status.
-6. Project the result into resource/deployment read models.
+5. Apply the provider-produced reload plan when the provider requires one, or record that the
+   provider's dynamic configuration watcher performs automatic reload.
+6. Record progress and final route realization status.
+7. Project the result into resource/deployment read models.
 
 The provider must target `ResourceNetworkProfile.internalPort` or the immutable network snapshot derived from it. It must not read deployment command transport fields for port/domain/proxy/TLS behavior.
+
+## Proxy Reload
+
+Proxy reload is part of route realization, not a separate public command.
+
+The provider must state the activation behavior in a provider-produced reload plan linked to route
+realization:
+
+| Reload mode | Meaning | Runtime obligation |
+| --- | --- | --- |
+| `automatic` | The provider watches the applied route/config state and activates it itself, for example through Docker label events or dynamic-provider polling. | Record the provider's success message; do not invent or execute a concrete reload command. |
+| `command` | The provider requires an explicit command, API call, or script after configuration changes. | Execute the command step with the provided timeout, capture output, and fail route realization if it exits unsuccessfully. |
+
+Reload applies after:
+
+- workload route labels/configuration have been applied;
+- durable domain route configuration changes;
+- certificate-backed proxy configuration changes when the provider needs explicit activation.
+
+Reload happens before public route verification and before a route is marked ready. A reload failure
+is a route-realization failure with phase `proxy-reload` and must be observable through deployment
+failure/degraded route state and logs.
+
+Application, Web, CLI, and HTTP code must never build concrete reload commands. They may only
+display provider-rendered reload sections or statuses from the query/read model.
 
 ## Observable Configuration
 
@@ -156,6 +185,7 @@ Canonical phases:
 - `proxy-bootstrap`;
 - `proxy-route-plan-render`;
 - `proxy-route-realization`;
+- `proxy-reload`;
 - `proxy-configuration-render`;
 - `proxy-diagnostics`;
 - `public-route-verification`.
@@ -174,11 +204,14 @@ Provider-specific configuration must not be generated inside Web components, CLI
 
 ## Current Implementation Notes And Migration Gaps
 
-Runtime proxy bootstrap and route label generation now execute provider-produced plans instead of adapter-owned concrete proxy branches.
+Runtime proxy bootstrap, route label generation, and proxy reload behavior now execute or observe
+provider-produced plans instead of adapter-owned concrete proxy branches.
 
 Server bootstrap resolves concrete edge proxy behavior through the injected provider registry and a runtime bootstrapper executor.
 
-Deployment execution asks the provider registry for route realization plans and passes the generated labels/network intent to runtime executors.
+Deployment execution asks the provider registry for route realization plans, passes the generated
+labels/network intent to runtime executors, and applies provider reload steps after route
+configuration changes.
 
 `resources.proxy-configuration.preview` exists for Web/API/CLI, but provider diagnostics are limited to generated configuration sections and basic metadata.
 

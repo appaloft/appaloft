@@ -18,6 +18,8 @@ import {
   type EdgeProxyProviderSelectionInput,
   type ProxyConfigurationView,
   type ProxyConfigurationViewInput,
+  type ProxyReloadInput,
+  type ProxyReloadPlan,
   type ProxyRouteRealizationInput,
   type ProxyRouteRealizationPlan,
   type ResourceReadModel,
@@ -96,6 +98,7 @@ class FakeEdgeProxyProvider implements EdgeProxyProvider {
   readonly capabilities = {
     ensureProxy: true,
     dockerLabels: true,
+    reloadProxy: true,
     configurationView: true,
     runtimeLogs: false,
     diagnostics: false,
@@ -124,6 +127,19 @@ class FakeEdgeProxyProvider implements EdgeProxyProvider {
       labels: [
         `traefik.http.services.${input.deploymentId}.loadbalancer.server.port=${input.port}`,
       ],
+    });
+  }
+
+  async reloadProxy(
+    _context: EdgeProxyExecutionContext,
+    input: ProxyReloadInput,
+  ): Promise<Result<ProxyReloadPlan>> {
+    return ok({
+      providerKey: this.key,
+      proxyKind: input.proxyKind,
+      displayName: this.displayName,
+      required: false,
+      steps: [],
     });
   }
 

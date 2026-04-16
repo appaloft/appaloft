@@ -14,12 +14,15 @@ Core and application code must not branch on concrete edge proxy implementations
 - `EdgeProxyProviderRegistry`;
 - `EdgeProxyEnsurePlan`;
 - `ProxyRouteRealizationPlan`;
+- `ProxyReloadPlan`;
 - `ProxyConfigurationView`.
 
 Concrete edge proxy providers own provider-specific decisions:
 
 - how the shared proxy is installed or ensured on a deployment target;
 - whether route realization is expressed as Docker labels, config files, commands, provider API calls, or runtime manifests;
+- whether realized route or certificate changes become active through automatic provider reload,
+  dynamic-provider watching, or an explicit reload command;
 - how logs, health checks, diagnostics, and generated configuration sections are collected;
 - how resource routes target destination-local workloads.
 
@@ -71,6 +74,11 @@ interface EdgeProxyProvider {
     input: ProxyRouteRealizationInput,
   ): Promise<Result<ProxyRouteRealizationPlan, DomainError>>;
 
+  reloadProxy(
+    context: EdgeProxyExecutionContext,
+    input: ProxyReloadInput,
+  ): Promise<Result<ProxyReloadPlan, DomainError>>;
+
   renderConfigurationView(
     context: EdgeProxyExecutionContext,
     input: ProxyConfigurationViewInput,
@@ -111,6 +119,19 @@ Transport adapters must not instantiate concrete providers. Application use case
 Runtime adapters execute provider-produced plans. They may still own transport details such as local shell execution, SSH execution, Docker command invocation, and log streaming, but they must not decide provider-specific route syntax through hardcoded switches.
 
 Route realization remains idempotent. Re-running realization for the same deployment snapshot and provider key must not create duplicate routes.
+
+Proxy reload is provider-owned route activation. Runtime adapters may execute only the provider's
+reload plan after route or certificate-related proxy configuration has changed:
+
+- providers that watch Docker labels or dynamic configuration may return an `automatic` reload plan
+  with no command;
+- providers that require an explicit reload must return command steps with timeout and safe
+  metadata;
+- runtime adapters must execute command steps after the route configuration is applied, before
+  public route verification;
+- reload failures are route-realization failures and must be recorded as structured async/runtime
+  failures, not hidden in logs;
+- application, Web, CLI, and HTTP code must not hardcode concrete reload commands.
 
 ### Observable Proxy Configuration
 
@@ -157,7 +178,7 @@ Provider-specific proxy code becomes replaceable without changing command schema
 
 Resource detail, API, and CLI can show what proxy configuration Yundu intends to apply or has applied. This reduces black-box runtime behavior and gives operators a stable debugging surface.
 
-Existing route realization and proxy bootstrap code must move behind concrete provider packages. Runtime adapters should become executors of provider-produced plans rather than authors of proxy-specific config.
+Existing route realization, proxy reload, and proxy bootstrap code must move behind concrete provider packages. Runtime adapters should become executors of provider-produced plans rather than authors of proxy-specific config.
 
 Future user-editable proxy overrides require a separate ADR and command boundary. The v1 query is read-only.
 
@@ -191,7 +212,8 @@ Current `DeploymentTarget` and runtime-plan data still expose concrete `proxyKin
 
 `resources.proxy-configuration.preview` is active for API/oRPC, CLI, and Web resource detail, but route input still comes from generated access summaries or deployment runtime-plan snapshots rather than a dedicated proxy-route read model.
 
-Edge proxy providers currently render Docker bootstrap commands, Docker labels, and read-only
+Edge proxy providers currently render Docker bootstrap commands, Docker labels, provider-owned
+reload plans, and read-only
 diagnostic command plans for server connectivity checks. Traefik diagnostics include expected image
 compatibility, Docker provider log scanning, and a bounded Docker-label route probe. Persisted
 provider log collection and richer long-running diagnostic history remain future provider

@@ -230,10 +230,13 @@ Current tests cover `ROUTE-TLS-PROVIDER-001`, `ROUTE-TLS-PROVIDER-002`, and
 `ROUTE-TLS-PROVIDER-003` with a fake ACME client boundary, plus existing shell e2e coverage for
 `ROUTE-TLS-PROVIDER-004`.
 
+Current edge-proxy provider/runtime tests cover provider-owned proxy reload plans for automatic
+Docker-label providers and command-based reload execution/failure through
+`EDGE-PROXY-PROVIDER-009` and `EDGE-PROXY-RELOAD-001..003`.
+
 Current tests do not yet cover DNS-provider verification workflow, certificate validation failure
 branches, event replay handling beyond the create/confirm/domain-ready/certificate-issued baseline,
-resource-scoped browser/e2e behavior, route realization failure state, or real ACME provider
-behavior.
+resource-scoped browser/e2e behavior, route realization failure state, or live CA behavior.
 
 Generated default access routing tests are governed by [Default Access Domain And Proxy Routing Test Matrix](./default-access-domain-and-proxy-routing-test-matrix.md) and must remain separate from durable domain binding readiness tests.
 
