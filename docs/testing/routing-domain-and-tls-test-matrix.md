@@ -104,6 +104,7 @@ Then:
 | ROUTE-TLS-EVT-009 | integration | Certificate imported | `certificate-imported` | Domain bound; manual certificate policy | `ok` | `domain-ready` | Binding ready | No |
 | ROUTE-TLS-EVT-010 | integration | Certificate issuance failed duplicate | Same failed attempt | Attempt already failed | `ok` | None | Remains failed | Retry requires new attempt |
 | ROUTE-TLS-EVT-011 | integration | Domain ready duplicate | `domain-ready` repeated | Already ready | `ok` | None | Remains ready | No |
+| ROUTE-TLS-EVT-012 | integration | Route realization failed for active binding | `deployment.finished(status = failed)` with route failure phase | Binding is `bound`, `certificate_pending`, or `ready` for the failed resource route | `ok` after durable state update | `domain-route-realization-failed` | Binding moves to `not_ready` with route failure metadata | Yes when provider/runtime marks the route failure retriable |
 
 ## Read Model Matrix
 
@@ -115,6 +116,7 @@ Then:
 | ROUTE-TLS-READMODEL-004 | integration | Certificate request list projection | `certificates.issue-or-renew` accepted a first issue attempt | `certificates.list` returns certificate `pending`, latest attempt `requested`, and the selected provider/challenge values |
 | ROUTE-TLS-READMODEL-005 | integration | Certificate terminal list projection | `certificate-requested` handler recorded issued or failed attempt state | `certificates.list` returns certificate `active` with latest attempt `issued`, expiry/fingerprint metadata when issued, or `failed`/`retry_scheduled` with safe failure metadata when issuance failed |
 | ROUTE-TLS-READMODEL-006 | integration | Certificate-backed durable HTTPS route projection | TLS-auto binding consumed `certificate-issued`, published `domain-ready`, and a latest succeeded reverse-proxy deployment exists | `resources.list` exposes `accessSummary.latestDurableDomainRoute` as `https://<domain>` while preserving generated access when present |
+| ROUTE-TLS-READMODEL-007 | integration | Route failure binding list projection | Active binding consumed route realization failure and published `domain-route-realization-failed` | `domain-bindings.list` returns `status = not_ready` and safe route failure metadata without exposing provider secrets |
 
 ## HTTP Challenge Serving Matrix
 
@@ -232,6 +234,10 @@ events, and public certificate read-model projection.
 Current tests also cover `ROUTE-TLS-EVT-008` and `ROUTE-TLS-READMODEL-006` for
 `certificate-issued` driven domain readiness and certificate-backed durable HTTPS route projection.
 
+Current route failure tests cover `ROUTE-TLS-EVT-012`, `ROUTE-TLS-READMODEL-007`, and
+`ROUTE-TLS-ASYNC-003` for route failure process-manager handling, durable binding `not_ready`
+state, and safe read-model projection.
+
 Current tests cover `ROUTE-TLS-CHALLENGE-001`, `ROUTE-TLS-CHALLENGE-002`, and
 `ROUTE-TLS-CHALLENGE-003` for HTTP-01 challenge token serving through the HTTP adapter and injected
 challenge token store.
@@ -250,8 +256,7 @@ long-running timer execution out of CLI one-shot commands.
 
 Current tests do not yet cover DNS-provider verification workflow, certificate validation failure
 branches, event replay handling beyond the create/confirm/domain-ready/certificate-issued baseline,
-resource-scoped browser/e2e behavior, route realization failure state, renewal-window scheduling,
-or live CA behavior.
+resource-scoped browser/e2e behavior, renewal-window scheduling, or live CA behavior.
 
 Generated default access routing tests are governed by [Default Access Domain And Proxy Routing Test Matrix](./default-access-domain-and-proxy-routing-test-matrix.md) and must remain separate from durable domain binding readiness tests.
 

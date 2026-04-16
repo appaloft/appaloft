@@ -43,6 +43,7 @@ import {
   ListSshCredentialsQueryService,
   MarkDomainReadyOnCertificateIssuedHandler,
   MarkDomainReadyOnDomainBoundHandler,
+  MarkDomainRouteFailedOnDeploymentFinishedHandler,
   OpenTerminalSessionUseCase,
   PromoteEnvironmentUseCase,
   RegisterServerUseCase,
@@ -77,6 +78,7 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(BootstrapServerEdgeProxyOnTargetRegisteredHandler);
   container.registerSingleton(MarkDomainReadyOnDomainBoundHandler);
   container.registerSingleton(MarkDomainReadyOnCertificateIssuedHandler);
+  container.registerSingleton(MarkDomainRouteFailedOnDeploymentFinishedHandler);
   container.registerSingleton(IssueCertificateOnCertificateRequestedHandler);
   container.registerSingleton(BootstrapServerProxyCommandHandler);
   container.registerSingleton(IssueOrRenewCertificateCommandHandler);

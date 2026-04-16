@@ -58,6 +58,7 @@ import {
   PgDiagnostics,
   PgDomainBindingReadModel,
   PgDomainBindingRepository,
+  PgDomainRouteFailureCandidateReader,
   PgEnvironmentReadModel,
   PgEnvironmentRepository,
   PgProjectReadModel,
@@ -389,6 +390,11 @@ export function registerRuntimeDependencies(
   });
   container.register(tokens.domainBindingRepository, {
     useFactory: instanceCachingFactory(() => new PgDomainBindingRepository(input.database.db)),
+  });
+  container.register(tokens.domainRouteFailureCandidateReader, {
+    useFactory: instanceCachingFactory(
+      () => new PgDomainRouteFailureCandidateReader(input.database.db),
+    ),
   });
   container.register(tokens.certificateRepository, {
     useFactory: instanceCachingFactory(() => new PgCertificateRepository(input.database.db)),

@@ -14,6 +14,7 @@ export const tokens = {
   resourceRepository: Symbol.for("yundu.resource_repository"),
   deploymentRepository: Symbol.for("yundu.deployment_repository"),
   domainBindingRepository: Symbol.for("yundu.domain_binding_repository"),
+  domainRouteFailureCandidateReader: Symbol.for("yundu.domain_route_failure_candidate_reader"),
   certificateRepository: Symbol.for("yundu.certificate_repository"),
   certificateRetryCandidateReader: Symbol.for("yundu.certificate_retry_candidate_reader"),
   sshCredentialRepository: Symbol.for("yundu.ssh_credential_repository"),

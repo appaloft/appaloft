@@ -48,6 +48,8 @@ import {
   DockerImageTag,
   DomainBindingId,
   DomainBindingStatusValue,
+  DomainRouteFailurePhaseValue,
+  type DomainRouteFailureState,
   DomainVerificationAttemptId,
   type DomainVerificationAttemptState,
   DomainVerificationAttemptStatusValue,
@@ -175,6 +177,7 @@ type DeploymentTargetCredentialKindInput = Parameters<
   typeof DeploymentTargetCredentialKindValue.rehydrate
 >[0];
 type DomainBindingStatusInput = Parameters<typeof DomainBindingStatusValue.rehydrate>[0];
+type DomainRouteFailurePhaseInput = Parameters<typeof DomainRouteFailurePhaseValue.rehydrate>[0];
 type DomainVerificationMethodInput = Parameters<typeof DomainVerificationMethodValue.rehydrate>[0];
 type DomainVerificationAttemptStatusInput = Parameters<
   typeof DomainVerificationAttemptStatusValue.rehydrate
@@ -350,6 +353,15 @@ export interface SerializedDomainVerificationAttempt extends Record<string, unkn
   status: DomainVerificationAttemptStatusInput;
   expectedTarget: string;
   createdAt: string;
+}
+
+export interface SerializedDomainRouteFailure extends Record<string, unknown> {
+  deploymentId: string;
+  failedAt: string;
+  errorCode: string;
+  failurePhase: DomainRouteFailurePhaseInput;
+  retriable: boolean;
+  errorMessage?: string;
 }
 
 export interface SerializedCertificateAttempt extends Record<string, unknown> {
@@ -995,9 +1007,27 @@ export function serializeDomainVerificationAttempts(
   }));
 }
 
+export function serializeDomainRouteFailure(
+  routeFailure?: DomainRouteFailureState,
+): SerializedDomainRouteFailure | null {
+  if (!routeFailure) {
+    return null;
+  }
+
+  return {
+    deploymentId: routeFailure.deploymentId.value,
+    failedAt: routeFailure.failedAt.value,
+    errorCode: routeFailure.errorCode.value,
+    failurePhase: routeFailure.failurePhase.value,
+    retriable: routeFailure.retriable,
+    ...(routeFailure.errorMessage ? { errorMessage: routeFailure.errorMessage.value } : {}),
+  };
+}
+
 export function rehydrateDomainBindingRow(row: Selectable<Database["domain_bindings"]>) {
   const verificationAttempts = (row.verification_attempts ??
     []) as unknown as SerializedDomainVerificationAttempt[];
+  const routeFailure = row.route_failure as SerializedDomainRouteFailure | null;
 
   return {
     id: DomainBindingId.rehydrate(row.id),
@@ -1021,6 +1051,20 @@ export function rehydrateDomainBindingRow(row: Selectable<Database["domain_bindi
       expectedTarget: MessageText.rehydrate(attempt.expectedTarget),
       createdAt: CreatedAt.rehydrate(attempt.createdAt),
     })),
+    ...(routeFailure
+      ? {
+          routeFailure: {
+            deploymentId: DeploymentId.rehydrate(routeFailure.deploymentId),
+            failedAt: CreatedAt.rehydrate(routeFailure.failedAt),
+            errorCode: ErrorCodeText.rehydrate(routeFailure.errorCode),
+            failurePhase: DomainRouteFailurePhaseValue.rehydrate(routeFailure.failurePhase),
+            retriable: routeFailure.retriable,
+            ...(routeFailure.errorMessage
+              ? { errorMessage: MessageText.rehydrate(routeFailure.errorMessage) }
+              : {}),
+          },
+        }
+      : {}),
     createdAt: CreatedAt.rehydrate(normalizeTimestamp(row.created_at) ?? row.created_at),
     ...(row.idempotency_key
       ? { idempotencyKey: IdempotencyKeyValue.rehydrate(row.idempotency_key) }

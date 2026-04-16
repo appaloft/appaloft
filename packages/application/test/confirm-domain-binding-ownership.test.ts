@@ -46,14 +46,36 @@ import {
   NoopLogger,
   SequenceIdGenerator,
 } from "@yundu/testkit";
-import { createExecutionContext, type ExecutionContext, toRepositoryContext } from "../src";
+import {
+  createExecutionContext,
+  type DomainRouteFailureCandidate,
+  type DomainRouteFailureCandidateReader,
+  type ExecutionContext,
+  toRepositoryContext,
+} from "../src";
 import {
   ConfirmDomainBindingOwnershipUseCase,
   CreateDomainBindingUseCase,
   ListDomainBindingsQueryService,
   MarkDomainReadyOnCertificateIssuedHandler,
   MarkDomainReadyOnDomainBoundHandler,
+  MarkDomainRouteFailedOnDeploymentFinishedHandler,
 } from "../src/use-cases";
+
+class StaticDomainRouteFailureCandidateReader implements DomainRouteFailureCandidateReader {
+  constructor(private readonly domainBindingIds: string[]) {}
+
+  async listAffectedBindings(
+    context: Parameters<DomainRouteFailureCandidateReader["listAffectedBindings"]>[0],
+    input: Parameters<DomainRouteFailureCandidateReader["listAffectedBindings"]>[1],
+  ): Promise<DomainRouteFailureCandidate[]> {
+    void context;
+    void input;
+    return this.domainBindingIds.map((domainBindingId) => ({
+      domainBindingId,
+    }));
+  }
+}
 
 function createTestContext(): ExecutionContext {
   return createExecutionContext({
@@ -440,6 +462,102 @@ describe("ConfirmDomainBindingOwnershipUseCase", () => {
       id: domainBindingId,
       status: "ready",
       verificationAttemptCount: 1,
+    });
+  });
+
+  test("[ROUTE-TLS-EVT-012][ROUTE-TLS-READMODEL-007] deployment route failure marks active binding not_ready", async () => {
+    const {
+      confirmUseCase,
+      context,
+      domainBindingId,
+      domainBindings,
+      eventBus,
+      logger,
+      readModel,
+      repositoryContext,
+    } = await seedRoutingContext({
+      domainName: "route-failure.example.com",
+      tlsMode: "auto",
+    });
+
+    const confirmed = await confirmUseCase.execute(context, { domainBindingId });
+    expect(confirmed.isOk()).toBe(true);
+
+    const handler = new MarkDomainRouteFailedOnDeploymentFinishedHandler(
+      domainBindings,
+      new StaticDomainRouteFailureCandidateReader([domainBindingId]),
+      eventBus,
+      logger,
+    );
+    const deploymentFinishedEvent: DomainEvent = {
+      type: "deployment.finished",
+      aggregateId: "dep_route_failed",
+      occurredAt: "2026-01-01T00:05:00.000Z",
+      payload: {
+        status: "failed",
+        exitCode: 1,
+        retryable: true,
+        errorCode: "proxy_reload_failed",
+        failurePhase: "proxy-reload",
+        errorMessage: "Proxy reload failed",
+      },
+    };
+
+    const handled = await handler.handle(context, deploymentFinishedEvent);
+    expect(handled.isOk()).toBe(true);
+
+    const persisted = await domainBindings.findOne(
+      repositoryContext,
+      DomainBindingByIdSpec.create(DomainBindingId.rehydrate(domainBindingId)),
+    );
+    expect(persisted?.toState().status.value).toBe("not_ready");
+    expect(persisted?.toState().routeFailure).toMatchObject({
+      retriable: true,
+    });
+    expect(persisted?.toState().routeFailure?.deploymentId.value).toBe("dep_route_failed");
+    expect(persisted?.toState().routeFailure?.failurePhase.value).toBe("proxy-reload");
+    expect(persisted?.toState().routeFailure?.errorCode.value).toBe("proxy_reload_failed");
+    expect(persisted?.toState().routeFailure?.errorMessage?.value).toBe("Proxy reload failed");
+
+    const routeFailureEvents = eventsByType(eventBus.events, "domain-route-realization-failed");
+    expect(routeFailureEvents).toHaveLength(1);
+    expect(routeFailureEvents[0]?.payload).toMatchObject({
+      domainBindingId,
+      domainName: "route-failure.example.com",
+      pathPrefix: "/",
+      projectId: "prj_demo",
+      environmentId: "env_demo",
+      resourceId: "res_demo",
+      serverId: "srv_demo",
+      destinationId: "dst_demo",
+      deploymentId: "dep_route_failed",
+      failedAt: "2026-01-01T00:05:00.000Z",
+      errorCode: "proxy_reload_failed",
+      failurePhase: "proxy-reload",
+      retriable: true,
+      errorMessage: "Proxy reload failed",
+      correlationId: "req_domain_binding_confirm_test",
+      causationId: "dep_route_failed",
+    });
+
+    const repeated = await handler.handle(context, deploymentFinishedEvent);
+    expect(repeated.isOk()).toBe(true);
+    expect(eventsByType(eventBus.events, "domain-route-realization-failed")).toHaveLength(1);
+
+    const listed = await new ListDomainBindingsQueryService(readModel).execute(context, {
+      resourceId: "res_demo",
+    });
+    expect(listed.items[0]).toMatchObject({
+      id: domainBindingId,
+      status: "not_ready",
+      routeFailure: {
+        deploymentId: "dep_route_failed",
+        failedAt: "2026-01-01T00:05:00.000Z",
+        errorCode: "proxy_reload_failed",
+        failurePhase: "proxy-reload",
+        retriable: true,
+        errorMessage: "Proxy reload failed",
+      },
     });
   });
 });

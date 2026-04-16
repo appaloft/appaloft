@@ -17,6 +17,7 @@ import { resourceProfilesMigration } from "./migrations/009_resource_profiles";
 import { resourceNetworkProfileMigration } from "./migrations/010_resource_network_profile";
 import { serverEdgeProxyBackfillMigration } from "./migrations/011_server_edge_proxy_backfill";
 import { certificatesMigration } from "./migrations/012_certificates";
+import { domainBindingRouteFailureMigration } from "./migrations/013_domain_binding_route_failure";
 import { PgliteDialect } from "./pglite-dialect";
 import { type Database } from "./schema";
 import { TracingDialect } from "./tracing-dialect";
@@ -123,6 +124,7 @@ class StaticMigrationProvider implements MigrationProvider {
       "010_resource_network_profile": resourceNetworkProfileMigration,
       "011_server_edge_proxy_backfill": serverEdgeProxyBackfillMigration,
       "012_certificates": certificatesMigration,
+      "013_domain_binding_route_failure": domainBindingRouteFailureMigration,
     };
   }
 }

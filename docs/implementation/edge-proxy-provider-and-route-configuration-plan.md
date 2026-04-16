@@ -90,13 +90,17 @@ Write-side changes are limited to:
 - applying provider-produced reload plans after route/certificate-related proxy configuration
   changes and before public route verification;
 - recording route realization status and provider key in deployment snapshots/read models where needed;
+- recording durable domain binding `not_ready` state when a failed route realization affects active
+  custom domain bindings;
 - preserving `DeploymentTarget` proxy readiness state as the server bootstrap ownership point.
 
 Provider-rendered configuration sections are query output. They must not become mutable aggregate state.
 
 ## Event Publishing Points
 
-No new formal event is required for the minimal deliverable.
+Route realization failure for durable domain bindings publishes:
+
+- `domain-route-realization-failed`.
 
 Existing events still govern lifecycle:
 
@@ -135,6 +139,8 @@ Minimum tests:
 - provider contract renders reload behavior as `automatic` or command steps;
 - server bootstrap uses provider ensure plan;
 - deployment route realization uses provider route and reload plans;
+- failed route realization marks affected active domain bindings `not_ready` with safe failure
+  metadata and publishes `domain-route-realization-failed`;
 - `resources.proxy-configuration.preview` returns planned/latest/deployment-snapshot views without side effects;
 - Web/API/CLI display query output instead of generating provider-specific config locally;
 - no runtime direct switch is used as the authoritative provider selection mechanism after migration.
@@ -159,6 +165,10 @@ Existing `proxyKind` fields may remain as provider-selection compatibility data 
 Existing generated access route read models are reused as route inputs for configuration preview. They do not yet form a dedicated provider route projection.
 
 The active public query is registered in `CORE_OPERATIONS.md`, `operation-catalog.ts`, API/oRPC, CLI, and Web resource detail.
+
+Durable domain route failure state is now owned by the domain binding route readiness process
+manager. Provider/runtime failures still originate in deployment execution, but affected bindings
+are persisted as `not_ready` for operator-facing status.
 
 ## Open Questions
 

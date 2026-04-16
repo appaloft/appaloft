@@ -6,3 +6,4 @@ export * from "./operations/domain-bindings/list-domain-bindings.handler";
 export * from "./operations/domain-bindings/list-domain-bindings.query-service";
 export * from "./operations/domain-bindings/mark-domain-ready-on-certificate-issued.handler";
 export * from "./operations/domain-bindings/mark-domain-ready-on-domain-bound.handler";
+export * from "./operations/domain-bindings/mark-domain-route-failed-on-deployment-finished.handler";

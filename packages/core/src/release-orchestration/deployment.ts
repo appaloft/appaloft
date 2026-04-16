@@ -160,11 +160,16 @@ export class Deployment extends AggregateRoot<DeploymentState> {
         );
       }
 
+      const failurePhase = resultState.metadata?.phase;
+      const errorMessage = resultState.metadata?.message;
+
       this.recordDomainEvent("deployment.finished", at, {
         status: this.state.status.value,
         exitCode: resultState.exitCode.value,
         retryable: resultState.retryable,
         ...(resultState.errorCode ? { errorCode: resultState.errorCode.value } : {}),
+        ...(failurePhase ? { failurePhase } : {}),
+        ...(errorMessage ? { errorMessage } : {}),
       });
       return undefined;
     });

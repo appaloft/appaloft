@@ -18,6 +18,8 @@ import {
   type DomainBindingReadModel,
   type DomainBindingRepository,
   type DomainBindingSummary,
+  type DomainRouteFailureCandidate,
+  type DomainRouteFailureCandidateReader,
   type EnvironmentReadModel,
   type EnvironmentRepository,
   type EnvironmentSummary,
@@ -634,10 +636,66 @@ export class MemoryDomainBindingReadModel implements DomainBindingReadModel {
           tlsMode: domainBinding.tlsMode.value,
           certificatePolicy: domainBinding.certificatePolicy.value,
           status: domainBinding.status.value,
+          ...(domainBinding.routeFailure
+            ? {
+                routeFailure: {
+                  deploymentId: domainBinding.routeFailure.deploymentId.value,
+                  failedAt: domainBinding.routeFailure.failedAt.value,
+                  errorCode: domainBinding.routeFailure.errorCode.value,
+                  failurePhase: domainBinding.routeFailure.failurePhase.value,
+                  retriable: domainBinding.routeFailure.retriable,
+                  ...(domainBinding.routeFailure.errorMessage
+                    ? { errorMessage: domainBinding.routeFailure.errorMessage.value }
+                    : {}),
+                },
+              }
+            : {}),
           verificationAttemptCount: domainBinding.verificationAttempts.length,
           createdAt: domainBinding.createdAt.value,
         }),
       );
+  }
+}
+
+export class MemoryDomainRouteFailureCandidateReader implements DomainRouteFailureCandidateReader {
+  constructor(
+    private readonly deployments: MemoryDeploymentRepository,
+    private readonly domainBindings: MemoryDomainBindingRepository,
+  ) {}
+
+  async listAffectedBindings(
+    context: RepositoryContext,
+    input: { deploymentId: string },
+  ): Promise<DomainRouteFailureCandidate[]> {
+    void context;
+    const deployment = this.deployments.items.get(input.deploymentId)?.toState();
+
+    if (!deployment) {
+      return [];
+    }
+
+    const candidates: DomainRouteFailureCandidate[] = [];
+
+    for (const domainBinding of this.domainBindings.items.values()) {
+      const state = domainBinding.toState();
+      if (
+        state.projectId.equals(deployment.projectId) &&
+        state.environmentId.equals(deployment.environmentId) &&
+        state.resourceId.equals(deployment.resourceId) &&
+        state.serverId.equals(deployment.serverId) &&
+        state.destinationId.equals(deployment.destinationId) &&
+        (state.status.value === "bound" ||
+          state.status.value === "certificate_pending" ||
+          state.status.value === "ready" ||
+          state.status.value === "not_ready")
+      ) {
+        candidates.push({
+          domainBindingId: state.id.value,
+        });
+      }
+    }
+
+    return candidates;
   }
 }
 

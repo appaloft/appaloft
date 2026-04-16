@@ -21,6 +21,7 @@ import { type Database } from "../schema";
 import {
   rehydrateDomainBindingRow,
   resolveRepositoryExecutor,
+  serializeDomainRouteFailure,
   serializeDomainVerificationAttempts,
 } from "./shared";
 
@@ -83,6 +84,7 @@ class KyselyDomainBindingMutationVisitor
         certificate_policy: spec.state.certificatePolicy.value,
         status: spec.state.status.value,
         verification_attempts: serializeDomainVerificationAttempts(spec.state.verificationAttempts),
+        route_failure: serializeDomainRouteFailure(spec.state.routeFailure),
         idempotency_key: spec.state.idempotencyKey?.value ?? null,
         created_at: spec.state.createdAt.value,
       },
@@ -127,6 +129,7 @@ export class PgDomainBindingRepository implements DomainBindingRepository {
               certificate_policy: mutation.values.certificate_policy,
               status: mutation.values.status,
               verification_attempts: mutation.values.verification_attempts,
+              route_failure: mutation.values.route_failure,
               idempotency_key: mutation.values.idempotency_key,
             }),
           )
