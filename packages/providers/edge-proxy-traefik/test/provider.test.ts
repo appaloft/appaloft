@@ -24,6 +24,26 @@ describe("TraefikEdgeProxyProvider", () => {
         ],
       },
     );
+    expect(realized.isOk()).toBe(true);
+
+    const reload = await provider.reloadProxy(
+      { correlationId: "req_traefik_provider_test" },
+      {
+        proxyKind: "traefik",
+        deploymentId: "dep_demo",
+        reason: "route-realization",
+        accessRoutes: [
+          {
+            proxyKind: "traefik",
+            domains: ["app.203.0.113.10.sslip.io"],
+            pathPrefix: "/",
+            tlsMode: "disabled",
+            targetPort: 3000,
+          },
+        ],
+        routePlan: realized._unsafeUnwrap(),
+      },
+    );
     const view = await provider.renderConfigurationView(
       {
         correlationId: "req_traefik_provider_test",
@@ -70,8 +90,19 @@ describe("TraefikEdgeProxyProvider", () => {
     ]);
     expect(diagnostics._unsafeUnwrap().checks[0]?.command).toContain("traefik:v3.6.2");
     expect(diagnostics._unsafeUnwrap().checks[2]?.command).toContain("traefik.enable=true");
-    expect(realized.isOk()).toBe(true);
     expect(realized._unsafeUnwrap().labels).toContain("traefik.enable=true");
+    expect(reload.isOk()).toBe(true);
+    expect(reload._unsafeUnwrap()).toMatchObject({
+      providerKey: "traefik",
+      proxyKind: "traefik",
+      required: true,
+    });
+    expect(reload._unsafeUnwrap().steps).toEqual([
+      expect.objectContaining({
+        name: "traefik-docker-provider-reload",
+        mode: "automatic",
+      }),
+    ]);
     expect(view.isOk()).toBe(true);
     expect(view._unsafeUnwrap().routes[0]?.source).toBe("generated-default");
     expect(view._unsafeUnwrap().sections[0]?.content).toContain(

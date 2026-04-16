@@ -10,7 +10,7 @@ The minimal deliverable is:
 EdgeProxyProvider port/registry
   -> concrete edge proxy provider packages
   -> server bootstrap uses provider ensure plan
-  -> deployment route realization uses provider route plan
+  -> deployment route realization uses provider route and reload plans
   -> resources.proxy-configuration.preview renders read-only config
   -> Web/API/CLI observe provider-rendered config from the query
 ```
@@ -39,7 +39,7 @@ Expected implementation areas:
 - `packages/application/src/tokens.ts`: add DI token(s) for edge proxy provider registry/query service.
 - `packages/application/src/operations/resources`: add the `resources.proxy-configuration.preview` query slice when promoted to active operation.
 - `packages/providers/edge-proxy-*`: add concrete provider packages.
-- `packages/adapters/runtime`: execute provider-produced plans instead of generating concrete proxy config through switches.
+- `packages/adapters/runtime`: execute provider-produced plans and reload steps instead of generating concrete proxy config or reload commands through switches.
 - `packages/persistence/pg`: project route realization and resource access/configuration read-model state as needed.
 - `packages/contracts`: expose provider-neutral query schema and view types when the query becomes active.
 - `packages/adapters/cli`: display query output without local provider-specific rendering.
@@ -63,6 +63,7 @@ interface EdgeProxyProvider {
   capabilities: EdgeProxyProviderCapabilities;
   ensureProxy(...): Promise<Result<EdgeProxyEnsurePlan, DomainError>>;
   realizeRoutes(...): Promise<Result<ProxyRouteRealizationPlan, DomainError>>;
+  reloadProxy(...): Promise<Result<ProxyReloadPlan, DomainError>>;
   renderConfigurationView(...): Promise<Result<ProxyConfigurationView, DomainError>>;
 }
 ```
@@ -76,7 +77,7 @@ provider plan -> local shell executor | ssh executor | future runtime executor
 Provider packages render plans:
 
 ```text
-resource/server/route snapshot -> provider-specific commands, labels, files, diagnostics
+resource/server/route snapshot -> provider-specific commands, labels, files, reload steps, diagnostics
 ```
 
 ## Write-Side State Changes
@@ -86,6 +87,8 @@ No new aggregate root is introduced for v1.
 Write-side changes are limited to:
 
 - replacing direct proxy-specific route/bootstrap construction with provider-produced plans;
+- applying provider-produced reload plans after route/certificate-related proxy configuration
+  changes and before public route verification;
 - recording route realization status and provider key in deployment snapshots/read models where needed;
 - preserving `DeploymentTarget` proxy readiness state as the server bootstrap ownership point.
 
@@ -117,6 +120,7 @@ Canonical new or reused phases:
 - `proxy-route-plan-render`;
 - `proxy-configuration-render`;
 - `proxy-route-realization`;
+- `proxy-reload`;
 - `proxy-bootstrap`.
 
 No provider-specific error code should mention a concrete proxy product. Provider-specific details may appear in `details.providerKey`, logs, diagnostics, and safe metadata.
@@ -128,8 +132,9 @@ Minimum tests:
 - provider registry resolves configured provider and returns structured error for missing provider;
 - application code does not import concrete edge proxy provider packages;
 - provider contract renders ensure plan, route realization plan, and configuration view from provider-neutral inputs;
+- provider contract renders reload behavior as `automatic` or command steps;
 - server bootstrap uses provider ensure plan;
-- deployment route realization uses provider route plan;
+- deployment route realization uses provider route and reload plans;
 - `resources.proxy-configuration.preview` returns planned/latest/deployment-snapshot views without side effects;
 - Web/API/CLI display query output instead of generating provider-specific config locally;
 - no runtime direct switch is used as the authoritative provider selection mechanism after migration.
@@ -140,7 +145,7 @@ The minimal deliverable is complete when:
 
 1. concrete edge proxy behavior is behind provider packages;
 2. application/server bootstrap and deployment route realization use provider-neutral ports;
-3. runtime adapters execute provider-produced plans;
+3. runtime adapters execute provider-produced plans and reload steps;
 4. resource detail can show read-only proxy configuration from a query;
 5. CLI/API can fetch the same query output or have an accepted migration gap;
 6. tests prove provider contract, query behavior, and one user-facing observation path.

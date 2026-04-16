@@ -110,6 +110,8 @@ Async work includes:
 
 - manual domain ownership verification with durable verification attempts;
 - route/proxy realization when the binding is made active;
+- provider-owned proxy reload or dynamic route activation when route or certificate-backed proxy
+  configuration changes;
 - route readiness projection into resource access summaries;
 - certificate challenge preparation;
 - HTTP-01 challenge token publication and serving when the selected certificate provider and
@@ -196,6 +198,13 @@ For TLS-disabled bindings, no certificate gate remains after route readiness is 
 For TLS auto or certificate-policy auto bindings, route readiness alone is not sufficient. The binding remains `bound` until certificate issuance completes. `certificate-requested` is consumed by the certificate worker through provider-neutral ports; `certificate-issued` records active certificate state and drives certificate-backed `domain-ready`; `certificate-issuance-failed` records failed or retry-scheduled attempt state.
 
 The route readiness baseline does not create a separate public command. It is an event/process-manager continuation from `domain-bound` and a query/read-model projection for resources and domain bindings.
+
+When a durable domain route or certificate-backed proxy configuration changes, route readiness must
+use the edge proxy provider reload behavior governed by
+[Edge Proxy Provider And Route Realization](./edge-proxy-provider-and-route-realization.md). A
+provider may declare automatic reload/activation, or it may return explicit command steps. Domain
+readiness must not be marked from certificate issuance alone when the selected provider still has a
+required reload/activation failure.
 
 ## HTTP-01 Challenge Serving
 
@@ -332,8 +341,8 @@ Current code includes a real ACME provider adapter package that can be enabled t
 shell certificate-provider configuration. The default shell profile remains unavailable so tests and
 local development do not contact a real CA by accident.
 
-Outbox/inbox workflow, DNS-provider verification, route realization failure state, retry scheduler
-execution, and proxy reload are not implemented yet.
+Outbox/inbox workflow, DNS-provider verification, route realization failure state, and retry
+scheduler execution are not implemented yet.
 
 ## Open Questions
 

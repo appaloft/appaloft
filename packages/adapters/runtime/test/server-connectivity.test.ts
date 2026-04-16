@@ -26,6 +26,8 @@ import {
   type ExecutionContext,
   type ProxyConfigurationView,
   type ProxyConfigurationViewInput,
+  type ProxyReloadInput,
+  type ProxyReloadPlan,
   type ProxyRouteRealizationInput,
   type ProxyRouteRealizationPlan,
 } from "@yundu/application";
@@ -37,6 +39,7 @@ class DiagnosticProvider implements EdgeProxyProvider {
   readonly capabilities = {
     ensureProxy: true,
     dockerLabels: true,
+    reloadProxy: true,
     configurationView: true,
     runtimeLogs: false,
     diagnostics: true,
@@ -79,6 +82,19 @@ class DiagnosticProvider implements EdgeProxyProvider {
     _input: ProxyRouteRealizationInput,
   ): Promise<Result<ProxyRouteRealizationPlan>> {
     return err(domainError.provider("not used"));
+  }
+
+  async reloadProxy(
+    _context: EdgeProxyExecutionContext,
+    input: ProxyReloadInput,
+  ): Promise<Result<ProxyReloadPlan>> {
+    return ok({
+      providerKey: this.key,
+      proxyKind: input.proxyKind,
+      displayName: this.displayName,
+      required: false,
+      steps: [],
+    });
   }
 
   async renderConfigurationView(

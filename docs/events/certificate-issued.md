@@ -41,7 +41,7 @@ Expected consumers:
 - domain-ready process manager;
 - certificate read-model projection;
 - audit/notification;
-- route/proxy reload process when required.
+- edge proxy route activation/reload process when provider configuration changes require it.
 
 ## Payload
 
@@ -98,8 +98,9 @@ succeed.
 Current code consumes `certificate-issued` for certificate-backed domain readiness. If the referenced
 domain binding is still `bound`, the handler marks it `ready` and publishes `domain-ready`.
 
-Current code does not yet implement a real ACME adapter, challenge token serving, proxy reload, or
-route realization failure state.
+Current code implements the real ACME adapter, HTTP-01 challenge token serving, and provider-owned
+proxy reload/activation plans for route realization. Route realization failure state is not yet
+implemented.
 
 ## Open Questions
 

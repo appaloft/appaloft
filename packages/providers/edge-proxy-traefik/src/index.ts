@@ -10,6 +10,8 @@ import {
   type ProxyConfigurationRouteView,
   type ProxyConfigurationView,
   type ProxyConfigurationViewInput,
+  type ProxyReloadInput,
+  type ProxyReloadPlan,
   type ProxyRouteRealizationInput,
   type ProxyRouteRealizationPlan,
 } from "@yundu/application";
@@ -21,6 +23,7 @@ const traefikImage = "traefik:v3.6.2";
 const capabilities: EdgeProxyProviderCapabilities = {
   ensureProxy: true,
   dockerLabels: true,
+  reloadProxy: true,
   configurationView: true,
   runtimeLogs: false,
   diagnostics: true,
@@ -333,6 +336,49 @@ export class TraefikEdgeProxyProvider implements EdgeProxyProvider {
       ...(labels.length > 0 ? { networkName: traefikEdgeNetworkName } : {}),
       metadata: {
         routeCount: String(providerRoutes.length),
+      },
+    });
+  }
+
+  async reloadProxy(
+    _context: EdgeProxyExecutionContext,
+    input: ProxyReloadInput,
+  ): Promise<Result<ProxyReloadPlan, DomainError>> {
+    if (input.proxyKind !== "traefik") {
+      return err(
+        domainError.proxyProviderUnavailable("Traefik does not support this proxy kind", {
+          phase: "proxy-reload-plan-render",
+          providerKey: this.key,
+          proxyKind: input.proxyKind,
+        }),
+      );
+    }
+
+    const routeCount = input.accessRoutes.filter((route) => route.proxyKind === "traefik").length;
+
+    return ok({
+      providerKey: this.key,
+      proxyKind: "traefik",
+      displayName: this.displayName,
+      required: routeCount > 0,
+      steps:
+        routeCount > 0
+          ? [
+              {
+                name: "traefik-docker-provider-reload",
+                mode: "automatic",
+                successMessage:
+                  "Traefik Docker provider watches container label changes and activates routes automatically",
+                metadata: {
+                  routeCount: String(routeCount),
+                  reason: input.reason,
+                },
+              },
+            ]
+          : [],
+      metadata: {
+        routeCount: String(routeCount),
+        routeLabelCount: String(input.routePlan.labels.length),
       },
     });
   }

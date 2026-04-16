@@ -4,6 +4,8 @@ import {
   type EdgeProxyExecutionContext,
   type EdgeProxyProviderRegistry,
   type EdgeProxyRouteInput,
+  type ProxyReloadPlan,
+  type ProxyReloadReason,
   type ProxyRouteRealizationPlan,
 } from "@yundu/application";
 import { type AccessRoute, type DomainError, err, ok, type Result } from "@yundu/core";
@@ -172,6 +174,47 @@ export async function createProxyRouteRealizationPlan(input: {
     deploymentId: input.deploymentId,
     port: input.port,
     accessRoutes: routes,
+  });
+  if (planResult.isErr()) {
+    return err(planResult.error);
+  }
+
+  return ok(planResult.value);
+}
+
+export async function createProxyReloadPlan(input: {
+  providerRegistry: EdgeProxyProviderRegistry;
+  context: EdgeProxyExecutionContext;
+  deploymentId: string;
+  accessRoutes: AccessRoute[];
+  routePlan: ProxyRouteRealizationPlan | null;
+  reason: ProxyReloadReason;
+}): Promise<Result<ProxyReloadPlan | null, DomainError>> {
+  const routes = routeInputsFromAccessRoutes(input.accessRoutes);
+  const route = firstProviderRoute(routes);
+  if (!route || !input.routePlan) {
+    return ok(null);
+  }
+
+  const providerResult = input.providerRegistry.defaultFor({
+    proxyKind: route.proxyKind,
+    ...(route.providerKey ? { providerKey: route.providerKey } : {}),
+  });
+  if (providerResult.isErr()) {
+    return err(providerResult.error);
+  }
+
+  const provider = providerResult.value;
+  if (!provider) {
+    return ok(null);
+  }
+
+  const planResult = await provider.reloadProxy(input.context, {
+    proxyKind: route.proxyKind,
+    deploymentId: input.deploymentId,
+    accessRoutes: routes,
+    routePlan: input.routePlan,
+    reason: input.reason,
   });
   if (planResult.isErr()) {
     return err(planResult.error);
