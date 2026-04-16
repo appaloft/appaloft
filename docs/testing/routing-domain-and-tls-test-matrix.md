@@ -133,6 +133,16 @@ Then:
 | ROUTE-TLS-PROVIDER-003 | provider contract | Unsupported challenge type | Adapter receives `challengeType != http-01` | Provider returns non-retryable `certificate_challenge_preparation_failed` with phase `challenge-preparation` |
 | ROUTE-TLS-PROVIDER-004 | composition integration | ACME disabled by default | Shell runs without ACME certificate-provider configuration | `certificates.issue-or-renew` remains accepted but the worker records retryable `certificate_provider_unavailable`; no live CA call is made |
 
+## Certificate Retry Scheduler Matrix
+
+| Test ID | Preferred automation | Case | Input/state | Expected result |
+| --- | --- | --- | --- | --- |
+| ROUTE-TLS-SCHED-001 | integration | Due retry-scheduled attempt | Latest certificate attempt is `retry_scheduled` and due | Scheduler dispatches `certificates.issue-or-renew` with the same reason/provider/challenge/certificate id and creates a new attempt id |
+| ROUTE-TLS-SCHED-002 | integration | Retry not due | Latest retry-scheduled attempt has future `retryAfter` or default-delay window has not elapsed | Scheduler skips the candidate and creates no new attempt |
+| ROUTE-TLS-SCHED-003 | integration | Existing newer in-flight attempt | Certificate has a `requested` or `issuing` attempt after a retry-scheduled failure | Scheduler skips the historical failed attempt |
+| ROUTE-TLS-SCHED-004 | integration | Repeated scheduler tick | Scheduler is run twice for the same due failed attempt | Stable idempotency key prevents duplicate retry attempts |
+| ROUTE-TLS-SCHED-005 | composition integration | Shell retry scheduler wiring | Shell composition starts the scheduler only when configured for a long-running server process | Scheduler uses application ports/use cases; CLI one-shot commands do not start hidden retry loops |
+
 ## Async Failure Matrix
 
 | Test ID | Preferred automation | Failure | Phase | Expected error code | Expected state | Expected event | Retriable |
@@ -234,9 +244,14 @@ Current edge-proxy provider/runtime tests cover provider-owned proxy reload plan
 Docker-label providers and command-based reload execution/failure through
 `EDGE-PROXY-PROVIDER-009` and `EDGE-PROXY-RELOAD-001..003`.
 
+Current certificate retry scheduler tests cover `ROUTE-TLS-SCHED-001..004` for due retry
+dispatch, future retry skip, in-flight skip, and repeated-tick idempotency. Shell wiring keeps
+long-running timer execution out of CLI one-shot commands.
+
 Current tests do not yet cover DNS-provider verification workflow, certificate validation failure
 branches, event replay handling beyond the create/confirm/domain-ready/certificate-issued baseline,
-resource-scoped browser/e2e behavior, route realization failure state, or live CA behavior.
+resource-scoped browser/e2e behavior, route realization failure state, renewal-window scheduling,
+or live CA behavior.
 
 Generated default access routing tests are governed by [Default Access Domain And Proxy Routing Test Matrix](./default-access-domain-and-proxy-routing-test-matrix.md) and must remain separate from durable domain binding readiness tests.
 

@@ -59,6 +59,9 @@ Required async/process ports:
 
 - `CertificateWorker`: consumes `certificate-requested` and drives provider issue/renew work.
 - `CertificateRenewalScheduler` or process manager: scans durable certificate state and dispatches `certificates.issue-or-renew(reason = renew)`.
+- `CertificateRetryScheduler` or process manager: scans durable certificate state for due
+  `retry_scheduled` attempts and dispatches `certificates.issue-or-renew` with the same
+  certificate id, reason, provider key, and challenge type.
 - `DomainReadyProcessManager`: evaluates readiness after `certificate-issued`.
 
 ## Write-Side State Changes
@@ -202,6 +205,36 @@ The fourth executable slice is HTTP-01 challenge serving and a real ACME provide
   explicitly present;
 - default tests and development keep the provider-unavailable behavior to avoid accidental CA calls.
 
+## Fifth Code Round Slice
+
+The fifth executable slice is provider-owned route activation and proxy reload:
+
+- edge-proxy provider descriptors expose whether route activation is automatic or requires command
+  steps;
+- runtime route plans include reload steps after proxy configuration changes when the provider
+  requires them;
+- runtime execution records reload success or failure without hiding it behind certificate state;
+- route readiness and certificate-backed domain readiness must not treat a provider-required reload
+  failure as ready.
+
+## Sixth Code Round Slice
+
+The sixth executable slice is retry scheduler execution for retryable certificate failures:
+
+- `CertificateRetryCandidateReader` queries durable certificate state, not certificate list UI
+  read models;
+- `CertificateRetryScheduler` selects latest `retry_scheduled` attempts that are due by explicit
+  `retryAfter` or by the configured default retry delay;
+- candidates with newer in-flight attempts are skipped;
+- each dispatch calls `certificates.issue-or-renew` through the application use case with the same
+  certificate id, domain binding id, reason, provider key, and challenge type as the failed
+  attempt;
+- each retry creates a new attempt id through normal command/use-case logic;
+- scheduler idempotency keys are derived from the previous failed attempt id so repeated ticks do
+  not duplicate retry attempts;
+- shell composition may start a timer only for long-running server processes, never for CLI
+  one-shot commands.
+
 ## Migration Seams And Legacy Edges
 
 Runtime proxy behavior that obtains certificates implicitly remains adapter behavior and must not be treated as platform-owned certificate lifecycle state.
@@ -249,5 +282,21 @@ Current code also implements the fourth executable slice:
   directory URL, and challenge verification policy;
 - default shell behavior remains provider-unavailable when ACME is not configured.
 
-Current code intentionally does not implement renewal scheduling, retry scheduler execution, proxy
-reload, or route realization failure state.
+Current code also implements the fifth executable slice:
+
+- edge-proxy provider descriptors declare automatic or command-based reload behavior;
+- runtime proxy plan generation and execution cover provider reload steps;
+- reload failure is recorded as execution failure instead of silently marking route realization as
+  complete.
+
+Current code also implements the sixth executable slice:
+
+- `CertificateRetryCandidateReader` and `CertificateRetryScheduler` scan durable certificate state
+  for due `retry_scheduled` attempts;
+- due retries dispatch `certificates.issue-or-renew` through the application use case with stable
+  scheduler idempotency;
+- shell composition starts retry scheduling only for long-running server processes and not CLI
+  one-shot commands.
+
+Current code intentionally does not implement renewal-window scheduling or route realization
+failure state.

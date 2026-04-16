@@ -90,7 +90,9 @@ is present. The default development/test shell profile must not contact a real C
 retryable `certificate_provider_unavailable` state after accepted requests when ACME is not
 configured.
 
-Retry scheduler execution and proxy reload are not implemented yet.
+Proxy reload is implemented through edge-proxy provider descriptors and runtime reload plans. Retry
+scheduler execution is implemented as a separate process-manager capability for retriable
+certificate attempts.
 
 ## Superseded Open Questions
 

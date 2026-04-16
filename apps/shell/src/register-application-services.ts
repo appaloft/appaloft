@@ -5,6 +5,7 @@ import {
   type CertificateProviderSelection,
   type CertificateProviderSelectionInput,
   type CertificateProviderSelectionPolicy,
+  CertificateRetryScheduler,
   ConfigureServerCredentialUseCase,
   ConfirmDomainBindingOwnershipUseCase,
   CreateDeploymentUseCase,
@@ -141,6 +142,7 @@ export function registerApplicationServices(container: DependencyContainer): voi
     tokens.issueOrRenewCertificateUseCase,
     IssueOrRenewCertificateUseCase,
   );
+  container.registerSingleton(tokens.certificateRetryScheduler, CertificateRetryScheduler);
   container.registerSingleton(tokens.listCertificatesQueryService, ListCertificatesQueryService);
   container.registerSingleton(tokens.listDeploymentsQueryService, ListDeploymentsQueryService);
   container.registerSingleton(tokens.logsQueryService, DeploymentLogsQueryService);

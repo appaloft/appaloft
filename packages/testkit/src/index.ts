@@ -5,6 +5,8 @@ import {
   type CertificateProviderPort,
   type CertificateReadModel,
   type CertificateRepository,
+  type CertificateRetryCandidate,
+  type CertificateRetryCandidateReader,
   type CertificateSecretStore,
   type CertificateSummary,
   type Clock,
@@ -678,6 +680,89 @@ export class MemoryCertificateRepository implements CertificateRepository {
     }
 
     return null;
+  }
+}
+
+function retryAttemptIsDue(input: {
+  failedAt?: string;
+  requestedAt: string;
+  retryAfter?: string;
+  now: string;
+  defaultRetryDelaySeconds: number;
+}): boolean {
+  const nowMs = Date.parse(input.now);
+  if (!Number.isFinite(nowMs)) {
+    return false;
+  }
+
+  if (input.retryAfter) {
+    const retryAfterMs = Date.parse(input.retryAfter);
+    return Number.isFinite(retryAfterMs) && retryAfterMs <= nowMs;
+  }
+
+  const basisMs = Date.parse(input.failedAt ?? input.requestedAt);
+  if (!Number.isFinite(basisMs)) {
+    return false;
+  }
+
+  return basisMs + input.defaultRetryDelaySeconds * 1000 <= nowMs;
+}
+
+export class MemoryCertificateRetryCandidateReader implements CertificateRetryCandidateReader {
+  constructor(private readonly repository: MemoryCertificateRepository) {}
+
+  async listDueRetries(
+    context: RepositoryContext,
+    input: {
+      now: string;
+      defaultRetryDelaySeconds: number;
+      limit: number;
+    },
+  ): Promise<CertificateRetryCandidate[]> {
+    void context;
+    const candidates: CertificateRetryCandidate[] = [];
+
+    for (const certificate of this.repository.items.values()) {
+      const state = certificate.toState();
+      const latestAttempt = state.attempts[state.attempts.length - 1];
+
+      if (!latestAttempt || latestAttempt.status.value !== "retry_scheduled") {
+        continue;
+      }
+
+      const retryAfter = latestAttempt.retryAfter?.value;
+      const failedAt = latestAttempt.failedAt?.value;
+      if (
+        !retryAttemptIsDue({
+          now: input.now,
+          defaultRetryDelaySeconds: input.defaultRetryDelaySeconds,
+          requestedAt: latestAttempt.requestedAt.value,
+          ...(failedAt ? { failedAt } : {}),
+          ...(retryAfter ? { retryAfter } : {}),
+        })
+      ) {
+        continue;
+      }
+
+      candidates.push({
+        certificateId: state.id.value,
+        domainBindingId: state.domainBindingId.value,
+        domainName: state.domainName.value,
+        attemptId: latestAttempt.id.value,
+        reason: latestAttempt.reason.value,
+        providerKey: latestAttempt.providerKey.value,
+        challengeType: latestAttempt.challengeType.value,
+        requestedAt: latestAttempt.requestedAt.value,
+        ...(failedAt ? { failedAt } : {}),
+        ...(retryAfter ? { retryAfter } : {}),
+      });
+
+      if (candidates.length >= input.limit) {
+        break;
+      }
+    }
+
+    return candidates;
   }
 }
 

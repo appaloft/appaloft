@@ -26,6 +26,13 @@ export interface CertificateProviderConfig {
   acme: AcmeCertificateProviderConfig;
 }
 
+export interface CertificateRetrySchedulerConfig {
+  enabled: boolean;
+  intervalSeconds: number;
+  defaultRetryDelaySeconds: number;
+  batchSize: number;
+}
+
 export interface AppConfig {
   appName: string;
   appVersion: string;
@@ -57,6 +64,7 @@ export interface AppConfig {
   secretMask: string;
   defaultAccessDomain: DefaultAccessDomainConfig;
   certificateProvider: CertificateProviderConfig;
+  certificateRetryScheduler: CertificateRetrySchedulerConfig;
   enabledSystemPlugins: string[];
   configFilePath?: string;
 }
@@ -100,6 +108,12 @@ const defaults: Omit<AppConfig, "dataDir" | "pgliteDataDir"> = {
       skipChallengeVerification: false,
       challengeTokenTtlSeconds: 600,
     },
+  },
+  certificateRetryScheduler: {
+    enabled: true,
+    intervalSeconds: 300,
+    defaultRetryDelaySeconds: 300,
+    batchSize: 25,
   },
   enabledSystemPlugins: [],
 };
@@ -159,6 +173,20 @@ function parseBoolean(value: string | undefined): boolean | undefined {
   }
 
   return undefined;
+}
+
+function parsePositiveInteger(value: string | number | undefined): number | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  const numberValue = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(numberValue)) {
+    return undefined;
+  }
+
+  const normalized = Math.trunc(numberValue);
+  return normalized > 0 ? normalized : undefined;
 }
 
 function normalizeOtlpTraceEndpointFromBase(endpoint: string): string {
@@ -242,6 +270,25 @@ export function resolveConfig(source: ConfigSource<AppConfig> = {}): AppConfig {
       acmeConfig.challengeTokenTtlSeconds ??
       defaults.certificateProvider.acme.challengeTokenTtlSeconds,
   );
+  const certificateRetryScheduler =
+    source.flags?.certificateRetryScheduler ??
+    fileConfig.certificateRetryScheduler ??
+    defaults.certificateRetryScheduler;
+  const certificateRetrySchedulerEnabled =
+    parseBoolean(env.YUNDU_CERTIFICATE_RETRY_SCHEDULER_ENABLED) ??
+    certificateRetryScheduler.enabled;
+  const certificateRetrySchedulerIntervalSeconds =
+    parsePositiveInteger(env.YUNDU_CERTIFICATE_RETRY_SCHEDULER_INTERVAL_SECONDS) ??
+    parsePositiveInteger(certificateRetryScheduler.intervalSeconds) ??
+    defaults.certificateRetryScheduler.intervalSeconds;
+  const certificateRetryDefaultDelaySeconds =
+    parsePositiveInteger(env.YUNDU_CERTIFICATE_RETRY_DEFAULT_DELAY_SECONDS) ??
+    parsePositiveInteger(certificateRetryScheduler.defaultRetryDelaySeconds) ??
+    defaults.certificateRetryScheduler.defaultRetryDelaySeconds;
+  const certificateRetrySchedulerBatchSize =
+    parsePositiveInteger(env.YUNDU_CERTIFICATE_RETRY_SCHEDULER_BATCH_SIZE) ??
+    parsePositiveInteger(certificateRetryScheduler.batchSize) ??
+    defaults.certificateRetryScheduler.batchSize;
 
   return {
     appName: source.flags?.appName ?? env.YUNDU_APP_NAME ?? fileConfig.appName ?? defaults.appName,
@@ -431,6 +478,12 @@ export function resolveConfig(source: ConfigSource<AppConfig> = {}): AppConfig {
         skipChallengeVerification: acmeSkipChallengeVerification,
         challengeTokenTtlSeconds: acmeChallengeTokenTtlSeconds,
       },
+    },
+    certificateRetryScheduler: {
+      enabled: certificateRetrySchedulerEnabled,
+      intervalSeconds: certificateRetrySchedulerIntervalSeconds,
+      defaultRetryDelaySeconds: certificateRetryDefaultDelaySeconds,
+      batchSize: certificateRetrySchedulerBatchSize,
     },
     enabledSystemPlugins,
     ...(source.configFilePath ? { configFilePath: source.configFilePath } : {}),

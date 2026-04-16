@@ -200,6 +200,30 @@ export interface CertificateRepository {
   ): Promise<void>;
 }
 
+export interface CertificateRetryCandidate {
+  certificateId: string;
+  domainBindingId: string;
+  domainName: string;
+  attemptId: string;
+  reason: CertificateIssueReason;
+  providerKey: string;
+  challengeType: string;
+  requestedAt: string;
+  failedAt?: string;
+  retryAfter?: string;
+}
+
+export interface CertificateRetryCandidateReader {
+  listDueRetries(
+    context: RepositoryContext,
+    input: {
+      now: string;
+      defaultRetryDelaySeconds: number;
+      limit: number;
+    },
+  ): Promise<CertificateRetryCandidate[]>;
+}
+
 export interface CertificateProviderSelectionInput {
   domainBindingId: string;
   domainName: string;
