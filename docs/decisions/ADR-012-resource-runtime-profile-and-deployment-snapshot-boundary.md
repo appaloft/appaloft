@@ -193,6 +193,7 @@ Future implementation must not add more reusable configuration fields to `deploy
 - [ADR-014: Deployment Admission Uses Resource Profile](./ADR-014-deployment-admission-uses-resource-profile.md)
 - [ADR-015: Resource Network Profile](./ADR-015-resource-network-profile.md)
 - [ADR-017: Default Access Domain And Proxy Routing](./ADR-017-default-access-domain-and-proxy-routing.md)
+- [ADR-020: Resource Health Observation](./ADR-020-resource-health-observation.md)
 - [Core Operations](../CORE_OPERATIONS.md)
 - [Domain Model](../DOMAIN_MODEL.md)
 
@@ -214,6 +215,10 @@ Public redeploy behavior is removed from the v1 deployment command surface by [A
 Resource-side source binding, runtime profile, and network profile persistence are being introduced through the first-deploy `resources.create` path. Dedicated update/configuration commands remain future work.
 
 Current code stores the resource listener port as `ResourceNetworkProfile.internalPort`.
+
+Current resource health observation is governed by ADR-020. Deployment-time health verification may
+remain an attempt execution concern, but reusable health policy and current health status belong to
+the resource profile/read-model side of the boundary.
 
 Current code has explicit source value objects and command/schema fields for the initial Git and
 Docker image source variants. Runtime planning still carries source variant values through source

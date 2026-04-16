@@ -161,17 +161,26 @@ Boundary rule:
   `ResourceNetworkProfile.internalPort` before dispatching a command
 - resource detail is the owner-scoped console surface for new deployment, deployment history,
   source/runtime/network profile, generated access routes, proxy configuration, application runtime
-  logs, domain/TLS, and resource-specific configuration actions
+  logs, diagnostic summary, domain/TLS, and resource-specific configuration actions
 - application runtime log observation belongs to the resource surface and is performed through an
   application-layer runtime log reader port; Docker, PM2, systemd, file-tail, and provider log
   mechanisms are adapter details and must not leak into core aggregates
+- current resource health observation belongs to the resource surface and is performed through
+  application-layer read/query ports that inspect runtime/container/process state, configured
+  health policy, proxy route state, and public access state. `ResourceHealthSummary` is a read
+  model/projection, not `Resource` aggregate state.
 - generated default access routes target `ResourceNetworkProfile.internalPort` through the selected
   deployment target's proxy; generated route providers are infrastructure adapters, not resource
   aggregate logic
 - current generated access URL/status is exposed through a resource-scoped read-model projection
   such as `ResourceAccessSummary`; it is not persisted as `Resource` aggregate state
+- durable domain bindings are resource-scoped. A deployment attempt may snapshot the route it used,
+  but domain ownership and current access status belong to resource/domain read models.
 - full generated proxy configuration is exposed through a resource-scoped read/query view such as
   `ProxyConfigurationView`; it is operator-facing read-model output, not `Resource` aggregate state
+- support/debug diagnostics are exposed through a resource-scoped read/query view such as
+  `ResourceDiagnosticSummary`; it composes read-model state and safe adapter/system context, and is
+  not `Resource` aggregate state
 
 ### Dependency Resources
 
@@ -202,6 +211,9 @@ Boundary rule:
 - `Deployment` does not own durable source binding, runtime profile, network profile, generated
   access policy, domain binding, or certificate policy
 - deployment snapshots may record resolved generated or durable access routes used by that attempt
+- deployment success is not current resource health. Attempt-time verification can feed resource
+  health observation, but the long-lived current health view belongs to Workload Delivery read
+  models such as `ResourceHealthSummary`.
 - deployments are displayed under the Resource that owns them; global or project-level deployment
   pages are read/query rollups
 - deployment logs are attempt/progress records; application runtime logs are resource-owned
@@ -426,8 +438,11 @@ Rules:
   admission can resolve reverse-proxy upstream targets
 - `internalPort` means the workload listener inside the runtime environment or container network;
   it is not the server host-published port
+- reverse-proxy resources may share the same `internalPort` on one deployment target because the
+  runtime/proxy fabric isolates them by resource/deployment identity
 - direct host publication is explicit and must not be the default exposure model for HTTP
-  application resources
+  application resources; host-port conflicts are direct-port placement failures, not permission to
+  stop another resource
 - generated default access routes target `ResourceNetworkProfile.internalPort` through the selected
   deployment target's edge proxy and do not require public host publication of the application port
 
@@ -549,7 +564,7 @@ Application slices should be understood through the same contexts:
 - `runtime-topology`: deployment target registration/listing, destinations, edge proxy state, and
   domain binding admission
 - `release-orchestration`: deployment creation, listing, logs, rollback
-- `extensibility`: providers, plugins, GitHub repository browsing, diagnostics
+- `extensibility`: providers, plugins, GitHub repository browsing, system diagnostics
 
 ## Naming Rules
 

@@ -97,7 +97,7 @@ The provider request includes:
 | `environmentId` | Environment context. |
 | `serverId` | Deployment target/server context. |
 | `destinationId` | Runtime placement context. |
-| `deploymentId` | Deployment attempt id when the route is deployment-scoped. |
+| `deploymentId` | Deployment attempt id only when the configured provider policy explicitly requires a deployment-scoped route. |
 | `routePurpose` | `default-resource-access`, `preview-access`, or future explicit purpose. |
 | `correlationId` | Observability id. |
 | `causationId` | Causation id from command/event. |
@@ -113,6 +113,11 @@ The provider response includes:
 | `metadata` | Safe diagnostic metadata only. |
 
 Provider-specific suffixes, DNS algorithms, and naming rules stay inside the provider adapter and configuration.
+
+Generated default access should prefer a stable resource-scoped hostname. Repeated deployments of
+the same resource should resolve the same generated hostname when resource, target, destination,
+and path policy are unchanged. If a provider requires deployment-scoped hostnames, that scope must
+be explicit in the route snapshot and `ResourceAccessSummary`.
 
 Concrete generated-domain providers live under:
 
@@ -138,12 +143,20 @@ For reverse-proxy exposure:
 - `networkProfile.internalPort` is required;
 - `networkProfile.upstreamProtocol` must be supported by the selected edge proxy provider and runtime adapter;
 - `networkProfile.exposureMode` must be `reverse-proxy`;
-- `hostPort` must not be required.
+- `hostPort` must not be required;
+- the same `internalPort` may be used by multiple resources on the same target because routing is
+  scoped by resource/deployment identity and proxy route metadata.
+
+Runtime adapters may allocate a loopback-only or runtime-local ephemeral host port for health
+checks, but generated access and edge proxy routing must continue to target the resolved
+`internalPort` through the proxy network or equivalent runtime fabric.
 
 For direct-port exposure:
 
 - default generated access routing is not used;
-- direct host publication must be implemented through a separate explicit resource network configuration path.
+- direct host publication must be implemented through a separate explicit resource network configuration path;
+- host-port conflicts must fail or reject the direct-port deployment without stopping another
+  resource that already owns the port.
 
 For no inbound exposure:
 
@@ -173,6 +186,8 @@ The edge proxy provider and runtime adapter together must:
 - render and apply route labels/config/manifests using the generated or durable hostname;
 - target the resource's resolved internal port;
 - attach the workload to the proxy network or equivalent runtime routing fabric;
+- scope workload replacement to the deployed resource, not to every workload that exposes the same
+  internal port;
 - publish public route progress/logs as deployment progress;
 - verify the public route when verification is configured;
 - record failures with structured error codes and phases.

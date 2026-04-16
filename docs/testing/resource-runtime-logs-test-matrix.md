@@ -78,7 +78,7 @@ Then:
 
 | Backend | Expected adapter behavior | Must not expose |
 | --- | --- | --- |
-| Docker | May call Docker API or `docker logs --tail --follow`; normalize to line events. | Container id as public input, Docker-specific event type in query output. |
+| Docker | May call Docker API or `docker logs --tail --follow`; for generic-SSH targets it may run the same Docker log command through SSH with resolved server credentials; normalize to line events. | Container id as public input, Docker-specific event type in query output, local-only assumptions for remote targets. |
 | PM2 | May call PM2 API or `pm2 logs --raw`; normalize process output. | PM2 process object as public input/output. |
 | systemd | May call journal API or `journalctl`; normalize journal entries. | systemd unit object as public input/output. |
 | File tail | May watch a configured log file; normalize appended lines. | Host filesystem path as public input. |
@@ -89,7 +89,8 @@ Then:
 | Entrypoint | Case | Expected behavior |
 | --- | --- | --- |
 | Web | Resource page opens bounded tail | Uses `resources.runtime-logs`; renders lines incrementally. |
-| Web | User toggles follow then navigates away | Stream aborts and backend closes. |
+| Web | User starts follow after a bounded tail is already visible | Opens follow mode without appending duplicate historical tail lines. |
+| Web | User stops follow or navigates away | Stream aborts and backend closes; normal cancellation is not rendered as a user-facing error. |
 | CLI | `resource logs --tail 50` | Prints bounded tail, exits cleanly. |
 | CLI | `resource logs --follow` then Ctrl-C | Aborts stream, exits cleanly. |
 | HTTP/oRPC | Bounded endpoint | Reuses query schema and serializes normalized lines. |
@@ -103,8 +104,11 @@ deployment/resource mismatch, and no observable deployment errors.
 Existing deployment log tests, if present, should remain deployment-attempt focused and must not be
 reused as proof that runtime application log streaming works.
 
-Additional adapter/transport/browser tests should cover runtime reader cancellation, Docker/Compose
-command construction, oRPC streaming iteration, and Web stream stop-on-navigation behavior.
+Additional adapter/transport/browser tests should cover runtime reader cancellation, oRPC streaming
+iteration, and Web stream stop-on-navigation behavior. Runtime adapter tests cover local Docker
+output draining and generic-SSH Docker/Compose command construction. Web verification covers lazy
+runtime-log loading for the logs tab, duplicate-tail avoidance when follow starts, and silent normal
+stream cancellation when follow stops.
 
 ## Open Questions
 

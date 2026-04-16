@@ -21,9 +21,13 @@ This workflow inherits:
 - [ADR-012: Resource Runtime Profile And Deployment Snapshot Boundary](../decisions/ADR-012-resource-runtime-profile-and-deployment-snapshot-boundary.md)
 - [ADR-015: Resource Network Profile](../decisions/ADR-015-resource-network-profile.md)
 - [ADR-018: Resource Runtime Log Observation](../decisions/ADR-018-resource-runtime-log-observation.md)
+- [ADR-020: Resource Health Observation](../decisions/ADR-020-resource-health-observation.md)
 - [resources.create Command Spec](../commands/resources.create.md)
 - [deployments.create Command Spec](../commands/deployments.create.md)
+- [resources.health Query Spec](../queries/resources.health.md)
+- [resources.diagnostic-summary Query Spec](../queries/resources.diagnostic-summary.md)
 - [resources.runtime-logs Query Spec](../queries/resources.runtime-logs.md)
+- [Resource Diagnostic Summary Workflow Spec](./resource-diagnostic-summary.md)
 - [Resource Runtime Log Observation Workflow Spec](./resource-runtime-log-observation.md)
 - [Quick Deploy Workflow Spec](./quick-deploy.md)
 - [Resource Create And First Deploy Workflow Spec](./resources.create-and-first-deploy.md)
@@ -59,11 +63,13 @@ Each resource item should expose:
 - resource name;
 - resource kind;
 - environment context;
-- latest deployment status when available;
+- current resource health when available;
+- latest deployment status as contextual history only;
 - primary navigation to the resource detail page;
 - resource-scoped create deployment shortcut only when the selected resource can accept it.
 
-Latest deployment status is a read-model/projection field. It must not become a Resource aggregate invariant unless a future ADR promotes it.
+Current resource health and latest deployment status are read-model/projection fields. They must not
+become Resource aggregate invariants unless a future ADR promotes them.
 
 ## Resource Detail Contract
 
@@ -73,8 +79,13 @@ Resource detail pages must be the primary owner-scoped surface for:
 - future redeploy only after it is reintroduced under ADR-016;
 - deployment history;
 - deployment progress/status;
+- current resource health through `resources.health` when that query/projection exists;
+- resource-scoped access URL from ready domain binding or `ResourceAccessSummary`, not only from a
+  deployment detail snapshot;
 - application runtime logs through `resources.runtime-logs` when an observable runtime instance
   exists;
+- copyable diagnostic summary through `resources.diagnostic-summary` when support/debug context is
+  needed, especially when access, proxy configuration, or runtime logs are empty or unavailable;
 - source binding, runtime profile, and network profile setup;
 - domain binding and TLS affordances;
 - resource-scoped variables or configuration affordances when supported;
@@ -83,6 +94,53 @@ Resource detail pages must be the primary owner-scoped surface for:
 Deployment history shown on the resource page must be filtered by `resourceId`.
 
 New deployment from a resource detail page must dispatch `deployments.create` with the resource id and use resource-profile-derived defaults during deployment admission.
+
+## Resource Detail Information Architecture Contract
+
+Resource detail pages are application-first configuration surfaces. The page shell must make the
+durable resource understandable before showing historical deployment attempts.
+
+The persistent resource header must be compact and must not become a summary dashboard. It may show:
+
+- resource name;
+- resource kind;
+- compact current health indicator and refresh affordance;
+- one primary resource-scoped lifecycle action such as new deployment when supported.
+
+The persistent resource header must not show these as primary actions:
+
+- open project;
+- view deployments;
+- open access URL;
+- bind domain;
+- copy diagnostic summary.
+
+Those actions belong in their owner section: project navigation in breadcrumbs/sidebar, deployment
+history in the deployment tab, access URL in the configuration overview, domain binding in the
+access/domain section, and diagnostics in the diagnostics/support section.
+
+The first top-level tab must be the resource configuration/overview tab. It must expose the
+application's current public access URL, basic profile, network/runtime placement, domain binding,
+health policy, and diagnostic affordances through inner section tabs or equivalent nested route
+state. The inner navigation must change the right-side content panel; it must not be implemented as
+same-page hash anchors that scroll through one long page.
+The access URL must be visible on the first/default resource tab when available because it is the
+primary application outcome. It must not be hidden only behind a later access tab or a deployment
+detail page.
+
+Deployment history and runtime logs must be later top-level tabs. They are attempt/runtime
+observations and must not displace the durable resource configuration surface as the default
+application page. Top-level tabs with only one content panel, such as deployment history or runtime
+logs, must not render a redundant inner sidebar.
+
+Routine resource-scoped domain binding and TLS creation must be inline in the configuration tab's
+access/domain section. A modal may be used only for destructive confirmation, advanced flows, or
+rare interruptions, not for the default bind-domain path.
+
+Current health must be compact in the page header. Detailed health policy configuration belongs in
+the configuration tab. The UI must not expose internal probe/check names, source error codes, or
+transport diagnostics as prominent main content; those details belong in diagnostics/support output
+or explicitly expanded debug areas.
 
 ## Resource Creation Contract
 
@@ -122,15 +180,17 @@ The sidebar should model:
 ```text
 Projects
   -> Project A
-      -> Resource 1 [latest deployment status]
-      -> Resource 2 [latest deployment status]
+      -> Resource 1 [resource health]
+      -> Resource 2 [resource health]
   -> Project B
-      -> Resource 3 [latest deployment status]
+      -> Resource 3 [resource health]
 ```
 
 The sidebar may use a compact resource summary read model. It must not dispatch deployment commands directly without routing through the resource or Quick Deploy workflow boundary.
 
-Resource latest status indicators are informational and must be derived from read models or projections.
+Resource health and latest deployment indicators are informational and must be derived from read
+models or projections. Sidebar and list current status should use resource health or unknown health,
+not latest deployment status.
 
 ## Entry Boundary
 
@@ -142,6 +202,8 @@ Allowed entry differences:
 | Project page new deployment | Must not be a direct project-owned write action. If reintroduced, it opens Quick Deploy or requires resource selection before deployment admission. |
 | Resource page new deployment | Dispatches `deployments.create` with the selected `resourceId` after collecting allowed attempt inputs. |
 | Resource page deployment history | Queries deployments filtered by resource. |
+| Resource page health | Queries `resources.health` or reads a compact health projection when available; latest deployment status remains context. |
+| Resource page diagnostic summary | Queries `resources.diagnostic-summary` with `resourceId` and optional `deploymentId`; copies structured support/debug context. |
 | Sidebar resource item | Navigates to resource detail and displays read-model status. |
 | Global deployments page | Read-model rollup/filter view, not owner of deployment write actions. |
 
@@ -156,11 +218,25 @@ deployments.create(resourceId)`.
 
 Current contracts store the listener port as `networkProfile.internalPort`, governed by [ADR-015](../decisions/ADR-015-resource-network-profile.md).
 
-Current sidebar exposes a Project -> Resource hierarchy with latest deployment status derived from
-read-model deployment data.
+Current sidebar exposes a Project -> Resource hierarchy with compact health status derived from
+`resources.health`.
 
-Current deployment and resource read models may need a resource summary projection or query shape to support latest deployment status efficiently.
+Current deployment and resource read models may need a resource summary projection or query shape
+to support compact resource health and latest deployment context efficiently.
+
+Resource detail now exposes a first-class copy diagnostic summary affordance backed by
+`resources.diagnostic-summary`.
+
+Resource detail now exposes the resource-level access URL from domain binding or access summary
+state. The same access URL should not be treated as deployment-owned configuration.
+
+`resources.health` exists. Resource detail and sidebar use unknown only when health is loading or
+unobserved, not as a deployment-status fallback.
+
+Deployment detail and Quick Deploy completion do not yet expose the action directly, so those
+surfaces still rely on navigation back to resource detail for the consolidated support payload.
 
 ## Open Questions
 
-- Should resource latest deployment status be added to `resources.list`, a future `resources.summary` query, or a separate navigation read model?
+- Should compact resource health be added to `resources.list`, a future `resources.summary` query,
+  or a separate navigation read model?

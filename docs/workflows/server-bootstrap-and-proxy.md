@@ -142,17 +142,36 @@ Connectivity retry is a new connectivity attempt.
 
 Proxy bootstrap retry is a new proxy bootstrap attempt.
 
+The accepted retry/repair operation is `servers.bootstrap-proxy`. Public CLI/API entrypoints may
+label the user action as proxy repair, but the workflow is still a new bootstrap attempt:
+
+```text
+server doctor reports proxy failure
+  -> operator runs servers.bootstrap-proxy
+  -> proxy-bootstrap-requested(new attemptId)
+  -> provider ensure plan verifies or recreates provider-owned proxy infrastructure
+  -> proxy-installed | proxy-install-failed
+```
+
+Repair must not touch user workload containers. It is limited to provider-owned proxy
+infrastructure and provider-owned networks or volumes.
+
 Previous failed attempts remain historical state and must not be erased by retry.
 
 ## Entry Boundaries
 
 Web may guide the user through registration, credential configuration, connectivity testing, and readiness display.
 
-CLI may expose separate commands for register, credential configuration, connectivity test, and future connect/proxy retry.
+CLI may expose separate commands for register, credential configuration, connectivity test, and proxy repair. The canonical proxy repair command is `yundu server proxy repair <serverId>`, dispatched as `servers.bootstrap-proxy`.
 
 API must expose strict command inputs and read-model status; it must not prompt.
 
 Diagnostic draft connectivity checks do not mutate lifecycle state.
+
+Existing-target connectivity diagnostics may include provider-rendered edge proxy checks when the
+server has provider-backed proxy intent. These checks are observational: they can inspect the proxy
+container image, scan provider logs, and run bounded temporary route probes, but they must clean up
+probe containers and must not mark the server connected, ready, failed, or repaired.
 
 Generated-domain provider selection is not part of server registration input. Server/installation configuration may select the concrete provider adapter, but core/application server commands see only provider-neutral proxy readiness and route eligibility state.
 
@@ -166,13 +185,27 @@ Current `servers.register` persists a `DeploymentTarget` and publishes `deployme
 
 Current event handling starts proxy bootstrap directly from `deployment_target.registered`, before a formal durable `server-connected` event exists.
 
+Current code implements public `servers.bootstrap-proxy` through CLI and HTTP/oRPC as the explicit
+repair/retry path for provider-owned edge proxy infrastructure. It allocates a new `pxy_*` attempt
+id, records edge proxy starting/ready/failed state, and publishes canonical proxy request/terminal
+events around the existing provider-backed bootstrapper.
+
 Current `servers.test-connectivity` and draft connectivity checks return diagnostic results but do not update server lifecycle state.
+
+Current `servers.test-connectivity` asks the registered edge proxy provider for diagnostic command
+plans and executes them locally or over SSH. Traefik diagnostics verify the expected proxy image,
+scan Docker provider logs for compatibility errors, and prove Docker-label route discovery with a
+temporary probe container. Failed provider-rendered edge proxy diagnostic checks include safe
+`repairCommand` metadata pointing to `yundu server proxy repair <serverId>`.
 
 Current server read model exposes edge proxy fields but no top-level readiness status.
 
 Current event bus dispatch is in-memory and fire-and-forget; handler failures are logged and not returned to the original command.
 
-Current proxy bootstrap started/succeeded/failed aggregate events are recorded by aggregate methods but not published by the current bootstrap handler after state changes.
+Current proxy bootstrap started/succeeded/failed aggregate events are recorded by aggregate methods.
+The explicit `servers.bootstrap-proxy` command publishes the pulled aggregate events after state
+changes; the registration-triggered bootstrap handler still needs migration to the same canonical
+publication path.
 
 Current runtime bootstrap code still contains concrete proxy branches and must migrate behind edge proxy provider packages governed by ADR-019.
 

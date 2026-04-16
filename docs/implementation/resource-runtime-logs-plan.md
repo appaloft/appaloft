@@ -154,21 +154,24 @@ No runtime application log archival or persistent search is required for the fir
 
 - `ResourceRuntimeLogsQuery`, schema, handler, and query service;
 - injected `ResourceRuntimeLogReader` port and token;
-- runtime adapter reader for host-process file logs, Docker container logs, and Docker Compose logs;
+- runtime adapter reader for host-process file logs, local Docker container logs, local Docker
+  Compose logs, and generic-SSH Docker/Compose logs with short-lived SSH connection reuse;
 - bounded and streaming oRPC procedures;
 - CLI `yundu resource logs <resourceId>`;
-- Web resource detail runtime log panel;
+- Web resource detail runtime log panel that lazy-loads on the logs tab, avoids duplicate bounded
+  tail lines when follow starts, and treats user stop/navigation cancellation as normal closure;
 - application tests for context resolution, reader delegation, stream mode, masking, mismatch, and
   unavailable runtime logs.
 
 `deployments.logs` remains implemented for deployment-attempt logs and is still a separate active
 operation.
 
-PM2, systemd/journalctl, provider-native API, and remote SSH reader implementations remain future
-adapter work behind the same application port. Runtime application log archival or persistent search
-is still out of scope for the first implementation.
+PM2, systemd/journalctl, provider-native API, and remote SSH file-tail reader implementations remain
+future adapter work behind the same application port. Runtime application log archival or persistent
+search is still out of scope for the first implementation.
 
 ## Open Questions
 
-- Should the next runtime reader be PM2, systemd/journalctl, or remote SSH file tailing?
+- Should the next runtime reader be PM2, systemd/journalctl, or remote SSH file tailing beyond
+  Docker/Compose logs?
 - Should stream reconnect/cursor support be added before persistent runtime log archival is modeled?

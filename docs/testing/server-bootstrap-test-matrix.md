@@ -75,7 +75,10 @@ Then:
 | Connect missing server | Unknown `serverId` | `err` | `not_found`, phase `connect` | None | No state change | No |
 | Connect unreachable server | Connectivity probes fail after connect attempt accepted | Accepted attempt result or persisted failed attempt | Async connect failure with phase `connect` | No `server-connected` | Server not ready | Depends |
 | Diagnostic draft connectivity | Draft server input | Diagnostic result | None unless schema invalid | None | No persisted lifecycle state | No |
+| Diagnostic existing-target proxy compatibility | Existing provider-backed target with usable runtime executor | Diagnostic result includes provider-rendered proxy checks | None unless provider diagnostics cannot be rendered | None | No lifecycle state change; failed proxy checks degrade the diagnostic result only | Yes for transient runtime/proxy errors |
 | Bootstrap proxy for connected server | `serverId`, edge proxy provider key, attempt id | `ok({ serverId, attemptId })` | None | `proxy-bootstrap-requested` | Edge proxy starting | No |
+| Repair proxy after doctor failure | `serverId`, reason `repair`, no attempt id | `ok({ serverId, attemptId })` with a new attempt id | None | `proxy-bootstrap-requested` | New proxy bootstrap attempt starts; provider-owned proxy may be recreated; user workload containers untouched | Depends on underlying proxy failure |
+| Repair proxy when already ready | `serverId`, reason `repair`, proxy already ready but compatible | `ok({ serverId, attemptId })` or idempotent ready result per implementation policy | None | None or `proxy-bootstrap-requested` only if a new verification attempt is intentionally recorded | Proxy remains ready; no duplicate provider-owned containers | No |
 | Bootstrap proxy when disabled | `edgeProxyMode = disabled` | `err` or no-op per command policy | `validation_error` or invariant, phase `proxy-bootstrap` | None | Edge proxy disabled | No |
 
 ## Event Matrix
@@ -149,6 +152,9 @@ Tests must prove:
 - duplicate `proxy-installed` does not duplicate `server-ready`;
 - duplicate `proxy-install-failed` does not duplicate retry scheduling;
 - retry creates a new proxy bootstrap attempt id.
+- `yundu server proxy repair <serverId>` dispatches `servers.bootstrap-proxy` and creates a new
+  proxy bootstrap attempt rather than replaying the old event.
+- proxy repair does not remove, restart, or mutate user workload containers.
 
 ## Server/Proxy Error Assertion Example
 
@@ -168,7 +174,7 @@ if (result.isErr()) {
 ```md
 Given a connected server with edgeProxyProviderKey resolved.
 When the process manager handles server-connected.
-Then proxy-bootstrap-requested is emitted with serverId, edgeProxyProviderKey, attemptId, correlationId, and causationId.
+Then proxy-bootstrap-requested is emitted with serverId, edgeProxyProviderKey, attemptId, reason, correlationId, and causationId.
 And server-ready is not emitted until proxy-installed is handled.
 ```
 
@@ -182,7 +188,18 @@ Current code allows `beginEdgeProxyBootstrap` from any non-disabled edge proxy s
 
 Current connectivity tests are diagnostic and do not persist lifecycle state.
 
+Existing-target connectivity tests include provider-rendered edge proxy diagnostics when an edge
+proxy provider registry is available. Tests should assert that these diagnostics are read-only,
+surface stale or incompatible proxy images, and can prove Docker label discovery through a bounded
+temporary route probe. Runtime adapter tests cover `repairCommand` metadata on failed
+provider-rendered edge proxy diagnostics.
+
 Current proxy bootstrap handler marks started/ready/failed but does not publish the aggregate events recorded by those state transitions.
+
+Current code exposes `servers.bootstrap-proxy` through CLI and HTTP/oRPC as the accepted proxy
+repair operation. Application tests cover new attempt id allocation, canonical proxy request and
+terminal events, retriable failure classification, public attempt id rejection, and disabled proxy
+rejection. CLI/API are typechecked but do not yet have dedicated transport-level integration tests.
 
 ## Open Questions
 

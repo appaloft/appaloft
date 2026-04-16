@@ -200,9 +200,13 @@ It must not:
 `ResourceRuntimeLogReader` port, bounded and streaming oRPC procedures, CLI `resource logs`, and a
 resource detail Web panel.
 
-The first runtime reader supports host-process file tailing, Docker container logs, and Docker
-Compose logs from deployment runtime metadata. PM2, systemd/journalctl, provider-native APIs, and
-remote SSH log readers remain future adapter implementations behind the same port.
+The first runtime reader supports host-process file tailing, local Docker container logs, local
+Docker Compose logs, and generic-SSH Docker/Compose logs from deployment runtime metadata and
+resolved server credentials, using short-lived SSH connection reuse for successive reads against the
+same remote target. The Web consumer lazy-loads bounded logs on the logs tab, follows only new output
+after an existing tail is visible, and treats user-initiated stream cancellation as normal closure.
+PM2, systemd/journalctl, provider-native APIs, and remote SSH file-tail readers remain future
+adapter implementations behind the same port.
 
 Runtime application log archival, search, and retention are still out of scope. `deployments.logs`
 remains the separate deployment-attempt log operation.

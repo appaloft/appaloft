@@ -46,7 +46,15 @@ The default for HTTP application resources is:
 }
 ```
 
-`hostPort` is valid only when `exposureMode = "direct-port"`. Reverse-proxy exposure must not require a stable host-published port because the proxy targets the destination-local workload endpoint through the runtime adapter.
+`internalPort` is scoped to one workload runtime environment. Multiple resources on the same
+deployment target may use the same `internalPort` when they are isolated by container, process,
+service, or runtime network boundaries.
+
+`hostPort` is valid only when `exposureMode = "direct-port"`. Reverse-proxy exposure must not
+require a stable host-published port because the proxy targets the destination-local workload
+endpoint through the runtime adapter. Runtime adapters may create a loopback-only or otherwise
+private ephemeral host-port mapping for local health checks, but that mapping is diagnostic runtime
+metadata, not public access state and not a deployment command input.
 
 Web, CLI, API, automation, and future MCP entrypoints must treat `internalPort` as part of the core user-configurable resource creation/configuration chain for inbound application resources. They must not defer this field or require a separate product decision each time an entrypoint is implemented.
 
@@ -123,6 +131,16 @@ Health policy remains a distinct resource/runtime concern. When a health check t
 
 Reverse-proxy upstream mapping must use `ResourceNetworkProfile.internalPort` as the default upstream port. For runtime adapters that need explicit port mapping, the adapter must derive the mapping from the resolved network snapshot instead of reading deployment command input.
 
+Reverse-proxy runtime cleanup must be scoped by resource/workload identity, not by `internalPort`
+or a published host-port lookup. A new terminal deployment attempt for one resource may replace the
+previous runtime instance for that same resource, but it must not stop another resource only because
+both resources listen on the same `internalPort`.
+
+Direct-port publication is a host placement concern. If two resources request the same effective
+host port on the same deployment target/destination, the later attempt must fail or be rejected with
+a structured conflict/runtime failure; it must not remove the other resource's runtime instance to
+free the port.
+
 `deployments.create` must not accept `internalPort`, `port`, `hostPort`, `exposureMode`, `upstreamProtocol`, `domain`, `pathPrefix`, `proxyKind`, or `tlsMode` as public input. It must resolve the network snapshot from resource state.
 
 ## Consequences
@@ -141,15 +159,21 @@ Runtime adapters can generate reverse-proxy upstream targets from resource/deplo
 
 Direct host publication remains explicit. It must not become the default path for HTTP application exposure.
 
+Same-port application deployments are valid under reverse-proxy exposure. The collision boundary is
+the public host port for `direct-port`, not the resource `internalPort`.
+
 The v1 user-facing path must expose `internalPort`. It may keep `direct-port` and `hostPort` out of Web/CLI until the direct host-port exposure behavior is implemented as an explicit resource network configuration path.
 
 ## Governed Specs
 
 - [resources.create Command Spec](../commands/resources.create.md)
 - [deployments.create Command Spec](../commands/deployments.create.md)
+- [deployments.create Workflow Spec](../workflows/deployments.create.md)
+- [deployments.create Test Matrix](../testing/deployments.create-test-matrix.md)
 - [Quick Deploy Workflow Spec](../workflows/quick-deploy.md)
 - [Resource Create And First Deploy Workflow Spec](../workflows/resources.create-and-first-deploy.md)
 - [resources.create Test Matrix](../testing/resources.create-test-matrix.md)
+- [Default Access Domain And Proxy Routing Test Matrix](../testing/default-access-domain-and-proxy-routing-test-matrix.md)
 - [Quick Deploy Test Matrix](../testing/quick-deploy-test-matrix.md)
 - [resources.create Implementation Plan](../implementation/resources.create-plan.md)
 - [ADR-012: Resource Runtime Profile And Deployment Snapshot Boundary](./ADR-012-resource-runtime-profile-and-deployment-snapshot-boundary.md)
@@ -171,7 +195,12 @@ Current deployment admission has removed public deployment override fields and r
 
 Current `resources.create` accepts `networkProfile.internalPort` as the canonical command, contract, domain, read-model, Web, CLI, and deployment-planning field. It does not accept `runtimeProfile.port`.
 
-Direct host publication and explicit resource access-profile update commands are not implemented.
+Runtime adapters isolate reverse-proxy resources by resource/workload identity and may use
+loopback-only ephemeral host-port mappings for health checks while keeping `internalPort` as the
+proxy upstream target.
+
+Direct host publication and explicit resource access-profile update commands are not implemented as
+user-facing Web/CLI/API configuration surfaces.
 
 ## Open Questions
 

@@ -70,12 +70,26 @@ Retry must be explicit:
 
 ```text
 proxy-install-failed
-  -> operator/process policy requests retry
+  -> operator/process policy requests servers.bootstrap-proxy
   -> new proxy bootstrap attempt id
   -> proxy-bootstrap-requested
 ```
 
 Retry must not be raw replay of the old `proxy-bootstrap-requested` event.
+
+The accepted public repair entrypoints are `yundu server proxy repair <serverId>` and
+`POST /api/servers/{serverId}/edge-proxy/bootstrap`; both dispatch `servers.bootstrap-proxy`.
+
+Default retry classification:
+
+| Error code | Retriable |
+| --- | --- |
+| `edge_proxy_kind_unsupported` | No unless configuration or compatibility aliases change. |
+| `edge_proxy_provider_unsupported` | No unless provider capability changes are expected. |
+| `proxy_provider_unavailable` | Usually yes after provider registration, package, or composition-root configuration is repaired. |
+| `edge_proxy_network_failed` | Usually yes if Docker/provider can recover. |
+| `edge_proxy_start_failed` | Usually yes unless the provider reports invalid configuration. |
+| Runtime execution errors classified as `runtime-error` | Usually yes after host/Docker/SSH/runtime state is repaired. |
 
 ## Idempotency
 
@@ -94,6 +108,9 @@ It is mutually exclusive with `proxy-installed` for the same attempt id.
 If failure is retriable, the read model must show retryable failure and the retry owner must be explicit.
 
 If failure is non-retriable, the read model must show terminal proxy failure until configuration changes or an explicit retry command is issued.
+
+Repair handling may verify, restart, recreate, or upgrade only provider-owned proxy infrastructure
+and provider-owned networks/volumes. It must not remove, restart, or mutate user workload containers.
 
 ## Observability
 
@@ -119,7 +136,11 @@ The current event handler marks failure but does not publish pulled aggregate ev
 
 Current runtime state still exposes `proxyKind`; ADR-019 treats that as provider-selection migration data. The target event payload uses `edgeProxyProviderKey`.
 
+Current public `servers.bootstrap-proxy` CLI and HTTP/oRPC entrypoints publish
+`proxy-install-failed` when repair reaches terminal failure. Registration-triggered bootstrap still
+records legacy aggregate failure events and needs migration to the same canonical terminal event
+publication path.
+
 ## Open Questions
 
-- Which proxy failure codes should be retriable by default?
-- Should raw command output be stored in a separate worker log table instead of the server aggregate/read model?
+- None. Raw worker command output storage remains an observability design detail and must stay outside aggregate/read-model failure details unless a separate redacted log table is specified.

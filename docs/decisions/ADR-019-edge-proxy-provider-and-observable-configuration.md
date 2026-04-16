@@ -191,7 +191,11 @@ Current `DeploymentTarget` and runtime-plan data still expose concrete `proxyKin
 
 `resources.proxy-configuration.preview` is active for API/oRPC, CLI, and Web resource detail, but route input still comes from generated access summaries or deployment runtime-plan snapshots rather than a dedicated proxy-route read model.
 
-Edge proxy providers currently render Docker bootstrap commands and Docker labels. Provider log collection, health probes, and richer diagnostics remain future provider capabilities.
+Edge proxy providers currently render Docker bootstrap commands, Docker labels, and read-only
+diagnostic command plans for server connectivity checks. Traefik diagnostics include expected image
+compatibility, Docker provider log scanning, and a bounded Docker-label route probe. Persisted
+provider log collection and richer long-running diagnostic history remain future provider
+capabilities.
 
 ## Open Questions
 

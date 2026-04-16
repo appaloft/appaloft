@@ -24,6 +24,8 @@ This workflow inherits:
 - [Async Lifecycle And Acceptance](../architecture/async-lifecycle-and-acceptance.md)
 - [deployments.create Command Spec](../commands/deployments.create.md)
 - [resources.create Command Spec](../commands/resources.create.md)
+- [resources.diagnostic-summary Query Spec](../queries/resources.diagnostic-summary.md)
+- [Resource Diagnostic Summary Workflow Spec](./resource-diagnostic-summary.md)
 - [deployments.create Workflow Spec](./deployments.create.md)
 
 ## Purpose
@@ -47,6 +49,11 @@ When Quick Deploy collects source/runtime/health values, those values are entry-
 When Quick Deploy collects domain/TLS intent, it must sequence an explicit `domain-bindings.create` or certificate command after the required resource, server, and destination context exists. It must not submit domain/TLS intent to `deployments.create`.
 
 When generated default access is enabled by platform policy, Quick Deploy may display the generated URL after the resource access summary projection is available. It must not collect concrete generated-domain provider fields from the user and must not send generated domain/proxy/TLS fields to `deployments.create`.
+
+When the final workflow has a resource id and deployment id, Quick Deploy should expose a copyable
+diagnostic summary through `resources.diagnostic-summary`. This is required when access, proxy
+configuration, deployment logs, or runtime logs are missing/unavailable so the user can report a bug
+without relying only on screenshots.
 
 When Quick Deploy is launched from a project page, the workflow must still select or create a
 resource before deployment admission. Project context may prefill `projectId`, but it must not make
@@ -161,6 +168,8 @@ When the workflow collects a port for an application resource, that field is res
 
 Web and CLI Quick Deploy implementations must expose this `internalPort` field when creating an inbound application resource. It is part of the core workflow contract, not an optional entrypoint enhancement.
 
+When the workflow collects health check configuration for a newly created resource, those fields are resource runtime input. The normalized step input must be `runtimeProfile.healthCheck`, with `runtimeProfile.healthCheckPath` kept in sync as the HTTP path used by current runtime adapters. Existing resources keep their saved runtime profile; Quick Deploy must not silently overwrite health check configuration while submitting a deployment against an existing `resourceId`.
+
 ## End-To-End Workflow
 
 ```text
@@ -187,6 +196,7 @@ user intent
 | Source selection | Web/CLI workflow | Source/provider queries as needed | Produce a `ResourceSourceBinding` draft and optional provider metadata. |
 | Source variant normalization | Web/CLI workflow | Local draft parser; provider branch/tag lookup when available | Convert deep Git URLs, local folder base directories, Docker image tags/digests, and build-file paths into resource source/runtime profile fields. |
 | Network draft | Web/CLI workflow | Local draft validation; optional source/runtime detection | Produce a `ResourceNetworkProfile` draft with `internalPort` for inbound resources. |
+| Health check draft | Web/CLI workflow | Local draft validation; optional runtime defaults | Produce optional `ResourceRuntimeProfile.healthCheck` for newly created resources, including HTTP path, expected status, interval, timeout, retries, and start period. |
 | Project context | Web/CLI workflow | `projects.list`; optional `projects.create` | Select or create the project before deployment admission. |
 | Server context | Web/CLI workflow | `servers.list`; optional `servers.register` | Select or register the deployment target/server before deployment admission. |
 | Credential context | Web/CLI workflow | `credentials.list-ssh`; optional `credentials.create-ssh`; optional `servers.configure-credential` | Store or attach credential material through credential/server commands, not inside deployment. |
@@ -198,6 +208,7 @@ user intent
 | Deployment admission | Application command | `deployments.create` | Dispatch ids-only deployment admission and accept or reject the deployment request according to the command spec. |
 | Generated access observation | Web/CLI workflow | `ResourceAccessSummary` after route snapshot resolution | Display generated access URL and proxy route status when policy/provider resolved one. |
 | Progress observation | Web/CLI workflow | deployment progress stream during the final deployment command; deployment read/progress queries after acceptance | Observe durable state or technical progress without treating progress events as Quick Deploy workflow steps. |
+| Diagnostic summary observation | Web/CLI workflow | `resources.diagnostic-summary` after resource/deployment ids are known | Provide a copyable support/debug payload with stable ids and access/proxy/log section statuses. |
 
 ## Entry Differences
 
@@ -290,11 +301,16 @@ Current Web QuickDeploy and CLI interactive deploy use `resources.create` before
 
 Current Web and CLI Quick Deploy auto-generate new-resource names with a short random suffix when the user has not supplied a resource name.
 
+Current Web QuickDeploy exposes optional HTTP health check policy input for newly created resources and sends it through `resources.create.runtimeProfile.healthCheck`. Current CLI entry flows expose the path-only subset through `--health-path`. When Quick Deploy uses an existing resource, it displays the existing-resource path as resource-owned configuration and does not modify it during deployment submission.
+
 The shared workflow module is available for Web and future CLI/backend reuse. CLI migration remains a follow-up implementation task.
 
 Quick Deploy domain/TLS input has been removed from the deployment flow. Resource-scoped domain binding remains available through the domain binding surfaces and should become the owner-scoped follow-up action after deployment.
 
 Generated default access URL display is not yet aligned with ADR-017 as a provider-neutral route snapshot/read-model surface.
+
+Quick Deploy does not yet expose `resources.diagnostic-summary` after deployment acceptance, so
+users may lack a copyable support/debug payload when access or logs are unavailable.
 
 Current Web and CLI entry fields may still use user-facing "method" wording. Entry workflows must map that wording to `ResourceRuntimeProfile.strategy` before dispatching `resources.create`; `deployments.create` must not receive `deploymentMethod`.
 

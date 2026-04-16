@@ -141,17 +141,21 @@ Current code exposes `deployments.logs` for persisted deployment-attempt logs.
 
 `resources.runtime-logs` is implemented through `ResourceRuntimeLogsQuery` and an injected
 `ResourceRuntimeLogReader` port. The first runtime reader supports host-process file tailing,
-Docker container logs, and Docker Compose logs from deployment runtime metadata.
+local Docker container logs, local Docker Compose logs, and generic-SSH Docker/Compose logs from
+deployment runtime metadata and resolved server credentials, with short-lived SSH connection reuse
+for successive reads against the same remote target.
 
 The query is exposed through bounded and streaming oRPC procedures, CLI `resource logs`, and the Web
-resource detail runtime log panel.
+resource detail runtime log panel. The Web panel lazy-loads on the logs tab, avoids duplicate
+bounded-tail lines when follow starts, and treats user-initiated stream cancellation as normal
+closure.
 
-PM2, systemd/journalctl, provider-native API, and remote SSH reader implementations remain future
+PM2, systemd/journalctl, provider-native API, and remote SSH file-tail implementations remain future
 adapter work behind the same port.
 
 ## Open Questions
 
 - Should the next runtime adapter be PM2, systemd/journalctl, provider API, or remote SSH file
-  tailing?
+  tailing beyond Docker/Compose logs?
 - What default retention or archival behavior, if any, should be added later for runtime logs beyond
   live tail and bounded tail reads?

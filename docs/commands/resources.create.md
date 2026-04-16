@@ -175,7 +175,7 @@ path. Runtime adapters may strip the leading `/` when materializing filesystem c
 
 `runtimeProfile` owns strategy-specific planning fields, not source identity. Dockerfile path,
 Docker Compose file path, static publish directory, Docker build target, install/build/start
-commands, and health-check defaults belong to runtime profile language. They are combined with
+commands, and health-check defaults belong to runtime profile language. HTTP health check policy may include method, scheme, host, port, path, expected status, expected response text, interval, timeout, retries, and start period. These fields are combined with
 `source.metadata.baseDirectory` during runtime plan resolution. A prebuilt `docker-image` source
 must use `RuntimePlanStrategy = "prebuilt-image"` and must not require Dockerfile or Compose path
 fields.

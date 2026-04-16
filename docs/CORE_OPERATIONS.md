@@ -113,6 +113,7 @@ Implemented operations:
 | List deployment targets | Query | `servers.list` | `ListServersQuery` | `ListServersQueryInput` | `yundu server list` | `GET /api/servers` |
 | Test deployment target connectivity | Command | `servers.test-connectivity` | `TestServerConnectivityCommand` | `TestServerConnectivityCommandInput` | `yundu server test <serverId>`; `yundu server doctor <serverId>` | `POST /api/servers/{serverId}/connectivity-tests` |
 | Test draft deployment target connectivity | Command | `servers.test-draft-connectivity` | `TestServerConnectivityCommand` | `TestServerConnectivityCommandInput` | - | `POST /api/servers/connectivity-tests` |
+| Repair deployment target edge proxy | Command | `servers.bootstrap-proxy` | `BootstrapServerProxyCommand` | `BootstrapServerProxyCommandInput` | `yundu server proxy repair <serverId>` | `POST /api/servers/{serverId}/edge-proxy/bootstrap` |
 | Create reusable SSH credential | Command | `credentials.create-ssh` | `CreateSshCredentialCommand` | `CreateSshCredentialCommandInput` | `yundu server credential-create` | `POST /api/credentials/ssh` |
 | List reusable SSH credentials | Query | `credentials.list-ssh` | `ListSshCredentialsQuery` | `ListSshCredentialsQueryInput` | `yundu server credential-list` | `GET /api/credentials/ssh` |
 
@@ -122,6 +123,12 @@ Implemented operations:
 - proxy bootstrap failure does not roll back deployment target metadata; it is recorded on the
   server proxy status/error fields and deployment execution still performs an idempotent proxy
   ensure when a runtime plan needs proxy-backed access
+- `servers.test-connectivity` / `yundu server doctor <serverId>` includes provider-rendered
+  edge proxy diagnostics for provider-backed targets when the runtime adapter can execute them; the
+  diagnostics are read-only and do not mark the server ready or repaired
+- `servers.bootstrap-proxy` is the explicit repair/retry operation for provider-owned proxy
+  infrastructure; it creates a new proxy bootstrap attempt and may recreate provider-owned proxy
+  containers, but it must not touch user workload containers
 - generated default access routes require proxy readiness and a usable target public address, but
   the generated-domain provider is selected by infrastructure configuration and dependency
   injection, not by core/application command input
@@ -167,8 +174,8 @@ Business meaning:
 - a Docker Compose stack is one resource that may contain multiple named services
 - deployments belong to one resource
 - resource detail is the owner-scoped surface for new deployment, deployment history,
-  source/runtime/network configuration, generated access, proxy configuration, resource runtime
-  logs, and resource-scoped domain/TLS actions
+  source/runtime/network configuration, current resource health, generated access, proxy
+  configuration, resource runtime logs, and resource-scoped domain/TLS actions
 - destinations and deployment targets / servers remain runtime placement, not the project
   organization layer
 
@@ -180,6 +187,8 @@ Implemented operations:
 | List resources | Query | `resources.list` | `ListResourcesQuery` | `ListResourcesQueryInput` | `yundu resource list` | `GET /api/resources` |
 | Read resource runtime logs | Query | `resources.runtime-logs` | `ResourceRuntimeLogsQuery` | `ResourceRuntimeLogsQueryInput` | `yundu resource logs <resourceId>` | `GET /api/resources/{resourceId}/runtime-logs`; stream: `GET /api/resources/{resourceId}/runtime-logs/stream` |
 | Preview resource proxy configuration | Query | `resources.proxy-configuration.preview` | `ResourceProxyConfigurationPreviewQuery` | `ResourceProxyConfigurationPreviewQueryInput` | `yundu resource proxy-config <resourceId>` | `GET /api/resources/{resourceId}/proxy-configuration` |
+| Read resource diagnostic summary | Query | `resources.diagnostic-summary` | `ResourceDiagnosticSummaryQuery` | `ResourceDiagnosticSummaryQueryInput` | `yundu resource diagnose <resourceId>` | `GET /api/resources/{resourceId}/diagnostic-summary` |
+| Read resource health | Query | `resources.health` | `ResourceHealthQuery` | `ResourceHealthQueryInput` | `yundu resource health <resourceId>` | `GET /api/resources/{resourceId}/health` |
 
 Current boundary:
 - resources are persisted and can be listed by project or environment
@@ -218,11 +227,25 @@ Current boundary:
   [ADR-019: Edge Proxy Provider And Observable Configuration](./decisions/ADR-019-edge-proxy-provider-and-observable-configuration.md);
   Web/API/CLI must display provider-rendered sections from the query instead of reconstructing
   proxy labels, files, or route manifests locally
+- resource diagnostic summary is resource-owned observation through
+  `resources.diagnostic-summary`; it composes stable ids, deployment/access/proxy/log statuses,
+  source errors, safe system context, and canonical copy JSON for support/debug workflows without
+  mutating deployment, runtime, or proxy state
+- resource health is resource-owned observation governed by
+  [ADR-020: Resource Health Observation](./decisions/ADR-020-resource-health-observation.md).
+  `resources.health` is the active current health source for resource detail, project resource
+  lists, sidebar navigation, CLI, and HTTP API. Latest deployment status remains contextual
+  history, not proof that the resource is reachable.
+- durable domain bindings belong to the resource. Deployment snapshots may record the route used
+  by one attempt, but they are not the domain ownership boundary. Generated default access should
+  be exposed through resource-scoped access summaries and should prefer stable resource-scoped
+  hostnames unless a provider explicitly requires deployment-scoped hostnames.
 
 Core next operations expected here:
 - show resource details
 - update resource profile/source
 - configure resource network profile
+- configure resource health policy
 - declare compose-stack services from compose metadata
 - archive resource
 
@@ -263,6 +286,10 @@ Current boundary:
   `deployments.create` input fields
 - reverse-proxy deployments must use `ResourceNetworkProfile.internalPort` as the upstream target
   and must not require public exposure of the application port on the SSH server
+- multiple reverse-proxy resources on the same server may use the same `internalPort`; runtime
+  replacement and cleanup must be scoped to the resource/workload identity, not to a shared port
+- direct-port exposure uses an explicit host port as the placement collision boundary and must not
+  stop another resource to free that port
 - deployment config files are workflow/bootstrap inputs for creating or configuring related
   resource/project/environment/server state before deployment admission; they are not
   `deployments.create` input fields

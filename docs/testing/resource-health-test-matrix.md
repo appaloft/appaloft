@@ -1,0 +1,139 @@
+# Resource Health Test Matrix
+
+## Normative Contract
+
+Tests for `resources.health` must verify that current resource health is distinct from latest
+deployment status.
+
+A successful deployment attempt must not make the resource healthy when the runtime, configured
+health check, proxy route, durable domain, or generated access route is failing.
+
+## Global References
+
+This test matrix inherits:
+
+- [ADR-020: Resource Health Observation](../decisions/ADR-020-resource-health-observation.md)
+- [resources.health Query Spec](../queries/resources.health.md)
+- [Resource Health Observation Workflow Spec](../workflows/resource-health-observation.md)
+- [Resource Health Error Spec](../errors/resources.health.md)
+- [Resource Health Implementation Plan](../implementation/resource-health-plan.md)
+- [Project Resource Console Workflow Spec](../workflows/project-resource-console.md)
+- [Project Resource Console Test Matrix](./project-resource-console-test-matrix.md)
+- [Resource Runtime Logs Test Matrix](./resource-runtime-logs-test-matrix.md)
+- [Edge Proxy Provider And Route Configuration Test Matrix](./edge-proxy-provider-and-route-configuration-test-matrix.md)
+- [Spec-Driven Testing](./SPEC_DRIVEN_TESTING.md)
+- [Error Model](../errors/model.md)
+- [neverthrow Conventions](../errors/neverthrow-conventions.md)
+
+## Test Layers
+
+| Layer | Focus |
+| --- | --- |
+| Query schema | Resource id, cached/live mode, include flags. |
+| Query handler/service | Delegates to query service and composes read-only sources without mutation. |
+| Runtime inspection | Container/process lifecycle and provider-native health states. |
+| Health policy | HTTP and command policy resolution, defaults, timeout, retries, and unsupported cases. |
+| Access/proxy observation | Durable domain precedence, generated route fallback, proxy readiness, public probes. |
+| Aggregation | Overall status priority and source error preservation. |
+| API/oRPC | Shared query schema/result shape. |
+| CLI | `resource health` renders JSON and human status from the query. |
+| Web/desktop | Resource detail, project resource list, and sidebar prefer health over deployment status. |
+
+## Given / When / Then Template
+
+```md
+Given:
+- Resource:
+- Latest deployment:
+- Runtime lifecycle:
+- Runtime/container health:
+- Health policy:
+- Access summary/domain binding:
+- Proxy route:
+- Entrypoint:
+
+When:
+- The caller requests resource health.
+
+Then:
+- Query input:
+- Source calls:
+- Overall status:
+- Section statuses:
+- Source errors:
+- Expected display status:
+- Expected absence of mutations:
+```
+
+## Query And Service Matrix
+
+| Case | Input/read state | Expected result | Required assertion |
+| --- | --- | --- | --- |
+| Resource missing | Unknown resource id | `err(not_found)` | No runtime/proxy/public probes run. |
+| No deployment/runtime | Resource exists with no deployment/runtime | `ok(overall = "not-deployed")` | Latest deployment context is absent and no health probe is attempted. |
+| Deployment succeeded, runtime healthy | Latest deployment succeeded, runtime running, required checks pass | `ok(overall = "healthy")` | Deployment status is context, not the only health proof. |
+| Deployment succeeded, public route fails | Latest deployment succeeded, internal runtime healthy, public URL times out | `ok(overall = "degraded")` | Public access failure is visible and success is not shown as reachable. |
+| Deployment succeeded, container unhealthy | Latest deployment succeeded, Docker health is `unhealthy` | `ok(overall = "unhealthy")` | Runtime health overrides deployment success. |
+| Runtime starting | Runtime lifecycle starting or restarting | `ok(overall = "starting")` | UI can show pending health rather than succeeded. |
+| Runtime exited | Latest runtime exited with no replacement | `ok(overall = "stopped")` | Status is not failed deployment unless deployment itself failed. |
+| Running with no policy | Runtime running, no configured health policy | `ok(overall = "unknown")` | Missing health check is not healthy. |
+| HTTP policy pass | Policy defaults to internal port, localhost, `/`, expected 200 and passes | `ok(overall = "healthy")` when other required checks pass | Default resolution uses `ResourceNetworkProfile.internalPort`. |
+| HTTP policy fail | HTTP probe returns unexpected status/body or times out | `ok(overall = "unhealthy")` | Check record includes status/reason without leaking body secrets. |
+| Command policy pass | Adapter supports command check and command exits 0 | `ok` with command check passed | Command runs inside workload boundary. |
+| Command policy unsupported | Adapter cannot run command policy | `ok(overall = "unknown")` or `degraded` by policy strictness | Source error is `resource_health_policy_unsupported`. |
+| Proxy route missing | Reverse-proxy exposure but route not applied | `ok(overall = "degraded")` | Proxy section identifies unavailable route. |
+| Durable domain ready | Ready domain binding and generated route both exist | `ok` uses durable domain as public access target | Durable domain precedes generated default route. |
+| Durable domain pending | Domain binding exists but is not ready | `ok(overall = "degraded")` when public access is required | Domain state is not hidden by generated route unless policy allows fallback. |
+| Runtime inspection fails | Runtime provider inspect fails | `ok(overall = "unknown")` | Source error records runtime inspection failure. |
+| Read model failure | Required resource context cannot be safely loaded | `err(resource_health_unavailable)` | No partial unsafe summary is returned. |
+
+## Status Aggregation Matrix
+
+| Signals | Expected overall |
+| --- | --- |
+| No runtime and no latest deployment | `not-deployed` |
+| Runtime starting/restarting | `starting` |
+| Runtime running, health policy missing | `unknown` |
+| Runtime running, Docker health healthy, HTTP health pass, proxy ready, public access pass | `healthy` |
+| Runtime running, internal health pass, public access fail | `degraded` |
+| Runtime running, Docker health unhealthy or required HTTP/command health fail | `unhealthy` |
+| Runtime stopped/exited without replacement | `stopped` |
+| Observation sources unavailable and no failing fact is known | `unknown` |
+
+## Entrypoint Matrix
+
+| Entrypoint | Case | Expected behavior |
+| --- | --- | --- |
+| Web resource detail | Latest deployment succeeded but public access fails | Header/status panel shows resource health `degraded` or `unhealthy`; deployment success appears only as context. |
+| Web resource detail | Access URL exists on resource summary | Access panel is visible on resource detail, not only deployment detail. |
+| Sidebar | Health projection available | Resource child uses compact resource health status. |
+| Sidebar | Health projection absent during migration | Resource child may fall back to latest deployment status but must not label it as current health. |
+| Project resource list | Multiple resources with mixed health | List displays resource health and latest deployment context separately. |
+| Deployment detail | Attempt succeeded, resource unhealthy | Deployment page links back to current resource health instead of implying the attempt proves availability. |
+| CLI | `resource health --json` | Prints `ResourceHealthSummary` JSON from the query. |
+| API/oRPC | HTTP query | Reuses input schema and returns `ResourceHealthSummary`. |
+
+## Current Implementation Notes And Migration Gaps
+
+Executable application tests for the first cached/read-model slice live in
+`packages/application/test/resource-health.test.ts`.
+
+Current covered cases:
+
+- no latest deployment returns `overall = "not-deployed"`;
+- deployment `succeeded` plus ready access/proxy but no health policy returns `overall = "unknown"`;
+- failed public/proxy route state returns `overall = "degraded"`;
+- in-flight latest deployment returns `overall = "starting"`;
+- configured `healthCheckPath` remains `overall = "unknown"` until a current probe exists.
+
+Current runtime adapter tests cover some deployment-time health checks. Those tests should remain
+attempt-scoped and new tests should cover the resource-owned observation contract separately.
+
+Remaining test gaps include provider-native runtime inspection, Docker health state, live HTTP
+policy pass/fail, command policy support/unsupported cases, durable-domain precedence inside the
+health query, and Web e2e mocking of mixed resource health states.
+
+## Open Questions
+
+- Should Web e2e tests mock a cached `ResourceHealthSummary` first, or wait for a real runtime
+  health query implementation?

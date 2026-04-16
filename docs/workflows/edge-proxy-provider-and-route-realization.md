@@ -79,7 +79,19 @@ server-connected
   -> proxy-installed | proxy-install-failed
 ```
 
+Explicit proxy repair uses the same provider ensure path:
+
+```text
+servers.bootstrap-proxy
+  -> proxy-bootstrap-requested(new attemptId)
+  -> EdgeProxyProvider.ensureProxy
+  -> runtime executor verifies or repairs provider-owned proxy infrastructure
+  -> proxy-installed | proxy-install-failed
+```
+
 The provider owns the proxy-specific ensure plan. Runtime execution owns how the plan is executed locally or over SSH.
+Provider ensure plans may mutate only provider-owned proxy assets and must not mutate user workload
+containers.
 
 ## Deployment Route Realization
 
