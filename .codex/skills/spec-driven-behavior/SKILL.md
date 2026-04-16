@@ -55,6 +55,37 @@ Yundu's current product target is a self-hosted deployment platform v1 with thes
 
 When selecting the next behavior, prioritize this v1 minimum loop over technical convenience or far-future platform depth.
 
+## Round Todo Gate
+
+Before executing any non-trivial round, create a round-specific todo checklist and keep it current.
+If a planning/todo tool is available, use it; otherwise write a compact checklist in the working
+response or notes before editing files.
+
+The todo is a gate, not a summary:
+
+- do not edit files until the current round has a todo with concrete exit criteria;
+- when chaining rounds in one user-authorized turn, create a top-level chain todo first, then refresh
+  the detailed todo before starting each round;
+- every todo item must be phrased as an observable outcome, not a vague activity;
+- mark items complete as they finish, and add missing items immediately when discovery reveals a
+  required surface;
+- do not start the next round while the current round has unchecked mandatory items, unless the item
+  is explicitly moved into documented migration gaps or a later authorized round;
+- include test matrix ids in todo items whenever tests or e2e/acceptance coverage are in scope.
+
+Minimum round todo contents:
+
+- **Spec Round**: governing docs read, behavior map position, ADR need/no-need decision, affected
+  command/event/workflow/error/testing/docs, implementation plan, and migration-gap updates.
+- **Test-First Round**: numbered matrix rows, automation level for each row, at least one CLI or
+  HTTP/oRPC e2e/acceptance row for every new/changed command, lower-level integration/unit rows,
+  test filenames, expected failing/passing state.
+- **Code Round**: core/application/persistence/read model/event/error changes, Web/API/CLI
+  entrypoints, operation catalog/CORE_OPERATIONS sync, e2e closure path, verification commands.
+- **Post-Implementation Sync**: spec alignment, workflow alignment, error alignment, test matrix
+  alignment, entrypoint bus/schema alignment, migration gaps, Open Questions/ADR decision,
+  ready/not-ready result.
+
 ## Round Types
 
 ### 1. Discover Round
@@ -98,7 +129,8 @@ Do this:
 
 - update or add the governing `docs/testing/**` test matrix before writing tests if the changed behavior lacks numbered matrix rows;
 - implement or rename automated tests so each changed matrix row has a matching test name with the matrix id;
-- prefer CLI or HTTP/oRPC e2e/acceptance tests for complete command/workflow chains, then add integration/unit tests for branch coverage and pure domain rules;
+- for every new or changed command, add at least one executable e2e/acceptance test through CLI or HTTP/oRPC that proves the command can be executed from a user-facing entrypoint and observed through a public read/query surface;
+- add integration/unit tests underneath for branch coverage, event payload details, persistence state, and pure domain rules;
 - classify every changed matrix row by the strongest boundary that can actually observe the assertion: `e2e-preferred` for CLI/HTTP/Web plus public read/query observability, `integration` for repository state/events/process-manager/adapter behavior, `unit` for pure domain/planner rules, and `contract` for schema/route/provider-port compatibility;
 - do not change business implementation code, package files, or config unless the change is limited to test fixtures or test harness wiring;
 - allow intentionally failing tests only when they express the target behavior from the governing specs.
@@ -126,7 +158,7 @@ Follow repository CQRS rules:
 - new or changed behaviors must already be positioned in `docs/BUSINESS_OPERATION_MAP.md`;
 - neverthrow boundaries follow `docs/errors/neverthrow-conventions.md`.
 
-Default Code Round closure includes an executable user-facing chain and the read/query surface needed for a user to observe the result of the behavior. Prefer a real CLI command or HTTP/oRPC API call for this e2e/acceptance chain; browser automation is required only when the Web workflow itself is the behavior under test. Do not treat a write-side command as complete if the only way to confirm it worked is by inspecting persistence manually. If Web, API, CLI, or query/read model coverage is intentionally deferred, record that explicitly in the final gaps and in the relevant migration notes.
+Default Code Round closure includes an executable user-facing chain and the read/query surface needed for a user to observe the result of the behavior. Every new or changed command must have at least one real CLI or HTTP/oRPC e2e/acceptance test unless the test matrix explicitly marks the command as not externally executable and documents why. Browser automation is required only when the Web workflow itself is the behavior under test. Do not treat a write-side command as complete if the only way to confirm it worked is by inspecting persistence manually. If Web, API, CLI, or query/read model coverage is intentionally deferred, record that explicitly in the final gaps and in the relevant migration notes.
 
 For changed commands and workflows, the behavior test matrix must enumerate scenario coverage across happy path, validation, lifecycle transitions, workflow branches, error mapping, emitted events, read/query observability, and Web/API/CLI entrypoints where applicable. Each required matrix row must have a stable test case id and preferred automation level. Mark entrypoint-to-read-model chains as `e2e-preferred` when they can be executed through CLI or HTTP/oRPC, and add integration/unit tests underneath for branch coverage and pure domain behavior.
 
@@ -253,6 +285,10 @@ Include:
 
 Use `CHECKLIST.md` for a compact checklist.
 
+Before edits, convert the behavior change map into the current round todo described in
+`Round Todo Gate`. For a chained Spec -> Test-First -> Code flow, keep separate todo sections for
+each round so coverage requirements cannot be hidden inside a broad "implement behavior" item.
+
 ### Step 4. Decide Scope
 
 State or infer the round:
@@ -297,20 +333,22 @@ If Spec Round:
 
 If Test-First Round:
 
+- create or refresh the Test-First Round todo before editing tests;
 - update the governing test matrix first when new or changed behavior lacks numbered rows;
 - implement automated tests before business implementation and name each test with the governing matrix id;
+- include at least one executable CLI or HTTP/oRPC e2e/acceptance test for every new or changed command, unless the test matrix explicitly documents why none can exist;
 - allow tests to fail only as executable target behavior for a future Code Round;
 - do not change production/business code, except for test fixtures or test harness wiring;
 - report failing matrix ids and the intended Code Round target.
 
 If Code Round:
 
+- create or refresh the Code Round todo before editing code;
 - implement the smallest behavior slice across core/application/adapters/transports;
 - keep CLI as a frontend-like input collection flow, not an afterthought;
 - keep Web/API/CLI differences at the entry boundary and converge on shared command/query semantics;
 - include the read/query path and relevant user-facing entrypoint needed for a minimal closed loop unless the governing spec explicitly scopes them out;
-- update tests according to the behavior test matrix;
-- prefer executable e2e/acceptance tests through CLI or HTTP/oRPC for complete command/workflow chains, then add integration and unit tests for branch coverage, pure domain rules, and fast diagnostics;
+- update tests according to the behavior test matrix, including executable CLI or HTTP/oRPC e2e/acceptance coverage for every new or changed command;
 - include the governing test case id in every automated test name that implements a matrix row, for example `test("[QUICK-DEPLOY-WF-001] accepts existing-context quick deploy through CLI", ...)`;
 - update docs only when behavior meaning, gaps, or coverage changed.
 - run Post-Implementation Sync for the same behavior before final output.
@@ -324,8 +362,10 @@ If Next Behavior Selection:
 
 If Post-Implementation Sync:
 
+- create or refresh the Post-Implementation Sync todo before checking alignment;
 - compare implementation, tests, entrypoints, and migration notes against the governing specs;
 - verify every new or changed test matrix row has a stable id, preferred automation level, and matching automated test name when implemented;
+- verify every new or changed command has at least one passing CLI or HTTP/oRPC e2e/acceptance test, or an explicit test-matrix exception;
 - verify test-first failures are resolved or still listed as blockers;
 - report ready/not-ready and blockers without starting the next behavior.
 

@@ -2,6 +2,7 @@ import { type ZodTypeAny } from "zod";
 import { createDeploymentCommandInputSchema } from "./operations/deployments/create-deployment.command";
 import { deploymentLogsQueryInputSchema } from "./operations/deployments/deployment-logs.query";
 import { listDeploymentsQueryInputSchema } from "./operations/deployments/list-deployments.query";
+import { confirmDomainBindingOwnershipCommandInputSchema } from "./operations/domain-bindings/confirm-domain-binding-ownership.command";
 import { createDomainBindingCommandInputSchema } from "./operations/domain-bindings/create-domain-binding.command";
 import { listDomainBindingsQueryInputSchema } from "./operations/domain-bindings/list-domain-bindings.query";
 import { createEnvironmentCommandInputSchema } from "./operations/environments/create-environment.command";
@@ -461,6 +462,23 @@ export const operationCatalog = [
     transports: {
       cli: "yundu domain-binding create",
       orpc: { method: "POST", path: "/api/domain-bindings" },
+    },
+  },
+  {
+    key: "domain-bindings.confirm-ownership",
+    kind: "command",
+    domain: "domain-bindings",
+    messageName: "ConfirmDomainBindingOwnershipCommand",
+    handlerName: "ConfirmDomainBindingOwnershipCommandHandler",
+    serviceName: "ConfirmDomainBindingOwnershipUseCase",
+    inputSchema: confirmDomainBindingOwnershipCommandInputSchema,
+    serviceToken: tokens.confirmDomainBindingOwnershipUseCase,
+    transports: {
+      cli: "yundu domain-binding confirm-ownership <domainBindingId>",
+      orpc: {
+        method: "POST",
+        path: "/api/domain-bindings/{domainBindingId}/ownership-confirmations",
+      },
     },
   },
   {

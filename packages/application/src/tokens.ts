@@ -52,6 +52,9 @@ export const tokens = {
   promoteEnvironmentUseCase: Symbol.for("yundu.promote_environment_use_case"),
   createDeploymentUseCase: Symbol.for("yundu.create_deployment_use_case"),
   createDomainBindingUseCase: Symbol.for("yundu.create_domain_binding_use_case"),
+  confirmDomainBindingOwnershipUseCase: Symbol.for(
+    "yundu.confirm_domain_binding_ownership_use_case",
+  ),
   listDomainBindingsQueryService: Symbol.for("yundu.list_domain_bindings_query_service"),
   listDeploymentsQueryService: Symbol.for("yundu.list_deployments_query_service"),
   logsQueryService: Symbol.for("yundu.logs_query_service"),

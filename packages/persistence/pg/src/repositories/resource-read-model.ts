@@ -2,6 +2,7 @@ import {
   createReadModelSpanName,
   projectResourceAccessSummary,
   type RepositoryContext,
+  type ResourceAccessSummaryDomainBinding,
   type ResourceReadModel,
   type ResourceSummary,
   yunduTraceAttributes,
@@ -62,6 +63,28 @@ export class PgResourceReadModel implements ResourceReadModel {
                 .orderBy("created_at", "desc")
                 .execute()
             : [];
+        const domainBindingRows =
+          rows.length > 0
+            ? await executor
+                .selectFrom("domain_bindings")
+                .select([
+                  "id",
+                  "resource_id",
+                  "status",
+                  "domain_name",
+                  "path_prefix",
+                  "proxy_kind",
+                  "tls_mode",
+                  "created_at",
+                ])
+                .where(
+                  "resource_id",
+                  "in",
+                  rows.map((row) => row.id),
+                )
+                .orderBy("created_at", "desc")
+                .execute()
+            : [];
 
         return rows.map((row): ResourceSummary => {
           const services = (row.services ?? []) as unknown as SerializedResourceService[];
@@ -70,6 +93,9 @@ export class PgResourceReadModel implements ResourceReadModel {
             : undefined;
           const deployments = deploymentRows.filter(
             (deployment) => deployment.resource_id === row.id,
+          );
+          const domainBindings = domainBindingRows.filter(
+            (domainBinding) => domainBinding.resource_id === row.id,
           );
           const lastDeployment = deployments[0];
           const accessSummary = projectResourceAccessSummary(
@@ -103,6 +129,16 @@ export class PgResourceReadModel implements ResourceReadModel {
                 },
               };
             }),
+            domainBindings.map((domainBinding) => ({
+              id: domainBinding.id,
+              status: domainBinding.status as ResourceAccessSummaryDomainBinding["status"],
+              createdAt: normalizeTimestamp(domainBinding.created_at) ?? domainBinding.created_at,
+              domainName: domainBinding.domain_name,
+              pathPrefix: domainBinding.path_prefix,
+              proxyKind:
+                domainBinding.proxy_kind as ResourceAccessSummaryDomainBinding["proxyKind"],
+              tlsMode: domainBinding.tls_mode as ResourceAccessSummaryDomainBinding["tlsMode"],
+            })),
           );
 
           return {

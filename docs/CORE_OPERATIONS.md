@@ -342,13 +342,21 @@ Implemented operations:
 | Capability | Kind | Operation Key | Message | Schema | CLI | oRPC / HTTP |
 | --- | --- | --- | --- | --- | --- | --- |
 | Create domain binding | Command | `domain-bindings.create` | `CreateDomainBindingCommand` | `CreateDomainBindingCommandInput` | `yundu domain-binding create <domainName>` | `POST /api/domain-bindings` |
+| Confirm domain binding ownership | Command | `domain-bindings.confirm-ownership` | `ConfirmDomainBindingOwnershipCommand` | `ConfirmDomainBindingOwnershipCommandInput` | `yundu domain-binding confirm-ownership <domainBindingId>` | `POST /api/domain-bindings/{domainBindingId}/ownership-confirmations` |
 | List domain bindings | Query | `domain-bindings.list` | `ListDomainBindingsQuery` | `ListDomainBindingsQueryInput` | `yundu domain-binding list` | `GET /api/domain-bindings` |
 
 Current boundary:
 - `domain-bindings.create` creates durable binding state, persists the first manual verification
   attempt, publishes `domain-binding-requested`, and returns accepted `ok({ id })`
+- `domain-bindings.confirm-ownership` confirms the current manual verification attempt, moves the
+  binding to `bound`, publishes `domain-bound`, and returns `ok({ id, verificationAttemptId })`
 - `domain-binding-requested` is a request event and does not mean the domain is bound, certificate
   issuance succeeded, or traffic is ready
+- `domain-bound` means ownership/route prerequisites are satisfied; it does not mean certificate
+  issuance or domain readiness is complete
+- TLS-disabled bindings may progress from `domain-bound` to `domain-ready` when route readiness
+  gates are satisfied; ready bindings are exposed through both `domain-bindings.list` and resource
+  `accessSummary.latestDurableDomainRoute`
 - `deployments.create` must not carry domain, proxy, path prefix, or TLS fields
 - duplicate active bindings are rejected for the same project/environment/resource/domain/path
   owner scope
@@ -363,15 +371,16 @@ Current boundary:
 - Web exposes domain binding from both the resource detail page and the standalone domain bindings
   page; the resource detail page is the owner-scoped affordance, while the standalone page is
   cross-resource management over the same command/query contracts
+- generated sslip/default access hostnames are not durable domain bindings and must be displayed as
+  generated access state, not as rows in the custom domain binding list
 
 Core next operations expected here:
 - configure default access domain policy
 - preview/show resource proxy configuration
-- verify or mark domain binding ownership
 - issue or renew certificate
 - import certificate
 - retry failed domain verification or certificate issuance attempt
-- list/show domain binding readiness state
+- list/show certificate-backed domain binding readiness state
 
 ## System Operations
 

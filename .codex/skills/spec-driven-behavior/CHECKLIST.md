@@ -60,6 +60,63 @@ Use this checklist after the behavior is identified.
 - [ ] Implementation plan exists, or scope is explicitly small enough
 - [ ] Open Questions do not block command boundary, ownership, lifecycle, retry, readiness, durable state, or route/domain/TLS semantics
 
+## Per-Round Todo Gate
+
+- [ ] Current round has a concrete todo before file edits
+- [ ] Chained rounds have separate Spec/Test-First/Code/Post-Implementation todo sections
+- [ ] Todo items use observable outcomes, not vague activities
+- [ ] Newly discovered required surfaces were added to the todo immediately
+- [ ] Unchecked mandatory items are completed, moved to an authorized later round, or documented as migration gaps
+- [ ] Test-related todo items include stable matrix ids
+
+### Spec Round Todo Minimum
+
+- [ ] Governing docs read
+- [ ] Behavior located or positioned in `docs/BUSINESS_OPERATION_MAP.md`
+- [ ] ADR need/no-need decision recorded
+- [ ] Command/query specs updated when semantics change
+- [ ] Event specs updated when emitted/consumed events change
+- [ ] Workflow specs updated when lifecycle sequencing changes
+- [ ] Error specs updated when error codes/phases change
+- [ ] Test matrix rows added/updated before tests
+- [ ] Implementation plan added/updated when Code Round will follow
+- [ ] Migration gaps/Open Questions updated
+
+### Test-First Round Todo Minimum
+
+- [ ] Numbered matrix rows exist for every changed scenario
+- [ ] Automation level selected for every changed matrix row
+- [ ] Every new/changed command has at least one CLI or HTTP/oRPC e2e/acceptance row, or a documented exception
+- [ ] Lower-level integration/unit rows cover event payloads, persistence details, branches, and pure domain rules
+- [ ] Automated test filenames selected
+- [ ] Automated test names include matrix ids
+- [ ] Expected failing/passing state recorded before Code Round
+
+### Code Round Todo Minimum
+
+- [ ] Core/domain transition changes
+- [ ] Application command/query/use-case/handler changes
+- [ ] Persistence/read model/projection changes when observable state changes
+- [ ] Event and error mapping changes
+- [ ] Operation catalog and `docs/CORE_OPERATIONS.md` sync
+- [ ] CLI entrypoint dispatches through the command/query bus
+- [ ] API/oRPC entrypoint reuses the command/query schema
+- [ ] Web entrypoint and owner-scoped affordance when applicable
+- [ ] E2E/acceptance closure path passes through public read/query observability
+- [ ] Verification commands selected and run
+
+### Post-Implementation Sync Todo Minimum
+
+- [ ] Command/query code aligns with spec
+- [ ] Workflow/process behavior aligns with spec
+- [ ] Error mapping aligns with error spec and neverthrow conventions
+- [ ] Tests align with matrix ids and automation levels
+- [ ] Every new/changed command has passing CLI or HTTP/oRPC e2e/acceptance coverage, or a documented exception
+- [ ] Web/API/CLI entrypoints dispatch through shared schemas and buses
+- [ ] Migration gaps updated
+- [ ] Open Questions resolved, retained, or escalated to ADR
+- [ ] Behavior ready/not-ready decision recorded
+
 ## Coverage Checks
 
 - [ ] Command

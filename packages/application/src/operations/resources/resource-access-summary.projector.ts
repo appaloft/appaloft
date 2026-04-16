@@ -1,4 +1,9 @@
-import { type DeploymentStatus, type EdgeProxyKind, type TlsMode } from "@yundu/core";
+import {
+  type DeploymentStatus,
+  type DomainBindingStatus,
+  type EdgeProxyKind,
+  type TlsMode,
+} from "@yundu/core";
 import { type ResourceAccessSummary } from "../../ports";
 
 export interface ResourceAccessSummaryDeployment {
@@ -17,6 +22,16 @@ export interface ResourceAccessSummaryDeployment {
       metadata?: Record<string, string>;
     };
   };
+}
+
+export interface ResourceAccessSummaryDomainBinding {
+  id: string;
+  status: DomainBindingStatus;
+  createdAt: string;
+  domainName: string;
+  pathPrefix: string;
+  proxyKind: EdgeProxyKind;
+  tlsMode: TlsMode;
 }
 
 function routeUrl(input: {
@@ -48,10 +63,22 @@ function proxyRouteStatusFor(
 
 export function projectResourceAccessSummary(
   deployments: ResourceAccessSummaryDeployment[],
+  domainBindings: ResourceAccessSummaryDomainBinding[] = [],
 ): ResourceAccessSummary | undefined {
   const sortedDeployments = [...deployments].sort((left, right) =>
     right.createdAt.localeCompare(left.createdAt),
   );
+
+  let latestRoute:
+    | {
+        deployment: ResourceAccessSummaryDeployment;
+        route: NonNullable<
+          ResourceAccessSummaryDeployment["runtimePlan"]["execution"]["accessRoutes"]
+        >[number];
+        metadata: Record<string, string>;
+      }
+    | undefined;
+  let latestGeneratedRoute: typeof latestRoute;
 
   for (const deployment of sortedDeployments) {
     const metadata = deployment.runtimePlan.execution.metadata ?? {};
@@ -63,20 +90,32 @@ export function projectResourceAccessSummary(
       continue;
     }
 
-    if (metadata["access.routeSource"] !== "generated-default") {
-      continue;
+    latestRoute ??= { deployment, route, metadata };
+
+    if (metadata["access.routeSource"] === "generated-default") {
+      latestGeneratedRoute ??= { deployment, route, metadata };
     }
+  }
+
+  const readyDurableBinding = [...domainBindings]
+    .filter((binding) => binding.status === "ready" && binding.proxyKind !== "none")
+    .sort((left, right) => right.createdAt.localeCompare(left.createdAt))[0];
+
+  if (!latestGeneratedRoute && (!readyDurableBinding || !latestRoute)) {
+    return undefined;
+  }
+
+  const summary: ResourceAccessSummary = {};
+
+  if (latestGeneratedRoute) {
+    const { deployment, metadata, route } = latestGeneratedRoute;
 
     const hostname = metadata["access.hostname"] ?? route.domains[0];
-    if (!hostname) {
-      continue;
-    }
+    if (hostname) {
+      const scheme =
+        metadata["access.scheme"] === "https" || route.tlsMode === "auto" ? "https" : "http";
 
-    const scheme =
-      metadata["access.scheme"] === "https" || route.tlsMode === "auto" ? "https" : "http";
-
-    return {
-      latestGeneratedAccessRoute: {
+      summary.latestGeneratedAccessRoute = {
         url: routeUrl({ hostname, scheme, pathPrefix: route.pathPrefix }),
         hostname,
         scheme,
@@ -87,11 +126,41 @@ export function projectResourceAccessSummary(
         proxyKind: route.proxyKind,
         ...(typeof route.targetPort === "number" ? { targetPort: route.targetPort } : {}),
         updatedAt: deployment.createdAt,
-      },
-      proxyRouteStatus: proxyRouteStatusFor(deployment.status),
-      lastRouteRealizationDeploymentId: deployment.id,
+      };
+    }
+  }
+
+  if (readyDurableBinding && latestRoute) {
+    const { deployment, metadata, route } = latestRoute;
+    const scheme = readyDurableBinding.tlsMode === "auto" ? "https" : "http";
+
+    summary.latestDurableDomainRoute = {
+      url: routeUrl({
+        hostname: readyDurableBinding.domainName,
+        scheme,
+        pathPrefix: readyDurableBinding.pathPrefix,
+      }),
+      hostname: readyDurableBinding.domainName,
+      scheme,
+      ...(metadata["access.providerKey"] ? { providerKey: metadata["access.providerKey"] } : {}),
+      deploymentId: deployment.id,
+      deploymentStatus: deployment.status,
+      pathPrefix: readyDurableBinding.pathPrefix,
+      proxyKind: readyDurableBinding.proxyKind,
+      ...(typeof route.targetPort === "number" ? { targetPort: route.targetPort } : {}),
+      updatedAt: readyDurableBinding.createdAt,
     };
   }
 
-  return undefined;
+  const routeStatusDeployment =
+    summary.latestDurableDomainRoute && latestRoute
+      ? latestRoute.deployment
+      : latestGeneratedRoute?.deployment;
+
+  if (routeStatusDeployment) {
+    summary.proxyRouteStatus = proxyRouteStatusFor(routeStatusDeployment.status);
+    summary.lastRouteRealizationDeploymentId = routeStatusDeployment.id;
+  }
+
+  return Object.keys(summary).length > 0 ? summary : undefined;
 }

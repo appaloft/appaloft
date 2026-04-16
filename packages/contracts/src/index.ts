@@ -676,6 +676,19 @@ export const createDomainBindingResponseSchema = z.object({
   id: z.string(),
 });
 
+export const confirmDomainBindingOwnershipInputSchema = z.object({
+  domainBindingId: z.string().min(1),
+  verificationAttemptId: z.string().min(1).optional(),
+  confirmedBy: z.string().min(1).optional(),
+  evidence: z.string().min(1).optional(),
+  idempotencyKey: z.string().min(1).optional(),
+});
+
+export const confirmDomainBindingOwnershipResponseSchema = z.object({
+  id: z.string(),
+  verificationAttemptId: z.string(),
+});
+
 export const domainBindingSummarySchema = z.object({
   id: z.string(),
   projectId: z.string(),
@@ -1352,6 +1365,12 @@ export type ListResourcesResponse = z.infer<typeof listResourcesResponseSchema>;
 export type DomainBindingSummary = z.infer<typeof domainBindingSummarySchema>;
 export type CreateDomainBindingInput = z.infer<typeof createDomainBindingInputSchema>;
 export type CreateDomainBindingResponse = z.infer<typeof createDomainBindingResponseSchema>;
+export type ConfirmDomainBindingOwnershipInput = z.infer<
+  typeof confirmDomainBindingOwnershipInputSchema
+>;
+export type ConfirmDomainBindingOwnershipResponse = z.infer<
+  typeof confirmDomainBindingOwnershipResponseSchema
+>;
 export type ListDomainBindingsResponse = z.infer<typeof listDomainBindingsResponseSchema>;
 export type SetEnvironmentVariableInput = z.infer<typeof setEnvironmentVariableInputSchema>;
 export type PromoteEnvironmentInput = z.infer<typeof promoteEnvironmentInputSchema>;

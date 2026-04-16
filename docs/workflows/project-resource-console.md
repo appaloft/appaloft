@@ -142,6 +142,14 @@ Routine resource-scoped domain binding and TLS creation must be inline in the co
 access/domain section. A modal may be used only for destructive confirmation, advanced flows, or
 rare interruptions, not for the default bind-domain path.
 
+Generated default access and custom domain binding must be visually and semantically separate. A
+generated sslip/default access URL belongs in the access URL area from `ResourceAccessSummary`.
+The domain binding list belongs to durable custom `DomainBinding` records only, and its empty state
+must say that no custom domain bindings exist rather than implying generated access is missing.
+
+Pending custom domain bindings should expose an owner-scoped ownership confirmation action from the
+resource detail domain section. That action must dispatch `domain-bindings.confirm-ownership`.
+
 Current health must be compact in the page header. Detailed health policy configuration belongs in
 the configuration tab. The UI must not expose internal probe/check names, source error codes, or
 transport diagnostics as prominent main content; those details belong in diagnostics/support output
@@ -234,7 +242,8 @@ Resource detail now exposes a first-class copy diagnostic summary affordance bac
 `resources.diagnostic-summary`.
 
 Resource detail now exposes the resource-level access URL from domain binding or access summary
-state. The same access URL should not be treated as deployment-owned configuration.
+state. Generated/default access is separated from the custom domain binding list, and pending
+custom bindings can be manually confirmed through `domain-bindings.confirm-ownership`.
 
 `resources.health` exists. Resource detail and sidebar use unknown only when health is loading or
 unobserved, not as a deployment-status fallback.

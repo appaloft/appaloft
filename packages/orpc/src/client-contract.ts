@@ -2,6 +2,7 @@ import { type AsyncIteratorClass, type Client, type ORPCError } from "@orpc/clie
 import {
   type BootstrapServerProxyCommandInput,
   type ConfigureServerCredentialCommandInput,
+  type ConfirmDomainBindingOwnershipCommandInput,
   type CreateDeploymentCommandInput,
   type CreateDomainBindingCommandInput,
   type CreateEnvironmentCommandInput,
@@ -30,6 +31,7 @@ import {
 } from "@yundu/application/schemas";
 import {
   type BootstrapServerProxyResponse,
+  type ConfirmDomainBindingOwnershipResponse,
   type CreateDeploymentResponse,
   type CreateDomainBindingResponse,
   type CreateEnvironmentResponse,
@@ -231,6 +233,12 @@ export type YunduOrpcClientContract = {
       YunduClientContext,
       CreateDomainBindingCommandInput,
       CreateDomainBindingResponse,
+      YunduClientError
+    >;
+    confirmOwnership: Client<
+      YunduClientContext,
+      ConfirmDomainBindingOwnershipCommandInput,
+      ConfirmDomainBindingOwnershipResponse,
       YunduClientError
     >;
   };
