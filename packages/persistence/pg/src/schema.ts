@@ -144,6 +144,11 @@ export interface DomainBindingsTable {
     Record<string, unknown>[],
     Record<string, unknown>[]
   >;
+  route_failure: ColumnType<
+    Record<string, unknown> | null,
+    Record<string, unknown> | null,
+    Record<string, unknown> | null
+  >;
   idempotency_key: string | null;
   created_at: TimestampColumn;
 }

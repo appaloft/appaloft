@@ -98,9 +98,9 @@ succeed.
 Current code consumes `certificate-issued` for certificate-backed domain readiness. If the referenced
 domain binding is still `bound`, the handler marks it `ready` and publishes `domain-ready`.
 
-Current code implements the real ACME adapter, HTTP-01 challenge token serving, and provider-owned
-proxy reload/activation plans for route realization. Route realization failure state is not yet
-implemented.
+Current code implements the real ACME adapter, HTTP-01 challenge token serving, provider-owned
+proxy reload/activation plans for route realization, and durable route realization failure state for
+affected domain bindings.
 
 ## Open Questions
 

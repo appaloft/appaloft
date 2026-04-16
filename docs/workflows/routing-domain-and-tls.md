@@ -68,6 +68,18 @@ domain-bindings.create
   -> domain remains bound but not ready for TLS-required traffic
 ```
 
+For route realization failure:
+
+```text
+domain-bindings.create
+  -> domain-binding-requested
+  -> domain-bindings.confirm-ownership
+  -> domain-bound
+  -> deployment route realization fails
+  -> domain-route-realization-failed
+  -> domain binding is not_ready until a later route realization succeeds
+```
+
 For manual certificate import:
 
 ```text
@@ -167,6 +179,7 @@ retry_scheduled
 | `certificate-requested` | Certificate attempt accepted. | Certificate attempt moves to `requested` or `issuing`. |
 | `certificate-issued` | Certificate state is active. | Certificate moves to `active`; domain may move to `ready`. |
 | `certificate-issuance-failed` | Certificate attempt failed. | Certificate attempt moves to `failed` or `retry_scheduled`; domain remains not ready if TLS is required. |
+| `domain-route-realization-failed` | Route/proxy realization failed for an active durable domain binding. | Domain binding moves to `not_ready` with safe route failure metadata. |
 | `domain-ready` | All routing and TLS gates are satisfied. | Domain binding read model reports ready. |
 
 ## Failure Visibility
@@ -176,6 +189,7 @@ Admission failures are returned to the caller as `err(DomainError)`.
 Async failures are exposed through:
 
 - domain binding read-model status;
+- domain binding route failure metadata when route realization fails;
 - certificate read-model status;
 - attempt status when available;
 - `certificate-issuance-failed` or domain verification failure state;
@@ -205,6 +219,17 @@ use the edge proxy provider reload behavior governed by
 provider may declare automatic reload/activation, or it may return explicit command steps. Domain
 readiness must not be marked from certificate issuance alone when the selected provider still has a
 required reload/activation failure.
+
+Route realization failure state is a domain binding process-manager continuation:
+
+- consume a durable failed route/deployment fact with phase `proxy-route-realization`,
+  `proxy-reload`, or `public-route-verification`;
+- find active durable domain bindings for the failed resource route;
+- mark each affected binding `not_ready` with the failed deployment id, phase, error code,
+  retriable flag, safe message, and failure timestamp;
+- publish `domain-route-realization-failed` only after the binding state is persisted;
+- leave `requested`, `pending_verification`, and `failed` bindings unchanged;
+- do not delete or recreate the binding.
 
 ## HTTP-01 Challenge Serving
 
@@ -361,8 +386,8 @@ Current code includes a real ACME provider adapter package that can be enabled t
 shell certificate-provider configuration. The default shell profile remains unavailable so tests and
 local development do not contact a real CA by accident.
 
-Outbox/inbox workflow, DNS-provider verification, route realization failure state, and
-renewal-window scheduling are not implemented yet.
+Outbox/inbox workflow, DNS-provider verification, and renewal-window scheduling are not implemented
+yet.
 
 ## Open Questions
 

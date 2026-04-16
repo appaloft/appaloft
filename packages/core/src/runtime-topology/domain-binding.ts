@@ -1,6 +1,7 @@
 import { AggregateRoot } from "../shared/entity";
 import { domainError } from "../shared/errors";
 import {
+  type DeploymentId,
   type DeploymentTargetId,
   type DestinationId,
   type DomainBindingId,
@@ -13,6 +14,7 @@ import { err, ok, type Result } from "../shared/result";
 import { type EdgeProxyKindValue, type TlsModeValue } from "../shared/state-machine";
 import { type CreatedAt } from "../shared/temporal";
 import {
+  type ErrorCodeText,
   type MessageText,
   type PublicDomainName,
   type RoutePathPrefix,
@@ -48,6 +50,14 @@ export type DomainVerificationMethod = (typeof domainVerificationMethods)[number
 export const certificatePolicies = ["auto", "manual", "disabled"] as const;
 
 export type CertificatePolicy = (typeof certificatePolicies)[number];
+
+export const domainRouteFailurePhases = [
+  "proxy-route-realization",
+  "proxy-reload",
+  "public-route-verification",
+] as const;
+
+export type DomainRouteFailurePhase = (typeof domainRouteFailurePhases)[number];
 
 function createLiteralValue<TValue extends string, TObject>(
   value: string,
@@ -176,6 +186,28 @@ export class CertificatePolicyValue extends ScalarValueObject<CertificatePolicy>
   }
 }
 
+const domainRouteFailurePhaseBrand: unique symbol = Symbol("DomainRouteFailurePhaseValue");
+export class DomainRouteFailurePhaseValue extends ScalarValueObject<DomainRouteFailurePhase> {
+  private [domainRouteFailurePhaseBrand]!: void;
+
+  private constructor(value: DomainRouteFailurePhase) {
+    super(value);
+  }
+
+  static create(value: string): Result<DomainRouteFailurePhaseValue> {
+    return createLiteralValue(
+      value,
+      domainRouteFailurePhases,
+      "Domain route failure phase",
+      (validated) => new DomainRouteFailurePhaseValue(validated),
+    );
+  }
+
+  static rehydrate(value: DomainRouteFailurePhase): DomainRouteFailurePhaseValue {
+    return new DomainRouteFailurePhaseValue(value);
+  }
+}
+
 const idempotencyKeyBrand: unique symbol = Symbol("IdempotencyKeyValue");
 export class IdempotencyKeyValue extends ScalarValueObject<string> {
   private [idempotencyKeyBrand]!: void;
@@ -212,6 +244,15 @@ export interface DomainVerificationAttemptState {
   createdAt: CreatedAt;
 }
 
+export interface DomainRouteFailureState {
+  deploymentId: DeploymentId;
+  failedAt: CreatedAt;
+  errorCode: ErrorCodeText;
+  failurePhase: DomainRouteFailurePhaseValue;
+  retriable: boolean;
+  errorMessage?: MessageText;
+}
+
 export interface DomainBindingState {
   id: DomainBindingId;
   projectId: ProjectId;
@@ -226,6 +267,7 @@ export interface DomainBindingState {
   certificatePolicy: CertificatePolicyValue;
   status: DomainBindingStatusValue;
   verificationAttempts: DomainVerificationAttemptState[];
+  routeFailure?: DomainRouteFailureState;
   createdAt: CreatedAt;
   idempotencyKey?: IdempotencyKeyValue;
 }
@@ -451,6 +493,7 @@ export class DomainBinding extends AggregateRoot<DomainBindingState> {
     }
 
     this.state.status = DomainBindingStatusValue.rehydrate("ready");
+    delete this.state.routeFailure;
 
     this.recordDomainEvent("domain-ready", input.readyAt, {
       domainBindingId: this.state.id.value,
@@ -465,6 +508,66 @@ export class DomainBinding extends AggregateRoot<DomainBindingState> {
       tlsMode: this.state.tlsMode.value,
       certificatePolicy: this.state.certificatePolicy.value,
       readyAt: input.readyAt.value,
+      ...(input.correlationId ? { correlationId: input.correlationId } : {}),
+      ...(input.causationId ? { causationId: input.causationId } : {}),
+    });
+
+    return ok(undefined);
+  }
+
+  markRouteRealizationFailed(input: {
+    deploymentId: DeploymentId;
+    failedAt: CreatedAt;
+    errorCode: ErrorCodeText;
+    failurePhase: DomainRouteFailurePhaseValue;
+    retriable: boolean;
+    errorMessage?: MessageText;
+    correlationId?: string;
+    causationId?: string;
+  }): Result<void> {
+    if (
+      this.state.status.value !== "bound" &&
+      this.state.status.value !== "certificate_pending" &&
+      this.state.status.value !== "ready" &&
+      this.state.status.value !== "not_ready"
+    ) {
+      return ok(undefined);
+    }
+
+    const existingFailure = this.state.routeFailure;
+    if (
+      this.state.status.value === "not_ready" &&
+      existingFailure?.deploymentId.equals(input.deploymentId) &&
+      existingFailure.failurePhase.equals(input.failurePhase)
+    ) {
+      return ok(undefined);
+    }
+
+    this.state.status = DomainBindingStatusValue.rehydrate("not_ready");
+    this.state.routeFailure = {
+      deploymentId: input.deploymentId,
+      failedAt: input.failedAt,
+      errorCode: input.errorCode,
+      failurePhase: input.failurePhase,
+      retriable: input.retriable,
+      ...(input.errorMessage ? { errorMessage: input.errorMessage } : {}),
+    };
+
+    this.recordDomainEvent("domain-route-realization-failed", input.failedAt, {
+      domainBindingId: this.state.id.value,
+      domainName: this.state.domainName.value,
+      pathPrefix: this.state.pathPrefix.value,
+      projectId: this.state.projectId.value,
+      environmentId: this.state.environmentId.value,
+      resourceId: this.state.resourceId.value,
+      serverId: this.state.serverId.value,
+      destinationId: this.state.destinationId.value,
+      deploymentId: input.deploymentId.value,
+      failedAt: input.failedAt.value,
+      errorCode: input.errorCode.value,
+      failurePhase: input.failurePhase.value,
+      retriable: input.retriable,
+      ...(input.errorMessage ? { errorMessage: input.errorMessage.value } : {}),
       ...(input.correlationId ? { correlationId: input.correlationId } : {}),
       ...(input.causationId ? { causationId: input.causationId } : {}),
     });

@@ -6,6 +6,7 @@ export * from "./deployment-repository";
 export * from "./destination-repository";
 export * from "./domain-binding-read-model";
 export * from "./domain-binding-repository";
+export * from "./domain-route-failure-candidate-reader";
 export * from "./environment-read-model";
 export * from "./environment-repository";
 export * from "./project-read-model";

@@ -127,8 +127,10 @@ Current code also implements durable domain readiness for TLS-disabled bindings 
 `domain-bound`, publishes `domain-ready`, and projects ready bindings into
 `ResourceAccessSummary.latestDurableDomainRoute`.
 
-Certificate-backed `domain-ready`, readiness expiry, and retryable route realization failure state
-remain follow-up behavior.
+Current code also records retryable route realization failure state by moving affected active
+bindings to `not_ready` and publishing `domain-route-realization-failed`.
+
+Readiness expiry and renewal-window scheduling remain follow-up behavior.
 
 ## Open Questions
 

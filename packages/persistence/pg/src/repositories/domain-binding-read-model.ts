@@ -11,6 +11,7 @@ import { type Database } from "../schema";
 import {
   normalizeTimestamp,
   resolveRepositoryExecutor,
+  type SerializedDomainRouteFailure,
   type SerializedDomainVerificationAttempt,
 } from "./shared";
 
@@ -55,6 +56,7 @@ export class PgDomainBindingReadModel implements DomainBindingReadModel {
         return rows.map((row): DomainBindingSummary => {
           const verificationAttempts = (row.verification_attempts ??
             []) as unknown as SerializedDomainVerificationAttempt[];
+          const routeFailure = row.route_failure as SerializedDomainRouteFailure | null;
 
           return {
             id: row.id,
@@ -69,6 +71,20 @@ export class PgDomainBindingReadModel implements DomainBindingReadModel {
             tlsMode: row.tls_mode as DomainBindingSummary["tlsMode"],
             certificatePolicy: row.certificate_policy as DomainBindingSummary["certificatePolicy"],
             status: row.status as DomainBindingSummary["status"],
+            ...(routeFailure
+              ? {
+                  routeFailure: {
+                    deploymentId: routeFailure.deploymentId,
+                    failedAt: normalizeTimestamp(routeFailure.failedAt) ?? routeFailure.failedAt,
+                    errorCode: routeFailure.errorCode,
+                    failurePhase: routeFailure.failurePhase,
+                    retriable: routeFailure.retriable,
+                    ...(routeFailure.errorMessage
+                      ? { errorMessage: routeFailure.errorMessage }
+                      : {}),
+                  },
+                }
+              : {}),
             verificationAttemptCount: verificationAttempts.length,
             createdAt: normalizeTimestamp(row.created_at) ?? row.created_at,
           };

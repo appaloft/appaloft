@@ -1540,6 +1540,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
           retryable: proxyRoutePlanResult.error.retryable,
           metadata: {
             message: proxyRoutePlanResult.error.message,
+            phase: "proxy-route-realization",
           },
         }).deployment,
       });
@@ -1680,6 +1681,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
           retryable: proxyReloadPlanResult.error.retryable,
           metadata: {
             message: proxyReloadPlanResult.error.message,
+            phase: "proxy-reload",
           },
         }).deployment,
       });

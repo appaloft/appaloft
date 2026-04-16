@@ -194,6 +194,10 @@ Provider errors must return structured `DomainError` values with category, phase
 
 Post-acceptance route realization failure must persist deployment failure or degraded route state. It must not rewrite the original accepted command result.
 
+When the failed route belongs to one or more active durable domain bindings, a route realization
+process manager must mark those bindings `not_ready` and publish
+`domain-route-realization-failed` after the binding state is durable.
+
 ## User-Facing Surfaces
 
 When the query is active, Web resource detail must expose read-only proxy configuration from `resources.proxy-configuration.preview`.
@@ -212,6 +216,9 @@ Server bootstrap resolves concrete edge proxy behavior through the injected prov
 Deployment execution asks the provider registry for route realization plans, passes the generated
 labels/network intent to runtime executors, and applies provider reload steps after route
 configuration changes.
+
+Durable domain binding route failure state is handled by a process manager that consumes failed
+deployment/route facts and records affected bindings as `not_ready`.
 
 `resources.proxy-configuration.preview` exists for Web/API/CLI, but provider diagnostics are limited to generated configuration sections and basic metadata.
 

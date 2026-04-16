@@ -24,6 +24,7 @@ import {
   type DomainBindingStatus,
   type DomainError,
   type DomainEvent,
+  type DomainRouteFailurePhase,
   type EdgeProxyKind,
   type EdgeProxyStatus,
   type EnvironmentKind,
@@ -189,6 +190,19 @@ export interface DomainBindingRepository {
     domainBinding: DomainBinding,
     spec: DomainBindingMutationSpec,
   ): Promise<void>;
+}
+
+export interface DomainRouteFailureCandidate {
+  domainBindingId: string;
+}
+
+export interface DomainRouteFailureCandidateReader {
+  listAffectedBindings(
+    context: RepositoryContext,
+    input: {
+      deploymentId: string;
+    },
+  ): Promise<DomainRouteFailureCandidate[]>;
 }
 
 export interface CertificateRepository {
@@ -1290,6 +1304,14 @@ export interface DomainBindingSummary {
   tlsMode: TlsMode;
   certificatePolicy: CertificatePolicy;
   status: DomainBindingStatus;
+  routeFailure?: {
+    deploymentId: string;
+    failedAt: string;
+    errorCode: string;
+    failurePhase: DomainRouteFailurePhase;
+    retriable: boolean;
+    errorMessage?: string;
+  };
   verificationAttemptCount: number;
   createdAt: string;
 }

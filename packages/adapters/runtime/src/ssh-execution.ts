@@ -1482,6 +1482,7 @@ export class SshExecutionBackend implements ExecutionBackend {
             metadata: {
               host: target.host,
               message: proxyRoutePlanResult.error.message,
+              phase: "proxy-route-realization",
             },
           }),
         });
@@ -1615,6 +1616,7 @@ export class SshExecutionBackend implements ExecutionBackend {
             metadata: {
               host: target.host,
               message: proxyReloadPlanResult.error.message,
+              phase: "proxy-reload",
             },
           }),
         });
@@ -1871,6 +1873,7 @@ export class SshExecutionBackend implements ExecutionBackend {
                   port: String(port),
                   publishedPort: String(publishedHostPort),
                   internalUrl,
+                  phase: "public-route-verification",
                   ...prepared.source.metadata,
                 },
               }),
@@ -1918,6 +1921,7 @@ export class SshExecutionBackend implements ExecutionBackend {
                     publishedPort: String(publishedHostPort),
                     internalUrl,
                     url: publicUrl,
+                    phase: "public-route-verification",
                     ...prepared.source.metadata,
                   },
                 }),
