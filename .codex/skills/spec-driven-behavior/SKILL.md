@@ -11,7 +11,7 @@ Use this skill to change one Yundu business behavior as a complete operation, no
 
 Treat a behavior as the coordinated unit spanning command or query, event, workflow, error contract, read model/projection, test matrix, Web/API/CLI entrypoints, implementation plan, and ADR/global contracts when applicable.
 
-Do not treat this skill as permission to move from specs into code automatically. The default round is Spec Round. Code Round is allowed only when the current prompt permits implementation and the governing ADRs, global contracts, local specs, and implementation plan are clear enough.
+Do not treat this skill as permission to move from specs into code automatically. The default round is Spec Round. Test-First Round is allowed only when the current prompt permits automated test work and the governing specs/test matrix are clear enough to write executable expectations. Code Round is allowed only when the current prompt permits implementation and the governing ADRs, global contracts, local specs, test matrix, automated tests, and implementation plan are clear enough.
 
 ## Source-Of-Truth Rules
 
@@ -90,9 +90,24 @@ Do this:
 
 Do not change business code, tests, package files, or config in Spec Round.
 
-### 3. Code Round
+### 3. Test-First Round
 
-Use only when the user allows implementation and the relevant ADRs, global contracts, local specs, test matrix, and implementation plan are sufficiently clear.
+Use when the user asks to implement tests before business code, or when a new/changed behavior needs executable expectations before Code Round.
+
+Do this:
+
+- update or add the governing `docs/testing/**` test matrix before writing tests if the changed behavior lacks numbered matrix rows;
+- implement or rename automated tests so each changed matrix row has a matching test name with the matrix id;
+- prefer CLI or HTTP/oRPC e2e/acceptance tests for complete command/workflow chains, then add integration/unit tests for branch coverage and pure domain rules;
+- classify every changed matrix row by the strongest boundary that can actually observe the assertion: `e2e-preferred` for CLI/HTTP/Web plus public read/query observability, `integration` for repository state/events/process-manager/adapter behavior, `unit` for pure domain/planner rules, and `contract` for schema/route/provider-port compatibility;
+- do not change business implementation code, package files, or config unless the change is limited to test fixtures or test harness wiring;
+- allow intentionally failing tests only when they express the target behavior from the governing specs.
+
+Output must list any failing matrix ids and the Code Round work expected to make them pass. The behavior remains `not aligned` until the tests pass or the matrix is revised by Spec Round.
+
+### 4. Code Round
+
+Use only when the user allows implementation and the relevant ADRs, global contracts, local specs, test matrix, automated tests, and implementation plan are sufficiently clear.
 
 Do this:
 
@@ -115,11 +130,15 @@ Default Code Round closure includes an executable user-facing chain and the read
 
 For changed commands and workflows, the behavior test matrix must enumerate scenario coverage across happy path, validation, lifecycle transitions, workflow branches, error mapping, emitted events, read/query observability, and Web/API/CLI entrypoints where applicable. Each required matrix row must have a stable test case id and preferred automation level. Mark entrypoint-to-read-model chains as `e2e-preferred` when they can be executed through CLI or HTTP/oRPC, and add integration/unit tests underneath for branch coverage and pure domain behavior.
 
+Do not use `e2e-preferred` for assertions an external user chain cannot observe directly, such as exact repository fields, internal method calls, hidden process-manager state, or adapter call ordering. Split those into companion `integration`, `unit`, or `contract` rows while keeping a separate `e2e-preferred` row for the user-visible chain when one exists.
+
+Treat every operation catalog entry as first-class test scope. New or changed tests for an explicit operation must live in operation-named test files, not only in generic smoke suites or as setup inside another operation's tests. If an operation has separate command, CLI, HTTP/oRPC, Web, or future MCP entrypoints, split the matrix rows and automated tests by those boundaries when each has distinct transport behavior to verify.
+
 When a behavior is owned by a specific aggregate or resource, Web closure should include an owner-scoped affordance on the relevant detail page, not only a standalone admin page, unless the governing spec explicitly makes the operation global-only.
 
 After implementation, run Post-Implementation Sync for the same behavior before recommending or starting another behavior.
 
-### 4. Sync Round
+### 5. Sync Round
 
 Use when implementation, specs, tests, or entrypoints have drifted.
 
@@ -131,7 +150,7 @@ Do this:
 - reconcile tests with the test matrix;
 - keep legacy gaps explicit in migration notes instead of hiding drift.
 
-### 5. Next Behavior Selection
+### 6. Next Behavior Selection
 
 Use when the current behavior is implemented or basically implemented and the user asks what to do next.
 
@@ -154,7 +173,7 @@ Output must include:
 
 Do not start writing the next spec or implementing the next behavior unless the current prompt explicitly asks to do so.
 
-### 6. Post-Implementation Sync
+### 7. Post-Implementation Sync
 
 Use immediately after a Code Round or when the user asks whether a behavior is implemented enough.
 
@@ -164,6 +183,7 @@ Check:
 - code aligns with workflow spec;
 - error mapping aligns with error spec and neverthrow conventions;
 - tests align with the test matrix, including matrix ids and matching automated test names;
+- intentionally test-first failures are either resolved by Code Round or listed as remaining gaps;
 - Web/API/CLI entrypoints dispatch through the intended command/query schemas and buses;
 - migration gaps are updated;
 - Open Questions are resolved, still valid, or need ADR escalation.
@@ -239,6 +259,7 @@ State or infer the round:
 
 - Discover Round when no behavior is selected;
 - Spec Round when docs-only, ADR-first, implementation plan work is requested, or governance is incomplete;
+- Test-First Round when executable tests are requested before business implementation and the matrix/specs are clear;
 - Code Round when code is explicitly allowed and specs are clear;
 - Sync Round when reconciling drift;
 - Next Behavior Selection when choosing the next v1 behavior after an implemented behavior;
@@ -251,6 +272,7 @@ Before code changes, decide whether the task first needs:
 - a new or updated ADR;
 - a new or updated command/event/workflow/error spec;
 - a new or updated test matrix with stable case ids and preferred automation levels;
+- new or updated automated tests that bind to the changed matrix ids;
 - a new or updated implementation plan.
 
 Enter Code Round only if the candidate behavior has:
@@ -258,6 +280,7 @@ Enter Code Round only if the candidate behavior has:
 - relevant Accepted ADRs or no ADR-needed boundary change;
 - global-contract coverage for errors/neverthrow/async when applicable;
 - local command/query, event, workflow, error, and testing specs where relevant;
+- automated tests for the changed matrix ids, or a documented reason they must be created inside the Code Round;
 - an implementation plan or an explicitly small enough implementation scope;
 - no unresolved Open Questions that would change command boundary, ownership, lifecycle, retry, readiness, durable state, or route/domain/TLS semantics.
 
@@ -271,6 +294,14 @@ If Spec Round:
 - update source-of-truth body text directly when the decision is accepted;
 - do not scatter analysis labels like `Current fact`, `Inference`, or `Target recommendation` through normative body text;
 - keep implementation reality in migration gaps.
+
+If Test-First Round:
+
+- update the governing test matrix first when new or changed behavior lacks numbered rows;
+- implement automated tests before business implementation and name each test with the governing matrix id;
+- allow tests to fail only as executable target behavior for a future Code Round;
+- do not change production/business code, except for test fixtures or test harness wiring;
+- report failing matrix ids and the intended Code Round target.
 
 If Code Round:
 
@@ -295,6 +326,7 @@ If Post-Implementation Sync:
 
 - compare implementation, tests, entrypoints, and migration notes against the governing specs;
 - verify every new or changed test matrix row has a stable id, preferred automation level, and matching automated test name when implemented;
+- verify test-first failures are resolved or still listed as blockers;
 - report ready/not-ready and blockers without starting the next behavior.
 
 ### Step 6. Output
@@ -310,6 +342,7 @@ The final response must include:
 - changed code modules;
 - changed tests;
 - covered or missing test matrix ids;
+- intentionally failing test-first matrix ids when present;
 - changed Web/API/CLI entrypoints;
 - governed ADRs;
 - remaining migration gaps;

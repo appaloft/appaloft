@@ -55,55 +55,55 @@ Then:
 
 ## Provider Boundary Matrix
 
-| Case | Input/state | Expected result | Expected error | Required assertion |
-| --- | --- | --- | --- | --- |
-| Provider resolves | Provider key registered | Provider returned | None | Application receives provider through registry/DI. |
-| Provider missing | Provider key not registered | `err` | `proxy_provider_unavailable`, phase `proxy-provider-resolution` | No concrete fallback switch is used. |
-| Provider renders ensure plan | Connected server requires proxy | Ensure plan returned | None | Plan includes only executable provider output, not aggregate mutations. |
-| Provider ensure plan detects incompatible installed proxy | Target already has a provider-owned proxy container with an older or unsupported image | Ensure plan recreates the provider-owned proxy | None | Plan readiness guard includes the expected provider image so stale proxy containers are replaced. |
-| Provider renders diagnostic plan | Existing target requests connectivity diagnostics for a provider-backed proxy | Diagnostic command plan returned | None | Plan includes provider-owned compatibility checks and any bounded route probe scripts; runtime executor, not command handler, runs them. |
-| Provider renders route plan | Resource route targets `internalPort` | Route realization plan returned | None | Target port comes from resource network snapshot. |
-| Provider renders config view | Planned or realized route exists | Read-only sections returned | None | Section content may be provider-specific; wrapper stays provider-neutral. |
-| Provider render fails | Provider cannot render safe config | `err` | `proxy_configuration_render_failed` | Error contains code, phase, retriable, provider key. |
+| Test ID | Preferred automation | Case | Input/state | Expected result | Expected error | Required assertion |
+| --- | --- | --- | --- | --- | --- | --- |
+| EDGE-PROXY-PROVIDER-001 | contract | Provider resolves | Provider key registered | Provider returned | None | Application receives provider through registry/DI. |
+| EDGE-PROXY-PROVIDER-002 | contract | Provider missing | Provider key not registered | `err` | `proxy_provider_unavailable`, phase `proxy-provider-resolution` | No concrete fallback switch is used. |
+| EDGE-PROXY-PROVIDER-003 | contract | Provider renders ensure plan | Connected server requires proxy | Ensure plan returned | None | Plan includes only executable provider output, not aggregate mutations. |
+| EDGE-PROXY-PROVIDER-004 | contract | Provider ensure plan detects incompatible installed proxy | Target already has a provider-owned proxy container with an older or unsupported image | Ensure plan recreates the provider-owned proxy | None | Plan readiness guard includes the expected provider image so stale proxy containers are replaced. |
+| EDGE-PROXY-PROVIDER-005 | contract | Provider renders diagnostic plan | Existing target requests connectivity diagnostics for a provider-backed proxy | Diagnostic command plan returned | None | Plan includes provider-owned compatibility checks and any bounded route probe scripts; runtime executor, not command handler, runs them. |
+| EDGE-PROXY-PROVIDER-006 | contract | Provider renders route plan | Resource route targets `internalPort` | Route realization plan returned | None | Target port comes from resource network snapshot. |
+| EDGE-PROXY-PROVIDER-007 | contract | Provider renders config view | Planned or realized route exists | Read-only sections returned | None | Section content may be provider-specific; wrapper stays provider-neutral. |
+| EDGE-PROXY-PROVIDER-008 | contract | Provider render fails | Provider cannot render safe config | `err` | `proxy_configuration_render_failed` | Error contains code, phase, retriable, provider key. |
 
 ## Server Bootstrap Matrix
 
-| Case | Input/state | Expected result | Expected event/state | Expected error | Retriable |
-| --- | --- | --- | --- | --- | --- |
-| Proxy required and provider ready | Connected server with proxy intent | Ensure plan executed | `proxy-installed`; server can become ready | None | No |
-| Proxy provider unavailable | Connected server with unknown provider key | Bootstrap attempt fails | `proxy-install-failed`; server not ready for proxy-backed routes | `proxy_provider_unavailable` | Conditional |
-| Ensure plan execution fails | Provider plan generated, runtime executor fails | Bootstrap attempt fails | `proxy-install-failed` | `infra_error` or provider-mapped code, phase `proxy-bootstrap` | Yes |
-| Proxy not required | Proxy intent disabled | No provider plan | Server may become ready after connectivity | None | No |
+| Test ID | Preferred automation | Case | Input/state | Expected result | Expected event/state | Expected error | Retriable |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| EDGE-PROXY-SERVER-001 | integration | Proxy required and provider ready | Connected server with proxy intent | Ensure plan executed | `proxy-installed`; server can become ready | None | No |
+| EDGE-PROXY-SERVER-002 | integration | Proxy provider unavailable | Connected server with unknown provider key | Bootstrap attempt fails | `proxy-install-failed`; server not ready for proxy-backed routes | `proxy_provider_unavailable` | Conditional |
+| EDGE-PROXY-SERVER-003 | integration | Ensure plan execution fails | Provider plan generated, runtime executor fails | Bootstrap attempt fails | `proxy-install-failed` | `infra_error` or provider-mapped code, phase `proxy-bootstrap` | Yes |
+| EDGE-PROXY-SERVER-004 | integration | Proxy not required | Proxy intent disabled | No provider plan | Server may become ready after connectivity | None | No |
 
 ## Route Realization Matrix
 
-| Case | Input/state | Expected result | Expected proxy config | Expected state | Retriable |
-| --- | --- | --- | --- | --- | --- |
-| Generated access route | Resource has generated route snapshot | Route plan applied | Provider-specific route targets internal port | Deployment continues or succeeds | Per deployment |
-| Durable domain route | Ready domain binding route exists | Route plan applied | Provider-specific route uses durable hostname/path | Deployment continues or succeeds | Per deployment |
-| Duplicate route realization | Same deployment and route are realized again | Idempotent no duplicate | Same desired config | No duplicate route state | No |
-| Route realization fails after acceptance | Runtime executor fails | Deployment failure/degraded route state | Config not marked applied | `deployment-failed` or degraded status | Yes |
+| Test ID | Preferred automation | Case | Input/state | Expected result | Expected proxy config | Expected state | Retriable |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| EDGE-PROXY-ROUTE-001 | integration | Generated access route | Resource has generated route snapshot | Route plan applied | Provider-specific route targets internal port | Deployment continues or succeeds | Per deployment |
+| EDGE-PROXY-ROUTE-002 | integration | Durable domain route | Ready domain binding route exists | Route plan applied | Provider-specific route uses durable hostname/path | Deployment continues or succeeds | Per deployment |
+| EDGE-PROXY-ROUTE-003 | integration | Duplicate route realization | Same deployment and route are realized again | Idempotent no duplicate | Same desired config | No duplicate route state | No |
+| EDGE-PROXY-ROUTE-004 | integration | Route realization fails after acceptance | Runtime executor fails | Deployment failure/degraded route state | Config not marked applied | `deployment-failed` or degraded status | Yes |
 
 ## Proxy Configuration Query Matrix
 
-| Case | Input | Expected result | Expected error | Expected sections |
-| --- | --- | --- | --- | --- |
-| Planned route before first deploy | `resourceId`, `routeScope = planned` | `ok`, status `planned` | None | Provider-rendered desired sections. |
-| Latest realized route | `resourceId`, `routeScope = latest` | `ok`, status `applied` or `stale` | None | Snapshot/provider sections. |
-| Deployment snapshot | `resourceId`, `deploymentId`, `routeScope = deployment-snapshot` | `ok` | None | Immutable snapshot-based sections. |
-| No proxy route | Resource has no inbound route | `ok`, status `not-configured` | None | Empty sections. |
-| Missing provider | Provider key unavailable | `err` | `proxy_provider_unavailable` | None. |
-| Sensitive diagnostic values | Provider returns secrets in diagnostics | `ok` | None | Values redacted. |
+| Test ID | Preferred automation | Case | Input | Expected result | Expected error | Expected sections |
+| --- | --- | --- | --- | --- | --- | --- |
+| EDGE-PROXY-QRY-001 | integration | Planned route before first deploy | `resourceId`, `routeScope = planned` | `ok`, status `planned` | None | Provider-rendered desired sections. |
+| EDGE-PROXY-QRY-002 | integration | Latest realized route | `resourceId`, `routeScope = latest` | `ok`, status `applied` or `stale` | None | Snapshot/provider sections. |
+| EDGE-PROXY-QRY-003 | integration | Deployment snapshot | `resourceId`, `deploymentId`, `routeScope = deployment-snapshot` | `ok` | None | Immutable snapshot-based sections. |
+| EDGE-PROXY-QRY-004 | integration | No proxy route | Resource has no inbound route | `ok`, status `not-configured` | None | Empty sections. |
+| EDGE-PROXY-QRY-005 | integration | Missing provider | Provider key unavailable | `err` | `proxy_provider_unavailable` | None. |
+| EDGE-PROXY-QRY-006 | integration | Sensitive diagnostic values | Provider returns secrets in diagnostics | `ok` | None | Values redacted. |
 
 ## Entry Surface Matrix
 
-| Entry | Required assertion |
-| --- | --- |
-| Web resource detail | Shows read-only config sections from query output; does not generate labels/config locally. |
-| API/oRPC | Exposes the query schema and returns the same `ProxyConfigurationView`. |
-| CLI | Displays the query output or a clear provider-neutral summary from the query. |
-| Deployment progress | May link to route realization status but does not replace the configuration query. |
-| Resource access summary | Continues to show URL/status; full proxy config lives in the configuration query. |
+| Test ID | Preferred automation | Entry | Required assertion |
+| --- | --- | --- | --- |
+| EDGE-PROXY-ENTRY-001 | e2e-preferred | Web resource detail | Shows read-only config sections from query output; does not generate labels/config locally. |
+| EDGE-PROXY-ENTRY-002 | e2e-preferred | API/oRPC | Exposes the query schema and returns the same `ProxyConfigurationView`. |
+| EDGE-PROXY-ENTRY-003 | e2e-preferred | CLI | Displays the query output or a clear provider-neutral summary from the query. |
+| EDGE-PROXY-ENTRY-004 | e2e-preferred | Deployment progress | May link to route realization status but does not replace the configuration query. |
+| EDGE-PROXY-ENTRY-005 | e2e-preferred | Resource access summary | Continues to show URL/status; full proxy config lives in the configuration query. |
 
 ## Current Implementation Notes And Migration Gaps
 

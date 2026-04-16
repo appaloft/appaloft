@@ -201,6 +201,27 @@ Command handlers must not:
 - treat event publication as proof of event-handler success;
 - hide proxy bootstrap inside transport adapters.
 
+## Tests
+
+The governing matrix is [Server Bootstrap Test Matrix](../testing/server-bootstrap-test-matrix.md).
+
+`servers.register` is a first-class operation. Its tests must be named and placed as server
+registration tests, not only as setup inside deployment, proxy, or generic CLI/HTTP smoke suites.
+
+Required first-class coverage:
+
+- `SERVER-BOOT-CMD-001`, `SERVER-BOOT-CMD-002`, and `SERVER-BOOT-CMD-003`: application command
+  boundary tests for accepted provider-backed metadata, accepted disabled-proxy metadata, and input
+  rejection.
+- `SERVER-BOOT-ENTRY-001`: CLI e2e chain for `yundu server register` followed by `yundu server
+  list`.
+- `SERVER-BOOT-ENTRY-002`: HTTP e2e chain for `POST /api/servers` followed by `GET /api/servers`.
+
+Command admission, repository state, accepted-event publication, edge proxy state-machine details,
+handler delegation, process-manager behavior, and retry/idempotency cases remain `integration` or
+`unit` coverage unless a public read/query surface can observe the exact assertion. Do not require
+an e2e test to prove hidden database fields or internal method calls.
+
 ## Current Implementation Notes And Migration Gaps
 
 Current code has `servers.register`, `servers.configure-credential`, `servers.test-connectivity`,

@@ -165,7 +165,7 @@ async function waitForHealth(url: string): Promise<void> {
 }
 
 describe("workspace Docker quick deploy e2e", () => {
-  test("quick deploys a workspace app without Dockerfile by generating Dockerfile.yundu", async () => {
+  test("[QUICK-DEPLOY-WF-011] quick deploys a workspace app without Dockerfile by generating Dockerfile.yundu", async () => {
     expect(existsSync(join(fixtureDir, "Dockerfile"))).toBe(false);
 
     const dockerVersion = runDocker(["version", "--format", "{{.Server.Version}}"]);

@@ -285,7 +285,7 @@ describe("quick deploy ssh e2e", () => {
     return;
   }
 
-  test("quick deploys a Dockerfile app to an SSH target with embedded PGlite state", () => {
+  test("[QUICK-DEPLOY-WF-022] quick deploys a Dockerfile app to an SSH target with embedded PGlite state", () => {
     const config = sshConfig();
     const dockerVersion = runSsh(config, "docker version --format '{{.Server.Version}}'");
     expect(dockerVersion.exitCode, dockerVersion.stderr).toBe(0);
@@ -351,7 +351,7 @@ describe("quick deploy ssh e2e", () => {
     }
   }, 240000);
 
-  test("captures Docker diagnostics when an SSH container exits before health passes", () => {
+  test("[QUICK-DEPLOY-WF-034] captures Docker diagnostics when an SSH container exits before health passes", () => {
     const config = sshConfig();
     const workspace = createWorkspaceDirs();
     const suffix = crypto.randomUUID().slice(0, 8);

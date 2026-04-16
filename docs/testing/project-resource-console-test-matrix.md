@@ -72,55 +72,55 @@ Then:
 
 ## Project Page Matrix
 
-| Case | Input/read state | Expected primary UI result | Expected command/query behavior | Expected absence |
-| --- | --- | --- | --- | --- |
-| Project with resources | Project has multiple resources | Resource list is prominent; each resource links to detail | `resources.list` filtered by project/environment context or equivalent query | No direct project-owned deployment mutation |
-| Project with no resources | Project has environments but no resources | Empty resource state plus create-resource/deploy action | Create action navigates to project-scoped create-resource first-deploy flow | No hidden `deployments.create(resource)` bootstrap as primary path |
-| Project all deployments | Project has deployments across resources | Project deployment view is labeled as rollup/all deployments | Deployment query filters by project and displays resource context | No new deployment command without resource selection |
-| Project new deployment shortcut | User clicks project-level shortcut | Opens Quick Deploy or resource selection | Workflow eventually selects/creates resource before `deployments.create` | No direct project-owned deployment command |
+| Test ID | Preferred automation | Case | Input/read state | Expected primary UI result | Expected command/query behavior | Expected absence |
+| --- | --- | --- | --- | --- | --- | --- |
+| PROJECT-CONSOLE-PROJECT-001 | e2e-preferred | Project with resources | Project has multiple resources | Resource list is prominent; each resource links to detail | `resources.list` filtered by project/environment context or equivalent query | No direct project-owned deployment mutation |
+| PROJECT-CONSOLE-PROJECT-002 | e2e-preferred | Project with no resources | Project has environments but no resources | Empty resource state plus create-resource/deploy action | Create action navigates to project-scoped create-resource first-deploy flow | No hidden `deployments.create(resource)` bootstrap as primary path |
+| PROJECT-CONSOLE-PROJECT-003 | e2e-preferred | Project all deployments | Project has deployments across resources | Project deployment view is labeled as rollup/all deployments | Deployment query filters by project and displays resource context | No new deployment command without resource selection |
+| PROJECT-CONSOLE-PROJECT-004 | e2e-preferred | Project new deployment shortcut | User clicks project-level shortcut | Opens Quick Deploy or resource selection | Workflow eventually selects/creates resource before `deployments.create` | No direct project-owned deployment command |
 
 ## Resource Page Matrix
 
-| Case | Input/read state | Expected primary UI result | Expected command/query behavior | Expected state/projection |
-| --- | --- | --- | --- | --- |
-| Resource detail | Resource exists | Resource profile, current health or fallback status, and deployment history are shown | Resource query/read model plus deployment history filtered by `resourceId` | Current status derives from health projection when available |
-| Resource detail default tab | Resource exists | Configuration/overview is the first selected tab; deployment history and logs are later tabs | Resource read model drives basic configuration and access URL | Deployment history is not the default application page |
-| Configuration section tabs | Resource detail configuration tab is open | Left configuration navigation selects one subsection and replaces the right-side content panel | Section state is encoded in nested route/query state, not a hash anchor | The page does not scroll through one long configuration document |
-| Single-panel top tabs | Deployment or runtime logs tab is open | The tab renders its single panel directly without an inner sidebar | No extra navigation state is needed | Redundant one-item sidebars are not shown |
-| Compact header actions | Resource exists with access URL, project, deployments, and domain placement | Header shows compact health and primary new-deployment action only | No command/query dispatched for removed navigation actions | Header does not expose open project, view deployments, open access URL, bind-domain, or diagnostic-copy as primary buttons |
-| Resource health preferred | Resource has health projection and latest deployment status | Current health is shown as resource status; latest deployment is contextual | Query/read compact resource health or `resources.health` when implemented | Health status derives from resource observation, not deployment attempt |
-| Deployment success but inaccessible | Latest deployment succeeded, public access or runtime health fails | Resource status shows degraded/unhealthy/unknown rather than succeeded | Health projection/query reports failing source | Deployment success remains historical context |
-| Access URL from resource | Resource has ready domain binding or resource access summary | Access URL appears in the first/default resource tab | Resource read model/access summary is used | URL is not hidden only on deployment detail or a later access tab |
-| New deployment from resource | Resource exists and can deploy | New deployment action is resource-scoped | Dispatch `deployments.create` with `resourceId` | Deployment attempt belongs to resource |
-| Runtime logs from resource | Resource has observable runtime instance | Runtime logs are shown as resource-owned application logs | Query `resources.runtime-logs` with `resourceId`; optional follow stream | Runtime logs remain separate from `deployments.logs` |
-| Terminal from resource | Resource has observable deployment workspace and terminal access is enabled | Terminal is offered from an operational tab/action, not the default overview | Dispatch `terminal-sessions.open` with resource scope and attach returned transport | Terminal starts in resolved deployment workspace, not a resource-name directory |
-| Diagnostic summary from resource | Access, proxy, or runtime logs are missing/unavailable | Copyable diagnostic summary is offered from the resource surface | Query `resources.diagnostic-summary` with `resourceId` and optional `deploymentId` | Summary includes stable ids and source-specific errors |
-| Redeploy absent in v1 | Latest deployment terminal | No public redeploy action is exposed | No redeploy command is dispatched | Existing deployments remain readable |
-| Active deployment | Latest deployment non-terminal | New deployment is blocked or explains active state | No deployment command until guard can pass | Latest status remains read-model projection |
-| Domain binding from resource | Resource has placement context | Configuration tab exposes an inline domain/TLS form with resource context | Dispatch `domain-bindings.create` with resource ownership fields | Domain binding belongs to resource and does not require a modal for the normal path |
-| Resource health detail density | Resource health includes runtime, health policy, proxy, access, checks, and source errors | Header shows one compact health control; expanded UI shows human-level runtime/policy details only | Raw checks/errors remain diagnostic data | Internal check names and error codes are not prominent main content |
+| Test ID | Preferred automation | Case | Input/read state | Expected primary UI result | Expected command/query behavior | Expected state/projection |
+| --- | --- | --- | --- | --- | --- | --- |
+| PROJECT-CONSOLE-RESOURCE-001 | e2e-preferred | Resource detail | Resource exists | Resource profile, current health or fallback status, and deployment history are shown | Resource query/read model plus deployment history filtered by `resourceId` | Current status derives from health projection when available |
+| PROJECT-CONSOLE-RESOURCE-002 | e2e-preferred | Resource detail default tab | Resource exists | Configuration/overview is the first selected tab; deployment history and logs are later tabs | Resource read model drives basic configuration and access URL | Deployment history is not the default application page |
+| PROJECT-CONSOLE-RESOURCE-003 | e2e-preferred | Configuration section tabs | Resource detail configuration tab is open | Left configuration navigation selects one subsection and replaces the right-side content panel | Section state is encoded in nested route/query state, not a hash anchor | The page does not scroll through one long configuration document |
+| PROJECT-CONSOLE-RESOURCE-004 | e2e-preferred | Single-panel top tabs | Deployment or runtime logs tab is open | The tab renders its single panel directly without an inner sidebar | No extra navigation state is needed | Redundant one-item sidebars are not shown |
+| PROJECT-CONSOLE-RESOURCE-005 | e2e-preferred | Compact header actions | Resource exists with access URL, project, deployments, and domain placement | Header shows compact health and primary new-deployment action only | No command/query dispatched for removed navigation actions | Header does not expose open project, view deployments, open access URL, bind-domain, or diagnostic-copy as primary buttons |
+| PROJECT-CONSOLE-RESOURCE-006 | e2e-preferred | Resource health preferred | Resource has health projection and latest deployment status | Current health is shown as resource status; latest deployment is contextual | Query/read compact resource health or `resources.health` when implemented | Health status derives from resource observation, not deployment attempt |
+| PROJECT-CONSOLE-RESOURCE-007 | e2e-preferred | Deployment success but inaccessible | Latest deployment succeeded, public access or runtime health fails | Resource status shows degraded/unhealthy/unknown rather than succeeded | Health projection/query reports failing source | Deployment success remains historical context |
+| PROJECT-CONSOLE-RESOURCE-008 | e2e-preferred | Access URL from resource | Resource has ready domain binding or resource access summary | Access URL appears in the first/default resource tab | Resource read model/access summary is used | URL is not hidden only on deployment detail or a later access tab |
+| PROJECT-CONSOLE-RESOURCE-009 | e2e-preferred | New deployment from resource | Resource exists and can deploy | New deployment action is resource-scoped | Dispatch `deployments.create` with `resourceId` | Deployment attempt belongs to resource |
+| PROJECT-CONSOLE-RESOURCE-010 | e2e-preferred | Runtime logs from resource | Resource has observable runtime instance | Runtime logs are shown as resource-owned application logs | Query `resources.runtime-logs` with `resourceId`; optional follow stream | Runtime logs remain separate from `deployments.logs` |
+| PROJECT-CONSOLE-RESOURCE-011 | e2e-preferred | Terminal from resource | Resource has observable deployment workspace and terminal access is enabled | Terminal is offered from an operational tab/action, not the default overview | Dispatch `terminal-sessions.open` with resource scope and attach returned transport | Terminal starts in resolved deployment workspace, not a resource-name directory |
+| PROJECT-CONSOLE-RESOURCE-012 | e2e-preferred | Diagnostic summary from resource | Access, proxy, or runtime logs are missing/unavailable | Copyable diagnostic summary is offered from the resource surface | Query `resources.diagnostic-summary` with `resourceId` and optional `deploymentId` | Summary includes stable ids and source-specific errors |
+| PROJECT-CONSOLE-RESOURCE-013 | e2e-preferred | Redeploy absent in v1 | Latest deployment terminal | No public redeploy action is exposed | No redeploy command is dispatched | Existing deployments remain readable |
+| PROJECT-CONSOLE-RESOURCE-014 | e2e-preferred | Active deployment | Latest deployment non-terminal | New deployment is blocked or explains active state | No deployment command until guard can pass | Latest status remains read-model projection |
+| PROJECT-CONSOLE-RESOURCE-015 | e2e-preferred | Domain binding from resource | Resource has placement context | Configuration tab exposes an inline domain/TLS form with resource context | Dispatch `domain-bindings.create` with resource ownership fields | Domain binding belongs to resource and does not require a modal for the normal path |
+| PROJECT-CONSOLE-RESOURCE-016 | e2e-preferred | Resource health detail density | Resource health includes runtime, health policy, proxy, access, checks, and source errors | Header shows one compact health control; expanded UI shows human-level runtime/policy details only | Raw checks/errors remain diagnostic data | Internal check names and error codes are not prominent main content |
 
 ## Create Resource Matrix
 
-| Case | Draft input | Expected command sequence | Expected state |
-| --- | --- | --- | --- |
-| Minimum resource | Project, environment, name | `resources.create` | Resource profile persisted |
-| Source/runtime/network draft | Project, environment, name, GitHub/Docker/Dockerfile/Compose/runtime draft, internal listener port | `resources.create` as part of first-deploy workflow; deployment intent continues through `deployments.create(resourceId)` | Resource profile persisted with source/runtime/network profile when supplied; deployment uses `resourceId` |
-| Source variant draft | Deep Git URL, Git branch/base directory, local folder base directory, Docker image tag/digest, Dockerfile path, or Compose path | Variant normalizer -> `resources.create`; deployment intent continues through `deployments.create(resourceId)` | Source identity lands in `ResourceSourceBinding`; strategy-specific file/command settings land in `ResourceRuntimeProfile` |
-| Generic port field | User enters application port on create-resource page | `resources.create(networkProfile.internalPort)` | Port is stored as resource network profile input, not deployment input |
-| Project-scoped deploy action | Project, environment, source/runtime/network draft, server, optional destination | `resources.create -> deployments.create(resourceId)` | Resource persists first; deployment is accepted or rejected by deployment command |
-| Continue into first deploy | Resource draft plus deploy intent | `resources.create -> deployments.create(resourceId)` | Resource exists; deployment accepted or rejected by deployment command |
+| Test ID | Preferred automation | Case | Draft input | Expected command sequence | Expected state |
+| --- | --- | --- | --- | --- | --- |
+| PROJECT-CONSOLE-CREATE-001 | e2e-preferred | Minimum resource | Project, environment, name | `resources.create` | Resource profile persisted |
+| PROJECT-CONSOLE-CREATE-002 | e2e-preferred | Source/runtime/network draft | Project, environment, name, GitHub/Docker/Dockerfile/Compose/runtime draft, internal listener port | `resources.create` as part of first-deploy workflow; deployment intent continues through `deployments.create(resourceId)` | Resource profile persisted with source/runtime/network profile when supplied; deployment uses `resourceId` |
+| PROJECT-CONSOLE-CREATE-003 | e2e-preferred | Source variant draft | Deep Git URL, Git branch/base directory, local folder base directory, Docker image tag/digest, Dockerfile path, or Compose path | Variant normalizer -> `resources.create`; deployment intent continues through `deployments.create(resourceId)` | Source identity lands in `ResourceSourceBinding`; strategy-specific file/command settings land in `ResourceRuntimeProfile` |
+| PROJECT-CONSOLE-CREATE-004 | e2e-preferred | Generic port field | User enters application port on create-resource page | `resources.create(networkProfile.internalPort)` | Port is stored as resource network profile input, not deployment input |
+| PROJECT-CONSOLE-CREATE-005 | e2e-preferred | Project-scoped deploy action | Project, environment, source/runtime/network draft, server, optional destination | `resources.create -> deployments.create(resourceId)` | Resource persists first; deployment is accepted or rejected by deployment command |
+| PROJECT-CONSOLE-CREATE-006 | e2e-preferred | Continue into first deploy | Resource draft plus deploy intent | `resources.create -> deployments.create(resourceId)` | Resource exists; deployment accepted or rejected by deployment command |
 
 ## Sidebar Matrix
 
-| Case | Read model state | Expected navigation result | Expected status behavior |
-| --- | --- | --- | --- |
-| Project with resources | Project and resources exist | Sidebar shows project group with resource children | Resource child status uses compact resource health |
-| No deployment yet | Resource has no deployments | Resource child shows neutral/no-deployment state | No inferred failed/succeeded state |
-| Health projection available | Resource has compact health status | Resource child shows health status | Latest deployment status is secondary/contextual |
-| Health projection query pending | Resource exists while `resources.health` is loading | Resource child shows unknown health | Latest deployment status is not used as current health |
-| Latest deployment running | Latest deployment for resource non-terminal | Resource child uses `resources.health` and may show `starting` | Deployment status remains contextual only |
-| Latest deployment failed | Latest deployment terminal failed | Resource child uses `resources.health` and links to resource/deployment context | No write-side mutation from navigation |
+| Test ID | Preferred automation | Case | Read model state | Expected navigation result | Expected status behavior |
+| --- | --- | --- | --- | --- | --- |
+| PROJECT-CONSOLE-SIDEBAR-001 | e2e-preferred | Project with resources | Project and resources exist | Sidebar shows project group with resource children | Resource child status uses compact resource health |
+| PROJECT-CONSOLE-SIDEBAR-002 | e2e-preferred | No deployment yet | Resource has no deployments | Resource child shows neutral/no-deployment state | No inferred failed/succeeded state |
+| PROJECT-CONSOLE-SIDEBAR-003 | e2e-preferred | Health projection available | Resource has compact health status | Resource child shows health status | Latest deployment status is secondary/contextual |
+| PROJECT-CONSOLE-SIDEBAR-004 | e2e-preferred | Health projection query pending | Resource exists while `resources.health` is loading | Resource child shows unknown health | Latest deployment status is not used as current health |
+| PROJECT-CONSOLE-SIDEBAR-005 | e2e-preferred | Latest deployment running | Latest deployment for resource non-terminal | Resource child uses `resources.health` and may show `starting` | Deployment status remains contextual only |
+| PROJECT-CONSOLE-SIDEBAR-006 | e2e-preferred | Latest deployment failed | Latest deployment terminal failed | Resource child uses `resources.health` and links to resource/deployment context | No write-side mutation from navigation |
 
 ## Current Implementation Notes And Migration Gaps
 
