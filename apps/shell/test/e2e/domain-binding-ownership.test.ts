@@ -19,6 +19,17 @@ type DeploymentSummary = {
   resourceId: string;
   serverId: string;
   destinationId: string;
+  runtimePlan: {
+    execution: {
+      accessRoutes?: Array<{
+        proxyKind: string;
+        domains: string[];
+        pathPrefix: string;
+        tlsMode: string;
+      }>;
+      metadata?: Record<string, string>;
+    };
+  };
 };
 
 type DomainBindingSummary = {
@@ -58,6 +69,7 @@ type ResourceSummary = {
       url: string;
       hostname: string;
       scheme: "http" | "https";
+      deploymentId?: string;
     };
   };
 };
@@ -580,6 +592,134 @@ describe("domain binding ownership e2e", () => {
       rmSync(workspaceDir, { recursive: true, force: true });
     }
   }, 30000);
+
+  test("[ROUTE-TLS-WORKFLOW-001] CLI binds a TLS-disabled domain before redeploy and observes a deployable runtime route", async () => {
+    const { cliOptions, workspaceDir } = createWorkspace("yundu-domain-binding-workflow-cli-");
+    const deploymentIds: string[] = [];
+
+    try {
+      const suffix = crypto.randomUUID().slice(0, 6);
+      const appPort = 5100 + Math.floor(Math.random() * 100);
+      const context = createDeploymentContext(cliOptions, {
+        appPort,
+        suffix,
+      });
+      deploymentIds.push(context.id);
+      const domainName = `${suffix}.workflow.example`;
+      const expectedUrl = `http://${domainName}`;
+
+      const created = runCli(
+        [
+          "domain-binding",
+          "create",
+          domainName,
+          "--project-id",
+          context.projectId,
+          "--environment-id",
+          context.environmentId,
+          "--resource-id",
+          context.resourceId,
+          "--server-id",
+          context.serverId,
+          "--destination-id",
+          context.destinationId,
+          "--proxy-kind",
+          "traefik",
+          "--tls-mode",
+          "disabled",
+        ],
+        cliOptions,
+      );
+      expectCliOk(created);
+      const domainBindingId = parseJson<{ id: string }>(created.stdout).id;
+
+      const confirmed = runCli(
+        ["domain-binding", "confirm-ownership", domainBindingId],
+        cliOptions,
+      );
+      expectCliOk(confirmed);
+      await waitForCliDomainBindingStatus({
+        options: cliOptions,
+        resourceId: context.resourceId,
+        domainBindingId,
+        status: "ready",
+      });
+
+      const redeployed = runCli(
+        [
+          "deploy",
+          fixtureDir,
+          "--project",
+          context.projectId,
+          "--server",
+          context.serverId,
+          "--destination",
+          context.destinationId,
+          "--environment",
+          context.environmentId,
+          "--resource",
+          context.resourceId,
+          "--method",
+          "workspace-commands",
+          "--start",
+          "node server.js",
+          "--port",
+          String(appPort),
+          "--health-path",
+          "/health",
+        ],
+        cliOptions,
+      );
+      expectCliOk(redeployed);
+      const redeploymentId = parseJson<{ id: string }>(redeployed.stdout).id;
+      deploymentIds.push(redeploymentId);
+
+      const deployments = runCli(
+        ["deployments", "list", "--project", context.projectId],
+        cliOptions,
+      );
+      expectCliOk(deployments);
+      const redeployment = findDeployment({
+        deploymentId: redeploymentId,
+        items: parseJson<{ items: DeploymentSummary[] }>(deployments.stdout).items,
+      });
+      expect(redeployment.runtimePlan.execution.accessRoutes?.[0]).toEqual(
+        expect.objectContaining({
+          proxyKind: "traefik",
+          domains: [domainName],
+          pathPrefix: "/",
+          tlsMode: "disabled",
+        }),
+      );
+      expect(redeployment.runtimePlan.execution.metadata).toEqual(
+        expect.objectContaining({
+          "access.routeSource": "durable-domain-binding",
+          "access.domainBindingId": domainBindingId,
+          "access.hostname": domainName,
+          "access.scheme": "http",
+        }),
+      );
+
+      const resource = await waitForCliDurableRoute({
+        options: cliOptions,
+        resourceId: context.resourceId,
+        expectedUrl,
+      });
+      expect(resource.accessSummary?.latestDurableDomainRoute).toEqual(
+        expect.objectContaining({
+          url: expectedUrl,
+          hostname: domainName,
+          scheme: "http",
+          deploymentId: redeploymentId,
+        }),
+      );
+    } finally {
+      for (const deploymentId of deploymentIds) {
+        cleanupDeploymentRuntime(deploymentId);
+      }
+      rmSync(workspaceDir, { recursive: true, force: true });
+    }
+  }, 60000);
 
   test("[ROUTE-TLS-ENTRY-013] CLI requests a certificate and CLI list observes provider-unavailable state", () => {
     const { cliOptions, workspaceDir } = createWorkspace("yundu-certificate-cli-");

@@ -138,6 +138,8 @@ Minimum tests:
 - provider contract renders ensure plan, route realization plan, and configuration view from provider-neutral inputs;
 - provider contract renders reload behavior as `automatic` or command steps;
 - server bootstrap uses provider ensure plan;
+- deployment planning includes deployable durable domain bindings in the runtime access-route
+  snapshot for the same project/environment/resource/server/destination;
 - deployment route realization uses provider route and reload plans;
 - failed route realization marks affected active domain bindings `not_ready` with safe failure
   metadata and publishes `domain-route-realization-failed`;
@@ -151,10 +153,12 @@ The minimal deliverable is complete when:
 
 1. concrete edge proxy behavior is behind provider packages;
 2. application/server bootstrap and deployment route realization use provider-neutral ports;
-3. runtime adapters execute provider-produced plans and reload steps;
-4. resource detail can show read-only proxy configuration from a query;
-5. CLI/API can fetch the same query output or have an accepted migration gap;
-6. tests prove provider contract, query behavior, and one user-facing observation path.
+3. runtime access-route snapshots include deployable durable domain bindings before route
+   realization;
+4. runtime adapters execute provider-produced plans and reload steps;
+5. resource detail can show read-only proxy configuration from a query;
+6. CLI/API can fetch the same query output or have an accepted migration gap;
+7. tests prove provider contract, query behavior, and one user-facing observation path.
 
 ## Migration Seams / Legacy Edges
 

@@ -18,6 +18,8 @@ import {
   type DomainBindingReadModel,
   type DomainBindingRepository,
   type DomainBindingSummary,
+  type DomainRouteBindingCandidate,
+  type DomainRouteBindingReader,
   type DomainRouteFailureCandidate,
   type DomainRouteFailureCandidateReader,
   type EnvironmentReadModel,
@@ -654,6 +656,47 @@ export class MemoryDomainBindingReadModel implements DomainBindingReadModel {
           createdAt: domainBinding.createdAt.value,
         }),
       );
+  }
+}
+
+export class MemoryDomainRouteBindingReader implements DomainRouteBindingReader {
+  constructor(private readonly domainBindings: MemoryDomainBindingRepository) {}
+
+  async listDeployableBindings(
+    context: RepositoryContext,
+    input: {
+      projectId: string;
+      environmentId: string;
+      resourceId: string;
+      serverId: string;
+      destinationId: string;
+    },
+  ): Promise<DomainRouteBindingCandidate[]> {
+    void context;
+    return [...this.domainBindings.items.values()]
+      .map((domainBinding) => domainBinding.toState())
+      .filter((domainBinding) => domainBinding.projectId.value === input.projectId)
+      .filter((domainBinding) => domainBinding.environmentId.value === input.environmentId)
+      .filter((domainBinding) => domainBinding.resourceId.value === input.resourceId)
+      .filter((domainBinding) => domainBinding.serverId.value === input.serverId)
+      .filter((domainBinding) => domainBinding.destinationId.value === input.destinationId)
+      .filter(
+        (domainBinding) =>
+          domainBinding.status.value === "bound" ||
+          domainBinding.status.value === "certificate_pending" ||
+          domainBinding.status.value === "ready" ||
+          domainBinding.status.value === "not_ready",
+      )
+      .sort((left, right) => right.createdAt.value.localeCompare(left.createdAt.value))
+      .map((domainBinding) => ({
+        id: domainBinding.id.value,
+        domainName: domainBinding.domainName.value,
+        pathPrefix: domainBinding.pathPrefix.value,
+        proxyKind: domainBinding.proxyKind.value,
+        tlsMode: domainBinding.tlsMode.value,
+        status: domainBinding.status.value,
+        createdAt: domainBinding.createdAt.value,
+      }));
   }
 }
 
