@@ -223,6 +223,29 @@ Challenge token storage is a provider-facing infrastructure boundary:
 - shell composition wires the concrete challenge store into both the provider adapter and HTTP
   adapter.
 
+## ACME Provider Adapter
+
+The real ACME adapter is a provider implementation of the `CertificateProviderPort`, not a new
+command. It is selected by shell composition when certificate provider configuration explicitly
+enables provider key `acme`.
+
+The adapter must:
+
+- accept only `providerKey = acme` and `challengeType = http-01` for the first slice;
+- use an injected ACME client boundary so provider package tests do not call public CAs;
+- generate a per-certificate private key and CSR inside the provider boundary;
+- publish the HTTP-01 key authorization through the challenge token store before asking the CA to
+  validate;
+- remove published challenge tokens when the CA flow succeeds, fails, or aborts;
+- return certificate PEM, private key PEM, optional chain PEM, expiry, and fingerprint through the
+  provider-neutral result shape;
+- map ACME/network/provider errors to stable certificate failure codes without logging account keys,
+  private keys, or certificate material.
+
+The adapter may use staging or production ACME directory URLs from shell configuration. Directory
+URL, account private key, account email, terms-of-service agreement, and internal challenge
+verification policy are composition/provider settings, not domain model fields.
+
 ## Retry Points
 
 Domain verification retry is a new verification attempt.
@@ -305,8 +328,12 @@ access summaries to project the durable custom domain as HTTPS.
 Current code implements HTTP-01 challenge token serving through an injected challenge token store
 and the HTTP adapter path `/.well-known/acme-challenge/{token}`.
 
-Real ACME provider issuance, outbox/inbox workflow, DNS-provider verification, route realization
-failure state, retry scheduler execution, and proxy reload are not implemented yet.
+Current code includes a real ACME provider adapter package that can be enabled through explicit
+shell certificate-provider configuration. The default shell profile remains unavailable so tests and
+local development do not contact a real CA by accident.
+
+Outbox/inbox workflow, DNS-provider verification, route realization failure state, retry scheduler
+execution, and proxy reload are not implemented yet.
 
 ## Open Questions
 

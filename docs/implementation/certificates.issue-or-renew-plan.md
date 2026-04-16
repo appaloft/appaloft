@@ -49,6 +49,8 @@ Required write-side ports:
 - `CertificateProviderSelectionPolicy`: resolves omitted provider/challenge inputs into a provider key and challenge type before certificate state is created. The first injected default resolves to `acme` and `http-01` according to ADR-007, but core treats both as opaque values.
 - `CertificateProviderPort`: creates ACME orders and performs HTTP-01 provider interactions behind a sanitized boundary.
 - `CertificateSecretStore`: stores certificate material and private keys without exposing secrets in events, errors, logs, or read models.
+- `CertificateHttpChallengeTokenStore`: publishes and removes public HTTP-01 challenge key
+  authorizations for provider adapters that need challenge serving.
 - `DomainBindingRepository`: loads the owning domain binding and policy state.
 - `DomainEventPublisher` or outbox port: records `certificate-requested`, `certificate-issued`, and `certificate-issuance-failed`.
 - `IdGenerator` and `Clock`: create `certificateId`, `attemptId`, and timestamps.
@@ -188,6 +190,18 @@ The third executable slice is certificate-backed domain readiness:
 This slice intentionally does not ship real ACME provider behavior, proxy reload, route realization
 failure state, or durable outbox/inbox processing.
 
+## Fourth Code Round Slice
+
+The fourth executable slice is HTTP-01 challenge serving and a real ACME provider adapter:
+
+- the HTTP adapter serves `/.well-known/acme-challenge/{token}` from an injected challenge token
+  store;
+- `packages/providers/certificate-acme` implements `CertificateProviderPort` for provider key
+  `acme` and challenge type `http-01`;
+- shell composition registers the real adapter only when ACME certificate-provider configuration is
+  explicitly present;
+- default tests and development keep the provider-unavailable behavior to avoid accidental CA calls.
+
 ## Migration Seams And Legacy Edges
 
 Runtime proxy behavior that obtains certificates implicitly remains adapter behavior and must not be treated as platform-owned certificate lifecycle state.
@@ -226,5 +240,14 @@ Current code also implements the second executable slice:
   `ROUTE-TLS-READMODEL-005`, plus domain-readiness tests for `ROUTE-TLS-EVT-008` and
   `ROUTE-TLS-READMODEL-006`.
 
-Current code intentionally does not implement real ACME order creation, challenge token serving,
-renewal scheduling, retry scheduler execution, proxy reload, or route realization failure state.
+Current code also implements the fourth executable slice:
+
+- HTTP-01 challenge token serving through the HTTP adapter;
+- `packages/providers/certificate-acme` with a real ACME client driver behind an injected provider
+  test boundary;
+- shell configuration for explicit ACME enablement with account key, email, TOS agreement,
+  directory URL, and challenge verification policy;
+- default shell behavior remains provider-unavailable when ACME is not configured.
+
+Current code intentionally does not implement renewal scheduling, retry scheduler execution, proxy
+reload, or route realization failure state.

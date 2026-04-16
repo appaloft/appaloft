@@ -10,6 +10,22 @@ export interface DefaultAccessDomainConfig {
   scheme: "http" | "https";
 }
 
+export interface AcmeCertificateProviderConfig {
+  directoryUrl: string;
+  email?: string;
+  accountPrivateKeyPem?: string;
+  accountPrivateKeyPath?: string;
+  termsOfServiceAgreed: boolean;
+  skipChallengeVerification: boolean;
+  challengeTokenTtlSeconds: number;
+}
+
+export interface CertificateProviderConfig {
+  mode: "disabled" | "acme";
+  providerKey: string;
+  acme: AcmeCertificateProviderConfig;
+}
+
 export interface AppConfig {
   appName: string;
   appVersion: string;
@@ -40,6 +56,7 @@ export interface AppConfig {
   traceLinkUrlTemplate?: string;
   secretMask: string;
   defaultAccessDomain: DefaultAccessDomainConfig;
+  certificateProvider: CertificateProviderConfig;
   enabledSystemPlugins: string[];
   configFilePath?: string;
 }
@@ -73,6 +90,16 @@ const defaults: Omit<AppConfig, "dataDir" | "pgliteDataDir"> = {
     providerKey: "sslip",
     zone: "sslip.io",
     scheme: "http",
+  },
+  certificateProvider: {
+    mode: "disabled",
+    providerKey: "acme",
+    acme: {
+      directoryUrl: "https://acme-staging-v02.api.letsencrypt.org/directory",
+      termsOfServiceAgreed: false,
+      skipChallengeVerification: false,
+      challengeTokenTtlSeconds: 600,
+    },
   },
   enabledSystemPlugins: [],
 };
@@ -196,6 +223,25 @@ export function resolveConfig(source: ConfigSource<AppConfig> = {}): AppConfig {
   const defaultAccessDomainScheme =
     (env.YUNDU_DEFAULT_ACCESS_DOMAIN_SCHEME as DefaultAccessDomainConfig["scheme"] | undefined) ??
     defaultAccessDomain.scheme;
+  const certificateProvider =
+    source.flags?.certificateProvider ??
+    fileConfig.certificateProvider ??
+    defaults.certificateProvider;
+  const certificateProviderMode = (source.flags?.certificateProvider?.mode ??
+    env.YUNDU_CERTIFICATE_PROVIDER ??
+    env.YUNDU_CERTIFICATE_PROVIDER_MODE ??
+    certificateProvider.mode) as CertificateProviderConfig["mode"];
+  const acmeConfig = certificateProvider.acme ?? defaults.certificateProvider.acme;
+  const acmeTermsOfServiceAgreed =
+    parseBoolean(env.YUNDU_ACME_TERMS_OF_SERVICE_AGREED) ?? acmeConfig.termsOfServiceAgreed;
+  const acmeSkipChallengeVerification =
+    parseBoolean(env.YUNDU_ACME_SKIP_CHALLENGE_VERIFICATION) ??
+    acmeConfig.skipChallengeVerification;
+  const acmeChallengeTokenTtlSeconds = Number(
+    env.YUNDU_ACME_CHALLENGE_TOKEN_TTL_SECONDS ??
+      acmeConfig.challengeTokenTtlSeconds ??
+      defaults.certificateProvider.acme.challengeTokenTtlSeconds,
+  );
 
   return {
     appName: source.flags?.appName ?? env.YUNDU_APP_NAME ?? fileConfig.appName ?? defaults.appName,
@@ -352,6 +398,39 @@ export function resolveConfig(source: ConfigSource<AppConfig> = {}): AppConfig {
         defaultAccessDomain.zone ??
         defaults.defaultAccessDomain.zone,
       scheme: defaultAccessDomainScheme,
+    },
+    certificateProvider: {
+      mode: certificateProviderMode,
+      providerKey:
+        env.YUNDU_CERTIFICATE_PROVIDER_KEY ??
+        certificateProvider.providerKey ??
+        defaults.certificateProvider.providerKey,
+      acme: {
+        directoryUrl:
+          env.YUNDU_ACME_DIRECTORY_URL ??
+          acmeConfig.directoryUrl ??
+          defaults.certificateProvider.acme.directoryUrl,
+        ...((env.YUNDU_ACME_EMAIL ?? acmeConfig.email)
+          ? {
+              email: env.YUNDU_ACME_EMAIL ?? acmeConfig.email,
+            }
+          : {}),
+        ...((env.YUNDU_ACME_ACCOUNT_KEY_PEM ?? acmeConfig.accountPrivateKeyPem)
+          ? {
+              accountPrivateKeyPem:
+                env.YUNDU_ACME_ACCOUNT_KEY_PEM ?? acmeConfig.accountPrivateKeyPem,
+            }
+          : {}),
+        ...((env.YUNDU_ACME_ACCOUNT_KEY_PATH ?? acmeConfig.accountPrivateKeyPath)
+          ? {
+              accountPrivateKeyPath:
+                env.YUNDU_ACME_ACCOUNT_KEY_PATH ?? acmeConfig.accountPrivateKeyPath,
+            }
+          : {}),
+        termsOfServiceAgreed: acmeTermsOfServiceAgreed,
+        skipChallengeVerification: acmeSkipChallengeVerification,
+        challengeTokenTtlSeconds: acmeChallengeTokenTtlSeconds,
+      },
     },
     enabledSystemPlugins,
     ...(source.configFilePath ? { configFilePath: source.configFilePath } : {}),

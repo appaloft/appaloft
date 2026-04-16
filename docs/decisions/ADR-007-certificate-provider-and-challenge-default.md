@@ -78,10 +78,19 @@ The ACME default lives in the shell composition's provider selection policy. App
 depend only on the `CertificateProviderSelectionPolicy` interface. Core receives only the selected
 provider key and challenge type as opaque values.
 
-Current code does not yet have a real ACME provider adapter, ACME account model, ACME order flow,
-challenge token serving, retry scheduler execution, proxy reload, or certificate-backed domain
-readiness. The default shell provider is intentionally unavailable and records retryable
-`certificate_provider_unavailable` state after accepted requests.
+Current code includes HTTP-01 challenge token serving, certificate-backed domain readiness, and a
+real ACME provider adapter under `packages/providers/certificate-acme`.
+
+The ACME provider adapter lives under `packages/providers/*`, depends inward on application ports,
+and keeps ACME client SDK types, account-key configuration, ACME order callbacks, and CA endpoint
+selection out of core/application.
+
+Shell composition wires the real ACME adapter only when explicit certificate-provider configuration
+is present. The default development/test shell profile must not contact a real CA and still records
+retryable `certificate_provider_unavailable` state after accepted requests when ACME is not
+configured.
+
+Retry scheduler execution and proxy reload are not implemented yet.
 
 ## Superseded Open Questions
 

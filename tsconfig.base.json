@@ -39,6 +39,7 @@
       "@yundu/provider-default-access-domain-sslip": [
         "./packages/providers/default-access-domain-sslip/src/index.ts"
       ],
+      "@yundu/provider-certificate-acme": ["./packages/providers/certificate-acme/src/index.ts"],
       "@yundu/provider-edge-proxy-caddy": ["./packages/providers/edge-proxy-caddy/src/index.ts"],
       "@yundu/provider-edge-proxy-traefik": [
         "./packages/providers/edge-proxy-traefik/src/index.ts"

@@ -112,4 +112,46 @@ describe("resolveConfig", () => {
     expect(config.otelEnabled).toBe(true);
     expect(config.otelExporterEndpoint).toBeUndefined();
   });
+
+  test("keeps ACME certificate provider disabled by default", () => {
+    const config = resolveConfig();
+
+    expect(config.certificateProvider).toMatchObject({
+      mode: "disabled",
+      providerKey: "acme",
+      acme: {
+        directoryUrl: "https://acme-staging-v02.api.letsencrypt.org/directory",
+        termsOfServiceAgreed: false,
+        skipChallengeVerification: false,
+        challengeTokenTtlSeconds: 600,
+      },
+    });
+  });
+
+  test("allows enabling ACME certificate provider through environment", () => {
+    const config = resolveConfig({
+      env: {
+        YUNDU_CERTIFICATE_PROVIDER: "acme",
+        YUNDU_ACME_DIRECTORY_URL: "https://ca.example.test/directory",
+        YUNDU_ACME_EMAIL: "ops@example.com",
+        YUNDU_ACME_ACCOUNT_KEY_PEM: "account-key",
+        YUNDU_ACME_TERMS_OF_SERVICE_AGREED: "true",
+        YUNDU_ACME_SKIP_CHALLENGE_VERIFICATION: "true",
+        YUNDU_ACME_CHALLENGE_TOKEN_TTL_SECONDS: "120",
+      },
+    });
+
+    expect(config.certificateProvider).toEqual({
+      mode: "acme",
+      providerKey: "acme",
+      acme: {
+        directoryUrl: "https://ca.example.test/directory",
+        email: "ops@example.com",
+        accountPrivateKeyPem: "account-key",
+        termsOfServiceAgreed: true,
+        skipChallengeVerification: true,
+        challengeTokenTtlSeconds: 120,
+      },
+    });
+  });
 });

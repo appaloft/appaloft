@@ -109,6 +109,9 @@ ship a real ACME adapter or ACME account model.
 Current code has an HTTP-01 challenge token serving port and HTTP adapter route that provider
 adapters can use during challenge preparation.
 
+Current code includes a real ACME provider adapter package that can fulfill HTTP-01 through the
+challenge token store when shell certificate-provider configuration explicitly enables it.
+
 ## Open Questions
 
 - None for the current `certificate-requested` baseline. Provider and challenge defaults are governed by ADR-007.

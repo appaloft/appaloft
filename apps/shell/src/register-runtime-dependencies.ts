@@ -1,5 +1,6 @@
 import { AsyncLocalStorage } from "node:async_hooks";
-import { join } from "node:path";
+import { existsSync, readFileSync } from "node:fs";
+import { isAbsolute, join } from "node:path";
 import {
   FileSystemDeploymentConfigReader,
   FileSystemSourceDetector,
@@ -70,6 +71,7 @@ import {
 import { createBuiltinPlugins } from "@yundu/plugin-builtins";
 import { LocalPluginHost } from "@yundu/plugin-host";
 import { aliyunProvider } from "@yundu/provider-aliyun";
+import { AcmeCertificateProvider, acmeCertificateProvider } from "@yundu/provider-certificate-acme";
 import { InMemoryProviderRegistry } from "@yundu/provider-core";
 import { SslipDefaultAccessDomainProvider } from "@yundu/provider-default-access-domain-sslip";
 import { caddyEdgeProxyProvider } from "@yundu/provider-edge-proxy-caddy";
@@ -128,6 +130,29 @@ class InMemoryCertificateSecretStore implements CertificateSecretStore {
       secretRef: `memory://${material.certificateId}/${material.attemptId}`,
     });
   }
+}
+
+function readAcmeAccountPrivateKeyPem(config: AppConfig): string | null {
+  const configuredPem = config.certificateProvider.acme.accountPrivateKeyPem?.trim();
+
+  if (configuredPem) {
+    return configuredPem;
+  }
+
+  const configuredPath = config.certificateProvider.acme.accountPrivateKeyPath;
+
+  if (!configuredPath) {
+    return null;
+  }
+
+  const path = isAbsolute(configuredPath) ? configuredPath : join(config.dataDir, configuredPath);
+
+  if (!existsSync(path)) {
+    return null;
+  }
+
+  const pem = readFileSync(path, "utf8").trim();
+  return pem.length > 0 ? pem : null;
 }
 
 class InMemoryCertificateHttpChallengeTokenStore implements CertificateHttpChallengeTokenStore {
@@ -367,14 +392,37 @@ export function registerRuntimeDependencies(
   container.register(tokens.certificateRepository, {
     useFactory: instanceCachingFactory(() => new PgCertificateRepository(input.database.db)),
   });
-  container.register(tokens.certificateProvider, {
-    useFactory: instanceCachingFactory(() => new UnavailableCertificateProvider()),
-  });
   container.register(tokens.certificateSecretStore, {
     useFactory: instanceCachingFactory(() => new InMemoryCertificateSecretStore()),
   });
   container.register(tokens.certificateHttpChallengeTokenStore, {
     useFactory: instanceCachingFactory(() => new InMemoryCertificateHttpChallengeTokenStore()),
+  });
+  container.register(tokens.certificateProvider, {
+    useFactory: instanceCachingFactory((dependencyContainer) => {
+      if (input.config.certificateProvider.mode !== "acme") {
+        return new UnavailableCertificateProvider();
+      }
+
+      const accountPrivateKeyPem = readAcmeAccountPrivateKeyPem(input.config);
+      const acmeConfig = input.config.certificateProvider.acme;
+
+      if (!accountPrivateKeyPem || !acmeConfig.email || !acmeConfig.termsOfServiceAgreed) {
+        return new UnavailableCertificateProvider();
+      }
+
+      const clock = dependencyContainer.resolve<Clock>(tokens.clock);
+      return new AcmeCertificateProvider({
+        directoryUrl: acmeConfig.directoryUrl,
+        accountPrivateKeyPem,
+        email: acmeConfig.email,
+        termsOfServiceAgreed: acmeConfig.termsOfServiceAgreed,
+        skipChallengeVerification: acmeConfig.skipChallengeVerification,
+        challengeStore: dependencyContainer.resolve(tokens.certificateHttpChallengeTokenStore),
+        challengeTokenTtlMs: acmeConfig.challengeTokenTtlSeconds * 1000,
+        now: () => clock.now(),
+      });
+    }),
   });
   container.register(tokens.deploymentContextDefaultsPolicy, {
     useFactory: instanceCachingFactory(
@@ -509,6 +557,7 @@ export function registerRuntimeDependencies(
           genericSshProvider,
           aliyunProvider,
           tencentProvider,
+          acmeCertificateProvider,
         ]),
     ),
   });
