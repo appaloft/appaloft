@@ -67,51 +67,51 @@ Then:
 
 ## Query And Service Matrix
 
-| Case | Input/read state | Expected result | Required assertion |
-| --- | --- | --- | --- |
-| Resource missing | Unknown resource id | `err(not_found)` | No runtime/proxy/public probes run. |
-| No deployment/runtime | Resource exists with no deployment/runtime | `ok(overall = "not-deployed")` | Latest deployment context is absent and no health probe is attempted. |
-| Deployment succeeded, runtime healthy | Latest deployment succeeded, runtime running, required checks pass | `ok(overall = "healthy")` | Deployment status is context, not the only health proof. |
-| Deployment succeeded, public route fails | Latest deployment succeeded, internal runtime healthy, public URL times out | `ok(overall = "degraded")` | Public access failure is visible and success is not shown as reachable. |
-| Deployment succeeded, container unhealthy | Latest deployment succeeded, Docker health is `unhealthy` | `ok(overall = "unhealthy")` | Runtime health overrides deployment success. |
-| Runtime starting | Runtime lifecycle starting or restarting | `ok(overall = "starting")` | UI can show pending health rather than succeeded. |
-| Runtime exited | Latest runtime exited with no replacement | `ok(overall = "stopped")` | Status is not failed deployment unless deployment itself failed. |
-| Running with no policy | Runtime running, no configured health policy | `ok(overall = "unknown")` | Missing health check is not healthy. |
-| HTTP policy pass | Policy defaults to internal port, localhost, `/`, expected 200 and passes | `ok(overall = "healthy")` when other required checks pass | Default resolution uses `ResourceNetworkProfile.internalPort`. |
-| HTTP policy fail | HTTP probe returns unexpected status/body or times out | `ok(overall = "unhealthy")` | Check record includes status/reason without leaking body secrets. |
-| Command policy pass | Adapter supports command check and command exits 0 | `ok` with command check passed | Command runs inside workload boundary. |
-| Command policy unsupported | Adapter cannot run command policy | `ok(overall = "unknown")` or `degraded` by policy strictness | Source error is `resource_health_policy_unsupported`. |
-| Proxy route missing | Reverse-proxy exposure but route not applied | `ok(overall = "degraded")` | Proxy section identifies unavailable route. |
-| Durable domain ready | Ready domain binding and generated route both exist | `ok` uses durable domain as public access target | Durable domain precedes generated default route. |
-| Durable domain pending | Domain binding exists but is not ready | `ok(overall = "degraded")` when public access is required | Domain state is not hidden by generated route unless policy allows fallback. |
-| Runtime inspection fails | Runtime provider inspect fails | `ok(overall = "unknown")` | Source error records runtime inspection failure. |
-| Read model failure | Required resource context cannot be safely loaded | `err(resource_health_unavailable)` | No partial unsafe summary is returned. |
+| Test ID | Preferred automation | Case | Input/read state | Expected result | Required assertion |
+| --- | --- | --- | --- | --- | --- |
+| RES-HEALTH-QRY-001 | integration | Resource missing | Unknown resource id | `err(not_found)` | No runtime/proxy/public probes run. |
+| RES-HEALTH-QRY-002 | integration | No deployment/runtime | Resource exists with no deployment/runtime | `ok(overall = "not-deployed")` | Latest deployment context is absent and no health probe is attempted. |
+| RES-HEALTH-QRY-003 | integration | Deployment succeeded, runtime healthy | Latest deployment succeeded, runtime running, required checks pass | `ok(overall = "healthy")` | Deployment status is context, not the only health proof. |
+| RES-HEALTH-QRY-004 | integration | Deployment succeeded, public route fails | Latest deployment succeeded, internal runtime healthy, public URL times out | `ok(overall = "degraded")` | Public access failure is visible and success is not shown as reachable. |
+| RES-HEALTH-QRY-005 | integration | Deployment succeeded, container unhealthy | Latest deployment succeeded, Docker health is `unhealthy` | `ok(overall = "unhealthy")` | Runtime health overrides deployment success. |
+| RES-HEALTH-QRY-006 | integration | Runtime starting | Runtime lifecycle starting or restarting | `ok(overall = "starting")` | UI can show pending health rather than succeeded. |
+| RES-HEALTH-QRY-007 | integration | Runtime exited | Latest runtime exited with no replacement | `ok(overall = "stopped")` | Status is not failed deployment unless deployment itself failed. |
+| RES-HEALTH-QRY-008 | integration | Running with no policy | Runtime running, no configured health policy | `ok(overall = "unknown")` | Missing health check is not healthy. |
+| RES-HEALTH-QRY-009 | integration | HTTP policy pass | Policy defaults to internal port, localhost, `/`, expected 200 and passes | `ok(overall = "healthy")` when other required checks pass | Default resolution uses `ResourceNetworkProfile.internalPort`. |
+| RES-HEALTH-QRY-010 | integration | HTTP policy fail | HTTP probe returns unexpected status/body or times out | `ok(overall = "unhealthy")` | Check record includes status/reason without leaking body secrets. |
+| RES-HEALTH-QRY-011 | integration | Command policy pass | Adapter supports command check and command exits 0 | `ok` with command check passed | Command runs inside workload boundary. |
+| RES-HEALTH-QRY-012 | integration | Command policy unsupported | Adapter cannot run command policy | `ok(overall = "unknown")` or `degraded` by policy strictness | Source error is `resource_health_policy_unsupported`. |
+| RES-HEALTH-QRY-013 | integration | Proxy route missing | Reverse-proxy exposure but route not applied | `ok(overall = "degraded")` | Proxy section identifies unavailable route. |
+| RES-HEALTH-QRY-014 | integration | Durable domain ready | Ready domain binding and generated route both exist | `ok` uses durable domain as public access target | Durable domain precedes generated default route. |
+| RES-HEALTH-QRY-015 | integration | Durable domain pending | Domain binding exists but is not ready | `ok(overall = "degraded")` when public access is required | Domain state is not hidden by generated route unless policy allows fallback. |
+| RES-HEALTH-QRY-016 | integration | Runtime inspection fails | Runtime provider inspect fails | `ok(overall = "unknown")` | Source error records runtime inspection failure. |
+| RES-HEALTH-QRY-017 | integration | Read model failure | Required resource context cannot be safely loaded | `err(resource_health_unavailable)` | No partial unsafe summary is returned. |
 
 ## Status Aggregation Matrix
 
-| Signals | Expected overall |
-| --- | --- |
-| No runtime and no latest deployment | `not-deployed` |
-| Runtime starting/restarting | `starting` |
-| Runtime running, health policy missing | `unknown` |
-| Runtime running, Docker health healthy, HTTP health pass, proxy ready, public access pass | `healthy` |
-| Runtime running, internal health pass, public access fail | `degraded` |
-| Runtime running, Docker health unhealthy or required HTTP/command health fail | `unhealthy` |
-| Runtime stopped/exited without replacement | `stopped` |
-| Observation sources unavailable and no failing fact is known | `unknown` |
+| Test ID | Preferred automation | Signals | Expected overall |
+| --- | --- | --- | --- |
+| RES-HEALTH-STATUS-001 | unit | No runtime and no latest deployment | `not-deployed` |
+| RES-HEALTH-STATUS-002 | unit | Runtime starting/restarting | `starting` |
+| RES-HEALTH-STATUS-003 | unit | Runtime running, health policy missing | `unknown` |
+| RES-HEALTH-STATUS-004 | unit | Runtime running, Docker health healthy, HTTP health pass, proxy ready, public access pass | `healthy` |
+| RES-HEALTH-STATUS-005 | unit | Runtime running, internal health pass, public access fail | `degraded` |
+| RES-HEALTH-STATUS-006 | unit | Runtime running, Docker health unhealthy or required HTTP/command health fail | `unhealthy` |
+| RES-HEALTH-STATUS-007 | unit | Runtime stopped/exited without replacement | `stopped` |
+| RES-HEALTH-STATUS-008 | unit | Observation sources unavailable and no failing fact is known | `unknown` |
 
 ## Entrypoint Matrix
 
-| Entrypoint | Case | Expected behavior |
-| --- | --- | --- |
-| Web resource detail | Latest deployment succeeded but public access fails | Header/status panel shows resource health `degraded` or `unhealthy`; deployment success appears only as context. |
-| Web resource detail | Access URL exists on resource summary | Access panel is visible on resource detail, not only deployment detail. |
-| Sidebar | Health projection available | Resource child uses compact resource health status. |
-| Sidebar | Health projection absent during migration | Resource child may fall back to latest deployment status but must not label it as current health. |
-| Project resource list | Multiple resources with mixed health | List displays resource health and latest deployment context separately. |
-| Deployment detail | Attempt succeeded, resource unhealthy | Deployment page links back to current resource health instead of implying the attempt proves availability. |
-| CLI | `resource health --json` | Prints `ResourceHealthSummary` JSON from the query. |
-| API/oRPC | HTTP query | Reuses input schema and returns `ResourceHealthSummary`. |
+| Test ID | Preferred automation | Entrypoint | Case | Expected behavior |
+| --- | --- | --- | --- | --- |
+| RES-HEALTH-ENTRY-001 | e2e-preferred | Web resource detail | Latest deployment succeeded but public access fails | Header/status panel shows resource health `degraded` or `unhealthy`; deployment success appears only as context. |
+| RES-HEALTH-ENTRY-002 | e2e-preferred | Web resource detail | Access URL exists on resource summary | Access panel is visible on resource detail, not only deployment detail. |
+| RES-HEALTH-ENTRY-003 | e2e-preferred | Sidebar | Health projection available | Resource child uses compact resource health status. |
+| RES-HEALTH-ENTRY-004 | e2e-preferred | Sidebar | Health projection absent during migration | Resource child may fall back to latest deployment status but must not label it as current health. |
+| RES-HEALTH-ENTRY-005 | e2e-preferred | Project resource list | Multiple resources with mixed health | List displays resource health and latest deployment context separately. |
+| RES-HEALTH-ENTRY-006 | e2e-preferred | Deployment detail | Attempt succeeded, resource unhealthy | Deployment page links back to current resource health instead of implying the attempt proves availability. |
+| RES-HEALTH-ENTRY-007 | e2e-preferred | CLI | `resource health --json` | Prints `ResourceHealthSummary` JSON from the query. |
+| RES-HEALTH-ENTRY-008 | e2e-preferred | API/oRPC | HTTP query | Reuses input schema and returns `ResourceHealthSummary`. |
 
 ## Current Implementation Notes And Migration Gaps
 

@@ -54,6 +54,45 @@ usually a CLI or HTTP/oRPC e2e test that proves the command or workflow can be e
 and observed through a read/query surface. Add integration and unit tests underneath it for branch
 coverage, rare failures, pure domain rules, and fast diagnostics.
 
+## Assertion Visibility Classification
+
+The `Preferred automation` column is the required test category for the row. Choose it by the
+strongest boundary that can actually observe the assertion:
+
+- use `e2e-preferred` only when the assertion can be proven through a real user-facing chain such
+  as CLI, HTTP/oRPC, Web, and a public read/query surface;
+- use `integration` when the assertion needs command/query bus behavior, repository state, emitted
+  domain events, read-model projection internals, process-manager state, or adapter behavior that
+  the external entrypoint cannot observe directly;
+- use `unit` when the assertion is a pure domain/value-object/planner/normalizer rule with no
+  meaningful entrypoint chain;
+- use `contract` when the assertion is about schema, route, serialization, provider port, or error
+  mapping compatibility.
+
+Do not mark a row `e2e-preferred` just because the broader scenario is user-facing. If an e2e can
+only prove "the user created a server and can list it", but cannot prove "the repository stored
+edgeProxy.status = disabled" or "the handler called a specific method", split those into separate
+rows: an `e2e-preferred` row for the observable user chain and an `integration`, `unit`, or
+`contract` row for the internal assertion.
+
+## First-Class Operation Test Placement
+
+Every operation catalog entry is a first-class behavior for testing. New or changed tests for an
+explicit operation must live in operation-named test files instead of generic smoke files.
+
+Examples:
+
+- `servers.register` CLI/HTTP e2e coverage belongs in `server-register.test.ts`, not in a broad
+  `cli-http.test.ts` suite;
+- Quick Deploy workflow coverage belongs in `quick-deploy-*.test.ts`;
+- command/application coverage for `servers.register` belongs in a register-server command test,
+  not only as setup inside proxy or deployment tests.
+
+Generic smoke suites may still prove broad system wiring, but they do not satisfy new first-class
+operation coverage by themselves. If an operation has separate command, CLI, HTTP/oRPC, Web, or MCP
+entrypoints, the matrix should split those boundaries into separate rows when each boundary has
+distinct behavior or transport mapping to verify.
+
 ## Test Name Binding
 
 Automated tests that implement a behavior matrix row must include the matrix id in the test name.
@@ -73,6 +112,25 @@ primarily proves and use additional numbered tests for branch-specific matrix ro
 When a Code Round changes a behavior matrix, Post-Implementation Sync must report any new or changed
 matrix id that lacks a matching automated test name as missing coverage. Existing unnumbered tests
 are migration gaps until they are renamed or linked by adding the matching matrix id.
+
+## Test-First Change Flow
+
+Every new feature, behavior change, command change, workflow change, or entrypoint behavior change
+must update an existing `docs/testing/*-test-matrix.md` file or add a new one before the behavior is
+considered specified enough for implementation.
+
+When implementation work is in scope, add or update the automated tests for the changed matrix ids
+before or in the same change as business code. A test-first change may intentionally introduce a
+failing test before the Code Round implements the behavior. In that case:
+
+- the test name must still include the matrix id;
+- the failure must express the intended business behavior, not an incidental implementation detail;
+- the final output must call out the failing matrix ids and the implementation work expected to make
+  them pass;
+- the behavior must remain `not aligned` until the tests pass or the matrix is revised by Spec Round.
+
+Code Round may use those failing tests as the executable target for the implementation, then update
+or split tests only when the test itself was wrong about the governing spec.
 
 ## Command Test Matrix Template
 

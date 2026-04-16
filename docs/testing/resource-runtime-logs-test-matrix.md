@@ -53,47 +53,47 @@ Then:
 
 ## Query And Service Matrix
 
-| Case | Input/read state | Expected query behavior | Expected port behavior | Expected result |
-| --- | --- | --- | --- | --- |
-| Bounded tail | Resource has latest observable runtime instance | Resolve latest instance | Open reader with `follow = false` and tail limit | Return no more than requested lines |
-| Follow stream | Resource has latest observable runtime instance | Resolve latest instance | Open reader with `follow = true` and abort signal | Yield line events until cancelled/source closes |
-| Specific deployment | `deploymentId` belongs to resource | Use selected instance | Open reader with deployment context | Lines include deployment context when available |
-| Deployment mismatch | `deploymentId` belongs to another resource | Reject during context resolution | Reader not called | `resource_runtime_logs_context_mismatch` |
-| No observable instance | Resource has no deployment/runtime placement | Reject during runtime resolution | Reader not called | `resource_runtime_logs_unavailable` |
-| Multi-service missing service | Multiple services and no default selected | Reject validation or service resolution | Reader not called | `validation_error` with service details |
-| Adapter unsupported | Runtime kind has no reader | Resolve context then fail open | Reader returns not-configured error | `resource_runtime_logs_not_configured` |
-| Secret masking | Source emits value known to redaction context | Mask before transport | Reader or service masks line | Line has `masked = true`; secret absent |
+| Test ID | Preferred automation | Case | Input/read state | Expected query behavior | Expected port behavior | Expected result |
+| --- | --- | --- | --- | --- | --- | --- |
+| RES-LOGS-QRY-001 | integration | Bounded tail | Resource has latest observable runtime instance | Resolve latest instance | Open reader with `follow = false` and tail limit | Return no more than requested lines |
+| RES-LOGS-QRY-002 | integration | Follow stream | Resource has latest observable runtime instance | Resolve latest instance | Open reader with `follow = true` and abort signal | Yield line events until cancelled/source closes |
+| RES-LOGS-QRY-003 | integration | Specific deployment | `deploymentId` belongs to resource | Use selected instance | Open reader with deployment context | Lines include deployment context when available |
+| RES-LOGS-QRY-004 | integration | Deployment mismatch | `deploymentId` belongs to another resource | Reject during context resolution | Reader not called | `resource_runtime_logs_context_mismatch` |
+| RES-LOGS-QRY-005 | integration | No observable instance | Resource has no deployment/runtime placement | Reject during runtime resolution | Reader not called | `resource_runtime_logs_unavailable` |
+| RES-LOGS-QRY-006 | integration | Multi-service missing service | Multiple services and no default selected | Reject validation or service resolution | Reader not called | `validation_error` with service details |
+| RES-LOGS-QRY-007 | integration | Adapter unsupported | Runtime kind has no reader | Resolve context then fail open | Reader returns not-configured error | `resource_runtime_logs_not_configured` |
+| RES-LOGS-QRY-008 | integration | Secret masking | Source emits value known to redaction context | Mask before transport | Reader or service masks line | Line has `masked = true`; secret absent |
 
 ## Streaming Matrix
 
-| Case | Log source behavior | Expected stream result | Expected cleanup |
-| --- | --- | --- | --- |
-| Line sequence | Source yields stdout/stderr lines | Events preserve source order per stream | Stream remains open |
-| Heartbeat | Source is idle in follow mode | Heartbeat events may be emitted | Stream remains open |
-| Source closes | Runtime backend closes normally | `closed(source-ended)` or transport EOF | Backend handle closed |
-| Caller cancels | Abort signal fires | `closed(cancelled)` when possible | Child process/socket/file watcher stopped |
-| Source fails after open | Backend returns an error after some lines | Structured stream error event | Backend handle closed |
-| Transport disconnect | HTTP/SSE client disconnects | Abort signal propagates | No orphan child process or SSH command |
+| Test ID | Preferred automation | Case | Log source behavior | Expected stream result | Expected cleanup |
+| --- | --- | --- | --- | --- | --- |
+| RES-LOGS-STREAM-001 | integration | Line sequence | Source yields stdout/stderr lines | Events preserve source order per stream | Stream remains open |
+| RES-LOGS-STREAM-002 | integration | Heartbeat | Source is idle in follow mode | Heartbeat events may be emitted | Stream remains open |
+| RES-LOGS-STREAM-003 | integration | Source closes | Runtime backend closes normally | `closed(source-ended)` or transport EOF | Backend handle closed |
+| RES-LOGS-STREAM-004 | integration | Caller cancels | Abort signal fires | `closed(cancelled)` when possible | Child process/socket/file watcher stopped |
+| RES-LOGS-STREAM-005 | integration | Source fails after open | Backend returns an error after some lines | Structured stream error event | Backend handle closed |
+| RES-LOGS-STREAM-006 | integration | Transport disconnect | HTTP/SSE client disconnects | Abort signal propagates | No orphan child process or SSH command |
 
 ## Runtime Adapter Matrix
 
-| Backend | Expected adapter behavior | Must not expose |
-| --- | --- | --- |
-| Docker | May call Docker API or `docker logs --tail --follow`; for generic-SSH targets it may run the same Docker log command through SSH with resolved server credentials; normalize to line events. | Container id as public input, Docker-specific event type in query output, local-only assumptions for remote targets. |
-| Future PM2/systemd/file-tail readers | May be added only after workload runtime semantics are accepted by ADR; normalize process output. | Runtime-native process/unit/path object as public input/output. |
-| Provider API | May call provider log endpoint; normalize provider records. | Provider-native event shape in query output. |
+| Test ID | Preferred automation | Backend | Expected adapter behavior | Must not expose |
+| --- | --- | --- | --- | --- |
+| RES-LOGS-ADAPTER-001 | contract | Docker | May call Docker API or `docker logs --tail --follow`; for generic-SSH targets it may run the same Docker log command through SSH with resolved server credentials; normalize to line events. | Container id as public input, Docker-specific event type in query output, local-only assumptions for remote targets. |
+| RES-LOGS-ADAPTER-002 | contract | Future PM2/systemd/file-tail readers | May be added only after workload runtime semantics are accepted by ADR; normalize process output. | Runtime-native process/unit/path object as public input/output. |
+| RES-LOGS-ADAPTER-003 | contract | Provider API | May call provider log endpoint; normalize provider records. | Provider-native event shape in query output. |
 
 ## Entrypoint Matrix
 
-| Entrypoint | Case | Expected behavior |
-| --- | --- | --- |
-| Web | Resource page opens bounded tail | Uses `resources.runtime-logs`; renders lines incrementally. |
-| Web | User starts follow after a bounded tail is already visible | Opens follow mode without appending duplicate historical tail lines. |
-| Web | User stops follow or navigates away | Stream aborts and backend closes; normal cancellation is not rendered as a user-facing error. |
-| CLI | `resource logs --tail 50` | Prints bounded tail, exits cleanly. |
-| CLI | `resource logs --follow` then Ctrl-C | Aborts stream, exits cleanly. |
-| HTTP/oRPC | Bounded endpoint | Reuses query schema and serializes normalized lines. |
-| HTTP/oRPC | Streaming endpoint | Reuses query schema and serializes normalized events. |
+| Test ID | Preferred automation | Entrypoint | Case | Expected behavior |
+| --- | --- | --- | --- | --- |
+| RES-LOGS-ENTRY-001 | e2e-preferred | Web | Resource page opens bounded tail | Uses `resources.runtime-logs`; renders lines incrementally. |
+| RES-LOGS-ENTRY-002 | e2e-preferred | Web | User starts follow after a bounded tail is already visible | Opens follow mode without appending duplicate historical tail lines. |
+| RES-LOGS-ENTRY-003 | e2e-preferred | Web | User stops follow or navigates away | Stream aborts and backend closes; normal cancellation is not rendered as a user-facing error. |
+| RES-LOGS-ENTRY-004 | e2e-preferred | CLI | `resource logs --tail 50` | Prints bounded tail, exits cleanly. |
+| RES-LOGS-ENTRY-005 | e2e-preferred | CLI | `resource logs --follow` then Ctrl-C | Aborts stream, exits cleanly. |
+| RES-LOGS-ENTRY-006 | e2e-preferred | HTTP/oRPC | Bounded endpoint | Reuses query schema and serializes normalized lines. |
+| RES-LOGS-ENTRY-007 | e2e-preferred | HTTP/oRPC | Streaming endpoint | Reuses query schema and serializes normalized events. |
 
 ## Current Implementation Notes And Migration Gaps
 
