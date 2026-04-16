@@ -46,16 +46,12 @@ function proxyConfigurationStatusFromDeployment(
 }
 
 function routesFromDeployment(deployment: DeploymentSummary): EdgeProxyRouteInput[] {
-  const metadata = deployment.runtimePlan.execution.metadata ?? {};
-  const providerKey = metadata["access.providerKey"];
-
   return (deployment.runtimePlan.execution.accessRoutes ?? []).map((route) => ({
     proxyKind: route.proxyKind,
     domains: route.domains,
     pathPrefix: route.pathPrefix,
     tlsMode: route.tlsMode,
     ...(route.targetPort === undefined ? {} : { targetPort: route.targetPort }),
-    ...(providerKey ? { providerKey } : {}),
   }));
 }
 
@@ -66,7 +62,6 @@ function routeFromPlannedSummary(route: PlannedResourceAccessRouteSummary): Edge
     pathPrefix: route.pathPrefix,
     tlsMode: route.scheme === "https" ? "auto" : "disabled",
     targetPort: route.targetPort,
-    ...(route.providerKey ? { providerKey: route.providerKey } : {}),
   };
 }
 

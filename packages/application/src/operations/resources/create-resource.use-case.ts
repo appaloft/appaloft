@@ -14,7 +14,17 @@ import {
   err,
   GitCommitShaText,
   GitRefText,
+  HealthCheckExpectedStatusCode,
+  HealthCheckHostText,
+  HealthCheckHttpMethodValue,
+  HealthCheckIntervalSeconds,
   HealthCheckPathText,
+  HealthCheckResponseText,
+  HealthCheckRetryCount,
+  HealthCheckSchemeValue,
+  HealthCheckStartPeriodSeconds,
+  HealthCheckTimeoutSeconds,
+  HealthCheckTypeValue,
   ok,
   PortNumber,
   ProjectByIdSpec,
@@ -345,6 +355,8 @@ export class CreateResourceUseCase {
 
       let runtimeProfile: ResourceRuntimeProfileState | undefined;
       if (input.runtimeProfile) {
+        const healthCheckInput = input.runtimeProfile.healthCheck;
+        const healthCheckHttpInput = healthCheckInput?.http;
         runtimeProfile = {
           strategy: yield* RuntimePlanStrategyValue.create(input.runtimeProfile.strategy ?? "auto"),
           ...(input.runtimeProfile.installCommand
@@ -361,6 +373,55 @@ export class CreateResourceUseCase {
                 healthCheckPath: yield* HealthCheckPathText.create(
                   input.runtimeProfile.healthCheckPath,
                 ),
+              }
+            : {}),
+          ...(healthCheckInput
+            ? {
+                healthCheck: {
+                  enabled: healthCheckInput.enabled ?? true,
+                  type: yield* HealthCheckTypeValue.create(healthCheckInput.type ?? "http"),
+                  intervalSeconds: yield* HealthCheckIntervalSeconds.create(
+                    healthCheckInput.intervalSeconds ?? 5,
+                  ),
+                  timeoutSeconds: yield* HealthCheckTimeoutSeconds.create(
+                    healthCheckInput.timeoutSeconds ?? 5,
+                  ),
+                  retries: yield* HealthCheckRetryCount.create(healthCheckInput.retries ?? 10),
+                  startPeriodSeconds: yield* HealthCheckStartPeriodSeconds.create(
+                    healthCheckInput.startPeriodSeconds ?? 5,
+                  ),
+                  ...(healthCheckHttpInput
+                    ? {
+                        http: {
+                          method: yield* HealthCheckHttpMethodValue.create(
+                            healthCheckHttpInput.method ?? "GET",
+                          ),
+                          scheme: yield* HealthCheckSchemeValue.create(
+                            healthCheckHttpInput.scheme ?? "http",
+                          ),
+                          host: yield* HealthCheckHostText.create(
+                            healthCheckHttpInput.host ?? "localhost",
+                          ),
+                          ...(healthCheckHttpInput.port
+                            ? {
+                                port: yield* PortNumber.create(healthCheckHttpInput.port),
+                              }
+                            : {}),
+                          path: yield* HealthCheckPathText.create(healthCheckHttpInput.path ?? "/"),
+                          expectedStatusCode: yield* HealthCheckExpectedStatusCode.create(
+                            healthCheckHttpInput.expectedStatusCode ?? 200,
+                          ),
+                          ...(healthCheckHttpInput.expectedResponseText
+                            ? {
+                                expectedResponseText: yield* HealthCheckResponseText.create(
+                                  healthCheckHttpInput.expectedResponseText,
+                                ),
+                              }
+                            : {}),
+                        },
+                      }
+                    : {}),
+                },
               }
             : {}),
         };

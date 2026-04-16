@@ -9,6 +9,9 @@ import {
   edgeProxyStatuses,
   environmentKinds,
   executionStrategyKinds,
+  healthCheckHttpMethods,
+  healthCheckSchemes,
+  healthCheckTypes,
   logLevels,
   packagingModes,
   resourceExposureModes,
@@ -35,6 +38,9 @@ export {
   edgeProxyStatuses,
   environmentKinds,
   executionStrategyKinds,
+  healthCheckHttpMethods,
+  healthCheckSchemes,
+  healthCheckTypes,
   logLevels,
   packagingModes,
   resourceExposureModes,
@@ -270,6 +276,74 @@ export class TlsModeValue extends EnumValueObject<(typeof tlsModes)[number]> {
 
   static rehydrate(value: (typeof tlsModes)[number]): TlsModeValue {
     return new TlsModeValue(value);
+  }
+}
+
+const healthCheckTypeBrand: unique symbol = Symbol("HealthCheckTypeValue");
+export class HealthCheckTypeValue extends EnumValueObject<(typeof healthCheckTypes)[number]> {
+  private [healthCheckTypeBrand]!: void;
+
+  private constructor(value: (typeof healthCheckTypes)[number]) {
+    super(value);
+  }
+
+  static create(value: string): Result<HealthCheckTypeValue> {
+    return createEnumValue(
+      value,
+      healthCheckTypes,
+      "Health check type",
+      (validated) => new HealthCheckTypeValue(validated),
+    );
+  }
+
+  static rehydrate(value: (typeof healthCheckTypes)[number]): HealthCheckTypeValue {
+    return new HealthCheckTypeValue(value);
+  }
+}
+
+const healthCheckHttpMethodBrand: unique symbol = Symbol("HealthCheckHttpMethodValue");
+export class HealthCheckHttpMethodValue extends EnumValueObject<
+  (typeof healthCheckHttpMethods)[number]
+> {
+  private [healthCheckHttpMethodBrand]!: void;
+
+  private constructor(value: (typeof healthCheckHttpMethods)[number]) {
+    super(value);
+  }
+
+  static create(value: string): Result<HealthCheckHttpMethodValue> {
+    return createEnumValue(
+      value,
+      healthCheckHttpMethods,
+      "Health check HTTP method",
+      (validated) => new HealthCheckHttpMethodValue(validated),
+    );
+  }
+
+  static rehydrate(value: (typeof healthCheckHttpMethods)[number]): HealthCheckHttpMethodValue {
+    return new HealthCheckHttpMethodValue(value);
+  }
+}
+
+const healthCheckSchemeBrand: unique symbol = Symbol("HealthCheckSchemeValue");
+export class HealthCheckSchemeValue extends EnumValueObject<(typeof healthCheckSchemes)[number]> {
+  private [healthCheckSchemeBrand]!: void;
+
+  private constructor(value: (typeof healthCheckSchemes)[number]) {
+    super(value);
+  }
+
+  static create(value: string): Result<HealthCheckSchemeValue> {
+    return createEnumValue(
+      value,
+      healthCheckSchemes,
+      "Health check scheme",
+      (validated) => new HealthCheckSchemeValue(validated),
+    );
+  }
+
+  static rehydrate(value: (typeof healthCheckSchemes)[number]): HealthCheckSchemeValue {
+    return new HealthCheckSchemeValue(value);
   }
 }
 

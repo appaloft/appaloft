@@ -15,6 +15,7 @@ import {
   type EdgeProxyExecutionContext,
   type EdgeProxyProvider,
   type EdgeProxyProviderRegistry,
+  type EdgeProxyProviderSelectionInput,
   type ProxyConfigurationView,
   type ProxyConfigurationViewInput,
   type ProxyRouteRealizationInput,
@@ -97,6 +98,7 @@ class FakeEdgeProxyProvider implements EdgeProxyProvider {
     dockerLabels: true,
     configurationView: true,
     runtimeLogs: false,
+    diagnostics: false,
   };
 
   lastConfigurationInput: ProxyConfigurationViewInput | null = null;
@@ -105,6 +107,10 @@ class FakeEdgeProxyProvider implements EdgeProxyProvider {
     _context: EdgeProxyExecutionContext,
     _input: EdgeProxyEnsureInput,
   ): Promise<Result<EdgeProxyEnsurePlan>> {
+    return err(domainError.provider("not used"));
+  }
+
+  async diagnoseProxy(): Promise<Result<never>> {
     return err(domainError.provider("not used"));
   }
 
@@ -154,14 +160,18 @@ class FakeEdgeProxyProvider implements EdgeProxyProvider {
 class StaticEdgeProxyProviderRegistry implements EdgeProxyProviderRegistry {
   constructor(private readonly provider: EdgeProxyProvider | null) {}
 
-  resolve(): Result<EdgeProxyProvider> {
-    return this.provider
+  resolve(key: string): Result<EdgeProxyProvider> {
+    return this.provider && this.provider.key === key
       ? ok(this.provider)
       : err(domainError.proxyProviderUnavailable("missing provider"));
   }
 
-  defaultFor(): Result<EdgeProxyProvider | null> {
-    return ok(this.provider);
+  defaultFor(input: EdgeProxyProviderSelectionInput): Result<EdgeProxyProvider | null> {
+    if (!input.proxyKind || input.proxyKind === "none") {
+      return ok(null);
+    }
+
+    return this.resolve(input.providerKey ?? input.proxyKind);
   }
 }
 
@@ -301,6 +311,70 @@ describe("ResourceProxyConfigurationPreviewQueryService", () => {
       deploymentId: "dep_web",
       port: 3000,
       includeDiagnostics: true,
+    });
+  });
+
+  test("does not treat generated access domain provider as edge proxy provider", async () => {
+    const context = createTestContext();
+    const resourceReadModel = new StaticResourceReadModel([
+      {
+        ...resourceSummary(),
+        accessSummary: {
+          latestGeneratedAccessRoute: {
+            url: "http://web.203.0.113.10.sslip.io",
+            hostname: "web.203.0.113.10.sslip.io",
+            scheme: "http",
+            providerKey: "sslip",
+            deploymentId: "dep_web",
+            deploymentStatus: "succeeded",
+            pathPrefix: "/",
+            proxyKind: "traefik",
+            targetPort: 3000,
+            updatedAt: "2026-01-01T00:00:00.000Z",
+          },
+          proxyRouteStatus: "ready",
+          lastRouteRealizationDeploymentId: "dep_web",
+        },
+      },
+    ]);
+    const listResourcesQueryService = new ListResourcesQueryService(
+      resourceReadModel,
+      new EmptyDestinationRepository(),
+      new EmptyServerRepository(),
+      new DisabledDefaultAccessDomainProvider(),
+    );
+    const deployment = deploymentSummary();
+    const service = new ResourceProxyConfigurationPreviewQueryService(
+      listResourcesQueryService,
+      new StaticDeploymentReadModel([
+        {
+          ...deployment,
+          runtimePlan: {
+            ...deployment.runtimePlan,
+            execution: {
+              ...deployment.runtimePlan.execution,
+              metadata: {
+                "access.providerKey": "sslip",
+                "access.routeSource": "generated-default",
+              },
+            },
+          },
+        },
+      ]),
+      new StaticEdgeProxyProviderRegistry(new FakeEdgeProxyProvider()),
+      new FixedClock(),
+    );
+    const query = ResourceProxyConfigurationPreviewQuery.create({
+      resourceId: "res_web",
+      routeScope: "latest",
+    })._unsafeUnwrap();
+
+    const result = await service.execute(context, query);
+
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap()).toMatchObject({
+      providerKey: "traefik",
+      status: "applied",
     });
   });
 

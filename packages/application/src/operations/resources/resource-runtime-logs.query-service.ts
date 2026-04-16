@@ -1,7 +1,14 @@
 import { type DomainError, domainError, err, ok, type Result } from "@yundu/core";
 import { inject, injectable } from "tsyringe";
 
-import { type ExecutionContext, toRepositoryContext } from "../../execution-context";
+import {
+  createDomainErrorTraceAttributes,
+  createRuntimeLogsSpanName,
+  type ExecutionContext,
+  type TraceAttributes,
+  toRepositoryContext,
+  yunduTraceAttributes,
+} from "../../execution-context";
 import {
   type DeploymentReadModel,
   type DeploymentSummary,
@@ -138,6 +145,22 @@ function redactionsFromDeployment(deployment: DeploymentSummary): string[] {
     .filter((value) => value.trim().length > 0);
 }
 
+function createRuntimeLogsTraceAttributes(input: {
+  deployment: DeploymentSummary;
+  request: ResourceRuntimeLogRequest;
+  resource: ResourceSummary;
+}): TraceAttributes {
+  return {
+    [yunduTraceAttributes.resourceId]: input.resource.id,
+    [yunduTraceAttributes.deploymentId]: input.deployment.id,
+    [yunduTraceAttributes.runtimeKind]: input.deployment.runtimePlan.execution.kind,
+    [yunduTraceAttributes.targetProviderKey]: input.deployment.runtimePlan.target.providerKey,
+    [yunduTraceAttributes.runtimeLogFollow]: input.request.follow,
+    [yunduTraceAttributes.runtimeLogTailLines]: input.request.tailLines,
+    [yunduTraceAttributes.runtimeLogServiceName]: input.request.serviceName,
+  };
+}
+
 @injectable()
 export class ResourceRuntimeLogsQueryService {
   constructor(
@@ -194,25 +217,57 @@ export class ResourceRuntimeLogsQueryService {
       ...(query.cursor ? { cursor: query.cursor } : {}),
     };
     const signal = query.signal ?? new AbortController().signal;
-    const opened = await this.runtimeLogReader.open(
-      context,
-      {
-        resource,
-        deployment,
-        redactions: redactionsFromDeployment(deployment),
-      },
+    const redactions = redactionsFromDeployment(deployment);
+    const traceAttributes = createRuntimeLogsTraceAttributes({
+      resource,
+      deployment,
       request,
-      signal,
+    });
+    const opened = await context.tracer.startActiveSpan(
+      createRuntimeLogsSpanName("open"),
+      {
+        attributes: traceAttributes,
+      },
+      async (span) => {
+        try {
+          const result = await this.runtimeLogReader.open(
+            context,
+            {
+              resource,
+              deployment,
+              redactions,
+            },
+            request,
+            signal,
+          );
+
+          result.match(
+            () => {
+              span.setStatus("ok");
+            },
+            (error) => {
+              span.setStatus("error", error.message);
+              span.setAttributes(createDomainErrorTraceAttributes(error));
+            },
+          );
+
+          return result;
+        } catch (error) {
+          span.setStatus(
+            "error",
+            error instanceof Error ? error.message : "Runtime log open failed",
+          );
+          span.recordError(error instanceof Error ? error : { message: String(error) });
+          throw error;
+        }
+      },
     );
 
     if (opened.isErr()) {
       return err(opened.error);
     }
 
-    const stream = new MaskingResourceRuntimeLogStream(
-      opened.value,
-      redactionsFromDeployment(deployment),
-    );
+    const stream = new MaskingResourceRuntimeLogStream(opened.value, redactions);
 
     if (query.follow) {
       return ok({
@@ -225,27 +280,61 @@ export class ResourceRuntimeLogsQueryService {
 
     const logs: ResourceRuntimeLogLine[] = [];
 
-    try {
-      for await (const event of stream) {
-        if (event.kind === "line") {
-          logs.push(event.line);
-          continue;
-        }
+    return context.tracer.startActiveSpan(
+      createRuntimeLogsSpanName("collect_bounded"),
+      {
+        attributes: traceAttributes,
+      },
+      async (span) => {
+        let closeReason: string | undefined;
 
-        if (event.kind === "error") {
-          return err(event.error);
-        }
-      }
-    } finally {
-      await stream.close();
-    }
+        try {
+          for await (const event of stream) {
+            if (event.kind === "line") {
+              logs.push(event.line);
+              continue;
+            }
 
-    return ok({
-      mode: "bounded",
-      resourceId: resource.id,
-      deploymentId: deployment.id,
-      logs,
-    });
+            if (event.kind === "closed") {
+              closeReason = event.reason;
+              continue;
+            }
+
+            if (event.kind === "error") {
+              span.setStatus("error", event.error.message);
+              span.setAttributes({
+                ...createDomainErrorTraceAttributes(event.error),
+                [yunduTraceAttributes.runtimeLogLineCount]: logs.length,
+              });
+              return err(event.error);
+            }
+          }
+
+          span.setAttributes({
+            [yunduTraceAttributes.runtimeLogLineCount]: logs.length,
+            [yunduTraceAttributes.runtimeLogCloseReason]: closeReason,
+          });
+          span.setStatus("ok");
+
+          return ok({
+            mode: "bounded",
+            resourceId: resource.id,
+            deploymentId: deployment.id,
+            logs,
+          });
+        } catch (error) {
+          span.setStatus(
+            "error",
+            error instanceof Error ? error.message : "Runtime log collection failed",
+          );
+          span.setAttribute(yunduTraceAttributes.runtimeLogLineCount, logs.length);
+          span.recordError(error instanceof Error ? error : { message: String(error) });
+          throw error;
+        } finally {
+          await stream.close();
+        }
+      },
+    );
   }
 
   private async resolveSelectedDeployment(

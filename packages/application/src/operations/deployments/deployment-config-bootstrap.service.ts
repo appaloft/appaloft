@@ -143,28 +143,6 @@ function selectDeploymentTarget(
   );
 }
 
-function mergeConfigIntoCommand(
-  input: LegacyDeploymentBootstrapInput,
-  config: DeploymentConfigSnapshot | null,
-): LegacyDeploymentBootstrapInput {
-  const deployment = config?.deployment;
-
-  return {
-    ...input,
-    deploymentMethod: input.deploymentMethod ?? deployment?.method,
-    installCommand: input.installCommand ?? deployment?.installCommand,
-    buildCommand: input.buildCommand ?? deployment?.buildCommand,
-    startCommand: input.startCommand ?? deployment?.startCommand,
-    port: input.port ?? deployment?.port,
-    healthCheckPath: input.healthCheckPath ?? deployment?.healthCheckPath,
-    proxyKind: input.proxyKind ?? deployment?.proxyKind,
-    domains: input.domains ?? deployment?.domains,
-    pathPrefix: input.pathPrefix ?? deployment?.pathPrefix,
-    tlsMode: input.tlsMode ?? deployment?.tlsMode,
-    resource: input.resource ?? config?.resource,
-  };
-}
-
 function normalizeDeploymentResourceInput(
   resource: NonNullable<LegacyDeploymentBootstrapInput["resource"]>,
 ): DeploymentConfiguredResource {

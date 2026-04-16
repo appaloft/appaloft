@@ -6,7 +6,15 @@ import {
   type RollbackPlanId,
   type RuntimePlanId,
 } from "../shared/identifiers";
-import { type ExitCode, type PortNumber } from "../shared/numeric-values";
+import {
+  type ExitCode,
+  type HealthCheckExpectedStatusCode,
+  type HealthCheckIntervalSeconds,
+  type HealthCheckRetryCount,
+  type HealthCheckStartPeriodSeconds,
+  type HealthCheckTimeoutSeconds,
+  type PortNumber,
+} from "../shared/numeric-values";
 import { err, ok, type Result } from "../shared/result";
 import {
   type BuildStrategyKindValue,
@@ -18,6 +26,9 @@ import {
   type ExecutionStrategyKindValue,
   type edgeProxyKinds,
   type executionStrategyKinds,
+  type HealthCheckHttpMethodValue,
+  type HealthCheckSchemeValue,
+  type HealthCheckTypeValue,
   type LogLevelValue,
   type PackagingModeValue,
   type packagingModes,
@@ -35,7 +46,9 @@ import {
   type DisplayNameText,
   type ErrorCodeText,
   type FilePathText,
+  type HealthCheckHostText,
   type HealthCheckPathText,
+  type HealthCheckResponseText,
   type ImageReference,
   type MessageText,
   type PlanStepText,
@@ -69,6 +82,7 @@ export interface RuntimeExecutionPlanState {
   buildCommand?: CommandText;
   startCommand?: CommandText;
   healthCheckPath?: HealthCheckPathText;
+  healthCheck?: RuntimeHealthCheckPolicyState;
   port?: PortNumber;
   image?: ImageReference;
   dockerfilePath?: FilePathText;
@@ -76,6 +90,31 @@ export interface RuntimeExecutionPlanState {
   accessRoutes?: AccessRoute[];
   verificationSteps?: RuntimeVerificationStep[];
   metadata?: Record<string, string>;
+}
+
+export interface RuntimeHealthCheckHttpPolicyState {
+  method: HealthCheckHttpMethodValue;
+  scheme: HealthCheckSchemeValue;
+  host: HealthCheckHostText;
+  port?: PortNumber;
+  path: HealthCheckPathText;
+  expectedStatusCode: HealthCheckExpectedStatusCode;
+  expectedResponseText?: HealthCheckResponseText;
+}
+
+export interface RuntimeHealthCheckCommandPolicyState {
+  command: CommandText;
+}
+
+export interface RuntimeHealthCheckPolicyState {
+  enabled: boolean;
+  type: HealthCheckTypeValue;
+  intervalSeconds: HealthCheckIntervalSeconds;
+  timeoutSeconds: HealthCheckTimeoutSeconds;
+  retries: HealthCheckRetryCount;
+  startPeriodSeconds: HealthCheckStartPeriodSeconds;
+  http?: RuntimeHealthCheckHttpPolicyState;
+  command?: RuntimeHealthCheckCommandPolicyState;
 }
 
 export interface AccessRouteState {
@@ -416,6 +455,18 @@ export class RuntimeExecutionPlan extends ValueObject<RuntimeExecutionPlanState>
     return this.state.healthCheckPath?.value;
   }
 
+  get healthCheck(): RuntimeHealthCheckPolicyState | undefined {
+    return this.state.healthCheck
+      ? {
+          ...this.state.healthCheck,
+          ...(this.state.healthCheck.http ? { http: { ...this.state.healthCheck.http } } : {}),
+          ...(this.state.healthCheck.command
+            ? { command: { ...this.state.healthCheck.command } }
+            : {}),
+        }
+      : undefined;
+  }
+
   get port(): number | undefined {
     return this.state.port?.value;
   }
@@ -476,6 +527,17 @@ export class RuntimeExecutionPlan extends ValueObject<RuntimeExecutionPlanState>
       ...(this.state.buildCommand ? { buildCommand: this.state.buildCommand } : {}),
       ...(this.state.startCommand ? { startCommand: this.state.startCommand } : {}),
       ...(this.state.healthCheckPath ? { healthCheckPath: this.state.healthCheckPath } : {}),
+      ...(this.state.healthCheck
+        ? {
+            healthCheck: {
+              ...this.state.healthCheck,
+              ...(this.state.healthCheck.http ? { http: { ...this.state.healthCheck.http } } : {}),
+              ...(this.state.healthCheck.command
+                ? { command: { ...this.state.healthCheck.command } }
+                : {}),
+            },
+          }
+        : {}),
       ...(this.state.port ? { port: this.state.port } : {}),
       ...(this.state.image ? { image: this.state.image } : {}),
       ...(this.state.dockerfilePath ? { dockerfilePath: this.state.dockerfilePath } : {}),

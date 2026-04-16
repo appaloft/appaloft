@@ -68,6 +68,32 @@ export const domainError = {
     message: string,
     details?: Record<string, string | number | boolean | null>,
   ): DomainError => createError("resource_runtime_log_cancelled", "user", message, details),
+  resourceDiagnosticContextMismatch: (
+    message: string,
+    details?: Record<string, string | number | boolean | null>,
+  ): DomainError => createError("resource_diagnostic_context_mismatch", "user", message, details),
+  resourceDiagnosticUnavailable: (
+    message: string,
+    details?: Record<string, string | number | boolean | null>,
+    retryable = true,
+  ): DomainError =>
+    createError("resource_diagnostic_unavailable", "infra", message, details, retryable),
+  resourceDiagnosticRedactionFailed: (
+    message: string,
+    details?: Record<string, string | number | boolean | null>,
+  ): DomainError => createError("resource_diagnostic_redaction_failed", "infra", message, details),
+  resourceHealthUnavailable: (
+    message: string,
+    details?: Record<string, string | number | boolean | null>,
+    retryable = true,
+  ): DomainError =>
+    createError("resource_health_unavailable", "infra", message, details, retryable),
+  resourceHealthAggregationFailed: (
+    message: string,
+    details?: Record<string, string | number | boolean | null>,
+    retryable = true,
+  ): DomainError =>
+    createError("resource_health_aggregation_failed", "infra", message, details, retryable),
   resourceSlugConflict: (
     message: string,
     details?: Record<string, string | number | boolean | null>,
