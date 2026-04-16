@@ -125,9 +125,19 @@ export const yunduTraceAttributes = {
   queryName: `${yunduTraceAttributePrefix}.query.name`,
   readModelName: `${yunduTraceAttributePrefix}.read_model.name`,
   repositoryName: `${yunduTraceAttributePrefix}.repository.name`,
+  deploymentId: `${yunduTraceAttributePrefix}.deployment.id`,
+  resourceId: `${yunduTraceAttributePrefix}.resource.id`,
   requestId: `${yunduTraceAttributePrefix}.request.id`,
+  runtimeKind: `${yunduTraceAttributePrefix}.runtime.kind`,
+  runtimeLogCloseReason: `${yunduTraceAttributePrefix}.runtime_logs.close_reason`,
+  runtimeLogCommand: `${yunduTraceAttributePrefix}.runtime_logs.command`,
+  runtimeLogFollow: `${yunduTraceAttributePrefix}.runtime_logs.follow`,
+  runtimeLogLineCount: `${yunduTraceAttributePrefix}.runtime_logs.line_count`,
+  runtimeLogServiceName: `${yunduTraceAttributePrefix}.runtime_logs.service_name`,
+  runtimeLogTailLines: `${yunduTraceAttributePrefix}.runtime_logs.tail_lines`,
   selectionSpecName: `${yunduTraceAttributePrefix}.selection_spec.name`,
   sourceLocator: `${yunduTraceAttributePrefix}.source.locator`,
+  targetProviderKey: `${yunduTraceAttributePrefix}.target.provider_key`,
 } as const;
 
 export function createExecutionContextAttributes(context: ExecutionContext): TraceAttributes {
@@ -189,4 +199,8 @@ export function createReadModelSpanName(readModelName: string, operation: string
 
 export function createAdapterSpanName(adapterName: string, operation: string): string {
   return `yundu.adapter.${toSpanSegment(adapterName)}.${toSpanSegment(operation)}`;
+}
+
+export function createRuntimeLogsSpanName(operation: string): string {
+  return `yundu.runtime_logs.${toSpanSegment(operation)}`;
 }

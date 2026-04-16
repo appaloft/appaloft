@@ -19,6 +19,12 @@ import {
   resolveYunduLocaleFromHeaders,
   translateDomainError,
 } from "@yundu/i18n";
+import {
+  finishActiveHttpServerSpan,
+  updateActiveHttpServerSpan,
+  wrapHttpRequestHandlerWithSpan,
+  writeActiveTraceResponseHeaders,
+} from "@yundu/observability";
 import { mountYunduOrpcRoutes } from "@yundu/orpc";
 import {
   type SystemPluginHttpMiddleware,
@@ -121,6 +127,41 @@ function appendVaryHeader(headers: MutableHeaders, value: string): void {
   if (!values.includes(value.toLowerCase())) {
     headers.vary = `${current}, ${value}`;
   }
+}
+
+function readHeader(headers: MutableHeaders, name: string): string | undefined {
+  const normalizedName = name.toLowerCase();
+  const match = Object.entries(headers).find(([key]) => key.toLowerCase() === normalizedName);
+
+  return match?.[1];
+}
+
+function setTraceHeaders(headers: MutableHeaders, config: AppConfig): void {
+  writeActiveTraceResponseHeaders(
+    {
+      getHeader(name) {
+        return readHeader(headers, name);
+      },
+      setHeader(name, value) {
+        const existingKey = Object.keys(headers).find(
+          (key) => key.toLowerCase() === name.toLowerCase(),
+        );
+        headers[existingKey ?? name] = value;
+      },
+    },
+    {
+      ...(config.traceLinkBaseUrl ? { traceLinkBaseUrl: config.traceLinkBaseUrl } : {}),
+      ...(config.traceLinkUrlTemplate ? { traceLinkUrlTemplate: config.traceLinkUrlTemplate } : {}),
+    },
+  );
+}
+
+function resolveStatusCode(status: unknown): number | undefined {
+  if (typeof status === "number") {
+    return status;
+  }
+
+  return undefined;
 }
 
 function createAllowedOrigins(webOrigin: string): Set<string> {
@@ -344,7 +385,27 @@ export function createHttpApp(input: {
   }
 
   const baseApp = new Elysia()
-    .onError(({ error, set }) => {
+    .wrap((handle, request) => {
+      const requestId = request.headers.get("x-request-id");
+
+      return wrapHttpRequestHandlerWithSpan(
+        {
+          request,
+          ...(requestId ? { requestId } : {}),
+        },
+        handle as (...args: unknown[]) => unknown,
+      );
+    })
+    .onError(({ error, request, set, route }) => {
+      const requestId = request.headers.get("x-request-id");
+      updateActiveHttpServerSpan({
+        error,
+        request,
+        route,
+        statusCode: 500,
+        ...(requestId ? { requestId } : {}),
+      });
+      setTraceHeaders(set.headers as MutableHeaders, input.config);
       input.logger.error("http_adapter_unhandled_error", {
         message: readErrorMessage(error),
       });
@@ -388,7 +449,16 @@ export function createHttpApp(input: {
         }
       }
     })
-    .onAfterHandle(({ request, set }) => {
+    .onAfterHandle(({ request, set, route }) => {
+      const requestId = request.headers.get("x-request-id");
+      updateActiveHttpServerSpan({
+        request,
+        route,
+        statusCode: resolveStatusCode(set.status) ?? 200,
+        ...(requestId ? { requestId } : {}),
+      });
+      setTraceHeaders(set.headers as MutableHeaders, input.config);
+
       const pathname = new URL(request.url).pathname;
 
       if (!isApiPath(pathname)) {
@@ -396,6 +466,15 @@ export function createHttpApp(input: {
       }
 
       applyCorsHeaders(request, set.headers as MutableHeaders, allowedOrigins);
+    })
+    .onAfterResponse(({ request, set, route }) => {
+      const requestId = request.headers.get("x-request-id");
+      finishActiveHttpServerSpan({
+        request,
+        route,
+        statusCode: resolveStatusCode(set.status) ?? 200,
+        ...(requestId ? { requestId } : {}),
+      });
     })
     .get("/api/health", () => ({
       status: "ok" as const,

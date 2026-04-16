@@ -18,6 +18,7 @@ import { resourceNetworkProfileMigration } from "./migrations/010_resource_netwo
 import { serverEdgeProxyBackfillMigration } from "./migrations/011_server_edge_proxy_backfill";
 import { PgliteDialect } from "./pglite-dialect";
 import { type Database } from "./schema";
+import { TracingDialect } from "./tracing-dialect";
 
 export interface DatabaseConnectionDescriptor {
   driver: "postgres" | "pglite";
@@ -53,7 +54,10 @@ export async function createDatabase(input: CreateDatabaseInput): Promise<Databa
       ? await PGlite.create(dataDir, input.pgliteRuntimeAssets)
       : await PGlite.create(dataDir);
     const db = new Kysely<Database>({
-      dialect: new PgliteDialect(pglite),
+      dialect: new TracingDialect(new PgliteDialect(pglite), {
+        driver: "pglite",
+        location: dataDir,
+      }),
     });
 
     return {
@@ -78,9 +82,15 @@ export async function createDatabase(input: CreateDatabaseInput): Promise<Databa
   });
 
   const db = new Kysely<Database>({
-    dialect: new PostgresJSDialect({
-      postgres: connection,
-    }),
+    dialect: new TracingDialect(
+      new PostgresJSDialect({
+        postgres: connection,
+      }),
+      {
+        driver: "postgres",
+        location: new URL(input.databaseUrl).hostname,
+      },
+    ),
   });
 
   return {

@@ -31,7 +31,12 @@ export interface AppConfig {
   environment: string;
   otelEnabled: boolean;
   otelServiceName: string;
-  otelExporterEndpoint: string;
+  otelExporterEndpoint?: string;
+  otelExporterHeaders?: string;
+  otelTracesSampler?: string;
+  otelTracesSamplerArg?: string;
+  traceLinkBaseUrl?: string;
+  traceLinkUrlTemplate?: string;
   secretMask: string;
   defaultAccessDomain: DefaultAccessDomainConfig;
   enabledSystemPlugins: string[];
@@ -60,7 +65,6 @@ const defaults: Omit<AppConfig, "dataDir" | "pgliteDataDir"> = {
   environment: "development",
   otelEnabled: false,
   otelServiceName: "yundu-backend",
-  otelExporterEndpoint: "http://localhost:4318/v1/traces",
   secretMask: "****",
   defaultAccessDomain: {
     mode: "provider",
@@ -110,11 +114,48 @@ function readConfigFile(configFilePath?: string): Partial<AppConfig> {
   return JSON.parse(readFileSync(path, "utf8")) as Partial<AppConfig>;
 }
 
+function parseBoolean(value: string | undefined): boolean | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  const normalized = value.trim().toLowerCase();
+
+  if (["1", "true", "yes", "on"].includes(normalized)) {
+    return true;
+  }
+
+  if (["0", "false", "no", "off"].includes(normalized)) {
+    return false;
+  }
+
+  return undefined;
+}
+
+function normalizeOtlpTraceEndpointFromBase(endpoint: string): string {
+  const trimmed = endpoint.trim().replace(/\/+$/, "");
+
+  if (trimmed.endsWith("/v1/traces")) {
+    return trimmed;
+  }
+
+  return `${trimmed}/v1/traces`;
+}
+
 export function resolveConfig(source: ConfigSource<AppConfig> = {}): AppConfig {
   const env = source.env ?? process.env;
   const fileConfig = readConfigFile(source.configFilePath);
   const builtInDataDir = defaultDataDir(env);
-  const otelEnabledFromEnv = env.YUNDU_OTEL_ENABLED ? env.YUNDU_OTEL_ENABLED === "true" : undefined;
+  const otelDisabledFromEnv = parseBoolean(env.OTEL_SDK_DISABLED) === true;
+  const otelEnabledFromEnv = otelDisabledFromEnv ? false : parseBoolean(env.YUNDU_OTEL_ENABLED);
+  const otelExporterEndpointFromEnv =
+    env.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT ??
+    (env.OTEL_EXPORTER_OTLP_ENDPOINT
+      ? normalizeOtlpTraceEndpointFromBase(env.OTEL_EXPORTER_OTLP_ENDPOINT)
+      : undefined) ??
+    env.YUNDU_OTEL_EXPORTER_OTLP_ENDPOINT;
+  const otelExporterHeadersFromEnv =
+    env.OTEL_EXPORTER_OTLP_TRACES_HEADERS ?? env.OTEL_EXPORTER_OTLP_HEADERS;
   const explicitDatabaseDriver =
     source.flags?.databaseDriver ??
     (env.YUNDU_DATABASE_DRIVER as AppConfig["databaseDriver"] | undefined) ??
@@ -225,17 +266,69 @@ export function resolveConfig(source: ConfigSource<AppConfig> = {}): AppConfig {
       source.flags?.otelEnabled ??
       otelEnabledFromEnv ??
       fileConfig.otelEnabled ??
-      defaults.otelEnabled,
+      (otelExporterEndpointFromEnv ? true : defaults.otelEnabled),
     otelServiceName:
       source.flags?.otelServiceName ??
+      env.OTEL_SERVICE_NAME ??
       env.YUNDU_OTEL_SERVICE_NAME ??
       fileConfig.otelServiceName ??
       defaults.otelServiceName,
-    otelExporterEndpoint:
-      source.flags?.otelExporterEndpoint ??
-      env.YUNDU_OTEL_EXPORTER_OTLP_ENDPOINT ??
-      fileConfig.otelExporterEndpoint ??
-      defaults.otelExporterEndpoint,
+    ...((source.flags?.otelExporterEndpoint ??
+    otelExporterEndpointFromEnv ??
+    fileConfig.otelExporterEndpoint)
+      ? {
+          otelExporterEndpoint:
+            source.flags?.otelExporterEndpoint ??
+            otelExporterEndpointFromEnv ??
+            fileConfig.otelExporterEndpoint,
+        }
+      : {}),
+    ...((source.flags?.otelExporterHeaders ??
+    otelExporterHeadersFromEnv ??
+    fileConfig.otelExporterHeaders)
+      ? {
+          otelExporterHeaders:
+            source.flags?.otelExporterHeaders ??
+            otelExporterHeadersFromEnv ??
+            fileConfig.otelExporterHeaders,
+        }
+      : {}),
+    ...((source.flags?.otelTracesSampler ?? env.OTEL_TRACES_SAMPLER ?? fileConfig.otelTracesSampler)
+      ? {
+          otelTracesSampler:
+            source.flags?.otelTracesSampler ??
+            env.OTEL_TRACES_SAMPLER ??
+            fileConfig.otelTracesSampler,
+        }
+      : {}),
+    ...((source.flags?.otelTracesSamplerArg ??
+    env.OTEL_TRACES_SAMPLER_ARG ??
+    fileConfig.otelTracesSamplerArg)
+      ? {
+          otelTracesSamplerArg:
+            source.flags?.otelTracesSamplerArg ??
+            env.OTEL_TRACES_SAMPLER_ARG ??
+            fileConfig.otelTracesSamplerArg,
+        }
+      : {}),
+    ...((source.flags?.traceLinkBaseUrl ?? env.TRACE_LINK_BASE_URL ?? fileConfig.traceLinkBaseUrl)
+      ? {
+          traceLinkBaseUrl:
+            source.flags?.traceLinkBaseUrl ??
+            env.TRACE_LINK_BASE_URL ??
+            fileConfig.traceLinkBaseUrl,
+        }
+      : {}),
+    ...((source.flags?.traceLinkUrlTemplate ??
+    env.TRACE_LINK_URL_TEMPLATE ??
+    fileConfig.traceLinkUrlTemplate)
+      ? {
+          traceLinkUrlTemplate:
+            source.flags?.traceLinkUrlTemplate ??
+            env.TRACE_LINK_URL_TEMPLATE ??
+            fileConfig.traceLinkUrlTemplate,
+        }
+      : {}),
     secretMask:
       source.flags?.secretMask ??
       env.YUNDU_SECRET_MASK ??
