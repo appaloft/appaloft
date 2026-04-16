@@ -47,6 +47,10 @@ describe("TraefikEdgeProxyProvider", () => {
         includeDiagnostics: true,
       },
     );
+    const diagnostics = await provider.diagnoseProxy(
+      { correlationId: "req_traefik_provider_test" },
+      { proxyKind: "traefik" },
+    );
 
     expect(ensure.isOk()).toBe(true);
     expect(ensure._unsafeUnwrap()).toMatchObject({
@@ -54,6 +58,18 @@ describe("TraefikEdgeProxyProvider", () => {
       networkName: "yundu-edge",
       containerName: "yundu-traefik",
     });
+    expect(ensure._unsafeUnwrap().containerCommand).toContain("traefik:v3.6.2");
+    expect(ensure._unsafeUnwrap().metadata).toMatchObject({
+      image: "traefik:v3.6.2",
+    });
+    expect(diagnostics.isOk()).toBe(true);
+    expect(diagnostics._unsafeUnwrap().checks.map((check) => check.name)).toEqual([
+      "edge-proxy-container",
+      "edge-proxy-provider-logs",
+      "edge-proxy-route-probe",
+    ]);
+    expect(diagnostics._unsafeUnwrap().checks[0]?.command).toContain("traefik:v3.6.2");
+    expect(diagnostics._unsafeUnwrap().checks[2]?.command).toContain("traefik.enable=true");
     expect(realized.isOk()).toBe(true);
     expect(realized._unsafeUnwrap().labels).toContain("traefik.enable=true");
     expect(view.isOk()).toBe(true);

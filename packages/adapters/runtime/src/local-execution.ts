@@ -30,6 +30,7 @@ import {
   type Deployment,
   type Result,
   type RollbackPlan,
+  type RuntimeExecutionPlan,
 } from "@yundu/core";
 import {
   createEdgeProxyEnsurePlan,
@@ -38,6 +39,14 @@ import {
   dockerNetworkFlagForProxyPlan,
   proxyBootstrapOptionsFromEnv,
 } from "./edge-proxy-plans";
+import {
+  dockerContainerLabelFlags,
+  dockerPublishedPortCommand,
+  dockerPublishedPortFlag,
+  dockerRemoveResourceContainersCommand,
+  parseDockerPublishedHostPort,
+  yunduDockerContainerLabels,
+} from "./docker-container-commands";
 
 type LogPhase = "detect" | "plan" | "package" | "deploy" | "verify" | "rollback";
 type LogLevel = "debug" | "info" | "warn" | "error";
@@ -181,26 +190,72 @@ async function reservePort(preferred?: number): Promise<number> {
   });
 }
 
-async function waitForHealth(url: string): Promise<{ ok: boolean; reason?: string }> {
-  for (let attempt = 0; attempt < 40; attempt += 1) {
-    try {
-      const response = await fetch(url);
-      if (response.ok) {
-        return { ok: true };
-      }
-    } catch (error) {
-      if (attempt === 39) {
-        return {
-          ok: false,
-          reason: error instanceof Error ? error.message : "unknown fetch error",
-        };
-      }
-    }
+interface HttpHealthCheckOptions {
+  method: string;
+  expectedStatusCode: number;
+  expectedResponseText?: string;
+  intervalMs: number;
+  timeoutMs: number;
+  retries: number;
+  startPeriodMs: number;
+}
 
-    await Bun.sleep(250);
+function httpHealthCheckOptions(
+  execution: RuntimeExecutionPlan,
+): HttpHealthCheckOptions | null {
+  const policy = execution.healthCheck;
+  if (policy && !policy.enabled) {
+    return null;
+  }
+  return {
+    method: policy?.http?.method.value ?? "GET",
+    expectedStatusCode: policy?.http?.expectedStatusCode.value ?? 200,
+    ...(policy?.http?.expectedResponseText
+      ? { expectedResponseText: policy.http.expectedResponseText.value }
+      : {}),
+    intervalMs: (policy?.intervalSeconds.value ?? 0.25) * 1000,
+    timeoutMs: (policy?.timeoutSeconds.value ?? 5) * 1000,
+    retries: policy?.retries.value ?? 40,
+    startPeriodMs: (policy?.startPeriodSeconds.value ?? 0) * 1000,
+  };
+}
+
+async function waitForHealth(
+  url: string,
+  options: HttpHealthCheckOptions,
+): Promise<{ ok: boolean; reason?: string }> {
+  let lastFailure = "health check timed out";
+
+  if (options.startPeriodMs > 0) {
+    await Bun.sleep(options.startPeriodMs);
   }
 
-  return { ok: false, reason: "health check timed out" };
+  for (let attempt = 0; attempt < options.retries; attempt += 1) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), options.timeoutMs);
+    try {
+      const response = await fetch(url, {
+        method: options.method,
+        signal: controller.signal,
+      });
+      const responseText = options.expectedResponseText ? await response.text() : "";
+      if (
+        response.status === options.expectedStatusCode &&
+        (!options.expectedResponseText || responseText.includes(options.expectedResponseText))
+      ) {
+        return { ok: true };
+      }
+      lastFailure = `last response was HTTP ${response.status} ${response.statusText}`;
+    } catch (error) {
+      lastFailure = error instanceof Error ? error.message : "unknown fetch error";
+    } finally {
+      clearTimeout(timeout);
+    }
+
+    await Bun.sleep(options.intervalMs);
+  }
+
+  return { ok: false, reason: lastFailure };
 }
 
 function sanitizeName(input: string): string {
@@ -209,16 +264,6 @@ function sanitizeName(input: string): string {
 
 function shellQuote(input: string): string {
   return `'${input.replaceAll("'", "'\\''")}'`;
-}
-
-function dockerRemovePublishedPortCommand(port: number): string {
-  return `docker ps --filter ${shellQuote(`publish=${port}`)} -q | while read -r container_id; do docker rm -f "$container_id"; done`;
-}
-
-function dockerPublishedPortFlag(port: number, metadata?: Record<string, string>): string {
-  return metadata?.["resource.exposureMode"] === "direct-port"
-    ? `-p ${port}:${port}`
-    : `-p 127.0.0.1:${port}:${port}`;
 }
 
 function runSyncCommand(input: {
@@ -572,6 +617,101 @@ export class LocalExecutionBackend implements ExecutionBackend {
     }));
 
     return { deployment };
+  }
+
+  private pushDockerContainerDiagnostics(
+    logs: DeploymentLogEntry[],
+    input: {
+      context: ExecutionContext;
+      deploymentId: string;
+      workdir: string;
+      env: NodeJS.ProcessEnv;
+      containerName: string;
+    },
+  ): void {
+    const format =
+      "status={{.State.Status}} exitCode={{.State.ExitCode}} error={{.State.Error}} oomKilled={{.State.OOMKilled}} finishedAt={{.State.FinishedAt}}";
+    const inspectMessage = `Inspect Docker container ${input.containerName}`;
+    logs.push(phaseLog("verify", inspectMessage));
+    this.report(input.context, {
+      deploymentId: input.deploymentId,
+      phase: "verify",
+      status: "running",
+      message: inspectMessage,
+    });
+
+    const inspect = runSyncCommand({
+      command: `docker inspect --format ${shellQuote(format)} ${shellQuote(input.containerName)}`,
+      cwd: input.workdir,
+      env: input.env,
+    });
+    this.pushCommandOutput(logs, {
+      context: input.context,
+      deploymentId: input.deploymentId,
+      phase: "verify",
+      output: inspect.stdout,
+      level: inspect.failed ? "warn" : "info",
+      stream: "stdout",
+    });
+    this.pushCommandOutput(logs, {
+      context: input.context,
+      deploymentId: input.deploymentId,
+      phase: "verify",
+      output: inspect.stderr,
+      level: "warn",
+      stream: "stderr",
+    });
+
+    const logsMessage = `Capture Docker logs for ${input.containerName}`;
+    logs.push(phaseLog("verify", logsMessage));
+    this.report(input.context, {
+      deploymentId: input.deploymentId,
+      phase: "verify",
+      status: "running",
+      message: logsMessage,
+    });
+
+    const dockerLogs = runSyncCommand({
+      command: `docker logs --tail 50 ${shellQuote(input.containerName)}`,
+      cwd: input.workdir,
+      env: input.env,
+    });
+    this.pushCommandOutput(logs, {
+      context: input.context,
+      deploymentId: input.deploymentId,
+      phase: "verify",
+      output: dockerLogs.stdout,
+      level: "info",
+      stream: "stdout",
+    });
+    this.pushCommandOutput(logs, {
+      context: input.context,
+      deploymentId: input.deploymentId,
+      phase: "verify",
+      output: dockerLogs.stderr,
+      level: dockerLogs.failed ? "warn" : "info",
+      stream: "stderr",
+    });
+
+    if (inspect.failed && !inspect.stdout && !inspect.stderr) {
+      logs.push(
+        phaseLog(
+          "verify",
+          `Docker inspect did not return diagnostics for ${input.containerName}`,
+          "warn",
+        ),
+      );
+    }
+
+    if (dockerLogs.failed && !dockerLogs.stdout && !dockerLogs.stderr) {
+      logs.push(
+        phaseLog(
+          "verify",
+          `Docker logs did not return application output for ${input.containerName}`,
+          "warn",
+        ),
+      );
+    }
   }
 
   private runtimeDirectory(deploymentId: string): string {
@@ -954,13 +1094,41 @@ export class LocalExecutionBackend implements ExecutionBackend {
 
     const healthPath = state.runtimePlan.execution.healthCheckPath ?? "/";
     const url = `http://127.0.0.1:${port}${healthPath}`;
+    const healthOptions = httpHealthCheckOptions(state.runtimePlan.execution);
+    if (!healthOptions) {
+      logTailer.stop();
+      this.report(context, {
+        deploymentId: state.id.value,
+        phase: "verify",
+        status: "succeeded",
+        message: "Health check disabled for resource",
+      });
+      logs.push(phaseLog("verify", "Health check disabled for resource"));
+      deployment.applyExecutionResult(
+        FinishedAt.rehydrate(new Date().toISOString()),
+        ExecutionResult.rehydrate({
+          exitCode: ExitCode.rehydrate(0),
+          status: ExecutionStatusValue.rehydrate("succeeded"),
+          retryable: false,
+          logs,
+          metadata: {
+            workdir,
+            port: String(port),
+            pid: String(child.pid),
+            logPath,
+            ...preparedSource.metadata,
+          },
+        }),
+      );
+      return ok({ deployment });
+    }
     this.report(context, {
       deploymentId: state.id.value,
       phase: "verify",
       status: "running",
       message: `Checking ${url}`,
     });
-    const health = await waitForHealth(url);
+    const health = await waitForHealth(url, healthOptions);
     logTailer.stop();
 
     if (!health.ok) {
@@ -1283,11 +1451,17 @@ export class LocalExecutionBackend implements ExecutionBackend {
       env,
     });
     runSyncCommand({
-      command: dockerRemovePublishedPortCommand(port),
+      command: dockerRemoveResourceContainersCommand({
+        resourceId: state.resourceId.value,
+        currentContainerName: containerName,
+        quote: shellQuote,
+      }),
       cwd: workdir,
       env,
     });
-    logs.push(phaseLog("deploy", `Release existing containers publishing port ${port}`));
+    logs.push(
+      phaseLog("deploy", `Release existing containers for resource ${state.resourceId.value}`),
+    );
 
     const proxyRoutePlanResult = this.edgeProxyProviderRegistry
       ? await createProxyRouteRealizationPlan({
@@ -1326,12 +1500,26 @@ export class LocalExecutionBackend implements ExecutionBackend {
       plan: proxyRoutePlanResult.value,
       quote: shellQuote,
     });
+    const yunduLabelFlags = dockerContainerLabelFlags({
+      labels: yunduDockerContainerLabels({
+        deploymentId: state.id.value,
+        projectId: state.projectId.value,
+        environmentId: state.environmentId.value,
+        resourceId: state.resourceId.value,
+        destinationId: state.destinationId.value,
+      }),
+      quote: shellQuote,
+    });
     const networkFlag = dockerNetworkFlagForProxyPlan(proxyRoutePlanResult.value);
     const runCommand = [
-      `docker run -d --rm --name ${containerName}`,
+      `docker run -d --name ${containerName}`,
       networkFlag,
-      dockerPublishedPortFlag(port, state.runtimePlan.execution.metadata),
+      dockerPublishedPortFlag({
+        containerPort: port,
+        exposureMode: state.runtimePlan.execution.metadata?.["resource.exposureMode"],
+      }),
       envFlags,
+      yunduLabelFlags,
       labelFlags,
       image,
     ]
@@ -1400,16 +1588,100 @@ export class LocalExecutionBackend implements ExecutionBackend {
     });
 
     const healthPath = state.runtimePlan.execution.healthCheckPath ?? "/";
-    const url = `http://127.0.0.1:${port}${healthPath}`;
+    const publishedPortResult = runSyncCommand({
+      command: dockerPublishedPortCommand({
+        containerName,
+        containerPort: port,
+        quote: shellQuote,
+      }),
+      cwd: workdir,
+      env,
+    });
+    const publishedHostPort = parseDockerPublishedHostPort(publishedPortResult.stdout);
+
+    if (publishedPortResult.failed || publishedHostPort === undefined) {
+      this.pushDockerContainerDiagnostics(logs, {
+        context,
+        deploymentId: state.id.value,
+        workdir,
+        env,
+        containerName,
+      });
+      runSyncCommand({
+        command: `docker rm -f ${containerName}`,
+        cwd: workdir,
+        env,
+      });
+      const message = `Docker published port could not be resolved for ${containerName}`;
+      this.report(context, {
+        deploymentId: state.id.value,
+        phase: "verify",
+        status: "failed",
+        level: "error",
+        message,
+      });
+      return ok({
+        deployment: this.applyFailure(deployment, {
+          logs: [
+            ...logs,
+            phaseLog("verify", message, "error"),
+          ],
+          errorCode: "docker_published_port_resolution_failed",
+          retryable: true,
+          metadata: {
+            image,
+            containerName,
+            port: String(port),
+            ...preparedSource.metadata,
+          },
+        }).deployment,
+      });
+    }
+
+    const url = `http://127.0.0.1:${publishedHostPort}${healthPath}`;
+    const healthOptions = httpHealthCheckOptions(state.runtimePlan.execution);
+    if (!healthOptions) {
+      this.report(context, {
+        deploymentId: state.id.value,
+        phase: "verify",
+        status: "succeeded",
+        message: "Health check disabled for resource",
+      });
+      logs.push(phaseLog("verify", "Health check disabled for resource"));
+      deployment.applyExecutionResult(
+        FinishedAt.rehydrate(new Date().toISOString()),
+        ExecutionResult.rehydrate({
+          exitCode: ExitCode.rehydrate(0),
+          status: ExecutionStatusValue.rehydrate("succeeded"),
+          retryable: false,
+          logs,
+          metadata: {
+            image,
+            containerName,
+            port: String(port),
+            publishedPort: String(publishedHostPort),
+            ...preparedSource.metadata,
+          },
+        }),
+      );
+      return ok({ deployment });
+    }
     this.report(context, {
       deploymentId: state.id.value,
       phase: "verify",
       status: "running",
       message: `Checking ${url}`,
     });
-    const health = await waitForHealth(url);
+    const health = await waitForHealth(url, healthOptions);
 
     if (!health.ok) {
+      this.pushDockerContainerDiagnostics(logs, {
+        context,
+        deploymentId: state.id.value,
+        workdir,
+        env,
+        containerName,
+      });
       runSyncCommand({
         command: `docker rm -f ${containerName}`,
         cwd: workdir,
@@ -1435,6 +1707,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
             image,
             containerName,
             port: String(port),
+            publishedPort: String(publishedHostPort),
             url,
             ...preparedSource.metadata,
           },
@@ -1459,6 +1732,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
         image,
         containerName,
         port: String(port),
+        publishedPort: String(publishedHostPort),
         url,
         ...preparedSource.metadata,
       },

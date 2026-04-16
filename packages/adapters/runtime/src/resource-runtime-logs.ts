@@ -1,5 +1,16 @@
-import { domainError, err, ok, type Result } from "@yundu/core";
+import { chmod, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
+  DeploymentTargetByIdSpec,
+  DeploymentTargetId,
+  domainError,
+  err,
+  ok,
+  type Result,
+} from "@yundu/core";
+import {
+  createRuntimeLogsSpanName,
   type ExecutionContext,
   type ResourceRuntimeLogContext,
   type ResourceRuntimeLogEvent,
@@ -8,9 +19,34 @@ import {
   type ResourceRuntimeLogRequest,
   type ResourceRuntimeLogStream,
   type ResourceRuntimeLogStreamName,
+  type ServerRepository,
+  type TraceAttributes,
+  toRepositoryContext,
+  yunduTraceAttributes,
 } from "@yundu/application";
 
 type RuntimeLogCloseReason = "completed" | "cancelled" | "source-ended";
+type RuntimeLogCommandKind =
+  | "docker_logs"
+  | "docker_compose_logs"
+  | "ssh_docker_logs"
+  | "ssh_compose_logs";
+type RuntimeLogSpawnOptions = {
+  cwd?: string;
+  stdout: "pipe";
+  stderr: "pipe";
+};
+type RuntimeLogSubprocess = Pick<
+  Bun.Subprocess<"ignore", "pipe", "pipe">,
+  "stdout" | "stderr" | "exited" | "kill"
+>;
+type RuntimeLogSpawn = (args: string[], options: RuntimeLogSpawnOptions) => RuntimeLogSubprocess;
+type SshRuntimeLogTarget = {
+  host: string;
+  port: string;
+  identityFile?: string;
+  cleanup(): Promise<void>;
+};
 
 class RuntimeLogLineBuffer {
   private pending = "";
@@ -142,6 +178,10 @@ function tailTextLines(text: string, count: number): string[] {
     .slice(-count);
 }
 
+function shellQuote(input: string): string {
+  return `'${input.replaceAll("'", "'\\''")}'`;
+}
+
 function metadataValue(
   context: ResourceRuntimeLogContext,
   key: string,
@@ -152,6 +192,14 @@ function metadataValue(
 
 function runtimeKind(context: ResourceRuntimeLogContext): string {
   return context.deployment.runtimePlan.execution.kind;
+}
+
+function targetMetadataValue(
+  context: ResourceRuntimeLogContext,
+  key: string,
+): string | undefined {
+  const value = context.deployment.runtimePlan.target.metadata?.[key];
+  return typeof value === "string" && value.trim().length > 0 ? value : undefined;
 }
 
 function runtimeInstanceId(context: ResourceRuntimeLogContext): string | undefined {
@@ -315,13 +363,18 @@ async function readProcessStream(input: {
 
 function createProcessRuntimeLogStream(input: {
   args: string[];
+  command: RuntimeLogCommandKind;
   cwd?: string;
+  executionContext: ExecutionContext;
   context: ResourceRuntimeLogContext;
+  request: ResourceRuntimeLogRequest;
   signal: AbortSignal;
+  spawnProcess: RuntimeLogSpawn;
+  cleanupBackend?: () => void | Promise<void>;
 }): ResourceRuntimeLogStream {
   const queue = new RuntimeLogEventQueue();
   let sequence = 0;
-  const subprocess = Bun.spawn(input.args, {
+  const subprocess = input.spawnProcess(input.args, {
     ...(input.cwd ? { cwd: input.cwd } : {}),
     stdout: "pipe",
     stderr: "pipe",
@@ -339,53 +392,199 @@ function createProcessRuntimeLogStream(input: {
 
   input.signal.addEventListener("abort", abort, { once: true });
 
-  void Promise.all([
-    readProcessStream({
-      stream: subprocess.stdout,
-      name: "stdout",
-      queue,
-      context: input.context,
-      nextSequence,
-    }),
-    readProcessStream({
-      stream: subprocess.stderr,
-      name: "stderr",
-      queue,
-      context: input.context,
-      nextSequence,
-    }),
-  ]).catch((error: unknown) => {
-    stream.fail(
-      createStreamFailure(
-        error instanceof Error ? error.message : String(error),
-        input.context,
-        "process-stream-read",
-      ),
-    );
-  });
+  void input.executionContext.tracer.startActiveSpan(
+    createRuntimeLogsSpanName("process"),
+    {
+      attributes: createRuntimeLogProcessTraceAttributes(input),
+    },
+    async (span) => {
+      try {
+        const [exitCode] = await Promise.all([
+          subprocess.exited,
+          readProcessStream({
+            stream: subprocess.stdout,
+            name: "stdout",
+            queue,
+            context: input.context,
+            nextSequence,
+          }),
+          readProcessStream({
+            stream: subprocess.stderr,
+            name: "stderr",
+            queue,
+            context: input.context,
+            nextSequence,
+          }),
+        ]);
 
-  void subprocess.exited.then((exitCode) => {
-    input.signal.removeEventListener("abort", abort);
-    if (input.signal.aborted) {
-      stream.complete("cancelled");
-      return;
-    }
+        span.setAttribute(yunduTraceAttributes.runtimeLogLineCount, sequence);
 
-    if (exitCode === 0) {
-      stream.complete("source-ended");
-      return;
-    }
+        if (input.signal.aborted) {
+          span.setAttribute(yunduTraceAttributes.runtimeLogCloseReason, "cancelled");
+          span.setStatus("ok");
+          stream.complete("cancelled");
+          return;
+        }
 
-    stream.fail(
-      createStreamFailure(
-        `Runtime log process exited with code ${exitCode}`,
-        input.context,
-        "process-exit",
-      ),
-    );
-  });
+        if (exitCode === 0) {
+          span.setAttribute(yunduTraceAttributes.runtimeLogCloseReason, "source-ended");
+          span.setStatus("ok");
+          stream.complete("source-ended");
+          return;
+        }
+
+        span.setStatus("error", `Runtime log process exited with code ${exitCode}`);
+        stream.fail(
+          createStreamFailure(
+            `Runtime log process exited with code ${exitCode}`,
+            input.context,
+            "process-exit",
+          ),
+        );
+      } catch (error: unknown) {
+        span.setStatus(
+          "error",
+          error instanceof Error ? error.message : "Runtime log process stream failed",
+        );
+        span.setAttribute(yunduTraceAttributes.runtimeLogLineCount, sequence);
+        span.recordError(error instanceof Error ? error : { message: String(error) });
+        stream.fail(
+          createStreamFailure(
+            error instanceof Error ? error.message : String(error),
+            input.context,
+            "process-stream-read",
+          ),
+        );
+      } finally {
+        input.signal.removeEventListener("abort", abort);
+        await input.cleanupBackend?.();
+      }
+    },
+  );
 
   return stream;
+}
+
+function createRuntimeLogProcessTraceAttributes(input: {
+  command: RuntimeLogCommandKind;
+  context: ResourceRuntimeLogContext;
+  request: ResourceRuntimeLogRequest;
+}): TraceAttributes {
+  return {
+    [yunduTraceAttributes.resourceId]: input.context.resource.id,
+    [yunduTraceAttributes.deploymentId]: input.context.deployment.id,
+    [yunduTraceAttributes.runtimeKind]: runtimeKind(input.context),
+    [yunduTraceAttributes.targetProviderKey]: input.context.deployment.runtimePlan.target.providerKey,
+    [yunduTraceAttributes.runtimeLogCommand]: input.command,
+    [yunduTraceAttributes.runtimeLogFollow]: input.request.follow,
+    [yunduTraceAttributes.runtimeLogTailLines]: input.request.tailLines,
+    [yunduTraceAttributes.runtimeLogServiceName]: input.request.serviceName,
+  };
+}
+
+function isGenericSshRuntime(context: ResourceRuntimeLogContext): boolean {
+  return context.deployment.runtimePlan.target.providerKey === "generic-ssh";
+}
+
+function hostWithUsername(host: string, username?: string): string {
+  return username && !host.includes("@") ? `${username}@${host}` : host;
+}
+
+function stableRuntimeLogHash(value: string): string {
+  let hash = 2166136261;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+
+  return (hash >>> 0).toString(36);
+}
+
+function sshControlPath(target: SshRuntimeLogTarget): string {
+  const targetHash = stableRuntimeLogHash(`${target.host}:${target.port}`);
+  return join(tmpdir(), `yundu-runtime-log-${targetHash}.sock`);
+}
+
+async function writeSshIdentityFile(privateKey: string): Promise<{
+  identityFile: string;
+  cleanup(): Promise<void>;
+}> {
+  const sshDir = await mkdtemp(join(tmpdir(), "yundu-runtime-log-ssh-"));
+  const identityFile = join(sshDir, "id_runtime_log");
+  await writeFile(identityFile, privateKey.endsWith("\n") ? privateKey : `${privateKey}\n`, {
+    mode: 0o600,
+  });
+  await chmod(identityFile, 0o600);
+
+  return {
+    identityFile,
+    cleanup: () => rm(sshDir, { recursive: true, force: true }),
+  };
+}
+
+function sshArgs(target: SshRuntimeLogTarget): string[] {
+  return [
+    "-p",
+    target.port,
+    ...(target.identityFile
+      ? ["-i", target.identityFile, "-o", "IdentitiesOnly=yes"]
+      : []),
+    "-o",
+    "BatchMode=yes",
+    "-o",
+    "PreferredAuthentications=publickey",
+    "-o",
+    "PasswordAuthentication=no",
+    "-o",
+    "KbdInteractiveAuthentication=no",
+    "-o",
+    "NumberOfPasswordPrompts=0",
+    "-o",
+    "StrictHostKeyChecking=accept-new",
+    "-o",
+    "ControlMaster=auto",
+    "-o",
+    "ControlPersist=120s",
+    "-o",
+    `ControlPath=${sshControlPath(target)}`,
+    target.host,
+  ];
+}
+
+function remoteCommandWithCwd(command: string, cwd?: string): string {
+  return cwd ? `cd ${shellQuote(cwd)} && ${command}` : command;
+}
+
+function dockerLogsCommand(input: {
+  containerName: string;
+  request: ResourceRuntimeLogRequest;
+}): string {
+  return [
+    "docker",
+    "logs",
+    "--tail",
+    shellQuote(String(input.request.tailLines)),
+    ...(input.request.follow ? ["--follow"] : []),
+    shellQuote(input.containerName),
+  ].join(" ");
+}
+
+function dockerComposeLogsCommand(input: {
+  composeFile: string;
+  request: ResourceRuntimeLogRequest;
+}): string {
+  return [
+    "docker",
+    "compose",
+    "-f",
+    shellQuote(input.composeFile),
+    "logs",
+    "--no-color",
+    "--tail",
+    shellQuote(String(input.request.tailLines)),
+    ...(input.request.follow ? ["--follow"] : []),
+    ...(input.request.serviceName ? [shellQuote(input.request.serviceName)] : []),
+  ].join(" ");
 }
 
 async function createFileRuntimeLogStream(input: {
@@ -502,8 +701,14 @@ async function createFileRuntimeLogStream(input: {
 }
 
 export class RuntimeResourceRuntimeLogReader implements ResourceRuntimeLogReader {
+  constructor(
+    private readonly serverRepository?: ServerRepository,
+    private readonly spawnProcess: RuntimeLogSpawn = (args, options) =>
+      Bun.spawn(args, options),
+  ) {}
+
   async open(
-    _context: ExecutionContext,
+    context: ExecutionContext,
     logContext: ResourceRuntimeLogContext,
     request: ResourceRuntimeLogRequest,
     signal: AbortSignal,
@@ -546,6 +751,34 @@ export class RuntimeResourceRuntimeLogReader implements ResourceRuntimeLogReader
           );
         }
 
+        const sshTargetResult = await this.resolveSshTarget(context, logContext);
+        if (sshTargetResult.isErr()) {
+          return err(sshTargetResult.error);
+        }
+
+        const sshTarget = sshTargetResult.value;
+        if (sshTarget) {
+          return ok(
+            createProcessRuntimeLogStream({
+              args: [
+                "ssh",
+                ...sshArgs(sshTarget),
+                dockerLogsCommand({
+                  containerName,
+                  request,
+                }),
+              ],
+              command: "ssh_docker_logs",
+              context: logContext,
+              executionContext: context,
+              request,
+              signal,
+              spawnProcess: this.spawnProcess,
+              cleanupBackend: sshTarget.cleanup,
+            }),
+          );
+        }
+
         return ok(
           createProcessRuntimeLogStream({
             args: [
@@ -556,8 +789,12 @@ export class RuntimeResourceRuntimeLogReader implements ResourceRuntimeLogReader
               ...(request.follow ? ["--follow"] : []),
               containerName,
             ],
+            command: "docker_logs",
             context: logContext,
+            executionContext: context,
+            request,
             signal,
+            spawnProcess: this.spawnProcess,
           }),
         );
       }
@@ -572,6 +809,37 @@ export class RuntimeResourceRuntimeLogReader implements ResourceRuntimeLogReader
               resourceId: logContext.resource.id,
               deploymentId: logContext.deployment.id,
               runtimeKind: execution.kind,
+            }),
+          );
+        }
+
+        const sshTargetResult = await this.resolveSshTarget(context, logContext);
+        if (sshTargetResult.isErr()) {
+          return err(sshTargetResult.error);
+        }
+
+        const sshTarget = sshTargetResult.value;
+        if (sshTarget) {
+          return ok(
+            createProcessRuntimeLogStream({
+              args: [
+                "ssh",
+                ...sshArgs(sshTarget),
+                remoteCommandWithCwd(
+                  dockerComposeLogsCommand({
+                    composeFile,
+                    request,
+                  }),
+                  cwd,
+                ),
+              ],
+              command: "ssh_compose_logs",
+              context: logContext,
+              executionContext: context,
+              request,
+              signal,
+              spawnProcess: this.spawnProcess,
+              cleanupBackend: sshTarget.cleanup,
             }),
           );
         }
@@ -591,11 +859,76 @@ export class RuntimeResourceRuntimeLogReader implements ResourceRuntimeLogReader
               ...(request.serviceName ? [request.serviceName] : []),
             ],
             ...(cwd ? { cwd } : {}),
+            command: "docker_compose_logs",
             context: logContext,
+            executionContext: context,
+            request,
             signal,
+            spawnProcess: this.spawnProcess,
           }),
         );
       }
     }
+  }
+
+  private async resolveSshTarget(
+    context: ExecutionContext,
+    logContext: ResourceRuntimeLogContext,
+  ): Promise<Result<SshRuntimeLogTarget | null>> {
+    if (!isGenericSshRuntime(logContext)) {
+      return ok(null);
+    }
+
+    const target = logContext.deployment.runtimePlan.target;
+    const serverId = target.serverIds[0];
+    const metadataHost =
+      metadataValue(logContext, "host") ?? targetMetadataValue(logContext, "serverHost");
+    let host = metadataHost;
+    let port = targetMetadataValue(logContext, "serverPort") ?? "22";
+    let identityFile: string | undefined;
+    let cleanup = async () => {};
+
+    if (this.serverRepository && serverId) {
+      const server = await this.serverRepository.findOne(
+        toRepositoryContext(context),
+        DeploymentTargetByIdSpec.create(DeploymentTargetId.rehydrate(serverId)),
+      );
+      const serverState = server?.toState();
+
+      if (serverState) {
+        const username = serverState.credential?.username?.value;
+        host = username
+          ? hostWithUsername(serverState.host.value, username)
+          : (metadataHost ?? serverState.host.value);
+        port = String(serverState.port.value);
+
+        const privateKey = serverState.credential?.privateKey?.value;
+        if (serverState.credential?.kind.value === "ssh-private-key" && privateKey) {
+          const identity = await writeSshIdentityFile(privateKey);
+          identityFile = identity.identityFile;
+          cleanup = identity.cleanup;
+        }
+      }
+    }
+
+    if (!host) {
+      return err(
+        domainError.resourceRuntimeLogsUnavailable("SSH runtime target is not available", {
+          phase: "runtime-instance-resolution",
+          step: "ssh-runtime-target",
+          resourceId: logContext.resource.id,
+          deploymentId: logContext.deployment.id,
+          runtimeKind: runtimeKind(logContext),
+          ...(serverId ? { targetId: serverId } : {}),
+        }),
+      );
+    }
+
+    return ok({
+      host,
+      port,
+      ...(identityFile ? { identityFile } : {}),
+      cleanup,
+    });
   }
 }

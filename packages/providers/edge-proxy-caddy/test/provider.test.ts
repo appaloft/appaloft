@@ -47,6 +47,10 @@ describe("CaddyEdgeProxyProvider", () => {
         includeDiagnostics: true,
       },
     );
+    const diagnostics = await provider.diagnoseProxy(
+      { correlationId: "req_caddy_provider_test" },
+      { proxyKind: "caddy" },
+    );
 
     expect(ensure.isOk()).toBe(true);
     expect(ensure._unsafeUnwrap()).toMatchObject({
@@ -54,6 +58,17 @@ describe("CaddyEdgeProxyProvider", () => {
       networkName: "yundu-edge",
       containerName: "yundu-caddy",
     });
+    expect(ensure._unsafeUnwrap().metadata).toMatchObject({
+      image: "lucaslorentz/caddy-docker-proxy:2.9-alpine",
+    });
+    expect(diagnostics.isOk()).toBe(true);
+    expect(diagnostics._unsafeUnwrap().checks.map((check) => check.name)).toEqual([
+      "edge-proxy-container",
+      "edge-proxy-provider-logs",
+    ]);
+    expect(diagnostics._unsafeUnwrap().checks[0]?.command).toContain(
+      "lucaslorentz/caddy-docker-proxy:2.9-alpine",
+    );
     expect(realized.isOk()).toBe(true);
     expect(realized._unsafeUnwrap().labels).toContain("caddy=http://app.203.0.113.10.sslip.io");
     expect(view.isOk()).toBe(true);

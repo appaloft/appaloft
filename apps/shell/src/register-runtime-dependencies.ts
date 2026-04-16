@@ -231,7 +231,12 @@ export function registerRuntimeDependencies(
   });
   container.registerInstance(tokens.deploymentProgressReporter, input.deploymentProgressReporter);
   container.register(tokens.serverConnectivityChecker, {
-    useFactory: instanceCachingFactory(() => new RuntimeServerConnectivityChecker()),
+    useFactory: instanceCachingFactory(
+      (dependencyContainer) =>
+        new RuntimeServerConnectivityChecker(
+          dependencyContainer.resolve(tokens.edgeProxyProviderRegistry),
+        ),
+    ),
   });
   container.register(tokens.serverEdgeProxyBootstrapper, {
     useFactory: instanceCachingFactory(
@@ -357,7 +362,10 @@ export function registerRuntimeDependencies(
     ),
   });
   container.register(tokens.resourceRuntimeLogReader, {
-    useFactory: instanceCachingFactory(() => new RuntimeResourceRuntimeLogReader()),
+    useFactory: instanceCachingFactory(
+      (dependencyContainer) =>
+        new RuntimeResourceRuntimeLogReader(dependencyContainer.resolve(tokens.serverRepository)),
+    ),
   });
   container.register(tokens.edgeProxyProviderRegistry, {
     useFactory: instanceCachingFactory(

@@ -1,4 +1,6 @@
 import {
+  type EdgeProxyDiagnosticsInput,
+  type EdgeProxyDiagnosticsPlan,
   type EdgeProxyEnsureInput,
   type EdgeProxyEnsurePlan,
   type EdgeProxyExecutionContext,
@@ -14,12 +16,14 @@ import {
 import { type DomainError, domainError, err, ok, type Result } from "@yundu/core";
 
 export const traefikEdgeNetworkName = "yundu-edge";
+const traefikImage = "traefik:v3.6.2";
 
 const capabilities: EdgeProxyProviderCapabilities = {
   ensureProxy: true,
   dockerLabels: true,
   configurationView: true,
   runtimeLogs: false,
+  diagnostics: true,
 };
 
 function hostPort(input: number | undefined, fallback: number): number {
@@ -37,11 +41,81 @@ function sanitizeRouteName(input: { deploymentId: string; suffix?: string }): st
     .replace(/[^a-zA-Z0-9-]/g, "-");
 }
 
+function shellQuote(input: string): string {
+  return `'${input.replaceAll("'", "'\\''")}'`;
+}
+
 function traefikRule(route: EdgeProxyRouteInput): string {
   const hostRule = route.domains.map((domain) => `Host(\`${domain}\`)`).join(" || ");
   return route.pathPrefix === "/"
     ? hostRule
     : `(${hostRule}) && PathPrefix(\`${route.pathPrefix}\`)`;
+}
+
+function routeProbeCommand(input: {
+  httpPort: number;
+  networkName: string;
+  token: string;
+}): string {
+  const containerName = `yundu-proxy-probe-${input.token}`;
+  const router = `yundu-proxy-probe-${input.token}`;
+  const service = `${router}-svc`;
+  const hostname = `${router}.local.yundu.test`;
+  const url = `http://127.0.0.1:${input.httpPort}/ping`;
+  const hostHeader = `Host: ${hostname}`;
+
+  return [
+    `cleanup() { docker rm -f ${shellQuote(containerName)} >/dev/null 2>&1 || true; }`,
+    [
+      "probe_http() {",
+      "if command -v curl >/dev/null 2>&1; then",
+      `curl -fsS --max-time 2 -H ${shellQuote(hostHeader)} ${shellQuote(url)} >/dev/null`,
+      "else",
+      `wget -q --timeout=2 --header=${shellQuote(hostHeader)} -O /dev/null ${shellQuote(url)}`,
+      "fi",
+      "}",
+    ].join(" "),
+    [
+      "dump_http() {",
+      "if command -v curl >/dev/null 2>&1; then",
+      `curl -sS -i --max-time 2 -H ${shellQuote(hostHeader)} ${shellQuote(url)} || true`,
+      "else",
+      `wget -S --timeout=2 --header=${shellQuote(hostHeader)} -O - ${shellQuote(url)} || true`,
+      "fi",
+      "}",
+    ].join(" "),
+    "trap cleanup EXIT",
+    "cleanup",
+    [
+      "docker run -d",
+      `--name ${shellQuote(containerName)}`,
+      `--network ${shellQuote(input.networkName)}`,
+      "--label traefik.enable=true",
+      `--label ${shellQuote(`traefik.docker.network=${input.networkName}`)}`,
+      `--label ${shellQuote(`traefik.http.routers.${router}.rule=Host(\`${hostname}\`)`)}`,
+      `--label ${shellQuote(`traefik.http.routers.${router}.entrypoints=web`)}`,
+      `--label ${shellQuote(`traefik.http.routers.${router}.service=${service}`)}`,
+      `--label ${shellQuote(`traefik.http.services.${service}.loadbalancer.server.port=80`)}`,
+      traefikImage,
+      "--ping=true",
+      "--entrypoints.web.address=:80",
+      "--ping.entrypoint=web",
+      ">/dev/null",
+    ].join(" "),
+    [
+      "i=0",
+      'while [ "$i" -lt 15 ]; do',
+      "if probe_http; then",
+      `printf '%s\\n' ${shellQuote(`Traefik Docker label route probe passed for ${hostname}`)}`,
+      "exit 0",
+      "fi",
+      "i=$((i + 1))",
+      "sleep 1",
+      "done",
+    ].join("; "),
+    "dump_http",
+    "exit 1",
+  ].join("; ");
 }
 
 function labelsForTraefik(input: {
@@ -126,6 +200,10 @@ export class TraefikEdgeProxyProvider implements EdgeProxyProvider {
     const httpPort = hostPort(input.httpPort, 80);
     const httpsPort = hostPort(input.httpsPort, 443);
     const containerName = "yundu-traefik";
+    const runningWithExpectedImageCommand = [
+      `docker inspect -f '{{.State.Running}}' ${containerName} 2>/dev/null | grep true >/dev/null`,
+      `[ "$(docker inspect -f '{{.Config.Image}}' ${containerName} 2>/dev/null)" = "${traefikImage}" ]`,
+    ].join(" && ");
 
     return ok({
       providerKey: this.key,
@@ -135,14 +213,14 @@ export class TraefikEdgeProxyProvider implements EdgeProxyProvider {
       networkCommand: `docker network inspect ${traefikEdgeNetworkName} >/dev/null 2>&1 || docker network create ${traefikEdgeNetworkName}`,
       containerName,
       containerCommand: [
-        `docker inspect -f '{{.State.Running}}' ${containerName} 2>/dev/null | grep true >/dev/null || (docker rm -f ${containerName} >/dev/null 2>&1 || true; docker run -d`,
+        `${runningWithExpectedImageCommand} || (docker rm -f ${containerName} >/dev/null 2>&1 || true; docker run -d`,
         "--restart unless-stopped",
         `--name ${containerName}`,
         `--network ${traefikEdgeNetworkName}`,
         `-p ${httpPort}:80`,
         `-p ${httpsPort}:443`,
         "-v /var/run/docker.sock:/var/run/docker.sock:ro",
-        "traefik:v3.1",
+        traefikImage,
         "--providers.docker=true",
         "--providers.docker.exposedbydefault=false",
         `--providers.docker.network=${traefikEdgeNetworkName}`,
@@ -153,6 +231,84 @@ export class TraefikEdgeProxyProvider implements EdgeProxyProvider {
       metadata: {
         httpPort: String(httpPort),
         httpsPort: String(httpsPort),
+        image: traefikImage,
+      },
+    });
+  }
+
+  async diagnoseProxy(
+    _context: EdgeProxyExecutionContext,
+    input: EdgeProxyDiagnosticsInput,
+  ): Promise<Result<EdgeProxyDiagnosticsPlan, DomainError>> {
+    if (input.proxyKind !== "traefik") {
+      return err(
+        domainError.proxyProviderUnavailable("Traefik does not support this proxy kind", {
+          phase: "proxy-diagnostics-plan-render",
+          providerKey: this.key,
+          proxyKind: input.proxyKind,
+        }),
+      );
+    }
+
+    const httpPort = hostPort(input.httpPort, 80);
+    const containerName = "yundu-traefik";
+    const token = Date.now().toString(36);
+
+    return ok({
+      providerKey: this.key,
+      proxyKind: "traefik",
+      displayName: this.displayName,
+      checks: [
+        {
+          name: "edge-proxy-container",
+          command: [
+            `actual="$(docker inspect -f 'status={{.State.Status}} image={{.Config.Image}}' ${shellQuote(containerName)} 2>/dev/null)"`,
+            'printf "%s\\n" "$actual"',
+            `[ "$actual" = ${shellQuote(`status=running image=${traefikImage}`)} ]`,
+          ].join("; "),
+          timeoutMs: 8_000,
+          successMessage: "Traefik proxy container image is compatible",
+          failureMessage:
+            "Traefik proxy container is missing, stopped, or running an unsupported image",
+          metadata: {
+            containerName,
+            expectedImage: traefikImage,
+          },
+        },
+        {
+          name: "edge-proxy-provider-logs",
+          command: [
+            `logs="$(docker logs --tail 80 ${shellQuote(containerName)} 2>&1 || true)"`,
+            'printf "%s\\n" "$logs" | tail -n 20',
+            '! printf "%s\\n" "$logs" | grep -E \'client version .* too old|Provider error|Failed to retrieve information of the docker client\'',
+          ].join("; "),
+          timeoutMs: 8_000,
+          successMessage: "Traefik Docker provider logs have no compatibility errors",
+          failureMessage: "Traefik Docker provider logs contain compatibility errors",
+          metadata: {
+            containerName,
+          },
+        },
+        {
+          name: "edge-proxy-route-probe",
+          command: routeProbeCommand({
+            httpPort,
+            networkName: traefikEdgeNetworkName,
+            token,
+          }),
+          timeoutMs: 30_000,
+          successMessage: "Traefik can discover Docker labels and route to a probe container",
+          failureMessage: "Traefik could not route to a Docker label probe container",
+          metadata: {
+            containerName,
+            networkName: traefikEdgeNetworkName,
+            expectedImage: traefikImage,
+          },
+        },
+      ],
+      metadata: {
+        image: traefikImage,
+        httpPort: String(httpPort),
       },
     });
   }

@@ -33,6 +33,7 @@ import {
   type AccessRoute,
   type Deployment,
   type Result,
+  type RuntimeExecutionPlan,
   type RuntimeVerificationStep,
   type RollbackPlan,
 } from "@yundu/core";
@@ -43,6 +44,14 @@ import {
   dockerNetworkFlagForProxyPlan,
   proxyBootstrapOptionsFromEnv,
 } from "./edge-proxy-plans";
+import {
+  dockerContainerLabelFlags,
+  dockerPublishedPortCommand,
+  dockerPublishedPortFlag,
+  dockerRemoveResourceContainersCommand,
+  parseDockerPublishedHostPort,
+  yunduDockerContainerLabels,
+} from "./docker-container-commands";
 
 type LogPhase = "detect" | "plan" | "package" | "deploy" | "verify" | "rollback";
 type LogLevel = "debug" | "info" | "warn" | "error";
@@ -82,16 +91,6 @@ function sanitizeName(input: string): string {
 
 function shellQuote(input: string): string {
   return `'${input.replaceAll("'", "'\\''")}'`;
-}
-
-function dockerRemovePublishedPortCommand(port: number): string {
-  return `docker ps --filter ${shellQuote(`publish=${port}`)} -q | while read -r container_id; do docker rm -f "$container_id"; done`;
-}
-
-function dockerPublishedPortFlag(port: number, metadata?: Record<string, string>): string {
-  return metadata?.["resource.exposureMode"] === "direct-port"
-    ? `-p ${port}:${port}`
-    : `-p 127.0.0.1:${port}:${port}`;
 }
 
 function redactSecrets(input: string, secrets: readonly string[] = []): string {
@@ -171,31 +170,73 @@ function hostWithUsername(host: string, username?: string): string {
   return username && !host.includes("@") ? `${username}@${host}` : host;
 }
 
-async function waitForHealth(url: string): Promise<{ ok: boolean; reason?: string }> {
-  for (let attempt = 0; attempt < 20; attempt += 1) {
+interface HttpHealthCheckOptions {
+  method: string;
+  expectedStatusCode: number;
+  expectedResponseText?: string;
+  intervalMs: number;
+  timeoutMs: number;
+  retries: number;
+  startPeriodMs: number;
+}
+
+function httpHealthCheckOptions(
+  execution: RuntimeExecutionPlan,
+): HttpHealthCheckOptions | null {
+  const policy = execution.healthCheck;
+  if (policy && !policy.enabled) {
+    return null;
+  }
+  return {
+    method: policy?.http?.method.value ?? "GET",
+    expectedStatusCode: policy?.http?.expectedStatusCode.value ?? 200,
+    ...(policy?.http?.expectedResponseText
+      ? { expectedResponseText: policy.http.expectedResponseText.value }
+      : {}),
+    intervalMs: (policy?.intervalSeconds.value ?? 0.25) * 1000,
+    timeoutMs: (policy?.timeoutSeconds.value ?? 5) * 1000,
+    retries: policy?.retries.value ?? 40,
+    startPeriodMs: (policy?.startPeriodSeconds.value ?? 0) * 1000,
+  };
+}
+
+async function waitForHealth(
+  url: string,
+  options: HttpHealthCheckOptions,
+): Promise<{ ok: boolean; reason?: string }> {
+  let lastFailure = "health check timed out";
+
+  if (options.startPeriodMs > 0) {
+    await Bun.sleep(options.startPeriodMs);
+  }
+
+  for (let attempt = 0; attempt < options.retries; attempt += 1) {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 2_000);
+    const timeout = setTimeout(() => controller.abort(), options.timeoutMs);
 
     try {
-      const response = await fetch(url, { signal: controller.signal });
-      if (response.ok) {
+      const response = await fetch(url, {
+        method: options.method,
+        signal: controller.signal,
+      });
+      const responseText = options.expectedResponseText ? await response.text() : "";
+      if (
+        response.status === options.expectedStatusCode &&
+        (!options.expectedResponseText || responseText.includes(options.expectedResponseText))
+      ) {
         return { ok: true };
       }
+      lastFailure = `last response was HTTP ${response.status} ${response.statusText}`;
     } catch (error) {
-      if (attempt === 19) {
-        return {
-          ok: false,
-          reason: error instanceof Error ? error.message : "unknown fetch error",
-        };
-      }
+      lastFailure = error instanceof Error ? error.message : "unknown fetch error";
     } finally {
       clearTimeout(timeout);
     }
 
-    await Bun.sleep(250);
+    await Bun.sleep(options.intervalMs);
   }
 
-  return { ok: false, reason: "health check timed out" };
+  return { ok: false, reason: lastFailure };
 }
 
 function normalizeHealthCheckPath(path: string | undefined): string {
@@ -239,14 +280,35 @@ function defaultVerificationSteps(accessRoutes: AccessRoute[]): Array<RuntimeVer
   return accessRoutes.length > 0 ? ["internal-http", "public-http"] : ["internal-http"];
 }
 
-function remoteInternalHealthCheckCommand(url: string): string {
-  return [
-    "(",
-    `command -v curl >/dev/null 2>&1 && curl --fail --silent --show-error --max-time 5 ${shellQuote(url)} >/dev/null`,
-    ") || (",
-    `command -v wget >/dev/null 2>&1 && wget -q --timeout=5 --tries=1 -O /dev/null ${shellQuote(url)}`,
-    ")",
-  ].join(" ");
+function remoteInternalHealthCheckCommand(url: string, options: HttpHealthCheckOptions): string {
+  const timeoutSeconds = Math.max(1, Math.ceil(options.timeoutMs / 1000));
+  const curlScript = [
+    "command -v curl >/dev/null 2>&1",
+    "body_file=$(mktemp)",
+    'trap \'rm -f "$body_file"\' EXIT',
+    [
+      "code=$(curl",
+      `--request ${shellQuote(options.method)}`,
+      "--silent --show-error",
+      `--max-time ${timeoutSeconds}`,
+      '--output "$body_file"',
+      '--write-out "%{http_code}"',
+      shellQuote(url),
+      ")",
+    ].join(" "),
+    `test "$code" = ${shellQuote(String(options.expectedStatusCode))}`,
+    ...(options.expectedResponseText
+      ? [`grep -F -- ${shellQuote(options.expectedResponseText)} "$body_file" >/dev/null`]
+      : []),
+  ].join(" && ");
+  const wgetFallback =
+    options.method === "GET" &&
+    options.expectedStatusCode === 200 &&
+    !options.expectedResponseText
+      ? ` || (command -v wget >/dev/null 2>&1 && wget -q --timeout=${timeoutSeconds} --tries=1 -O /dev/null ${shellQuote(url)})`
+      : "";
+
+  return `(sh -lc ${shellQuote(curlScript)})${wgetFallback}`;
 }
 
 function runSyncProcess(input: {
@@ -433,6 +495,104 @@ export class SshExecutionBackend implements ExecutionBackend {
     return deployment;
   }
 
+  private pushRemoteDockerContainerDiagnostics(
+    logs: DeploymentLogEntry[],
+    input: {
+      context: ExecutionContext;
+      deploymentId: string;
+      target: SshTarget;
+      runtimeDir: string;
+      env: NodeJS.ProcessEnv;
+      containerName: string;
+    },
+  ): void {
+    const format =
+      "status={{.State.Status}} exitCode={{.State.ExitCode}} error={{.State.Error}} oomKilled={{.State.OOMKilled}} finishedAt={{.State.FinishedAt}}";
+    const inspectMessage = `Inspect SSH Docker container ${input.containerName}`;
+    logs.push(phaseLog("verify", inspectMessage));
+    this.report(input.context, {
+      deploymentId: input.deploymentId,
+      phase: "verify",
+      status: "running",
+      message: inspectMessage,
+    });
+
+    const inspect = this.runRemoteCommand({
+      target: input.target,
+      command: `docker inspect --format ${shellQuote(format)} ${shellQuote(input.containerName)}`,
+      cwd: input.runtimeDir,
+      env: input.env,
+    });
+    this.pushCommandOutput(logs, {
+      context: input.context,
+      deploymentId: input.deploymentId,
+      phase: "verify",
+      output: inspect.stdout,
+      level: inspect.failed ? "warn" : "info",
+      stream: "stdout",
+    });
+    this.pushCommandOutput(logs, {
+      context: input.context,
+      deploymentId: input.deploymentId,
+      phase: "verify",
+      output: inspect.stderr,
+      level: "warn",
+      stream: "stderr",
+    });
+
+    const logsMessage = `Capture SSH Docker logs for ${input.containerName}`;
+    logs.push(phaseLog("verify", logsMessage));
+    this.report(input.context, {
+      deploymentId: input.deploymentId,
+      phase: "verify",
+      status: "running",
+      message: logsMessage,
+    });
+
+    const dockerLogs = this.runRemoteCommand({
+      target: input.target,
+      command: `docker logs --tail 50 ${shellQuote(input.containerName)}`,
+      cwd: input.runtimeDir,
+      env: input.env,
+    });
+    this.pushCommandOutput(logs, {
+      context: input.context,
+      deploymentId: input.deploymentId,
+      phase: "verify",
+      output: dockerLogs.stdout,
+      level: "info",
+      stream: "stdout",
+    });
+    this.pushCommandOutput(logs, {
+      context: input.context,
+      deploymentId: input.deploymentId,
+      phase: "verify",
+      output: dockerLogs.stderr,
+      level: dockerLogs.failed ? "warn" : "info",
+      stream: "stderr",
+    });
+
+    if (inspect.failed && !inspect.stdout && !inspect.stderr) {
+      logs.push(
+        phaseLog(
+          "verify",
+          `SSH Docker inspect did not return diagnostics for ${input.containerName}`,
+          "warn",
+        ),
+      );
+    }
+
+    if (dockerLogs.failed && !dockerLogs.stdout && !dockerLogs.stderr) {
+      logs.push(
+        phaseLog(
+          "verify",
+          `SSH Docker logs did not return application output for ${input.containerName}`,
+          "warn",
+        ),
+      );
+    }
+  }
+
   private writePrivateKey(runtimeDir: string, privateKey: string): string {
     const sshDir = resolve(runtimeDir, "ssh");
     const identityFile = resolve(sshDir, "id_deployment_target");
@@ -523,6 +683,54 @@ export class SshExecutionBackend implements ExecutionBackend {
       cwd: input.cwd,
       env: input.env,
     });
+  }
+
+  private async waitForRemoteInternalHealth(input: {
+    target: SshTarget;
+    url: string;
+    options: HttpHealthCheckOptions;
+    cwd: string;
+    env: NodeJS.ProcessEnv;
+  }): Promise<{ ok: boolean; reason?: string; stdout: string; stderr: string }> {
+    let lastFailure = "health check timed out";
+    let lastStdout = "";
+    let lastStderr = "";
+
+    if (input.options.startPeriodMs > 0) {
+      await Bun.sleep(input.options.startPeriodMs);
+    }
+
+    for (let attempt = 0; attempt < input.options.retries; attempt += 1) {
+      const result = this.runRemoteCommand({
+        target: input.target,
+        command: remoteInternalHealthCheckCommand(input.url, input.options),
+        cwd: input.cwd,
+        env: input.env,
+      });
+      lastStdout = result.stdout;
+      lastStderr = result.stderr;
+
+      if (!result.failed) {
+        return { ok: true, stdout: result.stdout, stderr: result.stderr };
+      }
+
+      lastFailure =
+        result.stderr.trim() ||
+        result.stdout.trim() ||
+        result.reason ||
+        `remote command exited with ${result.exitCode}`;
+
+      if (attempt < input.options.retries - 1) {
+        await Bun.sleep(input.options.intervalMs);
+      }
+    }
+
+    return {
+      ok: false,
+      reason: lastFailure,
+      stdout: lastStdout,
+      stderr: lastStderr,
+    };
   }
 
   private async prepareSshSource(
@@ -1222,23 +1430,46 @@ export class SshExecutionBackend implements ExecutionBackend {
         plan: proxyRoutePlanResult.value,
         quote: shellQuote,
       });
+      const yunduLabelFlags = dockerContainerLabelFlags({
+        labels: yunduDockerContainerLabels({
+          deploymentId: state.id.value,
+          projectId: state.projectId.value,
+          environmentId: state.environmentId.value,
+          resourceId: state.resourceId.value,
+          destinationId: state.destinationId.value,
+        }),
+        quote: shellQuote,
+      });
       const networkFlag = dockerNetworkFlagForProxyPlan(proxyRoutePlanResult.value);
-      const portFlag = dockerPublishedPortFlag(port, state.runtimePlan.execution.metadata);
+      const portFlag = dockerPublishedPortFlag({
+        containerPort: port,
+        exposureMode: state.runtimePlan.execution.metadata?.["resource.exposureMode"],
+      });
       const runCommand = [
         `docker rm -f ${shellQuote(containerName)} >/dev/null 2>&1 || true`,
-        dockerRemovePublishedPortCommand(port),
+        dockerRemoveResourceContainersCommand({
+          resourceId: state.resourceId.value,
+          currentContainerName: containerName,
+          quote: shellQuote,
+        }),
         [
-          `docker run -d --rm --name ${shellQuote(containerName)}`,
+          `docker run -d --name ${shellQuote(containerName)}`,
           networkFlag,
           portFlag,
           envFlags,
+          yunduLabelFlags,
           labelFlags,
           shellQuote(image),
         ]
           .filter(Boolean)
           .join(" "),
       ].join(" && ");
-      logs.push(phaseLog("deploy", `Release existing SSH containers publishing port ${port}`));
+      logs.push(
+        phaseLog(
+          "deploy",
+          `Release existing SSH containers for resource ${state.resourceId.value}`,
+        ),
+      );
       logs.push(phaseLog("deploy", `Start SSH container ${containerName}`));
       const run = this.runRemoteCommand({
         target,
@@ -1280,15 +1511,91 @@ export class SshExecutionBackend implements ExecutionBackend {
         });
       }
 
-      const healthPath = normalizeHealthCheckPath(state.runtimePlan.execution.healthCheckPath);
+      const publishedPortResult = this.runRemoteCommand({
+        target,
+        command: dockerPublishedPortCommand({
+          containerName,
+          containerPort: port,
+          quote: shellQuote,
+        }),
+        cwd: runtimeDir,
+        env,
+      });
+      const publishedHostPort = parseDockerPublishedHostPort(publishedPortResult.stdout);
+
+      if (publishedPortResult.failed || publishedHostPort === undefined) {
+        this.pushRemoteDockerContainerDiagnostics(logs, {
+          context,
+          deploymentId: state.id.value,
+          target,
+          runtimeDir,
+          env,
+          containerName,
+        });
+        this.runRemoteCommand({
+          target,
+          command: `docker rm -f ${shellQuote(containerName)}`,
+          cwd: runtimeDir,
+          env,
+        });
+        const message = `SSH Docker published port could not be resolved for ${containerName}`;
+        logs.push(phaseLog("verify", message, "error"));
+        return ok({
+          deployment: this.applyFailure(deployment, {
+            logs,
+            errorCode: "ssh_docker_published_port_resolution_failed",
+            retryable: true,
+            metadata: {
+              host: target.host,
+              image,
+              containerName,
+              port: String(port),
+              ...prepared.source.metadata,
+            },
+          }),
+        });
+      }
+
+      const healthPath = normalizeHealthCheckPath(
+        state.runtimePlan.execution.healthCheck?.http?.path.value ??
+          state.runtimePlan.execution.healthCheckPath,
+      );
       const verificationSteps =
         state.runtimePlan.execution.verificationSteps.length > 0
           ? state.runtimePlan.execution.verificationSteps.map((step) => step.kind)
           : defaultVerificationSteps(accessRoutes);
-      const internalUrl = `http://127.0.0.1:${port}${healthPath}`;
+      const internalUrl = `http://127.0.0.1:${publishedHostPort}${healthPath}`;
       const publicUrls = accessRoutes.map((route) =>
         publicHealthUrl({ route, healthPath, publicHost: target.publicHost, port }),
       );
+      const healthOptions = httpHealthCheckOptions(state.runtimePlan.execution);
+      if (!healthOptions) {
+        this.report(context, {
+          deploymentId: state.id.value,
+          phase: "verify",
+          status: "succeeded",
+          message: "Health check disabled for resource",
+        });
+        logs.push(phaseLog("verify", "Health check disabled for resource"));
+        deployment.applyExecutionResult(
+          FinishedAt.rehydrate(new Date().toISOString()),
+          ExecutionResult.rehydrate({
+            exitCode: ExitCode.rehydrate(0),
+            status: ExecutionStatusValue.rehydrate("succeeded"),
+            retryable: false,
+            logs,
+            metadata: {
+              host: target.host,
+              image,
+              containerName,
+              port: String(port),
+              publishedPort: String(publishedHostPort),
+              ...prepared.source.metadata,
+            },
+          }),
+        );
+        return ok({ deployment });
+      }
 
       for (const step of verificationSteps) {
         if (step === "internal-http") {
@@ -1298,9 +1605,10 @@ export class SshExecutionBackend implements ExecutionBackend {
             status: "running",
             message: `Checking remote internal container health at ${internalUrl}`,
           });
-          const internalHealth = this.runRemoteCommand({
+          const internalHealth = await this.waitForRemoteInternalHealth({
             target,
-            command: remoteInternalHealthCheckCommand(internalUrl),
+            url: internalUrl,
+            options: healthOptions,
             cwd: runtimeDir,
             env,
           });
@@ -1309,7 +1617,7 @@ export class SshExecutionBackend implements ExecutionBackend {
             deploymentId: state.id.value,
             phase: "verify",
             output: internalHealth.stdout,
-            level: "info",
+            level: internalHealth.ok ? "info" : "warn",
             stream: "stdout",
           });
           this.pushCommandOutput(logs, {
@@ -1321,14 +1629,24 @@ export class SshExecutionBackend implements ExecutionBackend {
             stream: "stderr",
           });
 
-          if (internalHealth.failed) {
+          if (!internalHealth.ok) {
+            this.pushRemoteDockerContainerDiagnostics(logs, {
+              context,
+              deploymentId: state.id.value,
+              target,
+              runtimeDir,
+              env,
+              containerName,
+            });
             this.runRemoteCommand({
               target,
               command: `docker rm -f ${shellQuote(containerName)}`,
               cwd: runtimeDir,
               env,
             });
-            const message = `SSH internal container health check failed for ${internalUrl}`;
+            const message = `SSH internal container health check failed for ${internalUrl}${
+              internalHealth.reason ? `: ${internalHealth.reason}` : ""
+            }`;
             logs.push(phaseLog("verify", message, "error"));
             return ok({
               deployment: this.applyFailure(deployment, {
@@ -1340,6 +1658,7 @@ export class SshExecutionBackend implements ExecutionBackend {
                   image,
                   containerName,
                   port: String(port),
+                  publishedPort: String(publishedHostPort),
                   url: internalUrl,
                   ...prepared.source.metadata,
                 },
@@ -1347,7 +1666,9 @@ export class SshExecutionBackend implements ExecutionBackend {
             });
           }
 
-          logs.push(phaseLog("verify", `SSH container is reachable internally at ${internalUrl}`));
+          logs.push(
+            phaseLog("verify", `SSH container is reachable internally at ${internalUrl}`),
+          );
           continue;
         }
 
@@ -1365,6 +1686,7 @@ export class SshExecutionBackend implements ExecutionBackend {
                   image,
                   containerName,
                   port: String(port),
+                  publishedPort: String(publishedHostPort),
                   internalUrl,
                   ...prepared.source.metadata,
                 },
@@ -1379,9 +1701,17 @@ export class SshExecutionBackend implements ExecutionBackend {
               status: "running",
               message: `Checking public access route ${publicUrl}`,
             });
-            const publicHealth = await waitForHealth(publicUrl);
+            const publicHealth = await waitForHealth(publicUrl, healthOptions);
 
             if (!publicHealth.ok) {
+              this.pushRemoteDockerContainerDiagnostics(logs, {
+                context,
+                deploymentId: state.id.value,
+                target,
+                runtimeDir,
+                env,
+                containerName,
+              });
               this.runRemoteCommand({
                 target,
                 command: `docker rm -f ${shellQuote(containerName)}`,
@@ -1402,6 +1732,7 @@ export class SshExecutionBackend implements ExecutionBackend {
                     image,
                     containerName,
                     port: String(port),
+                    publishedPort: String(publishedHostPort),
                     internalUrl,
                     url: publicUrl,
                     ...prepared.source.metadata,
@@ -1427,6 +1758,7 @@ export class SshExecutionBackend implements ExecutionBackend {
             image,
             containerName,
             port: String(port),
+            publishedPort: String(publishedHostPort),
             url: publicUrls[0] ?? internalUrl,
             internalUrl,
             ...(publicUrls.length > 0 ? { publicUrl: publicUrls[0] } : {}),

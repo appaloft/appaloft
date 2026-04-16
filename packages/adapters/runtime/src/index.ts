@@ -17,7 +17,17 @@ import {
   FilePathText,
   FinishedAt,
   GeneratedAt,
+  HealthCheckExpectedStatusCode,
+  HealthCheckHostText,
+  HealthCheckHttpMethodValue,
+  HealthCheckIntervalSeconds,
   HealthCheckPathText,
+  HealthCheckResponseText,
+  HealthCheckRetryCount,
+  HealthCheckSchemeValue,
+  HealthCheckStartPeriodSeconds,
+  HealthCheckTimeoutSeconds,
+  HealthCheckTypeValue,
   ImageReference,
   LogLevelValue,
   MessageText,
@@ -110,6 +120,55 @@ function normalizeDockerImage(locator: string): string {
 
 function dockerContainerPort(requestedDeployment: RequestedDeploymentConfig): PortNumber {
   return PortNumber.rehydrate(requestedDeployment.port ?? 3000);
+}
+
+function runtimeHealthCheckFields(requestedDeployment: RequestedDeploymentConfig) {
+  const healthCheck = requestedDeployment.healthCheck;
+  const healthCheckPath = healthCheck?.http?.path ?? requestedDeployment.healthCheckPath;
+
+  return {
+    ...(healthCheckPath ? { healthCheckPath: HealthCheckPathText.rehydrate(healthCheckPath) } : {}),
+    ...(healthCheck
+      ? {
+          healthCheck: {
+            enabled: healthCheck.enabled,
+            type: HealthCheckTypeValue.rehydrate(healthCheck.type),
+            intervalSeconds: HealthCheckIntervalSeconds.rehydrate(healthCheck.intervalSeconds),
+            timeoutSeconds: HealthCheckTimeoutSeconds.rehydrate(healthCheck.timeoutSeconds),
+            retries: HealthCheckRetryCount.rehydrate(healthCheck.retries),
+            startPeriodSeconds: HealthCheckStartPeriodSeconds.rehydrate(
+              healthCheck.startPeriodSeconds,
+            ),
+            ...(healthCheck.http
+              ? {
+                  http: {
+                    method: HealthCheckHttpMethodValue.rehydrate(healthCheck.http.method),
+                    scheme: HealthCheckSchemeValue.rehydrate(healthCheck.http.scheme),
+                    host: HealthCheckHostText.rehydrate(healthCheck.http.host),
+                    ...(healthCheck.http.port
+                      ? { port: PortNumber.rehydrate(healthCheck.http.port) }
+                      : {}),
+                    path: HealthCheckPathText.rehydrate(healthCheck.http.path),
+                    expectedStatusCode: HealthCheckExpectedStatusCode.rehydrate(
+                      healthCheck.http.expectedStatusCode,
+                    ),
+                    ...(healthCheck.http.expectedResponseText
+                      ? {
+                          expectedResponseText: HealthCheckResponseText.rehydrate(
+                            healthCheck.http.expectedResponseText,
+                          ),
+                        }
+                      : {}),
+                  },
+                }
+              : {}),
+            ...(healthCheck.command
+              ? { command: { command: CommandText.rehydrate(healthCheck.command.command) } }
+              : {}),
+          },
+        }
+      : {}),
+  };
 }
 
 function ensureSourceDescriptor(source: SourceDescriptor): SourceDescriptor {
@@ -390,9 +449,7 @@ function chooseStrategies(input: {
       kind: ExecutionStrategyKindValue.rehydrate("docker-compose-stack"),
       workingDirectory: FilePathText.rehydrate(source.locator),
       composeFile: FilePathText.rehydrate(composeFile),
-      ...(requestedDeployment.healthCheckPath
-        ? { healthCheckPath: HealthCheckPathText.rehydrate(requestedDeployment.healthCheckPath) }
-        : {}),
+      ...runtimeHealthCheckFields(requestedDeployment),
       ...(requestedDeployment.port ? { port: PortNumber.rehydrate(requestedDeployment.port) } : {}),
     });
     return withRequestedAccessRoutes({
@@ -414,9 +471,7 @@ function chooseStrategies(input: {
     const execution = RuntimeExecutionPlan.rehydrate({
       kind: ExecutionStrategyKindValue.rehydrate("docker-container"),
       image: ImageReference.rehydrate(normalizeDockerImage(source.locator)),
-      ...(requestedDeployment.healthCheckPath
-        ? { healthCheckPath: HealthCheckPathText.rehydrate(requestedDeployment.healthCheckPath) }
-        : {}),
+      ...runtimeHealthCheckFields(requestedDeployment),
       port,
     });
     return withRequestedAccessRoutes({
@@ -439,9 +494,7 @@ function chooseStrategies(input: {
       kind: ExecutionStrategyKindValue.rehydrate("docker-container"),
       workingDirectory: FilePathText.rehydrate(source.locator),
       dockerfilePath: FilePathText.rehydrate(source.metadata?.dockerfilePath ?? "Dockerfile"),
-      ...(requestedDeployment.healthCheckPath
-        ? { healthCheckPath: HealthCheckPathText.rehydrate(requestedDeployment.healthCheckPath) }
-        : {}),
+      ...runtimeHealthCheckFields(requestedDeployment),
       port,
     });
     return withRequestedAccessRoutes({
@@ -495,9 +548,7 @@ function chooseStrategies(input: {
             : undefined);
         return buildCommand ? { buildCommand: CommandText.rehydrate(buildCommand) } : {};
       })(),
-      ...(requestedDeployment.healthCheckPath
-        ? { healthCheckPath: HealthCheckPathText.rehydrate(requestedDeployment.healthCheckPath) }
-        : {}),
+      ...runtimeHealthCheckFields(requestedDeployment),
       ...(requestedDeployment.port ? { port: PortNumber.rehydrate(requestedDeployment.port) } : {}),
     });
 

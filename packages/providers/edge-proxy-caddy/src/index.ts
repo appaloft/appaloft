@@ -1,4 +1,6 @@
 import {
+  type EdgeProxyDiagnosticsInput,
+  type EdgeProxyDiagnosticsPlan,
   type EdgeProxyEnsureInput,
   type EdgeProxyEnsurePlan,
   type EdgeProxyExecutionContext,
@@ -14,12 +16,14 @@ import {
 import { type DomainError, domainError, err, ok, type Result } from "@yundu/core";
 
 export const caddyEdgeNetworkName = "yundu-edge";
+const caddyImage = "lucaslorentz/caddy-docker-proxy:2.9-alpine";
 
 const capabilities: EdgeProxyProviderCapabilities = {
   ensureProxy: true,
   dockerLabels: true,
   configurationView: true,
   runtimeLogs: false,
+  diagnostics: true,
 };
 
 function hostPort(input: number | undefined, fallback: number): number {
@@ -28,6 +32,10 @@ function hostPort(input: number | undefined, fallback: number): number {
   }
 
   return Number.isInteger(input) && input > 0 && input <= 65535 ? input : fallback;
+}
+
+function shellQuote(input: string): string {
+  return `'${input.replaceAll("'", "'\\''")}'`;
 }
 
 function labelsForCaddy(input: {
@@ -127,12 +135,71 @@ export class CaddyEdgeProxyProvider implements EdgeProxyProvider {
         "-v yundu-caddy-data:/data",
         "-v yundu-caddy-config:/config",
         `-e CADDY_INGRESS_NETWORKS=${caddyEdgeNetworkName}`,
-        "lucaslorentz/caddy-docker-proxy:2.9-alpine",
+        caddyImage,
         ")",
       ].join(" "),
       metadata: {
         httpPort: String(httpPort),
         httpsPort: String(httpsPort),
+        image: caddyImage,
+      },
+    });
+  }
+
+  async diagnoseProxy(
+    _context: EdgeProxyExecutionContext,
+    input: EdgeProxyDiagnosticsInput,
+  ): Promise<Result<EdgeProxyDiagnosticsPlan, DomainError>> {
+    if (input.proxyKind !== "caddy") {
+      return err(
+        domainError.proxyProviderUnavailable("Caddy does not support this proxy kind", {
+          phase: "proxy-diagnostics-plan-render",
+          providerKey: this.key,
+          proxyKind: input.proxyKind,
+        }),
+      );
+    }
+
+    const containerName = "yundu-caddy";
+
+    return ok({
+      providerKey: this.key,
+      proxyKind: "caddy",
+      displayName: this.displayName,
+      checks: [
+        {
+          name: "edge-proxy-container",
+          command: [
+            `actual="$(docker inspect -f 'status={{.State.Status}} image={{.Config.Image}}' ${shellQuote(containerName)} 2>/dev/null)"`,
+            'printf "%s\\n" "$actual"',
+            `[ "$actual" = ${shellQuote(`status=running image=${caddyImage}`)} ]`,
+          ].join("; "),
+          timeoutMs: 8_000,
+          successMessage: "Caddy proxy container image is compatible",
+          failureMessage:
+            "Caddy proxy container is missing, stopped, or running an unsupported image",
+          metadata: {
+            containerName,
+            expectedImage: caddyImage,
+          },
+        },
+        {
+          name: "edge-proxy-provider-logs",
+          command: [
+            `logs="$(docker logs --tail 80 ${shellQuote(containerName)} 2>&1 || true)"`,
+            'printf "%s\\n" "$logs" | tail -n 20',
+            '! printf "%s\\n" "$logs" | grep -E \'ERROR|Error|failed|Failed\'',
+          ].join("; "),
+          timeoutMs: 8_000,
+          successMessage: "Caddy Docker provider logs have no recent errors",
+          failureMessage: "Caddy Docker provider logs contain recent errors",
+          metadata: {
+            containerName,
+          },
+        },
+      ],
+      metadata: {
+        image: caddyImage,
       },
     });
   }
