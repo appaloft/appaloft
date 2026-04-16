@@ -167,9 +167,11 @@ Current code maps provider and secret-store failures from the `certificate-reque
 into durable failed or retry-scheduled certificate attempt state and publishes
 `certificate-issuance-failed` with safe structured error metadata.
 
+Current code consumes `certificate-issued` for certificate-backed domain readiness and publishes
+`domain-ready` after the referenced bound domain binding is marked ready.
+
 Route realization failure state, DNS-provider verification failure state, real provider-specific
-failure mapping, retry scheduler execution, and certificate-backed domain readiness are not
-implemented yet.
+failure mapping, retry scheduler execution, and proxy reload are not implemented yet.
 
 ## Open Questions
 

@@ -15,6 +15,7 @@ export * from "./operations/deployments/runtime-plan-resolution-input.builder";
 export * from "./operations/domain-bindings/confirm-domain-binding-ownership.use-case";
 export * from "./operations/domain-bindings/create-domain-binding.use-case";
 export * from "./operations/domain-bindings/list-domain-bindings.query-service";
+export * from "./operations/domain-bindings/mark-domain-ready-on-certificate-issued.handler";
 export * from "./operations/domain-bindings/mark-domain-ready-on-domain-bound.handler";
 export * from "./operations/environments/create-environment.use-case";
 export * from "./operations/environments/diff-environments.query-service";

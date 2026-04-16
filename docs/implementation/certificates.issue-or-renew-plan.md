@@ -174,6 +174,20 @@ The second executable slice is event-driven certificate issuance through provide
 This slice intentionally does not ship a real ACME adapter, ACME account persistence, challenge
 token serving, retry scheduler, proxy reload, or certificate-backed `domain-ready`.
 
+## Third Code Round Slice
+
+The third executable slice is certificate-backed domain readiness:
+
+- `certificate-issued` event handler consumes the event as a first-class behavior entrypoint;
+- when the referenced domain binding is still `bound`, the handler marks it `ready` and publishes
+  `domain-ready`;
+- duplicate `certificate-issued` handling is idempotent and does not duplicate `domain-ready`;
+- resource access summary projects ready TLS-auto durable domain bindings as HTTPS routes when a
+  latest reverse-proxy deployment route exists.
+
+This slice intentionally does not ship real ACME provider behavior, proxy reload, route realization
+failure state, or durable outbox/inbox processing.
+
 ## Migration Seams And Legacy Edges
 
 Runtime proxy behavior that obtains certificates implicitly remains adapter behavior and must not be treated as platform-owned certificate lifecycle state.
@@ -206,8 +220,11 @@ Current code also implements the second executable slice:
 - shell registration for the event handler with an explicitly unavailable default provider adapter,
   so local CLI/API users see a retryable post-acceptance failure instead of a hidden no-op when no
   real certificate provider is configured;
+- `certificate-issued` handler for certificate-backed `domain-ready`;
+- certificate-backed HTTPS durable route projection in resource access summaries;
 - application tests for `ROUTE-TLS-EVT-005`, `ROUTE-TLS-EVT-006`, and
-  `ROUTE-TLS-READMODEL-005`.
+  `ROUTE-TLS-READMODEL-005`, plus domain-readiness tests for `ROUTE-TLS-EVT-008` and
+  `ROUTE-TLS-READMODEL-006`.
 
 Current code intentionally does not implement real ACME order creation, challenge token serving,
-renewal scheduling, retry scheduler execution, proxy reload, or certificate-backed `domain-ready`.
+renewal scheduling, retry scheduler execution, proxy reload, or route realization failure state.
