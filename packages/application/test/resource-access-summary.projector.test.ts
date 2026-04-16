@@ -187,4 +187,59 @@ describe("projectResourceAccessSummary", () => {
     expect(summary?.latestDurableDomainRoute).toBeUndefined();
     expect(summary?.latestGeneratedAccessRoute?.hostname).toBe("generated.example.test");
   });
+
+  test("[ROUTE-TLS-READMODEL-006] projects certificate-backed ready durable route as HTTPS", () => {
+    const summary = projectResourceAccessSummary(
+      [
+        {
+          id: "dep_new",
+          status: "succeeded",
+          createdAt: "2026-01-01T01:00:00.000Z",
+          runtimePlan: {
+            execution: {
+              accessRoutes: [
+                {
+                  proxyKind: "traefik",
+                  domains: ["generated.example.test"],
+                  pathPrefix: "/",
+                  tlsMode: "disabled",
+                  targetPort: 3000,
+                },
+              ],
+              metadata: {
+                "access.routeSource": "generated-default",
+                "access.hostname": "generated.example.test",
+                "access.providerKey": "test-provider",
+                "access.scheme": "http",
+              },
+            },
+          },
+        },
+      ],
+      [
+        {
+          id: "dmb_ready_tls",
+          status: "ready",
+          createdAt: "2026-01-01T01:05:00.000Z",
+          domainName: "secure.example.com",
+          pathPrefix: "/",
+          proxyKind: "traefik",
+          tlsMode: "auto",
+        },
+      ],
+    );
+
+    expect(summary?.latestDurableDomainRoute).toEqual({
+      url: "https://secure.example.com",
+      hostname: "secure.example.com",
+      scheme: "https",
+      providerKey: "test-provider",
+      deploymentId: "dep_new",
+      deploymentStatus: "succeeded",
+      pathPrefix: "/",
+      proxyKind: "traefik",
+      targetPort: 3000,
+      updatedAt: "2026-01-01T01:05:00.000Z",
+    });
+  });
 });

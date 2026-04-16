@@ -40,6 +40,7 @@ import {
   ListResourcesQueryService,
   ListServersQueryService,
   ListSshCredentialsQueryService,
+  MarkDomainReadyOnCertificateIssuedHandler,
   MarkDomainReadyOnDomainBoundHandler,
   OpenTerminalSessionUseCase,
   PromoteEnvironmentUseCase,
@@ -74,6 +75,7 @@ class ShellCertificateProviderSelectionPolicy implements CertificateProviderSele
 export function registerApplicationServices(container: DependencyContainer): void {
   container.registerSingleton(BootstrapServerEdgeProxyOnTargetRegisteredHandler);
   container.registerSingleton(MarkDomainReadyOnDomainBoundHandler);
+  container.registerSingleton(MarkDomainReadyOnCertificateIssuedHandler);
   container.registerSingleton(IssueCertificateOnCertificateRequestedHandler);
   container.registerSingleton(BootstrapServerProxyCommandHandler);
   container.registerSingleton(IssueOrRenewCertificateCommandHandler);

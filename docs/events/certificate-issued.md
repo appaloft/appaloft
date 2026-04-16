@@ -95,8 +95,11 @@ Current code records issued certificate attempt state and publishes `certificate
 `certificate-requested` event handler after injected provider issuance and secret storage both
 succeed.
 
+Current code consumes `certificate-issued` for certificate-backed domain readiness. If the referenced
+domain binding is still `bound`, the handler marks it `ready` and publishes `domain-ready`.
+
 Current code does not yet implement a real ACME adapter, challenge token serving, proxy reload, or
-certificate-backed `domain-ready` continuation.
+route realization failure state.
 
 ## Open Questions
 

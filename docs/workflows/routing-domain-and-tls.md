@@ -191,9 +191,7 @@ The minimal v1 readiness baseline is:
 
 For TLS-disabled bindings, no certificate gate remains after route readiness is satisfied. The domain-ready process manager may persist the binding as `ready` and publish `domain-ready`.
 
-For TLS auto or certificate-policy auto bindings, route readiness alone is not sufficient. The binding remains `bound` until certificate issuance completes. `certificate-requested` is consumed by the certificate worker through provider-neutral ports; `certificate-issued` records active certificate state, and `certificate-issuance-failed` records failed or retry-scheduled attempt state.
-
-Certificate-backed `domain-ready` after `certificate-issued` is a later process-manager behavior.
+For TLS auto or certificate-policy auto bindings, route readiness alone is not sufficient. The binding remains `bound` until certificate issuance completes. `certificate-requested` is consumed by the certificate worker through provider-neutral ports; `certificate-issued` records active certificate state and drives certificate-backed `domain-ready`; `certificate-issuance-failed` records failed or retry-scheduled attempt state.
 
 The route readiness baseline does not create a separate public command. It is an event/process-manager continuation from `domain-bound` and a query/read-model projection for resources and domain bindings.
 
@@ -272,8 +270,12 @@ provider/store failure. The default shell provider is intentionally unavailable 
 provider adapter is configured, so CLI/API users can observe retryable
 `certificate_provider_unavailable` state.
 
+Current code implements certificate-backed domain readiness: `certificate-issued` is consumed for a
+bound TLS-auto binding, marks the binding `ready`, publishes `domain-ready`, and allows resource
+access summaries to project the durable custom domain as HTTPS.
+
 Real ACME provider issuance, outbox/inbox workflow, DNS-provider verification, route realization
-failure state, retry scheduler execution, proxy reload, and certificate-backed domain readiness are
+failure state, retry scheduler execution, and proxy reload are
 not implemented yet.
 
 ## Open Questions

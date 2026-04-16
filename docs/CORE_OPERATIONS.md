@@ -370,6 +370,9 @@ Current boundary:
 - `certificate-requested` is also a first-class event behavior entrypoint: the certificate worker
   consumes it through injected provider and secret-store ports, then records `certificate-issued` or
   `certificate-issuance-failed` as durable follow-up state
+- `certificate-issued` is a first-class event behavior entrypoint for certificate-backed readiness:
+  when the referenced domain binding is still bound, the handler marks it ready and publishes
+  `domain-ready`
 - the default shell composition intentionally registers an unavailable certificate provider until a
   real provider adapter is configured; this records retryable `certificate_provider_unavailable`
   state after accepted issue requests rather than pretending HTTPS is active

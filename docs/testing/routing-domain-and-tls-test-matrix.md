@@ -113,6 +113,7 @@ Then:
 | ROUTE-TLS-READMODEL-003 | integration | Bound TLS-auto route stays not ready | TLS-auto binding is `bound` but no certificate is active | `resources.list` does not expose the binding as `latestDurableDomainRoute`; `domain-bindings.list` remains `bound` |
 | ROUTE-TLS-READMODEL-004 | integration | Certificate request list projection | `certificates.issue-or-renew` accepted a first issue attempt | `certificates.list` returns certificate `pending`, latest attempt `requested`, and the selected provider/challenge values |
 | ROUTE-TLS-READMODEL-005 | integration | Certificate terminal list projection | `certificate-requested` handler recorded issued or failed attempt state | `certificates.list` returns certificate `active` with latest attempt `issued`, expiry/fingerprint metadata when issued, or `failed`/`retry_scheduled` with safe failure metadata when issuance failed |
+| ROUTE-TLS-READMODEL-006 | integration | Certificate-backed durable HTTPS route projection | TLS-auto binding consumed `certificate-issued`, published `domain-ready`, and a latest succeeded reverse-proxy deployment exists | `resources.list` exposes `accessSummary.latestDurableDomainRoute` as `https://<domain>` while preserving generated access when present |
 
 ## Async Failure Matrix
 
@@ -200,10 +201,13 @@ Current tests cover `ROUTE-TLS-EVT-005`, `ROUTE-TLS-EVT-006`, and
 provider and secret-store ports, including issued state, retryable provider failure state, terminal
 events, and public certificate read-model projection.
 
+Current tests also cover `ROUTE-TLS-EVT-008` and `ROUTE-TLS-READMODEL-006` for
+`certificate-issued` driven domain readiness and certificate-backed durable HTTPS route projection.
+
 Current tests do not yet cover DNS-provider verification workflow, certificate validation failure
-branches, event replay handling beyond the create/confirm/domain-ready baseline, resource-scoped
-browser/e2e behavior, route realization failure state, real ACME provider behavior, or
-certificate-backed domain readiness read-model projection.
+branches, event replay handling beyond the create/confirm/domain-ready/certificate-issued baseline,
+resource-scoped browser/e2e behavior, route realization failure state, or real ACME provider
+behavior.
 
 Generated default access routing tests are governed by [Default Access Domain And Proxy Routing Test Matrix](./default-access-domain-and-proxy-routing-test-matrix.md) and must remain separate from durable domain binding readiness tests.
 
