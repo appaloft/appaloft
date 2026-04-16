@@ -113,7 +113,7 @@ export function createYunduTranslator(input?: {
 
 export interface LocalizableDomainError {
   code: string;
-  category: "user" | "infra" | "provider" | "retryable";
+  category: "user" | "infra" | "provider" | "retryable" | "timeout";
   message: string;
   retryable: boolean;
   details?: Record<string, string | number | boolean | null>;
@@ -140,6 +140,10 @@ export function translateDomainError(error: LocalizableDomainError, t: YunduTran
     case "domain_binding_proxy_required":
     case "domain_binding_context_mismatch":
     case "resource_context_mismatch":
+    case "terminal_session_context_mismatch":
+    case "terminal_session_workspace_unavailable":
+    case "terminal_session_policy_denied":
+    case "terminal_session_not_found":
       return t(i18nKeys.errors.domain.validation, { message: error.message });
     case "validation_error":
       return t(i18nKeys.errors.domain.validation, { message: error.message });
@@ -151,6 +155,10 @@ export function translateDomainError(error: LocalizableDomainError, t: YunduTran
       }
 
       if (error.category === "retryable") {
+        return t(i18nKeys.errors.domain.retryable, { message: error.message });
+      }
+
+      if (error.category === "timeout") {
         return t(i18nKeys.errors.domain.retryable, { message: error.message });
       }
 

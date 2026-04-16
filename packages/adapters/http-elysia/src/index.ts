@@ -8,6 +8,8 @@ import {
   type ExecutionContext,
   type ExecutionContextFactory,
   type QueryBus,
+  type TerminalSession,
+  type TerminalSessionGateway,
 } from "@yundu/application";
 import { type AppConfig } from "@yundu/config";
 import { apiVersion } from "@yundu/contracts";
@@ -73,6 +75,30 @@ interface RequestContextRunner {
     context: ExecutionContext,
     callback: () => Promise<T>,
   ): Promise<T>;
+}
+
+type TerminalClientMessage =
+  | {
+      kind: "input";
+      data: string;
+    }
+  | {
+      kind: "resize";
+      rows: number;
+      cols: number;
+    }
+  | {
+      kind: "close";
+    };
+
+interface TerminalWebSocket {
+  data?: {
+    params?: {
+      sessionId?: string;
+    };
+  };
+  send(message: string): void;
+  close(code?: number, reason?: string): void;
 }
 
 type EmbeddedStaticAssets = Readonly<Record<string, Blob>>;
@@ -228,6 +254,64 @@ function encodeServerSentEvent(input: { event?: string; data: unknown }): string
   return `${lines.join("\n")}\n\n`;
 }
 
+function decodeTerminalClientMessage(message: unknown): TerminalClientMessage | null {
+  let parsed: unknown;
+
+  if (typeof message === "string") {
+    try {
+      parsed = JSON.parse(message);
+    } catch {
+      return null;
+    }
+  } else if (message instanceof ArrayBuffer) {
+    try {
+      parsed = JSON.parse(new TextDecoder().decode(message));
+    } catch {
+      return null;
+    }
+  } else if (message instanceof Uint8Array) {
+    try {
+      parsed = JSON.parse(new TextDecoder().decode(message));
+    } catch {
+      return null;
+    }
+  } else {
+    parsed = message;
+  }
+
+  if (!parsed || typeof parsed !== "object") {
+    return null;
+  }
+
+  const record = parsed as Record<string, unknown>;
+  if (record.kind === "input" && typeof record.data === "string") {
+    return {
+      kind: "input",
+      data: record.data,
+    };
+  }
+
+  if (
+    record.kind === "resize" &&
+    typeof record.rows === "number" &&
+    typeof record.cols === "number"
+  ) {
+    return {
+      kind: "resize",
+      rows: record.rows,
+      cols: record.cols,
+    };
+  }
+
+  if (record.kind === "close") {
+    return {
+      kind: "close",
+    };
+  }
+
+  return null;
+}
+
 function registerPluginRoute(app: Elysia, route: SystemPluginHttpRoute): Elysia {
   const handler = async ({
     request,
@@ -275,6 +359,7 @@ export function createHttpApp(input: {
   logger: AppLogger;
   executionContextFactory: ExecutionContextFactory;
   deploymentProgressObserver?: DeploymentProgressObserver;
+  terminalSessionGateway?: TerminalSessionGateway;
   pluginRuntime?: SystemPluginRuntime;
   authRuntime?: AuthRuntime;
   requestContextRunner?: RequestContextRunner;
@@ -285,6 +370,8 @@ export function createHttpApp(input: {
   const staticDir = input.config.webStaticDir ? resolve(input.config.webStaticDir) : null;
   const embeddedStaticAssets = input.embeddedStaticAssets ?? {};
   const allowedOrigins = createAllowedOrigins(input.config.webOrigin);
+  const terminalSessionsBySocket = new WeakMap<object, TerminalSession>();
+  const terminalSessionsBySessionId = new Map<string, TerminalSession>();
 
   function staticResponse(pathname: string): Response | null {
     const relativePath = pathname === "/" ? "index.html" : pathname.replace(/^\/+/, "");
@@ -382,6 +469,88 @@ export function createHttpApp(input: {
         connection: "keep-alive",
       },
     });
+  }
+
+  function attachTerminalSession(socket: TerminalWebSocket, socketKey: object): void {
+    const sessionId = socket.data?.params?.sessionId;
+
+    if (!input.terminalSessionGateway || !sessionId) {
+      socket.close(1011, "Terminal session gateway is unavailable");
+      return;
+    }
+
+    const result = input.terminalSessionGateway.attach(sessionId);
+    result.match(
+      (session) => {
+        terminalSessionsBySocket.set(socketKey, session);
+        terminalSessionsBySessionId.set(sessionId, session);
+        void streamTerminalSession(socket, sessionId, session);
+      },
+      (error) => {
+        socket.send(
+          JSON.stringify({
+            kind: "error",
+            error,
+          }),
+        );
+        socket.close(1011, error.message);
+      },
+    );
+  }
+
+  function terminalSessionForSocket(
+    socket: TerminalWebSocket,
+    socketKey: object,
+  ): TerminalSession | null {
+    const socketSession = terminalSessionsBySocket.get(socketKey);
+    if (socketSession) {
+      return socketSession;
+    }
+
+    const sessionId = socket.data?.params?.sessionId;
+    if (!sessionId) {
+      return null;
+    }
+
+    const session = terminalSessionsBySessionId.get(sessionId);
+    if (!session) {
+      return null;
+    }
+
+    terminalSessionsBySocket.set(socketKey, session);
+    return session;
+  }
+
+  async function streamTerminalSession(
+    socket: TerminalWebSocket,
+    sessionId: string,
+    session: TerminalSession,
+  ): Promise<void> {
+    try {
+      for await (const frame of session) {
+        socket.send(JSON.stringify(frame));
+
+        if (frame.kind === "closed" || frame.kind === "error") {
+          socket.close(1000, frame.kind === "closed" ? frame.reason : frame.error.message);
+          break;
+        }
+      }
+    } catch (error) {
+      socket.send(
+        JSON.stringify({
+          kind: "error",
+          error: {
+            code: "terminal_session_stream_failed",
+            category: "infra",
+            message: error instanceof Error ? error.message : String(error),
+            retryable: false,
+          },
+        }),
+      );
+      socket.close(1011, "Terminal session stream failed");
+    } finally {
+      terminalSessionsBySessionId.delete(sessionId);
+    }
   }
 
   const baseApp = new Elysia()
@@ -519,7 +688,45 @@ export function createHttpApp(input: {
     })
     .get("/api/system-plugins/web-extensions", async () => ({
       items: input.pluginRuntime?.listWebExtensions() ?? [],
-    }));
+    }))
+    .ws("/api/terminal-sessions/:sessionId/attach", {
+      open(ws) {
+        attachTerminalSession(ws as unknown as TerminalWebSocket, ws as object);
+      },
+      async message(ws, message) {
+        const session = terminalSessionForSocket(ws as unknown as TerminalWebSocket, ws as object);
+        const parsed = decodeTerminalClientMessage(message);
+
+        if (!session || !parsed) {
+          return;
+        }
+
+        switch (parsed.kind) {
+          case "input":
+            await session.write(parsed.data);
+            break;
+          case "resize":
+            await session.resize({
+              rows: parsed.rows,
+              cols: parsed.cols,
+            });
+            break;
+          case "close":
+            await session.close();
+            break;
+        }
+      },
+      close(ws) {
+        const socket = ws as unknown as TerminalWebSocket;
+        const session = terminalSessionForSocket(socket, ws as object);
+        const sessionId = socket.data?.params?.sessionId;
+        terminalSessionsBySocket.delete(ws as object);
+        if (sessionId) {
+          terminalSessionsBySessionId.delete(sessionId);
+        }
+        void session?.close();
+      },
+    });
 
   let app = baseApp as unknown as Elysia;
 

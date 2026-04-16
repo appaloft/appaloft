@@ -16,6 +16,7 @@ import {
   type ListGitHubRepositoriesQueryInput,
   type ListResourcesQueryInput,
   type ListSshCredentialsQueryInput,
+  type OpenTerminalSessionCommandInput,
   type PromoteEnvironmentCommandInput,
   type RegisterServerCommandInput,
   type ResourceDiagnosticSummaryQueryInput,
@@ -57,6 +58,7 @@ import {
   type ResourceRuntimeLogEvent,
   type ResourceRuntimeLogsResponse,
   type ResourceRuntimeLogsStreamResponse,
+  type TerminalSessionDescriptor,
   type TestServerConnectivityResponse,
 } from "@yundu/contracts";
 
@@ -207,6 +209,14 @@ export type YunduOrpcClientContract = {
       YunduClientContext,
       ResourceRuntimeLogsQueryInput,
       AsyncIteratorClass<ResourceRuntimeLogEvent, ResourceRuntimeLogsStreamResponse, void>,
+      YunduClientError
+    >;
+  };
+  terminalSessions: {
+    open: Client<
+      YunduClientContext,
+      OpenTerminalSessionCommandInput,
+      TerminalSessionDescriptor,
       YunduClientError
     >;
   };

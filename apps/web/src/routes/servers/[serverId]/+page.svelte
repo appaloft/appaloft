@@ -17,6 +17,7 @@
   import { readErrorMessage } from "$lib/api/client";
   import ConsoleShell from "$lib/components/console/ConsoleShell.svelte";
   import DeploymentTable from "$lib/components/console/DeploymentTable.svelte";
+  import TerminalSessionPanel from "$lib/components/console/TerminalSessionPanel.svelte";
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
   import { Skeleton } from "$lib/components/ui/skeleton";
@@ -313,6 +314,15 @@
           </div>
         </section>
       </section>
+
+      <TerminalSessionPanel
+        title={$t(i18nKeys.console.terminal.serverTitle)}
+        description={$t(i18nKeys.console.terminal.serverDescription)}
+        scope={{
+          kind: "server",
+          serverId: server.id,
+        }}
+      />
     </div>
   {/if}
 </ConsoleShell>

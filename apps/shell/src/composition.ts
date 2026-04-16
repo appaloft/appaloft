@@ -11,6 +11,7 @@ import {
   type IdGenerator,
   type IntegrationAuthPort,
   type QueryBus,
+  type TerminalSessionGateway,
   tokens,
 } from "@yundu/application";
 import { createBetterAuthRuntime } from "@yundu/auth-better";
@@ -126,6 +127,10 @@ export async function createAppComposition(
     childContainer,
     tokens.integrationAuthPort,
   );
+  const terminalSessionGateway = resolveToken<TerminalSessionGateway>(
+    childContainer,
+    tokens.terminalSessionGateway,
+  );
   const webStaticDir = await resolveWebStaticDir(config, options);
 
   const httpApp = createHttpApp({
@@ -135,6 +140,7 @@ export async function createAppComposition(
     logger,
     executionContextFactory,
     deploymentProgressObserver: deploymentProgressReporter,
+    terminalSessionGateway,
     pluginRuntime,
     authRuntime,
     requestContextRunner,

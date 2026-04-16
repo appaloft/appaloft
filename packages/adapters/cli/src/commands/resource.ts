@@ -2,6 +2,7 @@ import { Args, Command as EffectCommand, Options } from "@effect/cli";
 import {
   CreateResourceCommand,
   ListResourcesQuery,
+  OpenTerminalSessionCommand,
   ResourceDiagnosticSummaryQuery,
   ResourceHealthQuery,
   ResourceProxyConfigurationPreviewQuery,
@@ -29,6 +30,9 @@ const descriptionOption = Options.text("description").pipe(Options.optional);
 const internalPortOption = Options.text("internal-port").pipe(Options.optional);
 const portOption = Options.text("port").pipe(Options.optional);
 const deploymentOption = Options.text("deployment").pipe(Options.optional);
+const directoryOption = Options.text("directory").pipe(Options.optional);
+const rowsOption = Options.text("rows").pipe(Options.withDefault("24"));
+const colsOption = Options.text("cols").pipe(Options.withDefault("80"));
 const serviceOption = Options.text("service").pipe(Options.optional);
 const routeScopeOption = Options.choice("scope", ["planned", "latest", "deployment-snapshot"]).pipe(
   Options.withDefault("latest"),
@@ -124,6 +128,30 @@ const logsCommand = EffectCommand.make(
     ),
 ).pipe(EffectCommand.withDescription("Show resource runtime logs"));
 
+const terminalCommand = EffectCommand.make(
+  "terminal",
+  {
+    resourceId: resourceIdArg,
+    deployment: deploymentOption,
+    directory: directoryOption,
+    rows: rowsOption,
+    cols: colsOption,
+  },
+  ({ cols, deployment, directory, resourceId, rows }) =>
+    runCommand(
+      OpenTerminalSessionCommand.create({
+        scope: {
+          kind: "resource",
+          resourceId,
+          deploymentId: optionalValue(deployment),
+        },
+        relativeDirectory: optionalValue(directory),
+        initialRows: Number(rows),
+        initialCols: Number(cols),
+      }),
+    ),
+).pipe(EffectCommand.withDescription("Open a resource terminal session"));
+
 const proxyConfigCommand = EffectCommand.make(
   "proxy-config",
   {
@@ -198,6 +226,7 @@ export const resourceCommand = EffectCommand.make("resource").pipe(
   EffectCommand.withSubcommands([
     createCommand,
     listCommand,
+    terminalCommand,
     logsCommand,
     healthCommand,
     proxyConfigCommand,
