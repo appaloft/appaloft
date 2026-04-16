@@ -19,6 +19,7 @@ export const tokens = {
   certificateProviderSelectionPolicy: Symbol.for("yundu.certificate_provider_selection_policy"),
   certificateProvider: Symbol.for("yundu.certificate_provider"),
   certificateSecretStore: Symbol.for("yundu.certificate_secret_store"),
+  certificateHttpChallengeTokenStore: Symbol.for("yundu.certificate_http_challenge_token_store"),
   deploymentContextDefaultsPolicy: Symbol.for("yundu.deployment_context_defaults_policy"),
   projectReadModel: Symbol.for("yundu.project_read_model"),
   serverReadModel: Symbol.for("yundu.server_read_model"),

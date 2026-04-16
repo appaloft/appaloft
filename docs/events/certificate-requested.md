@@ -69,6 +69,11 @@ certificate attempt: requested -> issuing
 
 ## Follow-Up Actions
 
+For provider/challenge combinations that require HTTP challenge serving, the certificate provider
+worker may publish a public challenge token through the injected challenge token store before
+calling the provider validation/order finalization API. Published tokens must be removed after the
+provider succeeds, fails, or aborts the attempt.
+
 Successful handling publishes `certificate-issued`.
 
 Failed handling publishes `certificate-issuance-failed`.
@@ -99,8 +104,10 @@ The current provider-worker slice implements a provider-neutral `certificate-req
 handler that consumes the event, calls injected certificate provider and secret-store ports, records
 issued or failed attempt state, and publishes `certificate-issued` or
 `certificate-issuance-failed`. The first implementation is still provider-port driven and does not
-ship a real ACME adapter, ACME account model, challenge token serving, or certificate-backed
-`domain-ready`.
+ship a real ACME adapter or ACME account model.
+
+Current code has an HTTP-01 challenge token serving port and HTTP adapter route that provider
+adapters can use during challenge preparation.
 
 ## Open Questions
 

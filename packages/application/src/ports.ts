@@ -260,6 +260,32 @@ export interface CertificateSecretStore {
   ): Promise<Result<{ secretRef: string }, DomainError>>;
 }
 
+export interface CertificateHttpChallengeToken {
+  domainName: string;
+  token: string;
+  keyAuthorization: string;
+  publishedAt: string;
+  expiresAt?: string;
+  certificateId?: string;
+  attemptId?: string;
+  providerKey?: string;
+}
+
+export interface CertificateHttpChallengeTokenStore {
+  publish(
+    context: ExecutionContext,
+    token: CertificateHttpChallengeToken,
+  ): Promise<Result<CertificateHttpChallengeToken, DomainError>>;
+  find(
+    context: ExecutionContext,
+    input: { token: string; domainName: string },
+  ): Promise<Result<CertificateHttpChallengeToken | null, DomainError>>;
+  remove(
+    context: ExecutionContext,
+    input: { token: string; domainName: string },
+  ): Promise<Result<void, DomainError>>;
+}
+
 export interface ProjectSummary {
   id: string;
   name: string;

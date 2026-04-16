@@ -6,6 +6,7 @@ import { createCliProgram } from "@yundu/adapter-cli";
 import { createHttpApp } from "@yundu/adapter-http-elysia";
 import {
   type AppLogger,
+  type CertificateHttpChallengeTokenStore,
   type CommandBus,
   type ExecutionContext,
   type IdGenerator,
@@ -131,6 +132,10 @@ export async function createAppComposition(
     childContainer,
     tokens.terminalSessionGateway,
   );
+  const certificateHttpChallengeTokenStore = resolveToken<CertificateHttpChallengeTokenStore>(
+    childContainer,
+    tokens.certificateHttpChallengeTokenStore,
+  );
   const webStaticDir = await resolveWebStaticDir(config, options);
 
   const httpApp = createHttpApp({
@@ -141,6 +146,7 @@ export async function createAppComposition(
     executionContextFactory,
     deploymentProgressObserver: deploymentProgressReporter,
     terminalSessionGateway,
+    certificateHttpChallengeTokenStore,
     pluginRuntime,
     authRuntime,
     requestContextRunner,

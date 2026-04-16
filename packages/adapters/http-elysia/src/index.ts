@@ -2,6 +2,7 @@ import { existsSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
 import {
   type AppLogger,
+  type CertificateHttpChallengeTokenStore,
   type CommandBus,
   type DeploymentProgressObserver,
   DoctorQuery,
@@ -216,6 +217,21 @@ function isApiPath(pathname: string): boolean {
   return pathname === "/api" || pathname.startsWith("/api/");
 }
 
+function resolveRequestHostname(request: Request): string | null {
+  const host = request.headers.get("host")?.trim();
+
+  if (!host) {
+    return null;
+  }
+
+  try {
+    return new URL(`http://${host}`).hostname.toLowerCase();
+  } catch {
+    const fallback = host.split(":")[0]?.trim().toLowerCase();
+    return fallback && fallback.length > 0 ? fallback : null;
+  }
+}
+
 function resolveCorsOrigin(request: Request, allowedOrigins: Set<string>): string | null {
   const origin = request.headers.get("origin");
 
@@ -364,6 +380,7 @@ export function createHttpApp(input: {
   authRuntime?: AuthRuntime;
   requestContextRunner?: RequestContextRunner;
   embeddedStaticAssets?: EmbeddedStaticAssets;
+  certificateHttpChallengeTokenStore?: CertificateHttpChallengeTokenStore;
 }) {
   const pluginMiddlewares = input.pluginRuntime?.listHttpMiddlewares() ?? [];
   const pluginRoutes = input.pluginRuntime?.listHttpRoutes() ?? [];
@@ -469,6 +486,59 @@ export function createHttpApp(input: {
         connection: "keep-alive",
       },
     });
+  }
+
+  async function serveHttpChallenge(request: Request, token: string): Promise<Response> {
+    const notFound = () =>
+      new Response("Not found", {
+        status: 404,
+        headers: {
+          "cache-control": "no-store",
+          "content-type": "text/plain; charset=utf-8",
+        },
+      });
+    const normalizedToken = token.trim();
+    const domainName = resolveRequestHostname(request);
+
+    if (!input.certificateHttpChallengeTokenStore || !normalizedToken || !domainName) {
+      return notFound();
+    }
+
+    const requestId = request.headers.get("x-request-id");
+    const context = input.executionContextFactory.create({
+      entrypoint: "http",
+      locale: resolveYunduLocaleFromHeaders(request.headers),
+      ...(requestId ? { requestId } : {}),
+    });
+    const result = await input.certificateHttpChallengeTokenStore.find(context, {
+      token: normalizedToken,
+      domainName,
+    });
+
+    return result.match(
+      (challenge) => {
+        if (!challenge) {
+          return notFound();
+        }
+
+        return new Response(challenge.keyAuthorization, {
+          status: 200,
+          headers: {
+            "cache-control": "no-store",
+            "content-type": "text/plain; charset=utf-8",
+          },
+        });
+      },
+      (error) => {
+        input.logger.warn("http_challenge_token_lookup_failed", {
+          requestId: context.requestId,
+          domainName,
+          errorCode: error.code,
+          message: error.message,
+        });
+        return notFound();
+      },
+    );
   }
 
   function attachTerminalSession(socket: TerminalWebSocket, socketKey: object): void {
@@ -668,6 +738,9 @@ export function createHttpApp(input: {
       apiVersion,
       mode: input.config.runtimeMode,
     }))
+    .get("/.well-known/acme-challenge/:token", ({ request, params }) =>
+      serveHttpChallenge(request, params.token),
+    )
     .get("/api/schemas/yundu-config.json", () => yunduDeploymentConfigJsonSchema)
     .get("/api/deployment-progress/:requestId", ({ request, params }) =>
       deploymentProgressStream(request, params.requestId),

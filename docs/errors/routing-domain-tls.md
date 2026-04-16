@@ -108,6 +108,7 @@ Admission errors reject the command and return `err(DomainError)`.
 | DNS lookup/provider unavailable | Binding remains not ready or retry scheduled; record `code = dns_lookup_failed`, `phase = domain-verification`. | Yes when transient. |
 | Route realization fails | Binding remains not ready; record `code = route_realization_failed`, `phase = route-realization`. | Yes when proxy/provider can recover. |
 | Certificate challenge preparation fails | `certificate-issuance-failed` with `code = certificate_challenge_preparation_failed`, `failurePhase = challenge-preparation`. | No until configuration changes. |
+| HTTP-01 challenge token serving misses a token | Challenge route returns `404`; no domain state mutation. Provider validation later maps the CA failure to `certificate_challenge_failed`, `failurePhase = domain-validation`. | No until route/token/DNS configuration changes. |
 | Certificate provider request fails | `certificate-issuance-failed` with `code = certificate_provider_unavailable`, `failurePhase = provider-request`. | Yes when transient. |
 | Domain validation fails | `certificate-issuance-failed` with `code = certificate_challenge_failed`, `failurePhase = domain-validation`. | No until DNS/binding config changes. |
 | Certificate storage fails | `certificate-issuance-failed` with `code = certificate_storage_failed`, `failurePhase = certificate-storage`. | Yes when storage can recover. |
@@ -169,6 +170,10 @@ into durable failed or retry-scheduled certificate attempt state and publishes
 
 Current code consumes `certificate-issued` for certificate-backed domain readiness and publishes
 `domain-ready` after the referenced bound domain binding is marked ready.
+
+Current code serves HTTP-01 challenge tokens through an injected challenge token store. Missing,
+expired, removed, or host-mismatched challenge requests return HTTP `404` and do not mutate
+certificate or domain binding state.
 
 Route realization failure state, DNS-provider verification failure state, real provider-specific
 failure mapping, retry scheduler execution, and proxy reload are not implemented yet.
