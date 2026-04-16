@@ -106,7 +106,8 @@ Tests must assert:
 ## Current Implementation Notes And Migration Gaps
 
 `resources.runtime-logs` maps synchronous context/runtime resolution failures to `DomainError`
-results and maps backend process stream failures to `resource_runtime_log_stream_failed`.
+results, maps backend process stream failures to `resource_runtime_log_stream_failed`, and maps
+process-backed bounded read stalls to retriable `timeout` stream errors.
 
 Existing deployment log errors remain deployment-attempt specific and do not replace runtime log
 open/stream phase errors.

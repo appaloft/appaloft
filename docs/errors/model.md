@@ -86,6 +86,7 @@ Codes must be stable identifiers, not localized text. Examples:
 | `conflict` | `conflict` | conflict subject and state |
 | `deployment_not_redeployable` | `domain` or `application` | deployment id, resource id, current status |
 | `provider_error` | `integration` | provider key and operation |
+| `runtime_target_unsupported` | `application` or `integration` | target kind, provider key, missing capability, selected target/destination context |
 | `infra_error` | `infra` | adapter and operation |
 | `retryable_error` | category by source plus `retriable = true` | retry owner and retry hint when available |
 | `edge_proxy_provider_unsupported` | `integration` | server id, provider key, proxy kind |

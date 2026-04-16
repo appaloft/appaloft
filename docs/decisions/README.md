@@ -45,6 +45,9 @@ rebuild-required there, update the operation map and required ADR before local s
 | [ADR-018: Resource Runtime Log Observation](./ADR-018-resource-runtime-log-observation.md) | Accepted | Application runtime logs are resource-owned observation through an injected runtime log reader port, not a Docker-specific deployment-log concern. |
 | [ADR-019: Edge Proxy Provider And Observable Configuration](./ADR-019-edge-proxy-provider-and-observable-configuration.md) | Accepted | Provider-neutral edge proxy provider boundary and read-only proxy configuration visibility. |
 | [ADR-020: Resource Health Observation](./ADR-020-resource-health-observation.md) | Accepted | Current resource health is a resource-owned observation from runtime, health policy, proxy, and access signals, not latest deployment status. |
+| [ADR-021: Docker/OCI Workload Substrate](./ADR-021-docker-oci-workload-substrate.md) | Accepted | v1 deployment execution uses Docker/OCI images and containers behind provider-neutral resource/deployment contracts. |
+| [ADR-022: Operator Terminal Session Boundary](./ADR-022-operator-terminal-session-boundary.md) | Accepted | Ephemeral server/resource terminal sessions use an explicit command and runtime port, with resource scope resolving deployment workspaces by deployment metadata. |
+| [ADR-023: Runtime Orchestration Target Boundary](./ADR-023-runtime-orchestration-target-boundary.md) | Accepted | Deployment runtime target backends consume the Docker/OCI workload substrate behind provider-neutral deployment/resource contracts, enabling future Swarm or Kubernetes support without changing deployment admission. |
 
 ## Authoring Rules
 

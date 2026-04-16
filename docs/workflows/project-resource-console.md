@@ -22,13 +22,16 @@ This workflow inherits:
 - [ADR-015: Resource Network Profile](../decisions/ADR-015-resource-network-profile.md)
 - [ADR-018: Resource Runtime Log Observation](../decisions/ADR-018-resource-runtime-log-observation.md)
 - [ADR-020: Resource Health Observation](../decisions/ADR-020-resource-health-observation.md)
+- [ADR-022: Operator Terminal Session Boundary](../decisions/ADR-022-operator-terminal-session-boundary.md)
 - [resources.create Command Spec](../commands/resources.create.md)
 - [deployments.create Command Spec](../commands/deployments.create.md)
+- [terminal-sessions.open Command Spec](../commands/terminal-sessions.open.md)
 - [resources.health Query Spec](../queries/resources.health.md)
 - [resources.diagnostic-summary Query Spec](../queries/resources.diagnostic-summary.md)
 - [resources.runtime-logs Query Spec](../queries/resources.runtime-logs.md)
 - [Resource Diagnostic Summary Workflow Spec](./resource-diagnostic-summary.md)
 - [Resource Runtime Log Observation Workflow Spec](./resource-runtime-log-observation.md)
+- [Operator Terminal Session Workflow Spec](./operator-terminal-session.md)
 - [Quick Deploy Workflow Spec](./quick-deploy.md)
 - [Resource Create And First Deploy Workflow Spec](./resources.create-and-first-deploy.md)
 - [Project Resource Console Implementation Plan](../implementation/project-resource-console-plan.md)
@@ -84,6 +87,8 @@ Resource detail pages must be the primary owner-scoped surface for:
   deployment detail snapshot;
 - application runtime logs through `resources.runtime-logs` when an observable runtime instance
   exists;
+- resource-scoped terminal access through `terminal-sessions.open` when operator access is enabled
+  and a safe deployment workspace can be resolved;
 - copyable diagnostic summary through `resources.diagnostic-summary` when support/debug context is
   needed, especially when access, proxy configuration, or runtime logs are empty or unavailable;
 - source binding, runtime profile, and network profile setup;
@@ -128,10 +133,10 @@ The access URL must be visible on the first/default resource tab when available 
 primary application outcome. It must not be hidden only behind a later access tab or a deployment
 detail page.
 
-Deployment history and runtime logs must be later top-level tabs. They are attempt/runtime
-observations and must not displace the durable resource configuration surface as the default
-application page. Top-level tabs with only one content panel, such as deployment history or runtime
-logs, must not render a redundant inner sidebar.
+Deployment history, runtime logs, and terminal sessions must be later top-level tabs or operational
+sections. They are attempt/runtime/operator observations and must not displace the durable resource
+configuration surface as the default application page. Top-level tabs with only one content panel,
+such as deployment history or runtime logs, must not render a redundant inner sidebar.
 
 Routine resource-scoped domain binding and TLS creation must be inline in the configuration tab's
 access/domain section. A modal may be used only for destructive confirmation, advanced flows, or
@@ -204,6 +209,7 @@ Allowed entry differences:
 | Resource page deployment history | Queries deployments filtered by resource. |
 | Resource page health | Queries `resources.health` or reads a compact health projection when available; latest deployment status remains context. |
 | Resource page diagnostic summary | Queries `resources.diagnostic-summary` with `resourceId` and optional `deploymentId`; copies structured support/debug context. |
+| Resource page terminal | Dispatches `terminal-sessions.open` with resource scope and attaches to the returned terminal transport; starts in the resolved deployment workspace. |
 | Sidebar resource item | Navigates to resource detail and displays read-model status. |
 | Global deployments page | Read-model rollup/filter view, not owner of deployment write actions. |
 
@@ -232,6 +238,10 @@ state. The same access URL should not be treated as deployment-owned configurati
 
 `resources.health` exists. Resource detail and sidebar use unknown only when health is loading or
 unobserved, not as a deployment-status fallback.
+
+Resource/server terminal sessions are specified as accepted candidate behavior through
+`terminal-sessions.open`, but no Web resource tab/action, server action, command, or terminal
+transport exists yet.
 
 Deployment detail and Quick Deploy completion do not yet expose the action directly, so those
 surfaces still rely on navigation back to resource detail for the consolidated support payload.

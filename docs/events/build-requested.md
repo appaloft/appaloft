@@ -2,7 +2,7 @@
 
 ## Normative Contract
 
-`build-requested` means the deployment process has accepted a build/package step for an already accepted deployment request.
+`build-requested` means the deployment process has accepted an image build/package step for an already accepted deployment request.
 
 This is a formal async orchestration event in the target deployment workflow. It does not mean the build has completed or deployment has started.
 
@@ -22,7 +22,9 @@ Publish after:
 2. source information is available;
 3. the immutable environment snapshot exists;
 4. the runtime plan is resolved and persisted;
-5. the plan requires build/package work.
+5. the selected deployment target/destination has a runtime target backend with the capabilities
+   required for artifact distribution and runtime execution;
+6. the plan requires build/package work.
 
 ## Publisher
 
@@ -48,7 +50,13 @@ type BuildRequestedPayload = {
   resourceId: string;
   sourceKind: string;
   sourceLocator: string;
-  deploymentMethod: "auto" | "dockerfile" | "docker-compose" | "workspace-commands";
+  runtimeStrategy: "auto" | "dockerfile" | "docker-compose" | "workspace-commands" | "static";
+  expectedArtifact: "image" | "compose-project";
+  runtimeTarget?: {
+    targetKind: string;
+    providerKey: string;
+    backendKey?: string;
+  };
   environmentSnapshotId?: string;
   requestedAt: string;
   correlationId?: string;
@@ -56,7 +64,7 @@ type BuildRequestedPayload = {
 };
 ```
 
-Payload must reference immutable snapshots and ids, not raw secrets or mutable environment data.
+Payload must reference immutable snapshots and ids, not raw secrets or mutable environment data. It may include safe image naming intent in a future payload extension, but it must not include registry credentials.
 
 ## State Progression
 
@@ -81,10 +89,10 @@ If build/package work is required, it must occur before `deployment-started`.
 
 ## Retry And Failure Handling
 
-Retriable build failure should be recorded as async-processing failure with:
+Retriable image build/package failure should be recorded as async-processing failure with:
 
 - `code`;
-- `phase = build`;
+- `phase = image-build`;
 - `deploymentId`;
 - `runtimePlanId`;
 - `retriable = true`;

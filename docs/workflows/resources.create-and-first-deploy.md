@@ -52,6 +52,19 @@ user or automation intent
 
 Source binding, runtime profile, and network profile are resource-owned inputs for first-deploy resource creation. Generated default access is resolved from platform policy, server/proxy readiness, and resource network state during deployment planning/execution. Durable custom domain/TLS defaults remain separate domain binding and certificate concerns.
 
+For v1, first-deploy runtime profile choices must produce a Docker/OCI image artifact or Docker
+Compose project governed by [ADR-021](../decisions/ADR-021-docker-oci-workload-substrate.md). A
+source without a Dockerfile still deploys through a generated/buildpack-style image plan, not a
+long-lived host-process plan.
+
+First-deploy resource creation does not configure the concrete runtime orchestrator. The selected
+deployment target and destination choose the runtime target backend during `deployments.create`, as
+governed by
+[ADR-023: Runtime Orchestration Target Boundary](../decisions/ADR-023-runtime-orchestration-target-boundary.md).
+Kubernetes namespaces, Helm values, Swarm stack fields, and other orchestrator-specific settings
+must not be stored as generic resource runtime profile fields without a future target/profile Spec
+Round.
+
 The workflow must distinguish source selection from runtime planning. A selected source locator or source descriptor identifies what will be deployed. A runtime plan strategy describes how that source should be planned. The compatibility input name `deploymentMethod` may exist only at CLI/UI entry boundaries and must map to resource `RuntimePlanStrategy` before `resources.create`.
 
 Source selection is variant-specific. Entry workflows may let a user paste a compact address such as

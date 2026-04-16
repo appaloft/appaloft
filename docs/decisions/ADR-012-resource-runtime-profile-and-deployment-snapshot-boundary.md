@@ -21,6 +21,8 @@ The target domain vocabulary is:
 - `DefaultAccessDomainPolicy`: provider-neutral policy for generated default public access, governed by [ADR-017](./ADR-017-default-access-domain-and-proxy-routing.md).
 - `RuntimePlanStrategy`: the planning strategy used to resolve a runtime plan from a source and runtime profile.
 - `RuntimePlanSnapshot`: the immutable resolved runtime plan persisted by the deployment attempt.
+- `RuntimeArtifactSnapshot`: the provider-neutral image or Compose artifact identity resolved for
+  one v1 deployment attempt, governed by [ADR-021](./ADR-021-docker-oci-workload-substrate.md).
 
 `deploymentMethod` is not a domain term. The domain term is `RuntimePlanStrategy`.
 
@@ -168,6 +170,12 @@ New domain code and new specs must use the domain terms above. They must not int
 
 `SourceDescriptor.kind` and `RuntimePlanStrategy` are not synonyms. A runtime planner may derive a default strategy from the source descriptor, but an explicit strategy override must be validated against the source descriptor and rejected as a command-admission error when the pair cannot produce a valid runtime plan.
 
+For v1, a valid `RuntimePlanStrategy` must produce or reference Docker/OCI-backed runtime artifacts
+as governed by [ADR-021](./ADR-021-docker-oci-workload-substrate.md). Buildpack-style `auto`,
+workspace-command, Dockerfile, static, Docker Compose, and prebuilt-image strategies are different
+ways to produce or reference image/container artifacts; they are not permission to run arbitrary
+long-lived host processes as the deployment substrate.
+
 Any future redeploy command must prefer the resource-side durable profile plus explicit redeploy overrides accepted by that command. Existing latest deployment snapshots may be used only as a migration fallback for resources that predate profile persistence.
 
 ## Consequences
@@ -194,6 +202,7 @@ Future implementation must not add more reusable configuration fields to `deploy
 - [ADR-015: Resource Network Profile](./ADR-015-resource-network-profile.md)
 - [ADR-017: Default Access Domain And Proxy Routing](./ADR-017-default-access-domain-and-proxy-routing.md)
 - [ADR-020: Resource Health Observation](./ADR-020-resource-health-observation.md)
+- [ADR-021: Docker/OCI Workload Substrate](./ADR-021-docker-oci-workload-substrate.md)
 - [Core Operations](../CORE_OPERATIONS.md)
 - [Domain Model](../DOMAIN_MODEL.md)
 

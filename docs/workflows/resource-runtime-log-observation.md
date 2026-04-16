@@ -5,8 +5,10 @@
 Resource runtime log observation is a read workflow over `resources.runtime-logs`.
 
 The workflow starts from a selected resource and lets an operator read a bounded tail or follow live
-application stdout/stderr. It must not reveal whether the underlying runtime backend is Docker, PM2,
-systemd, file tailing, or a provider API.
+application stdout/stderr. It must not reveal whether the underlying reader uses Docker, Docker
+Compose, or another future adapter. ADR-021 makes Docker/OCI the v1 workload substrate; PM2,
+systemd, file tailing, and provider API readers remain future normalized adapters unless a later
+ADR accepts them as workload runtime strategies.
 
 ## Global References
 
@@ -14,6 +16,7 @@ This workflow inherits:
 
 - [ADR-018: Resource Runtime Log Observation](../decisions/ADR-018-resource-runtime-log-observation.md)
 - [ADR-013: Project Resource Navigation And Deployment Ownership](../decisions/ADR-013-project-resource-navigation-and-deployment-ownership.md)
+- [ADR-021: Docker/OCI Workload Substrate](../decisions/ADR-021-docker-oci-workload-substrate.md)
 - [resources.runtime-logs Query Spec](../queries/resources.runtime-logs.md)
 - [Resource Runtime Logs Error Spec](../errors/resources.runtime-logs.md)
 - [Resource Runtime Logs Test Matrix](../testing/resource-runtime-logs-test-matrix.md)
@@ -112,11 +115,12 @@ HTTP/oRPC must:
 Resource runtime log observation is exposed through the resource detail Web panel, CLI
 `resource logs`, bounded oRPC reads, and streaming oRPC reads.
 
-The runtime reader supports host-process file logs, local Docker/Compose logs, and generic-SSH
-Docker/Compose logs from deployment runtime metadata, with short-lived SSH connection reuse for
-successive bounded/follow reads. The Web panel lazy-loads runtime logs when the logs tab is opened,
-then starts follow mode without re-appending the already visible bounded tail. Deployment pages still
-display deployment-attempt logs, which are not the same as live resource runtime logs.
+The runtime reader supports local Docker/Compose logs and generic-SSH Docker/Compose logs from
+deployment runtime metadata, with short-lived SSH connection reuse for successive bounded/follow
+reads. Any host-process file log reader is a legacy/diagnostic capability and is not a v1 public
+deployment substrate. The Web panel lazy-loads runtime logs when the logs tab is opened, then starts
+follow mode without re-appending the already visible bounded tail. Deployment pages still display
+deployment-attempt logs, which are not the same as live resource runtime logs.
 
 ## Open Questions
 

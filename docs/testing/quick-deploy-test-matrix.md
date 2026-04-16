@@ -16,6 +16,8 @@ This test matrix inherits:
 - [ADR-014: Deployment Admission Uses Resource Profile](../decisions/ADR-014-deployment-admission-uses-resource-profile.md)
 - [ADR-015: Resource Network Profile](../decisions/ADR-015-resource-network-profile.md)
 - [ADR-017: Default Access Domain And Proxy Routing](../decisions/ADR-017-default-access-domain-and-proxy-routing.md)
+- [ADR-021: Docker/OCI Workload Substrate](../decisions/ADR-021-docker-oci-workload-substrate.md)
+- [ADR-023: Runtime Orchestration Target Boundary](../decisions/ADR-023-runtime-orchestration-target-boundary.md)
 - [deployments.create Command Spec](../commands/deployments.create.md)
 - [resources.create Command Spec](../commands/resources.create.md)
 - [resources.diagnostic-summary Query Spec](../queries/resources.diagnostic-summary.md)
@@ -75,6 +77,8 @@ Then:
 | First variable supplied | Web or CLI | Environment variable key/value | Deployment request accepted | None | `environments.set-variable` before `deployments.create` | Variable is included in deployment snapshot after acceptance | Retry from persisted environment state |
 | Domain/TLS requested | Web or CLI | Domain/proxy/path/TLS draft | Domain binding command accepted after context exists | None | Context commands -> `resources.create` if needed -> `domain-bindings.create` | Domain binding state progresses independently from deployment attempt | Domain/certificate retry rules |
 | Source/runtime/network draft supplied | Web or CLI | Source locator/source descriptor plus runtime plan strategy hint, optional health check policy, and internal listener port | Deployment request accepted when compatible | None | Context commands -> `resources.create(source, runtimeProfile.healthCheck, networkProfile)` -> `deployments.create(resourceId)` | Resource owns source/runtime/network profile; deployment carries resolved runtime, health check, and network snapshots | Deployment retry creates new attempt |
+| Docker/OCI substrate draft | Web or CLI | Dockerfile, Compose, Docker image, static, auto/buildpack-style, or workspace-command choice | Deployment request accepted when the choice can produce or reference a Docker/OCI image or Compose project | None | Source/runtime normalization -> `resources.create(runtimeProfile.strategy)` -> `deployments.create(resourceId)` | Runtime profile records strategy; deployment planning resolves image or Compose artifact intent, not host-process execution | Per deployment |
+| Runtime target stays target-owned | Web or CLI | User selects or creates deployment target/server and destination | Deployment request accepted when the selected target has a registered runtime backend | None | Context commands -> `resources.create` if needed -> `deployments.create` | Quick Deploy does not send Kubernetes, Swarm, Helm, namespace, manifest, ingress-class, replica, or pull-secret fields as deployment input | Per target/backend error |
 | New HTTP health check policy | Web QuickDeploy or create-resource | Enable HTTP health check with path, expected status, interval, timeout, retries, and start period | Deployment request accepted when compatible | None | `resources.create(runtimeProfile.healthCheck)` -> `deployments.create(resourceId)` | Resource runtime profile owns reusable health policy; runtime plan mirrors policy for deployment verification | Per deployment |
 | GitHub tree URL source | Web or CLI | `https://github.com/coollabsio/coolify-examples/tree/v4.x/bun` | Deployment request accepted when repository/ref/path are valid | None | Source variant normalization -> context commands -> `resources.create(source.locator = repository, source.metadata.gitRef = v4.x, source.metadata.baseDirectory = /bun)` -> `deployments.create(resourceId)` | Resource owns repository source plus base directory; runtime clones repository and uses the base directory during detection/planning | Per deployment |
 | Slash-containing Git ref | Web or CLI with provider lookup | Deep Git URL whose branch or tag contains slashes | Deployment request accepted only when provider lookup proves the longest valid ref prefix | None or `validation_error`, phase `resource-source-resolution` | Provider branch/tag lookup before `resources.create` | No guessed ref/path split is persisted | No for ambiguous draft |
@@ -159,11 +163,17 @@ Current Web and CLI do not yet expose all source variant fields as typed drafts.
 cover the parser/normalizer as a unit before full UI coverage, but the workflow contract requires
 Web and CLI parity before deep Git URL support is considered complete.
 
-`apps/shell/test/e2e/quick-deploy-ssh.test.ts` is the workflow-named executable e2e harness for
-the real SSH/Docker path. It is opt-in through environment variables because it mutates a real SSH
-target, while still using embedded PGlite for Yundu state. Its successful path must exercise the
-Traefik-backed generated public route so proxy image compatibility and Docker label discovery are
-covered by a real deployment.
+`apps/shell/test/e2e/workspace-docker.test.ts` is the required local Docker e2e harness for proving
+that a regular workspace without a Dockerfile can be deployed through `workspace-commands` by
+generating `Dockerfile.yundu`, building an image, starting a container, and passing HTTP health
+verification. Docker availability is a prerequisite for this e2e environment because Docker/OCI is
+the v1 deployment substrate.
+
+`apps/shell/test/e2e/quick-deploy-ssh.test.ts` is the workflow-named executable e2e harness for the
+real SSH/Docker path. It remains opt-in through environment variables because it mutates a real
+external SSH target, while still using embedded PGlite for Yundu state. Its successful path must
+exercise the Traefik-backed generated public route so proxy image compatibility and Docker label
+discovery are covered by a real deployment.
 
 ## Open Questions
 

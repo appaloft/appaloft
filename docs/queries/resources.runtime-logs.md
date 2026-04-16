@@ -202,9 +202,11 @@ resource detail Web panel.
 
 The first runtime reader supports host-process file tailing, local Docker container logs, local
 Docker Compose logs, and generic-SSH Docker/Compose logs from deployment runtime metadata and
-resolved server credentials, using short-lived SSH connection reuse for successive reads against the
-same remote target. The Web consumer lazy-loads bounded logs on the logs tab, follows only new output
-after an existing tail is visible, and treats user-initiated stream cancellation as normal closure.
+resolved server credentials. Process-backed bounded reads have a finite adapter timeout, and bounded
+generic-SSH reads do not reuse SSH multiplexed connections. Follow-mode SSH streams may still use
+short-lived connection reuse. The Web consumer lazy-loads bounded logs on the logs tab, follows only
+new output after an existing tail is visible, and treats user-initiated stream cancellation as normal
+closure.
 PM2, systemd/journalctl, provider-native APIs, and remote SSH file-tail readers remain future
 adapter implementations behind the same port.
 

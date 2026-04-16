@@ -29,6 +29,8 @@ This command inherits the shared platform contracts:
 - [ADR-014: Deployment Admission Uses Resource Profile](../decisions/ADR-014-deployment-admission-uses-resource-profile.md)
 - [ADR-015: Resource Network Profile](../decisions/ADR-015-resource-network-profile.md)
 - [ADR-017: Default Access Domain And Proxy Routing](../decisions/ADR-017-default-access-domain-and-proxy-routing.md)
+- [ADR-021: Docker/OCI Workload Substrate](../decisions/ADR-021-docker-oci-workload-substrate.md)
+- [ADR-023: Runtime Orchestration Target Boundary](../decisions/ADR-023-runtime-orchestration-target-boundary.md)
 - [Error Model](../errors/model.md)
 - [neverthrow Conventions](../errors/neverthrow-conventions.md)
 - [Async Lifecycle And Acceptance](../architecture/async-lifecycle-and-acceptance.md)
@@ -40,6 +42,15 @@ This file defines only the deployment-specific command semantics.
 Create a deployment attempt for a source, resource, environment, server, and destination. The command admits the request, prepares durable deployment state, and starts deployment progression.
 
 `deployments.create` is a deployment-attempt command. It is not the durable owner of reusable resource source, runtime, network, health, generated access, routing, domain, or TLS configuration. Deployment-specific snapshots are resolved from resource, environment, server, destination, default access policy, and routing state during admission/planning.
+
+For v1, the resolved runtime plan must be Docker/OCI-backed. Source and runtime profile variants are
+different ways to produce or reference image/container artifacts, not different public execution
+substrates.
+
+Docker/OCI is the workload artifact substrate. The selected deployment target and destination
+choose the runtime orchestration backend behind the command. Single-server Docker/Compose is the
+active v1 backend; Docker Swarm and Kubernetes are future backends governed by ADR-023 and must not
+add provider-specific fields to this command.
 
 The command's domain language is **deployment attempt admission**. It must not use `Deployment` as the owner name for source binding, runtime profile, health policy, access profile, domain binding, or TLS policy.
 
@@ -98,10 +109,12 @@ The command must perform or delegate these admission steps before returning acce
 8. Resolve network endpoint configuration from `ResourceNetworkProfile`.
 9. Create an immutable environment snapshot.
 10. Resolve default generated and durable access route snapshots from resource/domain/server/policy state when the resource requires public reverse-proxy access.
-11. Resolve the runtime plan and network/access snapshots.
-12. Create durable deployment state.
-13. Publish or record `deployment-requested`.
-14. Return `ok({ id })`.
+11. Resolve the runtime plan, Docker/OCI artifact requirements, and network/access snapshots.
+12. Resolve that the selected deployment target/destination has a runtime target backend with the
+    required capabilities.
+13. Create durable deployment state.
+14. Publish or record `deployment-requested`.
+15. Return `ok({ id })`.
 
 Build, rollout, verify, failure recording, and retry progression belong to the async workflow owner, process manager, event handler, worker, or runtime adapter boundary. They must not be hidden inside Web/CLI/API entry logic.
 
@@ -117,7 +130,7 @@ deployments.create
   -> deployment-succeeded | deployment-failed
 ```
 
-Prebuilt image deployments skip `build-requested` unless artifact verification is modeled as a separate event.
+Prebuilt image deployments skip `build-requested` unless artifact verification is modeled as a separate event. They still preserve image identity in the deployment snapshot when available.
 
 Terminal post-acceptance runtime failure records `Deployment.status = failed`, publishes `deployment-failed`, and preserves the original command result as `ok({ id })`.
 
@@ -148,12 +161,78 @@ All errors use the shared shape and category rules in [Error Model](../errors/mo
 | `invariant_violation` | `planning-transition`, `execution-start-transition`, `finalization` | No | Deployment state transition was attempted out of order. |
 | `infra_error` | `deployment-creation`, `event-publication` | Conditional | Persistence or infrastructure failure before the request can be safely accepted. |
 | `provider_error` | `runtime-plan-resolution` | Conditional | Provider/runtime boundary rejects the plan before acceptance. |
+| `runtime_target_unsupported` | `runtime-target-resolution` | No | The selected target kind/provider key has no registered backend with the required runtime capabilities. |
 | `default_access_route_unavailable` | `default-access-policy-resolution`, `default-access-domain-generation`, `proxy-readiness` | Conditional | A required generated access route cannot be resolved before acceptance. |
 | `proxy_route_realization_failed` | `proxy-route-realization`, `public-route-verification` | Yes | Runtime adapter failed to materialize or verify the resolved route after acceptance; represented as workflow failure. |
 
 Missing or explicitly disabled edge proxy intent makes generated default access unavailable rather than required. The command may continue without a generated route, and it must not publish a direct host-port fallback.
 
 Runtime/build/deploy/verify failures after acceptance are workflow failures and must be represented by deployment state plus `deployment-failed`.
+
+## Docker/OCI Runtime Substrate
+
+The v1 deployment runtime substrate is governed by
+[ADR-021: Docker/OCI Workload Substrate](../decisions/ADR-021-docker-oci-workload-substrate.md).
+
+The command contract remains provider-neutral, but the accepted runtime plan snapshot must identify
+the Docker/OCI artifact class needed by runtime execution:
+
+| Runtime plan kind | Snapshot requirement |
+| --- | --- |
+| Buildable source | Build context, strategy, Dockerfile/buildpack/static/workspace command plan, and expected image tag or digest. |
+| Prebuilt image | Image name plus tag or digest; digest is preferred for immutable snapshots. |
+| Compose stack | Compose project identity, service image/build declarations, target service for inbound traffic, and resource/deployment-scoped project naming. |
+
+The runtime adapter may store sanitized Docker image ids, container ids, Compose project names, and
+container/health diagnostics in deployment logs, diagnostics, or read models. Those fields are not
+public command input and must not be required by Web/CLI/API callers.
+
+Runtime execution steps derived from the accepted plan must be represented as typed runtime command
+specifications before they reach an executor. Docker build, Docker container run, Docker Compose,
+Docker inspect/log, and cleanup steps should carry structured fields for image reference, container
+identity, Compose file, environment variables, labels, ports, working directory, and redaction
+rules. Local shell strings, SSH shell strings, and future Docker API requests are render targets
+for those command specs, not the command contract itself.
+
+User-authored command text can still appear as a shell-script leaf when the resource runtime profile
+requires custom install/build/start commands. That shell-script leaf must remain scoped to the
+runtime command spec and must not become an untyped metadata bag that decides the deployment
+workflow.
+
+Runtime replacement and cleanup must be resource-scoped. A new deployment may replace only older
+runtime instances belonging to the same resource after the adapter strategy allows it. It must not
+stop another resource because the other resource shares an internal port, image name, Compose
+service name, or proxy label shape.
+
+Rollback remains a future public operation under ADR-016. `deployments.create` may preserve previous
+runtime identity as rollback-candidate metadata, but it must not expose a hidden rollback command or
+claim data-volume rollback.
+
+## Runtime Orchestration Target Boundary
+
+The command input selects an existing deployment target and optional destination. It does not select
+or configure the concrete runtime orchestrator directly.
+
+Runtime target selection is resolved from target kind, provider key, destination, and registered
+backend capabilities after admission context is resolved:
+
+| Target shape | Command behavior |
+| --- | --- |
+| Single-server Docker/Compose | Active v1 backend. The runtime adapter may execute locally or over SSH through injected ports. |
+| Docker Swarm cluster | Future backend. Requires its own target/profile specs before public use. |
+| Kubernetes cluster | Future backend. Requires its own target/profile specs before public use. |
+
+The command must not accept Kubernetes namespaces, Helm values, manifest fragments, Swarm stack
+fields, provider pull-secret names, ingress classes, replica counts, or rollout strategy fields.
+Those are backend configuration or future target/profile configuration concerns.
+
+If no runtime target backend can be selected before the deployment can be safely accepted, the
+command returns `err(DomainError)` with code `runtime_target_unsupported` or `provider_error` in
+phase `runtime-target-resolution`.
+
+If target rendering, apply, verify, or cleanup fails after acceptance, the original command result
+remains `ok({ id })`; the workflow records failed deployment/process state and publishes
+`deployment-failed`.
 
 ## Runtime Port Isolation
 
@@ -245,6 +324,12 @@ Migration gaps:
 - runtime adapter behavior treats reverse-proxy `internalPort` as a workload-local listener rather
   than a globally unique host port; same-port reverse-proxy resources require resource-scoped
   cleanup/replacement.
+- Docker build/run/Compose command composition now uses typed runtime command specs with local/SSH
+  renderers in the runtime adapter. Legacy workspace install/build/start command text remains a
+  shell-script leaf until runtime profile command fields are fully remodeled.
+- runtime target execution selection now uses a `RuntimeTargetBackendRegistry` for local-shell and
+  generic-SSH single-server backends; deployment admission still needs to use that registry for
+  pre-acceptance `runtime_target_unsupported` checks before Swarm or Kubernetes backends are added.
 - generated default access routing is governed by ADR-017, but the current runtime adapter path still contains adapter-facing requested deployment route fields that must be replaced by provider-neutral route resolution.
 
 ## Open Questions

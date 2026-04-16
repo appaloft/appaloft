@@ -8,6 +8,10 @@ For `deployments.create`, post-acceptance runtime failure must persist `Deployme
 
 `deployment-failed` is the canonical terminal failure event for the target model.
 
+For v1, failure may come from Docker/OCI artifact resolution, image build/pull, runtime target
+render/apply/observation, proxy route realization, deployment-time verification, cleanup, or
+adapter-level rollback.
+
 ## Event Type
 
 Domain event for the `Deployment` aggregate, with optional integration-event copies published through an outbox.
@@ -50,7 +54,13 @@ type DeploymentFailedPayload = {
   exitCode: number;
   errorCode?: string;
   retriable: boolean;
-  failurePhase?: "detect" | "plan" | "build" | "deploy" | "proxy-route-realization" | "verify" | "rollback";
+  failurePhase?: "detect" | "plan" | "image-build" | "image-pull" | "deploy" | "proxy-route-realization" | "verify" | "rollback";
+  runtimeArtifactKind?: "image" | "compose-project";
+  runtimeTarget?: {
+    targetKind: string;
+    providerKey: string;
+    backendKey?: string;
+  };
   correlationId?: string;
   causationId?: string;
 };
@@ -65,6 +75,10 @@ running -> failed
 ```
 
 If build/package is split into its own process state, build failure may occur before deployment runtime state reaches `running`, but it must still be exposed as a terminal failed deployment attempt or a clearly linked failed process state.
+
+If the adapter attempts to preserve or restore a previous container/image/Compose project after a
+failed rollout, that rollback result is part of the failed deployment diagnostics. It does not make
+the failed deployment a success and does not expose a public rollback command.
 
 ## Idempotency
 
@@ -100,3 +114,8 @@ type CurrentDeploymentFinishedPayload = {
 ```
 
 For now, `deployment-failed` can be treated as a canonical projection of `deployment.finished/status=failed`. The implementation should eventually split this into a first-class event or a stable derived event contract.
+
+Current failure events do not include runtime target backend identity. ADR-023 requires future
+failure payloads/read models to expose safe target summaries and phases such as
+`runtime-target-resolution`, `runtime-target-apply`, or `runtime-target-observation` without raw
+Docker, Swarm, or Kubernetes provider responses.
