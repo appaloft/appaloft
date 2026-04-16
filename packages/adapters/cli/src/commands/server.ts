@@ -1,5 +1,6 @@
 import { Args, Command as EffectCommand, Options } from "@effect/cli";
 import {
+  BootstrapServerProxyCommand,
   ConfigureServerCredentialCommand,
   CreateSshCredentialCommand,
   ListServersQuery,
@@ -153,6 +154,25 @@ const doctorCommand = EffectCommand.make(
     ),
 ).pipe(EffectCommand.withDescription("Diagnose server SSH and Docker readiness"));
 
+const proxyRepairCommand = EffectCommand.make(
+  "repair",
+  {
+    serverId: serverIdArg,
+  },
+  ({ serverId }) =>
+    runCommand(
+      BootstrapServerProxyCommand.create({
+        serverId,
+        reason: "repair",
+      }),
+    ),
+).pipe(EffectCommand.withDescription("Repair provider-owned edge proxy infrastructure"));
+
+const proxyCommand = EffectCommand.make("proxy").pipe(
+  EffectCommand.withDescription("Server edge proxy operations"),
+  EffectCommand.withSubcommands([proxyRepairCommand]),
+);
+
 export const serverCommand = EffectCommand.make("server").pipe(
   EffectCommand.withDescription("Server operations"),
   EffectCommand.withSubcommands([
@@ -163,5 +183,6 @@ export const serverCommand = EffectCommand.make("server").pipe(
     credentialListCommand,
     testCommand,
     doctorCommand,
+    proxyCommand,
   ]),
 );
