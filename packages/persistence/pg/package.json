@@ -7,6 +7,7 @@
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.4.3",
+    "@opentelemetry/api": "^1.9.1",
     "@yundu/application": "workspace:*",
     "@yundu/core": "workspace:*",
     "kysely": "^0.28.15",

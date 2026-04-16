@@ -10,12 +10,17 @@
     "@yundu/contracts": "workspace:*",
     "@yundu/deployment-config": "workspace:*",
     "@yundu/i18n": "workspace:*",
+    "@yundu/observability": "workspace:*",
     "@yundu/orpc": "workspace:*",
     "@yundu/plugin-sdk": "workspace:*",
     "elysia": "^1.4.28"
   },
+  "devDependencies": {
+    "reflect-metadata": "^0.2.2"
+  },
   "scripts": {
     "lint": "biome check .",
+    "test": "bun test",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   }
 }

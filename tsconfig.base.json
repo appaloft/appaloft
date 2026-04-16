@@ -25,6 +25,7 @@
       "@yundu/i18n": ["./packages/i18n/src/index.ts"],
       "@yundu/config": ["./packages/config/src/index.ts"],
       "@yundu/observability": ["./packages/observability/src/index.ts"],
+      "@yundu/observability/bootstrap": ["./packages/observability/src/bootstrap.ts"],
       "@yundu/orpc": ["./packages/orpc/src/index.ts"],
       "@yundu/orpc/client": ["./packages/orpc/src/client.ts"],
       "@yundu/persistence-pg": ["./packages/persistence/pg/src/index.ts"],

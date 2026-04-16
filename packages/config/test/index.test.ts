@@ -68,4 +68,37 @@ describe("resolveConfig", () => {
     expect(config.databaseDriver).toBe("pglite");
     expect(config.databaseUrl).toBe("postgres://postgres:postgres@127.0.0.1:5432/yundu");
   });
+
+  test("uses standard OpenTelemetry environment variables", () => {
+    const config = resolveConfig({
+      env: {
+        OTEL_SERVICE_NAME: "yundu-api",
+        OTEL_EXPORTER_OTLP_ENDPOINT: "http://collector:4318",
+        OTEL_EXPORTER_OTLP_HEADERS: "authorization=Bearer%20token",
+        OTEL_TRACES_SAMPLER: "parentbased_traceidratio",
+        OTEL_TRACES_SAMPLER_ARG: "0.5",
+        TRACE_LINK_URL_TEMPLATE: "http://traces.local/detail/{traceId}",
+      },
+    });
+
+    expect(config.otelEnabled).toBe(true);
+    expect(config.otelServiceName).toBe("yundu-api");
+    expect(config.otelExporterEndpoint).toBe("http://collector:4318/v1/traces");
+    expect(config.otelExporterHeaders).toBe("authorization=Bearer%20token");
+    expect(config.otelTracesSampler).toBe("parentbased_traceidratio");
+    expect(config.otelTracesSamplerArg).toBe("0.5");
+    expect(config.traceLinkUrlTemplate).toBe("http://traces.local/detail/{traceId}");
+  });
+
+  test("does not default production tracing to localhost", () => {
+    const config = resolveConfig({
+      env: {
+        YUNDU_ENV: "production",
+        YUNDU_OTEL_ENABLED: "true",
+      },
+    });
+
+    expect(config.otelEnabled).toBe(true);
+    expect(config.otelExporterEndpoint).toBeUndefined();
+  });
 });
