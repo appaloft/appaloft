@@ -207,6 +207,10 @@ They may display:
 - route/proxy readiness and failure state;
 - instructions to add a custom domain through `domain-bindings.create`.
 
+Generated default access must be labeled as generated or default access. It must not be counted,
+listed, or described as a durable domain binding. Custom domain binding lists must show only
+`DomainBinding` records created by `domain-bindings.create`.
+
 They must not require users to enter generated-domain provider details during normal resource creation or deployment.
 
 They must not send generated domain, proxy kind, path prefix, or TLS fields to `deployments.create`.

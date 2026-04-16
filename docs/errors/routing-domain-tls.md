@@ -29,6 +29,7 @@ Routing/domain/TLS errors must include command or event name, phase, related ent
 type RoutingDomainTlsErrorDetails = {
   commandName?:
     | "domain-bindings.create"
+    | "domain-bindings.confirm-ownership"
     | "certificates.issue-or-renew"
     | "certificates.import";
   eventName?:
@@ -92,6 +93,8 @@ Admission errors reject the command and return `err(DomainError)`.
 | `conflict` | `domain-binding-admission`, `certificate-admission` | No | Duplicate active binding or duplicate in-flight certificate attempt conflicts with the command. |
 | `domain_binding_proxy_required` | `domain-binding-admission` | No | Durable domain binding requested with proxy disabled. |
 | `domain_binding_context_mismatch` | `context-resolution` | No | Referenced project/environment/resource/server/destination relationship is inconsistent. |
+| `domain_verification_not_pending` | `domain-verification` | No | Ownership confirmation was requested but no pending manual verification attempt can be confirmed. |
+| `invariant_violation` | `domain-verification` | No | Binding state cannot transition to the requested verification or bound state. |
 | `certificate_not_allowed` | `certificate-admission` | No | Binding TLS policy does not allow issuance or renewal. |
 | `certificate_attempt_conflict` | `certificate-admission` | No | Duplicate in-flight certificate attempt conflicts with the command. |
 | `certificate_provider_unavailable` | `certificate-admission` | Yes | Required certificate provider is unavailable before acceptance. |
@@ -149,7 +152,14 @@ Current `domain-bindings.create` returns structured errors for validation, missi
 
 Current code has durable domain binding state, a domain binding read model, API/CLI list query, and Web console create/list entrypoint for accepted/pending-verification state.
 
-Certificate error model, certificate attempt state, route realization failure state, DNS verification failure state, and domain readiness read model are not implemented yet.
+Current code has manual ownership confirmation through `domain-bindings.confirm-ownership`, including
+`domain-bound` publication and bound-state read-model visibility.
+
+Current code adds TLS-disabled `domain-ready` state after `domain-bound` and resource access summary
+projection for ready durable domain routes.
+
+Certificate error model, certificate attempt state, route realization failure state, DNS-provider
+verification failure state, and certificate-backed domain readiness are not implemented yet.
 
 ## Open Questions
 

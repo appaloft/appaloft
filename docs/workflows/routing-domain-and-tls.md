@@ -6,7 +6,9 @@ Routing/domain/TLS is a durable lifecycle workflow separate from deployment rout
 
 ```text
 create durable domain binding
-  -> verify/bind domain routing
+  -> confirm or verify domain ownership
+  -> bind domain routing
+  -> evaluate route readiness
   -> request certificate when required
   -> issue certificate or record failure
   -> mark domain ready when all gates pass
@@ -34,7 +36,9 @@ This workflow inherits:
 ```text
 domain-bindings.create
   -> domain-binding-requested
+  -> domain-bindings.confirm-ownership
   -> domain-bound
+  -> route readiness satisfied
   -> certificate-requested, if tlsMode is auto or certificatePolicy is auto
   -> certificate-issued
   -> domain-ready
@@ -45,7 +49,9 @@ For TLS disabled:
 ```text
 domain-bindings.create
   -> domain-binding-requested
+  -> domain-bindings.confirm-ownership
   -> domain-bound
+  -> route readiness satisfied
   -> domain-ready
 ```
 
@@ -54,7 +60,9 @@ For certificate failure:
 ```text
 domain-bindings.create
   -> domain-binding-requested
+  -> domain-bindings.confirm-ownership
   -> domain-bound
+  -> route readiness satisfied
   -> certificate-requested
   -> certificate-issuance-failed
   -> domain remains bound but not ready for TLS-required traffic
@@ -66,6 +74,7 @@ For manual certificate import:
 domain-bindings.create
   -> domain-binding-requested
   -> domain-bound
+  -> route readiness satisfied
   -> certificates.import
   -> certificate-imported
   -> domain-ready
@@ -85,9 +94,11 @@ renewal scheduler/process manager
 Synchronous admission includes:
 
 - domain binding input validation;
+- manual ownership confirmation input validation;
 - normalized domain uniqueness/conflict checks;
 - project/environment/resource/server/destination consistency checks;
 - proxy kind and TLS mode policy checks;
+- pending verification attempt and state transition checks;
 - certificate request eligibility checks;
 - duplicate in-flight certificate attempt checks.
 
@@ -99,6 +110,7 @@ Async work includes:
 
 - manual domain ownership verification with durable verification attempts;
 - route/proxy realization when the binding is made active;
+- route readiness projection into resource access summaries;
 - certificate challenge preparation;
 - certificate provider request;
 - certificate storage;
@@ -146,7 +158,8 @@ retry_scheduled
 | Event | Meaning | State impact |
 | --- | --- | --- |
 | `domain-binding-requested` | Binding request accepted. | Binding moves to `requested` or `pending_verification`. |
-| `domain-bound` | Domain binding requirements satisfied. | Binding moves to `bound`. |
+| `domain-bound` | Domain binding requirements satisfied after manual confirmation or future provider verification. | Binding moves to `bound`. |
+| route readiness evaluation | Route/proxy gates for the binding are satisfied or failed. | Binding may remain `bound`, move to `ready`, or move to `not_ready` when a route failure is recorded. |
 | `certificate-requested` | Certificate attempt accepted. | Certificate attempt moves to `requested` or `issuing`. |
 | `certificate-issued` | Certificate state is active. | Certificate moves to `active`; domain may move to `ready`. |
 | `certificate-issuance-failed` | Certificate attempt failed. | Certificate attempt moves to `failed` or `retry_scheduled`; domain remains not ready if TLS is required. |
@@ -163,6 +176,24 @@ Async failures are exposed through:
 - attempt status when available;
 - `certificate-issuance-failed` or domain verification failure state;
 - logs/traces with correlation and causation ids.
+
+## Route Readiness Baseline
+
+Route readiness for a durable domain binding is evaluated after `domain-bound`.
+
+The minimal v1 readiness baseline is:
+
+- the binding is `bound`;
+- the binding uses an enabled proxy kind;
+- the current resource has a deployment route snapshot that can serve reverse-proxy traffic;
+- the binding's TLS/certificate policy has no remaining certificate gate, or the certificate gate has later completed;
+- the resource read model exposes a `latestDurableDomainRoute` for ready bindings so CLI, API, and Web can observe the same URL without inspecting persistence.
+
+For TLS-disabled bindings, no certificate gate remains after route readiness is satisfied. The domain-ready process manager may persist the binding as `ready` and publish `domain-ready`.
+
+For TLS auto or certificate-policy auto bindings, route readiness alone is not sufficient. The binding remains `bound` until certificate issuance completes. Certificate issuance and `certificate-issued` are follow-up behavior.
+
+The route readiness baseline does not create a separate public command. It is an event/process-manager continuation from `domain-bound` and a query/read-model projection for resources and domain bindings.
 
 ## Retry Points
 
@@ -184,6 +215,10 @@ Deployment route snapshots may shape Docker labels, edge proxy requirements, pub
 
 Durable domain binding and certificate lifecycle must use `domain-bindings.create`, `certificates.issue-or-renew`, `certificates.import`, and their event flows.
 
+Manual ownership confirmation must use `domain-bindings.confirm-ownership`. Entry surfaces must not
+infer ownership from generated sslip/default access routes or from deployment runtime route
+snapshots.
+
 ## Entry Boundaries
 
 Web must treat resource detail pages as the primary resource-scoped domain binding surface when the binding belongs to a resource. The resource page may preload project, environment, resource, destination, and recent placement context, then dispatch `domain-bindings.create` with the same command contract.
@@ -192,7 +227,11 @@ Web may also keep a standalone domain bindings page for cross-resource listing, 
 
 Web may guide users through DNS verification status, certificate issuance, and readiness display after the binding has been accepted.
 
-CLI may expose separate commands for binding domains, issuing/renewing certificates, checking status, and retrying failed attempts.
+Web must present generated default access and custom domain binding as separate concepts. A generated
+sslip/default access URL is read from `ResourceAccessSummary`; it is not a row in
+`domain-bindings.list` and it does not satisfy ownership confirmation for a custom domain.
+
+CLI may expose separate commands for binding domains, confirming ownership, issuing/renewing certificates, checking status, and retrying failed attempts.
 
 API must expose strict command inputs and read-model status; it must not prompt.
 
@@ -208,9 +247,18 @@ Current runtime adapters generate Traefik/Caddy labels and can ensure edge proxy
 
 Current health checks can build public URLs from access routes.
 
-Current code now implements the `domain-bindings.create -> domain-binding-requested` admission segment with durable `DomainBinding` state, a first manual verification attempt, PostgreSQL/PGlite persistence, oRPC/OpenAPI create/list routes, CLI create/list commands, standalone and resource-scoped Web console create/list entrypoints, read-model listing, and command/query-level tests.
+Current code now implements the `domain-bindings.create -> domain-binding-requested ->
+domain-bindings.confirm-ownership -> domain-bound` segment with durable `DomainBinding` state, a
+first manual verification attempt, PostgreSQL/PGlite persistence, oRPC/OpenAPI create/list/confirm
+routes, CLI create/list/confirm commands, standalone and resource-scoped Web console create/list
+entrypoints, read-model listing, and command/query-level tests.
 
-The DNS verification workflow, `domain-bound`, certificate issuance workflow, `domain-ready`, outbox/inbox workflow, and domain readiness read model are not implemented yet.
+Current code implements the TLS-disabled route readiness baseline: `domain-bound` is consumed for
+eligible bindings, the binding is marked `ready`, `domain-ready` is published, and ready durable
+domain routes are projected into resource access summaries.
+
+Certificate issuance workflow, outbox/inbox workflow, DNS-provider verification, route realization
+failure state, and certificate-backed domain readiness are not implemented yet.
 
 ## Open Questions
 

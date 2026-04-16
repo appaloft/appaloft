@@ -27,6 +27,7 @@ Publish after one of these paths:
 
 ```text
 domain-bound
+  -> route readiness evaluation
   -> domain-ready
 ```
 
@@ -34,6 +35,7 @@ when TLS is disabled or manually satisfied, or:
 
 ```text
 domain-bound
+  -> route readiness evaluation
   -> certificate-requested
   -> certificate-issued
   -> domain-ready
@@ -52,6 +54,7 @@ Publisher: domain binding process manager after verifying all readiness gates an
 Expected consumers:
 
 - domain binding read-model projection;
+- resource access summary projection;
 - deployment admission/readiness checks;
 - Web/CLI notification;
 - audit/observability.
@@ -84,6 +87,7 @@ A domain is ready when:
 - domain binding state is `bound`;
 - proxy kind is enabled and compatible with the server;
 - route/proxy policy for the binding is satisfied;
+- a current resource route snapshot exists when a serving deployment is required for public access;
 - if TLS is disabled, no certificate gate remains;
 - if TLS is automatic, certificate state is issued and active;
 - if TLS is manual, imported certificate state is valid, active, and attached;
@@ -117,7 +121,14 @@ Consumer failure is event-processing failure, not domain readiness failure.
 
 ## Current Implementation Notes And Migration Gaps
 
-Current code can verify deployment public access routes during deployment health checks, but it does not have durable domain readiness state or a `domain-ready` event.
+Current code can verify deployment public access routes during deployment health checks.
+
+Current code also implements durable domain readiness for TLS-disabled bindings after
+`domain-bound`, publishes `domain-ready`, and projects ready bindings into
+`ResourceAccessSummary.latestDurableDomainRoute`.
+
+Certificate-backed `domain-ready`, readiness expiry, and retryable route realization failure state
+remain follow-up behavior.
 
 ## Open Questions
 

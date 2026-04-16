@@ -366,6 +366,10 @@ export const i18nKeys = {
       resourcesTitle: "console:projects.resourcesTitle",
     },
     domainBindings: {
+      confirmOwnership: "console:domainBindings.confirmOwnership",
+      confirmOwnershipErrorTitle: "console:domainBindings.confirmOwnershipErrorTitle",
+      confirmOwnershipSuccessTitle: "console:domainBindings.confirmOwnershipSuccessTitle",
+      confirmingOwnership: "console:domainBindings.confirmingOwnership",
       createDescription: "console:domainBindings.createDescription",
       createErrorTitle: "console:domainBindings.createErrorTitle",
       createSuccessTitle: "console:domainBindings.createSuccessTitle",

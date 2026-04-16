@@ -152,6 +152,10 @@ It must not:
 
 Generated default access routes are governed by [ADR-017](../decisions/ADR-017-default-access-domain-and-proxy-routing.md). They may provide a convenience public URL without creating a `DomainBinding`.
 
+Manual ownership confirmation after creation is governed by
+[`domain-bindings.confirm-ownership`](./domain-bindings.confirm-ownership.md). Generated default
+access URLs such as sslip hostnames must not be interpreted as confirmed custom-domain ownership.
+
 ## Current Implementation Notes And Migration Gaps
 
 Current code models routing as runtime-plan `accessRoutes` with `proxyKind`, `domains`, `pathPrefix`, and `tlsMode`.
@@ -166,7 +170,9 @@ Current code now includes a first-class `DomainBinding` aggregate, repository po
 
 Current `domain-bindings.create` persists the binding in `pending_verification`, allocates the first manual verification attempt, publishes `domain-binding-requested`, returns `ok({ id })`, rejects `proxyKind = none`, detects active owner-scope duplicates, and supports idempotency key reuse. The `proxyKind` field is now provider-selection migration data; the target command resolves edge proxy provider eligibility through server/target state and optional `edgeProxyProviderKey`.
 
-The follow-up `domain-bound`, certificate issuance, and `domain-ready` process-manager chain is not implemented yet.
+`domain-bindings.confirm-ownership` now implements the manual confirmation step that publishes
+`domain-bound`. Certificate issuance and `domain-ready` process-manager behavior are not
+implemented yet.
 
 ## Open Questions
 

@@ -1,5 +1,9 @@
 import { Args, Command as EffectCommand, Options } from "@effect/cli";
-import { CreateDomainBindingCommand, ListDomainBindingsQuery } from "@yundu/application";
+import {
+  ConfirmDomainBindingOwnershipCommand,
+  CreateDomainBindingCommand,
+  ListDomainBindingsQuery,
+} from "@yundu/application";
 import { certificatePolicies, edgeProxyKinds, tlsModes } from "@yundu/core";
 
 import { optionalValue, runCommand, runQuery } from "../runtime.js";
@@ -10,6 +14,7 @@ const resourceIdOption = Options.text("resource-id");
 const serverIdOption = Options.text("server-id");
 const destinationIdOption = Options.text("destination-id");
 const domainNameArg = Args.text({ name: "domainName" });
+const domainBindingIdArg = Args.text({ name: "domainBindingId" });
 const pathPrefixOption = Options.text("path-prefix").pipe(Options.withDefault("/"));
 const proxyKindOption = Options.choice("proxy-kind", edgeProxyKinds);
 const tlsModeOption = Options.choice("tls-mode", tlsModes).pipe(Options.withDefault("auto"));
@@ -17,6 +22,9 @@ const certificatePolicyOption = Options.choice("certificate-policy", certificate
   Options.optional,
 );
 const idempotencyKeyOption = Options.text("idempotency-key").pipe(Options.optional);
+const verificationAttemptIdOption = Options.text("verification-attempt-id").pipe(Options.optional);
+const confirmedByOption = Options.text("confirmed-by").pipe(Options.optional);
+const evidenceOption = Options.text("evidence").pipe(Options.optional);
 const listProjectIdOption = Options.text("project").pipe(Options.optional);
 const listEnvironmentIdOption = Options.text("environment").pipe(Options.optional);
 const listResourceIdOption = Options.text("resource").pipe(Options.optional);
@@ -70,6 +78,27 @@ const createCommand = EffectCommand.make(
   },
 ).pipe(EffectCommand.withDescription("Create a durable domain binding"));
 
+const confirmOwnershipCommand = EffectCommand.make(
+  "confirm-ownership",
+  {
+    domainBindingId: domainBindingIdArg,
+    verificationAttemptId: verificationAttemptIdOption,
+    confirmedBy: confirmedByOption,
+    evidence: evidenceOption,
+    idempotencyKey: idempotencyKeyOption,
+  },
+  ({ confirmedBy, domainBindingId, evidence, idempotencyKey, verificationAttemptId }) =>
+    runCommand(
+      ConfirmDomainBindingOwnershipCommand.create({
+        domainBindingId,
+        verificationAttemptId: optionalValue(verificationAttemptId),
+        confirmedBy: optionalValue(confirmedBy),
+        evidence: optionalValue(evidence),
+        idempotencyKey: optionalValue(idempotencyKey),
+      }),
+    ),
+).pipe(EffectCommand.withDescription("Confirm manual domain binding ownership"));
+
 const listCommand = EffectCommand.make(
   "list",
   {
@@ -89,5 +118,5 @@ const listCommand = EffectCommand.make(
 
 export const domainBindingCommand = EffectCommand.make("domain-binding").pipe(
   EffectCommand.withDescription("Domain binding operations"),
-  EffectCommand.withSubcommands([createCommand, listCommand]),
+  EffectCommand.withSubcommands([createCommand, confirmOwnershipCommand, listCommand]),
 );

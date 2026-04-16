@@ -1,8 +1,12 @@
 <script lang="ts">
   import { browser } from "$app/environment";
   import { createMutation } from "@tanstack/svelte-query";
-  import { ArrowRight, Globe2, Plus, Route, ShieldCheck } from "@lucide/svelte";
-  import type { CreateDomainBindingInput, DomainBindingSummary } from "@yundu/contracts";
+  import { ArrowRight, Check, Globe2, Plus, Route, ShieldCheck } from "@lucide/svelte";
+  import type {
+    ConfirmDomainBindingOwnershipInput,
+    CreateDomainBindingInput,
+    DomainBindingSummary,
+  } from "@yundu/contracts";
 
   import { readErrorMessage } from "$lib/api/client";
   import ConsoleShell from "$lib/components/console/ConsoleShell.svelte";
@@ -118,6 +122,25 @@
       };
     },
   }));
+  const confirmDomainBindingOwnershipMutation = createMutation(() => ({
+    mutationFn: (input: ConfirmDomainBindingOwnershipInput) =>
+      orpcClient.domainBindings.confirmOwnership(input),
+    onSuccess: () => {
+      createFeedback = {
+        kind: "success",
+        title: $t(i18nKeys.console.domainBindings.confirmOwnershipSuccessTitle),
+        detail: $t(i18nKeys.common.status.bound),
+      };
+      void queryClient.invalidateQueries({ queryKey: ["domain-bindings"] });
+    },
+    onError: (error) => {
+      createFeedback = {
+        kind: "error",
+        title: $t(i18nKeys.console.domainBindings.confirmOwnershipErrorTitle),
+        detail: readErrorMessage(error),
+      };
+    },
+  }));
 
   $effect(() => {
     if (!browser || projectId || projects.length === 0) {
@@ -219,6 +242,17 @@
       case "requested":
         return "secondary";
     }
+  }
+
+  function confirmDomainBindingOwnership(binding: DomainBindingSummary): void {
+    if (binding.status !== "pending_verification" || confirmDomainBindingOwnershipMutation.isPending) {
+      return;
+    }
+
+    createFeedback = null;
+    confirmDomainBindingOwnershipMutation.mutate({
+      domainBindingId: binding.id,
+    });
   }
 </script>
 
@@ -466,7 +500,23 @@
                         {project?.name ?? binding.projectId} · {environment?.name ?? binding.environmentId}
                       </p>
                     </div>
-                    <p class="text-xs text-muted-foreground">{formatTime(binding.createdAt)}</p>
+                    <div class="flex flex-wrap items-center gap-2">
+                      {#if binding.status === "pending_verification"}
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          disabled={confirmDomainBindingOwnershipMutation.isPending}
+                          onclick={() => confirmDomainBindingOwnership(binding)}
+                        >
+                          <Check class="size-4" />
+                          {confirmDomainBindingOwnershipMutation.isPending
+                            ? $t(i18nKeys.console.domainBindings.confirmingOwnership)
+                            : $t(i18nKeys.console.domainBindings.confirmOwnership)}
+                        </Button>
+                      {/if}
+                      <p class="text-xs text-muted-foreground">{formatTime(binding.createdAt)}</p>
+                    </div>
                   </div>
 
                   <div class="mt-3 grid gap-3 sm:grid-cols-3">

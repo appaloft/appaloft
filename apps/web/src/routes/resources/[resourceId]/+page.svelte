@@ -17,6 +17,7 @@
     Terminal,
   } from "@lucide/svelte";
   import type {
+    ConfirmDomainBindingOwnershipInput,
     CreateDomainBindingInput,
     DomainBindingSummary,
     ProxyConfigurationView,
@@ -271,6 +272,25 @@
       createFeedback = {
         kind: "error",
         title: $t(i18nKeys.console.domainBindings.createErrorTitle),
+        detail: readErrorMessage(error),
+      };
+    },
+  }));
+  const confirmDomainBindingOwnershipMutation = createMutation(() => ({
+    mutationFn: (input: ConfirmDomainBindingOwnershipInput) =>
+      orpcClient.domainBindings.confirmOwnership(input),
+    onSuccess: () => {
+      createFeedback = {
+        kind: "success",
+        title: $t(i18nKeys.console.domainBindings.confirmOwnershipSuccessTitle),
+        detail: $t(i18nKeys.common.status.bound),
+      };
+      void queryClient.invalidateQueries({ queryKey: ["domain-bindings"] });
+    },
+    onError: (error) => {
+      createFeedback = {
+        kind: "error",
+        title: $t(i18nKeys.console.domainBindings.confirmOwnershipErrorTitle),
         detail: readErrorMessage(error),
       };
     },
@@ -668,6 +688,17 @@
       proxyKind,
       tlsMode,
       certificatePolicy,
+    });
+  }
+
+  function confirmDomainBindingOwnership(binding: DomainBindingSummary): void {
+    if (binding.status !== "pending_verification" || confirmDomainBindingOwnershipMutation.isPending) {
+      return;
+    }
+
+    createFeedback = null;
+    confirmDomainBindingOwnershipMutation.mutate({
+      domainBindingId: binding.id,
     });
   }
 
@@ -1403,7 +1434,23 @@
                               {binding.tlsMode}
                             </p>
                           </div>
-                          <p class="text-xs text-muted-foreground">{formatTime(binding.createdAt)}</p>
+                          <div class="flex flex-wrap items-center gap-2">
+                            {#if binding.status === "pending_verification"}
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                disabled={confirmDomainBindingOwnershipMutation.isPending}
+                                onclick={() => confirmDomainBindingOwnership(binding)}
+                              >
+                                <Check class="size-4" />
+                                {confirmDomainBindingOwnershipMutation.isPending
+                                  ? $t(i18nKeys.console.domainBindings.confirmingOwnership)
+                                  : $t(i18nKeys.console.domainBindings.confirmOwnership)}
+                              </Button>
+                            {/if}
+                            <p class="text-xs text-muted-foreground">{formatTime(binding.createdAt)}</p>
+                          </div>
                         </div>
                         <div class="mt-3 grid gap-3 sm:grid-cols-3">
                           <div class="rounded-md bg-muted/25 px-3 py-2">

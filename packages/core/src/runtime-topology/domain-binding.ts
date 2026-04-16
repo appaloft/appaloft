@@ -324,6 +324,154 @@ export class DomainBinding extends AggregateRoot<DomainBindingState> {
     });
   }
 
+  confirmOwnership(input: {
+    confirmedAt: CreatedAt;
+    verificationAttemptId?: DomainVerificationAttemptId;
+    correlationId?: string;
+    causationId?: string;
+  }): Result<{ verificationAttemptId: DomainVerificationAttemptId }> {
+    let existingAttemptIndex = -1;
+    const requestedAttemptId = input.verificationAttemptId;
+
+    if (requestedAttemptId) {
+      existingAttemptIndex = this.state.verificationAttempts.findIndex((attempt) =>
+        attempt.id.equals(requestedAttemptId),
+      );
+    } else {
+      for (let index = this.state.verificationAttempts.length - 1; index >= 0; index -= 1) {
+        const attempt = this.state.verificationAttempts[index];
+        if (attempt?.method.value === "manual" && attempt.status.value === "pending") {
+          existingAttemptIndex = index;
+          break;
+        }
+      }
+    }
+
+    if (existingAttemptIndex < 0) {
+      return err(
+        domainError.domainVerificationNotPending("No pending manual verification attempt exists", {
+          phase: "domain-verification",
+          domainBindingId: this.state.id.value,
+          ...(requestedAttemptId ? { verificationAttemptId: requestedAttemptId.value } : {}),
+          relatedState: this.state.status.value,
+        }),
+      );
+    }
+
+    const attempt = this.state.verificationAttempts[existingAttemptIndex];
+    if (!attempt) {
+      return err(
+        domainError.domainVerificationNotPending("No pending manual verification attempt exists", {
+          phase: "domain-verification",
+          domainBindingId: this.state.id.value,
+          relatedState: this.state.status.value,
+        }),
+      );
+    }
+
+    if (attempt.status.value === "verified" && this.state.status.value === "bound") {
+      return ok({ verificationAttemptId: attempt.id });
+    }
+
+    if (attempt.status.value !== "pending" || attempt.method.value !== "manual") {
+      return err(
+        domainError.domainVerificationNotPending(
+          "Verification attempt is not pending manual confirmation",
+          {
+            phase: "domain-verification",
+            domainBindingId: this.state.id.value,
+            verificationAttemptId: attempt.id.value,
+            relatedState: attempt.status.value,
+          },
+        ),
+      );
+    }
+
+    if (this.state.status.value !== "pending_verification") {
+      return err(
+        domainError.invariant("Domain binding cannot be marked bound from its current state", {
+          phase: "domain-verification",
+          domainBindingId: this.state.id.value,
+          verificationAttemptId: attempt.id.value,
+          relatedState: this.state.status.value,
+        }),
+      );
+    }
+
+    const nextVerificationAttempts = this.state.verificationAttempts.map((candidate, index) =>
+      index === existingAttemptIndex
+        ? {
+            ...candidate,
+            status: DomainVerificationAttemptStatusValue.rehydrate("verified"),
+          }
+        : candidate,
+    );
+
+    this.state.status = DomainBindingStatusValue.rehydrate("bound");
+    this.state.verificationAttempts = nextVerificationAttempts;
+
+    this.recordDomainEvent("domain-bound", input.confirmedAt, {
+      domainBindingId: this.state.id.value,
+      domainName: this.state.domainName.value,
+      pathPrefix: this.state.pathPrefix.value,
+      projectId: this.state.projectId.value,
+      environmentId: this.state.environmentId.value,
+      resourceId: this.state.resourceId.value,
+      serverId: this.state.serverId.value,
+      destinationId: this.state.destinationId.value,
+      proxyKind: this.state.proxyKind.value,
+      tlsMode: this.state.tlsMode.value,
+      certificatePolicy: this.state.certificatePolicy.value,
+      boundAt: input.confirmedAt.value,
+      verificationAttemptId: attempt.id.value,
+      ...(input.correlationId ? { correlationId: input.correlationId } : {}),
+      ...(input.causationId ? { causationId: input.causationId } : {}),
+    });
+
+    return ok({ verificationAttemptId: attempt.id });
+  }
+
+  markReady(input: {
+    readyAt: CreatedAt;
+    correlationId?: string;
+    causationId?: string;
+  }): Result<void> {
+    if (this.state.status.value === "ready") {
+      return ok(undefined);
+    }
+
+    if (this.state.status.value !== "bound" && this.state.status.value !== "certificate_pending") {
+      return err(
+        domainError.invariant("Domain binding cannot be marked ready from its current state", {
+          phase: "domain-ready",
+          domainBindingId: this.state.id.value,
+          relatedState: this.state.status.value,
+        }),
+      );
+    }
+
+    this.state.status = DomainBindingStatusValue.rehydrate("ready");
+
+    this.recordDomainEvent("domain-ready", input.readyAt, {
+      domainBindingId: this.state.id.value,
+      domainName: this.state.domainName.value,
+      pathPrefix: this.state.pathPrefix.value,
+      projectId: this.state.projectId.value,
+      environmentId: this.state.environmentId.value,
+      resourceId: this.state.resourceId.value,
+      serverId: this.state.serverId.value,
+      destinationId: this.state.destinationId.value,
+      proxyKind: this.state.proxyKind.value,
+      tlsMode: this.state.tlsMode.value,
+      certificatePolicy: this.state.certificatePolicy.value,
+      readyAt: input.readyAt.value,
+      ...(input.correlationId ? { correlationId: input.correlationId } : {}),
+      ...(input.causationId ? { causationId: input.causationId } : {}),
+    });
+
+    return ok(undefined);
+  }
+
   accept<TContext, TResult>(
     visitor: DomainBindingVisitor<TContext, TResult>,
     context: TContext,

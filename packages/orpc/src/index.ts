@@ -8,6 +8,7 @@ import {
   type Command,
   type CommandBus,
   ConfigureServerCredentialCommand,
+  ConfirmDomainBindingOwnershipCommand,
   CreateDeploymentCommand,
   type CreateDeploymentCommandInput,
   CreateDomainBindingCommand,
@@ -16,6 +17,7 @@ import {
   CreateResourceCommand,
   CreateSshCredentialCommand,
   configureServerCredentialCommandInputSchema,
+  confirmDomainBindingOwnershipCommandInputSchema,
   createDeploymentCommandInputSchema,
   createDomainBindingCommandInputSchema,
   createEnvironmentCommandInputSchema,
@@ -76,6 +78,7 @@ import {
 } from "@yundu/application";
 import {
   bootstrapServerProxyResponseSchema,
+  confirmDomainBindingOwnershipResponseSchema,
   createDeploymentResponseSchema,
   createDomainBindingResponseSchema,
   createEnvironmentResponseSchema,
@@ -739,6 +742,18 @@ export const createDomainBindingProcedure = base
     executeCommand(context, CreateDomainBindingCommand.create(input)),
   );
 
+export const confirmDomainBindingOwnershipProcedure = base
+  .route({
+    method: "POST",
+    path: "/domain-bindings/{domainBindingId}/ownership-confirmations",
+    successStatus: 200,
+  })
+  .input(confirmDomainBindingOwnershipCommandInputSchema)
+  .output(confirmDomainBindingOwnershipResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, ConfirmDomainBindingOwnershipCommand.create(input)),
+  );
+
 export const listDomainBindingsProcedure = base
   .route({
     method: "GET",
@@ -1011,6 +1026,7 @@ export const yunduOrpcRouter = {
   domainBindings: {
     list: listDomainBindingsProcedure,
     create: createDomainBindingProcedure,
+    confirmOwnership: confirmDomainBindingOwnershipProcedure,
   },
   deployments: {
     list: listDeploymentsProcedure,
@@ -1155,6 +1171,7 @@ export function mountYunduOrpcRoutes(
     "/api/resources/:resourceId/diagnostic-summary",
     "/api/terminal-sessions",
     "/api/domain-bindings",
+    "/api/domain-bindings/:domainBindingId/ownership-confirmations",
     "/api/deployments",
     "/api/deployments/stream",
     "/api/deployments/:deploymentId/logs",

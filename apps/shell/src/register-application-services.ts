@@ -3,6 +3,7 @@ import {
   BootstrapServerProxyCommandHandler,
   BootstrapServerProxyUseCase,
   ConfigureServerCredentialUseCase,
+  ConfirmDomainBindingOwnershipUseCase,
   CreateDeploymentUseCase,
   CreateDomainBindingUseCase,
   CreateEnvironmentUseCase,
@@ -30,6 +31,7 @@ import {
   ListResourcesQueryService,
   ListServersQueryService,
   ListSshCredentialsQueryService,
+  MarkDomainReadyOnDomainBoundHandler,
   OpenTerminalSessionUseCase,
   PromoteEnvironmentUseCase,
   RegisterServerUseCase,
@@ -48,6 +50,7 @@ import { type DependencyContainer } from "tsyringe";
 
 export function registerApplicationServices(container: DependencyContainer): void {
   container.registerSingleton(BootstrapServerEdgeProxyOnTargetRegisteredHandler);
+  container.registerSingleton(MarkDomainReadyOnDomainBoundHandler);
   container.registerSingleton(BootstrapServerProxyCommandHandler);
   container.registerSingleton(tokens.createProjectUseCase, CreateProjectUseCase);
   container.registerSingleton(tokens.listProjectsQueryService, ListProjectsQueryService);
@@ -94,6 +97,10 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(tokens.deploymentLifecycleService, DeploymentLifecycleService);
   container.registerSingleton(tokens.createDeploymentUseCase, CreateDeploymentUseCase);
   container.registerSingleton(tokens.createDomainBindingUseCase, CreateDomainBindingUseCase);
+  container.registerSingleton(
+    tokens.confirmDomainBindingOwnershipUseCase,
+    ConfirmDomainBindingOwnershipUseCase,
+  );
   container.registerSingleton(
     tokens.listDomainBindingsQueryService,
     ListDomainBindingsQueryService,

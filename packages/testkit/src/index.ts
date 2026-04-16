@@ -354,6 +354,7 @@ export class MemoryResourceReadModel implements ResourceReadModel {
   constructor(
     private readonly repository: MemoryResourceRepository,
     private readonly deployments?: MemoryDeploymentRepository,
+    private readonly domainBindings?: { items: Map<string, DomainBinding> },
   ) {}
 
   async list(
@@ -376,6 +377,10 @@ export class MemoryResourceReadModel implements ResourceReadModel {
         const deployments = [...(this.deployments?.items.values() ?? [])]
           .map((deployment) => deployment.toState())
           .filter((deployment) => deployment.resourceId.equals(resource.id))
+          .sort((left, right) => right.createdAt.value.localeCompare(left.createdAt.value));
+        const domainBindings = [...(this.domainBindings?.items.values() ?? [])]
+          .map((domainBinding) => domainBinding.toState())
+          .filter((domainBinding) => domainBinding.resourceId.equals(resource.id))
           .sort((left, right) => right.createdAt.value.localeCompare(left.createdAt.value));
         const lastDeployment = deployments[0];
         const accessSummary = projectResourceAccessSummary(
@@ -403,6 +408,15 @@ export class MemoryResourceReadModel implements ResourceReadModel {
                   : {}),
               },
             },
+          })),
+          domainBindings.map((domainBinding) => ({
+            id: domainBinding.id.value,
+            status: domainBinding.status.value,
+            createdAt: domainBinding.createdAt.value,
+            domainName: domainBinding.domainName.value,
+            pathPrefix: domainBinding.pathPrefix.value,
+            proxyKind: domainBinding.proxyKind.value,
+            tlsMode: domainBinding.tlsMode.value,
           })),
         );
 

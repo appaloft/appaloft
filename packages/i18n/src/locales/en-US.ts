@@ -398,6 +398,10 @@ export const enUS = {
       resourcesTitle: "Resources",
     },
     domainBindings: {
+      confirmOwnership: "Confirm ownership",
+      confirmOwnershipErrorTitle: "Unable to confirm domain ownership",
+      confirmOwnershipSuccessTitle: "Domain ownership confirmed",
+      confirmingOwnership: "Confirming",
       createDescription:
         "Choose the project, environment, resource, server, and destination before creating durable domain binding state.",
       createErrorTitle: "Unable to create domain binding",
@@ -463,8 +467,8 @@ export const enUS = {
         "Deployment attempts for this resource, newest first, with source and status context.",
       deploymentsTitle: "Deployments",
       domainBindingsDescription:
-        "These bindings belong to the current resource. DNS, certificate, and readiness progression attach to them.",
-      domainBindingsTitle: "Domain bindings",
+        "These are custom domain bindings for the current resource. Default sslip access appears in the access area.",
+      domainBindingsTitle: "Custom domains",
       durableDomainAccess: "Durable domain access",
       externalProfileDescription:
         "External resources keep project ownership and access context without a Yundu runtime.",
@@ -501,7 +505,8 @@ export const enUS = {
         "Choose only the server and destination for this deployment attempt.",
       newDeploymentTargetTitle: "Deployment target",
       openGeneratedAccess: "Open access URL",
-      noDomainBindings: "This resource has no durable domain bindings yet.",
+      noDomainBindings:
+        "This resource has no custom domain bindings yet. Default access appears in the access area.",
       noDeployments: "This resource has no deployments yet.",
       noServices: "This resource does not declare services.",
       notFoundBody:

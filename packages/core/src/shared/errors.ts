@@ -144,6 +144,10 @@ export const domainError = {
     message: string,
     details?: Record<string, string | number | boolean | null>,
   ): DomainError => createError("domain_binding_context_mismatch", "user", message, details),
+  domainVerificationNotPending: (
+    message: string,
+    details?: Record<string, string | number | boolean | null>,
+  ): DomainError => createError("domain_verification_not_pending", "user", message, details),
   proxyProviderUnavailable: (
     message: string,
     details?: Record<string, string | number | boolean | null>,

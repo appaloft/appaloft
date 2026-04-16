@@ -25,13 +25,15 @@ Domain lifecycle event for domain binding state, published as an application eve
 Publish after:
 
 1. a domain binding exists;
-2. DNS/ownership/route prerequisites required by policy are satisfied;
+2. the current manual verification attempt is durably confirmed or a future provider verifier
+   records equivalent safe verification evidence;
 3. binding state is durably recorded as `bound`;
 4. safe verification metadata is recorded.
 
 ## Publisher
 
-Publisher: domain verification process manager or domain binding aggregate behavior that records the bound state.
+Publisher: `domain-bindings.confirm-ownership`, domain verification process manager, or domain
+binding aggregate behavior that records the bound state.
 
 ## Consumers
 
@@ -39,6 +41,7 @@ Expected consumers:
 
 - certificate process manager;
 - domain-ready process manager;
+- route readiness/read-model projection;
 - domain binding read-model projection;
 - audit/notification;
 - deployment admission/readiness checks.
@@ -71,7 +74,7 @@ type DomainBoundPayload = {
 domain binding: pending_verification -> bound
 ```
 
-If `tlsMode = disabled` or `certificatePolicy = disabled`, this event may lead to `domain-ready` after route readiness is satisfied.
+If `tlsMode = disabled` or `certificatePolicy = disabled`, this event may lead to `domain-ready` after route readiness is satisfied and persisted.
 
 If certificate policy requires automatic issuance, this event must lead to `certificate-requested`.
 
@@ -87,11 +90,20 @@ Duplicate handling must not request duplicate certificates for the same binding 
 
 ## Retry And Failure Handling
 
-Consumer failure must be tracked separately from the binding fact. If certificate request creation fails after this event, the binding remains bound and certificate workflow failure is recorded separately.
+Consumer failure must be tracked separately from the binding fact. If route readiness evaluation or
+certificate request creation fails after this event, the binding remains bound and the downstream
+workflow failure is recorded separately.
 
 ## Current Implementation Notes And Migration Gaps
 
-Current runtime routes may become reachable through proxy labels, but no durable domain binding state or `domain-bound` event exists.
+Current code publishes `domain-bound` when `domain-bindings.confirm-ownership` verifies the current
+manual verification attempt. Runtime routes may become reachable through generated/default access or
+proxy labels, but those routes do not publish this event unless a durable domain binding is being
+confirmed.
+
+Current code consumes `domain-bound` for TLS-disabled bindings, persists `ready`, publishes
+`domain-ready`, and lets resource read models expose the ready binding as
+`latestDurableDomainRoute`.
 
 ## Open Questions
 
