@@ -135,6 +135,7 @@ export const yunduTraceAttributes = {
   runtimeLogLineCount: `${yunduTraceAttributePrefix}.runtime_logs.line_count`,
   runtimeLogServiceName: `${yunduTraceAttributePrefix}.runtime_logs.service_name`,
   runtimeLogTailLines: `${yunduTraceAttributePrefix}.runtime_logs.tail_lines`,
+  runtimeLogTimeoutMs: `${yunduTraceAttributePrefix}.runtime_logs.timeout_ms`,
   selectionSpecName: `${yunduTraceAttributePrefix}.selection_spec.name`,
   sourceLocator: `${yunduTraceAttributePrefix}.source.locator`,
   targetProviderKey: `${yunduTraceAttributePrefix}.target.provider_key`,
