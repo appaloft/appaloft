@@ -1,3 +1,5 @@
+export * from "./certificate-read-model";
+export * from "./certificate-repository";
 export * from "./deployment-read-model";
 export * from "./deployment-repository";
 export * from "./destination-repository";

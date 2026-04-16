@@ -1,3 +1,5 @@
+export * from "./certificate";
+export * from "./certificate-specifications";
 export * from "./deployment-target";
 export * from "./deployment-target-specifications";
 export * from "./destination";

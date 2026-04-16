@@ -1,3 +1,4 @@
+export * from "./certificate-messages";
 export * from "./deployment-messages";
 export * from "./domain-binding-messages";
 export * from "./environment-messages";

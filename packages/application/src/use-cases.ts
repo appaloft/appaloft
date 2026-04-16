@@ -1,3 +1,6 @@
+export * from "./operations/certificates/issue-certificate-on-certificate-requested.handler";
+export * from "./operations/certificates/issue-or-renew-certificate.use-case";
+export * from "./operations/certificates/list-certificates.query-service";
 export * from "./operations/deployments/create-deployment.use-case";
 export * from "./operations/deployments/default-access-domain-runtime-plan.resolver";
 export * from "./operations/deployments/deployment.factory";

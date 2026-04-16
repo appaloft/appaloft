@@ -33,6 +33,24 @@ type DomainBindingListResponse = {
   items: DomainBindingSummary[];
 };
 
+type CertificateSummary = {
+  id: string;
+  domainBindingId: string;
+  domainName: string;
+  status: string;
+  providerKey: string;
+  challengeType: string;
+  latestAttempt?: {
+    id: string;
+    status: string;
+    reason: string;
+  };
+};
+
+type CertificateListResponse = {
+  items: CertificateSummary[];
+};
+
 type ResourceSummary = {
   id: string;
   accessSummary?: {
@@ -159,6 +177,19 @@ function findDomainBinding(args: {
   }
 
   return binding;
+}
+
+function findCertificate(args: {
+  certificateId: string;
+  items: CertificateSummary[];
+}): CertificateSummary {
+  const certificate = args.items.find((item) => item.id === args.certificateId);
+
+  if (!certificate) {
+    throw new Error(`Certificate ${args.certificateId} was not listed`);
+  }
+
+  return certificate;
 }
 
 async function waitForCliDomainBindingStatus(args: {
@@ -545,6 +576,213 @@ describe("domain binding ownership e2e", () => {
         }),
       );
     } finally {
+      cleanupDeploymentRuntime(deploymentId);
+      rmSync(workspaceDir, { recursive: true, force: true });
+    }
+  }, 30000);
+
+  test("[ROUTE-TLS-ENTRY-013] CLI requests a certificate and CLI list observes provider-unavailable state", () => {
+    const { cliOptions, workspaceDir } = createWorkspace("yundu-certificate-cli-");
+    let deploymentId: string | undefined;
+
+    try {
+      const suffix = crypto.randomUUID().slice(0, 6);
+      const context = createDeploymentContext(cliOptions, {
+        appPort: 4900 + Math.floor(Math.random() * 100),
+        suffix,
+      });
+      deploymentId = context.id;
+      const domainName = `${suffix}.example.dev`;
+
+      const created = runCli(
+        [
+          "domain-binding",
+          "create",
+          domainName,
+          "--project-id",
+          context.projectId,
+          "--environment-id",
+          context.environmentId,
+          "--resource-id",
+          context.resourceId,
+          "--server-id",
+          context.serverId,
+          "--destination-id",
+          context.destinationId,
+          "--proxy-kind",
+          "traefik",
+          "--tls-mode",
+          "auto",
+        ],
+        cliOptions,
+      );
+      expectCliOk(created);
+      const domainBindingId = parseJson<{ id: string }>(created.stdout).id;
+
+      const confirmed = runCli(
+        ["domain-binding", "confirm-ownership", domainBindingId],
+        cliOptions,
+      );
+      expectCliOk(confirmed);
+
+      const requested = runCli(
+        ["certificate", "issue-or-renew", domainBindingId, "--reason", "issue"],
+        cliOptions,
+      );
+      expectCliOk(requested);
+      const certificateResult = parseJson<{ certificateId: string; attemptId: string }>(
+        requested.stdout,
+      );
+      expect(certificateResult).toEqual({
+        certificateId: expect.stringMatching(/^crt_/),
+        attemptId: expect.stringMatching(/^cat_/),
+      });
+
+      const listed = runCli(
+        ["certificate", "list", "--domain-binding", domainBindingId],
+        cliOptions,
+      );
+      expectCliOk(listed);
+      expect(
+        findCertificate({
+          certificateId: certificateResult.certificateId,
+          items: parseJson<CertificateListResponse>(listed.stdout).items,
+        }),
+      ).toEqual(
+        expect.objectContaining({
+          domainBindingId,
+          domainName,
+          status: "failed",
+          providerKey: "acme",
+          challengeType: "http-01",
+          latestAttempt: expect.objectContaining({
+            id: certificateResult.attemptId,
+            status: "retry_scheduled",
+            reason: "issue",
+            errorCode: "certificate_provider_unavailable",
+            failurePhase: "provider-request",
+            retriable: true,
+          }),
+        }),
+      );
+    } finally {
+      cleanupDeploymentRuntime(deploymentId);
+      rmSync(workspaceDir, { recursive: true, force: true });
+    }
+  }, 30000);
+
+  test("[ROUTE-TLS-ENTRY-014] HTTP requests a certificate and HTTP list observes provider-unavailable state", async () => {
+    const { cliOptions, workspaceDir } = createWorkspace("yundu-certificate-http-");
+    const baseUrl = `http://127.0.0.1:${cliOptions.httpPort}`;
+    let deploymentId: string | undefined;
+    let serverProcess: Bun.Subprocess | null = null;
+
+    try {
+      const suffix = crypto.randomUUID().slice(0, 6);
+      const context = createDeploymentContext(cliOptions, {
+        appPort: 5000 + Math.floor(Math.random() * 100),
+        suffix,
+      });
+      deploymentId = context.id;
+      const domainName = `${suffix}.example.io`;
+
+      serverProcess = Bun.spawn([process.execPath, "run", "src/index.ts", "serve"], {
+        cwd: shellRoot,
+        env: {
+          ...process.env,
+          YUNDU_APP_VERSION: "0.1.0-certificate-test",
+          YUNDU_DATABASE_DRIVER: "pglite",
+          YUNDU_DATA_DIR: cliOptions.dataDir,
+          YUNDU_HTTP_HOST: "127.0.0.1",
+          YUNDU_HTTP_PORT: cliOptions.httpPort,
+          YUNDU_PGLITE_DATA_DIR: cliOptions.pgliteDataDir,
+          YUNDU_WEB_STATIC_DIR: "",
+        },
+        stdout: "ignore",
+        stderr: "ignore",
+      });
+
+      await waitForHealth(`${baseUrl}/api/health`);
+
+      const created = await fetch(`${baseUrl}/api/domain-bindings`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          projectId: context.projectId,
+          environmentId: context.environmentId,
+          resourceId: context.resourceId,
+          serverId: context.serverId,
+          destinationId: context.destinationId,
+          domainName,
+          pathPrefix: "/",
+          proxyKind: "traefik",
+          tlsMode: "auto",
+        }),
+      });
+      expect(created.status).toBe(201);
+      const domainBindingId = ((await created.json()) as { id: string }).id;
+
+      const confirmed = await fetch(
+        `${baseUrl}/api/domain-bindings/${domainBindingId}/ownership-confirmations`,
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({ domainBindingId }),
+        },
+      );
+      expect(confirmed.status).toBe(200);
+
+      const requested = await fetch(`${baseUrl}/api/certificates/issue-or-renew`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          domainBindingId,
+          reason: "issue",
+        }),
+      });
+      expect(requested.status).toBe(202);
+      const certificateResult = (await requested.json()) as {
+        certificateId: string;
+        attemptId: string;
+      };
+      expect(certificateResult).toEqual({
+        certificateId: expect.stringMatching(/^crt_/),
+        attemptId: expect.stringMatching(/^cat_/),
+      });
+
+      const listed = await fetch(`${baseUrl}/api/certificates?domainBindingId=${domainBindingId}`);
+      expect(listed.ok).toBe(true);
+      expect(
+        findCertificate({
+          certificateId: certificateResult.certificateId,
+          items: ((await listed.json()) as CertificateListResponse).items,
+        }),
+      ).toEqual(
+        expect.objectContaining({
+          domainBindingId,
+          domainName,
+          status: "failed",
+          providerKey: "acme",
+          challengeType: "http-01",
+          latestAttempt: expect.objectContaining({
+            id: certificateResult.attemptId,
+            status: "retry_scheduled",
+            reason: "issue",
+            errorCode: "certificate_provider_unavailable",
+            failurePhase: "provider-request",
+            retriable: true,
+          }),
+        }),
+      );
+    } finally {
+      serverProcess?.kill();
+      await serverProcess?.exited;
       cleanupDeploymentRuntime(deploymentId);
       rmSync(workspaceDir, { recursive: true, force: true });
     }

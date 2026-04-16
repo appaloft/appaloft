@@ -90,7 +90,7 @@ Admission errors reject the command and return `err(DomainError)`.
 | --- | --- | --- | --- |
 | `validation_error` | `command-validation` | No | Input shape, domain name, path prefix, TLS mode, reason, provider, or challenge type is invalid. |
 | `not_found` | `context-resolution`, `certificate-context-resolution` | No | Project, environment, resource, server, destination, domain binding, or certificate is missing. |
-| `conflict` | `domain-binding-admission`, `certificate-admission` | No | Duplicate active binding or duplicate in-flight certificate attempt conflicts with the command. |
+| `conflict` | `domain-binding-admission` | No | Duplicate active binding conflicts with the command. |
 | `domain_binding_proxy_required` | `domain-binding-admission` | No | Durable domain binding requested with proxy disabled. |
 | `domain_binding_context_mismatch` | `context-resolution` | No | Referenced project/environment/resource/server/destination relationship is inconsistent. |
 | `domain_verification_not_pending` | `domain-verification` | No | Ownership confirmation was requested but no pending manual verification attempt can be confirmed. |
@@ -158,8 +158,18 @@ Current code has manual ownership confirmation through `domain-bindings.confirm-
 Current code adds TLS-disabled `domain-ready` state after `domain-bound` and resource access summary
 projection for ready durable domain routes.
 
-Certificate error model, certificate attempt state, route realization failure state, DNS-provider
-verification failure state, and certificate-backed domain readiness are not implemented yet.
+Current code implements certificate request admission errors for `certificates.issue-or-renew`,
+including `not_found` with `certificate-context-resolution`, `certificate_not_allowed` with
+`certificate-admission`, and `certificate_attempt_conflict` for duplicate in-flight attempts. It
+also persists certificate attempt state and publishes `certificate-requested` only after acceptance.
+
+Current code maps provider and secret-store failures from the `certificate-requested` event handler
+into durable failed or retry-scheduled certificate attempt state and publishes
+`certificate-issuance-failed` with safe structured error metadata.
+
+Route realization failure state, DNS-provider verification failure state, real provider-specific
+failure mapping, retry scheduler execution, and certificate-backed domain readiness are not
+implemented yet.
 
 ## Open Questions
 

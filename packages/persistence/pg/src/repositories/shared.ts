@@ -2,7 +2,25 @@ import { type RepositoryContext } from "@yundu/application";
 import {
   AccessRoute,
   BuildStrategyKindValue,
+  CertificateAttemptId,
+  CertificateAttemptIdempotencyKeyValue,
+  type CertificateAttemptState,
+  CertificateAttemptStatusValue,
+  CertificateChallengeTypeValue,
+  CertificateExpiresAtValue,
+  CertificateFailedAtValue,
+  CertificateFailureCodeValue,
+  CertificateFailureMessageValue,
+  type CertificateFailurePhase,
+  CertificateFailurePhaseValue,
+  CertificateFingerprintValue,
+  CertificateId,
+  CertificateIssuedAtValue,
+  CertificateIssueReasonValue,
   CertificatePolicyValue,
+  CertificateRetryAfterValue,
+  CertificateSecretRefValue,
+  CertificateStatusValue,
   CommandText,
   ConfigKey,
   ConfigScopeValue,
@@ -162,6 +180,9 @@ type DomainVerificationAttemptStatusInput = Parameters<
   typeof DomainVerificationAttemptStatusValue.rehydrate
 >[0];
 type CertificatePolicyInput = Parameters<typeof CertificatePolicyValue.rehydrate>[0];
+type CertificateStatusInput = Parameters<typeof CertificateStatusValue.rehydrate>[0];
+type CertificateAttemptStatusInput = Parameters<typeof CertificateAttemptStatusValue.rehydrate>[0];
+type CertificateIssueReasonInput = Parameters<typeof CertificateIssueReasonValue.rehydrate>[0];
 
 export interface SerializedSourceDescriptor extends Record<string, unknown> {
   kind: SourceKindInput;
@@ -329,6 +350,24 @@ export interface SerializedDomainVerificationAttempt extends Record<string, unkn
   status: DomainVerificationAttemptStatusInput;
   expectedTarget: string;
   createdAt: string;
+}
+
+export interface SerializedCertificateAttempt extends Record<string, unknown> {
+  id: string;
+  reason: CertificateIssueReasonInput;
+  status: CertificateAttemptStatusInput;
+  providerKey: string;
+  challengeType: string;
+  requestedAt: string;
+  issuedAt?: string;
+  expiresAt?: string;
+  failedAt?: string;
+  failureCode?: string;
+  failurePhase?: CertificateFailurePhase;
+  failureMessage?: string;
+  retriable?: boolean;
+  retryAfter?: string;
+  idempotencyKey?: string;
 }
 
 export type RepositoryExecutor = Kysely<Database> | Transaction<Database>;
@@ -986,6 +1025,95 @@ export function rehydrateDomainBindingRow(row: Selectable<Database["domain_bindi
     ...(row.idempotency_key
       ? { idempotencyKey: IdempotencyKeyValue.rehydrate(row.idempotency_key) }
       : {}),
+  };
+}
+
+export function serializeCertificateAttempts(
+  attempts: CertificateAttemptState[],
+): SerializedCertificateAttempt[] {
+  return attempts.map((attempt) => ({
+    id: attempt.id.value,
+    reason: attempt.reason.value,
+    status: attempt.status.value,
+    providerKey: attempt.providerKey.value,
+    challengeType: attempt.challengeType.value,
+    requestedAt: attempt.requestedAt.value,
+    ...(attempt.issuedAt ? { issuedAt: attempt.issuedAt.value } : {}),
+    ...(attempt.expiresAt ? { expiresAt: attempt.expiresAt.value } : {}),
+    ...(attempt.failedAt ? { failedAt: attempt.failedAt.value } : {}),
+    ...(attempt.failureCode ? { failureCode: attempt.failureCode.value } : {}),
+    ...(attempt.failurePhase ? { failurePhase: attempt.failurePhase.value } : {}),
+    ...(attempt.failureMessage ? { failureMessage: attempt.failureMessage.value } : {}),
+    ...(attempt.retriable === undefined ? {} : { retriable: attempt.retriable }),
+    ...(attempt.retryAfter ? { retryAfter: attempt.retryAfter.value } : {}),
+    ...(attempt.idempotencyKey ? { idempotencyKey: attempt.idempotencyKey.value } : {}),
+  }));
+}
+
+export function rehydrateCertificateRow(row: Selectable<Database["certificates"]>) {
+  const attempts = (row.attempts ?? []) as unknown as SerializedCertificateAttempt[];
+
+  return {
+    id: CertificateId.rehydrate(row.id),
+    domainBindingId: DomainBindingId.rehydrate(row.domain_binding_id),
+    domainName: PublicDomainName.rehydrate(row.domain_name),
+    status: CertificateStatusValue.rehydrate(row.status as CertificateStatusInput),
+    providerKey: ProviderKey.rehydrate(row.provider_key),
+    challengeType: CertificateChallengeTypeValue.rehydrate(row.challenge_type),
+    ...(row.issued_at
+      ? {
+          issuedAt: CertificateIssuedAtValue.rehydrate(
+            normalizeTimestamp(row.issued_at) ?? row.issued_at,
+          ),
+        }
+      : {}),
+    ...(row.expires_at
+      ? {
+          expiresAt: CertificateExpiresAtValue.rehydrate(
+            normalizeTimestamp(row.expires_at) ?? row.expires_at,
+          ),
+        }
+      : {}),
+    ...(row.fingerprint
+      ? { fingerprint: CertificateFingerprintValue.rehydrate(row.fingerprint) }
+      : {}),
+    ...(row.secret_ref ? { secretRef: CertificateSecretRefValue.rehydrate(row.secret_ref) } : {}),
+    attempts: attempts.map((attempt) => ({
+      id: CertificateAttemptId.rehydrate(attempt.id),
+      reason: CertificateIssueReasonValue.rehydrate(attempt.reason),
+      status: CertificateAttemptStatusValue.rehydrate(attempt.status),
+      providerKey: ProviderKey.rehydrate(attempt.providerKey),
+      challengeType: CertificateChallengeTypeValue.rehydrate(attempt.challengeType),
+      requestedAt: CreatedAt.rehydrate(attempt.requestedAt),
+      ...(attempt.issuedAt
+        ? { issuedAt: CertificateIssuedAtValue.rehydrate(attempt.issuedAt) }
+        : {}),
+      ...(attempt.expiresAt
+        ? { expiresAt: CertificateExpiresAtValue.rehydrate(attempt.expiresAt) }
+        : {}),
+      ...(attempt.failedAt
+        ? { failedAt: CertificateFailedAtValue.rehydrate(attempt.failedAt) }
+        : {}),
+      ...(attempt.failureCode
+        ? { failureCode: CertificateFailureCodeValue.rehydrate(attempt.failureCode) }
+        : {}),
+      ...(attempt.failurePhase
+        ? { failurePhase: CertificateFailurePhaseValue.rehydrate(attempt.failurePhase) }
+        : {}),
+      ...(attempt.failureMessage
+        ? { failureMessage: CertificateFailureMessageValue.rehydrate(attempt.failureMessage) }
+        : {}),
+      ...(attempt.retriable === undefined ? {} : { retriable: attempt.retriable }),
+      ...(attempt.retryAfter
+        ? { retryAfter: CertificateRetryAfterValue.rehydrate(attempt.retryAfter) }
+        : {}),
+      ...(attempt.idempotencyKey
+        ? {
+            idempotencyKey: CertificateAttemptIdempotencyKeyValue.rehydrate(attempt.idempotencyKey),
+          }
+        : {}),
+    })),
+    createdAt: CreatedAt.rehydrate(normalizeTimestamp(row.created_at) ?? row.created_at),
   };
 }
 

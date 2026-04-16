@@ -344,6 +344,8 @@ Implemented operations:
 | Create domain binding | Command | `domain-bindings.create` | `CreateDomainBindingCommand` | `CreateDomainBindingCommandInput` | `yundu domain-binding create <domainName>` | `POST /api/domain-bindings` |
 | Confirm domain binding ownership | Command | `domain-bindings.confirm-ownership` | `ConfirmDomainBindingOwnershipCommand` | `ConfirmDomainBindingOwnershipCommandInput` | `yundu domain-binding confirm-ownership <domainBindingId>` | `POST /api/domain-bindings/{domainBindingId}/ownership-confirmations` |
 | List domain bindings | Query | `domain-bindings.list` | `ListDomainBindingsQuery` | `ListDomainBindingsQueryInput` | `yundu domain-binding list` | `GET /api/domain-bindings` |
+| Issue or renew certificate | Command | `certificates.issue-or-renew` | `IssueOrRenewCertificateCommand` | `IssueOrRenewCertificateCommandInput` | `yundu certificate issue-or-renew <domainBindingId>` | `POST /api/certificates/issue-or-renew` |
+| List certificates | Query | `certificates.list` | `ListCertificatesQuery` | `ListCertificatesQueryInput` | `yundu certificate list` | `GET /api/certificates` |
 
 Current boundary:
 - `domain-bindings.create` creates durable binding state, persists the first manual verification
@@ -357,6 +359,22 @@ Current boundary:
 - TLS-disabled bindings may progress from `domain-bound` to `domain-ready` when route readiness
   gates are satisfied; ready bindings are exposed through both `domain-bindings.list` and resource
   `accessSummary.latestDurableDomainRoute`
+- `certificates.issue-or-renew` accepts provider-driven certificate issue/renew requests for
+  `tlsMode = auto` or certificate-policy-auto bindings, persists a certificate attempt, publishes
+  `certificate-requested`, and returns `ok({ certificateId, attemptId })`
+- default certificate provider selection resolves to `acme` with `http-01` through an injected
+  provider selection policy registered by the composition root; core certificate state treats
+  provider key and challenge type as opaque values and does not embed ACME-specific rules
+- `certificate-requested` means an attempt exists; it does not mean provider issuance succeeded,
+  certificate material is stored, or HTTPS traffic is ready
+- `certificate-requested` is also a first-class event behavior entrypoint: the certificate worker
+  consumes it through injected provider and secret-store ports, then records `certificate-issued` or
+  `certificate-issuance-failed` as durable follow-up state
+- the default shell composition intentionally registers an unavailable certificate provider until a
+  real provider adapter is configured; this records retryable `certificate_provider_unavailable`
+  state after accepted issue requests rather than pretending HTTPS is active
+- `certificates.list` exposes certificate and latest attempt state for CLI, API, and future Web
+  readiness views
 - `deployments.create` must not carry domain, proxy, path prefix, or TLS fields
 - duplicate active bindings are rejected for the same project/environment/resource/domain/path
   owner scope
@@ -377,7 +395,6 @@ Current boundary:
 Core next operations expected here:
 - configure default access domain policy
 - preview/show resource proxy configuration
-- issue or renew certificate
 - import certificate
 - retry failed domain verification or certificate issuance attempt
 - list/show certificate-backed domain binding readiness state

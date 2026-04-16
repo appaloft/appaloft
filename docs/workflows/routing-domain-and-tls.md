@@ -191,7 +191,9 @@ The minimal v1 readiness baseline is:
 
 For TLS-disabled bindings, no certificate gate remains after route readiness is satisfied. The domain-ready process manager may persist the binding as `ready` and publish `domain-ready`.
 
-For TLS auto or certificate-policy auto bindings, route readiness alone is not sufficient. The binding remains `bound` until certificate issuance completes. Certificate issuance and `certificate-issued` are follow-up behavior.
+For TLS auto or certificate-policy auto bindings, route readiness alone is not sufficient. The binding remains `bound` until certificate issuance completes. `certificate-requested` is consumed by the certificate worker through provider-neutral ports; `certificate-issued` records active certificate state, and `certificate-issuance-failed` records failed or retry-scheduled attempt state.
+
+Certificate-backed `domain-ready` after `certificate-issued` is a later process-manager behavior.
 
 The route readiness baseline does not create a separate public command. It is an event/process-manager continuation from `domain-bound` and a query/read-model projection for resources and domain bindings.
 
@@ -257,8 +259,22 @@ Current code implements the TLS-disabled route readiness baseline: `domain-bound
 eligible bindings, the binding is marked `ready`, `domain-ready` is published, and ready durable
 domain routes are projected into resource access summaries.
 
-Certificate issuance workflow, outbox/inbox workflow, DNS-provider verification, route realization
-failure state, and certificate-backed domain readiness are not implemented yet.
+Current code implements certificate request acceptance and public observability:
+`certificates.issue-or-renew` accepts issue/renew requests for eligible TLS-auto bindings, resolves
+provider/challenge defaults through an injected provider selection policy, persists certificate attempt
+state, publishes `certificate-requested`, and exposes the pending request through
+`certificates.list`, CLI, and API.
+
+Current code also implements the `certificate-requested` event-handler segment through injected
+certificate provider and secret-store ports. It records issued state and `certificate-issued` on
+provider/store success, or failed/retry-scheduled state and `certificate-issuance-failed` on
+provider/store failure. The default shell provider is intentionally unavailable until a real
+provider adapter is configured, so CLI/API users can observe retryable
+`certificate_provider_unavailable` state.
+
+Real ACME provider issuance, outbox/inbox workflow, DNS-provider verification, route realization
+failure state, retry scheduler execution, proxy reload, and certificate-backed domain readiness are
+not implemented yet.
 
 ## Open Questions
 

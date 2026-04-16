@@ -35,7 +35,9 @@ This command inherits:
 
 ## Purpose
 
-Issue or renew a certificate for an accepted domain binding. The command owns the application contract for certificate lifecycle requests while provider-specific ACME/DNS/HTTP challenge behavior stays behind adapter boundaries.
+Issue or renew a certificate for an accepted domain binding. The command owns the application contract for certificate lifecycle requests while provider-specific ACME/DNS/HTTP challenge behavior stays behind application/provider boundaries.
+
+The core certificate model and application use case must not choose ACME, HTTP-01, or any future CA/challenge provider through hard-coded branching. Omitted `providerKey` and `challengeType` are resolved by an injected provider selection policy registered by the composition root before certificate state is created.
 
 It is not:
 
@@ -53,8 +55,8 @@ It is not:
 | `domainName` | Required or derived | Normalized domain name. Required when not derivable from the binding. |
 | `certificateId` | Optional | Existing certificate id for renewal. Omitted for first issuance. |
 | `reason` | Required | `issue`, `renew`, or `replace`. |
-| `providerKey` | Optional | Certificate provider key. Defaults to `acme` according to ADR-007. |
-| `challengeType` | Optional | `http-01`, `dns-01`, or provider default. Defaults to `http-01` according to ADR-007. |
+| `providerKey` | Optional | Certificate provider key. The injected default policy resolves omitted values to `acme` according to ADR-007. |
+| `challengeType` | Optional | Provider challenge type. The injected default policy resolves omitted values to `http-01` according to ADR-007. |
 | `idempotencyKey` | Optional but recommended | Caller-supplied dedupe key for the issuance attempt. |
 | `causationId` | Required when event-driven | Event id or command id that requested issuance. |
 
@@ -66,11 +68,12 @@ The command must:
 2. Resolve the domain binding.
 3. Verify the binding is in a state that allows certificate issuance or renewal.
 4. Reject `tlsMode = disabled` unless `reason = replace` with an explicit policy that allows stored certificate replacement.
-5. Resolve or create certificate state for the binding.
-6. Reject duplicate in-flight issuance attempts for the same certificate and reason unless the idempotency key matches.
-7. Persist a new issuance attempt.
-8. Publish or record `certificate-requested`.
-9. Return `ok({ certificateId, attemptId })`.
+5. Resolve provider key and challenge type through the injected provider selection policy.
+6. Resolve or create certificate state for the binding.
+7. Reject duplicate in-flight issuance attempts for the same certificate and reason unless the idempotency key matches.
+8. Persist a new issuance attempt.
+9. Publish or record `certificate-requested`.
+10. Return `ok({ certificateId, attemptId })`.
 
 ## Async Progression
 
@@ -114,9 +117,23 @@ It must not:
 
 ## Current Implementation Notes And Migration Gaps
 
-Current code has `tlsMode` value objects and runtime access-route labels for Traefik/Caddy. Caddy may obtain certificates at runtime according to Caddy behavior, but the platform does not yet own durable certificate lifecycle state.
+Current code has a first-class `Certificate` aggregate, certificate repository, certificate read
+model, PostgreSQL/PGlite persistence, `certificates.issue-or-renew`, `certificates.list`, operation
+catalog entries, CLI/API entrypoints, and `certificate-requested` publication for accepted
+requests.
 
-No first-class `Certificate` aggregate, certificate repository, command, event chain, ACME provider port, or certificate read model was found in the current code.
+Current code resolves omitted provider/challenge values through an injected selection policy
+registered by the composition root. The default shell/test composition resolves to `acme` and
+`http-01` according to ADR-007. Core and application use cases store provider key and challenge
+type as opaque values and do not contain ACME-specific branching or default selection.
+
+Current code implements the `certificate-requested` provider-worker handler through injected
+certificate provider and secret-store ports. The default shell composition intentionally registers
+an unavailable provider until a real provider adapter is configured, so accepted requests become
+retryable `certificate_provider_unavailable` state instead of pretending HTTPS is active.
+
+Current code does not yet implement real ACME order creation, challenge token serving, retry
+scheduler execution, proxy reload, or certificate-backed `domain-ready`.
 
 ## Open Questions
 

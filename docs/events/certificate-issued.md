@@ -91,7 +91,12 @@ Later certificate revocation, expiry, or health failure must be represented by a
 
 ## Current Implementation Notes And Migration Gaps
 
-Current code has no durable certificate state or `certificate-issued` event.
+Current code records issued certificate attempt state and publishes `certificate-issued` from the
+`certificate-requested` event handler after injected provider issuance and secret storage both
+succeed.
+
+Current code does not yet implement a real ACME adapter, challenge token serving, proxy reload, or
+certificate-backed `domain-ready` continuation.
 
 ## Open Questions
 

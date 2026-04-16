@@ -83,10 +83,10 @@ Then:
 | ROUTE-TLS-CMD-009 | integration | Confirm with no pending attempt | Binding already failed, ready, or has no pending manual attempt | `err` | `domain_verification_not_pending`, phase `domain-verification` | None | Binding unchanged | No |
 | ROUTE-TLS-CMD-010 | integration | Confirm already bound attempt | Same `verificationAttemptId` after previous confirmation | idempotent `ok({ id, verificationAttemptId })` | None | No duplicate `domain-bound` | Binding remains `bound` | No |
 | ROUTE-TLS-CMD-011 | integration | Issue certificate | Bound domain with TLS auto | `ok({ certificateId, attemptId })` | None | `certificate-requested` | Certificate attempt requested | No |
-| ROUTE-TLS-CMD-012 | integration | Issue default ACME HTTP-01 certificate | Bound domain with route supporting HTTP-01; provider omitted | `ok({ certificateId, attemptId })` | None | `certificate-requested` with `providerKey = acme`, `challengeType = http-01` | Certificate attempt requested | No |
+| ROUTE-TLS-CMD-012 | integration | Issue with injected default certificate provider/challenge | Bound domain with route supporting the injected default; provider omitted | `ok({ certificateId, attemptId })` | None | `certificate-requested` with selected `providerKey = acme`, `challengeType = http-01` | Certificate attempt requested | No |
 | ROUTE-TLS-CMD-013 | integration | Issue certificate for missing binding | Unknown `domainBindingId` | `err` | `not_found`, phase `certificate-context-resolution` | None | No certificate attempt | No |
 | ROUTE-TLS-CMD-014 | integration | Issue certificate when TLS disabled | Binding TLS disabled | `err` | `certificate_not_allowed`, phase `certificate-admission` | None | No certificate attempt | No |
-| ROUTE-TLS-CMD-015 | integration | Duplicate in-flight certificate attempt | Same binding/certificate/reason already issuing | `err` or idempotent `ok` per idempotency key | `conflict` when rejected | No duplicate event | No duplicate attempt | No |
+| ROUTE-TLS-CMD-015 | integration | Duplicate in-flight certificate attempt | Same binding/certificate/reason already issuing | `err` or idempotent `ok` per idempotency key | `certificate_attempt_conflict` when rejected | No duplicate event | No duplicate attempt | No |
 
 ## Event Matrix
 
@@ -111,6 +111,8 @@ Then:
 | ROUTE-TLS-READMODEL-001 | integration | Ready binding list projection | TLS-disabled binding consumed `domain-bound` and published `domain-ready` | `domain-bindings.list` returns the binding with `status = ready` and one verification attempt |
 | ROUTE-TLS-READMODEL-002 | integration | Durable route resource projection | Ready binding exists for resource with latest succeeded reverse-proxy deployment | `resources.list` exposes `accessSummary.latestDurableDomainRoute` using the binding hostname/path/TLS policy and preserves generated access route when present |
 | ROUTE-TLS-READMODEL-003 | integration | Bound TLS-auto route stays not ready | TLS-auto binding is `bound` but no certificate is active | `resources.list` does not expose the binding as `latestDurableDomainRoute`; `domain-bindings.list` remains `bound` |
+| ROUTE-TLS-READMODEL-004 | integration | Certificate request list projection | `certificates.issue-or-renew` accepted a first issue attempt | `certificates.list` returns certificate `pending`, latest attempt `requested`, and the selected provider/challenge values |
+| ROUTE-TLS-READMODEL-005 | integration | Certificate terminal list projection | `certificate-requested` handler recorded issued or failed attempt state | `certificates.list` returns certificate `active` with latest attempt `issued`, expiry/fingerprint metadata when issued, or `failed`/`retry_scheduled` with safe failure metadata when issuance failed |
 
 ## Async Failure Matrix
 
@@ -153,6 +155,8 @@ Then:
 | ROUTE-TLS-ENTRY-010 | e2e-preferred | CLI confirms ownership | CLI passes `domain-binding confirm-ownership <domainBindingId>` after creating a pending binding | `ok({ id, verificationAttemptId })` is printed | Per command error contract | `domain-bound` on success | `domain-binding list` shows the binding as `bound` |
 | ROUTE-TLS-ENTRY-011 | e2e-preferred | API confirms ownership | HTTP/oRPC posts to `/api/domain-bindings/{domainBindingId}/ownership-confirmations` after creating a pending binding | `ok({ id, verificationAttemptId })` response | Per command error contract | `domain-bound` on success | `GET /api/domain-bindings` shows the binding as `bound` |
 | ROUTE-TLS-ENTRY-012 | e2e-preferred | CLI observes TLS-disabled ready route | CLI creates a TLS-disabled binding, confirms ownership, then lists resources | `ok({ id, verificationAttemptId })` is printed | Per command error contract | `domain-bound` then `domain-ready` | `resource list` shows `accessSummary.latestDurableDomainRoute.url` for the custom domain |
+| ROUTE-TLS-ENTRY-013 | e2e-preferred | CLI requests certificate issuance | CLI creates and confirms a TLS-auto binding, then runs `certificate issue-or-renew` | `ok({ certificateId, attemptId })` is printed | Per command error contract | `certificate-requested`, then `certificate-issuance-failed` when no provider is configured | `certificate list` shows the certificate and latest attempt; in the default shell profile this is `failed`/`retry_scheduled` with `certificate_provider_unavailable` |
+| ROUTE-TLS-ENTRY-014 | e2e-preferred | API requests certificate issuance | HTTP/oRPC creates and confirms a TLS-auto binding, then posts `/api/certificates/issue-or-renew` | `ok({ certificateId, attemptId })` response | Per command error contract | `certificate-requested`, then `certificate-issuance-failed` when no provider is configured | `GET /api/certificates` shows the certificate and latest attempt; in the default shell profile this is `failed`/`retry_scheduled` with `certificate_provider_unavailable` |
 
 ## Idempotency Assertions
 
@@ -182,13 +186,27 @@ through the public domain binding list read model.
 Current tests cover `ROUTE-TLS-EVT-004`, `ROUTE-TLS-READMODEL-001`,
 `ROUTE-TLS-READMODEL-002`, `ROUTE-TLS-READMODEL-003`, and `ROUTE-TLS-ENTRY-012`.
 
-Current tests do not yet cover DNS-provider verification workflow, certificate issuance, event
-replay handling beyond the create/confirm/domain-ready baseline, resource-scoped browser/e2e
-behavior, route realization failure state, or certificate-backed domain readiness read-model
-projection.
+Current tests also cover `ROUTE-TLS-CMD-011`, `ROUTE-TLS-CMD-012`,
+`ROUTE-TLS-CMD-013`, `ROUTE-TLS-CMD-014`, `ROUTE-TLS-CMD-015`,
+`ROUTE-TLS-READMODEL-004`, `ROUTE-TLS-ENTRY-013`, and `ROUTE-TLS-ENTRY-014` for
+certificate request acceptance, injected default provider/challenge resolution, missing-binding
+and TLS-disabled rejection, idempotency reuse, public read-model visibility, and CLI/HTTP
+entrypoint chains. The shell e2e certificate entrypoint assertions observe the default shell
+profile's post-acceptance `certificate_provider_unavailable` state because no real certificate
+provider adapter is configured.
+
+Current tests cover `ROUTE-TLS-EVT-005`, `ROUTE-TLS-EVT-006`, and
+`ROUTE-TLS-READMODEL-005` for direct `certificate-requested` event handling through injected fake
+provider and secret-store ports, including issued state, retryable provider failure state, terminal
+events, and public certificate read-model projection.
+
+Current tests do not yet cover DNS-provider verification workflow, certificate validation failure
+branches, event replay handling beyond the create/confirm/domain-ready baseline, resource-scoped
+browser/e2e behavior, route realization failure state, real ACME provider behavior, or
+certificate-backed domain readiness read-model projection.
 
 Generated default access routing tests are governed by [Default Access Domain And Proxy Routing Test Matrix](./default-access-domain-and-proxy-routing-test-matrix.md) and must remain separate from durable domain binding readiness tests.
 
 ## Open Questions
 
-- None for the current routing/domain/TLS test baseline. DNS verification tests begin with a manual verification fake according to ADR-006, and certificate contract tests assume ACME with HTTP-01 according to ADR-007.
+- None for the current routing/domain/TLS test baseline. DNS verification tests begin with a manual verification fake according to ADR-006, and certificate contract tests assume the injected ADR-007 selection policy returns `acme` with `http-01` in the default shell/test composition. Core and application use cases must not contain ACME-specific default selection.

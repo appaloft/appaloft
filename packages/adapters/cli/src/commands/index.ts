@@ -1,5 +1,6 @@
 import { Command as EffectCommand } from "@effect/cli";
 
+import { certificateCommand } from "./certificate.js";
 import { dbCommand } from "./db.js";
 import { deployCommand, deploymentsCommand, logsCommand } from "./deployment.js";
 import { domainBindingCommand } from "./domain-binding.js";
@@ -22,6 +23,7 @@ export const mainCommand = EffectCommand.make("yundu").pipe(
     resourceCommand,
     serverCommand,
     domainBindingCommand,
+    certificateCommand,
     deploymentsCommand,
     deployCommand,
     logsCommand,

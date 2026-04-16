@@ -11,6 +11,8 @@ import {
   type CreateSshCredentialCommandInput,
   type DeploymentLogsQueryInput,
   type DiffEnvironmentsQueryInput,
+  type IssueOrRenewCertificateCommandInput,
+  type ListCertificatesQueryInput,
   type ListDeploymentsQueryInput,
   type ListDomainBindingsQueryInput,
   type ListEnvironmentsQueryInput,
@@ -42,6 +44,8 @@ import {
   type DeploymentProgressEvent,
   type DiffEnvironmentResponse,
   type EnvironmentSummary,
+  type IssueOrRenewCertificateResponse,
+  type ListCertificatesResponse,
   type ListDeploymentsResponse,
   type ListDomainBindingsResponse,
   type ListEnvironmentsResponse,
@@ -239,6 +243,20 @@ export type YunduOrpcClientContract = {
       YunduClientContext,
       ConfirmDomainBindingOwnershipCommandInput,
       ConfirmDomainBindingOwnershipResponse,
+      YunduClientError
+    >;
+  };
+  certificates: {
+    list: Client<
+      YunduClientContext,
+      ListCertificatesQueryInput,
+      ListCertificatesResponse,
+      YunduClientError
+    >;
+    issueOrRenew: Client<
+      YunduClientContext,
+      IssueOrRenewCertificateCommandInput,
+      IssueOrRenewCertificateResponse,
       YunduClientError
     >;
   };

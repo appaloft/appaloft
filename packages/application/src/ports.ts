@@ -1,6 +1,11 @@
 import {
   type BuildStrategyKind,
+  type Certificate,
+  type CertificateIssueReason,
+  type CertificateMutationSpec,
   type CertificatePolicy,
+  type CertificateSelectionSpec,
+  type CertificateStatus,
   type ConfigScope,
   type Deployment,
   type DeploymentLogEntry,
@@ -184,6 +189,75 @@ export interface DomainBindingRepository {
     domainBinding: DomainBinding,
     spec: DomainBindingMutationSpec,
   ): Promise<void>;
+}
+
+export interface CertificateRepository {
+  findOne(context: RepositoryContext, spec: CertificateSelectionSpec): Promise<Certificate | null>;
+  upsert(
+    context: RepositoryContext,
+    certificate: Certificate,
+    spec: CertificateMutationSpec,
+  ): Promise<void>;
+}
+
+export interface CertificateProviderSelectionInput {
+  domainBindingId: string;
+  domainName: string;
+  tlsMode: TlsMode;
+  certificatePolicy: CertificatePolicy;
+  providerKey?: string;
+  challengeType?: string;
+}
+
+export interface CertificateProviderSelection {
+  providerKey: string;
+  challengeType: string;
+}
+
+export interface CertificateProviderSelectionPolicy {
+  select(
+    context: ExecutionContext,
+    input: CertificateProviderSelectionInput,
+  ): Promise<Result<CertificateProviderSelection, DomainError>>;
+}
+
+export interface CertificateProviderIssueInput {
+  certificateId: string;
+  domainBindingId: string;
+  domainName: string;
+  attemptId: string;
+  reason: CertificateIssueReason;
+  providerKey: string;
+  challengeType: string;
+  requestedAt: string;
+}
+
+export interface CertificateProviderIssueResult {
+  certificateId: string;
+  domainBindingId: string;
+  domainName: string;
+  attemptId: string;
+  providerKey: string;
+  issuedAt: string;
+  expiresAt: string;
+  fingerprint?: string;
+  certificatePem: string;
+  privateKeyPem: string;
+  certificateChainPem?: string;
+}
+
+export interface CertificateProviderPort {
+  issue(
+    context: ExecutionContext,
+    input: CertificateProviderIssueInput,
+  ): Promise<Result<CertificateProviderIssueResult, DomainError>>;
+}
+
+export interface CertificateSecretStore {
+  store(
+    context: ExecutionContext,
+    material: CertificateProviderIssueResult,
+  ): Promise<Result<{ secretRef: string }, DomainError>>;
 }
 
 export interface ProjectSummary {
@@ -1130,6 +1204,37 @@ export interface DomainBindingSummary {
   createdAt: string;
 }
 
+export interface CertificateAttemptSummary {
+  id: string;
+  status: "requested" | "issuing" | "issued" | "failed" | "retry_scheduled";
+  reason: CertificateIssueReason;
+  providerKey: string;
+  challengeType: string;
+  requestedAt: string;
+  issuedAt?: string;
+  expiresAt?: string;
+  failedAt?: string;
+  errorCode?: string;
+  failurePhase?: string;
+  failureMessage?: string;
+  retriable?: boolean;
+  retryAfter?: string;
+}
+
+export interface CertificateSummary {
+  id: string;
+  domainBindingId: string;
+  domainName: string;
+  status: CertificateStatus;
+  providerKey: string;
+  challengeType: string;
+  issuedAt?: string;
+  expiresAt?: string;
+  fingerprint?: string;
+  latestAttempt?: CertificateAttemptSummary;
+  createdAt: string;
+}
+
 export interface ProjectReadModel {
   list(context: RepositoryContext): Promise<ProjectSummary[]>;
 }
@@ -1177,6 +1282,15 @@ export interface DomainBindingReadModel {
       resourceId?: string;
     },
   ): Promise<DomainBindingSummary[]>;
+}
+
+export interface CertificateReadModel {
+  list(
+    context: RepositoryContext,
+    input?: {
+      domainBindingId?: string;
+    },
+  ): Promise<CertificateSummary[]>;
 }
 
 export interface SourceDetectionResult {

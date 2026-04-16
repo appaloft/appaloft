@@ -1,4 +1,6 @@
 import { type ZodTypeAny } from "zod";
+import { issueOrRenewCertificateCommandInputSchema } from "./operations/certificates/issue-or-renew-certificate.command";
+import { listCertificatesQueryInputSchema } from "./operations/certificates/list-certificates.query";
 import { createDeploymentCommandInputSchema } from "./operations/deployments/create-deployment.command";
 import { deploymentLogsQueryInputSchema } from "./operations/deployments/deployment-logs.query";
 import { listDeploymentsQueryInputSchema } from "./operations/deployments/list-deployments.query";
@@ -40,6 +42,7 @@ type OperationDomain =
   | "resources"
   | "deployments"
   | "domain-bindings"
+  | "certificates"
   | "system"
   | "terminal-sessions";
 
@@ -493,6 +496,34 @@ export const operationCatalog = [
     transports: {
       cli: "yundu domain-binding list",
       orpc: { method: "GET", path: "/api/domain-bindings" },
+    },
+  },
+  {
+    key: "certificates.issue-or-renew",
+    kind: "command",
+    domain: "certificates",
+    messageName: "IssueOrRenewCertificateCommand",
+    handlerName: "IssueOrRenewCertificateCommandHandler",
+    serviceName: "IssueOrRenewCertificateUseCase",
+    inputSchema: issueOrRenewCertificateCommandInputSchema,
+    serviceToken: tokens.issueOrRenewCertificateUseCase,
+    transports: {
+      cli: "yundu certificate issue-or-renew <domainBindingId>",
+      orpc: { method: "POST", path: "/api/certificates/issue-or-renew" },
+    },
+  },
+  {
+    key: "certificates.list",
+    kind: "query",
+    domain: "certificates",
+    messageName: "ListCertificatesQuery",
+    handlerName: "ListCertificatesQueryHandler",
+    serviceName: "ListCertificatesQueryService",
+    inputSchema: listCertificatesQueryInputSchema,
+    serviceToken: tokens.listCertificatesQueryService,
+    transports: {
+      cli: "yundu certificate list",
+      orpc: { method: "GET", path: "/api/certificates" },
     },
   },
   {

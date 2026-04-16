@@ -10,6 +10,8 @@ The first platform-owned certificate provider is an ACME provider with HTTP-01 c
 
 The default provider key is `acme`. Production/staging endpoint selection, account registration, and provider credentials must be explicit adapter configuration, not hidden in the domain model.
 
+`acme` and `http-01` are composition/provider configuration defaults, not core or application use-case defaults. The core certificate model must store an opaque provider key and challenge type chosen by an injected provider selection policy; it must not contain ACME-specific branching, account semantics, endpoint configuration, or default-provider selection.
+
 DNS-01, wildcard certificates, and provider-specific managed certificates are deferred capabilities.
 
 ## Context
@@ -29,7 +31,7 @@ HTTP-01 aligns with proxy-backed public domains and avoids requiring DNS provide
 
 ## Chosen Rule
 
-`certificates.issue-or-renew` should default to:
+The composition/provider policy for `certificates.issue-or-renew` should default to:
 
 - `providerKey = acme`;
 - `challengeType = http-01`;
@@ -68,7 +70,18 @@ Some domain use cases remain unsupported until DNS-01 or manual import is added,
 
 ## Current Implementation Notes And Migration Gaps
 
-Current code has `tlsMode` and runtime proxy labels, but no platform-owned certificate provider, certificate state, ACME account model, or challenge flow.
+Current code has `tlsMode`, runtime proxy labels, platform-owned certificate request state,
+`certificates.issue-or-renew`, `certificates.list`, `certificate-requested` publication, and a
+provider-neutral `certificate-requested` event handler.
+
+The ACME default lives in the shell composition's provider selection policy. Application use cases
+depend only on the `CertificateProviderSelectionPolicy` interface. Core receives only the selected
+provider key and challenge type as opaque values.
+
+Current code does not yet have a real ACME provider adapter, ACME account model, ACME order flow,
+challenge token serving, retry scheduler execution, proxy reload, or certificate-backed domain
+readiness. The default shell provider is intentionally unavailable and records retryable
+`certificate_provider_unavailable` state after accepted requests.
 
 ## Superseded Open Questions
 
