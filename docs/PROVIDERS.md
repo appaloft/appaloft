@@ -29,6 +29,9 @@
 - `tencent-cloud`
   - category: cloud provider
   - capabilities: CVM, registry, future VPC integration
+- `acme`
+  - category: infra service
+  - capabilities: certificate issuance, HTTP-01 challenge, ACME account/order flow
 
 ## Adding A Provider
 

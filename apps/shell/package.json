@@ -32,6 +32,7 @@
     "@yundu/plugin-builtins": "workspace:*",
     "@yundu/plugin-host": "workspace:*",
     "@yundu/provider-aliyun": "workspace:*",
+    "@yundu/provider-certificate-acme": "workspace:*",
     "@yundu/provider-default-access-domain-sslip": "workspace:*",
     "@yundu/provider-edge-proxy-caddy": "workspace:*",
     "@yundu/provider-edge-proxy-traefik": "workspace:*",

@@ -124,6 +124,15 @@ Then:
 | ROUTE-TLS-CHALLENGE-002 | adapter integration | Missing HTTP-01 token | Challenge route receives an unknown token | Response is `404` and does not return Web/static fallback content |
 | ROUTE-TLS-CHALLENGE-003 | adapter integration | Host mismatch | Challenge token exists for another domain | Response is `404`; provider adapters must publish host-scoped entries when host scoping is required |
 
+## Certificate Provider Adapter Matrix
+
+| Test ID | Preferred automation | Case | Input | Expected result |
+| --- | --- | --- | --- | --- |
+| ROUTE-TLS-PROVIDER-001 | provider contract | ACME descriptor | Provider package exports descriptor key `acme` | Descriptor is category `infra-service` and advertises ACME HTTP-01 certificate issuance capabilities |
+| ROUTE-TLS-PROVIDER-002 | provider contract | ACME HTTP-01 success | Fake ACME client asks provider callbacks to publish and remove an HTTP-01 challenge | Provider returns certificate material in `CertificateProviderIssueResult`, challenge token is published before validation and removed after completion |
+| ROUTE-TLS-PROVIDER-003 | provider contract | Unsupported challenge type | Adapter receives `challengeType != http-01` | Provider returns non-retryable `certificate_challenge_preparation_failed` with phase `challenge-preparation` |
+| ROUTE-TLS-PROVIDER-004 | composition integration | ACME disabled by default | Shell runs without ACME certificate-provider configuration | `certificates.issue-or-renew` remains accepted but the worker records retryable `certificate_provider_unavailable`; no live CA call is made |
+
 ## Async Failure Matrix
 
 | Test ID | Preferred automation | Failure | Phase | Expected error code | Expected state | Expected event | Retriable |
@@ -216,6 +225,10 @@ Current tests also cover `ROUTE-TLS-EVT-008` and `ROUTE-TLS-READMODEL-006` for
 Current tests cover `ROUTE-TLS-CHALLENGE-001`, `ROUTE-TLS-CHALLENGE-002`, and
 `ROUTE-TLS-CHALLENGE-003` for HTTP-01 challenge token serving through the HTTP adapter and injected
 challenge token store.
+
+Current tests cover `ROUTE-TLS-PROVIDER-001`, `ROUTE-TLS-PROVIDER-002`, and
+`ROUTE-TLS-PROVIDER-003` with a fake ACME client boundary, plus existing shell e2e coverage for
+`ROUTE-TLS-PROVIDER-004`.
 
 Current tests do not yet cover DNS-provider verification workflow, certificate validation failure
 branches, event replay handling beyond the create/confirm/domain-ready/certificate-issued baseline,

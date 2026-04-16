@@ -132,8 +132,11 @@ certificate provider and secret-store ports. The default shell composition inten
 an unavailable provider until a real provider adapter is configured, so accepted requests become
 retryable `certificate_provider_unavailable` state instead of pretending HTTPS is active.
 
-Current code does not yet implement real ACME order creation, challenge token serving, retry
-scheduler execution, proxy reload, or certificate-backed `domain-ready`.
+Current code implements HTTP-01 challenge token serving and a real ACME provider adapter package.
+The adapter is activated only by explicit shell certificate-provider configuration; the default
+shell profile remains provider-unavailable.
+
+Current code does not yet implement retry scheduler execution or proxy reload.
 
 ## Open Questions
 
