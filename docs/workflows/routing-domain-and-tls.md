@@ -112,6 +112,8 @@ Async work includes:
 - route/proxy realization when the binding is made active;
 - route readiness projection into resource access summaries;
 - certificate challenge preparation;
+- HTTP-01 challenge token publication and serving when the selected certificate provider and
+  challenge type require it;
 - certificate provider request;
 - certificate storage;
 - domain readiness finalization.
@@ -195,6 +197,32 @@ For TLS auto or certificate-policy auto bindings, route readiness alone is not s
 
 The route readiness baseline does not create a separate public command. It is an event/process-manager continuation from `domain-bound` and a query/read-model projection for resources and domain bindings.
 
+## HTTP-01 Challenge Serving
+
+When the selected certificate provider requires an HTTP-01 style challenge, the certificate provider
+adapter may publish a public token response through the application-owned challenge token store.
+
+The HTTP adapter must serve:
+
+```text
+GET /.well-known/acme-challenge/{token}
+```
+
+from that store before static Web fallback routing. The response body is the published
+key-authorization text, with `text/plain` content type and `no-store` cache control.
+
+Missing, expired, removed, or host-mismatched challenge tokens must return `404` and must not fall
+through to the Web console or API router.
+
+Challenge token storage is a provider-facing infrastructure boundary:
+
+- core does not model ACME accounts, orders, authorizations, or challenge tokens;
+- application defines only the token serving port shape and safe error contract;
+- the ACME provider adapter owns ACME account/order semantics and publishes/removes tokens through
+  the port;
+- shell composition wires the concrete challenge store into both the provider adapter and HTTP
+  adapter.
+
 ## Retry Points
 
 Domain verification retry is a new verification attempt.
@@ -274,9 +302,11 @@ Current code implements certificate-backed domain readiness: `certificate-issued
 bound TLS-auto binding, marks the binding `ready`, publishes `domain-ready`, and allows resource
 access summaries to project the durable custom domain as HTTPS.
 
+Current code implements HTTP-01 challenge token serving through an injected challenge token store
+and the HTTP adapter path `/.well-known/acme-challenge/{token}`.
+
 Real ACME provider issuance, outbox/inbox workflow, DNS-provider verification, route realization
-failure state, retry scheduler execution, and proxy reload are
-not implemented yet.
+failure state, retry scheduler execution, and proxy reload are not implemented yet.
 
 ## Open Questions
 

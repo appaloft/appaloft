@@ -42,6 +42,7 @@ This test matrix inherits:
 | Event/process manager | Event ordering, idempotency, retry, and async failure state. |
 | Provider adapter | DNS/domain verification and certificate provider failure mapping. |
 | Runtime adapter | Deployment access-route snapshots remain runtime-plan behavior, not durable binding creation. |
+| HTTP adapter | HTTP-01 challenge tokens are served from the injected store and never from Web/static fallback. |
 | Read model | Domain/certificate readiness exposed to UI/CLI/API. |
 | Entry workflow | Web/CLI/API differences converge on command semantics; Web covers both standalone and resource-scoped surfaces. |
 
@@ -114,6 +115,14 @@ Then:
 | ROUTE-TLS-READMODEL-004 | integration | Certificate request list projection | `certificates.issue-or-renew` accepted a first issue attempt | `certificates.list` returns certificate `pending`, latest attempt `requested`, and the selected provider/challenge values |
 | ROUTE-TLS-READMODEL-005 | integration | Certificate terminal list projection | `certificate-requested` handler recorded issued or failed attempt state | `certificates.list` returns certificate `active` with latest attempt `issued`, expiry/fingerprint metadata when issued, or `failed`/`retry_scheduled` with safe failure metadata when issuance failed |
 | ROUTE-TLS-READMODEL-006 | integration | Certificate-backed durable HTTPS route projection | TLS-auto binding consumed `certificate-issued`, published `domain-ready`, and a latest succeeded reverse-proxy deployment exists | `resources.list` exposes `accessSummary.latestDurableDomainRoute` as `https://<domain>` while preserving generated access when present |
+
+## HTTP Challenge Serving Matrix
+
+| Test ID | Preferred automation | Case | Input | Expected result |
+| --- | --- | --- | --- | --- |
+| ROUTE-TLS-CHALLENGE-001 | adapter integration | Published HTTP-01 token | Challenge token store contains token and key authorization for the requested host | `GET /.well-known/acme-challenge/{token}` returns `200`, `text/plain`, `no-store`, and the exact key authorization body |
+| ROUTE-TLS-CHALLENGE-002 | adapter integration | Missing HTTP-01 token | Challenge route receives an unknown token | Response is `404` and does not return Web/static fallback content |
+| ROUTE-TLS-CHALLENGE-003 | adapter integration | Host mismatch | Challenge token exists for another domain | Response is `404`; provider adapters must publish host-scoped entries when host scoping is required |
 
 ## Async Failure Matrix
 
@@ -203,6 +212,10 @@ events, and public certificate read-model projection.
 
 Current tests also cover `ROUTE-TLS-EVT-008` and `ROUTE-TLS-READMODEL-006` for
 `certificate-issued` driven domain readiness and certificate-backed durable HTTPS route projection.
+
+Current tests cover `ROUTE-TLS-CHALLENGE-001`, `ROUTE-TLS-CHALLENGE-002`, and
+`ROUTE-TLS-CHALLENGE-003` for HTTP-01 challenge token serving through the HTTP adapter and injected
+challenge token store.
 
 Current tests do not yet cover DNS-provider verification workflow, certificate validation failure
 branches, event replay handling beyond the create/confirm/domain-ready/certificate-issued baseline,

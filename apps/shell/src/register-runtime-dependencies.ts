@@ -18,6 +18,8 @@ import {
 } from "@yundu/adapter-runtime";
 import {
   type AppLogger,
+  type CertificateHttpChallengeToken,
+  type CertificateHttpChallengeTokenStore,
   type CertificateProviderIssueInput,
   type CertificateProviderIssueResult,
   type CertificateProviderPort,
@@ -125,6 +127,56 @@ class InMemoryCertificateSecretStore implements CertificateSecretStore {
     return ok({
       secretRef: `memory://${material.certificateId}/${material.attemptId}`,
     });
+  }
+}
+
+class InMemoryCertificateHttpChallengeTokenStore implements CertificateHttpChallengeTokenStore {
+  private readonly tokens = new Map<string, CertificateHttpChallengeToken>();
+
+  async publish(
+    context: ExecutionContext,
+    token: CertificateHttpChallengeToken,
+  ): Promise<Result<CertificateHttpChallengeToken, DomainError>> {
+    void context;
+    const storedToken = {
+      ...token,
+      domainName: token.domainName.toLowerCase(),
+    };
+    this.tokens.set(this.tokenKey(storedToken.domainName, storedToken.token), storedToken);
+    return ok(storedToken);
+  }
+
+  async find(
+    context: ExecutionContext,
+    input: { token: string; domainName: string },
+  ): Promise<Result<CertificateHttpChallengeToken | null, DomainError>> {
+    void context;
+    const key = this.tokenKey(input.domainName.toLowerCase(), input.token);
+    const token = this.tokens.get(key);
+
+    if (!token) {
+      return ok(null);
+    }
+
+    if (token.expiresAt && Date.parse(token.expiresAt) <= Date.now()) {
+      this.tokens.delete(key);
+      return ok(null);
+    }
+
+    return ok(token);
+  }
+
+  async remove(
+    context: ExecutionContext,
+    input: { token: string; domainName: string },
+  ): Promise<Result<void, DomainError>> {
+    void context;
+    this.tokens.delete(this.tokenKey(input.domainName.toLowerCase(), input.token));
+    return ok(undefined);
+  }
+
+  private tokenKey(domainName: string, token: string): string {
+    return `${domainName}:${token}`;
   }
 }
 
@@ -320,6 +372,9 @@ export function registerRuntimeDependencies(
   });
   container.register(tokens.certificateSecretStore, {
     useFactory: instanceCachingFactory(() => new InMemoryCertificateSecretStore()),
+  });
+  container.register(tokens.certificateHttpChallengeTokenStore, {
+    useFactory: instanceCachingFactory(() => new InMemoryCertificateHttpChallengeTokenStore()),
   });
   container.register(tokens.deploymentContextDefaultsPolicy, {
     useFactory: instanceCachingFactory(
