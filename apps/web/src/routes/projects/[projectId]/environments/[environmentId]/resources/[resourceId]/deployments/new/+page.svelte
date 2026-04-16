@@ -7,7 +7,6 @@
 
   import { readErrorMessage } from "$lib/api/client";
   import ConsoleShell from "$lib/components/console/ConsoleShell.svelte";
-  import DeploymentStatusBadge from "$lib/components/console/DeploymentStatusBadge.svelte";
   import DeploymentProgressDialog from "$lib/components/console/DeploymentProgressDialog.svelte";
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
@@ -248,9 +247,7 @@
             <div class="flex flex-wrap items-center gap-2">
               <Badge variant="outline">{$t(i18nKeys.common.domain.resource)}</Badge>
               <Badge variant="secondary">{resource.kind}</Badge>
-              {#if resource.lastDeploymentStatus}
-                <DeploymentStatusBadge status={resource.lastDeploymentStatus} />
-              {/if}
+              <Badge variant="outline">{$t(i18nKeys.common.status.unknown)}</Badge>
             </div>
             <div class="space-y-2">
               <h1 class="text-2xl font-semibold md:text-3xl">

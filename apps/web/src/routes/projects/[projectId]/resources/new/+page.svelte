@@ -72,6 +72,7 @@
   type ResourceCreateSourceKind = (typeof sourceKinds)[number];
   type ResourceSourceInput = NonNullable<CreateResourceInput["source"]>;
   type ResourceRuntimeProfileInput = NonNullable<CreateResourceInput["runtimeProfile"]>;
+  type ResourceHealthCheckInput = NonNullable<ResourceRuntimeProfileInput["healthCheck"]>;
   type ResourceNetworkProfileInput = NonNullable<CreateResourceInput["networkProfile"]>;
   type YunduDesktopBridge = {
     selectDirectory?: () => Promise<string | null | undefined>;
@@ -109,6 +110,18 @@
   let composeLocator = $state("");
   let localFolderSelectionNotice = $state<string | null>(null);
   let resourceInternalPort = $state("3000");
+  let resourceHealthCheckEnabled = $state(false);
+  let resourceHealthCheckMethod = $state<"GET" | "HEAD" | "POST" | "OPTIONS">("GET");
+  let resourceHealthCheckScheme = $state<"http" | "https">("http");
+  let resourceHealthCheckHost = $state("localhost");
+  let resourceHealthCheckPort = $state("");
+  let resourceHealthCheckPath = $state("/");
+  let resourceHealthCheckExpectedStatusCode = $state("200");
+  let resourceHealthCheckResponseText = $state("");
+  let resourceHealthCheckIntervalSeconds = $state("5");
+  let resourceHealthCheckTimeoutSeconds = $state("5");
+  let resourceHealthCheckRetries = $state("10");
+  let resourceHealthCheckStartPeriodSeconds = $state("5");
   let deploymentCreatePending = $state(false);
   let deploymentProgressDialogOpen = $state(false);
   let deploymentProgressDialogStatus = $state<DeploymentProgressDialogStatus>("idle");
@@ -132,6 +145,11 @@
   const sourceLocatorLabel = $derived(sourceLocatorLabelFor(sourceKind));
   const sourceLocatorPlaceholder = $derived(sourceLocatorPlaceholderFor(sourceKind));
   const sourceLocatorHelp = $derived(sourceLocatorHelpFor(sourceKind));
+  const resourceHealthCheckSummary = $derived(
+    resourceHealthCheckEnabled
+      ? `${resourceHealthCheckMethod} ${resourceHealthCheckPath.trim() || "/"} · ${resourceHealthCheckIntervalSeconds.trim() || "5"}s/${resourceHealthCheckTimeoutSeconds.trim() || "5"}s · ${resourceHealthCheckRetries.trim() || "10"}x`
+      : $t(i18nKeys.common.status.notConfigured),
+  );
   const canChooseNativeLocalFolder = $derived(
     browser &&
       typeof (window as WindowWithYunduDesktopBridge).yunduDesktop?.selectDirectory === "function",
@@ -452,16 +470,90 @@
     }
   }
 
+  function positiveIntegerField(value: string, fallback: number): number {
+    const parsed = Number(value.trim() || String(fallback));
+    if (!Number.isInteger(parsed) || parsed < 1) {
+      throw new Error($t(i18nKeys.console.quickDeploy.healthCheckInvalid));
+    }
+    return parsed;
+  }
+
+  function nonNegativeIntegerField(value: string, fallback: number): number {
+    const parsed = Number(value.trim() || String(fallback));
+    if (!Number.isInteger(parsed) || parsed < 0) {
+      throw new Error($t(i18nKeys.console.quickDeploy.healthCheckInvalid));
+    }
+    return parsed;
+  }
+
+  function optionalPortField(value: string): number | undefined {
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return undefined;
+    }
+    const parsed = Number(trimmed);
+    if (!Number.isInteger(parsed) || parsed < 1 || parsed > 65535) {
+      throw new Error($t(i18nKeys.console.quickDeploy.healthCheckInvalid));
+    }
+    return parsed;
+  }
+
+  function statusCodeField(value: string): number {
+    const parsed = Number(value.trim() || "200");
+    if (!Number.isInteger(parsed) || parsed < 100 || parsed > 599) {
+      throw new Error($t(i18nKeys.console.quickDeploy.healthCheckInvalid));
+    }
+    return parsed;
+  }
+
+  function healthCheckPolicyForForm(): ResourceHealthCheckInput | undefined {
+    if (!resourceHealthCheckEnabled) {
+      return undefined;
+    }
+
+    const path = resourceHealthCheckPath.trim() || "/";
+    const port = optionalPortField(resourceHealthCheckPort);
+    return {
+      enabled: true,
+      type: "http",
+      intervalSeconds: positiveIntegerField(resourceHealthCheckIntervalSeconds, 5),
+      timeoutSeconds: positiveIntegerField(resourceHealthCheckTimeoutSeconds, 5),
+      retries: positiveIntegerField(resourceHealthCheckRetries, 10),
+      startPeriodSeconds: nonNegativeIntegerField(resourceHealthCheckStartPeriodSeconds, 5),
+      http: {
+        method: resourceHealthCheckMethod,
+        scheme: resourceHealthCheckScheme,
+        host: resourceHealthCheckHost.trim() || "localhost",
+        ...(port ? { port } : {}),
+        path,
+        expectedStatusCode: statusCodeField(resourceHealthCheckExpectedStatusCode),
+        ...(resourceHealthCheckResponseText.trim()
+          ? { expectedResponseText: resourceHealthCheckResponseText.trim() }
+          : {}),
+      },
+    };
+  }
+
   function runtimeProfileForSource(): ResourceRuntimeProfileInput {
+    const healthCheck = healthCheckPolicyForForm();
+    const withHealthCheck = (input: ResourceRuntimeProfileInput): ResourceRuntimeProfileInput =>
+      healthCheck
+        ? {
+            ...input,
+            healthCheckPath: healthCheck.http?.path,
+            healthCheck,
+          }
+        : input;
+
     switch (sourceKind) {
       case "docker-image":
-        return { strategy: "prebuilt-image" };
+        return withHealthCheck({ strategy: "prebuilt-image" });
       case "compose":
-        return { strategy: "docker-compose" };
+        return withHealthCheck({ strategy: "docker-compose" });
       case "local-folder":
       case "github":
       case "remote-git":
-        return { strategy: "auto" };
+        return withHealthCheck({ strategy: "auto" });
     }
   }
 
@@ -794,6 +886,122 @@
                 </p>
               </div>
             </div>
+
+            <div class="mt-5 rounded-md border bg-background px-3 py-3">
+              <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div class="space-y-1">
+                  <p class="text-sm font-medium">
+                    {$t(i18nKeys.console.quickDeploy.healthCheckPolicy)}
+                  </p>
+                  <p class="text-xs text-muted-foreground">
+                    {$t(i18nKeys.console.quickDeploy.healthCheckPathHint)}
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={resourceHealthCheckEnabled ? "selected" : "outline"}
+                  onclick={() => {
+                    resourceHealthCheckEnabled = !resourceHealthCheckEnabled;
+                  }}
+                >
+                  {$t(i18nKeys.console.quickDeploy.healthCheckToggle)}
+                </Button>
+              </div>
+
+              {#if resourceHealthCheckEnabled}
+                <div class="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                  <label class="space-y-1.5 text-sm font-medium">
+                    <span>{$t(i18nKeys.console.quickDeploy.healthCheckMethod)}</span>
+                    <Select.Root bind:value={resourceHealthCheckMethod} type="single">
+                      <Select.Trigger class="w-full">{resourceHealthCheckMethod}</Select.Trigger>
+                      <Select.Content>
+                        {#each ["GET", "HEAD", "POST", "OPTIONS"] as method (method)}
+                          <Select.Item value={method}>{method}</Select.Item>
+                        {/each}
+                      </Select.Content>
+                    </Select.Root>
+                  </label>
+                  <label class="space-y-1.5 text-sm font-medium">
+                    <span>{$t(i18nKeys.console.quickDeploy.healthCheckScheme)}</span>
+                    <Select.Root bind:value={resourceHealthCheckScheme} type="single">
+                      <Select.Trigger class="w-full">{resourceHealthCheckScheme}</Select.Trigger>
+                      <Select.Content>
+                        {#each ["http", "https"] as scheme (scheme)}
+                          <Select.Item value={scheme}>{scheme}</Select.Item>
+                        {/each}
+                      </Select.Content>
+                    </Select.Root>
+                  </label>
+                  <label class="space-y-1.5 text-sm font-medium">
+                    <span>{$t(i18nKeys.console.quickDeploy.healthCheckHost)}</span>
+                    <Input bind:value={resourceHealthCheckHost} autocomplete="off" placeholder="localhost" />
+                  </label>
+                  <label class="space-y-1.5 text-sm font-medium">
+                    <span>{$t(i18nKeys.console.quickDeploy.healthCheckPort)}</span>
+                    <Input
+                      bind:value={resourceHealthCheckPort}
+                      autocomplete="off"
+                      inputmode="numeric"
+                      placeholder={resourceInternalPort.trim() || "3000"}
+                    />
+                  </label>
+                  <label class="space-y-1.5 text-sm font-medium">
+                    <span>{$t(i18nKeys.console.quickDeploy.healthCheckPath)}</span>
+                    <Input bind:value={resourceHealthCheckPath} autocomplete="off" placeholder="/health" />
+                  </label>
+                  <label class="space-y-1.5 text-sm font-medium">
+                    <span>{$t(i18nKeys.console.quickDeploy.healthCheckExpectedStatusCode)}</span>
+                    <Input
+                      bind:value={resourceHealthCheckExpectedStatusCode}
+                      autocomplete="off"
+                      inputmode="numeric"
+                      placeholder="200"
+                    />
+                  </label>
+                  <label class="space-y-1.5 text-sm font-medium sm:col-span-2">
+                    <span>{$t(i18nKeys.console.quickDeploy.healthCheckResponseText)}</span>
+                    <Input bind:value={resourceHealthCheckResponseText} autocomplete="off" placeholder="OK" />
+                  </label>
+                  <label class="space-y-1.5 text-sm font-medium">
+                    <span>{$t(i18nKeys.console.quickDeploy.healthCheckIntervalSeconds)}</span>
+                    <Input
+                      bind:value={resourceHealthCheckIntervalSeconds}
+                      autocomplete="off"
+                      inputmode="numeric"
+                      placeholder="5"
+                    />
+                  </label>
+                  <label class="space-y-1.5 text-sm font-medium">
+                    <span>{$t(i18nKeys.console.quickDeploy.healthCheckTimeoutSeconds)}</span>
+                    <Input
+                      bind:value={resourceHealthCheckTimeoutSeconds}
+                      autocomplete="off"
+                      inputmode="numeric"
+                      placeholder="5"
+                    />
+                  </label>
+                  <label class="space-y-1.5 text-sm font-medium">
+                    <span>{$t(i18nKeys.console.quickDeploy.healthCheckRetries)}</span>
+                    <Input
+                      bind:value={resourceHealthCheckRetries}
+                      autocomplete="off"
+                      inputmode="numeric"
+                      placeholder="10"
+                    />
+                  </label>
+                  <label class="space-y-1.5 text-sm font-medium">
+                    <span>{$t(i18nKeys.console.quickDeploy.healthCheckStartPeriodSeconds)}</span>
+                    <Input
+                      bind:value={resourceHealthCheckStartPeriodSeconds}
+                      autocomplete="off"
+                      inputmode="numeric"
+                      placeholder="5"
+                    />
+                  </label>
+                </div>
+              {/if}
+            </div>
           </section>
         </div>
 
@@ -814,11 +1022,11 @@
             </div>
 
             <div class="mt-5 space-y-3">
-              <div class="bg-muted/25 px-3 py-2">
+              <div class="rounded-md border bg-muted/10 px-3 py-2">
                 <p class="text-xs text-muted-foreground">{$t(i18nKeys.common.domain.project)}</p>
                 <p class="mt-1 truncate text-sm font-medium">{project.name}</p>
               </div>
-              <div class="bg-muted/25 px-3 py-2">
+              <div class="rounded-md border bg-muted/10 px-3 py-2">
                 <p class="text-xs text-muted-foreground">
                   {$t(i18nKeys.common.domain.environment)}
                 </p>
@@ -826,26 +1034,32 @@
                   {selectedEnvironment?.name ?? "-"}
                 </p>
               </div>
-              <div class="bg-muted/25 px-3 py-2">
+              <div class="rounded-md border bg-muted/10 px-3 py-2">
                 <p class="text-xs text-muted-foreground">{$t(i18nKeys.common.domain.server)}</p>
                 <p class="mt-1 truncate text-sm font-medium">
                   {selectedServer?.name ?? "-"}
                 </p>
               </div>
-              <div class="bg-muted/25 px-3 py-2">
+              <div class="rounded-md border bg-muted/10 px-3 py-2">
                 <p class="text-xs text-muted-foreground">{$t(i18nKeys.common.domain.source)}</p>
                 <p class="mt-1 truncate text-sm font-medium">{sourceKindLabel}</p>
                 <p class="mt-1 truncate font-mono text-xs text-muted-foreground">
                   {sourceLocator.trim() || $t(i18nKeys.console.quickDeploy.sourceNotSet)}
                 </p>
               </div>
-              <div class="bg-muted/25 px-3 py-2">
+              <div class="rounded-md border bg-muted/10 px-3 py-2">
                 <p class="text-xs text-muted-foreground">
                   {$t(i18nKeys.common.domain.proxy)}
                 </p>
                 <p class="mt-1 text-sm font-medium">
                   reverse-proxy · http · {resourceInternalPort.trim() || "3000"}
                 </p>
+              </div>
+              <div class="rounded-md border bg-muted/10 px-3 py-2">
+                <p class="text-xs text-muted-foreground">
+                  {$t(i18nKeys.console.quickDeploy.healthCheckPolicy)}
+                </p>
+                <p class="mt-1 truncate text-sm font-medium">{resourceHealthCheckSummary}</p>
               </div>
             </div>
 

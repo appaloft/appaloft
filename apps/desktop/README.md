@@ -3,8 +3,9 @@
 Tauri shell for the Yundu local desktop app.
 
 The desktop app does not own deployment business logic. It starts the packaged `yundu` backend
-binary as a Tauri sidecar, opens the embedded web console over loopback HTTP, and exposes the same
-small `window.yunduDesktop.selectDirectory()` bridge used by the web console.
+binary as a Tauri sidecar, opens the embedded web console over loopback HTTP, and exposes the small
+`window.yunduDesktop` bridge used by the web console for native directory selection and clipboard
+copy.
 
 ## Commands
 
