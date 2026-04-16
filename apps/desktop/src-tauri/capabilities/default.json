@@ -3,5 +3,8 @@
   "identifier": "default",
   "description": "Default permissions for Yundu desktop windows.",
   "windows": ["main"],
-  "permissions": ["core:default"]
+  "remote": {
+    "urls": ["http://127.0.0.1:*"]
+  },
+  "permissions": ["core:default", "clipboard-manager:allow-write-text"]
 }

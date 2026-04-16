@@ -3,22 +3,24 @@
   import { goto } from "$app/navigation";
   import { page } from "$app/state";
   import { onDestroy, untrack } from "svelte";
-  import { createMutation } from "@tanstack/svelte-query";
+  import { createMutation, createQuery, queryOptions } from "@tanstack/svelte-query";
   import {
     ArrowLeft,
-    ArrowRight,
-    Boxes,
+    Check,
+    Clipboard,
+    Copy,
     Globe2,
+    Link2,
     Plus,
     RefreshCw,
     Route,
-    Server,
     Terminal,
   } from "@lucide/svelte";
   import type {
     CreateDomainBindingInput,
     DomainBindingSummary,
     ProxyConfigurationView,
+    ResourceHealthOverall,
     ResourceRuntimeLogEvent,
     ResourceRuntimeLogLine,
     ResourceSummary,
@@ -27,11 +29,10 @@
   import { readErrorMessage } from "$lib/api/client";
   import ConsoleShell from "$lib/components/console/ConsoleShell.svelte";
   import DeploymentTable from "$lib/components/console/DeploymentTable.svelte";
-  import DeploymentStatusBadge from "$lib/components/console/DeploymentStatusBadge.svelte";
   import ResourceProfileSummary from "$lib/components/console/ResourceProfileSummary.svelte";
+  import ResourceStatusDot from "$lib/components/console/ResourceStatusDot.svelte";
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
-  import * as Dialog from "$lib/components/ui/dialog";
   import { Input } from "$lib/components/ui/input";
   import * as Select from "$lib/components/ui/select";
   import { Skeleton } from "$lib/components/ui/skeleton";
@@ -54,9 +55,35 @@
     next(): Promise<IteratorResult<ResourceRuntimeLogEvent, unknown>>;
     return?: () => Promise<IteratorResult<ResourceRuntimeLogEvent, unknown>>;
   };
-  type ResourceDetailTab = "deployments" | "access" | "logs" | "settings";
-
-  const resourceDetailTabs = ["deployments", "access", "logs", "settings"] as const;
+  type YunduDesktopBridge = {
+    copyText?: (text: string) => Promise<void>;
+  };
+  type WindowWithYunduDesktopBridge = Window &
+    typeof globalThis & {
+      yunduDesktop?: YunduDesktopBridge;
+    };
+  type ResourceDetailTab = "settings" | "deployments" | "logs";
+  type ResourceAccessSummary = NonNullable<ResourceSummary["accessSummary"]>;
+  type ResourceAccessRoute =
+    | NonNullable<ResourceAccessSummary["latestGeneratedAccessRoute"]>
+    | NonNullable<ResourceAccessSummary["plannedGeneratedAccessRoute"]>
+    | NonNullable<ResourceAccessSummary["latestDurableDomainRoute"]>;
+  type ResourceAccessKind =
+    | "domain-binding"
+    | "durable-domain"
+    | "generated-latest"
+    | "generated-planned";
+  type ResourceAccessStatus = NonNullable<ResourceAccessSummary["proxyRouteStatus"]>;
+  type ResourceSettingsSection = "access" | "profile" | "domains" | "health" | "proxy" | "diagnostics";
+  const resourceDetailTabs = ["settings", "deployments", "logs"] as const;
+  const resourceSettingsSections = [
+    "access",
+    "profile",
+    "domains",
+    "health",
+    "proxy",
+    "diagnostics",
+  ] as const;
 
   const {
     projectsQuery,
@@ -66,8 +93,20 @@
     deploymentsQuery,
     domainBindingsQuery,
   } = createConsoleQueries(browser);
-
   const resourceId = $derived(page.params.resourceId ?? "");
+  const resourceHealthQuery = createQuery(() =>
+    queryOptions({
+      queryKey: ["resources", "health", resourceId, "detail"],
+      queryFn: () =>
+        orpcClient.resources.health({
+          resourceId,
+          includeChecks: true,
+        }),
+      enabled: browser && resourceId.length > 0,
+      staleTime: 5_000,
+    }),
+  );
+
   const projects = $derived(projectsQuery.data?.items ?? []);
   const environments = $derived(environmentsQuery.data?.items ?? []);
   const resources = $derived(resourcesQuery.data?.items ?? []);
@@ -96,15 +135,27 @@
   const resourceDomainBindings = $derived(
     resource ? domainBindings.filter((binding) => binding.resourceId === resource.id) : [],
   );
+  const resourceHealth = $derived(resourceHealthQuery.data ?? null);
+  const resourceHealthOverall = $derived(resourceHealth?.overall ?? "unknown");
+  const latestGeneratedAccessRoute = $derived(
+    resource?.accessSummary?.latestGeneratedAccessRoute ?? null,
+  );
+  const plannedGeneratedAccessRoute = $derived(
+    resource?.accessSummary?.plannedGeneratedAccessRoute ?? null,
+  );
+  const latestDurableAccessRoute = $derived(
+    resource?.accessSummary?.latestDurableDomainRoute ?? null,
+  );
   const generatedAccessRoute = $derived(
-    resource?.accessSummary?.latestGeneratedAccessRoute ??
-      resource?.accessSummary?.plannedGeneratedAccessRoute ??
-      null,
+    latestGeneratedAccessRoute ?? plannedGeneratedAccessRoute ?? null,
   );
   const defaultDestinationId = $derived(
     resource?.destinationId ?? latestDeployment?.destinationId ?? "",
   );
   const activeTab = $derived(parseResourceDetailTab(page.url.searchParams.get("tab")));
+  const activeSettingsSection = $derived(
+    parseResourceSettingsSection(page.url.searchParams.get("section")),
+  );
 
   let serverId = $state("");
   let destinationId = $state("");
@@ -115,7 +166,6 @@
   let certificatePolicy = $state<NonNullable<CreateDomainBindingInput["certificatePolicy"]>>(
     "auto",
   );
-  let domainBindingDialogOpen = $state(false);
   let createFeedback = $state<{
     kind: "success" | "error";
     title: string;
@@ -127,10 +177,18 @@
   let runtimeLogsError = $state<string | null>(null);
   let runtimeLogsFollowing = $state(false);
   let runtimeLogStream = $state<RuntimeLogClientStream | null>(null);
+  let runtimeLogRequestGeneration = $state(0);
   let proxyConfigurationResourceId = $state("");
   let proxyConfiguration = $state<ProxyConfigurationView | null>(null);
   let proxyConfigurationLoading = $state(false);
   let proxyConfigurationError = $state<string | null>(null);
+  let diagnosticSummaryLoading = $state(false);
+  let diagnosticSummaryCopyState = $state<"idle" | "copied" | "failed">("idle");
+  let diagnosticSummaryError = $state<string | null>(null);
+  let diagnosticSummaryCopyFallback = $state<string | null>(null);
+  let diagnosticSummaryCopyResetTimeout: ReturnType<typeof setTimeout> | undefined;
+  let accessUrlCopyState = $state<"idle" | "copied" | "failed">("idle");
+  let accessUrlCopyResetTimeout: ReturnType<typeof setTimeout> | undefined;
 
   const selectedServer = $derived(findServer(servers, serverId));
   const primaryDomainBinding = $derived(
@@ -140,8 +198,36 @@
       null,
   );
   const primaryAccessHref = $derived(
-    primaryDomainBinding ? domainBindingHref(primaryDomainBinding) : (generatedAccessRoute?.url ?? ""),
+    primaryDomainBinding
+      ? domainBindingHref(primaryDomainBinding)
+      : (latestDurableAccessRoute?.url ?? generatedAccessRoute?.url ?? ""),
   );
+  const primaryAccessKind = $derived.by((): ResourceAccessKind | null => {
+    if (primaryDomainBinding) {
+      return "domain-binding";
+    }
+
+    if (latestDurableAccessRoute) {
+      return "durable-domain";
+    }
+
+    if (latestGeneratedAccessRoute) {
+      return "generated-latest";
+    }
+
+    if (plannedGeneratedAccessRoute) {
+      return "generated-planned";
+    }
+
+    return null;
+  });
+  const primaryAccessRoute = $derived.by((): ResourceAccessRoute | null => {
+    if (primaryDomainBinding) {
+      return null;
+    }
+
+    return latestDurableAccessRoute ?? generatedAccessRoute ?? null;
+  });
   const shouldShowServerField = $derived(!latestDeployment?.serverId);
   const shouldShowDestinationField = $derived(!defaultDestinationId);
   const canCreateBinding = $derived(
@@ -154,7 +240,22 @@
         proxyKind !== "none",
     ),
   );
-
+  const diagnosticSummaryButtonLabel = $derived(
+    diagnosticSummaryLoading
+      ? $t(i18nKeys.console.resources.diagnosticSummaryLoading)
+      : diagnosticSummaryCopyState === "copied"
+        ? $t(i18nKeys.console.resources.diagnosticSummaryCopied)
+        : diagnosticSummaryCopyState === "failed"
+          ? $t(i18nKeys.console.resources.diagnosticSummaryCopyFailed)
+          : $t(i18nKeys.console.resources.diagnosticSummaryCopy),
+  );
+  const accessUrlCopyLabel = $derived(
+    accessUrlCopyState === "copied"
+      ? $t(i18nKeys.console.resources.accessUrlCopied)
+      : accessUrlCopyState === "failed"
+        ? $t(i18nKeys.console.resources.accessUrlCopyFailed)
+        : $t(i18nKeys.console.resources.copyAccessUrl),
+  );
   const createDomainBindingMutation = createMutation(() => ({
     mutationFn: (input: CreateDomainBindingInput) => orpcClient.domainBindings.create(input),
     onSuccess: (result) => {
@@ -164,7 +265,6 @@
         detail: result.id,
       };
       domainName = "";
-      domainBindingDialogOpen = false;
       void queryClient.invalidateQueries({ queryKey: ["domain-bindings"] });
     },
     onError: (error) => {
@@ -182,17 +282,35 @@
     runtimeLogs = [...runtimeLogs, line].slice(-500);
   }
 
-  function handleRuntimeLogEvent(event: ResourceRuntimeLogEvent): void {
+  function isActiveRuntimeLogRequest(currentResourceId: string, generation: number): boolean {
+    return runtimeLogResourceId === currentResourceId && runtimeLogRequestGeneration === generation;
+  }
+
+  function isActiveRuntimeLogFollow(currentResourceId: string, generation: number): boolean {
+    return isActiveRuntimeLogRequest(currentResourceId, generation) && runtimeLogsFollowing;
+  }
+
+  function handleRuntimeLogEvent(
+    event: ResourceRuntimeLogEvent,
+    currentResourceId: string,
+    generation: number,
+  ): void {
+    if (!isActiveRuntimeLogRequest(currentResourceId, generation)) {
+      return;
+    }
+
     switch (event.kind) {
       case "line":
         appendRuntimeLogLine(event.line);
         break;
       case "error":
         runtimeLogsError = event.error.message;
-        stopRuntimeLogFollow();
+        runtimeLogStream = null;
+        runtimeLogsFollowing = false;
         break;
       case "closed":
-        stopRuntimeLogFollow();
+        runtimeLogStream = null;
+        runtimeLogsFollowing = false;
         break;
       case "heartbeat":
         break;
@@ -200,13 +318,16 @@
   }
 
   function stopRuntimeLogFollow(): void {
+    runtimeLogRequestGeneration += 1;
     const stream = runtimeLogStream;
     runtimeLogStream = null;
     runtimeLogsFollowing = false;
-    void stream?.return?.();
+    void stream?.return?.().catch(() => undefined);
   }
 
   async function loadRuntimeLogs(currentResourceId: string): Promise<void> {
+    const generation = runtimeLogRequestGeneration + 1;
+    runtimeLogRequestGeneration = generation;
     runtimeLogResourceId = currentResourceId;
     runtimeLogsLoading = true;
     runtimeLogsError = null;
@@ -218,29 +339,33 @@
         follow: false,
       });
 
-      if (runtimeLogResourceId === currentResourceId) {
+      if (isActiveRuntimeLogRequest(currentResourceId, generation)) {
         runtimeLogs = result.logs;
       }
     } catch (error) {
-      if (runtimeLogResourceId === currentResourceId) {
+      if (isActiveRuntimeLogRequest(currentResourceId, generation)) {
         runtimeLogsError = readErrorMessage(error);
       }
     } finally {
-      if (runtimeLogResourceId === currentResourceId) {
+      if (isActiveRuntimeLogRequest(currentResourceId, generation)) {
         runtimeLogsLoading = false;
       }
     }
   }
 
-  async function consumeRuntimeLogStream(currentResourceId: string): Promise<void> {
+  async function consumeRuntimeLogStream(
+    currentResourceId: string,
+    generation: number,
+    tailLines: number,
+  ): Promise<void> {
     try {
       const stream = await orpcClient.resources.logsStream({
         resourceId: currentResourceId,
-        tailLines: 100,
+        tailLines,
         follow: true,
       });
 
-      if (!runtimeLogsFollowing || runtimeLogResourceId !== currentResourceId) {
+      if (!isActiveRuntimeLogFollow(currentResourceId, generation)) {
         await stream.return?.();
         return;
       }
@@ -249,24 +374,23 @@
       let result = await stream.next();
 
       while (
-        runtimeLogsFollowing &&
-        runtimeLogResourceId === currentResourceId &&
+        isActiveRuntimeLogFollow(currentResourceId, generation) &&
         !result.done
       ) {
-        handleRuntimeLogEvent(result.value);
+        handleRuntimeLogEvent(result.value, currentResourceId, generation);
 
-        if (!runtimeLogsFollowing || runtimeLogResourceId !== currentResourceId) {
+        if (!isActiveRuntimeLogFollow(currentResourceId, generation)) {
           break;
         }
 
         result = await stream.next();
       }
     } catch (error) {
-      if (runtimeLogResourceId === currentResourceId) {
+      if (isActiveRuntimeLogFollow(currentResourceId, generation)) {
         runtimeLogsError = readErrorMessage(error);
       }
     } finally {
-      if (runtimeLogResourceId === currentResourceId) {
+      if (isActiveRuntimeLogRequest(currentResourceId, generation)) {
         runtimeLogStream = null;
         runtimeLogsFollowing = false;
       }
@@ -274,14 +398,17 @@
   }
 
   function startRuntimeLogFollow(): void {
-    if (!browser || !resource || runtimeLogsFollowing) {
+    if (!browser || !resource || runtimeLogsFollowing || runtimeLogsLoading) {
       return;
     }
 
+    const generation = runtimeLogRequestGeneration + 1;
+    runtimeLogRequestGeneration = generation;
     runtimeLogResourceId = resource.id;
     runtimeLogsError = null;
     runtimeLogsFollowing = true;
-    void consumeRuntimeLogStream(resource.id);
+    const tailLines = runtimeLogs.length > 0 ? 0 : 100;
+    void consumeRuntimeLogStream(resource.id, generation, tailLines);
   }
 
   function refreshRuntimeLogs(): void {
@@ -327,6 +454,125 @@
     void loadProxyConfiguration(resource.id);
   }
 
+  function scheduleDiagnosticSummaryCopyReset(): void {
+    if (diagnosticSummaryCopyResetTimeout) {
+      clearTimeout(diagnosticSummaryCopyResetTimeout);
+    }
+
+    diagnosticSummaryCopyResetTimeout = setTimeout(() => {
+      diagnosticSummaryCopyState = "idle";
+      diagnosticSummaryCopyResetTimeout = undefined;
+    }, 2200);
+  }
+
+  function markAccessUrlCopyState(state: "copied" | "failed"): void {
+    if (accessUrlCopyResetTimeout) {
+      clearTimeout(accessUrlCopyResetTimeout);
+    }
+
+    accessUrlCopyState = state;
+    accessUrlCopyResetTimeout = setTimeout(() => {
+      accessUrlCopyState = "idle";
+      accessUrlCopyResetTimeout = undefined;
+    }, 1800);
+  }
+
+  async function copyTextToClipboard(text: string): Promise<void> {
+    const desktopCopyText = (window as WindowWithYunduDesktopBridge).yunduDesktop?.copyText;
+    if (desktopCopyText) {
+      try {
+        await desktopCopyText(text);
+        return;
+      } catch {
+        // Fall back to browser clipboard APIs when an older desktop shell lacks permission.
+      }
+    }
+
+    if (navigator.clipboard?.writeText) {
+      try {
+        await navigator.clipboard.writeText(text);
+        return;
+      } catch {
+        // Fall back for desktop previews or browsers with restrictive clipboard permissions.
+      }
+    }
+
+    const textArea = document.createElement("textarea");
+    textArea.value = text;
+    textArea.setAttribute("readonly", "");
+    textArea.style.position = "fixed";
+    textArea.style.left = "-9999px";
+    document.body.append(textArea);
+    textArea.focus({ preventScroll: true });
+    textArea.select();
+    textArea.setSelectionRange(0, text.length);
+
+    try {
+      if (!document.execCommand("copy")) {
+        throw new Error($t(i18nKeys.console.resources.diagnosticSummaryCopyFailed));
+      }
+    } finally {
+      textArea.remove();
+    }
+  }
+
+  function selectDiagnosticSummaryFallback(event: Event): void {
+    const target = event.currentTarget;
+    if (target instanceof HTMLTextAreaElement) {
+      target.select();
+    }
+  }
+
+  async function copyResourceDiagnosticSummary(): Promise<void> {
+    if (!resource || diagnosticSummaryLoading) {
+      return;
+    }
+
+    diagnosticSummaryLoading = true;
+    diagnosticSummaryError = null;
+    diagnosticSummaryCopyFallback = null;
+
+    try {
+      const summary = await orpcClient.resources.diagnosticSummary({
+        resourceId: resource.id,
+        ...(latestDeployment?.id ? { deploymentId: latestDeployment.id } : {}),
+        includeDeploymentLogTail: true,
+        includeRuntimeLogTail: true,
+        includeProxyConfiguration: true,
+        tailLines: 20,
+      });
+      const copyJson = summary.copy.json;
+      try {
+        await copyTextToClipboard(copyJson);
+      } catch (copyError) {
+        diagnosticSummaryCopyFallback = copyJson;
+        throw copyError;
+      }
+      diagnosticSummaryCopyState = "copied";
+    } catch (error) {
+      diagnosticSummaryCopyState = "failed";
+      diagnosticSummaryError = readErrorMessage(error);
+    } finally {
+      diagnosticSummaryLoading = false;
+      if (diagnosticSummaryCopyState === "copied") {
+        scheduleDiagnosticSummaryCopyReset();
+      }
+    }
+  }
+
+  async function handleCopyAccessUrl(): Promise<void> {
+    if (!browser || !primaryAccessHref) {
+      return;
+    }
+
+    try {
+      await copyTextToClipboard(primaryAccessHref);
+      markAccessUrlCopyState("copied");
+    } catch {
+      markAccessUrlCopyState("failed");
+    }
+  }
+
   $effect(() => {
     if (!browser || !resource) {
       return;
@@ -356,23 +602,51 @@
     }
 
     untrack(() => {
-      stopRuntimeLogFollow();
-
       if (!currentResourceId) {
-        runtimeLogs = [];
-        runtimeLogResourceId = "";
         proxyConfiguration = null;
         proxyConfigurationResourceId = "";
         return;
       }
 
-      void loadRuntimeLogs(currentResourceId);
       void loadProxyConfiguration(currentResourceId);
+    });
+  });
+
+  $effect(() => {
+    const currentResourceId = resource?.id ?? "";
+    const currentTab = activeTab;
+
+    if (!browser) {
+      return;
+    }
+
+    untrack(() => {
+      stopRuntimeLogFollow();
+
+      if (!currentResourceId) {
+        runtimeLogs = [];
+        runtimeLogResourceId = "";
+        runtimeLogsLoading = false;
+        return;
+      }
+
+      if (currentTab !== "logs") {
+        runtimeLogsLoading = false;
+        return;
+      }
+
+      void loadRuntimeLogs(currentResourceId);
     });
   });
 
   onDestroy(() => {
     stopRuntimeLogFollow();
+    if (diagnosticSummaryCopyResetTimeout) {
+      clearTimeout(diagnosticSummaryCopyResetTimeout);
+    }
+    if (accessUrlCopyResetTimeout) {
+      clearTimeout(accessUrlCopyResetTimeout);
+    }
   });
 
   function createResourceDomainBinding(event: SubmitEvent): void {
@@ -397,11 +671,6 @@
     });
   }
 
-  function openDomainBindingDialog(): void {
-    createFeedback = null;
-    domainBindingDialogOpen = true;
-  }
-
   function domainBindingHref(binding: DomainBindingSummary): string {
     const normalizedPath = binding.pathPrefix.startsWith("/")
       ? binding.pathPrefix
@@ -422,16 +691,23 @@
   function parseResourceDetailTab(value: string | null): ResourceDetailTab {
     return resourceDetailTabs.includes(value as ResourceDetailTab)
       ? (value as ResourceDetailTab)
-      : "deployments";
+      : "settings";
+  }
+
+  function parseResourceSettingsSection(value: string | null): ResourceSettingsSection {
+    return resourceSettingsSections.includes(value as ResourceSettingsSection)
+      ? (value as ResourceSettingsSection)
+      : "access";
   }
 
   function resourceTabHref(tab: ResourceDetailTab): string {
     const params = new URLSearchParams(page.url.searchParams);
 
-    if (tab === "deployments") {
+    if (tab === "settings") {
       params.delete("tab");
     } else {
       params.set("tab", tab);
+      params.delete("section");
     }
 
     const search = params.toString();
@@ -447,12 +723,46 @@
     switch (tab) {
       case "deployments":
         return $t(i18nKeys.common.domain.deployments);
-      case "access":
-        return $t(i18nKeys.console.resources.accessTab);
       case "logs":
         return $t(i18nKeys.console.resources.logsTab);
       case "settings":
         return $t(i18nKeys.console.resources.settingsTab);
+    }
+  }
+
+  function resourceSettingsSectionHref(section: ResourceSettingsSection): string {
+    const params = new URLSearchParams(page.url.searchParams);
+    params.delete("tab");
+
+    if (section === "access") {
+      params.delete("section");
+    } else {
+      params.set("section", section);
+    }
+
+    const search = params.toString();
+    return `${page.url.pathname}${search ? `?${search}` : ""}`;
+  }
+
+  function selectResourceSettingsSection(section: ResourceSettingsSection, event: MouseEvent): void {
+    event.preventDefault();
+    void goto(resourceSettingsSectionHref(section), { noScroll: true, keepFocus: true });
+  }
+
+  function resourceSettingsSectionLabel(section: ResourceSettingsSection): string {
+    switch (section) {
+      case "access":
+        return $t(i18nKeys.console.resources.accessUrlTitle);
+      case "profile":
+        return $t(i18nKeys.console.resources.profileTitle);
+      case "domains":
+        return $t(i18nKeys.console.resources.domainBindingsTitle);
+      case "health":
+        return $t(i18nKeys.console.resources.healthPolicy);
+      case "proxy":
+        return $t(i18nKeys.console.resources.proxyConfigurationTitle);
+      case "diagnostics":
+        return $t(i18nKeys.console.resources.diagnosticsTitle);
     }
   }
 
@@ -522,6 +832,133 @@
         return "outline";
     }
   }
+
+  function resourceAccessKindLabel(kind: ResourceAccessKind): string {
+    switch (kind) {
+      case "domain-binding":
+      case "durable-domain":
+        return $t(i18nKeys.console.resources.durableDomainAccess);
+      case "generated-latest":
+        return $t(i18nKeys.console.resources.generatedAccessRoute);
+      case "generated-planned":
+        return $t(i18nKeys.console.resources.plannedAccessRoute);
+    }
+  }
+
+  function resourceAccessStatusLabel(status: ResourceAccessStatus | undefined): string {
+    switch (status) {
+      case "ready":
+        return $t(i18nKeys.common.status.ready);
+      case "not-ready":
+        return $t(i18nKeys.common.status.notReady);
+      case "failed":
+        return $t(i18nKeys.common.status.failed);
+      case "unknown":
+      default:
+        return $t(i18nKeys.common.status.unknown);
+    }
+  }
+
+  function resourceAccessStatusVariant(
+    status: ResourceAccessStatus | undefined,
+  ): "default" | "secondary" | "outline" | "destructive" {
+    switch (status) {
+      case "ready":
+        return "default";
+      case "failed":
+        return "destructive";
+      case "not-ready":
+        return "secondary";
+      case "unknown":
+      default:
+        return "outline";
+    }
+  }
+
+  function resourceHealthStatusLabel(status: ResourceHealthOverall): string {
+    switch (status) {
+      case "healthy":
+        return $t(i18nKeys.common.status.healthy);
+      case "degraded":
+        return $t(i18nKeys.common.status.degraded);
+      case "unhealthy":
+        return $t(i18nKeys.common.status.unhealthy);
+      case "starting":
+        return $t(i18nKeys.common.status.starting);
+      case "stopped":
+        return $t(i18nKeys.common.status.stopped);
+      case "not-deployed":
+        return $t(i18nKeys.common.status.notDeployed);
+      case "unknown":
+        return $t(i18nKeys.common.status.unknown);
+    }
+  }
+
+  function resourceHealthSectionStatusLabel(status: string | undefined): string {
+    switch (status) {
+      case "healthy":
+        return $t(i18nKeys.common.status.healthy);
+      case "degraded":
+        return $t(i18nKeys.common.status.degraded);
+      case "unhealthy":
+        return $t(i18nKeys.common.status.unhealthy);
+      case "starting":
+        return $t(i18nKeys.common.status.starting);
+      case "stopped":
+        return $t(i18nKeys.common.status.stopped);
+      case "not-deployed":
+        return $t(i18nKeys.common.status.notDeployed);
+      case "running":
+        return $t(i18nKeys.common.status.running);
+      case "ready":
+        return $t(i18nKeys.common.status.ready);
+      case "configured":
+        return $t(i18nKeys.common.status.configured);
+      case "not-ready":
+        return $t(i18nKeys.common.status.notReady);
+      case "not-configured":
+        return $t(i18nKeys.common.status.notConfigured);
+      case "failed":
+      case "exited":
+        return $t(i18nKeys.common.status.failed);
+      case "passed":
+        return $t(i18nKeys.common.status.passed);
+      case "skipped":
+        return $t(i18nKeys.common.status.skipped);
+      case "unknown":
+      default:
+        return $t(i18nKeys.common.status.unknown);
+    }
+  }
+
+  function resourceHealthSectionStatusVariant(
+    status: string | undefined,
+  ): "default" | "secondary" | "outline" | "destructive" {
+    switch (status) {
+      case "healthy":
+      case "ready":
+      case "running":
+      case "configured":
+      case "passed":
+        return "default";
+      case "degraded":
+      case "starting":
+      case "not-ready":
+        return "secondary";
+      case "unhealthy":
+      case "stopped":
+      case "failed":
+      case "exited":
+        return "destructive";
+      case "not-deployed":
+      case "not-configured":
+      case "skipped":
+      case "unknown":
+      default:
+        return "outline";
+    }
+  }
+
 </script>
 
 <svelte:head>
@@ -570,87 +1007,107 @@
     </section>
   {:else}
     <div class="space-y-8">
-      <section class="space-y-6">
+      <section class="border-b pb-4">
         <div class="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-          <div class="max-w-3xl space-y-3">
+          <div class="min-w-0 space-y-2">
             <div class="flex flex-wrap items-center gap-2">
-              <Badge variant="outline">{$t(i18nKeys.common.domain.resource)}</Badge>
+              <h1 class="break-words text-2xl font-semibold md:text-3xl">{resource.name}</h1>
               <Badge variant="secondary">{resource.kind}</Badge>
-              {#if resource.lastDeploymentStatus}
-                <DeploymentStatusBadge status={resource.lastDeploymentStatus} />
-              {/if}
             </div>
-            <div class="space-y-2">
-              <h1 class="text-2xl font-semibold md:text-3xl">{resource.name}</h1>
-              <p class="text-sm leading-6 text-muted-foreground">
-                {resource.description ?? $t(i18nKeys.console.projects.noDescription)}
+            {#if resource.description}
+              <p class="max-w-3xl text-sm leading-6 text-muted-foreground">
+                {resource.description}
               </p>
-            </div>
-            <p class="text-xs text-muted-foreground">
-              {project?.name ?? resource.projectId} · {environment?.name ?? resource.environmentId}
-            </p>
+            {/if}
           </div>
 
-          <div class="flex flex-wrap gap-2">
-            {#if primaryAccessHref}
-              <Button href={primaryAccessHref} target="_blank" rel="noreferrer" variant="outline">
-                {$t(i18nKeys.console.resources.openGeneratedAccess)}
-                <ArrowRight class="size-4" />
-              </Button>
-            {/if}
-            <Button onclick={openDomainBindingDialog}>
-              <Globe2 class="size-4" />
-              {$t(i18nKeys.common.actions.bindDomain)}
-            </Button>
-            {#if project}
-              <Button href={projectDetailHref(project.id)} variant="outline">
-                <ArrowLeft class="size-4" />
-                {$t(i18nKeys.common.actions.openProject)}
-              </Button>
-            {/if}
+          <div class="flex shrink-0 flex-wrap gap-2">
+            <details class="relative">
+              <summary
+                class="inline-flex h-9 cursor-pointer list-none items-center gap-2 rounded-md border bg-background px-3 text-sm font-medium shadow-xs transition-[color,box-shadow] hover:bg-accent hover:text-accent-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 [&::-webkit-details-marker]:hidden"
+              >
+                <ResourceStatusDot status={resourceHealthOverall} />
+                <span>{$t(i18nKeys.console.resources.healthTitle)}</span>
+                <span class="text-muted-foreground">
+                  {resourceHealthStatusLabel(resourceHealthOverall)}
+                </span>
+              </summary>
+              <div
+                class="absolute right-0 z-30 mt-2 w-96 max-w-[calc(100vw-2rem)] rounded-md border bg-popover p-3 shadow-lg"
+              >
+                <div class="flex items-start justify-between gap-3">
+                  <div class="min-w-0">
+                    <p class="flex items-center gap-2 text-sm font-medium">
+                      <ResourceStatusDot status={resourceHealthOverall} />
+                      {resourceHealthStatusLabel(resourceHealthOverall)}
+                    </p>
+                    {#if resourceHealth?.observedAt}
+                      <p class="mt-1 text-xs text-muted-foreground">
+                        {$t(i18nKeys.console.resources.healthObservedAt)}
+                        {formatTime(resourceHealth.observedAt)}
+                      </p>
+                    {/if}
+                  </div>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={resourceHealthQuery.isFetching}
+                    onclick={() => resourceHealthQuery.refetch()}
+                  >
+                    <RefreshCw
+                      class={["size-4", resourceHealthQuery.isFetching ? "animate-spin" : ""]}
+                    />
+                    {$t(i18nKeys.console.resources.healthRefresh)}
+                  </Button>
+                </div>
+
+                {#if resourceHealthQuery.isPending}
+                  <div class="mt-3 space-y-2">
+                    <Skeleton class="h-8 w-full" />
+                    <Skeleton class="h-8 w-full" />
+                  </div>
+                {:else if resourceHealthQuery.error}
+                  <p class="mt-3 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+                    {readErrorMessage(resourceHealthQuery.error)}
+                  </p>
+                {:else if resourceHealth}
+                  <div class="mt-3 space-y-2">
+                    <div
+                      class="flex items-center justify-between gap-3 rounded-md border bg-muted/20 px-3 py-2 text-sm"
+                    >
+                      <span class="font-medium">{$t(i18nKeys.console.resources.healthRuntime)}</span>
+                      <Badge variant={resourceHealthSectionStatusVariant(resourceHealth.runtime.lifecycle)}>
+                        {resourceHealthSectionStatusLabel(resourceHealth.runtime.lifecycle)}
+                      </Badge>
+                    </div>
+                    <div class="rounded-md border bg-muted/20 px-3 py-2 text-sm">
+                      <div class="flex items-center justify-between gap-3">
+                        <span class="font-medium">
+                          {$t(i18nKeys.console.resources.healthPolicy)}
+                        </span>
+                        <Badge
+                          variant={resourceHealthSectionStatusVariant(
+                            resourceHealth.healthPolicy.status,
+                          )}
+                        >
+                          {resourceHealthSectionStatusLabel(resourceHealth.healthPolicy.status)}
+                        </Badge>
+                      </div>
+                      {#if resourceHealth.healthPolicy.path}
+                        <p class="mt-1 truncate text-xs text-muted-foreground">
+                          {resourceHealth.healthPolicy.path}
+                        </p>
+                      {/if}
+                    </div>
+                  </div>
+                {/if}
+              </div>
+            </details>
             <Button href={resourceDeploymentHref()}>
               <Plus class="size-4" />
               {$t(i18nKeys.common.actions.newDeployment)}
             </Button>
-            <Button href={`/deployments?projectId=${resource.projectId}`} variant="outline">
-              {$t(i18nKeys.common.actions.viewDeployments)}
-              <ArrowRight class="size-4" />
-            </Button>
-          </div>
-        </div>
-
-        <div class="grid border-y sm:grid-cols-2 lg:grid-cols-4 lg:divide-x">
-          <div class="px-0 py-4 lg:px-4">
-            <p class="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              <Boxes class="size-4" />
-              {$t(i18nKeys.common.domain.deployments)}
-            </p>
-            <p class="mt-2 text-2xl font-semibold">{resourceDeployments.length}</p>
-          </div>
-          <div class="border-t px-0 py-4 sm:border-t-0 lg:px-4">
-            <p class="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              <Globe2 class="size-4" />
-              {$t(i18nKeys.common.domain.domainBindings)}
-            </p>
-            <p class="mt-2 text-2xl font-semibold">{resourceDomainBindings.length}</p>
-          </div>
-          <div class="border-t px-0 py-4 lg:border-t-0 lg:px-4">
-            <p class="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              <Server class="size-4" />
-              {$t(i18nKeys.common.domain.server)}
-            </p>
-            <p class="mt-2 truncate font-semibold">
-              {(selectedServer?.name ?? latestDeployment?.serverId ?? serverId) || "-"}
-            </p>
-          </div>
-          <div class="border-t px-0 py-4 sm:border-t-0 lg:px-4">
-            <p class="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              <Route class="size-4" />
-              {$t(i18nKeys.common.domain.destination)}
-            </p>
-            <p class="mt-2 truncate font-semibold">
-              {(resource.destinationId ?? latestDeployment?.destinationId ?? destinationId) || "-"}
-            </p>
           </div>
         </div>
       </section>
@@ -670,8 +1127,8 @@
           {/each}
         </Tabs.List>
 
-        <Tabs.Content value="deployments" class="mt-0 space-y-4">
-          <section class="space-y-4">
+        <Tabs.Content value="deployments" class="mt-0">
+          <section id="resource-deployments" class="space-y-4">
             <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div>
                 <h2 class="text-lg font-semibold">
@@ -706,358 +1163,548 @@
           </section>
         </Tabs.Content>
 
-        <Tabs.Content value="access" class="mt-0 space-y-8">
-          <section class="space-y-4">
-            <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-              <div>
-                <h2 class="text-lg font-semibold">
-                  {$t(i18nKeys.console.resources.domainBindingsTitle)}
-                </h2>
-                <p class="mt-1 text-sm text-muted-foreground">
-                  {$t(i18nKeys.console.resources.domainBindingsDescription)}
-                </p>
-              </div>
-            </div>
+        <Tabs.Content value="settings" class="mt-0">
+          <div class="grid gap-6 lg:grid-cols-[12rem_minmax(0,1fr)]">
+            <aside class="border-b pb-3 lg:border-b-0 lg:border-r lg:pb-0 lg:pr-4">
+              <nav aria-label={$t(i18nKeys.console.resources.settingsTab)}>
+                <div role="tablist" class="flex gap-2 overflow-x-auto lg:flex-col">
+                  {#each resourceSettingsSections as section (section)}
+                    <a
+                      href={resourceSettingsSectionHref(section)}
+                      role="tab"
+                      aria-selected={activeSettingsSection === section}
+                      class={[
+                        "rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                        activeSettingsSection === section
+                          ? "bg-muted text-foreground"
+                          : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                      ]}
+                      onclick={(event) => selectResourceSettingsSection(section, event)}
+                    >
+                      {resourceSettingsSectionLabel(section)}
+                    </a>
+                  {/each}
+                </div>
+              </nav>
+            </aside>
 
-            <div class="space-y-3">
-              {#if resourceDomainBindings.length > 0}
-                {#each resourceDomainBindings as binding (binding.id)}
-                  {@const server = findServer(servers, binding.serverId)}
-                  <article class="border-y py-3">
-                    <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                      <div class="min-w-0 space-y-2">
-                        <div class="flex flex-wrap items-center gap-2">
-                          <Globe2 class="size-4 text-muted-foreground" />
-                          <a
-                            class="truncate font-medium text-primary underline-offset-4 hover:underline"
-                            href={domainBindingHref(binding)}
-                            target="_blank"
-                            rel="noreferrer"
-                          >
-                            {binding.domainName}
-                          </a>
-                          <Badge variant={domainBindingStatusVariant(binding.status)}>
-                            {domainBindingStatusLabel(binding.status)}
+            <div class="space-y-8">
+              {#if activeSettingsSection === "access"}
+              <section id="resource-overview-access" class="rounded-md border bg-background p-4">
+                <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                  <div class="min-w-0 space-y-2">
+                    <p class="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                      <Link2 class="size-4" />
+                      {$t(i18nKeys.console.resources.accessUrlTitle)}
+                    </p>
+                    {#if primaryAccessHref}
+                      <a
+                        class="block break-all text-lg font-semibold text-primary underline-offset-4 hover:underline md:text-xl"
+                        href={primaryAccessHref}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        {primaryAccessHref}
+                      </a>
+                      <div class="flex flex-wrap items-center gap-2">
+                        {#if primaryAccessKind}
+                          <Badge variant="outline">{resourceAccessKindLabel(primaryAccessKind)}</Badge>
+                        {/if}
+                        {#if primaryDomainBinding}
+                          <Badge variant={domainBindingStatusVariant(primaryDomainBinding.status)}>
+                            {domainBindingStatusLabel(primaryDomainBinding.status)}
                           </Badge>
-                        </div>
-                        <p class="text-sm text-muted-foreground">
-                          {binding.pathPrefix} · {binding.proxyKind} · {$t(
-                            i18nKeys.common.domain.tls,
-                          )}
-                          {" "}
-                          {binding.tlsMode}
-                        </p>
+                        {:else}
+                          <Badge
+                            variant={resourceAccessStatusVariant(
+                              resource?.accessSummary?.proxyRouteStatus,
+                            )}
+                          >
+                            {resourceAccessStatusLabel(resource?.accessSummary?.proxyRouteStatus)}
+                          </Badge>
+                        {/if}
+                        {#if primaryAccessRoute?.targetPort}
+                          <Badge variant="secondary">
+                            {$t(i18nKeys.common.domain.port)} {primaryAccessRoute.targetPort}
+                          </Badge>
+                        {/if}
                       </div>
-                      <p class="text-xs text-muted-foreground">{formatTime(binding.createdAt)}</p>
-                    </div>
-                    <div class="mt-3 grid gap-3 sm:grid-cols-3">
-                      <div class="bg-muted/25 px-3 py-2">
-                        <p class="text-xs text-muted-foreground">
-                          {$t(i18nKeys.common.domain.server)}
-                        </p>
-                        <p class="mt-1 truncate text-sm font-medium">
-                          {server?.name ?? binding.serverId}
-                        </p>
-                      </div>
-                      <div class="bg-muted/25 px-3 py-2">
-                        <p class="text-xs text-muted-foreground">
-                          {$t(i18nKeys.common.domain.destination)}
-                        </p>
-                        <p class="mt-1 truncate text-sm font-medium">{binding.destinationId}</p>
-                      </div>
-                      <div class="bg-muted/25 px-3 py-2">
-                        <p class="text-xs text-muted-foreground">
-                          {$t(i18nKeys.console.domainBindings.verificationAttempts, {
-                            count: binding.verificationAttemptCount,
-                          })}
-                        </p>
-                        <p class="mt-1 truncate text-sm font-medium">
-                          {binding.certificatePolicy}
-                        </p>
-                      </div>
-                    </div>
-                  </article>
-                {/each}
-              {:else}
-                <div class="bg-muted/25 px-4 py-6 text-sm text-muted-foreground">
-                  {$t(i18nKeys.console.resources.noDomainBindings)}
-                </div>
-              {/if}
-            </div>
-          </section>
-
-          <section class="space-y-4 border-t pt-6">
-            <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-              <div class="flex items-start gap-3">
-                <div class="bg-muted p-2">
-                  <Route class="size-4" />
-                </div>
-                <div>
-                  <div class="flex flex-wrap items-center gap-2">
-                    <h2 class="text-lg font-semibold">
-                      {$t(i18nKeys.console.resources.proxyConfigurationTitle)}
-                    </h2>
-                    {#if proxyConfiguration}
-                      <Badge variant={proxyConfigurationStatusVariant(proxyConfiguration.status)}>
-                        {proxyConfigurationStatusLabel(proxyConfiguration.status)}
-                      </Badge>
+                    {:else}
+                      <p class="text-sm leading-6 text-muted-foreground">
+                        {$t(i18nKeys.console.resources.accessUrlEmpty)}
+                      </p>
                     {/if}
+                    <p class="text-xs leading-5 text-muted-foreground">
+                      {$t(i18nKeys.console.resources.accessUrlDescription)}
+                    </p>
                   </div>
+
+                  {#if primaryAccessHref}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      aria-label={accessUrlCopyLabel}
+                      title={accessUrlCopyLabel}
+                      onclick={handleCopyAccessUrl}
+                    >
+                      {#if accessUrlCopyState === "copied"}
+                        <Check class="size-4" />
+                      {:else}
+                        <Copy class="size-4" />
+                      {/if}
+                      {accessUrlCopyLabel}
+                    </Button>
+                  {/if}
+                </div>
+              </section>
+
+              {:else if activeSettingsSection === "profile"}
+              <div id="resource-overview-profile">
+                <ResourceProfileSummary
+                  {resource}
+                  projectName={project?.name ?? resource.projectId}
+                  environmentName={environment?.name ?? resource.environmentId}
+                  destinationId={defaultDestinationId}
+                />
+              </div>
+
+              {:else if activeSettingsSection === "domains"}
+              <section id="resource-overview-domains" class="space-y-4">
+                <div>
+                  <h2 class="text-lg font-semibold">
+                    {$t(i18nKeys.console.resources.domainBindingsTitle)}
+                  </h2>
                   <p class="mt-1 text-sm text-muted-foreground">
-                    {$t(i18nKeys.console.resources.proxyConfigurationDescription)}
+                    {$t(i18nKeys.console.resources.domainBindingsDescription)}
                   </p>
                 </div>
-              </div>
-              <Button
-                variant="outline"
-                onclick={refreshProxyConfiguration}
-                disabled={proxyConfigurationLoading}
-              >
-                <RefreshCw class={["size-4", proxyConfigurationLoading ? "animate-spin" : ""]} />
-                {$t(i18nKeys.console.resources.proxyConfigurationRefresh)}
-              </Button>
-            </div>
 
-            {#if proxyConfigurationError}
-              <div class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
-                {proxyConfigurationError}
-              </div>
-            {/if}
-
-            <div class="space-y-3">
-              {#if proxyConfigurationLoading}
-                <div class="bg-muted/25 px-4 py-4 text-sm text-muted-foreground">
-                  {$t(i18nKeys.console.resources.proxyConfigurationLoading)}
-                </div>
-              {:else if !proxyConfiguration || proxyConfiguration.sections.length === 0}
-                <div class="bg-muted/25 px-4 py-4 text-sm text-muted-foreground">
-                  {$t(i18nKeys.console.resources.proxyConfigurationEmpty)}
-                </div>
-              {:else}
-                <div class="grid gap-3 md:grid-cols-3">
-                  <div class="bg-muted/30 px-3 py-2 text-sm">
-                    <span class="text-muted-foreground">{$t(i18nKeys.common.domain.proxy)}</span>
-                    <span class="ml-2 font-medium">{proxyConfiguration.providerKey}</span>
-                  </div>
-                  <div class="bg-muted/30 px-3 py-2 text-sm">
-                    <span class="text-muted-foreground">{$t(i18nKeys.common.domain.resources)}</span>
-                    <span class="ml-2 font-medium">{proxyConfiguration.routes.length}</span>
-                  </div>
-                  <div class="bg-muted/30 px-3 py-2 text-sm">
-                    <span class="text-muted-foreground">
-                      {$t(i18nKeys.console.resources.proxyConfigurationGeneratedAt)}
+                <form class="rounded-md border bg-background p-4" onsubmit={createResourceDomainBinding}>
+                  <div class="flex flex-wrap gap-x-4 gap-y-1 border-b pb-3 text-xs text-muted-foreground">
+                    <span>{$t(i18nKeys.common.domain.resource)}: {resource.name}</span>
+                    <span>
+                      {$t(i18nKeys.common.domain.server)}:
+                      {selectedServer?.name ?? latestDeployment?.serverId ?? "-"}
                     </span>
-                    <span class="ml-2 font-medium">{formatTime(proxyConfiguration.generatedAt)}</span>
+                    <span>{$t(i18nKeys.common.domain.destination)}: {destinationId || "-"}</span>
                   </div>
+
+                  <div class="mt-4 grid gap-4 md:grid-cols-[minmax(0,1fr)_10rem_10rem]">
+                    <label class="space-y-1.5 text-sm font-medium">
+                      <span>{$t(i18nKeys.common.domain.domainName)}</span>
+                      <Input
+                        bind:value={domainName}
+                        autocomplete="off"
+                        placeholder={$t(i18nKeys.console.domainBindings.formDomainPlaceholder)}
+                      />
+                    </label>
+
+                    <label class="space-y-1.5 text-sm font-medium">
+                      <span>{$t(i18nKeys.common.domain.pathPrefix)}</span>
+                      <Input bind:value={pathPrefix} autocomplete="off" placeholder="/" />
+                    </label>
+
+                    <label class="space-y-1.5 text-sm font-medium">
+                      <span>{$t(i18nKeys.common.domain.tls)}</span>
+                      <Select.Root bind:value={tlsMode} type="single">
+                        <Select.Trigger class="w-full">{tlsMode}</Select.Trigger>
+                        <Select.Content>
+                          <Select.Item value="auto">auto</Select.Item>
+                          <Select.Item value="disabled">disabled</Select.Item>
+                        </Select.Content>
+                      </Select.Root>
+                    </label>
+                  </div>
+
+                  {#if shouldShowServerField || shouldShowDestinationField}
+                    <div class="mt-4 grid gap-4 sm:grid-cols-2">
+                      {#if shouldShowServerField}
+                        <label class="space-y-1.5 text-sm font-medium">
+                          <span>{$t(i18nKeys.common.domain.server)}</span>
+                          <Select.Root bind:value={serverId} type="single">
+                            <Select.Trigger class="w-full">
+                              {selectedServer?.name ??
+                                $t(i18nKeys.console.domainBindings.noServerOptions)}
+                            </Select.Trigger>
+                            <Select.Content>
+                              {#each servers as server (server.id)}
+                                <Select.Item value={server.id}>{server.name}</Select.Item>
+                              {/each}
+                            </Select.Content>
+                          </Select.Root>
+                        </label>
+                      {/if}
+
+                      {#if shouldShowDestinationField}
+                        <label class="space-y-1.5 text-sm font-medium">
+                          <span>{$t(i18nKeys.common.domain.destination)}</span>
+                          <Input
+                            bind:value={destinationId}
+                            autocomplete="off"
+                            placeholder={$t(i18nKeys.console.domainBindings.formDestinationPlaceholder)}
+                          />
+                        </label>
+                      {/if}
+                    </div>
+                  {/if}
+
+                  {#if createFeedback}
+                    <div
+                      class={[
+                        "mt-4 rounded-md border px-3 py-2 text-sm",
+                        createFeedback.kind === "success"
+                          ? "border-primary/25 bg-primary/5"
+                          : "border-destructive/30 bg-destructive/5 text-destructive",
+                      ]}
+                    >
+                      <p class="font-medium">{createFeedback.title}</p>
+                      <p class="mt-1 break-all text-xs">{createFeedback.detail}</p>
+                    </div>
+                  {/if}
+
+                  <div class="mt-4 flex justify-end">
+                    <Button
+                      type="submit"
+                      disabled={!canCreateBinding || createDomainBindingMutation.isPending}
+                    >
+                      <Globe2 class="size-4" />
+                      {createDomainBindingMutation.isPending
+                        ? $t(i18nKeys.console.domainBindings.formSubmitting)
+                        : $t(i18nKeys.common.actions.bindDomain)}
+                    </Button>
+                  </div>
+                </form>
+
+                <div class="space-y-3">
+                  {#if resourceDomainBindings.length > 0}
+                    {#each resourceDomainBindings as binding (binding.id)}
+                      {@const server = findServer(servers, binding.serverId)}
+                      <article class="rounded-md border bg-background p-4">
+                        <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                          <div class="min-w-0 space-y-2">
+                            <div class="flex flex-wrap items-center gap-2">
+                              <Globe2 class="size-4 text-muted-foreground" />
+                              <a
+                                class="truncate font-medium text-primary underline-offset-4 hover:underline"
+                                href={domainBindingHref(binding)}
+                                target="_blank"
+                                rel="noreferrer"
+                              >
+                                {binding.domainName}
+                              </a>
+                              <Badge variant={domainBindingStatusVariant(binding.status)}>
+                                {domainBindingStatusLabel(binding.status)}
+                              </Badge>
+                            </div>
+                            <p class="text-sm text-muted-foreground">
+                              {binding.pathPrefix} · {binding.proxyKind} · {$t(
+                                i18nKeys.common.domain.tls,
+                              )}
+                              {" "}
+                              {binding.tlsMode}
+                            </p>
+                          </div>
+                          <p class="text-xs text-muted-foreground">{formatTime(binding.createdAt)}</p>
+                        </div>
+                        <div class="mt-3 grid gap-3 sm:grid-cols-3">
+                          <div class="rounded-md bg-muted/25 px-3 py-2">
+                            <p class="text-xs text-muted-foreground">
+                              {$t(i18nKeys.common.domain.server)}
+                            </p>
+                            <p class="mt-1 truncate text-sm font-medium">
+                              {server?.name ?? binding.serverId}
+                            </p>
+                          </div>
+                          <div class="rounded-md bg-muted/25 px-3 py-2">
+                            <p class="text-xs text-muted-foreground">
+                              {$t(i18nKeys.common.domain.destination)}
+                            </p>
+                            <p class="mt-1 truncate text-sm font-medium">{binding.destinationId}</p>
+                          </div>
+                          <div class="rounded-md bg-muted/25 px-3 py-2">
+                            <p class="text-xs text-muted-foreground">
+                              {$t(i18nKeys.console.domainBindings.verificationAttempts, {
+                                count: binding.verificationAttemptCount,
+                              })}
+                            </p>
+                            <p class="mt-1 truncate text-sm font-medium">
+                              {binding.certificatePolicy}
+                            </p>
+                          </div>
+                        </div>
+                      </article>
+                    {/each}
+                  {:else}
+                    <div class="rounded-md border bg-muted/25 px-4 py-6 text-sm text-muted-foreground">
+                      {$t(i18nKeys.console.resources.noDomainBindings)}
+                    </div>
+                  {/if}
+                </div>
+              </section>
+
+              {:else if activeSettingsSection === "health"}
+              <section id="resource-overview-health" class="rounded-md border bg-background p-4">
+                <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <h2 class="text-lg font-semibold">
+                      {$t(i18nKeys.console.resources.healthPolicy)}
+                    </h2>
+                    <p class="mt-1 text-sm text-muted-foreground">
+                      {$t(i18nKeys.console.resources.healthDescription)}
+                    </p>
+                  </div>
+                  <Badge variant={resourceHealthSectionStatusVariant(resourceHealth?.healthPolicy.status)}>
+                    {resourceHealthSectionStatusLabel(resourceHealth?.healthPolicy.status)}
+                  </Badge>
                 </div>
 
-                {#each proxyConfiguration.sections as section (section.id)}
-                  <article class="bg-muted/20">
-                    <div class="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
-                      <h3 class="font-medium">{section.title}</h3>
-                      <Badge variant="outline">{section.format}</Badge>
+                <div class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                  <div class="rounded-md bg-muted/30 px-3 py-2">
+                    <p class="text-xs text-muted-foreground">
+                      {$t(i18nKeys.console.resources.healthChecks)}
+                    </p>
+                    <p class="mt-1 truncate text-sm font-medium">
+                      {resourceHealth?.healthPolicy.type ?? "-"}
+                    </p>
+                  </div>
+                  <div class="rounded-md bg-muted/30 px-3 py-2">
+                    <p class="text-xs text-muted-foreground">
+                      {$t(i18nKeys.console.quickDeploy.healthCheckPath)}
+                    </p>
+                    <p class="mt-1 truncate text-sm font-medium">
+                      {resourceHealth?.healthPolicy.path ?? "-"}
+                    </p>
+                  </div>
+                  <div class="rounded-md bg-muted/30 px-3 py-2">
+                    <p class="text-xs text-muted-foreground">
+                      {$t(i18nKeys.console.quickDeploy.healthCheckIntervalSeconds)}
+                    </p>
+                    <p class="mt-1 truncate text-sm font-medium">
+                      {resourceHealth?.healthPolicy.intervalSeconds ?? "-"}
+                    </p>
+                  </div>
+                  <div class="rounded-md bg-muted/30 px-3 py-2">
+                    <p class="text-xs text-muted-foreground">
+                      {$t(i18nKeys.console.quickDeploy.healthCheckRetries)}
+                    </p>
+                    <p class="mt-1 truncate text-sm font-medium">
+                      {resourceHealth?.healthPolicy.retries ?? "-"}
+                    </p>
+                  </div>
+                </div>
+              </section>
+
+              {:else if activeSettingsSection === "proxy"}
+              <section id="resource-overview-proxy" class="space-y-4">
+                <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                  <div class="flex items-start gap-3">
+                    <div class="bg-muted p-2">
+                      <Route class="size-4" />
                     </div>
-                    <pre class="max-h-80 overflow-auto p-4 text-xs"><code>{section.content}</code></pre>
-                  </article>
-                {/each}
+                    <div>
+                      <div class="flex flex-wrap items-center gap-2">
+                        <h2 class="text-lg font-semibold">
+                          {$t(i18nKeys.console.resources.proxyConfigurationTitle)}
+                        </h2>
+                        {#if proxyConfiguration}
+                          <Badge variant={proxyConfigurationStatusVariant(proxyConfiguration.status)}>
+                            {proxyConfigurationStatusLabel(proxyConfiguration.status)}
+                          </Badge>
+                        {/if}
+                      </div>
+                      <p class="mt-1 text-sm text-muted-foreground">
+                        {$t(i18nKeys.console.resources.proxyConfigurationDescription)}
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    variant="outline"
+                    onclick={refreshProxyConfiguration}
+                    disabled={proxyConfigurationLoading}
+                  >
+                    <RefreshCw class={["size-4", proxyConfigurationLoading ? "animate-spin" : ""]} />
+                    {$t(i18nKeys.console.resources.proxyConfigurationRefresh)}
+                  </Button>
+                </div>
+
+                {#if proxyConfigurationError}
+                  <div class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+                    {proxyConfigurationError}
+                  </div>
+                {/if}
+
+                <div class="space-y-3">
+                  {#if proxyConfigurationLoading}
+                    <div class="rounded-md bg-muted/25 px-4 py-4 text-sm text-muted-foreground">
+                      {$t(i18nKeys.console.resources.proxyConfigurationLoading)}
+                    </div>
+                  {:else if !proxyConfiguration || proxyConfiguration.sections.length === 0}
+                    <div class="rounded-md bg-muted/25 px-4 py-4 text-sm text-muted-foreground">
+                      {$t(i18nKeys.console.resources.proxyConfigurationEmpty)}
+                    </div>
+                  {:else}
+                    <div class="grid gap-3 md:grid-cols-3">
+                      <div class="rounded-md bg-muted/30 px-3 py-2 text-sm">
+                        <span class="text-muted-foreground">{$t(i18nKeys.common.domain.proxy)}</span>
+                        <span class="ml-2 font-medium">{proxyConfiguration.providerKey}</span>
+                      </div>
+                      <div class="rounded-md bg-muted/30 px-3 py-2 text-sm">
+                        <span class="text-muted-foreground">
+                          {$t(i18nKeys.common.domain.resources)}
+                        </span>
+                        <span class="ml-2 font-medium">{proxyConfiguration.routes.length}</span>
+                      </div>
+                      <div class="rounded-md bg-muted/30 px-3 py-2 text-sm">
+                        <span class="text-muted-foreground">
+                          {$t(i18nKeys.console.resources.proxyConfigurationGeneratedAt)}
+                        </span>
+                        <span class="ml-2 font-medium">
+                          {formatTime(proxyConfiguration.generatedAt)}
+                        </span>
+                      </div>
+                    </div>
+
+                    {#each proxyConfiguration.sections as section (section.id)}
+                      <article class="rounded-md bg-muted/20">
+                        <div class="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
+                          <h3 class="font-medium">{section.title}</h3>
+                          <Badge variant="outline">{section.format}</Badge>
+                        </div>
+                        <pre class="max-h-80 overflow-auto p-4 text-xs"><code>{section.content}</code></pre>
+                      </article>
+                    {/each}
+                  {/if}
+                </div>
+              </section>
+
+              {:else if activeSettingsSection === "diagnostics"}
+              <section id="resource-overview-diagnostics" class="rounded-md border bg-background p-4">
+                <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <h2 class="text-lg font-semibold">
+                      {$t(i18nKeys.console.resources.diagnosticsTitle)}
+                    </h2>
+                    <p class="mt-1 text-sm text-muted-foreground">
+                      {$t(i18nKeys.console.resources.diagnosticsDescription)}
+                    </p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    onclick={copyResourceDiagnosticSummary}
+                    disabled={diagnosticSummaryLoading}
+                  >
+                    <Clipboard class="size-4" />
+                    {diagnosticSummaryButtonLabel}
+                  </Button>
+                </div>
+
+                {#if diagnosticSummaryError}
+                  <div class="mt-4 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+                    {diagnosticSummaryError}
+                  </div>
+                {/if}
+                {#if diagnosticSummaryCopyFallback}
+                  <div class="mt-4 space-y-2 rounded-md border border-destructive/30 bg-destructive/5 p-3">
+                    <div class="space-y-1">
+                      <p class="text-sm font-medium text-destructive">
+                        {$t(i18nKeys.console.resources.diagnosticSummaryCopyFallbackTitle)}
+                      </p>
+                      <p class="text-xs leading-5 text-muted-foreground">
+                        {$t(i18nKeys.console.resources.diagnosticSummaryCopyFallbackDescription)}
+                      </p>
+                    </div>
+                    <textarea
+                      class="min-h-48 w-full resize-y rounded-md border bg-background p-3 font-mono text-xs leading-5"
+                      readonly
+                      value={diagnosticSummaryCopyFallback}
+                      onclick={selectDiagnosticSummaryFallback}
+                      onfocus={selectDiagnosticSummaryFallback}
+                    ></textarea>
+                  </div>
+                {/if}
+              </section>
               {/if}
             </div>
-          </section>
+          </div>
         </Tabs.Content>
 
-        <Tabs.Content value="settings" class="mt-0 space-y-5">
-          <ResourceProfileSummary
-            {resource}
-            projectName={project?.name ?? resource.projectId}
-            environmentName={environment?.name ?? resource.environmentId}
-            destinationId={defaultDestinationId}
-          />
-        </Tabs.Content>
-
-        <Tabs.Content value="logs" class="mt-0 space-y-5">
-      <section class="space-y-4">
-        <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-          <div class="flex items-start gap-3">
-            <div class="bg-muted p-2">
-              <Terminal class="size-4" />
-            </div>
-            <div>
-              <h2 class="text-lg font-semibold">
-                {$t(i18nKeys.console.resources.runtimeLogsTitle)}
-              </h2>
-              <p class="mt-1 text-sm text-muted-foreground">
-                {$t(i18nKeys.console.resources.runtimeLogsDescription)}
-              </p>
-            </div>
-          </div>
-          <div class="flex flex-wrap gap-2">
-            <Button
-              variant="outline"
-              onclick={refreshRuntimeLogs}
-              disabled={runtimeLogsLoading || runtimeLogsFollowing}
-            >
-              <RefreshCw class={["size-4", runtimeLogsLoading ? "animate-spin" : ""]} />
-              {$t(i18nKeys.console.resources.runtimeLogsRefresh)}
-            </Button>
-            <Button
-              variant={runtimeLogsFollowing ? "secondary" : "default"}
-              onclick={runtimeLogsFollowing ? stopRuntimeLogFollow : startRuntimeLogFollow}
-            >
-              <Terminal class="size-4" />
-              {runtimeLogsFollowing
-                ? $t(i18nKeys.console.resources.runtimeLogsStopFollow)
-                : $t(i18nKeys.console.resources.runtimeLogsStartFollow)}
-            </Button>
-          </div>
-        </div>
-
-        {#if runtimeLogsError}
-          <div class="mt-4 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
-            {runtimeLogsError}
-          </div>
-        {/if}
-
-        <div class="mt-4 max-h-96 overflow-auto rounded-md border bg-zinc-950 p-3 font-mono text-xs text-zinc-100">
-          {#if runtimeLogsLoading}
-            <p class="text-zinc-400">{$t(i18nKeys.console.resources.runtimeLogsLoading)}</p>
-          {:else if runtimeLogs.length === 0}
-            <p class="text-zinc-400">{$t(i18nKeys.console.resources.runtimeLogsEmpty)}</p>
-          {:else}
-            <div class="space-y-1">
-              {#each runtimeLogs as line, index (`${line.sequence ?? index}-${line.timestamp ?? ""}-${line.message}`)}
-                <div class="grid gap-2 sm:grid-cols-[10rem_1fr]">
-                  <span class="truncate text-zinc-500">
-                    {line.timestamp ? formatTime(line.timestamp) : line.stream}
-                  </span>
-                  <span class={["break-words", line.masked ? "text-amber-200" : "text-zinc-100"]}>
-                    {line.message}
-                  </span>
+        <Tabs.Content value="logs" class="mt-0">
+          <section id="resource-runtime-logs" class="space-y-4">
+              <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                <div class="flex items-start gap-3">
+                  <div class="bg-muted p-2">
+                    <Terminal class="size-4" />
+                  </div>
+                  <div>
+                    <h2 class="text-lg font-semibold">
+                      {$t(i18nKeys.console.resources.runtimeLogsTitle)}
+                    </h2>
+                    <p class="mt-1 text-sm text-muted-foreground">
+                      {$t(i18nKeys.console.resources.runtimeLogsDescription)}
+                    </p>
+                    {#if runtimeLogsLoading || runtimeLogsFollowing}
+                      <p class="mt-2 text-xs text-muted-foreground">
+                        {runtimeLogsLoading
+                          ? $t(i18nKeys.console.resources.runtimeLogsConnecting)
+                          : $t(i18nKeys.console.resources.runtimeLogsFollowing)}
+                      </p>
+                    {/if}
+                  </div>
                 </div>
-              {/each}
-            </div>
-          {/if}
-        </div>
-      </section>
+                <div class="flex flex-wrap gap-2">
+                  <Button
+                    variant="outline"
+                    onclick={refreshRuntimeLogs}
+                    disabled={runtimeLogsLoading || runtimeLogsFollowing}
+                  >
+                    <RefreshCw class={["size-4", runtimeLogsLoading ? "animate-spin" : ""]} />
+                    {$t(i18nKeys.console.resources.runtimeLogsRefresh)}
+                  </Button>
+                  <Button
+                    variant={runtimeLogsFollowing ? "secondary" : "default"}
+                    onclick={runtimeLogsFollowing ? stopRuntimeLogFollow : startRuntimeLogFollow}
+                    disabled={runtimeLogsLoading && !runtimeLogsFollowing}
+                  >
+                    <Terminal class="size-4" />
+                    {runtimeLogsFollowing
+                      ? $t(i18nKeys.console.resources.runtimeLogsStopFollow)
+                      : $t(i18nKeys.console.resources.runtimeLogsStartFollow)}
+                  </Button>
+                </div>
+              </div>
 
+              {#if runtimeLogsError}
+                <div class="mt-4 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+                  {runtimeLogsError}
+                </div>
+              {/if}
+
+              <div class="mt-4 max-h-96 overflow-auto rounded-md border bg-zinc-950 p-3 font-mono text-xs text-zinc-100">
+                {#if runtimeLogsLoading}
+                  <p class="text-zinc-400">{$t(i18nKeys.console.resources.runtimeLogsLoading)}</p>
+                {:else if runtimeLogs.length === 0}
+                  <p class="text-zinc-400">{$t(i18nKeys.console.resources.runtimeLogsEmpty)}</p>
+                {:else}
+                  <div class="space-y-1">
+                    {#each runtimeLogs as line, index (`${line.sequence ?? index}-${line.timestamp ?? ""}-${line.message}`)}
+                      <div class="grid gap-2 sm:grid-cols-[10rem_1fr]">
+                        <span class="truncate text-zinc-500">
+                          {line.timestamp ? formatTime(line.timestamp) : line.stream}
+                        </span>
+                        <span
+                          class={["break-words", line.masked ? "text-amber-200" : "text-zinc-100"]}
+                        >
+                          {line.message}
+                        </span>
+                      </div>
+                    {/each}
+                  </div>
+                {/if}
+              </div>
+          </section>
         </Tabs.Content>
       </Tabs.Root>
 
-      <Dialog.Root bind:open={domainBindingDialogOpen}>
-        <Dialog.Content closeLabel={$t(i18nKeys.common.actions.close)}>
-          <Dialog.Header>
-            <Dialog.Title>{$t(i18nKeys.console.domainBindings.resourceScopedTitle)}</Dialog.Title>
-            <Dialog.Description>
-              {$t(i18nKeys.console.domainBindings.resourceScopedDescription)}
-            </Dialog.Description>
-          </Dialog.Header>
-
-          <form class="space-y-5 px-5 pb-5" onsubmit={createResourceDomainBinding}>
-            <div class="flex flex-wrap gap-x-4 gap-y-1 border-y py-3 text-xs text-muted-foreground">
-              <span>{$t(i18nKeys.common.domain.resource)}: {resource.name}</span>
-              <span>
-                {$t(i18nKeys.common.domain.server)}:
-                {selectedServer?.name ?? latestDeployment?.serverId ?? "-"}
-              </span>
-              <span>{$t(i18nKeys.common.domain.destination)}: {destinationId || "-"}</span>
-            </div>
-
-            <div class="grid gap-4">
-              <label class="space-y-1.5 text-sm font-medium">
-                <span>{$t(i18nKeys.common.domain.domainName)}</span>
-                <Input
-                  bind:value={domainName}
-                  autocomplete="off"
-                  placeholder={$t(i18nKeys.console.domainBindings.formDomainPlaceholder)}
-                />
-              </label>
-
-              <label class="space-y-1.5 text-sm font-medium">
-                <span>{$t(i18nKeys.common.domain.pathPrefix)}</span>
-                <Input bind:value={pathPrefix} autocomplete="off" placeholder="/" />
-              </label>
-            </div>
-
-            <div class="grid gap-4">
-              <label class="space-y-1.5 text-sm font-medium">
-                <span>{$t(i18nKeys.common.domain.tls)}</span>
-                <Select.Root bind:value={tlsMode} type="single">
-                  <Select.Trigger class="w-full">{tlsMode}</Select.Trigger>
-                  <Select.Content>
-                    <Select.Item value="auto">auto</Select.Item>
-                    <Select.Item value="disabled">disabled</Select.Item>
-                  </Select.Content>
-                </Select.Root>
-              </label>
-            </div>
-
-            {#if shouldShowServerField || shouldShowDestinationField}
-              <div class="grid gap-4 sm:grid-cols-2">
-                {#if shouldShowServerField}
-                  <label class="space-y-1.5 text-sm font-medium">
-                    <span>{$t(i18nKeys.common.domain.server)}</span>
-                    <Select.Root bind:value={serverId} type="single">
-                      <Select.Trigger class="w-full">
-                        {selectedServer?.name ?? $t(i18nKeys.console.domainBindings.noServerOptions)}
-                      </Select.Trigger>
-                      <Select.Content>
-                        {#each servers as server (server.id)}
-                          <Select.Item value={server.id}>{server.name}</Select.Item>
-                        {/each}
-                      </Select.Content>
-                    </Select.Root>
-                  </label>
-                {/if}
-
-                {#if shouldShowDestinationField}
-                  <label class="space-y-1.5 text-sm font-medium">
-                    <span>{$t(i18nKeys.common.domain.destination)}</span>
-                    <Input
-                      bind:value={destinationId}
-                      autocomplete="off"
-                      placeholder={$t(i18nKeys.console.domainBindings.formDestinationPlaceholder)}
-                    />
-                  </label>
-                {/if}
-              </div>
-            {/if}
-
-            {#if createFeedback}
-              <div
-                class={[
-                  "rounded-md border px-3 py-2 text-sm",
-                  createFeedback.kind === "success"
-                    ? "border-primary/25 bg-primary/5"
-                    : "border-destructive/30 bg-destructive/5 text-destructive",
-                ]}
-              >
-                <p class="font-medium">{createFeedback.title}</p>
-                <p class="mt-1 break-all text-xs">{createFeedback.detail}</p>
-              </div>
-            {/if}
-
-            <Dialog.Footer>
-              <Button
-                type="button"
-                variant="outline"
-                onclick={() => {
-                  domainBindingDialogOpen = false;
-                }}
-              >
-                {$t(i18nKeys.common.actions.close)}
-              </Button>
-              <Button
-                type="submit"
-                disabled={!canCreateBinding || createDomainBindingMutation.isPending}
-              >
-                <Globe2 class="size-4" />
-                {createDomainBindingMutation.isPending
-                  ? $t(i18nKeys.console.domainBindings.formSubmitting)
-                  : $t(i18nKeys.common.actions.bindDomain)}
-              </Button>
-            </Dialog.Footer>
-          </form>
-        </Dialog.Content>
-      </Dialog.Root>
     </div>
   {/if}
 </ConsoleShell>

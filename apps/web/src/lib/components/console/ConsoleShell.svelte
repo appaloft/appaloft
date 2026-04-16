@@ -17,13 +17,13 @@
     Sun,
     UserRound,
   } from "@lucide/svelte";
-  import type { DeploymentSummary, ResourceSummary } from "@yundu/contracts";
+  import type { ResourceSummary } from "@yundu/contracts";
   import type { Snippet } from "svelte";
 
   import { API_BASE, readErrorMessage, request } from "$lib/api/client";
   import yunduLogoMark from "$lib/assets/yundu-logo-mark.svg";
-  import ResourceStatusDot from "$lib/components/console/ResourceStatusDot.svelte";
-  import SidebarResourceStatus from "$lib/components/console/SidebarResourceStatus.svelte";
+  import ResourceHealthDot from "$lib/components/console/ResourceHealthDot.svelte";
+  import ResourceHealthLabel from "$lib/components/console/ResourceHealthLabel.svelte";
   import { Avatar, AvatarFallback } from "$lib/components/ui/avatar";
   import { Badge } from "$lib/components/ui/badge";
   import * as Breadcrumb from "$lib/components/ui/breadcrumb";
@@ -61,7 +61,6 @@
   import { createConsoleQueries, defaultAuthSession } from "$lib/console/queries";
   import {
     initials,
-    latestResourceDeploymentStatus,
     projectDetailHref,
     readSessionIdentity,
     resourceDetailHref,
@@ -246,10 +245,6 @@
     return resources.filter((resource) => resource.projectId === projectId);
   }
 
-  function resourceDeploymentStatus(resource: ResourceSummary): DeploymentSummary["status"] | undefined {
-    return latestResourceDeploymentStatus(resource, deployments);
-  }
-
   function toggleColorMode(): void {
     colorMode = colorMode === "dark" ? "light" : "dark";
   }
@@ -328,7 +323,6 @@
                   {#if childResources.length > 0}
                     <SidebarMenuSub class="!mx-0 !ml-2 !translate-x-0 !border-l-0 !px-0 !py-1">
                       {#each childResources.slice(0, 8) as resource (resource.id)}
-                        {@const latestStatus = resourceDeploymentStatus(resource)}
                         <SidebarMenuSubItem>
                           <SidebarMenuSubButton
                             class="h-7 !translate-x-0 px-1.5 text-sidebar-foreground/80 data-[active=true]:!bg-sidebar-primary/5 data-[active=true]:!text-sidebar-foreground data-[active=true]:!shadow-none data-[active=true]:hover:!bg-sidebar-primary/10"
@@ -336,11 +330,11 @@
                           >
                             {#snippet child({ props })}
                               <a href={resourceDetailHref(resource)} {...props}>
-                                <ResourceStatusDot status={latestStatus} class="shrink-0" />
+                                <ResourceHealthDot resourceId={resource.id} class="shrink-0" />
                                 <span class="min-w-0 flex-1 truncate">
                                   {resource.name}
                                 </span>
-                                <SidebarResourceStatus status={latestStatus} />
+                                <ResourceHealthLabel resourceId={resource.id} />
                               </a>
                             {/snippet}
                           </SidebarMenuSubButton>

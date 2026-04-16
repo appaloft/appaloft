@@ -3,10 +3,9 @@
   import { page } from "$app/state";
   import { ArrowLeft, ArrowRight, FolderOpen, Play, Plus } from "@lucide/svelte";
 
-  import DeploymentStatusBadge from "$lib/components/console/DeploymentStatusBadge.svelte";
   import DeploymentTable from "$lib/components/console/DeploymentTable.svelte";
   import ConsoleShell from "$lib/components/console/ConsoleShell.svelte";
-  import ResourceStatusDot from "$lib/components/console/ResourceStatusDot.svelte";
+  import ResourceHealthDot from "$lib/components/console/ResourceHealthDot.svelte";
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
   import { Skeleton } from "$lib/components/ui/skeleton";
@@ -16,7 +15,6 @@
     findProject,
     formatTime,
     latestResourceDeployment,
-    latestResourceDeploymentStatus,
     projectCreateResourceHref,
     resourceDetailHref,
   } from "$lib/console/utils";
@@ -182,17 +180,15 @@
             {#if projectResources.length > 0}
               {#each projectResources as resource (resource.id)}
                 {@const latestDeployment = latestResourceDeployment(resource, deployments)}
-                {@const latestStatus = latestResourceDeploymentStatus(resource, deployments)}
                 <a
                   href={resourceDetailHref(resource)}
                   class="group grid gap-3 py-4 transition-colors hover:bg-muted/35 sm:grid-cols-[minmax(0,1fr)_18rem_auto] sm:px-3"
                 >
                   <div class="min-w-0 space-y-2">
                     <div class="flex min-w-0 flex-wrap items-center gap-2">
-                      <ResourceStatusDot status={latestStatus} class="shrink-0" />
+                      <ResourceHealthDot resourceId={resource.id} class="shrink-0" />
                       <h3 class="truncate font-medium">{resource.name}</h3>
                       <Badge variant="secondary">{resource.kind}</Badge>
-                      <DeploymentStatusBadge status={latestStatus} />
                     </div>
                     <p class="line-clamp-1 text-sm text-muted-foreground">
                       {resource.description ?? resource.slug}

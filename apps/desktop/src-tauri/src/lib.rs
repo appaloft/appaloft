@@ -16,11 +16,12 @@ use tauri_plugin_shell::{
 
 struct BackendProcess(Mutex<Option<CommandChild>>);
 
-const SELECT_DIRECTORY_BRIDGE: &str = r#"
+const DESKTOP_BRIDGE: &str = r#"
 (() => {
   window.yunduDesktop = {
     ...(window.yunduDesktop ?? {}),
     selectDirectory: () => window.__TAURI__.core.invoke("select_directory"),
+    copyText: (text) => window.__TAURI__.core.invoke("plugin:clipboard-manager|write_text", { text }),
   };
 })();
 "#;
@@ -28,7 +29,10 @@ const SELECT_DIRECTORY_BRIDGE: &str = r#"
 type DesktopResult<T> = Result<T, Box<dyn std::error::Error>>;
 
 fn boxed_error(message: impl Into<String>) -> Box<dyn std::error::Error> {
-    Box::new(std::io::Error::new(std::io::ErrorKind::Other, message.into()))
+    Box::new(std::io::Error::new(
+        std::io::ErrorKind::Other,
+        message.into(),
+    ))
 }
 
 #[tauri::command]
@@ -54,7 +58,9 @@ fn wait_for_backend(base_url: &str) -> DesktopResult<()> {
     while Instant::now() < deadline {
         match TcpStream::connect_timeout(&host.parse()?, Duration::from_millis(250)) {
             Ok(mut stream) => {
-                let request = format!("GET /api/health HTTP/1.1\r\nHost: {host}\r\nConnection: close\r\n\r\n");
+                let request = format!(
+                    "GET /api/health HTTP/1.1\r\nHost: {host}\r\nConnection: close\r\n\r\n"
+                );
                 stream.write_all(request.as_bytes())?;
 
                 let mut response = String::new();
@@ -71,7 +77,9 @@ fn wait_for_backend(base_url: &str) -> DesktopResult<()> {
         std::thread::sleep(Duration::from_millis(250));
     }
 
-    Err(boxed_error("Yundu backend did not become ready before the startup timeout"))
+    Err(boxed_error(
+        "Yundu backend did not become ready before the startup timeout",
+    ))
 }
 
 fn env_or_default(key: &str, default_value: &str) -> String {
@@ -88,7 +96,10 @@ fn start_backend(app: &tauri::App) -> DesktopResult<String> {
         .shell()
         .sidecar("yundu")?
         .args(["serve"])
-        .env("YUNDU_DATABASE_DRIVER", env_or_default("YUNDU_DATABASE_DRIVER", "pglite"))
+        .env(
+            "YUNDU_DATABASE_DRIVER",
+            env_or_default("YUNDU_DATABASE_DRIVER", "pglite"),
+        )
         .env(
             "YUNDU_DATA_DIR",
             env_or_default("YUNDU_DATA_DIR", &data_dir.to_string_lossy()),
@@ -148,7 +159,8 @@ fn create_main_window(app: &tauri::App, base_url: &str) -> DesktopResult<()> {
         .title("Yundu")
         .inner_size(1280.0, 840.0)
         .min_inner_size(960.0, 640.0)
-        .initialization_script(SELECT_DIRECTORY_BRIDGE)
+        .enable_clipboard_access()
+        .initialization_script(DESKTOP_BRIDGE)
         .on_new_window(move |url, _features| {
             if let Err(error) = open_external_http_url(&app_handle, &url) {
                 eprintln!("failed to open external URL {url}: {error}");
@@ -179,6 +191,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_clipboard_manager::init())
         .invoke_handler(tauri::generate_handler![select_directory])
         .setup(|app| {
             let base_url = start_backend(app)?;

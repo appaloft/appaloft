@@ -1,34 +1,51 @@
 <script lang="ts">
-  import type { DeploymentSummary } from "@yundu/contracts";
+  import type { ResourceHealthOverall } from "@yundu/contracts";
 
-  import { deploymentStatusLabel } from "$lib/console/utils";
+  import { i18nKeys, t } from "$lib/i18n";
 
   type Props = {
-    status?: DeploymentSummary["status"];
+    status?: ResourceHealthOverall;
     class?: string;
   };
 
-  let { status, class: className = "" }: Props = $props();
+  let { status = "unknown", class: className = "" }: Props = $props();
 
   const tone = $derived.by(() => {
     switch (status) {
-      case "succeeded":
-        return "text-emerald-700 dark:text-emerald-300";
-      case "failed":
-      case "canceled":
-      case "rolled-back":
-        return "text-red-700 dark:text-red-300";
-      case "created":
-      case "planning":
-      case "planned":
-      case "running":
-        return "text-sky-700 dark:text-sky-300";
-      default:
+      case "healthy":
+        return "text-emerald-700 dark:text-emerald-400";
+      case "degraded":
+      case "starting":
+        return "text-amber-700 dark:text-amber-400";
+      case "unhealthy":
+      case "stopped":
+        return "text-destructive";
+      case "not-deployed":
+      case "unknown":
         return "text-muted-foreground/70";
+    }
+  });
+
+  const label = $derived.by(() => {
+    switch (status) {
+      case "healthy":
+        return $t(i18nKeys.common.status.healthy);
+      case "degraded":
+        return $t(i18nKeys.common.status.degraded);
+      case "unhealthy":
+        return $t(i18nKeys.common.status.unhealthy);
+      case "starting":
+        return $t(i18nKeys.common.status.starting);
+      case "stopped":
+        return $t(i18nKeys.common.status.stopped);
+      case "not-deployed":
+        return $t(i18nKeys.common.status.notDeployed);
+      case "unknown":
+        return $t(i18nKeys.common.status.unknown);
     }
   });
 </script>
 
 <span class={["max-w-[4.25rem] shrink-0 truncate text-[0.6875rem] leading-4", tone, className]}>
-  {deploymentStatusLabel(status)}
+  {label}
 </span>

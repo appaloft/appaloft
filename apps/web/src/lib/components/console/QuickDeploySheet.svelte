@@ -93,6 +93,7 @@
     Partial<Pick<CreateResourceInput, "kind" | "description" | "services">>;
   type ResourceSourceInput = NonNullable<CreateResourceInput["source"]>;
   type ResourceRuntimeProfileInput = NonNullable<CreateResourceInput["runtimeProfile"]>;
+  type ResourceHealthCheckInput = NonNullable<ResourceRuntimeProfileInput["healthCheck"]>;
   type ResourceNetworkProfileInput = NonNullable<CreateResourceInput["networkProfile"]>;
   type YunduDesktopBridge = {
     selectDirectory?: () => Promise<string | null | undefined>;
@@ -297,6 +298,40 @@
   let resourceKind = $state<ResourceKind>(parseResourceKind(browser ? page.url.searchParams.get("resourceKind") : null));
   let resourceDescription = $state(browser ? (page.url.searchParams.get("resourceDescription") ?? "") : "");
   let resourceInternalPort = $state(browser ? (page.url.searchParams.get("resourceInternalPort") ?? "3000") : "3000");
+  let resourceHealthCheckEnabled = $state(
+    browser ? page.url.searchParams.get("resourceHealthCheckEnabled") === "true" : false,
+  );
+  let resourceHealthCheckMethod = $state<"GET" | "HEAD" | "POST" | "OPTIONS">(
+    parseHealthCheckMethod(browser ? page.url.searchParams.get("resourceHealthCheckMethod") : null),
+  );
+  let resourceHealthCheckScheme = $state<"http" | "https">(
+    parseHealthCheckScheme(browser ? page.url.searchParams.get("resourceHealthCheckScheme") : null),
+  );
+  let resourceHealthCheckHost = $state(
+    browser ? (page.url.searchParams.get("resourceHealthCheckHost") ?? "localhost") : "localhost",
+  );
+  let resourceHealthCheckPort = $state(browser ? (page.url.searchParams.get("resourceHealthCheckPort") ?? "") : "");
+  let resourceHealthCheckPath = $state(
+    browser ? (page.url.searchParams.get("resourceHealthCheckPath") ?? "/") : "/",
+  );
+  let resourceHealthCheckExpectedStatusCode = $state(
+    browser ? (page.url.searchParams.get("resourceHealthCheckExpectedStatusCode") ?? "200") : "200",
+  );
+  let resourceHealthCheckResponseText = $state(
+    browser ? (page.url.searchParams.get("resourceHealthCheckResponseText") ?? "") : "",
+  );
+  let resourceHealthCheckIntervalSeconds = $state(
+    browser ? (page.url.searchParams.get("resourceHealthCheckIntervalSeconds") ?? "5") : "5",
+  );
+  let resourceHealthCheckTimeoutSeconds = $state(
+    browser ? (page.url.searchParams.get("resourceHealthCheckTimeoutSeconds") ?? "5") : "5",
+  );
+  let resourceHealthCheckRetries = $state(
+    browser ? (page.url.searchParams.get("resourceHealthCheckRetries") ?? "10") : "10",
+  );
+  let resourceHealthCheckStartPeriodSeconds = $state(
+    browser ? (page.url.searchParams.get("resourceHealthCheckStartPeriodSeconds") ?? "5") : "5",
+  );
   let variableKey = $state(browser ? (page.url.searchParams.get("variableKey") ?? "") : "");
   let variableValue = $state("");
   let variableIsSecret = $state(browser ? page.url.searchParams.get("variableSecret") !== "false" : true);
@@ -492,6 +527,9 @@
       segments.push(`--resource ${selectedResourceId}`);
     }
 
+    const healthCheckPath = resourceHealthCheckPath.trim();
+    const createsResource = !resourceContextEnabled || resourceMode === "new";
+
     if (!resourceContextEnabled) {
       segments.push(`--resource-name ${inferredResourceInput.name}`);
       segments.push(`--port ${resourceInternalPort.trim() || "3000"}`);
@@ -501,6 +539,10 @@
         segments.push(`--resource-kind ${editedResourceInput.kind}`);
       }
       segments.push(`--port ${resourceInternalPort.trim() || "3000"}`);
+    }
+
+    if (createsResource && resourceHealthCheckEnabled && healthCheckPath) {
+      segments.push(`--health-path ${healthCheckPath}`);
     }
 
     return segments.join(" ");
@@ -754,6 +796,15 @@
 
     return `${editedResourceInput.name} · ${editedResourceInput.kind ?? "application"} · :${resourceInternalPort.trim() || "3000"}`;
   });
+  const resourceHealthCheckSummary = $derived.by(() => {
+    if (resourceContextEnabled && resourceMode === "existing") {
+      return $t(i18nKeys.console.quickDeploy.healthCheckExistingResource);
+    }
+
+    return resourceHealthCheckEnabled
+      ? `${resourceHealthCheckMethod} ${resourceHealthCheckPath.trim() || "/"} · ${resourceHealthCheckIntervalSeconds.trim() || "5"}s/${resourceHealthCheckTimeoutSeconds.trim() || "5"}s · ${resourceHealthCheckRetries.trim() || "10"}x`
+      : $t(i18nKeys.common.status.notConfigured);
+  });
   const variableSummary = $derived.by(() => {
     if (!variableContextEnabled) {
       return "跳过";
@@ -1000,6 +1051,16 @@
     return resourceKinds.includes(value as ResourceKind) ? (value as ResourceKind) : "application";
   }
 
+  function parseHealthCheckMethod(value: string | null): "GET" | "HEAD" | "POST" | "OPTIONS" {
+    return ["GET", "HEAD", "POST", "OPTIONS"].includes(value ?? "")
+      ? (value as "GET" | "HEAD" | "POST" | "OPTIONS")
+      : "GET";
+  }
+
+  function parseHealthCheckScheme(value: string | null): "http" | "https" {
+    return value === "https" ? "https" : "http";
+  }
+
   function setSearchParam(
     params: URLSearchParams,
     key: string,
@@ -1080,6 +1141,18 @@
       setSearchParam(params, "generatedResourceName", generatedResourceName);
     }
     setSearchParam(params, "resourceInternalPort", resourceInternalPort, "3000");
+    setSearchParam(params, "resourceHealthCheckEnabled", resourceHealthCheckEnabled ? "true" : "false", "false");
+    setSearchParam(params, "resourceHealthCheckMethod", resourceHealthCheckMethod, "GET");
+    setSearchParam(params, "resourceHealthCheckScheme", resourceHealthCheckScheme, "http");
+    setSearchParam(params, "resourceHealthCheckHost", resourceHealthCheckHost, "localhost");
+    setSearchParam(params, "resourceHealthCheckPort", resourceHealthCheckPort);
+    setSearchParam(params, "resourceHealthCheckPath", resourceHealthCheckPath, "/");
+    setSearchParam(params, "resourceHealthCheckExpectedStatusCode", resourceHealthCheckExpectedStatusCode, "200");
+    setSearchParam(params, "resourceHealthCheckResponseText", resourceHealthCheckResponseText);
+    setSearchParam(params, "resourceHealthCheckIntervalSeconds", resourceHealthCheckIntervalSeconds, "5");
+    setSearchParam(params, "resourceHealthCheckTimeoutSeconds", resourceHealthCheckTimeoutSeconds, "5");
+    setSearchParam(params, "resourceHealthCheckRetries", resourceHealthCheckRetries, "10");
+    setSearchParam(params, "resourceHealthCheckStartPeriodSeconds", resourceHealthCheckStartPeriodSeconds, "5");
 
     setSearchParam(params, "editVariables", variableContextEnabled ? "true" : "false", "false");
     if (variableContextEnabled) {
@@ -1126,6 +1199,18 @@
     resourceKind = parseResourceKind(params.get("resourceKind"));
     resourceDescription = params.get("resourceDescription") ?? "";
     resourceInternalPort = params.get("resourceInternalPort") ?? "3000";
+    resourceHealthCheckEnabled = params.get("resourceHealthCheckEnabled") === "true";
+    resourceHealthCheckMethod = parseHealthCheckMethod(params.get("resourceHealthCheckMethod"));
+    resourceHealthCheckScheme = parseHealthCheckScheme(params.get("resourceHealthCheckScheme"));
+    resourceHealthCheckHost = params.get("resourceHealthCheckHost") ?? "localhost";
+    resourceHealthCheckPort = params.get("resourceHealthCheckPort") ?? "";
+    resourceHealthCheckPath = params.get("resourceHealthCheckPath") ?? "/";
+    resourceHealthCheckExpectedStatusCode = params.get("resourceHealthCheckExpectedStatusCode") ?? "200";
+    resourceHealthCheckResponseText = params.get("resourceHealthCheckResponseText") ?? "";
+    resourceHealthCheckIntervalSeconds = params.get("resourceHealthCheckIntervalSeconds") ?? "5";
+    resourceHealthCheckTimeoutSeconds = params.get("resourceHealthCheckTimeoutSeconds") ?? "5";
+    resourceHealthCheckRetries = params.get("resourceHealthCheckRetries") ?? "10";
+    resourceHealthCheckStartPeriodSeconds = params.get("resourceHealthCheckStartPeriodSeconds") ?? "5";
     variableKey = params.get("variableKey") ?? "";
     variableIsSecret = params.get("variableSecret") !== "false";
     githubSourceMode = parseGithubSourceMode(params.get("githubMode"));
@@ -1244,14 +1329,90 @@
     }
   }
 
+  function positiveIntegerField(value: string, fallback: number): number {
+    const parsed = Number(value.trim() || String(fallback));
+    if (!Number.isInteger(parsed) || parsed < 1) {
+      throw new Error($t(i18nKeys.console.quickDeploy.healthCheckInvalid));
+    }
+    return parsed;
+  }
+
+  function nonNegativeIntegerField(value: string, fallback: number): number {
+    const parsed = Number(value.trim() || String(fallback));
+    if (!Number.isInteger(parsed) || parsed < 0) {
+      throw new Error($t(i18nKeys.console.quickDeploy.healthCheckInvalid));
+    }
+    return parsed;
+  }
+
+  function optionalPortField(value: string): number | undefined {
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return undefined;
+    }
+    const parsed = Number(trimmed);
+    if (!Number.isInteger(parsed) || parsed < 1 || parsed > 65535) {
+      throw new Error($t(i18nKeys.console.quickDeploy.healthCheckInvalid));
+    }
+    return parsed;
+  }
+
+  function statusCodeField(value: string): number {
+    const parsed = Number(value.trim() || "200");
+    if (!Number.isInteger(parsed) || parsed < 100 || parsed > 599) {
+      throw new Error($t(i18nKeys.console.quickDeploy.healthCheckInvalid));
+    }
+    return parsed;
+  }
+
+  function healthCheckPolicyForResource(): ResourceHealthCheckInput | undefined {
+    if (!resourceHealthCheckEnabled) {
+      return undefined;
+    }
+
+    const port = optionalPortField(resourceHealthCheckPort);
+    const path = resourceHealthCheckPath.trim() || "/";
+    return {
+      enabled: true,
+      type: "http",
+      intervalSeconds: positiveIntegerField(resourceHealthCheckIntervalSeconds, 5),
+      timeoutSeconds: positiveIntegerField(resourceHealthCheckTimeoutSeconds, 5),
+      retries: positiveIntegerField(resourceHealthCheckRetries, 10),
+      startPeriodSeconds: nonNegativeIntegerField(resourceHealthCheckStartPeriodSeconds, 5),
+      http: {
+        method: resourceHealthCheckMethod,
+        scheme: resourceHealthCheckScheme,
+        host: resourceHealthCheckHost.trim() || "localhost",
+        ...(port ? { port } : {}),
+        path,
+        expectedStatusCode: statusCodeField(resourceHealthCheckExpectedStatusCode),
+        ...(resourceHealthCheckResponseText.trim()
+          ? { expectedResponseText: resourceHealthCheckResponseText.trim() }
+          : {}),
+      },
+    };
+  }
+
   function runtimeProfileForSource(): ResourceRuntimeProfileInput {
+    const healthCheck = healthCheckPolicyForResource();
+    const withHealthCheckPath = (
+      input: ResourceRuntimeProfileInput,
+    ): ResourceRuntimeProfileInput =>
+      healthCheck
+        ? {
+            ...input,
+            healthCheckPath: healthCheck.http?.path,
+            healthCheck,
+          }
+        : input;
+
     switch (sourceKind) {
       case "docker-image":
-        return { strategy: "prebuilt-image" };
+        return withHealthCheckPath({ strategy: "prebuilt-image" });
       case "compose":
-        return { strategy: "docker-compose" };
+        return withHealthCheckPath({ strategy: "docker-compose" });
       default:
-        return { strategy: "auto" };
+        return withHealthCheckPath({ strategy: "auto" });
     }
   }
 
@@ -2292,39 +2453,45 @@
                 </p>
               </div>
               <div class="grid gap-3 text-sm md:grid-cols-2">
-                <div class="bg-muted/25 px-3 py-3">
+                <div class="rounded-md border bg-background px-3 py-3">
                   <p class="text-xs text-muted-foreground">{$t(i18nKeys.common.domain.source)}</p>
                   <p class="mt-1 truncate font-medium">{$t(selectedSourceOption.labelKey)} · {sourceSummary}</p>
                 </div>
-                <div class="bg-muted/25 px-3 py-3">
+                <div class="rounded-md border bg-background px-3 py-3">
                   <p class="text-xs text-muted-foreground">{$t(i18nKeys.common.domain.project)}</p>
                   <p class="mt-1 truncate font-medium">{projectSummary}</p>
                 </div>
-                <div class="bg-muted/25 px-3 py-3">
+                <div class="rounded-md border bg-background px-3 py-3">
                   <p class="text-xs text-muted-foreground">{$t(i18nKeys.common.domain.server)}</p>
                   <p class="mt-1 truncate font-medium">{serverSummary}</p>
                   <p class="mt-1 truncate text-xs text-muted-foreground">{serverCredentialSummary}</p>
                 </div>
-                <div class="bg-muted/25 px-3 py-3">
+                <div class="rounded-md border bg-background px-3 py-3">
                   <p class="text-xs text-muted-foreground">{$t(i18nKeys.common.domain.environment)}</p>
                   <p class="mt-1 truncate font-medium">{environmentSummary}</p>
                 </div>
-                <div class="bg-muted/25 px-3 py-3">
+                <div class="rounded-md border bg-background px-3 py-3">
                   <p class="text-xs text-muted-foreground">{$t(i18nKeys.common.domain.resource)}</p>
                   <p class="mt-1 truncate font-medium">{resourceSummary}</p>
                 </div>
-                <div class="bg-muted/25 px-3 py-3">
+                <div class="rounded-md border bg-background px-3 py-3">
+                  <p class="text-xs text-muted-foreground">
+                    {$t(i18nKeys.console.quickDeploy.healthCheckPath)}
+                  </p>
+                  <p class="mt-1 truncate font-medium">{resourceHealthCheckSummary}</p>
+                </div>
+                <div class="rounded-md border bg-background px-3 py-3">
                   <p class="text-xs text-muted-foreground">{$t(i18nKeys.common.domain.domainBindings)}</p>
                   <p class="mt-1 truncate font-medium">{domainBindingSummary}</p>
                 </div>
-                <div class="bg-muted/25 px-3 py-3">
+                <div class="rounded-md border bg-background px-3 py-3">
                   <p class="text-xs text-muted-foreground">{$t(i18nKeys.common.domain.variables)}</p>
                   <p class="mt-1 truncate font-medium">{variableSummary}</p>
                 </div>
               </div>
 
               <div class="space-y-3">
-                <div class="bg-muted/25 px-3 py-3">
+                <div class="rounded-md border bg-background px-3 py-3">
                   <div class="flex items-center justify-between gap-3">
                     <div>
                       <p class="text-sm font-medium">{$t(i18nKeys.common.domain.project)}</p>
@@ -2390,7 +2557,7 @@
                   {/if}
                 </div>
 
-                <div class="bg-muted/25 px-3 py-3">
+                <div class="rounded-md border bg-background px-3 py-3">
                   <div class="flex items-center justify-between gap-3">
                     <div>
                       <p class="text-sm font-medium">{$t(i18nKeys.common.domain.environment)}</p>
@@ -2468,7 +2635,7 @@
                   {/if}
                 </div>
 
-                <div class="bg-muted/25 px-3 py-3">
+                <div class="rounded-md border bg-background px-3 py-3">
                   <div class="flex items-center justify-between gap-3">
                     <div>
                       <p class="text-sm font-medium">{$t(i18nKeys.common.domain.resource)}</p>
@@ -2557,32 +2724,197 @@
                         </div>
                       {/if}
                       {#if resourceMode === "new"}
-                        <div class="space-y-2">
-                          <label class="text-xs font-medium text-muted-foreground" for="resource-internal-port">
-                            {$t(i18nKeys.console.quickDeploy.applicationPort)}
-                          </label>
-                          <Input id="resource-internal-port" bind:value={resourceInternalPort} placeholder="3000" />
-                          <p class="text-xs text-muted-foreground">
-                            {$t(i18nKeys.console.quickDeploy.applicationPortHint)}
-                          </p>
+                        <div class="grid gap-3 sm:grid-cols-2">
+                          <div class="space-y-2">
+                            <label class="text-xs font-medium text-muted-foreground" for="resource-internal-port">
+                              {$t(i18nKeys.console.quickDeploy.applicationPort)}
+                            </label>
+                            <Input id="resource-internal-port" bind:value={resourceInternalPort} placeholder="3000" />
+                            <p class="text-xs text-muted-foreground">
+                              {$t(i18nKeys.console.quickDeploy.applicationPortHint)}
+                            </p>
+                          </div>
+                          <Button
+                            type="button"
+                            variant={resourceHealthCheckEnabled ? "selected" : "outline"}
+                            onclick={() => {
+                              resourceHealthCheckEnabled = !resourceHealthCheckEnabled;
+                            }}
+                          >
+                            {$t(i18nKeys.console.quickDeploy.healthCheckToggle)}
+                          </Button>
                         </div>
+                        {#if resourceHealthCheckEnabled}
+                          <div class="grid gap-3 rounded-md border bg-muted/10 p-3 sm:grid-cols-3">
+                            <div class="space-y-1">
+                              <label class="text-xs font-medium text-muted-foreground" for="resource-health-path">
+                                {$t(i18nKeys.console.quickDeploy.healthCheckPath)}
+                              </label>
+                              <Input id="resource-health-path" bind:value={resourceHealthCheckPath} placeholder="/health" />
+                            </div>
+                            <div class="space-y-1">
+                              <label class="text-xs font-medium text-muted-foreground" for="resource-health-status">
+                                {$t(i18nKeys.console.quickDeploy.healthCheckExpectedStatusCode)}
+                              </label>
+                              <Input
+                                id="resource-health-status"
+                                bind:value={resourceHealthCheckExpectedStatusCode}
+                                inputmode="numeric"
+                                placeholder="200"
+                              />
+                            </div>
+                            <div class="space-y-1">
+                              <label class="text-xs font-medium text-muted-foreground" for="resource-health-interval">
+                                {$t(i18nKeys.console.quickDeploy.healthCheckIntervalSeconds)}
+                              </label>
+                              <Input
+                                id="resource-health-interval"
+                                bind:value={resourceHealthCheckIntervalSeconds}
+                                inputmode="numeric"
+                                placeholder="5"
+                              />
+                            </div>
+                            <div class="space-y-1">
+                              <label class="text-xs font-medium text-muted-foreground" for="resource-health-timeout">
+                                {$t(i18nKeys.console.quickDeploy.healthCheckTimeoutSeconds)}
+                              </label>
+                              <Input
+                                id="resource-health-timeout"
+                                bind:value={resourceHealthCheckTimeoutSeconds}
+                                inputmode="numeric"
+                                placeholder="5"
+                              />
+                            </div>
+                            <div class="space-y-1">
+                              <label class="text-xs font-medium text-muted-foreground" for="resource-health-retries">
+                                {$t(i18nKeys.console.quickDeploy.healthCheckRetries)}
+                              </label>
+                              <Input
+                                id="resource-health-retries"
+                                bind:value={resourceHealthCheckRetries}
+                                inputmode="numeric"
+                                placeholder="10"
+                              />
+                            </div>
+                            <div class="space-y-1">
+                              <label class="text-xs font-medium text-muted-foreground" for="resource-health-start-period">
+                                {$t(i18nKeys.console.quickDeploy.healthCheckStartPeriodSeconds)}
+                              </label>
+                              <Input
+                                id="resource-health-start-period"
+                                bind:value={resourceHealthCheckStartPeriodSeconds}
+                                inputmode="numeric"
+                                placeholder="5"
+                              />
+                            </div>
+                          </div>
+                          <p class="text-xs text-muted-foreground">
+                            {$t(i18nKeys.console.quickDeploy.healthCheckPathHint)}
+                          </p>
+                        {/if}
                       {/if}
                     </div>
                   {/if}
                   {#if !resourceContextEnabled}
-                    <div class="mt-3 space-y-2">
-                      <label class="text-xs font-medium text-muted-foreground" for="resource-default-internal-port">
-                        {$t(i18nKeys.console.quickDeploy.applicationPort)}
-                      </label>
-                      <Input id="resource-default-internal-port" bind:value={resourceInternalPort} placeholder="3000" />
-                      <p class="text-xs text-muted-foreground">
-                        {$t(i18nKeys.console.quickDeploy.applicationPortHint)}
-                      </p>
+                    <div class="mt-3 grid gap-3 sm:grid-cols-2">
+                      <div class="space-y-2">
+                        <label class="text-xs font-medium text-muted-foreground" for="resource-default-internal-port">
+                          {$t(i18nKeys.console.quickDeploy.applicationPort)}
+                        </label>
+                        <Input id="resource-default-internal-port" bind:value={resourceInternalPort} placeholder="3000" />
+                        <p class="text-xs text-muted-foreground">
+                          {$t(i18nKeys.console.quickDeploy.applicationPortHint)}
+                        </p>
+                      </div>
+                      <Button
+                        type="button"
+                        variant={resourceHealthCheckEnabled ? "selected" : "outline"}
+                        onclick={() => {
+                          resourceHealthCheckEnabled = !resourceHealthCheckEnabled;
+                        }}
+                      >
+                        {$t(i18nKeys.console.quickDeploy.healthCheckToggle)}
+                      </Button>
                     </div>
+                    {#if resourceHealthCheckEnabled}
+                      <div class="mt-3 grid gap-3 rounded-md border bg-muted/10 p-3 sm:grid-cols-3">
+                        <div class="space-y-1">
+                          <label class="text-xs font-medium text-muted-foreground" for="resource-default-health-path">
+                            {$t(i18nKeys.console.quickDeploy.healthCheckPath)}
+                          </label>
+                          <Input
+                            id="resource-default-health-path"
+                            bind:value={resourceHealthCheckPath}
+                            placeholder="/health"
+                          />
+                        </div>
+                        <div class="space-y-1">
+                          <label class="text-xs font-medium text-muted-foreground" for="resource-default-health-status">
+                            {$t(i18nKeys.console.quickDeploy.healthCheckExpectedStatusCode)}
+                          </label>
+                          <Input
+                            id="resource-default-health-status"
+                            bind:value={resourceHealthCheckExpectedStatusCode}
+                            inputmode="numeric"
+                            placeholder="200"
+                          />
+                        </div>
+                        <div class="space-y-1">
+                          <label class="text-xs font-medium text-muted-foreground" for="resource-default-health-interval">
+                            {$t(i18nKeys.console.quickDeploy.healthCheckIntervalSeconds)}
+                          </label>
+                          <Input
+                            id="resource-default-health-interval"
+                            bind:value={resourceHealthCheckIntervalSeconds}
+                            inputmode="numeric"
+                            placeholder="5"
+                          />
+                        </div>
+                        <div class="space-y-1">
+                          <label class="text-xs font-medium text-muted-foreground" for="resource-default-health-timeout">
+                            {$t(i18nKeys.console.quickDeploy.healthCheckTimeoutSeconds)}
+                          </label>
+                          <Input
+                            id="resource-default-health-timeout"
+                            bind:value={resourceHealthCheckTimeoutSeconds}
+                            inputmode="numeric"
+                            placeholder="5"
+                          />
+                        </div>
+                        <div class="space-y-1">
+                          <label class="text-xs font-medium text-muted-foreground" for="resource-default-health-retries">
+                            {$t(i18nKeys.console.quickDeploy.healthCheckRetries)}
+                          </label>
+                          <Input
+                            id="resource-default-health-retries"
+                            bind:value={resourceHealthCheckRetries}
+                            inputmode="numeric"
+                            placeholder="10"
+                          />
+                        </div>
+                        <div class="space-y-1">
+                          <label
+                            class="text-xs font-medium text-muted-foreground"
+                            for="resource-default-health-start-period"
+                          >
+                            {$t(i18nKeys.console.quickDeploy.healthCheckStartPeriodSeconds)}
+                          </label>
+                          <Input
+                            id="resource-default-health-start-period"
+                            bind:value={resourceHealthCheckStartPeriodSeconds}
+                            inputmode="numeric"
+                            placeholder="5"
+                          />
+                        </div>
+                      </div>
+                      <p class="mt-2 text-xs text-muted-foreground">
+                        {$t(i18nKeys.console.quickDeploy.healthCheckPathHint)}
+                      </p>
+                    {/if}
                   {/if}
                 </div>
 
-                <div class="bg-muted/25 px-3 py-3">
+                <div class="rounded-md border bg-background px-3 py-3">
                   <div class="flex items-center justify-between gap-3">
                     <div>
                       <p class="text-sm font-medium">{$t(i18nKeys.common.domain.variables)}</p>
@@ -2646,17 +2978,17 @@
   </div>
 
   <aside class="space-y-5 xl:sticky xl:top-5 xl:self-start">
-      <section class="space-y-4 border-y py-4">
+      <section class="space-y-4 rounded-md border bg-background p-4">
         <div class="space-y-2">
           <h2 class="text-lg font-semibold">{$t(i18nKeys.console.quickDeploy.currentSummary)}</h2>
           <p class="text-sm text-muted-foreground">{$t(i18nKeys.console.quickDeploy.currentSummaryDescription)}</p>
         </div>
         <div class="space-y-3 text-sm">
-          <div class="flex items-center justify-between gap-3">
+          <div class="flex items-center justify-between gap-3 rounded-md border bg-muted/10 px-3 py-2">
             <span class="text-muted-foreground">{$t(i18nKeys.console.quickDeploy.sourceType)}</span>
             <span class="font-medium">{$t(selectedSourceOption.labelKey)}</span>
           </div>
-          <div class="bg-muted/20 px-3 py-3">
+          <div class="rounded-md border bg-muted/10 px-3 py-3">
             <div class="mb-2 flex items-center justify-between gap-3">
               <span class="text-xs font-medium uppercase text-muted-foreground">
                 {$t(i18nKeys.console.quickDeploy.sourceDetails)}
@@ -2673,27 +3005,33 @@
               {/each}
             </div>
           </div>
-          <div class="flex items-center justify-between gap-3">
+          <div class="flex items-center justify-between gap-3 rounded-md border bg-muted/10 px-3 py-2">
             <span class="text-muted-foreground">{$t(i18nKeys.common.domain.project)}</span>
             <span class="font-medium">{projectSummary}</span>
           </div>
-          <div class="flex items-center justify-between gap-3">
+          <div class="flex items-center justify-between gap-3 rounded-md border bg-muted/10 px-3 py-2">
             <span class="text-muted-foreground">{$t(i18nKeys.common.domain.server)}</span>
             <span class="font-medium">{serverSummary}</span>
           </div>
-          <div class="flex items-center justify-between gap-3">
+          <div class="flex items-center justify-between gap-3 rounded-md border bg-muted/10 px-3 py-2">
             <span class="text-muted-foreground">{$t(i18nKeys.common.domain.environment)}</span>
             <span class="font-medium">{environmentSummary}</span>
           </div>
-          <div class="flex items-center justify-between gap-3">
+          <div class="flex items-center justify-between gap-3 rounded-md border bg-muted/10 px-3 py-2">
             <span class="text-muted-foreground">{$t(i18nKeys.common.domain.resource)}</span>
             <span class="font-medium">{resourceSummary}</span>
           </div>
-          <div class="flex items-center justify-between gap-3">
+          <div class="flex items-center justify-between gap-3 rounded-md border bg-muted/10 px-3 py-2">
+            <span class="text-muted-foreground">
+              {$t(i18nKeys.console.quickDeploy.healthCheckPath)}
+            </span>
+            <span class="min-w-0 truncate text-right font-medium">{resourceHealthCheckSummary}</span>
+          </div>
+          <div class="flex items-center justify-between gap-3 rounded-md border bg-muted/10 px-3 py-2">
             <span class="text-muted-foreground">{$t(i18nKeys.common.domain.domainBindings)}</span>
             <span class="min-w-0 truncate text-right font-medium">{domainBindingSummary}</span>
           </div>
-          <div class="flex items-center justify-between gap-3">
+          <div class="flex items-center justify-between gap-3 rounded-md border bg-muted/10 px-3 py-2">
             <span class="text-muted-foreground">{$t(i18nKeys.common.domain.variables)}</span>
             <span class="font-medium">{variableSummary}</span>
           </div>

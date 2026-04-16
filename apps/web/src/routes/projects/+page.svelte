@@ -3,7 +3,7 @@
   import { ArrowRight, FolderOpen, ShieldCheck } from "@lucide/svelte";
 
   import ConsoleShell from "$lib/components/console/ConsoleShell.svelte";
-  import ResourceStatusDot from "$lib/components/console/ResourceStatusDot.svelte";
+  import ResourceHealthDot from "$lib/components/console/ResourceHealthDot.svelte";
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
   import { Skeleton } from "$lib/components/ui/skeleton";
@@ -12,7 +12,6 @@
     countProjectEnvironments,
     formatTime,
     latestProjectDeployment,
-    latestResourceDeploymentStatus,
     projectDetailHref,
   } from "$lib/console/utils";
   import { i18nKeys, t } from "$lib/i18n";
@@ -123,9 +122,6 @@
             {@const latestResource =
               projectResources.find((resource) => resource.lastDeploymentId === latestDeployment?.id) ??
               projectResources[0]}
-            {@const latestResourceStatus = latestResource
-              ? latestResourceDeploymentStatus(latestResource, deployments)
-              : undefined}
             <a
               href={projectDetailHref(project.id)}
               class="group grid gap-3 py-4 transition-colors hover:bg-muted/35 lg:grid-cols-[minmax(0,1fr)_36rem_auto] lg:px-3"
@@ -152,7 +148,7 @@
                 </span>
                 <span class="flex min-w-0 items-center gap-2">
                   {#if latestResource}
-                    <ResourceStatusDot status={latestResourceStatus} class="shrink-0" />
+                    <ResourceHealthDot resourceId={latestResource.id} class="shrink-0" />
                     <span class="truncate">
                       {latestResource.name}
                       {#if latestDeployment}
