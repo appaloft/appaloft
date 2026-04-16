@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { DeploymentProgressEvent } from "@yundu/contracts";
+  import { tick } from "svelte";
 
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
@@ -39,6 +40,27 @@
 
   const sections = $derived(groupDeploymentProgressEvents(events));
   const resolvedStatus = $derived(status === "idle" ? undefined : status);
+  let progressScrollArea = $state<HTMLDivElement | undefined>();
+
+  $effect(() => {
+    const scrollKey = `${events.length}:${status}:${streamError}`;
+
+    if (!open || !progressScrollArea || scrollKey.length === 0) {
+      return;
+    }
+
+    void scrollProgressToBottom();
+  });
+
+  async function scrollProgressToBottom(): Promise<void> {
+    await tick();
+
+    if (!progressScrollArea) {
+      return;
+    }
+
+    progressScrollArea.scrollTop = progressScrollArea.scrollHeight;
+  }
 
   function phaseLabel(phase: DeploymentProgressEvent["phase"]): string {
     switch (phase) {
@@ -141,7 +163,10 @@
           </div>
         {/if}
 
-        <div class="flex max-h-[62vh] min-h-72 flex-col overflow-auto rounded-md border border-zinc-800 bg-zinc-950 px-4 py-3 font-mono text-xs text-zinc-200 shadow-inner">
+        <div
+          bind:this={progressScrollArea}
+          class="flex max-h-[62vh] min-h-72 flex-col overflow-auto rounded-md border border-zinc-800 bg-zinc-950 px-4 py-3 font-mono text-xs text-zinc-200 shadow-inner"
+        >
           {#if sections.length === 0}
             <p class="text-zinc-500">{$t(i18nKeys.console.deployments.progressWaiting)}</p>
           {:else}

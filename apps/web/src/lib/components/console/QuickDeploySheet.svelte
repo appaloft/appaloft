@@ -45,6 +45,7 @@
   import { API_BASE, readErrorMessage, request } from "$lib/api/client";
   import DockerIcon from "$lib/components/console/DockerIcon.svelte";
   import GitHubIcon from "$lib/components/console/GitHubIcon.svelte";
+  import QuickDeployProgressDialog from "$lib/components/console/QuickDeployProgressDialog.svelte";
   import ResourceSourceOption from "$lib/components/console/ResourceSourceOption.svelte";
   import ServerRegistrationForm from "$lib/components/console/ServerRegistrationForm.svelte";
   import { Button } from "$lib/components/ui/button";
@@ -53,11 +54,7 @@
   import { Skeleton } from "$lib/components/ui/skeleton";
   import { Textarea } from "$lib/components/ui/textarea";
   import { Badge } from "$lib/components/ui/badge";
-  import {
-    createDeploymentWithProgress,
-    groupDeploymentProgressEvents,
-    progressSourceLabel,
-  } from "$lib/console/deployment-progress";
+  import { createDeploymentWithProgress } from "$lib/console/deployment-progress";
   import { defaultAuthSession, type ProviderSummary } from "$lib/console/queries";
   import {
     createQuickDeployServerCredential,
@@ -351,6 +348,7 @@
     title: string;
     detail: string;
   } | null>(null);
+  let workflowProgressDialogOpen = $state(false);
   let lastCreatedDeploymentId = $state("");
   let lastGeneratedAccessUrl = $state("");
 
@@ -554,9 +552,6 @@
     ),
   );
   const activeStepDetails = $derived(deploymentSteps[currentStepIndex] ?? deploymentSteps[0]);
-  const workflowDeploymentProgressSections = $derived(
-    groupDeploymentProgressEvents(workflowDeploymentProgressEvents),
-  );
   const selectedSourceOption = $derived(
     sourceOptions.find((option) => option.key === sourceKind) ?? sourceOptions[0],
   );
@@ -1581,40 +1576,6 @@
       : [...workflowProgressItems, { kind, status }];
   }
 
-  function workflowStepLabel(kind: QuickDeployWorkflowStep["kind"]): string {
-    switch (kind) {
-      case "projects.create":
-        return $t(i18nKeys.console.quickDeploy.workflowStepProjectsCreate);
-      case "servers.register":
-        return $t(i18nKeys.console.quickDeploy.workflowStepServersRegister);
-      case "credentials.ssh.create":
-        return $t(i18nKeys.console.quickDeploy.workflowStepSshCredentialCreate);
-      case "servers.configureCredential":
-        return $t(i18nKeys.console.quickDeploy.workflowStepServerCredentialConfigure);
-      case "environments.create":
-        return $t(i18nKeys.console.quickDeploy.workflowStepEnvironmentsCreate);
-      case "resources.create":
-        return $t(i18nKeys.console.quickDeploy.workflowStepResourcesCreate);
-      case "environments.setVariable":
-        return $t(i18nKeys.console.quickDeploy.workflowStepEnvironmentVariableSet);
-      case "deployments.create":
-        return $t(i18nKeys.console.quickDeploy.workflowStepDeploymentsCreate);
-    }
-  }
-
-  function workflowStepStatusLabel(status: QuickDeployWorkflowStepStatus): string {
-    switch (status) {
-      case "pending":
-        return $t(i18nKeys.console.quickDeploy.workflowStepPending);
-      case "running":
-        return $t(i18nKeys.console.quickDeploy.workflowStepRunning);
-      case "succeeded":
-        return $t(i18nKeys.console.quickDeploy.workflowStepSucceeded);
-      case "failed":
-        return $t(i18nKeys.console.quickDeploy.workflowStepFailed);
-    }
-  }
-
   function appendWorkflowDeploymentProgressEvent(event: DeploymentProgressEvent): void {
     workflowDeploymentProgressEvents = [...workflowDeploymentProgressEvents, event];
     lastCreatedDeploymentId = event.deploymentId ?? lastCreatedDeploymentId;
@@ -1631,53 +1592,6 @@
       environmentId: selectedEnvironmentId,
       resourceId: selectedResourceId,
     });
-  }
-
-  function deploymentProgressPhaseLabel(phase: DeploymentProgressEvent["phase"]): string {
-    switch (phase) {
-      case "detect":
-        return $t(i18nKeys.console.deployments.progressPhaseDetect);
-      case "plan":
-        return $t(i18nKeys.console.deployments.progressPhasePlan);
-      case "package":
-        return $t(i18nKeys.console.deployments.progressPhasePackage);
-      case "deploy":
-        return $t(i18nKeys.console.deployments.progressPhaseDeploy);
-      case "verify":
-        return $t(i18nKeys.console.deployments.progressPhaseVerify);
-      case "rollback":
-        return $t(i18nKeys.console.deployments.progressPhaseRollback);
-    }
-  }
-
-  function deploymentProgressStatusLabel(status?: DeploymentProgressEvent["status"]): string {
-    switch (status) {
-      case "running":
-        return $t(i18nKeys.console.deployments.progressStatusRunning);
-      case "succeeded":
-        return $t(i18nKeys.console.deployments.progressStatusSucceeded);
-      case "failed":
-        return $t(i18nKeys.common.status.failed);
-      default:
-        return $t(i18nKeys.console.deployments.progressStatusLog);
-    }
-  }
-
-  function deploymentProgressLevelClass(level: DeploymentProgressEvent["level"]): string {
-    switch (level) {
-      case "error":
-        return "text-destructive";
-      case "warn":
-        return "text-amber-600";
-      case "debug":
-        return "text-muted-foreground";
-      case "info":
-        return "text-foreground";
-    }
-  }
-
-  function deploymentProgressTimeLabel(timestamp: string): string {
-    return timestamp.slice(11, 19) || "--:--:--";
   }
 
   function testDraftServerConnectivity(input: DraftServerConnectivityInput) {
@@ -1768,6 +1682,7 @@
   async function handleQuickDeploy(): Promise<void> {
     deployFeedback = null;
     lastCreatedDeploymentId = "";
+    workflowProgressDialogOpen = false;
     resetWorkflowProgress();
 
     try {
@@ -1952,6 +1867,7 @@
             }
           : {}),
       };
+      workflowProgressDialogOpen = true;
       const workflowResult = await runQuickDeployWorkflow(
         workflowInput,
         executeQuickDeployWorkflowStep,
@@ -3048,79 +2964,16 @@
               {/if}
             </Button>
             {#if workflowProgressItems.length > 0}
-              <div class="bg-muted/20 px-3 py-3">
-                <div class="mb-2 space-y-1">
-                  <p class="text-xs font-medium text-foreground">
-                    {$t(i18nKeys.console.quickDeploy.workflowProgressTitle)}
-                  </p>
-                  <p class="text-xs text-muted-foreground">
-                    {$t(i18nKeys.console.quickDeploy.workflowProgressDescription)}
-                  </p>
-                </div>
-                <div class="space-y-2">
-                  {#each workflowProgressItems as item (item.kind)}
-                    <div class="flex items-center justify-between gap-3 text-xs">
-                      <span class="flex min-w-0 items-center gap-2">
-                        {#if item.status === "running"}
-                          <LoaderCircle class="size-3.5 shrink-0 animate-spin text-primary" />
-                        {:else if item.status === "succeeded"}
-                          <CheckCircle2 class="size-3.5 shrink-0 text-primary" />
-                        {:else if item.status === "failed"}
-                          <ShieldCheck class="size-3.5 shrink-0 text-destructive" />
-                        {:else}
-                          <span class="size-3.5 shrink-0 rounded-full border border-muted-foreground/50"></span>
-                        {/if}
-                        <span class="truncate">{workflowStepLabel(item.kind)}</span>
-                      </span>
-                      <span
-                        class={`shrink-0 ${
-                          item.status === "failed"
-                            ? "text-destructive"
-                            : item.status === "succeeded"
-                              ? "text-primary"
-                              : "text-muted-foreground"
-                        }`}
-                      >
-                        {workflowStepStatusLabel(item.status)}
-                      </span>
-                    </div>
-                  {/each}
-                </div>
-                {#if workflowDeploymentProgressSections.length > 0}
-                  <div class="mt-3 max-h-56 overflow-auto bg-background/60 px-3 py-2">
-                    <div class="space-y-3">
-                      {#each workflowDeploymentProgressSections as section (section.phase)}
-                        <div class="space-y-1.5">
-                          <div class="flex flex-wrap items-center gap-2 text-xs font-medium">
-                            <span class="text-primary">
-                              [{section.step?.current ?? "-"} / {section.step?.total ?? "-"}]
-                            </span>
-                            <span>{deploymentProgressPhaseLabel(section.phase)}</span>
-                            {#if section.status}
-                              <span class="text-muted-foreground">·</span>
-                              <span>{deploymentProgressStatusLabel(section.status)}</span>
-                            {/if}
-                          </div>
-                          <div class="space-y-1 font-mono text-[11px] leading-5">
-                            {#each section.events as event, index (`${event.timestamp}-${section.phase}-${index}`)}
-                              <div class="grid grid-cols-[3.75rem_4.75rem_minmax(0,1fr)] gap-2">
-                                <span class="text-muted-foreground">{deploymentProgressTimeLabel(event.timestamp)}</span>
-                                <span class="text-muted-foreground">{progressSourceLabel(event)}</span>
-                                <span class={`min-w-0 break-words ${deploymentProgressLevelClass(event.level)}`}>
-                                  {event.message}
-                                </span>
-                              </div>
-                            {/each}
-                          </div>
-                        </div>
-                      {/each}
-                    </div>
-                  </div>
-                {/if}
-                {#if workflowProgressError}
-                  <p class="mt-2 text-xs text-destructive">{workflowProgressError}</p>
-                {/if}
-              </div>
+              <Button
+                type="button"
+                class="w-full"
+                variant="outline"
+                onclick={() => {
+                  workflowProgressDialogOpen = true;
+                }}
+              >
+                {$t(i18nKeys.common.actions.viewProgress)}
+              </Button>
             {/if}
             <pre class="overflow-x-auto bg-muted px-3 py-3 text-xs text-muted-foreground">{deploymentCommandPreview}</pre>
           </div>
@@ -3169,3 +3022,19 @@
       {/if}
   </aside>
 </div>
+
+<QuickDeployProgressDialog
+  open={workflowProgressDialogOpen}
+  pending={deployPending}
+  progressItems={workflowProgressItems}
+  deploymentEvents={workflowDeploymentProgressEvents}
+  progressError={workflowProgressError}
+  feedback={deployFeedback}
+  deploymentId={lastCreatedDeploymentId}
+  onClose={() => {
+    workflowProgressDialogOpen = false;
+  }}
+  onOpenDeployment={() => {
+    void goto(lastCreatedDeploymentHref());
+  }}
+/>
