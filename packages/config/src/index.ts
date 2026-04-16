@@ -27,6 +27,7 @@ export interface AppConfig {
   databaseUrl?: string;
   dataDir: string;
   pgliteDataDir: string;
+  remoteRuntimeRoot: string;
   logLevel: "debug" | "info" | "warn" | "error";
   environment: string;
   otelEnabled: boolean;
@@ -61,6 +62,7 @@ const defaults: Omit<AppConfig, "dataDir" | "pgliteDataDir"> = {
   webOrigin: "http://localhost:4173",
   databaseDriver: "pglite",
   databaseUrl: "postgres://postgres:postgres@localhost:5432/yundu",
+  remoteRuntimeRoot: "/var/lib/yundu/runtime",
   logLevel: "info",
   environment: "development",
   otelEnabled: false,
@@ -255,6 +257,11 @@ export function resolveConfig(source: ConfigSource<AppConfig> = {}): AppConfig {
     ...(databaseUrl ? { databaseUrl } : {}),
     dataDir,
     pgliteDataDir,
+    remoteRuntimeRoot:
+      source.flags?.remoteRuntimeRoot ??
+      env.YUNDU_REMOTE_RUNTIME_ROOT ??
+      fileConfig.remoteRuntimeRoot ??
+      defaults.remoteRuntimeRoot,
     logLevel:
       source.flags?.logLevel ??
       (env.YUNDU_LOG_LEVEL as AppConfig["logLevel"] | undefined) ??

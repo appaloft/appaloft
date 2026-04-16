@@ -5,6 +5,7 @@ import {
   FileSystemSourceDetector,
 } from "@yundu/adapter-filesystem";
 import {
+  createDefaultRuntimeTargetBackendRegistry,
   DefaultRuntimePlanResolver,
   InMemoryExecutionBackend,
   LocalExecutionBackend,
@@ -12,6 +13,7 @@ import {
   RuntimeResourceRuntimeLogReader,
   RuntimeServerConnectivityChecker,
   RuntimeServerEdgeProxyBootstrapper,
+  RuntimeTerminalSessionGateway,
   SshExecutionBackend,
 } from "@yundu/adapter-runtime";
 import {
@@ -336,25 +338,33 @@ export function registerRuntimeDependencies(
         ),
     ),
   });
+  container.register(tokens.runtimeTargetBackendRegistry, {
+    useFactory: instanceCachingFactory((dependencyContainer) =>
+      createDefaultRuntimeTargetBackendRegistry({
+        localBackend: new LocalExecutionBackend(
+          join(input.config.dataDir, "runtime"),
+          dependencyContainer.resolve(tokens.logger),
+          dependencyContainer.resolve(tokens.deploymentProgressReporter),
+          dependencyContainer.resolve(tokens.integrationAuthPort),
+          dependencyContainer.resolve(tokens.edgeProxyProviderRegistry),
+        ),
+        sshBackend: new SshExecutionBackend(
+          join(input.config.dataDir, "runtime"),
+          dependencyContainer.resolve(tokens.logger),
+          dependencyContainer.resolve(tokens.deploymentProgressReporter),
+          dependencyContainer.resolve(tokens.integrationAuthPort),
+          dependencyContainer.resolve(tokens.serverRepository),
+          dependencyContainer.resolve(tokens.edgeProxyProviderRegistry),
+          input.config.remoteRuntimeRoot,
+        ),
+      }),
+    ),
+  });
   container.register(tokens.executionBackend, {
     useFactory: instanceCachingFactory(
       (dependencyContainer) =>
         new RoutingExecutionBackend(
-          new LocalExecutionBackend(
-            join(input.config.dataDir, "runtime"),
-            dependencyContainer.resolve(tokens.logger),
-            dependencyContainer.resolve(tokens.deploymentProgressReporter),
-            dependencyContainer.resolve(tokens.integrationAuthPort),
-            dependencyContainer.resolve(tokens.edgeProxyProviderRegistry),
-          ),
-          new SshExecutionBackend(
-            join(input.config.dataDir, "runtime"),
-            dependencyContainer.resolve(tokens.logger),
-            dependencyContainer.resolve(tokens.deploymentProgressReporter),
-            dependencyContainer.resolve(tokens.integrationAuthPort),
-            dependencyContainer.resolve(tokens.serverRepository),
-            dependencyContainer.resolve(tokens.edgeProxyProviderRegistry),
-          ),
+          dependencyContainer.resolve(tokens.runtimeTargetBackendRegistry),
           new InMemoryExecutionBackend(
             dependencyContainer.resolve(tokens.deploymentProgressReporter),
           ),
@@ -365,6 +375,16 @@ export function registerRuntimeDependencies(
     useFactory: instanceCachingFactory(
       (dependencyContainer) =>
         new RuntimeResourceRuntimeLogReader(dependencyContainer.resolve(tokens.serverRepository)),
+    ),
+  });
+  container.register(tokens.terminalSessionGateway, {
+    useFactory: instanceCachingFactory(
+      (dependencyContainer) =>
+        new RuntimeTerminalSessionGateway({
+          allowTerminalSessions: input.config.runtimeMode === "self-hosted",
+          logger: dependencyContainer.resolve(tokens.logger),
+          serverRepository: dependencyContainer.resolve(tokens.serverRepository),
+        }),
     ),
   });
   container.register(tokens.edgeProxyProviderRegistry, {

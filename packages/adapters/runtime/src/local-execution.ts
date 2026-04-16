@@ -35,18 +35,19 @@ import {
 import {
   createEdgeProxyEnsurePlan,
   createProxyRouteRealizationPlan,
-  dockerLabelFlagsForProxyPlan,
-  dockerNetworkFlagForProxyPlan,
   proxyBootstrapOptionsFromEnv,
 } from "./edge-proxy-plans";
 import {
-  dockerContainerLabelFlags,
   dockerPublishedPortCommand,
-  dockerPublishedPortFlag,
-  dockerRemoveResourceContainersCommand,
   parseDockerPublishedHostPort,
   yunduDockerContainerLabels,
 } from "./docker-container-commands";
+import {
+  RuntimeCommandBuilder,
+  dockerLabelsFromAssignments,
+  renderRuntimeCommandString,
+} from "./runtime-commands";
+import { generateWorkspaceDockerfile } from "./workspace-planners";
 
 type LogPhase = "detect" | "plan" | "package" | "deploy" | "verify" | "rollback";
 type LogLevel = "debug" | "info" | "warn" | "error";
@@ -1246,10 +1247,54 @@ export class LocalExecutionBackend implements ExecutionBackend {
     let image = state.runtimePlan.execution.image;
     const containerName = sanitizeName(`yundu-${state.id.value}`);
 
-    if (state.runtimePlan.buildStrategy === "dockerfile") {
+    if (state.runtimePlan.buildStrategy === "dockerfile" || state.runtimePlan.buildStrategy === "workspace-commands") {
       image = sanitizeName(`yundu-image-${state.id.value}`);
-      const dockerfilePath = state.runtimePlan.execution.dockerfilePath ?? "Dockerfile";
-      logs.push(phaseLog("package", `docker build -t ${image} -f ${dockerfilePath} ${workdir}`));
+      const dockerfilePath =
+        state.runtimePlan.buildStrategy === "workspace-commands"
+          ? resolve(runtimeDir, state.runtimePlan.execution.dockerfilePath ?? "Dockerfile.yundu")
+          : state.runtimePlan.execution.dockerfilePath ?? "Dockerfile";
+
+      if (state.runtimePlan.buildStrategy === "workspace-commands") {
+        const dockerfile = generateWorkspaceDockerfile({
+          execution: state.runtimePlan.execution,
+          ...(state.runtimePlan.source.inspection
+            ? { sourceInspection: state.runtimePlan.source.inspection }
+            : {}),
+        });
+        if (!dockerfile) {
+          const message = "Start command is required for workspace image generation";
+          this.report(context, {
+            deploymentId: state.id.value,
+            phase: "package",
+            status: "failed",
+            level: "error",
+            message,
+          });
+          return ok({
+            deployment: this.applyFailure(deployment, {
+              logs: [
+                ...logs,
+                phaseLog("package", message, "error"),
+              ],
+              errorCode: "workspace_start_command_missing",
+              retryable: false,
+            }).deployment,
+          });
+        }
+        mkdirSync(runtimeDir, { recursive: true });
+        await Bun.write(dockerfilePath, dockerfile);
+        logs.push(phaseLog("package", `Generated workspace Dockerfile at ${dockerfilePath}`));
+      }
+
+      const buildCommand = renderRuntimeCommandString(
+        RuntimeCommandBuilder.docker().buildImage({
+          image,
+          dockerfilePath,
+          contextPath: workdir,
+        }),
+        { quote: shellQuote },
+      );
+      logs.push(phaseLog("package", buildCommand));
       this.report(context, {
         deploymentId: state.id.value,
         phase: "package",
@@ -1257,7 +1302,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
         message: `Build image ${image}`,
       });
       const build = runSyncCommand({
-        command: `docker build -t ${image} -f ${dockerfilePath} ${workdir}`,
+        command: buildCommand,
         cwd: workdir,
         env,
       });
@@ -1445,17 +1490,26 @@ export class LocalExecutionBackend implements ExecutionBackend {
       });
     }
 
+    const dockerCommandBuilder = RuntimeCommandBuilder.docker();
     runSyncCommand({
-      command: `docker rm -f ${containerName}`,
+      command: renderRuntimeCommandString(
+        dockerCommandBuilder.removeContainer({
+          containerName,
+          ignoreMissing: true,
+        }),
+        { quote: shellQuote },
+      ),
       cwd: workdir,
       env,
     });
     runSyncCommand({
-      command: dockerRemoveResourceContainersCommand({
-        resourceId: state.resourceId.value,
-        currentContainerName: containerName,
-        quote: shellQuote,
-      }),
+      command: renderRuntimeCommandString(
+        dockerCommandBuilder.removeResourceContainers({
+          resourceId: state.resourceId.value,
+          currentContainerName: containerName,
+        }),
+        { quote: shellQuote },
+      ),
       cwd: workdir,
       env,
     });
@@ -1489,43 +1543,58 @@ export class LocalExecutionBackend implements ExecutionBackend {
       });
     }
 
-    const envFlags = Object.entries(env)
+    const dockerEnvVariables = Object.entries(env)
       .filter((entry): entry is [string, string] => typeof entry[1] === "string")
       .filter(([key]) =>
-        key === "PORT" || key.startsWith("YUNDU_") || state.environmentSnapshot.variables.some((variable) => variable.key === key),
+        key === "PORT" ||
+        key.startsWith("YUNDU_") ||
+        state.environmentSnapshot.variables.some((variable) => variable.key === key),
       )
-      .map(([key, value]) => `-e ${shellQuote(`${key}=${value}`)}`)
-      .join(" ");
-    const labelFlags = dockerLabelFlagsForProxyPlan({
-      plan: proxyRoutePlanResult.value,
-      quote: shellQuote,
-    });
-    const yunduLabelFlags = dockerContainerLabelFlags({
-      labels: yunduDockerContainerLabels({
+      .map(([name, value]) => {
+        const snapshotVariable = state.environmentSnapshot.variables.find(
+          (variable) => variable.key === name,
+        );
+        return {
+          name,
+          value,
+          ...(snapshotVariable?.isSecret ? { redacted: true } : {}),
+        };
+      });
+    const labels = dockerLabelsFromAssignments([
+      ...yunduDockerContainerLabels({
         deploymentId: state.id.value,
         projectId: state.projectId.value,
         environmentId: state.environmentId.value,
         resourceId: state.resourceId.value,
         destinationId: state.destinationId.value,
       }),
-      quote: shellQuote,
-    });
-    const networkFlag = dockerNetworkFlagForProxyPlan(proxyRoutePlanResult.value);
-    const runCommand = [
-      `docker run -d --name ${containerName}`,
-      networkFlag,
-      dockerPublishedPortFlag({
-        containerPort: port,
-        exposureMode: state.runtimePlan.execution.metadata?.["resource.exposureMode"],
-      }),
-      envFlags,
-      yunduLabelFlags,
-      labelFlags,
+      ...(proxyRoutePlanResult.value?.labels ?? []),
+    ]);
+    const runCommandSpec = dockerCommandBuilder.runContainer({
       image,
-    ]
-      .filter(Boolean)
-      .join(" ");
-    logs.push(phaseLog("deploy", runCommand));
+      containerName,
+      env: dockerEnvVariables,
+      labels,
+      ...(proxyRoutePlanResult.value?.networkName
+        ? { networkName: proxyRoutePlanResult.value.networkName }
+        : {}),
+      publishedPorts: [
+        dockerCommandBuilder.publishPort({
+          containerPort: port,
+          mode:
+            state.runtimePlan.execution.metadata?.["resource.exposureMode"] === "direct-port"
+              ? "host-same-port"
+              : "loopback-ephemeral",
+        }),
+      ],
+    });
+    const runCommand = renderRuntimeCommandString(runCommandSpec, { quote: shellQuote });
+    logs.push(
+      phaseLog(
+        "deploy",
+        renderRuntimeCommandString(runCommandSpec, { quote: shellQuote, mode: "display" }),
+      ),
+    );
     this.report(context, {
       deploymentId: state.id.value,
       phase: "deploy",
@@ -1769,7 +1838,13 @@ export class LocalExecutionBackend implements ExecutionBackend {
         ? resolve(workdir, "docker-compose.yml")
         : (state.runtimePlan.execution.composeFile ?? state.runtimePlan.source.locator);
     logs.push(phaseLog("plan", `Compose working directory: ${workdir}`));
-    logs.push(phaseLog("deploy", `docker compose -f ${composeFile} up -d --build`));
+    const upCommand = renderRuntimeCommandString(
+      RuntimeCommandBuilder.docker().composeUp({
+        composeFile,
+      }),
+      { quote: shellQuote },
+    );
+    logs.push(phaseLog("deploy", upCommand));
     this.report(context, {
       deploymentId: state.id.value,
       phase: "deploy",
@@ -1778,7 +1853,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
     });
 
     const up = runSyncCommand({
-      command: `docker compose -f ${composeFile} up -d --build`,
+      command: upCommand,
       cwd: workdir,
       env,
     });

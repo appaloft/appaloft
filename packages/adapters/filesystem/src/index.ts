@@ -14,12 +14,25 @@ import {
   DisplayNameText,
   domainError,
   err,
+  FilePathText,
   ok,
   type Result,
   SourceDescriptor,
+  type SourceDetectedFile,
+  SourceDetectedFileValue,
+  type SourceDetectedScript,
+  SourceDetectedScriptValue,
+  type SourceFramework,
+  SourceFrameworkValue,
+  SourceInspectionSnapshot,
   type SourceKind,
   SourceKindValue,
   SourceLocator,
+  type SourcePackageManager,
+  SourcePackageManagerValue,
+  type SourceRuntimeFamily,
+  SourceRuntimeFamilyValue,
+  SourceRuntimeVersionText,
 } from "@yundu/core";
 import {
   domainsFromDeploymentConfig,
@@ -34,9 +47,13 @@ import {
 } from "@yundu/deployment-config";
 
 interface LocalProjectProfile {
-  runtimeFamily: "node" | "python" | "java";
+  runtimeFamily: Extract<SourceRuntimeFamily, "java" | "node" | "python">;
+  framework?: SourceFramework;
+  packageManager?: SourcePackageManager;
+  runtimeVersion?: string;
   projectName?: string;
-  metadata: Record<string, string>;
+  detectedFiles: SourceDetectedFile[];
+  detectedScripts: SourceDetectedScript[];
 }
 
 interface LocalProjectProfileDetector {
@@ -62,6 +79,24 @@ function readText(path: string): string | null {
   }
 }
 
+function firstLine(text: string | null): string | undefined {
+  return text
+    ?.split(/\r?\n/)
+    .map((line) => line.trim())
+    .find((line) => line.length > 0);
+}
+
+function readFirstExistingVersion(path: string, fileNames: string[]): string | undefined {
+  for (const fileName of fileNames) {
+    const version = firstLine(readText(join(path, fileName)));
+    if (version) {
+      return version;
+    }
+  }
+
+  return undefined;
+}
+
 class NodeProjectProfileDetector implements LocalProjectProfileDetector {
   detect(path: string): LocalProjectProfile | null {
     const packageJsonPath = join(path, "package.json");
@@ -83,17 +118,34 @@ class NodeProjectProfileDetector implements LocalProjectProfileDetector {
             ? "pnpm"
             : "npm"
         : "npm";
+    const dependencies =
+      packageJson?.dependencies && typeof packageJson.dependencies === "object"
+        ? (packageJson.dependencies as Record<string, unknown>)
+        : {};
+    const devDependencies =
+      packageJson?.devDependencies && typeof packageJson.devDependencies === "object"
+        ? (packageJson.devDependencies as Record<string, unknown>)
+        : {};
+    const hasNextDependency = "next" in dependencies || "next" in devDependencies;
+    const hasNextConfig =
+      existsSync(join(path, "next.config.js")) ||
+      existsSync(join(path, "next.config.mjs")) ||
+      existsSync(join(path, "next.config.ts"));
+    const detectedScripts: SourceDetectedScript[] = [
+      ...(typeof scripts.build === "string" ? ["build" as const] : []),
+      ...(typeof scripts.start === "string" ? ["start" as const] : []),
+      ...(typeof scripts["start:built"] === "string" ? ["start-built" as const] : []),
+    ];
+    const runtimeVersion = readFirstExistingVersion(path, [".node-version", ".nvmrc"]);
 
     return {
       runtimeFamily: "node",
+      ...(hasNextDependency || hasNextConfig ? { framework: "nextjs" as const } : {}),
+      packageManager,
+      ...(runtimeVersion ? { runtimeVersion } : {}),
       ...(typeof packageJson?.name === "string" ? { projectName: packageJson.name } : {}),
-      metadata: {
-        hasPackageJson: "true",
-        packageManager,
-        hasBuildScript: String(typeof scripts.build === "string"),
-        hasStartScript: String(typeof scripts.start === "string"),
-        hasStartBuiltScript: String(typeof scripts["start:built"] === "string"),
-      },
+      detectedFiles: ["package-json", ...(hasNextConfig ? ["next-config" as const] : [])],
+      detectedScripts,
     };
   }
 }
@@ -109,14 +161,17 @@ class PythonProjectProfileDetector implements LocalProjectProfileDetector {
 
     const pyproject = existsSync(pyprojectPath) ? readText(pyprojectPath) : null;
     const projectName = pyproject?.match(/^\s*name\s*=\s*"([^"]+)"/m)?.[1];
+    const runtimeVersion = readFirstExistingVersion(path, [".python-version"]);
 
     return {
       runtimeFamily: "python",
+      ...(runtimeVersion ? { runtimeVersion } : {}),
       ...(projectName ? { projectName } : {}),
-      metadata: {
-        hasPyprojectToml: String(existsSync(pyprojectPath)),
-        hasRequirementsTxt: String(existsSync(requirementsPath)),
-      },
+      detectedFiles: [
+        ...(existsSync(pyprojectPath) ? ["pyproject-toml" as const] : []),
+        ...(existsSync(requirementsPath) ? ["requirements-txt" as const] : []),
+      ],
+      detectedScripts: [],
     };
   }
 }
@@ -140,14 +195,19 @@ class JavaProjectProfileDetector implements LocalProjectProfileDetector {
     const projectName =
       pom?.match(/<artifactId>([^<]+)<\/artifactId>/)?.[1] ??
       gradle?.match(/rootProject\.name\s*=\s*["']([^"']+)["']/)?.[1];
+    const runtimeVersion = readFirstExistingVersion(path, [".java-version"]);
 
     return {
       runtimeFamily: "java",
+      ...(runtimeVersion ? { runtimeVersion } : {}),
       ...(projectName ? { projectName } : {}),
-      metadata: {
-        hasPomXml: String(existsSync(pomPath)),
-        hasGradleBuild: String(existsSync(gradlePath) || existsSync(gradleKtsPath)),
-      },
+      detectedFiles: [
+        ...(existsSync(pomPath) ? ["pom-xml" as const] : []),
+        ...(existsSync(gradlePath) || existsSync(gradleKtsPath) ? ["gradle-build" as const] : []),
+        ...(existsSync(join(path, "mvnw")) ? ["maven-wrapper" as const] : []),
+        ...(existsSync(join(path, "gradlew")) ? ["gradle-wrapper" as const] : []),
+      ],
+      detectedScripts: [],
     };
   }
 }
@@ -169,35 +229,51 @@ function detectLocalProjectProfile(path: string): LocalProjectProfile | null {
   return null;
 }
 
-function detectLocalMetadata(path: string): Record<string, string> {
+function detectLocalInspection(path: string): SourceInspectionSnapshot {
   const profile = detectLocalProjectProfile(path);
+  const detectedFiles: SourceDetectedFile[] = [
+    ...(existsSync(join(path, "Dockerfile")) ? ["dockerfile" as const] : []),
+    ...(existsSync(join(path, "docker-compose.yml")) || existsSync(join(path, "compose.yml"))
+      ? ["compose-manifest" as const]
+      : []),
+    ...(existsSync(join(path, ".git")) ? ["git-directory" as const] : []),
+    ...(profile?.detectedFiles ?? []),
+  ];
 
-  return {
-    hasDockerfile: String(existsSync(join(path, "Dockerfile"))),
-    hasCompose: String(
-      existsSync(join(path, "docker-compose.yml")) || existsSync(join(path, "compose.yml")),
-    ),
-    hasGit: String(existsSync(join(path, ".git"))),
-    hasPackageJson: String(existsSync(join(path, "package.json"))),
+  return SourceInspectionSnapshot.rehydrate({
     ...(profile
+      ? { runtimeFamily: SourceRuntimeFamilyValue.rehydrate(profile.runtimeFamily) }
+      : {}),
+    ...(profile?.framework ? { framework: SourceFrameworkValue.rehydrate(profile.framework) } : {}),
+    ...(profile?.packageManager
+      ? { packageManager: SourcePackageManagerValue.rehydrate(profile.packageManager) }
+      : {}),
+    ...(profile?.runtimeVersion
+      ? { runtimeVersion: SourceRuntimeVersionText.rehydrate(profile.runtimeVersion) }
+      : {}),
+    ...(profile?.projectName
+      ? { projectName: DisplayNameText.rehydrate(profile.projectName) }
+      : {}),
+    detectedFiles: detectedFiles.map((file) => SourceDetectedFileValue.rehydrate(file)),
+    ...(profile?.detectedScripts
       ? {
-          runtimeFamily: profile.runtimeFamily,
-          ...(profile.projectName ? { inferredProjectName: profile.projectName } : {}),
-          ...profile.metadata,
+          detectedScripts: profile.detectedScripts.map((script) =>
+            SourceDetectedScriptValue.rehydrate(script),
+          ),
         }
-      : {
-          packageManager: "npm",
-          hasBuildScript: "false",
-          hasStartScript: "false",
-          hasStartBuiltScript: "false",
-        }),
-    dockerfilePath: "Dockerfile",
-  };
+      : {}),
+    dockerfilePath: FilePathText.rehydrate("Dockerfile"),
+    ...(existsSync(join(path, "docker-compose.yml"))
+      ? { composeFilePath: FilePathText.rehydrate("docker-compose.yml") }
+      : existsSync(join(path, "compose.yml"))
+        ? { composeFilePath: FilePathText.rehydrate("compose.yml") }
+        : {}),
+  });
 }
 
 function resolveSourceKind(locator: string): {
   kind: SourceKind;
-  metadata?: Record<string, string>;
+  inspection?: SourceInspectionSnapshot;
 } {
   if (/^(https?|ssh):\/\//.test(locator) || locator.endsWith(".git")) {
     return { kind: "git-public" };
@@ -218,17 +294,17 @@ function resolveSourceKind(locator: string): {
   const absolutePath = resolve(locator);
 
   if (existsSync(absolutePath) && statSync(absolutePath).isDirectory()) {
-    const metadata = detectLocalMetadata(absolutePath);
+    const inspection = detectLocalInspection(absolutePath);
 
-    if (metadata.hasCompose === "true") {
-      return { kind: "compose", metadata };
+    if (inspection.hasDetectedFile("compose-manifest")) {
+      return { kind: "compose", inspection };
     }
 
-    if (metadata.hasGit === "true") {
-      return { kind: "local-git", metadata };
+    if (inspection.hasDetectedFile("git-directory")) {
+      return { kind: "local-git", inspection };
     }
 
-    return { kind: "local-folder", metadata };
+    return { kind: "local-folder", inspection };
   }
 
   return { kind: "local-folder" };
@@ -252,10 +328,10 @@ export class FileSystemSourceDetector implements SourceDetector {
         const resolved = resolveSourceKind(locator);
         const reasoning = [
           `Detected source kind: ${resolved.kind}`,
-          resolved.metadata?.hasDockerfile === "true"
+          resolved.inspection?.hasDetectedFile("dockerfile")
             ? "Dockerfile present in workspace"
             : "Dockerfile not detected",
-          resolved.metadata?.hasCompose === "true"
+          resolved.inspection?.hasDetectedFile("compose-manifest")
             ? "Compose manifest present in workspace"
             : "Compose manifest not detected",
         ];
@@ -266,7 +342,7 @@ export class FileSystemSourceDetector implements SourceDetector {
             locator.startsWith(".") || locator.startsWith("/") ? absolutePath : locator,
           ),
           displayName: DisplayNameText.rehydrate(basename(locator) || basename(absolutePath)),
-          ...(resolved.metadata ? { metadata: resolved.metadata } : {}),
+          ...(resolved.inspection ? { inspection: resolved.inspection } : {}),
         });
 
         return ok({ source, reasoning });

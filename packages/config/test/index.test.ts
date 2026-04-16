@@ -33,6 +33,7 @@ describe("resolveConfig", () => {
     expect(config.databaseUrl).toBeUndefined();
     expect(config.dataDir).toBe(expectedDefaultDataDir());
     expect(config.pgliteDataDir).toBe(join(expectedDefaultDataDir(), "pglite"));
+    expect(config.remoteRuntimeRoot).toBe("/var/lib/yundu/runtime");
   });
 
   test("infers postgres when a database URL is configured", () => {
@@ -55,6 +56,16 @@ describe("resolveConfig", () => {
 
     expect(config.dataDir.endsWith(".yundu/data")).toBe(true);
     expect(config.pgliteDataDir.endsWith(".yundu/data/pglite")).toBe(true);
+  });
+
+  test("allows overriding the remote runtime root", () => {
+    const config = resolveConfig({
+      env: {
+        YUNDU_REMOTE_RUNTIME_ROOT: "/srv/yundu/runtime",
+      },
+    });
+
+    expect(config.remoteRuntimeRoot).toBe("/srv/yundu/runtime");
   });
 
   test("keeps an explicit pglite driver even if a database URL exists", () => {

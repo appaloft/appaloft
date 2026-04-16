@@ -85,6 +85,9 @@ import {
   ResourceServiceName,
   ResourceSlug,
   RoutePathPrefix,
+  RuntimeArtifactIntentValue,
+  RuntimeArtifactKindValue,
+  RuntimeArtifactSnapshot,
   RuntimeExecutionPlan,
   RuntimePlan,
   RuntimePlanId,
@@ -94,11 +97,18 @@ import {
   RuntimeVerificationStepKindValue,
   SourceBaseDirectory,
   SourceDescriptor,
+  SourceDetectedFileValue,
+  SourceDetectedScriptValue,
+  SourceFrameworkValue,
+  SourceInspectionSnapshot,
   SourceKindValue,
   SourceLocator,
   SourceOriginalLocator,
+  SourcePackageManagerValue,
   SourceRepositoryFullName,
   SourceRepositoryId,
+  SourceRuntimeFamilyValue,
+  SourceRuntimeVersionText,
   SshCredentialId,
   SshCredentialName,
   SshPrivateKeyText,
@@ -136,6 +146,13 @@ type ResourceServiceKindInput = Parameters<typeof ResourceServiceKindValue.rehyd
 type ResourceNetworkProtocolInput = Parameters<typeof ResourceNetworkProtocolValue.rehydrate>[0];
 type ResourceExposureModeInput = Parameters<typeof ResourceExposureModeValue.rehydrate>[0];
 type RuntimePlanStrategyInput = Parameters<typeof RuntimePlanStrategyValue.rehydrate>[0];
+type RuntimeArtifactKindInput = Parameters<typeof RuntimeArtifactKindValue.rehydrate>[0];
+type RuntimeArtifactIntentInput = Parameters<typeof RuntimeArtifactIntentValue.rehydrate>[0];
+type SourceRuntimeFamilyInput = Parameters<typeof SourceRuntimeFamilyValue.rehydrate>[0];
+type SourceFrameworkInput = Parameters<typeof SourceFrameworkValue.rehydrate>[0];
+type SourcePackageManagerInput = Parameters<typeof SourcePackageManagerValue.rehydrate>[0];
+type SourceDetectedFileInput = Parameters<typeof SourceDetectedFileValue.rehydrate>[0];
+type SourceDetectedScriptInput = Parameters<typeof SourceDetectedScriptValue.rehydrate>[0];
 type DeploymentTargetCredentialKindInput = Parameters<
   typeof DeploymentTargetCredentialKindValue.rehydrate
 >[0];
@@ -150,7 +167,21 @@ export interface SerializedSourceDescriptor extends Record<string, unknown> {
   kind: SourceKindInput;
   locator: string;
   displayName: string;
+  inspection?: SerializedSourceInspectionSnapshot;
   metadata?: Record<string, string>;
+}
+
+export interface SerializedSourceInspectionSnapshot extends Record<string, unknown> {
+  runtimeFamily?: SourceRuntimeFamilyInput;
+  framework?: SourceFrameworkInput;
+  packageManager?: SourcePackageManagerInput;
+  runtimeVersion?: string;
+  projectName?: string;
+  detectedFiles?: SourceDetectedFileInput[];
+  detectedScripts?: SourceDetectedScriptInput[];
+  dockerfilePath?: string;
+  composeFilePath?: string;
+  jarPath?: string;
 }
 
 export interface SerializedRuntimeExecutionPlan extends Record<string, unknown> {
@@ -207,12 +238,21 @@ export interface SerializedDeploymentTargetDescriptor extends Record<string, unk
   metadata?: Record<string, string>;
 }
 
+export interface SerializedRuntimeArtifactSnapshot extends Record<string, unknown> {
+  kind: RuntimeArtifactKindInput;
+  intent: RuntimeArtifactIntentInput;
+  image?: string;
+  composeFile?: string;
+  metadata?: Record<string, string>;
+}
+
 export interface SerializedRuntimePlan extends Record<string, unknown> {
   id: string;
   source: SerializedSourceDescriptor;
   buildStrategy: BuildStrategyInput;
   packagingMode: PackagingModeInput;
   execution: SerializedRuntimeExecutionPlan;
+  runtimeArtifact?: SerializedRuntimeArtifactSnapshot;
   target: SerializedDeploymentTargetDescriptor;
   detectSummary: string;
   steps: string[];
@@ -410,6 +450,68 @@ function rehydrateHealthCheckPolicy(policy: SerializedHealthCheckPolicy) {
   };
 }
 
+function serializeSourceInspection(
+  inspection: SourceInspectionSnapshot,
+): SerializedSourceInspectionSnapshot {
+  return {
+    ...(inspection.runtimeFamily ? { runtimeFamily: inspection.runtimeFamily } : {}),
+    ...(inspection.framework ? { framework: inspection.framework } : {}),
+    ...(inspection.packageManager ? { packageManager: inspection.packageManager } : {}),
+    ...(inspection.runtimeVersion ? { runtimeVersion: inspection.runtimeVersion } : {}),
+    ...(inspection.projectName ? { projectName: inspection.projectName } : {}),
+    ...(inspection.detectedFiles.length > 0 ? { detectedFiles: inspection.detectedFiles } : {}),
+    ...(inspection.detectedScripts.length > 0
+      ? { detectedScripts: inspection.detectedScripts }
+      : {}),
+    ...(inspection.dockerfilePath ? { dockerfilePath: inspection.dockerfilePath } : {}),
+    ...(inspection.composeFilePath ? { composeFilePath: inspection.composeFilePath } : {}),
+    ...(inspection.jarPath ? { jarPath: inspection.jarPath } : {}),
+  };
+}
+
+function rehydrateSourceInspection(
+  inspection: SerializedSourceInspectionSnapshot,
+): SourceInspectionSnapshot {
+  return SourceInspectionSnapshot.rehydrate({
+    ...(inspection.runtimeFamily
+      ? { runtimeFamily: SourceRuntimeFamilyValue.rehydrate(inspection.runtimeFamily) }
+      : {}),
+    ...(inspection.framework
+      ? { framework: SourceFrameworkValue.rehydrate(inspection.framework) }
+      : {}),
+    ...(inspection.packageManager
+      ? { packageManager: SourcePackageManagerValue.rehydrate(inspection.packageManager) }
+      : {}),
+    ...(inspection.runtimeVersion
+      ? { runtimeVersion: SourceRuntimeVersionText.rehydrate(inspection.runtimeVersion) }
+      : {}),
+    ...(inspection.projectName
+      ? { projectName: DisplayNameText.rehydrate(inspection.projectName) }
+      : {}),
+    ...(inspection.detectedFiles
+      ? {
+          detectedFiles: inspection.detectedFiles.map((file) =>
+            SourceDetectedFileValue.rehydrate(file),
+          ),
+        }
+      : {}),
+    ...(inspection.detectedScripts
+      ? {
+          detectedScripts: inspection.detectedScripts.map((script) =>
+            SourceDetectedScriptValue.rehydrate(script),
+          ),
+        }
+      : {}),
+    ...(inspection.dockerfilePath
+      ? { dockerfilePath: FilePathText.rehydrate(inspection.dockerfilePath) }
+      : {}),
+    ...(inspection.composeFilePath
+      ? { composeFilePath: FilePathText.rehydrate(inspection.composeFilePath) }
+      : {}),
+    ...(inspection.jarPath ? { jarPath: FilePathText.rehydrate(inspection.jarPath) } : {}),
+  });
+}
+
 export function serializeRuntimePlan(plan: RuntimePlanType): SerializedRuntimePlan {
   return {
     id: plan.id,
@@ -417,10 +519,26 @@ export function serializeRuntimePlan(plan: RuntimePlanType): SerializedRuntimePl
       kind: plan.source.kind,
       locator: plan.source.locator,
       displayName: plan.source.displayName,
+      ...(plan.source.inspection
+        ? { inspection: serializeSourceInspection(plan.source.inspection) }
+        : {}),
       ...(plan.source.metadata ? { metadata: plan.source.metadata } : {}),
     },
     buildStrategy: plan.buildStrategy,
     packagingMode: plan.packagingMode,
+    ...(plan.runtimeArtifact
+      ? {
+          runtimeArtifact: {
+            kind: plan.runtimeArtifact.kind,
+            intent: plan.runtimeArtifact.intent,
+            ...(plan.runtimeArtifact.image ? { image: plan.runtimeArtifact.image } : {}),
+            ...(plan.runtimeArtifact.composeFile
+              ? { composeFile: plan.runtimeArtifact.composeFile }
+              : {}),
+            ...(plan.runtimeArtifact.metadata ? { metadata: plan.runtimeArtifact.metadata } : {}),
+          },
+        }
+      : {}),
     execution: {
       kind: plan.execution.kind,
       ...(plan.execution.workingDirectory
@@ -484,6 +602,7 @@ export function rehydrateRuntimePlan(raw: unknown): RuntimePlan {
       kind: SourceKindValue.rehydrate(source.kind),
       locator: SourceLocator.rehydrate(source.locator),
       displayName: DisplayNameText.rehydrate(source.displayName),
+      ...(source.inspection ? { inspection: rehydrateSourceInspection(source.inspection) } : {}),
       ...(source.metadata ? { metadata: source.metadata } : {}),
     }),
     buildStrategy: BuildStrategyKindValue.rehydrate(record.buildStrategy),
@@ -543,6 +662,23 @@ export function rehydrateRuntimePlan(raw: unknown): RuntimePlan {
         : {}),
       ...(execution.metadata ? { metadata: execution.metadata } : {}),
     }),
+    ...(record.runtimeArtifact
+      ? {
+          runtimeArtifact: RuntimeArtifactSnapshot.rehydrate({
+            kind: RuntimeArtifactKindValue.rehydrate(record.runtimeArtifact.kind),
+            intent: RuntimeArtifactIntentValue.rehydrate(record.runtimeArtifact.intent),
+            ...(record.runtimeArtifact.image
+              ? { image: ImageReference.rehydrate(record.runtimeArtifact.image) }
+              : {}),
+            ...(record.runtimeArtifact.composeFile
+              ? { composeFile: FilePathText.rehydrate(record.runtimeArtifact.composeFile) }
+              : {}),
+            ...(record.runtimeArtifact.metadata
+              ? { metadata: record.runtimeArtifact.metadata }
+              : {}),
+          }),
+        }
+      : {}),
     target: DeploymentTargetDescriptor.rehydrate({
       kind: TargetKindValue.rehydrate(target.kind),
       providerKey: ProviderKey.rehydrate(target.providerKey),

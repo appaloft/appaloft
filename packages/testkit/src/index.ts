@@ -607,12 +607,77 @@ export class MemoryDeploymentReadModel implements DeploymentReadModel {
               kind: deployment.runtimePlan.source.kind,
               locator: deployment.runtimePlan.source.locator,
               displayName: deployment.runtimePlan.source.displayName,
+              ...(deployment.runtimePlan.source.inspection
+                ? {
+                    inspection: {
+                      ...(deployment.runtimePlan.source.inspection.runtimeFamily
+                        ? { runtimeFamily: deployment.runtimePlan.source.inspection.runtimeFamily }
+                        : {}),
+                      ...(deployment.runtimePlan.source.inspection.framework
+                        ? { framework: deployment.runtimePlan.source.inspection.framework }
+                        : {}),
+                      ...(deployment.runtimePlan.source.inspection.packageManager
+                        ? {
+                            packageManager: deployment.runtimePlan.source.inspection.packageManager,
+                          }
+                        : {}),
+                      ...(deployment.runtimePlan.source.inspection.runtimeVersion
+                        ? {
+                            runtimeVersion: deployment.runtimePlan.source.inspection.runtimeVersion,
+                          }
+                        : {}),
+                      ...(deployment.runtimePlan.source.inspection.projectName
+                        ? { projectName: deployment.runtimePlan.source.inspection.projectName }
+                        : {}),
+                      ...(deployment.runtimePlan.source.inspection.detectedFiles.length > 0
+                        ? { detectedFiles: deployment.runtimePlan.source.inspection.detectedFiles }
+                        : {}),
+                      ...(deployment.runtimePlan.source.inspection.detectedScripts.length > 0
+                        ? {
+                            detectedScripts:
+                              deployment.runtimePlan.source.inspection.detectedScripts,
+                          }
+                        : {}),
+                      ...(deployment.runtimePlan.source.inspection.dockerfilePath
+                        ? {
+                            dockerfilePath: deployment.runtimePlan.source.inspection.dockerfilePath,
+                          }
+                        : {}),
+                      ...(deployment.runtimePlan.source.inspection.composeFilePath
+                        ? {
+                            composeFilePath:
+                              deployment.runtimePlan.source.inspection.composeFilePath,
+                          }
+                        : {}),
+                      ...(deployment.runtimePlan.source.inspection.jarPath
+                        ? { jarPath: deployment.runtimePlan.source.inspection.jarPath }
+                        : {}),
+                    },
+                  }
+                : {}),
               ...(deployment.runtimePlan.source.metadata
                 ? { metadata: deployment.runtimePlan.source.metadata }
                 : {}),
             },
             buildStrategy: deployment.runtimePlan.buildStrategy,
             packagingMode: deployment.runtimePlan.packagingMode,
+            ...(deployment.runtimePlan.runtimeArtifact
+              ? {
+                  runtimeArtifact: {
+                    kind: deployment.runtimePlan.runtimeArtifact.kind,
+                    intent: deployment.runtimePlan.runtimeArtifact.intent,
+                    ...(deployment.runtimePlan.runtimeArtifact.image
+                      ? { image: deployment.runtimePlan.runtimeArtifact.image }
+                      : {}),
+                    ...(deployment.runtimePlan.runtimeArtifact.composeFile
+                      ? { composeFile: deployment.runtimePlan.runtimeArtifact.composeFile }
+                      : {}),
+                    ...(deployment.runtimePlan.runtimeArtifact.metadata
+                      ? { metadata: deployment.runtimePlan.runtimeArtifact.metadata }
+                      : {}),
+                  },
+                }
+              : {}),
             execution: {
               kind: deployment.runtimePlan.execution.kind,
               ...(deployment.runtimePlan.execution.workingDirectory

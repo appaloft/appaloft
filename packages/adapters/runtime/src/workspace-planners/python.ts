@@ -1,0 +1,82 @@
+import { err, ok, type Result, type SourceInspectionSnapshot } from "@yundu/core";
+import {
+  commandMentions,
+  dockerfileFromExecution,
+  generatedWorkspaceDockerfileName,
+  requiredStartCommand,
+  workspaceMetadata,
+  type WorkspaceDockerfileInput,
+  type WorkspacePlannerInput,
+  type WorkspaceRuntimePlan,
+  type WorkspaceRuntimePlanner,
+} from "./types";
+
+function pythonBaseImage(inspection?: SourceInspectionSnapshot): string {
+  const version = inspection?.runtimeVersion ?? "3.12";
+  return `python:${version}-slim`;
+}
+
+function pythonInstallCommand(input: WorkspacePlannerInput): string | undefined {
+  return (
+    input.requestedDeployment.installCommand ??
+    (input.source.inspection?.hasDetectedFile("requirements-txt")
+      ? "pip install --no-cache-dir -r requirements.txt"
+      : input.source.inspection?.hasDetectedFile("pyproject-toml")
+        ? "pip install --no-cache-dir ."
+        : undefined)
+  );
+}
+
+export const pythonWorkspacePlanner: WorkspaceRuntimePlanner = {
+  name: "python",
+  runtimeKind: "python",
+
+  detect(input) {
+    return Boolean(
+      input.source.inspection?.runtimeFamily === "python" ||
+        input.source.inspection?.hasDetectedFile("requirements-txt") ||
+        input.source.inspection?.hasDetectedFile("pyproject-toml") ||
+        commandMentions(input, ["python", "pip", "uvicorn", "gunicorn", "fastapi"]),
+    );
+  },
+
+  plan(input): Result<WorkspaceRuntimePlan> {
+    const startCommand = requiredStartCommand(input);
+
+    if (startCommand.isErr()) {
+      return err(startCommand.error);
+    }
+
+    const baseImage = pythonBaseImage(input.source.inspection);
+    const installCommand = pythonInstallCommand(input);
+    const buildCommand = input.requestedDeployment.buildCommand;
+
+    return ok({
+      planner: this.name,
+      runtimeKind: this.runtimeKind,
+      dockerfilePath: generatedWorkspaceDockerfileName,
+      baseImage,
+      ...(installCommand ? { installCommand } : {}),
+      ...(buildCommand ? { buildCommand } : {}),
+      startCommand: startCommand.value,
+      metadata: workspaceMetadata({
+        planner: this.name,
+        runtimeKind: this.runtimeKind,
+        baseImage,
+      }),
+    });
+  },
+
+  dockerfile(input: WorkspaceDockerfileInput): string | null {
+    return dockerfileFromExecution({
+      baseImage:
+        input.execution.metadata?.["workspace.baseImage"] ??
+        pythonBaseImage(input.sourceInspection),
+      execution: input.execution,
+      env: {
+        PYTHONDONTWRITEBYTECODE: "1",
+        PYTHONUNBUFFERED: "1",
+      },
+    });
+  },
+};

@@ -179,7 +179,8 @@ function expectCliSuccess(result: ReturnType<typeof runCli>, label: string): voi
 function remoteCleanup(config: SshConfig, deploymentId: string): void {
   const containerName = `yundu-${deploymentId}`.toLowerCase().replace(/[^a-z0-9_.-]/g, "-");
   const imageName = `yundu-image-${deploymentId}`.toLowerCase().replace(/[^a-z0-9_.-]/g, "-");
-  const remoteRoot = `/tmp/yundu-deployments/${deploymentId.toLowerCase().replace(/[^a-z0-9_.-]/g, "-")}`;
+  const remoteRuntimeRoot = process.env.YUNDU_REMOTE_RUNTIME_ROOT ?? "/var/lib/yundu/runtime";
+  const remoteRoot = `${remoteRuntimeRoot.replace(/\/+$/, "")}/ssh-deployments/${deploymentId.toLowerCase().replace(/[^a-z0-9_.-]/g, "-")}`;
   runSsh(
     config,
     [
