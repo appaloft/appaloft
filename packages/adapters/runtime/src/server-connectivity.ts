@@ -3,12 +3,17 @@ import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
+  type EdgeProxyProviderRegistry,
   type ExecutionContext,
   type ServerConnectivityCheck,
   type ServerConnectivityChecker,
   type ServerConnectivityResult,
 } from "@yundu/application";
 import { ok, type DeploymentTargetState, type Result } from "@yundu/core";
+import {
+  createEdgeProxyDiagnosticsPlanForSelection,
+  proxyBootstrapOptionsFromEnv,
+} from "./edge-proxy-plans";
 
 interface ProcessCheckInput {
   name: string;
@@ -155,17 +160,17 @@ function prepareSshArgs(server: DeploymentTargetState, remoteCommand: string): P
 
   return {
     args: [
-    "-p",
-    String(server.port.value),
-    ...identityArgs,
-    "-o",
-    "BatchMode=yes",
-    "-o",
-    "ConnectTimeout=5",
-    "-o",
-    "StrictHostKeyChecking=accept-new",
-    hostWithUsername(server.host.value, credential?.username?.value),
-    remoteCommand,
+      "-p",
+      String(server.port.value),
+      ...identityArgs,
+      "-o",
+      "BatchMode=yes",
+      "-o",
+      "ConnectTimeout=5",
+      "-o",
+      "StrictHostKeyChecking=accept-new",
+      hostWithUsername(server.host.value, credential?.username?.value),
+      remoteCommand,
     ],
     cleanup(): void {
       if (tempDir) {
@@ -192,14 +197,151 @@ function sshProcessCheck(
   }
 }
 
+function shellProcessCheck(
+  command: string,
+  input: Omit<ProcessCheckInput, "command" | "args">,
+): ServerConnectivityCheck {
+  return processCheck({
+    ...input,
+    command: "sh",
+    args: ["-lc", command],
+  });
+}
+
+function withProxyRepairMetadata(
+  server: DeploymentTargetState,
+  check: ServerConnectivityCheck,
+): ServerConnectivityCheck {
+  if (check.status !== "failed") {
+    return check;
+  }
+
+  return {
+    ...check,
+    metadata: {
+      ...check.metadata,
+      repairCommand: `yundu server proxy repair ${server.id.value}`,
+    },
+  };
+}
+
 export class RuntimeServerConnectivityChecker implements ServerConnectivityChecker {
+  constructor(private readonly edgeProxyProviderRegistry?: EdgeProxyProviderRegistry) {}
+
+  private async edgeProxyChecks(
+    context: ExecutionContext,
+    server: DeploymentTargetState,
+  ): Promise<ServerConnectivityCheck[]> {
+    const proxyKind = server.edgeProxy?.kind.value;
+
+    if (!proxyKind || proxyKind === "none") {
+      return [
+        {
+          name: "edge-proxy",
+          status: "skipped",
+          message: "Edge proxy is disabled for this server",
+          durationMs: 0,
+        },
+      ];
+    }
+
+    if (!this.edgeProxyProviderRegistry) {
+      return [
+        {
+          name: "edge-proxy-provider",
+          status: "skipped",
+          message: "No edge proxy provider registry is available for diagnostics",
+          durationMs: 0,
+          metadata: {
+            proxyKind,
+          },
+        },
+      ];
+    }
+
+    const planResult = await createEdgeProxyDiagnosticsPlanForSelection({
+      providerRegistry: this.edgeProxyProviderRegistry,
+      context: {
+        correlationId: context.requestId,
+        server,
+      },
+      proxyKind,
+      options: proxyBootstrapOptionsFromEnv(process.env),
+    });
+
+    if (planResult.isErr()) {
+      return [
+        {
+          name: "edge-proxy-provider",
+          status: "failed",
+          message: planResult.error.message,
+          durationMs: 0,
+          metadata: {
+            errorCode: planResult.error.code,
+            proxyKind,
+          },
+        },
+      ];
+    }
+
+    const plan = planResult.value;
+    if (!plan) {
+      return [
+        {
+          name: "edge-proxy-provider",
+          status: "skipped",
+          message: `No edge proxy diagnostics are required for ${proxyKind}`,
+          durationMs: 0,
+          metadata: {
+            proxyKind,
+          },
+        },
+      ];
+    }
+
+    if (server.providerKey.value !== "local-shell" && server.providerKey.value !== "generic-ssh") {
+      return [
+        {
+          name: "edge-proxy-provider",
+          status: "skipped",
+          message: `No edge proxy diagnostic executor is registered for ${server.providerKey.value}`,
+          durationMs: 0,
+          metadata: {
+            providerKey: plan.providerKey,
+            proxyKind,
+          },
+        },
+      ];
+    }
+
+    return plan.checks.map((check) => {
+      const input = {
+        name: check.name,
+        timeoutMs: check.timeoutMs,
+        successMessage: check.successMessage,
+        failureMessage: check.failureMessage,
+        metadata: {
+          providerKey: plan.providerKey,
+          proxyKind,
+          ...check.metadata,
+        },
+      };
+
+      const result =
+        server.providerKey.value === "generic-ssh"
+          ? sshProcessCheck(server, check.command, input)
+          : shellProcessCheck(check.command, input);
+
+      return withProxyRepairMetadata(server, result);
+    });
+  }
+
   async test(
     context: ExecutionContext,
     input: {
       server: DeploymentTargetState;
     },
   ): Promise<Result<ServerConnectivityResult>> {
-    void context;
     const { server } = input;
     const checks: ServerConnectivityCheck[] = [];
 
@@ -260,6 +402,8 @@ export class RuntimeServerConnectivityChecker implements ServerConnectivityCheck
         durationMs: 0,
       });
     }
+
+    checks.push(...(await this.edgeProxyChecks(context, server)));
 
     return ok({
       serverId: server.id.value,

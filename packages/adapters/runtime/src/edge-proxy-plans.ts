@@ -1,4 +1,5 @@
 import {
+  type EdgeProxyDiagnosticsPlan,
   type EdgeProxyEnsurePlan,
   type EdgeProxyExecutionContext,
   type EdgeProxyProviderRegistry,
@@ -94,6 +95,42 @@ export async function createEdgeProxyEnsurePlanForSelection(input: {
   }
 
   const planResult = await provider.ensureProxy(input.context, {
+    proxyKind: input.proxyKind,
+    ...(input.options?.httpPort === undefined ? {} : { httpPort: input.options.httpPort }),
+    ...(input.options?.httpsPort === undefined ? {} : { httpsPort: input.options.httpsPort }),
+  });
+  if (planResult.isErr()) {
+    return err(planResult.error);
+  }
+
+  return ok(planResult.value);
+}
+
+export async function createEdgeProxyDiagnosticsPlanForSelection(input: {
+  providerRegistry: EdgeProxyProviderRegistry;
+  context: EdgeProxyExecutionContext;
+  proxyKind: EdgeProxyRouteInput["proxyKind"];
+  providerKey?: string;
+  options?: ProxyBootstrapOptions;
+}): Promise<Result<EdgeProxyDiagnosticsPlan | null, DomainError>> {
+  if (input.proxyKind === "none") {
+    return ok(null);
+  }
+
+  const providerResult = input.providerRegistry.defaultFor({
+    proxyKind: input.proxyKind,
+    ...(input.providerKey ? { providerKey: input.providerKey } : {}),
+  });
+  if (providerResult.isErr()) {
+    return err(providerResult.error);
+  }
+
+  const provider = providerResult.value;
+  if (!provider) {
+    return ok(null);
+  }
+
+  const planResult = await provider.diagnoseProxy(input.context, {
     proxyKind: input.proxyKind,
     ...(input.options?.httpPort === undefined ? {} : { httpPort: input.options.httpPort }),
     ...(input.options?.httpsPort === undefined ? {} : { httpsPort: input.options.httpsPort }),
