@@ -60,11 +60,39 @@ import {
 import { ValueObject } from "../shared/value-object";
 
 export const runtimeVerificationStepKinds = ["internal-http", "public-http"] as const;
+export const runtimeArtifactKinds = ["image", "compose-project"] as const;
+export const runtimeArtifactIntents = ["build-image", "prebuilt-image", "compose-project"] as const;
+export const sourceRuntimeFamilies = ["custom", "java", "node", "python"] as const;
+export const sourceFrameworks = ["nextjs"] as const;
+export const sourcePackageManagers = ["bun", "npm", "pnpm"] as const;
+export const sourceDetectedFiles = [
+  "compose-manifest",
+  "dockerfile",
+  "git-directory",
+  "gradle-build",
+  "gradle-wrapper",
+  "maven-wrapper",
+  "next-config",
+  "package-json",
+  "pom-xml",
+  "pyproject-toml",
+  "requirements-txt",
+] as const;
+export const sourceDetectedScripts = ["build", "start", "start-built"] as const;
+
+export type RuntimeArtifactKind = (typeof runtimeArtifactKinds)[number];
+export type RuntimeArtifactIntent = (typeof runtimeArtifactIntents)[number];
+export type SourceRuntimeFamily = (typeof sourceRuntimeFamilies)[number];
+export type SourceFramework = (typeof sourceFrameworks)[number];
+export type SourcePackageManager = (typeof sourcePackageManagers)[number];
+export type SourceDetectedFile = (typeof sourceDetectedFiles)[number];
+export type SourceDetectedScript = (typeof sourceDetectedScripts)[number];
 
 export interface SourceDescriptorState {
   kind: SourceKindValue;
   locator: SourceLocator;
   displayName: DisplayNameText;
+  inspection?: SourceInspectionSnapshot;
   metadata?: Record<string, string>;
 }
 
@@ -130,12 +158,34 @@ export interface RuntimeVerificationStepState {
   label: PlanStepText;
 }
 
+export interface RuntimeArtifactSnapshotState {
+  kind: RuntimeArtifactKindValue;
+  intent: RuntimeArtifactIntentValue;
+  image?: ImageReference;
+  composeFile?: FilePathText;
+  metadata?: Record<string, string>;
+}
+
+export interface SourceInspectionSnapshotState {
+  runtimeFamily?: SourceRuntimeFamilyValue;
+  framework?: SourceFrameworkValue;
+  packageManager?: SourcePackageManagerValue;
+  runtimeVersion?: SourceRuntimeVersionText;
+  projectName?: DisplayNameText;
+  detectedFiles?: SourceDetectedFileValue[];
+  detectedScripts?: SourceDetectedScriptValue[];
+  dockerfilePath?: FilePathText;
+  composeFilePath?: FilePathText;
+  jarPath?: FilePathText;
+}
+
 export interface RuntimePlanState {
   id: RuntimePlanId;
   source: SourceDescriptor;
   buildStrategy: BuildStrategyKindValue;
   packagingMode: PackagingModeValue;
   execution: RuntimeExecutionPlan;
+  runtimeArtifact?: RuntimeArtifactSnapshot;
   target: DeploymentTargetDescriptor;
   detectSummary: DetectSummary;
   steps: PlanStepText[];
@@ -186,6 +236,237 @@ export interface SourceDescriptorVisitor<TResult> {
   compose(source: SourceDescriptor): TResult;
 }
 
+function createRuntimeEnumValue<TValue extends string>(
+  value: string,
+  allowed: readonly TValue[],
+  label: string,
+): Result<TValue> {
+  const matched = allowed.find((item) => item === value);
+  if (!matched) {
+    return err(domainError.validation(`${label} must be one of ${allowed.join(", ")}`, { value }));
+  }
+
+  return ok(matched);
+}
+
+const sourceRuntimeFamilyBrand: unique symbol = Symbol("SourceRuntimeFamilyValue");
+export class SourceRuntimeFamilyValue extends ValueObject<SourceRuntimeFamily> {
+  private [sourceRuntimeFamilyBrand]!: void;
+
+  private constructor(value: SourceRuntimeFamily) {
+    super(value);
+  }
+
+  static create(value: string): Result<SourceRuntimeFamilyValue> {
+    return createRuntimeEnumValue(value, sourceRuntimeFamilies, "Source runtime family").map(
+      (validated) => new SourceRuntimeFamilyValue(validated),
+    );
+  }
+
+  static rehydrate(value: SourceRuntimeFamily): SourceRuntimeFamilyValue {
+    return new SourceRuntimeFamilyValue(value);
+  }
+
+  get value(): SourceRuntimeFamily {
+    return this.state;
+  }
+}
+
+const sourceFrameworkBrand: unique symbol = Symbol("SourceFrameworkValue");
+export class SourceFrameworkValue extends ValueObject<SourceFramework> {
+  private [sourceFrameworkBrand]!: void;
+
+  private constructor(value: SourceFramework) {
+    super(value);
+  }
+
+  static create(value: string): Result<SourceFrameworkValue> {
+    return createRuntimeEnumValue(value, sourceFrameworks, "Source framework").map(
+      (validated) => new SourceFrameworkValue(validated),
+    );
+  }
+
+  static rehydrate(value: SourceFramework): SourceFrameworkValue {
+    return new SourceFrameworkValue(value);
+  }
+
+  get value(): SourceFramework {
+    return this.state;
+  }
+}
+
+const sourcePackageManagerBrand: unique symbol = Symbol("SourcePackageManagerValue");
+export class SourcePackageManagerValue extends ValueObject<SourcePackageManager> {
+  private [sourcePackageManagerBrand]!: void;
+
+  private constructor(value: SourcePackageManager) {
+    super(value);
+  }
+
+  static create(value: string): Result<SourcePackageManagerValue> {
+    return createRuntimeEnumValue(value, sourcePackageManagers, "Source package manager").map(
+      (validated) => new SourcePackageManagerValue(validated),
+    );
+  }
+
+  static rehydrate(value: SourcePackageManager): SourcePackageManagerValue {
+    return new SourcePackageManagerValue(value);
+  }
+
+  get value(): SourcePackageManager {
+    return this.state;
+  }
+}
+
+const sourceDetectedFileBrand: unique symbol = Symbol("SourceDetectedFileValue");
+export class SourceDetectedFileValue extends ValueObject<SourceDetectedFile> {
+  private [sourceDetectedFileBrand]!: void;
+
+  private constructor(value: SourceDetectedFile) {
+    super(value);
+  }
+
+  static create(value: string): Result<SourceDetectedFileValue> {
+    return createRuntimeEnumValue(value, sourceDetectedFiles, "Source detected file").map(
+      (validated) => new SourceDetectedFileValue(validated),
+    );
+  }
+
+  static rehydrate(value: SourceDetectedFile): SourceDetectedFileValue {
+    return new SourceDetectedFileValue(value);
+  }
+
+  get value(): SourceDetectedFile {
+    return this.state;
+  }
+}
+
+const sourceDetectedScriptBrand: unique symbol = Symbol("SourceDetectedScriptValue");
+export class SourceDetectedScriptValue extends ValueObject<SourceDetectedScript> {
+  private [sourceDetectedScriptBrand]!: void;
+
+  private constructor(value: SourceDetectedScript) {
+    super(value);
+  }
+
+  static create(value: string): Result<SourceDetectedScriptValue> {
+    return createRuntimeEnumValue(value, sourceDetectedScripts, "Source detected script").map(
+      (validated) => new SourceDetectedScriptValue(validated),
+    );
+  }
+
+  static rehydrate(value: SourceDetectedScript): SourceDetectedScriptValue {
+    return new SourceDetectedScriptValue(value);
+  }
+
+  get value(): SourceDetectedScript {
+    return this.state;
+  }
+}
+
+const sourceRuntimeVersionBrand: unique symbol = Symbol("SourceRuntimeVersionText");
+export class SourceRuntimeVersionText extends ValueObject<string> {
+  private [sourceRuntimeVersionBrand]!: void;
+
+  private constructor(value: string) {
+    super(value);
+  }
+
+  static create(value: string): Result<SourceRuntimeVersionText> {
+    const normalized = value.trim();
+    if (!normalized) {
+      return err(domainError.validation("Source runtime version is required"));
+    }
+
+    return ok(new SourceRuntimeVersionText(normalized));
+  }
+
+  static rehydrate(value: string): SourceRuntimeVersionText {
+    return new SourceRuntimeVersionText(value.trim());
+  }
+
+  get value(): string {
+    return this.state;
+  }
+}
+
+export class SourceInspectionSnapshot extends ValueObject<SourceInspectionSnapshotState> {
+  private constructor(state: SourceInspectionSnapshotState) {
+    super(state);
+  }
+
+  static create(input: SourceInspectionSnapshotState): Result<SourceInspectionSnapshot> {
+    return ok(new SourceInspectionSnapshot(input));
+  }
+
+  static rehydrate(state: SourceInspectionSnapshotState): SourceInspectionSnapshot {
+    return new SourceInspectionSnapshot(state);
+  }
+
+  get runtimeFamily(): SourceRuntimeFamily | undefined {
+    return this.state.runtimeFamily?.value;
+  }
+
+  get framework(): SourceFramework | undefined {
+    return this.state.framework?.value;
+  }
+
+  get packageManager(): SourcePackageManager | undefined {
+    return this.state.packageManager?.value;
+  }
+
+  get runtimeVersion(): string | undefined {
+    return this.state.runtimeVersion?.value;
+  }
+
+  get projectName(): string | undefined {
+    return this.state.projectName?.value;
+  }
+
+  get detectedFiles(): SourceDetectedFile[] {
+    return (this.state.detectedFiles ?? []).map((item) => item.value);
+  }
+
+  get detectedScripts(): SourceDetectedScript[] {
+    return (this.state.detectedScripts ?? []).map((item) => item.value);
+  }
+
+  get dockerfilePath(): string | undefined {
+    return this.state.dockerfilePath?.value;
+  }
+
+  get composeFilePath(): string | undefined {
+    return this.state.composeFilePath?.value;
+  }
+
+  get jarPath(): string | undefined {
+    return this.state.jarPath?.value;
+  }
+
+  hasDetectedFile(file: SourceDetectedFile): boolean {
+    return this.detectedFiles.includes(file);
+  }
+
+  hasDetectedScript(script: SourceDetectedScript): boolean {
+    return this.detectedScripts.includes(script);
+  }
+
+  toState(): SourceInspectionSnapshotState {
+    return {
+      ...(this.state.runtimeFamily ? { runtimeFamily: this.state.runtimeFamily } : {}),
+      ...(this.state.framework ? { framework: this.state.framework } : {}),
+      ...(this.state.packageManager ? { packageManager: this.state.packageManager } : {}),
+      ...(this.state.runtimeVersion ? { runtimeVersion: this.state.runtimeVersion } : {}),
+      ...(this.state.projectName ? { projectName: this.state.projectName } : {}),
+      ...(this.state.detectedFiles ? { detectedFiles: [...this.state.detectedFiles] } : {}),
+      ...(this.state.detectedScripts ? { detectedScripts: [...this.state.detectedScripts] } : {}),
+      ...(this.state.dockerfilePath ? { dockerfilePath: this.state.dockerfilePath } : {}),
+      ...(this.state.composeFilePath ? { composeFilePath: this.state.composeFilePath } : {}),
+      ...(this.state.jarPath ? { jarPath: this.state.jarPath } : {}),
+    };
+  }
+}
+
 export class SourceDescriptor extends ValueObject<SourceDescriptorState> {
   private constructor(state: SourceDescriptorState) {
     super(state);
@@ -213,6 +494,10 @@ export class SourceDescriptor extends ValueObject<SourceDescriptorState> {
 
   get displayName(): string {
     return this.state.displayName.value;
+  }
+
+  get inspection(): SourceInspectionSnapshot | undefined {
+    return this.state.inspection;
   }
 
   get metadata(): Record<string, string> | undefined {
@@ -254,6 +539,7 @@ export class SourceDescriptor extends ValueObject<SourceDescriptorState> {
       kind: this.state.kind,
       locator: this.state.locator,
       displayName: this.state.displayName,
+      ...(this.state.inspection ? { inspection: this.state.inspection } : {}),
       ...(this.state.metadata ? { metadata: { ...this.state.metadata } } : {}),
     };
   }
@@ -415,6 +701,122 @@ export class RuntimeVerificationStep extends ValueObject<RuntimeVerificationStep
 
   toState(): RuntimeVerificationStepState {
     return { ...this.state };
+  }
+}
+
+const runtimeArtifactKindBrand: unique symbol = Symbol("RuntimeArtifactKindValue");
+export class RuntimeArtifactKindValue extends ValueObject<RuntimeArtifactKind> {
+  private [runtimeArtifactKindBrand]!: void;
+
+  private constructor(value: RuntimeArtifactKind) {
+    super(value);
+  }
+
+  static create(value: string): Result<RuntimeArtifactKindValue> {
+    const kind = runtimeArtifactKinds.find((item) => item === value);
+
+    if (!kind) {
+      return err(
+        domainError.validation(
+          `Runtime artifact kind must be one of ${runtimeArtifactKinds.join(", ")}`,
+          { value },
+        ),
+      );
+    }
+
+    return ok(new RuntimeArtifactKindValue(kind));
+  }
+
+  static rehydrate(value: RuntimeArtifactKind): RuntimeArtifactKindValue {
+    return new RuntimeArtifactKindValue(value);
+  }
+
+  get value(): RuntimeArtifactKind {
+    return this.state;
+  }
+}
+
+const runtimeArtifactIntentBrand: unique symbol = Symbol("RuntimeArtifactIntentValue");
+export class RuntimeArtifactIntentValue extends ValueObject<RuntimeArtifactIntent> {
+  private [runtimeArtifactIntentBrand]!: void;
+
+  private constructor(value: RuntimeArtifactIntent) {
+    super(value);
+  }
+
+  static create(value: string): Result<RuntimeArtifactIntentValue> {
+    const intent = runtimeArtifactIntents.find((item) => item === value);
+
+    if (!intent) {
+      return err(
+        domainError.validation(
+          `Runtime artifact intent must be one of ${runtimeArtifactIntents.join(", ")}`,
+          { value },
+        ),
+      );
+    }
+
+    return ok(new RuntimeArtifactIntentValue(intent));
+  }
+
+  static rehydrate(value: RuntimeArtifactIntent): RuntimeArtifactIntentValue {
+    return new RuntimeArtifactIntentValue(value);
+  }
+
+  get value(): RuntimeArtifactIntent {
+    return this.state;
+  }
+}
+
+export class RuntimeArtifactSnapshot extends ValueObject<RuntimeArtifactSnapshotState> {
+  private constructor(state: RuntimeArtifactSnapshotState) {
+    super(state);
+  }
+
+  static create(input: RuntimeArtifactSnapshotState): Result<RuntimeArtifactSnapshot> {
+    if (input.intent.value === "prebuilt-image" && !input.image) {
+      return err(domainError.validation("Prebuilt image artifacts require an image reference"));
+    }
+
+    if (input.kind.value === "compose-project" && !input.composeFile) {
+      return err(domainError.validation("Compose project artifacts require a compose file"));
+    }
+
+    return ok(new RuntimeArtifactSnapshot(input));
+  }
+
+  static rehydrate(state: RuntimeArtifactSnapshotState): RuntimeArtifactSnapshot {
+    return new RuntimeArtifactSnapshot(state);
+  }
+
+  get kind(): RuntimeArtifactKind {
+    return this.state.kind.value;
+  }
+
+  get intent(): RuntimeArtifactIntent {
+    return this.state.intent.value;
+  }
+
+  get image(): string | undefined {
+    return this.state.image?.value;
+  }
+
+  get composeFile(): string | undefined {
+    return this.state.composeFile?.value;
+  }
+
+  get metadata(): Record<string, string> | undefined {
+    return this.state.metadata ? { ...this.state.metadata } : undefined;
+  }
+
+  toState(): RuntimeArtifactSnapshotState {
+    return {
+      kind: this.state.kind,
+      intent: this.state.intent,
+      ...(this.state.image ? { image: this.state.image } : {}),
+      ...(this.state.composeFile ? { composeFile: this.state.composeFile } : {}),
+      ...(this.state.metadata ? { metadata: { ...this.state.metadata } } : {}),
+    };
   }
 }
 
@@ -586,6 +988,10 @@ export class RuntimePlan extends ValueObject<RuntimePlanState> {
 
   get execution(): RuntimeExecutionPlan {
     return this.state.execution;
+  }
+
+  get runtimeArtifact(): RuntimeArtifactSnapshot | undefined {
+    return this.state.runtimeArtifact;
   }
 
   get target(): DeploymentTargetDescriptor {

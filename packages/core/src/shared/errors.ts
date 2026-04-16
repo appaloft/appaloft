@@ -1,4 +1,4 @@
-export type ErrorCategory = "user" | "infra" | "provider" | "retryable";
+export type ErrorCategory = "user" | "infra" | "provider" | "retryable" | "timeout";
 
 export interface DomainError {
   code: string;
@@ -68,6 +68,35 @@ export const domainError = {
     message: string,
     details?: Record<string, string | number | boolean | null>,
   ): DomainError => createError("resource_runtime_log_cancelled", "user", message, details),
+  terminalSessionContextMismatch: (
+    message: string,
+    details?: Record<string, string | number | boolean | null>,
+  ): DomainError => createError("terminal_session_context_mismatch", "user", message, details),
+  terminalSessionWorkspaceUnavailable: (
+    message: string,
+    details?: Record<string, string | number | boolean | null>,
+  ): DomainError => createError("terminal_session_workspace_unavailable", "user", message, details),
+  terminalSessionNotConfigured: (
+    message: string,
+    details?: Record<string, string | number | boolean | null>,
+  ): DomainError => createError("terminal_session_not_configured", "provider", message, details),
+  terminalSessionUnsupported: (
+    message: string,
+    details?: Record<string, string | number | boolean | null>,
+  ): DomainError => createError("terminal_session_unsupported", "provider", message, details),
+  terminalSessionPolicyDenied: (
+    message: string,
+    details?: Record<string, string | number | boolean | null>,
+  ): DomainError => createError("terminal_session_policy_denied", "user", message, details),
+  terminalSessionFailed: (
+    message: string,
+    details?: Record<string, string | number | boolean | null>,
+    retryable = false,
+  ): DomainError => createError("terminal_session_failed", "infra", message, details, retryable),
+  terminalSessionNotFound: (
+    message: string,
+    details?: Record<string, string | number | boolean | null>,
+  ): DomainError => createError("terminal_session_not_found", "user", message, details),
   resourceDiagnosticContextMismatch: (
     message: string,
     details?: Record<string, string | number | boolean | null>,
@@ -133,6 +162,10 @@ export const domainError = {
     retryable = true,
   ): DomainError =>
     createError("proxy_route_not_resolved", "provider", message, details, retryable),
+  runtimeTargetUnsupported: (
+    message: string,
+    details?: Record<string, string | number | boolean | null>,
+  ): DomainError => createError("runtime_target_unsupported", "provider", message, details),
   resourceNetworkProfileMissing: (
     message: string,
     details?: Record<string, string | number | boolean | null>,
@@ -150,4 +183,8 @@ export const domainError = {
     message: string,
     details?: Record<string, string | number | boolean | null>,
   ): DomainError => createError("retryable_error", "retryable", message, details, true),
+  timeout: (
+    message: string,
+    details?: Record<string, string | number | boolean | null>,
+  ): DomainError => createError("timeout", "timeout", message, details, true),
 };

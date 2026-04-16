@@ -38,6 +38,9 @@ import {
   ProviderKey,
   PublicDomainName,
   RoutePathPrefix,
+  RuntimeArtifactIntentValue,
+  RuntimeArtifactKindValue,
+  RuntimeArtifactSnapshot,
   RuntimeExecutionPlan,
   RuntimeVerificationStep,
   RuntimeVerificationStepKindValue,
@@ -68,54 +71,52 @@ import {
   type DeploymentProgressReporter,
   type ExecutionBackend,
   type RequestedDeploymentConfig,
+  type RuntimeTargetBackend,
+  type RuntimeTargetBackendDescriptor,
+  type RuntimeTargetBackendRegistry,
+  type RuntimeTargetBackendSelection,
+  type RuntimeTargetCapability,
   type RuntimePlanResolver,
 } from "@yundu/application";
 import { i18nKeys } from "@yundu/i18n";
 import { LocalExecutionBackend } from "./local-execution";
 import { SshExecutionBackend } from "./ssh-execution";
+import { resolveWorkspaceRuntimePlan } from "./workspace-planners";
 
 export { RuntimeServerConnectivityChecker } from "./server-connectivity";
 export { RuntimeDeploymentHealthChecker } from "./deployment-health";
 export { RuntimeResourceRuntimeLogReader } from "./resource-runtime-logs";
+export { RuntimeTerminalSessionGateway } from "./terminal-sessions";
 export { SshExecutionBackend } from "./ssh-execution";
-
-function resolvePackageManager(source: SourceDescriptor): "npm" | "bun" | "pnpm" {
-  const packageManager = source.metadata?.packageManager;
-
-  if (packageManager === "bun" || packageManager === "pnpm" || packageManager === "npm") {
-    return packageManager;
-  }
-
-  return "npm";
-}
-
-function installCommandFor(packageManager: "npm" | "bun" | "pnpm"): string {
-  switch (packageManager) {
-    case "bun":
-      return "bun install";
-    case "pnpm":
-      return "pnpm install";
-    case "npm":
-      return "npm install";
-  }
-}
-
-function runCommandFor(
-  packageManager: "npm" | "bun" | "pnpm",
-  script: string,
-): string {
-  switch (packageManager) {
-    case "bun":
-      return `bun run ${script}`;
-    case "pnpm":
-      return `pnpm ${script}`;
-    case "npm":
-      return `npm run ${script}`;
-  }
-}
+export * from "./runtime-commands";
 
 function normalizeDockerImage(locator: string): string {
   return locator.replace(/^docker:\/\//, "").replace(/^image:\/\//, "");
+}
+
+function imageRuntimeArtifact(input: {
+  intent: "build-image" | "prebuilt-image";
+  image?: string;
+  metadata?: Record<string, string>;
+}): RuntimeArtifactSnapshot {
+  return RuntimeArtifactSnapshot.rehydrate({
+    kind: RuntimeArtifactKindValue.rehydrate("image"),
+    intent: RuntimeArtifactIntentValue.rehydrate(input.intent),
+    ...(input.image ? { image: ImageReference.rehydrate(input.image) } : {}),
+    ...(input.metadata ? { metadata: input.metadata } : {}),
+  });
+}
+
+function composeRuntimeArtifact(input: {
+  composeFile: string;
+  metadata?: Record<string, string>;
+}): RuntimeArtifactSnapshot {
+  return RuntimeArtifactSnapshot.rehydrate({
+    kind: RuntimeArtifactKindValue.rehydrate("compose-project"),
+    intent: RuntimeArtifactIntentValue.rehydrate("compose-project"),
+    composeFile: FilePathText.rehydrate(input.composeFile),
+    ...(input.metadata ? { metadata: input.metadata } : {}),
+  });
 }
 
 function dockerContainerPort(requestedDeployment: RequestedDeploymentConfig): PortNumber {
@@ -195,7 +196,7 @@ function hasRequestedWorkspaceCommands(requestedDeployment: RequestedDeploymentC
   );
 }
 
-function workspaceMethodFromMetadata(
+function workspaceMethodFromInspection(
   source: SourceDescriptor,
   requestedDeployment: RequestedDeploymentConfig,
 ): RequestedDeploymentConfig["method"] {
@@ -203,11 +204,11 @@ function workspaceMethodFromMetadata(
     return "workspace-commands";
   }
 
-  if (source.metadata?.hasDockerfile === "true") {
+  if (source.inspection?.hasDetectedFile("dockerfile")) {
     return "dockerfile";
   }
 
-  if (source.metadata?.hasPackageJson === "true") {
+  if (source.inspection?.runtimeFamily || source.inspection?.hasDetectedFile("package-json")) {
     return "workspace-commands";
   }
 
@@ -219,13 +220,13 @@ function autoDeploymentMethodFor(
   requestedDeployment: RequestedDeploymentConfig,
 ): RequestedDeploymentConfig["method"] {
   return ensureSourceDescriptor(source).accept<RequestedDeploymentConfig["method"]>({
-    localFolder: (visited) => workspaceMethodFromMetadata(visited, requestedDeployment),
-    localGit: (visited) => workspaceMethodFromMetadata(visited, requestedDeployment),
+    localFolder: (visited) => workspaceMethodFromInspection(visited, requestedDeployment),
+    localGit: (visited) => workspaceMethodFromInspection(visited, requestedDeployment),
     remoteGit: () => "dockerfile",
     gitPublic: () => "dockerfile",
     gitGithubApp: () => "dockerfile",
     gitDeployKey: () => "dockerfile",
-    zipArtifact: (visited) => workspaceMethodFromMetadata(visited, requestedDeployment),
+    zipArtifact: (visited) => workspaceMethodFromInspection(visited, requestedDeployment),
     dockerfileInline: () => "dockerfile",
     dockerComposeInline: () => "docker-compose",
     dockerImage: () => "prebuilt-image",
@@ -366,11 +367,13 @@ function withRequestedAccessRoutes(input: {
   buildStrategy: BuildStrategyKindValue;
   packagingMode: PackagingModeValue;
   execution: RuntimeExecutionPlan;
+  runtimeArtifact: RuntimeArtifactSnapshot;
   steps: PlanStepText[];
 }): Result<{
   buildStrategy: BuildStrategyKindValue;
   packagingMode: PackagingModeValue;
   execution: RuntimeExecutionPlan;
+  runtimeArtifact: RuntimeArtifactSnapshot;
   steps: PlanStepText[];
 }> {
   return createAccessRoutes({
@@ -383,6 +386,7 @@ function withRequestedAccessRoutes(input: {
           buildStrategy: input.buildStrategy,
           packagingMode: input.packagingMode,
           execution: input.execution,
+          runtimeArtifact: input.runtimeArtifact,
           steps: runtimePlanStepsFor({
             execution: input.execution,
             accessRoutes: [],
@@ -415,6 +419,7 @@ function withRequestedAccessRoutes(input: {
       packagingMode: input.packagingMode,
       execution:
         verificationSteps.length > 0 ? execution.withVerificationSteps(verificationSteps) : execution,
+      runtimeArtifact: input.runtimeArtifact,
       steps: runtimePlanStepsFor({
         execution,
         accessRoutes,
@@ -431,10 +436,10 @@ function chooseStrategies(input: {
   buildStrategy: BuildStrategyKindValue;
   packagingMode: PackagingModeValue;
   execution: RuntimeExecutionPlan;
+  runtimeArtifact: RuntimeArtifactSnapshot;
   steps: PlanStepText[];
 }> {
   const { source, requestedDeployment } = input;
-  const packageManager = resolvePackageManager(source);
   const requestedMethod =
     requestedDeployment.method === "auto"
       ? autoDeploymentMethodFor(source, requestedDeployment)
@@ -443,7 +448,7 @@ function chooseStrategies(input: {
   if (requestedMethod === "docker-compose") {
     const composeFile =
       source.kind === "docker-compose-inline"
-        ? (source.metadata?.composeFilePath ?? "docker-compose.yml")
+        ? (source.inspection?.composeFilePath ?? source.metadata?.composeFilePath ?? "docker-compose.yml")
         : source.locator;
     const execution = RuntimeExecutionPlan.rehydrate({
       kind: ExecutionStrategyKindValue.rehydrate("docker-compose-stack"),
@@ -457,6 +462,12 @@ function chooseStrategies(input: {
       buildStrategy: BuildStrategyKindValue.rehydrate("compose-deploy"),
       packagingMode: PackagingModeValue.rehydrate("compose-bundle"),
       execution,
+      runtimeArtifact: composeRuntimeArtifact({
+        composeFile,
+        metadata: {
+          sourceKind: source.kind,
+        },
+      }),
       steps: [
         PlanStepText.rehydrate("Inspect compose manifest"),
         PlanStepText.rehydrate("Prepare compose bundle"),
@@ -468,9 +479,10 @@ function chooseStrategies(input: {
 
   if (requestedMethod === "prebuilt-image") {
     const port = dockerContainerPort(requestedDeployment);
+    const image = normalizeDockerImage(source.locator);
     const execution = RuntimeExecutionPlan.rehydrate({
       kind: ExecutionStrategyKindValue.rehydrate("docker-container"),
-      image: ImageReference.rehydrate(normalizeDockerImage(source.locator)),
+      image: ImageReference.rehydrate(image),
       ...runtimeHealthCheckFields(requestedDeployment),
       port,
     });
@@ -479,6 +491,13 @@ function chooseStrategies(input: {
       buildStrategy: BuildStrategyKindValue.rehydrate("prebuilt-image"),
       packagingMode: PackagingModeValue.rehydrate("all-in-one-docker"),
       execution,
+      runtimeArtifact: imageRuntimeArtifact({
+        intent: "prebuilt-image",
+        image,
+        metadata: {
+          sourceKind: source.kind,
+        },
+      }),
       steps: [
         PlanStepText.rehydrate("Resolve image reference"),
         PlanStepText.rehydrate("Prepare runtime config"),
@@ -490,10 +509,11 @@ function chooseStrategies(input: {
 
   if (requestedMethod === "dockerfile") {
     const port = dockerContainerPort(requestedDeployment);
+    const dockerfilePath = source.inspection?.dockerfilePath ?? source.metadata?.dockerfilePath ?? "Dockerfile";
     const execution = RuntimeExecutionPlan.rehydrate({
       kind: ExecutionStrategyKindValue.rehydrate("docker-container"),
       workingDirectory: FilePathText.rehydrate(source.locator),
-      dockerfilePath: FilePathText.rehydrate(source.metadata?.dockerfilePath ?? "Dockerfile"),
+      dockerfilePath: FilePathText.rehydrate(dockerfilePath),
       ...runtimeHealthCheckFields(requestedDeployment),
       port,
     });
@@ -502,6 +522,13 @@ function chooseStrategies(input: {
       buildStrategy: BuildStrategyKindValue.rehydrate("dockerfile"),
       packagingMode: PackagingModeValue.rehydrate("all-in-one-docker"),
       execution,
+      runtimeArtifact: imageRuntimeArtifact({
+        intent: "build-image",
+        metadata: {
+          sourceKind: source.kind,
+          dockerfilePath,
+        },
+      }),
       steps: [
         PlanStepText.rehydrate("Build docker image"),
         PlanStepText.rehydrate("Apply environment config"),
@@ -512,56 +539,54 @@ function chooseStrategies(input: {
   }
 
   if (requestedMethod === "workspace-commands") {
-    const startCommand =
-      requestedDeployment.startCommand ??
-      (source.metadata?.hasStartBuiltScript === "true"
-        ? runCommandFor(packageManager, "start:built")
-        : source.metadata?.hasStartScript === "true"
-          ? runCommandFor(packageManager, "start")
-          : undefined);
+    const workspacePlan = resolveWorkspaceRuntimePlan({
+      source,
+      requestedDeployment,
+    });
 
-    if (!startCommand) {
-      return err(
-        domainError.validation(
-          "Workspace command deployments require a start command or a start script",
-        ),
-      );
+    if (workspacePlan.isErr()) {
+      return err(workspacePlan.error);
     }
 
+    const plan = workspacePlan.value;
     const execution = RuntimeExecutionPlan.rehydrate({
-      kind: ExecutionStrategyKindValue.rehydrate("host-process"),
+      kind: ExecutionStrategyKindValue.rehydrate("docker-container"),
       workingDirectory: FilePathText.rehydrate(source.locator),
-      startCommand: CommandText.rehydrate(startCommand),
-      ...(() => {
-        const installCommand =
-          requestedDeployment.installCommand ??
-          (source.metadata?.hasPackageJson === "true"
-            ? installCommandFor(packageManager)
-            : undefined);
-        return installCommand ? { installCommand: CommandText.rehydrate(installCommand) } : {};
-      })(),
-      ...(() => {
-        const buildCommand =
-          requestedDeployment.buildCommand ??
-          (source.metadata?.hasBuildScript === "true"
-            ? runCommandFor(packageManager, "build")
-            : undefined);
-        return buildCommand ? { buildCommand: CommandText.rehydrate(buildCommand) } : {};
-      })(),
+      dockerfilePath: FilePathText.rehydrate(plan.dockerfilePath),
+      startCommand: CommandText.rehydrate(plan.startCommand),
+      ...(plan.installCommand ? { installCommand: CommandText.rehydrate(plan.installCommand) } : {}),
+      ...(plan.buildCommand ? { buildCommand: CommandText.rehydrate(plan.buildCommand) } : {}),
       ...runtimeHealthCheckFields(requestedDeployment),
-      ...(requestedDeployment.port ? { port: PortNumber.rehydrate(requestedDeployment.port) } : {}),
+      port: dockerContainerPort(requestedDeployment),
+      metadata: {
+        "artifact.source": "workspace-commands",
+        "artifact.generatedDockerfile": "true",
+        ...plan.metadata,
+      },
     });
 
     return withRequestedAccessRoutes({
       requestedDeployment,
       buildStrategy: BuildStrategyKindValue.rehydrate("workspace-commands"),
-      packagingMode: PackagingModeValue.rehydrate("host-process-runtime"),
+      packagingMode: PackagingModeValue.rehydrate("all-in-one-docker"),
       execution,
+      runtimeArtifact: imageRuntimeArtifact({
+        intent: "build-image",
+        metadata: {
+          sourceKind: source.kind,
+          dockerfilePath: plan.dockerfilePath,
+          generatedDockerfile: "true",
+          planner: plan.planner,
+          runtimeKind: plan.runtimeKind,
+          baseImage: plan.baseImage,
+        },
+      }),
       steps: [
         PlanStepText.rehydrate("Install workspace dependencies"),
         PlanStepText.rehydrate("Build application bundle"),
-        PlanStepText.rehydrate("Start host process"),
-        PlanStepText.rehydrate("Verify process health"),
+        PlanStepText.rehydrate("Build workspace image"),
+        PlanStepText.rehydrate("Run docker container"),
+        PlanStepText.rehydrate("Verify container health"),
       ],
     });
   }
@@ -604,6 +629,7 @@ export class DefaultRuntimePlanResolver implements RuntimePlanResolver {
             buildStrategy: strategy.buildStrategy,
             packagingMode: strategy.packagingMode,
             execution: strategy.execution,
+            runtimeArtifact: strategy.runtimeArtifact,
             target: DeploymentTargetDescriptor.rehydrate({
               kind: TargetKindValue.rehydrate("single-server"),
               providerKey: input.server.providerKey,
@@ -849,41 +875,32 @@ export class InMemoryExecutionBackend implements ExecutionBackend {
   }
 }
 
-export class RoutingExecutionBackend implements ExecutionBackend {
+export class ExecutionBackendRuntimeTargetAdapter implements RuntimeTargetBackend {
+  readonly descriptor: RuntimeTargetBackendDescriptor;
+
   constructor(
-    private readonly localBackend: LocalExecutionBackend,
-    private readonly sshBackend: SshExecutionBackend,
-    private readonly fallbackBackend: ExecutionBackend,
-  ) {}
+    descriptor: RuntimeTargetBackendDescriptor,
+    private readonly backend: ExecutionBackend,
+  ) {
+    this.descriptor = {
+      ...descriptor,
+      targetKinds: [...descriptor.targetKinds],
+      capabilities: [...descriptor.capabilities],
+    };
+  }
 
   async execute(
     context: ExecutionContext,
     deployment: Deployment,
   ): Promise<Result<{ deployment: Deployment }>> {
-    if (deployment.toState().runtimePlan.target.providerKey === "local-shell") {
-      return await this.localBackend.execute(context, deployment);
-    }
-
-    if (deployment.toState().runtimePlan.target.providerKey === "generic-ssh") {
-      return await this.sshBackend.execute(context, deployment);
-    }
-
-    return await this.fallbackBackend.execute(context, deployment);
+    return await this.backend.execute(context, deployment);
   }
 
   async cancel(
     context: ExecutionContext,
     deployment: Deployment,
   ): Promise<Result<{ logs: DeploymentLogEntry[] }>> {
-    if (deployment.toState().runtimePlan.target.providerKey === "local-shell") {
-      return await this.localBackend.cancel(context, deployment);
-    }
-
-    if (deployment.toState().runtimePlan.target.providerKey === "generic-ssh") {
-      return await this.sshBackend.cancel(context, deployment);
-    }
-
-    return await this.fallbackBackend.cancel(context, deployment);
+    return await this.backend.cancel(context, deployment);
   }
 
   async rollback(
@@ -891,15 +908,151 @@ export class RoutingExecutionBackend implements ExecutionBackend {
     deployment: Deployment,
     plan: RollbackPlan,
   ): Promise<Result<{ deployment: Deployment }>> {
-    if (deployment.toState().runtimePlan.target.providerKey === "local-shell") {
-      return await this.localBackend.rollback(context, deployment, plan);
+    return await this.backend.rollback(context, deployment, plan);
+  }
+}
+
+export class DefaultRuntimeTargetBackendRegistry implements RuntimeTargetBackendRegistry {
+  private readonly backends: RuntimeTargetBackend[];
+
+  constructor(backends: RuntimeTargetBackend[]) {
+    this.backends = [...backends];
+  }
+
+  find(input: RuntimeTargetBackendSelection): Result<RuntimeTargetBackend> {
+    const backend = this.backends.find((candidate) => this.matches(candidate, input));
+    if (backend) {
+      return ok(backend);
     }
 
-    if (deployment.toState().runtimePlan.target.providerKey === "generic-ssh") {
-      return await this.sshBackend.rollback(context, deployment, plan);
+    const missingCapability = this.firstMissingCapability(input);
+    return err(
+      domainError.runtimeTargetUnsupported("Runtime target backend is not registered", {
+        phase: "runtime-target-resolution",
+        targetKind: input.targetKind,
+        providerKey: input.providerKey,
+        ...(missingCapability ? { missingCapability } : {}),
+      }),
+    );
+  }
+
+  private matches(
+    backend: RuntimeTargetBackend,
+    input: RuntimeTargetBackendSelection,
+  ): boolean {
+    return (
+      backend.descriptor.providerKey === input.providerKey &&
+      backend.descriptor.targetKinds.includes(input.targetKind) &&
+      (input.requiredCapabilities ?? []).every((capability) =>
+        backend.descriptor.capabilities.includes(capability),
+      )
+    );
+  }
+
+  private firstMissingCapability(
+    input: RuntimeTargetBackendSelection,
+  ): RuntimeTargetCapability | undefined {
+    const matchingTargetBackend = this.backends.find(
+      (backend) =>
+        backend.descriptor.providerKey === input.providerKey &&
+        backend.descriptor.targetKinds.includes(input.targetKind),
+    );
+    if (!matchingTargetBackend) {
+      return undefined;
     }
 
-    return await this.fallbackBackend.rollback(context, deployment, plan);
+    return (input.requiredCapabilities ?? []).find(
+      (capability) => !matchingTargetBackend.descriptor.capabilities.includes(capability),
+    );
+  }
+}
+
+const singleServerDockerCapabilities: RuntimeTargetCapability[] = [
+  "runtime.apply",
+  "runtime.verify",
+  "runtime.logs",
+  "runtime.health",
+  "runtime.cleanup",
+  "proxy.route",
+];
+
+export function createDefaultRuntimeTargetBackendRegistry(input: {
+  localBackend: ExecutionBackend;
+  sshBackend: ExecutionBackend;
+}): RuntimeTargetBackendRegistry {
+  return new DefaultRuntimeTargetBackendRegistry([
+    new ExecutionBackendRuntimeTargetAdapter(
+      {
+        key: "single-server-local-shell",
+        providerKey: "local-shell",
+        targetKinds: ["single-server"],
+        capabilities: singleServerDockerCapabilities,
+      },
+      input.localBackend,
+    ),
+    new ExecutionBackendRuntimeTargetAdapter(
+      {
+        key: "single-server-generic-ssh",
+        providerKey: "generic-ssh",
+        targetKinds: ["single-server"],
+        capabilities: singleServerDockerCapabilities,
+      },
+      input.sshBackend,
+    ),
+  ]);
+}
+
+export class RoutingExecutionBackend implements ExecutionBackend {
+  constructor(
+    private readonly registry: RuntimeTargetBackendRegistry,
+    private readonly fallbackBackend: ExecutionBackend,
+  ) {}
+
+  private backendFor(
+    deployment: Deployment,
+    requiredCapabilities: RuntimeTargetCapability[],
+  ): ExecutionBackend {
+    const target = deployment.toState().runtimePlan.target;
+    const backend = this.registry.find({
+      targetKind: target.kind,
+      providerKey: target.providerKey,
+      requiredCapabilities,
+    });
+
+    if (backend.isOk()) {
+      return backend.value;
+    }
+
+    return this.fallbackBackend;
+  }
+
+  async execute(
+    context: ExecutionContext,
+    deployment: Deployment,
+  ): Promise<Result<{ deployment: Deployment }>> {
+    return await this.backendFor(deployment, ["runtime.apply", "runtime.verify"]).execute(
+      context,
+      deployment,
+    );
+  }
+
+  async cancel(
+    context: ExecutionContext,
+    deployment: Deployment,
+  ): Promise<Result<{ logs: DeploymentLogEntry[] }>> {
+    return await this.backendFor(deployment, ["runtime.cleanup"]).cancel(context, deployment);
+  }
+
+  async rollback(
+    context: ExecutionContext,
+    deployment: Deployment,
+    plan: RollbackPlan,
+  ): Promise<Result<{ deployment: Deployment }>> {
+    return await this.backendFor(deployment, ["runtime.cleanup"]).rollback(
+      context,
+      deployment,
+      plan,
+    );
   }
 }
 

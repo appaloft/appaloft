@@ -11,7 +11,7 @@
     "lint": "biome check .",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "bun test",
-    "test:e2e": "bun test test/e2e/hosted-system-plugins.test.ts && bun test test/e2e/pglite-cli-http.test.ts && bun test test/e2e/quick-deploy-ssh.test.ts && bun test test/e2e/local-shell-deploy.test.ts && bun test test/e2e/cli-http.test.ts && bun test test/e2e/proxy-docker.test.ts",
+    "test:e2e": "bun test test/e2e/hosted-system-plugins.test.ts && bun test test/e2e/pglite-cli-http.test.ts && bun test test/e2e/quick-deploy-ssh.test.ts && bun test test/e2e/local-shell-deploy.test.ts && bun test test/e2e/cli-http.test.ts && bun test test/e2e/workspace-docker.test.ts && bun test test/e2e/proxy-docker.test.ts",
     "db:migrate": "bun run src/index.ts db migrate",
     "db:status": "bun run src/index.ts db status"
   },

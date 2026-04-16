@@ -42,6 +42,7 @@ export const tokens = {
   ),
   resourceHealthQueryService: Symbol.for("yundu.resource_health_query_service"),
   resourceRuntimeLogsQueryService: Symbol.for("yundu.resource_runtime_logs_query_service"),
+  openTerminalSessionUseCase: Symbol.for("yundu.open_terminal_session_use_case"),
   resourceProxyConfigurationPreviewQueryService: Symbol.for(
     "yundu.resource_proxy_configuration_preview_query_service",
   ),
@@ -70,8 +71,10 @@ export const tokens = {
   runtimePlanResolver: Symbol.for("yundu.runtime_plan_resolver"),
   defaultAccessDomainProvider: Symbol.for("yundu.default_access_domain_provider"),
   edgeProxyProviderRegistry: Symbol.for("yundu.edge_proxy_provider_registry"),
+  runtimeTargetBackendRegistry: Symbol.for("yundu.runtime_target_backend_registry"),
   executionBackend: Symbol.for("yundu.execution_backend"),
   resourceRuntimeLogReader: Symbol.for("yundu.resource_runtime_log_reader"),
+  terminalSessionGateway: Symbol.for("yundu.terminal_session_gateway"),
   providerRegistry: Symbol.for("yundu.provider_registry"),
   integrationRegistry: Symbol.for("yundu.integration_registry"),
   integrationAuthPort: Symbol.for("yundu.integration_auth_port"),

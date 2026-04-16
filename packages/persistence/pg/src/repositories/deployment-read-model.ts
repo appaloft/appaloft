@@ -69,10 +69,63 @@ export class PgDeploymentReadModel implements DeploymentReadModel {
                 kind: runtimePlan.source.kind,
                 locator: runtimePlan.source.locator,
                 displayName: runtimePlan.source.displayName,
+                ...(runtimePlan.source.inspection
+                  ? {
+                      inspection: {
+                        ...(runtimePlan.source.inspection.runtimeFamily
+                          ? { runtimeFamily: runtimePlan.source.inspection.runtimeFamily }
+                          : {}),
+                        ...(runtimePlan.source.inspection.framework
+                          ? { framework: runtimePlan.source.inspection.framework }
+                          : {}),
+                        ...(runtimePlan.source.inspection.packageManager
+                          ? { packageManager: runtimePlan.source.inspection.packageManager }
+                          : {}),
+                        ...(runtimePlan.source.inspection.runtimeVersion
+                          ? { runtimeVersion: runtimePlan.source.inspection.runtimeVersion }
+                          : {}),
+                        ...(runtimePlan.source.inspection.projectName
+                          ? { projectName: runtimePlan.source.inspection.projectName }
+                          : {}),
+                        ...(runtimePlan.source.inspection.detectedFiles?.length
+                          ? { detectedFiles: [...runtimePlan.source.inspection.detectedFiles] }
+                          : {}),
+                        ...(runtimePlan.source.inspection.detectedScripts?.length
+                          ? { detectedScripts: [...runtimePlan.source.inspection.detectedScripts] }
+                          : {}),
+                        ...(runtimePlan.source.inspection.dockerfilePath
+                          ? { dockerfilePath: runtimePlan.source.inspection.dockerfilePath }
+                          : {}),
+                        ...(runtimePlan.source.inspection.composeFilePath
+                          ? { composeFilePath: runtimePlan.source.inspection.composeFilePath }
+                          : {}),
+                        ...(runtimePlan.source.inspection.jarPath
+                          ? { jarPath: runtimePlan.source.inspection.jarPath }
+                          : {}),
+                      },
+                    }
+                  : {}),
                 ...(runtimePlan.source.metadata ? { metadata: runtimePlan.source.metadata } : {}),
               },
               buildStrategy: runtimePlan.buildStrategy,
               packagingMode: runtimePlan.packagingMode,
+              ...(runtimePlan.runtimeArtifact
+                ? {
+                    runtimeArtifact: {
+                      kind: runtimePlan.runtimeArtifact.kind,
+                      intent: runtimePlan.runtimeArtifact.intent,
+                      ...(runtimePlan.runtimeArtifact.image
+                        ? { image: runtimePlan.runtimeArtifact.image }
+                        : {}),
+                      ...(runtimePlan.runtimeArtifact.composeFile
+                        ? { composeFile: runtimePlan.runtimeArtifact.composeFile }
+                        : {}),
+                      ...(runtimePlan.runtimeArtifact.metadata
+                        ? { metadata: runtimePlan.runtimeArtifact.metadata }
+                        : {}),
+                    },
+                  }
+                : {}),
               execution: {
                 kind: runtimePlan.execution.kind,
                 ...(runtimePlan.execution.workingDirectory

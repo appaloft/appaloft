@@ -41,6 +41,8 @@ import {
   type ResourceServiceKind,
   type Result,
   type RollbackPlan,
+  type RuntimeArtifactIntent,
+  type RuntimeArtifactKind,
   type RuntimePlan,
   type Server,
   type ServerMutationSpec,
@@ -733,6 +735,76 @@ export interface ResourceRuntimeLogReader {
   ): Promise<Result<ResourceRuntimeLogStream>>;
 }
 
+export type TerminalSessionTargetScope =
+  | {
+      kind: "server";
+      server: ServerSummary;
+    }
+  | {
+      kind: "resource";
+      resource: ResourceSummary;
+      deployment: DeploymentSummary;
+      server: ServerSummary;
+      workingDirectory: string;
+    };
+
+export interface TerminalSessionOpenRequest {
+  sessionId: string;
+  scope: TerminalSessionTargetScope;
+  initialRows: number;
+  initialCols: number;
+}
+
+export interface TerminalSessionDescriptor {
+  sessionId: string;
+  scope: "server" | "resource";
+  serverId: string;
+  resourceId?: string;
+  deploymentId?: string;
+  transport: {
+    kind: "websocket";
+    path: string;
+  };
+  providerKey: string;
+  workingDirectory?: string;
+  createdAt: string;
+}
+
+export type TerminalSessionFrame =
+  | {
+      kind: "ready";
+      sessionId: string;
+      workingDirectory?: string;
+    }
+  | {
+      kind: "output";
+      stream: "stdout" | "stderr";
+      data: string;
+    }
+  | {
+      kind: "closed";
+      reason: "completed" | "cancelled" | "source-ended";
+      exitCode?: number;
+    }
+  | {
+      kind: "error";
+      error: DomainError;
+    };
+
+export interface TerminalSession extends AsyncIterable<TerminalSessionFrame> {
+  write(data: string): Promise<void>;
+  resize(input: { rows: number; cols: number }): Promise<void>;
+  close(): Promise<void>;
+}
+
+export interface TerminalSessionGateway {
+  open(
+    context: ExecutionContext,
+    request: TerminalSessionOpenRequest,
+  ): Promise<Result<TerminalSessionDescriptor>>;
+  attach(sessionId: string): Result<TerminalSession>;
+}
+
 export type ResourceRuntimeLogsResult =
   | {
       mode: "bounded";
@@ -949,10 +1021,41 @@ export interface DeploymentSummary {
       kind: SourceKind;
       locator: string;
       displayName: string;
+      inspection?: {
+        runtimeFamily?: "custom" | "java" | "node" | "python";
+        framework?: "nextjs";
+        packageManager?: "bun" | "npm" | "pnpm";
+        runtimeVersion?: string;
+        projectName?: string;
+        detectedFiles?: Array<
+          | "compose-manifest"
+          | "dockerfile"
+          | "git-directory"
+          | "gradle-build"
+          | "gradle-wrapper"
+          | "maven-wrapper"
+          | "next-config"
+          | "package-json"
+          | "pom-xml"
+          | "pyproject-toml"
+          | "requirements-txt"
+        >;
+        detectedScripts?: Array<"build" | "start" | "start-built">;
+        dockerfilePath?: string;
+        composeFilePath?: string;
+        jarPath?: string;
+      };
       metadata?: Record<string, string>;
     };
     buildStrategy: BuildStrategyKind;
     packagingMode: PackagingMode;
+    runtimeArtifact?: {
+      kind: RuntimeArtifactKind;
+      intent: RuntimeArtifactIntent;
+      image?: string;
+      composeFile?: string;
+      metadata?: Record<string, string>;
+    };
     execution: {
       kind: ExecutionStrategyKind;
       workingDirectory?: string;
@@ -971,6 +1074,10 @@ export interface DeploymentSummary {
         pathPrefix: string;
         tlsMode: TlsMode;
         targetPort?: number;
+      }>;
+      verificationSteps?: Array<{
+        kind: "internal-http" | "public-http";
+        label: string;
       }>;
       metadata?: Record<string, string>;
     };
@@ -1359,6 +1466,36 @@ export interface ExecutionBackend {
     deployment: Deployment,
     plan: RollbackPlan,
   ): Promise<Result<{ deployment: Deployment }>>;
+}
+
+export type RuntimeTargetCapability =
+  | "runtime.plan-target"
+  | "runtime.apply"
+  | "runtime.verify"
+  | "runtime.logs"
+  | "runtime.health"
+  | "runtime.cleanup"
+  | "proxy.route";
+
+export interface RuntimeTargetBackendDescriptor {
+  key: string;
+  providerKey: string;
+  targetKinds: TargetKind[];
+  capabilities: RuntimeTargetCapability[];
+}
+
+export interface RuntimeTargetBackend extends ExecutionBackend {
+  readonly descriptor: RuntimeTargetBackendDescriptor;
+}
+
+export interface RuntimeTargetBackendSelection {
+  targetKind: TargetKind;
+  providerKey: string;
+  requiredCapabilities?: RuntimeTargetCapability[];
+}
+
+export interface RuntimeTargetBackendRegistry {
+  find(input: RuntimeTargetBackendSelection): Result<RuntimeTargetBackend>;
 }
 
 export interface ProviderDescriptor {

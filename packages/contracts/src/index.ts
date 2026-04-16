@@ -507,6 +507,26 @@ export const resourceHealthCheckPolicySchema = z
     }
   });
 
+export const requestedDeploymentHealthCheckSchema = z.object({
+  enabled: z.boolean(),
+  type: z.enum(["http", "command"]),
+  intervalSeconds: z.number().int().positive(),
+  timeoutSeconds: z.number().int().positive(),
+  retries: z.number().int().positive(),
+  startPeriodSeconds: z.number().int().nonnegative(),
+  http: z
+    .object({
+      method: z.enum(["GET", "HEAD", "POST", "OPTIONS"]),
+      scheme: z.enum(["http", "https"]),
+      host: z.string(),
+      port: z.number().int().positive().max(65535).optional(),
+      path: z.string(),
+      expectedStatusCode: z.number().int().min(100).max(599),
+      expectedResponseText: z.string().optional(),
+    })
+    .optional(),
+});
+
 export const createResourceInputSchema = z.object({
   projectId: z.string().min(1),
   environmentId: z.string().min(1),
@@ -782,6 +802,36 @@ export const runtimePlanSchema = z.object({
     locator: z.string(),
     displayName: z.string(),
     integrationKey: z.string().optional(),
+    inspection: z
+      .object({
+        runtimeFamily: z.enum(["custom", "java", "node", "python"]).optional(),
+        framework: z.enum(["nextjs"]).optional(),
+        packageManager: z.enum(["bun", "npm", "pnpm"]).optional(),
+        runtimeVersion: z.string().optional(),
+        projectName: z.string().optional(),
+        detectedFiles: z
+          .array(
+            z.enum([
+              "compose-manifest",
+              "dockerfile",
+              "git-directory",
+              "gradle-build",
+              "gradle-wrapper",
+              "maven-wrapper",
+              "next-config",
+              "package-json",
+              "pom-xml",
+              "pyproject-toml",
+              "requirements-txt",
+            ]),
+          )
+          .optional(),
+        detectedScripts: z.array(z.enum(["build", "start", "start-built"])).optional(),
+        dockerfilePath: z.string().optional(),
+        composeFilePath: z.string().optional(),
+        jarPath: z.string().optional(),
+      })
+      .optional(),
     metadata: z.record(z.string(), z.string()).optional(),
   }),
   buildStrategy: z.enum([
@@ -799,6 +849,15 @@ export const runtimePlanSchema = z.object({
     "host-process-runtime",
     "optional-future-binary",
   ]),
+  runtimeArtifact: z
+    .object({
+      kind: z.enum(["image", "compose-project"]),
+      intent: z.enum(["build-image", "prebuilt-image", "compose-project"]),
+      image: z.string().optional(),
+      composeFile: z.string().optional(),
+      metadata: z.record(z.string(), z.string()).optional(),
+    })
+    .optional(),
   execution: z.object({
     kind: z.enum(["docker-container", "docker-compose-stack", "host-process"]),
     workingDirectory: z.string().optional(),
@@ -806,7 +865,7 @@ export const runtimePlanSchema = z.object({
     buildCommand: z.string().optional(),
     startCommand: z.string().optional(),
     healthCheckPath: z.string().optional(),
-    healthCheck: resourceHealthCheckPolicySchema.optional(),
+    healthCheck: requestedDeploymentHealthCheckSchema.optional(),
     port: z.number().int().positive().optional(),
     image: z.string().optional(),
     dockerfilePath: z.string().optional(),
@@ -915,7 +974,7 @@ export const resourceRuntimeLogLineSchema = z.object({
 
 export const domainErrorResponseSchema = z.object({
   code: z.string(),
-  category: z.enum(["user", "infra", "provider", "retryable"]),
+  category: z.enum(["user", "infra", "provider", "retryable", "timeout"]),
   message: z.string(),
   retryable: z.boolean(),
   details: z
@@ -952,6 +1011,43 @@ export const resourceRuntimeLogsStreamResponseSchema = z.object({
   resourceId: z.string(),
   deploymentId: z.string().optional(),
 });
+
+export const terminalSessionDescriptorSchema = z.object({
+  sessionId: z.string(),
+  scope: z.enum(["server", "resource"]),
+  serverId: z.string(),
+  resourceId: z.string().optional(),
+  deploymentId: z.string().optional(),
+  transport: z.object({
+    kind: z.literal("websocket"),
+    path: z.string(),
+  }),
+  providerKey: z.string(),
+  workingDirectory: z.string().optional(),
+  createdAt: z.string(),
+});
+
+export const terminalSessionFrameSchema = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("ready"),
+    sessionId: z.string(),
+    workingDirectory: z.string().optional(),
+  }),
+  z.object({
+    kind: z.literal("output"),
+    stream: z.enum(["stdout", "stderr"]),
+    data: z.string(),
+  }),
+  z.object({
+    kind: z.literal("closed"),
+    reason: z.enum(["completed", "cancelled", "source-ended"]),
+    exitCode: z.number().optional(),
+  }),
+  z.object({
+    kind: z.literal("error"),
+    error: domainErrorResponseSchema,
+  }),
+]);
 
 export const resourceDiagnosticSectionStatusSchema = z.enum([
   "available",
@@ -1274,6 +1370,8 @@ export type ResourceRuntimeLogsResponse = z.infer<typeof resourceRuntimeLogsResp
 export type ResourceRuntimeLogsStreamResponse = z.infer<
   typeof resourceRuntimeLogsStreamResponseSchema
 >;
+export type TerminalSessionDescriptor = z.infer<typeof terminalSessionDescriptorSchema>;
+export type TerminalSessionFrame = z.infer<typeof terminalSessionFrameSchema>;
 export type ResourceDiagnosticSummary = z.infer<typeof resourceDiagnosticSummarySchema>;
 export type ProxyConfigurationView = z.infer<typeof proxyConfigurationViewSchema>;
 export type ListProvidersResponse = z.infer<typeof listProvidersResponseSchema>;

@@ -2,10 +2,28 @@ import { describe, expect, test } from "bun:test";
 import type { ExecutionContext } from "@yundu/application";
 import {
   ConfigScopeValue,
+  DisplayNameText,
   EnvironmentConfigSnapshot,
   EnvironmentId,
   EnvironmentSnapshotId,
+  FilePathText,
   GeneratedAt,
+  SourceDescriptor,
+  SourceDetectedFileValue,
+  SourceDetectedScriptValue,
+  SourceFrameworkValue,
+  SourceInspectionSnapshot,
+  SourceKindValue,
+  SourceLocator,
+  SourcePackageManagerValue,
+  SourceRuntimeFamilyValue,
+  SourceRuntimeVersionText,
+  type SourceDetectedFile,
+  type SourceDetectedScript,
+  type SourceFramework,
+  type SourceKind,
+  type SourcePackageManager,
+  type SourceRuntimeFamily,
 } from "@yundu/core";
 
 function createTestExecutionContext(): ExecutionContext {
@@ -63,7 +81,98 @@ function createEnvironmentSnapshot(snapshotId: string) {
   });
 }
 
+function createSourceInspection(input: {
+  runtimeFamily?: SourceRuntimeFamily;
+  framework?: SourceFramework;
+  packageManager?: SourcePackageManager;
+  runtimeVersion?: string;
+  detectedFiles?: SourceDetectedFile[];
+  detectedScripts?: SourceDetectedScript[];
+  dockerfilePath?: string;
+  composeFilePath?: string;
+}): SourceInspectionSnapshot {
+  return SourceInspectionSnapshot.rehydrate({
+    ...(input.runtimeFamily
+      ? { runtimeFamily: SourceRuntimeFamilyValue.rehydrate(input.runtimeFamily) }
+      : {}),
+    ...(input.framework ? { framework: SourceFrameworkValue.rehydrate(input.framework) } : {}),
+    ...(input.packageManager
+      ? { packageManager: SourcePackageManagerValue.rehydrate(input.packageManager) }
+      : {}),
+    ...(input.runtimeVersion
+      ? { runtimeVersion: SourceRuntimeVersionText.rehydrate(input.runtimeVersion) }
+      : {}),
+    ...(input.detectedFiles
+      ? {
+          detectedFiles: input.detectedFiles.map((file) =>
+            SourceDetectedFileValue.rehydrate(file),
+          ),
+        }
+      : {}),
+    ...(input.detectedScripts
+      ? {
+          detectedScripts: input.detectedScripts.map((script) =>
+            SourceDetectedScriptValue.rehydrate(script),
+          ),
+        }
+      : {}),
+    ...(input.dockerfilePath ? { dockerfilePath: FilePathText.rehydrate(input.dockerfilePath) } : {}),
+    ...(input.composeFilePath
+      ? { composeFilePath: FilePathText.rehydrate(input.composeFilePath) }
+      : {}),
+  });
+}
+
+function createSource(input: {
+  kind: SourceKind;
+  locator: string;
+  displayName: string;
+  inspection?: SourceInspectionSnapshot;
+  metadata?: Record<string, string>;
+}): SourceDescriptor {
+  return SourceDescriptor.rehydrate({
+    kind: SourceKindValue.rehydrate(input.kind),
+    locator: SourceLocator.rehydrate(input.locator),
+    displayName: DisplayNameText.rehydrate(input.displayName),
+    ...(input.inspection ? { inspection: input.inspection } : {}),
+    ...(input.metadata ? { metadata: input.metadata } : {}),
+  });
+}
+
 describe("DefaultRuntimePlanResolver", () => {
+  test("renders workspace Dockerfiles through the Dockerfile builder", async () => {
+    const { renderWorkspaceDockerfile } = await import("../src/workspace-planners");
+
+    const dockerfile = renderWorkspaceDockerfile({
+      baseImage: "node:22-alpine",
+      env: {
+        NEXT_TELEMETRY_DISABLED: "1",
+        NODE_ENV: "production",
+      },
+      beforeCopyRunCommands: ["corepack enable || true"],
+      installCommand: "pnpm install",
+      buildCommand: "pnpm build",
+      port: 3000,
+      startCommand: "pnpm start",
+    });
+
+    expect(dockerfile).toBe(
+      [
+        "FROM node:22-alpine",
+        "WORKDIR /app",
+        'ENV NEXT_TELEMETRY_DISABLED="1"',
+        'ENV NODE_ENV="production"',
+        'RUN ["sh","-lc","corepack enable || true"]',
+        "COPY . .",
+        'RUN ["sh","-lc","pnpm install"]',
+        'RUN ["sh","-lc","pnpm build"]',
+        "EXPOSE 3000",
+        'CMD ["sh","-lc","pnpm start"]',
+        "",
+      ].join("\n"),
+    );
+  });
+
   test("selects workspace commands when explicitly requested", async () => {
     ensureReflectMetadata();
     const { DefaultRuntimePlanResolver } = await import("../src");
@@ -72,14 +181,11 @@ describe("DefaultRuntimePlanResolver", () => {
 
     const result = await resolver.resolve(context, {
       id: "plan_1",
-      source: {
+      source: createSource({
         kind: "local-folder",
         locator: "/tmp/demo",
         displayName: "demo",
-        metadata: {
-          hasPackageJson: "false",
-        },
-      },
+      }),
       server: {
         id: "srv_1",
         providerKey: "local-shell",
@@ -100,14 +206,144 @@ describe("DefaultRuntimePlanResolver", () => {
     const plan = result._unsafeUnwrap();
 
     expect(plan.buildStrategy).toBe("workspace-commands");
-    expect(plan.packagingMode).toBe("host-process-runtime");
+    expect(plan.packagingMode).toBe("all-in-one-docker");
+    expect(plan.runtimeArtifact).toEqual(
+      expect.objectContaining({
+        kind: "image",
+        intent: "build-image",
+        metadata: expect.objectContaining({
+          generatedDockerfile: "true",
+          dockerfilePath: "Dockerfile.yundu",
+        }),
+      }),
+    );
     expect(plan.execution).toEqual(
       expect.objectContaining({
-        kind: "host-process",
+        kind: "docker-container",
+        dockerfilePath: "Dockerfile.yundu",
         buildCommand: "node build.mjs",
         startCommand: "node dist/server.js",
         port: 4310,
         healthCheckPath: "/health",
+      }),
+    );
+    expect(
+      plan.execution.verificationSteps.map((step) => ({ kind: step.kind, label: step.label })),
+    ).toEqual([
+      {
+        kind: "internal-http",
+        label: "Verify internal container health",
+      },
+    ]);
+    expect(plan.steps).toContain("Build workspace image");
+    expect(plan.steps).toContain("Run docker container");
+  });
+
+  test("uses the Next.js workspace planner when framework metadata is detected", async () => {
+    ensureReflectMetadata();
+    const { DefaultRuntimePlanResolver } = await import("../src");
+    const resolver = new DefaultRuntimePlanResolver();
+    const context = createTestExecutionContext();
+
+    const result = await resolver.resolve(context, {
+      id: "plan_next",
+      source: createSource({
+        kind: "local-folder",
+        locator: "/tmp/next-app",
+        displayName: "next-app",
+        inspection: createSourceInspection({
+          runtimeFamily: "node",
+          framework: "nextjs",
+          packageManager: "pnpm",
+          runtimeVersion: "22",
+          detectedFiles: ["package-json", "next-config"],
+          detectedScripts: ["build", "start"],
+        }),
+      }),
+      server: {
+        id: "srv_next",
+        providerKey: "local-shell",
+      },
+      environmentSnapshot: createEnvironmentSnapshot("snap_next"),
+      detectedReasoning: ["detected next app"],
+      requestedDeployment: {
+        method: "auto",
+        port: 4315,
+      },
+      generatedAt: "2026-01-01T00:00:00.000Z",
+    });
+
+    expect(result.isOk()).toBe(true);
+    const plan = result._unsafeUnwrap();
+
+    expect(plan.buildStrategy).toBe("workspace-commands");
+    expect(plan.runtimeArtifact?.metadata).toEqual(
+      expect.objectContaining({
+        planner: "nextjs",
+        runtimeKind: "nextjs",
+        baseImage: "node:22-alpine",
+      }),
+    );
+    expect(plan.execution).toEqual(
+      expect.objectContaining({
+        kind: "docker-container",
+        installCommand: "pnpm install",
+        buildCommand: "pnpm build",
+        startCommand: "pnpm start",
+        port: 4315,
+      }),
+    );
+  });
+
+  test("uses the Python workspace planner when Python metadata is detected", async () => {
+    ensureReflectMetadata();
+    const { DefaultRuntimePlanResolver } = await import("../src");
+    const resolver = new DefaultRuntimePlanResolver();
+    const context = createTestExecutionContext();
+
+    const result = await resolver.resolve(context, {
+      id: "plan_python",
+      source: createSource({
+        kind: "local-folder",
+        locator: "/tmp/python-app",
+        displayName: "python-app",
+        inspection: createSourceInspection({
+          runtimeFamily: "python",
+          runtimeVersion: "3.12",
+          detectedFiles: ["requirements-txt"],
+        }),
+      }),
+      server: {
+        id: "srv_python",
+        providerKey: "local-shell",
+      },
+      environmentSnapshot: createEnvironmentSnapshot("snap_python"),
+      detectedReasoning: ["detected python app"],
+      requestedDeployment: {
+        method: "workspace-commands",
+        startCommand: "python -m app",
+        port: 4316,
+      },
+      generatedAt: "2026-01-01T00:00:00.000Z",
+    });
+
+    expect(result.isOk()).toBe(true);
+    const plan = result._unsafeUnwrap();
+
+    expect(plan.buildStrategy).toBe("workspace-commands");
+    expect(plan.runtimeArtifact?.metadata).toEqual(
+      expect.objectContaining({
+        planner: "python",
+        runtimeKind: "python",
+        baseImage: "python:3.12-slim",
+      }),
+    );
+    expect(plan.execution).toEqual(
+      expect.objectContaining({
+        kind: "docker-container",
+        installCommand: "pip install --no-cache-dir -r requirements.txt",
+        startCommand: "python -m app",
+        port: 4316,
       }),
     );
   });
@@ -120,17 +356,17 @@ describe("DefaultRuntimePlanResolver", () => {
 
     const result = await resolver.resolve(context, {
       id: "plan_2",
-      source: {
+      source: createSource({
         kind: "local-folder",
         locator: "/tmp/docker-app",
         displayName: "docker-app",
-        metadata: {
-          hasDockerfile: "true",
-          dockerfilePath: "Dockerfile",
-          hasPackageJson: "true",
+        inspection: createSourceInspection({
+          runtimeFamily: "node",
           packageManager: "npm",
-        },
-      },
+          detectedFiles: ["dockerfile", "package-json"],
+          dockerfilePath: "Dockerfile",
+        }),
+      }),
       server: {
         id: "srv_2",
         providerKey: "local-shell",
@@ -148,6 +384,15 @@ describe("DefaultRuntimePlanResolver", () => {
     const plan = result._unsafeUnwrap();
 
     expect(plan.buildStrategy).toBe("dockerfile");
+    expect(plan.runtimeArtifact).toEqual(
+      expect.objectContaining({
+        kind: "image",
+        intent: "build-image",
+        metadata: expect.objectContaining({
+          dockerfilePath: "Dockerfile",
+        }),
+      }),
+    );
     expect(plan.execution).toEqual(
       expect.objectContaining({
         kind: "docker-container",
@@ -177,11 +422,11 @@ describe("DefaultRuntimePlanResolver", () => {
 
     const result = await resolver.resolve(context, {
       id: "plan_direct_port",
-      source: {
+      source: createSource({
         kind: "docker-image",
         locator: "docker://ghcr.io/example/app:latest",
         displayName: "app",
-      },
+      }),
       server: {
         id: "srv_direct",
         providerKey: "generic-ssh",
@@ -200,6 +445,13 @@ describe("DefaultRuntimePlanResolver", () => {
     const plan = result._unsafeUnwrap();
     const [route] = plan.execution.accessRoutes;
 
+    expect(plan.runtimeArtifact).toEqual(
+      expect.objectContaining({
+        kind: "image",
+        intent: "prebuilt-image",
+        image: "ghcr.io/example/app:latest",
+      }),
+    );
     expect(route?.domains).toEqual([]);
     expect(route?.proxyKind).toBe("none");
     expect(route?.targetPort).toBe(4314);
@@ -213,11 +465,11 @@ describe("DefaultRuntimePlanResolver", () => {
 
     const result = await resolver.resolve(context, {
       id: "plan_3",
-      source: {
+      source: createSource({
         kind: "docker-image",
         locator: "docker://ghcr.io/example/app:latest",
         displayName: "app",
-      },
+      }),
       server: {
         id: "srv_3",
         providerKey: "generic-ssh",
@@ -267,11 +519,11 @@ describe("DefaultRuntimePlanResolver", () => {
 
     const result = await resolver.resolve(context, {
       id: "plan_4",
-      source: {
+      source: createSource({
         kind: "git-public",
         locator: "https://github.com/example/app.git",
         displayName: "app",
-      },
+      }),
       server: {
         id: "srv_4",
         providerKey: "generic-ssh",
@@ -307,15 +559,18 @@ describe("DefaultRuntimePlanResolver", () => {
 
     const result = await resolver.resolve(context, {
       id: "plan_5",
-      source: {
+      source: createSource({
         kind: "docker-compose-inline",
         locator: "inline://docker-compose.yml",
         displayName: "compose",
+        inspection: createSourceInspection({
+          detectedFiles: ["compose-manifest"],
+          composeFilePath: "compose.yml",
+        }),
         metadata: {
           content: "services: {}",
-          composeFilePath: "compose.yml",
         },
-      },
+      }),
       server: {
         id: "srv_5",
         providerKey: "generic-ssh",
@@ -333,6 +588,13 @@ describe("DefaultRuntimePlanResolver", () => {
 
     expect(plan.source.kind).toBe("docker-compose-inline");
     expect(plan.buildStrategy).toBe("compose-deploy");
+    expect(plan.runtimeArtifact).toEqual(
+      expect.objectContaining({
+        kind: "compose-project",
+        intent: "compose-project",
+        composeFile: "compose.yml",
+      }),
+    );
     expect(plan.execution).toEqual(
       expect.objectContaining({
         kind: "docker-compose-stack",

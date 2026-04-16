@@ -40,18 +40,19 @@ import {
 import {
   createEdgeProxyEnsurePlan,
   createProxyRouteRealizationPlan,
-  dockerLabelFlagsForProxyPlan,
-  dockerNetworkFlagForProxyPlan,
   proxyBootstrapOptionsFromEnv,
 } from "./edge-proxy-plans";
 import {
-  dockerContainerLabelFlags,
   dockerPublishedPortCommand,
-  dockerPublishedPortFlag,
-  dockerRemoveResourceContainersCommand,
   parseDockerPublishedHostPort,
   yunduDockerContainerLabels,
 } from "./docker-container-commands";
+import {
+  RuntimeCommandBuilder,
+  dockerLabelsFromAssignments,
+  renderRuntimeCommandString,
+} from "./runtime-commands";
+import { generateWorkspaceDockerfile } from "./workspace-planners";
 
 type LogPhase = "detect" | "plan" | "package" | "deploy" | "verify" | "rollback";
 type LogLevel = "debug" | "info" | "warn" | "error";
@@ -412,6 +413,7 @@ export class SshExecutionBackend implements ExecutionBackend {
     private readonly integrationAuthPort?: IntegrationAuthPort,
     private readonly serverRepository?: ServerRepository,
     private readonly edgeProxyProviderRegistry?: EdgeProxyProviderRegistry,
+    private readonly remoteRuntimeRoot = "/var/lib/yundu/runtime",
   ) {}
 
   private report(
@@ -440,6 +442,10 @@ export class SshExecutionBackend implements ExecutionBackend {
 
   private runtimeDirectory(deploymentId: string): string {
     return resolve(this.runtimeRoot, "ssh-deployments", deploymentId);
+  }
+
+  private remoteRuntimeDirectory(deploymentId: string): string {
+    return `${this.remoteRuntimeRoot.replace(/\/+$/, "")}/ssh-deployments/${sanitizeName(deploymentId)}`;
   }
 
   private pushCommandOutput(
@@ -1171,7 +1177,7 @@ export class SshExecutionBackend implements ExecutionBackend {
       return targetResult.map(() => ({ deployment }));
     }
     const target = targetResult._unsafeUnwrap();
-    const remoteRoot = `/tmp/yundu-deployments/${sanitizeName(state.id.value)}`;
+    const remoteRoot = this.remoteRuntimeDirectory(state.id.value);
 
     const port = state.runtimePlan.execution.port ?? 3000;
     const env = deploymentEnv(deployment, port);
@@ -1216,15 +1222,78 @@ export class SshExecutionBackend implements ExecutionBackend {
       let image = prepared.source.image ?? state.runtimePlan.execution.image;
       const containerName = sanitizeName(`yundu-${state.id.value}`);
 
-      if (state.runtimePlan.buildStrategy === "dockerfile") {
+      if (state.runtimePlan.buildStrategy === "dockerfile" || state.runtimePlan.buildStrategy === "workspace-commands") {
         image = sanitizeName(`yundu-image-${state.id.value}`);
-        const dockerfilePath = state.runtimePlan.execution.dockerfilePath ?? "Dockerfile";
         const remoteWorkdir = prepared.source.remoteWorkdir;
         if (!remoteWorkdir) {
           return err(domainError.validation("Dockerfile SSH deployment requires a remote workdir"));
         }
 
-        const buildCommand = `cd ${shellQuote(remoteWorkdir)} && docker build -t ${shellQuote(image)} -f ${shellQuote(dockerfilePath)} .`;
+        const dockerfilePath =
+          state.runtimePlan.buildStrategy === "workspace-commands"
+            ? `${remoteRoot}/${state.runtimePlan.execution.dockerfilePath ?? "Dockerfile.yundu"}`
+            : state.runtimePlan.execution.dockerfilePath ?? "Dockerfile";
+
+        if (state.runtimePlan.buildStrategy === "workspace-commands") {
+          const dockerfile = generateWorkspaceDockerfile({
+            execution: state.runtimePlan.execution,
+            ...(state.runtimePlan.source.inspection
+              ? { sourceInspection: state.runtimePlan.source.inspection }
+              : {}),
+          });
+          if (!dockerfile) {
+            const message = "Start command is required for workspace image generation";
+            logs.push(phaseLog("package", message, "error"));
+            return ok({
+              deployment: this.applyFailure(deployment, {
+                logs,
+                errorCode: "workspace_start_command_missing",
+                retryable: false,
+                metadata: {
+                  host: target.host,
+                  remoteWorkdir,
+                },
+              }),
+            });
+          }
+
+          const encodedDockerfile = Buffer.from(dockerfile, "utf8").toString("base64");
+          const writeDockerfile = this.runRemoteCommand({
+            target,
+            command: [
+              `mkdir -p ${shellQuote(remoteRoot)}`,
+              `printf %s ${shellQuote(encodedDockerfile)} | base64 -d > ${shellQuote(dockerfilePath)}`,
+            ].join(" && "),
+            cwd: runtimeDir,
+            env,
+          });
+
+          if (writeDockerfile.failed) {
+            const message = "SSH workspace Dockerfile write failed";
+            logs.push(phaseLog("package", message, "error"));
+            return ok({
+              deployment: this.applyFailure(deployment, {
+                logs,
+                errorCode: "ssh_workspace_dockerfile_write_failed",
+                retryable: true,
+                metadata: {
+                  host: target.host,
+                  remoteWorkdir,
+                },
+              }),
+            });
+          }
+        }
+
+        const buildCommand = renderRuntimeCommandString(
+          RuntimeCommandBuilder.docker().buildImage({
+            image,
+            dockerfilePath,
+            contextPath: ".",
+            workingDirectory: remoteWorkdir,
+          }),
+          { quote: shellQuote },
+        );
         logs.push(phaseLog("package", `Build Docker image ${image} on SSH target`));
         this.report(context, {
           deploymentId: state.id.value,
@@ -1416,7 +1485,8 @@ export class SshExecutionBackend implements ExecutionBackend {
         });
       }
 
-      const envFlags = Object.entries(env)
+      const dockerCommandBuilder = RuntimeCommandBuilder.docker();
+      const dockerEnvVariables = Object.entries(env)
         .filter((entry): entry is [string, string] => typeof entry[1] === "string")
         .filter(
           ([key]) =>
@@ -1424,46 +1494,55 @@ export class SshExecutionBackend implements ExecutionBackend {
             key.startsWith("YUNDU_") ||
             state.environmentSnapshot.variables.some((variable) => variable.key === key),
         )
-        .map(([key, value]) => `-e ${shellQuote(`${key}=${value}`)}`)
-        .join(" ");
-      const labelFlags = dockerLabelFlagsForProxyPlan({
-        plan: proxyRoutePlanResult.value,
-        quote: shellQuote,
-      });
-      const yunduLabelFlags = dockerContainerLabelFlags({
-        labels: yunduDockerContainerLabels({
+        .map(([name, value]) => {
+          const snapshotVariable = state.environmentSnapshot.variables.find(
+            (variable) => variable.key === name,
+          );
+          return {
+            name,
+            value,
+            ...(snapshotVariable?.isSecret ? { redacted: true } : {}),
+          };
+        });
+      const labels = dockerLabelsFromAssignments([
+        ...yunduDockerContainerLabels({
           deploymentId: state.id.value,
           projectId: state.projectId.value,
           environmentId: state.environmentId.value,
           resourceId: state.resourceId.value,
           destinationId: state.destinationId.value,
         }),
-        quote: shellQuote,
-      });
-      const networkFlag = dockerNetworkFlagForProxyPlan(proxyRoutePlanResult.value);
-      const portFlag = dockerPublishedPortFlag({
-        containerPort: port,
-        exposureMode: state.runtimePlan.execution.metadata?.["resource.exposureMode"],
-      });
-      const runCommand = [
-        `docker rm -f ${shellQuote(containerName)} >/dev/null 2>&1 || true`,
-        dockerRemoveResourceContainersCommand({
+        ...(proxyRoutePlanResult.value?.labels ?? []),
+      ]);
+      const runCommandSpec = RuntimeCommandBuilder.sequence([
+        dockerCommandBuilder.removeContainer({
+          containerName,
+          ignoreMissing: true,
+        }),
+        dockerCommandBuilder.removeResourceContainers({
           resourceId: state.resourceId.value,
           currentContainerName: containerName,
-          quote: shellQuote,
         }),
-        [
-          `docker run -d --name ${shellQuote(containerName)}`,
-          networkFlag,
-          portFlag,
-          envFlags,
-          yunduLabelFlags,
-          labelFlags,
-          shellQuote(image),
-        ]
-          .filter(Boolean)
-          .join(" "),
-      ].join(" && ");
+        dockerCommandBuilder.runContainer({
+          image,
+          containerName,
+          env: dockerEnvVariables,
+          labels,
+          ...(proxyRoutePlanResult.value?.networkName
+            ? { networkName: proxyRoutePlanResult.value.networkName }
+            : {}),
+          publishedPorts: [
+            dockerCommandBuilder.publishPort({
+              containerPort: port,
+              mode:
+                state.runtimePlan.execution.metadata?.["resource.exposureMode"] === "direct-port"
+                  ? "host-same-port"
+                  : "loopback-ephemeral",
+            }),
+          ],
+        }),
+      ]);
+      const runCommand = renderRuntimeCommandString(runCommandSpec, { quote: shellQuote });
       logs.push(
         phaseLog(
           "deploy",
@@ -1806,7 +1885,7 @@ export class SshExecutionBackend implements ExecutionBackend {
       return targetResult.map(() => ({ deployment }));
     }
     const target = targetResult._unsafeUnwrap();
-    const remoteRoot = `/tmp/yundu-deployments/${sanitizeName(state.id.value)}`;
+    const remoteRoot = this.remoteRuntimeDirectory(state.id.value);
     const env = deploymentEnv(deployment, state.runtimePlan.execution.port);
     const logs: DeploymentLogEntry[] = [
       phaseLog(
@@ -1860,7 +1939,13 @@ export class SshExecutionBackend implements ExecutionBackend {
       const remoteComposeFile = composeFile.startsWith("/")
         ? composeFile
         : `${remoteWorkdir}/${composeFile}`;
-      const upCommand = `cd ${shellQuote(remoteWorkdir)} && docker compose -f ${shellQuote(remoteComposeFile)} up -d --build`;
+      const upCommand = renderRuntimeCommandString(
+        RuntimeCommandBuilder.docker().composeUp({
+          composeFile: remoteComposeFile,
+          workingDirectory: remoteWorkdir,
+        }),
+        { quote: shellQuote },
+      );
       logs.push(phaseLog("deploy", `Run docker compose on SSH target with ${remoteComposeFile}`));
       this.report(context, {
         deploymentId: state.id.value,
