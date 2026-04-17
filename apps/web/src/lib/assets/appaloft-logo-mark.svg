@@ -1,13 +1,9 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 96 96" role="img" aria-labelledby="title desc">
 	<title id="title">Appaloft logo mark</title>
-	<desc id="desc">An A-shaped launch loft with an upward deployment route.</desc>
-	<rect width="96" height="96" rx="20" fill="#101918" />
-	<path d="M22 70h52" fill="none" stroke="#F8FBF7" stroke-width="9" stroke-linecap="round" />
-	<path d="M23 70 44 21 70 70" fill="none" stroke="#F8FBF7" stroke-width="9" stroke-linecap="round" stroke-linejoin="round" />
-	<path d="M35 51h24" fill="none" stroke="#67D9B5" stroke-width="8" stroke-linecap="round" />
-	<path d="M45 59C51 49 58 41 68 34" fill="none" stroke="#FFB84D" stroke-width="6" stroke-linecap="round" />
-	<path d="m68 34-1 12 10-7Z" fill="#FFB84D" />
-	<circle cx="44" cy="21" r="5.5" fill="#67D9B5" />
-	<circle cx="74" cy="23" r="4.5" fill="#EF6F61" />
-	<circle cx="80" cy="55" r="3.5" fill="#67D9B5" />
+	<desc id="desc">A connected a and l letter mark for Appaloft.</desc>
+	<rect x="7" y="8" width="82" height="80" rx="18" fill="#F3F3F3" />
+	<circle cx="34" cy="53" r="23" fill="#089428" />
+	<circle cx="34" cy="53" r="12.5" fill="#F3F3F3" />
+	<rect x="52" y="33" width="11" height="42" rx="5.5" fill="#089428" />
+	<rect x="69" y="19" width="11" height="56" rx="5.5" fill="#171717" />
 </svg>
