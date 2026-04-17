@@ -75,6 +75,7 @@ Then:
 | TERM-SESSION-WORKSPACE-005 | unit | Generic SSH uploaded local folder | Uses recorded `remoteWorkdir`. |
 | TERM-SESSION-WORKSPACE-006 | unit | Resource renamed after deployment | Workspace resolution still uses deployment metadata, not resource name or slug. |
 | TERM-SESSION-WORKSPACE-007 | unit | Concurrent deployments for same resource | Each selected deployment resolves to its own deployment-id workspace. |
+| TERM-SESSION-WORKSPACE-008 | unit | Source locator fallback | Rejects URL-like or SSH-style Git `workingDirectory` values when no adapter workspace metadata exists. |
 
 ## Transport Matrix
 
@@ -101,9 +102,10 @@ Then:
 
 ## Current Implementation Notes And Migration Gaps
 
-Focused application use-case tests exist for latest resource workspace resolution, server
-relative-directory rejection, selected deployment context mismatch, unsafe relative directory
-validation, and no-deployment workspace unavailable errors.
+Focused application use-case tests exist for latest resource workspace resolution, `sourceDir`
+workspace metadata, source-locator fallback rejection, server relative-directory rejection,
+selected deployment context mismatch, unsafe relative directory validation, and no-deployment
+workspace unavailable errors.
 
 Runtime adapter, HTTP/WebSocket, interactive CLI, and Web E2E tests remain follow-up coverage.
 

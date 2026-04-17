@@ -250,6 +250,81 @@ describe("OpenTerminalSessionUseCase", () => {
     });
   });
 
+  test("[TERM-SESSION-WORKSPACE-003] opens a resource session from sourceDir metadata when runtime workingDirectory is a git locator", async () => {
+    const context = createExecutionContext({ entrypoint: "http" });
+    const runtimePlan = deploymentSummary().runtimePlan;
+    const { gateway, useCase } = createUseCase({
+      deployments: [
+        deploymentSummary({
+          runtimePlan: {
+            ...runtimePlan,
+            source: {
+              kind: "git-public",
+              locator: "https://github.com/coollabsio/coolify-examples",
+              displayName: "coolify examples",
+            },
+            execution: {
+              kind: "docker-container",
+              workingDirectory: "https://github.com/coollabsio/coolify-examples",
+              metadata: {
+                sourceDir: "/var/lib/appaloft/runtime/local-deployments/dep_new/source",
+              },
+            },
+          },
+        }),
+      ],
+    });
+    const command = OpenTerminalSessionCommand.create({
+      scope: {
+        kind: "resource",
+        resourceId: "res_web",
+      },
+    })._unsafeUnwrap();
+
+    const result = await useCase.execute(context, command);
+
+    expect(result.isOk()).toBe(true);
+    expect(gateway.calls[0]?.scope).toMatchObject({
+      kind: "resource",
+      workingDirectory: "/var/lib/appaloft/runtime/local-deployments/dep_new/source",
+    });
+  });
+
+  test("[TERM-SESSION-WORKSPACE-008] reports unavailable workspace instead of opening a session in a git locator", async () => {
+    const context = createExecutionContext({ entrypoint: "http" });
+    const runtimePlan = deploymentSummary().runtimePlan;
+    const { gateway, useCase } = createUseCase({
+      deployments: [
+        deploymentSummary({
+          runtimePlan: {
+            ...runtimePlan,
+            source: {
+              kind: "git-public",
+              locator: "https://github.com/coollabsio/coolify-examples",
+              displayName: "coolify examples",
+            },
+            execution: {
+              kind: "docker-container",
+              workingDirectory: "https://github.com/coollabsio/coolify-examples",
+            },
+          },
+        }),
+      ],
+    });
+    const command = OpenTerminalSessionCommand.create({
+      scope: {
+        kind: "resource",
+        resourceId: "res_web",
+      },
+    })._unsafeUnwrap();
+
+    const result = await useCase.execute(context, command);
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr().code).toBe("terminal_session_workspace_unavailable");
+    expect(gateway.calls).toHaveLength(0);
+  });
+
   test("rejects server sessions with resource-relative directories", async () => {
     const context = createExecutionContext({ entrypoint: "http" });
     const { gateway, useCase } = createUseCase();

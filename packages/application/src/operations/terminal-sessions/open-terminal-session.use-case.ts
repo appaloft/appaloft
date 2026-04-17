@@ -29,6 +29,19 @@ function appendRelativeDirectory(root: string, relativeDirectory?: string): stri
   return normalizedRelative ? `${normalizedRoot}/${normalizedRelative}` : normalizedRoot;
 }
 
+function meaningfulWorkingDirectory(workingDirectory?: string): string | undefined {
+  const trimmed = workingDirectory?.trim();
+  if (!trimmed) {
+    return undefined;
+  }
+
+  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(trimmed) || /^[^@\s]+@[^:\s]+:.+/.test(trimmed)) {
+    return undefined;
+  }
+
+  return trimmed;
+}
+
 function deploymentCreatedAtMillis(deployment: DeploymentSummary): number {
   const parsed = Date.parse(deployment.createdAt);
   return Number.isFinite(parsed) ? parsed : 0;
@@ -44,7 +57,8 @@ function resolveDeploymentWorkspace(deployment: DeploymentSummary): string | und
   return (
     metadataValue(deployment, "workdir") ??
     metadataValue(deployment, "remoteWorkdir") ??
-    deployment.runtimePlan.execution.workingDirectory
+    metadataValue(deployment, "sourceDir") ??
+    meaningfulWorkingDirectory(deployment.runtimePlan.execution.workingDirectory)
   );
 }
 

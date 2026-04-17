@@ -64,6 +64,8 @@ defines a safe default terminal directory.
 
 Resource scope starts in the project workspace directory resolved from deployment runtime metadata.
 The user-facing resource id, resource name, or slug must never be used as the checkout directory.
+Source locators such as HTTPS Git URLs and SSH-style Git remotes must not be used as terminal
+working directories when adapter workspace metadata is missing.
 
 For current runtime adapters, expected mappings are:
 
