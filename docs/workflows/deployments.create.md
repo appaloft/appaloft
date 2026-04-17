@@ -173,6 +173,13 @@ Runtime adapters must not implement reverse-proxy rollout by globally removing w
 publish the same application port. A new deployment attempt may replace an older runtime instance
 only for the same resource after the redeploy guard allows a new terminal attempt.
 
+For reverse-proxy resources, replacement is candidate-first. The runtime adapter must keep the
+previous successful runtime instance for the same resource serving until the replacement candidate
+has passed the required apply, internal health, proxy route realization, and public route
+verification gates. A failure in any of those gates, including DNS or route readiness failures
+during public verification, must clean up only the failed candidate and preserve the previous
+successful runtime/route when one exists.
+
 If an adapter needs a host-side port for health checks, it may allocate a private loopback or
 runtime-local ephemeral port and discover that mapping after start. That port is not a public access
 route and must not be shown as the resource's generated URL.
@@ -180,6 +187,11 @@ route and must not be shown as the resource's generated URL.
 For direct-port resources, the effective host port is a placement constraint. A direct-port
 collision with another resource on the same target/destination is a conflict or runtime failure, not
 authorization to stop the other resource.
+
+Direct-port replacement for the same resource is the exception to candidate-first replacement
+because the previous runtime may occupy the only usable host port. If an adapter releases the
+previous same-resource runtime before binding the replacement, that behavior must be treated as a
+direct-port rollout strategy and must never expand into cross-resource cleanup.
 
 ## State And Event Points
 

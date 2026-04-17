@@ -23,6 +23,9 @@ const certificatePolicyOption = Options.choice("certificate-policy", certificate
 );
 const idempotencyKeyOption = Options.text("idempotency-key").pipe(Options.optional);
 const verificationAttemptIdOption = Options.text("verification-attempt-id").pipe(Options.optional);
+const verificationModeOption = Options.choice("verification-mode", ["dns", "manual"] as const).pipe(
+  Options.optional,
+);
 const confirmedByOption = Options.text("confirmed-by").pipe(Options.optional);
 const evidenceOption = Options.text("evidence").pipe(Options.optional);
 const listProjectIdOption = Options.text("project").pipe(Options.optional);
@@ -83,21 +86,30 @@ const confirmOwnershipCommand = EffectCommand.make(
   {
     domainBindingId: domainBindingIdArg,
     verificationAttemptId: verificationAttemptIdOption,
+    verificationMode: verificationModeOption,
     confirmedBy: confirmedByOption,
     evidence: evidenceOption,
     idempotencyKey: idempotencyKeyOption,
   },
-  ({ confirmedBy, domainBindingId, evidence, idempotencyKey, verificationAttemptId }) =>
+  ({
+    confirmedBy,
+    domainBindingId,
+    evidence,
+    idempotencyKey,
+    verificationAttemptId,
+    verificationMode,
+  }) =>
     runCommand(
       ConfirmDomainBindingOwnershipCommand.create({
         domainBindingId,
         verificationAttemptId: optionalValue(verificationAttemptId),
+        verificationMode: optionalValue(verificationMode),
         confirmedBy: optionalValue(confirmedBy),
         evidence: optionalValue(evidence),
         idempotencyKey: optionalValue(idempotencyKey),
       }),
     ),
-).pipe(EffectCommand.withDescription("Confirm manual domain binding ownership"));
+).pipe(EffectCommand.withDescription("Confirm domain binding ownership"));
 
 const listCommand = EffectCommand.make(
   "list",

@@ -62,7 +62,7 @@ describe("routing/domain/TLS workflow e2e", () => {
     const domainBindingId = parseJson<{ id: string }>(created.stdout).id;
 
     const confirmed = runShellCli(
-      ["domain-binding", "confirm-ownership", domainBindingId],
+      ["domain-binding", "confirm-ownership", domainBindingId, "--verification-mode", "manual"],
       fixture.cliOptions,
     );
     expectCliSuccess(confirmed, "confirm workflow domain ownership");

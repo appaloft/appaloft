@@ -2,9 +2,11 @@
 
 ## Normative Contract
 
-`domain-bindings.confirm-ownership` is the source-of-truth command for confirming a manual domain ownership verification attempt for an accepted durable domain binding.
+`domain-bindings.confirm-ownership` is the source-of-truth command for confirming a domain ownership verification attempt for an accepted durable domain binding.
 
-Command success means the current manual verification attempt is durably marked verified, the owning binding state is moved to `bound`, and `domain-bound` is published or recorded.
+Command success means the current verification attempt is durably marked verified, the owning binding state is moved to `bound`, and `domain-bound` is published or recorded.
+
+The default confirmation mode is DNS-gated. Appaloft re-observes public DNS through an application port, compares the observed answers with the binding's expected target metadata, records safe DNS observation evidence, and only confirms ownership when the expected target is observed. Explicit manual confirmation remains available as a user/trusted-automation override when DNS cannot be reliably observed from Appaloft's resolver context.
 
 ```ts
 type ConfirmDomainBindingOwnershipResult = Result<
@@ -37,7 +39,13 @@ This command inherits:
 
 ## Purpose
 
-Confirm that the operator or trusted automation has verified the DNS/route ownership evidence required by the binding's current manual verification attempt.
+Confirm that the DNS or operator evidence required by the binding's current verification attempt is sufficient to move the binding from `pending_verification` to `bound`.
+
+The actors are:
+
+- User or trusted automation: chooses the domain, configures DNS with the registrar/DNS provider, and may request explicit manual override when Appaloft cannot observe the evidence.
+- DNS provider and public resolvers: own DNS propagation timing and resolver answers. Appaloft cannot make this step synchronous.
+- Appaloft: records the expected target, observes public DNS answers when asked to confirm ownership, stores safe DNS evidence, and performs the write-side binding transition only when confirmation succeeds.
 
 It is not:
 
@@ -56,7 +64,8 @@ Generated default access routes such as sslip hostnames do not create `DomainBin
 | Field | Requirement | Meaning |
 | --- | --- | --- |
 | `domainBindingId` | Required | Durable domain binding whose current manual verification attempt is being confirmed. |
-| `verificationAttemptId` | Optional | Current attempt id to confirm. When omitted, the command confirms the latest pending manual attempt. |
+| `verificationAttemptId` | Optional | Current attempt id to confirm. When omitted, the command confirms the latest pending attempt. |
+| `verificationMode` | Optional | `dns` or `manual`. Defaults to `dns`. `dns` asks Appaloft to verify current public DNS evidence before confirmation; `manual` is an explicit user/trusted-automation override. |
 | `confirmedBy` | Optional | Operator or automation label. Must not contain credentials or secrets. |
 | `evidence` | Optional | Safe non-secret confirmation note, such as "DNS record checked" or "operator confirmed route". |
 | `idempotencyKey` | Optional | Caller-supplied dedupe key for repeated confirmation submissions. |
@@ -70,13 +79,17 @@ The command must:
 1. Validate command input.
 2. Resolve the domain binding by `domainBindingId`.
 3. Reject missing bindings.
-4. Select the supplied `verificationAttemptId` or the latest pending manual attempt.
-5. Reject when no pending manual verification attempt exists.
+4. Select the supplied `verificationAttemptId` or the latest pending verification attempt.
+5. Reject when no pending verification attempt exists.
 6. Reject when the binding is already `ready`, `failed`, or in another state that cannot move to `bound`.
 7. Treat an already verified/bound binding for the same attempt as idempotent success.
-8. Persist the verified attempt and bound binding state.
-9. Publish or record `domain-bound`.
-10. Return `ok({ id, verificationAttemptId })`.
+8. If `verificationMode = dns`, call the injected DNS ownership verifier with the normalized domain name and the binding's expected DNS targets.
+9. If DNS observation is `matched`, record `dnsObservation.status = matched` with safe observed targets and proceed.
+10. If DNS observation is `pending`, `unresolved`, `mismatch`, or `lookup_failed`, record the observation, keep the verification attempt pending, return a command error, and do not publish `domain-bound`.
+11. If `verificationMode = manual`, record no DNS success unless evidence is separately available; the actor is the user/trusted automation that requested override.
+12. Persist the verified attempt and bound binding state.
+13. Publish or record `domain-bound`.
+14. Return `ok({ id, verificationAttemptId })`.
 
 ## State Transition
 
@@ -103,7 +116,9 @@ All errors use [Routing, Domain Binding, And TLS Error Spec](../errors/routing-d
 | --- | --- | --- | --- |
 | `validation_error` | `command-validation` | No | Input shape, attempt id, confirmation actor, or evidence is invalid. |
 | `not_found` | `domain-verification` | No | Domain binding does not exist. |
-| `domain_verification_not_pending` | `domain-verification` | No | No current pending manual verification attempt can be confirmed. |
+| `domain_verification_not_pending` | `domain-verification` | No | No current pending verification attempt can be confirmed. |
+| `domain_ownership_unverified` | `domain-verification` | No | DNS mode did not observe the expected target; the user must fix DNS, wait for propagation, or choose an explicit manual override. |
+| `dns_lookup_failed` | `domain-verification` | Yes | Appaloft could not complete the DNS lookup through configured resolvers. |
 | `invariant_violation` | `domain-verification` | No | Binding state cannot transition to `bound`. |
 | `infra_error` | `domain-binding-persistence` or `event-publication` | Conditional | Bound state or event could not be safely recorded. |
 
@@ -114,6 +129,7 @@ The handler must delegate to an application use case and return the typed `Resul
 It must not:
 
 - call DNS provider SDKs directly;
+- perform DNS resolution inline instead of using the injected application port;
 - issue or import certificates;
 - mutate deployment runtime plans;
 - update read models directly;
@@ -130,10 +146,10 @@ API/oRPC must expose strict command input and dispatch through the command bus.
 
 ## Current Implementation Notes And Migration Gaps
 
-Current code creates and lists durable domain bindings, persists the first manual verification attempt, and publishes `domain-binding-requested`.
+Current code creates and lists durable domain bindings, persists the first verification attempt, records initial DNS observation metadata, and publishes `domain-binding-requested`.
 
-`domain-bindings.confirm-ownership` is implemented as the first manual verification confirmation slice. Downstream `certificates.issue-or-renew`, `domain-ready`, durable outbox/inbox, DNS-provider verification, and automatic verification retries remain follow-up behavior.
+`domain-bindings.confirm-ownership` must support DNS-gated confirmation through an injected DNS ownership verifier and explicit manual override. Downstream `certificates.issue-or-renew`, `domain-ready`, durable outbox/inbox, DNS provider writes, background DNS recheck scheduling, and confirmation-file route proof remain follow-up behavior.
 
 ## Open Questions
 
-- None for the manual confirmation baseline. ADR-006 governs why the first verification strategy is manual and auditable.
+- None for the DNS-gated confirmation baseline. ADR-006 governs why DNS observation, route proof, and manual override remain separate evidence types.

@@ -205,6 +205,30 @@ export interface DomainRouteFailureCandidateReader {
   ): Promise<DomainRouteFailureCandidate[]>;
 }
 
+export type DomainOwnershipVerificationStatus =
+  | "pending"
+  | "matched"
+  | "mismatch"
+  | "unresolved"
+  | "lookup_failed"
+  | "skipped";
+
+export interface DomainOwnershipVerificationResult {
+  status: DomainOwnershipVerificationStatus;
+  observedTargets: string[];
+  message?: string;
+}
+
+export interface DomainOwnershipVerifier {
+  verifyDns(
+    context: ExecutionContext,
+    input: {
+      domainName: string;
+      expectedTargets: string[];
+    },
+  ): Promise<DomainOwnershipVerificationResult>;
+}
+
 export interface DomainRouteBindingCandidate {
   id: string;
   domainName: string;
@@ -1357,6 +1381,13 @@ export interface DomainBindingSummary {
   tlsMode: TlsMode;
   certificatePolicy: CertificatePolicy;
   status: DomainBindingStatus;
+  dnsObservation?: {
+    status: "pending" | "matched" | "mismatch" | "unresolved" | "lookup_failed" | "skipped";
+    expectedTargets: string[];
+    observedTargets: string[];
+    checkedAt?: string;
+    message?: string;
+  };
   routeFailure?: {
     deploymentId: string;
     failedAt: string;

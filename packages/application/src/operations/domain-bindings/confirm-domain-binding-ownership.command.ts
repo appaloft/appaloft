@@ -5,6 +5,7 @@ import { parseOperationInput } from "../shared-schema";
 import {
   type ConfirmDomainBindingOwnershipCommandInput,
   confirmDomainBindingOwnershipCommandInputSchema,
+  type DomainBindingOwnershipVerificationMode,
 } from "./confirm-domain-binding-ownership.schema";
 
 export {
@@ -19,6 +20,7 @@ export class ConfirmDomainBindingOwnershipCommand extends Command<{
   constructor(
     public readonly domainBindingId: string,
     public readonly verificationAttemptId?: string,
+    public readonly verificationMode?: DomainBindingOwnershipVerificationMode,
     public readonly confirmedBy?: string,
     public readonly evidence?: string,
     public readonly idempotencyKey?: string,
@@ -34,6 +36,7 @@ export class ConfirmDomainBindingOwnershipCommand extends Command<{
         new ConfirmDomainBindingOwnershipCommand(
           parsed.domainBindingId,
           parsed.verificationAttemptId,
+          parsed.verificationMode,
           parsed.confirmedBy,
           parsed.evidence,
           parsed.idempotencyKey,

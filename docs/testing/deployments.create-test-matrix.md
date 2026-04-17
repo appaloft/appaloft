@@ -18,6 +18,8 @@ Deployment-specific canonical assertions:
   generic timeout;
 - reverse-proxy deployments allow different resources to share the same `internalPort` on the same
   target without stopping each other;
+- reverse-proxy replacement for the same resource preserves the last-known-good runtime until the
+  new candidate passes required verification, and failed candidates are the only cleanup target;
 - direct-port deployments treat the host port as the collision boundary and must fail or reject a
   collision without removing another resource;
 - terminal events are `deployment-succeeded` and `deployment-failed`;
@@ -125,11 +127,12 @@ Then:
 | DEP-CREATE-ASYNC-008 | integration | Runtime failure, retriable | Runtime rollout fails after acceptance with retriable error | `ok({ id })` | `deployment-failed`; retry scheduling event/job if modeled | Terminal `failed`; retry creates new attempt |
 | DEP-CREATE-ASYNC-009 | integration | Docker container exits before health check | Docker run command returns a container id, but the container exits before internal or public verification passes | `ok({ id })` | `deployment-failed` | Terminal `failed`; deployment logs include Docker inspect state and recent container logs before cleanup |
 | DEP-CREATE-ASYNC-010 | integration | Reverse-proxy same internal port | Two accepted deployments for different resources both listen on port `3000` inside their containers/processes | `ok({ id })` for each accepted attempt | Each attempt has its own terminal event | Both resources may remain running; runtime cleanup is scoped to resource identity, not `publish=3000` or `internalPort=3000` |
-| DEP-CREATE-ASYNC-011 | integration | Same resource replacement | A resource has a terminal deployment and a new deployment for the same resource is accepted | `ok({ id })` | New attempt emits its own terminal event | Runtime may replace the previous instance for the same resource after the new attempt starts successfully according to adapter strategy |
-| DEP-CREATE-ASYNC-012 | integration | Failed same-resource replacement preserves rollback candidate | A resource has a previously running deployment and the new rollout fails after starting replacement runtime | `ok({ id })` | `deployment-failed` | Failed attempt records sanitized previous-runtime/rollback-candidate metadata when available; public rollback command is still absent under ADR-016 |
+| DEP-CREATE-ASYNC-011 | integration | Same resource replacement | A resource has a terminal deployment and a new deployment for the same resource is accepted | `ok({ id })` | New attempt emits its own terminal event | Reverse-proxy replacement keeps the previous runtime active until candidate verification passes, then cleans up the superseded same-resource runtime according to adapter strategy |
+| DEP-CREATE-ASYNC-012 | integration | Failed same-resource replacement preserves rollback candidate | A resource has a previously running deployment and the new rollout fails after starting replacement runtime | `ok({ id })` | `deployment-failed` | Failed attempt records sanitized previous-runtime/rollback-candidate metadata when available; failed candidate is cleaned up; previous successful runtime remains active when the rollout strategy had not superseded it; public rollback command is still absent under ADR-016 |
 | DEP-CREATE-ASYNC-013 | integration | Direct-port collision after acceptance | Runtime cannot bind requested direct host port because another resource already owns it | Original command remains `ok({ id })` | `deployment-failed` | Conflicting attempt is failed; existing resource runtime remains untouched |
 | DEP-CREATE-ASYNC-014 | integration | Runtime failure, permanent | Runtime rollout fails after acceptance with non-retriable error | `ok({ id })` | `deployment-failed` | Terminal `failed`; no retry |
 | DEP-CREATE-ASYNC-015 | integration | Worker crash before state persistence | Worker cannot persist outcome | Original accepted command remains `ok({ id })` | No terminal event until recovery | Process state records retryable processing error |
+| DEP-CREATE-ASYNC-016 | integration | Public route verification failure preserves previous runtime | A reverse-proxy resource has a previously successful runtime and the replacement candidate starts, but generated or durable public route verification fails because DNS, proxy route readiness, or HTTP verification is not ready | `ok({ id })` | `deployment-failed` for the new attempt | Previous successful runtime and route remain active; failed candidate is removed or isolated; failure details include the observed public route error |
 
 ## Event Matrix
 

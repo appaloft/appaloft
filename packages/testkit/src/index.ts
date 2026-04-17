@@ -638,6 +638,25 @@ export class MemoryDomainBindingReadModel implements DomainBindingReadModel {
           tlsMode: domainBinding.tlsMode.value,
           certificatePolicy: domainBinding.certificatePolicy.value,
           status: domainBinding.status.value,
+          ...(domainBinding.dnsObservation
+            ? {
+                dnsObservation: {
+                  status: domainBinding.dnsObservation.status.value,
+                  expectedTargets: domainBinding.dnsObservation.expectedTargets.map(
+                    (target) => target.value,
+                  ),
+                  observedTargets: domainBinding.dnsObservation.observedTargets.map(
+                    (target) => target.value,
+                  ),
+                  ...(domainBinding.dnsObservation.checkedAt
+                    ? { checkedAt: domainBinding.dnsObservation.checkedAt.value }
+                    : {}),
+                  ...(domainBinding.dnsObservation.message
+                    ? { message: domainBinding.dnsObservation.message.value }
+                    : {}),
+                },
+              }
+            : {}),
           ...(domainBinding.routeFailure
             ? {
                 routeFailure: {

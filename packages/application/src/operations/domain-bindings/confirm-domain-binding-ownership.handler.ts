@@ -26,6 +26,7 @@ export class ConfirmDomainBindingOwnershipCommandHandler
       ...(command.verificationAttemptId
         ? { verificationAttemptId: command.verificationAttemptId }
         : {}),
+      ...(command.verificationMode ? { verificationMode: command.verificationMode } : {}),
       ...(command.confirmedBy ? { confirmedBy: command.confirmedBy } : {}),
       ...(command.evidence ? { evidence: command.evidence } : {}),
       ...(command.idempotencyKey ? { idempotencyKey: command.idempotencyKey } : {}),

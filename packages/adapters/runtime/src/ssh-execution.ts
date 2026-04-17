@@ -1618,15 +1618,19 @@ export class SshExecutionBackend implements ExecutionBackend {
         }),
         ...(proxyRoutePlanResult.value?.labels ?? []),
       ]);
+      const usesDirectHostPort =
+        state.runtimePlan.execution.metadata?.["resource.exposureMode"] === "direct-port";
+      const removeSupersededResourceContainersSpec =
+        dockerCommandBuilder.removeResourceContainers({
+          resourceId: state.resourceId.value,
+          currentContainerName: containerName,
+        });
       const runCommandSpec = RuntimeCommandBuilder.sequence([
         dockerCommandBuilder.removeContainer({
           containerName,
           ignoreMissing: true,
         }),
-        dockerCommandBuilder.removeResourceContainers({
-          resourceId: state.resourceId.value,
-          currentContainerName: containerName,
-        }),
+        ...(usesDirectHostPort ? [removeSupersededResourceContainersSpec] : []),
         dockerCommandBuilder.runContainer({
           image,
           containerName,
@@ -1638,21 +1642,20 @@ export class SshExecutionBackend implements ExecutionBackend {
           publishedPorts: [
             dockerCommandBuilder.publishPort({
               containerPort: port,
-              mode:
-                state.runtimePlan.execution.metadata?.["resource.exposureMode"] === "direct-port"
-                  ? "host-same-port"
-                  : "loopback-ephemeral",
+              mode: usesDirectHostPort ? "host-same-port" : "loopback-ephemeral",
             }),
           ],
         }),
       ]);
       const runCommand = renderRuntimeCommandString(runCommandSpec, { quote: shellQuote });
-      logs.push(
-        phaseLog(
-          "deploy",
-          `Release existing SSH containers for resource ${state.resourceId.value}`,
-        ),
-      );
+      if (usesDirectHostPort) {
+        logs.push(
+          phaseLog(
+            "deploy",
+            `Release existing SSH containers for resource ${state.resourceId.value}`,
+          ),
+        );
+      }
       logs.push(phaseLog("deploy", `Start SSH container ${containerName}`));
       const run = await this.runRemoteCommandStreaming({
         target,
@@ -2024,6 +2027,27 @@ export class SshExecutionBackend implements ExecutionBackend {
             logs.push(phaseLog("verify", `SSH public route is reachable at ${publicUrl}`));
           }
         }
+      }
+
+      if (!usesDirectHostPort) {
+        const cleanupCommand = renderRuntimeCommandString(removeSupersededResourceContainersSpec, {
+          quote: shellQuote,
+        });
+        const cleanup = this.runRemoteCommand({
+          target,
+          command: cleanupCommand,
+          cwd: runtimeDir,
+          env,
+        });
+        logs.push(
+          phaseLog(
+            "deploy",
+            cleanup.failed
+              ? `Failed to release superseded SSH containers for resource ${state.resourceId.value}`
+              : `Released superseded SSH containers for resource ${state.resourceId.value}`,
+            cleanup.failed ? "warn" : "info",
+          ),
+        );
       }
 
       deployment.applyExecutionResult(

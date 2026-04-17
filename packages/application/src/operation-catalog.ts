@@ -492,7 +492,7 @@ export const operationCatalog = [
     inputSchema: confirmDomainBindingOwnershipCommandInputSchema,
     serviceToken: tokens.confirmDomainBindingOwnershipUseCase,
     transports: {
-      cli: "appaloft domain-binding confirm-ownership <domainBindingId>",
+      cli: "appaloft domain-binding confirm-ownership <domainBindingId> [--verification-mode dns|manual]",
       orpc: {
         method: "POST",
         path: "/api/domain-bindings/{domainBindingId}/ownership-confirmations",

@@ -62,6 +62,7 @@ import {
 } from "@appaloft/application";
 import { type DomainError, ok, type Result } from "@appaloft/core";
 import { type DependencyContainer } from "tsyringe";
+import { PublicDnsDomainOwnershipVerifier } from "./domain-ownership-verifier";
 
 class ShellCertificateProviderSelectionPolicy implements CertificateProviderSelectionPolicy {
   async select(
@@ -90,6 +91,7 @@ export function registerApplicationServices(container: DependencyContainer): voi
     tokens.certificateProviderSelectionPolicy,
     ShellCertificateProviderSelectionPolicy,
   );
+  container.registerSingleton(tokens.domainOwnershipVerifier, PublicDnsDomainOwnershipVerifier);
   container.registerSingleton(tokens.createProjectUseCase, CreateProjectUseCase);
   container.registerSingleton(tokens.listProjectsQueryService, ListProjectsQueryService);
   container.registerSingleton(tokens.createResourceUseCase, CreateResourceUseCase);

@@ -47,6 +47,17 @@ export const domainVerificationMethods = ["manual"] as const;
 
 export type DomainVerificationMethod = (typeof domainVerificationMethods)[number];
 
+export const domainDnsObservationStatuses = [
+  "pending",
+  "matched",
+  "mismatch",
+  "unresolved",
+  "lookup_failed",
+  "skipped",
+] as const;
+
+export type DomainDnsObservationStatus = (typeof domainDnsObservationStatuses)[number];
+
 export const certificatePolicies = ["auto", "manual", "disabled"] as const;
 
 export type CertificatePolicy = (typeof certificatePolicies)[number];
@@ -160,6 +171,32 @@ export class DomainVerificationMethodValue extends ScalarValueObject<DomainVerif
   }
 }
 
+const domainDnsObservationStatusBrand: unique symbol = Symbol("DomainDnsObservationStatusValue");
+export class DomainDnsObservationStatusValue extends ScalarValueObject<DomainDnsObservationStatus> {
+  private [domainDnsObservationStatusBrand]!: void;
+
+  private constructor(value: DomainDnsObservationStatus) {
+    super(value);
+  }
+
+  static create(value: string): Result<DomainDnsObservationStatusValue> {
+    return createLiteralValue(
+      value,
+      domainDnsObservationStatuses,
+      "Domain DNS observation status",
+      (validated) => new DomainDnsObservationStatusValue(validated),
+    );
+  }
+
+  static rehydrate(value: DomainDnsObservationStatus): DomainDnsObservationStatusValue {
+    return new DomainDnsObservationStatusValue(value);
+  }
+
+  static pending(): DomainDnsObservationStatusValue {
+    return new DomainDnsObservationStatusValue("pending");
+  }
+}
+
 const certificatePolicyBrand: unique symbol = Symbol("CertificatePolicyValue");
 export class CertificatePolicyValue extends ScalarValueObject<CertificatePolicy> {
   private [certificatePolicyBrand]!: void;
@@ -253,6 +290,14 @@ export interface DomainRouteFailureState {
   errorMessage?: MessageText;
 }
 
+export interface DomainDnsObservationState {
+  status: DomainDnsObservationStatusValue;
+  expectedTargets: MessageText[];
+  observedTargets: MessageText[];
+  checkedAt?: CreatedAt;
+  message?: MessageText;
+}
+
 export interface DomainBindingState {
   id: DomainBindingId;
   projectId: ProjectId;
@@ -267,6 +312,7 @@ export interface DomainBindingState {
   certificatePolicy: CertificatePolicyValue;
   status: DomainBindingStatusValue;
   verificationAttempts: DomainVerificationAttemptState[];
+  dnsObservation?: DomainDnsObservationState;
   routeFailure?: DomainRouteFailureState;
   createdAt: CreatedAt;
   idempotencyKey?: IdempotencyKeyValue;
@@ -295,6 +341,7 @@ export class DomainBinding extends AggregateRoot<DomainBindingState> {
     certificatePolicy?: CertificatePolicyValue;
     verificationAttemptId: DomainVerificationAttemptId;
     verificationExpectedTarget: MessageText;
+    dnsExpectedTargets?: MessageText[];
     createdAt: CreatedAt;
     idempotencyKey?: IdempotencyKeyValue;
     correlationId?: string;
@@ -334,6 +381,16 @@ export class DomainBinding extends AggregateRoot<DomainBindingState> {
           createdAt: input.createdAt,
         },
       ],
+      ...(input.dnsExpectedTargets
+        ? {
+            dnsObservation: {
+              status: DomainDnsObservationStatusValue.pending(),
+              expectedTargets: [...input.dnsExpectedTargets],
+              observedTargets: [],
+              checkedAt: input.createdAt,
+            },
+          }
+        : {}),
       createdAt: input.createdAt,
       ...(input.idempotencyKey ? { idempotencyKey: input.idempotencyKey } : {}),
     });
@@ -363,7 +420,37 @@ export class DomainBinding extends AggregateRoot<DomainBindingState> {
     return new DomainBinding({
       ...state,
       verificationAttempts: [...state.verificationAttempts],
+      ...(state.dnsObservation
+        ? {
+            dnsObservation: {
+              ...state.dnsObservation,
+              expectedTargets: [...state.dnsObservation.expectedTargets],
+              observedTargets: [...state.dnsObservation.observedTargets],
+            },
+          }
+        : {}),
     });
+  }
+
+  recordDnsObservation(input: {
+    status: DomainDnsObservationStatusValue;
+    observedTargets?: MessageText[];
+    checkedAt: CreatedAt;
+    expectedTargets?: MessageText[];
+    message?: MessageText;
+  }): Result<void> {
+    const current = this.state.dnsObservation;
+    const expectedTargets = input.expectedTargets ?? current?.expectedTargets ?? [];
+
+    this.state.dnsObservation = {
+      status: input.status,
+      expectedTargets: [...expectedTargets],
+      observedTargets: [...(input.observedTargets ?? [])],
+      checkedAt: input.checkedAt,
+      ...(input.message ? { message: input.message } : {}),
+    };
+
+    return ok(undefined);
   }
 
   confirmOwnership(input: {
@@ -586,6 +673,15 @@ export class DomainBinding extends AggregateRoot<DomainBindingState> {
     return {
       ...this.state,
       verificationAttempts: [...this.state.verificationAttempts],
+      ...(this.state.dnsObservation
+        ? {
+            dnsObservation: {
+              ...this.state.dnsObservation,
+              expectedTargets: [...this.state.dnsObservation.expectedTargets],
+              observedTargets: [...this.state.dnsObservation.observedTargets],
+            },
+          }
+        : {}),
     };
   }
 }

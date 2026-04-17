@@ -149,6 +149,11 @@ Cleanup and replacement are resource-scoped:
 
 - a new deployment may replace older runtime instance(s) for the same resource after the adapter's
   chosen rollout strategy says it is safe;
+- reverse-proxy and route-mediated rollout strategies must keep the previous successful
+  same-resource runtime serving until the replacement candidate passes required health, route, and
+  public verification gates;
+- failed replacement candidates must be cleaned up separately from superseded successful runtime
+  instances;
 - it must not stop another resource because it shares the same internal port, image, service name,
   or container label shape;
 - Compose stack cleanup must use resource/deployment-scoped project identity, not global service

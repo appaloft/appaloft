@@ -6,7 +6,9 @@ Routing/domain/TLS is a durable lifecycle workflow separate from deployment rout
 
 ```text
 create durable domain binding
+  -> observe public DNS propagation
   -> confirm or verify domain ownership
+  -> prove route reachability when required
   -> bind domain routing
   -> evaluate route readiness
   -> request certificate when required
@@ -43,9 +45,9 @@ provider adapters, runtime route realization, and public read/query surfaces.
 
 | Actor | Responsibilities | Success Signal | Failure Branch |
 | --- | --- | --- | --- |
-| User/operator | Acquire or choose a domain, decide which resource owns it, configure DNS to point at the Appaloft edge address, provide manual ownership evidence for the v1 flow, and retry after fixing DNS/provider/proxy issues. | The requested hostname resolves to the Appaloft edge and the user can open the service URL. | DNS missing/wrong, ownership evidence absent, or user selects the wrong project/resource/server/destination. |
-| Appaloft | Admit commands, persist domain binding/certificate/deployment state, publish events after durable transitions, serve HTTP-01 tokens, select provider adapters through ports, realize proxy routes during deployment/redeploy, expose status through domain/certificate/resource read models, and record retryable failures without hiding them in logs only. | `domain-bindings.list`, `certificates.list`, and `resources.list` converge on `ready` state and a durable route URL tied to the latest realized deployment. | Admission `err(DomainError)`, `certificate-issuance-failed`, `domain-route-realization-failed`, or resource access summary reports no ready durable route. |
-| DNS provider/registrar | Host the public DNS records selected by the user, such as `A`, `AAAA`, or `CNAME` to the Appaloft edge address. | DNS queries return the edge address before challenge/traffic checks. | Propagation delay, wrong record, stale record, or provider outage. |
+| User/operator | Acquire or choose a domain, decide which resource owns it, configure DNS to point at the Appaloft edge address, wait for external DNS propagation when needed, request DNS-gated confirmation after DNS appears correct, provide explicit manual override evidence when Appaloft cannot observe DNS from its resolver context, and retry after fixing DNS/provider/proxy issues. | The requested hostname resolves to the Appaloft edge and the user can open the service URL. | DNS missing/wrong, ownership evidence absent, propagation still pending, or user selects the wrong project/resource/server/destination. |
+| Appaloft | Admit commands, persist domain binding/certificate/deployment state, publish events after durable transitions, record expected DNS targets and observed DNS/readiness state, perform DNS-gated ownership confirmation through an application port, serve HTTP-01 and future confirmation-file tokens, select provider adapters through ports, realize proxy routes during deployment/redeploy, expose status through domain/certificate/resource read models, and record retryable failures without hiding them in logs only. | `domain-bindings.list`, `certificates.list`, and `resources.list` converge on `ready` state and a durable route URL tied to the latest realized deployment. DNS observation reports `matched`, ownership confirmation succeeds, and route proof/readiness gates pass when required. | Admission `err(DomainError)`, `dnsObservation.status` remains `pending`/`unresolved`/`mismatch`/`lookup_failed`, DNS-gated confirmation returns `domain_ownership_unverified` or `dns_lookup_failed`, `certificate-issuance-failed`, `domain-route-realization-failed`, or resource access summary reports no ready durable route. |
+| DNS provider/registrar | Host and propagate the public DNS records selected by the user, such as `A`, `AAAA`, or `CNAME` to the Appaloft edge address. DNS propagation timing is outside Appaloft control. | DNS queries return the edge address before challenge/traffic checks. | Propagation delay, wrong record, stale record, resolver cache, split-horizon resolver mismatch, or provider outage. |
 | Certificate authority/provider | Validate HTTP-01 challenge when TLS is required and issue certificate material through the provider adapter. | `certificate-issued` and an active certificate with expiry/fingerprint metadata. | Challenge validation failure, account/config error, rate limit, unavailable provider, or storage failure. |
 | Edge proxy provider/runtime | Render route configuration, attach labels/config, reload or auto-activate the proxy, and route public requests to the deployed workload. | Deployment finishes with a route snapshot containing the durable domain and public route checks pass when enabled. | Route render failure, reload command failure, proxy unavailable, or public route health check failure. |
 
@@ -63,10 +65,22 @@ sequenceDiagram
 
   User->>DNS: Create A/CNAME for app.example.com to Appaloft edge
   User->>Appaloft: domain-bindings.create(app.example.com, resource, tlsMode)
-  Appaloft-->>User: accepted domainBindingId and expected verification target
+  Appaloft-->>User: accepted domainBindingId, expected DNS target, verification instructions
   Appaloft-->>Appaloft: domain-binding-requested
-  User->>Appaloft: domain-bindings.confirm-ownership(domainBindingId)
+  loop Until public DNS converges or user fixes records
+    Appaloft->>DNS: observe public DNS for app.example.com
+    DNS-->>Appaloft: pending, mismatch, lookup failure, or matched target
+    Appaloft-->>User: domain-bindings.list dnsObservation
+  end
+  User->>Appaloft: domain-bindings.confirm-ownership(domainBindingId, verificationMode=dns)
+  Appaloft->>DNS: Re-observe public DNS for confirmation evidence
+  DNS-->>Appaloft: matched expected target
   Appaloft-->>Appaloft: domain-bound
+  opt Route proof required
+    Appaloft->>Proxy: expose confirmation token route for host/path
+    Appaloft->>Proxy: GET /.well-known/appaloft-domain-confirmation/{token}
+    Proxy-->>Appaloft: expected token body
+  end
   alt TLS disabled
     Appaloft-->>Appaloft: domain-ready
   else TLS auto
@@ -93,10 +107,17 @@ flowchart TD
   B --> C["domain-bindings.create"]
   C -->|admission error| C1["Return DomainError; no event"]
   C --> D["domain-binding-requested"]
-  D --> E["domain-bindings.confirm-ownership"]
-  E -->|ownership/DNS not valid| E1["Remain pending or failed verification; no domain-bound"]
+  D --> D1["DNS observation"]
+  D1 -->|pending, unresolved, lookup_failed| D2["Keep binding pending; show expected/observed DNS and next wait/recheck guidance"]
+  D1 -->|mismatch| D3["Keep binding pending/not_ready; show wrong observed targets"]
+  D1 -->|matched| E["domain-bindings.confirm-ownership verificationMode=dns"]
+  D1 -->|user accepts external evidence| E0["domain-bindings.confirm-ownership verificationMode=manual"]
+  E -->|DNS no longer matches or lookup fails| E1["Record observation; remain pending; no domain-bound"]
+  E0 --> F
   E --> F["domain-bound"]
-  F --> G{"TLS required?"}
+  F --> F1{"Route proof required?"}
+  F1 -->|yes and proof fails| F2["Keep binding bound/not_ready; retry route proof; do not fail deployment admission"]
+  F1 -->|no or proof succeeds| G{"TLS required?"}
   G -->|no| H["domain-ready"]
   G -->|yes| I["certificate-requested"]
   I -->|provider/challenge/storage failure| I1["certificate-issuance-failed; failed or retry_scheduled attempt"]
@@ -206,6 +227,10 @@ Admission rejection returns `err(DomainError)` and must not publish lifecycle su
 Async work includes:
 
 - manual domain ownership verification with durable verification attempts;
+- public DNS observation against configured public resolvers;
+- waiting/rechecking when public DNS propagation is pending, stale, or resolver-specific;
+- confirmation-file or token route proof when a workflow requires proof that the hostname reaches
+  the Appaloft edge/proxy;
 - route/proxy realization when the binding is made active;
 - provider-owned proxy reload or dynamic route activation when route or certificate-backed proxy
   configuration changes;
@@ -219,6 +244,13 @@ Async work includes:
 
 Async work must persist state and publish formal events after durable transitions.
 
+DNS observation is async workflow work even when implemented as an immediate check. Appaloft owns
+the observation record and retry/wait guidance; the DNS provider/registrar owns propagation and
+record serving. A slow or stale public DNS answer must not make `domain-bindings.create` fail after
+admission, must not make `deployments.create` delete a previously serving runtime, and must not be
+reported only as a transient log line. The binding remains observable through
+`domain-bindings.list`.
+
 ## State Model
 
 Domain binding state:
@@ -230,6 +262,17 @@ bound
 certificate_pending
 ready
 failed | not_ready
+```
+
+DNS observation state:
+
+```text
+pending
+matched
+mismatch
+unresolved
+lookup_failed
+skipped
 ```
 
 Certificate state:
@@ -259,7 +302,9 @@ retry_scheduled
 | Event | Meaning | State impact |
 | --- | --- | --- |
 | `domain-binding-requested` | Binding request accepted. | Binding moves to `requested` or `pending_verification`. |
+| DNS observation | Public resolver state was observed for the requested hostname. | Binding remains visible with `dnsObservation`; DNS pending/mismatch does not publish `domain-bound`. |
 | `domain-bound` | Domain binding requirements satisfied after manual confirmation or future provider verification. | Binding moves to `bound`. |
+| route proof evaluation | Confirmation-file/token or Host-header proof reached the Appaloft edge/proxy. | Binding may continue toward readiness; failure remains waitable/retriable and does not erase the binding. |
 | route readiness evaluation | Route/proxy gates for the binding are satisfied or failed. | Binding may remain `bound`, move to `ready`, or move to `not_ready` when a route failure is recorded. |
 | `certificate-requested` | Certificate attempt accepted. | Certificate attempt moves to `requested` or `issuing`. |
 | `certificate-issued` | Certificate state is active. | Certificate moves to `active`; domain may move to `ready`. |
@@ -298,6 +343,13 @@ For TLS auto or certificate-policy auto bindings, route readiness alone is not s
 
 The route readiness baseline does not create a separate public command. It is an event/process-manager continuation from `domain-bound` and a query/read-model projection for resources and domain bindings.
 
+Route readiness must not depend on the local resolver used by the deployment worker when a direct
+edge/proxy Host-header probe can prove the route without waiting for public DNS. Public DNS
+observation remains useful for user guidance and certificate/domain readiness, but the deployment
+worker should prefer edge-proxy route checks that connect to the known edge address and send the
+intended `Host` header when possible. This keeps deployment replacement independent from external
+DNS propagation delay.
+
 Deployment planning must include deployable durable domain bindings for the same
 project/environment/resource/server/destination in the runtime access-route snapshot. This is what
 turns a confirmed binding into proxy configuration on the next deployment or redeploy. Bindings in
@@ -321,6 +373,33 @@ Route realization failure state is a domain binding process-manager continuation
 - publish `domain-route-realization-failed` only after the binding state is persisted;
 - leave `requested`, `pending_verification`, and `failed` bindings unchanged;
 - do not delete or recreate the binding.
+
+Public DNS pending or mismatch is recorded as DNS observation state, not as route realization
+failure, unless a configured public-route verification step explicitly chooses public resolver based
+health checks. Even then, the failure is retriable and must preserve any previous serving runtime.
+
+## DNS Observation And Confirmation-File Route Proof
+
+When a binding is requested, Appaloft must persist a safe DNS observation record containing the
+expected public target and current status. The initial status may be `pending` before any live lookup
+has run. A later observer may update it to `matched`, `mismatch`, `unresolved`, `lookup_failed`, or
+`skipped`.
+
+DNS observation records must be exposed through `domain-bindings.list` so Web, CLI, API, automation,
+and future MCP tools can show the user whether Appaloft is waiting for external DNS, seeing wrong
+targets, or ready for the next verification step.
+
+Confirmation-file route proof is a good pattern to borrow from platforms that verify hostname
+reachability by serving a generated token. Appaloft may use it for route proof with these rules:
+
+- Appaloft generates and persists a non-secret token/path for one binding/proof attempt.
+- The edge/proxy must serve the token only for the requested hostname and path scope.
+- Appaloft or the user-visible checker requests the token through the public route or a direct
+  edge-address plus `Host` header probe.
+- A matching token proves the route reaches Appaloft; it does not replace DNS observation or
+  registrar/provider ownership checks.
+- Failure keeps the binding waiting or not ready with a retriable route-proof observation; it must
+  not delete the binding or previously serving deployment runtime.
 
 ## HTTP-01 Challenge Serving
 
@@ -411,9 +490,10 @@ Deployment route snapshots may shape Docker labels, edge proxy requirements, pub
 
 Durable domain binding and certificate lifecycle must use `domain-bindings.create`, `certificates.issue-or-renew`, `certificates.import`, and their event flows.
 
-Manual ownership confirmation must use `domain-bindings.confirm-ownership`. Entry surfaces must not
-infer ownership from generated sslip/default access routes or from deployment runtime route
-snapshots.
+Ownership confirmation must use `domain-bindings.confirm-ownership`. DNS-gated confirmation is the
+default path. Explicit manual override may be exposed for operators and trusted automation, but entry
+surfaces must not infer ownership from generated sslip/default access routes or from deployment
+runtime route snapshots.
 
 ## Entry Boundaries
 
@@ -445,9 +525,14 @@ Current health checks can build public URLs from access routes.
 
 Current code now implements the `domain-bindings.create -> domain-binding-requested ->
 domain-bindings.confirm-ownership -> domain-bound` segment with durable `DomainBinding` state, a
-first manual verification attempt, PostgreSQL/PGlite persistence, oRPC/OpenAPI create/list/confirm
+first verification attempt, PostgreSQL/PGlite persistence, oRPC/OpenAPI create/list/confirm
 routes, CLI create/list/confirm commands, standalone and resource-scoped Web console create/list
 entrypoints, read-model listing, and command/query-level tests.
+
+Current code records initial DNS observation metadata during `domain-bindings.create`, including a
+`pending` status and expected target derived from the selected server/edge context. The observation
+is persisted with the binding and exposed through `domain-bindings.list` so the user can see that
+DNS propagation is a waiting state rather than a deployment failure.
 
 Current code implements the TLS-disabled route readiness baseline: `domain-bound` is consumed for
 eligible bindings, the binding is marked `ready`, `domain-ready` is published, and ready durable
@@ -477,8 +562,8 @@ Current code includes a real ACME provider adapter package that can be enabled t
 shell certificate-provider configuration. The default shell profile remains unavailable so tests and
 local development do not contact a real CA by accident.
 
-Outbox/inbox workflow, DNS-provider verification, and renewal-window scheduling are not implemented
-yet.
+Outbox/inbox workflow, live DNS lookup/recheck, DNS-provider verification, confirmation-file route
+proof, and renewal-window scheduling are not implemented yet.
 
 ## Open Questions
 

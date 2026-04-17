@@ -53,6 +53,9 @@ Required write-side ports:
 Required async/process ports:
 
 - `DomainVerificationPort`: represents manual verification confirmation first, then DNS lookup/provider verification later behind the same attempt model.
+- `DomainDnsObservationPort` or equivalent process capability: observes public resolver answers for
+  the binding hostname and records safe DNS observation state. This port is async/readiness
+  workflow infrastructure, not command admission.
 - `RouteRealizationPort`: checks or applies proxy route readiness when the binding moves toward ready.
 
 Adapters must keep provider credentials, DNS details, and proxy-specific implementation details outside `core`.
@@ -65,6 +68,8 @@ The minimal write-side model must include:
 - Owner scope governed by ADR-005.
 - States: `requested`, `pending_verification`, `bound`, `certificate_pending`, `ready`, `not_ready`, and failed/degraded state when needed by workflow specs.
 - A first durable verification attempt allocated before `domain-binding-requested`.
+- Initial DNS observation metadata with expected public target and waitable status when the target
+  can be derived from the selected edge/server context.
 - Verification attempt states such as `requested`, `pending`, `verified`, `failed`, and `retry_scheduled`.
 - Normalized uniqueness guard for active `(domainName, pathPrefix, ownerScope)` combinations.
 - Idempotency key support for repeated create attempts.
@@ -104,6 +109,8 @@ Required test coverage:
 - Duplicate active binding detection for the ADR-005 owner scope.
 - Command handler delegates through command bus/use case and returns typed `Result`.
 - Use case persists binding and first verification attempt before event publication.
+- Use case persists initial DNS observation metadata before event publication, so
+  `domain-bindings.list` can show pending DNS propagation immediately after command acceptance.
 - `domain-binding-requested` payload includes `verificationAttemptId`.
 - Verification success publishes `domain-bound`.
 - Verification failure records structured error state and does not publish `domain-bound`.
@@ -118,6 +125,7 @@ The minimal deliverable is:
 - write-side `DomainBinding` aggregate and repository;
 - `domain-bindings.create` command, schema, handler, use case, and operation catalog entry;
 - first manual verification attempt persistence;
+- initial DNS observation read-model visibility;
 - outbox/event publication for `domain-binding-requested`;
 - read-model status sufficient for UI/CLI/API to show accepted and pending-verification states;
 - Web entrypoints for both standalone cross-resource management and resource-scoped creation/listing from the resource detail page;
@@ -140,7 +148,9 @@ The first implementation slice now covers:
 - `DomainBinding` aggregate and write-side selection/mutation specs in `packages/core/src/runtime-topology`;
 - `domain-bindings.create` schema, command, handler, use case, operation catalog entry, and shell registration;
 - `DomainBindingRepository` and `DomainBindingReadModel` ports;
-- PostgreSQL/PGlite `domain_bindings` migration, repository, and read model;
+- PostgreSQL/PGlite `domain_bindings` migrations, repository, and read model;
+- initial `dnsObservation` aggregate state, persistence JSON, contract schema, and read-model
+  projection;
 - oRPC/OpenAPI `POST /api/domain-bindings` and `GET /api/domain-bindings`;
 - CLI `appaloft domain-binding create` and `appaloft domain-binding list`;
 - Web console standalone domain binding create/list entrypoint and resource-scoped resource detail create/list entrypoint;
@@ -148,7 +158,9 @@ The first implementation slice now covers:
 
 Remaining implementation gaps:
 
-- DNS/manual verification process manager that consumes `domain-binding-requested`;
+- live DNS/manual verification process manager that consumes `domain-binding-requested`;
+- user-triggered DNS recheck command or scheduler;
+- confirmation-file route proof token generation/serving;
 - `domain-bound` state transition and event publisher;
 - certificate issuance/renewal/import implementation;
 - `domain-ready` process-manager behavior and readiness read model;

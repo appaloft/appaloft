@@ -176,15 +176,14 @@ export class CreateDomainBindingUseCase {
         });
       }
 
-      const serverExists = Boolean(
-        await serverRepository.findOne(
-          repositoryContext,
-          DeploymentTargetByIdSpec.create(serverId),
-        ),
+      const server = await serverRepository.findOne(
+        repositoryContext,
+        DeploymentTargetByIdSpec.create(serverId),
       );
-      if (!serverExists) {
+      if (!server) {
         return err(domainError.notFound("Server", serverId.value));
       }
+      const serverState = server.toState();
 
       const destination = await destinationRepository.findOne(
         repositoryContext,
@@ -230,6 +229,7 @@ export class CreateDomainBindingUseCase {
       const verificationExpectedTarget = yield* MessageText.create(
         `Manual verification required for ${domainName.value}`,
       );
+      const dnsExpectedTarget = yield* MessageText.create(serverState.host.value);
 
       const domainBinding = yield* DomainBinding.create({
         id: domainBindingId,
@@ -245,6 +245,7 @@ export class CreateDomainBindingUseCase {
         ...(certificatePolicy ? { certificatePolicy } : {}),
         verificationAttemptId,
         verificationExpectedTarget,
+        dnsExpectedTargets: [dnsExpectedTarget],
         createdAt,
         ...(idempotencyKey ? { idempotencyKey } : {}),
         correlationId: context.requestId,

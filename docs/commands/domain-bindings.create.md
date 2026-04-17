@@ -17,6 +17,8 @@ The command contract is:
 - admission failure returns `err(DomainError)`;
 - accepted requests return `ok({ id })`;
 - accepted requests persist a domain binding state such as `requested` or `pending_verification`;
+- accepted requests persist the expected public DNS target and initial DNS observation state when
+  the target can be derived safely;
 - accepted requests publish `domain-binding-requested`;
 - DNS/proxy/certificate readiness progresses asynchronously.
 
@@ -85,8 +87,9 @@ The command must:
 7. Reject durable bindings when the target resolves to no edge proxy provider or to a provider that does not support durable domain routes.
 8. Persist a durable binding in `requested` or `pending_verification`.
 9. Allocate and persist the first domain verification attempt id according to ADR-006.
-10. Publish or record `domain-binding-requested` with the verification attempt id.
-11. Return `ok({ id })`.
+10. Persist initial DNS observation state such as `pending` with the expected Appaloft edge target.
+11. Publish or record `domain-binding-requested` with the verification attempt id.
+12. Return `ok({ id })`.
 
 ## Async Progression
 
@@ -95,6 +98,7 @@ Required progression:
 ```text
 domain-bindings.create
   -> domain-binding-requested
+  -> DNS observation pending | matched | mismatch | unresolved | lookup_failed
   -> domain-bound
   -> certificate-requested, when certificatePolicy is auto
   -> certificate-issued | certificate-issuance-failed
@@ -129,7 +133,7 @@ All errors use [Error Model](../errors/model.md). Command-specific codes and pha
 | `domain_binding_context_mismatch` | `context-resolution` | No | Resource, environment, server, destination, or project relationship is inconsistent. |
 | `infra_error` | `domain-binding-persistence` or `event-publication` | Conditional | Binding could not be safely persisted or event recorded. |
 
-DNS verification, proxy route realization, and certificate failures after acceptance are async-processing failures and must be represented through binding/certificate state and events.
+DNS verification, public DNS propagation, proxy route realization, and certificate failures after acceptance are async-processing failures and must be represented through binding/certificate state, DNS observation, route proof/readiness state, and events where applicable. A pending or stale public DNS answer after command admission must not turn command success into failure.
 
 ## Handler Boundary
 
@@ -171,8 +175,11 @@ Current code now includes a first-class `DomainBinding` aggregate, repository po
 Current `domain-bindings.create` persists the binding in `pending_verification`, allocates the first manual verification attempt, publishes `domain-binding-requested`, returns `ok({ id })`, rejects `proxyKind = none`, detects active owner-scope duplicates, and supports idempotency key reuse. The `proxyKind` field is now provider-selection migration data; the target command resolves edge proxy provider eligibility through server/target state and optional `edgeProxyProviderKey`.
 
 `domain-bindings.confirm-ownership` now implements the manual confirmation step that publishes
-`domain-bound`. Certificate issuance and `domain-ready` process-manager behavior are not
-implemented yet.
+`domain-bound`. Certificate issuance and `domain-ready` process-manager behavior are implemented as
+separate follow-on workflow steps outside `domain-bindings.create`.
+
+Current code records initial DNS observation metadata on accepted bindings, but live public DNS
+lookup, user-triggered recheck, and confirmation-file route proof remain follow-up workflow work.
 
 ## Open Questions
 

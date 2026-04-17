@@ -189,6 +189,8 @@ Runtime target abstraction Code Rounds should add tests for:
   `runtime-target-resolution` before acceptance when safe to detect;
 - accepted deployment failure from target apply/verify keeps command result accepted and records
   `deployment-failed`;
+- reverse-proxy replacement starts a candidate without deleting the previous same-resource runtime
+  and cleans up only the failed candidate when health, route, or public verification fails;
 - runtime logs and health queries return normalized shapes regardless of target backend;
 - target backend registry does not require Web/CLI/API transport-specific input;
 - Docker/Compose cleanup remains resource-scoped after the registry is introduced;

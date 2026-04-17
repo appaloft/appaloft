@@ -12,6 +12,7 @@ import {
   DestinationName,
   DomainBindingByIdSpec,
   DomainBindingId,
+  DomainDnsObservationStatusValue,
   type DomainEvent,
   EdgeProxyKindValue,
   Environment,
@@ -19,6 +20,7 @@ import {
   EnvironmentKindValue,
   EnvironmentName,
   HostAddress,
+  MessageText,
   PortNumber,
   Project,
   ProjectId,
@@ -33,6 +35,7 @@ import {
   TlsModeValue,
   UpsertDeploymentTargetSpec,
   UpsertDestinationSpec,
+  UpsertDomainBindingSpec,
   UpsertEnvironmentSpec,
   UpsertProjectSpec,
   UpsertResourceSpec,
@@ -171,7 +174,7 @@ async function seedRoutingContext(input?: {
 }
 
 describe("CreateDomainBindingUseCase", () => {
-  test("accepts a durable domain binding request and publishes domain-binding-requested", async () => {
+  test("ROUTE-TLS-EVT-013 ROUTE-TLS-READMODEL-008 accepts a binding and exposes pending DNS observation", async () => {
     const { context, domainBindings, eventBus, repositoryContext, useCase } =
       await seedRoutingContext();
 
@@ -198,6 +201,13 @@ describe("CreateDomainBindingUseCase", () => {
     expect(persistedState?.pathPrefix.value).toBe("/");
     expect(persistedState?.status.value).toBe("pending_verification");
     expect(persistedState?.verificationAttempts[0]?.id.value).toBe("dva_0002");
+    expect(persistedState?.dnsObservation?.status.value).toBe("pending");
+    expect(persistedState?.dnsObservation?.expectedTargets.map((target) => target.value)).toEqual([
+      "127.0.0.1",
+    ]);
+    expect(persistedState?.dnsObservation?.observedTargets.map((target) => target.value)).toEqual(
+      [],
+    );
 
     const event = domainBindingRequestedEvent(eventBus.events);
     expect(event.aggregateId).toBe(id);
@@ -324,7 +334,7 @@ describe("CreateDomainBindingUseCase", () => {
     expect(TlsModeValue.create("auto").isOk()).toBe(true);
   });
 
-  test("lists accepted domain bindings through the read model query service", async () => {
+  test("ROUTE-TLS-READMODEL-008 lists accepted domain bindings with pending DNS observation", async () => {
     const { context, readModel, useCase } = await seedRoutingContext();
 
     const result = await useCase.execute(context, {
@@ -351,7 +361,72 @@ describe("CreateDomainBindingUseCase", () => {
       pathPrefix: "/",
       proxyKind: "traefik",
       status: "pending_verification",
+      dnsObservation: {
+        status: "pending",
+        expectedTargets: ["127.0.0.1"],
+        observedTargets: [],
+        checkedAt: "2026-01-01T00:00:00.000Z",
+      },
       verificationAttemptCount: 1,
+    });
+  });
+
+  test("ROUTE-TLS-READMODEL-009 lists matched DNS observation without confirming ownership", async () => {
+    const { context, domainBindings, readModel, repositoryContext, useCase } =
+      await seedRoutingContext();
+
+    const result = await useCase.execute(context, {
+      projectId: "prj_demo",
+      environmentId: "env_demo",
+      resourceId: "res_demo",
+      serverId: "srv_demo",
+      destinationId: "dst_demo",
+      domainName: "www.example.com",
+      proxyKind: "traefik",
+    });
+    expect(result.isOk()).toBe(true);
+
+    const id = result._unsafeUnwrap().id;
+    const persisted = await domainBindings.findOne(
+      repositoryContext,
+      DomainBindingByIdSpec.create(DomainBindingId.rehydrate(id)),
+    );
+    expect(persisted).toBeTruthy();
+
+    persisted
+      ?.recordDnsObservation({
+        status: DomainDnsObservationStatusValue.rehydrate("matched"),
+        observedTargets: [MessageText.rehydrate("127.0.0.1")],
+        checkedAt: CreatedAt.rehydrate("2026-01-01T00:01:00.000Z"),
+        message: MessageText.rehydrate("Public DNS matches expected Appaloft edge target"),
+      })
+      ._unsafeUnwrap();
+
+    if (persisted) {
+      await domainBindings.upsert(
+        repositoryContext,
+        persisted,
+        UpsertDomainBindingSpec.fromDomainBinding(persisted),
+      );
+    }
+
+    const queryService = new ListDomainBindingsQueryService(readModel);
+    const listed = await queryService.execute(context, {
+      projectId: "prj_demo",
+      environmentId: "env_demo",
+      resourceId: "res_demo",
+    });
+
+    expect(listed.items[0]).toMatchObject({
+      domainName: "www.example.com",
+      status: "pending_verification",
+      dnsObservation: {
+        status: "matched",
+        expectedTargets: ["127.0.0.1"],
+        observedTargets: ["127.0.0.1"],
+        checkedAt: "2026-01-01T00:01:00.000Z",
+        message: "Public DNS matches expected Appaloft edge target",
+      },
     });
   });
 });

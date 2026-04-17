@@ -688,6 +688,7 @@ export const createDomainBindingResponseSchema = z.object({
 export const confirmDomainBindingOwnershipInputSchema = z.object({
   domainBindingId: z.string().min(1),
   verificationAttemptId: z.string().min(1).optional(),
+  verificationMode: z.enum(["dns", "manual"]).optional(),
   confirmedBy: z.string().min(1).optional(),
   evidence: z.string().min(1).optional(),
   idempotencyKey: z.string().min(1).optional(),
@@ -719,6 +720,15 @@ export const domainBindingSummarySchema = z.object({
     "not_ready",
     "failed",
   ]),
+  dnsObservation: z
+    .object({
+      status: z.enum(["pending", "matched", "mismatch", "unresolved", "lookup_failed", "skipped"]),
+      expectedTargets: z.array(z.string()),
+      observedTargets: z.array(z.string()),
+      checkedAt: z.string().optional(),
+      message: z.string().optional(),
+    })
+    .optional(),
   verificationAttemptCount: z.number(),
   createdAt: z.string(),
 });

@@ -93,7 +93,9 @@ Admission errors reject the command and return `err(DomainError)`.
 | `conflict` | `domain-binding-admission` | No | Duplicate active binding conflicts with the command. |
 | `domain_binding_proxy_required` | `domain-binding-admission` | No | Durable domain binding requested with proxy disabled. |
 | `domain_binding_context_mismatch` | `context-resolution` | No | Referenced project/environment/resource/server/destination relationship is inconsistent. |
-| `domain_verification_not_pending` | `domain-verification` | No | Ownership confirmation was requested but no pending manual verification attempt can be confirmed. |
+| `domain_verification_not_pending` | `domain-verification` | No | Ownership confirmation was requested but no pending verification attempt can be confirmed. |
+| `domain_ownership_unverified` | `domain-verification` | No | DNS-gated ownership confirmation did not observe the expected target. |
+| `dns_lookup_failed` | `domain-verification` | Yes | DNS-gated ownership confirmation could not complete a public DNS lookup through configured resolvers. |
 | `invariant_violation` | `domain-verification` | No | Binding state cannot transition to the requested verification or bound state. |
 | `certificate_not_allowed` | `certificate-admission` | No | Binding TLS policy does not allow issuance or renewal. |
 | `certificate_attempt_conflict` | `certificate-admission` | No | Duplicate in-flight certificate attempt conflicts with the command. |
@@ -153,8 +155,9 @@ Current `domain-bindings.create` returns structured errors for validation, missi
 
 Current code has durable domain binding state, a domain binding read model, API/CLI list query, and Web console create/list entrypoint for accepted/pending-verification state.
 
-Current code has manual ownership confirmation through `domain-bindings.confirm-ownership`, including
-`domain-bound` publication and bound-state read-model visibility.
+Current code has ownership confirmation through `domain-bindings.confirm-ownership`, including
+DNS-gated confirmation, explicit manual override, `domain-bound` publication, and bound-state
+read-model visibility.
 
 Current code adds TLS-disabled `domain-ready` state after `domain-bound` and resource access summary
 projection for ready durable domain routes.

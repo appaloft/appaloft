@@ -22,6 +22,7 @@ minimal v1 workflow path is:
 ```text
 resource/deployment context exists
   -> domain-bindings.create
+  -> domain-bindings.list exposes DNS observation while public DNS is pending or matched
   -> domain-bindings.confirm-ownership
   -> domain-ready when gates pass
   -> deployments.create or redeploy realizes the durable route
@@ -92,10 +93,13 @@ Then:
 | ROUTE-TLS-CMD-004 | integration | Create binding without proxy-capable target | Durable binding requested without an eligible edge proxy provider | `err` | `domain_binding_proxy_required`, phase `domain-binding-admission` | None | No binding created | No |
 | ROUTE-TLS-CMD-005 | integration | Duplicate binding | Same normalized domain/path/scope already active | `err` | `conflict`, phase `domain-binding-admission` | None | No duplicate binding | No |
 | ROUTE-TLS-CMD-006 | integration | Context mismatch | Resource/server/destination/environment/project mismatch | `err` | `domain_binding_context_mismatch`, phase `context-resolution` | None | No binding created | No |
-| ROUTE-TLS-CMD-007 | integration | Confirm manual ownership | Pending manual verification attempt | `ok({ id, verificationAttemptId })` | None | `domain-bound` | Binding `bound`; attempt `verified` | No |
+| ROUTE-TLS-CMD-007 | integration | Confirm manual ownership override | Pending verification attempt with `verificationMode = manual` | `ok({ id, verificationAttemptId })` | None | `domain-bound` | Binding `bound`; attempt `verified`; DNS verifier not called | No |
 | ROUTE-TLS-CMD-008 | integration | Confirm missing binding | Unknown `domainBindingId` | `err` | `not_found`, phase `domain-verification` | None | No binding mutation | No |
-| ROUTE-TLS-CMD-009 | integration | Confirm with no pending attempt | Binding already failed, ready, or has no pending manual attempt | `err` | `domain_verification_not_pending`, phase `domain-verification` | None | Binding unchanged | No |
+| ROUTE-TLS-CMD-009 | integration | Confirm with no pending attempt | Binding already failed, ready, or has no pending verification attempt | `err` | `domain_verification_not_pending`, phase `domain-verification` | None | Binding unchanged | No |
 | ROUTE-TLS-CMD-010 | integration | Confirm already bound attempt | Same `verificationAttemptId` after previous confirmation | idempotent `ok({ id, verificationAttemptId })` | None | No duplicate `domain-bound` | Binding remains `bound` | No |
+| ROUTE-TLS-CMD-016 | integration | Confirm DNS ownership match | Pending verification attempt with default `verificationMode = dns`; verifier observes expected target | `ok({ id, verificationAttemptId })` | None | `domain-bound` | Binding `bound`; attempt `verified`; `dnsObservation.status = matched` with safe observed targets | No |
+| ROUTE-TLS-CMD-017 | integration | Confirm DNS ownership mismatch | Pending verification attempt with default `verificationMode = dns`; verifier observes a wrong target | `err` | `domain_ownership_unverified`, phase `domain-verification` | None | Binding remains `pending_verification`; attempt remains `pending`; `dnsObservation.status = mismatch` | No until DNS/config changes |
+| ROUTE-TLS-CMD-018 | integration | Confirm DNS lookup failure | Pending verification attempt with default `verificationMode = dns`; verifier cannot complete lookup | `err` | `dns_lookup_failed`, phase `domain-verification` | None | Binding remains `pending_verification`; attempt remains `pending`; `dnsObservation.status = lookup_failed` | Yes |
 | ROUTE-TLS-CMD-011 | integration | Issue certificate | Bound domain with TLS auto | `ok({ certificateId, attemptId })` | None | `certificate-requested` | Certificate attempt requested | No |
 | ROUTE-TLS-CMD-012 | integration | Issue with injected default certificate provider/challenge | Bound domain with route supporting the injected default; provider omitted | `ok({ certificateId, attemptId })` | None | `certificate-requested` with selected `providerKey = acme`, `challengeType = http-01` | Certificate attempt requested | No |
 | ROUTE-TLS-CMD-013 | integration | Issue certificate for missing binding | Unknown `domainBindingId` | `err` | `not_found`, phase `certificate-context-resolution` | None | No certificate attempt | No |
@@ -107,6 +111,7 @@ Then:
 | Test ID | Preferred automation | Case | Given event | Existing state | Expected result | Expected follow-up event | Expected state | Retriable |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | ROUTE-TLS-EVT-001 | integration | Binding requested records manual verification | `domain-binding-requested` | Binding pending verification | `ok` | None until `domain-bindings.confirm-ownership` | Binding remains pending verification | No |
+| ROUTE-TLS-EVT-013 | integration | Binding requested records DNS observation expectation | `domain-binding-requested` | Binding pending verification with expected edge target | `ok` | None until DNS observation/confirmation progresses | Binding read model exposes DNS observation `pending` with safe expected target | Yes; DNS propagation is waitable |
 | ROUTE-TLS-EVT-002 | integration | Binding requested fails verification | `domain-binding-requested` | Ownership evidence missing | `ok` after recording failure | None | Binding not ready; verification failed | No until DNS/config/evidence changes |
 | ROUTE-TLS-EVT-003 | integration | Domain bound with TLS auto | `domain-bound` | Certificate required | `ok` | `certificate-requested` | Certificate attempt requested | No |
 | ROUTE-TLS-EVT-004 | integration | Domain bound with TLS disabled | `domain-bound` | Route readiness satisfied; no certificate required | `ok` | `domain-ready` | Binding ready | No |
@@ -130,6 +135,8 @@ Then:
 | ROUTE-TLS-READMODEL-005 | integration | Certificate terminal list projection | `certificate-requested` handler recorded issued or failed attempt state | `certificates.list` returns certificate `active` with latest attempt `issued`, expiry/fingerprint metadata when issued, or `failed`/`retry_scheduled` with safe failure metadata when issuance failed |
 | ROUTE-TLS-READMODEL-006 | integration | Certificate-backed durable HTTPS route projection | TLS-auto binding consumed `certificate-issued`, published `domain-ready`, and a latest succeeded reverse-proxy deployment exists | `resources.list` exposes `accessSummary.latestDurableDomainRoute` as `https://<domain>` while preserving generated access when present |
 | ROUTE-TLS-READMODEL-007 | integration | Route failure binding list projection | Active binding consumed route realization failure and published `domain-route-realization-failed` | `domain-bindings.list` returns `status = not_ready` and safe route failure metadata without exposing provider secrets |
+| ROUTE-TLS-READMODEL-008 | integration | DNS pending binding list projection | `domain-bindings.create` accepted a binding before public DNS has converged | `domain-bindings.list` returns `dnsObservation.status = pending`, expected target metadata, and no `domain-bound` implication |
+| ROUTE-TLS-READMODEL-009 | integration | DNS matched binding list projection | DNS observer records the expected public target for a pending binding | `domain-bindings.list` returns `dnsObservation.status = matched` with observed targets and keeps ownership confirmation as a separate gate |
 
 ## Workflow Matrix
 
@@ -137,6 +144,8 @@ Then:
 | --- | --- | --- | --- | --- |
 | ROUTE-TLS-WORKFLOW-001 | e2e-preferred | CLI durable domain binding realized on redeploy | CLI creates a deployment context, creates and confirms a TLS-disabled durable binding, then redeploys the resource | The redeployment runtime plan contains the durable domain access route, `domain-bindings.list` reports `ready`, and `resources.list` exposes `latestDurableDomainRoute` for the redeployment |
 | ROUTE-TLS-WORKFLOW-002 | e2e-preferred, opt-in Docker | Durable domain reaches service through proxy | Docker/proxy e2e creates and confirms a TLS-disabled durable binding, redeploys the resource, then calls the proxy on `127.0.0.1` with `Host: <domain>` | The proxy returns the deployed service health/body for the durable domain without requiring public DNS registration |
+| ROUTE-TLS-WORKFLOW-003 | e2e-preferred | DNS propagation pending is waitable | CLI/API creates a domain binding for a domain whose public DNS has not converged | Binding remains accepted and observable as `pending_verification` with `dnsObservation.status = pending`; deployment replacement and previously serving runtime are not failed only because public DNS is pending |
+| ROUTE-TLS-WORKFLOW-004 | integration, opt-in public route | Confirmation-file route proof | Binding has generated route-proof token and edge/proxy can serve the requested host/path | A public request or direct edge-address plus `Host` header request returns the exact token body; proof success is route reachability evidence, not a replacement for DNS observation |
 
 ## HTTP Challenge Serving Matrix
 
@@ -145,6 +154,8 @@ Then:
 | ROUTE-TLS-CHALLENGE-001 | adapter integration | Published HTTP-01 token | Challenge token store contains token and key authorization for the requested host | `GET /.well-known/acme-challenge/{token}` returns `200`, `text/plain`, `no-store`, and the exact key authorization body |
 | ROUTE-TLS-CHALLENGE-002 | adapter integration | Missing HTTP-01 token | Challenge route receives an unknown token | Response is `404` and does not return Web/static fallback content |
 | ROUTE-TLS-CHALLENGE-003 | adapter integration | Host mismatch | Challenge token exists for another domain | Response is `404`; provider adapters must publish host-scoped entries when host scoping is required |
+| ROUTE-TLS-CHALLENGE-004 | adapter integration | Appaloft confirmation file token | Confirmation-file token store contains a token for the requested host/path | `GET /.well-known/appaloft-domain-confirmation/{token}` returns `200`, `text/plain`, `no-store`, and the exact token only for the matching host/path |
+| ROUTE-TLS-CHALLENGE-005 | adapter integration | Confirmation file host mismatch | Confirmation-file token exists for another domain | Response is `404`; route proof must be host-scoped and must not fall through to Web/static fallback |
 
 ## Certificate Provider Adapter Matrix
 
@@ -180,6 +191,8 @@ Then:
 | ROUTE-TLS-ASYNC-009 | integration | Certificate import storage failed | `certificate-import-storage` | `certificate_import_storage_failed` | Import attempt retryable/unknown | No `certificate-imported` | Yes when storage can recover |
 | ROUTE-TLS-ASYNC-010 | integration | Invalid state transition | lifecycle transition | `invariant_violation` | Unchanged | No success event | No |
 | ROUTE-TLS-ASYNC-011 | integration | Worker crash before final persistence | `event-consumption` | `retryable_error` | Attempt retryable/unknown | No terminal event | Yes |
+| ROUTE-TLS-ASYNC-012 | integration | Public DNS propagation pending | `dns-observation` | None; waitable observation state | Binding remains `pending_verification` or `not_ready` with `dnsObservation.status = pending` | No success event | Yes; next observer tick or user recheck |
+| ROUTE-TLS-ASYNC-013 | integration | Public DNS resolves to wrong target | `dns-observation` | None; waitable mismatch observation state | Binding remains `pending_verification` or `not_ready` with `dnsObservation.status = mismatch` and safe observed targets | No success event | Yes after DNS/config changes |
 
 ## Deployment Boundary Matrix
 
@@ -203,8 +216,8 @@ Then:
 | ROUTE-TLS-ENTRY-007 | e2e-preferred | Resource detail confirms ownership | User confirms a pending binding from `/resources/:resourceId` | Same `domain-bindings.confirm-ownership` result as API/CLI | Per command error contract | `domain-bound` on success | Binding status becomes `bound` in resource-scoped list |
 | ROUTE-TLS-ENTRY-008 | e2e-preferred | Standalone page confirms ownership | User confirms a pending binding from `/domain-bindings` | Same command semantics as resource detail | Per command error contract | `domain-bound` on success | Binding status becomes `bound` in standalone list |
 | ROUTE-TLS-ENTRY-009 | e2e-preferred | Generated default access is not a binding | Resource has sslip/default generated access but no custom binding | Generated URL appears in access summary; custom domain binding list remains empty | None | No domain binding event | No `DomainBinding` row is created |
-| ROUTE-TLS-ENTRY-010 | e2e-preferred | CLI confirms ownership | CLI passes `domain-binding confirm-ownership <domainBindingId>` after creating a pending binding | `ok({ id, verificationAttemptId })` is printed | Per command error contract | `domain-bound` on success | `domain-binding list` shows the binding as `bound` |
-| ROUTE-TLS-ENTRY-011 | e2e-preferred | API confirms ownership | HTTP/oRPC posts to `/api/domain-bindings/{domainBindingId}/ownership-confirmations` after creating a pending binding | `ok({ id, verificationAttemptId })` response | Per command error contract | `domain-bound` on success | `GET /api/domain-bindings` shows the binding as `bound` |
+| ROUTE-TLS-ENTRY-010 | e2e-preferred | CLI confirms ownership | CLI passes `domain-binding confirm-ownership <domainBindingId>` after creating a pending binding; tests may use explicit `--verification-mode manual` to avoid public DNS dependency | `ok({ id, verificationAttemptId })` is printed | Per command error contract | `domain-bound` on success | `domain-binding list` shows the binding as `bound` |
+| ROUTE-TLS-ENTRY-011 | e2e-preferred | API confirms ownership | HTTP/oRPC posts to `/api/domain-bindings/{domainBindingId}/ownership-confirmations` after creating a pending binding; tests may send `verificationMode = manual` to avoid public DNS dependency | `ok({ id, verificationAttemptId })` response | Per command error contract | `domain-bound` on success | `GET /api/domain-bindings` shows the binding as `bound` |
 | ROUTE-TLS-ENTRY-012 | e2e-preferred | CLI observes TLS-disabled ready route | CLI creates a TLS-disabled binding, confirms ownership, then lists resources | `ok({ id, verificationAttemptId })` is printed | Per command error contract | `domain-bound` then `domain-ready` | `resource list` shows `accessSummary.latestDurableDomainRoute.url` for the custom domain |
 | ROUTE-TLS-ENTRY-013 | e2e-preferred | CLI requests certificate issuance | CLI creates and confirms a TLS-auto binding, then runs `certificate issue-or-renew` | `ok({ certificateId, attemptId })` is printed | Per command error contract | `certificate-requested`, then `certificate-issuance-failed` when no provider is configured | `certificate list` shows the certificate and latest attempt; in the default shell profile this is `failed`/`retry_scheduled` with `certificate_provider_unavailable` |
 | ROUTE-TLS-ENTRY-014 | e2e-preferred | API requests certificate issuance | HTTP/oRPC creates and confirms a TLS-auto binding, then posts `/api/certificates/issue-or-renew` | `ok({ certificateId, attemptId })` response | Per command error contract | `certificate-requested`, then `certificate-issuance-failed` when no provider is configured | `GET /api/certificates` shows the certificate and latest attempt; in the default shell profile this is `failed`/`retry_scheduled` with `certificate_provider_unavailable` |
@@ -227,12 +240,19 @@ Existing tests cover runtime access-route value objects, runtime plan access rou
 
 Current tests also cover `domain-bindings.create` admission, first verification attempt persistence, `domain-binding-requested` event payload, idempotency key reuse, duplicate active owner-scope rejection, `proxyKind = none` rejection, context mismatch rejection, domain/path/proxy/TLS value-object validation, and `domain-bindings.list` query-service read-model output. `proxyKind` assertions are now migration coverage; target tests should assert proxy-capable provider eligibility.
 
+Current tests cover `ROUTE-TLS-EVT-013`, `ROUTE-TLS-READMODEL-008`,
+`ROUTE-TLS-READMODEL-009`, and `ROUTE-TLS-WORKFLOW-003` for initial DNS observation persistence,
+pending DNS observation read-model visibility, matched DNS observation visibility without treating
+DNS match as manual ownership confirmation, and CLI-visible pending DNS propagation before manual
+ownership confirmation.
+
 Current Web implementation includes both a standalone `/domain-bindings` surface and a resource-scoped `/resources/:resourceId` surface, but resource-scoped browser/e2e coverage is not implemented yet.
 
-Current tests cover manual ownership confirmation through `domain-bindings.confirm-ownership`,
-including `domain-bound`, idempotent repeated confirmation, no-pending-attempt rejection, and
-read-model status projection. Shell e2e coverage also verifies CLI and HTTP confirmation entrypoints
-through the public domain binding list read model.
+Current tests cover ownership confirmation through `domain-bindings.confirm-ownership`, including
+DNS-gated confirmation, explicit manual override, DNS mismatch/lookup-failure rejection,
+`domain-bound`, idempotent repeated confirmation, no-pending-attempt rejection, and read-model status
+projection. Shell e2e coverage also verifies CLI and HTTP confirmation entrypoints through the public
+domain binding list read model.
 
 Current tests cover `ROUTE-TLS-EVT-004`, `ROUTE-TLS-READMODEL-001`,
 `ROUTE-TLS-READMODEL-002`, `ROUTE-TLS-READMODEL-003`, and `ROUTE-TLS-ENTRY-012`.
@@ -279,9 +299,10 @@ Current certificate retry scheduler tests cover `ROUTE-TLS-SCHED-001..004` for d
 dispatch, future retry skip, in-flight skip, and repeated-tick idempotency. Shell wiring keeps
 long-running timer execution out of CLI one-shot commands.
 
-Current tests do not yet cover DNS-provider verification workflow, certificate validation failure
-branches, event replay handling beyond the create/confirm/domain-ready/certificate-issued baseline,
-resource-scoped browser/e2e behavior, renewal-window scheduling, or live CA behavior.
+Current tests do not yet cover live DNS lookup/recheck, DNS-provider verification workflow,
+confirmation-file route proof serving, certificate validation failure branches, event replay
+handling beyond the create/confirm/domain-ready/certificate-issued baseline, resource-scoped
+browser/e2e behavior, renewal-window scheduling, or live CA behavior.
 
 Generated default access routing tests are governed by [Default Access Domain And Proxy Routing Test Matrix](./default-access-domain-and-proxy-routing-test-matrix.md) and must remain separate from durable domain binding readiness tests.
 

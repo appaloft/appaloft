@@ -14,6 +14,7 @@ export const tokens = {
   resourceRepository: Symbol.for("appaloft.resource_repository"),
   deploymentRepository: Symbol.for("appaloft.deployment_repository"),
   domainBindingRepository: Symbol.for("appaloft.domain_binding_repository"),
+  domainOwnershipVerifier: Symbol.for("appaloft.domain_ownership_verifier"),
   domainRouteFailureCandidateReader: Symbol.for("appaloft.domain_route_failure_candidate_reader"),
   domainRouteBindingReader: Symbol.for("appaloft.domain_route_binding_reader"),
   certificateRepository: Symbol.for("appaloft.certificate_repository"),
