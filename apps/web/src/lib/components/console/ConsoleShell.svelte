@@ -254,10 +254,11 @@
   <Sidebar variant="inset" collapsible="icon">
     <SidebarHeader class="gap-3">
       <a class="flex items-center gap-3 px-2 py-2" href="/">
-        <Avatar size="sm">
-          <img src={appaloftLogoMark} alt={$t(i18nKeys.common.app.productName)} class="size-full object-cover" />
-          <AvatarFallback>{initials("Appaloft")}</AvatarFallback>
-        </Avatar>
+        <img
+          src={appaloftLogoMark}
+          alt={$t(i18nKeys.common.app.productName)}
+          class="size-6 shrink-0 rounded-md object-contain"
+        />
         <span class="min-w-0 group-data-[collapsible=icon]:hidden">
           <span class="block truncate text-sm font-medium">{$t(i18nKeys.common.app.productName)}</span>
           <span class="block truncate text-xs text-muted-foreground">{$t(i18nKeys.common.app.consoleSubtitle)}</span>
