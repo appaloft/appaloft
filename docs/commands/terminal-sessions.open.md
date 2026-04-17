@@ -110,9 +110,10 @@ Resource scope must start in the deployed project directory:
 1. Use `scope.deploymentId` when supplied and verify it belongs to `scope.resourceId`.
 2. Otherwise resolve the latest observable deployment/runtime instance for the resource.
 3. Prefer adapter-recorded metadata, in this order for the first slice: `workdir`,
-   `remoteWorkdir`, then host-process `workdir`.
+   `remoteWorkdir`, then `sourceDir`.
 4. Use `runtimePlan.execution.workingDirectory` only if adapter metadata is absent and the value is
-   meaningful for the selected runtime.
+   meaningful for the selected runtime. Source locators such as HTTPS Git URLs and SSH-style Git
+   remotes are not safe working directories.
 5. Apply `relativeDirectory` below the resolved workspace root after validation.
 6. Reject with `terminal_session_workspace_unavailable` if no safe workspace can be resolved.
 
@@ -149,6 +150,7 @@ Binary transport is allowed later if it preserves the same logical frame semanti
 | Resource missing | `resourceId` cannot be resolved or is not visible | Reject during context resolution | `err(not_found)` |
 | Deployment mismatch | `deploymentId` does not belong to `resourceId` | Reject during context resolution | `err(terminal_session_context_mismatch)` |
 | No observable deployment | Resource scope has no runtime placement | Reject during workspace resolution | `err(terminal_session_workspace_unavailable)` |
+| Source locator fallback | Runtime execution only exposes a source locator such as `https://...` or `git@host:org/repo.git` as `workingDirectory` | Reject during workspace resolution instead of opening a shell in the locator text | `err(terminal_session_workspace_unavailable)` |
 | Unsafe relative directory | `relativeDirectory` is absolute, has `..`, URL, or shell fragment | Reject during validation | `err(validation_error)` |
 | Unsupported target | Provider/runtime cannot open a terminal | Reject during terminal open | `err(terminal_session_not_configured)` or `err(terminal_session_unsupported)` |
 | Hosted control plane disabled | Runtime mode disallows direct shell | Reject during policy gate | `err(terminal_session_policy_denied)` |
@@ -184,10 +186,10 @@ Application command/schema/handler/use case, terminal gateway port, runtime adap
 endpoint, WebSocket attach transport, CLI descriptor commands, and Web terminal component are
 implemented in the first slice.
 
-Current resource workspace resolution uses execution metadata `workdir`, `remoteWorkdir`, and
-`runtimePlan.execution.workingDirectory`. `sourceDir` and source `baseDirectory` normalization are
-documented terminal rules but remain follow-up implementation gaps. Docker container shell and
-compose service shell targets remain future scope.
+Current resource workspace resolution uses execution metadata `workdir`, `remoteWorkdir`,
+`sourceDir`, and safe `runtimePlan.execution.workingDirectory` fallbacks. Source `baseDirectory`
+normalization remains a follow-up implementation gap. Docker container shell and compose service
+shell targets remain future scope.
 
 ## Open Questions
 
