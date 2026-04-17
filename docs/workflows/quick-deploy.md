@@ -29,6 +29,8 @@ This workflow inherits:
 - [resources.diagnostic-summary Query Spec](../queries/resources.diagnostic-summary.md)
 - [Resource Diagnostic Summary Workflow Spec](./resource-diagnostic-summary.md)
 - [deployments.create Workflow Spec](./deployments.create.md)
+- [Workflow Spec Format](./WORKFLOW_SPEC_FORMAT.md)
+- [Quick Deploy Test Matrix](../testing/quick-deploy-test-matrix.md)
 
 ## Purpose
 
@@ -181,20 +183,97 @@ When the workflow collects health check configuration for a newly created resour
 
 ## End-To-End Workflow
 
-```text
-user intent
-  -> source selection
-  -> project selection or projects.create
-  -> server selection or servers.register
-  -> optional credential creation/configuration
-  -> optional server connectivity preflight
-  -> environment selection or environments.create
-  -> resource selection or resource bootstrap/create path
-  -> optional environment variable command
-  -> optional domain binding command after resource/destination context exists
-  -> deployments.create
-  -> deployment progress/read-model observation
+Quick Deploy is a first-class entry workflow, not a single command. The user-facing route from "I
+want to deploy this source" to "the deployment request is accepted and observable" crosses user
+input collection, explicit Yundu commands, optional external runtime targets, deployment progress,
+read models, and diagnostics.
+
+### Actor Responsibilities
+
+| Actor | Responsibilities | Success Signal | Failure Branch |
+| --- | --- | --- | --- |
+| User/operator | Choose or provide source, project, server, environment, resource, credentials, environment variables, network/health inputs, and optional domain follow-up intent. | The workflow returns stable project/server/environment/resource/deployment ids and the user can observe deployment progress or result state. | Missing required input, ambiguous source, wrong target, invalid credential, duplicate resource name, or follow-up domain intent that belongs to the separate routing/domain/TLS workflow. |
+| Web/CLI entry | Collect draft input, normalize source/runtime/network/health fields, run the shared workflow program, execute yielded operations through typed clients or command/query buses, and show per-step progress. | Each explicit step is visible as pending/succeeded/failed; the final deployment step uses `deployments.create`. | Local preflight rejects before dispatch, or an underlying command error stops the workflow at that step. |
+| Shared Quick Deploy workflow program | Own side-effect-free operation order and id-threading between selected ids and create inputs. It must not call HTTP, CommandBus, QueryBus, repositories, prompts, or UI APIs directly. | Returns project, server, environment, resource, and deployment ids after the executor completes each yielded step. | Executor returns or throws a failed step; later steps are not yielded. |
+| Yundu application/API | Enforce underlying command/query specs, persist aggregate state, publish command events, expose progress/read-model state, and preserve stable error contracts. | Explicit operations succeed and `deployments.create` accepts a deployment request. | Command admission returns `err(DomainError)`; accepted deployment may later fail asynchronously. |
+| Runtime target/proxy/provider | Resolve and execute Docker/OCI or Compose deployment plans, realize generated access routes when policy/provider state allows, and perform runtime health checks. | Deployment reaches succeeded state and access projections can expose generated or configured routes. | Runtime plan, image build, container start, proxy route, public route, or health verification fails. |
+| Diagnostics/read-model surfaces | Expose deployment progress, resource access summary, logs when available, and `resources.diagnostic-summary` after resource/deployment ids are known. | The user has copyable stable ids and section statuses for support/debugging. | Access/proxy/log sources are missing or unavailable; diagnostic summary still reports safe source errors. |
+
+### Success Path
+
+```mermaid
+sequenceDiagram
+  autonumber
+  actor User
+  participant Entry as Web/CLI entry
+  participant Program as Quick Deploy program
+  participant Yundu as Yundu commands/queries
+  participant Runtime as Runtime target/proxy
+  participant Read as Read models/diagnostics
+
+  User->>Entry: Provide source and desired context
+  Entry->>Entry: Normalize source/runtime/network/health drafts
+  Entry->>Program: Run with existing ids or create inputs
+  Program-->>Entry: yield projects.create when needed
+  Entry->>Yundu: projects.create or select project
+  Program-->>Entry: yield servers.register and credential steps when needed
+  Entry->>Yundu: servers.register, credentials.create, servers.configureCredential
+  Program-->>Entry: yield environments.create when needed
+  Entry->>Yundu: environments.create or select environment
+  Program-->>Entry: yield resources.create when needed
+  Entry->>Yundu: resources.create(source, runtimeProfile, networkProfile)
+  Program-->>Entry: yield environments.setVariable when supplied
+  Entry->>Yundu: environments.setVariable
+  Program-->>Entry: yield deployments.create(resourceId)
+  Entry->>Yundu: deployments.create
+  Yundu->>Runtime: detect, plan, execute, verify, rollback if needed
+  Runtime-->>Yundu: deployment state and route/access facts
+  Entry->>Read: observe deployment progress and resource access summary
+  Entry->>Read: query resources.diagnostic-summary when ids are known
+  Entry-->>User: Show accepted deployment, progress, access, and diagnostics
 ```
+
+### Failure Branches
+
+```mermaid
+flowchart TD
+  A["User starts Quick Deploy"] --> B["Entry preflight and draft normalization"]
+  B -->|missing or ambiguous input| B1["Reject before dispatch; no mutation"]
+  B --> C["Context select/create steps"]
+  C -->|project/server/credential/environment command error| C1["Stop at failed step; earlier successful state remains"]
+  C --> D["resources.create when a resource must be created"]
+  D -->|source/runtime/network/resource admission error| D1["Stop before deployment; created context remains"]
+  D --> E["optional environments.setVariable"]
+  E -->|variable command error| E1["Stop before deployment; prior state remains"]
+  E --> F["deployments.create"]
+  F -->|deployment admission error| F1["No accepted deployment; context/resource state remains"]
+  F --> G["accepted deployment id"]
+  G --> H["runtime/proxy/health execution"]
+  H -->|async runtime failure| H1["Deployment terminal failed; retry creates a new deployment attempt"]
+  G --> I["progress/access/diagnostic observation"]
+  I -->|access or logs unavailable| I1["Diagnostic summary returns safe source errors"]
+  I --> J["User observes accepted deployment"]
+```
+
+### Test Strategy
+
+Automated tests must prove the workflow by observing explicit operations and stable ids, not by
+asserting UI copy or prompt text as domain behavior.
+
+- `docs/testing/quick-deploy-test-matrix.md` owns every `QUICK-DEPLOY-WF-*` and
+  `QUICK-DEPLOY-ENTRY-*` scenario.
+- `packages/contracts/test/quick-deploy-workflow.test.ts` is the numbered executable baseline for
+  shared workflow sequencing, id-threading, stop points, and ids-only `deployments.create`.
+- Web component/browser tests should cover entry-only behavior: default selections, local preflight,
+  per-step progress rendering, generated access display, and diagnostic-copy interaction.
+- CLI tests should cover TTY/non-TTY input collection, explicit command dispatch, and final
+  `CreateDeploymentCommandInput`.
+- Docker/SSH/proxy e2e tests may be opt-in when they mutate external runtime targets, but the
+  matrix row must state that the shared workflow test is the default hermetic baseline and the
+  opt-in test proves real runtime reachability.
+- Quick Deploy tests must not buy domains, depend on public DNS propagation, or hide domain/TLS
+  behavior inside deployment tests. Durable custom domains are covered by the routing/domain/TLS
+  workflow and are invoked only through explicit follow-up commands.
 
 `deployments.create` remains the final deployment command. Command success means request accepted.
 
@@ -218,6 +297,93 @@ user intent
 | Generated access observation | Web/CLI workflow | `ResourceAccessSummary` after route snapshot resolution | Display generated access URL and proxy route status when policy/provider resolved one. |
 | Progress observation | Web/CLI workflow | deployment progress stream during the final deployment command; deployment read/progress queries after acceptance | Observe durable state or technical progress without treating progress events as Quick Deploy workflow steps. |
 | Diagnostic summary observation | Web/CLI workflow | `resources.diagnostic-summary` after resource/deployment ids are known | Provide a copyable support/debug payload with stable ids and access/proxy/log section statuses. |
+
+## Synchronous Admission And Preflight
+
+Quick Deploy preflight includes:
+
+- entry-local required-field checks before any command is dispatched;
+- source URL/image/local-folder parsing and ambiguity detection;
+- runtime strategy, health check, and internal listener port draft validation;
+- existing-id versus create-input shape validation for project, server, environment, and resource;
+- TTY versus non-TTY input collection rules for CLI;
+- Web wizard step completeness checks;
+- optional connectivity checks when the user explicitly requests them before final deployment.
+
+Preflight failure must not create or mutate durable state.
+
+Command admission remains owned by the command that is being dispatched. Quick Deploy must preserve
+the returned `DomainError` fields, including `code`, `category`, `phase`, `retriable`,
+`relatedEntityId`, and `correlationId`.
+
+## Async Work
+
+Quick Deploy does not introduce a hidden durable async workflow command.
+
+Async work after the final step belongs to existing operations and providers:
+
+- `deployments.create` accepts a deployment request and then drives detect, plan, execute, verify,
+  and rollback behavior according to the deployment specs;
+- runtime target/provider adapters may build images, start containers, render proxy configuration,
+  and run health checks;
+- generated default access route realization is resolved from resource/server/policy/proxy state;
+- resource access summaries, deployment progress, deployment logs, runtime logs, and diagnostic
+  summaries expose the observable result.
+
+Quick Deploy may observe those async states, but it must not convert them into hidden workflow
+success semantics.
+
+## State Model
+
+Quick Deploy-local state is entry-owned and may be transient:
+
+```text
+collecting_input
+draft_invalid
+ready_to_submit
+executing_step
+failed_step
+deployment_accepted
+observing_deployment
+completed | deployment_failed
+```
+
+Durable state belongs to the underlying aggregates and read models:
+
+- project, server, credential, environment, resource, and environment-variable state after their
+  explicit commands succeed;
+- deployment state after `deployments.create` accepts the request and runtime execution progresses;
+- resource access summary state after route snapshots/read-model projections update;
+- diagnostic summary state as a query result, not as a workflow aggregate.
+
+There is no `QuickDeploy` aggregate in v1.
+
+## Event / State Mapping
+
+| Step or event source | Meaning | State impact |
+| --- | --- | --- |
+| Entry preflight | Draft is complete enough to dispatch explicit operations. | Entry-local state moves from `collecting_input` to `ready_to_submit`; no durable mutation. |
+| `projects.create`, `servers.register`, `credentials.create-ssh`, `servers.configure-credential`, `environments.create` | Context prerequisite accepted. | The returned id is threaded into later steps; successful state remains if a later step fails. |
+| `resources.create` | Durable resource profile accepted. | Resource owns source/runtime/network/health profile; later deployment input must use `resourceId`. |
+| `environments.set-variable` | Optional first variable accepted. | Variable is available for deployment snapshot resolution. |
+| `deployments.create` | Final deployment request accepted. | Deployment attempt exists and progresses according to deployment lifecycle specs. |
+| Deployment progress/read-model updates | Runtime execution is observable. | Entry can show progress, terminal succeeded/failed state, and route/access projections. |
+| `resources.diagnostic-summary` | Support/debug payload queried after ids are known. | Entry can expose copyable stable ids and safe section statuses. |
+| Domain/TLS follow-up command | Custom domain lifecycle starts outside Quick Deploy. | State is governed by the routing/domain/TLS workflow, not by deployment admission. |
+
+## Failure Visibility
+
+Quick Deploy must surface the failure at the boundary where it happened:
+
+- preflight failures are entry-local and create no durable state;
+- command failures stop the workflow at the failed step and preserve the underlying `DomainError`;
+- partial success is visible through already-created ids and read models;
+- accepted deployment followed by async runtime failure is shown as deployment state, not as a
+  failed `deployments.create` response;
+- missing access, proxy, deployment log, or runtime log data should be reported through
+  `resources.diagnostic-summary` source errors when resource/deployment ids are known;
+- durable domain/TLS failures are shown through domain binding and certificate read models after
+  the separate follow-up commands run.
 
 ## Entry Differences
 
