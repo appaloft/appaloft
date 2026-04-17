@@ -77,6 +77,12 @@ Then:
 | EDGE-PROXY-SERVER-003 | integration | Ensure plan execution fails | Provider plan generated, runtime executor fails | Bootstrap attempt fails | `proxy-install-failed` | `infra_error` or provider-mapped code, phase `proxy-bootstrap` | Yes |
 | EDGE-PROXY-SERVER-004 | integration | Proxy not required | Proxy intent disabled | No provider plan | Server may become ready after connectivity | None | No |
 
+## Runtime Execution Matrix
+
+| Test ID | Preferred automation | Case | Input/state | Expected result | Expected error | Required assertion |
+| --- | --- | --- | --- | --- | --- | --- |
+| EDGE-PROXY-RUNTIME-001 | unit | Docker host port conflict | Provider ensure command stderr contains Docker bind/port allocation failure | Failure is classified before persistence | `edge_proxy_host_port_conflict`, phase `proxy-container`, retriable | Parsed host port/address and provider-owned container/network metadata are preserved without relying on raw Docker text. |
+
 ## Route Realization Matrix
 
 | Test ID | Preferred automation | Case | Input/state | Expected result | Expected proxy config | Expected state | Retriable |

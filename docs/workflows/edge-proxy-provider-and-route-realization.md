@@ -95,6 +95,26 @@ The provider owns the proxy-specific ensure plan. Runtime execution owns how the
 Provider ensure plans may mutate only provider-owned proxy assets and must not mutate user workload
 containers.
 
+## Runtime Failure Classification
+
+Runtime executors must translate expected proxy execution failures into stable Appaloft error codes
+before persisting deployment/server state. Raw Docker, SSH, or process output remains deployment
+log/runtime output; durable error state and read models must use the structured code and safe
+metadata.
+
+When a provider-produced proxy container command fails because the host port is already allocated
+or the bind address is already in use, the runtime executor records:
+
+- `errorCode = edge_proxy_host_port_conflict`
+- `phase = proxy-container`
+- `retriable = true`
+- provider key, proxy kind, provider-owned container name, provider network name, and parsed host
+  port/address when available
+
+Consumers should use this code to offer targeted repairs such as freeing the existing listener,
+adopting/importing an existing compatible edge proxy, or changing the configured edge proxy host
+ports.
+
 ## Deployment Route Realization
 
 For every accepted deployment attempt with reverse-proxy routes:

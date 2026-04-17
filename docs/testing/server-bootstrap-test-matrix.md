@@ -117,6 +117,7 @@ Then:
 | SERVER-BOOT-ASYNC-007 | integration | Proxy container start failed | `proxy-container` | `edge_proxy_start_failed` | Edge proxy failed | `proxy-install-failed` | Usually yes |
 | SERVER-BOOT-ASYNC-008 | integration | State transition invalid | lifecycle transition | `invariant_violation` | Unchanged | No success event | No |
 | SERVER-BOOT-ASYNC-009 | integration | Event worker crash before final persistence | `event-consumption` | `retryable_error` | Attempt retryable/unknown | No terminal event | Yes |
+| SERVER-BOOT-ASYNC-010 | integration | Proxy host port conflict | `proxy-container` | `edge_proxy_host_port_conflict` | Edge proxy failed with safe port/container metadata | `proxy-install-failed` | Yes after freeing/adopting/reconfiguring the conflicting port |
 
 ## State Progression Assertions
 

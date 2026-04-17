@@ -13,6 +13,7 @@ import {
   createEdgeProxyEnsurePlanForSelection,
   proxyBootstrapOptionsFromEnv,
 } from "./edge-proxy-plans";
+import { classifyEdgeProxyStartFailure } from "./edge-proxy-failure-classification";
 
 interface CommandResult {
   failed: boolean;
@@ -111,8 +112,14 @@ function failedResult(input: {
   attemptedAt: string;
   message: string;
   errorCode: string;
+  metadata?: Record<string, string>;
   output?: string;
 }): ServerEdgeProxyBootstrapResult {
+  const metadata = {
+    ...(input.metadata ?? {}),
+    ...(input.output ? { output: input.output } : {}),
+  };
+
   return {
     serverId: input.server.id.value,
     kind: input.kind,
@@ -120,7 +127,7 @@ function failedResult(input: {
     attemptedAt: input.attemptedAt,
     message: input.message,
     errorCode: input.errorCode,
-    ...(input.output ? { metadata: { output: input.output } } : {}),
+    ...(Object.keys(metadata).length > 0 ? { metadata } : {}),
   };
 }
 
@@ -207,13 +214,24 @@ export class RuntimeServerEdgeProxyBootstrapper implements ServerEdgeProxyBootst
 
     const proxy = runCommand(plan.containerCommand);
     if (proxy.failed) {
+      const failure = classifyEdgeProxyStartFailure({
+        containerName: plan.containerName,
+        defaultErrorCode: "edge_proxy_start_failed",
+        defaultMessage: `${plan.displayName} edge proxy failed to start`,
+        networkName: plan.networkName,
+        output: proxy.output,
+        providerKey: plan.providerKey,
+        proxyKind: plan.proxyKind,
+      });
+
       return ok(
         failedResult({
           server,
           kind,
           attemptedAt,
-          message: `${plan.displayName} edge proxy failed to start`,
-          errorCode: "edge_proxy_start_failed",
+          message: failure.message,
+          errorCode: failure.errorCode,
+          metadata: failure.metadata,
           output: proxy.output,
         }),
       );

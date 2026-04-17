@@ -42,6 +42,7 @@ function mapFailurePhase(errorCode: string): ProxyInstallFailurePhase {
     case "edge_proxy_network_failed":
       return "proxy-network";
     case "edge_proxy_start_failed":
+    case "edge_proxy_host_port_conflict":
       return "proxy-container";
     case "edge_proxy_kind_unsupported":
     case "edge_proxy_provider_unsupported":
@@ -59,6 +60,7 @@ function isProxyFailureRetriable(errorCode: string, fallback: boolean): boolean 
     case "proxy_provider_unavailable":
     case "edge_proxy_network_failed":
     case "edge_proxy_start_failed":
+    case "edge_proxy_host_port_conflict":
       return true;
     default:
       return fallback;

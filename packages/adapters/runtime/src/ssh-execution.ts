@@ -43,6 +43,7 @@ import {
   createProxyRouteRealizationPlan,
   proxyBootstrapOptionsFromEnv,
 } from "./edge-proxy-plans";
+import { classifyEdgeProxyStartFailure } from "./edge-proxy-failure-classification";
 import { executeProxyReloadPlan } from "./proxy-reload-execution";
 import {
   dockerPublishedPortCommand,
@@ -54,6 +55,7 @@ import {
   dockerLabelsFromAssignments,
   renderRuntimeCommandString,
 } from "./runtime-commands";
+import { runStreamingProcess } from "./streaming-process";
 import { generateWorkspaceDockerfile } from "./workspace-planners";
 
 type LogPhase = "detect" | "plan" | "package" | "deploy" | "verify" | "rollback";
@@ -480,6 +482,71 @@ export class SshExecutionBackend implements ExecutionBackend {
     }
   }
 
+  private pushStreamingCommandOutput(
+    logs: DeploymentLogEntry[],
+    input: {
+      context: ExecutionContext;
+      deploymentId: string;
+      phase: LogPhase;
+      line: string;
+      level: LogLevel;
+      stream: "stdout" | "stderr";
+      persistedCount: number;
+    },
+  ): number {
+    if (input.persistedCount >= 50) {
+      return input.persistedCount;
+    }
+
+    this.report(input.context, {
+      deploymentId: input.deploymentId,
+      phase: input.phase,
+      source: "application",
+      level: input.level,
+      message: input.line,
+      stream: input.stream,
+    });
+    logs.push(phaseLog(input.phase, input.line, input.level, "application"));
+    return input.persistedCount + 1;
+  }
+
+  private createStreamingOutputSink(
+    logs: DeploymentLogEntry[],
+    input: {
+      context: ExecutionContext;
+      deploymentId: string;
+      phase: LogPhase;
+    },
+  ): (line: string, level: LogLevel, stream: "stdout" | "stderr") => void {
+    let stdoutCount = 0;
+    let stderrCount = 0;
+
+    return (line, level, stream) => {
+      if (stream === "stdout") {
+        stdoutCount = this.pushStreamingCommandOutput(logs, {
+          context: input.context,
+          deploymentId: input.deploymentId,
+          phase: input.phase,
+          line,
+          level,
+          stream,
+          persistedCount: stdoutCount,
+        });
+        return;
+      }
+
+      stderrCount = this.pushStreamingCommandOutput(logs, {
+        context: input.context,
+        deploymentId: input.deploymentId,
+        phase: input.phase,
+        line,
+        level,
+        stream,
+        persistedCount: stderrCount,
+      });
+    };
+  }
+
   private applyFailure(
     deployment: Deployment,
     input: {
@@ -693,6 +760,24 @@ export class SshExecutionBackend implements ExecutionBackend {
     });
   }
 
+  private async runRemoteCommandStreaming(input: {
+    target: SshTarget;
+    command: string;
+    cwd: string;
+    env: NodeJS.ProcessEnv;
+    redactions?: readonly string[];
+    onOutput(line: string, level: LogLevel, stream: "stdout" | "stderr"): void;
+  }) {
+    return await runStreamingProcess({
+      command: "ssh",
+      args: [...this.sshArgs(input.target), input.command],
+      cwd: input.cwd,
+      env: input.env,
+      ...(input.redactions ? { redactions: input.redactions } : {}),
+      onOutput: input.onOutput,
+    });
+  }
+
   private async waitForRemoteInternalHealth(input: {
     target: SshTarget;
     url: string;
@@ -891,20 +976,38 @@ export class SshExecutionBackend implements ExecutionBackend {
         ...(setupCommand ? [setupCommand] : []),
         `${cloneEnv} git clone --depth 1 ${branchOption}${shellQuote(cloneLocator)} ${shellQuote(remoteSourceRoot)}`.trim(),
       ].join(" && ");
-      const clone = this.runRemoteCommand({
+      let cloneStdoutCount = 0;
+      let cloneStderrCount = 0;
+      const clone = await this.runRemoteCommandStreaming({
         target: input.target,
         command: cloneCommand,
         cwd: input.runtimeDir,
         env: input.env,
-      });
-      this.pushCommandOutput(logs, {
-        context,
-        deploymentId: state.id.value,
-        phase: "package",
-        output: clone.stderr,
-        level: "warn",
-        stream: "stderr",
         redactions,
+        onOutput: (line, level, stream) => {
+          if (stream === "stdout") {
+            cloneStdoutCount = this.pushStreamingCommandOutput(logs, {
+              context,
+              deploymentId: state.id.value,
+              phase: "package",
+              line,
+              level,
+              stream,
+              persistedCount: cloneStdoutCount,
+            });
+            return;
+          }
+
+          cloneStderrCount = this.pushStreamingCommandOutput(logs, {
+            context,
+            deploymentId: state.id.value,
+            phase: "package",
+            line,
+            level,
+            stream,
+            persistedCount: cloneStderrCount,
+          });
+        },
       });
 
       if (clone.failed) {
@@ -1216,6 +1319,7 @@ export class SshExecutionBackend implements ExecutionBackend {
             retryable: false,
             metadata: {
               host: target.host,
+              ...prepared.source.metadata,
             },
           }),
         });
@@ -1303,27 +1407,37 @@ export class SshExecutionBackend implements ExecutionBackend {
           status: "running",
           message: `Build image ${image}`,
         });
-        const build = this.runRemoteCommand({
+        let buildStdoutCount = 0;
+        let buildStderrCount = 0;
+        const build = await this.runRemoteCommandStreaming({
           target,
           command: buildCommand,
           cwd: runtimeDir,
           env,
-        });
-        this.pushCommandOutput(logs, {
-          context,
-          deploymentId: state.id.value,
-          phase: "package",
-          output: build.stdout,
-          level: "info",
-          stream: "stdout",
-        });
-        this.pushCommandOutput(logs, {
-          context,
-          deploymentId: state.id.value,
-          phase: "package",
-          output: build.stderr,
-          level: "warn",
-          stream: "stderr",
+          onOutput: (line, level, stream) => {
+            if (stream === "stdout") {
+              buildStdoutCount = this.pushStreamingCommandOutput(logs, {
+                context,
+                deploymentId: state.id.value,
+                phase: "package",
+                line,
+                level,
+                stream,
+                persistedCount: buildStdoutCount,
+              });
+              return;
+            }
+
+            buildStderrCount = this.pushStreamingCommandOutput(logs, {
+              context,
+              deploymentId: state.id.value,
+              phase: "package",
+              line,
+              level,
+              stream,
+              persistedCount: buildStderrCount,
+            });
+          },
         });
 
         if (build.failed) {
@@ -1368,6 +1482,7 @@ export class SshExecutionBackend implements ExecutionBackend {
             retryable: proxyBootstrapResult.error.retryable,
             metadata: {
               host: target.host,
+              ...prepared.source.metadata,
               message: proxyBootstrapResult.error.message,
             },
           }),
@@ -1385,66 +1500,51 @@ export class SshExecutionBackend implements ExecutionBackend {
           message: proxyMessage,
         });
 
-        const network = this.runRemoteCommand({
+        const network = await this.runRemoteCommandStreaming({
           target,
           command: proxyBootstrap.networkCommand,
           cwd: runtimeDir,
           env,
-        });
-        this.pushCommandOutput(logs, {
-          context,
-          deploymentId: state.id.value,
-          phase: "deploy",
-          output: network.stdout,
-          level: "info",
-          stream: "stdout",
-        });
-        this.pushCommandOutput(logs, {
-          context,
-          deploymentId: state.id.value,
-          phase: "deploy",
-          output: network.stderr,
-          level: "warn",
-          stream: "stderr",
+          onOutput: this.createStreamingOutputSink(logs, {
+            context,
+            deploymentId: state.id.value,
+            phase: "deploy",
+          }),
         });
 
-        const proxy = this.runRemoteCommand({
+        const proxy = await this.runRemoteCommandStreaming({
           target,
           command: proxyBootstrap.containerCommand,
           cwd: runtimeDir,
           env,
-        });
-        this.pushCommandOutput(logs, {
-          context,
-          deploymentId: state.id.value,
-          phase: "deploy",
-          output: proxy.stdout,
-          level: "info",
-          stream: "stdout",
-        });
-        this.pushCommandOutput(logs, {
-          context,
-          deploymentId: state.id.value,
-          phase: "deploy",
-          output: proxy.stderr,
-          level: "warn",
-          stream: "stderr",
+          onOutput: this.createStreamingOutputSink(logs, {
+            context,
+            deploymentId: state.id.value,
+            phase: "deploy",
+          }),
         });
 
         if (network.failed || proxy.failed) {
-          const message = `${proxyBootstrap.displayName} edge proxy failed to start`;
+          const failure = classifyEdgeProxyStartFailure({
+            containerName: proxyBootstrap.containerName,
+            defaultErrorCode: "ssh_edge_proxy_start_failed",
+            defaultMessage: `${proxyBootstrap.displayName} edge proxy failed to start`,
+            networkName: proxyBootstrap.networkName,
+            output: `${network.stdout}\n${network.stderr}\n${proxy.stdout}\n${proxy.stderr}`,
+            providerKey: proxyBootstrap.providerKey,
+            proxyKind: proxyBootstrap.proxyKind,
+          });
+          const message = failure.message;
           logs.push(phaseLog("deploy", message, "error"));
           return ok({
             deployment: this.applyFailure(deployment, {
               logs,
-              errorCode: "ssh_edge_proxy_start_failed",
-              retryable: true,
+              errorCode: failure.errorCode,
+              retryable: failure.retryable,
               metadata: {
                 host: target.host,
-                proxyKind: proxyBootstrap.proxyKind,
-                providerKey: proxyBootstrap.providerKey,
-                containerName: proxyBootstrap.containerName,
-                networkName: proxyBootstrap.networkName,
+                ...prepared.source.metadata,
+                ...failure.metadata,
               },
             }),
           });
@@ -1481,6 +1581,7 @@ export class SshExecutionBackend implements ExecutionBackend {
             retryable: proxyRoutePlanResult.error.retryable,
             metadata: {
               host: target.host,
+              ...prepared.source.metadata,
               message: proxyRoutePlanResult.error.message,
               phase: "proxy-route-realization",
             },
@@ -1553,27 +1654,16 @@ export class SshExecutionBackend implements ExecutionBackend {
         ),
       );
       logs.push(phaseLog("deploy", `Start SSH container ${containerName}`));
-      const run = this.runRemoteCommand({
+      const run = await this.runRemoteCommandStreaming({
         target,
         command: runCommand,
         cwd: runtimeDir,
         env,
-      });
-      this.pushCommandOutput(logs, {
-        context,
-        deploymentId: state.id.value,
-        phase: "deploy",
-        output: run.stdout,
-        level: "info",
-        stream: "stdout",
-      });
-      this.pushCommandOutput(logs, {
-        context,
-        deploymentId: state.id.value,
-        phase: "deploy",
-        output: run.stderr,
-        level: "warn",
-        stream: "stderr",
+        onOutput: this.createStreamingOutputSink(logs, {
+          context,
+          deploymentId: state.id.value,
+          phase: "deploy",
+        }),
       });
 
       if (run.failed) {
@@ -1588,6 +1678,7 @@ export class SshExecutionBackend implements ExecutionBackend {
               host: target.host,
               image,
               containerName,
+              ...prepared.source.metadata,
             },
           }),
         });
@@ -1615,6 +1706,7 @@ export class SshExecutionBackend implements ExecutionBackend {
             retryable: proxyReloadPlanResult.error.retryable,
             metadata: {
               host: target.host,
+              ...prepared.source.metadata,
               message: proxyReloadPlanResult.error.message,
               phase: "proxy-reload",
             },
@@ -1679,6 +1771,7 @@ export class SshExecutionBackend implements ExecutionBackend {
               retryable: reload.retryable,
               metadata: {
                 host: target.host,
+                ...prepared.source.metadata,
                 providerKey: proxyReloadPlan.providerKey,
                 proxyKind: proxyReloadPlan.proxyKind,
                 stepName: reload.stepName,
@@ -2038,6 +2131,7 @@ export class SshExecutionBackend implements ExecutionBackend {
             retryable: false,
             metadata: {
               host: target.host,
+              ...prepared.source.metadata,
             },
           }),
         });
@@ -2062,27 +2156,16 @@ export class SshExecutionBackend implements ExecutionBackend {
         message: `Start compose stack ${remoteComposeFile}`,
       });
 
-      const up = this.runRemoteCommand({
+      const up = await this.runRemoteCommandStreaming({
         target,
         command: upCommand,
         cwd: runtimeDir,
         env,
-      });
-      this.pushCommandOutput(logs, {
-        context,
-        deploymentId: state.id.value,
-        phase: "deploy",
-        output: up.stdout,
-        level: "info",
-        stream: "stdout",
-      });
-      this.pushCommandOutput(logs, {
-        context,
-        deploymentId: state.id.value,
-        phase: "deploy",
-        output: up.stderr,
-        level: "warn",
-        stream: "stderr",
+        onOutput: this.createStreamingOutputSink(logs, {
+          context,
+          deploymentId: state.id.value,
+          phase: "deploy",
+        }),
       });
 
       if (up.failed) {
