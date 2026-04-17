@@ -82,6 +82,7 @@ Admission errors reject the command and return `err(DomainError)`.
 | Edge proxy provider unavailable | `proxy-install-failed` with `errorCode = proxy_provider_unavailable`. | Usually yes after provider registration, package, or composition-root configuration is repaired. |
 | Proxy network preparation fails | `proxy-install-failed` with `errorCode = edge_proxy_network_failed` and `failurePhase = proxy-network`. | Usually yes if Docker/provider can recover. |
 | Proxy container start fails | `proxy-install-failed` with `errorCode = edge_proxy_start_failed` and `failurePhase = proxy-container`. | Usually yes unless the provider reports invalid configuration. |
+| Proxy host port conflict | `proxy-install-failed` with `errorCode = edge_proxy_host_port_conflict`, `failurePhase = proxy-container`, and safe port/container/network metadata. | Yes after the conflicting host port is freed, the existing proxy is adopted, or the proxy port configuration changes. |
 | Runtime bootstrap execution fails | `proxy-install-failed` with `failurePhase = runtime-error`. | Usually yes after host/Docker/SSH/runtime state is repaired. |
 | Generated access route requires proxy but proxy is failed | Deployment route resolution or execution records `phase = proxy-readiness`; server edge proxy state remains failed. | Depends on proxy failure. |
 | Event handler crashes before terminal state | Persist event-processing failure or retryable attempt state; do not publish terminal success/failure until state is known. | Yes |

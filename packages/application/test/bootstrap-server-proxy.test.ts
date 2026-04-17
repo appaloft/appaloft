@@ -20,7 +20,13 @@ class RecordingProxyBootstrapper implements ServerEdgeProxyBootstrapper {
   readonly calls: DeploymentTargetState[] = [];
   private nextStatusIndex = 0;
 
-  constructor(private readonly statuses: ServerEdgeProxyBootstrapResult["status"][]) {}
+  constructor(
+    private readonly statuses: ServerEdgeProxyBootstrapResult["status"][],
+    private readonly failure?: {
+      errorCode: string;
+      message: string;
+    },
+  ) {}
 
   async bootstrap(
     context: ExecutionContext,
@@ -40,8 +46,12 @@ class RecordingProxyBootstrapper implements ServerEdgeProxyBootstrapper {
       status,
       attemptedAt: "2026-01-01T00:00:01.000Z",
       message:
-        status === "ready" ? "Traefik edge proxy is ready" : "Traefik edge proxy failed to start",
-      ...(status === "failed" ? { errorCode: "edge_proxy_start_failed" } : {}),
+        status === "ready"
+          ? "Traefik edge proxy is ready"
+          : (this.failure?.message ?? "Traefik edge proxy failed to start"),
+      ...(status === "failed"
+        ? { errorCode: this.failure?.errorCode ?? "edge_proxy_start_failed" }
+        : {}),
       metadata: {
         image: "traefik:v3.6.2",
       },
@@ -197,6 +207,43 @@ describe("BootstrapServerProxyUseCase", () => {
     const persisted = serverRepository.items.get(serverId)?.toState();
     expect(persisted?.edgeProxy?.status.value).toBe("failed");
     expect(persisted?.edgeProxy?.lastErrorCode?.value).toBe("edge_proxy_start_failed");
+  });
+
+  test("[SERVER-BOOT-ASYNC-010] records host port conflicts as a retriable proxy-container failure", async () => {
+    const { clock, eventBus, idGenerator, logger, serverId, serverRepository } =
+      await createRegisteredServer();
+    const bootstrapper = new RecordingProxyBootstrapper(["failed"], {
+      errorCode: "edge_proxy_host_port_conflict",
+      message: "Traefik edge proxy failed to start: host port 80 is already allocated",
+    });
+    const useCase = new BootstrapServerProxyUseCase(
+      serverRepository,
+      bootstrapper,
+      clock,
+      idGenerator,
+      eventBus,
+      logger,
+    );
+
+    clock.set("2026-01-01T00:00:01.000Z");
+    const result = await useCase.execute(createTestContext(), {
+      serverId,
+      reason: "repair",
+    });
+
+    expect(result.isOk()).toBe(true);
+    const failed = eventsByType(eventBus.events, "proxy-install-failed");
+    expect(failed).toHaveLength(1);
+    expect(failed[0]?.payload).toMatchObject({
+      errorCode: "edge_proxy_host_port_conflict",
+      errorMessage: "Traefik edge proxy failed to start: host port 80 is already allocated",
+      failurePhase: "proxy-container",
+      retriable: true,
+    });
+
+    const persisted = serverRepository.items.get(serverId)?.toState();
+    expect(persisted?.edgeProxy?.status.value).toBe("failed");
+    expect(persisted?.edgeProxy?.lastErrorCode?.value).toBe("edge_proxy_host_port_conflict");
   });
 
   test("rejects public repair requests that provide their own attempt id", async () => {

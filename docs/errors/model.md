@@ -92,6 +92,7 @@ Codes must be stable identifiers, not localized text. Examples:
 | `edge_proxy_provider_unsupported` | `integration` | server id, provider key, proxy kind |
 | `edge_proxy_network_failed` | `async-processing` or `infra` | server id, proxy kind, attempt id |
 | `edge_proxy_start_failed` | `async-processing` or `infra` | server id, proxy kind, attempt id |
+| `edge_proxy_host_port_conflict` | `async-processing` or `infra` | phase `proxy-container`, provider key, proxy kind, host port when parseable, container name, network name |
 
 When introducing a new code, the command/event/workflow spec that owns the branch must define its category, phase, retriable behavior, and consumer mapping.
 

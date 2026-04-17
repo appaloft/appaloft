@@ -38,6 +38,7 @@ import {
   createProxyRouteRealizationPlan,
   proxyBootstrapOptionsFromEnv,
 } from "./edge-proxy-plans";
+import { classifyEdgeProxyStartFailure } from "./edge-proxy-failure-classification";
 import { executeProxyReloadPlan } from "./proxy-reload-execution";
 import {
   dockerPublishedPortCommand,
@@ -1456,7 +1457,16 @@ export class LocalExecutionBackend implements ExecutionBackend {
       });
 
       if (network.failed || proxy.failed) {
-        const message = `${proxyBootstrap.displayName} edge proxy failed to start`;
+        const failure = classifyEdgeProxyStartFailure({
+          containerName: proxyBootstrap.containerName,
+          defaultErrorCode: "edge_proxy_start_failed",
+          defaultMessage: `${proxyBootstrap.displayName} edge proxy failed to start`,
+          networkName: proxyBootstrap.networkName,
+          output: `${network.stdout}\n${network.stderr}\n${proxy.stdout}\n${proxy.stderr}`,
+          providerKey: proxyBootstrap.providerKey,
+          proxyKind: proxyBootstrap.proxyKind,
+        });
+        const message = failure.message;
         this.report(context, {
           deploymentId: state.id.value,
           phase: "deploy",
@@ -1470,13 +1480,11 @@ export class LocalExecutionBackend implements ExecutionBackend {
               ...logs,
               phaseLog("deploy", message, "error"),
             ],
-            errorCode: "edge_proxy_start_failed",
-            retryable: true,
+            errorCode: failure.errorCode,
+            retryable: failure.retryable,
             metadata: {
-              proxyKind: proxyBootstrap.proxyKind,
-              providerKey: proxyBootstrap.providerKey,
-              containerName: proxyBootstrap.containerName,
-              networkName: proxyBootstrap.networkName,
+              ...preparedSource.metadata,
+              ...failure.metadata,
             },
           }).deployment,
         });
@@ -1742,6 +1750,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
             errorCode: reload.errorCode,
             retryable: reload.retryable,
             metadata: {
+              ...preparedSource.metadata,
               providerKey: proxyReloadPlan.providerKey,
               proxyKind: proxyReloadPlan.proxyKind,
               stepName: reload.stepName,
