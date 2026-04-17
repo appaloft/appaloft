@@ -1,13 +1,13 @@
-import { type DomainError } from "@yundu/core";
+import { type DomainError } from "@appaloft/core";
 import {
-  createYunduTranslator,
-  defaultYunduLocale,
-  normalizeYunduLocale,
+  type AppaloftLocale,
+  type AppaloftTranslate,
+  createAppaloftTranslator,
+  defaultAppaloftLocale,
+  normalizeAppaloftLocale,
   type TranslationKey,
   type TranslationValues,
-  type YunduLocale,
-  type YunduTranslate,
-} from "@yundu/i18n";
+} from "@appaloft/i18n";
 
 export type TraceAttributeValue = boolean | number | string;
 export type TraceAttributes = Record<string, TraceAttributeValue | undefined>;
@@ -41,17 +41,17 @@ export interface AppTracer {
 export interface ExecutionContext {
   actor?: ExecutionActor;
   entrypoint: AppEntrypoint;
-  locale: YunduLocale;
+  locale: AppaloftLocale;
   requestId: string;
-  t: YunduTranslate;
+  t: AppaloftTranslate;
   tracer: AppTracer;
 }
 
 export interface RepositoryContext {
   actor?: ExecutionActor;
-  locale: YunduLocale;
+  locale: AppaloftLocale;
   requestId: string;
-  t: YunduTranslate;
+  t: AppaloftTranslate;
   tracer: AppTracer;
   transaction?: unknown;
 }
@@ -65,7 +65,7 @@ export interface ExecutionContextFactory {
   }): ExecutionContext;
 }
 
-const defaultTranslate = createYunduTranslator({ locale: defaultYunduLocale });
+const defaultTranslate = createAppaloftTranslator({ locale: defaultAppaloftLocale });
 
 export const translateKey = (key: TranslationKey, values?: TranslationValues): string =>
   defaultTranslate(key, values);
@@ -94,10 +94,10 @@ export function createExecutionContext(input: {
   locale?: string;
   requestId?: string;
   tracer?: AppTracer;
-  t?: YunduTranslate;
+  t?: AppaloftTranslate;
 }): ExecutionContext {
-  const locale = normalizeYunduLocale(input.locale);
-  const t = input.t ?? createYunduTranslator({ locale });
+  const locale = normalizeAppaloftLocale(input.locale);
+  const t = input.t ?? createAppaloftTranslator({ locale });
 
   return {
     entrypoint: input.entrypoint,
@@ -109,52 +109,52 @@ export function createExecutionContext(input: {
   };
 }
 
-export const yunduTraceAttributePrefix = "yundu";
+export const appaloftTraceAttributePrefix = "appaloft";
 
-export const yunduTraceAttributes = {
-  actorId: `${yunduTraceAttributePrefix}.actor.id`,
-  actorKind: `${yunduTraceAttributePrefix}.actor.kind`,
-  commandName: `${yunduTraceAttributePrefix}.command.name`,
-  entrypoint: `${yunduTraceAttributePrefix}.entrypoint`,
-  errorCategory: `${yunduTraceAttributePrefix}.error.category`,
-  errorCode: `${yunduTraceAttributePrefix}.error.code`,
-  handlerName: `${yunduTraceAttributePrefix}.handler.name`,
-  integrationKey: `${yunduTraceAttributePrefix}.integration.key`,
-  locale: `${yunduTraceAttributePrefix}.locale`,
-  mutationSpecName: `${yunduTraceAttributePrefix}.mutation_spec.name`,
-  queryName: `${yunduTraceAttributePrefix}.query.name`,
-  readModelName: `${yunduTraceAttributePrefix}.read_model.name`,
-  repositoryName: `${yunduTraceAttributePrefix}.repository.name`,
-  deploymentId: `${yunduTraceAttributePrefix}.deployment.id`,
-  resourceId: `${yunduTraceAttributePrefix}.resource.id`,
-  requestId: `${yunduTraceAttributePrefix}.request.id`,
-  runtimeKind: `${yunduTraceAttributePrefix}.runtime.kind`,
-  runtimeLogCloseReason: `${yunduTraceAttributePrefix}.runtime_logs.close_reason`,
-  runtimeLogCommand: `${yunduTraceAttributePrefix}.runtime_logs.command`,
-  runtimeLogFollow: `${yunduTraceAttributePrefix}.runtime_logs.follow`,
-  runtimeLogLineCount: `${yunduTraceAttributePrefix}.runtime_logs.line_count`,
-  runtimeLogServiceName: `${yunduTraceAttributePrefix}.runtime_logs.service_name`,
-  runtimeLogTailLines: `${yunduTraceAttributePrefix}.runtime_logs.tail_lines`,
-  runtimeLogTimeoutMs: `${yunduTraceAttributePrefix}.runtime_logs.timeout_ms`,
-  selectionSpecName: `${yunduTraceAttributePrefix}.selection_spec.name`,
-  sourceLocator: `${yunduTraceAttributePrefix}.source.locator`,
-  targetProviderKey: `${yunduTraceAttributePrefix}.target.provider_key`,
+export const appaloftTraceAttributes = {
+  actorId: `${appaloftTraceAttributePrefix}.actor.id`,
+  actorKind: `${appaloftTraceAttributePrefix}.actor.kind`,
+  commandName: `${appaloftTraceAttributePrefix}.command.name`,
+  entrypoint: `${appaloftTraceAttributePrefix}.entrypoint`,
+  errorCategory: `${appaloftTraceAttributePrefix}.error.category`,
+  errorCode: `${appaloftTraceAttributePrefix}.error.code`,
+  handlerName: `${appaloftTraceAttributePrefix}.handler.name`,
+  integrationKey: `${appaloftTraceAttributePrefix}.integration.key`,
+  locale: `${appaloftTraceAttributePrefix}.locale`,
+  mutationSpecName: `${appaloftTraceAttributePrefix}.mutation_spec.name`,
+  queryName: `${appaloftTraceAttributePrefix}.query.name`,
+  readModelName: `${appaloftTraceAttributePrefix}.read_model.name`,
+  repositoryName: `${appaloftTraceAttributePrefix}.repository.name`,
+  deploymentId: `${appaloftTraceAttributePrefix}.deployment.id`,
+  resourceId: `${appaloftTraceAttributePrefix}.resource.id`,
+  requestId: `${appaloftTraceAttributePrefix}.request.id`,
+  runtimeKind: `${appaloftTraceAttributePrefix}.runtime.kind`,
+  runtimeLogCloseReason: `${appaloftTraceAttributePrefix}.runtime_logs.close_reason`,
+  runtimeLogCommand: `${appaloftTraceAttributePrefix}.runtime_logs.command`,
+  runtimeLogFollow: `${appaloftTraceAttributePrefix}.runtime_logs.follow`,
+  runtimeLogLineCount: `${appaloftTraceAttributePrefix}.runtime_logs.line_count`,
+  runtimeLogServiceName: `${appaloftTraceAttributePrefix}.runtime_logs.service_name`,
+  runtimeLogTailLines: `${appaloftTraceAttributePrefix}.runtime_logs.tail_lines`,
+  runtimeLogTimeoutMs: `${appaloftTraceAttributePrefix}.runtime_logs.timeout_ms`,
+  selectionSpecName: `${appaloftTraceAttributePrefix}.selection_spec.name`,
+  sourceLocator: `${appaloftTraceAttributePrefix}.source.locator`,
+  targetProviderKey: `${appaloftTraceAttributePrefix}.target.provider_key`,
 } as const;
 
 export function createExecutionContextAttributes(context: ExecutionContext): TraceAttributes {
   return {
-    [yunduTraceAttributes.requestId]: context.requestId,
-    [yunduTraceAttributes.entrypoint]: context.entrypoint,
-    [yunduTraceAttributes.locale]: context.locale,
-    [yunduTraceAttributes.actorId]: context.actor?.id,
-    [yunduTraceAttributes.actorKind]: context.actor?.kind,
+    [appaloftTraceAttributes.requestId]: context.requestId,
+    [appaloftTraceAttributes.entrypoint]: context.entrypoint,
+    [appaloftTraceAttributes.locale]: context.locale,
+    [appaloftTraceAttributes.actorId]: context.actor?.id,
+    [appaloftTraceAttributes.actorKind]: context.actor?.kind,
   };
 }
 
 export function createDomainErrorTraceAttributes(error: DomainError): TraceAttributes {
   return {
-    [yunduTraceAttributes.errorCode]: error.code,
-    [yunduTraceAttributes.errorCategory]: error.category,
+    [appaloftTraceAttributes.errorCode]: error.code,
+    [appaloftTraceAttributes.errorCategory]: error.category,
   };
 }
 
@@ -183,25 +183,25 @@ function toSpanSegment(name: string): string {
 }
 
 export function createCommandSpanName(commandName: string): string {
-  return `yundu.command.${toSpanSegment(commandName)}`;
+  return `appaloft.command.${toSpanSegment(commandName)}`;
 }
 
 export function createQuerySpanName(queryName: string): string {
-  return `yundu.query.${toSpanSegment(queryName)}`;
+  return `appaloft.query.${toSpanSegment(queryName)}`;
 }
 
 export function createRepositorySpanName(repositoryName: string, operation: string): string {
-  return `yundu.repository.${toSpanSegment(repositoryName)}.${toSpanSegment(operation)}`;
+  return `appaloft.repository.${toSpanSegment(repositoryName)}.${toSpanSegment(operation)}`;
 }
 
 export function createReadModelSpanName(readModelName: string, operation: string): string {
-  return `yundu.read_model.${toSpanSegment(readModelName)}.${toSpanSegment(operation)}`;
+  return `appaloft.read_model.${toSpanSegment(readModelName)}.${toSpanSegment(operation)}`;
 }
 
 export function createAdapterSpanName(adapterName: string, operation: string): string {
-  return `yundu.adapter.${toSpanSegment(adapterName)}.${toSpanSegment(operation)}`;
+  return `appaloft.adapter.${toSpanSegment(adapterName)}.${toSpanSegment(operation)}`;
 }
 
 export function createRuntimeLogsSpanName(operation: string): string {
-  return `yundu.runtime_logs.${toSpanSegment(operation)}`;
+  return `appaloft.runtime_logs.${toSpanSegment(operation)}`;
 }

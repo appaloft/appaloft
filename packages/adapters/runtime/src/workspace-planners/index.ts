@@ -1,4 +1,4 @@
-import { domainError, err, type Result, type RuntimeExecutionPlan } from "@yundu/core";
+import { domainError, err, type Result, type RuntimeExecutionPlan } from "@appaloft/core";
 import { customWorkspacePlanner } from "./custom";
 import { javaWorkspacePlanner } from "./java";
 import { nextjsWorkspacePlanner } from "./nextjs";

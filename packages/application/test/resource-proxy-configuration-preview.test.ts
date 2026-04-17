@@ -1,7 +1,7 @@
 import "reflect-metadata";
 
 import { describe, expect, test } from "bun:test";
-import { domainError, err, ok, type Result } from "@yundu/core";
+import { domainError, err, ok, type Result } from "@appaloft/core";
 
 import { createExecutionContext, type ExecutionContext, type toRepositoryContext } from "../src";
 import { ResourceProxyConfigurationPreviewQuery } from "../src/messages";
@@ -123,7 +123,7 @@ class FakeEdgeProxyProvider implements EdgeProxyProvider {
   ): Promise<Result<ProxyRouteRealizationPlan>> {
     return ok({
       providerKey: this.key,
-      networkName: "yundu-edge",
+      networkName: "appaloft-edge",
       labels: [
         `traefik.http.services.${input.deploymentId}.loadbalancer.server.port=${input.port}`,
       ],

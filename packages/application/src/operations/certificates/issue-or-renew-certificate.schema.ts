@@ -1,4 +1,4 @@
-import { certificateIssueReasons } from "@yundu/core";
+import { certificateIssueReasons } from "@appaloft/core";
 import { z } from "zod";
 
 import { nonEmptyTrimmedString } from "../shared-schema";

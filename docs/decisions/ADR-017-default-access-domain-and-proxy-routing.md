@@ -6,7 +6,7 @@ Date: 2026-04-15
 
 ## Decision
 
-Yundu supports generated default access domains for resources, but the generated-domain provider is an infrastructure adapter selected by configuration and dependency injection. Core and application code must not know the concrete provider brand, hostname suffix, DNS algorithm, or provider-specific naming rules.
+Appaloft supports generated default access domains for resources, but the generated-domain provider is an infrastructure adapter selected by configuration and dependency injection. Core and application code must not know the concrete provider brand, hostname suffix, DNS algorithm, or provider-specific naming rules.
 
 The platform model is:
 

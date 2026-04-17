@@ -17,7 +17,7 @@ interface DatabaseTraceDescriptor {
   location?: string;
 }
 
-const tracer = trace.getTracer("yundu.persistence.pg");
+const tracer = trace.getTracer("appaloft.persistence.pg");
 
 function readOperationName(sql: string): string {
   const operation = sql.trim().split(/\s+/, 1)[0]?.toUpperCase();

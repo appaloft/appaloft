@@ -1,4 +1,3 @@
-import { Args, Command as EffectCommand, Options } from "@effect/cli";
 import {
   CreateResourceCommand,
   ListResourcesQuery,
@@ -7,8 +6,9 @@ import {
   ResourceHealthQuery,
   ResourceProxyConfigurationPreviewQuery,
   ResourceRuntimeLogsQuery,
-} from "@yundu/application";
-import { resourceKinds } from "@yundu/core";
+} from "@appaloft/application";
+import { resourceKinds } from "@appaloft/core";
+import { Args, Command as EffectCommand, Options } from "@effect/cli";
 
 import {
   optionalNumber,

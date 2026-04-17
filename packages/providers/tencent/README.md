@@ -1,4 +1,4 @@
-# @yundu/provider-tencent
+# @appaloft/provider-tencent
 
 Tencent Cloud provider placeholder package.
 

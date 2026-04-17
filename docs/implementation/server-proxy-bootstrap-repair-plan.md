@@ -58,7 +58,7 @@ Expected implementation areas:
   attempt table if needed by ADR-004 readiness queries.
 - `packages/contracts` and `packages/orpc`: expose the command schema and
   `POST /api/servers/{serverId}/edge-proxy/bootstrap`.
-- `packages/adapters/cli`: add `yundu server proxy repair <serverId>` and dispatch the command bus.
+- `packages/adapters/cli`: add `appaloft server proxy repair <serverId>` and dispatch the command bus.
 - `apps/shell`: register use case, handler, provider registry, runtime ports, and worker/process
   manager dependencies through tokens.
 
@@ -116,7 +116,7 @@ Minimum tests:
   workload containers;
 - successful repair publishes `proxy-installed` and marks edge proxy ready;
 - failed repair publishes `proxy-install-failed` with the configured retryability;
-- CLI `yundu server proxy repair <serverId>` dispatches `servers.bootstrap-proxy`;
+- CLI `appaloft server proxy repair <serverId>` dispatches `servers.bootstrap-proxy`;
 - HTTP `POST /api/servers/{serverId}/edge-proxy/bootstrap` reuses the command schema;
 - server doctor output can point to the repair operation for retriable proxy failures without
   mutating lifecycle state itself.

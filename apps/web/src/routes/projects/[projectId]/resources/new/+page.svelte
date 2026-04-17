@@ -19,7 +19,7 @@
     CreateResourceInput,
     DeploymentProgressEvent,
     ResourceSummary,
-  } from "@yundu/contracts";
+  } from "@appaloft/contracts";
   import type { Component } from "svelte";
 
   import { readErrorMessage } from "$lib/api/client";
@@ -74,12 +74,12 @@
   type ResourceRuntimeProfileInput = NonNullable<CreateResourceInput["runtimeProfile"]>;
   type ResourceHealthCheckInput = NonNullable<ResourceRuntimeProfileInput["healthCheck"]>;
   type ResourceNetworkProfileInput = NonNullable<CreateResourceInput["networkProfile"]>;
-  type YunduDesktopBridge = {
+  type AppaloftDesktopBridge = {
     selectDirectory?: () => Promise<string | null | undefined>;
   };
-  type WindowWithYunduDesktopBridge = Window &
+  type WindowWithAppaloftDesktopBridge = Window &
     typeof globalThis & {
-      yunduDesktop?: YunduDesktopBridge;
+      appaloftDesktop?: AppaloftDesktopBridge;
     };
 
   const { projectsQuery, environmentsQuery, serversQuery } = createConsoleQueries(browser);
@@ -152,7 +152,7 @@
   );
   const canChooseNativeLocalFolder = $derived(
     browser &&
-      typeof (window as WindowWithYunduDesktopBridge).yunduDesktop?.selectDirectory === "function",
+      typeof (window as WindowWithAppaloftDesktopBridge).appaloftDesktop?.selectDirectory === "function",
   );
   const canDeploy = $derived(
     Boolean(project?.id && environmentId && serverId && name.trim() && sourceLocator.trim()),
@@ -564,7 +564,7 @@
       return;
     }
 
-    const selectDirectory = (window as WindowWithYunduDesktopBridge).yunduDesktop?.selectDirectory;
+    const selectDirectory = (window as WindowWithAppaloftDesktopBridge).appaloftDesktop?.selectDirectory;
 
     if (!selectDirectory) {
       localFolderSelectionNotice = $t(
@@ -605,7 +605,7 @@
 </script>
 
 <svelte:head>
-  <title>{$t(i18nKeys.common.actions.createResource)} · Yundu</title>
+  <title>{$t(i18nKeys.common.actions.createResource)} · Appaloft</title>
 </svelte:head>
 
 <ConsoleShell

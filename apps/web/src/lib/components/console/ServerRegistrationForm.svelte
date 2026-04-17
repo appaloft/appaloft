@@ -1,6 +1,6 @@
 <script lang="ts">
   import { LoaderCircle } from "@lucide/svelte";
-  import type { TestServerConnectivityResponse } from "@yundu/contracts";
+  import type { TestServerConnectivityResponse } from "@appaloft/contracts";
 
   import { readErrorMessage } from "$lib/api/client";
   import { Badge } from "$lib/components/ui/badge";
@@ -19,7 +19,7 @@
     type ServerRegistrationDraft,
   } from "$lib/console/server-registration";
   import { i18nKeys, t } from "$lib/i18n";
-  import type { SshCredentialSummary } from "@yundu/contracts";
+  import type { SshCredentialSummary } from "@appaloft/contracts";
 
   type Props = {
     draft?: ServerRegistrationDraft;

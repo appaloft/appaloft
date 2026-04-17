@@ -1,9 +1,9 @@
 import "reflect-metadata";
 
 import { afterAll, describe, expect, test } from "bun:test";
-import { type CommandBus, createExecutionContext, type QueryBus } from "@yundu/application";
-import { resolveConfig } from "@yundu/config";
-import { bootstrapOpenTelemetry } from "@yundu/observability/bootstrap";
+import { type CommandBus, createExecutionContext, type QueryBus } from "@appaloft/application";
+import { resolveConfig } from "@appaloft/config";
+import { bootstrapOpenTelemetry } from "@appaloft/observability/bootstrap";
 
 import { createHttpApp } from "../src";
 
@@ -18,7 +18,7 @@ const telemetry = await bootstrapOpenTelemetry({
   appVersion: "0.1.0-test",
   environment: "test",
   otelEnabled: true,
-  otelServiceName: "yundu-http-test",
+  otelServiceName: "appaloft-http-test",
   otelExporterEndpoint: `http://127.0.0.1:${collector.port}/v1/traces`,
   otelTracesSampler: "always_on",
 });

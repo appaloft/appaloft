@@ -14,7 +14,7 @@ describe("api client helpers", () => {
       return new Response(
         JSON.stringify({
           status: "ok",
-          service: "yundu",
+          service: "appaloft",
         }),
       );
     });
@@ -27,7 +27,7 @@ describe("api client helpers", () => {
     expect(requestedUrl).toBe("http://localhost:3001/api/health");
     expect(data).toEqual({
       status: "ok",
-      service: "yundu",
+      service: "appaloft",
     });
   });
 

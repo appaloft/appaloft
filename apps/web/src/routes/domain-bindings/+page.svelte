@@ -6,7 +6,7 @@
     ConfirmDomainBindingOwnershipInput,
     CreateDomainBindingInput,
     DomainBindingSummary,
-  } from "@yundu/contracts";
+  } from "@appaloft/contracts";
 
   import { readErrorMessage } from "$lib/api/client";
   import ConsoleShell from "$lib/components/console/ConsoleShell.svelte";
@@ -257,7 +257,7 @@
 </script>
 
 <svelte:head>
-  <title>{$t(i18nKeys.console.domainBindings.pageTitle)} · Yundu</title>
+  <title>{$t(i18nKeys.console.domainBindings.pageTitle)} · Appaloft</title>
 </svelte:head>
 
 <ConsoleShell

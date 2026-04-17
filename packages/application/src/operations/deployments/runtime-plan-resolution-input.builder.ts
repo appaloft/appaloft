@@ -7,7 +7,7 @@ import {
   type Server,
   type SourceDescriptor,
   safeTry,
-} from "@yundu/core";
+} from "@appaloft/core";
 import { inject, injectable } from "tsyringe";
 
 import {

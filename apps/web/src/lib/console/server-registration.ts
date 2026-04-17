@@ -3,7 +3,7 @@ import {
   type QuickDeployServerCredential,
   type RegisterServerInput,
   type SshCredentialSummary,
-} from "@yundu/contracts";
+} from "@appaloft/contracts";
 
 import { type ProviderSummary } from "$lib/console/queries";
 

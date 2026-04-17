@@ -1,6 +1,6 @@
 # express-hello
 
-Minimal Express demo application for local Yundu smoke validation.
+Minimal Express demo application for local Appaloft smoke validation.
 
 Use it to verify:
 

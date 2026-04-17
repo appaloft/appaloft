@@ -7,7 +7,7 @@ import {
   resourceServiceKinds,
   runtimePlanStrategies,
   sourceKinds,
-} from "@yundu/core";
+} from "@appaloft/core";
 import { z } from "zod";
 
 import { nonEmptyTrimmedString } from "../shared-schema";

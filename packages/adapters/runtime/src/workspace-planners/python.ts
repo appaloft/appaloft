@@ -1,4 +1,4 @@
-import { err, ok, type Result, type SourceInspectionSnapshot } from "@yundu/core";
+import { err, ok, type Result, type SourceInspectionSnapshot } from "@appaloft/core";
 import {
   commandMentions,
   dockerfileFromExecution,

@@ -44,7 +44,7 @@ describe("EnvironmentProfile", () => {
     });
     environment.setVariable({
       key: ConfigKey.rehydrate("PUBLIC_BASE_URL"),
-      value: ConfigValueText.rehydrate("https://demo.yundu.dev"),
+      value: ConfigValueText.rehydrate("https://demo.appaloft.dev"),
       kind: VariableKindValue.rehydrate("plain-config"),
       exposure: VariableExposureValue.rehydrate("build-time"),
       scope: ConfigScopeValue.rehydrate("project"),

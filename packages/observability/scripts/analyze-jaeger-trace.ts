@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 
-import { yunduTraceAttributes } from "@yundu/application/execution-context";
+import { appaloftTraceAttributes } from "@appaloft/application/execution-context";
 
 type AttributeValue = string | number | boolean;
 type AttributeMap = Record<string, AttributeValue>;
@@ -27,7 +27,7 @@ interface CliOptions {
   top: number;
 }
 
-interface YunduAttributeKeys {
+interface AppaloftAttributeKeys {
   commandName: string;
   errorCategory: string;
   errorCode: string;
@@ -107,28 +107,28 @@ interface TraceSummary {
   traceId: string;
 }
 
-const fallbackYunduTraceAttributes: YunduAttributeKeys = {
-  commandName: "yundu.command.name",
-  errorCategory: "yundu.error.category",
-  errorCode: "yundu.error.code",
-  handlerName: "yundu.handler.name",
-  integrationKey: "yundu.integration.key",
-  mutationSpecName: "yundu.mutation_spec.name",
-  queryName: "yundu.query.name",
-  readModelName: "yundu.read_model.name",
-  repositoryName: "yundu.repository.name",
-  deploymentId: "yundu.deployment.id",
-  resourceId: "yundu.resource.id",
-  requestId: "yundu.request.id",
-  runtimeKind: "yundu.runtime.kind",
-  runtimeLogCloseReason: "yundu.runtime_logs.close_reason",
-  runtimeLogCommand: "yundu.runtime_logs.command",
-  runtimeLogFollow: "yundu.runtime_logs.follow",
-  runtimeLogLineCount: "yundu.runtime_logs.line_count",
-  runtimeLogServiceName: "yundu.runtime_logs.service_name",
-  runtimeLogTailLines: "yundu.runtime_logs.tail_lines",
-  selectionSpecName: "yundu.selection_spec.name",
-  sourceLocator: "yundu.source.locator",
+const fallbackAppaloftTraceAttributes: AppaloftAttributeKeys = {
+  commandName: "appaloft.command.name",
+  errorCategory: "appaloft.error.category",
+  errorCode: "appaloft.error.code",
+  handlerName: "appaloft.handler.name",
+  integrationKey: "appaloft.integration.key",
+  mutationSpecName: "appaloft.mutation_spec.name",
+  queryName: "appaloft.query.name",
+  readModelName: "appaloft.read_model.name",
+  repositoryName: "appaloft.repository.name",
+  deploymentId: "appaloft.deployment.id",
+  resourceId: "appaloft.resource.id",
+  requestId: "appaloft.request.id",
+  runtimeKind: "appaloft.runtime.kind",
+  runtimeLogCloseReason: "appaloft.runtime_logs.close_reason",
+  runtimeLogCommand: "appaloft.runtime_logs.command",
+  runtimeLogFollow: "appaloft.runtime_logs.follow",
+  runtimeLogLineCount: "appaloft.runtime_logs.line_count",
+  runtimeLogServiceName: "appaloft.runtime_logs.service_name",
+  runtimeLogTailLines: "appaloft.runtime_logs.tail_lines",
+  selectionSpecName: "appaloft.selection_spec.name",
+  sourceLocator: "appaloft.source.locator",
 };
 
 const allCategories: SpanCategory[] = [
@@ -276,41 +276,49 @@ function toAttributeValue(value: unknown): AttributeValue | undefined {
   return undefined;
 }
 
-function loadYunduAttributeKeys(): YunduAttributeKeys {
+function loadAppaloftAttributeKeys(): AppaloftAttributeKeys {
   return {
-    commandName: yunduTraceAttributes.commandName ?? fallbackYunduTraceAttributes.commandName,
-    errorCategory: yunduTraceAttributes.errorCategory ?? fallbackYunduTraceAttributes.errorCategory,
-    errorCode: yunduTraceAttributes.errorCode ?? fallbackYunduTraceAttributes.errorCode,
-    handlerName: yunduTraceAttributes.handlerName ?? fallbackYunduTraceAttributes.handlerName,
+    commandName: appaloftTraceAttributes.commandName ?? fallbackAppaloftTraceAttributes.commandName,
+    errorCategory:
+      appaloftTraceAttributes.errorCategory ?? fallbackAppaloftTraceAttributes.errorCategory,
+    errorCode: appaloftTraceAttributes.errorCode ?? fallbackAppaloftTraceAttributes.errorCode,
+    handlerName: appaloftTraceAttributes.handlerName ?? fallbackAppaloftTraceAttributes.handlerName,
     integrationKey:
-      yunduTraceAttributes.integrationKey ?? fallbackYunduTraceAttributes.integrationKey,
+      appaloftTraceAttributes.integrationKey ?? fallbackAppaloftTraceAttributes.integrationKey,
     mutationSpecName:
-      yunduTraceAttributes.mutationSpecName ?? fallbackYunduTraceAttributes.mutationSpecName,
-    queryName: yunduTraceAttributes.queryName ?? fallbackYunduTraceAttributes.queryName,
-    readModelName: yunduTraceAttributes.readModelName ?? fallbackYunduTraceAttributes.readModelName,
+      appaloftTraceAttributes.mutationSpecName ?? fallbackAppaloftTraceAttributes.mutationSpecName,
+    queryName: appaloftTraceAttributes.queryName ?? fallbackAppaloftTraceAttributes.queryName,
+    readModelName:
+      appaloftTraceAttributes.readModelName ?? fallbackAppaloftTraceAttributes.readModelName,
     repositoryName:
-      yunduTraceAttributes.repositoryName ?? fallbackYunduTraceAttributes.repositoryName,
-    deploymentId: yunduTraceAttributes.deploymentId ?? fallbackYunduTraceAttributes.deploymentId,
-    resourceId: yunduTraceAttributes.resourceId ?? fallbackYunduTraceAttributes.resourceId,
-    requestId: yunduTraceAttributes.requestId ?? fallbackYunduTraceAttributes.requestId,
-    runtimeKind: yunduTraceAttributes.runtimeKind ?? fallbackYunduTraceAttributes.runtimeKind,
+      appaloftTraceAttributes.repositoryName ?? fallbackAppaloftTraceAttributes.repositoryName,
+    deploymentId:
+      appaloftTraceAttributes.deploymentId ?? fallbackAppaloftTraceAttributes.deploymentId,
+    resourceId: appaloftTraceAttributes.resourceId ?? fallbackAppaloftTraceAttributes.resourceId,
+    requestId: appaloftTraceAttributes.requestId ?? fallbackAppaloftTraceAttributes.requestId,
+    runtimeKind: appaloftTraceAttributes.runtimeKind ?? fallbackAppaloftTraceAttributes.runtimeKind,
     runtimeLogCloseReason:
-      yunduTraceAttributes.runtimeLogCloseReason ??
-      fallbackYunduTraceAttributes.runtimeLogCloseReason,
+      appaloftTraceAttributes.runtimeLogCloseReason ??
+      fallbackAppaloftTraceAttributes.runtimeLogCloseReason,
     runtimeLogCommand:
-      yunduTraceAttributes.runtimeLogCommand ?? fallbackYunduTraceAttributes.runtimeLogCommand,
+      appaloftTraceAttributes.runtimeLogCommand ??
+      fallbackAppaloftTraceAttributes.runtimeLogCommand,
     runtimeLogFollow:
-      yunduTraceAttributes.runtimeLogFollow ?? fallbackYunduTraceAttributes.runtimeLogFollow,
+      appaloftTraceAttributes.runtimeLogFollow ?? fallbackAppaloftTraceAttributes.runtimeLogFollow,
     runtimeLogLineCount:
-      yunduTraceAttributes.runtimeLogLineCount ?? fallbackYunduTraceAttributes.runtimeLogLineCount,
+      appaloftTraceAttributes.runtimeLogLineCount ??
+      fallbackAppaloftTraceAttributes.runtimeLogLineCount,
     runtimeLogServiceName:
-      yunduTraceAttributes.runtimeLogServiceName ??
-      fallbackYunduTraceAttributes.runtimeLogServiceName,
+      appaloftTraceAttributes.runtimeLogServiceName ??
+      fallbackAppaloftTraceAttributes.runtimeLogServiceName,
     runtimeLogTailLines:
-      yunduTraceAttributes.runtimeLogTailLines ?? fallbackYunduTraceAttributes.runtimeLogTailLines,
+      appaloftTraceAttributes.runtimeLogTailLines ??
+      fallbackAppaloftTraceAttributes.runtimeLogTailLines,
     selectionSpecName:
-      yunduTraceAttributes.selectionSpecName ?? fallbackYunduTraceAttributes.selectionSpecName,
-    sourceLocator: yunduTraceAttributes.sourceLocator ?? fallbackYunduTraceAttributes.sourceLocator,
+      appaloftTraceAttributes.selectionSpecName ??
+      fallbackAppaloftTraceAttributes.selectionSpecName,
+    sourceLocator:
+      appaloftTraceAttributes.sourceLocator ?? fallbackAppaloftTraceAttributes.sourceLocator,
   };
 }
 
@@ -468,45 +476,45 @@ function hasAttribute(attributes: AttributeMap, key: string): boolean {
 function classifySpan(
   operationName: string,
   attributes: AttributeMap,
-  yunduAttributes: YunduAttributeKeys,
+  appaloftAttributes: AppaloftAttributeKeys,
 ): SpanCategory {
   if (/^(GET|POST|PUT|PATCH|DELETE|OPTIONS|HEAD) /.test(operationName)) {
     return "http.server";
   }
 
   if (
-    operationName.startsWith("yundu.command.") ||
-    hasAttribute(attributes, yunduAttributes.commandName)
+    operationName.startsWith("appaloft.command.") ||
+    hasAttribute(attributes, appaloftAttributes.commandName)
   ) {
     return "command";
   }
 
   if (
-    operationName.startsWith("yundu.query.") ||
-    hasAttribute(attributes, yunduAttributes.queryName)
+    operationName.startsWith("appaloft.query.") ||
+    hasAttribute(attributes, appaloftAttributes.queryName)
   ) {
     return "query";
   }
 
   if (
-    operationName.startsWith("yundu.repository.") ||
-    hasAttribute(attributes, yunduAttributes.repositoryName)
+    operationName.startsWith("appaloft.repository.") ||
+    hasAttribute(attributes, appaloftAttributes.repositoryName)
   ) {
     return "repository";
   }
 
   if (
-    operationName.startsWith("yundu.read_model.") ||
-    hasAttribute(attributes, yunduAttributes.readModelName)
+    operationName.startsWith("appaloft.read_model.") ||
+    hasAttribute(attributes, appaloftAttributes.readModelName)
   ) {
     return "read_model";
   }
 
-  if (operationName.startsWith("yundu.adapter.")) {
+  if (operationName.startsWith("appaloft.adapter.")) {
     return "adapter";
   }
 
-  if (operationName.startsWith("yundu.runtime_logs.")) {
+  if (operationName.startsWith("appaloft.runtime_logs.")) {
     return "runtime_logs";
   }
 
@@ -514,7 +522,7 @@ function classifySpan(
     return "database";
   }
 
-  if (hasAttribute(attributes, yunduAttributes.integrationKey)) {
+  if (hasAttribute(attributes, appaloftAttributes.integrationKey)) {
     return "integration";
   }
 
@@ -525,13 +533,16 @@ function classifySpan(
   return "other";
 }
 
-function findErrorReasons(attributes: AttributeMap, yunduAttributes: YunduAttributeKeys): string[] {
+function findErrorReasons(
+  attributes: AttributeMap,
+  appaloftAttributes: AppaloftAttributeKeys,
+): string[] {
   const reasons: string[] = [];
   const errorValue = attributes.error;
   const statusCode = attributes["http.response.status_code"];
   const otelStatusCode = attributes["otel.status_code"];
-  const yunduErrorCode = attributes[yunduAttributes.errorCode];
-  const yunduErrorCategory = attributes[yunduAttributes.errorCategory];
+  const appaloftErrorCode = attributes[appaloftAttributes.errorCode];
+  const appaloftErrorCategory = attributes[appaloftAttributes.errorCategory];
 
   if (errorValue === true || errorValue === "true") {
     reasons.push("error=true");
@@ -545,12 +556,12 @@ function findErrorReasons(attributes: AttributeMap, yunduAttributes: YunduAttrib
     reasons.push(`http.response.status_code=${statusCode}`);
   }
 
-  if (yunduErrorCode !== undefined) {
-    reasons.push(`${yunduAttributes.errorCode}=${String(yunduErrorCode)}`);
+  if (appaloftErrorCode !== undefined) {
+    reasons.push(`${appaloftAttributes.errorCode}=${String(appaloftErrorCode)}`);
   }
 
-  if (yunduErrorCategory !== undefined) {
-    reasons.push(`${yunduAttributes.errorCategory}=${String(yunduErrorCategory)}`);
+  if (appaloftErrorCategory !== undefined) {
+    reasons.push(`${appaloftAttributes.errorCategory}=${String(appaloftErrorCategory)}`);
   }
 
   return reasons;
@@ -558,7 +569,7 @@ function findErrorReasons(attributes: AttributeMap, yunduAttributes: YunduAttrib
 
 function buildSpanNodes(
   traceRecord: Record<string, unknown>,
-  yunduAttributes: YunduAttributeKeys,
+  appaloftAttributes: AppaloftAttributeKeys,
 ): SpanNode[] {
   const traceId = readString(traceRecord, "traceID") ?? "unknown-trace";
   const serviceNames = readProcesses(traceRecord);
@@ -583,7 +594,7 @@ function buildSpanNodes(
 
       const attributes = readTags(spanRecord.tags);
       const processId = readString(spanRecord, "processID");
-      const category = classifySpan(operationName, attributes, yunduAttributes);
+      const category = classifySpan(operationName, attributes, appaloftAttributes);
 
       return {
         attributes,
@@ -592,7 +603,7 @@ function buildSpanNodes(
         durationMs: durationUs / 1000,
         durationUs,
         endUs: startUs + durationUs,
-        errorReasons: findErrorReasons(attributes, yunduAttributes),
+        errorReasons: findErrorReasons(attributes, appaloftAttributes),
         operationName,
         parentSpanIds: readParentSpanIds(spanRecord),
         ...(processId ? { processId } : {}),
@@ -666,7 +677,7 @@ function coveredChildDurationUs(parent: SpanNode, children: SpanNode[]): number 
 
 function pickInterestingAttributes(
   span: SpanNode,
-  yunduAttributes: YunduAttributeKeys,
+  appaloftAttributes: AppaloftAttributeKeys,
 ): Record<string, AttributeValue> {
   const keys = [
     "http.route",
@@ -676,27 +687,27 @@ function pickInterestingAttributes(
     "db.system.name",
     "db.operation.name",
     "db.response.returned_rows",
-    yunduAttributes.commandName,
-    yunduAttributes.queryName,
-    yunduAttributes.repositoryName,
-    yunduAttributes.readModelName,
-    yunduAttributes.handlerName,
-    yunduAttributes.integrationKey,
-    yunduAttributes.mutationSpecName,
-    yunduAttributes.selectionSpecName,
-    yunduAttributes.resourceId,
-    yunduAttributes.deploymentId,
-    yunduAttributes.requestId,
-    yunduAttributes.runtimeKind,
-    yunduAttributes.runtimeLogCloseReason,
-    yunduAttributes.runtimeLogCommand,
-    yunduAttributes.runtimeLogFollow,
-    yunduAttributes.runtimeLogLineCount,
-    yunduAttributes.runtimeLogServiceName,
-    yunduAttributes.runtimeLogTailLines,
-    yunduAttributes.sourceLocator,
-    yunduAttributes.errorCode,
-    yunduAttributes.errorCategory,
+    appaloftAttributes.commandName,
+    appaloftAttributes.queryName,
+    appaloftAttributes.repositoryName,
+    appaloftAttributes.readModelName,
+    appaloftAttributes.handlerName,
+    appaloftAttributes.integrationKey,
+    appaloftAttributes.mutationSpecName,
+    appaloftAttributes.selectionSpecName,
+    appaloftAttributes.resourceId,
+    appaloftAttributes.deploymentId,
+    appaloftAttributes.requestId,
+    appaloftAttributes.runtimeKind,
+    appaloftAttributes.runtimeLogCloseReason,
+    appaloftAttributes.runtimeLogCommand,
+    appaloftAttributes.runtimeLogFollow,
+    appaloftAttributes.runtimeLogLineCount,
+    appaloftAttributes.runtimeLogServiceName,
+    appaloftAttributes.runtimeLogTailLines,
+    appaloftAttributes.sourceLocator,
+    appaloftAttributes.errorCode,
+    appaloftAttributes.errorCategory,
   ];
   const attributes: Record<string, AttributeValue> = {};
 
@@ -711,9 +722,9 @@ function pickInterestingAttributes(
   return attributes;
 }
 
-function toSummarySpan(span: SpanNode, yunduAttributes: YunduAttributeKeys): SummarySpan {
+function toSummarySpan(span: SpanNode, appaloftAttributes: AppaloftAttributeKeys): SummarySpan {
   return {
-    attrs: pickInterestingAttributes(span, yunduAttributes),
+    attrs: pickInterestingAttributes(span, appaloftAttributes),
     category: span.category,
     durationMs: roundMs(span.durationMs),
     errors: span.errorReasons,
@@ -742,10 +753,10 @@ function createEmptyCategoryStats(): Record<SpanCategory, CategoryStats> {
 
 function summarizeTrace(
   traceRecord: Record<string, unknown>,
-  yunduAttributes: YunduAttributeKeys,
+  appaloftAttributes: AppaloftAttributeKeys,
   options: CliOptions,
 ): TraceSummary {
-  const spans = buildSpanNodes(traceRecord, yunduAttributes);
+  const spans = buildSpanNodes(traceRecord, appaloftAttributes);
 
   if (spans.length === 0) {
     throw new Error("Trace does not contain readable spans");
@@ -790,14 +801,14 @@ function summarizeTrace(
     categories,
     criticalPath: {
       scoreMs: roundMs(criticalPath.scoreMs),
-      spans: criticalPath.spans.map((span) => toSummarySpan(span, yunduAttributes)),
+      spans: criticalPath.spans.map((span) => toSummarySpan(span, appaloftAttributes)),
     },
     durationMs: roundMs((maxEndUs - minStartUs) / 1000),
-    errorSpans: errorSpans.map((span) => toSummarySpan(span, yunduAttributes)),
-    rootSpans: roots.map((span) => toSummarySpan(span, yunduAttributes)),
+    errorSpans: errorSpans.map((span) => toSummarySpan(span, appaloftAttributes)),
+    rootSpans: roots.map((span) => toSummarySpan(span, appaloftAttributes)),
     services: [...new Set(spans.map((span) => span.serviceName))].sort(),
-    slowSelfSpans: slowSelfSpans.map((span) => toSummarySpan(span, yunduAttributes)),
-    slowSpans: slowSpans.map((span) => toSummarySpan(span, yunduAttributes)),
+    slowSelfSpans: slowSelfSpans.map((span) => toSummarySpan(span, appaloftAttributes)),
+    slowSpans: slowSpans.map((span) => toSummarySpan(span, appaloftAttributes)),
     spanCount: spans.length,
     thresholdMs: options.thresholdMs,
     traceId,
@@ -964,10 +975,10 @@ async function main(): Promise<void> {
     return;
   }
 
-  const yunduAttributes = loadYunduAttributeKeys();
+  const appaloftAttributes = loadAppaloftAttributeKeys();
   const payload = await readPayload(options);
   const traceRecord = extractTraceRecord(payload);
-  const summary = summarizeTrace(traceRecord, yunduAttributes, options);
+  const summary = summarizeTrace(traceRecord, appaloftAttributes, options);
 
   console.log(options.json ? JSON.stringify(summary, null, 2) : renderMarkdown(summary));
 }

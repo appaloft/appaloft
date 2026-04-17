@@ -8,8 +8,8 @@ import {
   type ServerConnectivityCheck,
   type ServerConnectivityChecker,
   type ServerConnectivityResult,
-} from "@yundu/application";
-import { ok, type DeploymentTargetState, type Result } from "@yundu/core";
+} from "@appaloft/application";
+import { ok, type DeploymentTargetState, type Result } from "@appaloft/core";
 import {
   createEdgeProxyDiagnosticsPlanForSelection,
   proxyBootstrapOptionsFromEnv,
@@ -145,7 +145,7 @@ function prepareSshArgs(server: DeploymentTargetState, remoteCommand: string): P
   let identityArgs: string[] = [];
 
   if (credential?.kind.value === "ssh-private-key" && credential.privateKey) {
-    tempDir = mkdtempSync(join(tmpdir(), "yundu-ssh-"));
+    tempDir = mkdtempSync(join(tmpdir(), "appaloft-ssh-"));
     const identityFile = join(tempDir, "id_deployment_target");
     writeFileSync(
       identityFile,
@@ -220,7 +220,7 @@ function withProxyRepairMetadata(
     ...check,
     metadata: {
       ...check.metadata,
-      repairCommand: `yundu server proxy repair ${server.id.value}`,
+      repairCommand: `appaloft server proxy repair ${server.id.value}`,
     },
   };
 }
@@ -364,7 +364,7 @@ export class RuntimeServerConnectivityChecker implements ServerConnectivityCheck
       );
     } else if (server.providerKey.value === "generic-ssh") {
       checks.push(
-        sshProcessCheck(server, "printf yundu-connectivity", {
+        sshProcessCheck(server, "printf appaloft-connectivity", {
           name: "ssh",
           timeoutMs: 8000,
           successMessage: "SSH connection succeeded",

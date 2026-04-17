@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { type ExecutionContext } from "@yundu/application";
+import { type ExecutionContext } from "@appaloft/application";
 import { SslipDefaultAccessDomainProvider } from "../src";
 
 function createProviderTestContext(): ExecutionContext {

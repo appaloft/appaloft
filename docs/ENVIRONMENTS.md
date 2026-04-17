@@ -66,13 +66,13 @@ This prevents accidental frontend secret leakage in Milestone 1.
 
 Current CLI:
 
-- `yundu env list`
-- `yundu env create`
-- `yundu env show <id>`
-- `yundu env set <id> <key> <value>`
-- `yundu env unset <id> <key>`
-- `yundu env diff <source> <target>`
-- `yundu env promote <source> <target-name>`
+- `appaloft env list`
+- `appaloft env create`
+- `appaloft env show <id>`
+- `appaloft env set <id> <key> <value>`
+- `appaloft env unset <id> <key>`
+- `appaloft env diff <source> <target>`
+- `appaloft env promote <source> <target-name>`
 
 Current HTTP API:
 

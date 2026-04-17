@@ -62,7 +62,7 @@ import {
   type TlsMode,
   type VariableExposure,
   type VariableKind,
-} from "@yundu/core";
+} from "@appaloft/core";
 import { type ExecutionContext, type RepositoryContext } from "./execution-context";
 
 export interface Clock {

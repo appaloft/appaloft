@@ -1,4 +1,4 @@
-import { type YunduTranslationResource } from "./zh-CN";
+import { type AppaloftTranslationResource } from "./zh-CN";
 
 export const enUS = {
   common: {
@@ -43,7 +43,7 @@ export const enUS = {
     },
     app: {
       consoleSubtitle: "Deployment console",
-      productName: "Yundu",
+      productName: "Appaloft",
     },
     domain: {
       currentList: "Current list",
@@ -153,7 +153,7 @@ export const enUS = {
     web: {
       backendUnavailable: "Backend unavailable",
       backendUnavailableDescription:
-        "Start `yundu serve`, then confirm the database is ready. If you use PostgreSQL, check the username and password.",
+        "Start `appaloft serve`, then confirm the database is ready. If you use PostgreSQL, check the username and password.",
       requestFailedWithDetail: "API request failed for {{path}}: {{status}} {{detail}}",
       requestFailedWithoutDetail: "API request failed for {{path}}: {{status}}",
       unknownRequestFailure: "Unknown request failure",
@@ -245,7 +245,7 @@ export const enUS = {
       precedence: "Precedence",
       progressDeploymentLabel: "deployment",
       progressDescription:
-        "Shows deployment phases, Yundu logs, and application output from the same progress stream as the CLI.",
+        "Shows deployment phases, Appaloft logs, and application output from the same progress stream as the CLI.",
       progressParseError: "Could not parse deployment progress.",
       progressPhaseDeploy: "Deploy",
       progressPhaseDetect: "Detect",
@@ -275,7 +275,7 @@ export const enUS = {
     home: {
       databaseCard: "Database",
       deploymentBaseBody:
-        "Choose a local folder, GitHub repository, remote Git URL, or image. Yundu connects the project link, target server, environment snapshot, and deployment record in one deployment flow.",
+        "Choose a local folder, GitHub repository, remote Git URL, or image. Appaloft connects the project link, target server, environment snapshot, and deployment record in one deployment flow.",
       deploymentBaseTitle: "Start with one deployment; project links are created from there.",
       deploymentFlowCreateEnvironment: "Save environment snapshot",
       deploymentFlowCreateProject: "Create project",
@@ -436,7 +436,7 @@ export const enUS = {
       accessUrlCopied: "Copied",
       accessUrlCopyFailed: "Unable to copy",
       accessUrlDescription:
-        "The public entry for this resource. Bound domains take priority; otherwise Yundu uses the generated address.",
+        "The public entry for this resource. Bound domains take priority; otherwise Appaloft uses the generated address.",
       accessUrlEmpty: "This resource has no public access URL yet.",
       accessUrlTitle: "Access URL",
       applicationProfileDescription:
@@ -471,7 +471,7 @@ export const enUS = {
       domainBindingsTitle: "Custom domains",
       durableDomainAccess: "Durable domain access",
       externalProfileDescription:
-        "External resources keep project ownership and access context without a Yundu runtime.",
+        "External resources keep project ownership and access context without a Appaloft runtime.",
       externalProfileTitle: "External resource",
       generatedAccessRoute: "Generated default access",
       healthChecks: "Health checks",
@@ -664,9 +664,9 @@ export const enUS = {
       hostRequired: "Enter a server host first.",
       localSshAgent: "Local SSH agent",
       localSshAgentDescriptionOne:
-        "Local SSH agent uses SSH_AUTH_SOCK and loaded keys on the machine running the Yundu backend.",
+        "Local SSH agent uses SSH_AUTH_SOCK and loaded keys on the machine running the Appaloft backend.",
       localSshAgentDescriptionTwo:
-        "Use this for local development or desktop mode. When Yundu runs on a remote server, it is not using the agent from your laptop.",
+        "Use this for local development or desktop mode. When Appaloft runs on a remote server, it is not using the agent from your laptop.",
       manualInput: "Manual input",
       pastePrivateKey: "Paste private key",
       portInvalid: "SSH port must be an integer between 1 and 65535.",
@@ -742,4 +742,4 @@ export const enUS = {
       userSettings: "User settings",
     },
   },
-} as const satisfies YunduTranslationResource;
+} as const satisfies AppaloftTranslationResource;

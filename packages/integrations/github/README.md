@@ -1,4 +1,4 @@
-# @yundu/integration-github
+# @appaloft/integration-github
 
 GitHub integration skeleton package.
 

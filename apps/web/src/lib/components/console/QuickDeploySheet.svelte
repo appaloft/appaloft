@@ -23,8 +23,8 @@
     type QuickDeployWorkflowInput,
     type QuickDeployWorkflowStep,
     type QuickDeployWorkflowStepOutput,
-  } from "@yundu/contracts";
-  import type { TranslationKey } from "@yundu/i18n";
+  } from "@appaloft/contracts";
+  import type { TranslationKey } from "@appaloft/i18n";
   import type { Component } from "svelte";
   import type {
     AuthSessionResponse,
@@ -40,7 +40,7 @@
     ServerSummary,
     SshCredentialSummary,
     TestServerConnectivityResponse,
-  } from "@yundu/contracts";
+  } from "@appaloft/contracts";
 
   import { API_BASE, readErrorMessage, request } from "$lib/api/client";
   import DockerIcon from "$lib/components/console/DockerIcon.svelte";
@@ -92,12 +92,12 @@
   type ResourceRuntimeProfileInput = NonNullable<CreateResourceInput["runtimeProfile"]>;
   type ResourceHealthCheckInput = NonNullable<ResourceRuntimeProfileInput["healthCheck"]>;
   type ResourceNetworkProfileInput = NonNullable<CreateResourceInput["networkProfile"]>;
-  type YunduDesktopBridge = {
+  type AppaloftDesktopBridge = {
     selectDirectory?: () => Promise<string | null | undefined>;
   };
-  type WindowWithYunduDesktopBridge = Window &
+  type WindowWithAppaloftDesktopBridge = Window &
     typeof globalThis & {
-      yunduDesktop?: YunduDesktopBridge;
+      appaloftDesktop?: AppaloftDesktopBridge;
     };
 
   const environmentKinds = [
@@ -438,7 +438,7 @@
   const authIdentity = $derived(readSessionIdentity(authSession.session));
   const canChooseNativeLocalFolder = $derived(
     browser &&
-      typeof (window as WindowWithYunduDesktopBridge).yunduDesktop?.selectDirectory === "function",
+      typeof (window as WindowWithAppaloftDesktopBridge).appaloftDesktop?.selectDirectory === "function",
   );
   const selectedProject = $derived(
     projects.find((project) => project.id === selectedProjectId) ?? null,
@@ -505,7 +505,7 @@
     }
   });
   const deploymentCommandPreview = $derived.by(() => {
-    const segments = [`yundu deploy ${sourceLocator || "."}`];
+    const segments = [`appaloft deploy ${sourceLocator || "."}`];
 
     if (projectMode === "existing" && selectedProjectId) {
       segments.push(`--project ${selectedProjectId}`);
@@ -1494,7 +1494,7 @@
       return;
     }
 
-    const selectDirectory = (window as WindowWithYunduDesktopBridge).yunduDesktop?.selectDirectory;
+    const selectDirectory = (window as WindowWithAppaloftDesktopBridge).appaloftDesktop?.selectDirectory;
 
     if (!selectDirectory) {
       localFolderSelectionNotice = $t(i18nKeys.console.quickDeploy.chooseSourceDirectoryBrowserHint);

@@ -4,7 +4,7 @@ import {
   createExecutionContext,
   type RepositoryContext,
   toRepositoryContext,
-} from "@yundu/application";
+} from "@appaloft/application";
 
 import {
   BuildStrategyKindValue,
@@ -72,7 +72,7 @@ import {
   UpsertServerSpec,
   VariableExposureValue,
   VariableKindValue,
-} from "@yundu/core";
+} from "@appaloft/core";
 
 function createRepositoryContext(): RepositoryContext {
   return toRepositoryContext(
@@ -96,7 +96,7 @@ function createRepositoryContext(): RepositoryContext {
   );
 }
 
-const databaseUrl = process.env.YUNDU_DATABASE_URL;
+const databaseUrl = process.env.APPALOFT_DATABASE_URL;
 
 describe("postgres persistence integration", () => {
   test("is configured", () => {
@@ -182,7 +182,7 @@ describe("postgres persistence integration", () => {
 
     environment.setVariable({
       key: ConfigKey.rehydrate("DATABASE_URL"),
-      value: ConfigValueText.rehydrate("postgres://postgres:postgres@db:5432/yundu"),
+      value: ConfigValueText.rehydrate("postgres://postgres:postgres@db:5432/appaloft"),
       kind: VariableKindValue.rehydrate("secret"),
       exposure: VariableExposureValue.rehydrate("runtime"),
       scope: ConfigScopeValue.rehydrate("environment"),

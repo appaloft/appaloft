@@ -12,7 +12,7 @@ import {
   type ShellE2eWorkspace,
 } from "./support/shell-e2e-fixture";
 
-const enabled = process.env.YUNDU_E2E_SSH_QUICK_DEPLOY === "true";
+const enabled = process.env.APPALOFT_E2E_SSH_QUICK_DEPLOY === "true";
 const successfulFixtureDir = fixturePath("docker-express-hello");
 const failingFixtureDir = fixturePath("docker-exits-fast");
 
@@ -34,11 +34,11 @@ function expandHome(path: string): string {
 }
 
 function sshConfig(): SshConfig {
-  const host = process.env.YUNDU_E2E_SSH_HOST;
-  const privateKeyFile = expandHome(process.env.YUNDU_E2E_SSH_PRIVATE_KEY ?? "~/.ssh/yundu");
+  const host = process.env.APPALOFT_E2E_SSH_HOST;
+  const privateKeyFile = expandHome(process.env.APPALOFT_E2E_SSH_PRIVATE_KEY ?? "~/.ssh/appaloft");
 
   if (!host) {
-    throw new Error("YUNDU_E2E_SSH_HOST is required when YUNDU_E2E_SSH_QUICK_DEPLOY=true");
+    throw new Error("APPALOFT_E2E_SSH_HOST is required when APPALOFT_E2E_SSH_QUICK_DEPLOY=true");
   }
 
   if (!existsSync(privateKeyFile)) {
@@ -47,9 +47,9 @@ function sshConfig(): SshConfig {
 
   return {
     host,
-    port: process.env.YUNDU_E2E_SSH_PORT ?? "22",
+    port: process.env.APPALOFT_E2E_SSH_PORT ?? "22",
     privateKeyFile,
-    username: process.env.YUNDU_E2E_SSH_USERNAME ?? "root",
+    username: process.env.APPALOFT_E2E_SSH_USERNAME ?? "root",
   };
 }
 
@@ -89,9 +89,9 @@ function runSsh(
 }
 
 function remoteCleanup(config: SshConfig, deploymentId: string): void {
-  const containerName = `yundu-${deploymentId}`.toLowerCase().replace(/[^a-z0-9_.-]/g, "-");
-  const imageName = `yundu-image-${deploymentId}`.toLowerCase().replace(/[^a-z0-9_.-]/g, "-");
-  const remoteRuntimeRoot = process.env.YUNDU_REMOTE_RUNTIME_ROOT ?? "/var/lib/yundu/runtime";
+  const containerName = `appaloft-${deploymentId}`.toLowerCase().replace(/[^a-z0-9_.-]/g, "-");
+  const imageName = `appaloft-image-${deploymentId}`.toLowerCase().replace(/[^a-z0-9_.-]/g, "-");
+  const remoteRuntimeRoot = process.env.APPALOFT_REMOTE_RUNTIME_ROOT ?? "/var/lib/appaloft/runtime";
   const remoteRoot = `${remoteRuntimeRoot.replace(/\/+$/, "")}/ssh-deployments/${deploymentId.toLowerCase().replace(/[^a-z0-9_.-]/g, "-")}`;
 
   runSsh(
@@ -182,8 +182,8 @@ function bootstrapSshContext(input: {
 
 describe("quick deploy SSH workflow e2e", () => {
   if (!enabled) {
-    test.skip("[QUICK-DEPLOY-WF-022] opt-in SSH Docker workflow requires YUNDU_E2E_SSH_QUICK_DEPLOY=true", () => {});
-    test.skip("[QUICK-DEPLOY-WF-034] opt-in SSH failure diagnostics workflow requires YUNDU_E2E_SSH_QUICK_DEPLOY=true", () => {});
+    test.skip("[QUICK-DEPLOY-WF-022] opt-in SSH Docker workflow requires APPALOFT_E2E_SSH_QUICK_DEPLOY=true", () => {});
+    test.skip("[QUICK-DEPLOY-WF-034] opt-in SSH failure diagnostics workflow requires APPALOFT_E2E_SSH_QUICK_DEPLOY=true", () => {});
     return;
   }
 
@@ -197,7 +197,7 @@ describe("quick deploy SSH workflow e2e", () => {
     const dockerVersion = runSsh(config, "docker version --format '{{.Server.Version}}'");
     expect(dockerVersion.exitCode, dockerVersion.stderr).toBe(0);
 
-    workspace = createShellE2eWorkspace("yundu-quick-deploy-ssh-", {
+    workspace = createShellE2eWorkspace("appaloft-quick-deploy-ssh-", {
       appVersion: "0.1.0-quick-deploy-ssh-e2e",
     });
     const suffix = crypto.randomUUID().slice(0, 8);

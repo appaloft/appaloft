@@ -83,7 +83,7 @@ using `ResourceDiagnosticSummaryQueryInput`.
 CLI exposes:
 
 ```text
-yundu resource diagnose <resourceId> [--deployment <deploymentId>] [--json]
+appaloft resource diagnose <resourceId> [--deployment <deploymentId>] [--json]
 ```
 
 CLI should print canonical JSON in `--json` mode and a concise section summary in human mode.
@@ -187,7 +187,7 @@ Remaining gaps:
 
 - Quick Deploy completion does not yet expose the copy action after accepted deployment.
 - Deployment detail does not yet expose the action directly.
-- CLI human-readable summary mode is not implemented; `yundu resource diagnose` currently prints
+- CLI human-readable summary mode is not implemented; `appaloft resource diagnose` currently prints
   JSON through the shared query renderer.
 - Optional `copy.markdown` and `copy.plainText` are not generated.
 - API/oRPC, CLI, and Web copy affordance do not yet have dedicated automated contract/e2e tests

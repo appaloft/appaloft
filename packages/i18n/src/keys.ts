@@ -1,4 +1,4 @@
-import { type YunduTranslationResource } from "./locales/zh-CN";
+import { type AppaloftTranslationResource } from "./locales/zh-CN";
 
 export const i18nKeys = {
   common: {
@@ -682,10 +682,10 @@ type DotPath<T> = {
 }[keyof T & string];
 
 type ResourceTranslationKey = {
-  [Namespace in keyof YunduTranslationResource & string]: `${Namespace}:${DotPath<
-    YunduTranslationResource[Namespace]
+  [Namespace in keyof AppaloftTranslationResource & string]: `${Namespace}:${DotPath<
+    AppaloftTranslationResource[Namespace]
   >}`;
-}[keyof YunduTranslationResource & string];
+}[keyof AppaloftTranslationResource & string];
 
 type AssertExact<Actual, Expected> = [Actual] extends [Expected]
   ? [Expected] extends [Actual]

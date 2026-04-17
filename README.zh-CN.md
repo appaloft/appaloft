@@ -1,6 +1,6 @@
-# 云渡 Yundu
+# Appaloft Appaloft
 
-云渡是一个 AI Native、本地优先、后端优先的本地到云部署平台，目标是让开发者把本地工作区、本地 Git 仓库、GitHub 仓库、zip、Docker 镜像或 Compose 文件一键部署到自己的服务器。
+Appaloft是一个 AI Native、本地优先、后端优先的本地到云部署平台，目标是让开发者把本地工作区、本地 Git 仓库、GitHub 仓库、zip、Docker 镜像或 Compose 文件一键部署到自己的服务器。
 
 它不是“网页后台为主、CLI 为辅”的产品。当前仓库从第一天就按下面的原则组织：
 
@@ -15,7 +15,7 @@ Milestone 1 已打通：
 - Bun + TypeScript strict + Turborepo Monorepo
 - `apps/shell` 作为组合入口，承载 backend runtime 和 CLI
 - `apps/web` 作为 SvelteKit static 控制台
-- `apps/web` 已通过 `@yundu/orpc/client` + `@tanstack/svelte-query` 消费后端业务接口
+- `apps/web` 已通过 `@appaloft/orpc/client` + `@tanstack/svelte-query` 消费后端业务接口
 - Elysia API 提供 health/readiness/version 与最小项目、服务器、环境、部署接口
 - Kysely 持久化已同时支持外部 PostgreSQL 与嵌入式 PGlite 两种模式
 - 默认 self-hosted 模式无需登录；进入 hosted-control-plane 模式后，GitHub 授权会在真正需要导入 GitHub 仓库时再触发
@@ -36,12 +36,12 @@ bun install
 
 ```bash
 # 本地开发默认推荐嵌入式 PGlite
-export YUNDU_DATABASE_DRIVER=pglite
+export APPALOFT_DATABASE_DRIVER=pglite
 
 # 或切到外部 PostgreSQL
 # docker compose -f docker-compose.dev.yml up -d
-# export YUNDU_DATABASE_DRIVER=postgres
-# export YUNDU_DATABASE_URL=postgres://postgres:postgres@localhost:5432/yundu
+# export APPALOFT_DATABASE_DRIVER=postgres
+# export APPALOFT_DATABASE_URL=postgres://postgres:postgres@localhost:5432/appaloft
 ```
 
 3. 执行 migration
@@ -69,14 +69,14 @@ bun run build
 bun run package:binary-bundle
 bun run package:artifacts
 bun run checksums
-docker build -t yundu-all-in-one:local .
+docker build -t appaloft-all-in-one:local .
 ```
 
 当前 release 产物包含：
 
-- `yundu-backend`
-- `yundu-web-static`
-- `yundu-binary-bundle`
+- `appaloft-backend`
+- `appaloft-web-static`
+- `appaloft-binary-bundle`
 - `Dockerfile`
 - `docker-compose.selfhost.yml`
 - `release-manifest.json`
@@ -84,7 +84,7 @@ docker build -t yundu-all-in-one:local .
 
 ## 运行形态
 
-云渡当前架构同时支持：
+Appaloft当前架构同时支持：
 
 - 前后端分离部署
 - All-in-one Docker
@@ -95,8 +95,8 @@ docker build -t yundu-all-in-one:local .
 
 - binary 只是分发形态，不代表内嵌数据库
 - PostgreSQL 仍然是 Hosted 与标准生产环境的主后端
-- PGlite 适用于嵌入式、单实例、文件落盘场景，默认写入平台用户数据目录；只有在需要便携的项目内状态时才设置 `YUNDU_DATA_DIR=.yundu/data`
-- `yundu-binary-bundle` 现在会打出单个 Bun 编译可执行文件，并把 web static 与 PGlite runtime 资源一起嵌进去
+- PGlite 适用于嵌入式、单实例、文件落盘场景，默认写入平台用户数据目录；只有在需要便携的项目内状态时才设置 `APPALOFT_DATA_DIR=.appaloft/data`
+- `appaloft-binary-bundle` 现在会打出单个 Bun 编译可执行文件，并把 web static 与 PGlite runtime 资源一起嵌进去
 
 ## 目录概览
 

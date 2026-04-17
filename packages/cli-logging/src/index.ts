@@ -1,4 +1,4 @@
-import { type DeploymentProgressEvent } from "@yundu/application";
+import { type DeploymentProgressEvent } from "@appaloft/application";
 import {
   type Deployment,
   type DeploymentTarget,
@@ -26,7 +26,7 @@ import {
   type ResourceInstanceVisitor,
   type Workload,
   type WorkloadVisitor,
-} from "@yundu/core";
+} from "@appaloft/core";
 
 type OutputStream = Pick<NodeJS.WriteStream, "columns" | "isTTY" | "write">;
 
@@ -229,7 +229,7 @@ function applyColor(enabled: boolean, value: string, ...codes: string[]): string
 }
 
 function labelFor(event: DeploymentProgressEvent): string {
-  const source = event.source === "application" ? "app" : "yundu";
+  const source = event.source === "application" ? "app" : "appaloft";
   const stream = event.stream ? ` ${event.stream}` : "";
   return `${source}${stream}`;
 }
@@ -301,7 +301,7 @@ export class DeploymentLogRenderer {
     if (event.source === "application") {
       this.addApplicationEvent(event);
     } else {
-      this.addYunduEvent(event);
+      this.addAppaloftEvent(event);
     }
   }
 
@@ -333,7 +333,7 @@ export class DeploymentLogRenderer {
     const line =
       event.source === "application"
         ? `  ${labelFor(event)} | ${event.message}\n`
-        : `${status} yundu [${this.stepText(event)}] ${event.message}\n`;
+        : `${status} appaloft [${this.stepText(event)}] ${event.message}\n`;
     this.output.write(line);
   }
 
@@ -344,7 +344,7 @@ export class DeploymentLogRenderer {
     }
 
     const lines = [
-      this.formatYunduLine(current.event, { truncate: true }),
+      this.formatAppaloftLine(current.event, { truncate: true }),
       ...current.appLogs.map((event) => this.formatAppLine(event, { truncate: true })),
     ];
 
@@ -365,7 +365,7 @@ export class DeploymentLogRenderer {
     this.render();
   }
 
-  private addYunduEvent(event: DeploymentProgressEvent): void {
+  private addAppaloftEvent(event: DeploymentProgressEvent): void {
     if (
       this.current &&
       this.current.event.phase === event.phase &&
@@ -393,7 +393,7 @@ export class DeploymentLogRenderer {
 
     this.clearPreviousLines();
     this.current = undefined;
-    this.writeHistoryLine(this.formatYunduLine(event, { truncate: false }));
+    this.writeHistoryLine(this.formatAppaloftLine(event, { truncate: false }));
   }
 
   private flushCurrent(input: { keepAppLogs: boolean }): void {
@@ -404,7 +404,7 @@ export class DeploymentLogRenderer {
 
     this.clearPreviousLines();
     this.current = undefined;
-    this.writeHistoryLine(this.formatYunduLine(current.event, { truncate: false }));
+    this.writeHistoryLine(this.formatAppaloftLine(current.event, { truncate: false }));
 
     if (input.keepAppLogs) {
       for (const event of current.appLogs) {
@@ -435,7 +435,7 @@ export class DeploymentLogRenderer {
       : event.phase;
   }
 
-  private formatYunduLine(event: DeploymentProgressEvent, input: { truncate: boolean }): string {
+  private formatAppaloftLine(event: DeploymentProgressEvent, input: { truncate: boolean }): string {
     const frame = spinnerFrames[this.spinnerIndex] ?? "-";
     const mark = statusMark(event, frame);
     const markColor =
@@ -444,7 +444,7 @@ export class DeploymentLogRenderer {
         : event.status === "succeeded"
           ? ansi.green
           : ansi.cyan;
-    const label = applyColor(this.color, "yundu", ansi.bold, ansi.cyan);
+    const label = applyColor(this.color, "appaloft", ansi.bold, ansi.cyan);
     const status = applyColor(this.color, mark, markColor);
     const prefix = `${status} ${label} ${applyColor(this.color, `[${this.stepText(event)}]`, ansi.bold)}`;
     const line = `${prefix} ${event.message}`;

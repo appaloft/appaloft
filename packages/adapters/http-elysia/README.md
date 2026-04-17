@@ -1,11 +1,11 @@
-# @yundu/adapter-http-elysia
+# @appaloft/adapter-http-elysia
 
-HTTP adapter for Yundu.
+HTTP adapter for Appaloft.
 
 Responsibilities:
 
 - expose REST endpoints through Elysia
-- translate transport inputs and outputs using `@yundu/contracts`
+- translate transport inputs and outputs using `@appaloft/contracts`
 - map application errors to HTTP status codes
 
 Must not:

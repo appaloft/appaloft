@@ -142,7 +142,7 @@ type BootstrapServerProxyResult = Result<
 
 Lifecycle failures after async acceptance are represented in server/proxy state and events according to the shared async lifecycle contract.
 
-`servers.bootstrap-proxy` may be invoked by `yundu server proxy repair <serverId>` as an
+`servers.bootstrap-proxy` may be invoked by `appaloft server proxy repair <serverId>` as an
 operator action after `server doctor` reports a proxy problem. The operation must not mutate user
 workload containers. It may create, verify, replace, or restart only provider-owned proxy
 infrastructure and provider-owned networks or volumes rendered by the selected edge proxy provider.
@@ -213,7 +213,7 @@ Required first-class coverage:
 - `SERVER-BOOT-CMD-001`, `SERVER-BOOT-CMD-002`, and `SERVER-BOOT-CMD-003`: application command
   boundary tests for accepted provider-backed metadata, accepted disabled-proxy metadata, and input
   rejection.
-- `SERVER-BOOT-ENTRY-001`: CLI e2e chain for `yundu server register` followed by `yundu server
+- `SERVER-BOOT-ENTRY-001`: CLI e2e chain for `appaloft server register` followed by `appaloft server
   list`.
 - `SERVER-BOOT-ENTRY-002`: HTTP e2e chain for `POST /api/servers` followed by `GET /api/servers`.
 
@@ -245,7 +245,7 @@ Current `servers.test-connectivity` includes provider-rendered edge proxy diagno
 generic SSH targets when an edge proxy provider registry is available. Traefik diagnostics include
 container image compatibility, Docker provider log scanning, and a bounded Docker-label route probe.
 Failed provider-rendered edge proxy diagnostic checks include safe `repairCommand` metadata pointing
-to `yundu server proxy repair <serverId>`.
+to `appaloft server proxy repair <serverId>`.
 
 Current aggregate records `deployment_target.edge_proxy_bootstrap_started`, `deployment_target.edge_proxy_bootstrap_succeeded`, and `deployment_target.edge_proxy_bootstrap_failed`, but the current bootstrap event handler does not publish pulled events after marking started/succeeded/failed.
 

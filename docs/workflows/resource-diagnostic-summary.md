@@ -90,7 +90,7 @@ separate endpoints and merging ad hoc shapes.
 Desktop/local installations must still expose product-level diagnostic information through the same
 query. Safe context may include:
 
-- Yundu backend version/build;
+- Appaloft backend version/build;
 - shell/runtime mode such as desktop, local, or server;
 - persistence driver such as PGlite or PostgreSQL;
 - selected provider keys and capability status;

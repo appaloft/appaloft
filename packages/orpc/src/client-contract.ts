@@ -1,4 +1,3 @@
-import { type AsyncIteratorClass, type Client, type ORPCError } from "@orpc/client";
 import {
   type BootstrapServerProxyCommandInput,
   type ConfigureServerCredentialCommandInput,
@@ -30,7 +29,7 @@ import {
   type ShowEnvironmentQueryInput,
   type TestServerConnectivityCommandInput,
   type UnsetEnvironmentVariableCommandInput,
-} from "@yundu/application/schemas";
+} from "@appaloft/application/schemas";
 import {
   type BootstrapServerProxyResponse,
   type ConfirmDomainBindingOwnershipResponse,
@@ -66,240 +65,241 @@ import {
   type ResourceRuntimeLogsStreamResponse,
   type TerminalSessionDescriptor,
   type TestServerConnectivityResponse,
-} from "@yundu/contracts";
+} from "@appaloft/contracts";
+import { type AsyncIteratorClass, type Client, type ORPCError } from "@orpc/client";
 
-type YunduClientContext = Record<never, never>;
-type YunduClientError = ORPCError<string, unknown>;
+type AppaloftClientContext = Record<never, never>;
+type AppaloftClientError = ORPCError<string, unknown>;
 
-export type YunduOrpcClientContract = {
+export type AppaloftOrpcClientContract = {
   projects: {
-    list: Client<YunduClientContext, undefined, ListProjectsResponse, YunduClientError>;
+    list: Client<AppaloftClientContext, undefined, ListProjectsResponse, AppaloftClientError>;
     create: Client<
-      YunduClientContext,
+      AppaloftClientContext,
       CreateProjectCommandInput,
       CreateProjectResponse,
-      YunduClientError
+      AppaloftClientError
     >;
   };
   servers: {
-    list: Client<YunduClientContext, undefined, ListServersResponse, YunduClientError>;
+    list: Client<AppaloftClientContext, undefined, ListServersResponse, AppaloftClientError>;
     create: Client<
-      YunduClientContext,
+      AppaloftClientContext,
       RegisterServerCommandInput,
       RegisterServerResponse,
-      YunduClientError
+      AppaloftClientError
     >;
     configureCredential: Client<
-      YunduClientContext,
+      AppaloftClientContext,
       ConfigureServerCredentialCommandInput,
       null,
-      YunduClientError
+      AppaloftClientError
     >;
     testConnectivity: Client<
-      YunduClientContext,
+      AppaloftClientContext,
       TestServerConnectivityCommandInput,
       TestServerConnectivityResponse,
-      YunduClientError
+      AppaloftClientError
     >;
     testDraftConnectivity: Client<
-      YunduClientContext,
+      AppaloftClientContext,
       TestServerConnectivityCommandInput,
       TestServerConnectivityResponse,
-      YunduClientError
+      AppaloftClientError
     >;
     bootstrapProxy: Client<
-      YunduClientContext,
+      AppaloftClientContext,
       BootstrapServerProxyCommandInput,
       BootstrapServerProxyResponse,
-      YunduClientError
+      AppaloftClientError
     >;
   };
   credentials: {
     ssh: {
       list: Client<
-        YunduClientContext,
+        AppaloftClientContext,
         ListSshCredentialsQueryInput,
         ListSshCredentialsResponse,
-        YunduClientError
+        AppaloftClientError
       >;
       create: Client<
-        YunduClientContext,
+        AppaloftClientContext,
         CreateSshCredentialCommandInput,
         CreateSshCredentialResponse,
-        YunduClientError
+        AppaloftClientError
       >;
     };
   };
   environments: {
     list: Client<
-      YunduClientContext,
+      AppaloftClientContext,
       ListEnvironmentsQueryInput,
       ListEnvironmentsResponse,
-      YunduClientError
+      AppaloftClientError
     >;
     create: Client<
-      YunduClientContext,
+      AppaloftClientContext,
       CreateEnvironmentCommandInput,
       CreateEnvironmentResponse,
-      YunduClientError
+      AppaloftClientError
     >;
     show: Client<
-      YunduClientContext,
+      AppaloftClientContext,
       ShowEnvironmentQueryInput,
       EnvironmentSummary,
-      YunduClientError
+      AppaloftClientError
     >;
     setVariable: Client<
-      YunduClientContext,
+      AppaloftClientContext,
       SetEnvironmentVariableCommandInput,
       null,
-      YunduClientError
+      AppaloftClientError
     >;
     unsetVariable: Client<
-      YunduClientContext,
+      AppaloftClientContext,
       UnsetEnvironmentVariableCommandInput,
       null,
-      YunduClientError
+      AppaloftClientError
     >;
     promote: Client<
-      YunduClientContext,
+      AppaloftClientContext,
       PromoteEnvironmentCommandInput,
       PromoteEnvironmentResponse,
-      YunduClientError
+      AppaloftClientError
     >;
     diff: Client<
-      YunduClientContext,
+      AppaloftClientContext,
       DiffEnvironmentsQueryInput,
       DiffEnvironmentResponse,
-      YunduClientError
+      AppaloftClientError
     >;
   };
   resources: {
     list: Client<
-      YunduClientContext,
+      AppaloftClientContext,
       ListResourcesQueryInput,
       ListResourcesResponse,
-      YunduClientError
+      AppaloftClientError
     >;
     create: Client<
-      YunduClientContext,
+      AppaloftClientContext,
       CreateResourceCommandInput,
       CreateResourceResponse,
-      YunduClientError
+      AppaloftClientError
     >;
     diagnosticSummary: Client<
-      YunduClientContext,
+      AppaloftClientContext,
       ResourceDiagnosticSummaryQueryInput,
       ResourceDiagnosticSummary,
-      YunduClientError
+      AppaloftClientError
     >;
     health: Client<
-      YunduClientContext,
+      AppaloftClientContext,
       ResourceHealthQueryInput,
       ResourceHealthSummary,
-      YunduClientError
+      AppaloftClientError
     >;
     proxyConfiguration: Client<
-      YunduClientContext,
+      AppaloftClientContext,
       ResourceProxyConfigurationPreviewQueryInput,
       ProxyConfigurationView,
-      YunduClientError
+      AppaloftClientError
     >;
     logs: Client<
-      YunduClientContext,
+      AppaloftClientContext,
       ResourceRuntimeLogsQueryInput,
       ResourceRuntimeLogsResponse,
-      YunduClientError
+      AppaloftClientError
     >;
     logsStream: Client<
-      YunduClientContext,
+      AppaloftClientContext,
       ResourceRuntimeLogsQueryInput,
       AsyncIteratorClass<ResourceRuntimeLogEvent, ResourceRuntimeLogsStreamResponse, void>,
-      YunduClientError
+      AppaloftClientError
     >;
   };
   terminalSessions: {
     open: Client<
-      YunduClientContext,
+      AppaloftClientContext,
       OpenTerminalSessionCommandInput,
       TerminalSessionDescriptor,
-      YunduClientError
+      AppaloftClientError
     >;
   };
   domainBindings: {
     list: Client<
-      YunduClientContext,
+      AppaloftClientContext,
       ListDomainBindingsQueryInput,
       ListDomainBindingsResponse,
-      YunduClientError
+      AppaloftClientError
     >;
     create: Client<
-      YunduClientContext,
+      AppaloftClientContext,
       CreateDomainBindingCommandInput,
       CreateDomainBindingResponse,
-      YunduClientError
+      AppaloftClientError
     >;
     confirmOwnership: Client<
-      YunduClientContext,
+      AppaloftClientContext,
       ConfirmDomainBindingOwnershipCommandInput,
       ConfirmDomainBindingOwnershipResponse,
-      YunduClientError
+      AppaloftClientError
     >;
   };
   certificates: {
     list: Client<
-      YunduClientContext,
+      AppaloftClientContext,
       ListCertificatesQueryInput,
       ListCertificatesResponse,
-      YunduClientError
+      AppaloftClientError
     >;
     issueOrRenew: Client<
-      YunduClientContext,
+      AppaloftClientContext,
       IssueOrRenewCertificateCommandInput,
       IssueOrRenewCertificateResponse,
-      YunduClientError
+      AppaloftClientError
     >;
   };
   deployments: {
     list: Client<
-      YunduClientContext,
+      AppaloftClientContext,
       ListDeploymentsQueryInput,
       ListDeploymentsResponse,
-      YunduClientError
+      AppaloftClientError
     >;
     create: Client<
-      YunduClientContext,
+      AppaloftClientContext,
       CreateDeploymentCommandInput,
       CreateDeploymentResponse,
-      YunduClientError
+      AppaloftClientError
     >;
     createStream: Client<
-      YunduClientContext,
+      AppaloftClientContext,
       CreateDeploymentCommandInput,
       AsyncIteratorClass<DeploymentProgressEvent, CreateDeploymentResponse, void>,
-      YunduClientError
+      AppaloftClientError
     >;
     logs: Client<
-      YunduClientContext,
+      AppaloftClientContext,
       DeploymentLogsQueryInput,
       DeploymentLogsResponse,
-      YunduClientError
+      AppaloftClientError
     >;
   };
   providers: {
-    list: Client<YunduClientContext, undefined, ListProvidersResponse, YunduClientError>;
+    list: Client<AppaloftClientContext, undefined, ListProvidersResponse, AppaloftClientError>;
   };
   plugins: {
-    list: Client<YunduClientContext, undefined, ListPluginsResponse, YunduClientError>;
+    list: Client<AppaloftClientContext, undefined, ListPluginsResponse, AppaloftClientError>;
   };
   integrations: {
     github: {
       repositories: {
         list: Client<
-          YunduClientContext,
+          AppaloftClientContext,
           ListGitHubRepositoriesQueryInput,
           ListGitHubRepositoriesResponse,
-          YunduClientError
+          AppaloftClientError
         >;
       };
     };

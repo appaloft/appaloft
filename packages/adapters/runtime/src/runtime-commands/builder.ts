@@ -6,7 +6,7 @@ import {
   FilePathText,
   ImageReference,
   PortNumber,
-} from "@yundu/core";
+} from "@appaloft/core";
 import type {
   DockerBuildImageCommandSpec,
   DockerComposeUpCommandSpec,

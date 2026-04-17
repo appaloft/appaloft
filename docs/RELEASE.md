@@ -17,9 +17,9 @@ bun run checksums
 
 ## Artifacts
 
-- `yundu-backend`
-- `yundu-web-static`
-- `yundu-binary-bundle` containing a single executable, launcher script, and `.env.example`
+- `appaloft-backend`
+- `appaloft-web-static`
+- `appaloft-binary-bundle` containing a single executable, launcher script, and `.env.example`
 - `docker-compose.selfhost.yml`
 - `Dockerfile`
 - `release-manifest.json`

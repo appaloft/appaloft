@@ -13,12 +13,12 @@ import {
   RegisterServerCommand,
   type ResourceSummary,
   type ServerSummary,
-} from "@yundu/application";
+} from "@appaloft/application";
 import {
   createQuickDeployGeneratedResourceName,
   normalizeQuickDeployGeneratedNameBase,
-} from "@yundu/contracts";
-import { domainError, type EnvironmentKind, environmentKinds } from "@yundu/core";
+} from "@appaloft/contracts";
+import { domainError, type EnvironmentKind, environmentKinds } from "@appaloft/core";
 import { Effect } from "effect";
 
 import { type CliInteraction, effectCliInteraction } from "../interaction.js";

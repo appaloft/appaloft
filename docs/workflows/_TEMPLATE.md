@@ -44,7 +44,7 @@ Explain the full route from initial user/system intent or trigger to observable 
 | Actor | Responsibilities | Success Signal | Failure Branch |
 | --- | --- | --- | --- |
 | User/operator or trigger source | | | |
-| Yundu | | | |
+| Appaloft | | | |
 | External provider/runtime/integration | | | |
 
 ### Success Path
@@ -53,13 +53,13 @@ Explain the full route from initial user/system intent or trigger to observable 
 sequenceDiagram
   autonumber
   actor User
-  participant Yundu
+  participant Appaloft
   participant Provider
 
-  User->>Yundu: Start workflow
-  Yundu->>Provider: Execute provider-owned step when needed
-  Provider-->>Yundu: Return provider result
-  Yundu-->>User: Expose observable success state
+  User->>Appaloft: Start workflow
+  Appaloft->>Provider: Execute provider-owned step when needed
+  Provider-->>Appaloft: Return provider result
+  Appaloft-->>User: Expose observable success state
 ```
 
 ### Failure Branches

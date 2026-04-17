@@ -1,4 +1,4 @@
-import { type PluginRegistry, type PluginSummary } from "@yundu/application";
+import { type PluginRegistry, type PluginSummary } from "@appaloft/application";
 import {
   isPluginCompatible,
   pluginManifestSchema,
@@ -7,7 +7,7 @@ import {
   type SystemPluginHttpRoute,
   type SystemPluginWebExtension,
   systemPluginWebExtensionSchema,
-} from "@yundu/plugin-sdk";
+} from "@appaloft/plugin-sdk";
 
 export interface SystemPluginWebExtensionSummary extends SystemPluginWebExtension {
   pluginName: string;

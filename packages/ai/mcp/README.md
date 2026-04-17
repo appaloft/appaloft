@@ -1,4 +1,4 @@
-# @yundu/ai-mcp
+# @appaloft/ai-mcp
 
 AI and MCP-facing tool contract package.
 

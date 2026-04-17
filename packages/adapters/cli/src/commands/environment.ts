@@ -1,4 +1,3 @@
-import { Args, Command as EffectCommand, Options } from "@effect/cli";
 import {
   CreateEnvironmentCommand,
   DiffEnvironmentsQuery,
@@ -7,8 +6,9 @@ import {
   SetEnvironmentVariableCommand,
   ShowEnvironmentQuery,
   UnsetEnvironmentVariableCommand,
-} from "@yundu/application";
-import { configScopes, environmentKinds, variableExposures, variableKinds } from "@yundu/core";
+} from "@appaloft/application";
+import { configScopes, environmentKinds, variableExposures, variableKinds } from "@appaloft/core";
+import { Args, Command as EffectCommand, Options } from "@effect/cli";
 
 import { optionalValue, runCommand, runQuery } from "../runtime.js";
 

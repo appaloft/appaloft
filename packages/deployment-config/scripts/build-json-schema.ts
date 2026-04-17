@@ -1,11 +1,11 @@
 import { mkdir } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
-import { yunduDeploymentConfigJsonSchema } from "../src/index";
+import { appaloftDeploymentConfigJsonSchema } from "../src/index";
 
-const outputPath = resolve("json-schema/yundu.config.schema.json");
+const outputPath = resolve("json-schema/appaloft.config.schema.json");
 
 await mkdir(dirname(outputPath), { recursive: true });
-await Bun.write(outputPath, `${JSON.stringify(yunduDeploymentConfigJsonSchema, null, 2)}\n`);
+await Bun.write(outputPath, `${JSON.stringify(appaloftDeploymentConfigJsonSchema, null, 2)}\n`);
 
 const format = Bun.spawnSync(["bunx", "biome", "format", "--write", outputPath], {
   stdout: "pipe",

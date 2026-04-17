@@ -4,7 +4,7 @@ import { defineConfig, loadEnv } from "vite";
 
 function createApiProxyTarget(mode: string): string {
   const env = loadEnv(mode, process.cwd(), "");
-  return env.YUNDU_WEB_DEV_PROXY_TARGET || "http://127.0.0.1:3001";
+  return env.APPALOFT_WEB_DEV_PROXY_TARGET || "http://127.0.0.1:3001";
 }
 
 export default defineConfig(({ mode }) => {

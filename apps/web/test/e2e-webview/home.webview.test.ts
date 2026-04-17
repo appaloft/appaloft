@@ -8,7 +8,7 @@ const apiResponses: Record<ApiScenario, Record<string, unknown>> = {
   dashboard: {
     "/api/health": {
       status: "ok",
-      service: "yundu",
+      service: "appaloft",
       version: "0.1.0-test",
       timestamp: "2026-01-01T00:00:00.000Z",
     },
@@ -23,7 +23,7 @@ const apiResponses: Record<ApiScenario, Record<string, unknown>> = {
       },
     },
     "/api/version": {
-      name: "Yundu",
+      name: "Appaloft",
       version: "0.1.0-test",
       apiVersion: "v1",
       mode: "self-hosted",
@@ -201,7 +201,7 @@ const apiResponses: Record<ApiScenario, Record<string, unknown>> = {
   "github-connected": {
     "/api/health": {
       status: "ok",
-      service: "yundu",
+      service: "appaloft",
       version: "0.1.0-test",
       timestamp: "2026-01-01T00:00:00.000Z",
     },
@@ -216,7 +216,7 @@ const apiResponses: Record<ApiScenario, Record<string, unknown>> = {
       },
     },
     "/api/version": {
-      name: "Yundu",
+      name: "Appaloft",
       version: "0.1.0-test",
       apiVersion: "v1",
       mode: "self-hosted",
@@ -411,7 +411,7 @@ async function setupWebApp(): Promise<void> {
     cwd: import.meta.dir.replace(/\/test\/e2e-webview$/, ""),
     env: {
       ...process.env,
-      YUNDU_WEB_DEV_PROXY_TARGET: `http://127.0.0.1:${apiServer.port}`,
+      APPALOFT_WEB_DEV_PROXY_TARGET: `http://127.0.0.1:${apiServer.port}`,
     },
     stdout: "pipe",
     stderr: "pipe",

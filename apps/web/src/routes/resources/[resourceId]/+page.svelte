@@ -25,7 +25,7 @@
     ResourceRuntimeLogEvent,
     ResourceRuntimeLogLine,
     ResourceSummary,
-  } from "@yundu/contracts";
+  } from "@appaloft/contracts";
 
   import { readErrorMessage } from "$lib/api/client";
   import ConsoleShell from "$lib/components/console/ConsoleShell.svelte";
@@ -57,12 +57,12 @@
     next(): Promise<IteratorResult<ResourceRuntimeLogEvent, unknown>>;
     return?: () => Promise<IteratorResult<ResourceRuntimeLogEvent, unknown>>;
   };
-  type YunduDesktopBridge = {
+  type AppaloftDesktopBridge = {
     copyText?: (text: string) => Promise<void>;
   };
-  type WindowWithYunduDesktopBridge = Window &
+  type WindowWithAppaloftDesktopBridge = Window &
     typeof globalThis & {
-      yunduDesktop?: YunduDesktopBridge;
+      appaloftDesktop?: AppaloftDesktopBridge;
     };
   type ResourceDetailTab = "settings" | "deployments" | "logs" | "terminal";
   type ResourceAccessSummary = NonNullable<ResourceSummary["accessSummary"]>;
@@ -498,7 +498,7 @@
   }
 
   async function copyTextToClipboard(text: string): Promise<void> {
-    const desktopCopyText = (window as WindowWithYunduDesktopBridge).yunduDesktop?.copyText;
+    const desktopCopyText = (window as WindowWithAppaloftDesktopBridge).appaloftDesktop?.copyText;
     if (desktopCopyText) {
       try {
         await desktopCopyText(text);
@@ -993,7 +993,7 @@
 </script>
 
 <svelte:head>
-  <title>{resource?.name ?? $t(i18nKeys.console.resources.pageTitle)} · Yundu</title>
+  <title>{resource?.name ?? $t(i18nKeys.console.resources.pageTitle)} · Appaloft</title>
 </svelte:head>
 
 <ConsoleShell

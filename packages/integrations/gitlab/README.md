@@ -1,4 +1,4 @@
-# @yundu/integration-gitlab
+# @appaloft/integration-gitlab
 
 GitLab integration placeholder package.
 

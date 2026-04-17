@@ -36,7 +36,7 @@ import {
   UpsertEnvironmentSpec,
   UpsertProjectSpec,
   UpsertResourceSpec,
-} from "@yundu/core";
+} from "@appaloft/core";
 import {
   CapturedEventBus,
   FixedClock,
@@ -49,7 +49,7 @@ import {
   MemoryServerRepository,
   NoopLogger,
   SequenceIdGenerator,
-} from "@yundu/testkit";
+} from "@appaloft/testkit";
 import { createExecutionContext, type ExecutionContext, toRepositoryContext } from "../src";
 import { CreateDomainBindingUseCase, ListDomainBindingsQueryService } from "../src/use-cases";
 

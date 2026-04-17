@@ -1,59 +1,59 @@
 import {
-  createYunduTranslator,
-  defaultYunduLocale,
+  type AppaloftLocale,
+  type AppaloftTranslate,
+  appaloftLocaleHeader,
+  appaloftLocaleStorageKey,
+  createAppaloftTranslator,
+  defaultAppaloftLocale,
   i18nKeys,
-  normalizeYunduLocale,
+  normalizeAppaloftLocale,
   type TranslationKey,
   type TranslationValues,
-  type YunduLocale,
-  type YunduTranslate,
-  yunduLocaleHeader,
-  yunduLocaleStorageKey,
-} from "@yundu/i18n";
+} from "@appaloft/i18n";
 import { derived, writable } from "svelte/store";
 
-function readInitialLocale(): YunduLocale {
+function readInitialLocale(): AppaloftLocale {
   if (typeof window === "undefined") {
-    return defaultYunduLocale;
+    return defaultAppaloftLocale;
   }
 
-  return normalizeYunduLocale(
-    window.localStorage.getItem(yunduLocaleStorageKey) ?? window.navigator.language,
+  return normalizeAppaloftLocale(
+    window.localStorage.getItem(appaloftLocaleStorageKey) ?? window.navigator.language,
   );
 }
 
-export const locale = writable<YunduLocale>(readInitialLocale());
+export const locale = writable<AppaloftLocale>(readInitialLocale());
 
-export const t = derived<typeof locale, YunduTranslate>(locale, ($locale) =>
-  createYunduTranslator({ locale: $locale }),
+export const t = derived<typeof locale, AppaloftTranslate>(locale, ($locale) =>
+  createAppaloftTranslator({ locale: $locale }),
 );
 
 export function translate(key: TranslationKey, values?: TranslationValues): string {
-  return createYunduTranslator({ locale: readInitialLocale() })(key, values);
+  return createAppaloftTranslator({ locale: readInitialLocale() })(key, values);
 }
 
-export function currentLocale(): YunduLocale {
+export function currentLocale(): AppaloftLocale {
   return typeof window !== "undefined"
-    ? normalizeYunduLocale(window.localStorage.getItem(yunduLocaleStorageKey))
-    : defaultYunduLocale;
+    ? normalizeAppaloftLocale(window.localStorage.getItem(appaloftLocaleStorageKey))
+    : defaultAppaloftLocale;
 }
 
 export function setLocale(nextLocale: string): void {
-  const normalizedLocale = normalizeYunduLocale(nextLocale);
+  const normalizedLocale = normalizeAppaloftLocale(nextLocale);
   locale.set(normalizedLocale);
 
   if (typeof window === "undefined") {
     return;
   }
 
-  window.localStorage.setItem(yunduLocaleStorageKey, normalizedLocale);
+  window.localStorage.setItem(appaloftLocaleStorageKey, normalizedLocale);
   document.documentElement.lang = normalizedLocale;
-  window.dispatchEvent(new CustomEvent("yundu:locale-change", { detail: normalizedLocale }));
+  window.dispatchEvent(new CustomEvent("appaloft:locale-change", { detail: normalizedLocale }));
 }
 
 export function localeHeaders(): Record<string, string> {
   return {
-    [yunduLocaleHeader]: currentLocale(),
+    [appaloftLocaleHeader]: currentLocale(),
   };
 }
 

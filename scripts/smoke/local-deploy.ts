@@ -31,13 +31,13 @@ function runCli(
     cwd: shellRoot,
     env: {
       ...process.env,
-      YUNDU_DATABASE_DRIVER: "pglite",
-      YUNDU_DATA_DIR: options.dataDir,
-      YUNDU_PGLITE_DATA_DIR: options.pgliteDataDir,
-      YUNDU_HTTP_HOST: "127.0.0.1",
-      YUNDU_HTTP_PORT: "3001",
-      YUNDU_APP_VERSION: "0.1.0-smoke",
-      YUNDU_WEB_STATIC_DIR: "",
+      APPALOFT_DATABASE_DRIVER: "pglite",
+      APPALOFT_DATA_DIR: options.dataDir,
+      APPALOFT_PGLITE_DATA_DIR: options.pgliteDataDir,
+      APPALOFT_HTTP_HOST: "127.0.0.1",
+      APPALOFT_HTTP_PORT: "3001",
+      APPALOFT_APP_VERSION: "0.1.0-smoke",
+      APPALOFT_WEB_STATIC_DIR: "",
     },
     stdout: "pipe",
     stderr: "pipe",
@@ -75,8 +75,10 @@ async function main(): Promise<void> {
   const method = parseMethod(process.argv.slice(2));
   const port = parsePort(process.argv.slice(2));
   const tempRoot = process.env.TMPDIR ?? "/tmp";
-  const workspaceDir = (await $`mktemp -d ${join(tempRoot, "yundu-smoke.XXXXXX")}`.text()).trim();
-  const dataDir = join(workspaceDir, ".yundu", "data");
+  const workspaceDir = (
+    await $`mktemp -d ${join(tempRoot, "appaloft-smoke.XXXXXX")}`.text()
+  ).trim();
+  const dataDir = join(workspaceDir, ".appaloft", "data");
   const pgliteDataDir = join(dataDir, "pglite");
   const sourceDir = resolve("examples/express-hello");
   let serverProcess: Bun.Subprocess | null = null;
@@ -87,13 +89,13 @@ async function main(): Promise<void> {
       cwd: resolve("apps/shell"),
       env: {
         ...process.env,
-        YUNDU_DATABASE_DRIVER: "pglite",
-        YUNDU_DATA_DIR: dataDir,
-        YUNDU_PGLITE_DATA_DIR: pgliteDataDir,
-        YUNDU_HTTP_HOST: "127.0.0.1",
-        YUNDU_HTTP_PORT: "3001",
-        YUNDU_APP_VERSION: "0.1.0-smoke",
-        YUNDU_WEB_STATIC_DIR: "",
+        APPALOFT_DATABASE_DRIVER: "pglite",
+        APPALOFT_DATA_DIR: dataDir,
+        APPALOFT_PGLITE_DATA_DIR: pgliteDataDir,
+        APPALOFT_HTTP_HOST: "127.0.0.1",
+        APPALOFT_HTTP_PORT: "3001",
+        APPALOFT_APP_VERSION: "0.1.0-smoke",
+        APPALOFT_WEB_STATIC_DIR: "",
       },
       stdout: "ignore",
       stderr: "ignore",
@@ -129,9 +131,9 @@ async function main(): Promise<void> {
     const payload = await response.json();
     preserveWorkspace = true;
     const rollbackCommand = [
-      `YUNDU_DATABASE_DRIVER=pglite`,
-      `YUNDU_DATA_DIR=${JSON.stringify(dataDir)}`,
-      `YUNDU_PGLITE_DATA_DIR=${JSON.stringify(pgliteDataDir)}`,
+      `APPALOFT_DATABASE_DRIVER=pglite`,
+      `APPALOFT_DATA_DIR=${JSON.stringify(dataDir)}`,
+      `APPALOFT_PGLITE_DATA_DIR=${JSON.stringify(pgliteDataDir)}`,
       `bun run --cwd apps/shell src/index.ts rollback ${deploymentId}`,
     ].join(" ");
 

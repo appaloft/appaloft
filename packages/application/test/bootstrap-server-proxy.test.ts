@@ -1,14 +1,14 @@
 import "reflect-metadata";
 
 import { describe, expect, test } from "bun:test";
-import { type DeploymentTargetState, type DomainEvent, ok } from "@yundu/core";
+import { type DeploymentTargetState, type DomainEvent, ok } from "@appaloft/core";
 import {
   CapturedEventBus,
   FixedClock,
   MemoryServerRepository,
   NoopLogger,
   SequenceIdGenerator,
-} from "@yundu/testkit";
+} from "@appaloft/testkit";
 import { createExecutionContext, type ExecutionContext } from "../src/execution-context";
 import {
   type ServerEdgeProxyBootstrapper,

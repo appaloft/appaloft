@@ -39,7 +39,7 @@ Expected implementation scope:
 - `packages/application/src/resource-handlers.ts`, `resource-messages.ts`, and package exports: export the new command and handler consistently with existing resource query exports.
 - `packages/orpc`: add typed `POST /api/resources` route using the application command schema and expose `orpcClient.resources.create`.
 - `packages/contracts`: expose `CreateResourceInput` and `CreateResourceResponse` from application schemas or contract bridge without defining a parallel transport-only schema; map generic UI/CLI port wording to `networkProfile.internalPort`.
-- `packages/adapters/cli`: add `yundu resource create` and update interactive deploy to use it in Code Round when Quick Deploy migration is in scope.
+- `packages/adapters/cli`: add `appaloft resource create` and update interactive deploy to use it in Code Round when Quick Deploy migration is in scope.
 - `apps/web`: add owner-scoped resource create affordance and update Quick Deploy to call `resources.create` before `deployments.create(resourceId)` when implementation scope includes Web closure.
 - `apps/shell`: register the use case, handler, and dependencies in the composition root.
 
@@ -183,7 +183,7 @@ The minimal Code Round deliverable is:
 - `resources.create` command/schema/handler/use case;
 - operation catalog and `CORE_OPERATIONS.md` implementation status update;
 - typed API/oRPC route;
-- CLI `yundu resource create`;
+- CLI `appaloft resource create`;
 - Web owner-scoped create affordance sufficient for a user to create a resource without deploying;
 - Quick Deploy migration for the new-resource path when Web/CLI closure is in scope;
 - resource network profile persistence for first-deploy application listener port;

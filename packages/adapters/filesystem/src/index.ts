@@ -1,6 +1,7 @@
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 import {
+  appaloftTraceAttributes,
   createAdapterSpanName,
   type DeploymentConfigReader,
   type DeploymentConfigSnapshot,
@@ -8,8 +9,7 @@ import {
   type ExecutionContext,
   type SourceDetectionResult,
   type SourceDetector,
-  yunduTraceAttributes,
-} from "@yundu/application";
+} from "@appaloft/application";
 import {
   DisplayNameText,
   domainError,
@@ -33,18 +33,18 @@ import {
   type SourceRuntimeFamily,
   SourceRuntimeFamilyValue,
   SourceRuntimeVersionText,
-} from "@yundu/core";
+} from "@appaloft/core";
 import {
+  type AppaloftDeploymentConfig,
+  type AppaloftDeploymentTargetConfig,
+  appaloftDeploymentConfigFileNames,
   domainsFromDeploymentConfig,
   healthCheckPathFromDeploymentConfig,
-  parseYunduDeploymentConfig,
+  parseAppaloftDeploymentConfig,
   providerKeyFromTargetConfig,
   targetKeyFromDeploymentConfig,
   targetsFromDeploymentConfig,
-  type YunduDeploymentConfig,
-  type YunduDeploymentTargetConfig,
-  yunduDeploymentConfigFileNames,
-} from "@yundu/deployment-config";
+} from "@appaloft/deployment-config";
 
 interface LocalProjectProfile {
   runtimeFamily: Extract<SourceRuntimeFamily, "java" | "node" | "python">;
@@ -316,7 +316,7 @@ export class FileSystemSourceDetector implements SourceDetector {
       createAdapterSpanName("filesystem_source_detector", "detect"),
       {
         attributes: {
-          [yunduTraceAttributes.sourceLocator]: locator,
+          [appaloftTraceAttributes.sourceLocator]: locator,
         },
       },
       async () => {
@@ -351,7 +351,7 @@ export class FileSystemSourceDetector implements SourceDetector {
   }
 }
 
-function toConfiguredTarget(target: YunduDeploymentTargetConfig): DeploymentConfiguredTarget {
+function toConfiguredTarget(target: AppaloftDeploymentTargetConfig): DeploymentConfiguredTarget {
   return {
     providerKey: providerKeyFromTargetConfig(target),
     ...(target.key ? { key: target.key } : {}),
@@ -370,7 +370,7 @@ function toConfiguredTarget(target: YunduDeploymentTargetConfig): DeploymentConf
 }
 
 function toDeploymentConfigSnapshot(
-  config: YunduDeploymentConfig,
+  config: AppaloftDeploymentConfig,
   configFilePath: string,
 ): DeploymentConfigSnapshot {
   const targets = targetsFromDeploymentConfig(config).map((target) => toConfiguredTarget(target));
@@ -457,7 +457,7 @@ function findConfigFile(sourceLocator: string, configFilePath?: string): string 
     return null;
   }
 
-  for (const candidate of yunduDeploymentConfigFileNames) {
+  for (const candidate of appaloftDeploymentConfigFileNames) {
     const path = join(sourceDirectory, candidate);
     if (existsSync(path)) {
       return path;
@@ -498,7 +498,7 @@ export class FileSystemDeploymentConfigReader implements DeploymentConfigReader 
       createAdapterSpanName("filesystem_deployment_config_reader", "read"),
       {
         attributes: {
-          [yunduTraceAttributes.sourceLocator]: input.sourceLocator,
+          [appaloftTraceAttributes.sourceLocator]: input.sourceLocator,
         },
       },
       async () => {
@@ -518,11 +518,11 @@ export class FileSystemDeploymentConfigReader implements DeploymentConfigReader 
         }
 
         const parsed = readJsonObject(configFilePath);
-        const parsedConfig = parseYunduDeploymentConfig(parsed);
+        const parsedConfig = parseAppaloftDeploymentConfig(parsed);
 
         if (!parsedConfig.success) {
           return err(
-            domainError.validation("Yundu deployment config is invalid", {
+            domainError.validation("Appaloft deployment config is invalid", {
               configFilePath,
               issues: JSON.stringify(
                 parsedConfig.error.issues.map((issue) => ({

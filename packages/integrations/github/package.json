@@ -1,13 +1,16 @@
 {
-  "name": "@yundu/integration-github",
+  "name": "@appaloft/integration-github",
   "private": true,
   "type": "module",
   "exports": {
     ".": "./src/index.ts"
   },
   "dependencies": {
-    "@yundu/application": "workspace:*",
-    "@yundu/integration-core": "workspace:*"
+    "@appaloft/application": "workspace:*",
+    "@appaloft/integration-core": "workspace:*"
+  },
+  "devDependencies": {
+    "reflect-metadata": "^0.2.2"
   },
   "scripts": {
     "lint": "biome check .",

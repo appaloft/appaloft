@@ -1,5 +1,5 @@
 {
-  "name": "@yundu/auth-better",
+  "name": "@appaloft/auth-better",
   "private": true,
   "type": "module",
   "exports": {

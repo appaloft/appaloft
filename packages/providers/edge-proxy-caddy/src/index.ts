@@ -14,10 +14,10 @@ import {
   type ProxyReloadPlan,
   type ProxyRouteRealizationInput,
   type ProxyRouteRealizationPlan,
-} from "@yundu/application";
-import { type DomainError, domainError, err, ok, type Result } from "@yundu/core";
+} from "@appaloft/application";
+import { type DomainError, domainError, err, ok, type Result } from "@appaloft/core";
 
-export const caddyEdgeNetworkName = "yundu-edge";
+export const caddyEdgeNetworkName = "appaloft-edge";
 const caddyImage = "lucaslorentz/caddy-docker-proxy:2.9-alpine";
 
 const capabilities: EdgeProxyProviderCapabilities = {
@@ -118,7 +118,7 @@ export class CaddyEdgeProxyProvider implements EdgeProxyProvider {
 
     const httpPort = hostPort(input.httpPort, 80);
     const httpsPort = hostPort(input.httpsPort, 443);
-    const containerName = "yundu-caddy";
+    const containerName = "appaloft-caddy";
 
     return ok({
       providerKey: this.key,
@@ -135,8 +135,8 @@ export class CaddyEdgeProxyProvider implements EdgeProxyProvider {
         `-p ${httpPort}:80`,
         `-p ${httpsPort}:443`,
         "-v /var/run/docker.sock:/var/run/docker.sock",
-        "-v yundu-caddy-data:/data",
-        "-v yundu-caddy-config:/config",
+        "-v appaloft-caddy-data:/data",
+        "-v appaloft-caddy-config:/config",
         `-e CADDY_INGRESS_NETWORKS=${caddyEdgeNetworkName}`,
         caddyImage,
         ")",
@@ -163,7 +163,7 @@ export class CaddyEdgeProxyProvider implements EdgeProxyProvider {
       );
     }
 
-    const containerName = "yundu-caddy";
+    const containerName = "appaloft-caddy";
 
     return ok({
       providerKey: this.key,

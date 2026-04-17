@@ -1,13 +1,13 @@
 {
-  "name": "@yundu/plugin-host",
+  "name": "@appaloft/plugin-host",
   "private": true,
   "type": "module",
   "exports": {
     ".": "./src/index.ts"
   },
   "dependencies": {
-    "@yundu/application": "workspace:*",
-    "@yundu/plugin-sdk": "workspace:*"
+    "@appaloft/application": "workspace:*",
+    "@appaloft/plugin-sdk": "workspace:*"
   },
   "scripts": {
     "lint": "biome check .",

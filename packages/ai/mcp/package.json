@@ -1,12 +1,12 @@
 {
-  "name": "@yundu/ai-mcp",
+  "name": "@appaloft/ai-mcp",
   "private": true,
   "type": "module",
   "exports": {
     ".": "./src/index.ts"
   },
   "dependencies": {
-    "@yundu/contracts": "workspace:*",
+    "@appaloft/contracts": "workspace:*",
     "zod": "^4.1.12"
   },
   "scripts": {

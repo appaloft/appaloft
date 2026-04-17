@@ -1,12 +1,12 @@
 import {
+  appaloftTraceAttributes,
   createReadModelSpanName,
   projectResourceAccessSummary,
   type RepositoryContext,
   type ResourceAccessSummaryDomainBinding,
   type ResourceReadModel,
   type ResourceSummary,
-  yunduTraceAttributes,
-} from "@yundu/application";
+} from "@appaloft/application";
 import { type Kysely } from "kysely";
 
 import { type Database } from "../schema";
@@ -35,7 +35,7 @@ export class PgResourceReadModel implements ResourceReadModel {
       createReadModelSpanName("resource", "list"),
       {
         attributes: {
-          [yunduTraceAttributes.readModelName]: "resource",
+          [appaloftTraceAttributes.readModelName]: "resource",
         },
       },
       async () => {

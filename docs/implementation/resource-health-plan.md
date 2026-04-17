@@ -88,7 +88,7 @@ using `ResourceHealthQueryInput`.
 CLI exposes:
 
 ```text
-yundu resource health <resourceId> [--live] [--json]
+appaloft resource health <resourceId> [--live] [--json]
 ```
 
 CLI should print canonical JSON in `--json` mode and a concise section summary in human mode.

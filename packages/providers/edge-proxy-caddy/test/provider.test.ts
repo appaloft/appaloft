@@ -75,8 +75,8 @@ describe("CaddyEdgeProxyProvider", () => {
     expect(ensure.isOk()).toBe(true);
     expect(ensure._unsafeUnwrap()).toMatchObject({
       providerKey: "caddy",
-      networkName: "yundu-edge",
-      containerName: "yundu-caddy",
+      networkName: "appaloft-edge",
+      containerName: "appaloft-caddy",
     });
     expect(ensure._unsafeUnwrap().metadata).toMatchObject({
       image: "lucaslorentz/caddy-docker-proxy:2.9-alpine",

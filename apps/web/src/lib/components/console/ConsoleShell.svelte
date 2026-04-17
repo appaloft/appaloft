@@ -17,11 +17,11 @@
     Sun,
     UserRound,
   } from "@lucide/svelte";
-  import type { ResourceSummary } from "@yundu/contracts";
+  import type { ResourceSummary } from "@appaloft/contracts";
   import type { Snippet } from "svelte";
 
   import { API_BASE, readErrorMessage, request } from "$lib/api/client";
-  import yunduLogoMark from "$lib/assets/yundu-logo-mark.svg";
+  import appaloftLogoMark from "$lib/assets/appaloft-logo-mark.svg";
   import ResourceHealthDot from "$lib/components/console/ResourceHealthDot.svelte";
   import ResourceHealthLabel from "$lib/components/console/ResourceHealthLabel.svelte";
   import { Avatar, AvatarFallback } from "$lib/components/ui/avatar";
@@ -171,7 +171,7 @@
       return;
     }
 
-    const storedMode = window.localStorage.getItem("yundu:color-mode");
+    const storedMode = window.localStorage.getItem("appaloft:color-mode");
     if (storedMode === "light" || storedMode === "dark") {
       colorMode = storedMode;
     }
@@ -185,7 +185,7 @@
 
     document.documentElement.classList.toggle("dark", colorMode === "dark");
     document.documentElement.style.colorScheme = colorMode;
-    window.localStorage.setItem("yundu:color-mode", colorMode);
+    window.localStorage.setItem("appaloft:color-mode", colorMode);
   });
 
   $effect(() => {
@@ -197,9 +197,9 @@
       void goto("/deploy");
     };
 
-    window.addEventListener("yundu:open-quick-deploy", openQuickDeploy);
+    window.addEventListener("appaloft:open-quick-deploy", openQuickDeploy);
     return () => {
-      window.removeEventListener("yundu:open-quick-deploy", openQuickDeploy);
+      window.removeEventListener("appaloft:open-quick-deploy", openQuickDeploy);
     };
   });
 
@@ -255,8 +255,8 @@
     <SidebarHeader class="gap-3">
       <a class="flex items-center gap-3 px-2 py-2" href="/">
         <Avatar size="sm">
-          <img src={yunduLogoMark} alt="yundu" class="size-full object-cover" />
-          <AvatarFallback>{initials("Yundu")}</AvatarFallback>
+          <img src={appaloftLogoMark} alt="appaloft" class="size-full object-cover" />
+          <AvatarFallback>{initials("Appaloft")}</AvatarFallback>
         </Avatar>
         <span class="min-w-0 group-data-[collapsible=icon]:hidden">
           <span class="block truncate text-sm font-medium">{$t(i18nKeys.common.app.productName)}</span>
@@ -367,7 +367,7 @@
           class="flex w-full items-center gap-2 px-2 py-2 text-left text-sm transition-colors hover:bg-muted/50 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0"
         >
           <Avatar size="sm">
-            <AvatarFallback>{initials(authIdentity ?? "Yundu")}</AvatarFallback>
+            <AvatarFallback>{initials(authIdentity ?? "Appaloft")}</AvatarFallback>
           </Avatar>
           <span class="min-w-0 flex-1 group-data-[collapsible=icon]:hidden">
             <span class="block truncate text-sm font-medium">{authIdentity ?? $t(i18nKeys.common.status.unauthenticated)}</span>
@@ -487,7 +487,7 @@
             <pre class="overflow-x-auto bg-muted px-3 py-3 text-xs text-muted-foreground">{connectionError}</pre>
             <div class="flex flex-wrap gap-2">
               <Button variant="outline" onclick={openHealthCheck}>{$t(i18nKeys.common.actions.checkHealth)}</Button>
-              <Badge variant="outline">yundu db migrate && yundu serve</Badge>
+              <Badge variant="outline">appaloft db migrate && appaloft serve</Badge>
             </div>
           </div>
         </section>

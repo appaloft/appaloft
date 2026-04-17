@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { DeploymentSummary } from "@yundu/contracts";
+  import type { DeploymentSummary } from "@appaloft/contracts";
 
   import { Badge } from "$lib/components/ui/badge";
   import { deploymentStatusLabel } from "$lib/console/utils";

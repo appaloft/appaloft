@@ -1,4 +1,4 @@
-import { type Result } from "@yundu/core";
+import { type Result } from "@appaloft/core";
 
 import { Command } from "../../cqrs";
 import { parseOperationInput, trimToUndefined } from "../shared-schema";

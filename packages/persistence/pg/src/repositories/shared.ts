@@ -1,4 +1,4 @@
-import { type RepositoryContext } from "@yundu/application";
+import { type RepositoryContext } from "@appaloft/application";
 import {
   AccessRoute,
   BuildStrategyKindValue,
@@ -139,7 +139,7 @@ import {
   UpdatedAt,
   VariableExposureValue,
   VariableKindValue,
-} from "@yundu/core";
+} from "@appaloft/core";
 import { type Kysely, type Selectable, type Transaction } from "kysely";
 
 import { type Database } from "../schema";
@@ -302,7 +302,7 @@ export interface SerializedEnvironmentSnapshot extends Record<string, unknown> {
 
 export interface SerializedDeploymentLog extends Record<string, unknown> {
   timestamp: string;
-  source?: "yundu" | "application";
+  source?: "appaloft" | "application";
   phase: DeploymentPhaseInput;
   level: LogLevelInput;
   message: string;
@@ -799,7 +799,7 @@ export function rehydrateDeploymentLogs(raw: unknown): DeploymentLogEntry[] {
   return ((raw as SerializedDeploymentLog[] | null | undefined) ?? []).map((entry) =>
     DeploymentLogEntry.rehydrate({
       timestamp: OccurredAt.rehydrate(entry.timestamp),
-      source: DeploymentLogSourceValue.rehydrate(entry.source ?? "yundu"),
+      source: DeploymentLogSourceValue.rehydrate(entry.source ?? "appaloft"),
       phase: DeploymentPhaseValue.rehydrate(entry.phase as DeploymentPhaseInput),
       level: LogLevelValue.rehydrate(entry.level as LogLevelInput),
       message: MessageText.rehydrate(entry.message),

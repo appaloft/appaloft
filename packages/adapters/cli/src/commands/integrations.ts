@@ -1,5 +1,5 @@
+import { ListPluginsQuery, ListProvidersQuery } from "@appaloft/application";
 import { Command as EffectCommand } from "@effect/cli";
-import { ListPluginsQuery, ListProvidersQuery } from "@yundu/application";
 
 import { runQuery } from "../runtime.js";
 

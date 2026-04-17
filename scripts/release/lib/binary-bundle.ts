@@ -88,7 +88,7 @@ async function loadEmbeddedPgliteRuntimeAssets() {
 }
 
 function shouldUseEmbeddedPglite(): boolean {
-	const driver = process.env.YUNDU_DATABASE_DRIVER?.toLowerCase();
+	const driver = process.env.APPALOFT_DATABASE_DRIVER?.toLowerCase();
 	return !driver || driver === "pglite";
 }
 
@@ -110,58 +110,58 @@ set -eu
 
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 
-export YUNDU_DATABASE_DRIVER="\${YUNDU_DATABASE_DRIVER:-pglite}"
-if [ -z "\${YUNDU_DATA_DIR:-}" ]; then
+export APPALOFT_DATABASE_DRIVER="\${APPALOFT_DATABASE_DRIVER:-pglite}"
+if [ -z "\${APPALOFT_DATA_DIR:-}" ]; then
 	case "$(uname -s 2>/dev/null || echo unknown)" in
 		Darwin)
 			if [ -n "\${HOME:-}" ]; then
-				YUNDU_DATA_DIR="$HOME/Library/Application Support/Yundu/data"
+				APPALOFT_DATA_DIR="$HOME/Library/Application Support/Appaloft/data"
 			else
-				YUNDU_DATA_DIR="$PWD/.yundu/data"
+				APPALOFT_DATA_DIR="$PWD/.appaloft/data"
 			fi
 			;;
 		*)
 			if [ -n "\${XDG_DATA_HOME:-}" ]; then
-				YUNDU_DATA_DIR="$XDG_DATA_HOME/yundu/data"
+				APPALOFT_DATA_DIR="$XDG_DATA_HOME/appaloft/data"
 			elif [ -n "\${HOME:-}" ]; then
-				YUNDU_DATA_DIR="$HOME/.local/share/yundu/data"
+				APPALOFT_DATA_DIR="$HOME/.local/share/appaloft/data"
 			else
-				YUNDU_DATA_DIR="$PWD/.yundu/data"
+				APPALOFT_DATA_DIR="$PWD/.appaloft/data"
 			fi
 			;;
 	esac
-	export YUNDU_DATA_DIR
+	export APPALOFT_DATA_DIR
 fi
-export YUNDU_PGLITE_DATA_DIR="\${YUNDU_PGLITE_DATA_DIR:-$YUNDU_DATA_DIR/pglite}"
+export APPALOFT_PGLITE_DATA_DIR="\${APPALOFT_PGLITE_DATA_DIR:-$APPALOFT_DATA_DIR/pglite}"
 
-exec "$SCRIPT_DIR/yundu" "$@"
+exec "$SCRIPT_DIR/appaloft" "$@"
 `;
 }
 
 function bundleReadme(): string {
-  return `Yundu Binary Bundle
+  return `Appaloft Binary Bundle
 
 Contents:
-- yundu: Bun-compiled backend/CLI executable
-- run-yundu.sh: launcher that defaults to embedded PGlite
+- appaloft: Bun-compiled backend/CLI executable
+- run-appaloft.sh: launcher that defaults to embedded PGlite
 
 The binary embeds:
 - PGlite runtime assets (fs bundle + wasm)
 - Web console static assets
 
 Default runtime behavior:
-- YUNDU_DATABASE_DRIVER defaults to pglite
-- YUNDU_DATA_DIR defaults to the platform user data directory
-- YUNDU_PGLITE_DATA_DIR defaults to $YUNDU_DATA_DIR/pglite
+- APPALOFT_DATABASE_DRIVER defaults to pglite
+- APPALOFT_DATA_DIR defaults to the platform user data directory
+- APPALOFT_PGLITE_DATA_DIR defaults to $APPALOFT_DATA_DIR/pglite
 
 Optional overrides:
-- Set YUNDU_DATABASE_DRIVER=postgres and YUNDU_DATABASE_URL=... to use external PostgreSQL
-- Set YUNDU_WEB_STATIC_DIR=/path/to/web-build to override embedded console assets
+- Set APPALOFT_DATABASE_DRIVER=postgres and APPALOFT_DATABASE_URL=... to use external PostgreSQL
+- Set APPALOFT_WEB_STATIC_DIR=/path/to/web-build to override embedded console assets
 
 Examples:
-  ./run-yundu.sh db migrate
-  ./run-yundu.sh serve
-  ./run-yundu.sh doctor
+  ./run-appaloft.sh db migrate
+  ./run-appaloft.sh serve
+  ./run-appaloft.sh doctor
 `;
 }
 
@@ -186,7 +186,7 @@ export async function createBinaryBundle(input: {
 }): Promise<void> {
   const webRoot = join(input.root, "apps", "web");
   const webBuildDir = join(webRoot, "build");
-  const binaryPath = join(input.outDir, "yundu");
+  const binaryPath = join(input.outDir, "appaloft");
   const tempBuildRoot = join(input.root, "dist", ".tmp-binary-bundle");
   const embeddedWebAssetsModulePath = join(tempBuildRoot, "embedded-web-assets.generated.ts");
   const binaryEntryPath = join(tempBuildRoot, "binary-entry.ts");
@@ -229,8 +229,8 @@ export async function createBinaryBundle(input: {
 
   await copyFileIfExists(join(input.root, ".env.example"), join(input.outDir, ".env.example"));
 
-  await Bun.write(join(input.outDir, "run-yundu.sh"), bundleLauncher());
-  await $`chmod 755 ${join(input.outDir, "run-yundu.sh")}`;
+  await Bun.write(join(input.outDir, "run-appaloft.sh"), bundleLauncher());
+  await $`chmod 755 ${join(input.outDir, "run-appaloft.sh")}`;
 
   await Bun.write(join(input.outDir, "README.txt"), bundleReadme());
 

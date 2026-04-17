@@ -1,10 +1,10 @@
 import {
+  appaloftTraceAttributes,
   type CertificateRetryCandidate,
   type CertificateRetryCandidateReader,
   createRepositorySpanName,
   type RepositoryContext,
-  yunduTraceAttributes,
-} from "@yundu/application";
+} from "@appaloft/application";
 import { type Kysely } from "kysely";
 
 import { type Database } from "../schema";
@@ -51,7 +51,7 @@ export class PgCertificateRetryCandidateReader implements CertificateRetryCandid
       createRepositorySpanName("certificate_retry_candidate", "list_due_retries"),
       {
         attributes: {
-          [yunduTraceAttributes.repositoryName]: "certificate_retry_candidate",
+          [appaloftTraceAttributes.repositoryName]: "certificate_retry_candidate",
         },
       },
       async () => {

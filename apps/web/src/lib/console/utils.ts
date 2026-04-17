@@ -4,7 +4,7 @@ import {
   type ProjectSummary,
   type ResourceSummary,
   type ServerSummary,
-} from "@yundu/contracts";
+} from "@appaloft/contracts";
 
 export function readSessionIdentity(session: unknown): string | null {
   if (!session || typeof session !== "object") {

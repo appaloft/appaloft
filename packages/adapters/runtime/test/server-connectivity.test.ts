@@ -14,7 +14,7 @@ import {
   ok,
   type DeploymentTargetState,
   type Result,
-} from "@yundu/core";
+} from "@appaloft/core";
 import {
   type EdgeProxyDiagnosticsInput,
   type EdgeProxyDiagnosticsPlan,
@@ -30,7 +30,7 @@ import {
   type ProxyReloadPlan,
   type ProxyRouteRealizationInput,
   type ProxyRouteRealizationPlan,
-} from "@yundu/application";
+} from "@appaloft/application";
 import { RuntimeServerConnectivityChecker } from "../src/server-connectivity";
 
 class DiagnosticProvider implements EdgeProxyProvider {
@@ -199,7 +199,7 @@ describe("RuntimeServerConnectivityChecker", () => {
           metadata: expect.objectContaining({
             providerKey: "traefik",
             proxyKind: "traefik",
-            repairCommand: "yundu server proxy repair srv_demo",
+            repairCommand: "appaloft server proxy repair srv_demo",
           }),
         }),
       ]),

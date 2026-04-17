@@ -1,4 +1,4 @@
-# @yundu/persistence-pg
+# @appaloft/persistence-pg
 
 Postgres-compatible persistence adapter backed by Kysely.
 

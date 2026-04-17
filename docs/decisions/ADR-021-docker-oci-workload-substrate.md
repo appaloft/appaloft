@@ -6,7 +6,7 @@ Date: 2026-04-16
 
 ## Decision
 
-Yundu v1 deployment execution is Docker/OCI-based.
+Appaloft v1 deployment execution is Docker/OCI-based.
 
 Every successful v1 application deployment must either:
 
@@ -81,7 +81,7 @@ image/container units even when the user does not provide a Dockerfile:
   containers. Its rollback command starts a new container from a previous image/container version.
 
 This does not mean every self-hosted deployment tool in the world is Docker-based. It means the
-tools closest to Yundu's v1 goal use image/container identity as the operational unit for rollout,
+tools closest to Appaloft's v1 goal use image/container identity as the operational unit for rollout,
 rollback, health, logs, proxy routing, cleanup, and diagnostics.
 
 ## Options Considered

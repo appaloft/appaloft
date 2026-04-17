@@ -5,7 +5,9 @@ function normalizeBaseUrl(baseUrl: string): string {
 }
 
 function resolveApiBaseUrl(): string {
-  const configuredBaseUrl = (import.meta.env.VITE_YUNDU_API_BASE_URL as string | undefined)?.trim();
+  const configuredBaseUrl = (
+    import.meta.env.VITE_APPALOFT_API_BASE_URL as string | undefined
+  )?.trim();
 
   if (configuredBaseUrl) {
     return normalizeBaseUrl(configuredBaseUrl);

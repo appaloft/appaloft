@@ -1,9 +1,9 @@
 import {
+  appaloftTraceAttributes,
   createRepositorySpanName,
   type ProjectRepository,
   type RepositoryContext,
-  yunduTraceAttributes,
-} from "@yundu/application";
+} from "@appaloft/application";
 import {
   Project,
   type ProjectByIdSpec,
@@ -13,7 +13,7 @@ import {
   type ProjectSelectionSpec,
   type ProjectSelectionSpecVisitor,
   type UpsertProjectSpec,
-} from "@yundu/core";
+} from "@appaloft/core";
 import { type Insertable, type Kysely, type Selectable, type SelectQueryBuilder } from "kysely";
 
 import { type Database } from "../schema";
@@ -66,8 +66,8 @@ export class PgProjectRepository implements ProjectRepository {
       createRepositorySpanName("project", "upsert"),
       {
         attributes: {
-          [yunduTraceAttributes.repositoryName]: "project",
-          [yunduTraceAttributes.mutationSpecName]: spec.constructor.name,
+          [appaloftTraceAttributes.repositoryName]: "project",
+          [appaloftTraceAttributes.mutationSpecName]: spec.constructor.name,
         },
       },
       async () => {
@@ -92,8 +92,8 @@ export class PgProjectRepository implements ProjectRepository {
       createRepositorySpanName("project", "find_one"),
       {
         attributes: {
-          [yunduTraceAttributes.repositoryName]: "project",
-          [yunduTraceAttributes.selectionSpecName]: spec.constructor.name,
+          [appaloftTraceAttributes.repositoryName]: "project",
+          [appaloftTraceAttributes.selectionSpecName]: spec.constructor.name,
         },
       },
       async () => {

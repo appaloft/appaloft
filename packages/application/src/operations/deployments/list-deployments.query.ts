@@ -1,4 +1,4 @@
-import { type Result } from "@yundu/core";
+import { type Result } from "@appaloft/core";
 
 import { Query } from "../../cqrs";
 import { type DeploymentSummary } from "../../ports";

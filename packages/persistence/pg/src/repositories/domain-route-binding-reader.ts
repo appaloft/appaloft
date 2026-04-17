@@ -1,10 +1,10 @@
 import {
+  appaloftTraceAttributes,
   createRepositorySpanName,
   type DomainRouteBindingCandidate,
   type DomainRouteBindingReader,
   type RepositoryContext,
-  yunduTraceAttributes,
-} from "@yundu/application";
+} from "@appaloft/application";
 import { type Kysely } from "kysely";
 
 import { type Database } from "../schema";
@@ -30,7 +30,7 @@ export class PgDomainRouteBindingReader implements DomainRouteBindingReader {
       createRepositorySpanName("domain_route_binding", "list_deployable_bindings"),
       {
         attributes: {
-          [yunduTraceAttributes.repositoryName]: "domain_route_binding",
+          [appaloftTraceAttributes.repositoryName]: "domain_route_binding",
         },
       },
       async () => {

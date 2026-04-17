@@ -1,6 +1,6 @@
 import { join, resolve } from "node:path";
 
-import { createStandardReleaseManifest } from "@yundu/adapter-packaging";
+import { createStandardReleaseManifest } from "@appaloft/adapter-packaging";
 import { createBinaryBundle } from "./lib/binary-bundle";
 import { copyDir, copyFileIfExists, resetDir, run } from "./lib/release-utils";
 
@@ -12,12 +12,12 @@ await resetDir(releaseRoot);
 await run(["bun", "run", "--cwd", "apps/shell", "build"], root);
 await run(["bun", "run", "--cwd", "apps/web", "build"], root);
 
-await copyDir(join(root, "apps", "shell", "dist"), join(releaseRoot, "yundu-backend"));
-await copyDir(join(root, "apps", "web", "build"), join(releaseRoot, "yundu-web-static"));
+await copyDir(join(root, "apps", "shell", "dist"), join(releaseRoot, "appaloft-backend"));
+await copyDir(join(root, "apps", "web", "build"), join(releaseRoot, "appaloft-web-static"));
 
 await createBinaryBundle({
   root,
-  outDir: join(releaseRoot, "yundu-binary-bundle"),
+  outDir: join(releaseRoot, "appaloft-binary-bundle"),
   skipWebBuild: true,
 });
 
@@ -31,7 +31,7 @@ await Bun.write(
   join(releaseRoot, "release-manifest.json"),
   `${JSON.stringify(
     createStandardReleaseManifest({
-      version: process.env.YUNDU_APP_VERSION ?? "0.1.0",
+      version: process.env.APPALOFT_APP_VERSION ?? "0.1.0",
       generatedAt: new Date().toISOString(),
     }),
     null,

@@ -1,4 +1,4 @@
-# @yundu/adapter-runtime
+# @appaloft/adapter-runtime
 
 Execution backend adapters.
 

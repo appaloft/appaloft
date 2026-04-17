@@ -3,15 +3,15 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: yundu-all-in-one:latest
+    image: appaloft-all-in-one:latest
     environment:
-      YUNDU_APP_NAME: Yundu
-      YUNDU_APP_VERSION: 0.1.0
-      YUNDU_HTTP_HOST: 0.0.0.0
-      YUNDU_HTTP_PORT: 3001
-      YUNDU_WEB_STATIC_DIR: /app/web
-      YUNDU_DATABASE_URL: postgres://postgres:postgres@postgres:5432/yundu
-      YUNDU_WEB_ORIGIN: http://localhost:3001
+      APPALOFT_APP_NAME: Appaloft
+      APPALOFT_APP_VERSION: 0.1.0
+      APPALOFT_HTTP_HOST: 0.0.0.0
+      APPALOFT_HTTP_PORT: 3001
+      APPALOFT_WEB_STATIC_DIR: /app/web
+      APPALOFT_DATABASE_URL: postgres://postgres:postgres@postgres:5432/appaloft
+      APPALOFT_WEB_ORIGIN: http://localhost:3001
     ports:
       - "3001:3001"
     depends_on:
@@ -21,16 +21,16 @@ services:
   postgres:
     image: postgres:16
     environment:
-      POSTGRES_DB: yundu
+      POSTGRES_DB: appaloft
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
     volumes:
-      - yundu_pg_selfhost:/var/lib/postgresql/data
+      - appaloft_pg_selfhost:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d yundu"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d appaloft"]
       interval: 5s
       timeout: 5s
       retries: 10
 
 volumes:
-  yundu_pg_selfhost:
+  appaloft_pg_selfhost:

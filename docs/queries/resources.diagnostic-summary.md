@@ -210,7 +210,7 @@ All errors use [Resource Diagnostic Summary Error Spec](../errors/resources.diag
 | --- | --- | --- |
 | Web | Resource detail exposes a copy diagnostic summary action. Quick Deploy completion and deployment detail remain follow-up surfaces. | Implemented / partial |
 | Desktop | Desktop Web resource detail exposes the same Web action. Safe desktop-client appendix is not yet added. | Implemented / partial |
-| CLI | `yundu resource diagnose <resourceId> [--deployment <deploymentId>] [--json]` prints canonical JSON. Human summary rendering remains a follow-up. | Implemented / partial |
+| CLI | `appaloft resource diagnose <resourceId> [--deployment <deploymentId>] [--json]` prints canonical JSON. Human summary rendering remains a follow-up. | Implemented / partial |
 | oRPC / HTTP | `GET /api/resources/{resourceId}/diagnostic-summary` using the query schema. | Implemented |
 | Automation / MCP | Future query/tool over the same operation key. | Future |
 

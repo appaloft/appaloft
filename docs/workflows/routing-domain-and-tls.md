@@ -36,16 +36,16 @@ This workflow inherits:
 ## End-To-End Workflow
 
 This is a first-class workflow, not a single command. The user-facing route from "I have a domain"
-to "the service is reachable" crosses user-owned external setup, Yundu commands, Yundu events,
+to "the service is reachable" crosses user-owned external setup, Appaloft commands, Appaloft events,
 provider adapters, runtime route realization, and public read/query surfaces.
 
 ### Actor Responsibilities
 
 | Actor | Responsibilities | Success Signal | Failure Branch |
 | --- | --- | --- | --- |
-| User/operator | Acquire or choose a domain, decide which resource owns it, configure DNS to point at the Yundu edge address, provide manual ownership evidence for the v1 flow, and retry after fixing DNS/provider/proxy issues. | The requested hostname resolves to the Yundu edge and the user can open the service URL. | DNS missing/wrong, ownership evidence absent, or user selects the wrong project/resource/server/destination. |
-| Yundu | Admit commands, persist domain binding/certificate/deployment state, publish events after durable transitions, serve HTTP-01 tokens, select provider adapters through ports, realize proxy routes during deployment/redeploy, expose status through domain/certificate/resource read models, and record retryable failures without hiding them in logs only. | `domain-bindings.list`, `certificates.list`, and `resources.list` converge on `ready` state and a durable route URL tied to the latest realized deployment. | Admission `err(DomainError)`, `certificate-issuance-failed`, `domain-route-realization-failed`, or resource access summary reports no ready durable route. |
-| DNS provider/registrar | Host the public DNS records selected by the user, such as `A`, `AAAA`, or `CNAME` to the Yundu edge address. | DNS queries return the edge address before challenge/traffic checks. | Propagation delay, wrong record, stale record, or provider outage. |
+| User/operator | Acquire or choose a domain, decide which resource owns it, configure DNS to point at the Appaloft edge address, provide manual ownership evidence for the v1 flow, and retry after fixing DNS/provider/proxy issues. | The requested hostname resolves to the Appaloft edge and the user can open the service URL. | DNS missing/wrong, ownership evidence absent, or user selects the wrong project/resource/server/destination. |
+| Appaloft | Admit commands, persist domain binding/certificate/deployment state, publish events after durable transitions, serve HTTP-01 tokens, select provider adapters through ports, realize proxy routes during deployment/redeploy, expose status through domain/certificate/resource read models, and record retryable failures without hiding them in logs only. | `domain-bindings.list`, `certificates.list`, and `resources.list` converge on `ready` state and a durable route URL tied to the latest realized deployment. | Admission `err(DomainError)`, `certificate-issuance-failed`, `domain-route-realization-failed`, or resource access summary reports no ready durable route. |
+| DNS provider/registrar | Host the public DNS records selected by the user, such as `A`, `AAAA`, or `CNAME` to the Appaloft edge address. | DNS queries return the edge address before challenge/traffic checks. | Propagation delay, wrong record, stale record, or provider outage. |
 | Certificate authority/provider | Validate HTTP-01 challenge when TLS is required and issue certificate material through the provider adapter. | `certificate-issued` and an active certificate with expiry/fingerprint metadata. | Challenge validation failure, account/config error, rate limit, unavailable provider, or storage failure. |
 | Edge proxy provider/runtime | Render route configuration, attach labels/config, reload or auto-activate the proxy, and route public requests to the deployed workload. | Deployment finishes with a route snapshot containing the durable domain and public route checks pass when enabled. | Route render failure, reload command failure, proxy unavailable, or public route health check failure. |
 
@@ -56,32 +56,32 @@ sequenceDiagram
   autonumber
   actor User
   participant DNS as DNS provider
-  participant Yundu
+  participant Appaloft
   participant Proxy as Edge proxy/runtime
   participant CA as Certificate provider
   participant Service
 
-  User->>DNS: Create A/CNAME for app.example.com to Yundu edge
-  User->>Yundu: domain-bindings.create(app.example.com, resource, tlsMode)
-  Yundu-->>User: accepted domainBindingId and expected verification target
-  Yundu-->>Yundu: domain-binding-requested
-  User->>Yundu: domain-bindings.confirm-ownership(domainBindingId)
-  Yundu-->>Yundu: domain-bound
+  User->>DNS: Create A/CNAME for app.example.com to Appaloft edge
+  User->>Appaloft: domain-bindings.create(app.example.com, resource, tlsMode)
+  Appaloft-->>User: accepted domainBindingId and expected verification target
+  Appaloft-->>Appaloft: domain-binding-requested
+  User->>Appaloft: domain-bindings.confirm-ownership(domainBindingId)
+  Appaloft-->>Appaloft: domain-bound
   alt TLS disabled
-    Yundu-->>Yundu: domain-ready
+    Appaloft-->>Appaloft: domain-ready
   else TLS auto
-    Yundu-->>Yundu: certificates.issue-or-renew(reason=issue)
-    Yundu-->>Yundu: certificate-requested
-    CA->>Yundu: request HTTP-01 token serving
-    Yundu-->>CA: /.well-known/acme-challenge/{token}
-    CA-->>Yundu: certificate material
-    Yundu-->>Yundu: certificate-issued
-    Yundu-->>Yundu: domain-ready
+    Appaloft-->>Appaloft: certificates.issue-or-renew(reason=issue)
+    Appaloft-->>Appaloft: certificate-requested
+    CA->>Appaloft: request HTTP-01 token serving
+    Appaloft-->>CA: /.well-known/acme-challenge/{token}
+    CA-->>Appaloft: certificate material
+    Appaloft-->>Appaloft: certificate-issued
+    Appaloft-->>Appaloft: domain-ready
   end
-  User->>Yundu: deployments.create or redeploy resource
-  Yundu->>Proxy: realize durable domain route
+  User->>Appaloft: deployments.create or redeploy resource
+  Appaloft->>Proxy: realize durable domain route
   Proxy->>Service: route app.example.com traffic
-  Yundu-->>User: resources.list latestDurableDomainRoute
+  Appaloft-->>User: resources.list latestDurableDomainRoute
   User->>Service: open app.example.com
 ```
 
@@ -89,7 +89,7 @@ sequenceDiagram
 
 ```mermaid
 flowchart TD
-  A["User chooses domain and target resource"] --> B["DNS points to Yundu edge"]
+  A["User chooses domain and target resource"] --> B["DNS points to Appaloft edge"]
   B --> C["domain-bindings.create"]
   C -->|admission error| C1["Return DomainError; no event"]
   C --> D["domain-binding-requested"]

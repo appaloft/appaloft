@@ -1153,8 +1153,8 @@ export class DeploymentLogSourceValue extends EnumValueObject<
     );
   }
 
-  static yundu(): DeploymentLogSourceValue {
-    return new DeploymentLogSourceValue("yundu");
+  static appaloft(): DeploymentLogSourceValue {
+    return new DeploymentLogSourceValue("appaloft");
   }
 
   static rehydrate(value: (typeof deploymentLogSources)[number]): DeploymentLogSourceValue {

@@ -1,4 +1,4 @@
-# @yundu/provider-local-shell
+# @appaloft/provider-local-shell
 
 Local shell deployment target provider.
 

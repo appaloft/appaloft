@@ -1,14 +1,14 @@
-import { type DomainEvent, domainError, err, type Result } from "@yundu/core";
-import { i18nKeys } from "@yundu/i18n";
+import { type DomainEvent, domainError, err, type Result } from "@appaloft/core";
+import { i18nKeys } from "@appaloft/i18n";
 import { type DependencyContainer } from "tsyringe";
 
 import {
+  appaloftTraceAttributes,
   createCommandSpanName,
   createDomainErrorTraceAttributes,
   createExecutionContextAttributes,
   createQuerySpanName,
   type ExecutionContext,
-  yunduTraceAttributes,
 } from "./execution-context";
 import { type AppLogger } from "./ports";
 
@@ -122,8 +122,8 @@ export class CommandBus {
       {
         attributes: {
           ...createExecutionContextAttributes(context),
-          [yunduTraceAttributes.commandName]: command.constructor.name,
-          [yunduTraceAttributes.handlerName]: handlerType.name,
+          [appaloftTraceAttributes.commandName]: command.constructor.name,
+          [appaloftTraceAttributes.handlerName]: handlerType.name,
         },
       },
       async (span) => {
@@ -191,8 +191,8 @@ export class QueryBus {
       {
         attributes: {
           ...createExecutionContextAttributes(context),
-          [yunduTraceAttributes.queryName]: query.constructor.name,
-          [yunduTraceAttributes.handlerName]: handlerType.name,
+          [appaloftTraceAttributes.queryName]: query.constructor.name,
+          [appaloftTraceAttributes.handlerName]: handlerType.name,
         },
       },
       async (span) => {

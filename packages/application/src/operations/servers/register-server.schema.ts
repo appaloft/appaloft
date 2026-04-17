@@ -1,4 +1,4 @@
-import { edgeProxyKinds } from "@yundu/core";
+import { edgeProxyKinds } from "@appaloft/core";
 import { z } from "zod";
 
 import { nonEmptyTrimmedString } from "../shared-schema";

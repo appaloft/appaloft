@@ -2,16 +2,16 @@
 
 > CORE DOCUMENT
 >
-> This file is the domain-model source of truth for Yundu.
+> This file is the domain-model source of truth for Appaloft.
 > If a package layout, aggregate name, or application slice conflicts with this file, this file wins.
-> [CORE_OPERATIONS.md](/Users/nichenqin/projects/yundu/docs/CORE_OPERATIONS.md) defines the business surface.
-> [BUSINESS_OPERATION_MAP.md](/Users/nichenqin/projects/yundu/docs/BUSINESS_OPERATION_MAP.md)
+> [CORE_OPERATIONS.md](/Users/nichenqin/projects/appaloft/docs/CORE_OPERATIONS.md) defines the business surface.
+> [BUSINESS_OPERATION_MAP.md](/Users/nichenqin/projects/appaloft/docs/BUSINESS_OPERATION_MAP.md)
 > defines how commands, queries, workflows, events, and rebuild gates relate to each other.
 > This file defines the domain boundaries and ubiquitous language underneath that surface.
 
 ## Design Goal
 
-Yundu is not primarily "server CRUD". Its core project-facing flow is:
+Appaloft is not primarily "server CRUD". Its core project-facing flow is:
 
 `Project -> Environment -> Resource -> Deployment`
 
@@ -49,12 +49,12 @@ dispatching explicit operations. The final deployment write remains `deployments
 - repositories exist only for aggregate roots
 - entities and value objects are persisted through the owning aggregate root, never through standalone repositories
 - aggregate root state and entity state use branded value objects instead of raw strings, numbers, or status literals
-- Yundu uses `unique symbol` branded classes for IDs, temporal values, statuses, names, slugs, addresses, and other domain-significant values
+- Appaloft uses `unique symbol` branded classes for IDs, temporal values, statuses, names, slugs, addresses, and other domain-significant values
 - state transitions live inside state-machine value objects such as `DeploymentStatusValue`, not in aggregate-level string-switch logic
 
 ## Bounded Contexts
 
-Current Yundu is organized around these contexts:
+Current Appaloft is organized around these contexts:
 
 ### Workspace
 

@@ -7,8 +7,8 @@ import {
   createExecutionContext,
   type ExecutionContext,
   type ExecutionContextFactory,
-} from "@yundu/application";
-import { ok } from "@yundu/core";
+} from "@appaloft/application";
+import { ok } from "@appaloft/core";
 
 import { createCertificateRetrySchedulerRunner } from "../src/certificate-retry-scheduler-runner";
 

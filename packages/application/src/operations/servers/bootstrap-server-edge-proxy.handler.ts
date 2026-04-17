@@ -9,7 +9,7 @@ import {
   safeTry,
   UpdatedAt,
   UpsertDeploymentTargetSpec,
-} from "@yundu/core";
+} from "@appaloft/core";
 import { inject, injectable } from "tsyringe";
 
 import { EventHandler, type EventHandlerContract } from "../../cqrs";

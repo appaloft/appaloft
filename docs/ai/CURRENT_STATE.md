@@ -15,7 +15,7 @@ Legend:
 
 Confirmed:
 
-- Yundu is a Bun monorepo with `apps/shell`, `apps/web`, and packages for `core`,
+- Appaloft is a Bun monorepo with `apps/shell`, `apps/web`, and packages for `core`,
   `application`, `orpc`, `persistence/pg`, adapters, providers, integrations, plugins, and
   contracts.
 - The business operation surface is documented in `docs/CORE_OPERATIONS.md` and mirrored in

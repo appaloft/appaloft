@@ -14,8 +14,8 @@ import {
   type ProxyReloadPlan,
   type ProxyRouteRealizationInput,
   type ProxyRouteRealizationPlan,
-} from "@yundu/application";
-import { domainError, err, ok, type Result } from "@yundu/core";
+} from "@appaloft/application";
+import { domainError, err, ok, type Result } from "@appaloft/core";
 import {
   createProxyReloadPlan,
   createProxyRouteRealizationPlan,
@@ -55,7 +55,7 @@ class ReloadAwareProvider implements EdgeProxyProvider {
   ): Promise<Result<ProxyRouteRealizationPlan>> {
     return ok({
       providerKey: this.key,
-      networkName: "yundu-edge",
+      networkName: "appaloft-edge",
       labels: ["traefik.enable=true"],
     });
   }

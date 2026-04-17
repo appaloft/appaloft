@@ -63,7 +63,7 @@ force every runtime backend to persist high-volume stdout/stderr into deployment
 This would expose Docker container ids or Docker log options directly through application queries
 or transports.
 
-This option is rejected because Yundu must support non-Docker runtime backends and deployment
+This option is rejected because Appaloft must support non-Docker runtime backends and deployment
 strategies. Docker is one adapter implementation detail, not the platform contract.
 
 ### Option C: Add A Resource-Owned Runtime Log Query Over An Injected Port
@@ -106,12 +106,12 @@ All adapters must normalize output into the same resource runtime log event cont
 
 ## Consequences
 
-Application runtime logs become available without coupling Yundu to Docker.
+Application runtime logs become available without coupling Appaloft to Docker.
 
 The Web console can render a resource log stream by consuming the query/stream contract rather than
 knowing how a resource was deployed.
 
-The CLI can offer `yundu resource logs <resourceId>` and `--follow` later without changing the
+The CLI can offer `appaloft resource logs <resourceId>` and `--follow` later without changing the
 business meaning of the operation.
 
 Log archival, log drains, search, retention, and metrics remain separate future behaviors. This ADR

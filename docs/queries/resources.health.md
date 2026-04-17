@@ -218,7 +218,7 @@ All errors use [Resource Health Error Spec](../errors/resources.health.md).
 | --- | --- | --- |
 | Web | Resource detail shows current resource health and sidebar/list compact status uses this query/projection when available. | Implemented |
 | Desktop | Same Web surface. | Implemented through Web shell |
-| CLI | `yundu resource health <resourceId> [--live] [--json]` prints summary and checks. | Implemented |
+| CLI | `appaloft resource health <resourceId> [--live] [--json]` prints summary and checks. | Implemented |
 | oRPC / HTTP | `GET /api/resources/{resourceId}/health` using the query schema. | Implemented |
 | Automation / MCP | Future query/tool over the same operation key. | Future |
 

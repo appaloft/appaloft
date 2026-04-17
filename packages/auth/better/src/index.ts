@@ -53,7 +53,7 @@ function buildGitHubProviderStatus(input: {
         }
       : {
           reason:
-            "Configure YUNDU_GITHUB_CLIENT_ID and YUNDU_GITHUB_CLIENT_SECRET to enable GitHub import.",
+            "Configure APPALOFT_GITHUB_CLIENT_ID and APPALOFT_GITHUB_CLIENT_SECRET to enable GitHub import.",
         }),
   };
 }

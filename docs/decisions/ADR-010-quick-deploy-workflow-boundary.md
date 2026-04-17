@@ -12,7 +12,7 @@ Quick Deploy may guide a user through selecting or creating the context needed f
 
 The final deployment write in Quick Deploy must be `deployments.create`. The `deployments.create` command remains the source-of-truth command for deployment admission and keeps the acceptance semantics defined by its command spec: success means the deployment request is accepted and a deployment id is available, not that runtime execution has completed.
 
-`yundu deploy` without a source argument is the CLI form of the same entry workflow. Its prompts are input collection and context bootstrap, not CLI-only deployment business rules.
+`appaloft deploy` without a source argument is the CLI form of the same entry workflow. Its prompts are input collection and context bootstrap, not CLI-only deployment business rules.
 
 The Web QuickDeploy surface is the Web form of the same entry workflow. Its wizard steps are input collection and preflight UX, not aggregate invariants.
 
@@ -142,7 +142,7 @@ The second option is required if the workflow needs resumability, delayed user i
 
 - Should Web-created project/server/environment side effects remain inside QuickDeploy workflow or move to explicit separate steps before deployment?
 - Should Quick Deploy be a standalone command?
-- Should CLI no-arg `yundu deploy` prompts be modeled as deployment command semantics or as input collection?
+- Should CLI no-arg `appaloft deploy` prompts be modeled as deployment command semantics or as input collection?
 
 ## Current Implementation Notes And Migration Gaps
 

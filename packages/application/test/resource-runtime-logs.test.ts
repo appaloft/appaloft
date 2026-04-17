@@ -1,7 +1,7 @@
 import "reflect-metadata";
 
 import { describe, expect, test } from "bun:test";
-import { ok, type Result } from "@yundu/core";
+import { ok, type Result } from "@appaloft/core";
 
 import {
   type AppSpan,
@@ -222,7 +222,7 @@ function deploymentSummary(overrides?: Partial<DeploymentSummary>): DeploymentSu
         kind: "host-process",
         port: 3000,
         metadata: {
-          logPath: "/tmp/yundu-runtime.log",
+          logPath: "/tmp/appaloft-runtime.log",
         },
       },
       target: {
@@ -345,22 +345,22 @@ describe("ResourceRuntimeLogsQueryService", () => {
 
     expect(result.isOk()).toBe(true);
     expect(tracer.spans.map((span) => span.name)).toEqual([
-      "yundu.runtime_logs.open",
-      "yundu.runtime_logs.collect_bounded",
+      "appaloft.runtime_logs.open",
+      "appaloft.runtime_logs.collect_bounded",
     ]);
     expect(tracer.spans[0]?.attributes).toMatchObject({
-      "yundu.resource.id": "res_web",
-      "yundu.deployment.id": "dep_web",
-      "yundu.runtime.kind": "host-process",
-      "yundu.runtime_logs.follow": false,
-      "yundu.runtime_logs.tail_lines": 50,
-      "yundu.runtime_logs.service_name": "web",
-      "yundu.target.provider_key": "local-shell",
+      "appaloft.resource.id": "res_web",
+      "appaloft.deployment.id": "dep_web",
+      "appaloft.runtime.kind": "host-process",
+      "appaloft.runtime_logs.follow": false,
+      "appaloft.runtime_logs.tail_lines": 50,
+      "appaloft.runtime_logs.service_name": "web",
+      "appaloft.target.provider_key": "local-shell",
     });
     expect(tracer.spans[0]?.status).toEqual({ status: "ok" });
     expect(tracer.spans[1]?.attributes).toMatchObject({
-      "yundu.runtime_logs.close_reason": "source-ended",
-      "yundu.runtime_logs.line_count": 1,
+      "appaloft.runtime_logs.close_reason": "source-ended",
+      "appaloft.runtime_logs.line_count": 1,
     });
     expect(tracer.spans[1]?.status).toEqual({ status: "ok" });
   });

@@ -1,14 +1,14 @@
 import "reflect-metadata";
 
 import { describe, expect, test } from "bun:test";
-import { type DomainEvent } from "@yundu/core";
+import { type DomainEvent } from "@appaloft/core";
 import {
   CapturedEventBus,
   FixedClock,
   MemoryServerRepository,
   NoopLogger,
   SequenceIdGenerator,
-} from "@yundu/testkit";
+} from "@appaloft/testkit";
 import {
   createExecutionContext,
   type ExecutionContext,

@@ -16,6 +16,7 @@ playwright-report
 blob-report
 .playwright
 .playwright-cli
+.tmp-*
 
 # Turbo
 .turbo
@@ -33,7 +34,7 @@ apps/desktop/out
 apps/desktop/dist
 runtime/logs/*
 runtime/public/*
-.yundu
+.appaloft
 
 # Debug
 npm-debug.log*

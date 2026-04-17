@@ -6,7 +6,7 @@
     ProjectSummary,
     ResourceSummary,
     ServerSummary,
-  } from "@yundu/contracts";
+  } from "@appaloft/contracts";
 
   import DeploymentStatusBadge from "$lib/components/console/DeploymentStatusBadge.svelte";
   import * as Table from "$lib/components/ui/table";

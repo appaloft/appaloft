@@ -9,7 +9,7 @@
   import { createConsoleQueries } from "$lib/console/queries";
   import { formatTime } from "$lib/console/utils";
   import { i18nKeys, t } from "$lib/i18n";
-  import type { ServerSummary } from "@yundu/contracts";
+  import type { ServerSummary } from "@appaloft/contracts";
 
   const { serversQuery, deploymentsQuery } = createConsoleQueries(browser);
 
@@ -26,7 +26,7 @@
 </script>
 
 <svelte:head>
-  <title>{$t(i18nKeys.console.servers.pageTitle)} · Yundu</title>
+  <title>{$t(i18nKeys.console.servers.pageTitle)} · Appaloft</title>
 </svelte:head>
 
 <ConsoleShell

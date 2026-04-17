@@ -1,4 +1,4 @@
-import { type IntegrationDescriptor } from "@yundu/application";
+import { type IntegrationDescriptor } from "@appaloft/application";
 
 export const gitlabIntegration: IntegrationDescriptor = {
   key: "gitlab",

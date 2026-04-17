@@ -7,8 +7,8 @@ import {
   type ProxyReloadPlan,
   type ProxyReloadReason,
   type ProxyRouteRealizationPlan,
-} from "@yundu/application";
-import { type AccessRoute, type DomainError, err, ok, type Result } from "@yundu/core";
+} from "@appaloft/application";
+import { type AccessRoute, type DomainError, err, ok, type Result } from "@appaloft/core";
 
 export interface ProxyBootstrapOptions {
   httpPort?: number;
@@ -28,8 +28,8 @@ function portFromEnv(env: Record<string, string | undefined>, key: string): numb
 export function proxyBootstrapOptionsFromEnv(
   env: Record<string, string | undefined>,
 ): ProxyBootstrapOptions {
-  const httpPort = portFromEnv(env, "YUNDU_EDGE_HTTP_PORT");
-  const httpsPort = portFromEnv(env, "YUNDU_EDGE_HTTPS_PORT");
+  const httpPort = portFromEnv(env, "APPALOFT_EDGE_HTTP_PORT");
+  const httpsPort = portFromEnv(env, "APPALOFT_EDGE_HTTPS_PORT");
 
   return {
     ...(httpPort === undefined ? {} : { httpPort }),

@@ -1,6 +1,6 @@
-# @yundu/plugin-sdk
+# @appaloft/plugin-sdk
 
-Plugin authoring contract for Yundu.
+Plugin authoring contract for Appaloft.
 
 Responsibilities:
 

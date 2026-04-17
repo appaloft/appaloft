@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { ResourceHealthOverall } from "@yundu/contracts";
+  import type { ResourceHealthOverall } from "@appaloft/contracts";
 
   import { i18nKeys, t } from "$lib/i18n";
 

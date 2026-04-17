@@ -12,7 +12,7 @@ import {
   safeTry,
   UpdatedAt,
   UpsertDeploymentTargetSpec,
-} from "@yundu/core";
+} from "@appaloft/core";
 import { inject, injectable } from "tsyringe";
 
 import { type ExecutionContext, toRepositoryContext } from "../../execution-context";

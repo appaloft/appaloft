@@ -6,7 +6,7 @@ Date: 2026-04-16
 
 ## Decision
 
-Yundu may expose interactive operator terminals through an explicit application command named
+Appaloft may expose interactive operator terminals through an explicit application command named
 `terminal-sessions.open`.
 
 The command opens an ephemeral interactive session. It is not a Resource or Deployment aggregate
@@ -208,8 +208,8 @@ The current runtime adapters already record enough metadata for many resource wo
 local host-process metadata records `workdir`; local and SSH Compose paths can record `workdir`;
 SSH source preparation records `remoteWorkdir`; remote Git materialization uses
 `<remoteRuntimeRoot>/ssh-deployments/<deploymentId>/source` plus optional `baseDirectory`.
-The default remote runtime root is `/var/lib/yundu/runtime` and can be overridden with
-`YUNDU_REMOTE_RUNTIME_ROOT`.
+The default remote runtime root is `/var/lib/appaloft/runtime` and can be overridden with
+`APPALOFT_REMOTE_RUNTIME_ROOT`.
 
 Current local-shell terminal support uses a Bun subprocess bridge rather than a true local PTY, so
 resize is a no-op for local targets. Generic SSH uses `ssh -tt` for an interactive remote TTY.

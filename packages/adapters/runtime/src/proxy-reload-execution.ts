@@ -1,4 +1,4 @@
-import type { ProxyReloadPlan, ProxyReloadStepPlan } from "@yundu/application";
+import type { ProxyReloadPlan, ProxyReloadStepPlan } from "@appaloft/application";
 
 export interface ProxyReloadCommandResult {
   failed: boolean;

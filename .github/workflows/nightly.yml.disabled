@@ -9,7 +9,7 @@ jobs:
   compose-smoke:
     runs-on: ubuntu-latest
     env:
-      YUNDU_OTEL_ENABLED: "false"
+      APPALOFT_OTEL_ENABLED: "false"
     steps:
       - uses: actions/checkout@v4
 

@@ -64,7 +64,7 @@
 </script>
 
 <svelte:head>
-  <title>{project?.name ?? $t(i18nKeys.console.projects.pageTitle)} · Yundu</title>
+  <title>{project?.name ?? $t(i18nKeys.console.projects.pageTitle)} · Appaloft</title>
 </svelte:head>
 
 <ConsoleShell

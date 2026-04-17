@@ -59,7 +59,7 @@ spec says why.
 Every end-to-end workflow must identify at least:
 
 - the initiating user, operator, automation, scheduler, or event source;
-- Yundu entry/application responsibilities;
+- Appaloft entry/application responsibilities;
 - provider, runtime, database, VCS, DNS, certificate authority, or other third-party
   responsibilities when present;
 - the observable success signal for each actor;
@@ -71,7 +71,7 @@ Use this table shape:
 | Actor | Responsibilities | Success Signal | Failure Branch |
 | --- | --- | --- | --- |
 | User/operator | | | |
-| Yundu | | | |
+| Appaloft | | | |
 | External provider | | | |
 ```
 

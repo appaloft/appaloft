@@ -75,7 +75,7 @@ oRPC/HTTP exposes:
 
 CLI exposes:
 
-- `yundu resource logs <resourceId>`;
+- `appaloft resource logs <resourceId>`;
 - `--follow`;
 - `--tail <n>`;
 - `--service <name>`;
@@ -161,7 +161,7 @@ No runtime application log archival or persistent search is required for the fir
   generic-SSH Docker/Compose logs with bounded process timeouts, no SSH ControlMaster reuse for
   bounded reads, and short-lived SSH connection reuse for follow-mode streams;
 - bounded and streaming oRPC procedures;
-- CLI `yundu resource logs <resourceId>`;
+- CLI `appaloft resource logs <resourceId>`;
 - Web resource detail runtime log panel that lazy-loads on the logs tab, avoids duplicate bounded
   tail lines when follow starts, and treats user stop/navigation cancellation as normal closure;
 - application tests for context resolution, reader delegation, stream mode, masking, mismatch, and

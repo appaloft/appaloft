@@ -1,6 +1,6 @@
 import "reflect-metadata";
 
-import { bootstrapOpenTelemetryFromEnv } from "@yundu/observability/bootstrap";
+import { bootstrapOpenTelemetryFromEnv } from "@appaloft/observability/bootstrap";
 
 await bootstrapOpenTelemetryFromEnv();
 

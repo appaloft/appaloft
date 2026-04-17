@@ -1,3 +1,9 @@
+import {
+  type AppSpan,
+  type AppTracer,
+  type TraceAttributes,
+  type TraceAttributeValue,
+} from "@appaloft/application";
 import { type Attributes, type Span, SpanStatusCode, type Tracer, trace } from "@opentelemetry/api";
 import { getNodeAutoInstrumentations } from "@opentelemetry/auto-instrumentations-node";
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
@@ -11,13 +17,6 @@ import {
   TraceIdRatioBasedSampler,
 } from "@opentelemetry/sdk-trace-base";
 import { ATTR_SERVICE_NAME, ATTR_SERVICE_VERSION } from "@opentelemetry/semantic-conventions";
-
-import {
-  type AppSpan,
-  type AppTracer,
-  type TraceAttributes,
-  type TraceAttributeValue,
-} from "@yundu/application";
 
 export interface OpenTelemetryBootstrapConfig {
   appVersion?: string;
@@ -281,7 +280,7 @@ function buildRuntime(config: OpenTelemetryBootstrapConfig): OpenTelemetryRuntim
   sdk.start();
 
   return {
-    tracer: new OpenTelemetryAppTracer(trace.getTracer("yundu.application", config.appVersion)),
+    tracer: new OpenTelemetryAppTracer(trace.getTracer("appaloft.application", config.appVersion)),
     async shutdown(): Promise<void> {
       await sdk.shutdown();
     },
@@ -310,21 +309,21 @@ export function resolveOpenTelemetryConfigFromEnv(
   env: Record<string, string | undefined> = process.env,
 ): OpenTelemetryBootstrapConfig {
   const disabled = parseBoolean(env.OTEL_SDK_DISABLED) === true;
-  const legacyEnabled = parseBoolean(env.YUNDU_OTEL_ENABLED);
+  const legacyEnabled = parseBoolean(env.APPALOFT_OTEL_ENABLED);
   const traceEndpoint =
     env.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT ??
     (env.OTEL_EXPORTER_OTLP_ENDPOINT
       ? normalizeTraceEndpointFromBase(env.OTEL_EXPORTER_OTLP_ENDPOINT)
       : undefined) ??
-    env.YUNDU_OTEL_EXPORTER_OTLP_ENDPOINT;
+    env.APPALOFT_OTEL_EXPORTER_OTLP_ENDPOINT;
   const enabled = disabled ? false : (legacyEnabled ?? Boolean(traceEndpoint));
-  const appVersion = env.YUNDU_APP_VERSION;
+  const appVersion = env.APPALOFT_APP_VERSION;
   const exporterHeaders = env.OTEL_EXPORTER_OTLP_TRACES_HEADERS ?? env.OTEL_EXPORTER_OTLP_HEADERS;
 
   return {
-    environment: env.YUNDU_ENV ?? env.NODE_ENV ?? "development",
+    environment: env.APPALOFT_ENV ?? env.NODE_ENV ?? "development",
     otelEnabled: enabled,
-    otelServiceName: env.OTEL_SERVICE_NAME ?? env.YUNDU_OTEL_SERVICE_NAME ?? "yundu-backend",
+    otelServiceName: env.OTEL_SERVICE_NAME ?? env.APPALOFT_OTEL_SERVICE_NAME ?? "appaloft-backend",
     ...(appVersion ? { appVersion } : {}),
     ...(traceEndpoint ? { otelExporterEndpoint: traceEndpoint } : {}),
     ...(exporterHeaders ? { otelExporterHeaders: exporterHeaders } : {}),

@@ -14,10 +14,10 @@ import {
   type ProxyReloadPlan,
   type ProxyRouteRealizationInput,
   type ProxyRouteRealizationPlan,
-} from "@yundu/application";
-import { type DomainError, domainError, err, ok, type Result } from "@yundu/core";
+} from "@appaloft/application";
+import { type DomainError, domainError, err, ok, type Result } from "@appaloft/core";
 
-export const traefikEdgeNetworkName = "yundu-edge";
+export const traefikEdgeNetworkName = "appaloft-edge";
 const traefikImage = "traefik:v3.6.2";
 
 const capabilities: EdgeProxyProviderCapabilities = {
@@ -60,10 +60,10 @@ function routeProbeCommand(input: {
   networkName: string;
   token: string;
 }): string {
-  const containerName = `yundu-proxy-probe-${input.token}`;
-  const router = `yundu-proxy-probe-${input.token}`;
+  const containerName = `appaloft-proxy-probe-${input.token}`;
+  const router = `appaloft-proxy-probe-${input.token}`;
   const service = `${router}-svc`;
-  const hostname = `${router}.local.yundu.test`;
+  const hostname = `${router}.local.appaloft.test`;
   const url = `http://127.0.0.1:${input.httpPort}/ping`;
   const hostHeader = `Host: ${hostname}`;
 
@@ -202,7 +202,7 @@ export class TraefikEdgeProxyProvider implements EdgeProxyProvider {
 
     const httpPort = hostPort(input.httpPort, 80);
     const httpsPort = hostPort(input.httpsPort, 443);
-    const containerName = "yundu-traefik";
+    const containerName = "appaloft-traefik";
     const runningWithExpectedImageCommand = [
       `docker inspect -f '{{.State.Running}}' ${containerName} 2>/dev/null | grep true >/dev/null`,
       `[ "$(docker inspect -f '{{.Config.Image}}' ${containerName} 2>/dev/null)" = "${traefikImage}" ]`,
@@ -254,7 +254,7 @@ export class TraefikEdgeProxyProvider implements EdgeProxyProvider {
     }
 
     const httpPort = hostPort(input.httpPort, 80);
-    const containerName = "yundu-traefik";
+    const containerName = "appaloft-traefik";
     const token = Date.now().toString(36);
 
     return ok({

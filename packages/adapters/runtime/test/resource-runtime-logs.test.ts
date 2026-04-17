@@ -9,7 +9,7 @@ import type {
   ResourceSummary,
   ServerRepository,
   DeploymentSummary,
-} from "@yundu/application";
+} from "@appaloft/application";
 import {
   CreatedAt,
   DeploymentTargetCredentialKindValue,
@@ -22,7 +22,7 @@ import {
   SshPrivateKeyText,
   TargetKindValue,
   DeploymentTargetUsername,
-} from "@yundu/core";
+} from "@appaloft/core";
 
 type SpawnCall = {
   args: string[];
@@ -259,7 +259,7 @@ function deploymentSummary(input?: {
             }
           : {
               metadata: {
-                containerName: "yundu-dep_web",
+                containerName: "appaloft-dep_web",
               },
             }),
       },
@@ -343,7 +343,7 @@ describe("RuntimeResourceRuntimeLogReader", () => {
       "logs",
       "--tail",
       "25",
-      "yundu-dep_web",
+      "appaloft-dep_web",
     ]);
     expect(events).toContainEqual(
       expect.objectContaining({
@@ -358,16 +358,16 @@ describe("RuntimeResourceRuntimeLogReader", () => {
       reason: "source-ended",
     });
     expect(tracer.spans).toHaveLength(1);
-    expect(tracer.spans[0]?.name).toBe("yundu.runtime_logs.process");
+    expect(tracer.spans[0]?.name).toBe("appaloft.runtime_logs.process");
     expect(tracer.spans[0]?.attributes).toMatchObject({
-      "yundu.resource.id": "res_web",
-      "yundu.deployment.id": "dep_web",
-      "yundu.runtime.kind": "docker-container",
-      "yundu.runtime_logs.command": "docker_logs",
-      "yundu.runtime_logs.follow": false,
-      "yundu.runtime_logs.line_count": 1,
-      "yundu.runtime_logs.tail_lines": 25,
-      "yundu.target.provider_key": "local-shell",
+      "appaloft.resource.id": "res_web",
+      "appaloft.deployment.id": "dep_web",
+      "appaloft.runtime.kind": "docker-container",
+      "appaloft.runtime_logs.command": "docker_logs",
+      "appaloft.runtime_logs.follow": false,
+      "appaloft.runtime_logs.line_count": 1,
+      "appaloft.runtime_logs.tail_lines": 25,
+      "appaloft.target.provider_key": "local-shell",
     });
     expect(tracer.spans[0]?.status).toEqual({ status: "ok" });
   });
@@ -394,7 +394,7 @@ describe("RuntimeResourceRuntimeLogReader", () => {
     expect(calls[0]?.args).toContain("deployer@203.0.113.10");
     expect(calls[0]?.args).toContain("ControlMaster=auto");
     expect(calls[0]?.args.at(-1)).toBe(
-      "docker logs --tail '25' --follow 'yundu-dep_web'",
+      "docker logs --tail '25' --follow 'appaloft-dep_web'",
     );
   });
 
@@ -449,7 +449,7 @@ describe("RuntimeResourceRuntimeLogReader", () => {
       "logs",
       "--tail",
       "25",
-      "yundu-dep_web",
+      "appaloft-dep_web",
     ]);
     expect(killed.value).toBe(true);
     expect(error).toEqual({
@@ -471,8 +471,8 @@ describe("RuntimeResourceRuntimeLogReader", () => {
       message: "Runtime log process timed out after 1ms",
     });
     expect(tracer.spans[0]?.attributes).toMatchObject({
-      "yundu.runtime_logs.close_reason": "timeout",
-      "yundu.runtime_logs.timeout_ms": 1,
+      "appaloft.runtime_logs.close_reason": "timeout",
+      "appaloft.runtime_logs.timeout_ms": 1,
     });
   });
 });

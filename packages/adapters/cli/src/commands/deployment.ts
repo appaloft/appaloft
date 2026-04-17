@@ -1,12 +1,12 @@
-import { Args, Command as EffectCommand, Options } from "@effect/cli";
 import {
   CreateDeploymentCommand,
   type CreateDeploymentCommandInput,
   DeploymentLogsQuery,
   ListDeploymentsQuery,
-} from "@yundu/application";
-import { createQuickDeployGeneratedResourceName } from "@yundu/contracts";
-import { resourceKinds } from "@yundu/core";
+} from "@appaloft/application";
+import { createQuickDeployGeneratedResourceName } from "@appaloft/contracts";
+import { resourceKinds } from "@appaloft/core";
+import { Args, Command as EffectCommand, Options } from "@effect/cli";
 import { Effect } from "effect";
 
 import { optionalNumber, optionalValue, runDeploymentCommand, runQuery } from "../runtime.js";

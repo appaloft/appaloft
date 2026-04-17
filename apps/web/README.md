@@ -1,6 +1,6 @@
-# @yundu/web
+# @appaloft/web
 
-Static SvelteKit console for Yundu.
+Static SvelteKit console for Appaloft.
 
 ## Role
 

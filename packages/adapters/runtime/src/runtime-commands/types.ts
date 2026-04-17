@@ -1,4 +1,4 @@
-import type { RuntimeCommandKind } from "@yundu/core";
+import type { RuntimeCommandKind } from "@appaloft/core";
 
 export type {
   DockerBuildImageCommandSpec,
@@ -18,7 +18,7 @@ export type {
   RuntimeCommandSequenceSpec,
   RuntimeCommandSpec,
   ShellScriptCommandSpec,
-} from "@yundu/core";
+} from "@appaloft/core";
 
 export type RuntimeCommandRenderMode = "execute" | "display";
 

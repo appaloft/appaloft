@@ -13,7 +13,7 @@ import {
   UpsertEnvironmentSpec,
   VariableExposureValue,
   VariableKindValue,
-} from "@yundu/core";
+} from "@appaloft/core";
 import { inject, injectable } from "tsyringe";
 import { type ExecutionContext, toRepositoryContext } from "../../execution-context";
 import { type AppLogger, type Clock, type EnvironmentRepository, type EventBus } from "../../ports";

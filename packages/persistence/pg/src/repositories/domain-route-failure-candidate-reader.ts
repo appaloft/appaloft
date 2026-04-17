@@ -1,10 +1,10 @@
 import {
+  appaloftTraceAttributes,
   createRepositorySpanName,
   type DomainRouteFailureCandidate,
   type DomainRouteFailureCandidateReader,
   type RepositoryContext,
-  yunduTraceAttributes,
-} from "@yundu/application";
+} from "@appaloft/application";
 import { type Kysely } from "kysely";
 
 import { type Database } from "../schema";
@@ -24,7 +24,7 @@ export class PgDomainRouteFailureCandidateReader implements DomainRouteFailureCa
       createRepositorySpanName("domain_route_failure_candidate", "list_affected_bindings"),
       {
         attributes: {
-          [yunduTraceAttributes.repositoryName]: "domain_route_failure_candidate",
+          [appaloftTraceAttributes.repositoryName]: "domain_route_failure_candidate",
         },
       },
       async () => {

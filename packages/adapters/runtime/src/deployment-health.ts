@@ -4,8 +4,8 @@ import {
   type DeploymentHealthChecker,
   type DeploymentHealthResult,
   type ExecutionContext,
-} from "@yundu/application";
-import { ok, type Deployment, type Result } from "@yundu/core";
+} from "@appaloft/application";
+import { ok, type Deployment, type Result } from "@appaloft/core";
 
 function normalizeHealthCheckPath(path: string | undefined): string {
   if (!path || path.trim() === "") {

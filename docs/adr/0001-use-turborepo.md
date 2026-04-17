@@ -2,7 +2,7 @@
 
 ## Context
 
-Yundu needs a monorepo with apps, layered packages, shared scripts, and selective task execution.
+Appaloft needs a monorepo with apps, layered packages, shared scripts, and selective task execution.
 
 ## Decision
 

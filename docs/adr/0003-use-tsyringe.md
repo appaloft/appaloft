@@ -2,7 +2,7 @@
 
 ## Context
 
-Yundu needs explicit dependency assembly but must avoid framework-style global container usage.
+Appaloft needs explicit dependency assembly but must avoid framework-style global container usage.
 
 ## Decision
 

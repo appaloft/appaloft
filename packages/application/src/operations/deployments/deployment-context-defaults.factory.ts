@@ -33,7 +33,7 @@ import {
   ResourceSlug,
   type Result,
   safeTry,
-} from "@yundu/core";
+} from "@appaloft/core";
 import { inject, injectable } from "tsyringe";
 
 import {

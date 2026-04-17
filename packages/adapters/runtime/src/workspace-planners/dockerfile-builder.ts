@@ -1,4 +1,4 @@
-import { type RuntimeExecutionPlan } from "@yundu/core";
+import { type RuntimeExecutionPlan } from "@appaloft/core";
 
 export interface DockerfileBuildContext {
   baseImage: string;

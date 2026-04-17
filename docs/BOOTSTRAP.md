@@ -1,6 +1,6 @@
 # Bootstrap
 
-Yundu was bootstrapped with official CLIs instead of hand-written boilerplate.
+Appaloft was bootstrapped with official CLIs instead of hand-written boilerplate.
 
 ## Commands Used
 

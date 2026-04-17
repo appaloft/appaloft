@@ -1,4 +1,4 @@
-src-tauri/binaries/yundu-*
+src-tauri/binaries/appaloft-*
 !src-tauri/binaries/.gitkeep
 src-tauri/gen/
 src-tauri/target/

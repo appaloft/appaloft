@@ -32,7 +32,7 @@ Expected implementation scope:
 - `packages/persistence/pg`: reuse the existing domain binding upsert/read model because verification attempts are serialized in aggregate state.
 - `packages/orpc`: add typed `POST /api/domain-bindings/{domainBindingId}/ownership-confirmations`.
 - `packages/contracts`: expose confirm input/response and read-model bound status.
-- `packages/adapters/cli`: add `yundu domain-binding confirm-ownership <domainBindingId>`.
+- `packages/adapters/cli`: add `appaloft domain-binding confirm-ownership <domainBindingId>`.
 - `apps/web`: add resource-scoped and standalone pending-binding confirmation affordances.
 - `apps/shell`: register the use case.
 

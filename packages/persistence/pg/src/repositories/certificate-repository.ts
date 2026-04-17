@@ -1,9 +1,9 @@
 import {
+  appaloftTraceAttributes,
   type CertificateRepository,
   createRepositorySpanName,
   type RepositoryContext,
-  yunduTraceAttributes,
-} from "@yundu/application";
+} from "@appaloft/application";
 import {
   Certificate,
   CertificateByAttemptIdempotencyKeySpec,
@@ -14,7 +14,7 @@ import {
   type CertificateSelectionSpec,
   type CertificateSelectionSpecVisitor,
   type UpsertCertificateSpec,
-} from "@yundu/core";
+} from "@appaloft/core";
 import { type Insertable, type Kysely, type Selectable, type SelectQueryBuilder } from "kysely";
 
 import { type Database } from "../schema";
@@ -97,8 +97,8 @@ export class PgCertificateRepository implements CertificateRepository {
       createRepositorySpanName("certificate", "upsert"),
       {
         attributes: {
-          [yunduTraceAttributes.repositoryName]: "certificate",
-          [yunduTraceAttributes.mutationSpecName]: spec.constructor.name,
+          [appaloftTraceAttributes.repositoryName]: "certificate",
+          [appaloftTraceAttributes.mutationSpecName]: spec.constructor.name,
         },
       },
       async () => {
@@ -129,8 +129,8 @@ export class PgCertificateRepository implements CertificateRepository {
       createRepositorySpanName("certificate", "find_one"),
       {
         attributes: {
-          [yunduTraceAttributes.repositoryName]: "certificate",
-          [yunduTraceAttributes.selectionSpecName]: spec.constructor.name,
+          [appaloftTraceAttributes.repositoryName]: "certificate",
+          [appaloftTraceAttributes.selectionSpecName]: spec.constructor.name,
         },
       },
       async () => {

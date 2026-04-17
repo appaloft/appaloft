@@ -2,7 +2,7 @@
 
 ## Product Goal
 
-Yundu is an intent-first deployment platform:
+Appaloft is an intent-first deployment platform:
 
 - users say "deploy this project to that server"
 - the system detects source shape, selects a runtime strategy, materializes environment snapshot state, and executes a deployment plan
@@ -35,7 +35,7 @@ Self-hosted:
 flowchart LR
   Dev["Developer"] --> CLI["CLI"]
   Dev --> Web["Static Web Console"]
-  CLI --> API["Self-hosted Yundu Backend"]
+  CLI --> API["Self-hosted Appaloft Backend"]
   Web --> API
   API --> PG["External PostgreSQL"]
   API --> Targets["User-owned Servers"]
@@ -46,7 +46,7 @@ Local embedded mode:
 ```mermaid
 flowchart LR
   Dev["Developer"] --> CLI["CLI / Optional Local Serve"]
-  CLI --> API["Single local Yundu process"]
+  CLI --> API["Single local Appaloft process"]
   API --> PG["PGlite data dir (user data dir by default)"]
   API --> Targets["User-owned Servers"]
 ```
@@ -100,7 +100,7 @@ flowchart TD
 - `apps/shell`
   - composition root, only place where `tsyringe` assembles the app
 - `apps/web`
-  - static interface that talks to the backend API through `@yundu/orpc/client` and `@tanstack/svelte-query`
+  - static interface that talks to the backend API through `@appaloft/orpc/client` and `@tanstack/svelte-query`
 
 ## Interface Relationship
 
@@ -113,20 +113,20 @@ flowchart TD
 - `OpenAPI REST`
   - exposes the same business capability under `/api` for external clients and contract visibility
 - `Web`
-  - uses the shared `@yundu/orpc/client` package plus TanStack Query, rather than hand-written fetch calls for business routes
+  - uses the shared `@appaloft/orpc/client` package plus TanStack Query, rather than hand-written fetch calls for business routes
 - `MCP`
   - remains a future interface that must call the same application layer
 
 ## Core Business Surface
 
 - the human-facing and AI-facing business capability contract lives in
-  [CORE_OPERATIONS.md](/Users/nichenqin/projects/yundu/docs/CORE_OPERATIONS.md)
+  [CORE_OPERATIONS.md](/Users/nichenqin/projects/appaloft/docs/CORE_OPERATIONS.md)
 - the human-facing and AI-facing business operation relationship map lives in
-  [BUSINESS_OPERATION_MAP.md](/Users/nichenqin/projects/yundu/docs/BUSINESS_OPERATION_MAP.md)
+  [BUSINESS_OPERATION_MAP.md](/Users/nichenqin/projects/appaloft/docs/BUSINESS_OPERATION_MAP.md)
 - the human-facing and AI-facing domain boundary contract lives in
-  [DOMAIN_MODEL.md](/Users/nichenqin/projects/yundu/docs/DOMAIN_MODEL.md)
+  [DOMAIN_MODEL.md](/Users/nichenqin/projects/appaloft/docs/DOMAIN_MODEL.md)
 - the executable mirror of that contract lives in
-  [operation-catalog.ts](/Users/nichenqin/projects/yundu/packages/application/src/operation-catalog.ts)
+  [operation-catalog.ts](/Users/nichenqin/projects/appaloft/packages/application/src/operation-catalog.ts)
 - CLI, oRPC, HTTP, and future MCP tools must add or consume operations through those two files in
   lockstep
 - infrastructure endpoints such as `health`, `readiness`, and `version` are adapter concerns and
@@ -165,7 +165,7 @@ flowchart LR
 
 ## Deployment Method And Execution Strategy
 
-Yundu now treats deployment method as an explicit planning input, not just an implementation detail.
+Appaloft now treats deployment method as an explicit planning input, not just an implementation detail.
 
 - deployment method:
   - the operator-facing choice supplied to the command layer
@@ -181,7 +181,7 @@ Current mapping:
 - `prebuilt-image` -> prebuilt image + `docker-container`
 - `workspace-commands` -> command-driven build/start + `host-process`
 
-This is intentionally broader than a container-only platform model because Yundu needs to support
+This is intentionally broader than a container-only platform model because Appaloft needs to support
 local-first validation and non-Docker targets as first-class flows.
 
 ## Domain Terminology Compatibility
@@ -224,7 +224,7 @@ Important:
 - binary mode is only a distribution choice
 - PostgreSQL remains the main hosted and production backend
 - PGlite is an embedded option for single-instance installs and defaults to platform user-level storage
-- release artifacts currently map to `yundu-backend`, `yundu-web-static`, `Dockerfile`, and `docker-compose.selfhost.yml`
+- release artifacts currently map to `appaloft-backend`, `appaloft-web-static`, `Dockerfile`, and `docker-compose.selfhost.yml`
 - hosted auth is optional and additive; self-hosted/local mode can remain anonymous
 
 ## Anonymous vs Hosted Mode
@@ -243,7 +243,7 @@ Important:
 
 The release form does not change the data model:
 
-- `yundu-backend` can talk to external PostgreSQL or embedded PGlite depending on config
+- `appaloft-backend` can talk to external PostgreSQL or embedded PGlite depending on config
 - all-in-one Docker usually talks to external PostgreSQL
 - `docker-compose.selfhost.yml` provides a recommended self-hosted stack with PostgreSQL as a separate service
 - a future optional binary can use embedded PGlite for local-first installs without changing application/core layers

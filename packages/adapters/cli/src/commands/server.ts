@@ -1,4 +1,3 @@
-import { Args, Command as EffectCommand, Options } from "@effect/cli";
 import {
   BootstrapServerProxyCommand,
   ConfigureServerCredentialCommand,
@@ -8,8 +7,9 @@ import {
   OpenTerminalSessionCommand,
   RegisterServerCommand,
   TestServerConnectivityCommand,
-} from "@yundu/application";
-import { deploymentTargetCredentialKinds, edgeProxyKinds } from "@yundu/core";
+} from "@appaloft/application";
+import { deploymentTargetCredentialKinds, edgeProxyKinds } from "@appaloft/core";
+import { Args, Command as EffectCommand, Options } from "@effect/cli";
 import { Effect } from "effect";
 
 import { optionalValue, runCommand, runQuery } from "../runtime.js";

@@ -119,8 +119,8 @@ Resource scope must start in the deployed project directory:
 Current deployment workspace naming remains deployment-attempt scoped. Git clone and source
 materialization must not use resource name, resource slug, or resource id as the checkout directory.
 For generic SSH Git sources, the default remote source root is
-`/var/lib/yundu/runtime/ssh-deployments/<deploymentId>/source`, with the root configurable through
-`YUNDU_REMOTE_RUNTIME_ROOT`.
+`/var/lib/appaloft/runtime/ssh-deployments/<deploymentId>/source`, with the root configurable through
+`APPALOFT_REMOTE_RUNTIME_ROOT`.
 
 ## Transport Frame Contract
 
@@ -174,7 +174,7 @@ It must not:
 | --- | --- | --- |
 | Web resource detail | Resource terminal tab/action dispatches `terminal-sessions.open` with resource scope and attaches to returned WebSocket. | Implemented |
 | Web server detail/list | Server terminal action dispatches `terminal-sessions.open` with server scope and attaches to returned WebSocket. | Implemented on server detail |
-| CLI | `yundu server terminal <serverId>` and `yundu resource terminal <resourceId>` reuse the same command schema and print the descriptor. | Implemented descriptor open; interactive CLI attach future |
+| CLI | `appaloft server terminal <serverId>` and `appaloft resource terminal <resourceId>` reuse the same command schema and print the descriptor. | Implemented descriptor open; interactive CLI attach future |
 | HTTP/oRPC | Command endpoint plus WebSocket attach endpoint. | Implemented |
 | Automation / MCP | Future tool can request a session only when an interactive transport is available. | Future |
 

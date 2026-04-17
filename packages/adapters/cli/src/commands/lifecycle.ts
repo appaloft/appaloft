@@ -1,13 +1,13 @@
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { createInterface, type Interface } from "node:readline/promises";
+import { DoctorQuery, ListProvidersQuery, type ProviderDescriptor } from "@appaloft/application";
+import { type Result } from "@appaloft/core";
 import { Command as EffectCommand, Options } from "@effect/cli";
-import { DoctorQuery, ListProvidersQuery, type ProviderDescriptor } from "@yundu/application";
-import { type Result } from "@yundu/core";
 import { Effect } from "effect";
 import { CliRuntime, optionalValue, print, runQuery } from "../runtime.js";
 
-const initOutputOption = Options.text("output").pipe(Options.withDefault("yundu.json"));
+const initOutputOption = Options.text("output").pipe(Options.withDefault("appaloft.json"));
 const initProjectOption = Options.text("project").pipe(Options.optional);
 const initTargetsOption = Options.text("targets").pipe(Options.optional);
 const initForceOption = Options.boolean("force").pipe(Options.withDefault(false));
@@ -128,8 +128,8 @@ async function createInitConfig(input: {
 
   try {
     const projectName = reader
-      ? await promptText(reader, "Project name", input.project ?? "Yundu Project")
-      : (input.project ?? "Yundu Project");
+      ? await promptText(reader, "Project name", input.project ?? "Appaloft Project")
+      : (input.project ?? "Appaloft Project");
     const targetPrompt = initTargetAliases.join(",");
     const targetAliases = parseInitTargets(
       reader
@@ -198,7 +198,7 @@ export const versionCommand = EffectCommand.make("version", {}, () =>
     const cli = yield* CliRuntime;
 
     yield* print({
-      name: "Yundu",
+      name: "Appaloft",
       version: cli.version,
     });
   }),
@@ -211,7 +211,7 @@ export const serveCommand = EffectCommand.make("serve", {}, () =>
     yield* Effect.promise(() => cli.startServer());
     yield* Effect.never;
   }),
-).pipe(EffectCommand.withDescription("Start the Yundu backend service"));
+).pipe(EffectCommand.withDescription("Start the Appaloft backend service"));
 
 export const initCommand = EffectCommand.make(
   "init",
@@ -249,10 +249,10 @@ export const initCommand = EffectCommand.make(
       yield* print({
         created: true,
         path: outputPath,
-        next: `yundu deploy . --config ${outputPath}`,
+        next: `appaloft deploy . --config ${outputPath}`,
       });
     }),
-).pipe(EffectCommand.withDescription("Create a local Yundu deployment config"));
+).pipe(EffectCommand.withDescription("Create a local Appaloft deployment config"));
 
 export const doctorCommand = EffectCommand.make("doctor", {}, () =>
   runQuery(DoctorQuery.create()),

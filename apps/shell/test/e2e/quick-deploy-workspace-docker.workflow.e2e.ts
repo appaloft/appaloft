@@ -33,13 +33,13 @@ async function waitForHealth(url: string): Promise<void> {
 }
 
 describe("quick deploy workspace Docker workflow e2e", () => {
-  test("[QUICK-DEPLOY-WF-011] quick deploys a workspace app without Dockerfile by generating Dockerfile.yundu", async () => {
+  test("[QUICK-DEPLOY-WF-011] quick deploys a workspace app without Dockerfile by generating Dockerfile.appaloft", async () => {
     expect(existsSync(join(fixtureDir, "Dockerfile"))).toBe(false);
 
     const dockerVersion = runDocker(["version", "--format", "{{.Server.Version}}"]);
     expect(dockerVersion.exitCode, dockerVersion.stderr).toBe(0);
 
-    const workspace = createShellE2eWorkspace("yundu-workspace-docker-", {
+    const workspace = createShellE2eWorkspace("appaloft-workspace-docker-", {
       appVersion: "0.1.0-quick-deploy-workspace-docker-e2e",
     });
     const appPort = await reservePort();
@@ -129,7 +129,7 @@ describe("quick deploy workspace Docker workflow e2e", () => {
         "runtime",
         "local-deployments",
         deploymentId,
-        "Dockerfile.yundu",
+        "Dockerfile.appaloft",
       );
       expect(existsSync(generatedDockerfile)).toBe(true);
       const dockerfileText = await Bun.file(generatedDockerfile).text();

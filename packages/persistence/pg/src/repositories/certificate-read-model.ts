@@ -1,10 +1,10 @@
 import {
+  appaloftTraceAttributes,
   type CertificateReadModel,
   type CertificateSummary,
   createReadModelSpanName,
   type RepositoryContext,
-  yunduTraceAttributes,
-} from "@yundu/application";
+} from "@appaloft/application";
 import { type Kysely } from "kysely";
 
 import { type Database } from "../schema";
@@ -28,7 +28,7 @@ export class PgCertificateReadModel implements CertificateReadModel {
       createReadModelSpanName("certificate", "list"),
       {
         attributes: {
-          [yunduTraceAttributes.readModelName]: "certificate",
+          [appaloftTraceAttributes.readModelName]: "certificate",
         },
       },
       async () => {

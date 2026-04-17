@@ -49,7 +49,7 @@ export const zhCN = {
     },
     app: {
       consoleSubtitle: "部署控制台",
-      productName: "Yundu",
+      productName: "Appaloft",
     },
     domain: {
       currentList: "当前列表",
@@ -159,7 +159,7 @@ export const zhCN = {
     web: {
       backendUnavailable: "后端不可用",
       backendUnavailableDescription:
-        "先启动 `yundu serve`，再确认数据库已就绪。若使用 PostgreSQL，请检查用户名和密码。",
+        "先启动 `appaloft serve`，再确认数据库已就绪。若使用 PostgreSQL，请检查用户名和密码。",
       requestFailedWithDetail: "API 请求失败 {{path}}：{{status}} {{detail}}",
       requestFailedWithoutDetail: "API 请求失败 {{path}}：{{status}}",
       unknownRequestFailure: "未知请求失败",
@@ -246,7 +246,7 @@ export const zhCN = {
       planSteps: "计划步骤",
       precedence: "优先级",
       progressDeploymentLabel: "deployment",
-      progressDescription: "这里显示和 CLI 同源的部署阶段、Yundu 日志和应用输出。",
+      progressDescription: "这里显示和 CLI 同源的部署阶段、Appaloft 日志和应用输出。",
       progressParseError: "无法解析部署进度。",
       progressPhaseDeploy: "部署",
       progressPhaseDetect: "检测",
@@ -274,7 +274,7 @@ export const zhCN = {
     home: {
       databaseCard: "Database",
       deploymentBaseBody:
-        "选择本地目录、GitHub 仓库、远程 Git 或镜像后，Yundu 会在同一个部署向导里串起项目关系、目标服务器、环境快照和部署记录。",
+        "选择本地目录、GitHub 仓库、远程 Git 或镜像后，Appaloft 会在同一个部署向导里串起项目关系、目标服务器、环境快照和部署记录。",
       deploymentBaseTitle: "从一次部署开始，项目关系会自动建立。",
       deploymentFlowCreateEnvironment: "保存环境快照",
       deploymentFlowCreateProject: "创建项目",
@@ -442,7 +442,7 @@ export const zhCN = {
         "这些是当前资源的自定义域名绑定。默认 sslip 访问地址显示在访问区域。",
       domainBindingsTitle: "自定义域名",
       durableDomainAccess: "持久域名访问",
-      externalProfileDescription: "外部资源只保留项目关系和访问上下文，不由 Yundu 执行运行时。",
+      externalProfileDescription: "外部资源只保留项目关系和访问上下文，不由 Appaloft 执行运行时。",
       externalProfileTitle: "外部资源",
       generatedAccessRoute: "默认生成访问",
       healthChecks: "健康检查",
@@ -619,9 +619,9 @@ export const zhCN = {
       hostRequired: "请先填写服务器地址。",
       localSshAgent: "本机 SSH agent",
       localSshAgentDescriptionOne:
-        "本机 SSH agent 会使用运行 Yundu 后端这台机器上的 SSH_AUTH_SOCK 和已加载的 key。",
+        "本机 SSH agent 会使用运行 Appaloft 后端这台机器上的 SSH_AUTH_SOCK 和已加载的 key。",
       localSshAgentDescriptionTwo:
-        "适合本地开发或桌面模式；如果 Yundu 跑在远程服务器上，就不是使用你笔记本里的 agent。",
+        "适合本地开发或桌面模式；如果 Appaloft 跑在远程服务器上，就不是使用你笔记本里的 agent。",
       manualInput: "手动输入",
       pastePrivateKey: "粘贴私钥内容",
       portInvalid: "SSH 端口必须是 1 到 65535 之间的整数。",
@@ -691,4 +691,4 @@ export const zhCN = {
   },
 } as const;
 
-export type YunduTranslationResource = DeepStringValues<typeof zhCN>;
+export type AppaloftTranslationResource = DeepStringValues<typeof zhCN>;

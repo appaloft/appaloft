@@ -3,20 +3,20 @@ import { join } from "node:path";
 
 import { resolveConfig } from "../src";
 
-const testHome = "/Users/yundu";
+const testHome = "/Users/appaloft";
 const testXdgDataHome = "/var/lib/xdg-data";
-const testAppData = "C:\\Users\\yundu\\AppData\\Roaming";
+const testAppData = "C:\\Users\\appaloft\\AppData\\Roaming";
 
 function expectedDefaultDataDir(): string {
   if (process.platform === "darwin") {
-    return join(testHome, "Library", "Application Support", "Yundu", "data");
+    return join(testHome, "Library", "Application Support", "Appaloft", "data");
   }
 
   if (process.platform === "win32") {
-    return join(testAppData, "Yundu", "data");
+    return join(testAppData, "Appaloft", "data");
   }
 
-  return join(testXdgDataHome, "yundu", "data");
+  return join(testXdgDataHome, "appaloft", "data");
 }
 
 describe("resolveConfig", () => {
@@ -33,57 +33,57 @@ describe("resolveConfig", () => {
     expect(config.databaseUrl).toBeUndefined();
     expect(config.dataDir).toBe(expectedDefaultDataDir());
     expect(config.pgliteDataDir).toBe(join(expectedDefaultDataDir(), "pglite"));
-    expect(config.remoteRuntimeRoot).toBe("/var/lib/yundu/runtime");
+    expect(config.remoteRuntimeRoot).toBe("/var/lib/appaloft/runtime");
   });
 
   test("infers postgres when a database URL is configured", () => {
     const config = resolveConfig({
       env: {
-        YUNDU_DATABASE_URL: "postgres://postgres:postgres@127.0.0.1:5432/yundu",
+        APPALOFT_DATABASE_URL: "postgres://postgres:postgres@127.0.0.1:5432/appaloft",
       },
     });
 
     expect(config.databaseDriver).toBe("postgres");
-    expect(config.databaseUrl).toBe("postgres://postgres:postgres@127.0.0.1:5432/yundu");
+    expect(config.databaseUrl).toBe("postgres://postgres:postgres@127.0.0.1:5432/appaloft");
   });
 
   test("derives pglite storage from explicit data dir", () => {
     const config = resolveConfig({
       env: {
-        YUNDU_DATA_DIR: ".yundu/data",
+        APPALOFT_DATA_DIR: ".appaloft/data",
       },
     });
 
-    expect(config.dataDir.endsWith(".yundu/data")).toBe(true);
-    expect(config.pgliteDataDir.endsWith(".yundu/data/pglite")).toBe(true);
+    expect(config.dataDir.endsWith(".appaloft/data")).toBe(true);
+    expect(config.pgliteDataDir.endsWith(".appaloft/data/pglite")).toBe(true);
   });
 
   test("allows overriding the remote runtime root", () => {
     const config = resolveConfig({
       env: {
-        YUNDU_REMOTE_RUNTIME_ROOT: "/srv/yundu/runtime",
+        APPALOFT_REMOTE_RUNTIME_ROOT: "/srv/appaloft/runtime",
       },
     });
 
-    expect(config.remoteRuntimeRoot).toBe("/srv/yundu/runtime");
+    expect(config.remoteRuntimeRoot).toBe("/srv/appaloft/runtime");
   });
 
   test("keeps an explicit pglite driver even if a database URL exists", () => {
     const config = resolveConfig({
       env: {
-        YUNDU_DATABASE_DRIVER: "pglite",
-        YUNDU_DATABASE_URL: "postgres://postgres:postgres@127.0.0.1:5432/yundu",
+        APPALOFT_DATABASE_DRIVER: "pglite",
+        APPALOFT_DATABASE_URL: "postgres://postgres:postgres@127.0.0.1:5432/appaloft",
       },
     });
 
     expect(config.databaseDriver).toBe("pglite");
-    expect(config.databaseUrl).toBe("postgres://postgres:postgres@127.0.0.1:5432/yundu");
+    expect(config.databaseUrl).toBe("postgres://postgres:postgres@127.0.0.1:5432/appaloft");
   });
 
   test("uses standard OpenTelemetry environment variables", () => {
     const config = resolveConfig({
       env: {
-        OTEL_SERVICE_NAME: "yundu-api",
+        OTEL_SERVICE_NAME: "appaloft-api",
         OTEL_EXPORTER_OTLP_ENDPOINT: "http://collector:4318",
         OTEL_EXPORTER_OTLP_HEADERS: "authorization=Bearer%20token",
         OTEL_TRACES_SAMPLER: "parentbased_traceidratio",
@@ -93,7 +93,7 @@ describe("resolveConfig", () => {
     });
 
     expect(config.otelEnabled).toBe(true);
-    expect(config.otelServiceName).toBe("yundu-api");
+    expect(config.otelServiceName).toBe("appaloft-api");
     expect(config.otelExporterEndpoint).toBe("http://collector:4318/v1/traces");
     expect(config.otelExporterHeaders).toBe("authorization=Bearer%20token");
     expect(config.otelTracesSampler).toBe("parentbased_traceidratio");
@@ -104,8 +104,8 @@ describe("resolveConfig", () => {
   test("does not default production tracing to localhost", () => {
     const config = resolveConfig({
       env: {
-        YUNDU_ENV: "production",
-        YUNDU_OTEL_ENABLED: "true",
+        APPALOFT_ENV: "production",
+        APPALOFT_OTEL_ENABLED: "true",
       },
     });
 
@@ -137,13 +137,13 @@ describe("resolveConfig", () => {
   test("allows enabling ACME certificate provider through environment", () => {
     const config = resolveConfig({
       env: {
-        YUNDU_CERTIFICATE_PROVIDER: "acme",
-        YUNDU_ACME_DIRECTORY_URL: "https://ca.example.test/directory",
-        YUNDU_ACME_EMAIL: "ops@example.com",
-        YUNDU_ACME_ACCOUNT_KEY_PEM: "account-key",
-        YUNDU_ACME_TERMS_OF_SERVICE_AGREED: "true",
-        YUNDU_ACME_SKIP_CHALLENGE_VERIFICATION: "true",
-        YUNDU_ACME_CHALLENGE_TOKEN_TTL_SECONDS: "120",
+        APPALOFT_CERTIFICATE_PROVIDER: "acme",
+        APPALOFT_ACME_DIRECTORY_URL: "https://ca.example.test/directory",
+        APPALOFT_ACME_EMAIL: "ops@example.com",
+        APPALOFT_ACME_ACCOUNT_KEY_PEM: "account-key",
+        APPALOFT_ACME_TERMS_OF_SERVICE_AGREED: "true",
+        APPALOFT_ACME_SKIP_CHALLENGE_VERIFICATION: "true",
+        APPALOFT_ACME_CHALLENGE_TOKEN_TTL_SECONDS: "120",
       },
     });
 
@@ -164,10 +164,10 @@ describe("resolveConfig", () => {
   test("allows configuring the certificate retry scheduler through environment", () => {
     const config = resolveConfig({
       env: {
-        YUNDU_CERTIFICATE_RETRY_SCHEDULER_ENABLED: "false",
-        YUNDU_CERTIFICATE_RETRY_SCHEDULER_INTERVAL_SECONDS: "30",
-        YUNDU_CERTIFICATE_RETRY_DEFAULT_DELAY_SECONDS: "45",
-        YUNDU_CERTIFICATE_RETRY_SCHEDULER_BATCH_SIZE: "7",
+        APPALOFT_CERTIFICATE_RETRY_SCHEDULER_ENABLED: "false",
+        APPALOFT_CERTIFICATE_RETRY_SCHEDULER_INTERVAL_SECONDS: "30",
+        APPALOFT_CERTIFICATE_RETRY_DEFAULT_DELAY_SECONDS: "45",
+        APPALOFT_CERTIFICATE_RETRY_SCHEDULER_BATCH_SIZE: "7",
       },
     });
 

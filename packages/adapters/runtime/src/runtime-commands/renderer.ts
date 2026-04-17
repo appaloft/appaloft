@@ -151,7 +151,7 @@ function renderDockerRemoveResourceContainersCommand(
   spec: DockerRemoveResourceContainersCommandSpec,
   options: RuntimeCommandRenderOptions,
 ): string {
-  const resourceLabelFilter = options.quote(`label=yundu.resource-id=${spec.resourceId.value}`);
+  const resourceLabelFilter = options.quote(`label=appaloft.resource-id=${spec.resourceId.value}`);
   const currentContainerName = options.quote(spec.currentContainerName.value);
 
   return [

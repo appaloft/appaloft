@@ -81,7 +81,7 @@ export const operationCatalog = [
     inputSchema: createProjectCommandInputSchema,
     serviceToken: tokens.createProjectUseCase,
     transports: {
-      cli: "yundu project create",
+      cli: "appaloft project create",
       orpc: { method: "POST", path: "/api/projects" },
     },
   },
@@ -95,7 +95,7 @@ export const operationCatalog = [
     inputSchema: listProjectsQueryInputSchema,
     serviceToken: tokens.listProjectsQueryService,
     transports: {
-      cli: "yundu project list",
+      cli: "appaloft project list",
       orpc: { method: "GET", path: "/api/projects" },
     },
   },
@@ -109,7 +109,7 @@ export const operationCatalog = [
     inputSchema: registerServerCommandInputSchema,
     serviceToken: tokens.registerServerUseCase,
     transports: {
-      cli: "yundu server register",
+      cli: "appaloft server register",
       orpc: { method: "POST", path: "/api/servers" },
     },
   },
@@ -123,7 +123,7 @@ export const operationCatalog = [
     inputSchema: configureServerCredentialCommandInputSchema,
     serviceToken: tokens.configureServerCredentialUseCase,
     transports: {
-      cli: "yundu server credential <serverId>",
+      cli: "appaloft server credential <serverId>",
       orpc: { method: "POST", path: "/api/servers/{serverId}/credentials" },
     },
   },
@@ -137,7 +137,7 @@ export const operationCatalog = [
     inputSchema: createSshCredentialCommandInputSchema,
     serviceToken: tokens.createSshCredentialUseCase,
     transports: {
-      cli: "yundu server credential-create",
+      cli: "appaloft server credential-create",
       orpc: { method: "POST", path: "/api/credentials/ssh" },
     },
   },
@@ -151,7 +151,7 @@ export const operationCatalog = [
     inputSchema: listSshCredentialsQueryInputSchema,
     serviceToken: tokens.listSshCredentialsQueryService,
     transports: {
-      cli: "yundu server credential-list",
+      cli: "appaloft server credential-list",
       orpc: { method: "GET", path: "/api/credentials/ssh" },
     },
   },
@@ -165,7 +165,7 @@ export const operationCatalog = [
     inputSchema: listServersQueryInputSchema,
     serviceToken: tokens.listServersQueryService,
     transports: {
-      cli: "yundu server list",
+      cli: "appaloft server list",
       orpc: { method: "GET", path: "/api/servers" },
     },
   },
@@ -179,7 +179,7 @@ export const operationCatalog = [
     inputSchema: testServerConnectivityCommandInputSchema,
     serviceToken: tokens.testServerConnectivityUseCase,
     transports: {
-      cli: "yundu server test <serverId>; yundu server doctor <serverId>",
+      cli: "appaloft server test <serverId>; appaloft server doctor <serverId>",
       orpc: { method: "POST", path: "/api/servers/{serverId}/connectivity-tests" },
     },
   },
@@ -206,7 +206,7 @@ export const operationCatalog = [
     inputSchema: bootstrapServerProxyCommandInputSchema,
     serviceToken: tokens.bootstrapServerProxyUseCase,
     transports: {
-      cli: "yundu server proxy repair <serverId>",
+      cli: "appaloft server proxy repair <serverId>",
       orpc: { method: "POST", path: "/api/servers/{serverId}/edge-proxy/bootstrap" },
     },
   },
@@ -220,7 +220,7 @@ export const operationCatalog = [
     inputSchema: listResourcesQueryInputSchema,
     serviceToken: tokens.listResourcesQueryService,
     transports: {
-      cli: "yundu resource list",
+      cli: "appaloft resource list",
       orpc: { method: "GET", path: "/api/resources" },
     },
   },
@@ -234,7 +234,7 @@ export const operationCatalog = [
     inputSchema: createResourceCommandInputSchema,
     serviceToken: tokens.createResourceUseCase,
     transports: {
-      cli: "yundu resource create",
+      cli: "appaloft resource create",
       orpc: { method: "POST", path: "/api/resources" },
     },
   },
@@ -248,7 +248,7 @@ export const operationCatalog = [
     inputSchema: resourceRuntimeLogsQueryInputSchema,
     serviceToken: tokens.resourceRuntimeLogsQueryService,
     transports: {
-      cli: "yundu resource logs <resourceId>",
+      cli: "appaloft resource logs <resourceId>",
       orpc: { method: "GET", path: "/api/resources/{resourceId}/runtime-logs" },
       orpcStream: { method: "GET", path: "/api/resources/{resourceId}/runtime-logs/stream" },
     },
@@ -263,7 +263,7 @@ export const operationCatalog = [
     inputSchema: openTerminalSessionCommandInputSchema,
     serviceToken: tokens.openTerminalSessionUseCase,
     transports: {
-      cli: "yundu server terminal <serverId>; yundu resource terminal <resourceId>",
+      cli: "appaloft server terminal <serverId>; appaloft resource terminal <resourceId>",
       orpc: { method: "POST", path: "/api/terminal-sessions" },
     },
   },
@@ -277,7 +277,7 @@ export const operationCatalog = [
     inputSchema: resourceDiagnosticSummaryQueryInputSchema,
     serviceToken: tokens.resourceDiagnosticSummaryQueryService,
     transports: {
-      cli: "yundu resource diagnose <resourceId>",
+      cli: "appaloft resource diagnose <resourceId>",
       orpc: { method: "GET", path: "/api/resources/{resourceId}/diagnostic-summary" },
     },
   },
@@ -291,7 +291,7 @@ export const operationCatalog = [
     inputSchema: resourceHealthQueryInputSchema,
     serviceToken: tokens.resourceHealthQueryService,
     transports: {
-      cli: "yundu resource health <resourceId>",
+      cli: "appaloft resource health <resourceId>",
       orpc: { method: "GET", path: "/api/resources/{resourceId}/health" },
     },
   },
@@ -305,7 +305,7 @@ export const operationCatalog = [
     inputSchema: resourceProxyConfigurationPreviewQueryInputSchema,
     serviceToken: tokens.resourceProxyConfigurationPreviewQueryService,
     transports: {
-      cli: "yundu resource proxy-config <resourceId>",
+      cli: "appaloft resource proxy-config <resourceId>",
       orpc: { method: "GET", path: "/api/resources/{resourceId}/proxy-configuration" },
     },
   },
@@ -319,7 +319,7 @@ export const operationCatalog = [
     inputSchema: createEnvironmentCommandInputSchema,
     serviceToken: tokens.createEnvironmentUseCase,
     transports: {
-      cli: "yundu env create",
+      cli: "appaloft env create",
       orpc: { method: "POST", path: "/api/environments" },
     },
   },
@@ -333,7 +333,7 @@ export const operationCatalog = [
     inputSchema: listEnvironmentsQueryInputSchema,
     serviceToken: tokens.listEnvironmentsQueryService,
     transports: {
-      cli: "yundu env list",
+      cli: "appaloft env list",
       orpc: { method: "GET", path: "/api/environments" },
     },
   },
@@ -347,7 +347,7 @@ export const operationCatalog = [
     inputSchema: showEnvironmentQueryInputSchema,
     serviceToken: tokens.showEnvironmentQueryService,
     transports: {
-      cli: "yundu env show <environmentId>",
+      cli: "appaloft env show <environmentId>",
       orpc: { method: "GET", path: "/api/environments/{environmentId}" },
     },
   },
@@ -361,7 +361,7 @@ export const operationCatalog = [
     inputSchema: setEnvironmentVariableCommandInputSchema,
     serviceToken: tokens.setEnvironmentVariableUseCase,
     transports: {
-      cli: "yundu env set <environmentId> <key> <value>",
+      cli: "appaloft env set <environmentId> <key> <value>",
       orpc: { method: "POST", path: "/api/environments/{environmentId}/variables" },
     },
   },
@@ -375,7 +375,7 @@ export const operationCatalog = [
     inputSchema: unsetEnvironmentVariableCommandInputSchema,
     serviceToken: tokens.unsetEnvironmentVariableUseCase,
     transports: {
-      cli: "yundu env unset <environmentId> <key>",
+      cli: "appaloft env unset <environmentId> <key>",
       orpc: { method: "DELETE", path: "/api/environments/{environmentId}/variables/{key}" },
     },
   },
@@ -389,7 +389,7 @@ export const operationCatalog = [
     inputSchema: diffEnvironmentsQueryInputSchema,
     serviceToken: tokens.diffEnvironmentsQueryService,
     transports: {
-      cli: "yundu env diff <environmentId> <otherEnvironmentId>",
+      cli: "appaloft env diff <environmentId> <otherEnvironmentId>",
       orpc: {
         method: "GET",
         path: "/api/environments/{environmentId}/diff/{otherEnvironmentId}",
@@ -406,7 +406,7 @@ export const operationCatalog = [
     inputSchema: promoteEnvironmentCommandInputSchema,
     serviceToken: tokens.promoteEnvironmentUseCase,
     transports: {
-      cli: "yundu env promote <environmentId> <targetName>",
+      cli: "appaloft env promote <environmentId> <targetName>",
       orpc: { method: "POST", path: "/api/environments/{environmentId}/promote" },
     },
   },
@@ -420,7 +420,7 @@ export const operationCatalog = [
     inputSchema: createDeploymentCommandInputSchema,
     serviceToken: tokens.createDeploymentUseCase,
     transports: {
-      cli: "yundu deploy [path-or-source] [--config yundu.json]",
+      cli: "appaloft deploy [path-or-source] [--config appaloft.json]",
       orpc: { method: "POST", path: "/api/deployments" },
       orpcStream: { method: "POST", path: "/api/deployments/stream" },
     },
@@ -435,7 +435,7 @@ export const operationCatalog = [
     inputSchema: listDeploymentsQueryInputSchema,
     serviceToken: tokens.listDeploymentsQueryService,
     transports: {
-      cli: "yundu deployments list",
+      cli: "appaloft deployments list",
       orpc: { method: "GET", path: "/api/deployments" },
     },
   },
@@ -449,7 +449,7 @@ export const operationCatalog = [
     inputSchema: deploymentLogsQueryInputSchema,
     serviceToken: tokens.logsQueryService,
     transports: {
-      cli: "yundu logs <deploymentId>",
+      cli: "appaloft logs <deploymentId>",
       orpc: { method: "GET", path: "/api/deployments/{deploymentId}/logs" },
     },
   },
@@ -463,7 +463,7 @@ export const operationCatalog = [
     inputSchema: createDomainBindingCommandInputSchema,
     serviceToken: tokens.createDomainBindingUseCase,
     transports: {
-      cli: "yundu domain-binding create",
+      cli: "appaloft domain-binding create",
       orpc: { method: "POST", path: "/api/domain-bindings" },
     },
   },
@@ -477,7 +477,7 @@ export const operationCatalog = [
     inputSchema: confirmDomainBindingOwnershipCommandInputSchema,
     serviceToken: tokens.confirmDomainBindingOwnershipUseCase,
     transports: {
-      cli: "yundu domain-binding confirm-ownership <domainBindingId>",
+      cli: "appaloft domain-binding confirm-ownership <domainBindingId>",
       orpc: {
         method: "POST",
         path: "/api/domain-bindings/{domainBindingId}/ownership-confirmations",
@@ -494,7 +494,7 @@ export const operationCatalog = [
     inputSchema: listDomainBindingsQueryInputSchema,
     serviceToken: tokens.listDomainBindingsQueryService,
     transports: {
-      cli: "yundu domain-binding list",
+      cli: "appaloft domain-binding list",
       orpc: { method: "GET", path: "/api/domain-bindings" },
     },
   },
@@ -508,7 +508,7 @@ export const operationCatalog = [
     inputSchema: issueOrRenewCertificateCommandInputSchema,
     serviceToken: tokens.issueOrRenewCertificateUseCase,
     transports: {
-      cli: "yundu certificate issue-or-renew <domainBindingId>",
+      cli: "appaloft certificate issue-or-renew <domainBindingId>",
       orpc: { method: "POST", path: "/api/certificates/issue-or-renew" },
     },
   },
@@ -522,7 +522,7 @@ export const operationCatalog = [
     inputSchema: listCertificatesQueryInputSchema,
     serviceToken: tokens.listCertificatesQueryService,
     transports: {
-      cli: "yundu certificate list",
+      cli: "appaloft certificate list",
       orpc: { method: "GET", path: "/api/certificates" },
     },
   },
@@ -535,7 +535,7 @@ export const operationCatalog = [
     serviceName: "ListProvidersQueryService",
     serviceToken: tokens.providersQueryService,
     transports: {
-      cli: "yundu providers list",
+      cli: "appaloft providers list",
       orpc: { method: "GET", path: "/api/providers" },
     },
   },
@@ -548,7 +548,7 @@ export const operationCatalog = [
     serviceName: "ListPluginsQueryService",
     serviceToken: tokens.pluginsQueryService,
     transports: {
-      cli: "yundu plugins list",
+      cli: "appaloft plugins list",
       orpc: { method: "GET", path: "/api/plugins" },
     },
   },
@@ -574,7 +574,7 @@ export const operationCatalog = [
     serviceName: "DoctorQueryService",
     serviceToken: tokens.doctorQueryService,
     transports: {
-      cli: "yundu doctor",
+      cli: "appaloft doctor",
     },
   },
   {
@@ -586,7 +586,7 @@ export const operationCatalog = [
     serviceName: "DbStatusQueryService",
     serviceToken: tokens.dbStatusQueryService,
     transports: {
-      cli: "yundu db status",
+      cli: "appaloft db status",
     },
   },
   {
@@ -598,7 +598,7 @@ export const operationCatalog = [
     serviceName: "DbMigrateUseCase",
     serviceToken: tokens.dbMigrateUseCase,
     transports: {
-      cli: "yundu db migrate",
+      cli: "appaloft db migrate",
     },
   },
 ] as const satisfies readonly OperationCatalogEntry[];

@@ -4,7 +4,7 @@ import {
   type ExecutionContext,
   type RuntimeTargetBackend,
   type RuntimeTargetBackendDescriptor,
-} from "@yundu/application";
+} from "@appaloft/application";
 import {
   ok,
   type Deployment,
@@ -12,7 +12,7 @@ import {
   type Result,
   type RollbackPlan,
   type TargetKind,
-} from "@yundu/core";
+} from "@appaloft/core";
 
 type RuntimeTargetAdapterConstructor = new (
   descriptor: RuntimeTargetBackendDescriptor,

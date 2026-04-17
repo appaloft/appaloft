@@ -1,9 +1,9 @@
 import {
+  appaloftTraceAttributes,
   createRepositorySpanName,
   type RepositoryContext,
   type SshCredentialRepository,
-  yunduTraceAttributes,
-} from "@yundu/application";
+} from "@appaloft/application";
 import {
   SshCredential,
   type SshCredentialByIdSpec,
@@ -12,7 +12,7 @@ import {
   type SshCredentialSelectionSpec,
   type SshCredentialSelectionSpecVisitor,
   type UpsertSshCredentialSpec,
-} from "@yundu/core";
+} from "@appaloft/core";
 import { type Insertable, type Kysely, type Selectable, type SelectQueryBuilder } from "kysely";
 
 import { type Database } from "../schema";
@@ -68,8 +68,8 @@ export class PgSshCredentialRepository implements SshCredentialRepository {
       createRepositorySpanName("ssh_credential", "upsert"),
       {
         attributes: {
-          [yunduTraceAttributes.repositoryName]: "ssh_credential",
-          [yunduTraceAttributes.mutationSpecName]: spec.constructor.name,
+          [appaloftTraceAttributes.repositoryName]: "ssh_credential",
+          [appaloftTraceAttributes.mutationSpecName]: spec.constructor.name,
         },
       },
       async () => {
@@ -99,8 +99,8 @@ export class PgSshCredentialRepository implements SshCredentialRepository {
       createRepositorySpanName("ssh_credential", "find_one"),
       {
         attributes: {
-          [yunduTraceAttributes.repositoryName]: "ssh_credential",
-          [yunduTraceAttributes.selectionSpecName]: spec.constructor.name,
+          [appaloftTraceAttributes.repositoryName]: "ssh_credential",
+          [appaloftTraceAttributes.selectionSpecName]: spec.constructor.name,
         },
       },
       async () => {

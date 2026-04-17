@@ -1,4 +1,4 @@
-# @yundu/provider-aliyun
+# @appaloft/provider-aliyun
 
 Aliyun provider placeholder package.
 

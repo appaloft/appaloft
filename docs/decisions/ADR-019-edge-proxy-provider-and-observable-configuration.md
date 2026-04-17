@@ -6,7 +6,7 @@ Date: 2026-04-15
 
 ## Decision
 
-Yundu must model edge proxy behavior through provider-neutral application ports and expose generated proxy configuration through a read/query surface.
+Appaloft must model edge proxy behavior through provider-neutral application ports and expose generated proxy configuration through a read/query surface.
 
 Core and application code must not branch on concrete edge proxy implementations such as a specific reverse-proxy product. They may depend only on provider-neutral concepts:
 
@@ -40,7 +40,7 @@ Generated default access routes and durable domain bindings require an edge prox
 
 The source-of-truth model needs two separate but connected boundaries:
 
-1. Provider-neutral route intent and route snapshots owned by Yundu workflows.
+1. Provider-neutral route intent and route snapshots owned by Appaloft workflows.
 2. Provider-specific configuration rendering and application owned by edge proxy providers.
 
 Proxy configuration must not remain an opaque side effect hidden inside runtime execution. Resource detail, API, and CLI observation paths must be able to show a read-only provider-rendered configuration view for a resource route.
@@ -135,7 +135,7 @@ reload plan after route or certificate-related proxy configuration has changed:
 
 ### Observable Proxy Configuration
 
-Yundu must expose read-only resource-scoped proxy configuration through:
+Appaloft must expose read-only resource-scoped proxy configuration through:
 
 ```text
 resources.proxy-configuration.preview
@@ -176,7 +176,7 @@ Provider-rendered configuration view is not persisted as mutable domain state un
 
 Provider-specific proxy code becomes replaceable without changing command schemas or core aggregate language.
 
-Resource detail, API, and CLI can show what proxy configuration Yundu intends to apply or has applied. This reduces black-box runtime behavior and gives operators a stable debugging surface.
+Resource detail, API, and CLI can show what proxy configuration Appaloft intends to apply or has applied. This reduces black-box runtime behavior and gives operators a stable debugging surface.
 
 Existing route realization, proxy reload, and proxy bootstrap code must move behind concrete provider packages. Runtime adapters should become executors of provider-produced plans rather than authors of proxy-specific config.
 

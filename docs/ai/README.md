@@ -32,7 +32,7 @@
 9. Local command/event/error/workflow/testing specs
    - Read the local spec for the operation being changed after decisions and global contracts.
 10. [`../PRODUCT_ROADMAP.md`](../PRODUCT_ROADMAP.md)
-   - Yundu product roadmap for resource lifecycle, deployment, routing, TLS, operations, and platform depth.
+   - Appaloft product roadmap for resource lifecycle, deployment, routing, TLS, operations, and platform depth.
 11. [`CURRENT_STATE.md`](./CURRENT_STATE.md)
    - Reverse-engineered command, event, async, error, neverthrow, and testing state.
 12. [`SPEC_PLANNING.md`](./SPEC_PLANNING.md)

@@ -823,7 +823,7 @@ export const diffEnvironmentResponseSchema = z.array(
 
 export const deploymentLogEntrySchema = z.object({
   timestamp: z.string(),
-  source: z.enum(["yundu", "application"]),
+  source: z.enum(["appaloft", "application"]),
   phase: z.enum(["detect", "plan", "package", "deploy", "verify", "rollback"]),
   level: z.enum(["debug", "info", "warn", "error"]),
   message: z.string(),
@@ -832,7 +832,7 @@ export const deploymentLogEntrySchema = z.object({
 
 export const deploymentProgressEventSchema = z.object({
   timestamp: z.string(),
-  source: z.enum(["yundu", "application"]),
+  source: z.enum(["appaloft", "application"]),
   phase: z.enum(["detect", "plan", "package", "deploy", "verify", "rollback"]),
   level: z.enum(["debug", "info", "warn", "error"]),
   message: z.string(),
@@ -1282,7 +1282,7 @@ export const resourceDiagnosticProxySchema = z.object({
 
 export const resourceDiagnosticLogLineSchema = z.object({
   timestamp: z.string().optional(),
-  source: z.enum(["yundu", "application"]).optional(),
+  source: z.enum(["appaloft", "application"]).optional(),
   phase: z.enum(["detect", "plan", "package", "deploy", "verify", "rollback"]).optional(),
   level: z.enum(["debug", "info", "warn", "error"]).optional(),
   stream: z.enum(["stdout", "stderr", "unknown"]).optional(),

@@ -1,4 +1,4 @@
-# @yundu/provider-generic-ssh
+# @appaloft/provider-generic-ssh
 
 Generic SSH deployment provider skeleton.
 

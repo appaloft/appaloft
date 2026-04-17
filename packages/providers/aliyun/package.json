@@ -1,12 +1,12 @@
 {
-  "name": "@yundu/provider-aliyun",
+  "name": "@appaloft/provider-aliyun",
   "private": true,
   "type": "module",
   "exports": {
     ".": "./src/index.ts"
   },
   "dependencies": {
-    "@yundu/provider-core": "workspace:*"
+    "@appaloft/provider-core": "workspace:*"
   },
   "scripts": {
     "lint": "biome check .",

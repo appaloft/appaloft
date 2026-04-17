@@ -18,8 +18,8 @@ struct BackendProcess(Mutex<Option<CommandChild>>);
 
 const DESKTOP_BRIDGE: &str = r#"
 (() => {
-  window.yunduDesktop = {
-    ...(window.yunduDesktop ?? {}),
+  window.appaloftDesktop = {
+    ...(window.appaloftDesktop ?? {}),
     selectDirectory: () => window.__TAURI__.core.invoke("select_directory"),
     copyText: (text) => window.__TAURI__.core.invoke("plugin:clipboard-manager|write_text", { text }),
   };
@@ -70,7 +70,7 @@ fn wait_for_backend(base_url: &str) -> DesktopResult<()> {
                 }
             }
             Err(error) => {
-                eprintln!("waiting for Yundu backend: {error}");
+                eprintln!("waiting for Appaloft backend: {error}");
             }
         }
 
@@ -78,7 +78,7 @@ fn wait_for_backend(base_url: &str) -> DesktopResult<()> {
     }
 
     Err(boxed_error(
-        "Yundu backend did not become ready before the startup timeout",
+        "Appaloft backend did not become ready before the startup timeout",
     ))
 }
 
@@ -94,26 +94,26 @@ fn start_backend(app: &tauri::App) -> DesktopResult<String> {
 
     let (mut rx, child) = app
         .shell()
-        .sidecar("yundu")?
+        .sidecar("appaloft")?
         .args(["serve"])
         .env(
-            "YUNDU_DATABASE_DRIVER",
-            env_or_default("YUNDU_DATABASE_DRIVER", "pglite"),
+            "APPALOFT_DATABASE_DRIVER",
+            env_or_default("APPALOFT_DATABASE_DRIVER", "pglite"),
         )
         .env(
-            "YUNDU_DATA_DIR",
-            env_or_default("YUNDU_DATA_DIR", &data_dir.to_string_lossy()),
+            "APPALOFT_DATA_DIR",
+            env_or_default("APPALOFT_DATA_DIR", &data_dir.to_string_lossy()),
         )
         .env(
-            "YUNDU_PGLITE_DATA_DIR",
-            env_or_default("YUNDU_PGLITE_DATA_DIR", &pglite_data_dir.to_string_lossy()),
+            "APPALOFT_PGLITE_DATA_DIR",
+            env_or_default("APPALOFT_PGLITE_DATA_DIR", &pglite_data_dir.to_string_lossy()),
         )
-        .env("YUNDU_HTTP_HOST", "127.0.0.1")
-        .env("YUNDU_HTTP_PORT", port.to_string())
-        .env("YUNDU_WEB_ORIGIN", &base_url)
+        .env("APPALOFT_HTTP_HOST", "127.0.0.1")
+        .env("APPALOFT_HTTP_PORT", port.to_string())
+        .env("APPALOFT_WEB_ORIGIN", &base_url)
         .env(
-            "YUNDU_BETTER_AUTH_URL",
-            env_or_default("YUNDU_BETTER_AUTH_URL", &base_url),
+            "APPALOFT_BETTER_AUTH_URL",
+            env_or_default("APPALOFT_BETTER_AUTH_URL", &base_url),
         )
         .spawn()?;
 
@@ -123,10 +123,10 @@ fn start_backend(app: &tauri::App) -> DesktopResult<String> {
         while let Some(event) = rx.recv().await {
             match event {
                 CommandEvent::Stdout(line) => {
-                    println!("[yundu] {}", String::from_utf8_lossy(&line).trim_end());
+                    println!("[appaloft] {}", String::from_utf8_lossy(&line).trim_end());
                 }
                 CommandEvent::Stderr(line) => {
-                    eprintln!("[yundu] {}", String::from_utf8_lossy(&line).trim_end());
+                    eprintln!("[appaloft] {}", String::from_utf8_lossy(&line).trim_end());
                 }
                 _ => {}
             }
@@ -156,7 +156,7 @@ fn create_main_window(app: &tauri::App, base_url: &str) -> DesktopResult<()> {
     let app_handle = app.handle().clone();
 
     WebviewWindowBuilder::new(app, "main", WebviewUrl::External(url))
-        .title("Yundu")
+        .title("Appaloft")
         .inner_size(1280.0, 840.0)
         .min_inner_size(960.0, 640.0)
         .enable_clipboard_access()
@@ -199,7 +199,7 @@ pub fn run() {
             Ok(())
         })
         .build(tauri::generate_context!())
-        .expect("error while building Yundu Tauri app")
+        .expect("error while building Appaloft Tauri app")
         .run(|app, event| {
             if matches!(event, RunEvent::ExitRequested { .. }) {
                 stop_backend(app);

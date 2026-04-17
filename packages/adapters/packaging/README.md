@@ -1,4 +1,4 @@
-# @yundu/adapter-packaging
+# @appaloft/adapter-packaging
 
 Responsibility:
 

@@ -16,7 +16,7 @@
     Server,
     ShieldCheck,
   } from "@lucide/svelte";
-  import type { DeploymentProgressEvent, DeploymentSummary } from "@yundu/contracts";
+  import type { DeploymentProgressEvent, DeploymentSummary } from "@appaloft/contracts";
 
   import ConsoleShell from "$lib/components/console/ConsoleShell.svelte";
   import DeploymentStatusBadge from "$lib/components/console/DeploymentStatusBadge.svelte";
@@ -149,7 +149,7 @@
   }
 
   function logSourceLabel(log: DeploymentSummary["logs"][number]): string {
-    return log.source === "application" ? "app" : "yundu";
+    return log.source === "application" ? "app" : "appaloft";
   }
 
   function logTimeLabel(timestamp: string): string {
@@ -358,7 +358,7 @@
 </script>
 
 <svelte:head>
-  <title>{deployment?.runtimePlan.source.displayName ?? $t(i18nKeys.console.deployments.pageTitle)} · Yundu</title>
+  <title>{deployment?.runtimePlan.source.displayName ?? $t(i18nKeys.console.deployments.pageTitle)} · Appaloft</title>
 </svelte:head>
 
 <ConsoleShell

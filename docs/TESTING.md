@@ -94,7 +94,7 @@ If tests bypass the runtime or write directly to the database to simulate succes
 
 ```bash
 bun run test:unit
-YUNDU_DATABASE_URL=postgres://postgres:postgres@localhost:5432/yundu bun run test:integration
-YUNDU_DATABASE_URL=postgres://postgres:postgres@localhost:5432/yundu YUNDU_HTTP_PORT=3101 bun run --cwd apps/shell test:e2e
-YUNDU_DATABASE_DRIVER=pglite YUNDU_PGLITE_DATA_DIR=.yundu/test-data/pglite bun run --cwd apps/shell test:e2e
+APPALOFT_DATABASE_URL=postgres://postgres:postgres@localhost:5432/appaloft bun run test:integration
+APPALOFT_DATABASE_URL=postgres://postgres:postgres@localhost:5432/appaloft APPALOFT_HTTP_PORT=3101 bun run --cwd apps/shell test:e2e
+APPALOFT_DATABASE_DRIVER=pglite APPALOFT_PGLITE_DATA_DIR=.appaloft/test-data/pglite bun run --cwd apps/shell test:e2e
 ```

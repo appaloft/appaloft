@@ -7,8 +7,8 @@ import {
   type CertificateProviderPort,
   type ExecutionContext,
   type ProviderDescriptor,
-} from "@yundu/application";
-import { type DomainError, err, ok, type Result } from "@yundu/core";
+} from "@appaloft/application";
+import { type DomainError, err, ok, type Result } from "@appaloft/core";
 import acme from "acme-client";
 
 const providerKey = "acme";

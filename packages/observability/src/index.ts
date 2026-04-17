@@ -5,9 +5,9 @@ import {
   type ExecutionContextFactory,
   type ExecutionContextFactory as ExecutionContextFactoryContract,
   type IdGenerator,
-} from "@yundu/application";
-import { type AppConfig } from "@yundu/config";
-import { createYunduTranslator, normalizeYunduLocale } from "@yundu/i18n";
+} from "@appaloft/application";
+import { type AppConfig } from "@appaloft/config";
+import { createAppaloftTranslator, normalizeAppaloftLocale } from "@appaloft/i18n";
 import { readActiveTraceLogContext } from "./trace-headers";
 
 export { bootstrapOpenTelemetry } from "./bootstrap";
@@ -46,13 +46,13 @@ class DefaultExecutionContextFactory implements ExecutionContextFactory {
   ) {}
 
   create(input: Parameters<ExecutionContextFactoryContract["create"]>[0]): ExecutionContext {
-    const locale = normalizeYunduLocale(input.locale);
+    const locale = normalizeAppaloftLocale(input.locale);
 
     return {
       requestId: input.requestId ?? this.idGenerator.next("req"),
       entrypoint: input.entrypoint,
       locale,
-      t: createYunduTranslator({ locale }),
+      t: createAppaloftTranslator({ locale }),
       tracer: this.tracer,
       ...(input.actor ? { actor: input.actor } : {}),
     };

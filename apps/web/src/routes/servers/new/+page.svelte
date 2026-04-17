@@ -2,7 +2,7 @@
   import { browser } from "$app/environment";
   import { ArrowLeft, CheckCircle2, LoaderCircle, Server } from "@lucide/svelte";
   import { createQuery, queryOptions } from "@tanstack/svelte-query";
-  import type { TestServerConnectivityResponse } from "@yundu/contracts";
+  import type { TestServerConnectivityResponse } from "@appaloft/contracts";
 
   import { readErrorMessage } from "$lib/api/client";
   import ServerRegistrationForm from "$lib/components/console/ServerRegistrationForm.svelte";
@@ -102,7 +102,7 @@
 </script>
 
 <svelte:head>
-  <title>{$t(i18nKeys.console.servers.createTitle)} · Yundu</title>
+  <title>{$t(i18nKeys.console.servers.createTitle)} · Appaloft</title>
 </svelte:head>
 
 <ConsoleShell

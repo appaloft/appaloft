@@ -1,5 +1,5 @@
 {
-  "name": "@yundu/adapter-packaging",
+  "name": "@appaloft/adapter-packaging",
   "private": true,
   "type": "module",
   "exports": {

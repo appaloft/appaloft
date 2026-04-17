@@ -162,7 +162,7 @@ Previous failed attempts remain historical state and must not be erased by retry
 
 Web may guide the user through registration, credential configuration, connectivity testing, and readiness display.
 
-CLI may expose separate commands for register, credential configuration, connectivity test, and proxy repair. The canonical proxy repair command is `yundu server proxy repair <serverId>`, dispatched as `servers.bootstrap-proxy`.
+CLI may expose separate commands for register, credential configuration, connectivity test, and proxy repair. The canonical proxy repair command is `appaloft server proxy repair <serverId>`, dispatched as `servers.bootstrap-proxy`.
 
 API must expose strict command inputs and read-model status; it must not prompt.
 
@@ -196,7 +196,7 @@ Current `servers.test-connectivity` asks the registered edge proxy provider for 
 plans and executes them locally or over SSH. Traefik diagnostics verify the expected proxy image,
 scan Docker provider logs for compatibility errors, and prove Docker-label route discovery with a
 temporary probe container. Failed provider-rendered edge proxy diagnostic checks include safe
-`repairCommand` metadata pointing to `yundu server proxy repair <serverId>`.
+`repairCommand` metadata pointing to `appaloft server proxy repair <serverId>`.
 
 Current server read model exposes edge proxy fields but no top-level readiness status.
 

@@ -6,7 +6,7 @@ Date: 2026-04-16
 
 ## Decision
 
-Yundu separates the **workload substrate** from the **runtime orchestration target**.
+Appaloft separates the **workload substrate** from the **runtime orchestration target**.
 
 The workload substrate remains governed by
 [ADR-021: Docker/OCI Workload Substrate](./ADR-021-docker-oci-workload-substrate.md): v1
@@ -34,7 +34,7 @@ configuration concerns, not deployment admission input.
 
 ## Context
 
-Yundu's v1 loop needs one coherent deployment path, but the product direction should not make
+Appaloft's v1 loop needs one coherent deployment path, but the product direction should not make
 single-node Docker the permanent architecture. Similar self-hosted deployment products often start
 with Docker or Docker Compose and then add cluster scheduling later. Kubernetes support is useful
 only if the domain model can keep the same business operation surface while swapping the execution

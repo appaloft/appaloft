@@ -72,7 +72,7 @@ For current runtime adapters, expected mappings are:
 | Local host process | Execution metadata `workdir`, with optional safe relative subdirectory. |
 | Local Dockerfile/container source build | Execution metadata `sourceDir` or deployment runtime source directory, plus source `baseDirectory` when not already applied. |
 | Local Docker Compose | Execution metadata `workdir` or execution `workingDirectory`. |
-| SSH Git source | `<remoteRuntimeRoot>/ssh-deployments/<deploymentId>/source` plus source `baseDirectory`; default root is `/var/lib/yundu/runtime`. |
+| SSH Git source | `<remoteRuntimeRoot>/ssh-deployments/<deploymentId>/source` plus source `baseDirectory`; default root is `/var/lib/appaloft/runtime`. |
 | SSH uploaded local workspace | Remote `remoteWorkdir` recorded by source preparation. |
 | Docker image without source workspace | No resource workspace; reject with `terminal_session_workspace_unavailable` unless future container shell scope is accepted. |
 

@@ -3,11 +3,11 @@ import { $ } from "bun";
 
 const root = resolve(import.meta.dir, "../../..");
 const sidecarDir = join(root, "apps", "desktop", "src-tauri", "binaries");
-const sourceBinaryName = process.platform === "win32" ? "yundu.exe" : "yundu";
-const sourceBinaryPath = join(root, "dist", "release", "yundu-binary-bundle", sourceBinaryName);
+const sourceBinaryName = process.platform === "win32" ? "appaloft.exe" : "appaloft";
+const sourceBinaryPath = join(root, "dist", "release", "appaloft-binary-bundle", sourceBinaryName);
 
 function detectTargetTriple(): string {
-  const configuredTriple = process.env.YUNDU_TAURI_TARGET_TRIPLE;
+  const configuredTriple = process.env.APPALOFT_TAURI_TARGET_TRIPLE;
   if (configuredTriple) {
     return configuredTriple;
   }
@@ -32,18 +32,18 @@ function detectTargetTriple(): string {
   }
 
   throw new Error(
-    `Unsupported Tauri sidecar target for platform=${process.platform} arch=${process.arch}. Set YUNDU_TAURI_TARGET_TRIPLE explicitly.`,
+    `Unsupported Tauri sidecar target for platform=${process.platform} arch=${process.arch}. Set APPALOFT_TAURI_TARGET_TRIPLE explicitly.`,
   );
 }
 
 const targetTriple = detectTargetTriple();
 const targetBinaryName =
-  process.platform === "win32" ? `yundu-${targetTriple}.exe` : `yundu-${targetTriple}`;
+  process.platform === "win32" ? `appaloft-${targetTriple}.exe` : `appaloft-${targetTriple}`;
 const targetBinaryPath = join(sidecarDir, targetBinaryName);
 
 if (!(await Bun.file(sourceBinaryPath).exists())) {
   throw new Error(
-    `Missing Yundu backend binary at ${sourceBinaryPath}. Run bun run package:binary-bundle first.`,
+    `Missing Appaloft backend binary at ${sourceBinaryPath}. Run bun run package:binary-bundle first.`,
   );
 }
 

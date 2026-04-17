@@ -176,13 +176,13 @@ added.
 
 `apps/shell/test/e2e/quick-deploy-workspace-docker.workflow.e2e.ts` is the required local Docker
 workflow e2e harness for proving that a regular workspace without a Dockerfile can be deployed
-through `workspace-commands` by generating `Dockerfile.yundu`, building an image, starting a
+through `workspace-commands` by generating `Dockerfile.appaloft`, building an image, starting a
 container, and passing HTTP health verification. Docker availability is a prerequisite for this e2e
 environment because Docker/OCI is the v1 deployment substrate.
 
 `apps/shell/test/e2e/quick-deploy-ssh.workflow.e2e.ts` is the workflow-named executable e2e harness
 for the real SSH/Docker path. It remains opt-in through environment variables because it mutates a
-real external SSH target, while still using embedded PGlite for Yundu state. Its successful path
+real external SSH target, while still using embedded PGlite for Appaloft state. Its successful path
 must exercise the Traefik-backed generated public route so proxy image compatibility and Docker
 label discovery are covered by a real deployment.
 

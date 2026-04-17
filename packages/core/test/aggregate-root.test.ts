@@ -51,7 +51,7 @@ describe("AggregateRoot", () => {
       environment
         .setVariable({
           key: ConfigKey.rehydrate("PUBLIC_SITE_NAME"),
-          value: ConfigValueText.rehydrate("yundu"),
+          value: ConfigValueText.rehydrate("appaloft"),
           kind: VariableKindValue.rehydrate("plain-config"),
           exposure: VariableExposureValue.rehydrate("build-time"),
           scope: ConfigScopeValue.rehydrate("environment"),

@@ -1,4 +1,4 @@
-import { type Result } from "@yundu/core";
+import { type Result } from "@appaloft/core";
 import { inject, injectable } from "tsyringe";
 
 import { QueryHandler, type QueryHandlerContract } from "../../cqrs";

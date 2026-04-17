@@ -1,14 +1,14 @@
 {
-	"name": "@yundu/adapter-runtime",
+	"name": "@appaloft/adapter-runtime",
 	"private": true,
 	"type": "module",
 	"exports": {
 		".": "./src/index.ts"
 	},
 	"dependencies": {
-		"@yundu/application": "workspace:*",
-		"@yundu/core": "workspace:*",
-		"@yundu/i18n": "workspace:*"
+		"@appaloft/application": "workspace:*",
+		"@appaloft/core": "workspace:*",
+		"@appaloft/i18n": "workspace:*"
 	},
 	"scripts": {
 		"lint": "biome check .",

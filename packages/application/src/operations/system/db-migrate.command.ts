@@ -1,4 +1,4 @@
-import { ok, type Result } from "@yundu/core";
+import { ok, type Result } from "@appaloft/core";
 
 import { Command } from "../../cqrs";
 

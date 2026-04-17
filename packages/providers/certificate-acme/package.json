@@ -1,13 +1,13 @@
 {
-  "name": "@yundu/provider-certificate-acme",
+  "name": "@appaloft/provider-certificate-acme",
   "private": true,
   "type": "module",
   "exports": {
     ".": "./src/index.ts"
   },
   "dependencies": {
-    "@yundu/application": "workspace:*",
-    "@yundu/core": "workspace:*",
+    "@appaloft/application": "workspace:*",
+    "@appaloft/core": "workspace:*",
     "acme-client": "^5.4.0"
   },
   "scripts": {

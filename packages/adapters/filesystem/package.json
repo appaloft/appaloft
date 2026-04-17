@@ -1,14 +1,14 @@
 {
-  "name": "@yundu/adapter-filesystem",
+  "name": "@appaloft/adapter-filesystem",
   "private": true,
   "type": "module",
   "exports": {
     ".": "./src/index.ts"
   },
   "dependencies": {
-    "@yundu/application": "workspace:*",
-    "@yundu/core": "workspace:*",
-    "@yundu/deployment-config": "workspace:*"
+    "@appaloft/application": "workspace:*",
+    "@appaloft/core": "workspace:*",
+    "@appaloft/deployment-config": "workspace:*"
   },
   "scripts": {
     "lint": "biome check .",

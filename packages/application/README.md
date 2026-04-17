@@ -1,6 +1,6 @@
-# @yundu/application
+# @appaloft/application
 
-CQRS-oriented application layer for Yundu.
+CQRS-oriented application layer for Appaloft.
 
 Responsibilities:
 
@@ -14,7 +14,7 @@ Responsibilities:
 
 Depends on:
 
-- `@yundu/core`
+- `@appaloft/core`
 
 Must not:
 

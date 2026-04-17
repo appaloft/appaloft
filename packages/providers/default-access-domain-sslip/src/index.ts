@@ -3,8 +3,15 @@ import {
   type DefaultAccessDomainProvider,
   type DefaultAccessDomainRequest,
   type ExecutionContext,
-} from "@yundu/application";
-import { type DomainError, domainError, err, ok, PublicDomainName, type Result } from "@yundu/core";
+} from "@appaloft/application";
+import {
+  type DomainError,
+  domainError,
+  err,
+  ok,
+  PublicDomainName,
+  type Result,
+} from "@appaloft/core";
 
 export interface SslipDefaultAccessDomainProviderOptions {
   providerKey?: string;

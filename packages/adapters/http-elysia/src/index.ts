@@ -11,30 +11,30 @@ import {
   type QueryBus,
   type TerminalSession,
   type TerminalSessionGateway,
-} from "@yundu/application";
-import { type AppConfig } from "@yundu/config";
-import { apiVersion } from "@yundu/contracts";
-import { type Result } from "@yundu/core";
-import { yunduDeploymentConfigJsonSchema } from "@yundu/deployment-config";
+} from "@appaloft/application";
+import { type AppConfig } from "@appaloft/config";
+import { apiVersion } from "@appaloft/contracts";
+import { type Result } from "@appaloft/core";
+import { appaloftDeploymentConfigJsonSchema } from "@appaloft/deployment-config";
 import {
-  createYunduTranslator,
+  createAppaloftTranslator,
   i18nKeys,
-  resolveYunduLocaleFromHeaders,
+  resolveAppaloftLocaleFromHeaders,
   translateDomainError,
-} from "@yundu/i18n";
+} from "@appaloft/i18n";
 import {
   finishActiveHttpServerSpan,
   updateActiveHttpServerSpan,
   wrapHttpRequestHandlerWithSpan,
   writeActiveTraceResponseHeaders,
-} from "@yundu/observability";
-import { mountYunduOrpcRoutes } from "@yundu/orpc";
+} from "@appaloft/observability";
+import { mountAppaloftOrpcRoutes } from "@appaloft/orpc";
 import {
   type SystemPluginHttpMiddleware,
   type SystemPluginHttpRoute,
   type SystemPluginHttpRouteResult,
   type SystemPluginWebExtension,
-} from "@yundu/plugin-sdk";
+} from "@appaloft/plugin-sdk";
 import { Elysia } from "elysia";
 
 interface SystemPluginRuntime {
@@ -116,7 +116,7 @@ function readErrorMessage(error: unknown): string {
     return error.message;
   }
 
-  return createYunduTranslator()(i18nKeys.errors.backend.adapterUnhandled);
+  return createAppaloftTranslator()(i18nKeys.errors.backend.adapterUnhandled);
 }
 
 function unwrapResult<T>(context: ExecutionContext, result: Result<T>): T {
@@ -507,7 +507,7 @@ export function createHttpApp(input: {
     const requestId = request.headers.get("x-request-id");
     const context = input.executionContextFactory.create({
       entrypoint: "http",
-      locale: resolveYunduLocaleFromHeaders(request.headers),
+      locale: resolveAppaloftLocaleFromHeaders(request.headers),
       ...(requestId ? { requestId } : {}),
     });
     const result = await input.certificateHttpChallengeTokenStore.find(context, {
@@ -725,7 +725,7 @@ export function createHttpApp(input: {
       const requestId = request.headers.get("x-request-id");
       const context = input.executionContextFactory.create({
         entrypoint: "http",
-        locale: resolveYunduLocaleFromHeaders(request.headers),
+        locale: resolveAppaloftLocaleFromHeaders(request.headers),
         ...(requestId ? { requestId } : {}),
       });
       const doctor = unwrapResult(context, DoctorQuery.create());
@@ -741,7 +741,7 @@ export function createHttpApp(input: {
     .get("/.well-known/acme-challenge/:token", ({ request, params }) =>
       serveHttpChallenge(request, params.token),
     )
-    .get("/api/schemas/yundu-config.json", () => yunduDeploymentConfigJsonSchema)
+    .get("/api/schemas/appaloft-config.json", () => appaloftDeploymentConfigJsonSchema)
     .get("/api/deployment-progress/:requestId", ({ request, params }) =>
       deploymentProgressStream(request, params.requestId),
     )
@@ -830,7 +830,7 @@ export function createHttpApp(input: {
     }
   }
 
-  app = mountYunduOrpcRoutes(app, {
+  app = mountAppaloftOrpcRoutes(app, {
     commandBus: input.commandBus,
     ...(input.deploymentProgressObserver
       ? {
@@ -848,7 +848,7 @@ export function createHttpApp(input: {
   });
 
   return app
-    .get("/", () => staticResponse("/") ?? new Response("Yundu backend is running"))
+    .get("/", () => staticResponse("/") ?? new Response("Appaloft backend is running"))
     .get(
       "/_app/*",
       ({ request }) =>

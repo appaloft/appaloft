@@ -3,7 +3,7 @@ import {
   type DomainBindingStatus,
   type EdgeProxyKind,
   type TlsMode,
-} from "@yundu/core";
+} from "@appaloft/core";
 import { type ResourceAccessSummary } from "../../ports";
 
 export interface ResourceAccessSummaryDeployment {

@@ -162,7 +162,7 @@ Entry points supply executors:
 
 The Web executor must use one request per yielded workflow step. It must show workflow step progress from those explicit requests: the running step is loading, succeeded steps are marked complete, and a failed step stops the workflow with the underlying command error. User-facing copy must describe the operation being performed, not the fact that the implementation uses separate requests.
 
-The final deployment step is still the `deployments.create` command. Web may use the deployment progress stream transport for that final step so the user can see detect, plan, package, deploy, verify, rollback, Yundu log, and application output while the command runs. `deployments.createStream` must not be used to execute project, server, environment, resource, credential, or variable workflow steps, and it must not become a hidden Quick Deploy workflow command.
+The final deployment step is still the `deployments.create` command. Web may use the deployment progress stream transport for that final step so the user can see detect, plan, package, deploy, verify, rollback, Appaloft log, and application output while the command runs. `deployments.createStream` must not be used to execute project, server, environment, resource, credential, or variable workflow steps, and it must not become a hidden Quick Deploy workflow command.
 
 The Web QuickDeploy wizard must collect project context immediately after source selection. When no project exists, the project step may stay on the new-project path and use the default first-project name if the user does not override it. When projects exist, the project step must default to selecting an existing project and still allow the user to switch to creating a new project.
 
@@ -185,7 +185,7 @@ When the workflow collects health check configuration for a newly created resour
 
 Quick Deploy is a first-class entry workflow, not a single command. The user-facing route from "I
 want to deploy this source" to "the deployment request is accepted and observable" crosses user
-input collection, explicit Yundu commands, optional external runtime targets, deployment progress,
+input collection, explicit Appaloft commands, optional external runtime targets, deployment progress,
 read models, and diagnostics.
 
 ### Actor Responsibilities
@@ -195,7 +195,7 @@ read models, and diagnostics.
 | User/operator | Choose or provide source, project, server, environment, resource, credentials, environment variables, network/health inputs, and optional domain follow-up intent. | The workflow returns stable project/server/environment/resource/deployment ids and the user can observe deployment progress or result state. | Missing required input, ambiguous source, wrong target, invalid credential, duplicate resource name, or follow-up domain intent that belongs to the separate routing/domain/TLS workflow. |
 | Web/CLI entry | Collect draft input, normalize source/runtime/network/health fields, run the shared workflow program, execute yielded operations through typed clients or command/query buses, and show per-step progress. | Each explicit step is visible as pending/succeeded/failed; the final deployment step uses `deployments.create`. | Local preflight rejects before dispatch, or an underlying command error stops the workflow at that step. |
 | Shared Quick Deploy workflow program | Own side-effect-free operation order and id-threading between selected ids and create inputs. It must not call HTTP, CommandBus, QueryBus, repositories, prompts, or UI APIs directly. | Returns project, server, environment, resource, and deployment ids after the executor completes each yielded step. | Executor returns or throws a failed step; later steps are not yielded. |
-| Yundu application/API | Enforce underlying command/query specs, persist aggregate state, publish command events, expose progress/read-model state, and preserve stable error contracts. | Explicit operations succeed and `deployments.create` accepts a deployment request. | Command admission returns `err(DomainError)`; accepted deployment may later fail asynchronously. |
+| Appaloft application/API | Enforce underlying command/query specs, persist aggregate state, publish command events, expose progress/read-model state, and preserve stable error contracts. | Explicit operations succeed and `deployments.create` accepts a deployment request. | Command admission returns `err(DomainError)`; accepted deployment may later fail asynchronously. |
 | Runtime target/proxy/provider | Resolve and execute Docker/OCI or Compose deployment plans, realize generated access routes when policy/provider state allows, and perform runtime health checks. | Deployment reaches succeeded state and access projections can expose generated or configured routes. | Runtime plan, image build, container start, proxy route, public route, or health verification fails. |
 | Diagnostics/read-model surfaces | Expose deployment progress, resource access summary, logs when available, and `resources.diagnostic-summary` after resource/deployment ids are known. | The user has copyable stable ids and section statuses for support/debugging. | Access/proxy/log sources are missing or unavailable; diagnostic summary still reports safe source errors. |
 
@@ -207,7 +207,7 @@ sequenceDiagram
   actor User
   participant Entry as Web/CLI entry
   participant Program as Quick Deploy program
-  participant Yundu as Yundu commands/queries
+  participant Appaloft as Appaloft commands/queries
   participant Runtime as Runtime target/proxy
   participant Read as Read models/diagnostics
 
@@ -215,19 +215,19 @@ sequenceDiagram
   Entry->>Entry: Normalize source/runtime/network/health drafts
   Entry->>Program: Run with existing ids or create inputs
   Program-->>Entry: yield projects.create when needed
-  Entry->>Yundu: projects.create or select project
+  Entry->>Appaloft: projects.create or select project
   Program-->>Entry: yield servers.register and credential steps when needed
-  Entry->>Yundu: servers.register, credentials.create, servers.configureCredential
+  Entry->>Appaloft: servers.register, credentials.create, servers.configureCredential
   Program-->>Entry: yield environments.create when needed
-  Entry->>Yundu: environments.create or select environment
+  Entry->>Appaloft: environments.create or select environment
   Program-->>Entry: yield resources.create when needed
-  Entry->>Yundu: resources.create(source, runtimeProfile, networkProfile)
+  Entry->>Appaloft: resources.create(source, runtimeProfile, networkProfile)
   Program-->>Entry: yield environments.setVariable when supplied
-  Entry->>Yundu: environments.setVariable
+  Entry->>Appaloft: environments.setVariable
   Program-->>Entry: yield deployments.create(resourceId)
-  Entry->>Yundu: deployments.create
-  Yundu->>Runtime: detect, plan, execute, verify, rollback if needed
-  Runtime-->>Yundu: deployment state and route/access facts
+  Entry->>Appaloft: deployments.create
+  Appaloft->>Runtime: detect, plan, execute, verify, rollback if needed
+  Runtime-->>Appaloft: deployment state and route/access facts
   Entry->>Read: observe deployment progress and resource access summary
   Entry->>Read: query resources.diagnostic-summary when ids are known
   Entry-->>User: Show accepted deployment, progress, access, and diagnostics
@@ -390,9 +390,9 @@ Quick Deploy must surface the failure at the boundary where it happened:
 | Entrypoint | Contract |
 | --- | --- |
 | Web QuickDeploy | May use a multi-step wizard and local draft state; all writes dispatch explicit commands or the final `deployments.create` command. |
-| CLI `yundu deploy` with source/options | May create/select a resource with source/runtime/network profile, then dispatch ids-only `deployments.create`. |
-| CLI `yundu deploy` without source in TTY | May prompt for missing source/context, call prerequisite commands, and dispatch `deployments.create`. |
-| CLI `yundu deploy` without source outside TTY | May dispatch ids-only `deployments.create` when project/server/environment/resource ids are supplied; otherwise must reject before dispatch because non-interactive input collection cannot complete. |
+| CLI `appaloft deploy` with source/options | May create/select a resource with source/runtime/network profile, then dispatch ids-only `deployments.create`. |
+| CLI `appaloft deploy` without source in TTY | May prompt for missing source/context, call prerequisite commands, and dispatch `deployments.create`. |
+| CLI `appaloft deploy` without source outside TTY | May dispatch ids-only `deployments.create` when project/server/environment/resource ids are supplied; otherwise must reject before dispatch because non-interactive input collection cannot complete. |
 | HTTP API | Does not expose hidden prompts; clients call explicit operations or submit a complete `deployments.create` input. |
 | Automation/MCP | Must call explicit operations in sequence or use a future durable workflow command if one is accepted by ADR. |
 
