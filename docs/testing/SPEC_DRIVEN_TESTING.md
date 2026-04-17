@@ -82,9 +82,9 @@ explicit operation must live in operation-named test files instead of generic sm
 
 Examples:
 
-- `servers.register` CLI/HTTP e2e coverage belongs in `server-register.test.ts`, not in a broad
-  `cli-http.test.ts` suite;
-- Quick Deploy workflow coverage belongs in `quick-deploy-*.test.ts`;
+- `servers.register` CLI/HTTP e2e coverage belongs in `server-register.command.e2e.ts`, not in a
+  broad CLI/HTTP smoke suite;
+- Quick Deploy workflow coverage belongs in `quick-deploy-*.workflow.e2e.ts`;
 - command/application coverage for `servers.register` belongs in a register-server command test,
   not only as setup inside proxy or deployment tests.
 

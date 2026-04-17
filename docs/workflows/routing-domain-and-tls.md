@@ -30,6 +30,8 @@ This workflow inherits:
 - [Error Model](../errors/model.md)
 - [neverthrow Conventions](../errors/neverthrow-conventions.md)
 - [Async Lifecycle And Acceptance](../architecture/async-lifecycle-and-acceptance.md)
+- [Workflow Spec Format](./WORKFLOW_SPEC_FORMAT.md)
+- [Routing Domain And TLS Test Matrix](../testing/routing-domain-and-tls-test-matrix.md)
 
 ## End-To-End Workflow
 

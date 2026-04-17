@@ -2,68 +2,162 @@
 
 > Copy this file to `docs/workflows/<workflow-name>.md`.
 >
-> A workflow spec describes input collection, multi-step UX, or process orchestration. It must end
-> in explicit commands/events rather than inventing parallel business semantics.
+> Follow [Workflow Spec Format](./WORKFLOW_SPEC_FORMAT.md). A workflow spec describes input
+> collection, multi-step UX, event/process-manager progression, or provider/runtime orchestration.
+> It must end in explicit commands, events, queries, or provider boundaries rather than inventing
+> parallel business semantics.
 
-## Metadata
+## Normative Contract
 
-- Workflow name:
-- Entrypoint: Web / CLI / API / automation / process manager
-- Current status: implemented / partial / proposed / legacy compatibility
+Describe what this workflow is and is not.
+
+State whether it is:
+
+- a first-class workflow;
+- an entry workflow;
+- an event/process-manager continuation;
+- a compatibility path;
+- proposed, partial, or implemented.
+
+## Global References
+
+This workflow inherits:
+
+- [Workflow Spec Format](./WORKFLOW_SPEC_FORMAT.md)
+- Relevant ADRs:
+- Global contracts:
+  - [Error Model](../errors/model.md)
+  - [neverthrow Conventions](../errors/neverthrow-conventions.md)
+  - [Async Lifecycle And Acceptance](../architecture/async-lifecycle-and-acceptance.md)
 - Related command specs:
 - Related event specs:
-- Source classification: current code / recommended target / needs verification
+- Related query specs:
+- Related workflow specs:
+- Related test matrix:
 
-## Purpose
+## End-To-End Workflow
 
-Describe why this workflow exists and what user/system problem it solves.
+Explain the full route from initial user/system intent or trigger to observable completion.
 
-## Not Domain Truth
+### Actor Responsibilities
 
-List decisions that are only input collection or UX convenience and must not be treated as domain
-rules.
+| Actor | Responsibilities | Success Signal | Failure Branch |
+| --- | --- | --- | --- |
+| User/operator or trigger source | | | |
+| Yundu | | | |
+| External provider/runtime/integration | | | |
 
-## Steps
+### Success Path
 
-| Step | Owner | Input | Command/query called | Output | Failure |
-| --- | --- | --- | --- | --- | --- |
-| | UI/CLI/API/process manager | | | | |
+```mermaid
+sequenceDiagram
+  autonumber
+  actor User
+  participant Yundu
+  participant Provider
 
-## Final Command Payload
-
-```ts
-// The final payload submitted to the business command.
-type FinalCommandInput = unknown;
+  User->>Yundu: Start workflow
+  Yundu->>Provider: Execute provider-owned step when needed
+  Provider-->>Yundu: Return provider result
+  Yundu-->>User: Expose observable success state
 ```
 
-## Async State Progression
+### Failure Branches
 
-| State | Trigger | Owner | User-visible status | Retry/compensation |
-| --- | --- | --- | --- | --- |
-| | | | | |
+```mermaid
+flowchart TD
+  A["Workflow starts"] --> B["Synchronous admission or preflight"]
+  B -->|admission error| B1["Return DomainError or entry preflight error; no hidden success event"]
+  B --> C["Async or provider work"]
+  C -->|async/provider failure| C1["Persist failure state and expose retry/diagnostic data"]
+  C --> D["Observable success"]
+```
 
-## Error Handling
+### Test Strategy
 
-| Error | Sync/async | Source | Mapping | User visibility |
-| --- | --- | --- | --- | --- |
-| | | | | |
+State how tests prove the workflow without relying on fragile UI copy, prompts, or real external
+systems when fakes/adapters can cover the behavior.
+
+Required points:
+
+- matching `docs/testing/<workflow-name>-test-matrix.md`;
+- matrix ids for success, failure, entry, async, retry, and provider branches;
+- default hermetic executable tests;
+- opt-in external e2e tests when Docker, SSH, public DNS, real CAs, or other mutable systems are
+  required;
+- explicit current implementation gaps.
+
+## Synchronous Admission And Preflight
+
+List validation/admission gates that can fail before durable async work begins.
+
+| Gate | Owner | Success | Failure |
+| --- | --- | --- | --- |
+| | | | |
+
+## Async Work
+
+List worker, scheduler, process-manager, provider, runtime, or event-consumption work.
+
+| Async step | Owner | Durable state/read model | Retry behavior |
+| --- | --- | --- | --- |
+| | | | |
+
+## State Model
+
+Separate workflow-local state from durable aggregate/read-model state.
+
+```text
+workflow_local_state
+durable_state_or_read_model_state
+```
+
+## Event / State Mapping
+
+| Command/event/query/provider callback | Meaning | State impact |
+| --- | --- | --- |
+| | | |
+
+## Failure Visibility
+
+Describe how failures are surfaced:
+
+- synchronous admission errors;
+- async failures;
+- provider/runtime failures;
+- retry state;
+- diagnostic/read-model visibility;
+- logs/traces when relevant.
+
+## Operation Sequence
+
+| Step | Owner | Command/query/event/provider call | Required behavior |
+| --- | --- | --- | --- |
+| | | | |
 
 ## Entry Differences
 
-| Entrypoint | Difference | Must still preserve |
-| --- | --- | --- |
-| Web | | command semantics |
-| CLI | | command semantics |
-| API | | command semantics |
-| Automation / MCP | | command semantics |
+| Entrypoint | Contract |
+| --- | --- |
+| Web | |
+| CLI | |
+| API | |
+| Automation / MCP | |
 
-## Tests
+## Partial Failure Semantics
 
-- Unit tests for input collection helpers:
-- Command integration tests:
-- Event/process-manager tests:
-- Web/CLI flow tests:
-- E2E tests:
+State whether the workflow is atomic. If it is not atomic, list which successful steps remain
+persisted when a later step fails.
+
+## Idempotency And Deduplication
+
+State how repeated submissions, retries, natural matches, idempotency keys, and duplicate events are
+handled.
+
+## Current Implementation Notes And Migration Gaps
+
+Keep temporary implementation divergence here. Do not weaken the normative sections to match
+incomplete code.
 
 ## Open Questions
 

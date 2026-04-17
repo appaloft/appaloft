@@ -226,44 +226,44 @@ class InMemoryEventBus implements EventBus {
     }
 
     for (const event of events) {
-      for (const handlerType of eventHandlerTypesFor(event.type)) {
-        void Promise.resolve()
-          .then(async () => {
-            this.logger.debug("event_bus.dispatch", {
-              requestId: context.requestId,
-              eventType: event.type,
-              handler: handlerType.name,
-            });
-            const handler = this.container.resolve(handlerType as never) as EventHandlerContract;
-            const result = await handler.handle(context, event);
-            result.match(
-              () => {
-                this.logger.debug("event_bus.handler_succeeded", {
-                  requestId: context.requestId,
-                  eventType: event.type,
-                  handler: handlerType.name,
-                });
-              },
-              (error) => {
-                this.logger.error("event_bus.handler_failed", {
-                  requestId: context.requestId,
-                  eventType: event.type,
-                  handler: handlerType.name,
-                  errorCode: error.code,
-                  message: error.message,
-                });
-              },
-            );
-          })
-          .catch((error) => {
-            this.logger.error("event_bus.handler_unhandled_error", {
-              requestId: context.requestId,
-              eventType: event.type,
-              handler: handlerType.name,
-              message: error instanceof Error ? error.message : String(error),
-            });
+      const dispatches = eventHandlerTypesFor(event.type).map(async (handlerType) => {
+        try {
+          this.logger.debug("event_bus.dispatch", {
+            requestId: context.requestId,
+            eventType: event.type,
+            handler: handlerType.name,
           });
-      }
+          const handler = this.container.resolve(handlerType as never) as EventHandlerContract;
+          const result = await handler.handle(context, event);
+          result.match(
+            () => {
+              this.logger.debug("event_bus.handler_succeeded", {
+                requestId: context.requestId,
+                eventType: event.type,
+                handler: handlerType.name,
+              });
+            },
+            (error) => {
+              this.logger.error("event_bus.handler_failed", {
+                requestId: context.requestId,
+                eventType: event.type,
+                handler: handlerType.name,
+                errorCode: error.code,
+                message: error.message,
+              });
+            },
+          );
+        } catch (error) {
+          this.logger.error("event_bus.handler_unhandled_error", {
+            requestId: context.requestId,
+            eventType: event.type,
+            handler: handlerType.name,
+            message: error instanceof Error ? error.message : String(error),
+          });
+        }
+      });
+
+      await Promise.all(dispatches);
     }
   }
 }

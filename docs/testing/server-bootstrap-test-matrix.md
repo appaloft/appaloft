@@ -190,7 +190,7 @@ And server-ready is not emitted until proxy-installed is handled.
 Existing coverage includes `SERVER-BOOT-CMD-001`, `SERVER-BOOT-CMD-002`, and
 `SERVER-BOOT-CMD-003` in `packages/application/test/register-server.test.ts` for the
 first-class command boundary. `SERVER-BOOT-ENTRY-001` and `SERVER-BOOT-ENTRY-002` live in
-`apps/shell/test/e2e/server-register.test.ts` for the first-class CLI and HTTP entrypoint chains.
+`apps/shell/test/e2e/server-register.command.e2e.ts` for the first-class CLI and HTTP entrypoint chains.
 Application tests also cover proxy bootstrap success and failure after `deployment_target.registered`,
 plus runtime adapter tests for proxy bootstrap plan generation and proxy labels.
 
