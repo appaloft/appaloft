@@ -13,6 +13,7 @@
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
   import { Input } from "$lib/components/ui/input";
+  import * as Select from "$lib/components/ui/select";
   import { Skeleton } from "$lib/components/ui/skeleton";
   import { createConsoleQueries } from "$lib/console/queries";
   import {
@@ -39,6 +40,7 @@
   const resources = $derived(resourcesQuery.data?.items ?? []);
   const servers = $derived(serversQuery.data?.items ?? []);
   const domainBindings = $derived(domainBindingsQuery.data?.items ?? []);
+  const allProjectsFilterValue = "__all_projects__";
   const pageLoading = $derived(
     projectsQuery.isPending ||
       environmentsQuery.isPending ||
@@ -84,7 +86,14 @@
       return true;
     }),
   );
+  const selectedProject = $derived(findProject(projects, projectId));
+  const selectedEnvironment = $derived(findEnvironment(environments, environmentId));
   const selectedResource = $derived(findResource(resources, resourceId));
+  const selectedServer = $derived(findServer(servers, serverId));
+  const selectedProjectFilter = $derived(
+    projectFilter ? findProject(projects, projectFilter) : null,
+  );
+  const projectFilterSelectValue = $derived(projectFilter || allProjectsFilterValue);
   const visibleDomainBindings = $derived.by(() =>
     projectFilter
       ? domainBindings.filter((binding) => binding.projectId === projectFilter)
@@ -254,6 +263,10 @@
       domainBindingId: binding.id,
     });
   }
+
+  function selectProjectFilter(value: string): void {
+    projectFilter = value === allProjectsFilterValue ? "" : value;
+  }
 </script>
 
 <svelte:head>
@@ -323,64 +336,67 @@
             <div class="grid gap-3 sm:grid-cols-2">
               <label class="space-y-1.5 text-sm font-medium">
                 <span>{$t(i18nKeys.common.domain.project)}</span>
-                <select
-                  bind:value={projectId}
-                  class="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-                >
-                  {#if projects.length === 0}
-                    <option value="">{$t(i18nKeys.console.domainBindings.noProjectOptions)}</option>
-                  {/if}
-                  {#each projects as project (project.id)}
-                    <option value={project.id}>{project.name}</option>
-                  {/each}
-                </select>
+                <Select.Root bind:value={projectId} type="single" disabled={projects.length === 0}>
+                  <Select.Trigger class="w-full">
+                    {selectedProject?.name ?? $t(i18nKeys.console.domainBindings.noProjectOptions)}
+                  </Select.Trigger>
+                  <Select.Content>
+                    {#each projects as project (project.id)}
+                      <Select.Item value={project.id}>{project.name}</Select.Item>
+                    {/each}
+                  </Select.Content>
+                </Select.Root>
               </label>
 
               <label class="space-y-1.5 text-sm font-medium">
                 <span>{$t(i18nKeys.common.domain.environment)}</span>
-                <select
+                <Select.Root
                   bind:value={environmentId}
-                  class="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                  type="single"
+                  disabled={filteredEnvironments.length === 0}
                 >
-                  {#if filteredEnvironments.length === 0}
-                    <option value="">
-                      {$t(i18nKeys.console.domainBindings.noEnvironmentOptions)}
-                    </option>
-                  {/if}
-                  {#each filteredEnvironments as environment (environment.id)}
-                    <option value={environment.id}>{environment.name}</option>
-                  {/each}
-                </select>
+                  <Select.Trigger class="w-full">
+                    {selectedEnvironment?.name ??
+                      $t(i18nKeys.console.domainBindings.noEnvironmentOptions)}
+                  </Select.Trigger>
+                  <Select.Content>
+                    {#each filteredEnvironments as environment (environment.id)}
+                      <Select.Item value={environment.id}>{environment.name}</Select.Item>
+                    {/each}
+                  </Select.Content>
+                </Select.Root>
               </label>
 
               <label class="space-y-1.5 text-sm font-medium">
                 <span>{$t(i18nKeys.common.domain.resource)}</span>
-                <select
+                <Select.Root
                   bind:value={resourceId}
-                  class="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                  type="single"
+                  disabled={filteredResources.length === 0}
                 >
-                  {#if filteredResources.length === 0}
-                    <option value="">{$t(i18nKeys.console.domainBindings.noResourceOptions)}</option>
-                  {/if}
-                  {#each filteredResources as resource (resource.id)}
-                    <option value={resource.id}>{resource.name}</option>
-                  {/each}
-                </select>
+                  <Select.Trigger class="w-full">
+                    {selectedResource?.name ?? $t(i18nKeys.console.domainBindings.noResourceOptions)}
+                  </Select.Trigger>
+                  <Select.Content>
+                    {#each filteredResources as resource (resource.id)}
+                      <Select.Item value={resource.id}>{resource.name}</Select.Item>
+                    {/each}
+                  </Select.Content>
+                </Select.Root>
               </label>
 
               <label class="space-y-1.5 text-sm font-medium">
                 <span>{$t(i18nKeys.common.domain.server)}</span>
-                <select
-                  bind:value={serverId}
-                  class="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-                >
-                  {#if servers.length === 0}
-                    <option value="">{$t(i18nKeys.console.domainBindings.noServerOptions)}</option>
-                  {/if}
-                  {#each servers as server (server.id)}
-                    <option value={server.id}>{server.name}</option>
-                  {/each}
-                </select>
+                <Select.Root bind:value={serverId} type="single" disabled={servers.length === 0}>
+                  <Select.Trigger class="w-full">
+                    {selectedServer?.name ?? $t(i18nKeys.console.domainBindings.noServerOptions)}
+                  </Select.Trigger>
+                  <Select.Content>
+                    {#each servers as server (server.id)}
+                      <Select.Item value={server.id}>{server.name}</Select.Item>
+                    {/each}
+                  </Select.Content>
+                </Select.Root>
               </label>
 
               <label class="space-y-1.5 text-sm font-medium">
@@ -399,24 +415,24 @@
 
               <label class="space-y-1.5 text-sm font-medium">
                 <span>{$t(i18nKeys.common.domain.proxy)}</span>
-                <select
-                  bind:value={proxyKind}
-                  class="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-                >
-                  <option value="traefik">traefik</option>
-                  <option value="caddy">caddy</option>
-                </select>
+                <Select.Root bind:value={proxyKind} type="single">
+                  <Select.Trigger class="w-full">{proxyKind}</Select.Trigger>
+                  <Select.Content>
+                    <Select.Item value="traefik">traefik</Select.Item>
+                    <Select.Item value="caddy">caddy</Select.Item>
+                  </Select.Content>
+                </Select.Root>
               </label>
 
               <label class="space-y-1.5 text-sm font-medium">
                 <span>{$t(i18nKeys.common.domain.tls)}</span>
-                <select
-                  bind:value={tlsMode}
-                  class="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-                >
-                  <option value="auto">auto</option>
-                  <option value="disabled">disabled</option>
-                </select>
+                <Select.Root bind:value={tlsMode} type="single">
+                  <Select.Trigger class="w-full">{tlsMode}</Select.Trigger>
+                  <Select.Content>
+                    <Select.Item value="auto">auto</Select.Item>
+                    <Select.Item value="disabled">disabled</Select.Item>
+                  </Select.Content>
+                </Select.Root>
               </label>
 
               <label class="space-y-1.5 text-sm font-medium sm:col-span-2">
@@ -467,15 +483,24 @@
                 {$t(i18nKeys.console.domainBindings.listDescription)}
               </p>
             </div>
-            <select
-              bind:value={projectFilter}
-              class="h-8 min-w-44 rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+            <Select.Root
+              type="single"
+              value={projectFilterSelectValue}
+              onValueChange={selectProjectFilter}
             >
-              <option value="">{$t(i18nKeys.console.domainBindings.filterAllProjects)}</option>
-              {#each projects as project (project.id)}
-                <option value={project.id}>{project.name}</option>
-              {/each}
-            </select>
+              <Select.Trigger class="min-w-44">
+                {selectedProjectFilter?.name ??
+                  $t(i18nKeys.console.domainBindings.filterAllProjects)}
+              </Select.Trigger>
+              <Select.Content>
+                <Select.Item value={allProjectsFilterValue}>
+                  {$t(i18nKeys.console.domainBindings.filterAllProjects)}
+                </Select.Item>
+                {#each projects as project (project.id)}
+                  <Select.Item value={project.id}>{project.name}</Select.Item>
+                {/each}
+              </Select.Content>
+            </Select.Root>
           </div>
 
           <div>

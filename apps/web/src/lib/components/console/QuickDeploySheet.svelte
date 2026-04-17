@@ -1913,19 +1913,21 @@
 
 </script>
 
-<div class="grid gap-5 xl:grid-cols-[minmax(0,1fr)_22rem]">
-  <div class="space-y-5">
-      <section class="space-y-6">
+<div class="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1fr)_22rem]">
+  <div class="min-w-0 space-y-5">
+      <section class="min-w-0 space-y-6">
         <div class="space-y-2">
           <h2 class="text-lg font-semibold">{$t(i18nKeys.console.quickDeploy.deploymentEntryTitle, { stepTitle: activeStepDetails.title })}</h2>
           <p class="text-sm text-muted-foreground">{activeStepDetails.description}</p>
         </div>
         <div class="space-y-6">
-          <div class="flex flex-wrap items-center gap-1.5 bg-muted/20 px-2 py-2">
+          <div class="grid grid-cols-2 gap-1.5 bg-muted/20 px-2 py-2 sm:flex sm:flex-wrap sm:items-center">
             {#each deploymentSteps as step, index (step.key)}
-              <button
+              <Button
                 type="button"
-                class={`flex h-8 items-center gap-1.5 rounded-md px-2.5 text-xs transition-colors ${
+                variant="ghost"
+                size="sm"
+                class={`h-8 min-w-0 justify-start gap-1.5 rounded-md px-2.5 text-xs sm:w-auto ${
                   activeStep === step.key
                     ? "border border-primary/70 bg-background text-foreground shadow-sm"
                     : stepIsComplete(step.key)
@@ -1947,8 +1949,8 @@
                   {/if}
                 </span>
                 <step.icon class="size-3.5 text-muted-foreground" />
-                <span>{step.title}</span>
-              </button>
+                <span class="min-w-0 truncate">{step.title}</span>
+              </Button>
             {/each}
           </div>
 
@@ -2016,7 +2018,7 @@
                   {$t(i18nKeys.console.quickDeploy.sourceAddress)}
                 </label>
                 {#if sourceKind === "local-folder"}
-                <div class="flex gap-2">
+                <div class="flex flex-col gap-2 sm:flex-row">
                   <Input
                     id="source-locator"
                     class="font-mono text-xs"
@@ -2027,7 +2029,7 @@
                   <Button
                     type="button"
                     variant="outline"
-                    class="shrink-0"
+                    class="justify-start sm:shrink-0"
                     disabled={!canChooseNativeLocalFolder}
                     title={canChooseNativeLocalFolder ? $t(i18nKeys.common.actions.selectDirectory) : $t(i18nKeys.console.quickDeploy.chooseSourceDirectoryBrowserHint)}
                     onclick={chooseLocalFolder}
@@ -2094,9 +2096,10 @@
                       {/each}
                     {:else if githubRepositories.length > 0}
                       {#each githubRepositories as repository (repository.id)}
-                        <button
+                        <Button
                           type="button"
-                          class={`w-full px-3 py-3 text-left transition-colors ${
+                          variant="ghost"
+                          class={`h-auto w-full justify-start whitespace-normal rounded-md px-3 py-3 text-left ${
                             selectedGitHubRepositoryId === repository.id
                               ? "bg-primary/5 ring-1 ring-primary/40"
                               : "hover:bg-muted/50"
@@ -2111,7 +2114,7 @@
                               </span>
                             </span>
                           </span>
-                        </button>
+                        </Button>
                       {/each}
                     {:else}
                       <p class="px-2 py-3 text-sm text-muted-foreground">{$t(i18nKeys.console.quickDeploy.noRepositoryResults)}</p>
@@ -2130,7 +2133,7 @@
               <span>{$t(i18nKeys.common.domain.project)}</span>
             </div>
             {#if projects.length > 0}
-              <div class="grid grid-cols-2 gap-2">
+              <div class="grid gap-2 sm:grid-cols-2">
                 <Button
                   variant={projectMode === "existing" ? "selected" : "outline"}
                   onclick={() => {
@@ -2198,7 +2201,7 @@
               <Server class="size-4 text-muted-foreground" />
               <span>{$t(i18nKeys.common.domain.server)}</span>
             </div>
-            <div class="grid grid-cols-2 gap-2">
+            <div class="grid gap-2 sm:grid-cols-2">
               <Button
                 variant={serverMode === "existing" ? "selected" : "outline"}
                 onclick={() => {
@@ -2258,7 +2261,7 @@
               <Settings2 class="size-4 text-muted-foreground" />
               <span>{$t(i18nKeys.common.domain.environment)}</span>
             </div>
-            <div class="grid grid-cols-2 gap-2">
+            <div class="grid gap-2 sm:grid-cols-2">
               <Button
                 variant={environmentMode === "existing" ? "selected" : "outline"}
                 onclick={() => {
@@ -2305,7 +2308,7 @@
                 </div>
                 <div class="space-y-2">
                   <p class="text-xs font-medium text-muted-foreground">{$t(i18nKeys.console.quickDeploy.environmentKind)}</p>
-                  <div class="grid grid-cols-2 gap-2">
+                  <div class="grid gap-2 sm:grid-cols-2">
                     {#each environmentKinds as kind (kind)}
                       <Button
                         size="sm"
@@ -2368,54 +2371,55 @@
                   {$t(i18nKeys.console.quickDeploy.reviewBody)}
                 </p>
               </div>
-              <div class="grid gap-3 text-sm md:grid-cols-2">
-                <div class="rounded-md border bg-background px-3 py-3">
+              <div class="grid min-w-0 gap-3 text-sm md:grid-cols-2">
+                <div class="min-w-0 rounded-md border bg-background px-3 py-3">
                   <p class="text-xs text-muted-foreground">{$t(i18nKeys.common.domain.source)}</p>
-                  <p class="mt-1 truncate font-medium">{$t(selectedSourceOption.labelKey)} · {sourceSummary}</p>
+                  <p class="mt-1 break-all font-medium">{$t(selectedSourceOption.labelKey)} · {sourceSummary}</p>
                 </div>
-                <div class="rounded-md border bg-background px-3 py-3">
+                <div class="min-w-0 rounded-md border bg-background px-3 py-3">
                   <p class="text-xs text-muted-foreground">{$t(i18nKeys.common.domain.project)}</p>
-                  <p class="mt-1 truncate font-medium">{projectSummary}</p>
+                  <p class="mt-1 break-words font-medium">{projectSummary}</p>
                 </div>
-                <div class="rounded-md border bg-background px-3 py-3">
+                <div class="min-w-0 rounded-md border bg-background px-3 py-3">
                   <p class="text-xs text-muted-foreground">{$t(i18nKeys.common.domain.server)}</p>
-                  <p class="mt-1 truncate font-medium">{serverSummary}</p>
-                  <p class="mt-1 truncate text-xs text-muted-foreground">{serverCredentialSummary}</p>
+                  <p class="mt-1 break-words font-medium">{serverSummary}</p>
+                  <p class="mt-1 break-words text-xs text-muted-foreground">{serverCredentialSummary}</p>
                 </div>
-                <div class="rounded-md border bg-background px-3 py-3">
+                <div class="min-w-0 rounded-md border bg-background px-3 py-3">
                   <p class="text-xs text-muted-foreground">{$t(i18nKeys.common.domain.environment)}</p>
-                  <p class="mt-1 truncate font-medium">{environmentSummary}</p>
+                  <p class="mt-1 break-words font-medium">{environmentSummary}</p>
                 </div>
-                <div class="rounded-md border bg-background px-3 py-3">
+                <div class="min-w-0 rounded-md border bg-background px-3 py-3">
                   <p class="text-xs text-muted-foreground">{$t(i18nKeys.common.domain.resource)}</p>
-                  <p class="mt-1 truncate font-medium">{resourceSummary}</p>
+                  <p class="mt-1 break-words font-medium">{resourceSummary}</p>
                 </div>
-                <div class="rounded-md border bg-background px-3 py-3">
+                <div class="min-w-0 rounded-md border bg-background px-3 py-3">
                   <p class="text-xs text-muted-foreground">
                     {$t(i18nKeys.console.quickDeploy.healthCheckPath)}
                   </p>
-                  <p class="mt-1 truncate font-medium">{resourceHealthCheckSummary}</p>
+                  <p class="mt-1 break-words font-medium">{resourceHealthCheckSummary}</p>
                 </div>
-                <div class="rounded-md border bg-background px-3 py-3">
+                <div class="min-w-0 rounded-md border bg-background px-3 py-3">
                   <p class="text-xs text-muted-foreground">{$t(i18nKeys.common.domain.domainBindings)}</p>
-                  <p class="mt-1 truncate font-medium">{domainBindingSummary}</p>
+                  <p class="mt-1 break-all font-medium">{domainBindingSummary}</p>
                 </div>
-                <div class="rounded-md border bg-background px-3 py-3">
+                <div class="min-w-0 rounded-md border bg-background px-3 py-3">
                   <p class="text-xs text-muted-foreground">{$t(i18nKeys.common.domain.variables)}</p>
-                  <p class="mt-1 truncate font-medium">{variableSummary}</p>
+                  <p class="mt-1 break-words font-medium">{variableSummary}</p>
                 </div>
               </div>
 
               <div class="space-y-3">
-                <div class="rounded-md border bg-background px-3 py-3">
+                <div class="min-w-0 rounded-md border bg-background px-3 py-3">
                   <div class="flex items-center justify-between gap-3">
-                    <div>
+                    <div class="min-w-0">
                       <p class="text-sm font-medium">{$t(i18nKeys.common.domain.project)}</p>
-                      <p class="text-xs text-muted-foreground">{projectSummary}</p>
+                      <p class="break-words text-xs text-muted-foreground">{projectSummary}</p>
                     </div>
                     <Button
                       type="button"
                       size="sm"
+                      class="shrink-0"
                       variant={projectContextEnabled ? "selected" : "outline"}
                       onclick={() => {
                         projectContextEnabled = !projectContextEnabled;
@@ -2426,7 +2430,7 @@
                   </div>
                   {#if projectContextEnabled}
                     <div class="mt-3 space-y-3">
-                      <div class="grid grid-cols-2 gap-2">
+                      <div class="grid gap-2 sm:grid-cols-2">
                         <Button
                           variant={projectMode === "existing" ? "selected" : "outline"}
                           onclick={() => {
@@ -2473,15 +2477,16 @@
                   {/if}
                 </div>
 
-                <div class="rounded-md border bg-background px-3 py-3">
+                <div class="min-w-0 rounded-md border bg-background px-3 py-3">
                   <div class="flex items-center justify-between gap-3">
-                    <div>
+                    <div class="min-w-0">
                       <p class="text-sm font-medium">{$t(i18nKeys.common.domain.environment)}</p>
-                      <p class="text-xs text-muted-foreground">{environmentSummary}</p>
+                      <p class="break-words text-xs text-muted-foreground">{environmentSummary}</p>
                     </div>
                     <Button
                       type="button"
                       size="sm"
+                      class="shrink-0"
                       variant={environmentContextEnabled ? "selected" : "outline"}
                       onclick={() => {
                         environmentContextEnabled = !environmentContextEnabled;
@@ -2492,7 +2497,7 @@
                   </div>
                   {#if environmentContextEnabled}
                     <div class="mt-3 space-y-3">
-                      <div class="grid grid-cols-2 gap-2">
+                      <div class="grid gap-2 sm:grid-cols-2">
                         <Button
                           variant={environmentMode === "existing" ? "selected" : "outline"}
                           onclick={() => {
@@ -2532,7 +2537,7 @@
                       {:else}
                         <div class="space-y-3">
                           <Input bind:value={environmentName} placeholder="production" />
-                          <div class="grid grid-cols-2 gap-2">
+                          <div class="grid gap-2 sm:grid-cols-2">
                             {#each environmentKinds as kind (kind)}
                               <Button
                                 size="sm"
@@ -2551,15 +2556,16 @@
                   {/if}
                 </div>
 
-                <div class="rounded-md border bg-background px-3 py-3">
+                <div class="min-w-0 rounded-md border bg-background px-3 py-3">
                   <div class="flex items-center justify-between gap-3">
-                    <div>
+                    <div class="min-w-0">
                       <p class="text-sm font-medium">{$t(i18nKeys.common.domain.resource)}</p>
-                      <p class="text-xs text-muted-foreground">{resourceSummary}</p>
+                      <p class="break-words text-xs text-muted-foreground">{resourceSummary}</p>
                     </div>
                     <Button
                       type="button"
                       size="sm"
+                      class="shrink-0"
                       variant={resourceContextEnabled ? "selected" : "outline"}
                       onclick={() => {
                         resourceContextEnabled = !resourceContextEnabled;
@@ -2570,7 +2576,7 @@
                   </div>
                   {#if resourceContextEnabled}
                     <div class="mt-3 space-y-3">
-                      <div class="grid grid-cols-2 gap-2">
+                      <div class="grid gap-2 sm:grid-cols-2">
                         <Button
                           variant={resourceMode === "existing" ? "selected" : "outline"}
                           onclick={() => {
@@ -2620,7 +2626,7 @@
                             <Input bind:value={resourceName} placeholder={generatedResourceName || inferredSourceName} />
                             <Input bind:value={resourceDescription} placeholder={$t(i18nKeys.common.domain.description)} />
                           </div>
-                          <div class="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                          <div class="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
                             {#each resourceKinds as kind (kind)}
                               <Button
                                 type="button"
@@ -2830,15 +2836,16 @@
                   {/if}
                 </div>
 
-                <div class="rounded-md border bg-background px-3 py-3">
+                <div class="min-w-0 rounded-md border bg-background px-3 py-3">
                   <div class="flex items-center justify-between gap-3">
-                    <div>
+                    <div class="min-w-0">
                       <p class="text-sm font-medium">{$t(i18nKeys.common.domain.variables)}</p>
-                      <p class="text-xs text-muted-foreground">{variableSummary}</p>
+                      <p class="break-words text-xs text-muted-foreground">{variableSummary}</p>
                     </div>
                     <Button
                       type="button"
                       size="sm"
+                      class="shrink-0"
                       variant={variableContextEnabled ? "selected" : "outline"}
                       onclick={() => {
                         variableContextEnabled = !variableContextEnabled;
@@ -2893,18 +2900,18 @@
 
   </div>
 
-  <aside class="space-y-5 xl:sticky xl:top-5 xl:self-start">
-      <section class="space-y-4 rounded-md border bg-background p-4">
+  <aside class="min-w-0 space-y-5 xl:sticky xl:top-5 xl:self-start">
+      <section class="min-w-0 space-y-4 rounded-md border bg-background p-4">
         <div class="space-y-2">
           <h2 class="text-lg font-semibold">{$t(i18nKeys.console.quickDeploy.currentSummary)}</h2>
           <p class="text-sm text-muted-foreground">{$t(i18nKeys.console.quickDeploy.currentSummaryDescription)}</p>
         </div>
         <div class="space-y-3 text-sm">
-          <div class="flex items-center justify-between gap-3 rounded-md border bg-muted/10 px-3 py-2">
-            <span class="text-muted-foreground">{$t(i18nKeys.console.quickDeploy.sourceType)}</span>
-            <span class="font-medium">{$t(selectedSourceOption.labelKey)}</span>
+          <div class="flex min-w-0 items-center justify-between gap-3 rounded-md border bg-muted/10 px-3 py-2">
+            <span class="shrink-0 text-muted-foreground">{$t(i18nKeys.console.quickDeploy.sourceType)}</span>
+            <span class="min-w-0 break-words text-right font-medium">{$t(selectedSourceOption.labelKey)}</span>
           </div>
-          <div class="rounded-md border bg-muted/10 px-3 py-3">
+          <div class="min-w-0 rounded-md border bg-muted/10 px-3 py-3">
             <div class="mb-2 flex items-center justify-between gap-3">
               <span class="text-xs font-medium uppercase text-muted-foreground">
                 {$t(i18nKeys.console.quickDeploy.sourceDetails)}
@@ -2914,42 +2921,42 @@
               {#each sourceDetailRows as row, index (`${row.label}-${index}`)}
                 <div class="flex min-w-0 items-start justify-between gap-3">
                   <span class="shrink-0 text-muted-foreground">{row.label}</span>
-                  <span class={`min-w-0 flex-1 truncate text-right font-medium ${row.mono ? "font-mono text-xs" : ""}`}>
+                  <span class={`min-w-0 flex-1 break-all text-right font-medium ${row.mono ? "font-mono text-xs" : ""}`}>
                     {row.value}
                   </span>
                 </div>
               {/each}
             </div>
           </div>
-          <div class="flex items-center justify-between gap-3 rounded-md border bg-muted/10 px-3 py-2">
-            <span class="text-muted-foreground">{$t(i18nKeys.common.domain.project)}</span>
-            <span class="font-medium">{projectSummary}</span>
+          <div class="flex min-w-0 items-center justify-between gap-3 rounded-md border bg-muted/10 px-3 py-2">
+            <span class="shrink-0 text-muted-foreground">{$t(i18nKeys.common.domain.project)}</span>
+            <span class="min-w-0 break-words text-right font-medium">{projectSummary}</span>
           </div>
-          <div class="flex items-center justify-between gap-3 rounded-md border bg-muted/10 px-3 py-2">
-            <span class="text-muted-foreground">{$t(i18nKeys.common.domain.server)}</span>
-            <span class="font-medium">{serverSummary}</span>
+          <div class="flex min-w-0 items-center justify-between gap-3 rounded-md border bg-muted/10 px-3 py-2">
+            <span class="shrink-0 text-muted-foreground">{$t(i18nKeys.common.domain.server)}</span>
+            <span class="min-w-0 break-words text-right font-medium">{serverSummary}</span>
           </div>
-          <div class="flex items-center justify-between gap-3 rounded-md border bg-muted/10 px-3 py-2">
-            <span class="text-muted-foreground">{$t(i18nKeys.common.domain.environment)}</span>
-            <span class="font-medium">{environmentSummary}</span>
+          <div class="flex min-w-0 items-center justify-between gap-3 rounded-md border bg-muted/10 px-3 py-2">
+            <span class="shrink-0 text-muted-foreground">{$t(i18nKeys.common.domain.environment)}</span>
+            <span class="min-w-0 break-words text-right font-medium">{environmentSummary}</span>
           </div>
-          <div class="flex items-center justify-between gap-3 rounded-md border bg-muted/10 px-3 py-2">
-            <span class="text-muted-foreground">{$t(i18nKeys.common.domain.resource)}</span>
-            <span class="font-medium">{resourceSummary}</span>
+          <div class="flex min-w-0 items-center justify-between gap-3 rounded-md border bg-muted/10 px-3 py-2">
+            <span class="shrink-0 text-muted-foreground">{$t(i18nKeys.common.domain.resource)}</span>
+            <span class="min-w-0 break-words text-right font-medium">{resourceSummary}</span>
           </div>
-          <div class="flex items-center justify-between gap-3 rounded-md border bg-muted/10 px-3 py-2">
-            <span class="text-muted-foreground">
+          <div class="flex min-w-0 items-center justify-between gap-3 rounded-md border bg-muted/10 px-3 py-2">
+            <span class="shrink-0 text-muted-foreground">
               {$t(i18nKeys.console.quickDeploy.healthCheckPath)}
             </span>
-            <span class="min-w-0 truncate text-right font-medium">{resourceHealthCheckSummary}</span>
+            <span class="min-w-0 break-words text-right font-medium">{resourceHealthCheckSummary}</span>
           </div>
-          <div class="flex items-center justify-between gap-3 rounded-md border bg-muted/10 px-3 py-2">
-            <span class="text-muted-foreground">{$t(i18nKeys.common.domain.domainBindings)}</span>
-            <span class="min-w-0 truncate text-right font-medium">{domainBindingSummary}</span>
+          <div class="flex min-w-0 items-center justify-between gap-3 rounded-md border bg-muted/10 px-3 py-2">
+            <span class="shrink-0 text-muted-foreground">{$t(i18nKeys.common.domain.domainBindings)}</span>
+            <span class="min-w-0 break-all text-right font-medium">{domainBindingSummary}</span>
           </div>
-          <div class="flex items-center justify-between gap-3 rounded-md border bg-muted/10 px-3 py-2">
-            <span class="text-muted-foreground">{$t(i18nKeys.common.domain.variables)}</span>
-            <span class="font-medium">{variableSummary}</span>
+          <div class="flex min-w-0 items-center justify-between gap-3 rounded-md border bg-muted/10 px-3 py-2">
+            <span class="shrink-0 text-muted-foreground">{$t(i18nKeys.common.domain.variables)}</span>
+            <span class="min-w-0 break-words text-right font-medium">{variableSummary}</span>
           </div>
         </div>
         {#if activeStep === "review"}
@@ -2975,7 +2982,7 @@
                 {$t(i18nKeys.common.actions.viewProgress)}
               </Button>
             {/if}
-            <pre class="overflow-x-auto bg-muted px-3 py-3 text-xs text-muted-foreground">{deploymentCommandPreview}</pre>
+            <pre class="max-w-full overflow-x-auto bg-muted px-3 py-3 text-xs text-muted-foreground">{deploymentCommandPreview}</pre>
           </div>
         {/if}
       </section>

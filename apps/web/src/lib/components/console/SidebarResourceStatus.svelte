@@ -3,8 +3,10 @@
 
   import { i18nKeys, t } from "$lib/i18n";
 
+  type ResourceHealthViewStatus = ResourceHealthOverall | "loading";
+
   type Props = {
-    status?: ResourceHealthOverall;
+    status?: ResourceHealthViewStatus;
     class?: string;
   };
 
@@ -14,6 +16,8 @@
     switch (status) {
       case "healthy":
         return "text-emerald-700 dark:text-emerald-400";
+      case "loading":
+        return "animate-pulse text-muted-foreground";
       case "degraded":
       case "starting":
         return "text-amber-700 dark:text-amber-400";
@@ -30,6 +34,8 @@
     switch (status) {
       case "healthy":
         return $t(i18nKeys.common.status.healthy);
+      case "loading":
+        return $t(i18nKeys.common.status.loading);
       case "degraded":
         return $t(i18nKeys.common.status.degraded);
       case "unhealthy":
