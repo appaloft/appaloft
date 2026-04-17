@@ -33,6 +33,13 @@ export interface DeploymentSummary {
 }
 
 export interface DomainBindingSummary {
+  dnsObservation?: {
+    checkedAt?: string;
+    expectedTargets: string[];
+    message?: string;
+    observedTargets: string[];
+    status: string;
+  };
   domainName: string;
   id: string;
   resourceId: string;

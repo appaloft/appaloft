@@ -112,6 +112,13 @@ router keyed by target kind, provider key, and capabilities. Hardcoded provider 
 as an implementation gap for the current local/generic-SSH backend, but they are not the target
 architecture.
 
+Runtime target backends also own rollout-strategy-aware cleanup. Reverse-proxy or route-mediated
+backends must distinguish a replacement candidate from the previous successful same-resource
+runtime: candidate cleanup may happen on apply, health, route, or public verification failure, but
+cleanup of the superseded successful runtime happens only after terminal success. Direct-port
+backends may release the previous same-resource runtime earlier only when an exclusive host port
+makes candidate-first verification impossible.
+
 ## Kubernetes Target Scope
 
 Kubernetes support means a runtime target backend can do all of the following behind the existing

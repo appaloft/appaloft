@@ -48,6 +48,8 @@ import {
 } from "@appaloft/testkit";
 import {
   createExecutionContext,
+  type DomainOwnershipVerificationResult,
+  type DomainOwnershipVerifier,
   type DomainRouteFailureCandidate,
   type DomainRouteFailureCandidateReader,
   type ExecutionContext,
@@ -77,6 +79,33 @@ class StaticDomainRouteFailureCandidateReader implements DomainRouteFailureCandi
   }
 }
 
+class StaticDomainOwnershipVerifier implements DomainOwnershipVerifier {
+  readonly calls: Array<{
+    domainName: string;
+    expectedTargets: string[];
+  }> = [];
+
+  constructor(
+    private readonly result: DomainOwnershipVerificationResult = {
+      status: "matched",
+      observedTargets: ["127.0.0.1"],
+      message: "Observed expected target",
+    },
+  ) {}
+
+  async verifyDns(
+    context: Parameters<DomainOwnershipVerifier["verifyDns"]>[0],
+    input: Parameters<DomainOwnershipVerifier["verifyDns"]>[1],
+  ): Promise<DomainOwnershipVerificationResult> {
+    void context;
+    this.calls.push({
+      domainName: input.domainName,
+      expectedTargets: [...input.expectedTargets],
+    });
+    return this.result;
+  }
+}
+
 function createTestContext(): ExecutionContext {
   return createExecutionContext({
     requestId: "req_domain_binding_confirm_test",
@@ -94,7 +123,11 @@ function eventsByType(events: unknown[], type: string): DomainEvent[] {
   });
 }
 
-async function seedRoutingContext(input?: { domainName?: string; tlsMode?: "auto" | "disabled" }) {
+async function seedRoutingContext(input?: {
+  domainName?: string;
+  tlsMode?: "auto" | "disabled";
+  domainOwnershipVerifier?: DomainOwnershipVerifier;
+}) {
   const context = createTestContext();
   const repositoryContext = toRepositoryContext(context);
   const clock = new FixedClock("2026-01-01T00:00:00.000Z");
@@ -106,6 +139,8 @@ async function seedRoutingContext(input?: { domainName?: string; tlsMode?: "auto
   const domainBindings = new MemoryDomainBindingRepository();
   const eventBus = new CapturedEventBus();
   const logger = new NoopLogger();
+  const domainOwnershipVerifier =
+    input?.domainOwnershipVerifier ?? new StaticDomainOwnershipVerifier();
 
   const project = Project.create({
     id: ProjectId.rehydrate("prj_demo"),
@@ -176,6 +211,7 @@ async function seedRoutingContext(input?: { domainName?: string; tlsMode?: "auto
   );
   const confirmUseCase = new ConfirmDomainBindingOwnershipUseCase(
     domainBindings,
+    domainOwnershipVerifier,
     clock,
     eventBus,
     logger,
@@ -207,7 +243,12 @@ async function seedRoutingContext(input?: { domainName?: string; tlsMode?: "auto
 }
 
 describe("ConfirmDomainBindingOwnershipUseCase", () => {
-  test("[ROUTE-TLS-CMD-007] confirms manual ownership and publishes domain-bound", async () => {
+  test("[ROUTE-TLS-CMD-007] confirms manual ownership override and publishes domain-bound", async () => {
+    const domainOwnershipVerifier = new StaticDomainOwnershipVerifier({
+      status: "mismatch",
+      observedTargets: ["203.0.113.10"],
+      message: "Wrong target",
+    });
     const {
       confirmUseCase,
       context,
@@ -215,10 +256,11 @@ describe("ConfirmDomainBindingOwnershipUseCase", () => {
       domainBindings,
       eventBus,
       repositoryContext,
-    } = await seedRoutingContext();
+    } = await seedRoutingContext({ domainOwnershipVerifier });
 
     const result = await confirmUseCase.execute(context, {
       domainBindingId,
+      verificationMode: "manual",
       confirmedBy: "operator",
       evidence: "DNS target checked",
     });
@@ -236,6 +278,7 @@ describe("ConfirmDomainBindingOwnershipUseCase", () => {
     const persistedState = persisted?.toState();
     expect(persistedState?.status.value).toBe("bound");
     expect(persistedState?.verificationAttempts[0]?.status.value).toBe("verified");
+    expect(domainOwnershipVerifier.calls).toHaveLength(0);
 
     const domainBoundEvents = eventsByType(eventBus.events, "domain-bound");
     expect(domainBoundEvents).toHaveLength(1);
@@ -253,6 +296,144 @@ describe("ConfirmDomainBindingOwnershipUseCase", () => {
       verificationAttemptId: "dva_0002",
       correlationId: "req_domain_binding_confirm_test",
     });
+  });
+
+  test("[ROUTE-TLS-CMD-016] confirms DNS ownership when resolver observes expected target", async () => {
+    const domainOwnershipVerifier = new StaticDomainOwnershipVerifier({
+      status: "matched",
+      observedTargets: ["127.0.0.1"],
+      message: "Expected target observed",
+    });
+    const {
+      confirmUseCase,
+      context,
+      domainBindingId,
+      domainBindings,
+      eventBus,
+      repositoryContext,
+    } = await seedRoutingContext({
+      domainName: "dns-ok.example.com",
+      domainOwnershipVerifier,
+    });
+
+    const result = await confirmUseCase.execute(context, {
+      domainBindingId,
+    });
+
+    expect(result.isOk()).toBe(true);
+    expect(domainOwnershipVerifier.calls).toEqual([
+      {
+        domainName: "dns-ok.example.com",
+        expectedTargets: ["127.0.0.1"],
+      },
+    ]);
+
+    const persisted = await domainBindings.findOne(
+      repositoryContext,
+      DomainBindingByIdSpec.create(DomainBindingId.rehydrate(domainBindingId)),
+    );
+    const persistedState = persisted?.toState();
+    expect(persistedState?.status.value).toBe("bound");
+    expect(persistedState?.verificationAttempts[0]?.status.value).toBe("verified");
+    expect(persistedState?.dnsObservation?.status.value).toBe("matched");
+    expect(persistedState?.dnsObservation?.checkedAt?.value).toBe("2026-01-01T00:00:00.000Z");
+    expect(persistedState?.dnsObservation?.message?.value).toBe("Expected target observed");
+    expect(persistedState?.dnsObservation?.observedTargets.map((target) => target.value)).toEqual([
+      "127.0.0.1",
+    ]);
+    expect(eventsByType(eventBus.events, "domain-bound")).toHaveLength(1);
+  });
+
+  test("[ROUTE-TLS-CMD-017] blocks DNS ownership confirmation when resolver observes wrong target", async () => {
+    const domainOwnershipVerifier = new StaticDomainOwnershipVerifier({
+      status: "mismatch",
+      observedTargets: ["203.0.113.10"],
+      message: "Wrong target observed",
+    });
+    const {
+      confirmUseCase,
+      context,
+      domainBindingId,
+      domainBindings,
+      eventBus,
+      repositoryContext,
+    } = await seedRoutingContext({
+      domainName: "dns-mismatch.example.com",
+      domainOwnershipVerifier,
+    });
+
+    const result = await confirmUseCase.execute(context, {
+      domainBindingId,
+    });
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "domain_ownership_unverified",
+      retryable: false,
+      details: {
+        phase: "domain-verification",
+        domainBindingId,
+        domainName: "dns-mismatch.example.com",
+      },
+    });
+    expect(eventsByType(eventBus.events, "domain-bound")).toHaveLength(0);
+
+    const persisted = await domainBindings.findOne(
+      repositoryContext,
+      DomainBindingByIdSpec.create(DomainBindingId.rehydrate(domainBindingId)),
+    );
+    const persistedState = persisted?.toState();
+    expect(persistedState?.status.value).toBe("pending_verification");
+    expect(persistedState?.verificationAttempts[0]?.status.value).toBe("pending");
+    expect(persistedState?.dnsObservation?.status.value).toBe("mismatch");
+    expect(persistedState?.dnsObservation?.observedTargets.map((target) => target.value)).toEqual([
+      "203.0.113.10",
+    ]);
+  });
+
+  test("[ROUTE-TLS-CMD-018] records lookup failure without publishing domain-bound", async () => {
+    const domainOwnershipVerifier = new StaticDomainOwnershipVerifier({
+      status: "lookup_failed",
+      observedTargets: [],
+      message: "Resolver unavailable",
+    });
+    const {
+      confirmUseCase,
+      context,
+      domainBindingId,
+      domainBindings,
+      eventBus,
+      repositoryContext,
+    } = await seedRoutingContext({
+      domainName: "dns-failure.example.com",
+      domainOwnershipVerifier,
+    });
+
+    const result = await confirmUseCase.execute(context, {
+      domainBindingId,
+    });
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "dns_lookup_failed",
+      retryable: true,
+      details: {
+        phase: "domain-verification",
+        domainBindingId,
+        domainName: "dns-failure.example.com",
+      },
+    });
+    expect(eventsByType(eventBus.events, "domain-bound")).toHaveLength(0);
+
+    const persisted = await domainBindings.findOne(
+      repositoryContext,
+      DomainBindingByIdSpec.create(DomainBindingId.rehydrate(domainBindingId)),
+    );
+    const persistedState = persisted?.toState();
+    expect(persistedState?.status.value).toBe("pending_verification");
+    expect(persistedState?.verificationAttempts[0]?.status.value).toBe("pending");
+    expect(persistedState?.dnsObservation?.status.value).toBe("lookup_failed");
+    expect(persistedState?.dnsObservation?.message?.value).toBe("Resolver unavailable");
   });
 
   test("[ROUTE-TLS-CMD-010] repeated confirmation for the same verified attempt is idempotent", async () => {

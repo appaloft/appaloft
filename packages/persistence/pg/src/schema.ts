@@ -144,6 +144,11 @@ export interface DomainBindingsTable {
     Record<string, unknown>[],
     Record<string, unknown>[]
   >;
+  dns_observation: ColumnType<
+    Record<string, unknown> | null,
+    Record<string, unknown> | null,
+    Record<string, unknown> | null
+  >;
   route_failure: ColumnType<
     Record<string, unknown> | null,
     Record<string, unknown> | null,

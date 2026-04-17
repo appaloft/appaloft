@@ -48,6 +48,8 @@ import {
   DockerImageTag,
   DomainBindingId,
   DomainBindingStatusValue,
+  type DomainDnsObservationState,
+  DomainDnsObservationStatusValue,
   DomainRouteFailurePhaseValue,
   type DomainRouteFailureState,
   DomainVerificationAttemptId,
@@ -177,6 +179,9 @@ type DeploymentTargetCredentialKindInput = Parameters<
   typeof DeploymentTargetCredentialKindValue.rehydrate
 >[0];
 type DomainBindingStatusInput = Parameters<typeof DomainBindingStatusValue.rehydrate>[0];
+type DomainDnsObservationStatusInput = Parameters<
+  typeof DomainDnsObservationStatusValue.rehydrate
+>[0];
 type DomainRouteFailurePhaseInput = Parameters<typeof DomainRouteFailurePhaseValue.rehydrate>[0];
 type DomainVerificationMethodInput = Parameters<typeof DomainVerificationMethodValue.rehydrate>[0];
 type DomainVerificationAttemptStatusInput = Parameters<
@@ -353,6 +358,14 @@ export interface SerializedDomainVerificationAttempt extends Record<string, unkn
   status: DomainVerificationAttemptStatusInput;
   expectedTarget: string;
   createdAt: string;
+}
+
+export interface SerializedDomainDnsObservation extends Record<string, unknown> {
+  status: DomainDnsObservationStatusInput;
+  expectedTargets: string[];
+  observedTargets: string[];
+  checkedAt?: string;
+  message?: string;
 }
 
 export interface SerializedDomainRouteFailure extends Record<string, unknown> {
@@ -1007,6 +1020,22 @@ export function serializeDomainVerificationAttempts(
   }));
 }
 
+export function serializeDomainDnsObservation(
+  dnsObservation?: DomainDnsObservationState,
+): SerializedDomainDnsObservation | null {
+  if (!dnsObservation) {
+    return null;
+  }
+
+  return {
+    status: dnsObservation.status.value,
+    expectedTargets: dnsObservation.expectedTargets.map((target) => target.value),
+    observedTargets: dnsObservation.observedTargets.map((target) => target.value),
+    ...(dnsObservation.checkedAt ? { checkedAt: dnsObservation.checkedAt.value } : {}),
+    ...(dnsObservation.message ? { message: dnsObservation.message.value } : {}),
+  };
+}
+
 export function serializeDomainRouteFailure(
   routeFailure?: DomainRouteFailureState,
 ): SerializedDomainRouteFailure | null {
@@ -1027,6 +1056,7 @@ export function serializeDomainRouteFailure(
 export function rehydrateDomainBindingRow(row: Selectable<Database["domain_bindings"]>) {
   const verificationAttempts = (row.verification_attempts ??
     []) as unknown as SerializedDomainVerificationAttempt[];
+  const dnsObservation = row.dns_observation as SerializedDomainDnsObservation | null;
   const routeFailure = row.route_failure as SerializedDomainRouteFailure | null;
 
   return {
@@ -1051,6 +1081,25 @@ export function rehydrateDomainBindingRow(row: Selectable<Database["domain_bindi
       expectedTarget: MessageText.rehydrate(attempt.expectedTarget),
       createdAt: CreatedAt.rehydrate(attempt.createdAt),
     })),
+    ...(dnsObservation
+      ? {
+          dnsObservation: {
+            status: DomainDnsObservationStatusValue.rehydrate(dnsObservation.status),
+            expectedTargets: dnsObservation.expectedTargets.map((target) =>
+              MessageText.rehydrate(target),
+            ),
+            observedTargets: dnsObservation.observedTargets.map((target) =>
+              MessageText.rehydrate(target),
+            ),
+            ...(dnsObservation.checkedAt
+              ? { checkedAt: CreatedAt.rehydrate(dnsObservation.checkedAt) }
+              : {}),
+            ...(dnsObservation.message
+              ? { message: MessageText.rehydrate(dnsObservation.message) }
+              : {}),
+          },
+        }
+      : {}),
     ...(routeFailure
       ? {
           routeFailure: {

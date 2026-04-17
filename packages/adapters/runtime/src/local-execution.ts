@@ -1501,6 +1501,13 @@ export class LocalExecutionBackend implements ExecutionBackend {
     }
 
     const dockerCommandBuilder = RuntimeCommandBuilder.docker();
+    const usesDirectHostPort =
+      state.runtimePlan.execution.metadata?.["resource.exposureMode"] === "direct-port";
+    const removeSupersededResourceContainersSpec =
+      dockerCommandBuilder.removeResourceContainers({
+        resourceId: state.resourceId.value,
+        currentContainerName: containerName,
+      });
     runSyncCommand({
       command: renderRuntimeCommandString(
         dockerCommandBuilder.removeContainer({
@@ -1512,20 +1519,18 @@ export class LocalExecutionBackend implements ExecutionBackend {
       cwd: workdir,
       env,
     });
-    runSyncCommand({
-      command: renderRuntimeCommandString(
-        dockerCommandBuilder.removeResourceContainers({
-          resourceId: state.resourceId.value,
-          currentContainerName: containerName,
+    if (usesDirectHostPort) {
+      runSyncCommand({
+        command: renderRuntimeCommandString(removeSupersededResourceContainersSpec, {
+          quote: shellQuote,
         }),
-        { quote: shellQuote },
-      ),
-      cwd: workdir,
-      env,
-    });
-    logs.push(
-      phaseLog("deploy", `Release existing containers for resource ${state.resourceId.value}`),
-    );
+        cwd: workdir,
+        env,
+      });
+      logs.push(
+        phaseLog("deploy", `Release existing containers for resource ${state.resourceId.value}`),
+      );
+    }
 
     const proxyRoutePlanResult = this.edgeProxyProviderRegistry
       ? await createProxyRouteRealizationPlan({
@@ -1592,10 +1597,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
       publishedPorts: [
         dockerCommandBuilder.publishPort({
           containerPort: port,
-          mode:
-            state.runtimePlan.execution.metadata?.["resource.exposureMode"] === "direct-port"
-              ? "host-same-port"
-              : "loopback-ephemeral",
+          mode: usesDirectHostPort ? "host-same-port" : "loopback-ephemeral",
         }),
       ],
     });
@@ -1904,6 +1906,24 @@ export class LocalExecutionBackend implements ExecutionBackend {
       status: "succeeded",
       message,
     });
+    if (!usesDirectHostPort) {
+      const cleanup = runSyncCommand({
+        command: renderRuntimeCommandString(removeSupersededResourceContainersSpec, {
+          quote: shellQuote,
+        }),
+        cwd: workdir,
+        env,
+      });
+      logs.push(
+        phaseLog(
+          "deploy",
+          cleanup.failed
+            ? `Failed to release superseded containers for resource ${state.resourceId.value}`
+            : `Released superseded containers for resource ${state.resourceId.value}`,
+          cleanup.failed ? "warn" : "info",
+        ),
+      );
+    }
     deployment.applyExecutionResult(FinishedAt.rehydrate(new Date().toISOString()), ExecutionResult.rehydrate({
       exitCode: ExitCode.rehydrate(0),
       status: ExecutionStatusValue.rehydrate("succeeded"),

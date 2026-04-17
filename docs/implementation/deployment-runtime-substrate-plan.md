@@ -129,6 +129,9 @@ Required coverage:
 - generic-SSH Docker adapter uses resolved server credentials and reports sanitized failures;
 - same internal port on two reverse-proxy resources does not trigger cross-resource cleanup;
 - direct host-port collision fails or rejects without stopping the existing resource;
+- reverse-proxy same-resource replacement keeps the previous successful runtime serving until the
+  candidate passes health, route, and public verification, and failed candidates are cleaned up
+  without deleting that previous runtime;
 - typed runtime command builder and renderer tests for Docker image build, Docker container run with
   env/labels/ports/network, Docker Compose up/down, resource-scoped cleanup, quoting, and redacted
   display output;

@@ -207,7 +207,7 @@ describe("routing/domain/TLS proxy workflow e2e", () => {
       const domainBindingId = parseJson<{ id: string }>(createdBinding.stdout).id;
 
       const confirmed = runShellCli(
-        ["domain-binding", "confirm-ownership", domainBindingId],
+        ["domain-binding", "confirm-ownership", domainBindingId, "--verification-mode", "manual"],
         workspace.cliOptions,
       );
       expectCliSuccess(confirmed, "confirm durable proxy domain binding");

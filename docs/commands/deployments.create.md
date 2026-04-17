@@ -204,6 +204,17 @@ runtime instances belonging to the same resource after the adapter strategy allo
 stop another resource because the other resource shares an internal port, image name, Compose
 service name, or proxy label shape.
 
+For reverse-proxy or otherwise route-mediated deployments, the adapter strategy must preserve the
+last-known-good runtime for the same resource until the replacement attempt passes the required
+apply, health, route realization, and public route verification gates. If the replacement fails
+after starting a candidate runtime, cleanup targets the failed candidate and preserves the previous
+serving runtime and rollback-candidate identity when available.
+
+For direct-port deployments, the effective host port is exclusive, so an adapter may need to release
+the previous same-resource runtime before binding the replacement. That exception must stay scoped
+to the same resource and must be reflected as direct-port rollout strategy behavior, not as general
+cleanup permission.
+
 Rollback remains a future public operation under ADR-016. `deployments.create` may preserve previous
 runtime identity as rollback-candidate metadata, but it must not expose a hidden rollback command or
 claim data-volume rollback.

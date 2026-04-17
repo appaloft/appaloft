@@ -34,7 +34,7 @@ describe("domain-bindings command e2e", () => {
     fixture?.cleanup();
   }, 60000);
 
-  test("[ROUTE-TLS-ENTRY-010] CLI confirms ownership and CLI list observes the bound binding", () => {
+  test("[ROUTE-TLS-ENTRY-010][ROUTE-TLS-WORKFLOW-003] CLI observes DNS pending before ownership confirmation", () => {
     const suffix = crypto.randomUUID().slice(0, 6);
     const context = fixture.deployWorkspaceResource({
       appPort: 4600 + Math.floor(Math.random() * 100),
@@ -67,11 +67,36 @@ describe("domain-bindings command e2e", () => {
     expectCliSuccess(created, "create domain binding through CLI");
     const domainBindingId = parseJson<{ id: string }>(created.stdout).id;
 
+    const pendingListed = runShellCli(
+      ["domain-binding", "list", "--resource", context.resourceId],
+      fixture.cliOptions,
+    );
+    expectCliSuccess(pendingListed, "list pending domain binding through CLI");
+    const pendingBinding = findDomainBinding({
+      domainBindingId,
+      items: parseJson<DomainBindingListResponse>(pendingListed.stdout).items,
+    });
+    expectDomainBindingSummary({
+      binding: pendingBinding,
+      domainName,
+      resourceId: context.resourceId,
+      status: "pending_verification",
+    });
+    expect(pendingBinding.dnsObservation).toEqual(
+      expect.objectContaining({
+        expectedTargets: ["127.0.0.1"],
+        observedTargets: [],
+        status: "pending",
+      }),
+    );
+
     const confirmed = runShellCli(
       [
         "domain-binding",
         "confirm-ownership",
         domainBindingId,
+        "--verification-mode",
+        "manual",
         "--confirmed-by",
         "cli-e2e",
         "--evidence",
@@ -138,6 +163,7 @@ describe("domain-bindings command e2e", () => {
             confirmedBy: "http-e2e",
             domainBindingId,
             evidence: "manual DNS ownership confirmed",
+            verificationMode: "manual",
           }),
           headers: {
             "content-type": "application/json",
@@ -204,7 +230,7 @@ describe("domain-bindings command e2e", () => {
     const domainBindingId = parseJson<{ id: string }>(created.stdout).id;
 
     const confirmed = runShellCli(
-      ["domain-binding", "confirm-ownership", domainBindingId],
+      ["domain-binding", "confirm-ownership", domainBindingId, "--verification-mode", "manual"],
       fixture.cliOptions,
     );
     expectCliSuccess(confirmed, "confirm TLS-disabled domain ownership through CLI");

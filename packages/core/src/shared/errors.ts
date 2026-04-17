@@ -148,6 +148,15 @@ export const domainError = {
     message: string,
     details?: Record<string, string | number | boolean | null>,
   ): DomainError => createError("domain_verification_not_pending", "user", message, details),
+  domainOwnershipUnverified: (
+    message: string,
+    details?: Record<string, string | number | boolean | null>,
+  ): DomainError => createError("domain_ownership_unverified", "user", message, details),
+  dnsLookupFailed: (
+    message: string,
+    details?: Record<string, string | number | boolean | null>,
+    retryable = true,
+  ): DomainError => createError("dns_lookup_failed", "retryable", message, details, retryable),
   certificateNotAllowed: (
     message: string,
     details?: Record<string, string | number | boolean | null>,

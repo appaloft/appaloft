@@ -53,7 +53,13 @@ import {
   NoopLogger,
   SequenceIdGenerator,
 } from "@appaloft/testkit";
-import { createExecutionContext, type ExecutionContext, toRepositoryContext } from "../src";
+import {
+  createExecutionContext,
+  type DomainOwnershipVerificationResult,
+  type DomainOwnershipVerifier,
+  type ExecutionContext,
+  toRepositoryContext,
+} from "../src";
 import {
   CertificateRetryScheduler,
   ConfirmDomainBindingOwnershipUseCase,
@@ -89,6 +95,21 @@ class StaticCertificateRetryCandidateReader {
 
   async listDueRetries() {
     return this.candidates;
+  }
+}
+
+class StaticDomainOwnershipVerifier implements DomainOwnershipVerifier {
+  async verifyDns(
+    context: Parameters<DomainOwnershipVerifier["verifyDns"]>[0],
+    input: Parameters<DomainOwnershipVerifier["verifyDns"]>[1],
+  ): Promise<DomainOwnershipVerificationResult> {
+    void context;
+    void input;
+    return {
+      status: "matched",
+      observedTargets: ["127.0.0.1"],
+      message: "Observed expected target",
+    };
   }
 }
 
@@ -184,6 +205,7 @@ async function seedCertificateContext(input?: { tlsMode?: "auto" | "disabled" })
   );
   const confirmDomainBindingUseCase = new ConfirmDomainBindingOwnershipUseCase(
     domainBindings,
+    new StaticDomainOwnershipVerifier(),
     clock,
     eventBus,
     logger,

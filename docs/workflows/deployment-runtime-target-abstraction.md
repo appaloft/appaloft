@@ -118,6 +118,10 @@ It must:
 - scope container/project names, labels, networks, cleanup, and diagnostics to resource id,
   deployment id, target id, and destination id;
 - avoid public host-port requirements for reverse-proxy resources;
+- keep previous same-resource reverse-proxy runtime instances serving until a replacement candidate
+  passes required apply, health, route, and public verification gates;
+- clean up failed replacement candidates separately from cleanup of superseded successful runtime
+  instances;
 - treat direct host-port collisions as conflicts or post-acceptance runtime failures without
   stopping another resource;
 - read logs and health through normalized application ports;
@@ -182,7 +186,14 @@ failures. They must:
 2. persist failed or retryable deployment/process state;
 3. publish `deployment-failed` after failure state is durable;
 4. expose safe target details through read models, logs, or diagnostics;
-5. require a new deployment attempt or future retry command for retry.
+5. clean up failed candidate runtime instances without deleting a previous successful runtime that
+   the rollout strategy has not superseded;
+6. require a new deployment attempt or future retry command for retry.
+
+Cleanup is rollout-strategy aware. Reverse-proxy and ephemeral-port strategies must distinguish
+candidate cleanup from superseded-runtime cleanup; superseded cleanup happens only after terminal
+success. Direct-port strategies may release the previous same-resource runtime earlier only when the
+exclusive host port makes candidate-first verification impossible.
 
 ## Current Implementation Notes And Migration Gaps
 

@@ -28,7 +28,7 @@ Expected implementation scope:
 - `packages/core/src/runtime-topology`: add `DomainBinding.confirmOwnership(...)` transition and event payload.
 - `packages/application/src/operations/domain-bindings`: command schema, command message, handler, and use case.
 - `packages/application/src/operation-catalog.ts`: add `domain-bindings.confirm-ownership`.
-- `packages/application/src/ports.ts` and `packages/application/src/tokens.ts`: reuse `DomainBindingRepository`, `Clock`, `EventBus`, `AppLogger`.
+- `packages/application/src/ports.ts` and `packages/application/src/tokens.ts`: reuse `DomainBindingRepository`, `Clock`, `EventBus`, `AppLogger`, and add a DNS ownership verifier port.
 - `packages/persistence/pg`: reuse the existing domain binding upsert/read model because verification attempts are serialized in aggregate state.
 - `packages/orpc`: add typed `POST /api/domain-bindings/{domainBindingId}/ownership-confirmations`.
 - `packages/contracts`: expose confirm input/response and read-model bound status.
@@ -40,8 +40,10 @@ Expected implementation scope:
 
 The command mutates one `DomainBinding` aggregate:
 
-- current pending manual verification attempt moves to `verified`;
+- current pending verification attempt moves to `verified`;
 - binding status moves from `pending_verification` to `bound`;
+- DNS-gated confirmation records `dnsObservation.status = matched` before the bound transition;
+- DNS-gated confirmation failures record `dnsObservation.status = mismatch`, `unresolved`, or `lookup_failed` and leave the attempt pending;
 - safe confirmation metadata may be recorded when supported by the aggregate state;
 - `domain-bound` is published after persistence.
 
@@ -66,7 +68,10 @@ Expected errors must use [Routing, Domain Binding, And TLS Error Spec](../errors
 Required tests:
 
 - command schema validates required `domainBindingId` and optional fields;
-- use case confirms the latest pending manual attempt and publishes `domain-bound`;
+- command schema validates `verificationMode = dns | manual`;
+- use case confirms DNS ownership when the injected verifier observes the expected target and publishes `domain-bound`;
+- use case records DNS mismatch/lookup failure without publishing `domain-bound`;
+- use case confirms the latest pending attempt in explicit manual mode without calling the DNS verifier;
 - use case accepts an explicit matching `verificationAttemptId`;
 - repeated confirmation of the same verified/bound attempt is idempotent and does not duplicate events;
 - missing binding returns `not_found` with phase `domain-verification`;
@@ -79,6 +84,7 @@ Required tests:
 The minimal Code Round deliverable is:
 
 - `domain-bindings.confirm-ownership` command/schema/handler/use case;
+- `DomainOwnershipVerifier` application port and shell DNS resolver-backed implementation;
 - aggregate transition and `domain-bound` event;
 - operation catalog and `CORE_OPERATIONS.md` entry;
 - typed API/oRPC route;
@@ -91,10 +97,14 @@ Certificate issuance and domain readiness remain follow-up behavior.
 
 ## Current Implementation Notes And Migration Gaps
 
-The manual confirmation slice is implemented. It does not perform DNS lookups, DNS provider writes, certificate issuance, or route readiness checks.
+The baseline confirmation slice is implemented. Target implementation adds live DNS lookup through an
+application port and keeps explicit manual override. It does not perform DNS provider writes,
+confirmation-file route proof, certificate issuance, or route readiness checks.
 
-`domain-bound` is currently produced only by explicit manual confirmation. Future DNS/provider automation can reuse the same aggregate transition and event semantics.
+`domain-bound` should be produced by DNS-gated confirmation or explicit manual override. Future DNS
+provider automation and confirmation-file route proof can reuse the same aggregate transition and
+event semantics, but DNS observation remains separate from route proof state.
 
 ## Open Questions
 
-- None for the manual confirmation baseline.
+- None for the DNS-gated confirmation baseline.

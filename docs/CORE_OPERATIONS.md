@@ -334,7 +334,7 @@ Business meaning:
 - runtime plan access routes are deployment snapshots, not durable domain ownership state
 - a `DomainBinding` is durable routing/domain ownership state for a project, environment,
   resource, destination, and deployment target
-- DNS verification, certificate issuance, renewal, and domain readiness progress outside
+- DNS observation/verification, certificate issuance, renewal, and domain readiness progress outside
   `deployments.create`
 
 Implemented operations:
@@ -342,18 +342,23 @@ Implemented operations:
 | Capability | Kind | Operation Key | Message | Schema | CLI | oRPC / HTTP |
 | --- | --- | --- | --- | --- | --- | --- |
 | Create domain binding | Command | `domain-bindings.create` | `CreateDomainBindingCommand` | `CreateDomainBindingCommandInput` | `appaloft domain-binding create <domainName>` | `POST /api/domain-bindings` |
-| Confirm domain binding ownership | Command | `domain-bindings.confirm-ownership` | `ConfirmDomainBindingOwnershipCommand` | `ConfirmDomainBindingOwnershipCommandInput` | `appaloft domain-binding confirm-ownership <domainBindingId>` | `POST /api/domain-bindings/{domainBindingId}/ownership-confirmations` |
+| Confirm domain binding ownership | Command | `domain-bindings.confirm-ownership` | `ConfirmDomainBindingOwnershipCommand` | `ConfirmDomainBindingOwnershipCommandInput` | `appaloft domain-binding confirm-ownership <domainBindingId> [--verification-mode dns\|manual]` | `POST /api/domain-bindings/{domainBindingId}/ownership-confirmations` |
 | List domain bindings | Query | `domain-bindings.list` | `ListDomainBindingsQuery` | `ListDomainBindingsQueryInput` | `appaloft domain-binding list` | `GET /api/domain-bindings` |
 | Issue or renew certificate | Command | `certificates.issue-or-renew` | `IssueOrRenewCertificateCommand` | `IssueOrRenewCertificateCommandInput` | `appaloft certificate issue-or-renew <domainBindingId>` | `POST /api/certificates/issue-or-renew` |
 | List certificates | Query | `certificates.list` | `ListCertificatesQuery` | `ListCertificatesQueryInput` | `appaloft certificate list` | `GET /api/certificates` |
 
 Current boundary:
 - `domain-bindings.create` creates durable binding state, persists the first manual verification
-  attempt, publishes `domain-binding-requested`, and returns accepted `ok({ id })`
-- `domain-bindings.confirm-ownership` confirms the current manual verification attempt, moves the
-  binding to `bound`, publishes `domain-bound`, and returns `ok({ id, verificationAttemptId })`
+  attempt, records initial DNS observation metadata, publishes `domain-binding-requested`, and
+  returns accepted `ok({ id })`
+- `domain-bindings.confirm-ownership` confirms the current verification attempt, defaults to
+  Appaloft-observed DNS evidence before moving the binding to `bound`, supports explicit manual
+  override, publishes `domain-bound`, and returns `ok({ id, verificationAttemptId })`
 - `domain-binding-requested` is a request event and does not mean the domain is bound, certificate
   issuance succeeded, or traffic is ready
+- public DNS propagation is external to Appaloft; `domain-bindings.list` must expose DNS
+  observation status so pending/mismatch DNS is a visible wait/recheck state rather than a hidden
+  deployment failure
 - `domain-bound` means ownership/route prerequisites are satisfied; it does not mean certificate
   issuance or domain readiness is complete
 - TLS-disabled bindings may progress from `domain-bound` to `domain-ready` when route readiness

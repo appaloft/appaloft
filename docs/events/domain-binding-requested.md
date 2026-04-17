@@ -73,7 +73,10 @@ domain binding: requested -> pending_verification
 
 Consumers may:
 
+- record or update public DNS observation state for the requested hostname;
 - verify DNS/domain ownership;
+- wait/retry when public DNS propagation is pending or resolver-specific;
+- run confirmation-file route proof when configured;
 - verify that the server proxy policy can serve the binding;
 - publish `domain-bound` when route/domain requirements are satisfied;
 - persist verification failure state when requirements are not satisfied.
@@ -98,11 +101,16 @@ Retry must create or select a new verification attempt according to the workflow
 
 Current code now records `domain-binding-requested` from the `DomainBinding` aggregate after `domain-bindings.create` persists binding state and the first manual verification attempt.
 
+Current code also persists initial DNS observation metadata for the accepted binding so
+`domain-bindings.list` can show that Appaloft is waiting for public DNS propagation or a later
+observer.
+
 Deployment runtime access routes currently carry `domains`, but those routes do not publish this event and do not create durable domain binding state.
 
 Generated default access routes do not publish this event and do not create durable domain binding state.
 
-No event consumer/process manager for domain verification, route realization, or downstream certificate progression is implemented yet.
+No event consumer/process manager for live DNS lookup, confirmation-file route proof, or DNS
+provider writes is implemented yet.
 
 ## Open Questions
 

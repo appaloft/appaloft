@@ -121,11 +121,12 @@ Then:
 | DEF-ACCESS-RUNTIME-003 | integration | Public host port | Application container does not require stable public `0.0.0.0:<internalPort>` publication when reverse proxy is used. |
 | DEF-ACCESS-RUNTIME-004 | integration | Private health port | Runtime may use a loopback-only or runtime-local ephemeral host port for health checks, and tests must treat it as diagnostic metadata rather than a public route. |
 | DEF-ACCESS-RUNTIME-005 | integration | Same internal port isolation | Deploying another resource with the same `internalPort` does not remove, replace, or hijack the first resource's runtime instance or proxy route. |
-| DEF-ACCESS-RUNTIME-006 | integration | Same resource replacement | A new terminal deployment attempt for the same resource may replace the previous runtime instance for that resource without affecting other resources on the same `internalPort`. |
+| DEF-ACCESS-RUNTIME-006 | integration | Same resource replacement | A new terminal deployment attempt for the same resource may replace the previous runtime instance only after the replacement route has passed required verification, without affecting other resources on the same `internalPort`. |
 | DEF-ACCESS-RUNTIME-007 | integration | Direct-port collision | A direct-port host-port conflict fails or rejects the conflicting deployment and preserves the resource that already owns the host port. |
 | DEF-ACCESS-RUNTIME-008 | integration | Proxy install idempotency | Runtime adapter can ensure proxy/network more than once without duplicating containers/routes. |
 | DEF-ACCESS-RUNTIME-009 | integration | Route config idempotency | Re-running route realization for the same deployment does not create duplicate proxy route definitions. |
 | DEF-ACCESS-RUNTIME-010 | integration | Public route verification | Verification uses generated/durable public URL only after route config is realized. |
+| DEF-ACCESS-RUNTIME-011 | integration | Public route failure preserves previous route | When a replacement candidate fails generated/durable public route verification, the failed candidate is cleaned up or isolated and the previous successful same-resource route remains active. |
 
 ## Entry Surface Matrix
 

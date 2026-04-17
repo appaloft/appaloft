@@ -102,7 +102,7 @@ describe("certificates.issue-or-renew command e2e", () => {
       const confirmed = await fetch(
         `${httpServer.baseUrl}/api/domain-bindings/${domainBindingId}/ownership-confirmations`,
         {
-          body: JSON.stringify({ domainBindingId }),
+          body: JSON.stringify({ domainBindingId, verificationMode: "manual" }),
           headers: {
             "content-type": "application/json",
           },
@@ -184,7 +184,7 @@ function createConfirmedTlsAutoBinding(input: {
   const domainBindingId = parseJson<{ id: string }>(created.stdout).id;
 
   const confirmed = runShellCli(
-    ["domain-binding", "confirm-ownership", domainBindingId],
+    ["domain-binding", "confirm-ownership", domainBindingId, "--verification-mode", "manual"],
     input.options,
   );
   expectCliSuccess(confirmed, "confirm TLS-auto domain ownership through CLI");
