@@ -85,6 +85,7 @@ import { resolveWorkspaceRuntimePlan } from "./workspace-planners";
 
 export { RuntimeServerConnectivityChecker } from "./server-connectivity";
 export { RuntimeDeploymentHealthChecker } from "./deployment-health";
+export { RuntimeResourceHealthProbeRunner } from "./resource-health-probes";
 export { RuntimeResourceRuntimeLogReader } from "./resource-runtime-logs";
 export { RuntimeTerminalSessionGateway } from "./terminal-sessions";
 export { SshExecutionBackend } from "./ssh-execution";

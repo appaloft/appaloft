@@ -113,6 +113,9 @@ Typical source errors:
 | `health-policy` | `resource_health_policy_not_configured` | `health-policy-resolution` | No health policy exists for a running resource. |
 | `health-policy` | `resource_health_policy_unsupported` | `health-policy-resolution` | Configured policy cannot run on the selected runtime adapter. |
 | `health-check` | `resource_health_check_failed` | `health-check-execution` | HTTP status, response text, timeout, or command exit code failed. |
+| `health-check` | `resource_health_check_unavailable` | `health-check-execution` | No safe current runtime URL can be resolved for a configured policy. |
+| `health-check` | `resource_health_check_timeout` | `health-check-execution` | Bounded HTTP policy probe timed out. |
+| `health-check` | `resource_health_check_response_mismatch` | `health-check-execution` | Bounded HTTP policy probe returned an unexpected status or response text. |
 | `proxy` | `resource_proxy_route_unavailable` | `proxy-route-observation` | Required proxy route is missing, unapplied, or not ready. |
 | `public-access` | `resource_public_access_unavailable` | `public-access-observation` | No current durable or generated public route is available. |
 | `public-access` | `resource_public_access_probe_failed` | `public-access-observation` | Current public route timed out or returned an unexpected result. |
@@ -143,8 +146,8 @@ Tests must assert:
 
 ## Current Implementation Notes And Migration Gaps
 
-`resources.health` query and whole-query error mapping are implemented for the first
-cached/read-model slice.
+`resources.health` query and whole-query error mapping are implemented for the first aggregation
+slice with bounded HTTP/public probes.
 
 Implemented whole-query errors:
 
@@ -155,11 +158,13 @@ Implemented source errors include:
 
 - `resource_latest_deployment_unavailable`;
 - `resource_health_policy_not_configured`;
+- `resource_health_check_unavailable`;
+- `resource_health_check_timeout`;
+- `resource_health_check_response_mismatch`;
+- `resource_health_check_failed`;
 - `resource_public_access_unavailable`;
 - `resource_public_access_probe_failed`;
 - `resource_proxy_route_unavailable`;
-- `resource_health_live_probe_unavailable`;
-- `resource_public_access_live_probe_unavailable`;
 - `resource_runtime_live_probe_unavailable`.
 
 Current deployment-time verification errors belong to `deployments.create` execution and should not

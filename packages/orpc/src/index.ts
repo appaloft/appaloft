@@ -4,6 +4,7 @@ import {
   bootstrapServerProxyCommandInputSchema,
   type Command,
   type CommandBus,
+  ConfigureResourceHealthCommand,
   ConfigureServerCredentialCommand,
   ConfirmDomainBindingOwnershipCommand,
   CreateDeploymentCommand,
@@ -13,6 +14,7 @@ import {
   CreateProjectCommand,
   CreateResourceCommand,
   CreateSshCredentialCommand,
+  configureResourceHealthCommandInputSchema,
   configureServerCredentialCommandInputSchema,
   confirmDomainBindingOwnershipCommandInputSchema,
   createDeploymentCommandInputSchema,
@@ -79,6 +81,7 @@ import {
 } from "@appaloft/application";
 import {
   bootstrapServerProxyResponseSchema,
+  configureResourceHealthResponseSchema,
   confirmDomainBindingOwnershipResponseSchema,
   createDeploymentResponseSchema,
   createDomainBindingResponseSchema,
@@ -738,6 +741,18 @@ export const createResourceProcedure = base
     executeCommand(context, CreateResourceCommand.create(input)),
   );
 
+export const configureResourceHealthProcedure = base
+  .route({
+    method: "POST",
+    path: "/resources/{resourceId}/health-policy",
+    successStatus: 200,
+  })
+  .input(configureResourceHealthCommandInputSchema)
+  .output(configureResourceHealthResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, ConfigureResourceHealthCommand.create(input)),
+  );
+
 export const createDomainBindingProcedure = base
   .route({
     method: "POST",
@@ -1046,6 +1061,7 @@ export const appaloftOrpcRouter = {
   resources: {
     list: listResourcesProcedure,
     create: createResourceProcedure,
+    configureHealth: configureResourceHealthProcedure,
     diagnosticSummary: resourceDiagnosticSummaryProcedure,
     health: resourceHealthProcedure,
     proxyConfiguration: resourceProxyConfigurationPreviewProcedure,
@@ -1204,7 +1220,12 @@ export function mountAppaloftOrpcRoutes(
     "/api/environments/:environmentId/promote",
     "/api/environments/:environmentId/diff/:otherEnvironmentId",
     "/api/resources",
+    "/api/resources/:resourceId/health",
+    "/api/resources/:resourceId/health-policy",
     "/api/resources/:resourceId/diagnostic-summary",
+    "/api/resources/:resourceId/proxy-configuration",
+    "/api/resources/:resourceId/runtime-logs",
+    "/api/resources/:resourceId/runtime-logs/stream",
     "/api/terminal-sessions",
     "/api/domain-bindings",
     "/api/domain-bindings/:domainBindingId/ownership-confirmations",

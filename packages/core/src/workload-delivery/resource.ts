@@ -25,7 +25,7 @@ import {
   type ResourceServiceKindValue,
   type RuntimePlanStrategyValue,
 } from "../shared/state-machine";
-import { type CreatedAt } from "../shared/temporal";
+import { type CreatedAt, type UpdatedAt } from "../shared/temporal";
 import {
   type CommandText,
   type DescriptionText,
@@ -343,6 +343,82 @@ export class Resource extends AggregateRoot<ResourceState> {
         : {}),
       ...(state.networkProfile ? { networkProfile: { ...state.networkProfile } } : {}),
     });
+  }
+
+  configureHealthPolicy(input: {
+    policy: ResourceHealthCheckPolicyState;
+    configuredAt: UpdatedAt;
+    defaultStrategy: RuntimePlanStrategyValue;
+  }): Result<void> {
+    if (input.policy.enabled && input.policy.type.value !== "http") {
+      return err(
+        domainError.validation("Only HTTP resource health policies are supported", {
+          phase: "health-policy-resolution",
+          resourceId: this.state.id.value,
+          healthCheckType: input.policy.type.value,
+        }),
+      );
+    }
+
+    if (input.policy.enabled && !input.policy.http) {
+      return err(
+        domainError.validation("Enabled HTTP health policy requires HTTP configuration", {
+          phase: "health-policy-resolution",
+          resourceId: this.state.id.value,
+          healthCheckType: input.policy.type.value,
+        }),
+      );
+    }
+
+    const currentProfile = this.state.runtimeProfile;
+    const currentProfileWithoutHealth = currentProfile
+      ? (() => {
+          const { healthCheck, healthCheckPath, ...rest } =
+            cloneResourceRuntimeProfileState(currentProfile);
+          void healthCheck;
+          void healthCheckPath;
+          return rest;
+        })()
+      : undefined;
+    const nextPolicy = cloneResourceHealthCheckPolicyState(input.policy);
+    this.state.runtimeProfile = {
+      ...(currentProfileWithoutHealth ?? {}),
+      strategy: currentProfile?.strategy ?? input.defaultStrategy,
+      ...(input.policy.enabled && input.policy.http
+        ? { healthCheckPath: input.policy.http.path }
+        : {}),
+      healthCheck: nextPolicy,
+    };
+
+    this.recordDomainEvent("resource-health-policy-configured", input.configuredAt, {
+      resourceId: this.state.id.value,
+      projectId: this.state.projectId.value,
+      environmentId: this.state.environmentId.value,
+      enabled: input.policy.enabled,
+      type: input.policy.type.value,
+      ...(input.policy.http
+        ? {
+            http: {
+              method: input.policy.http.method.value,
+              scheme: input.policy.http.scheme.value,
+              host: input.policy.http.host.value,
+              ...(input.policy.http.port ? { port: input.policy.http.port.value } : {}),
+              path: input.policy.http.path.value,
+              expectedStatusCode: input.policy.http.expectedStatusCode.value,
+              ...(input.policy.http.expectedResponseText
+                ? { expectedResponseText: input.policy.http.expectedResponseText.value }
+                : {}),
+            },
+          }
+        : {}),
+      intervalSeconds: input.policy.intervalSeconds.value,
+      timeoutSeconds: input.policy.timeoutSeconds.value,
+      retries: input.policy.retries.value,
+      startPeriodSeconds: input.policy.startPeriodSeconds.value,
+      configuredAt: input.configuredAt.value,
+    });
+
+    return ok(undefined);
   }
 
   accept<TContext, TResult>(

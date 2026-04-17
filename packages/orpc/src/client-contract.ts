@@ -1,5 +1,6 @@
 import {
   type BootstrapServerProxyCommandInput,
+  type ConfigureResourceHealthCommandInput,
   type ConfigureServerCredentialCommandInput,
   type ConfirmDomainBindingOwnershipCommandInput,
   type CreateDeploymentCommandInput,
@@ -32,6 +33,7 @@ import {
 } from "@appaloft/application/schemas";
 import {
   type BootstrapServerProxyResponse,
+  type ConfigureResourceHealthResponse,
   type ConfirmDomainBindingOwnershipResponse,
   type CreateDeploymentResponse,
   type CreateDomainBindingResponse,
@@ -185,6 +187,12 @@ export type AppaloftOrpcClientContract = {
       AppaloftClientContext,
       CreateResourceCommandInput,
       CreateResourceResponse,
+      AppaloftClientError
+    >;
+    configureHealth: Client<
+      AppaloftClientContext,
+      ConfigureResourceHealthCommandInput,
+      ConfigureResourceHealthResponse,
       AppaloftClientError
     >;
     diagnosticSummary: Client<

@@ -1,7 +1,34 @@
 import "reflect-metadata";
 
 import { describe, expect, test } from "bun:test";
-import { ok } from "@appaloft/core";
+import {
+  CreatedAt,
+  EnvironmentId,
+  HealthCheckExpectedStatusCode,
+  HealthCheckHostText,
+  HealthCheckHttpMethodValue,
+  HealthCheckIntervalSeconds,
+  HealthCheckPathText,
+  HealthCheckRetryCount,
+  HealthCheckSchemeValue,
+  HealthCheckStartPeriodSeconds,
+  HealthCheckTimeoutSeconds,
+  HealthCheckTypeValue,
+  ok,
+  PortNumber,
+  ProjectId,
+  Resource,
+  ResourceExposureModeValue,
+  ResourceId,
+  ResourceKindValue,
+  type ResourceMutationSpec,
+  ResourceName,
+  ResourceNetworkProtocolValue,
+  type ResourceSelectionSpec,
+  ResourceSlug,
+  type Result,
+  RuntimePlanStrategyValue,
+} from "@appaloft/core";
 
 import { createExecutionContext, type ExecutionContext, type toRepositoryContext } from "../src";
 import { ResourceHealthQuery } from "../src/messages";
@@ -11,7 +38,11 @@ import {
   type DeploymentReadModel,
   type DeploymentSummary,
   type DestinationRepository,
+  type ResourceHealthProbeRequest,
+  type ResourceHealthProbeResult,
+  type ResourceHealthProbeRunner,
   type ResourceReadModel,
+  type ResourceRepository,
   type ResourceSummary,
   type ServerRepository,
 } from "../src/ports";
@@ -29,6 +60,23 @@ class StaticResourceReadModel implements ResourceReadModel {
   async list(): Promise<ResourceSummary[]> {
     return this.resources;
   }
+}
+
+class StaticResourceRepository implements ResourceRepository {
+  constructor(private readonly resources: Resource[] = []) {}
+
+  async findOne(
+    _context: ReturnType<typeof toRepositoryContext>,
+    spec: ResourceSelectionSpec,
+  ): Promise<Resource | null> {
+    return this.resources.find((resource) => spec.isSatisfiedBy(resource)) ?? null;
+  }
+
+  async upsert(
+    _context: ReturnType<typeof toRepositoryContext>,
+    _resource: Resource,
+    _spec: ResourceMutationSpec,
+  ): Promise<void> {}
 }
 
 class StaticDeploymentReadModel implements DeploymentReadModel {
@@ -75,6 +123,29 @@ class DisabledDefaultAccessDomainProvider implements DefaultAccessDomainProvider
       kind: "disabled" as const,
       reason: "test-disabled",
     });
+  }
+}
+
+class StaticResourceHealthProbeRunner implements ResourceHealthProbeRunner {
+  readonly requests: ResourceHealthProbeRequest[] = [];
+
+  constructor(private readonly result?: ResourceHealthProbeResult) {}
+
+  async probe(
+    _context: ExecutionContext,
+    request: ResourceHealthProbeRequest,
+  ): Promise<Result<ResourceHealthProbeResult>> {
+    this.requests.push(request);
+    return ok(
+      this.result ?? {
+        name: request.name,
+        target: request.target,
+        status: "passed",
+        observedAt: "2026-01-01T00:00:10.100Z",
+        durationMs: 12,
+        statusCode: request.expectedStatusCode,
+      },
+    );
   }
 }
 
@@ -186,9 +257,48 @@ function deploymentSummary(overrides?: Partial<DeploymentSummary>): DeploymentSu
   };
 }
 
+function resourceAggregateWithHealthPolicy(): Resource {
+  return Resource.rehydrate({
+    id: ResourceId.rehydrate("res_web"),
+    projectId: ProjectId.rehydrate("prj_demo"),
+    environmentId: EnvironmentId.rehydrate("env_demo"),
+    name: ResourceName.rehydrate("Web"),
+    slug: ResourceSlug.rehydrate("web"),
+    kind: ResourceKindValue.rehydrate("application"),
+    services: [],
+    runtimeProfile: {
+      strategy: RuntimePlanStrategyValue.rehydrate("workspace-commands"),
+      healthCheckPath: HealthCheckPathText.rehydrate("/health"),
+      healthCheck: {
+        enabled: true,
+        type: HealthCheckTypeValue.rehydrate("http"),
+        intervalSeconds: HealthCheckIntervalSeconds.rehydrate(5),
+        timeoutSeconds: HealthCheckTimeoutSeconds.rehydrate(5),
+        retries: HealthCheckRetryCount.rehydrate(10),
+        startPeriodSeconds: HealthCheckStartPeriodSeconds.rehydrate(5),
+        http: {
+          method: HealthCheckHttpMethodValue.rehydrate("GET"),
+          scheme: HealthCheckSchemeValue.rehydrate("http"),
+          host: HealthCheckHostText.rehydrate("localhost"),
+          path: HealthCheckPathText.rehydrate("/health"),
+          expectedStatusCode: HealthCheckExpectedStatusCode.rehydrate(200),
+        },
+      },
+    },
+    networkProfile: {
+      internalPort: PortNumber.rehydrate(3000),
+      upstreamProtocol: ResourceNetworkProtocolValue.rehydrate("http"),
+      exposureMode: ResourceExposureModeValue.rehydrate("reverse-proxy"),
+    },
+    createdAt: CreatedAt.rehydrate("2026-01-01T00:00:00.000Z"),
+  });
+}
+
 function createService(input?: {
   resources?: ResourceSummary[];
+  resourceAggregates?: Resource[];
   deployments?: DeploymentSummary[];
+  probeRunner?: StaticResourceHealthProbeRunner;
 }) {
   const resourceReadModel = new StaticResourceReadModel(input?.resources ?? [resourceSummary()]);
   const deploymentReadModel = new StaticDeploymentReadModel(
@@ -203,7 +313,9 @@ function createService(input?: {
 
   return new ResourceHealthQueryService(
     listResourcesQueryService,
+    new StaticResourceRepository(input?.resourceAggregates ?? []),
     deploymentReadModel,
+    input?.probeRunner ?? new StaticResourceHealthProbeRunner(),
     new FixedClock(),
   );
 }
@@ -357,6 +469,92 @@ describe("ResourceHealthQueryService", () => {
         name: "health-policy",
         status: "unknown",
         reasonCode: "cached_policy_not_executed",
+      }),
+    );
+  });
+
+  test("[RES-HEALTH-QRY-009] marks live HTTP policy pass as healthy", async () => {
+    const probeRunner = new StaticResourceHealthProbeRunner({
+      name: "health-policy",
+      target: "runtime",
+      status: "passed",
+      observedAt: "2026-01-01T00:00:10.100Z",
+      durationMs: 16,
+      statusCode: 200,
+    });
+    const service = createService({
+      resourceAggregates: [resourceAggregateWithHealthPolicy()],
+      probeRunner,
+    });
+
+    const result = await service.execute(
+      createTestContext(),
+      createQuery({
+        mode: "live",
+        includeChecks: true,
+      }),
+    );
+
+    expect(result.isOk()).toBe(true);
+    const summary = result._unsafeUnwrap();
+    expect(summary.overall).toBe("healthy");
+    expect(summary.runtime.health).toBe("healthy");
+    expect(summary.healthPolicy.reasonCode).toBe("resource_health_check_passed");
+    expect(summary.checks).toContainEqual(
+      expect.objectContaining({
+        name: "health-policy",
+        target: "runtime",
+        status: "passed",
+        statusCode: 200,
+      }),
+    );
+    expect(probeRunner.requests[0]).toMatchObject({
+      url: "http://127.0.0.1:3000/health",
+      expectedStatusCode: 200,
+    });
+  });
+
+  test("[RES-HEALTH-QRY-010] marks live HTTP policy failure as unhealthy", async () => {
+    const probeRunner = new StaticResourceHealthProbeRunner({
+      name: "health-policy",
+      target: "runtime",
+      status: "failed",
+      observedAt: "2026-01-01T00:00:10.100Z",
+      durationMs: 16,
+      statusCode: 500,
+      reasonCode: "resource_health_check_response_mismatch",
+      message: "Resource health probe returned an unexpected status code.",
+      retriable: true,
+    });
+    const service = createService({
+      resourceAggregates: [resourceAggregateWithHealthPolicy()],
+      probeRunner,
+    });
+
+    const result = await service.execute(
+      createTestContext(),
+      createQuery({
+        mode: "live",
+        includeChecks: true,
+      }),
+    );
+
+    expect(result.isOk()).toBe(true);
+    const summary = result._unsafeUnwrap();
+    expect(summary.overall).toBe("unhealthy");
+    expect(summary.runtime.health).toBe("unhealthy");
+    expect(summary.checks).toContainEqual(
+      expect.objectContaining({
+        name: "health-policy",
+        status: "failed",
+        statusCode: 500,
+        reasonCode: "resource_health_check_response_mismatch",
+      }),
+    );
+    expect(summary.sourceErrors).toContainEqual(
+      expect.objectContaining({
+        source: "health-check",
+        code: "resource_health_check_response_mismatch",
       }),
     );
   });

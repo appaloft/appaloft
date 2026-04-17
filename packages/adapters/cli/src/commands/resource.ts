@@ -1,4 +1,5 @@
 import {
+  ConfigureResourceHealthCommand,
   CreateResourceCommand,
   ListResourcesQuery,
   OpenTerminalSessionCommand,
@@ -44,6 +45,22 @@ const publicAccessProbeOption = Options.boolean("public-access-probe").pipe(
   Options.withDefault(false),
 );
 const runtimeProbeOption = Options.boolean("runtime-probe").pipe(Options.withDefault(false));
+const healthPathOption = Options.text("path").pipe(Options.withDefault("/"));
+const healthMethodOption = Options.choice("method", ["GET", "HEAD", "POST", "OPTIONS"]).pipe(
+  Options.withDefault("GET"),
+);
+const healthSchemeOption = Options.choice("scheme", ["http", "https"]).pipe(
+  Options.withDefault("http"),
+);
+const healthHostOption = Options.text("host").pipe(Options.withDefault("localhost"));
+const healthPortOption = Options.text("health-port").pipe(Options.optional);
+const healthExpectedStatusOption = Options.text("expected-status").pipe(Options.withDefault("200"));
+const healthExpectedTextOption = Options.text("expected-text").pipe(Options.optional);
+const healthIntervalOption = Options.text("interval").pipe(Options.withDefault("5"));
+const healthTimeoutOption = Options.text("timeout").pipe(Options.withDefault("5"));
+const healthRetriesOption = Options.text("retries").pipe(Options.withDefault("10"));
+const healthStartPeriodOption = Options.text("start-period").pipe(Options.withDefault("5"));
+const disableHealthOption = Options.boolean("disable").pipe(Options.withDefault(false));
 const tailOption = Options.text("tail").pipe(Options.withDefault("100"));
 const diagnosticTailOption = Options.text("tail").pipe(Options.withDefault("20"));
 const includeDeploymentLogsOption = Options.boolean("deployment-logs").pipe(
@@ -221,6 +238,72 @@ const healthCommand = EffectCommand.make(
   },
 ).pipe(EffectCommand.withDescription("Show current resource health"));
 
+const configureHealthCommand = EffectCommand.make(
+  "configure-health",
+  {
+    resourceId: resourceIdArg,
+    path: healthPathOption,
+    method: healthMethodOption,
+    scheme: healthSchemeOption,
+    host: healthHostOption,
+    healthPort: healthPortOption,
+    expectedStatus: healthExpectedStatusOption,
+    expectedText: healthExpectedTextOption,
+    interval: healthIntervalOption,
+    timeout: healthTimeoutOption,
+    retries: healthRetriesOption,
+    startPeriod: healthStartPeriodOption,
+    disable: disableHealthOption,
+    json: jsonOption,
+  },
+  ({
+    disable,
+    expectedStatus,
+    expectedText,
+    healthPort,
+    host,
+    interval,
+    json,
+    method,
+    path,
+    resourceId,
+    retries,
+    scheme,
+    startPeriod,
+    timeout,
+  }) => {
+    void json;
+    return runCommand(
+      ConfigureResourceHealthCommand.create({
+        resourceId,
+        healthCheck: {
+          enabled: !disable,
+          type: "http",
+          intervalSeconds: Number(interval),
+          timeoutSeconds: Number(timeout),
+          retries: Number(retries),
+          startPeriodSeconds: Number(startPeriod),
+          ...(!disable
+            ? {
+                http: {
+                  method,
+                  scheme,
+                  host,
+                  path,
+                  expectedStatusCode: Number(expectedStatus),
+                  ...(optionalNumber(healthPort) ? { port: optionalNumber(healthPort) } : {}),
+                  ...(optionalValue(expectedText)
+                    ? { expectedResponseText: optionalValue(expectedText) }
+                    : {}),
+                },
+              }
+            : {}),
+        },
+      }),
+    );
+  },
+).pipe(EffectCommand.withDescription("Configure resource health policy"));
+
 export const resourceCommand = EffectCommand.make("resource").pipe(
   EffectCommand.withDescription("Resource operations"),
   EffectCommand.withSubcommands([
@@ -229,6 +312,7 @@ export const resourceCommand = EffectCommand.make("resource").pipe(
     terminalCommand,
     logsCommand,
     healthCommand,
+    configureHealthCommand,
     proxyConfigCommand,
     diagnoseCommand,
   ]),

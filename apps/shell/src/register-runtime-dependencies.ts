@@ -11,6 +11,7 @@ import {
   InMemoryExecutionBackend,
   LocalExecutionBackend,
   RoutingExecutionBackend,
+  RuntimeResourceHealthProbeRunner,
   RuntimeResourceRuntimeLogReader,
   RuntimeServerConnectivityChecker,
   RuntimeServerEdgeProxyBootstrapper,
@@ -550,6 +551,9 @@ export function registerRuntimeDependencies(
       (dependencyContainer) =>
         new RuntimeResourceRuntimeLogReader(dependencyContainer.resolve(tokens.serverRepository)),
     ),
+  });
+  container.register(tokens.resourceHealthProbeRunner, {
+    useFactory: instanceCachingFactory(() => new RuntimeResourceHealthProbeRunner()),
   });
   container.register(tokens.terminalSessionGateway, {
     useFactory: instanceCachingFactory(
