@@ -113,6 +113,16 @@ Then:
 | RES-HEALTH-ENTRY-007 | e2e-preferred | CLI | `resource health --json` | Prints `ResourceHealthSummary` JSON from the query. |
 | RES-HEALTH-ENTRY-008 | e2e-preferred | API/oRPC | HTTP query | Reuses input schema and returns `ResourceHealthSummary`. |
 
+## Configure Health Command Matrix
+
+| Test ID | Preferred automation | Case | Input/read state | Expected result | Required assertion |
+| --- | --- | --- | --- | --- | --- |
+| RES-HEALTH-CFG-001 | e2e-preferred | Configure HTTP policy through public entrypoint | Existing resource, HTTP health policy input | `ok({ id })`, then `resources.health` reports configured policy | CLI or HTTP/oRPC dispatches `ConfigureResourceHealthCommand` and the query observes the policy. |
+| RES-HEALTH-CFG-002 | integration | Configure policy preserves runtime profile | Existing resource with install/build/start strategy fields | `ok({ id })` | Existing non-health runtime profile fields are preserved and health path is mirrored. |
+| RES-HEALTH-CFG-003 | integration | Disable health policy | Existing resource, `enabled = false` | `ok({ id })`, `resources.health` reports policy `not-configured` | Disabled policy is not treated as proof of health. |
+| RES-HEALTH-CFG-004 | integration | Resource missing | Unknown resource id | `err(not_found)` | No event is published and no resource is persisted. |
+| RES-HEALTH-CFG-005 | contract | Invalid HTTP policy | Enabled HTTP policy without HTTP config or invalid port/status/path | `err(validation_error)` | Input schema rejects invalid policy before use case execution. |
+
 ## Current Implementation Notes And Migration Gaps
 
 Executable application tests for the first cached/read-model slice live in
@@ -124,14 +134,17 @@ Current covered cases:
 - deployment `succeeded` plus ready access/proxy but no health policy returns `overall = "unknown"`;
 - failed public/proxy route state returns `overall = "degraded"`;
 - in-flight latest deployment returns `overall = "starting"`;
-- configured `healthCheckPath` remains `overall = "unknown"` until a current probe exists.
+- configured policy remains `overall = "unknown"` in cached mode until a current probe exists;
+- live HTTP policy pass/fail is covered in application tests;
+- `resources.configure-health` is covered by application integration tests and at least one public
+  CLI or HTTP/oRPC acceptance path.
 
 Current runtime adapter tests cover some deployment-time health checks. Those tests should remain
 attempt-scoped and new tests should cover the resource-owned observation contract separately.
 
-Remaining test gaps include provider-native runtime inspection, Docker health state, live HTTP
-policy pass/fail, command policy support/unsupported cases, durable-domain precedence inside the
-health query, and Web e2e mocking of mixed resource health states.
+Remaining test gaps include provider-native runtime inspection, Docker health state, command policy
+support/unsupported cases, durable-domain precedence inside the health query, and Web e2e mocking
+of mixed resource health states.
 
 ## Open Questions
 

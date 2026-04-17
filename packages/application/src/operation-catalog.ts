@@ -16,6 +16,7 @@ import { showEnvironmentQueryInputSchema } from "./operations/environments/show-
 import { unsetEnvironmentVariableCommandInputSchema } from "./operations/environments/unset-environment-variable.command";
 import { createProjectCommandInputSchema } from "./operations/projects/create-project.command";
 import { listProjectsQueryInputSchema } from "./operations/projects/list-projects.query";
+import { configureResourceHealthCommandInputSchema } from "./operations/resources/configure-resource-health.command";
 import { createResourceCommandInputSchema } from "./operations/resources/create-resource.command";
 import { listResourcesQueryInputSchema } from "./operations/resources/list-resources.query";
 import { resourceDiagnosticSummaryQueryInputSchema } from "./operations/resources/resource-diagnostic-summary.query";
@@ -236,6 +237,20 @@ export const operationCatalog = [
     transports: {
       cli: "appaloft resource create",
       orpc: { method: "POST", path: "/api/resources" },
+    },
+  },
+  {
+    key: "resources.configure-health",
+    kind: "command",
+    domain: "resources",
+    messageName: "ConfigureResourceHealthCommand",
+    handlerName: "ConfigureResourceHealthCommandHandler",
+    serviceName: "ConfigureResourceHealthUseCase",
+    inputSchema: configureResourceHealthCommandInputSchema,
+    serviceToken: tokens.configureResourceHealthUseCase,
+    transports: {
+      cli: "appaloft resource configure-health <resourceId>",
+      orpc: { method: "POST", path: "/api/resources/{resourceId}/health-policy" },
     },
   },
   {

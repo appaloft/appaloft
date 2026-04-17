@@ -6,6 +6,8 @@ import {
   type CertificateProviderSelectionInput,
   type CertificateProviderSelectionPolicy,
   CertificateRetryScheduler,
+  ConfigureResourceHealthCommandHandler,
+  ConfigureResourceHealthUseCase,
   ConfigureServerCredentialUseCase,
   ConfirmDomainBindingOwnershipUseCase,
   CreateDeploymentUseCase,
@@ -81,6 +83,7 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(MarkDomainRouteFailedOnDeploymentFinishedHandler);
   container.registerSingleton(IssueCertificateOnCertificateRequestedHandler);
   container.registerSingleton(BootstrapServerProxyCommandHandler);
+  container.registerSingleton(ConfigureResourceHealthCommandHandler);
   container.registerSingleton(IssueOrRenewCertificateCommandHandler);
   container.registerSingleton(ListCertificatesQueryHandler);
   container.registerSingleton(
@@ -90,6 +93,10 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(tokens.createProjectUseCase, CreateProjectUseCase);
   container.registerSingleton(tokens.listProjectsQueryService, ListProjectsQueryService);
   container.registerSingleton(tokens.createResourceUseCase, CreateResourceUseCase);
+  container.registerSingleton(
+    tokens.configureResourceHealthUseCase,
+    ConfigureResourceHealthUseCase,
+  );
   container.registerSingleton(tokens.listResourcesQueryService, ListResourcesQueryService);
   container.registerSingleton(tokens.registerServerUseCase, RegisterServerUseCase);
   container.registerSingleton(

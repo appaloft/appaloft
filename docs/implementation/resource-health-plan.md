@@ -40,8 +40,8 @@ Add application ports/tokens as needed:
 
 - a read-only `ResourceHealthObservationReader` or equivalent read-model port;
 - a read-only `RuntimeHealthInspector` for runtime/container/process lifecycle and health state;
-- a bounded `ResourceHealthCheckRunner` for HTTP and command policy execution when live mode is
-  accepted;
+- a bounded `ResourceHealthProbeRunner` for HTTP policy and public access execution when live mode
+  is requested;
 - a bounded `ResourcePublicAccessProbe` for public URL checks when explicitly requested;
 - `tokens.resourceHealthQueryService`.
 
@@ -74,6 +74,10 @@ mark deployments terminal while serving this query.
 
 Public access probes must be bounded by timeout, redirect limit, response size, and retry policy.
 They must not send credentials or private headers.
+
+`resources.configure-health` adds a command slice under `packages/application/src/operations/resources/`
+that loads the `Resource` aggregate, mutates `ResourceRuntimeProfile.healthCheck`, persists through
+the resource repository, and publishes `resource-health-policy-configured`.
 
 ## Expected Transport Scope
 
@@ -136,7 +140,8 @@ The minimal Code Round deliverable is:
 - application query slice and schema;
 - fake/in-memory health observation sources for application tests;
 - cached `ResourceHealthSummary` output with correct aggregation;
-- runtime inspection adapter for local Docker/local execution where current metadata allows it;
+- bounded live HTTP probe adapter for local/public URLs where current metadata allows it;
+- `resources.configure-health` command/API/CLI/Web affordance for existing resources;
 - Web resource detail status panel and resource access URL panel;
 - tests for deployment success plus inaccessible resource, missing policy, unhealthy runtime,
   public route failure, durable-domain precedence, and no write side effects.
@@ -173,28 +178,31 @@ come from resource-scoped access summary and domain binding state.
 
 ## Current Implementation Notes And Migration Gaps
 
-`resources.health` is implemented as a first cached/read-model aggregation slice.
+`resources.health` is implemented as a first aggregation slice with bounded live HTTP/public
+probes.
 
 Implemented scope:
 
 - application schema/query/handler/service under `packages/application/src/operations/resources/`;
+- `resources.configure-health` command schema/handler/use case and resource aggregate mutation;
 - operation catalog, tokens, DI registration, contracts, oRPC/HTTP, and CLI command wiring;
 - Web resource detail health panel, resource access URL panel, sidebar compact health, project list
   compact health, and project resource-list compact health;
 - application tests in `packages/application/test/resource-health.test.ts` for no deployment,
-  deployment success without health proof, failed public/proxy access, in-flight deployment, and
-  configured policy without a current probe.
+  deployment success without health proof, failed public/proxy access, in-flight deployment,
+  configured policy without a current probe, and live HTTP policy pass/fail;
+- application tests in `packages/application/test/configure-resource-health.test.ts` for policy
+  persistence, disabled policy, not found, and event publication.
 
-Current implementation reads latest deployment context, runtime lifecycle inferred from deployment
-state, configured `runtimePlan.execution.healthCheckPath`, resource access summary, and proxy route
-status. It deliberately keeps `overall = "unknown"` for a succeeded deployment when no configured
-health policy/current probe proves health.
+Current implementation reads latest deployment context, resource-owned health policy, runtime
+lifecycle inferred from deployment state, configured deployment snapshot health path as fallback,
+resource access summary, and proxy route status. It deliberately keeps `overall = "unknown"` for a
+succeeded deployment when no configured/current health observation proves health.
 
 Still deferred:
 
 - provider-native runtime/container inspection and Docker health state;
-- bounded live HTTP internal probes and command health checks;
-- bounded public access probes;
+- command health checks;
 - durable-domain readiness composition from domain binding records inside the health query;
 - background/scheduled health observation projection.
 

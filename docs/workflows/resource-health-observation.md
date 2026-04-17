@@ -17,6 +17,8 @@ Resource profile + latest runtime instance
 ```
 
 It is not a deployment write operation. It must not add health fields back to `deployments.create`.
+Existing resources configure policy through `resources.configure-health`; the observation workflow
+then reads that policy without mutating it.
 
 ## Global References
 
@@ -72,7 +74,7 @@ configuration, or health policy.
 | Configured HTTP policy | Bounded HTTP probe details and expected result. | Yes for HTTP resources |
 | Configured command policy | Bounded command result inside workload runtime. | Future or adapter-dependent |
 | Proxy route state | Whether reverse-proxy route configuration is applied/ready. | Yes when route data exists |
-| Public access probe | Whether the current resource URL responds as expected. | Optional first slice |
+| Public access probe | Whether the current resource URL responds as expected. | Yes when explicitly requested with live mode |
 | Runtime logs | Evidence for diagnostics, not health proof by itself. | Diagnostic-only |
 
 Runtime log text must not be used as the sole health predicate.
@@ -106,6 +108,16 @@ resources.health({ mode: "live" })
 If live observation persists the latest summary for navigation/list performance, that persistence
 belongs to an internal observer/process and must not be hidden inside a read query unless a future
 ADR accepts query-time cache writes.
+
+Existing-resource policy configuration flow:
+
+```text
+resources.configure-health({ resourceId, healthCheck })
+  -> persist resource-owned health policy
+  -> publish resource-health-policy-configured
+  -> resources.health({ resourceId, mode: "live" })
+  -> evaluate current runtime/public access using the configured policy when supported
+```
 
 ## Status Aggregation
 
@@ -171,9 +183,9 @@ Whole-query `err(DomainError)` is reserved for:
 
 ## Current Implementation Notes And Migration Gaps
 
-`resources.health` is implemented as a cached/read-model aggregation query. It reads the resource
-read model, latest deployment context, deployment runtime plan health path, resource access summary,
-and proxy route status, then returns `ResourceHealthSummary`.
+`resources.health` is implemented as an aggregation query. It reads the resource read model,
+resource-owned health policy, latest deployment context, deployment runtime plan health path,
+resource access summary, and proxy route status, then returns `ResourceHealthSummary`.
 
 The first implementation deliberately keeps a succeeded deployment with no current health proof as
 `overall = "unknown"` and uses failed proxy/public access state to report `degraded`.
@@ -184,11 +196,11 @@ context.
 
 Current runtime deployment execution still performs attempt-time health checks and fails the
 deployment attempt when local loopback/container checks fail. Those checks remain attempt-scoped
-until runtime/container inspection and health-check execution ports feed resource-owned health
-observation.
+until provider-native runtime/container inspection feeds resource-owned health observation.
 
-Live runtime inspection, Docker health-state inspection, HTTP/command policy execution, public
-access probes, and scheduled summary persistence are still future work.
+Bounded live HTTP policy and public access probes are implemented for safe HTTP targets. Docker
+health-state inspection, command policy execution, durable-domain readiness composition, and
+scheduled summary persistence are still future work.
 
 ## Open Questions
 

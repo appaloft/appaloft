@@ -210,19 +210,15 @@ They are exposed through operation catalog, oRPC/HTTP, CLI, contracts, and Web r
 The Web sidebar, resource header, resource detail health panel, project list, and project resource
 list use `ResourceHealthSummary.overall` instead of latest deployment status.
 
-This first implementation does not yet run live runtime/container inspection, HTTP/command health
-checks, or public access probes. Explicit `live`/probe requests return a safe cached summary with
-source errors describing the unavailable live probe source.
+The current implementation runs bounded HTTP health policy probes and optional public access probes
+when callers request `resources.health({ mode: "live" })` and a safe target URL can be resolved.
+Provider-native runtime/container inspection and command health checks remain future adapter work.
 
 `ResourceRuntimeProfile.healthCheck` now exists for first-deploy resource creation and is mirrored
-into runtime plans for deployment-time HTTP verification. A dedicated resource health policy update
-command remains future work.
+into runtime plans for deployment-time HTTP verification. Existing resources update this reusable
+policy through the dedicated `resources.configure-health` command.
 
 ## Open Questions
 
-- Should the first implementation expose only cached health summaries, or allow
-  `resources.health({ mode: "live" })` to run bounded read-only probes?
 - Should scheduled health observation be owned by a background job before Web shows health as the
   primary sidebar status?
-- What future command name should configure health policy: `resources.configure-health` or
-  `resources.configure-runtime`?

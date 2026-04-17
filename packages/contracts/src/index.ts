@@ -498,7 +498,7 @@ export const resourceHealthCheckPolicySchema = z
   })
   .strict()
   .superRefine((value, context) => {
-    if (value.type === "http" && !value.http) {
+    if (value.enabled && value.type === "http" && !value.http) {
       context.addIssue({
         code: "custom",
         path: ["http"],
@@ -600,6 +600,15 @@ export const createResourceInputSchema = z.object({
 });
 
 export const createResourceResponseSchema = z.object({
+  id: z.string(),
+});
+
+export const configureResourceHealthInputSchema = z.object({
+  resourceId: z.string().min(1),
+  healthCheck: resourceHealthCheckPolicySchema,
+});
+
+export const configureResourceHealthResponseSchema = z.object({
   id: z.string(),
 });
 
@@ -1408,6 +1417,8 @@ export type ResourceHealthSummary = z.infer<typeof resourceHealthSummarySchema>;
 export type ResourceSummary = z.infer<typeof resourceSummarySchema>;
 export type CreateResourceInput = z.infer<typeof createResourceInputSchema>;
 export type CreateResourceResponse = z.infer<typeof createResourceResponseSchema>;
+export type ConfigureResourceHealthInput = z.infer<typeof configureResourceHealthInputSchema>;
+export type ConfigureResourceHealthResponse = z.infer<typeof configureResourceHealthResponseSchema>;
 export type CreateEnvironmentInput = z.infer<typeof createEnvironmentInputSchema>;
 export type CreateEnvironmentResponse = z.infer<typeof createEnvironmentResponseSchema>;
 export type ListEnvironmentsResponse = z.infer<typeof listEnvironmentsResponseSchema>;

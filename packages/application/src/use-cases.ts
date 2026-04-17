@@ -28,6 +28,7 @@ export * from "./operations/environments/show-environment.query-service";
 export * from "./operations/environments/unset-environment-variable.use-case";
 export * from "./operations/projects/create-project.use-case";
 export * from "./operations/projects/list-projects.query-service";
+export * from "./operations/resources/configure-resource-health.use-case";
 export * from "./operations/resources/create-resource.use-case";
 export * from "./operations/resources/list-resources.query-service";
 export * from "./operations/resources/resource-access-summary.projector";

@@ -8,8 +8,8 @@
 - Handler: `ResourceHealthQueryHandler`
 - Query service: `ResourceHealthQueryService`
 - Domain / bounded context: Workload Delivery / Resource observation
-- Current status: active query, implemented cached/read-model aggregation
-- Source classification: implemented contract with live-probe gaps
+- Current status: active query, implemented aggregation with bounded HTTP/public live probes
+- Source classification: implemented contract with provider-native runtime inspection gaps
 
 ## Normative Contract
 
@@ -56,10 +56,10 @@ type ResourceHealthQueryInput = {
 | Field | Required | Meaning |
 | --- | --- | --- |
 | `resourceId` | Yes | Resource whose current health is requested. |
-| `mode` | No | Defaults to `cached`. `cached` reads the latest observed summary. `live` may perform bounded read-only inspection when the adapter supports it. |
+| `mode` | No | Defaults to `cached`. `cached` reads the latest observed summary. `live` performs bounded read-only HTTP/public probes when a safe target can be resolved. |
 | `includeChecks` | No | Includes individual check records when true. Defaults to true for resource detail and false for compact navigation. |
 | `includePublicAccessProbe` | No | Allows a bounded public route probe when `mode = live`. |
-| `includeRuntimeProbe` | No | Allows runtime/container/process inspection when `mode = live`. |
+| `includeRuntimeProbe` | No | Allows provider-native runtime/container/process inspection when `mode = live`; unsupported adapters report a source error rather than mutating state. |
 
 The query input must not accept deployment command fields, source locators, raw container ids,
 provider-native route ids, shell commands, host paths, tokens, credentials, or mutable policy
@@ -216,7 +216,7 @@ All errors use [Resource Health Error Spec](../errors/resources.health.md).
 
 | Entrypoint | Mapping | Status |
 | --- | --- | --- |
-| Web | Resource detail shows current resource health and sidebar/list compact status uses this query/projection when available. | Implemented |
+| Web | Resource detail shows current resource health, can request `mode = "live"` for detail refresh, and sidebar/list compact status uses this query/projection when available. | Implemented |
 | Desktop | Same Web surface. | Implemented through Web shell |
 | CLI | `appaloft resource health <resourceId> [--live] [--json]` prints summary and checks. | Implemented |
 | oRPC / HTTP | `GET /api/resources/{resourceId}/health` using the query schema. | Implemented |
@@ -227,16 +227,15 @@ All errors use [Resource Health Error Spec](../errors/resources.health.md).
 `resources.health` is implemented as an application query slice and exposed through operation
 catalog, oRPC/HTTP, CLI, contracts, and Web resource surfaces.
 
-The current implementation is a cached/read-model aggregation slice. It resolves resource context,
-latest deployment context, runtime lifecycle from latest deployment state, configured
-`runtimePlan.execution.healthCheckPath`, resource access summary, and proxy route status. It does
-not mark a successful deployment as healthy without a configured/current health observation.
+The current implementation resolves resource context, resource-owned runtime health policy, latest
+deployment context, runtime lifecycle from latest deployment state, resource access summary, proxy
+route status, and bounded live HTTP/public probes when `mode = "live"` can resolve a safe URL. It
+does not mark a successful deployment as healthy without a configured/current health observation.
 
-Live runtime inspection, Docker health-state inspection, command health checks, bounded HTTP
-internal probes, durable-domain readiness composition from domain binding records, and public URL
-probes are still future work. When callers request `mode = "live"` or explicit probe flags, the
-query returns a safe cached summary with source errors stating that live probes are not available in
-this implementation slice.
+Provider-native runtime inspection, Docker health-state inspection, command health checks,
+durable-domain readiness composition from domain binding records, and scheduled health summary
+persistence are still future work. Unsupported live inspection sources are reported as source
+errors inside `ok(ResourceHealthSummary)`.
 
 Runtime deployment verification still checks local loopback or Docker container reachability during
 `deployments.create` execution and records deployment success/failure. That remains
@@ -247,7 +246,5 @@ list now use `ResourceHealthSummary.overall` rather than `lastDeploymentStatus`.
 
 ## Open Questions
 
-- Should `mode = live` be exposed in the first public query or kept internal until background
-  observation state exists?
 - Should resource list and sidebar use `resources.health` per resource or a future compact
   `resources.summary`/navigation projection?

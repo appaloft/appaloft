@@ -851,6 +851,36 @@ export interface ResourceHealthCheck {
   metadata?: Record<string, string>;
 }
 
+export interface ResourceHealthProbeRequest {
+  name: string;
+  target: "runtime" | "public-access";
+  url: string;
+  method: "GET" | "HEAD" | "POST" | "OPTIONS";
+  expectedStatusCode: number;
+  expectedResponseText?: string;
+  timeoutSeconds: number;
+}
+
+export interface ResourceHealthProbeResult {
+  name: string;
+  target: "runtime" | "public-access";
+  status: "passed" | "failed";
+  observedAt: string;
+  durationMs: number;
+  statusCode?: number;
+  message?: string;
+  reasonCode?: string;
+  retriable?: boolean;
+  metadata?: Record<string, string>;
+}
+
+export interface ResourceHealthProbeRunner {
+  probe(
+    context: ExecutionContext,
+    request: ResourceHealthProbeRequest,
+  ): Promise<Result<ResourceHealthProbeResult, DomainError>>;
+}
+
 export interface ResourceHealthSummary {
   schemaVersion: "resources.health/v1";
   resourceId: string;

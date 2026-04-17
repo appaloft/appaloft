@@ -2,7 +2,9 @@
 
 ## Normative Contract
 
-Resource lifecycle commands use the shared platform error model and neverthrow conventions. This file defines the resource-specific error profile for `resources.create` and the minimum resource lifecycle.
+Resource lifecycle commands use the shared platform error model and neverthrow conventions. This
+file defines the resource-specific error profile for `resources.create`,
+`resources.configure-health`, and the minimum resource lifecycle.
 
 Resource errors must use stable `code`, `category`, `phase`, `retriable`, and related entity details. They must not rely on message text as the contract.
 
@@ -20,14 +22,15 @@ This spec inherits:
 
 ```ts
 type ResourceLifecycleErrorDetails = {
-  commandName?: "resources.create";
-  eventName?: "resource-created";
+  commandName?: "resources.create" | "resources.configure-health";
+  eventName?: "resource-created" | "resource-health-policy-configured";
   phase:
     | "command-validation"
     | "context-resolution"
     | "resource-admission"
     | "resource-source-resolution"
     | "resource-network-resolution"
+    | "health-policy-resolution"
     | "resource-persistence"
     | "event-publication"
     | "event-consumption";
@@ -48,6 +51,9 @@ type ResourceLifecycleErrorDetails = {
   imageTag?: string;
   imageDigest?: string;
   internalPort?: number;
+  healthCheckPath?: string;
+  healthCheckType?: "http";
+  healthCheckEnabled?: boolean;
   exposureMode?: "none" | "reverse-proxy" | "direct-port";
   upstreamProtocol?: "http" | "tcp";
   targetServiceName?: string;
@@ -74,6 +80,7 @@ Admission errors reject `resources.create` and return `err(DomainError)`.
 | `invariant_violation` | `domain` | `resource-admission` | No | Resource aggregate rule rejected the requested state. |
 | `validation_error` | `resource-source-resolution` | No | Source variant metadata is invalid, such as an uncloneable deep Git URL, ambiguous Git ref/base-directory split, invalid source-relative path, or invalid Docker image tag/digest pair. |
 | `validation_error` | `validation` | `resource-network-resolution` | No | Resource network profile is missing, invalid, or ambiguous for an inbound resource endpoint. |
+| `validation_error` | `validation` | `health-policy-resolution` | No | Resource health policy is missing required HTTP fields, has invalid probe fields, or requests an unsupported policy type. |
 | `infra_error` | `infra` | `resource-persistence` | Conditional | Persistence failed before the resource could be safely created. |
 | `infra_error` | `infra` | `event-publication` | Conditional | Event publication or outbox recording failed before command success could be safely returned. |
 

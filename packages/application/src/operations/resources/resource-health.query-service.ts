@@ -1,4 +1,12 @@
-import { domainError, err, ok, type Result } from "@appaloft/core";
+import {
+  domainError,
+  err,
+  ok,
+  ResourceByIdSpec,
+  ResourceId,
+  type ResourceState,
+  type Result,
+} from "@appaloft/core";
 import { inject, injectable } from "tsyringe";
 
 import { type ExecutionContext, toRepositoryContext } from "../../execution-context";
@@ -11,11 +19,15 @@ import {
   type ResourceHealthDeploymentContext,
   type ResourceHealthOverall,
   type ResourceHealthPolicySection,
+  type ResourceHealthProbeRequest,
+  type ResourceHealthProbeResult,
+  type ResourceHealthProbeRunner,
   type ResourceHealthSource,
   type ResourceHealthSourceError,
   type ResourceHealthSummary,
   type ResourceProxyHealthSection,
   type ResourcePublicAccessHealthSection,
+  type ResourceRepository,
   type ResourceRuntimeHealth,
   type ResourceRuntimeHealthSection,
   type ResourceSummary,
@@ -166,18 +178,153 @@ function runtimeSection(
   };
 }
 
-function healthPolicySection(
+interface ResolvedHttpHealthPolicy {
+  enabled: boolean;
+  type: "http";
+  method: "GET" | "HEAD" | "POST" | "OPTIONS";
+  scheme: "http" | "https";
+  host: string;
+  path: string;
+  port?: number;
+  expectedStatusCode: number;
+  expectedResponseText?: string;
+  intervalSeconds: number;
+  timeoutSeconds: number;
+  retries: number;
+  startPeriodSeconds: number;
+}
+
+function httpPolicyFromResourceState(
+  resource: ResourceSummary,
+  resourceState: ResourceState | undefined,
+): ResolvedHttpHealthPolicy | undefined {
+  const healthCheck = resourceState?.runtimeProfile?.healthCheck;
+  if (!healthCheck) {
+    const path = resourceState?.runtimeProfile?.healthCheckPath?.value;
+    return path
+      ? {
+          enabled: true,
+          type: "http",
+          method: "GET",
+          scheme: "http",
+          host: "localhost",
+          path,
+          ...(resource.networkProfile?.internalPort
+            ? { port: resource.networkProfile.internalPort }
+            : {}),
+          expectedStatusCode: 200,
+          intervalSeconds: 5,
+          timeoutSeconds: 5,
+          retries: 10,
+          startPeriodSeconds: 5,
+        }
+      : undefined;
+  }
+
+  const http = healthCheck.http;
+  if (!healthCheck.enabled || healthCheck.type.value !== "http" || !http) {
+    return {
+      enabled: healthCheck.enabled,
+      type: "http",
+      method: "GET",
+      scheme: "http",
+      host: "localhost",
+      path: resourceState?.runtimeProfile?.healthCheckPath?.value ?? "/",
+      expectedStatusCode: 200,
+      intervalSeconds: healthCheck.intervalSeconds.value,
+      timeoutSeconds: healthCheck.timeoutSeconds.value,
+      retries: healthCheck.retries.value,
+      startPeriodSeconds: healthCheck.startPeriodSeconds.value,
+    };
+  }
+
+  const port = http.port?.value ?? resource.networkProfile?.internalPort;
+
+  return {
+    enabled: healthCheck.enabled,
+    type: "http",
+    method: http.method.value,
+    scheme: http.scheme.value,
+    host: http.host.value,
+    path: http.path.value,
+    ...(port ? { port } : {}),
+    expectedStatusCode: http.expectedStatusCode.value,
+    ...(http.expectedResponseText ? { expectedResponseText: http.expectedResponseText.value } : {}),
+    intervalSeconds: healthCheck.intervalSeconds.value,
+    timeoutSeconds: healthCheck.timeoutSeconds.value,
+    retries: healthCheck.retries.value,
+    startPeriodSeconds: healthCheck.startPeriodSeconds.value,
+  };
+}
+
+function httpPolicyFromDeployment(
   resource: ResourceSummary,
   deployment: DeploymentSummary | undefined,
-): ResourceHealthPolicySection {
+): ResolvedHttpHealthPolicy | undefined {
   const healthCheck = deployment?.runtimePlan.execution.healthCheck;
-  const httpHealthCheck = healthCheck?.http;
-  const healthCheckPath =
-    httpHealthCheck?.path ?? deployment?.runtimePlan.execution.healthCheckPath;
+  const http = healthCheck?.http;
+  const path = http?.path ?? deployment?.runtimePlan.execution.healthCheckPath;
+  if (!healthCheck && !path) {
+    return undefined;
+  }
+
+  if (healthCheck && (!healthCheck.enabled || healthCheck.type !== "http")) {
+    return {
+      enabled: healthCheck.enabled,
+      type: "http",
+      method: "GET",
+      scheme: "http",
+      host: "localhost",
+      path: path ?? "/",
+      expectedStatusCode: 200,
+      intervalSeconds: healthCheck.intervalSeconds,
+      timeoutSeconds: healthCheck.timeoutSeconds,
+      retries: healthCheck.retries,
+      startPeriodSeconds: healthCheck.startPeriodSeconds,
+    };
+  }
+
   const port =
-    httpHealthCheck?.port ??
-    resource.networkProfile?.internalPort ??
-    deployment?.runtimePlan.execution.port;
+    http?.port ?? resource.networkProfile?.internalPort ?? deployment?.runtimePlan.execution.port;
+
+  return {
+    enabled: true,
+    type: "http",
+    method: http?.method ?? "GET",
+    scheme: http?.scheme ?? "http",
+    host: http?.host ?? "localhost",
+    path: path ?? "/",
+    ...(port ? { port } : {}),
+    expectedStatusCode: http?.expectedStatusCode ?? 200,
+    ...(http?.expectedResponseText ? { expectedResponseText: http.expectedResponseText } : {}),
+    intervalSeconds: healthCheck?.intervalSeconds ?? 5,
+    timeoutSeconds: healthCheck?.timeoutSeconds ?? 5,
+    retries: healthCheck?.retries ?? 10,
+    startPeriodSeconds: healthCheck?.startPeriodSeconds ?? 5,
+  };
+}
+
+function resolvedHttpHealthPolicy(input: {
+  resource: ResourceSummary;
+  resourceState: ResourceState | undefined;
+  deployment: DeploymentSummary | undefined;
+}): ResolvedHttpHealthPolicy | undefined {
+  return (
+    httpPolicyFromResourceState(input.resource, input.resourceState) ??
+    httpPolicyFromDeployment(input.resource, input.deployment)
+  );
+}
+
+function healthPolicySection(
+  resource: ResourceSummary,
+  resourceState: ResourceState | undefined,
+  deployment: DeploymentSummary | undefined,
+): ResourceHealthPolicySection {
+  const healthCheck = resolvedHttpHealthPolicy({
+    resource,
+    resourceState,
+    deployment,
+  });
 
   if (healthCheck && !healthCheck.enabled) {
     return {
@@ -187,7 +334,7 @@ function healthPolicySection(
     };
   }
 
-  if (!healthCheckPath && !healthCheck) {
+  if (!healthCheck) {
     return {
       status: "not-configured" as const,
       enabled: false,
@@ -198,18 +345,14 @@ function healthPolicySection(
   return {
     status: "configured" as const,
     enabled: true,
-    type: healthCheck?.type ?? "http",
-    ...(healthCheckPath ? { path: healthCheckPath } : {}),
-    ...(port ? { port } : {}),
-    expectedStatusCode: httpHealthCheck?.expectedStatusCode ?? 200,
-    ...(healthCheck
-      ? {
-          intervalSeconds: healthCheck.intervalSeconds,
-          timeoutSeconds: healthCheck.timeoutSeconds,
-          retries: healthCheck.retries,
-          startPeriodSeconds: healthCheck.startPeriodSeconds,
-        }
-      : {}),
+    type: "http",
+    path: healthCheck.path,
+    ...(healthCheck.port ? { port: healthCheck.port } : {}),
+    expectedStatusCode: healthCheck.expectedStatusCode,
+    intervalSeconds: healthCheck.intervalSeconds,
+    timeoutSeconds: healthCheck.timeoutSeconds,
+    retries: healthCheck.retries,
+    startPeriodSeconds: healthCheck.startPeriodSeconds,
     reasonCode: "cached_policy_not_executed",
   };
 }
@@ -354,6 +497,7 @@ function checkRecords(input: {
   healthPolicy: ResourceHealthPolicySection;
   publicAccess: ResourcePublicAccessHealthSection;
   proxy: ResourceProxyHealthSection;
+  liveChecks?: ResourceHealthCheck[];
 }): ResourceHealthCheck[] {
   const checks: ResourceHealthCheck[] = [
     {
@@ -372,8 +516,10 @@ function checkRecords(input: {
     },
     {
       name: "health-policy",
-      target: input.healthPolicy.type === "command" ? "command" : "container",
-      status: input.healthPolicy.status === "configured" ? "unknown" : "skipped",
+      target: input.healthPolicy.type === "command" ? "command" : "runtime",
+      status:
+        input.liveChecks?.find((check) => check.name === "health-policy")?.status ??
+        (input.healthPolicy.status === "configured" ? "unknown" : "skipped"),
       observedAt: input.observedAt,
       ...(input.healthPolicy.reasonCode ? { reasonCode: input.healthPolicy.reasonCode } : {}),
       ...(input.healthPolicy.path ? { metadata: { path: input.healthPolicy.path } } : {}),
@@ -409,7 +555,7 @@ function checkRecords(input: {
     },
   ];
 
-  return checks;
+  return checks.map((check) => input.liveChecks?.find((live) => live.name === check.name) ?? check);
 }
 
 function overallStatus(input: {
@@ -431,6 +577,10 @@ function overallStatus(input: {
     return "stopped";
   }
 
+  if (input.runtime.health === "unhealthy") {
+    return "unhealthy";
+  }
+
   if (
     input.publicAccess.status === "failed" ||
     input.publicAccess.status === "not-ready" ||
@@ -444,7 +594,113 @@ function overallStatus(input: {
     return "unknown";
   }
 
+  if (
+    input.runtime.lifecycle === "running" &&
+    input.runtime.health === "healthy" &&
+    input.healthPolicy.status === "configured" &&
+    (input.publicAccess.status === "ready" || input.publicAccess.status === "not-configured") &&
+    (input.proxy.status === "ready" || input.proxy.status === "not-configured")
+  ) {
+    return "healthy";
+  }
+
   return "unknown";
+}
+
+function positiveIntegerFromString(raw: string | undefined): number | undefined {
+  if (!raw) {
+    return undefined;
+  }
+
+  const parsed = Number(raw);
+  return Number.isInteger(parsed) ? parsed : undefined;
+}
+
+function checkFromProbeResult(result: ResourceHealthProbeResult): ResourceHealthCheck {
+  return {
+    name: result.name,
+    target: result.target,
+    status: result.status,
+    observedAt: result.observedAt,
+    durationMs: result.durationMs,
+    ...(result.statusCode ? { statusCode: result.statusCode } : {}),
+    ...(result.message ? { message: result.message } : {}),
+    ...(result.reasonCode ? { reasonCode: result.reasonCode } : {}),
+    ...(typeof result.retriable === "boolean" ? { retriable: result.retriable } : {}),
+    ...(result.metadata ? { metadata: result.metadata } : {}),
+  };
+}
+
+function withPolicyPath(rawUrl: string, path: string): string | undefined {
+  try {
+    const url = new URL(rawUrl);
+    url.pathname = path.startsWith("/") ? path : `/${path}`;
+    url.search = "";
+    url.hash = "";
+    return url.toString();
+  } catch {
+    return undefined;
+  }
+}
+
+function isRemoteLoopbackUrl(rawUrl: string, deployment: DeploymentSummary): boolean {
+  if (deployment.runtimePlan.target.providerKey !== "generic-ssh") {
+    return false;
+  }
+
+  try {
+    const url = new URL(rawUrl);
+    return url.hostname === "127.0.0.1" || url.hostname === "localhost" || url.hostname === "::1";
+  } catch {
+    return false;
+  }
+}
+
+function runtimeProbeUrl(input: {
+  resource: ResourceSummary;
+  deployment: DeploymentSummary;
+  policy: ResolvedHttpHealthPolicy;
+}): string | undefined {
+  const metadata = input.deployment.runtimePlan.execution.metadata;
+  const metadataUrl = metadata?.url ?? metadata?.publicUrl;
+  if (metadataUrl && !isRemoteLoopbackUrl(metadataUrl, input.deployment)) {
+    const url = withPolicyPath(metadataUrl, input.policy.path);
+    if (url) {
+      return url;
+    }
+  }
+
+  const publishedPort = positiveIntegerFromString(metadata?.publishedPort);
+  if (
+    publishedPort &&
+    (input.deployment.runtimePlan.target.providerKey === "local-shell" ||
+      input.deployment.runtimePlan.target.providerKey === "local")
+  ) {
+    return `${input.policy.scheme}://127.0.0.1:${publishedPort}${input.policy.path}`;
+  }
+
+  if (
+    input.deployment.runtimePlan.target.providerKey === "local-shell" &&
+    input.deployment.runtimePlan.execution.port
+  ) {
+    return `${input.policy.scheme}://127.0.0.1:${input.deployment.runtimePlan.execution.port}${input.policy.path}`;
+  }
+
+  const publicRoute =
+    input.resource.accessSummary?.latestDurableDomainRoute ??
+    input.resource.accessSummary?.latestGeneratedAccessRoute;
+  return publicRoute ? withPolicyPath(publicRoute.url, input.policy.path) : undefined;
+}
+
+function publicAccessProbeUrl(
+  publicAccess: ResourcePublicAccessHealthSection,
+  policy: ResolvedHttpHealthPolicy,
+): string | undefined {
+  if (!publicAccess.url) {
+    return undefined;
+  }
+
+  return withPolicyPath(publicAccess.url, policy.path);
 }
 
 @injectable()
@@ -452,8 +708,12 @@ export class ResourceHealthQueryService {
   constructor(
     @inject(tokens.listResourcesQueryService)
     private readonly listResourcesQueryService: ListResourcesQueryService,
+    @inject(tokens.resourceRepository)
+    private readonly resourceRepository: ResourceRepository,
     @inject(tokens.deploymentReadModel)
     private readonly deploymentReadModel: DeploymentReadModel,
+    @inject(tokens.resourceHealthProbeRunner)
+    private readonly probeRunner: ResourceHealthProbeRunner,
     @inject(tokens.clock)
     private readonly clock: Clock,
   ) {}
@@ -468,6 +728,11 @@ export class ResourceHealthQueryService {
     }
 
     const resource = resourceResult.value;
+    const resourceStateResult = await this.resolveResourceState(context, resource.id);
+    if (resourceStateResult.isErr()) {
+      return err(resourceStateResult.error);
+    }
+    const resourceState = resourceStateResult.value;
     const deploymentsResult = await this.resolveDeployments(context, resource.id);
     if (deploymentsResult.isErr()) {
       return err(deploymentsResult.error);
@@ -480,7 +745,7 @@ export class ResourceHealthQueryService {
     const sourceErrors: ResourceHealthSourceError[] = [];
     const latestDeploymentHealthContext = latestDeploymentContext(latestDeployment);
 
-    this.recordUnsupportedLiveProbeRequests(query, resource, sourceErrors);
+    this.recordUnsupportedLiveInspectionRequests(query, resource, sourceErrors);
 
     if (!latestDeployment) {
       sourceErrors.push(
@@ -496,7 +761,7 @@ export class ResourceHealthQueryService {
       );
     }
 
-    const healthPolicy = healthPolicySection(resource, latestDeployment);
+    let healthPolicy = healthPolicySection(resource, resourceState, latestDeployment);
     if (healthPolicy.status === "not-configured" && latestDeployment?.status === "succeeded") {
       sourceErrors.push(
         sourceError({
@@ -511,13 +776,151 @@ export class ResourceHealthQueryService {
       );
     }
 
-    const runtime = runtimeSection(
+    let runtime = runtimeSection(
       observedAt,
       latestDeployment,
       healthPolicy.status === "configured",
     );
-    const publicAccess = publicAccessSection(resource, sourceErrors);
+    let publicAccess = publicAccessSection(resource, sourceErrors);
     const proxy = proxySection(resource, sourceErrors);
+    const liveChecks: ResourceHealthCheck[] = [];
+
+    const resolvedPolicy = resolvedHttpHealthPolicy({
+      resource,
+      resourceState,
+      deployment: latestDeployment,
+    });
+
+    if (
+      query.mode === "live" &&
+      latestDeployment &&
+      runtime.lifecycle === "running" &&
+      healthPolicy.status === "configured" &&
+      resolvedPolicy?.enabled
+    ) {
+      const request = this.runtimeProbeRequest(resource, latestDeployment, resolvedPolicy);
+
+      if (request) {
+        const probeResult = await this.probeRunner.probe(context, request);
+        if (probeResult.isOk()) {
+          const check = checkFromProbeResult(probeResult.value);
+          liveChecks.push(check);
+
+          if (probeResult.value.status === "passed") {
+            runtime = {
+              ...runtime,
+              health: "healthy",
+              reasonCode: "resource_health_check_passed",
+              observedAt: probeResult.value.observedAt,
+            };
+            healthPolicy = {
+              ...healthPolicy,
+              reasonCode: "resource_health_check_passed",
+            };
+          } else {
+            runtime = {
+              ...runtime,
+              health: "unhealthy",
+              reasonCode: probeResult.value.reasonCode ?? "resource_health_check_failed",
+              observedAt: probeResult.value.observedAt,
+              ...(probeResult.value.message ? { message: probeResult.value.message } : {}),
+            };
+            sourceErrors.push(
+              sourceError({
+                source: "health-check",
+                code: probeResult.value.reasonCode ?? "resource_health_check_failed",
+                category: "infra",
+                phase: "health-check-execution",
+                retriable: probeResult.value.retriable ?? true,
+                relatedEntityId: resource.id,
+                ...(probeResult.value.message ? { message: probeResult.value.message } : {}),
+              }),
+            );
+          }
+        } else {
+          sourceErrors.push(
+            sourceError({
+              source: "health-check",
+              code: probeResult.error.code,
+              category: probeResult.error.category,
+              phase: "health-check-execution",
+              retriable: probeResult.error.retryable,
+              relatedEntityId: resource.id,
+              message: probeResult.error.message,
+            }),
+          );
+        }
+      } else {
+        sourceErrors.push(
+          sourceError({
+            source: "health-check",
+            code: "resource_health_check_unavailable",
+            category: "infra",
+            phase: "health-check-execution",
+            retriable: true,
+            relatedEntityId: resource.id,
+            message: "No safe current runtime URL can be resolved for this resource health policy.",
+          }),
+        );
+      }
+    }
+
+    if (
+      query.mode === "live" &&
+      query.includePublicAccessProbe &&
+      resolvedPolicy?.enabled &&
+      healthPolicy.status === "configured"
+    ) {
+      const request = this.publicAccessProbeRequest(publicAccess, resolvedPolicy);
+      if (request) {
+        const probeResult = await this.probeRunner.probe(context, request);
+        if (probeResult.isOk()) {
+          const check = checkFromProbeResult(probeResult.value);
+          liveChecks.push(check);
+
+          if (probeResult.value.status === "passed") {
+            const { phase, reasonCode, ...readyPublicAccess } = publicAccess;
+            void phase;
+            void reasonCode;
+            publicAccess = {
+              ...readyPublicAccess,
+              status: "ready",
+            };
+          } else {
+            publicAccess = {
+              ...publicAccess,
+              status: "failed",
+              reasonCode: "resource_public_access_probe_failed",
+              phase: "public-access-observation",
+            };
+            sourceErrors.push(
+              sourceError({
+                source: "public-access",
+                code: "resource_public_access_probe_failed",
+                category: "infra",
+                phase: "public-access-observation",
+                retriable: probeResult.value.retriable ?? true,
+                relatedEntityId: resource.id,
+                ...(probeResult.value.message ? { message: probeResult.value.message } : {}),
+              }),
+            );
+          }
+        } else {
+          sourceErrors.push(
+            sourceError({
+              source: "public-access",
+              code: "resource_public_access_probe_failed",
+              category: probeResult.error.category,
+              phase: "public-access-observation",
+              retriable: probeResult.error.retryable,
+              relatedEntityId: resource.id,
+              message: probeResult.error.message,
+            }),
+          );
+        }
+      }
+    }
+
     const overall = overallStatus({
       deployment: latestDeployment,
       runtime,
@@ -544,6 +947,7 @@ export class ResourceHealthQueryService {
             healthPolicy,
             publicAccess,
             proxy,
+            liveChecks,
           })
         : [],
       sourceErrors,
@@ -566,6 +970,35 @@ export class ResourceHealthQueryService {
           {
             resourceId,
             phase: "read-model-load",
+          },
+        ),
+      );
+    }
+  }
+
+  private async resolveResourceState(
+    context: ExecutionContext,
+    resourceId: string,
+  ): Promise<Result<ResourceState | undefined>> {
+    try {
+      const parsedResourceId = ResourceId.create(resourceId);
+      if (parsedResourceId.isErr()) {
+        return err(parsedResourceId.error);
+      }
+
+      const resource = await this.resourceRepository.findOne(
+        toRepositoryContext(context),
+        ResourceByIdSpec.create(parsedResourceId.value),
+      );
+
+      return ok(resource?.toState());
+    } catch (error) {
+      return err(
+        domainError.resourceHealthUnavailable(
+          error instanceof Error ? error.message : "Resource health is unavailable",
+          {
+            resourceId,
+            phase: "resource-resolution",
           },
         ),
       );
@@ -595,40 +1028,55 @@ export class ResourceHealthQueryService {
     }
   }
 
-  private recordUnsupportedLiveProbeRequests(
+  private runtimeProbeRequest(
+    resource: ResourceSummary,
+    deployment: DeploymentSummary,
+    policy: ResolvedHttpHealthPolicy,
+  ): ResourceHealthProbeRequest | undefined {
+    const url = runtimeProbeUrl({ resource, deployment, policy });
+
+    return url
+      ? {
+          name: "health-policy",
+          target: "runtime",
+          url,
+          method: policy.method,
+          expectedStatusCode: policy.expectedStatusCode,
+          ...(policy.expectedResponseText
+            ? { expectedResponseText: policy.expectedResponseText }
+            : {}),
+          timeoutSeconds: policy.timeoutSeconds,
+        }
+      : undefined;
+  }
+
+  private publicAccessProbeRequest(
+    publicAccess: ResourcePublicAccessHealthSection,
+    policy: ResolvedHttpHealthPolicy,
+  ): ResourceHealthProbeRequest | undefined {
+    const url = publicAccessProbeUrl(publicAccess, policy);
+
+    return url
+      ? {
+          name: "public-access",
+          target: "public-access",
+          url,
+          method: policy.method,
+          expectedStatusCode: policy.expectedStatusCode,
+          ...(policy.expectedResponseText
+            ? { expectedResponseText: policy.expectedResponseText }
+            : {}),
+          timeoutSeconds: policy.timeoutSeconds,
+        }
+      : undefined;
+  }
+
+  private recordUnsupportedLiveInspectionRequests(
     query: ResourceHealthQuery,
     resource: ResourceSummary,
     sourceErrors: ResourceHealthSourceError[],
   ): void {
-    if (query.mode === "live") {
-      sourceErrors.push(
-        sourceError({
-          source: "health-check",
-          code: "resource_health_live_probe_unavailable",
-          category: "infra",
-          phase: "live-probe",
-          retriable: true,
-          relatedEntityId: resource.id,
-          message: "Live resource health probes are not available in this implementation slice.",
-        }),
-      );
-    }
-
-    if (query.includePublicAccessProbe) {
-      sourceErrors.push(
-        sourceError({
-          source: "public-access",
-          code: "resource_public_access_live_probe_unavailable",
-          category: "infra",
-          phase: "public-access-live-probe",
-          retriable: true,
-          relatedEntityId: resource.id,
-          message: "Live public access probes are not available in this implementation slice.",
-        }),
-      );
-    }
-
-    if (query.includeRuntimeProbe) {
+    if (query.mode === "live" && query.includeRuntimeProbe) {
       sourceErrors.push(
         sourceError({
           source: "runtime",
