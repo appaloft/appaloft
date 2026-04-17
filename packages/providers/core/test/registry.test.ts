@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
-import { aliyunProvider } from "@yundu/provider-aliyun";
-import { genericSshProvider } from "@yundu/provider-generic-ssh";
-import { tencentProvider } from "@yundu/provider-tencent";
+import { aliyunProvider } from "@appaloft/provider-aliyun";
+import { genericSshProvider } from "@appaloft/provider-generic-ssh";
+import { tencentProvider } from "@appaloft/provider-tencent";
 import { InMemoryProviderRegistry } from "../src/index";
 
 describe("provider registry contract", () => {

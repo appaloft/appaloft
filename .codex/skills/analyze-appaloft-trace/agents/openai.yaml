@@ -1,0 +1,4 @@
+interface:
+  display_name: "Analyze Appaloft Trace"
+  short_description: "Analyze Jaeger traces using Appaloft span conventions."
+  default_prompt: "Analyze this Jaeger trace URL or trace ID for Appaloft latency, critical path, errors, and span categories."

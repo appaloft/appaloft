@@ -17,7 +17,7 @@ describe("routing/domain/TLS workflow e2e", () => {
   beforeAll(() => {
     fixture = createRoutingDomainTlsFixture({
       appVersion: "0.1.0-routing-domain-tls-workflow-e2e",
-      prefix: "yundu-routing-domain-tls-workflow-",
+      prefix: "appaloft-routing-domain-tls-workflow-",
       proxyKind: "traefik",
     });
   }, 60000);

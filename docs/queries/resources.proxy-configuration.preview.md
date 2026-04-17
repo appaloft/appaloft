@@ -22,7 +22,7 @@ This query inherits:
 
 ## Purpose
 
-Show operators what Yundu intends to apply, or has already applied, for a resource's edge proxy route.
+Show operators what Appaloft intends to apply, or has already applied, for a resource's edge proxy route.
 
 It is not:
 
@@ -131,7 +131,7 @@ API and oRPC must expose the same query input/output schema.
 CLI exposes the query through:
 
 ```text
-yundu resource proxy-config <resourceId>
+appaloft resource proxy-config <resourceId>
 ```
 
 CLI and Web must not re-render provider-specific config locally. They display query output.

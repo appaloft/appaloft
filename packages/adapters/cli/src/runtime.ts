@@ -9,9 +9,9 @@ import {
   type QueryBus,
   type ResourceRuntimeLogLine,
   type ResourceRuntimeLogsResult,
-} from "@yundu/application";
-import { createCliLogRenderer } from "@yundu/cli-logging";
-import { type DomainError, domainError, type Result } from "@yundu/core";
+} from "@appaloft/application";
+import { createCliLogRenderer } from "@appaloft/cli-logging";
+import { type DomainError, domainError, type Result } from "@appaloft/core";
 import { Context, Effect, Layer, Option } from "effect";
 
 export interface CliProgram {
@@ -32,7 +32,7 @@ export interface ExecuteCommandOptions {
 }
 
 function readCliLocale(): string | undefined {
-  return process.env.YUNDU_LOCALE ?? process.env.LANG;
+  return process.env.APPALOFT_LOCALE ?? process.env.LANG;
 }
 
 export class CliRuntime extends Context.Tag("CliRuntime")<
@@ -60,7 +60,7 @@ export const CliRuntimeLive = (input: CliProgramInput) =>
         actor: {
           kind: "system",
           id: "cli",
-          label: "yundu-cli",
+          label: "appaloft-cli",
         },
       });
       const unsubscribe =
@@ -88,7 +88,7 @@ export const CliRuntimeLive = (input: CliProgramInput) =>
           actor: {
             kind: "system",
             id: "cli",
-            label: "yundu-cli",
+            label: "appaloft-cli",
           },
         }),
         message,

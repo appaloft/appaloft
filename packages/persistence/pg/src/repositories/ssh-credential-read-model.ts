@@ -1,9 +1,9 @@
 import {
+  appaloftTraceAttributes,
   createReadModelSpanName,
   type RepositoryContext,
   type SshCredentialReadModel,
-  yunduTraceAttributes,
-} from "@yundu/application";
+} from "@appaloft/application";
 import { type Kysely } from "kysely";
 
 import { type Database } from "../schema";
@@ -18,7 +18,7 @@ export class PgSshCredentialReadModel implements SshCredentialReadModel {
       createReadModelSpanName("ssh_credential", "list"),
       {
         attributes: {
-          [yunduTraceAttributes.readModelName]: "ssh_credential",
+          [appaloftTraceAttributes.readModelName]: "ssh_credential",
         },
       },
       async () =>

@@ -1,13 +1,13 @@
-import { type DomainError, domainError, err, ok, type Result } from "@yundu/core";
+import { type DomainError, domainError, err, ok, type Result } from "@appaloft/core";
 import { inject, injectable } from "tsyringe";
 
 import {
+  appaloftTraceAttributes,
   createDomainErrorTraceAttributes,
   createRuntimeLogsSpanName,
   type ExecutionContext,
   type TraceAttributes,
   toRepositoryContext,
-  yunduTraceAttributes,
 } from "../../execution-context";
 import {
   type DeploymentReadModel,
@@ -151,13 +151,13 @@ function createRuntimeLogsTraceAttributes(input: {
   resource: ResourceSummary;
 }): TraceAttributes {
   return {
-    [yunduTraceAttributes.resourceId]: input.resource.id,
-    [yunduTraceAttributes.deploymentId]: input.deployment.id,
-    [yunduTraceAttributes.runtimeKind]: input.deployment.runtimePlan.execution.kind,
-    [yunduTraceAttributes.targetProviderKey]: input.deployment.runtimePlan.target.providerKey,
-    [yunduTraceAttributes.runtimeLogFollow]: input.request.follow,
-    [yunduTraceAttributes.runtimeLogTailLines]: input.request.tailLines,
-    [yunduTraceAttributes.runtimeLogServiceName]: input.request.serviceName,
+    [appaloftTraceAttributes.resourceId]: input.resource.id,
+    [appaloftTraceAttributes.deploymentId]: input.deployment.id,
+    [appaloftTraceAttributes.runtimeKind]: input.deployment.runtimePlan.execution.kind,
+    [appaloftTraceAttributes.targetProviderKey]: input.deployment.runtimePlan.target.providerKey,
+    [appaloftTraceAttributes.runtimeLogFollow]: input.request.follow,
+    [appaloftTraceAttributes.runtimeLogTailLines]: input.request.tailLines,
+    [appaloftTraceAttributes.runtimeLogServiceName]: input.request.serviceName,
   };
 }
 
@@ -304,15 +304,15 @@ export class ResourceRuntimeLogsQueryService {
               span.setStatus("error", event.error.message);
               span.setAttributes({
                 ...createDomainErrorTraceAttributes(event.error),
-                [yunduTraceAttributes.runtimeLogLineCount]: logs.length,
+                [appaloftTraceAttributes.runtimeLogLineCount]: logs.length,
               });
               return err(event.error);
             }
           }
 
           span.setAttributes({
-            [yunduTraceAttributes.runtimeLogLineCount]: logs.length,
-            [yunduTraceAttributes.runtimeLogCloseReason]: closeReason,
+            [appaloftTraceAttributes.runtimeLogLineCount]: logs.length,
+            [appaloftTraceAttributes.runtimeLogCloseReason]: closeReason,
           });
           span.setStatus("ok");
 
@@ -327,7 +327,7 @@ export class ResourceRuntimeLogsQueryService {
             "error",
             error instanceof Error ? error.message : "Runtime log collection failed",
           );
-          span.setAttribute(yunduTraceAttributes.runtimeLogLineCount, logs.length);
+          span.setAttribute(appaloftTraceAttributes.runtimeLogLineCount, logs.length);
           span.recordError(error instanceof Error ? error : { message: String(error) });
           throw error;
         } finally {

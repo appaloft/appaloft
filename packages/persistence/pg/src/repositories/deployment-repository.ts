@@ -1,9 +1,9 @@
 import {
+  appaloftTraceAttributes,
   createRepositorySpanName,
   type DeploymentRepository,
   type RepositoryContext,
-  yunduTraceAttributes,
-} from "@yundu/application";
+} from "@appaloft/application";
 import {
   Deployment,
   type DeploymentByIdSpec,
@@ -13,7 +13,7 @@ import {
   type DeploymentSelectionSpecVisitor,
   type LatestDeploymentSpec,
   type UpsertDeploymentSpec,
-} from "@yundu/core";
+} from "@appaloft/core";
 import { type Insertable, type Kysely, type Selectable, type SelectQueryBuilder } from "kysely";
 
 import { type Database } from "../schema";
@@ -96,8 +96,8 @@ export class PgDeploymentRepository implements DeploymentRepository {
       createRepositorySpanName("deployment", "upsert"),
       {
         attributes: {
-          [yunduTraceAttributes.repositoryName]: "deployment",
-          [yunduTraceAttributes.mutationSpecName]: spec.constructor.name,
+          [appaloftTraceAttributes.repositoryName]: "deployment",
+          [appaloftTraceAttributes.mutationSpecName]: spec.constructor.name,
         },
       },
       async () => {
@@ -135,8 +135,8 @@ export class PgDeploymentRepository implements DeploymentRepository {
       createRepositorySpanName("deployment", "find_one"),
       {
         attributes: {
-          [yunduTraceAttributes.repositoryName]: "deployment",
-          [yunduTraceAttributes.selectionSpecName]: spec.constructor.name,
+          [appaloftTraceAttributes.repositoryName]: "deployment",
+          [appaloftTraceAttributes.selectionSpecName]: spec.constructor.name,
         },
       },
       async () => {

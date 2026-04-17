@@ -3,12 +3,12 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "yundu",
+      "name": "appaloft",
       "devDependencies": {
+        "@appaloft/adapter-packaging": "workspace:*",
         "@biomejs/biome": "^2.4.11",
         "@types/node": "^22.18.9",
         "@types/semver": "^7.7.1",
-        "@yundu/adapter-packaging": "workspace:*",
         "bun-types": "^1.3.12",
         "husky": "^9.1.7",
         "lint-staged": "^16.4.0",
@@ -17,54 +17,57 @@
       },
     },
     "apps/desktop": {
-      "name": "@yundu/desktop",
+      "name": "@appaloft/desktop",
       "version": "0.1.0",
       "devDependencies": {
         "@tauri-apps/cli": "^2.10.1",
       },
     },
     "apps/shell": {
-      "name": "@yundu/shell",
+      "name": "@appaloft/shell",
       "bin": {
-        "yundu": "./src/index.ts",
+        "appaloft": "./src/index.ts",
       },
       "dependencies": {
-        "@yundu/adapter-cli": "workspace:*",
-        "@yundu/adapter-filesystem": "workspace:*",
-        "@yundu/adapter-http-elysia": "workspace:*",
-        "@yundu/adapter-runtime": "workspace:*",
-        "@yundu/ai-mcp": "workspace:*",
-        "@yundu/application": "workspace:*",
-        "@yundu/auth-better": "workspace:*",
-        "@yundu/config": "workspace:*",
-        "@yundu/contracts": "workspace:*",
-        "@yundu/integration-github": "workspace:*",
-        "@yundu/integration-gitlab": "workspace:*",
-        "@yundu/observability": "workspace:*",
-        "@yundu/persistence-pg": "workspace:*",
-        "@yundu/plugin-builtins": "workspace:*",
-        "@yundu/plugin-host": "workspace:*",
-        "@yundu/provider-aliyun": "workspace:*",
-        "@yundu/provider-certificate-acme": "workspace:*",
-        "@yundu/provider-default-access-domain-sslip": "workspace:*",
-        "@yundu/provider-edge-proxy-caddy": "workspace:*",
-        "@yundu/provider-edge-proxy-traefik": "workspace:*",
-        "@yundu/provider-generic-ssh": "workspace:*",
-        "@yundu/provider-local-shell": "workspace:*",
-        "@yundu/provider-tencent": "workspace:*",
+        "@appaloft/adapter-cli": "workspace:*",
+        "@appaloft/adapter-filesystem": "workspace:*",
+        "@appaloft/adapter-http-elysia": "workspace:*",
+        "@appaloft/adapter-runtime": "workspace:*",
+        "@appaloft/ai-mcp": "workspace:*",
+        "@appaloft/application": "workspace:*",
+        "@appaloft/auth-better": "workspace:*",
+        "@appaloft/config": "workspace:*",
+        "@appaloft/contracts": "workspace:*",
+        "@appaloft/integration-github": "workspace:*",
+        "@appaloft/integration-gitlab": "workspace:*",
+        "@appaloft/observability": "workspace:*",
+        "@appaloft/persistence-pg": "workspace:*",
+        "@appaloft/plugin-builtins": "workspace:*",
+        "@appaloft/plugin-host": "workspace:*",
+        "@appaloft/provider-aliyun": "workspace:*",
+        "@appaloft/provider-certificate-acme": "workspace:*",
+        "@appaloft/provider-default-access-domain-sslip": "workspace:*",
+        "@appaloft/provider-edge-proxy-caddy": "workspace:*",
+        "@appaloft/provider-edge-proxy-traefik": "workspace:*",
+        "@appaloft/provider-generic-ssh": "workspace:*",
+        "@appaloft/provider-local-shell": "workspace:*",
+        "@appaloft/provider-tencent": "workspace:*",
         "nanoid": "^5.1.7",
         "reflect-metadata": "^0.2.2",
         "tsyringe": "^4.10.0",
       },
     },
     "apps/web": {
-      "name": "@yundu/web",
+      "name": "@appaloft/web",
       "version": "0.0.1",
       "dependencies": {
         "@xterm/addon-fit": "^0.11.0",
         "@xterm/xterm": "^6.0.0",
       },
       "devDependencies": {
+        "@appaloft/contracts": "workspace:*",
+        "@appaloft/i18n": "workspace:*",
+        "@appaloft/orpc": "workspace:*",
         "@fontsource-variable/inter": "^5.2.8",
         "@fontsource/fraunces": "^5.2.9",
         "@fontsource/ibm-plex-mono": "^5.2.7",
@@ -77,9 +80,6 @@
         "@tailwindcss/vite": "^4.2.2",
         "@tanstack/svelte-query": "^6.1.14",
         "@types/node": "^22",
-        "@yundu/contracts": "workspace:*",
-        "@yundu/i18n": "workspace:*",
-        "@yundu/orpc": "workspace:*",
         "bits-ui": "^2.16.3",
         "clsx": "^2.1.1",
         "shadcn-svelte": "^1.2.7",
@@ -95,34 +95,34 @@
       },
     },
     "packages/adapters/cli": {
-      "name": "@yundu/adapter-cli",
+      "name": "@appaloft/adapter-cli",
       "dependencies": {
+        "@appaloft/application": "workspace:*",
+        "@appaloft/cli-logging": "workspace:*",
+        "@appaloft/contracts": "workspace:*",
         "@effect/cli": "^0.75.0",
         "@effect/platform-node": "^0.106.0",
-        "@yundu/application": "workspace:*",
-        "@yundu/cli-logging": "workspace:*",
-        "@yundu/contracts": "workspace:*",
         "effect": "^3.21.0",
       },
     },
     "packages/adapters/filesystem": {
-      "name": "@yundu/adapter-filesystem",
+      "name": "@appaloft/adapter-filesystem",
       "dependencies": {
-        "@yundu/application": "workspace:*",
-        "@yundu/core": "workspace:*",
-        "@yundu/deployment-config": "workspace:*",
+        "@appaloft/application": "workspace:*",
+        "@appaloft/core": "workspace:*",
+        "@appaloft/deployment-config": "workspace:*",
       },
     },
     "packages/adapters/http-elysia": {
-      "name": "@yundu/adapter-http-elysia",
+      "name": "@appaloft/adapter-http-elysia",
       "dependencies": {
-        "@yundu/application": "workspace:*",
-        "@yundu/contracts": "workspace:*",
-        "@yundu/deployment-config": "workspace:*",
-        "@yundu/i18n": "workspace:*",
-        "@yundu/observability": "workspace:*",
-        "@yundu/orpc": "workspace:*",
-        "@yundu/plugin-sdk": "workspace:*",
+        "@appaloft/application": "workspace:*",
+        "@appaloft/contracts": "workspace:*",
+        "@appaloft/deployment-config": "workspace:*",
+        "@appaloft/i18n": "workspace:*",
+        "@appaloft/observability": "workspace:*",
+        "@appaloft/orpc": "workspace:*",
+        "@appaloft/plugin-sdk": "workspace:*",
         "elysia": "^1.4.28",
       },
       "devDependencies": {
@@ -130,97 +130,103 @@
       },
     },
     "packages/adapters/packaging": {
-      "name": "@yundu/adapter-packaging",
+      "name": "@appaloft/adapter-packaging",
     },
     "packages/adapters/runtime": {
-      "name": "@yundu/adapter-runtime",
+      "name": "@appaloft/adapter-runtime",
       "dependencies": {
-        "@yundu/application": "workspace:*",
-        "@yundu/core": "workspace:*",
-        "@yundu/i18n": "workspace:*",
+        "@appaloft/application": "workspace:*",
+        "@appaloft/core": "workspace:*",
+        "@appaloft/i18n": "workspace:*",
       },
     },
     "packages/ai/mcp": {
-      "name": "@yundu/ai-mcp",
+      "name": "@appaloft/ai-mcp",
       "dependencies": {
-        "@yundu/contracts": "workspace:*",
+        "@appaloft/contracts": "workspace:*",
         "zod": "^4.1.12",
       },
     },
     "packages/application": {
-      "name": "@yundu/application",
+      "name": "@appaloft/application",
       "dependencies": {
-        "@yundu/core": "workspace:*",
-        "@yundu/i18n": "workspace:*",
+        "@appaloft/core": "workspace:*",
+        "@appaloft/i18n": "workspace:*",
         "reflect-metadata": "^0.2.2",
         "tsyringe": "^4.10.0",
         "zod": "^4.1.12",
       },
     },
     "packages/auth/better": {
-      "name": "@yundu/auth-better",
+      "name": "@appaloft/auth-better",
       "dependencies": {
         "better-auth": "^1.6.1",
       },
     },
     "packages/cli-logging": {
-      "name": "@yundu/cli-logging",
+      "name": "@appaloft/cli-logging",
       "dependencies": {
-        "@yundu/application": "workspace:*",
-        "@yundu/core": "workspace:*",
+        "@appaloft/application": "workspace:*",
+        "@appaloft/core": "workspace:*",
       },
     },
     "packages/config": {
-      "name": "@yundu/config",
+      "name": "@appaloft/config",
     },
     "packages/contracts": {
-      "name": "@yundu/contracts",
+      "name": "@appaloft/contracts",
       "dependencies": {
         "nanoid": "^5.1.7",
         "zod": "^4.1.12",
       },
     },
     "packages/core": {
-      "name": "@yundu/core",
+      "name": "@appaloft/core",
       "dependencies": {
         "neverthrow": "^8.2.0",
       },
     },
     "packages/deployment-config": {
-      "name": "@yundu/deployment-config",
+      "name": "@appaloft/deployment-config",
       "dependencies": {
-        "@yundu/core": "workspace:*",
+        "@appaloft/core": "workspace:*",
         "zod": "^4.1.12",
       },
     },
     "packages/i18n": {
-      "name": "@yundu/i18n",
+      "name": "@appaloft/i18n",
       "dependencies": {
         "i18next": "^25.6.3",
       },
     },
     "packages/integrations/core": {
-      "name": "@yundu/integration-core",
+      "name": "@appaloft/integration-core",
       "dependencies": {
-        "@yundu/application": "workspace:*",
+        "@appaloft/application": "workspace:*",
       },
     },
     "packages/integrations/github": {
-      "name": "@yundu/integration-github",
+      "name": "@appaloft/integration-github",
       "dependencies": {
-        "@yundu/application": "workspace:*",
-        "@yundu/integration-core": "workspace:*",
+        "@appaloft/application": "workspace:*",
+        "@appaloft/integration-core": "workspace:*",
+      },
+      "devDependencies": {
+        "reflect-metadata": "^0.2.2",
       },
     },
     "packages/integrations/gitlab": {
-      "name": "@yundu/integration-gitlab",
+      "name": "@appaloft/integration-gitlab",
       "dependencies": {
-        "@yundu/integration-core": "workspace:*",
+        "@appaloft/integration-core": "workspace:*",
       },
     },
     "packages/observability": {
-      "name": "@yundu/observability",
+      "name": "@appaloft/observability",
       "dependencies": {
+        "@appaloft/application": "workspace:*",
+        "@appaloft/config": "workspace:*",
+        "@appaloft/i18n": "workspace:*",
         "@opentelemetry/api": "^1.9.1",
         "@opentelemetry/auto-instrumentations-node": "^0.72.0",
         "@opentelemetry/context-async-hooks": "^2.6.1",
@@ -229,33 +235,30 @@
         "@opentelemetry/sdk-node": "^0.214.0",
         "@opentelemetry/sdk-trace-base": "^2.6.1",
         "@opentelemetry/semantic-conventions": "^1.40.0",
-        "@yundu/application": "workspace:*",
-        "@yundu/config": "workspace:*",
-        "@yundu/i18n": "workspace:*",
       },
     },
     "packages/orpc": {
-      "name": "@yundu/orpc",
+      "name": "@appaloft/orpc",
       "dependencies": {
+        "@appaloft/application": "workspace:*",
+        "@appaloft/contracts": "workspace:*",
+        "@appaloft/core": "workspace:*",
+        "@appaloft/i18n": "workspace:*",
         "@orpc/client": "latest",
         "@orpc/openapi": "latest",
         "@orpc/server": "latest",
         "@orpc/tanstack-query": "latest",
-        "@yundu/application": "workspace:*",
-        "@yundu/contracts": "workspace:*",
-        "@yundu/core": "workspace:*",
-        "@yundu/i18n": "workspace:*",
         "elysia": "^1.4.28",
         "zod": "^4.1.12",
       },
     },
     "packages/persistence/pg": {
-      "name": "@yundu/persistence-pg",
+      "name": "@appaloft/persistence-pg",
       "dependencies": {
+        "@appaloft/application": "workspace:*",
+        "@appaloft/core": "workspace:*",
         "@electric-sql/pglite": "^0.4.3",
         "@opentelemetry/api": "^1.9.1",
-        "@yundu/application": "workspace:*",
-        "@yundu/core": "workspace:*",
         "kysely": "^0.28.15",
         "kysely-postgres-js": "^3.0.0",
         "postgres": "^3.4.9",
@@ -265,96 +268,170 @@
       },
     },
     "packages/plugins/builtins": {
-      "name": "@yundu/plugin-builtins",
+      "name": "@appaloft/plugin-builtins",
       "dependencies": {
-        "@yundu/plugin-sdk": "workspace:*",
+        "@appaloft/plugin-sdk": "workspace:*",
       },
     },
     "packages/plugins/host": {
-      "name": "@yundu/plugin-host",
+      "name": "@appaloft/plugin-host",
       "dependencies": {
-        "@yundu/application": "workspace:*",
-        "@yundu/plugin-sdk": "workspace:*",
+        "@appaloft/application": "workspace:*",
+        "@appaloft/plugin-sdk": "workspace:*",
       },
     },
     "packages/plugins/sdk": {
-      "name": "@yundu/plugin-sdk",
+      "name": "@appaloft/plugin-sdk",
       "dependencies": {
         "semver": "^7.7.3",
         "zod": "^4.1.12",
       },
     },
     "packages/providers/aliyun": {
-      "name": "@yundu/provider-aliyun",
+      "name": "@appaloft/provider-aliyun",
       "dependencies": {
-        "@yundu/provider-core": "workspace:*",
+        "@appaloft/provider-core": "workspace:*",
       },
     },
     "packages/providers/certificate-acme": {
-      "name": "@yundu/provider-certificate-acme",
+      "name": "@appaloft/provider-certificate-acme",
       "dependencies": {
-        "@yundu/application": "workspace:*",
-        "@yundu/core": "workspace:*",
+        "@appaloft/application": "workspace:*",
+        "@appaloft/core": "workspace:*",
         "acme-client": "^5.4.0",
       },
     },
     "packages/providers/core": {
-      "name": "@yundu/provider-core",
+      "name": "@appaloft/provider-core",
       "dependencies": {
-        "@yundu/application": "workspace:*",
+        "@appaloft/application": "workspace:*",
       },
     },
     "packages/providers/default-access-domain-sslip": {
-      "name": "@yundu/provider-default-access-domain-sslip",
+      "name": "@appaloft/provider-default-access-domain-sslip",
       "dependencies": {
-        "@yundu/application": "workspace:*",
-        "@yundu/core": "workspace:*",
+        "@appaloft/application": "workspace:*",
+        "@appaloft/core": "workspace:*",
       },
     },
     "packages/providers/edge-proxy-caddy": {
-      "name": "@yundu/provider-edge-proxy-caddy",
+      "name": "@appaloft/provider-edge-proxy-caddy",
       "dependencies": {
-        "@yundu/application": "workspace:*",
-        "@yundu/core": "workspace:*",
+        "@appaloft/application": "workspace:*",
+        "@appaloft/core": "workspace:*",
       },
     },
     "packages/providers/edge-proxy-traefik": {
-      "name": "@yundu/provider-edge-proxy-traefik",
+      "name": "@appaloft/provider-edge-proxy-traefik",
       "dependencies": {
-        "@yundu/application": "workspace:*",
-        "@yundu/core": "workspace:*",
+        "@appaloft/application": "workspace:*",
+        "@appaloft/core": "workspace:*",
       },
     },
     "packages/providers/generic-ssh": {
-      "name": "@yundu/provider-generic-ssh",
+      "name": "@appaloft/provider-generic-ssh",
       "dependencies": {
-        "@yundu/provider-core": "workspace:*",
+        "@appaloft/provider-core": "workspace:*",
       },
     },
     "packages/providers/local-shell": {
-      "name": "@yundu/provider-local-shell",
+      "name": "@appaloft/provider-local-shell",
       "dependencies": {
-        "@yundu/provider-core": "workspace:*",
+        "@appaloft/provider-core": "workspace:*",
       },
     },
     "packages/providers/tencent": {
-      "name": "@yundu/provider-tencent",
+      "name": "@appaloft/provider-tencent",
       "dependencies": {
-        "@yundu/provider-core": "workspace:*",
+        "@appaloft/provider-core": "workspace:*",
       },
     },
     "packages/testkit": {
-      "name": "@yundu/testkit",
+      "name": "@appaloft/testkit",
       "dependencies": {
-        "@yundu/application": "workspace:*",
-        "@yundu/core": "workspace:*",
+        "@appaloft/application": "workspace:*",
+        "@appaloft/core": "workspace:*",
       },
     },
     "packages/ui": {
-      "name": "@yundu/ui",
+      "name": "@appaloft/ui",
     },
   },
   "packages": {
+    "@appaloft/adapter-cli": ["@appaloft/adapter-cli@workspace:packages/adapters/cli"],
+
+    "@appaloft/adapter-filesystem": ["@appaloft/adapter-filesystem@workspace:packages/adapters/filesystem"],
+
+    "@appaloft/adapter-http-elysia": ["@appaloft/adapter-http-elysia@workspace:packages/adapters/http-elysia"],
+
+    "@appaloft/adapter-packaging": ["@appaloft/adapter-packaging@workspace:packages/adapters/packaging"],
+
+    "@appaloft/adapter-runtime": ["@appaloft/adapter-runtime@workspace:packages/adapters/runtime"],
+
+    "@appaloft/ai-mcp": ["@appaloft/ai-mcp@workspace:packages/ai/mcp"],
+
+    "@appaloft/application": ["@appaloft/application@workspace:packages/application"],
+
+    "@appaloft/auth-better": ["@appaloft/auth-better@workspace:packages/auth/better"],
+
+    "@appaloft/cli-logging": ["@appaloft/cli-logging@workspace:packages/cli-logging"],
+
+    "@appaloft/config": ["@appaloft/config@workspace:packages/config"],
+
+    "@appaloft/contracts": ["@appaloft/contracts@workspace:packages/contracts"],
+
+    "@appaloft/core": ["@appaloft/core@workspace:packages/core"],
+
+    "@appaloft/deployment-config": ["@appaloft/deployment-config@workspace:packages/deployment-config"],
+
+    "@appaloft/desktop": ["@appaloft/desktop@workspace:apps/desktop"],
+
+    "@appaloft/i18n": ["@appaloft/i18n@workspace:packages/i18n"],
+
+    "@appaloft/integration-core": ["@appaloft/integration-core@workspace:packages/integrations/core"],
+
+    "@appaloft/integration-github": ["@appaloft/integration-github@workspace:packages/integrations/github"],
+
+    "@appaloft/integration-gitlab": ["@appaloft/integration-gitlab@workspace:packages/integrations/gitlab"],
+
+    "@appaloft/observability": ["@appaloft/observability@workspace:packages/observability"],
+
+    "@appaloft/orpc": ["@appaloft/orpc@workspace:packages/orpc"],
+
+    "@appaloft/persistence-pg": ["@appaloft/persistence-pg@workspace:packages/persistence/pg"],
+
+    "@appaloft/plugin-builtins": ["@appaloft/plugin-builtins@workspace:packages/plugins/builtins"],
+
+    "@appaloft/plugin-host": ["@appaloft/plugin-host@workspace:packages/plugins/host"],
+
+    "@appaloft/plugin-sdk": ["@appaloft/plugin-sdk@workspace:packages/plugins/sdk"],
+
+    "@appaloft/provider-aliyun": ["@appaloft/provider-aliyun@workspace:packages/providers/aliyun"],
+
+    "@appaloft/provider-certificate-acme": ["@appaloft/provider-certificate-acme@workspace:packages/providers/certificate-acme"],
+
+    "@appaloft/provider-core": ["@appaloft/provider-core@workspace:packages/providers/core"],
+
+    "@appaloft/provider-default-access-domain-sslip": ["@appaloft/provider-default-access-domain-sslip@workspace:packages/providers/default-access-domain-sslip"],
+
+    "@appaloft/provider-edge-proxy-caddy": ["@appaloft/provider-edge-proxy-caddy@workspace:packages/providers/edge-proxy-caddy"],
+
+    "@appaloft/provider-edge-proxy-traefik": ["@appaloft/provider-edge-proxy-traefik@workspace:packages/providers/edge-proxy-traefik"],
+
+    "@appaloft/provider-generic-ssh": ["@appaloft/provider-generic-ssh@workspace:packages/providers/generic-ssh"],
+
+    "@appaloft/provider-local-shell": ["@appaloft/provider-local-shell@workspace:packages/providers/local-shell"],
+
+    "@appaloft/provider-tencent": ["@appaloft/provider-tencent@workspace:packages/providers/tencent"],
+
+    "@appaloft/shell": ["@appaloft/shell@workspace:apps/shell"],
+
+    "@appaloft/testkit": ["@appaloft/testkit@workspace:packages/testkit"],
+
+    "@appaloft/ui": ["@appaloft/ui@workspace:packages/ui"],
+
+    "@appaloft/web": ["@appaloft/web@workspace:apps/web"],
+
     "@babel/runtime": ["@babel/runtime@7.29.2", "", {}, "sha512-JiDShH45zKHWyGe4ZNVRrCjBz8Nh9TMmZG1kh4QTK8hCBTWBi8Da+i7s1fJw7/lYpM4ccepSNfqzZ/QvABBi5g=="],
 
     "@better-auth/core": ["@better-auth/core@1.6.1", "", { "dependencies": { "@opentelemetry/semantic-conventions": "^1.39.0", "@standard-schema/spec": "^1.1.0", "zod": "^4.3.6" }, "peerDependencies": { "@better-auth/utils": "0.4.0", "@better-fetch/fetch": "1.1.21", "@cloudflare/workers-types": ">=4", "@opentelemetry/api": "^1.9.0", "better-call": "1.3.5", "jose": "^6.1.0", "kysely": "^0.28.5", "nanostores": "^1.0.1" }, "optionalPeers": ["@cloudflare/workers-types"] }, "sha512-HnRQEuuCT7tIc2GMuRGqudt0DNO8+LhoR3O1heY/nYMxbxPVOBm/f4UQFXeb5HYcHpDrwTO+woWpp318OQ++Uw=="],
@@ -962,80 +1039,6 @@
     "@xterm/addon-fit": ["@xterm/addon-fit@0.11.0", "", {}, "sha512-jYcgT6xtVYhnhgxh3QgYDnnNMYTcf8ElbxxFzX0IZo+vabQqSPAjC3c1wJrKB5E19VwQei89QCiZZP86DCPF7g=="],
 
     "@xterm/xterm": ["@xterm/xterm@6.0.0", "", {}, "sha512-TQwDdQGtwwDt+2cgKDLn0IRaSxYu1tSUjgKarSDkUM0ZNiSRXFpjxEsvc/Zgc5kq5omJ+V0a8/kIM2WD3sMOYg=="],
-
-    "@yundu/adapter-cli": ["@yundu/adapter-cli@workspace:packages/adapters/cli"],
-
-    "@yundu/adapter-filesystem": ["@yundu/adapter-filesystem@workspace:packages/adapters/filesystem"],
-
-    "@yundu/adapter-http-elysia": ["@yundu/adapter-http-elysia@workspace:packages/adapters/http-elysia"],
-
-    "@yundu/adapter-packaging": ["@yundu/adapter-packaging@workspace:packages/adapters/packaging"],
-
-    "@yundu/adapter-runtime": ["@yundu/adapter-runtime@workspace:packages/adapters/runtime"],
-
-    "@yundu/ai-mcp": ["@yundu/ai-mcp@workspace:packages/ai/mcp"],
-
-    "@yundu/application": ["@yundu/application@workspace:packages/application"],
-
-    "@yundu/auth-better": ["@yundu/auth-better@workspace:packages/auth/better"],
-
-    "@yundu/cli-logging": ["@yundu/cli-logging@workspace:packages/cli-logging"],
-
-    "@yundu/config": ["@yundu/config@workspace:packages/config"],
-
-    "@yundu/contracts": ["@yundu/contracts@workspace:packages/contracts"],
-
-    "@yundu/core": ["@yundu/core@workspace:packages/core"],
-
-    "@yundu/deployment-config": ["@yundu/deployment-config@workspace:packages/deployment-config"],
-
-    "@yundu/desktop": ["@yundu/desktop@workspace:apps/desktop"],
-
-    "@yundu/i18n": ["@yundu/i18n@workspace:packages/i18n"],
-
-    "@yundu/integration-core": ["@yundu/integration-core@workspace:packages/integrations/core"],
-
-    "@yundu/integration-github": ["@yundu/integration-github@workspace:packages/integrations/github"],
-
-    "@yundu/integration-gitlab": ["@yundu/integration-gitlab@workspace:packages/integrations/gitlab"],
-
-    "@yundu/observability": ["@yundu/observability@workspace:packages/observability"],
-
-    "@yundu/orpc": ["@yundu/orpc@workspace:packages/orpc"],
-
-    "@yundu/persistence-pg": ["@yundu/persistence-pg@workspace:packages/persistence/pg"],
-
-    "@yundu/plugin-builtins": ["@yundu/plugin-builtins@workspace:packages/plugins/builtins"],
-
-    "@yundu/plugin-host": ["@yundu/plugin-host@workspace:packages/plugins/host"],
-
-    "@yundu/plugin-sdk": ["@yundu/plugin-sdk@workspace:packages/plugins/sdk"],
-
-    "@yundu/provider-aliyun": ["@yundu/provider-aliyun@workspace:packages/providers/aliyun"],
-
-    "@yundu/provider-certificate-acme": ["@yundu/provider-certificate-acme@workspace:packages/providers/certificate-acme"],
-
-    "@yundu/provider-core": ["@yundu/provider-core@workspace:packages/providers/core"],
-
-    "@yundu/provider-default-access-domain-sslip": ["@yundu/provider-default-access-domain-sslip@workspace:packages/providers/default-access-domain-sslip"],
-
-    "@yundu/provider-edge-proxy-caddy": ["@yundu/provider-edge-proxy-caddy@workspace:packages/providers/edge-proxy-caddy"],
-
-    "@yundu/provider-edge-proxy-traefik": ["@yundu/provider-edge-proxy-traefik@workspace:packages/providers/edge-proxy-traefik"],
-
-    "@yundu/provider-generic-ssh": ["@yundu/provider-generic-ssh@workspace:packages/providers/generic-ssh"],
-
-    "@yundu/provider-local-shell": ["@yundu/provider-local-shell@workspace:packages/providers/local-shell"],
-
-    "@yundu/provider-tencent": ["@yundu/provider-tencent@workspace:packages/providers/tencent"],
-
-    "@yundu/shell": ["@yundu/shell@workspace:apps/shell"],
-
-    "@yundu/testkit": ["@yundu/testkit@workspace:packages/testkit"],
-
-    "@yundu/ui": ["@yundu/ui@workspace:packages/ui"],
-
-    "@yundu/web": ["@yundu/web@workspace:apps/web"],
 
     "acme-client": ["acme-client@5.4.0", "", { "dependencies": { "@peculiar/x509": "^1.11.0", "asn1js": "^3.0.5", "axios": "^1.7.2", "debug": "^4.3.5", "node-forge": "^1.3.1" } }, "sha512-mORqg60S8iML6XSmVjqjGHJkINrCGLMj2QvDmFzI9vIlv1RGlyjmw3nrzaINJjkNsYXC41XhhD5pfy7CtuGcbA=="],
 

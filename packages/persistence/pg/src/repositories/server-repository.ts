@@ -1,9 +1,9 @@
 import {
+  appaloftTraceAttributes,
   createRepositorySpanName,
   type RepositoryContext,
   type ServerRepository,
-  yunduTraceAttributes,
-} from "@yundu/application";
+} from "@appaloft/application";
 import {
   DeploymentTarget,
   type DeploymentTargetByIdSpec,
@@ -13,7 +13,7 @@ import {
   type DeploymentTargetSelectionSpec,
   type DeploymentTargetSelectionSpecVisitor,
   type UpsertDeploymentTargetSpec,
-} from "@yundu/core";
+} from "@appaloft/core";
 import { type Insertable, type Kysely, type Selectable, type SelectQueryBuilder } from "kysely";
 
 import { type Database } from "../schema";
@@ -88,8 +88,8 @@ export class PgServerRepository implements ServerRepository {
       createRepositorySpanName("server", "upsert"),
       {
         attributes: {
-          [yunduTraceAttributes.repositoryName]: "server",
-          [yunduTraceAttributes.mutationSpecName]: spec.constructor.name,
+          [appaloftTraceAttributes.repositoryName]: "server",
+          [appaloftTraceAttributes.mutationSpecName]: spec.constructor.name,
         },
       },
       async () => {
@@ -129,8 +129,8 @@ export class PgServerRepository implements ServerRepository {
       createRepositorySpanName("server", "find_one"),
       {
         attributes: {
-          [yunduTraceAttributes.repositoryName]: "server",
-          [yunduTraceAttributes.selectionSpecName]: spec.constructor.name,
+          [appaloftTraceAttributes.repositoryName]: "server",
+          [appaloftTraceAttributes.selectionSpecName]: spec.constructor.name,
         },
       },
       async () => {

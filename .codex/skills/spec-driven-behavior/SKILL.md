@@ -1,13 +1,13 @@
 ---
 name: spec-driven-behavior
-description: Use when Codex needs to discover, specify, implement, reconcile, post-check, or choose the next Yundu business behavior/business operation from ADRs, global contracts, local command/query/event/workflow/error specs, implementation plans, operation catalog entries, read models, Web/API/CLI entrypoints, or spec-driven test matrices. Supports explicit Discover Round, Spec Round, Code Round, Sync Round, Next Behavior Selection, and Post-Implementation Sync.
+description: Use when Codex needs to discover, specify, implement, reconcile, post-check, or choose the next Appaloft business behavior/business operation from ADRs, global contracts, local command/query/event/workflow/error specs, implementation plans, operation catalog entries, read models, Web/API/CLI entrypoints, or spec-driven test matrices. Supports explicit Discover Round, Spec Round, Code Round, Sync Round, Next Behavior Selection, and Post-Implementation Sync.
 ---
 
 # Spec-Driven Behavior
 
 ## Purpose
 
-Use this skill to change one Yundu business behavior as a complete operation, not as an isolated class or endpoint.
+Use this skill to change one Appaloft business behavior as a complete operation, not as an isolated class or endpoint.
 
 Treat a behavior as the coordinated unit spanning command or query, event, workflow, error contract, read model/projection, test matrix, Web/API/CLI entrypoints, implementation plan, and ADR/global contracts when applicable.
 
@@ -45,7 +45,7 @@ Local specs use Normative Contract style. Read the main body as the target contr
 
 ## v1 Closure Target
 
-Yundu's current product target is a self-hosted deployment platform v1 with these closure needs:
+Appaloft's current product target is a self-hosted deployment platform v1 with these closure needs:
 
 - zero-to-SSH-server setup;
 - application deployment;

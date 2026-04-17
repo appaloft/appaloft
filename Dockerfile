@@ -11,13 +11,13 @@ RUN bun run --cwd apps/web build
 FROM oven/bun:1.3.11 AS runtime
 WORKDIR /app
 
-COPY --from=builder /app/apps/shell/dist/yundu /app/yundu
+COPY --from=builder /app/apps/shell/dist/appaloft /app/appaloft
 COPY --from=builder /app/apps/web/build /app/web
 
-ENV YUNDU_HTTP_HOST=0.0.0.0
-ENV YUNDU_HTTP_PORT=3001
-ENV YUNDU_WEB_STATIC_DIR=/app/web
+ENV APPALOFT_HTTP_HOST=0.0.0.0
+ENV APPALOFT_HTTP_PORT=3001
+ENV APPALOFT_WEB_STATIC_DIR=/app/web
 
 EXPOSE 3001
 
-CMD ["bun", "/app/yundu", "serve"]
+CMD ["bun", "/app/appaloft", "serve"]

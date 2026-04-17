@@ -1,10 +1,10 @@
-import { Args, Command as EffectCommand, Options } from "@effect/cli";
 import {
   ConfirmDomainBindingOwnershipCommand,
   CreateDomainBindingCommand,
   ListDomainBindingsQuery,
-} from "@yundu/application";
-import { certificatePolicies, edgeProxyKinds, tlsModes } from "@yundu/core";
+} from "@appaloft/application";
+import { certificatePolicies, edgeProxyKinds, tlsModes } from "@appaloft/core";
+import { Args, Command as EffectCommand, Options } from "@effect/cli";
 
 import { optionalValue, runCommand, runQuery } from "../runtime.js";
 

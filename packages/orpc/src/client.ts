@@ -1,9 +1,9 @@
+import { appaloftLocaleHeader, defaultAppaloftLocale } from "@appaloft/i18n";
 import { createORPCClient } from "@orpc/client";
 import { RPCLink } from "@orpc/client/fetch";
 import { createTanstackQueryUtils } from "@orpc/tanstack-query";
-import { defaultYunduLocale, yunduLocaleHeader } from "@yundu/i18n";
 
-import { type YunduOrpcClientContract } from "./client-contract";
+import { type AppaloftOrpcClientContract } from "./client-contract";
 
 function normalizeBaseUrl(baseUrl: string): string {
   return baseUrl.endsWith("/") ? baseUrl.slice(0, -1) : baseUrl;
@@ -23,26 +23,26 @@ function resolveAbsoluteBaseUrl(baseUrl: string): string {
   return normalizeBaseUrl(`http://localhost:3001${normalizedBaseUrl}`);
 }
 
-export type YunduOrpcClient = YunduOrpcClientContract;
-export type YunduOrpcLocaleResolver = () => string | null | undefined;
+export type AppaloftOrpcClient = AppaloftOrpcClientContract;
+export type AppaloftOrpcLocaleResolver = () => string | null | undefined;
 
-export function createYunduOrpcClient(
+export function createAppaloftOrpcClient(
   baseUrl: string,
-  localeResolver?: YunduOrpcLocaleResolver,
-): YunduOrpcClient {
+  localeResolver?: AppaloftOrpcLocaleResolver,
+): AppaloftOrpcClient {
   const link = new RPCLink({
     url: `${resolveAbsoluteBaseUrl(baseUrl)}/api/rpc`,
     headers: () => ({
-      [yunduLocaleHeader]: localeResolver?.() ?? defaultYunduLocale,
+      [appaloftLocaleHeader]: localeResolver?.() ?? defaultAppaloftLocale,
     }),
   });
 
-  return createORPCClient<YunduOrpcClient>(link);
+  return createORPCClient<AppaloftOrpcClient>(link);
 }
 
-export function createYunduOrpcQueryUtils(
+export function createAppaloftOrpcQueryUtils(
   baseUrl: string,
-  localeResolver?: YunduOrpcLocaleResolver,
+  localeResolver?: AppaloftOrpcLocaleResolver,
 ) {
-  return createTanstackQueryUtils(createYunduOrpcClient(baseUrl, localeResolver));
+  return createTanstackQueryUtils(createAppaloftOrpcClient(baseUrl, localeResolver));
 }

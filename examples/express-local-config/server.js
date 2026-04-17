@@ -12,7 +12,7 @@ app.get("/health", (_request, response) => {
 });
 
 app.get("/", (_request, response) => {
-  response.send("hello from yundu config-driven local express demo");
+  response.send("hello from appaloft config-driven local express demo");
 });
 
 app.listen(port, "0.0.0.0", () => {

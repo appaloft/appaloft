@@ -60,12 +60,12 @@ import {
   type EnvironmentSnapshot,
   type Result,
   type RollbackPlan,
-} from "@yundu/core";
+} from "@appaloft/core";
 import {
   createAdapterSpanName,
   deploymentProgressSteps,
   reportDeploymentProgress,
-  yunduTraceAttributes,
+  appaloftTraceAttributes,
   type ExecutionContext,
   type AppLogger,
   type DeploymentProgressReporter,
@@ -77,8 +77,8 @@ import {
   type RuntimeTargetBackendSelection,
   type RuntimeTargetCapability,
   type RuntimePlanResolver,
-} from "@yundu/application";
-import { i18nKeys } from "@yundu/i18n";
+} from "@appaloft/application";
+import { i18nKeys } from "@appaloft/i18n";
 import { LocalExecutionBackend } from "./local-execution";
 import { SshExecutionBackend } from "./ssh-execution";
 import { resolveWorkspaceRuntimePlan } from "./workspace-planners";
@@ -615,7 +615,7 @@ export class DefaultRuntimePlanResolver implements RuntimePlanResolver {
       createAdapterSpanName("runtime_plan_resolver", "resolve"),
       {
         attributes: {
-          [yunduTraceAttributes.sourceLocator]: input.source.locator,
+          [appaloftTraceAttributes.sourceLocator]: input.source.locator,
         },
       },
       async () =>
@@ -667,7 +667,7 @@ function phaseLog(
 ): DeploymentLogEntry {
   return DeploymentLogEntry.rehydrate({
     timestamp: OccurredAt.rehydrate(new Date().toISOString()),
-    source: DeploymentLogSourceValue.rehydrate("yundu"),
+    source: DeploymentLogSourceValue.rehydrate("appaloft"),
     phase: DeploymentPhaseValue.rehydrate(phase),
     level: LogLevelValue.rehydrate(level),
     message: MessageText.rehydrate(message),
@@ -680,7 +680,7 @@ function shouldFail(deployment: Deployment): boolean {
     state.runtimePlan.source.locator.includes("fail") ||
     state.environmentSnapshot.variables.some(
       (variable) =>
-        variable.key === "YUNDU_SIMULATE_FAILURE" && variable.value === "true",
+        variable.key === "APPALOFT_SIMULATE_FAILURE" && variable.value === "true",
     )
   );
 }
@@ -732,7 +732,7 @@ export class InMemoryExecutionBackend implements ExecutionBackend {
       createAdapterSpanName("in_memory_execution_backend", "execute"),
       {
         attributes: {
-          [yunduTraceAttributes.sourceLocator]: state.runtimePlan.source.locator,
+          [appaloftTraceAttributes.sourceLocator]: state.runtimePlan.source.locator,
         },
       },
       async () => {

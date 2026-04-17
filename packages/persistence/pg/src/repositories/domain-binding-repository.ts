@@ -1,9 +1,9 @@
 import {
+  appaloftTraceAttributes,
   createRepositorySpanName,
   type DomainBindingRepository,
   type RepositoryContext,
-  yunduTraceAttributes,
-} from "@yundu/application";
+} from "@appaloft/application";
 import {
   type ActiveDomainBindingByOwnerAndRouteSpec,
   DomainBinding,
@@ -14,7 +14,7 @@ import {
   type DomainBindingSelectionSpec,
   type DomainBindingSelectionSpecVisitor,
   type UpsertDomainBindingSpec,
-} from "@yundu/core";
+} from "@appaloft/core";
 import { type Insertable, type Kysely, type Selectable, type SelectQueryBuilder } from "kysely";
 
 import { type Database } from "../schema";
@@ -107,8 +107,8 @@ export class PgDomainBindingRepository implements DomainBindingRepository {
       createRepositorySpanName("domain_binding", "upsert"),
       {
         attributes: {
-          [yunduTraceAttributes.repositoryName]: "domain_binding",
-          [yunduTraceAttributes.mutationSpecName]: spec.constructor.name,
+          [appaloftTraceAttributes.repositoryName]: "domain_binding",
+          [appaloftTraceAttributes.mutationSpecName]: spec.constructor.name,
         },
       },
       async () => {
@@ -147,8 +147,8 @@ export class PgDomainBindingRepository implements DomainBindingRepository {
       createRepositorySpanName("domain_binding", "find_one"),
       {
         attributes: {
-          [yunduTraceAttributes.repositoryName]: "domain_binding",
-          [yunduTraceAttributes.selectionSpecName]: spec.constructor.name,
+          [appaloftTraceAttributes.repositoryName]: "domain_binding",
+          [appaloftTraceAttributes.selectionSpecName]: spec.constructor.name,
         },
       },
       async () => {

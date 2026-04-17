@@ -1,5 +1,5 @@
 {
-  "$schema": "../../packages/deployment-config/json-schema/yundu.config.schema.json",
+  "$schema": "../../packages/deployment-config/json-schema/appaloft.config.schema.json",
   "project": {
     "name": "Express Local Config",
     "description": "Config-driven local Express deployment example."

@@ -1,9 +1,9 @@
 import {
+  appaloftTraceAttributes,
   createReadModelSpanName,
   type EnvironmentReadModel,
   type RepositoryContext,
-  yunduTraceAttributes,
-} from "@yundu/application";
+} from "@appaloft/application";
 import { type Kysely } from "kysely";
 
 import { type Database } from "../schema";
@@ -47,7 +47,7 @@ export class PgEnvironmentReadModel implements EnvironmentReadModel {
       createReadModelSpanName("environment", "list"),
       {
         attributes: {
-          [yunduTraceAttributes.readModelName]: "environment",
+          [appaloftTraceAttributes.readModelName]: "environment",
         },
       },
       async () => {

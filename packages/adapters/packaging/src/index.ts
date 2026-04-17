@@ -28,19 +28,19 @@ export function createStandardReleaseManifest(input: {
     artifacts: [
       {
         kind: "backend-service",
-        name: "yundu-backend",
-        path: "yundu-backend",
+        name: "appaloft-backend",
+        path: "appaloft-backend",
         description: "Standalone backend service artifact",
       },
       {
         kind: "web-static",
-        name: "yundu-web-static",
-        path: "yundu-web-static",
+        name: "appaloft-web-static",
+        path: "appaloft-web-static",
         description: "Static frontend artifact for CDN, Nginx, or object storage",
       },
       {
         kind: "all-in-one-image",
-        name: "yundu-all-in-one-image",
+        name: "appaloft-all-in-one-image",
         path: "Dockerfile",
         description: "All-in-one Docker image definition",
       },
@@ -52,8 +52,8 @@ export function createStandardReleaseManifest(input: {
       },
       {
         kind: "binary-bundle",
-        name: "yundu-binary-bundle",
-        path: "yundu-binary-bundle",
+        name: "appaloft-binary-bundle",
+        path: "appaloft-binary-bundle",
         description:
           "Self-contained Bun binary bundle with embedded web console assets and embedded-PGlite-friendly launcher",
       },

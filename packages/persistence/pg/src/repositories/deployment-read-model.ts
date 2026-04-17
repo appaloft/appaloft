@@ -1,9 +1,9 @@
 import {
+  appaloftTraceAttributes,
   createReadModelSpanName,
   type DeploymentReadModel,
   type RepositoryContext,
-  yunduTraceAttributes,
-} from "@yundu/application";
+} from "@appaloft/application";
 import { type Kysely } from "kysely";
 
 import { type Database } from "../schema";
@@ -30,7 +30,7 @@ export class PgDeploymentReadModel implements DeploymentReadModel {
       createReadModelSpanName("deployment", "list"),
       {
         attributes: {
-          [yunduTraceAttributes.readModelName]: "deployment",
+          [appaloftTraceAttributes.readModelName]: "deployment",
         },
       },
       async () => {
@@ -197,7 +197,7 @@ export class PgDeploymentReadModel implements DeploymentReadModel {
             },
             logs: logs.map((entry) => ({
               timestamp: entry.timestamp,
-              source: entry.source ?? "yundu",
+              source: entry.source ?? "appaloft",
               phase: entry.phase,
               level: entry.level,
               message: entry.message,
@@ -221,7 +221,7 @@ export class PgDeploymentReadModel implements DeploymentReadModel {
       createReadModelSpanName("deployment", "find_logs"),
       {
         attributes: {
-          [yunduTraceAttributes.readModelName]: "deployment",
+          [appaloftTraceAttributes.readModelName]: "deployment",
         },
       },
       async () => {
@@ -232,7 +232,7 @@ export class PgDeploymentReadModel implements DeploymentReadModel {
           .executeTakeFirst();
         return ((row?.logs ?? []) as unknown as SerializedDeploymentLog[]).map((entry) => ({
           timestamp: entry.timestamp,
-          source: entry.source ?? "yundu",
+          source: entry.source ?? "appaloft",
           phase: entry.phase,
           level: entry.level,
           message: entry.message,

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import type { ExecutionContext } from "@yundu/application";
+import type { ExecutionContext } from "@appaloft/application";
 import {
   ConfigScopeValue,
   DisplayNameText,
@@ -24,7 +24,7 @@ import {
   type SourceKind,
   type SourcePackageManager,
   type SourceRuntimeFamily,
-} from "@yundu/core";
+} from "@appaloft/core";
 
 function createTestExecutionContext(): ExecutionContext {
   return {
@@ -213,14 +213,14 @@ describe("DefaultRuntimePlanResolver", () => {
         intent: "build-image",
         metadata: expect.objectContaining({
           generatedDockerfile: "true",
-          dockerfilePath: "Dockerfile.yundu",
+          dockerfilePath: "Dockerfile.appaloft",
         }),
       }),
     );
     expect(plan.execution).toEqual(
       expect.objectContaining({
         kind: "docker-container",
-        dockerfilePath: "Dockerfile.yundu",
+        dockerfilePath: "Dockerfile.appaloft",
         buildCommand: "node build.mjs",
         startCommand: "node dist/server.js",
         port: 4310,

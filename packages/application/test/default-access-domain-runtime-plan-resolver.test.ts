@@ -31,7 +31,7 @@ import {
   SourceKindValue,
   SourceLocator,
   TargetKindValue,
-} from "@yundu/core";
+} from "@appaloft/core";
 import { createExecutionContext, type ExecutionContext } from "../src/execution-context";
 import { DefaultAccessDomainRuntimePlanResolver } from "../src/operations/deployments/default-access-domain-runtime-plan.resolver";
 import {

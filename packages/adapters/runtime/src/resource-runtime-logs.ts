@@ -8,7 +8,7 @@ import {
   err,
   ok,
   type Result,
-} from "@yundu/core";
+} from "@appaloft/core";
 import {
   createRuntimeLogsSpanName,
   type ExecutionContext,
@@ -22,8 +22,8 @@ import {
   type ServerRepository,
   type TraceAttributes,
   toRepositoryContext,
-  yunduTraceAttributes,
-} from "@yundu/application";
+  appaloftTraceAttributes,
+} from "@appaloft/application";
 
 type RuntimeLogCloseReason = "completed" | "cancelled" | "source-ended";
 type RuntimeLogCommandKind =
@@ -478,22 +478,22 @@ function createProcessRuntimeLogStream(input: {
           ? await Promise.race([processDone, processTimeout.promise])
           : await processDone;
 
-        span.setAttribute(yunduTraceAttributes.runtimeLogLineCount, sequence);
+        span.setAttribute(appaloftTraceAttributes.runtimeLogLineCount, sequence);
 
         if (outcome.kind === "timeout") {
           subprocess.kill();
           void processDone.catch(() => undefined);
 
           if (input.signal.aborted || closeRequested) {
-            span.setAttribute(yunduTraceAttributes.runtimeLogCloseReason, "cancelled");
+            span.setAttribute(appaloftTraceAttributes.runtimeLogCloseReason, "cancelled");
             span.setStatus("ok");
             stream.complete("cancelled");
             return;
           }
 
           span.setAttributes({
-            [yunduTraceAttributes.runtimeLogCloseReason]: "timeout",
-            [yunduTraceAttributes.runtimeLogTimeoutMs]: timeoutMs,
+            [appaloftTraceAttributes.runtimeLogCloseReason]: "timeout",
+            [appaloftTraceAttributes.runtimeLogTimeoutMs]: timeoutMs,
           });
           span.setStatus("error", `Runtime log process timed out after ${timeoutMs}ms`);
           stream.fail(
@@ -507,7 +507,7 @@ function createProcessRuntimeLogStream(input: {
         }
 
         if (input.signal.aborted) {
-          span.setAttribute(yunduTraceAttributes.runtimeLogCloseReason, "cancelled");
+          span.setAttribute(appaloftTraceAttributes.runtimeLogCloseReason, "cancelled");
           span.setStatus("ok");
           stream.complete("cancelled");
           return;
@@ -516,7 +516,7 @@ function createProcessRuntimeLogStream(input: {
         const exitCode = outcome.exitCode;
 
         if (exitCode === 0) {
-          span.setAttribute(yunduTraceAttributes.runtimeLogCloseReason, "source-ended");
+          span.setAttribute(appaloftTraceAttributes.runtimeLogCloseReason, "source-ended");
           span.setStatus("ok");
           stream.complete("source-ended");
           return;
@@ -535,7 +535,7 @@ function createProcessRuntimeLogStream(input: {
           "error",
           error instanceof Error ? error.message : "Runtime log process stream failed",
         );
-        span.setAttribute(yunduTraceAttributes.runtimeLogLineCount, sequence);
+        span.setAttribute(appaloftTraceAttributes.runtimeLogLineCount, sequence);
         span.recordError(error instanceof Error ? error : { message: String(error) });
         stream.fail(
           createStreamFailure(
@@ -561,14 +561,14 @@ function createRuntimeLogProcessTraceAttributes(input: {
   request: ResourceRuntimeLogRequest;
 }): TraceAttributes {
   return {
-    [yunduTraceAttributes.resourceId]: input.context.resource.id,
-    [yunduTraceAttributes.deploymentId]: input.context.deployment.id,
-    [yunduTraceAttributes.runtimeKind]: runtimeKind(input.context),
-    [yunduTraceAttributes.targetProviderKey]: input.context.deployment.runtimePlan.target.providerKey,
-    [yunduTraceAttributes.runtimeLogCommand]: input.command,
-    [yunduTraceAttributes.runtimeLogFollow]: input.request.follow,
-    [yunduTraceAttributes.runtimeLogTailLines]: input.request.tailLines,
-    [yunduTraceAttributes.runtimeLogServiceName]: input.request.serviceName,
+    [appaloftTraceAttributes.resourceId]: input.context.resource.id,
+    [appaloftTraceAttributes.deploymentId]: input.context.deployment.id,
+    [appaloftTraceAttributes.runtimeKind]: runtimeKind(input.context),
+    [appaloftTraceAttributes.targetProviderKey]: input.context.deployment.runtimePlan.target.providerKey,
+    [appaloftTraceAttributes.runtimeLogCommand]: input.command,
+    [appaloftTraceAttributes.runtimeLogFollow]: input.request.follow,
+    [appaloftTraceAttributes.runtimeLogTailLines]: input.request.tailLines,
+    [appaloftTraceAttributes.runtimeLogServiceName]: input.request.serviceName,
   };
 }
 
@@ -592,14 +592,14 @@ function stableRuntimeLogHash(value: string): string {
 
 function sshControlPath(target: SshRuntimeLogTarget): string {
   const targetHash = stableRuntimeLogHash(`${target.host}:${target.port}`);
-  return join(tmpdir(), `yundu-runtime-log-${targetHash}.sock`);
+  return join(tmpdir(), `appaloft-runtime-log-${targetHash}.sock`);
 }
 
 async function writeSshIdentityFile(privateKey: string): Promise<{
   identityFile: string;
   cleanup(): Promise<void>;
 }> {
-  const sshDir = await mkdtemp(join(tmpdir(), "yundu-runtime-log-ssh-"));
+  const sshDir = await mkdtemp(join(tmpdir(), "appaloft-runtime-log-ssh-"));
   const identityFile = join(sshDir, "id_runtime_log");
   await writeFile(identityFile, privateKey.endsWith("\n") ? privateKey : `${privateKey}\n`, {
     mode: 0o600,

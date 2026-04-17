@@ -20,7 +20,7 @@
       "!**/test-results",
       "!**/playwright-report",
       "!**/runtime",
-      "!**/.yundu",
+      "!**/.appaloft",
       "!**/.tmp",
       "!**/*.svelte"
     ]

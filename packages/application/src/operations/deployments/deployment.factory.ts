@@ -12,7 +12,7 @@ import {
   type RuntimePlan,
   type Server,
   safeTry,
-} from "@yundu/core";
+} from "@appaloft/core";
 import { inject, injectable } from "tsyringe";
 
 import { type Clock, type IdGenerator } from "../../ports";

@@ -50,8 +50,8 @@ Container exec and compose service shells are out of scope for the first slice.
    - ensure WebSocket close aborts the backend session;
    - keep terminal frames separate from domain aggregate state.
 5. CLI:
-   - add `yundu terminal open --server <serverId>`;
-   - add `yundu resource terminal <resourceId> [--deployment <deploymentId>]`;
+   - add `appaloft terminal open --server <serverId>`;
+   - add `appaloft resource terminal <resourceId> [--deployment <deploymentId>]`;
    - restore local TTY on all exit paths.
 6. Web:
    - add an xterm-based Svelte terminal component;
@@ -104,8 +104,8 @@ Implemented:
 - HTTP/oRPC open endpoint and WebSocket attach endpoint;
 - Web resource terminal tab and server detail terminal panel using `@xterm/xterm` and
   `@xterm/addon-fit`;
-- CLI descriptor commands for `yundu server terminal <serverId>` and
-  `yundu resource terminal <resourceId>`.
+- CLI descriptor commands for `appaloft server terminal <serverId>` and
+  `appaloft resource terminal <resourceId>`.
 
 Known gaps:
 

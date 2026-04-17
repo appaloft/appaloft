@@ -21,7 +21,7 @@ import {
   type Result,
   safeTry,
   UpsertCertificateSpec,
-} from "@yundu/core";
+} from "@appaloft/core";
 import { inject, injectable } from "tsyringe";
 
 import { EventHandler, type EventHandlerContract } from "../../cqrs";

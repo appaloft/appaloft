@@ -2,17 +2,17 @@
 
 > CORE DOCUMENT
 >
-> This file is the human-facing and AI-facing source of truth for Yundu business capabilities.
+> This file is the human-facing and AI-facing source of truth for Appaloft business capabilities.
 > If a transport, UI flow, or local shortcut conflicts with this document, this document wins.
 > The executable mirror of this document is
-> [`packages/application/src/operation-catalog.ts`](/Users/nichenqin/projects/yundu/packages/application/src/operation-catalog.ts).
-> Use [BUSINESS_OPERATION_MAP.md](/Users/nichenqin/projects/yundu/docs/BUSINESS_OPERATION_MAP.md)
+> [`packages/application/src/operation-catalog.ts`](/Users/nichenqin/projects/appaloft/packages/application/src/operation-catalog.ts).
+> Use [BUSINESS_OPERATION_MAP.md](/Users/nichenqin/projects/appaloft/docs/BUSINESS_OPERATION_MAP.md)
 > to understand operation relationships, workflow sequencing, and rebuild gates before adding or
 > changing a behavior.
 
 ## Why This File Exists
 
-Yundu is not a web-first CRUD application. Its core is a deployment control system with multiple
+Appaloft is not a web-first CRUD application. Its core is a deployment control system with multiple
 entry points:
 
 - CLI
@@ -37,14 +37,14 @@ to an explicit application operation.
    - `*.handler.ts`
    - `*.use-case.ts` or `*.query-service.ts`
 5. Any new business capability must update this document and
-   [`packages/application/src/operation-catalog.ts`](/Users/nichenqin/projects/yundu/packages/application/src/operation-catalog.ts)
+   [`packages/application/src/operation-catalog.ts`](/Users/nichenqin/projects/appaloft/packages/application/src/operation-catalog.ts)
    in the same change.
 6. Infrastructure endpoints such as `/api/health`, `/api/readiness`, and `/api/version` are not
    business operations. They belong to the HTTP adapter layer.
 
 ## Business Capability Model
 
-The current Yundu core is organized into seven capability groups:
+The current Appaloft core is organized into seven capability groups:
 
 - Projects
 - Deployment Targets
@@ -69,8 +69,8 @@ Implemented operations:
 
 | Capability | Kind | Operation Key | Message | Schema | CLI | oRPC / HTTP |
 | --- | --- | --- | --- | --- | --- | --- |
-| Create project | Command | `projects.create` | `CreateProjectCommand` | `CreateProjectCommandInput` | `yundu project create` | `POST /api/projects` |
-| List projects | Query | `projects.list` | `ListProjectsQuery` | `ListProjectsQueryInput` | `yundu project list` | `GET /api/projects` |
+| Create project | Command | `projects.create` | `CreateProjectCommand` | `CreateProjectCommandInput` | `appaloft project create` | `POST /api/projects` |
+| List projects | Query | `projects.list` | `ListProjectsQuery` | `ListProjectsQueryInput` | `appaloft project list` | `GET /api/projects` |
 
 Current boundary:
 - a project is currently metadata plus deployment ownership
@@ -97,7 +97,7 @@ transports until added here and to the operation catalog.
 ## Deployment Targets
 
 Business meaning:
-- a `DeploymentTarget` is a deploy target record owned by Yundu
+- a `DeploymentTarget` is a deploy target record owned by Appaloft
 - providers describe how the server is reached or operated
 
 Transport compatibility:
@@ -108,15 +108,15 @@ Implemented operations:
 
 | Capability | Kind | Operation Key | Message | Schema | CLI | oRPC / HTTP |
 | --- | --- | --- | --- | --- | --- | --- |
-| Register deployment target | Command | `servers.register` | `RegisterServerCommand` | `RegisterServerCommandInput` | `yundu server register` | `POST /api/servers` |
-| Configure deployment target credential | Command | `servers.configure-credential` | `ConfigureServerCredentialCommand` | `ConfigureServerCredentialCommandInput` | `yundu server credential <serverId>` | `POST /api/servers/{serverId}/credentials` |
-| List deployment targets | Query | `servers.list` | `ListServersQuery` | `ListServersQueryInput` | `yundu server list` | `GET /api/servers` |
-| Test deployment target connectivity | Command | `servers.test-connectivity` | `TestServerConnectivityCommand` | `TestServerConnectivityCommandInput` | `yundu server test <serverId>`; `yundu server doctor <serverId>` | `POST /api/servers/{serverId}/connectivity-tests` |
+| Register deployment target | Command | `servers.register` | `RegisterServerCommand` | `RegisterServerCommandInput` | `appaloft server register` | `POST /api/servers` |
+| Configure deployment target credential | Command | `servers.configure-credential` | `ConfigureServerCredentialCommand` | `ConfigureServerCredentialCommandInput` | `appaloft server credential <serverId>` | `POST /api/servers/{serverId}/credentials` |
+| List deployment targets | Query | `servers.list` | `ListServersQuery` | `ListServersQueryInput` | `appaloft server list` | `GET /api/servers` |
+| Test deployment target connectivity | Command | `servers.test-connectivity` | `TestServerConnectivityCommand` | `TestServerConnectivityCommandInput` | `appaloft server test <serverId>`; `appaloft server doctor <serverId>` | `POST /api/servers/{serverId}/connectivity-tests` |
 | Test draft deployment target connectivity | Command | `servers.test-draft-connectivity` | `TestServerConnectivityCommand` | `TestServerConnectivityCommandInput` | - | `POST /api/servers/connectivity-tests` |
-| Repair deployment target edge proxy | Command | `servers.bootstrap-proxy` | `BootstrapServerProxyCommand` | `BootstrapServerProxyCommandInput` | `yundu server proxy repair <serverId>` | `POST /api/servers/{serverId}/edge-proxy/bootstrap` |
-| Create reusable SSH credential | Command | `credentials.create-ssh` | `CreateSshCredentialCommand` | `CreateSshCredentialCommandInput` | `yundu server credential-create` | `POST /api/credentials/ssh` |
-| List reusable SSH credentials | Query | `credentials.list-ssh` | `ListSshCredentialsQuery` | `ListSshCredentialsQueryInput` | `yundu server credential-list` | `GET /api/credentials/ssh` |
-| Open deployment target terminal | Command | `terminal-sessions.open` | `OpenTerminalSessionCommand` | `OpenTerminalSessionCommandInput` | `yundu server terminal <serverId>` | `POST /api/terminal-sessions`; attach: `WS /api/terminal-sessions/{sessionId}/attach` |
+| Repair deployment target edge proxy | Command | `servers.bootstrap-proxy` | `BootstrapServerProxyCommand` | `BootstrapServerProxyCommandInput` | `appaloft server proxy repair <serverId>` | `POST /api/servers/{serverId}/edge-proxy/bootstrap` |
+| Create reusable SSH credential | Command | `credentials.create-ssh` | `CreateSshCredentialCommand` | `CreateSshCredentialCommandInput` | `appaloft server credential-create` | `POST /api/credentials/ssh` |
+| List reusable SSH credentials | Query | `credentials.list-ssh` | `ListSshCredentialsQuery` | `ListSshCredentialsQueryInput` | `appaloft server credential-list` | `GET /api/credentials/ssh` |
+| Open deployment target terminal | Command | `terminal-sessions.open` | `OpenTerminalSessionCommand` | `OpenTerminalSessionCommandInput` | `appaloft server terminal <serverId>` | `POST /api/terminal-sessions`; attach: `WS /api/terminal-sessions/{sessionId}/attach` |
 
 - server registration may carry edge proxy intent/provider selection; when omitted, the deployment
   target records the configured default edge proxy intent and an asynchronous lifecycle path
@@ -124,7 +124,7 @@ Implemented operations:
 - proxy bootstrap failure does not roll back deployment target metadata; it is recorded on the
   server proxy status/error fields and deployment execution still performs an idempotent proxy
   ensure when a runtime plan needs proxy-backed access
-- `servers.test-connectivity` / `yundu server doctor <serverId>` includes provider-rendered
+- `servers.test-connectivity` / `appaloft server doctor <serverId>` includes provider-rendered
   edge proxy diagnostics for provider-backed targets when the runtime adapter can execute them; the
   diagnostics are read-only and do not mark the server ready or repaired
 - `servers.bootstrap-proxy` is the explicit repair/retry operation for provider-owned proxy
@@ -152,13 +152,13 @@ Implemented operations:
 
 | Capability | Kind | Operation Key | Message | Schema | CLI | oRPC / HTTP |
 | --- | --- | --- | --- | --- | --- | --- |
-| Create environment | Command | `environments.create` | `CreateEnvironmentCommand` | `CreateEnvironmentCommandInput` | `yundu env create` | `POST /api/environments` |
-| List environments | Query | `environments.list` | `ListEnvironmentsQuery` | `ListEnvironmentsQueryInput` | `yundu env list` | `GET /api/environments` |
-| Show environment | Query | `environments.show` | `ShowEnvironmentQuery` | `ShowEnvironmentQueryInput` | `yundu env show <environmentId>` | `GET /api/environments/{environmentId}` |
-| Set environment variable | Command | `environments.set-variable` | `SetEnvironmentVariableCommand` | `SetEnvironmentVariableCommandInput` | `yundu env set <environmentId> <key> <value>` | `POST /api/environments/{environmentId}/variables` |
-| Unset environment variable | Command | `environments.unset-variable` | `UnsetEnvironmentVariableCommand` | `UnsetEnvironmentVariableCommandInput` | `yundu env unset <environmentId> <key>` | `DELETE /api/environments/{environmentId}/variables/{key}` |
-| Diff environments | Query | `environments.diff` | `DiffEnvironmentsQuery` | `DiffEnvironmentsQueryInput` | `yundu env diff <environmentId> <otherEnvironmentId>` | `GET /api/environments/{environmentId}/diff/{otherEnvironmentId}` |
-| Promote environment | Command | `environments.promote` | `PromoteEnvironmentCommand` | `PromoteEnvironmentCommandInput` | `yundu env promote <environmentId> <targetName>` | `POST /api/environments/{environmentId}/promote` |
+| Create environment | Command | `environments.create` | `CreateEnvironmentCommand` | `CreateEnvironmentCommandInput` | `appaloft env create` | `POST /api/environments` |
+| List environments | Query | `environments.list` | `ListEnvironmentsQuery` | `ListEnvironmentsQueryInput` | `appaloft env list` | `GET /api/environments` |
+| Show environment | Query | `environments.show` | `ShowEnvironmentQuery` | `ShowEnvironmentQueryInput` | `appaloft env show <environmentId>` | `GET /api/environments/{environmentId}` |
+| Set environment variable | Command | `environments.set-variable` | `SetEnvironmentVariableCommand` | `SetEnvironmentVariableCommandInput` | `appaloft env set <environmentId> <key> <value>` | `POST /api/environments/{environmentId}/variables` |
+| Unset environment variable | Command | `environments.unset-variable` | `UnsetEnvironmentVariableCommand` | `UnsetEnvironmentVariableCommandInput` | `appaloft env unset <environmentId> <key>` | `DELETE /api/environments/{environmentId}/variables/{key}` |
+| Diff environments | Query | `environments.diff` | `DiffEnvironmentsQuery` | `DiffEnvironmentsQueryInput` | `appaloft env diff <environmentId> <otherEnvironmentId>` | `GET /api/environments/{environmentId}/diff/{otherEnvironmentId}` |
+| Promote environment | Command | `environments.promote` | `PromoteEnvironmentCommand` | `PromoteEnvironmentCommandInput` | `appaloft env promote <environmentId> <targetName>` | `POST /api/environments/{environmentId}/promote` |
 
 Core next operations expected here:
 - clone environment
@@ -184,13 +184,13 @@ Implemented operations:
 
 | Capability | Kind | Operation Key | Message | Schema | CLI | oRPC / HTTP |
 | --- | --- | --- | --- | --- | --- | --- |
-| Create resource | Command | `resources.create` | `CreateResourceCommand` | `CreateResourceCommandInput` | `yundu resource create` | `POST /api/resources` |
-| List resources | Query | `resources.list` | `ListResourcesQuery` | `ListResourcesQueryInput` | `yundu resource list` | `GET /api/resources` |
-| Read resource runtime logs | Query | `resources.runtime-logs` | `ResourceRuntimeLogsQuery` | `ResourceRuntimeLogsQueryInput` | `yundu resource logs <resourceId>` | `GET /api/resources/{resourceId}/runtime-logs`; stream: `GET /api/resources/{resourceId}/runtime-logs/stream` |
-| Preview resource proxy configuration | Query | `resources.proxy-configuration.preview` | `ResourceProxyConfigurationPreviewQuery` | `ResourceProxyConfigurationPreviewQueryInput` | `yundu resource proxy-config <resourceId>` | `GET /api/resources/{resourceId}/proxy-configuration` |
-| Read resource diagnostic summary | Query | `resources.diagnostic-summary` | `ResourceDiagnosticSummaryQuery` | `ResourceDiagnosticSummaryQueryInput` | `yundu resource diagnose <resourceId>` | `GET /api/resources/{resourceId}/diagnostic-summary` |
-| Read resource health | Query | `resources.health` | `ResourceHealthQuery` | `ResourceHealthQueryInput` | `yundu resource health <resourceId>` | `GET /api/resources/{resourceId}/health` |
-| Open resource terminal | Command | `terminal-sessions.open` | `OpenTerminalSessionCommand` | `OpenTerminalSessionCommandInput` | `yundu resource terminal <resourceId>` | `POST /api/terminal-sessions`; attach: `WS /api/terminal-sessions/{sessionId}/attach` |
+| Create resource | Command | `resources.create` | `CreateResourceCommand` | `CreateResourceCommandInput` | `appaloft resource create` | `POST /api/resources` |
+| List resources | Query | `resources.list` | `ListResourcesQuery` | `ListResourcesQueryInput` | `appaloft resource list` | `GET /api/resources` |
+| Read resource runtime logs | Query | `resources.runtime-logs` | `ResourceRuntimeLogsQuery` | `ResourceRuntimeLogsQueryInput` | `appaloft resource logs <resourceId>` | `GET /api/resources/{resourceId}/runtime-logs`; stream: `GET /api/resources/{resourceId}/runtime-logs/stream` |
+| Preview resource proxy configuration | Query | `resources.proxy-configuration.preview` | `ResourceProxyConfigurationPreviewQuery` | `ResourceProxyConfigurationPreviewQueryInput` | `appaloft resource proxy-config <resourceId>` | `GET /api/resources/{resourceId}/proxy-configuration` |
+| Read resource diagnostic summary | Query | `resources.diagnostic-summary` | `ResourceDiagnosticSummaryQuery` | `ResourceDiagnosticSummaryQueryInput` | `appaloft resource diagnose <resourceId>` | `GET /api/resources/{resourceId}/diagnostic-summary` |
+| Read resource health | Query | `resources.health` | `ResourceHealthQuery` | `ResourceHealthQueryInput` | `appaloft resource health <resourceId>` | `GET /api/resources/{resourceId}/health` |
+| Open resource terminal | Command | `terminal-sessions.open` | `OpenTerminalSessionCommand` | `OpenTerminalSessionCommandInput` | `appaloft resource terminal <resourceId>` | `POST /api/terminal-sessions`; attach: `WS /api/terminal-sessions/{sessionId}/attach` |
 
 Current boundary:
 - resources are persisted and can be listed by project or environment
@@ -262,9 +262,9 @@ Implemented operations:
 
 | Capability | Kind | Operation Key | Message | Schema | CLI | oRPC / HTTP |
 | --- | --- | --- | --- | --- | --- | --- |
-| Create deployment | Command | `deployments.create` | `CreateDeploymentCommand` | `CreateDeploymentCommandInput` | `yundu deploy [path-or-source]` or ids-only flags | `POST /api/deployments` |
-| List deployments | Query | `deployments.list` | `ListDeploymentsQuery` | `ListDeploymentsQueryInput` | `yundu deployments list` | `GET /api/deployments` |
-| Read deployment logs | Query | `deployments.logs` | `DeploymentLogsQuery` | `DeploymentLogsQueryInput` | `yundu logs <deploymentId>` | `GET /api/deployments/{deploymentId}/logs` |
+| Create deployment | Command | `deployments.create` | `CreateDeploymentCommand` | `CreateDeploymentCommandInput` | `appaloft deploy [path-or-source]` or ids-only flags | `POST /api/deployments` |
+| List deployments | Query | `deployments.list` | `ListDeploymentsQuery` | `ListDeploymentsQueryInput` | `appaloft deployments list` | `GET /api/deployments` |
+| Read deployment logs | Query | `deployments.logs` | `DeploymentLogsQuery` | `DeploymentLogsQueryInput` | `appaloft logs <deploymentId>` | `GET /api/deployments/{deploymentId}/logs` |
 
 Current boundary:
 - `deployments.create` is the only public deployment write command for the v1 operation surface.
@@ -311,7 +311,7 @@ Current boundary:
   operations in the v1 surface. They must be reintroduced only after new source-of-truth specs,
   test matrices, implementation plans, and Web/API/CLI contracts are accepted.
 - Quick Deploy is an entry workflow over explicit operations, not a separate domain command or
-  operation-catalog entry. Web QuickDeploy and CLI interactive `yundu deploy` must create/select
+  operation-catalog entry. Web QuickDeploy and CLI interactive `appaloft deploy` must create/select
   context through existing commands and queries, then dispatch `deployments.create`. See
   [ADR-010: Quick Deploy Workflow Boundary](./decisions/ADR-010-quick-deploy-workflow-boundary.md).
 - source, runtime, network, health, route, domain, and TLS fields on `deployments.create` are superseded by
@@ -341,11 +341,11 @@ Implemented operations:
 
 | Capability | Kind | Operation Key | Message | Schema | CLI | oRPC / HTTP |
 | --- | --- | --- | --- | --- | --- | --- |
-| Create domain binding | Command | `domain-bindings.create` | `CreateDomainBindingCommand` | `CreateDomainBindingCommandInput` | `yundu domain-binding create <domainName>` | `POST /api/domain-bindings` |
-| Confirm domain binding ownership | Command | `domain-bindings.confirm-ownership` | `ConfirmDomainBindingOwnershipCommand` | `ConfirmDomainBindingOwnershipCommandInput` | `yundu domain-binding confirm-ownership <domainBindingId>` | `POST /api/domain-bindings/{domainBindingId}/ownership-confirmations` |
-| List domain bindings | Query | `domain-bindings.list` | `ListDomainBindingsQuery` | `ListDomainBindingsQueryInput` | `yundu domain-binding list` | `GET /api/domain-bindings` |
-| Issue or renew certificate | Command | `certificates.issue-or-renew` | `IssueOrRenewCertificateCommand` | `IssueOrRenewCertificateCommandInput` | `yundu certificate issue-or-renew <domainBindingId>` | `POST /api/certificates/issue-or-renew` |
-| List certificates | Query | `certificates.list` | `ListCertificatesQuery` | `ListCertificatesQueryInput` | `yundu certificate list` | `GET /api/certificates` |
+| Create domain binding | Command | `domain-bindings.create` | `CreateDomainBindingCommand` | `CreateDomainBindingCommandInput` | `appaloft domain-binding create <domainName>` | `POST /api/domain-bindings` |
+| Confirm domain binding ownership | Command | `domain-bindings.confirm-ownership` | `ConfirmDomainBindingOwnershipCommand` | `ConfirmDomainBindingOwnershipCommandInput` | `appaloft domain-binding confirm-ownership <domainBindingId>` | `POST /api/domain-bindings/{domainBindingId}/ownership-confirmations` |
+| List domain bindings | Query | `domain-bindings.list` | `ListDomainBindingsQuery` | `ListDomainBindingsQueryInput` | `appaloft domain-binding list` | `GET /api/domain-bindings` |
+| Issue or renew certificate | Command | `certificates.issue-or-renew` | `IssueOrRenewCertificateCommand` | `IssueOrRenewCertificateCommandInput` | `appaloft certificate issue-or-renew <domainBindingId>` | `POST /api/certificates/issue-or-renew` |
+| List certificates | Query | `certificates.list` | `ListCertificatesQuery` | `ListCertificatesQueryInput` | `appaloft certificate list` | `GET /api/certificates` |
 
 Current boundary:
 - `domain-bindings.create` creates durable binding state, persists the first manual verification
@@ -405,19 +405,19 @@ Core next operations expected here:
 ## System Operations
 
 Business meaning:
-- these are application-level control plane operations required to operate Yundu itself
+- these are application-level control plane operations required to operate Appaloft itself
 - they are not domain aggregates, but they are still first-class application operations
 
 Implemented operations:
 
 | Capability | Kind | Operation Key | Message | Schema | CLI | oRPC / HTTP |
 | --- | --- | --- | --- | --- | --- | --- |
-| List providers | Query | `system.providers.list` | `ListProvidersQuery` | none | `yundu providers list` | `GET /api/providers` |
-| List plugins | Query | `system.plugins.list` | `ListPluginsQuery` | none | `yundu plugins list` | `GET /api/plugins` |
+| List providers | Query | `system.providers.list` | `ListProvidersQuery` | none | `appaloft providers list` | `GET /api/providers` |
+| List plugins | Query | `system.plugins.list` | `ListPluginsQuery` | none | `appaloft plugins list` | `GET /api/plugins` |
 | List GitHub repositories | Query | `system.github-repositories.list` | `ListGitHubRepositoriesQuery` | `ListGitHubRepositoriesQueryInput` | none yet | `GET /api/integrations/github/repositories` |
-| Doctor diagnostics | Query | `system.doctor` | `DoctorQuery` | none | `yundu doctor` | none |
-| Database status | Query | `system.db-status` | `DbStatusQuery` | none | `yundu db status` | none |
-| Database migrate | Command | `system.db-migrate` | `DbMigrateCommand` | none | `yundu db migrate` | none |
+| Doctor diagnostics | Query | `system.doctor` | `DoctorQuery` | none | `appaloft doctor` | none |
+| Database status | Query | `system.db-status` | `DbStatusQuery` | none | `appaloft db status` | none |
+| Database migrate | Command | `system.db-migrate` | `DbMigrateCommand` | none | `appaloft db migrate` | none |
 
 Current boundary:
 - embedded self-hosted PGlite applies migrations automatically during shell startup
@@ -450,11 +450,11 @@ Before adding a new CLI command, API endpoint, or UI workflow:
 
 1. Decide whether it is a `Command` or `Query`.
 2. Locate the behavior in
-   [BUSINESS_OPERATION_MAP.md](/Users/nichenqin/projects/yundu/docs/BUSINESS_OPERATION_MAP.md) and
+   [BUSINESS_OPERATION_MAP.md](/Users/nichenqin/projects/appaloft/docs/BUSINESS_OPERATION_MAP.md) and
    update the map first if the behavior is absent or rebuild-required.
 3. Add the operation to this file when it becomes a public command/query.
 4. Add the executable mirror entry to
-   [`packages/application/src/operation-catalog.ts`](/Users/nichenqin/projects/yundu/packages/application/src/operation-catalog.ts).
+   [`packages/application/src/operation-catalog.ts`](/Users/nichenqin/projects/appaloft/packages/application/src/operation-catalog.ts).
 5. Create the vertical slice files:
    - `*.schema.ts`
    - `*.command.ts` or `*.query.ts`
@@ -463,4 +463,4 @@ Before adding a new CLI command, API endpoint, or UI workflow:
 6. Map CLI and oRPC / HTTP to that operation.
 7. Add tests at the transport and application levels.
 
-If a capability is not listed here, it is not part of the agreed Yundu business surface yet.
+If a capability is not listed here, it is not part of the agreed Appaloft business surface yet.

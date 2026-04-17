@@ -35,7 +35,7 @@ That is not a contradiction: the deployment attempt reached its terminal success
 resource may still be unreachable, unhealthy, missing a configured health check, or behind a broken
 proxy route.
 
-Yundu already has deployment-time health checks in runtime adapters. That behavior verifies one
+Appaloft already has deployment-time health checks in runtime adapters. That behavior verifies one
 deployment attempt during execution. It does not provide a durable, resource-owned current health
 view for the latest runtime instance.
 

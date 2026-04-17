@@ -13,8 +13,8 @@ jobs:
   release:
     runs-on: ubuntu-latest
     env:
-      YUNDU_APP_VERSION: ${{ github.ref_name }}
-      YUNDU_OTEL_ENABLED: "false"
+      APPALOFT_APP_VERSION: ${{ github.ref_name }}
+      APPALOFT_OTEL_ENABLED: "false"
     steps:
       - uses: actions/checkout@v4
 
@@ -32,19 +32,19 @@ jobs:
         run: bun run package:artifacts
 
       - name: Archive Backend
-        run: tar -C dist/release -czf dist/release/yundu-backend-${{ github.ref_name }}.tar.gz yundu-backend
+        run: tar -C dist/release -czf dist/release/appaloft-backend-${{ github.ref_name }}.tar.gz appaloft-backend
 
       - name: Archive Web Static
-        run: tar -C dist/release -czf dist/release/yundu-web-static-${{ github.ref_name }}.tar.gz yundu-web-static
+        run: tar -C dist/release -czf dist/release/appaloft-web-static-${{ github.ref_name }}.tar.gz appaloft-web-static
 
       - name: Archive Binary Bundle
-        run: tar -C dist/release -czf dist/release/yundu-binary-bundle-linux-x64-${{ github.ref_name }}.tar.gz yundu-binary-bundle
+        run: tar -C dist/release -czf dist/release/appaloft-binary-bundle-linux-x64-${{ github.ref_name }}.tar.gz appaloft-binary-bundle
 
       - name: Build All-In-One Image
-        run: docker build -t yundu-all-in-one:${{ github.ref_name }} .
+        run: docker build -t appaloft-all-in-one:${{ github.ref_name }} .
 
       - name: Save All-In-One Image
-        run: docker save yundu-all-in-one:${{ github.ref_name }} | gzip > dist/release/yundu-all-in-one-${{ github.ref_name }}.tar.gz
+        run: docker save appaloft-all-in-one:${{ github.ref_name }} | gzip > dist/release/appaloft-all-in-one-${{ github.ref_name }}.tar.gz
 
       - name: Checksums
         run: bun run checksums

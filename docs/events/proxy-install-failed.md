@@ -77,7 +77,7 @@ proxy-install-failed
 
 Retry must not be raw replay of the old `proxy-bootstrap-requested` event.
 
-The accepted public repair entrypoints are `yundu server proxy repair <serverId>` and
+The accepted public repair entrypoints are `appaloft server proxy repair <serverId>` and
 `POST /api/servers/{serverId}/edge-proxy/bootstrap`; both dispatch `servers.bootstrap-proxy`.
 
 Default retry classification:

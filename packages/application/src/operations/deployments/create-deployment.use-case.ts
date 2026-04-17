@@ -10,8 +10,8 @@ import {
   SourceDescriptor,
   safeTry,
   UpsertDeploymentSpec,
-} from "@yundu/core";
-import { i18nKeys } from "@yundu/i18n";
+} from "@appaloft/core";
+import { i18nKeys } from "@appaloft/i18n";
 import { inject, injectable } from "tsyringe";
 import { deploymentProgressSteps, reportDeploymentProgress } from "../../deployment-progress";
 import { type ExecutionContext, toRepositoryContext } from "../../execution-context";

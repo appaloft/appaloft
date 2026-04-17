@@ -1,4 +1,4 @@
-# @yundu/observability
+# @appaloft/observability
 
 Observability bootstrap and adapters.
 
@@ -16,7 +16,7 @@ Conventions:
 - create one `ExecutionContext` per CLI invocation or HTTP/RPC request
 - pass `context` as the first parameter across buses, use cases, ports, and adapters
 - narrow write-side persistence to `RepositoryContext`, carrying only request-scoped concerns such as `requestId`, `actor`, `tracer`, and optional `transaction`
-- use `yundu.*` span names and `yundu.*` attributes for application-level tracing metadata; keep the attribute keys centralized in `packages/application/src/execution-context.ts`
+- use `appaloft.*` span names and `appaloft.*` attributes for application-level tracing metadata; keep the attribute keys centralized in `packages/application/src/execution-context.ts`
 - configure exporters with standard OpenTelemetry environment variables such as `OTEL_SERVICE_NAME`, `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_EXPORTER_OTLP_HEADERS`, `OTEL_TRACES_SAMPLER`, and `OTEL_TRACES_SAMPLER_ARG`
 - configure trace UI links with `TRACE_LINK_URL_TEMPLATE` or `TRACE_LINK_BASE_URL`; base URLs use `{base}/trace/{traceId}`
 

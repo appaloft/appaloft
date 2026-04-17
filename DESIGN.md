@@ -1,8 +1,8 @@
-# Yundu Console Design Rules
+# Appaloft Console Design Rules
 
 ## Source Inspiration
 
-Yundu's console design is adapted from the Vercel-inspired DESIGN.md in
+Appaloft's console design is adapted from the Vercel-inspired DESIGN.md in
 `VoltAgent/awesome-design-md`:
 
 - collection: <https://github.com/VoltAgent/awesome-design-md>
@@ -13,7 +13,7 @@ infrastructure should feel precise, quiet, and strongly hierarchical.
 
 ## Product Model
 
-Yundu is a tool console for deployment operations. The UI must keep the domain order visible:
+Appaloft is a tool console for deployment operations. The UI must keep the domain order visible:
 
 ```text
 Project -> Environment -> Resource -> Deployment

@@ -1,4 +1,4 @@
-import { type Deployment, ok, type Result, StartedAt, safeTry } from "@yundu/core";
+import { type Deployment, ok, type Result, StartedAt, safeTry } from "@appaloft/core";
 import { inject, injectable } from "tsyringe";
 
 import { type Clock } from "../../ports";

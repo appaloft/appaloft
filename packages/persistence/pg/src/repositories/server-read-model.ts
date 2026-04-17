@@ -1,9 +1,9 @@
 import {
+  appaloftTraceAttributes,
   createReadModelSpanName,
   type RepositoryContext,
   type ServerReadModel,
-  yunduTraceAttributes,
-} from "@yundu/application";
+} from "@appaloft/application";
 import { type Kysely } from "kysely";
 
 import { type Database } from "../schema";
@@ -18,7 +18,7 @@ export class PgServerReadModel implements ServerReadModel {
       createReadModelSpanName("server", "list"),
       {
         attributes: {
-          [yunduTraceAttributes.readModelName]: "server",
+          [appaloftTraceAttributes.readModelName]: "server",
         },
       },
       async () =>

@@ -1,5 +1,5 @@
+import { CreateProjectCommand, ListProjectsQuery } from "@appaloft/application";
 import { Command as EffectCommand, Options } from "@effect/cli";
-import { CreateProjectCommand, ListProjectsQuery } from "@yundu/application";
 
 import { optionalValue, runCommand, runQuery } from "../runtime.js";
 

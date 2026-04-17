@@ -2,9 +2,9 @@ import {
   type DeploymentContextDefaultsDecision,
   type DeploymentContextDefaultsPolicy,
   type DeploymentContextDefaultsPolicyInput,
-} from "@yundu/application";
-import { type AppConfig } from "@yundu/config";
-import { ok } from "@yundu/core";
+} from "@appaloft/application";
+import { type AppConfig } from "@appaloft/config";
+import { ok } from "@appaloft/core";
 
 const localEmbeddedDefaults: DeploymentContextDefaultsDecision = {
   project: {

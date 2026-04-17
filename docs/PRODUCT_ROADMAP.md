@@ -2,19 +2,19 @@
 
 > Analysis date: 2026-04-13.
 >
-> Scope: deployment platform product requirements, current Yundu implementation state, local
+> Scope: deployment platform product requirements, current Appaloft implementation state, local
 > self-hosted PaaS reference inspection, public self-hosted deployment product documentation, and
-> comparable platform patterns. This is Yundu's product and platform roadmap.
+> comparable platform patterns. This is Appaloft's product and platform roadmap.
 
 ## Why This Exists
 
-Yundu's intended core is `detect -> plan -> execute -> verify -> rollback`, with CLI, HTTP API,
+Appaloft's intended core is `detect -> plan -> execute -> verify -> rollback`, with CLI, HTTP API,
 and future MCP/tool interfaces as first-class interfaces. This roadmap turns the expected day-two
-application configuration surface for a self-hosted PaaS into Yundu-owned product work.
+application configuration surface for a self-hosted PaaS into Appaloft-owned product work.
 
 The key product direction from this review:
 
-- Keep the Yundu domain model as the source of truth; do not hide deployment behavior in web forms.
+- Keep the Appaloft domain model as the source of truth; do not hide deployment behavior in web forms.
 - Add the missing resource configuration operations before adding many one-off UI tabs.
 - Treat static site deployment as an early core resource type.
 - Treat Nixpacks/buildpack support as an onboarding accelerator, not a prerequisite for the first
@@ -22,7 +22,7 @@ The key product direction from this review:
 
 ## Inputs
 
-- Yundu source of truth:
+- Appaloft source of truth:
   - [`docs/BUSINESS_OPERATION_MAP.md`](./BUSINESS_OPERATION_MAP.md)
   - [`docs/CORE_OPERATIONS.md`](./CORE_OPERATIONS.md)
   - [`docs/DOMAIN_MODEL.md`](./DOMAIN_MODEL.md)
@@ -56,7 +56,7 @@ The key product direction from this review:
 
 ## Target Project And Application Surface
 
-Yundu project/environment pages should expose these major surfaces:
+Appaloft project/environment pages should expose these major surfaces:
 
 - Environment resource list with Applications and Services, resource search, tags, clone, and delete
   environment.
@@ -76,9 +76,9 @@ Yundu project/environment pages should expose these major surfaces:
     Git submodules/LFS/shallow clone, healthcheck policy, rollback image retention, CPU/memory
     limits, clone/move resource, and metrics behind Sentinel.
 
-## Current Yundu Baseline
+## Current Appaloft Baseline
 
-Yundu already has a stronger domain foundation than a generic UI-only implementation would:
+Appaloft already has a stronger domain foundation than a generic UI-only implementation would:
 
 - Projects, environments, resources, destinations, deployment targets, deployments, releases, and
   rollback plans are modeled in core.
@@ -101,17 +101,17 @@ Yundu already has a stronger domain foundation than a generic UI-only implementa
 
 ## Roadmap Table
 
-| Area | Product signal | Yundu state | Gap | Priority | Necessity | Roadmap action |
+| Area | Product signal | Appaloft state | Gap | Priority | Necessity | Roadmap action |
 | --- | --- | --- | --- | --- | --- | --- |
 | Resource create/show/update | Persistent resource configuration must be the center of the application page. | Only `resources.list` is a public operation; deployment can bootstrap a resource. | No first-class operation for creating/editing resource profile, source, build config, routing, storage, or lifecycle. | P0 | Core | Add `resources.create`, `resources.show`, `resources.update`, and `resources.archive`. Keep resource config in application/core slices, then expose in web. |
 | Static site deployment | Static apps are a common first deployment and need explicit base/publish directory semantics. | `static-site`, `static-artifact`, and static workload/runtime value objects exist, but runtime resolver does not implement a static deployment method. | Static assets cannot be deployed as a first-class resource. | P0 | Core | Add `static-site` / `static-artifact` deployment method, `baseDirectory`, `publishDirectory`, SPA fallback, cache headers, static web server image, domain routing, and tests. |
 | Git source binding | Resource redeploy/webhook behavior needs durable source ownership and credential references. | Deployment source can be supplied per deployment; Git source is not yet a persisted project/resource binding. | Redeploy and webhook flows depend on latest deployment state instead of a durable source binding. | P0 | Core | Model resource source binding and credential reference. UI should prefer connected GitHub repositories when available, but allow manual public/private URLs. |
-| Deployment detail and events | Deployment history must show status, start/end/duration, commit, trigger, logs, and reconnectable state. | Yundu has list/logs/reattach and progress dialog, but explicit show/stream operations are still expected next operations. | UI cannot fully reconstruct or stream execution state as a stable business operation. | P0 | Core | Add `deployments.show` and `deployments.stream-events`; persist enough runtime metadata for reconnect, logs, access routes, and health checks. |
+| Deployment detail and events | Deployment history must show status, start/end/duration, commit, trigger, logs, and reconnectable state. | Appaloft has list/logs/reattach and progress dialog, but explicit show/stream operations are still expected next operations. | UI cannot fully reconstruct or stream execution state as a stable business operation. | P0 | Core | Add `deployments.show` and `deployments.stream-events`; persist enough runtime metadata for reconnect, logs, access routes, and health checks. |
 | Domain/TLS/access routing | Domains/TLS are core app configuration, not deployment form-only hints. | Runtime plans support access route hints and Traefik/Caddy proxy intent. | No durable resource-level routing config UI/API; proxy support is container-only for now. | P0 | Core | Add resource routing config: domains, path prefix, TLS mode, proxy kind, target port, redirect direction. Keep runtime adapter-specific labels outside core. |
-| Environment variables and secrets | Build/runtime variables, shared variables, preview variables, secret handling, and Compose interpolation are production requirements. | Yundu environment config exists with scopes and deployment snapshots; web quick deploy has variable input. | Resource-specific, preview-specific, and shared variable surfaces are incomplete. | P1 | Production | Add resource env var operations/read models, secret masking, build/runtime exposure controls, `.env` paste/import, and preview scope later. |
-| Healthcheck policy | Health checks need durable HTTP/CMD policy, expected response semantics, interval, timeout, retries, and start period. | Yundu can check deployment health after deployment using persisted route/runtime metadata. | Healthcheck policy is not yet a resource config with full HTTP/CMD semantics. | P1 | Production | Add resource healthcheck config and pass it into runtime plans. Start with HTTP path/code/timeout; add CMD later. |
+| Environment variables and secrets | Build/runtime variables, shared variables, preview variables, secret handling, and Compose interpolation are production requirements. | Appaloft environment config exists with scopes and deployment snapshots; web quick deploy has variable input. | Resource-specific, preview-specific, and shared variable surfaces are incomplete. | P1 | Production | Add resource env var operations/read models, secret masking, build/runtime exposure controls, `.env` paste/import, and preview scope later. |
+| Healthcheck policy | Health checks need durable HTTP/CMD policy, expected response semantics, interval, timeout, retries, and start period. | Appaloft can check deployment health after deployment using persisted route/runtime metadata. | Healthcheck policy is not yet a resource config with full HTTP/CMD semantics. | P1 | Production | Add resource healthcheck config and pass it into runtime plans. Start with HTTP path/code/timeout; add CMD later. |
 | Persistent storage | Stateful workloads need Docker volumes, bind mounts, destination paths, and backup relationship metadata. | Resource binding concepts exist, but resource storage operations are not implemented. | Stateful apps/databases cannot safely preserve data through resource-level config. | P1 | Production | Add persistent storage config: named volume, bind mount, destination path, file/directory mode, secret-safe read models, and adapter implementation. |
-| Rollback retention | Rollback needs retained artifact/image references and a user-visible candidate list. | Yundu has rollback plan concepts, but public rollback command behavior is rebuild-required under ADR-016. | Rollback UX, retention policy, and command semantics are not yet resource-level configuration. | P1 | Production | Store last successful artifacts/runtime image refs and rollback retention policy. Rebuild rollback as a spec-driven behavior before exposing it. |
+| Rollback retention | Rollback needs retained artifact/image references and a user-visible candidate list. | Appaloft has rollback plan concepts, but public rollback command behavior is rebuild-required under ADR-016. | Rollback UX, retention policy, and command semantics are not yet resource-level configuration. | P1 | Production | Store last successful artifacts/runtime image refs and rollback retention policy. Rebuild rollback as a spec-driven behavior before exposing it. |
 | Auto deploy and webhooks | Push-to-deploy and signed webhooks are expected deployment automation capabilities. | No durable webhook operation surface yet. | Push-to-deploy and external CI/CD integrations are missing. | P1 | Production | Add integration webhook endpoints and resource-level auto-deploy policy. Start with GitHub App/push, then generic signed deploy webhook. |
 | Static resource front-end UX | Static site deployment needs base/publish directory, web server, and domain routing inputs. | Web quick deploy has resource kind choices but no static deployment path. | Users cannot explicitly deploy static assets or understand output directory requirements. | P1 | Core | Add a "Static site" deployment flow with build command optionality, publish directory required, framework presets for Vite/SvelteKit/Next static, and generated command preview. |
 | Databases and dependency resources | Databases, backups, and explicit binding injection are first-class self-hosted PaaS expectations. | `ResourceInstance` and `ResourceBinding` are modeled but provisioning commands are future. | No database provisioning, binding injection, or restore/backup workflow. | P1 | Production | Add minimal Postgres and Redis provisioning/binding first. Make connection injection explicit instead of plain env vars. |
@@ -119,18 +119,18 @@ Yundu already has a stronger domain foundation than a generic UI-only implementa
 | Preview deployments | PR-scoped preview URLs and scoped preview variables are required for mature Git automation. | Environments include `preview`; deployment model can represent separate resources/runs. | No PR ingestion, preview resource lifecycle, or scoped preview env vars. | P2 | Production | Implement after source binding and webhooks. Use GitHub App PR events, wildcard domain template, scoped secrets, and cleanup on PR close/merge. |
 | Nixpacks / buildpack | Buildpack-style auto-detection improves onboarding when a repository has no Dockerfile. | `buildpack` enum exists, but no buildpack adapter. | "No Dockerfile" onboarding is weaker, but the core loop still works through Dockerfile/static/compose/prebuilt/workspace commands. | P2 | Optional | Add Nixpacks as an adapter-owned build strategy later. Do not block static-site or persisted resource config on it. |
 | Build server / registry / cache | Large builds need build placement, registry image/tag, build cache, and commit metadata policy. | Runtime planning builds locally/over SSH; registry/build-cache policy is not first-class. | Large builds may load production servers and cache behavior is opaque. | P2 | Production | Add build placement policy, registry push/pull config, cache mode, and source-commit build arg policy. |
-| Logs, metrics, notifications | Operators need streaming logs, filtering, metrics, health notifications, and stopped/restarted workload signals. | Yundu has deployment logs and health checks; metrics/notifications are not a full surface. | Operators lack proactive signals and richer log UX. | P2 | Production | Add log streaming, log drain config, metrics read models, and notifications for deploy/health/server events. |
+| Logs, metrics, notifications | Operators need streaming logs, filtering, metrics, health notifications, and stopped/restarted workload signals. | Appaloft has deployment logs and health checks; metrics/notifications are not a full surface. | Operators lack proactive signals and richer log UX. | P2 | Production | Add log streaming, log drain config, metrics read models, and notifications for deploy/health/server events. |
 | Resource limits and advanced Docker config | Production services need CPU/memory, labels, network aliases, basic auth, gzip, and selected advanced options. | Some runtime hints exist; no resource-level advanced config. | Advanced container tuning is unavailable or only implicit. | P2 | Optional | Add targeted fields only after core config is stable: CPU/memory first, then labels/options/network/basic auth. GPU is P3 unless a real target user needs it. |
 | Clone/move resource and environment clone | Users need to duplicate resource and environment configuration safely. | `environments.promote` exists; clone operations are expected but not implemented. | Users cannot duplicate production config for staging/preview easily. | P2 | Production | Add clone operations once resource config is durable. Include copied env vars with secret handling rules. |
 | Teams/RBAC/tags/audit | Team-scale deployments need tags, permissions, and audit trails. | Identity/governance models are foundational only. | Multi-user governance is incomplete. | P2 | Production | Add organization/member/role operations after single-user resource lifecycle is stable. Tags can come earlier as low-risk metadata. |
-| Terminal / remote exec | Browser-side remote exec is useful but requires strong auth/RBAC/audit/redaction first. | Yundu has CLI/SSH runtime adapters but no terminal product surface. | Browser-side ad hoc operations are missing. | P3 | Optional | Keep CLI-first. Add terminal only after auth/RBAC/audit and redaction policy are clear. |
+| Terminal / remote exec | Browser-side remote exec is useful but requires strong auth/RBAC/audit/redaction first. | Appaloft has CLI/SSH runtime adapters but no terminal product surface. | Browser-side ad hoc operations are missing. | P3 | Optional | Keep CLI-first. Add terminal only after auth/RBAC/audit and redaction policy are clear. |
 | Service template marketplace | One-click service templates need stable resource, variable, domain, mount, and backup models. | ResourceInstance/binding concepts exist; templates are not implemented. | Template breadth is missing. | P3 | Optional | Start with a small curated set after database/resource binding exists. Avoid building a large catalog before the resource model is stable. |
 | Multi-server / Swarm / Kubernetes | Multi-node scheduling is important only after single-server resource lifecycle is reliable. | ADR-023 defines Swarm/Kubernetes as future runtime target backends behind the existing Docker/OCI workload substrate. Current support is single-server oriented. | Multi-node scheduling is not available, and the target backend registry is not implemented yet. | P3 | Optional | Defer until single-server resource lifecycle, storage, routing, rollback, and runtime target backend registry are reliable. |
 
 ## Static Site Deployment Proposal
 
 Static site support should be pulled forward because it is a common first deployment and because
-Yundu already has the vocabulary for it.
+Appaloft already has the vocabulary for it.
 
 Minimum viable behavior:
 
@@ -158,12 +158,12 @@ Minimum viable behavior:
   - publish directory preview and validation
   - show generated route and deploy command before execution
 
-This should happen before Nixpacks because it gives Yundu a simple, explicit resource type with
+This should happen before Nixpacks because it gives Appaloft a simple, explicit resource type with
 less magic and clearer failure modes.
 
 ## Nixpacks / Buildpack Position
 
-Nixpacks is useful, but it should be a P2 optional accelerator for Yundu:
+Nixpacks is useful, but it should be a P2 optional accelerator for Appaloft:
 
 - It improves onboarding when a repository has no Dockerfile.
 - It introduces opaque auto-detection behavior and generated Dockerfiles.

@@ -1,4 +1,4 @@
-# @yundu/plugin-host
+# @appaloft/plugin-host
 
 Plugin loading and registry package.
 

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import type { ProxyReloadPlan } from "@yundu/application";
+import type { ProxyReloadPlan } from "@appaloft/application";
 import { executeProxyReloadPlan } from "../src/proxy-reload-execution";
 
 function reloadPlan(input?: {

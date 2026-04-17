@@ -37,7 +37,7 @@ import {
   type ResourceSummary,
   type ServerReadModel,
   type ServerRepository,
-} from "@yundu/application";
+} from "@appaloft/application";
 import {
   ActiveDomainBindingByOwnerAndRouteSpec,
   Certificate,
@@ -84,7 +84,7 @@ import {
   type ResourceMutationSpec,
   type ResourceSelectionSpec,
   type Result,
-} from "@yundu/core";
+} from "@appaloft/core";
 
 export class FixedClock implements Clock {
   constructor(private value = "2026-01-01T00:00:00.000Z") {}

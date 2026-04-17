@@ -41,7 +41,7 @@ export function createShellE2eWorkspace(
   } = {},
 ): ShellE2eWorkspace {
   const workspaceDir = mkdtempSync(join(tmpdir(), prefix));
-  const dataDir = join(workspaceDir, ".yundu", "data");
+  const dataDir = join(workspaceDir, ".appaloft", "data");
   const pgliteDataDir = join(dataDir, "pglite");
   const httpPort = options.httpPort ?? String(3500 + Math.floor(Math.random() * 2000));
   const cliOptions: ShellCliOptions = {
@@ -71,13 +71,13 @@ export function runShellCli(args: string[], options: ShellCliOptions): CliResult
     env: {
       ...process.env,
       OTEL_SDK_DISABLED: "true",
-      YUNDU_APP_VERSION: options.appVersion ?? "0.1.0-e2e",
-      YUNDU_DATABASE_DRIVER: "pglite",
-      YUNDU_DATA_DIR: options.dataDir,
-      YUNDU_HTTP_HOST: "127.0.0.1",
-      YUNDU_HTTP_PORT: options.httpPort ?? "0",
-      YUNDU_PGLITE_DATA_DIR: options.pgliteDataDir,
-      YUNDU_WEB_STATIC_DIR: "",
+      APPALOFT_APP_VERSION: options.appVersion ?? "0.1.0-e2e",
+      APPALOFT_DATABASE_DRIVER: "pglite",
+      APPALOFT_DATA_DIR: options.dataDir,
+      APPALOFT_HTTP_HOST: "127.0.0.1",
+      APPALOFT_HTTP_PORT: options.httpPort ?? "0",
+      APPALOFT_PGLITE_DATA_DIR: options.pgliteDataDir,
+      APPALOFT_WEB_STATIC_DIR: "",
       ...options.env,
     },
     stderr: "pipe",
@@ -179,13 +179,13 @@ export async function startShellHttpServer(options: ShellCliOptions): Promise<{
     env: {
       ...process.env,
       OTEL_SDK_DISABLED: "true",
-      YUNDU_APP_VERSION: options.appVersion ?? "0.1.0-e2e",
-      YUNDU_DATABASE_DRIVER: "pglite",
-      YUNDU_DATA_DIR: options.dataDir,
-      YUNDU_HTTP_HOST: "127.0.0.1",
-      YUNDU_HTTP_PORT: options.httpPort,
-      YUNDU_PGLITE_DATA_DIR: options.pgliteDataDir,
-      YUNDU_WEB_STATIC_DIR: "",
+      APPALOFT_APP_VERSION: options.appVersion ?? "0.1.0-e2e",
+      APPALOFT_DATABASE_DRIVER: "pglite",
+      APPALOFT_DATA_DIR: options.dataDir,
+      APPALOFT_HTTP_HOST: "127.0.0.1",
+      APPALOFT_HTTP_PORT: options.httpPort,
+      APPALOFT_PGLITE_DATA_DIR: options.pgliteDataDir,
+      APPALOFT_WEB_STATIC_DIR: "",
       ...options.env,
     },
     stderr: "ignore",
@@ -226,8 +226,8 @@ export function cleanupLocalDockerDeployment(deploymentId: string | undefined): 
     return;
   }
 
-  runDocker(["rm", "-f", dockerName(`yundu-${deploymentId}`)]);
-  runDocker(["image", "rm", "-f", dockerName(`yundu-image-${deploymentId}`)]);
+  runDocker(["rm", "-f", dockerName(`appaloft-${deploymentId}`)]);
+  runDocker(["image", "rm", "-f", dockerName(`appaloft-image-${deploymentId}`)]);
 }
 
 export async function reservePort(): Promise<number> {

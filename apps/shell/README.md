@@ -1,12 +1,12 @@
-# @yundu/shell
+# @appaloft/shell
 
-Composition root and runtime entry for Yundu.
+Composition root and runtime entry for Appaloft.
 
 Responsibilities:
 
 - load config, logger, tracing, database, repositories, registries
 - wire `tsyringe` registrations in one place
-- expose the `yundu` CLI and `yundu serve`
+- expose the `appaloft` CLI and `appaloft serve`
 
 Depends on:
 

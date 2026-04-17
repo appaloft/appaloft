@@ -1037,7 +1037,7 @@ export class DeploymentLogEntry extends ValueObject<DeploymentLogEntryState> {
   static rehydrate(state: DeploymentLogEntryRehydrateState): DeploymentLogEntry {
     return new DeploymentLogEntry({
       ...state,
-      source: state.source ?? DeploymentLogSourceValue.yundu(),
+      source: state.source ?? DeploymentLogSourceValue.appaloft(),
     });
   }
 

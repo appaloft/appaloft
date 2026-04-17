@@ -1,5 +1,5 @@
 {
-  "name": "@yundu/persistence-pg",
+  "name": "@appaloft/persistence-pg",
   "private": true,
   "type": "module",
   "exports": {
@@ -8,8 +8,8 @@
   "dependencies": {
     "@electric-sql/pglite": "^0.4.3",
     "@opentelemetry/api": "^1.9.1",
-    "@yundu/application": "workspace:*",
-    "@yundu/core": "workspace:*",
+    "@appaloft/application": "workspace:*",
+    "@appaloft/core": "workspace:*",
     "kysely": "^0.28.15",
     "kysely-postgres-js": "^3.0.0",
     "postgres": "^3.4.9"

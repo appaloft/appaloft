@@ -2,15 +2,15 @@
 
 > CORE DOCUMENT
 >
-> This file is the human-facing and AI-facing source of truth for how Yundu commands, queries,
+> This file is the human-facing and AI-facing source of truth for how Appaloft commands, queries,
 > workflows, events, read models, and implementation plans relate to each other.
 >
-> [DOMAIN_MODEL.md](/Users/nichenqin/projects/yundu/docs/DOMAIN_MODEL.md) defines the domain
+> [DOMAIN_MODEL.md](/Users/nichenqin/projects/appaloft/docs/DOMAIN_MODEL.md) defines the domain
 > boundaries and aggregate language.
 >
-> [CORE_OPERATIONS.md](/Users/nichenqin/projects/yundu/docs/CORE_OPERATIONS.md) defines the public
+> [CORE_OPERATIONS.md](/Users/nichenqin/projects/appaloft/docs/CORE_OPERATIONS.md) defines the public
 > command/query catalog and must stay mirrored by
-> [operation-catalog.ts](/Users/nichenqin/projects/yundu/packages/application/src/operation-catalog.ts).
+> [operation-catalog.ts](/Users/nichenqin/projects/appaloft/packages/application/src/operation-catalog.ts).
 >
 > This file defines where a behavior sits before agents write ADRs, local specs, tests, or code.
 

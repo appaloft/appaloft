@@ -1,17 +1,17 @@
 {
-  "name": "@yundu/testkit",
+  "name": "@appaloft/testkit",
   "private": true,
   "type": "module",
   "exports": {
     ".": "./src/index.ts"
   },
   "dependencies": {
-    "@yundu/application": "workspace:*",
-    "@yundu/core": "workspace:*"
+    "@appaloft/application": "workspace:*",
+    "@appaloft/core": "workspace:*"
   },
   "scripts": {
     "lint": "biome check .",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "bun test"
+    "test": "bun test --pass-with-no-tests"
   }
 }

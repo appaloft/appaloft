@@ -142,7 +142,7 @@ The first implementation slice now covers:
 - `DomainBindingRepository` and `DomainBindingReadModel` ports;
 - PostgreSQL/PGlite `domain_bindings` migration, repository, and read model;
 - oRPC/OpenAPI `POST /api/domain-bindings` and `GET /api/domain-bindings`;
-- CLI `yundu domain-binding create` and `yundu domain-binding list`;
+- CLI `appaloft domain-binding create` and `appaloft domain-binding list`;
 - Web console standalone domain binding create/list entrypoint and resource-scoped resource detail create/list entrypoint;
 - command/query-level tests for admission, duplicate detection, idempotency key reuse, structured errors, `domain-binding-requested` payload, and read-model listing.
 

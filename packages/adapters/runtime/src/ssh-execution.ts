@@ -12,7 +12,7 @@ import {
   type ServerRepository,
   reportDeploymentProgress,
   toRepositoryContext,
-} from "@yundu/application";
+} from "@appaloft/application";
 import {
   DeploymentLogEntry,
   DeploymentLogSourceValue,
@@ -36,7 +36,7 @@ import {
   type RuntimeExecutionPlan,
   type RuntimeVerificationStep,
   type RollbackPlan,
-} from "@yundu/core";
+} from "@appaloft/core";
 import {
   createEdgeProxyEnsurePlan,
   createProxyReloadPlan,
@@ -47,7 +47,7 @@ import { executeProxyReloadPlan } from "./proxy-reload-execution";
 import {
   dockerPublishedPortCommand,
   parseDockerPublishedHostPort,
-  yunduDockerContainerLabels,
+  appaloftDockerContainerLabels,
 } from "./docker-container-commands";
 import {
   RuntimeCommandBuilder,
@@ -58,7 +58,7 @@ import { generateWorkspaceDockerfile } from "./workspace-planners";
 
 type LogPhase = "detect" | "plan" | "package" | "deploy" | "verify" | "rollback";
 type LogLevel = "debug" | "info" | "warn" | "error";
-type LogSource = "yundu" | "application";
+type LogSource = "appaloft" | "application";
 
 function classifyOutputLogLevel(line: string, fallback: LogLevel): LogLevel {
   const normalized = line.toLowerCase();
@@ -77,7 +77,7 @@ function phaseLog(
   phase: LogPhase,
   message: string,
   level: LogLevel = "info",
-  source: LogSource = "yundu",
+  source: LogSource = "appaloft",
 ): DeploymentLogEntry {
   return DeploymentLogEntry.rehydrate({
     timestamp: OccurredAt.rehydrate(new Date().toISOString()),
@@ -375,11 +375,11 @@ function deploymentEnv(deployment: Deployment, port?: number): NodeJS.ProcessEnv
   const state = deployment.toState();
   const env = {
     ...process.env,
-    YUNDU_DEPLOYMENT_ID: state.id.value,
-    YUNDU_PROJECT_ID: state.projectId.value,
-    YUNDU_ENVIRONMENT_ID: state.environmentId.value,
-    YUNDU_RESOURCE_ID: state.resourceId.value,
-    YUNDU_DESTINATION_ID: state.destinationId.value,
+    APPALOFT_DEPLOYMENT_ID: state.id.value,
+    APPALOFT_PROJECT_ID: state.projectId.value,
+    APPALOFT_ENVIRONMENT_ID: state.environmentId.value,
+    APPALOFT_RESOURCE_ID: state.resourceId.value,
+    APPALOFT_DESTINATION_ID: state.destinationId.value,
   } as NodeJS.ProcessEnv;
 
   for (const variable of state.environmentSnapshot.variables) {
@@ -415,7 +415,7 @@ export class SshExecutionBackend implements ExecutionBackend {
     private readonly integrationAuthPort?: IntegrationAuthPort,
     private readonly serverRepository?: ServerRepository,
     private readonly edgeProxyProviderRegistry?: EdgeProxyProviderRegistry,
-    private readonly remoteRuntimeRoot = "/var/lib/yundu/runtime",
+    private readonly remoteRuntimeRoot = "/var/lib/appaloft/runtime",
   ) {}
 
   private report(
@@ -1222,10 +1222,10 @@ export class SshExecutionBackend implements ExecutionBackend {
       }
 
       let image = prepared.source.image ?? state.runtimePlan.execution.image;
-      const containerName = sanitizeName(`yundu-${state.id.value}`);
+      const containerName = sanitizeName(`appaloft-${state.id.value}`);
 
       if (state.runtimePlan.buildStrategy === "dockerfile" || state.runtimePlan.buildStrategy === "workspace-commands") {
-        image = sanitizeName(`yundu-image-${state.id.value}`);
+        image = sanitizeName(`appaloft-image-${state.id.value}`);
         const remoteWorkdir = prepared.source.remoteWorkdir;
         if (!remoteWorkdir) {
           return err(domainError.validation("Dockerfile SSH deployment requires a remote workdir"));
@@ -1233,7 +1233,7 @@ export class SshExecutionBackend implements ExecutionBackend {
 
         const dockerfilePath =
           state.runtimePlan.buildStrategy === "workspace-commands"
-            ? `${remoteRoot}/${state.runtimePlan.execution.dockerfilePath ?? "Dockerfile.yundu"}`
+            ? `${remoteRoot}/${state.runtimePlan.execution.dockerfilePath ?? "Dockerfile.appaloft"}`
             : state.runtimePlan.execution.dockerfilePath ?? "Dockerfile";
 
         if (state.runtimePlan.buildStrategy === "workspace-commands") {
@@ -1494,7 +1494,7 @@ export class SshExecutionBackend implements ExecutionBackend {
         .filter(
           ([key]) =>
             key === "PORT" ||
-            key.startsWith("YUNDU_") ||
+            key.startsWith("APPALOFT_") ||
             state.environmentSnapshot.variables.some((variable) => variable.key === key),
         )
         .map(([name, value]) => {
@@ -1508,7 +1508,7 @@ export class SshExecutionBackend implements ExecutionBackend {
           };
         });
       const labels = dockerLabelsFromAssignments([
-        ...yunduDockerContainerLabels({
+        ...appaloftDockerContainerLabels({
           deploymentId: state.id.value,
           projectId: state.projectId.value,
           environmentId: state.environmentId.value,
@@ -2162,7 +2162,7 @@ export class SshExecutionBackend implements ExecutionBackend {
 
     const target = targetResult._unsafeUnwrap();
     const env = deploymentEnv(deployment);
-    const containerName = metadata.containerName ?? sanitizeName(`yundu-${state.id.value}`);
+    const containerName = metadata.containerName ?? sanitizeName(`appaloft-${state.id.value}`);
 
     try {
       if (state.runtimePlan.execution.kind === "docker-container") {

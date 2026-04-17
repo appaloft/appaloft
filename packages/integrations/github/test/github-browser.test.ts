@@ -1,4 +1,6 @@
+import "reflect-metadata";
 import { describe, expect, test } from "bun:test";
+import { createExecutionContext } from "@appaloft/application";
 
 import { createGitHubRepositoryBrowser } from "../src";
 
@@ -46,10 +48,13 @@ describe("GitHubApiRepositoryBrowser", () => {
         ),
     );
 
-    const repositories = await browser.listRepositories({
-      accessToken: "github-token",
-      search: "work",
-    });
+    const repositories = await browser.listRepositories(
+      createExecutionContext({ entrypoint: "system" }),
+      {
+        accessToken: "github-token",
+        search: "work",
+      },
+    );
 
     expect(repositories).toEqual([
       {

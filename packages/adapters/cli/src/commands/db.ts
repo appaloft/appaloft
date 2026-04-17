@@ -1,5 +1,5 @@
+import { DbMigrateCommand, DbStatusQuery } from "@appaloft/application";
 import { Command as EffectCommand } from "@effect/cli";
-import { DbMigrateCommand, DbStatusQuery } from "@yundu/application";
 
 import { runCommand, runQuery } from "../runtime.js";
 

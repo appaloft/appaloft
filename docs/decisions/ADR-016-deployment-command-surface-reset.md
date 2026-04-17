@@ -6,7 +6,7 @@ Accepted
 
 ## Decision
 
-Yundu v1 keeps `deployments.create` as the only public deployment write command.
+Appaloft v1 keeps `deployments.create` as the only public deployment write command.
 
 Deployment read/query and observation surfaces remain available so users and agents can inspect the result of a deployment attempt. The deployment progress stream remains a transport for observing `deployments.create`; it is not a separate business command.
 

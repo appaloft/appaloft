@@ -1,18 +1,18 @@
 {
-  "name": "@yundu/adapter-http-elysia",
+  "name": "@appaloft/adapter-http-elysia",
   "private": true,
   "type": "module",
   "exports": {
     ".": "./src/index.ts"
   },
   "dependencies": {
-    "@yundu/application": "workspace:*",
-    "@yundu/contracts": "workspace:*",
-    "@yundu/deployment-config": "workspace:*",
-    "@yundu/i18n": "workspace:*",
-    "@yundu/observability": "workspace:*",
-    "@yundu/orpc": "workspace:*",
-    "@yundu/plugin-sdk": "workspace:*",
+    "@appaloft/application": "workspace:*",
+    "@appaloft/contracts": "workspace:*",
+    "@appaloft/deployment-config": "workspace:*",
+    "@appaloft/i18n": "workspace:*",
+    "@appaloft/observability": "workspace:*",
+    "@appaloft/orpc": "workspace:*",
+    "@appaloft/plugin-sdk": "workspace:*",
     "elysia": "^1.4.28"
   },
   "devDependencies": {

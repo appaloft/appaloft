@@ -7,7 +7,7 @@ import {
   createExecutionContext,
   type RepositoryContext,
   toRepositoryContext,
-} from "@yundu/application";
+} from "@appaloft/application";
 
 import {
   BuildStrategyKindValue,
@@ -75,7 +75,7 @@ import {
   UpsertServerSpec,
   VariableExposureValue,
   VariableKindValue,
-} from "@yundu/core";
+} from "@appaloft/core";
 
 function createRepositoryContext(): RepositoryContext {
   return toRepositoryContext(
@@ -101,8 +101,8 @@ function createRepositoryContext(): RepositoryContext {
 
 describe("pglite persistence integration", () => {
   test("persists environments and deployments to a file-backed embedded store", async () => {
-    const workspaceDir = mkdtempSync(join(tmpdir(), "yundu-pglite-"));
-    const pgliteDataDir = join(workspaceDir, ".yundu", "data", "pglite");
+    const workspaceDir = mkdtempSync(join(tmpdir(), "appaloft-pglite-"));
+    const pgliteDataDir = join(workspaceDir, ".appaloft", "data", "pglite");
     const context = createRepositoryContext();
 
     try {
@@ -177,7 +177,7 @@ describe("pglite persistence integration", () => {
 
       environment.setVariable({
         key: ConfigKey.rehydrate("PUBLIC_SITE_NAME"),
-        value: ConfigValueText.rehydrate("embedded-yundu"),
+        value: ConfigValueText.rehydrate("embedded-appaloft"),
         kind: VariableKindValue.rehydrate("plain-config"),
         exposure: VariableExposureValue.rehydrate("build-time"),
         scope: ConfigScopeValue.rehydrate("environment"),
@@ -283,7 +283,7 @@ describe("pglite persistence integration", () => {
       expect(environments[0]?.maskedVariables).toEqual([
         expect.objectContaining({
           key: "PUBLIC_SITE_NAME",
-          value: "embedded-yundu",
+          value: "embedded-appaloft",
           isSecret: false,
         }),
       ]);
@@ -297,8 +297,8 @@ describe("pglite persistence integration", () => {
   }, 15000);
 
   test("backfills legacy server edge proxy intent during migration", async () => {
-    const workspaceDir = mkdtempSync(join(tmpdir(), "yundu-pglite-migration-"));
-    const pgliteDataDir = join(workspaceDir, ".yundu", "data", "pglite");
+    const workspaceDir = mkdtempSync(join(tmpdir(), "appaloft-pglite-migration-"));
+    const pgliteDataDir = join(workspaceDir, ".appaloft", "data", "pglite");
 
     try {
       const { createDatabase, createMigrator } = await import("../src/index");

@@ -5,7 +5,7 @@
 </script>
 
 <svelte:head>
-  <title>{$t(i18nKeys.common.actions.newDeployment)} · Yundu</title>
+  <title>{$t(i18nKeys.common.actions.newDeployment)} · Appaloft</title>
 </svelte:head>
 
 <ConsoleShell title={$t(i18nKeys.common.actions.newDeployment)} description={$t(i18nKeys.console.deployments.description)}>

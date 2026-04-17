@@ -1,4 +1,4 @@
-import { type DomainError, err, ok, type Result, type RuntimePlan } from "@yundu/core";
+import { type DomainError, err, ok, type Result, type RuntimePlan } from "@appaloft/core";
 import { type ExecutionContext } from "../../execution-context";
 import {
   type DefaultAccessDomainProvider,

@@ -6,14 +6,14 @@ export interface DockerContainerIdentity {
   destinationId: string;
 }
 
-export function yunduDockerContainerLabels(identity: DockerContainerIdentity): string[] {
+export function appaloftDockerContainerLabels(identity: DockerContainerIdentity): string[] {
   return [
-    "yundu.managed=true",
-    `yundu.deployment-id=${identity.deploymentId}`,
-    `yundu.project-id=${identity.projectId}`,
-    `yundu.environment-id=${identity.environmentId}`,
-    `yundu.resource-id=${identity.resourceId}`,
-    `yundu.destination-id=${identity.destinationId}`,
+    "appaloft.managed=true",
+    `appaloft.deployment-id=${identity.deploymentId}`,
+    `appaloft.project-id=${identity.projectId}`,
+    `appaloft.environment-id=${identity.environmentId}`,
+    `appaloft.resource-id=${identity.resourceId}`,
+    `appaloft.destination-id=${identity.destinationId}`,
   ];
 }
 
@@ -29,7 +29,7 @@ export function dockerRemoveResourceContainersCommand(input: {
   currentContainerName: string;
   quote: (value: string) => string;
 }): string {
-  const resourceLabelFilter = input.quote(`label=yundu.resource-id=${input.resourceId}`);
+  const resourceLabelFilter = input.quote(`label=appaloft.resource-id=${input.resourceId}`);
   const currentContainerName = input.quote(input.currentContainerName);
 
   return [

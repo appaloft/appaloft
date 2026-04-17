@@ -8,7 +8,7 @@ import {
   err,
   ok,
   type Result,
-} from "@yundu/core";
+} from "@appaloft/core";
 import {
   toRepositoryContext,
   type AppLogger,
@@ -19,7 +19,7 @@ import {
   type TerminalSessionFrame,
   type TerminalSessionGateway,
   type TerminalSessionOpenRequest,
-} from "@yundu/application";
+} from "@appaloft/application";
 
 type TerminalSpawnOptions = {
   cwd?: string;
@@ -181,7 +181,7 @@ function hostWithUsername(host: string, username?: string): string {
 function remoteCommandWithCwd(cwd?: string): string {
   const prompt = shellQuote("\\u@\\h:\\W\\$ ");
   const setup = [
-    'export YUNDU_TERMINAL_WORKDIR="$PWD"',
+    'export APPALOFT_TERMINAL_WORKDIR="$PWD"',
     `export PS1=${prompt}`,
     "if command -v bash >/dev/null 2>&1; then exec bash --noprofile --norc -i; fi",
     "exec ${SHELL:-/bin/sh} -i",
@@ -193,7 +193,7 @@ async function writeSshIdentityFile(privateKey: string): Promise<{
   identityFile: string;
   cleanup(): Promise<void>;
 }> {
-  const sshDir = await mkdtemp(join(tmpdir(), "yundu-terminal-ssh-"));
+  const sshDir = await mkdtemp(join(tmpdir(), "appaloft-terminal-ssh-"));
   const identityFile = join(sshDir, "id_terminal");
   await writeFile(identityFile, privateKey.endsWith("\n") ? privateKey : `${privateKey}\n`, {
     mode: 0o600,

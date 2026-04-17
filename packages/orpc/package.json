@@ -1,5 +1,5 @@
 {
-  "name": "@yundu/orpc",
+  "name": "@appaloft/orpc",
   "private": true,
   "type": "module",
   "exports": {
@@ -11,10 +11,10 @@
     "@orpc/openapi": "latest",
     "@orpc/server": "latest",
     "@orpc/tanstack-query": "latest",
-    "@yundu/application": "workspace:*",
-    "@yundu/contracts": "workspace:*",
-    "@yundu/core": "workspace:*",
-    "@yundu/i18n": "workspace:*",
+    "@appaloft/application": "workspace:*",
+    "@appaloft/contracts": "workspace:*",
+    "@appaloft/core": "workspace:*",
+    "@appaloft/i18n": "workspace:*",
     "elysia": "^1.4.28",
     "zod": "^4.1.12"
   },

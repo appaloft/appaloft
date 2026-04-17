@@ -1,4 +1,4 @@
-import { type DomainError, domainError, err, ok, type Result } from "@yundu/core";
+import { type DomainError, domainError, err, ok, type Result } from "@appaloft/core";
 import {
   type EdgeProxyProvider,
   type EdgeProxyProviderRegistry,

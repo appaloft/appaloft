@@ -100,7 +100,7 @@ Duplicate event consumption must not run duplicate bootstrap commands for an alr
 Retry must be a new explicit proxy bootstrap attempt with a new `attemptId`. It must not be raw replay of an old `proxy-bootstrap-requested` event.
 
 The accepted public retry/repair command is `servers.bootstrap-proxy`, exposed through
-`yundu server proxy repair <serverId>` and `POST /api/servers/{serverId}/edge-proxy/bootstrap`.
+`appaloft server proxy repair <serverId>` and `POST /api/servers/{serverId}/edge-proxy/bootstrap`.
 
 Worker crashes before terminal status must leave a retryable async-processing state visible to operators.
 

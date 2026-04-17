@@ -5,13 +5,13 @@ import {
   resourceKinds,
   resourceServiceKinds,
   tlsModes,
-} from "@yundu/core";
+} from "@appaloft/core";
 import { z } from "zod";
 
-export const yunduDeploymentConfigFileNames = [
-  "yundu.json",
-  "yundu.config.json",
-  ".yundu.json",
+export const appaloftDeploymentConfigFileNames = [
+  "appaloft.json",
+  "appaloft.config.json",
+  ".appaloft.json",
 ] as const;
 
 export const deploymentMethods = [
@@ -24,14 +24,14 @@ export const deploymentMethods = [
 
 const nonEmptyStringSchema = z.string().trim().min(1);
 
-export const yunduDeploymentProjectConfigSchema = z
+export const appaloftDeploymentProjectConfigSchema = z
   .object({
     name: nonEmptyStringSchema.describe("Project name to reuse or create."),
     description: z.string().trim().min(1).optional().describe("Optional project description."),
   })
   .describe("Project bootstrap settings.");
 
-export const yunduDeploymentEnvironmentConfigSchema = z
+export const appaloftDeploymentEnvironmentConfigSchema = z
   .object({
     name: nonEmptyStringSchema.describe("Environment name to reuse or create."),
     kind: z
@@ -41,20 +41,20 @@ export const yunduDeploymentEnvironmentConfigSchema = z
   })
   .describe("Environment bootstrap settings.");
 
-export const yunduDeploymentResourceServiceConfigSchema = z
+export const appaloftDeploymentResourceServiceConfigSchema = z
   .object({
     name: nonEmptyStringSchema.describe("Service name inside a compose-stack resource."),
     kind: z.enum(resourceServiceKinds).describe("Service role inside the resource."),
   })
   .describe("Service entry inside a resource.");
 
-export const yunduDeploymentResourceConfigSchema = z
+export const appaloftDeploymentResourceConfigSchema = z
   .object({
     name: nonEmptyStringSchema.describe("Resource name to reuse or create."),
     kind: z.enum(resourceKinds).optional().describe("Resource kind. Defaults to application."),
     description: z.string().trim().min(1).optional().describe("Optional resource description."),
     services: z
-      .array(yunduDeploymentResourceServiceConfigSchema)
+      .array(appaloftDeploymentResourceServiceConfigSchema)
       .optional()
       .describe("Services contained by a compose-stack resource."),
   })
@@ -84,7 +84,7 @@ const targetBaseSchema = z.object({
     .describe("Deployment destination or isolation boundary on the selected server."),
 });
 
-export const yunduDeploymentTargetConfigSchema = z
+export const appaloftDeploymentTargetConfigSchema = z
   .union([
     targetBaseSchema.extend({
       providerKey: nonEmptyStringSchema.describe(
@@ -97,7 +97,7 @@ export const yunduDeploymentTargetConfigSchema = z
   ])
   .describe("Deployment target bootstrap settings.");
 
-export const yunduDeploymentRuntimeConfigSchema = z
+export const appaloftDeploymentRuntimeConfigSchema = z
   .object({
     targetKey: z
       .string()
@@ -129,40 +129,44 @@ export const yunduDeploymentRuntimeConfigSchema = z
   })
   .describe("Deployment command defaults.");
 
-export const yunduDeploymentConfigSchema = z
+export const appaloftDeploymentConfigSchema = z
   .object({
     $schema: z.string().trim().min(1).optional(),
-    project: yunduDeploymentProjectConfigSchema.optional(),
-    environment: yunduDeploymentEnvironmentConfigSchema.optional(),
-    resource: yunduDeploymentResourceConfigSchema.optional(),
-    targets: z.array(yunduDeploymentTargetConfigSchema).optional(),
+    project: appaloftDeploymentProjectConfigSchema.optional(),
+    environment: appaloftDeploymentEnvironmentConfigSchema.optional(),
+    resource: appaloftDeploymentResourceConfigSchema.optional(),
+    targets: z.array(appaloftDeploymentTargetConfigSchema).optional(),
     servers: z
-      .array(yunduDeploymentTargetConfigSchema)
+      .array(appaloftDeploymentTargetConfigSchema)
       .optional()
       .describe("Alias for targets, kept for transport-compatible server wording."),
-    deployment: yunduDeploymentRuntimeConfigSchema.optional(),
+    deployment: appaloftDeploymentRuntimeConfigSchema.optional(),
   })
-  .describe("Yundu deployment config file.");
+  .describe("Appaloft deployment config file.");
 
-export type YunduDeploymentConfigInput = z.input<typeof yunduDeploymentConfigSchema>;
-export type YunduDeploymentConfig = z.output<typeof yunduDeploymentConfigSchema>;
-export type YunduDeploymentTargetConfig = z.output<typeof yunduDeploymentTargetConfigSchema>;
+export type AppaloftDeploymentConfigInput = z.input<typeof appaloftDeploymentConfigSchema>;
+export type AppaloftDeploymentConfig = z.output<typeof appaloftDeploymentConfigSchema>;
+export type AppaloftDeploymentTargetConfig = z.output<typeof appaloftDeploymentTargetConfigSchema>;
 
-export function providerKeyFromTargetConfig(target: YunduDeploymentTargetConfig): string {
+export function providerKeyFromTargetConfig(target: AppaloftDeploymentTargetConfig): string {
   return "providerKey" in target ? target.providerKey : target.provider;
 }
 
-export function targetKeyFromDeploymentConfig(config: YunduDeploymentConfig): string | undefined {
+export function targetKeyFromDeploymentConfig(
+  config: AppaloftDeploymentConfig,
+): string | undefined {
   return config.deployment?.targetKey ?? config.deployment?.target;
 }
 
 export function healthCheckPathFromDeploymentConfig(
-  config: YunduDeploymentConfig,
+  config: AppaloftDeploymentConfig,
 ): string | undefined {
   return config.deployment?.healthCheckPath ?? config.deployment?.healthPath;
 }
 
-export function domainsFromDeploymentConfig(config: YunduDeploymentConfig): string[] | undefined {
+export function domainsFromDeploymentConfig(
+  config: AppaloftDeploymentConfig,
+): string[] | undefined {
   const domains = [
     ...(config.deployment?.domain ? [config.deployment.domain] : []),
     ...(config.deployment?.domains ?? []),
@@ -172,13 +176,13 @@ export function domainsFromDeploymentConfig(config: YunduDeploymentConfig): stri
 }
 
 export function targetsFromDeploymentConfig(
-  config: YunduDeploymentConfig,
-): YunduDeploymentTargetConfig[] {
+  config: AppaloftDeploymentConfig,
+): AppaloftDeploymentTargetConfig[] {
   return config.targets ?? config.servers ?? [];
 }
 
-export function parseYunduDeploymentConfig(input: unknown) {
-  return yunduDeploymentConfigSchema.safeParse(input);
+export function parseAppaloftDeploymentConfig(input: unknown) {
+  return appaloftDeploymentConfigSchema.safeParse(input);
 }
 
-export const yunduDeploymentConfigJsonSchema = z.toJSONSchema(yunduDeploymentConfigSchema);
+export const appaloftDeploymentConfigJsonSchema = z.toJSONSchema(appaloftDeploymentConfigSchema);

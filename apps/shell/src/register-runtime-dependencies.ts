@@ -4,7 +4,7 @@ import { isAbsolute, join } from "node:path";
 import {
   FileSystemDeploymentConfigReader,
   FileSystemSourceDetector,
-} from "@yundu/adapter-filesystem";
+} from "@appaloft/adapter-filesystem";
 import {
   createDefaultRuntimeTargetBackendRegistry,
   DefaultRuntimePlanResolver,
@@ -16,7 +16,7 @@ import {
   RuntimeServerEdgeProxyBootstrapper,
   RuntimeTerminalSessionGateway,
   SshExecutionBackend,
-} from "@yundu/adapter-runtime";
+} from "@appaloft/adapter-runtime";
 import {
   type AppLogger,
   type CertificateHttpChallengeToken,
@@ -40,13 +40,13 @@ import {
   type IntegrationAuthPort,
   QueryBus,
   tokens,
-} from "@yundu/application";
-import { type AuthRuntime } from "@yundu/auth-better";
-import { type AppConfig } from "@yundu/config";
-import { type DomainError, domainError, err, ok, type Result } from "@yundu/core";
-import { InMemoryIntegrationRegistry } from "@yundu/integration-core";
-import { createGitHubRepositoryBrowser, githubIntegration } from "@yundu/integration-github";
-import { gitlabIntegration } from "@yundu/integration-gitlab";
+} from "@appaloft/application";
+import { type AuthRuntime } from "@appaloft/auth-better";
+import { type AppConfig } from "@appaloft/config";
+import { type DomainError, domainError, err, ok, type Result } from "@appaloft/core";
+import { InMemoryIntegrationRegistry } from "@appaloft/integration-core";
+import { createGitHubRepositoryBrowser, githubIntegration } from "@appaloft/integration-github";
+import { gitlabIntegration } from "@appaloft/integration-gitlab";
 import {
   type DatabaseConnection,
   PgCertificateReadModel,
@@ -70,18 +70,21 @@ import {
   PgServerRepository,
   PgSshCredentialReadModel,
   PgSshCredentialRepository,
-} from "@yundu/persistence-pg";
-import { createBuiltinPlugins } from "@yundu/plugin-builtins";
-import { LocalPluginHost } from "@yundu/plugin-host";
-import { aliyunProvider } from "@yundu/provider-aliyun";
-import { AcmeCertificateProvider, acmeCertificateProvider } from "@yundu/provider-certificate-acme";
-import { InMemoryProviderRegistry } from "@yundu/provider-core";
-import { SslipDefaultAccessDomainProvider } from "@yundu/provider-default-access-domain-sslip";
-import { caddyEdgeProxyProvider } from "@yundu/provider-edge-proxy-caddy";
-import { traefikEdgeProxyProvider } from "@yundu/provider-edge-proxy-traefik";
-import { genericSshProvider } from "@yundu/provider-generic-ssh";
-import { localShellProvider } from "@yundu/provider-local-shell";
-import { tencentProvider } from "@yundu/provider-tencent";
+} from "@appaloft/persistence-pg";
+import { createBuiltinPlugins } from "@appaloft/plugin-builtins";
+import { LocalPluginHost } from "@appaloft/plugin-host";
+import { aliyunProvider } from "@appaloft/provider-aliyun";
+import {
+  AcmeCertificateProvider,
+  acmeCertificateProvider,
+} from "@appaloft/provider-certificate-acme";
+import { InMemoryProviderRegistry } from "@appaloft/provider-core";
+import { SslipDefaultAccessDomainProvider } from "@appaloft/provider-default-access-domain-sslip";
+import { caddyEdgeProxyProvider } from "@appaloft/provider-edge-proxy-caddy";
+import { traefikEdgeProxyProvider } from "@appaloft/provider-edge-proxy-traefik";
+import { genericSshProvider } from "@appaloft/provider-generic-ssh";
+import { localShellProvider } from "@appaloft/provider-local-shell";
+import { tencentProvider } from "@appaloft/provider-tencent";
 import { customAlphabet } from "nanoid";
 import { type DependencyContainer, instanceCachingFactory } from "tsyringe";
 

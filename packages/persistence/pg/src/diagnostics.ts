@@ -1,4 +1,4 @@
-import { type DiagnosticsPort } from "@yundu/application";
+import { type DiagnosticsPort } from "@appaloft/application";
 import { type Kysely, type Migrator } from "kysely";
 import { type DatabaseConnectionDescriptor, pingDatabase } from "./db";
 import { type Database } from "./schema";

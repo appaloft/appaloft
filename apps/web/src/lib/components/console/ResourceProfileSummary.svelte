@@ -1,6 +1,6 @@
 <script lang="ts">
   import { Boxes, Database, Globe2, Layers3, Server, Waypoints } from "@lucide/svelte";
-  import type { ResourceSummary } from "@yundu/contracts";
+  import type { ResourceSummary } from "@appaloft/contracts";
 
   import { Badge } from "$lib/components/ui/badge";
   import { i18nKeys, t } from "$lib/i18n";

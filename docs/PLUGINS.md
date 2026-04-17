@@ -86,14 +86,14 @@ Planned isolation rules:
 
 ## Why Plugins Are Separate From Integrations
 
-- integrations connect Yundu to external systems like GitHub
-- plugins extend Yundu behavior itself
+- integrations connect Appaloft to external systems like GitHub
+- plugins extend Appaloft behavior itself
 - a future GitHub-related plugin is still not the same thing as the GitHub integration adapter
 
 ## Better Auth And Hosted Tenancy
 
-- default self-hosted Yundu does not require login
-- when `YUNDU_RUNTIME_MODE=hosted-control-plane`, Yundu activates a first-party Better Auth runtime and can also activate operator-installed system plugins
+- default self-hosted Appaloft does not require login
+- when `APPALOFT_RUNTIME_MODE=hosted-control-plane`, Appaloft activates a first-party Better Auth runtime and can also activate operator-installed system plugins
 - GitHub sign-in is intentionally deferred until the user chooses a GitHub workflow
 - the Better Auth runtime reserves the `organization()` plugin path for future tenant isolation
 - auth remains an adapter/runtime concern; core/application should not hard-code Better Auth types

@@ -1,4 +1,4 @@
-import { type IntegrationDescriptor, type IntegrationRegistry } from "@yundu/application";
+import { type IntegrationDescriptor, type IntegrationRegistry } from "@appaloft/application";
 
 export class InMemoryIntegrationRegistry implements IntegrationRegistry {
   constructor(private readonly integrations: IntegrationDescriptor[]) {}

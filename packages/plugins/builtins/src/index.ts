@@ -1,4 +1,4 @@
-import { type SystemPluginDefinition } from "@yundu/plugin-sdk";
+import { type SystemPluginDefinition } from "@appaloft/plugin-sdk";
 
 const builtinFakeRuntimePlugin: SystemPluginDefinition = {
   manifest: {

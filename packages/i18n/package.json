@@ -1,5 +1,5 @@
 {
-  "name": "@yundu/i18n",
+  "name": "@appaloft/i18n",
   "private": true,
   "type": "module",
   "exports": {
@@ -11,6 +11,6 @@
   "scripts": {
     "lint": "biome check .",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "bun test"
+    "test": "bun test --pass-with-no-tests"
   }
 }

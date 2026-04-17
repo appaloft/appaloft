@@ -7,8 +7,8 @@ import {
   type EdgeProxyProviderRegistry,
   type ServerEdgeProxyBootstrapper,
   type ServerEdgeProxyBootstrapResult,
-} from "@yundu/application";
-import { ok, type DeploymentTargetState, type Result } from "@yundu/core";
+} from "@appaloft/application";
+import { ok, type DeploymentTargetState, type Result } from "@appaloft/core";
 import {
   createEdgeProxyEnsurePlanForSelection,
   proxyBootstrapOptionsFromEnv,
@@ -53,7 +53,7 @@ function prepareSshArgs(server: DeploymentTargetState, remoteCommand: string): P
   let identityArgs: string[] = [];
 
   if (credential?.kind.value === "ssh-private-key" && credential.privateKey) {
-    tempDir = mkdtempSync(join(tmpdir(), "yundu-ssh-"));
+    tempDir = mkdtempSync(join(tmpdir(), "appaloft-ssh-"));
     const identityFile = join(tempDir, "id_deployment_target");
     writeFileSync(
       identityFile,

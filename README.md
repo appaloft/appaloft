@@ -1,6 +1,6 @@
-# Yundu
+# Appaloft
 
-Yundu is an AI-native local-to-cloud deployment platform for developers who want to deploy local workspaces, local Git repositories, GitHub repositories, zip archives, Docker images, or Compose bundles onto their own servers.
+Appaloft is an AI-native local-to-cloud deployment platform for developers who want to deploy local workspaces, local Git repositories, GitHub repositories, zip archives, Docker images, or Compose bundles onto their own servers.
 
 The system is backend-first and interface-agnostic:
 
@@ -15,7 +15,7 @@ Milestone 1 is implemented:
 - Bun + TypeScript strict monorepo with Turborepo
 - `apps/shell` bootstraps the backend runtime and CLI
 - `apps/web` builds as a static SvelteKit app
-- `apps/web` consumes the backend through `@yundu/orpc/client` and `@tanstack/svelte-query`
+- `apps/web` consumes the backend through `@appaloft/orpc/client` and `@tanstack/svelte-query`
 - Elysia serves `/api/health`, `/api/readiness`, `/api/version`, project/server/environment/deployment APIs
 - CLI supports `serve`, `doctor`, `db migrate`, `project`, `server`, `deploy`, `rollback`, `env`, `plugins`, `providers`
 - Kysely persistence is wired with migrations for external PostgreSQL and embedded PGlite modes
@@ -38,12 +38,12 @@ bun install
 
 ```bash
 # embedded PGlite is now the default local dev mode
-export YUNDU_DATABASE_DRIVER=pglite
+export APPALOFT_DATABASE_DRIVER=pglite
 
 # or external PostgreSQL
 # docker compose -f docker-compose.dev.yml up -d
-# export YUNDU_DATABASE_DRIVER=postgres
-# export YUNDU_DATABASE_URL=postgres://postgres:postgres@localhost:5432/yundu
+# export APPALOFT_DATABASE_DRIVER=postgres
+# export APPALOFT_DATABASE_URL=postgres://postgres:postgres@localhost:5432/appaloft
 ```
 
 3. Apply migrations.
@@ -71,22 +71,22 @@ bun run build
 bun run package:binary-bundle
 bun run package:artifacts
 bun run checksums
-docker build -t yundu-all-in-one:local .
+docker build -t appaloft-all-in-one:local .
 ```
 
 Release outputs currently target:
 
-- `yundu-backend`
-- `yundu-web-static`
-- `yundu-binary-bundle`
-- `Dockerfile` for `yundu-all-in-one`
+- `appaloft-backend`
+- `appaloft-web-static`
+- `appaloft-binary-bundle`
+- `Dockerfile` for `appaloft-all-in-one`
 - `docker-compose.selfhost.yml`
 - `release-manifest.json`
 - `checksums.txt`
 
 ## Runtime Shapes
 
-Yundu is intentionally not single-shape:
+Appaloft is intentionally not single-shape:
 
 - split deployment: static frontend + standalone backend
 - all-in-one Docker image
@@ -98,9 +98,9 @@ Important:
 - optional binary distribution is only a packaging form
 - PostgreSQL remains the primary hosted/production backend
 - PGlite is supported for embedded single-instance installs and defaults to the platform user data
-  directory; set `YUNDU_DATA_DIR=.yundu/data` only when you want portable workspace-local state
+  directory; set `APPALOFT_DATA_DIR=.appaloft/data` only when you want portable workspace-local state
 - hosted auth and tenant features are additive, not mandatory for local/self-hosted use
-- `yundu-binary-bundle` now packages a single Bun-compiled executable with embedded web console assets and embedded PGlite runtime assets
+- `appaloft-binary-bundle` now packages a single Bun-compiled executable with embedded web console assets and embedded PGlite runtime assets
 
 ## Repository Layout
 

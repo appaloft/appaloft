@@ -1,4 +1,4 @@
-# @yundu/provider-core
+# @appaloft/provider-core
 
 Provider contracts and shared capability helpers.
 

@@ -1,12 +1,12 @@
 {
-  "name": "@yundu/provider-generic-ssh",
+  "name": "@appaloft/provider-generic-ssh",
   "private": true,
   "type": "module",
   "exports": {
     ".": "./src/index.ts"
   },
   "dependencies": {
-    "@yundu/provider-core": "workspace:*"
+    "@appaloft/provider-core": "workspace:*"
   },
   "scripts": {
     "lint": "biome check .",

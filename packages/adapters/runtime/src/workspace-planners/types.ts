@@ -1,4 +1,4 @@
-import { type RequestedDeploymentConfig } from "@yundu/application";
+import { type RequestedDeploymentConfig } from "@appaloft/application";
 import {
   domainError,
   err,
@@ -7,7 +7,7 @@ import {
   type RuntimeExecutionPlan,
   type SourceDescriptor,
   type SourceInspectionSnapshot,
-} from "@yundu/core";
+} from "@appaloft/core";
 
 export {
   DockerfileBuilder,
@@ -16,7 +16,7 @@ export {
   type DockerfileBuildContext,
 } from "./dockerfile-builder";
 
-export const generatedWorkspaceDockerfileName = "Dockerfile.yundu";
+export const generatedWorkspaceDockerfileName = "Dockerfile.appaloft";
 
 export type WorkspaceRuntimeKind = "custom" | "java" | "nextjs" | "node" | "python";
 

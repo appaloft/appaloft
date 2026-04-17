@@ -8,9 +8,9 @@ import {
   createExecutionContext,
   type ExecutionContext,
   type QueryBus,
-} from "@yundu/application";
-import { resolveConfig } from "@yundu/config";
-import { ok, type Result } from "@yundu/core";
+} from "@appaloft/application";
+import { resolveConfig } from "@appaloft/config";
+import { ok, type Result } from "@appaloft/core";
 
 import { createHttpApp } from "../src";
 

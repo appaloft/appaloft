@@ -1,4 +1,4 @@
-# @yundu/testkit
+# @appaloft/testkit
 
 Shared test fixtures and fake harness helpers.
 

@@ -2,8 +2,8 @@ import {
   type AppLogger,
   type CertificateRetryScheduler,
   type ExecutionContextFactory,
-} from "@yundu/application";
-import { type AppConfig } from "@yundu/config";
+} from "@appaloft/application";
+import { type AppConfig } from "@appaloft/config";
 
 export interface CertificateRetrySchedulerRunner {
   start(): void;

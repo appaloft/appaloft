@@ -1,13 +1,13 @@
 {
-  "name": "@yundu/deployment-config",
+  "name": "@appaloft/deployment-config",
   "private": true,
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./schema": "./json-schema/yundu.config.schema.json"
+    "./schema": "./json-schema/appaloft.config.schema.json"
   },
   "dependencies": {
-    "@yundu/core": "workspace:*",
+    "@appaloft/core": "workspace:*",
     "zod": "^4.1.12"
   },
   "scripts": {

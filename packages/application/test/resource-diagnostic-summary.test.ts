@@ -1,7 +1,7 @@
 import "reflect-metadata";
 
 import { describe, expect, test } from "bun:test";
-import { domainError, err, ok, type Result } from "@yundu/core";
+import { domainError, err, ok, type Result } from "@appaloft/core";
 
 import { createExecutionContext, type ExecutionContext, type toRepositoryContext } from "../src";
 import { ResourceDiagnosticSummaryQuery } from "../src/messages";

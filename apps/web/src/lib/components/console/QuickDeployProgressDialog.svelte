@@ -1,6 +1,6 @@
 <script lang="ts">
   import { CheckCircle2, LoaderCircle, ShieldCheck } from "@lucide/svelte";
-  import type { DeploymentProgressEvent, QuickDeployWorkflowStep } from "@yundu/contracts";
+  import type { DeploymentProgressEvent, QuickDeployWorkflowStep } from "@appaloft/contracts";
   import { tick } from "svelte";
 
   import { Badge } from "$lib/components/ui/badge";

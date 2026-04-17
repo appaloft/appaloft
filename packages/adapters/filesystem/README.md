@@ -1,4 +1,4 @@
-# @yundu/adapter-filesystem
+# @appaloft/adapter-filesystem
 
 Filesystem-facing adapter package.
 

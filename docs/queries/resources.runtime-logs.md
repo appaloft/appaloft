@@ -190,7 +190,7 @@ It must not:
 | Entrypoint | Mapping | Status |
 | --- | --- | --- |
 | Web | Resource detail log panel reads bounded tail and may open stream mode. | Implemented |
-| CLI | `yundu resource logs <resourceId> [--follow] [--tail <n>] [--service <name>]` | Implemented |
+| CLI | `appaloft resource logs <resourceId> [--follow] [--tail <n>] [--service <name>]` | Implemented |
 | oRPC / HTTP | Bounded read endpoint plus streaming endpoint using the same query schema. | Implemented via oRPC |
 | Automation / MCP | Future stream-capable query/tool over the same operation key. | Future |
 

@@ -1,4 +1,4 @@
-# @yundu/plugin-builtins
+# @appaloft/plugin-builtins
 
 Responsibility:
 
@@ -8,7 +8,7 @@ Responsibility:
 
 Allowed dependencies:
 
-- `@yundu/plugin-sdk`
+- `@appaloft/plugin-sdk`
 - lightweight helpers needed by bundled plugin definitions
 
 Forbidden:

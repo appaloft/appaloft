@@ -1,4 +1,4 @@
-import { type ProviderDescriptor } from "@yundu/application";
+import { type ProviderDescriptor } from "@appaloft/application";
 
 export const genericSshProvider: ProviderDescriptor = {
   key: "generic-ssh",

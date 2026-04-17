@@ -2,8 +2,8 @@ import "reflect-metadata";
 
 import { fileURLToPath } from "node:url";
 
-import { createCliProgram } from "@yundu/adapter-cli";
-import { createHttpApp } from "@yundu/adapter-http-elysia";
+import { createCliProgram } from "@appaloft/adapter-cli";
+import { createHttpApp } from "@appaloft/adapter-http-elysia";
 import {
   type AppLogger,
   type CertificateHttpChallengeTokenStore,
@@ -15,16 +15,16 @@ import {
   type QueryBus,
   type TerminalSessionGateway,
   tokens,
-} from "@yundu/application";
-import { createBetterAuthRuntime } from "@yundu/auth-better";
-import { type AppConfig, resolveConfig } from "@yundu/config";
+} from "@appaloft/application";
+import { createBetterAuthRuntime } from "@appaloft/auth-better";
+import { type AppConfig, resolveConfig } from "@appaloft/config";
 import {
   bootstrapOpenTelemetry,
   createExecutionContextFactory,
   createLogger,
-} from "@yundu/observability";
-import { createDatabase, createMigrator, type PgliteRuntimeAssets } from "@yundu/persistence-pg";
-import { type LocalPluginHost } from "@yundu/plugin-host";
+} from "@appaloft/observability";
+import { createDatabase, createMigrator, type PgliteRuntimeAssets } from "@appaloft/persistence-pg";
+import { type LocalPluginHost } from "@appaloft/plugin-host";
 import { container, type DependencyContainer } from "tsyringe";
 import { createCertificateRetrySchedulerRunner } from "./certificate-retry-scheduler-runner";
 import { ShellDeploymentProgressReporter } from "./deployment-progress-reporter";
@@ -65,7 +65,7 @@ async function resolveWebStaticDir(
   if (
     config.webStaticDir ||
     options?.embeddedWebAssets ||
-    Bun.env.YUNDU_DEV_DISABLE_LOCAL_WEB_STATIC_DIR === "true"
+    Bun.env.APPALOFT_DEV_DISABLE_LOCAL_WEB_STATIC_DIR === "true"
   ) {
     return config.webStaticDir;
   }

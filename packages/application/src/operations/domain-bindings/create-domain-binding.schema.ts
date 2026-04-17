@@ -1,4 +1,4 @@
-import { certificatePolicies, edgeProxyKinds, tlsModes } from "@yundu/core";
+import { certificatePolicies, edgeProxyKinds, tlsModes } from "@appaloft/core";
 import { z } from "zod";
 
 import { nonEmptyTrimmedString } from "../shared-schema";

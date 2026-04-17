@@ -1,6 +1,6 @@
 export const productIdentity = {
-  name: "Yundu",
-  nameZhCn: "云渡",
+  name: "Appaloft",
+  nameZhCn: "Appaloft",
   tagline: "AI Native local-to-cloud deployment platform",
 } as const;
 

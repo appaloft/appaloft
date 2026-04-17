@@ -35,7 +35,7 @@ import {
   UpsertEnvironmentSpec,
   UpsertProjectSpec,
   UpsertResourceSpec,
-} from "@yundu/core";
+} from "@appaloft/core";
 import {
   CapturedEventBus,
   FakeCertificateProvider,
@@ -52,7 +52,7 @@ import {
   MemoryServerRepository,
   NoopLogger,
   SequenceIdGenerator,
-} from "@yundu/testkit";
+} from "@appaloft/testkit";
 import { createExecutionContext, type ExecutionContext, toRepositoryContext } from "../src";
 import {
   CertificateRetryScheduler,

@@ -24,7 +24,7 @@ This command inherits:
 
 ## Purpose
 
-Configure whether Yundu generates default public access hostnames for resources and which provider-neutral strategy is used.
+Configure whether Appaloft generates default public access hostnames for resources and which provider-neutral strategy is used.
 
 It is not:
 

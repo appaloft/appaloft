@@ -1,6 +1,3 @@
-import { OpenAPIHandler } from "@orpc/openapi/fetch";
-import { eventIterator, ORPCError, os } from "@orpc/server";
-import { RPCHandler } from "@orpc/server/fetch";
 import {
   type AppLogger,
   BootstrapServerProxyCommand,
@@ -79,7 +76,7 @@ import {
   testServerConnectivityCommandInputSchema,
   UnsetEnvironmentVariableCommand,
   unsetEnvironmentVariableCommandInputSchema,
-} from "@yundu/application";
+} from "@appaloft/application";
 import {
   bootstrapServerProxyResponseSchema,
   confirmDomainBindingOwnershipResponseSchema,
@@ -115,13 +112,16 @@ import {
   resourceRuntimeLogsStreamResponseSchema,
   terminalSessionDescriptorSchema,
   testServerConnectivityResponseSchema,
-} from "@yundu/contracts";
-import { type DomainError, type Result } from "@yundu/core";
-import { resolveYunduLocaleFromHeaders, translateDomainError } from "@yundu/i18n";
+} from "@appaloft/contracts";
+import { type DomainError, type Result } from "@appaloft/core";
+import { resolveAppaloftLocaleFromHeaders, translateDomainError } from "@appaloft/i18n";
+import { OpenAPIHandler } from "@orpc/openapi/fetch";
+import { eventIterator, ORPCError, os } from "@orpc/server";
+import { RPCHandler } from "@orpc/server/fetch";
 import { type Elysia } from "elysia";
 import { z } from "zod";
 
-export interface YunduOrpcContext {
+export interface AppaloftOrpcContext {
   commandBus: CommandBus;
   executionContextFactory: ExecutionContextFactory;
   queryBus: QueryBus;
@@ -129,7 +129,7 @@ export interface YunduOrpcContext {
   deploymentProgressObserver?: DeploymentProgressObserver;
 }
 
-interface YunduOrpcRequestContext extends YunduOrpcContext {
+interface AppaloftOrpcRequestContext extends AppaloftOrpcContext {
   executionContext: ExecutionContext;
 }
 
@@ -145,7 +145,7 @@ export interface RequestContextRunner {
   ): Promise<T>;
 }
 
-const base = os.$context<YunduOrpcRequestContext>();
+const base = os.$context<AppaloftOrpcRequestContext>();
 const emptyResponseSchema = z.null();
 
 function readObjectProperty(input: unknown, key: string): unknown {
@@ -398,7 +398,7 @@ function unwrapResult<T>(context: ExecutionContext, result: Result<T>): T {
 }
 
 async function executeCommand<TMessage extends Command<TResult>, TResult>(
-  context: YunduOrpcRequestContext,
+  context: AppaloftOrpcRequestContext,
   message: Result<TMessage>,
 ): Promise<TResult> {
   return unwrapResult(
@@ -411,7 +411,7 @@ async function executeCommand<TMessage extends Command<TResult>, TResult>(
 }
 
 async function executeQuery<TMessage extends Query<TResult>, TResult>(
-  context: YunduOrpcRequestContext,
+  context: AppaloftOrpcRequestContext,
   message: Result<TMessage>,
 ): Promise<TResult> {
   return unwrapResult(
@@ -424,7 +424,7 @@ async function executeQuery<TMessage extends Query<TResult>, TResult>(
 }
 
 function createDeploymentStream(
-  context: YunduOrpcRequestContext,
+  context: AppaloftOrpcRequestContext,
   input: CreateDeploymentCommandInput,
 ): AsyncGenerator<DeploymentProgressStreamEvent, { id: string }, void> {
   if (!context.deploymentProgressObserver) {
@@ -509,7 +509,7 @@ function createDeploymentStream(
 }
 
 function createResourceRuntimeLogStream(
-  context: YunduOrpcRequestContext,
+  context: AppaloftOrpcRequestContext,
   input: ResourceRuntimeLogsQueryInput,
 ): AsyncGenerator<ResourceRuntimeLogEvent, { resourceId: string; deploymentId?: string }, void> {
   const streamResult = (result: ResourceRuntimeLogsResult) => ({
@@ -575,7 +575,7 @@ function createRequestExecutionContext(
 
   return executionContextFactory.create({
     entrypoint,
-    locale: resolveYunduLocaleFromHeaders(request.headers),
+    locale: resolveAppaloftLocaleFromHeaders(request.headers),
     ...(requestId ? { requestId } : {}),
   });
 }
@@ -1015,7 +1015,7 @@ export const listGitHubRepositoriesProcedure = base
     executeQuery(context, ListGitHubRepositoriesQuery.create(input)),
   );
 
-export const yunduOrpcRouter = {
+export const appaloftOrpcRouter = {
   projects: {
     list: listProjectsProcedure,
     create: createProjectProcedure,
@@ -1085,14 +1085,14 @@ export const yunduOrpcRouter = {
   },
 } as const;
 
-export type YunduOrpcRouter = typeof yunduOrpcRouter;
+export type AppaloftOrpcRouter = typeof appaloftOrpcRouter;
 
-export function createYunduOpenApiHandler() {
-  return new OpenAPIHandler(yunduOrpcRouter);
+export function createAppaloftOpenApiHandler() {
+  return new OpenAPIHandler(appaloftOrpcRouter);
 }
 
-export function createYunduRpcHandler() {
-  return new RPCHandler(yunduOrpcRouter);
+export function createAppaloftRpcHandler() {
+  return new RPCHandler(appaloftOrpcRouter);
 }
 
 function createRequestRunner(
@@ -1108,14 +1108,14 @@ function createRequestRunner(
   return <T>(callback: () => Promise<T>) => callback();
 }
 
-export function mountYunduOrpcRoutes(
+export function mountAppaloftOrpcRoutes(
   app: Elysia,
-  context: YunduOrpcContext & {
+  context: AppaloftOrpcContext & {
     requestContextRunner?: RequestContextRunner;
   },
 ): Elysia {
-  const openApiHandler = createYunduOpenApiHandler();
-  const rpcHandler = createYunduRpcHandler();
+  const openApiHandler = createAppaloftOpenApiHandler();
+  const rpcHandler = createAppaloftRpcHandler();
 
   const openApiRouteHandler = async ({ request }: { request: Request }) => {
     const executionContext = createRequestExecutionContext(

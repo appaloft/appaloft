@@ -11,7 +11,7 @@ import {
   type ExecutionContext,
   type IntegrationAuthPort,
   reportDeploymentProgress,
-} from "@yundu/application";
+} from "@appaloft/application";
 import {
   DeploymentLogEntry,
   DeploymentLogSourceValue,
@@ -31,7 +31,7 @@ import {
   type Result,
   type RollbackPlan,
   type RuntimeExecutionPlan,
-} from "@yundu/core";
+} from "@appaloft/core";
 import {
   createEdgeProxyEnsurePlan,
   createProxyReloadPlan,
@@ -42,7 +42,7 @@ import { executeProxyReloadPlan } from "./proxy-reload-execution";
 import {
   dockerPublishedPortCommand,
   parseDockerPublishedHostPort,
-  yunduDockerContainerLabels,
+  appaloftDockerContainerLabels,
 } from "./docker-container-commands";
 import {
   RuntimeCommandBuilder,
@@ -53,7 +53,7 @@ import { generateWorkspaceDockerfile } from "./workspace-planners";
 
 type LogPhase = "detect" | "plan" | "package" | "deploy" | "verify" | "rollback";
 type LogLevel = "debug" | "info" | "warn" | "error";
-type LogSource = "yundu" | "application";
+type LogSource = "appaloft" | "application";
 
 const persistedOutputLineLimit = 50;
 
@@ -61,7 +61,7 @@ function phaseLog(
   phase: LogPhase,
   message: string,
   level: LogLevel = "info",
-  source: LogSource = "yundu",
+  source: LogSource = "appaloft",
 ): DeploymentLogEntry {
   return DeploymentLogEntry.rehydrate({
     timestamp: OccurredAt.rehydrate(new Date().toISOString()),
@@ -130,11 +130,11 @@ function deploymentEnv(
   const state = deployment.toState();
   const env = {
     ...process.env,
-    YUNDU_DEPLOYMENT_ID: state.id.value,
-    YUNDU_PROJECT_ID: state.projectId.value,
-    YUNDU_ENVIRONMENT_ID: state.environmentId.value,
-    YUNDU_RESOURCE_ID: state.resourceId.value,
-    YUNDU_DESTINATION_ID: state.destinationId.value,
+    APPALOFT_DEPLOYMENT_ID: state.id.value,
+    APPALOFT_PROJECT_ID: state.projectId.value,
+    APPALOFT_ENVIRONMENT_ID: state.environmentId.value,
+    APPALOFT_RESOURCE_ID: state.resourceId.value,
+    APPALOFT_DESTINATION_ID: state.destinationId.value,
   } as NodeJS.ProcessEnv;
 
   for (const variable of state.environmentSnapshot.variables) {
@@ -1247,13 +1247,13 @@ export class LocalExecutionBackend implements ExecutionBackend {
     }
 
     let image = state.runtimePlan.execution.image;
-    const containerName = sanitizeName(`yundu-${state.id.value}`);
+    const containerName = sanitizeName(`appaloft-${state.id.value}`);
 
     if (state.runtimePlan.buildStrategy === "dockerfile" || state.runtimePlan.buildStrategy === "workspace-commands") {
-      image = sanitizeName(`yundu-image-${state.id.value}`);
+      image = sanitizeName(`appaloft-image-${state.id.value}`);
       const dockerfilePath =
         state.runtimePlan.buildStrategy === "workspace-commands"
-          ? resolve(runtimeDir, state.runtimePlan.execution.dockerfilePath ?? "Dockerfile.yundu")
+          ? resolve(runtimeDir, state.runtimePlan.execution.dockerfilePath ?? "Dockerfile.appaloft")
           : state.runtimePlan.execution.dockerfilePath ?? "Dockerfile";
 
       if (state.runtimePlan.buildStrategy === "workspace-commands") {
@@ -1550,7 +1550,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
       .filter((entry): entry is [string, string] => typeof entry[1] === "string")
       .filter(([key]) =>
         key === "PORT" ||
-        key.startsWith("YUNDU_") ||
+        key.startsWith("APPALOFT_") ||
         state.environmentSnapshot.variables.some((variable) => variable.key === key),
       )
       .map(([name, value]) => {
@@ -1564,7 +1564,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
         };
       });
     const labels = dockerLabelsFromAssignments([
-      ...yunduDockerContainerLabels({
+      ...appaloftDockerContainerLabels({
         deploymentId: state.id.value,
         projectId: state.projectId.value,
         environmentId: state.environmentId.value,
@@ -2104,7 +2104,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
         );
         break;
       case "docker-container": {
-        const containerName = metadata.containerName ?? sanitizeName(`yundu-${state.id.value}`);
+        const containerName = metadata.containerName ?? sanitizeName(`appaloft-${state.id.value}`);
         runSyncCommand({
           command: `docker rm -f ${shellQuote(containerName)} >/dev/null 2>&1 || true`,
           cwd: workdir,

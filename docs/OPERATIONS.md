@@ -5,21 +5,21 @@
 Embedded PGlite is the default local development mode:
 
 ```bash
-export YUNDU_DATABASE_DRIVER=pglite
+export APPALOFT_DATABASE_DRIVER=pglite
 ```
 
-When `YUNDU_DATA_DIR` is not set, Yundu stores embedded data in the platform user data directory:
-`~/Library/Application Support/Yundu/data` on macOS, `$XDG_DATA_HOME/yundu/data` or
-`~/.local/share/yundu/data` on Linux, and `%APPDATA%\Yundu\data` on Windows. Set
-`YUNDU_DATA_DIR=.yundu/data` and `YUNDU_PGLITE_DATA_DIR=.yundu/data/pglite` only when you
+When `APPALOFT_DATA_DIR` is not set, Appaloft stores embedded data in the platform user data directory:
+`~/Library/Application Support/Appaloft/data` on macOS, `$XDG_DATA_HOME/appaloft/data` or
+`~/.local/share/appaloft/data` on Linux, and `%APPDATA%\Appaloft\data` on Windows. Set
+`APPALOFT_DATA_DIR=.appaloft/data` and `APPALOFT_PGLITE_DATA_DIR=.appaloft/data/pglite` only when you
 intentionally want portable workspace-local state.
 
 External PostgreSQL:
 
 ```bash
 docker compose -f docker-compose.dev.yml up -d
-export YUNDU_DATABASE_DRIVER=postgres
-export YUNDU_DATABASE_URL=postgres://postgres:postgres@localhost:5432/yundu
+export APPALOFT_DATABASE_DRIVER=postgres
+export APPALOFT_DATABASE_URL=postgres://postgres:postgres@localhost:5432/appaloft
 ```
 
 Apply migrations:
@@ -41,9 +41,9 @@ http://localhost:3001
 ```
 
 By default the Vite dev server listens on port `3001`, the backend listens on port `3002`, and Vite
-proxies `/api` to the backend. Override the dev-only ports with `YUNDU_DEV_WEB_PORT` and
-`YUNDU_DEV_BACKEND_PORT` when needed. Override the public browser origin used for OAuth callbacks
-with `YUNDU_DEV_WEB_ORIGIN`.
+proxies `/api` to the backend. Override the dev-only ports with `APPALOFT_DEV_WEB_PORT` and
+`APPALOFT_DEV_BACKEND_PORT` when needed. Override the public browser origin used for OAuth callbacks
+with `APPALOFT_DEV_WEB_ORIGIN`.
 
 Run backend only:
 
@@ -55,15 +55,15 @@ Build binary bundle:
 
 ```bash
 bun run package:binary-bundle
-./dist/release/yundu-binary-bundle/run-yundu.sh db migrate
-./dist/release/yundu-binary-bundle/run-yundu.sh serve
+./dist/release/appaloft-binary-bundle/run-appaloft.sh db migrate
+./dist/release/appaloft-binary-bundle/run-appaloft.sh serve
 ```
 
 The binary bundle is self-contained:
 
 - the web console static assets are embedded into the executable
 - the PGlite fs bundle and wasm modules are embedded into the executable
-- `YUNDU_WEB_STATIC_DIR` remains available only as an override for an external web build
+- `APPALOFT_WEB_STATIC_DIR` remains available only as an override for an external web build
 
 Run the Tauri desktop shell:
 
@@ -72,16 +72,16 @@ bun run desktop:dev
 ```
 
 This still uses the same binary bundle as the backend. Tauri packaging requires a Rust toolchain;
-keep `yundu-binary-bundle` as the deployment artifact.
+keep `appaloft-binary-bundle` as the deployment artifact.
 
 Hosted control-plane mode with first-party Better Auth runtime:
 
 ```bash
-export YUNDU_RUNTIME_MODE=hosted-control-plane
-export YUNDU_BETTER_AUTH_URL=http://localhost:3001
-export YUNDU_BETTER_AUTH_SECRET=change-me-in-production
-export YUNDU_GITHUB_CLIENT_ID=...
-export YUNDU_GITHUB_CLIENT_SECRET=...
+export APPALOFT_RUNTIME_MODE=hosted-control-plane
+export APPALOFT_BETTER_AUTH_URL=http://localhost:3001
+export APPALOFT_BETTER_AUTH_SECRET=change-me-in-production
+export APPALOFT_GITHUB_CLIENT_ID=...
+export APPALOFT_GITHUB_CLIENT_SECRET=...
 ```
 
 GitHub repository import uses a deferred OAuth flow. The operator can open the console without
@@ -89,7 +89,7 @@ signing in, then authorize only after choosing a GitHub source in the deploy flo
 OAuth App in GitHub developer settings and set its authorization callback URL to:
 
 ```text
-<YUNDU_BETTER_AUTH_URL>/api/auth/callback/github
+<APPALOFT_BETTER_AUTH_URL>/api/auth/callback/github
 ```
 
 For local development with the default backend URL, that is:
@@ -98,23 +98,23 @@ For local development with the default backend URL, that is:
 http://localhost:3001/api/auth/callback/github
 ```
 
-The OAuth App cannot be fully created in Yundu source code because GitHub issues the client id and
-client secret. Yundu reads those values from `YUNDU_GITHUB_CLIENT_ID` and
-`YUNDU_GITHUB_CLIENT_SECRET`, then stores Better Auth users, sessions, linked accounts, and provider
+The OAuth App cannot be fully created in Appaloft source code because GitHub issues the client id and
+client secret. Appaloft reads those values from `APPALOFT_GITHUB_CLIENT_ID` and
+`APPALOFT_GITHUB_CLIENT_SECRET`, then stores Better Auth users, sessions, linked accounts, and provider
 tokens in the configured Postgres-compatible database.
 
 Run web only:
 
 ```bash
-YUNDU_WEB_DEV_PROXY_TARGET=http://127.0.0.1:3002 bun --cwd apps/web run dev -- --port 3001 --strictPort
+APPALOFT_WEB_DEV_PROXY_TARGET=http://127.0.0.1:3002 bun --cwd apps/web run dev -- --port 3001 --strictPort
 ```
 
 Default web behavior:
 
 - the browser talks to `/api` on the same origin
-- in local development, Vite proxies `/api` to `YUNDU_WEB_DEV_PROXY_TARGET`
+- in local development, Vite proxies `/api` to `APPALOFT_WEB_DEV_PROXY_TARGET`
 - in deployed mode, the backend serves static assets and `/api` from the same origin
-- only set `VITE_YUNDU_API_BASE_URL` when you intentionally want the web app to target a different
+- only set `VITE_APPALOFT_API_BASE_URL` when you intentionally want the web app to target a different
   external API origin
 
 ## Static Frontend Deployment
@@ -127,17 +127,17 @@ Default web behavior:
 
 The web app defaults to same-origin `/api`.
 
-Use `VITE_YUNDU_API_BASE_URL` only for split deployments where static assets and API live on
+Use `VITE_APPALOFT_API_BASE_URL` only for split deployments where static assets and API live on
 different origins.
 
 ## All-In-One Docker
 
 ```bash
-docker build -t yundu-all-in-one:local .
+docker build -t appaloft-all-in-one:local .
 docker run --rm -p 3001:3001 \
-  -e YUNDU_DATABASE_URL=postgres://... \
-  -e YUNDU_WEB_STATIC_DIR=/app/web \
-  yundu-all-in-one:local
+  -e APPALOFT_DATABASE_URL=postgres://... \
+  -e APPALOFT_WEB_STATIC_DIR=/app/web \
+  appaloft-all-in-one:local
 ```
 
 ## Self-Hosted Compose
@@ -153,7 +153,7 @@ docker compose -f docker-compose.selfhost.yml up -d --build
 - required for CI integration/E2E
 - required for hosted control plane
 - required for self-hosted production
-- optional for local-first embedded installs that use `YUNDU_DATABASE_DRIVER=pglite`
+- optional for local-first embedded installs that use `APPALOFT_DATABASE_DRIVER=pglite`
 - auth is not required for self-hosted/local mode
 - hosted auth and tenant features are activated by runtime mode and config, not by end-user plugin installation
 
@@ -162,18 +162,18 @@ Binary distribution does not imply embedded storage by default. Embedded mode is
 ## Embedded PGlite
 
 - stores data in the platform user data directory by default
-- can be made portable by setting `YUNDU_DATA_DIR=.yundu/data` and
-  `YUNDU_PGLITE_DATA_DIR=.yundu/data/pglite`
+- can be made portable by setting `APPALOFT_DATA_DIR=.appaloft/data` and
+  `APPALOFT_PGLITE_DATA_DIR=.appaloft/data/pglite`
 - suited for single-instance operation
 - not the recommended backend for multi-process hosted control planes
 - keep backups by copying the embedded data directory while the app is stopped
 - the binary bundle launcher defaults to `pglite` and follows the same user-level data directory
   default unless overridden
-- a fully self-contained binary can still target external PostgreSQL by setting `YUNDU_DATABASE_DRIVER=postgres`
+- a fully self-contained binary can still target external PostgreSQL by setting `APPALOFT_DATABASE_DRIVER=postgres`
 
 ## Local Manual Validation
 
-Yundu now supports a first-party `local-shell` deploy target for manual validation on the current
+Appaloft now supports a first-party `local-shell` deploy target for manual validation on the current
 machine.
 
 Available deployment methods:
@@ -189,13 +189,13 @@ Available deployment methods:
   - run an existing image locally
 
 `generic-ssh` deploy targets support Docker container execution on a remote Linux host. For
-`dockerfile` plans, Yundu materializes the source on the control-plane machine first: GitHub and
+`dockerfile` plans, Appaloft materializes the source on the control-plane machine first: GitHub and
 other remote git sources are cloned into the runtime directory, then the prepared workspace is
-uploaded to the SSH host and built there. For `prebuilt-image` plans, Yundu skips git/source
+uploaded to the SSH host and built there. For `prebuilt-image` plans, Appaloft skips git/source
 materialization and runs the image directly on the SSH host.
 
 The SSH target must have Docker installed. For authentication, a target can either use the local SSH
-agent/config available to the Yundu process or store an SSH private key on the server record. The
+agent/config available to the Appaloft process or store an SSH private key on the server record. The
 server `host` may include a user, for example `root@203.0.113.10`; alternatively set the login user
 on the credential. The stored public key is descriptive, while the private key is what SSH uses.
 
@@ -238,9 +238,9 @@ deployments need the git URL to be accessible from the local git environment.
 
 ```bash
 bun run --cwd apps/shell src/index.ts server register --name ssh-demo --host root@<server-ip> --provider generic-ssh
-bun run --cwd apps/shell src/index.ts server credential <serverId> --kind ssh-private-key --username root --private-key-file ~/.ssh/yundu_demo
+bun run --cwd apps/shell src/index.ts server credential <serverId> --kind ssh-private-key --username root --private-key-file ~/.ssh/appaloft_demo
 
-bun run --cwd apps/shell src/index.ts deploy https://github.com/nichenqin/yundu-express-hello.git \
+bun run --cwd apps/shell src/index.ts deploy https://github.com/nichenqin/appaloft-express-hello.git \
   --project <projectId> \
   --server <serverId> \
   --environment <environmentId> \

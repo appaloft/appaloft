@@ -85,7 +85,7 @@ Then:
 
 | Test ID | Preferred automation | Case | Entry | Input/read state | Expected observable result | Companion lower-level coverage |
 | --- | --- | --- | --- | --- | --- | --- |
-| SERVER-BOOT-ENTRY-001 | e2e-preferred | CLI registers server and CLI read model observes it | CLI command plus CLI read model | `yundu server register --provider local-shell --proxy-kind none`; then `yundu server list` | Register returns a server id; CLI list includes the same id, name, host, provider key, and disabled proxy summary | `SERVER-BOOT-CMD-002` covers repository state, accepted event, and edge proxy disabled semantics at integration level |
+| SERVER-BOOT-ENTRY-001 | e2e-preferred | CLI registers server and CLI read model observes it | CLI command plus CLI read model | `appaloft server register --provider local-shell --proxy-kind none`; then `appaloft server list` | Register returns a server id; CLI list includes the same id, name, host, provider key, and disabled proxy summary | `SERVER-BOOT-CMD-002` covers repository state, accepted event, and edge proxy disabled semantics at integration level |
 | SERVER-BOOT-ENTRY-002 | e2e-preferred | HTTP registers server and HTTP read model observes it | HTTP API command plus HTTP read model | `POST /api/servers` with `providerKey = local-shell`, `proxyKind = none`; then `GET /api/servers` | HTTP register returns `201` and server id; HTTP list includes the same id, name, host, provider key, and disabled proxy summary | `SERVER-BOOT-CMD-002` covers repository state, accepted event, and edge proxy disabled semantics at integration level |
 
 ## Event Matrix
@@ -159,7 +159,7 @@ Tests must prove:
 - duplicate `proxy-installed` does not duplicate `server-ready`;
 - duplicate `proxy-install-failed` does not duplicate retry scheduling;
 - retry creates a new proxy bootstrap attempt id.
-- `yundu server proxy repair <serverId>` dispatches `servers.bootstrap-proxy` and creates a new
+- `appaloft server proxy repair <serverId>` dispatches `servers.bootstrap-proxy` and creates a new
   proxy bootstrap attempt rather than replaying the old event.
 - proxy repair does not remove, restart, or mutate user workload containers.
 

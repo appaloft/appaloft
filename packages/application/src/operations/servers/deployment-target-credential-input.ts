@@ -11,7 +11,7 @@ import {
   SshPrivateKeyText,
   SshPublicKeyText,
   safeTry,
-} from "@yundu/core";
+} from "@appaloft/core";
 
 import { type RepositoryContext } from "../../execution-context";
 import { type SshCredentialRepository } from "../../ports";

@@ -1,29 +1,29 @@
 import i18next, { type i18n as I18nextInstance } from "i18next";
 
 import { i18nKeys, type TranslationKey } from "./keys";
-import { yunduI18nResources } from "./resources";
+import { appaloftI18nResources } from "./resources";
 
 export type { TranslationKey } from "./keys";
 export { i18nKeys } from "./keys";
-export type { YunduTranslationResource } from "./locales/zh-CN";
-export { enUS, yunduI18nResources, zhCN } from "./resources";
+export type { AppaloftTranslationResource } from "./locales/zh-CN";
+export { appaloftI18nResources, enUS, zhCN } from "./resources";
 
-export const yunduLocales = ["zh-CN", "en-US"] as const;
-export type YunduLocale = (typeof yunduLocales)[number];
+export const appaloftLocales = ["zh-CN", "en-US"] as const;
+export type AppaloftLocale = (typeof appaloftLocales)[number];
 
-export const defaultYunduLocale: YunduLocale = "zh-CN";
-export const yunduLocaleStorageKey = "yundu.locale";
-export const yunduLocaleHeader = "x-yundu-locale";
+export const defaultAppaloftLocale: AppaloftLocale = "zh-CN";
+export const appaloftLocaleStorageKey = "appaloft.locale";
+export const appaloftLocaleHeader = "x-appaloft-locale";
 
 export type TranslationValues = Record<string, string | number | boolean | null | undefined>;
 
-export type YunduTranslate = (key: TranslationKey, values?: TranslationValues) => string;
+export type AppaloftTranslate = (key: TranslationKey, values?: TranslationValues) => string;
 
-export function normalizeYunduLocale(input?: string | null): YunduLocale {
+export function normalizeAppaloftLocale(input?: string | null): AppaloftLocale {
   const value = input?.trim();
 
   if (!value) {
-    return defaultYunduLocale;
+    return defaultAppaloftLocale;
   }
 
   const normalized = value.toLowerCase().replace("_", "-");
@@ -36,10 +36,10 @@ export function normalizeYunduLocale(input?: string | null): YunduLocale {
     return "en-US";
   }
 
-  return defaultYunduLocale;
+  return defaultAppaloftLocale;
 }
 
-export function resolveYunduLocaleFromAcceptLanguage(header?: string | null): YunduLocale {
+export function resolveAppaloftLocaleFromAcceptLanguage(header?: string | null): AppaloftLocale {
   const candidates = (header ?? "")
     .split(",")
     .map((entry) => entry.trim())
@@ -62,28 +62,28 @@ export function resolveYunduLocaleFromAcceptLanguage(header?: string | null): Yu
     )
     .sort((left, right) => right.quality - left.quality);
 
-  return normalizeYunduLocale(candidates[0]?.tag);
+  return normalizeAppaloftLocale(candidates[0]?.tag);
 }
 
-export function resolveYunduLocaleFromHeaders(headers: Headers): YunduLocale {
-  const explicitLocale = headers.get(yunduLocaleHeader);
+export function resolveAppaloftLocaleFromHeaders(headers: Headers): AppaloftLocale {
+  const explicitLocale = headers.get(appaloftLocaleHeader);
 
   if (explicitLocale) {
-    return normalizeYunduLocale(explicitLocale);
+    return normalizeAppaloftLocale(explicitLocale);
   }
 
-  return resolveYunduLocaleFromAcceptLanguage(headers.get("accept-language"));
+  return resolveAppaloftLocaleFromAcceptLanguage(headers.get("accept-language"));
 }
 
-export function createYunduI18n(input?: {
+export function createAppaloftI18n(input?: {
   locale?: string | null;
-  fallbackLocale?: YunduLocale;
+  fallbackLocale?: AppaloftLocale;
 }): I18nextInstance {
   const instance = i18next.createInstance();
   void instance.init({
-    resources: yunduI18nResources,
-    lng: normalizeYunduLocale(input?.locale),
-    fallbackLng: input?.fallbackLocale ?? defaultYunduLocale,
+    resources: appaloftI18nResources,
+    lng: normalizeAppaloftLocale(input?.locale),
+    fallbackLng: input?.fallbackLocale ?? defaultAppaloftLocale,
     defaultNS: "common",
     ns: ["common", "errors", "backend", "console"],
     interpolation: {
@@ -96,11 +96,11 @@ export function createYunduI18n(input?: {
   return instance;
 }
 
-export function createYunduTranslator(input?: {
+export function createAppaloftTranslator(input?: {
   locale?: string | null;
-  fallbackLocale?: YunduLocale;
-}): YunduTranslate {
-  const instance = createYunduI18n(input);
+  fallbackLocale?: AppaloftLocale;
+}): AppaloftTranslate {
+  const instance = createAppaloftI18n(input);
 
   return (key, values) => {
     if (values) {
@@ -119,7 +119,7 @@ export interface LocalizableDomainError {
   details?: Record<string, string | number | boolean | null>;
 }
 
-export function translateDomainError(error: LocalizableDomainError, t: YunduTranslate): string {
+export function translateDomainError(error: LocalizableDomainError, t: AppaloftTranslate): string {
   if (error.code === "not_found") {
     return t(i18nKeys.errors.domain.notFound, {
       entity: error.details?.entity ?? "entity",

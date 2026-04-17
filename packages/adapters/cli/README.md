@@ -1,6 +1,6 @@
-# @yundu/adapter-cli
+# @appaloft/adapter-cli
 
-CLI adapter for Yundu.
+CLI adapter for Appaloft.
 
 Responsibilities:
 

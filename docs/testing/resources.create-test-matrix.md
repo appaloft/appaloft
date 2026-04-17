@@ -40,7 +40,7 @@ This test matrix inherits:
 | Read model/query | Created resource appears in `resources.list` and future `resources.show`. |
 | Event/projection | `resource-created` is idempotent for consumers. |
 | API/oRPC | `POST /api/resources` uses the command schema and maps structured errors. |
-| CLI | `yundu resource create` dispatches `resources.create`. |
+| CLI | `appaloft resource create` dispatches `resources.create`. |
 | Web | Resource create affordance dispatches `resources.create` and refreshes resource lists/details. |
 | Quick Deploy | New resource path calls `resources.create` before `deployments.create(resourceId)`. |
 

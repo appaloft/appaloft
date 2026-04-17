@@ -31,7 +31,7 @@ export interface HttpServerSpanUpdate {
   statusCode?: number;
 }
 
-const httpServerTracerName = "yundu.http";
+const httpServerTracerName = "appaloft.http";
 const traceLinkValue = (traceUrl: string): string => `<${traceUrl}>; rel="trace"`;
 const endedSpans = new WeakSet<Span>();
 
@@ -107,7 +107,7 @@ function setHttpSpanAttributes(span: Span, input: HttpServerSpanUpdate): void {
     "url.path": pathname,
     ...(scheme ? { "url.scheme": scheme } : {}),
     ...(route ? { "http.route": route } : {}),
-    ...(input.requestId ? { "yundu.request.id": input.requestId } : {}),
+    ...(input.requestId ? { "appaloft.request.id": input.requestId } : {}),
     ...(input.statusCode ? { "http.response.status_code": input.statusCode } : {}),
   });
 
@@ -213,7 +213,7 @@ export function wrapHttpRequestHandlerWithSpan(
         "http.request.method": input.request.method,
         "url.path": readPathname(input.request),
         ...(readUrlScheme(input.request) ? { "url.scheme": readUrlScheme(input.request) } : {}),
-        ...(input.requestId ? { "yundu.request.id": input.requestId } : {}),
+        ...(input.requestId ? { "appaloft.request.id": input.requestId } : {}),
       },
     },
     parentContext,

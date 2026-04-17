@@ -1,4 +1,4 @@
-import { ok, type Result } from "@yundu/core";
+import { ok, type Result } from "@appaloft/core";
 
 import { Query } from "../../cqrs";
 import { type DiagnosticsStatus, type PluginSummary, type ProviderDescriptor } from "../../ports";

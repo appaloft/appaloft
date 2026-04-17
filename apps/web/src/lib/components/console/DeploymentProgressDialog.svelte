@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { DeploymentProgressEvent } from "@yundu/contracts";
+  import type { DeploymentProgressEvent } from "@appaloft/contracts";
   import { tick } from "svelte";
 
   import { Badge } from "$lib/components/ui/badge";

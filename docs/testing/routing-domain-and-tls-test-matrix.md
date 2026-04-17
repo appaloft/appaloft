@@ -259,7 +259,7 @@ Current route failure tests cover `ROUTE-TLS-EVT-012`, `ROUTE-TLS-READMODEL-007`
 state, and safe read-model projection.
 
 Current workflow tests cover `ROUTE-TLS-WORKFLOW-001` through the default CLI e2e chain. The
-`ROUTE-TLS-WORKFLOW-002` proxy reachability test is opt-in through `YUNDU_E2E_PROXY_DOCKER=true`
+`ROUTE-TLS-WORKFLOW-002` proxy reachability test is opt-in through `APPALOFT_E2E_PROXY_DOCKER=true`
 because it needs Docker and host ports; it proves routing with a local Host header rather than a
 public DNS purchase.
 

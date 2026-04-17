@@ -1,10 +1,10 @@
-# @yundu/desktop
+# @appaloft/desktop
 
-Tauri shell for the Yundu local desktop app.
+Tauri shell for the Appaloft local desktop app.
 
-The desktop app does not own deployment business logic. It starts the packaged `yundu` backend
+The desktop app does not own deployment business logic. It starts the packaged `appaloft` backend
 binary as a Tauri sidecar, opens the embedded web console over loopback HTTP, and exposes the small
-`window.yunduDesktop` bridge used by the web console for native directory selection and clipboard
+`window.appaloftDesktop` bridge used by the web console for native directory selection and clipboard
 copy.
 
 ## Commands
@@ -23,8 +23,8 @@ bun run package:binary-bundle
 bun run --cwd apps/desktop package:app
 ```
 
-`prepare:sidecar` copies `dist/release/yundu-binary-bundle/yundu` to the Tauri sidecar path
-expected by the current host target. Override target detection with `YUNDU_TAURI_TARGET_TRIPLE`
+`prepare:sidecar` copies `dist/release/appaloft-binary-bundle/appaloft` to the Tauri sidecar path
+expected by the current host target. Override target detection with `APPALOFT_TAURI_TARGET_TRIPLE`
 when preparing a sidecar for a different target.
 
 This package is intentionally not wired into the root `build` or `typecheck` tasks yet. Tauri

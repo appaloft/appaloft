@@ -1,4 +1,4 @@
-# @yundu/ui
+# @appaloft/ui
 
 Responsibility:
 

@@ -1,6 +1,6 @@
-# @yundu/orpc
+# @appaloft/orpc
 
-oRPC transport package for Yundu.
+oRPC transport package for Appaloft.
 
 Responsibilities:
 
@@ -11,14 +11,14 @@ Responsibilities:
 
 Depends on:
 
-- `@yundu/application` for buses and message types
-- `@yundu/application` command/query input schemas for transport inputs
-- `@yundu/contracts` for transport response schemas
+- `@appaloft/application` for buses and message types
+- `@appaloft/application` command/query input schemas for transport inputs
+- `@appaloft/contracts` for transport response schemas
 - `elysia` and `@orpc/*` transport libraries on the server side
 
 Frontend note:
 
-- `apps/web` should consume `@yundu/orpc/client` and bind business queries/mutations through `@tanstack/svelte-query`
+- `apps/web` should consume `@appaloft/orpc/client` and bind business queries/mutations through `@tanstack/svelte-query`
 - ad-hoc `fetch('/api/...')` is acceptable only for infrastructure endpoints such as health/readiness/version when they intentionally stay outside the business oRPC surface
 
 Must not:

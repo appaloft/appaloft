@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-labelledby="title desc">
-	<title id="title">yundu favicon</title>
-	<desc id="desc">A compact yundu deployment route mark.</desc>
+	<title id="title">appaloft favicon</title>
+	<desc id="desc">A compact appaloft deployment route mark.</desc>
 	<rect width="64" height="64" rx="14" fill="#202426" />
 	<path d="M16 40c0-5.8 4.7-10.5 10.5-10.5 2.3 0 4.4.7 6.1 2a11.7 11.7 0 0 1 21.2 6.9c0 6.4-5.2 11.6-11.6 11.6H24.6C19.8 50 16 45.5 16 40Z" fill="#F5F7F7" />
 	<path d="M20 22h9.2c4.2 0 7.6 3.4 7.6 7.6v13.8" fill="none" stroke="#0BB7A5" stroke-width="6" stroke-linecap="round" />

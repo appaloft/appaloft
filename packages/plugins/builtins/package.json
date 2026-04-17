@@ -1,12 +1,12 @@
 {
-  "name": "@yundu/plugin-builtins",
+  "name": "@appaloft/plugin-builtins",
   "private": true,
   "type": "module",
   "exports": {
     ".": "./src/index.ts"
   },
   "dependencies": {
-    "@yundu/plugin-sdk": "workspace:*"
+    "@appaloft/plugin-sdk": "workspace:*"
   },
   "scripts": {
     "lint": "biome check .",

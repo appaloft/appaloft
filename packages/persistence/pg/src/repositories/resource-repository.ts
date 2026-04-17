@@ -1,9 +1,9 @@
 import {
+  appaloftTraceAttributes,
   createRepositorySpanName,
   type RepositoryContext,
   type ResourceRepository,
-  yunduTraceAttributes,
-} from "@yundu/application";
+} from "@appaloft/application";
 import {
   Resource,
   type ResourceByEnvironmentAndSlugSpec,
@@ -14,7 +14,7 @@ import {
   type ResourceSelectionSpecVisitor,
   ResourceSourceBinding,
   type UpsertResourceSpec,
-} from "@yundu/core";
+} from "@appaloft/core";
 import { type Insertable, type Kysely, type Selectable, type SelectQueryBuilder } from "kysely";
 
 import { type Database } from "../schema";
@@ -169,8 +169,8 @@ export class PgResourceRepository implements ResourceRepository {
       createRepositorySpanName("resource", "upsert"),
       {
         attributes: {
-          [yunduTraceAttributes.repositoryName]: "resource",
-          [yunduTraceAttributes.mutationSpecName]: spec.constructor.name,
+          [appaloftTraceAttributes.repositoryName]: "resource",
+          [appaloftTraceAttributes.mutationSpecName]: spec.constructor.name,
         },
       },
       async () => {
@@ -201,8 +201,8 @@ export class PgResourceRepository implements ResourceRepository {
       createRepositorySpanName("resource", "find_one"),
       {
         attributes: {
-          [yunduTraceAttributes.repositoryName]: "resource",
-          [yunduTraceAttributes.selectionSpecName]: spec.constructor.name,
+          [appaloftTraceAttributes.repositoryName]: "resource",
+          [appaloftTraceAttributes.selectionSpecName]: spec.constructor.name,
         },
       },
       async () => {

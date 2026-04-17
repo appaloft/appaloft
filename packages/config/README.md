@@ -1,6 +1,6 @@
-# @yundu/config
+# @appaloft/config
 
-Layered configuration resolver for Yundu.
+Layered configuration resolver for Appaloft.
 
 Responsibilities:
 

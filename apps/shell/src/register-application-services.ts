@@ -57,8 +57,8 @@ import {
   TestServerConnectivityUseCase,
   tokens,
   UnsetEnvironmentVariableUseCase,
-} from "@yundu/application";
-import { type DomainError, ok, type Result } from "@yundu/core";
+} from "@appaloft/application";
+import { type DomainError, ok, type Result } from "@appaloft/core";
 import { type DependencyContainer } from "tsyringe";
 
 class ShellCertificateProviderSelectionPolicy implements CertificateProviderSelectionPolicy {

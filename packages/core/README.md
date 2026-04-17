@@ -1,6 +1,6 @@
-# @yundu/core
+# @appaloft/core
 
-Pure domain model for Yundu.
+Pure domain model for Appaloft.
 
 Responsibilities:
 

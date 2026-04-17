@@ -1,4 +1,4 @@
-# @yundu/auth-better
+# @appaloft/auth-better
 
 First-party Better Auth runtime for deferred control-plane authentication.
 

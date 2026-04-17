@@ -12,7 +12,7 @@
     TriangleAlert,
     XCircle,
   } from "@lucide/svelte";
-  import type { TestServerConnectivityResponse } from "@yundu/contracts";
+  import type { TestServerConnectivityResponse } from "@appaloft/contracts";
 
   import { readErrorMessage } from "$lib/api/client";
   import ConsoleShell from "$lib/components/console/ConsoleShell.svelte";
@@ -119,7 +119,7 @@
 </script>
 
 <svelte:head>
-  <title>{server?.name ?? $t(i18nKeys.console.servers.pageTitle)} · Yundu</title>
+  <title>{server?.name ?? $t(i18nKeys.console.servers.pageTitle)} · Appaloft</title>
 </svelte:head>
 
 <ConsoleShell

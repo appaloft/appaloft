@@ -1,4 +1,4 @@
-import { domainError, err, type Result } from "@yundu/core";
+import { domainError, err, type Result } from "@appaloft/core";
 import { inject, injectable } from "tsyringe";
 
 import { type ExecutionContext, toRepositoryContext } from "../../execution-context";

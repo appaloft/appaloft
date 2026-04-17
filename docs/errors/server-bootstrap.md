@@ -104,7 +104,7 @@ Admission errors reject the command and return `err(DomainError)`.
 `servers.bootstrap-proxy`:
 
 - returns `ok({ serverId, attemptId })` when proxy bootstrap attempt is accepted;
-- is the canonical public repair/retry operation behind `yundu server proxy repair <serverId>` and `POST /api/servers/{serverId}/edge-proxy/bootstrap`;
+- is the canonical public repair/retry operation behind `appaloft server proxy repair <serverId>` and `POST /api/servers/{serverId}/edge-proxy/bootstrap`;
 - allocates a new attempt id when invoked as repair/retry and must not replay an old `proxy-bootstrap-requested` event;
 - records terminal proxy failure as `edgeProxy.status = failed` and publishes `proxy-install-failed`;
 - returns `err(DomainError)` only when the attempt cannot be accepted or state cannot be safely persisted.

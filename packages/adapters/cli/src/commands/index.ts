@@ -11,7 +11,7 @@ import { projectCommand } from "./project.js";
 import { resourceCommand } from "./resource.js";
 import { serverCommand } from "./server.js";
 
-export const mainCommand = EffectCommand.make("yundu").pipe(
+export const mainCommand = EffectCommand.make("appaloft").pipe(
   EffectCommand.withDescription("AI Native local-to-cloud deployment platform"),
   EffectCommand.withSubcommands([
     versionCommand,

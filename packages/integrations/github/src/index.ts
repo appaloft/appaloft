@@ -1,11 +1,11 @@
 import {
+  appaloftTraceAttributes,
   createAdapterSpanName,
   type ExecutionContext,
   type GitHubRepositoryBrowser,
   type GitHubRepositorySummary,
   type IntegrationDescriptor,
-  yunduTraceAttributes,
-} from "@yundu/application";
+} from "@appaloft/application";
 
 export const githubIntegration: IntegrationDescriptor = {
   key: "github",
@@ -45,7 +45,7 @@ export class GitHubApiRepositoryBrowser implements GitHubRepositoryBrowser {
       createAdapterSpanName("github_repository_browser", "list_repositories"),
       {
         attributes: {
-          [yunduTraceAttributes.integrationKey]: "github",
+          [appaloftTraceAttributes.integrationKey]: "github",
         },
       },
       async () => {
@@ -58,7 +58,7 @@ export class GitHubApiRepositoryBrowser implements GitHubRepositoryBrowser {
           headers: {
             accept: "application/vnd.github+json",
             authorization: `Bearer ${input.accessToken}`,
-            "user-agent": "yundu-control-plane",
+            "user-agent": "appaloft-control-plane",
             "x-github-api-version": "2022-11-28",
           },
         });

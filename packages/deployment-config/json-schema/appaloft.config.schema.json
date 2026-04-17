@@ -384,5 +384,5 @@
     }
   },
   "additionalProperties": false,
-  "description": "Yundu deployment config file."
+  "description": "Appaloft deployment config file."
 }

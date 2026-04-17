@@ -1,13 +1,13 @@
 {
-  "name": "@yundu/cli-logging",
+  "name": "@appaloft/cli-logging",
   "private": true,
   "type": "module",
   "exports": {
     ".": "./src/index.ts"
   },
   "dependencies": {
-    "@yundu/application": "workspace:*",
-    "@yundu/core": "workspace:*"
+    "@appaloft/application": "workspace:*",
+    "@appaloft/core": "workspace:*"
   },
   "scripts": {
     "lint": "biome check .",

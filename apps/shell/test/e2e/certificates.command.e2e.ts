@@ -22,7 +22,7 @@ describe("certificates.issue-or-renew command e2e", () => {
   beforeAll(() => {
     fixture = createRoutingDomainTlsFixture({
       appVersion: "0.1.0-certificates-command-e2e",
-      prefix: "yundu-certificates-command-",
+      prefix: "appaloft-certificates-command-",
       proxyKind: "traefik",
     });
   }, 60000);

@@ -4,7 +4,7 @@ import {
   type DeploymentProgressObserver,
   type DeploymentProgressReporter,
   type ExecutionContext,
-} from "@yundu/application";
+} from "@appaloft/application";
 
 type BufferedDeploymentProgressEvent = {
   context: ExecutionContext;

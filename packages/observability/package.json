@@ -1,5 +1,5 @@
 {
-  "name": "@yundu/observability",
+  "name": "@appaloft/observability",
   "private": true,
   "type": "module",
   "exports": {
@@ -7,9 +7,9 @@
     "./bootstrap": "./src/bootstrap.ts"
   },
   "dependencies": {
-    "@yundu/application": "workspace:*",
-    "@yundu/config": "workspace:*",
-    "@yundu/i18n": "workspace:*",
+    "@appaloft/application": "workspace:*",
+    "@appaloft/config": "workspace:*",
+    "@appaloft/i18n": "workspace:*",
     "@opentelemetry/api": "^1.9.1",
     "@opentelemetry/auto-instrumentations-node": "^0.72.0",
     "@opentelemetry/context-async-hooks": "^2.6.1",

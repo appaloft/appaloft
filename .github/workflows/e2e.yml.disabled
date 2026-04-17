@@ -11,23 +11,23 @@ jobs:
       postgres:
         image: postgres:16
         env:
-          POSTGRES_DB: yundu
+          POSTGRES_DB: appaloft
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U postgres -d yundu"
+          --health-cmd "pg_isready -U postgres -d appaloft"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 20
     env:
-      YUNDU_DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/yundu
-      YUNDU_HTTP_HOST: 127.0.0.1
-      YUNDU_HTTP_PORT: 3101
-      YUNDU_APP_VERSION: 0.1.0-e2e
-      YUNDU_E2E_EXTERNAL_SERVER: "true"
-      YUNDU_OTEL_ENABLED: "false"
+      APPALOFT_DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/appaloft
+      APPALOFT_HTTP_HOST: 127.0.0.1
+      APPALOFT_HTTP_PORT: 3101
+      APPALOFT_APP_VERSION: 0.1.0-e2e
+      APPALOFT_E2E_EXTERNAL_SERVER: "true"
+      APPALOFT_OTEL_ENABLED: "false"
     steps:
       - uses: actions/checkout@v4
 
@@ -48,10 +48,10 @@ jobs:
       - name: Migrate Database
         run: bun run db:migrate
 
-      - name: Start Yundu Backend
+      - name: Start Appaloft Backend
         run: |
           bun run serve > runtime/logs/e2e-server.log 2>&1 &
-          echo $! > .yundu-server.pid
+          echo $! > .appaloft-server.pid
 
       - name: Wait For Backend
         run: bun run scripts/test/wait-for-http.ts http://127.0.0.1:3101/api/health 60000
@@ -67,15 +67,15 @@ jobs:
       - name: Stop Backend
         if: always()
         run: |
-          if [ -f .yundu-server.pid ]; then
-            kill "$(cat .yundu-server.pid)" || true
+          if [ -f .appaloft-server.pid ]; then
+            kill "$(cat .appaloft-server.pid)" || true
           fi
 
       - name: Upload E2E Logs
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: yundu-e2e-logs
+          name: appaloft-e2e-logs
           path: |
             runtime/logs
             apps/web/playwright-report

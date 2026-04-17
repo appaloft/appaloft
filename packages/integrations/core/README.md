@@ -1,4 +1,4 @@
-# @yundu/integration-core
+# @appaloft/integration-core
 
 Integration contracts and shared flags.
 

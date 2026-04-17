@@ -49,7 +49,7 @@ export interface PgliteRuntimeAssets {
 
 export async function createDatabase(input: CreateDatabaseInput): Promise<DatabaseConnection> {
   if (input.driver === "pglite") {
-    const dataDir = resolve(input.pgliteDataDir ?? ".yundu/data/pglite");
+    const dataDir = resolve(input.pgliteDataDir ?? ".appaloft/data/pglite");
     await $`mkdir -p ${dataDir}`;
 
     const pglite = input.pgliteRuntimeAssets
@@ -76,7 +76,7 @@ export async function createDatabase(input: CreateDatabaseInput): Promise<Databa
   }
 
   if (!input.databaseUrl) {
-    throw new Error("YUNDU_DATABASE_URL is required when YUNDU_DATABASE_DRIVER=postgres");
+    throw new Error("APPALOFT_DATABASE_URL is required when APPALOFT_DATABASE_DRIVER=postgres");
   }
 
   const connection = postgres(input.databaseUrl, {

@@ -1,10 +1,10 @@
 import {
+  appaloftTraceAttributes,
   createReadModelSpanName,
   type DomainBindingReadModel,
   type DomainBindingSummary,
   type RepositoryContext,
-  yunduTraceAttributes,
-} from "@yundu/application";
+} from "@appaloft/application";
 import { type Kysely } from "kysely";
 
 import { type Database } from "../schema";
@@ -31,7 +31,7 @@ export class PgDomainBindingReadModel implements DomainBindingReadModel {
       createReadModelSpanName("domain_binding", "list"),
       {
         attributes: {
-          [yunduTraceAttributes.readModelName]: "domain_binding",
+          [appaloftTraceAttributes.readModelName]: "domain_binding",
         },
       },
       async () => {

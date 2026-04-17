@@ -12,7 +12,7 @@ import {
   runShellCli,
 } from "./support/shell-e2e-fixture";
 
-const enabled = process.env.YUNDU_E2E_PROXY_DOCKER === "true";
+const enabled = process.env.APPALOFT_E2E_PROXY_DOCKER === "true";
 const fixtureDir = fixturePath("docker-express-hello");
 
 type DeploymentSummary = {
@@ -86,7 +86,7 @@ async function waitForProxy(input: { domain: string; port: number }): Promise<st
 
 describe("routing/domain/TLS proxy workflow e2e", () => {
   if (!enabled) {
-    test.skip("[ROUTE-TLS-WORKFLOW-002] opt-in Docker proxy workflow requires YUNDU_E2E_PROXY_DOCKER=true", () => {});
+    test.skip("[ROUTE-TLS-WORKFLOW-002] opt-in Docker proxy workflow requires APPALOFT_E2E_PROXY_DOCKER=true", () => {});
     return;
   }
 
@@ -94,21 +94,21 @@ describe("routing/domain/TLS proxy workflow e2e", () => {
     const dockerVersion = runDocker(["version", "--format", "{{.Server.Version}}"]);
     expect(dockerVersion.exitCode, dockerVersion.stderr).toBe(0);
 
-    const existingProxy = runDocker(["inspect", "yundu-traefik"]);
+    const existingProxy = runDocker(["inspect", "appaloft-traefik"]);
     if (existingProxy.exitCode === 0) {
-      console.warn("Skipping proxy workflow e2e because yundu-traefik already exists.");
+      console.warn("Skipping proxy workflow e2e because appaloft-traefik already exists.");
       return;
     }
 
-    const existingNetwork = runDocker(["network", "inspect", "yundu-edge"]).exitCode === 0;
+    const existingNetwork = runDocker(["network", "inspect", "appaloft-edge"]).exitCode === 0;
     const proxyHttpPort = await reservePort();
     const proxyHttpsPort = await reservePort();
     const appPort = await reservePort();
-    const workspace = createShellE2eWorkspace("yundu-proxy-domain-workflow-e2e-", {
+    const workspace = createShellE2eWorkspace("appaloft-proxy-domain-workflow-e2e-", {
       appVersion: "0.1.0-routing-domain-tls-proxy-e2e",
       env: {
-        YUNDU_EDGE_HTTP_PORT: String(proxyHttpPort),
-        YUNDU_EDGE_HTTPS_PORT: String(proxyHttpsPort),
+        APPALOFT_EDGE_HTTP_PORT: String(proxyHttpPort),
+        APPALOFT_EDGE_HTTPS_PORT: String(proxyHttpsPort),
       },
     });
     const suffix = crypto.randomUUID().slice(0, 8);
@@ -254,9 +254,9 @@ describe("routing/domain/TLS proxy workflow e2e", () => {
         cleanupLocalDockerDeployment(deploymentId);
       }
 
-      runDocker(["rm", "-f", "yundu-traefik"]);
+      runDocker(["rm", "-f", "appaloft-traefik"]);
       if (!existingNetwork) {
-        runDocker(["network", "rm", "yundu-edge"]);
+        runDocker(["network", "rm", "appaloft-edge"]);
       }
       cleanupWorkspace(workspace.workspaceDir);
     }

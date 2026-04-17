@@ -1,7 +1,7 @@
 import "reflect-metadata";
 
 import { describe, expect, test } from "bun:test";
-import { domainError, err, ok, type Result } from "@yundu/core";
+import { domainError, err, ok, type Result } from "@appaloft/core";
 
 import { createExecutionContext, type ExecutionContext, type RepositoryContext } from "../src";
 import { OpenTerminalSessionCommand } from "../src/messages";
@@ -155,7 +155,7 @@ function deploymentSummary(overrides: Partial<DeploymentSummary> = {}): Deployme
       execution: {
         kind: "host-process",
         metadata: {
-          workdir: "/var/lib/yundu/runtime/local-deployments/dep_new/source",
+          workdir: "/var/lib/appaloft/runtime/local-deployments/dep_new/source",
         },
       },
       target: {
@@ -246,7 +246,7 @@ describe("OpenTerminalSessionUseCase", () => {
     });
     expect(gateway.calls[0]?.scope).toMatchObject({
       kind: "resource",
-      workingDirectory: "/var/lib/yundu/runtime/local-deployments/dep_new/source/packages/api",
+      workingDirectory: "/var/lib/appaloft/runtime/local-deployments/dep_new/source/packages/api",
     });
   });
 

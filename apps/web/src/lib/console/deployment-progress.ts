@@ -3,7 +3,7 @@ import {
   type CreateDeploymentResponse,
   type DeploymentProgressEvent,
   type DeploymentSummary,
-} from "@yundu/contracts";
+} from "@appaloft/contracts";
 
 import { API_BASE, request } from "$lib/api/client";
 import { i18nKeys, translate } from "$lib/i18n";
@@ -242,7 +242,7 @@ export function progressEventsFromDeployment(
     ...logEvents,
     {
       timestamp: deployment.finishedAt ?? deployment.startedAt ?? deployment.createdAt,
-      source: "yundu",
+      source: "appaloft",
       phase: statusPhase,
       level:
         deployment.status === "failed"
@@ -326,7 +326,7 @@ export function progressStatusVariant(
 }
 
 export function progressSourceLabel(event: DeploymentProgressEvent): string {
-  const source = event.source === "application" ? "app" : "yundu";
+  const source = event.source === "application" ? "app" : "appaloft";
   return event.stream ? `${source}:${event.stream}` : source;
 }
 

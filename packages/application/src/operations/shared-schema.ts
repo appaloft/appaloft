@@ -1,4 +1,4 @@
-import { domainError, err, ok, type Result } from "@yundu/core";
+import { domainError, err, ok, type Result } from "@appaloft/core";
 import { z } from "zod";
 
 export const emptyOperationInputSchema = z.object({});

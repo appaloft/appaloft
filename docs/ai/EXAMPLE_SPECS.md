@@ -15,7 +15,7 @@ Current code basis:
 - Handler: `CreateDeploymentCommandHandler`
 - Use case: `CreateDeploymentUseCase`
 - Operation key: `deployments.create`
-- Transports: CLI `yundu deploy`, oRPC/OpenAPI `POST /api/deployments`, oRPC stream
+- Transports: CLI `appaloft deploy`, oRPC/OpenAPI `POST /api/deployments`, oRPC stream
   `/api/deployments/stream`, Web QuickDeploy through typed oRPC client
 
 Current behavior:

@@ -3,7 +3,7 @@
   import { FitAddon } from "@xterm/addon-fit";
   import { Terminal } from "@xterm/xterm";
   import "@xterm/xterm/css/xterm.css";
-  import type { TerminalSessionDescriptor, TerminalSessionFrame } from "@yundu/contracts";
+  import type { TerminalSessionDescriptor, TerminalSessionFrame } from "@appaloft/contracts";
 
   import { readErrorMessage } from "$lib/api/client";
   import { API_BASE } from "$lib/api/client";

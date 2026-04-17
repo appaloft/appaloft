@@ -1,4 +1,4 @@
-import { type ProviderDescriptor, type ProviderRegistry } from "@yundu/application";
+import { type ProviderDescriptor, type ProviderRegistry } from "@appaloft/application";
 
 export class InMemoryProviderRegistry implements ProviderRegistry {
   constructor(private readonly providers: ProviderDescriptor[]) {}

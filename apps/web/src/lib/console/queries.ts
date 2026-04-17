@@ -1,4 +1,3 @@
-import { createQuery, queryOptions } from "@tanstack/svelte-query";
 import {
   type AuthSessionResponse,
   type DeploymentSummary,
@@ -11,7 +10,8 @@ import {
   type ResourceSummary,
   type ServerSummary,
   type VersionResponse,
-} from "@yundu/contracts";
+} from "@appaloft/contracts";
+import { createQuery, queryOptions } from "@tanstack/svelte-query";
 
 import { request } from "$lib/api/client";
 import { orpcClient } from "$lib/orpc";

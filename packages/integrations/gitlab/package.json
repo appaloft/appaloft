@@ -1,12 +1,12 @@
 {
-  "name": "@yundu/integration-gitlab",
+  "name": "@appaloft/integration-gitlab",
   "private": true,
   "type": "module",
   "exports": {
     ".": "./src/index.ts"
   },
   "dependencies": {
-    "@yundu/integration-core": "workspace:*"
+    "@appaloft/integration-core": "workspace:*"
   },
   "scripts": {
     "lint": "biome check .",

@@ -1,5 +1,5 @@
 {
-  "name": "@yundu/adapter-cli",
+  "name": "@appaloft/adapter-cli",
   "private": true,
   "type": "module",
   "exports": {
@@ -8,9 +8,9 @@
   "dependencies": {
     "@effect/cli": "^0.75.0",
     "@effect/platform-node": "^0.106.0",
-    "@yundu/application": "workspace:*",
-    "@yundu/cli-logging": "workspace:*",
-    "@yundu/contracts": "workspace:*",
+    "@appaloft/application": "workspace:*",
+    "@appaloft/cli-logging": "workspace:*",
+    "@appaloft/contracts": "workspace:*",
     "effect": "^3.21.0"
   },
   "scripts": {

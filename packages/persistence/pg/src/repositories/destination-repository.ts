@@ -1,9 +1,9 @@
 import {
+  appaloftTraceAttributes,
   createRepositorySpanName,
   type DestinationRepository,
   type RepositoryContext,
-  yunduTraceAttributes,
-} from "@yundu/application";
+} from "@appaloft/application";
 import {
   Destination,
   type DestinationByIdSpec,
@@ -13,7 +13,7 @@ import {
   type DestinationSelectionSpec,
   type DestinationSelectionSpecVisitor,
   type UpsertDestinationSpec,
-} from "@yundu/core";
+} from "@appaloft/core";
 import { type Insertable, type Kysely, type Selectable, type SelectQueryBuilder } from "kysely";
 
 import { type Database } from "../schema";
@@ -74,8 +74,8 @@ export class PgDestinationRepository implements DestinationRepository {
       createRepositorySpanName("destination", "upsert"),
       {
         attributes: {
-          [yunduTraceAttributes.repositoryName]: "destination",
-          [yunduTraceAttributes.mutationSpecName]: spec.constructor.name,
+          [appaloftTraceAttributes.repositoryName]: "destination",
+          [appaloftTraceAttributes.mutationSpecName]: spec.constructor.name,
         },
       },
       async () => {
@@ -103,8 +103,8 @@ export class PgDestinationRepository implements DestinationRepository {
       createRepositorySpanName("destination", "find_one"),
       {
         attributes: {
-          [yunduTraceAttributes.repositoryName]: "destination",
-          [yunduTraceAttributes.selectionSpecName]: spec.constructor.name,
+          [appaloftTraceAttributes.repositoryName]: "destination",
+          [appaloftTraceAttributes.selectionSpecName]: spec.constructor.name,
         },
       },
       async () => {

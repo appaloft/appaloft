@@ -3,7 +3,7 @@
   import { goto } from "$app/navigation";
   import { page } from "$app/state";
   import { ArrowLeft, Boxes, GitBranch, Play, Server, Waypoints } from "@lucide/svelte";
-  import type { CreateDeploymentInput, DeploymentProgressEvent } from "@yundu/contracts";
+  import type { CreateDeploymentInput, DeploymentProgressEvent } from "@appaloft/contracts";
 
   import { readErrorMessage } from "$lib/api/client";
   import ConsoleShell from "$lib/components/console/ConsoleShell.svelte";
@@ -192,7 +192,7 @@
 </script>
 
 <svelte:head>
-  <title>{$t(i18nKeys.common.actions.newDeployment)} · Yundu</title>
+  <title>{$t(i18nKeys.common.actions.newDeployment)} · Appaloft</title>
 </svelte:head>
 
 <ConsoleShell

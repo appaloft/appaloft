@@ -1,6 +1,6 @@
 # Resources
 
-Yundu now uses two related but different resource concepts:
+Appaloft now uses two related but different resource concepts:
 
 - `Resource`: the project/environment-scoped deployable unit, such as a Next.js frontend, Express
   backend, Redis, Postgres, worker, static site, or Docker Compose stack.
@@ -8,7 +8,7 @@ Yundu now uses two related but different resource concepts:
 - `ResourceInstance`: a provisioned or externally attached dependency resource used through
   bindings, such as a managed Postgres instance or object storage bucket.
 
-`ResourceInstance` and `ResourceBinding` are first-class Yundu concepts even before the full
+`ResourceInstance` and `ResourceBinding` are first-class Appaloft concepts even before the full
 provider-backed resource provisioning context is implemented.
 
 ## Why This Exists
@@ -66,5 +66,5 @@ Expected future commands:
 - `DeleteResource`
 
 These are not part of the current business surface until they are added to
-[CORE_OPERATIONS.md](/Users/nichenqin/projects/yundu/docs/CORE_OPERATIONS.md) and the operation
+[CORE_OPERATIONS.md](/Users/nichenqin/projects/appaloft/docs/CORE_OPERATIONS.md) and the operation
 catalog.

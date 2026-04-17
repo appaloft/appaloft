@@ -37,7 +37,7 @@ function serverSummary(input: { id: string; name: string }) {
 
 describe("servers.register command e2e", () => {
   test("[SERVER-BOOT-ENTRY-001] CLI server register is observable through CLI server list", () => {
-    const workspace = createShellE2eWorkspace("yundu-server-register-cli-", {
+    const workspace = createShellE2eWorkspace("appaloft-server-register-cli-", {
       appVersion: "0.1.0-server-register-e2e",
     });
 
@@ -73,7 +73,7 @@ describe("servers.register command e2e", () => {
   });
 
   test("[SERVER-BOOT-ENTRY-002] HTTP server register is observable through HTTP server list", async () => {
-    const workspace = createShellE2eWorkspace("yundu-server-register-http-", {
+    const workspace = createShellE2eWorkspace("appaloft-server-register-http-", {
       appVersion: "0.1.0-server-register-e2e",
     });
     let httpServer: Awaited<ReturnType<typeof startShellHttpServer>> | undefined;

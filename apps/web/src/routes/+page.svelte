@@ -50,7 +50,7 @@
 </script>
 
 <svelte:head>
-  <title>{$t(i18nKeys.console.home.pageTitle)} · Yundu</title>
+  <title>{$t(i18nKeys.console.home.pageTitle)} · Appaloft</title>
 </svelte:head>
 
 <ConsoleShell title={$t(i18nKeys.console.home.pageTitle)} description={$t(i18nKeys.console.home.pageDescription)}>

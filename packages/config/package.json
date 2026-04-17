@@ -1,5 +1,5 @@
 {
-  "name": "@yundu/config",
+  "name": "@appaloft/config",
   "private": true,
   "type": "module",
   "exports": {

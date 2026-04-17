@@ -11,7 +11,7 @@ export function createCliProgram(input: CliProgramInput): CliProgram {
   return {
     parseAsync: (argv = process.argv) =>
       EffectCommand.run(mainCommand, {
-        name: "yundu",
+        name: "appaloft",
         version: input.version,
       })(argv).pipe(
         Effect.provide(live),

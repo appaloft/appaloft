@@ -1,6 +1,6 @@
-# @yundu/deployment-config
+# @appaloft/deployment-config
 
-Owns the Zod source schema for local Yundu deployment config files and the generated JSON Schema.
+Owns the Zod source schema for local Appaloft deployment config files and the generated JSON Schema.
 
 Build the JSON Schema:
 
@@ -11,5 +11,5 @@ bun run build:schema
 The HTTP adapter serves the same schema at:
 
 ```text
-/api/schemas/yundu-config.json
+/api/schemas/appaloft-config.json
 ```

@@ -1,9 +1,9 @@
 import {
+  appaloftTraceAttributes,
   createRepositorySpanName,
   type EnvironmentRepository,
   type RepositoryContext,
-  yunduTraceAttributes,
-} from "@yundu/application";
+} from "@appaloft/application";
 import {
   Environment,
   type EnvironmentByIdSpec,
@@ -14,7 +14,7 @@ import {
   type EnvironmentSelectionSpecVisitor,
   type EnvironmentState,
   type UpsertEnvironmentSpec,
-} from "@yundu/core";
+} from "@appaloft/core";
 import { type Insertable, type Kysely, type Selectable, type SelectQueryBuilder } from "kysely";
 
 import { type Database } from "../schema";
@@ -98,8 +98,8 @@ export class PgEnvironmentRepository implements EnvironmentRepository {
       createRepositorySpanName("environment", "upsert"),
       {
         attributes: {
-          [yunduTraceAttributes.repositoryName]: "environment",
-          [yunduTraceAttributes.mutationSpecName]: spec.constructor.name,
+          [appaloftTraceAttributes.repositoryName]: "environment",
+          [appaloftTraceAttributes.mutationSpecName]: spec.constructor.name,
         },
       },
       async () => {
@@ -165,8 +165,8 @@ export class PgEnvironmentRepository implements EnvironmentRepository {
       createRepositorySpanName("environment", "find_one"),
       {
         attributes: {
-          [yunduTraceAttributes.repositoryName]: "environment",
-          [yunduTraceAttributes.selectionSpecName]: spec.constructor.name,
+          [appaloftTraceAttributes.repositoryName]: "environment",
+          [appaloftTraceAttributes.selectionSpecName]: spec.constructor.name,
         },
       },
       async () => {

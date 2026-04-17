@@ -1,4 +1,0 @@
-interface:
-  display_name: "Analyze Yundu Trace"
-  short_description: "Analyze Jaeger traces using Yundu span conventions."
-  default_prompt: "Analyze this Jaeger trace URL or trace ID for Yundu latency, critical path, errors, and span categories."

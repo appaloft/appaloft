@@ -1,4 +1,4 @@
-import { type DeploymentLogSource, type LogLevel } from "@yundu/core";
+import { type DeploymentLogSource, type LogLevel } from "@appaloft/core";
 import { type ExecutionContext } from "./execution-context";
 import {
   type DeploymentProgressEvent,
@@ -43,7 +43,7 @@ export function reportDeploymentProgress(
 ): void {
   const event: DeploymentProgressEvent = {
     timestamp: new Date().toISOString(),
-    source: input.source ?? "yundu",
+    source: input.source ?? "appaloft",
     phase: input.phase,
     level: input.level ?? (input.status === "failed" ? "error" : "info"),
     message: input.message,

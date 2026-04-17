@@ -75,8 +75,8 @@ describe("TraefikEdgeProxyProvider", () => {
     expect(ensure.isOk()).toBe(true);
     expect(ensure._unsafeUnwrap()).toMatchObject({
       providerKey: "traefik",
-      networkName: "yundu-edge",
-      containerName: "yundu-traefik",
+      networkName: "appaloft-edge",
+      containerName: "appaloft-traefik",
     });
     expect(ensure._unsafeUnwrap().containerCommand).toContain("traefik:v3.6.2");
     expect(ensure._unsafeUnwrap().metadata).toMatchObject({

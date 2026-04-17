@@ -4,7 +4,7 @@ import {
   dockerPublishedPortFlag,
   dockerRemoveResourceContainersCommand,
   parseDockerPublishedHostPort,
-  yunduDockerContainerLabels,
+  appaloftDockerContainerLabels,
 } from "../src/docker-container-commands";
 
 function quote(input: string): string {
@@ -28,17 +28,17 @@ describe("docker container command helpers", () => {
   test("scopes cleanup to containers for the same resource", () => {
     const command = dockerRemoveResourceContainersCommand({
       resourceId: "res_first",
-      currentContainerName: "yundu-dep_current",
+      currentContainerName: "appaloft-dep_current",
       quote,
     });
 
-    expect(command).toContain("--filter 'label=yundu.resource-id=res_first'");
-    expect(command).toContain("!= 'yundu-dep_current'");
+    expect(command).toContain("--filter 'label=appaloft.resource-id=res_first'");
+    expect(command).toContain("!= 'appaloft-dep_current'");
     expect(command).not.toContain("publish=3000");
   });
 
-  test("renders stable Yundu identity labels", () => {
-    const labels = yunduDockerContainerLabels({
+  test("renders stable Appaloft identity labels", () => {
+    const labels = appaloftDockerContainerLabels({
       deploymentId: "dep_1",
       projectId: "proj_1",
       environmentId: "env_1",
@@ -47,15 +47,15 @@ describe("docker container command helpers", () => {
     });
 
     expect(labels).toEqual([
-      "yundu.managed=true",
-      "yundu.deployment-id=dep_1",
-      "yundu.project-id=proj_1",
-      "yundu.environment-id=env_1",
-      "yundu.resource-id=res_1",
-      "yundu.destination-id=dest_1",
+      "appaloft.managed=true",
+      "appaloft.deployment-id=dep_1",
+      "appaloft.project-id=proj_1",
+      "appaloft.environment-id=env_1",
+      "appaloft.resource-id=res_1",
+      "appaloft.destination-id=dest_1",
     ]);
     expect(dockerContainerLabelFlags({ labels, quote })).toContain(
-      "--label 'yundu.resource-id=res_1'",
+      "--label 'appaloft.resource-id=res_1'",
     );
   });
 
