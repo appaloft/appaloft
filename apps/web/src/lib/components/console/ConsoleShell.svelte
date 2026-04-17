@@ -418,7 +418,7 @@
     <header
       class="sticky top-0 z-10 flex h-14 items-center justify-between border-b bg-background/80 px-4 backdrop-blur-sm md:px-6"
     >
-      <div class="flex min-w-0 items-center gap-3">
+      <div class="flex min-w-0 flex-1 items-center gap-3">
         <SidebarTrigger />
         <div class="min-w-0">
           {#if breadcrumbs.length > 0}
@@ -446,7 +446,7 @@
           <p class="truncate text-xs text-muted-foreground">{description}</p>
         </div>
       </div>
-      <div class="flex items-center gap-2">
+      <div class="flex shrink-0 items-center gap-2">
         <Badge variant="outline" class="hidden md:inline-flex">{deploymentModeLabel}</Badge>
         <Button
           aria-label={colorModeLabel}
@@ -472,7 +472,7 @@
       </div>
     </header>
 
-    <main class="flex-1 p-4 md:p-6">
+    <main class="min-w-0 flex-1 p-4 md:p-6">
       {#if connectionError}
         <section class="space-y-4 border-y py-5">
           <div class="space-y-2">

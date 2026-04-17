@@ -17,6 +17,7 @@
     Terminal,
   } from "@lucide/svelte";
   import type {
+    ConfigureResourceHealthInput,
     ConfirmDomainBindingOwnershipInput,
     CreateDomainBindingInput,
     DomainBindingSummary,
@@ -36,9 +37,11 @@
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
   import { Input } from "$lib/components/ui/input";
+  import * as Popover from "$lib/components/ui/popover";
   import * as Select from "$lib/components/ui/select";
   import { Skeleton } from "$lib/components/ui/skeleton";
   import * as Tabs from "$lib/components/ui/tabs";
+  import { Textarea } from "$lib/components/ui/textarea";
   import { createConsoleQueries } from "$lib/console/queries";
   import {
     findEnvironment,
@@ -76,6 +79,10 @@
     | "generated-latest"
     | "generated-planned";
   type ResourceAccessStatus = NonNullable<ResourceAccessSummary["proxyRouteStatus"]>;
+  type ResourceHealthViewStatus = ResourceHealthOverall | "loading";
+  type HealthCheckHttpInput = NonNullable<ConfigureResourceHealthInput["healthCheck"]["http"]>;
+  type HealthCheckMethod = HealthCheckHttpInput["method"];
+  type HealthCheckScheme = HealthCheckHttpInput["scheme"];
   type ResourceSettingsSection = "profile" | "domains" | "health" | "proxy" | "diagnostics";
   const resourceDetailTabs = ["settings", "deployments", "logs", "terminal"] as const;
   const resourceSettingsSections = [
@@ -101,7 +108,9 @@
       queryFn: () =>
         orpcClient.resources.health({
           resourceId,
+          mode: "live",
           includeChecks: true,
+          includePublicAccessProbe: true,
         }),
       enabled: browser && resourceId.length > 0,
       staleTime: 5_000,
@@ -137,7 +146,16 @@
     resource ? domainBindings.filter((binding) => binding.resourceId === resource.id) : [],
   );
   const resourceHealth = $derived(resourceHealthQuery.data ?? null);
-  const resourceHealthOverall = $derived(resourceHealth?.overall ?? "unknown");
+  const resourceHealthOverall = $derived.by((): ResourceHealthViewStatus => {
+    if (
+      resourceHealthQuery.isPending ||
+      (resourceHealthQuery.isFetching && resourceHealth?.overall === "unknown")
+    ) {
+      return "loading";
+    }
+
+    return resourceHealth?.overall ?? "unknown";
+  });
   const latestGeneratedAccessRoute = $derived(
     resource?.accessSummary?.latestGeneratedAccessRoute ?? null,
   );
@@ -172,6 +190,24 @@
     title: string;
     detail: string;
   } | null>(null);
+  let healthFeedback = $state<{
+    kind: "success" | "error";
+    title: string;
+    detail: string;
+  } | null>(null);
+  let healthFormResourceId = $state("");
+  let healthEnabled = $state(true);
+  let healthMethod = $state<HealthCheckMethod>("GET");
+  let healthScheme = $state<HealthCheckScheme>("http");
+  let healthHost = $state("localhost");
+  let healthPath = $state("/");
+  let healthPort = $state("");
+  let healthExpectedStatus = $state("200");
+  let healthExpectedText = $state("");
+  let healthIntervalSeconds = $state("5");
+  let healthTimeoutSeconds = $state("5");
+  let healthRetries = $state("10");
+  let healthStartPeriodSeconds = $state("5");
   let runtimeLogResourceId = $state("");
   let runtimeLogs = $state<ResourceRuntimeLogLine[]>([]);
   let runtimeLogsLoading = $state(false);
@@ -257,6 +293,21 @@
         ? $t(i18nKeys.console.resources.accessUrlCopyFailed)
         : $t(i18nKeys.console.resources.copyAccessUrl),
   );
+  const canConfigureHealth = $derived(
+    Boolean(
+      resource &&
+        (!healthEnabled ||
+          (healthPath.trim() &&
+            isPositiveIntegerText(healthExpectedStatus) &&
+            Number(healthExpectedStatus) >= 100 &&
+            Number(healthExpectedStatus) <= 599 &&
+            isPositiveIntegerText(healthIntervalSeconds) &&
+            isPositiveIntegerText(healthTimeoutSeconds) &&
+            isPositiveIntegerText(healthRetries) &&
+            isNonNegativeIntegerText(healthStartPeriodSeconds) &&
+            (!healthPort.trim() || isPositiveIntegerText(healthPort)))),
+    ),
+  );
   const createDomainBindingMutation = createMutation(() => ({
     mutationFn: (input: CreateDomainBindingInput) => orpcClient.domainBindings.create(input),
     onSuccess: (result) => {
@@ -291,6 +342,27 @@
       createFeedback = {
         kind: "error",
         title: $t(i18nKeys.console.domainBindings.confirmOwnershipErrorTitle),
+        detail: readErrorMessage(error),
+      };
+    },
+  }));
+  const configureResourceHealthMutation = createMutation(() => ({
+    mutationFn: (input: ConfigureResourceHealthInput) => orpcClient.resources.configureHealth(input),
+    onSuccess: (result) => {
+      healthFeedback = {
+        kind: "success",
+        title: $t(i18nKeys.console.resources.healthPolicySaved),
+        detail: result.id,
+      };
+      void queryClient.invalidateQueries({ queryKey: ["resources"] });
+      void queryClient.invalidateQueries({
+        queryKey: ["resources", "health", resourceId, "detail"],
+      });
+    },
+    onError: (error) => {
+      healthFeedback = {
+        kind: "error",
+        title: $t(i18nKeys.console.resources.healthPolicySaveFailed),
         detail: readErrorMessage(error),
       };
     },
@@ -615,6 +687,29 @@
   });
 
   $effect(() => {
+    if (!browser || !resource || !resourceHealth) {
+      return;
+    }
+
+    if (healthFormResourceId === resource.id) {
+      return;
+    }
+
+    const policy = resourceHealth.healthPolicy;
+    healthFormResourceId = resource.id;
+    healthEnabled = policy.status === "configured";
+    healthPath = policy.path ?? "/";
+    healthPort = policy.port ? String(policy.port) : "";
+    healthExpectedStatus = policy.expectedStatusCode ? String(policy.expectedStatusCode) : "200";
+    healthIntervalSeconds = policy.intervalSeconds ? String(policy.intervalSeconds) : "5";
+    healthTimeoutSeconds = policy.timeoutSeconds ? String(policy.timeoutSeconds) : "5";
+    healthRetries = policy.retries ? String(policy.retries) : "10";
+    healthStartPeriodSeconds = policy.startPeriodSeconds
+      ? String(policy.startPeriodSeconds)
+      : "5";
+  });
+
+  $effect(() => {
     const currentResourceId = resource?.id ?? "";
 
     if (!browser) {
@@ -688,6 +783,53 @@
       proxyKind,
       tlsMode,
       certificatePolicy,
+    });
+  }
+
+  function isPositiveIntegerText(value: string): boolean {
+    const parsed = Number(value);
+    return Number.isInteger(parsed) && parsed > 0;
+  }
+
+  function isNonNegativeIntegerText(value: string): boolean {
+    const parsed = Number(value);
+    return Number.isInteger(parsed) && parsed >= 0;
+  }
+
+  function configureResourceHealth(event: SubmitEvent): void {
+    event.preventDefault();
+
+    if (!resource || !canConfigureHealth || configureResourceHealthMutation.isPending) {
+      return;
+    }
+
+    const port = healthPort.trim() ? Number(healthPort) : undefined;
+    const expectedResponseText = healthExpectedText.trim();
+    healthFeedback = null;
+
+    configureResourceHealthMutation.mutate({
+      resourceId: resource.id,
+      healthCheck: {
+        enabled: healthEnabled,
+        type: "http",
+        intervalSeconds: Number(healthIntervalSeconds),
+        timeoutSeconds: Number(healthTimeoutSeconds),
+        retries: Number(healthRetries),
+        startPeriodSeconds: Number(healthStartPeriodSeconds),
+        ...(healthEnabled
+          ? {
+              http: {
+                method: healthMethod,
+                scheme: healthScheme,
+                host: healthHost.trim() || "localhost",
+                path: healthPath.trim() || "/",
+                expectedStatusCode: Number(healthExpectedStatus),
+                ...(port ? { port } : {}),
+                ...(expectedResponseText ? { expectedResponseText } : {}),
+              },
+            }
+          : {}),
+      },
     });
   }
 
@@ -906,10 +1048,12 @@
     }
   }
 
-  function resourceHealthStatusLabel(status: ResourceHealthOverall): string {
+  function resourceHealthStatusLabel(status: ResourceHealthViewStatus): string {
     switch (status) {
       case "healthy":
         return $t(i18nKeys.common.status.healthy);
+      case "loading":
+        return $t(i18nKeys.common.status.loading);
       case "degraded":
         return $t(i18nKeys.common.status.degraded);
       case "unhealthy":
@@ -1053,19 +1197,19 @@
           </div>
 
           <div class="flex shrink-0 flex-wrap gap-2">
-            <details class="relative">
-              <summary
-                class="inline-flex h-9 cursor-pointer list-none items-center gap-2 rounded-md border bg-background px-3 text-sm font-medium shadow-xs transition-[color,box-shadow] hover:bg-accent hover:text-accent-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 [&::-webkit-details-marker]:hidden"
-              >
-                <ResourceStatusDot status={resourceHealthOverall} />
-                <span>{$t(i18nKeys.console.resources.healthTitle)}</span>
-                <span class="text-muted-foreground">
-                  {resourceHealthStatusLabel(resourceHealthOverall)}
-                </span>
-              </summary>
-              <div
-                class="absolute right-0 z-30 mt-2 w-96 max-w-[calc(100vw-2rem)] rounded-md border bg-popover p-3 shadow-lg"
-              >
+            <Popover.Root>
+              <Popover.Trigger>
+                {#snippet child({ props })}
+                  <Button {...props} variant="outline" size="lg">
+                    <ResourceStatusDot status={resourceHealthOverall} />
+                    <span>{$t(i18nKeys.console.resources.healthTitle)}</span>
+                    <span class="text-muted-foreground">
+                      {resourceHealthStatusLabel(resourceHealthOverall)}
+                    </span>
+                  </Button>
+                {/snippet}
+              </Popover.Trigger>
+              <Popover.Content align="end" sideOffset={8} class="w-96 max-w-[calc(100vw-2rem)] p-3">
                 <div class="flex items-start justify-between gap-3">
                   <div class="min-w-0">
                     <p class="flex items-center gap-2 text-sm font-medium">
@@ -1133,8 +1277,8 @@
                     </div>
                   </div>
                 {/if}
-              </div>
-            </details>
+              </Popover.Content>
+            </Popover.Root>
             <Button href={resourceDeploymentHref()}>
               <Plus class="size-4" />
               {$t(i18nKeys.common.actions.newDeployment)}
@@ -1538,6 +1682,123 @@
                     </p>
                   </div>
                 </div>
+
+                <form class="mt-5 border-t pt-4" onsubmit={configureResourceHealth}>
+                  <Button
+                    type="button"
+                    variant={healthEnabled ? "selected" : "outline"}
+                    aria-pressed={healthEnabled}
+                    onclick={() => {
+                      healthEnabled = !healthEnabled;
+                    }}
+                  >
+                    {$t(i18nKeys.console.quickDeploy.healthCheckToggle)}
+                  </Button>
+
+                  <div class="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                    <label class="space-y-1.5 text-sm font-medium">
+                      <span>{$t(i18nKeys.console.quickDeploy.healthCheckMethod)}</span>
+                      <Select.Root bind:value={healthMethod} type="single">
+                        <Select.Trigger class="w-full">{healthMethod}</Select.Trigger>
+                        <Select.Content>
+                          <Select.Item value="GET">GET</Select.Item>
+                          <Select.Item value="HEAD">HEAD</Select.Item>
+                          <Select.Item value="POST">POST</Select.Item>
+                          <Select.Item value="OPTIONS">OPTIONS</Select.Item>
+                        </Select.Content>
+                      </Select.Root>
+                    </label>
+
+                    <label class="space-y-1.5 text-sm font-medium">
+                      <span>{$t(i18nKeys.console.quickDeploy.healthCheckScheme)}</span>
+                      <Select.Root bind:value={healthScheme} type="single">
+                        <Select.Trigger class="w-full">{healthScheme}</Select.Trigger>
+                        <Select.Content>
+                          <Select.Item value="http">http</Select.Item>
+                          <Select.Item value="https">https</Select.Item>
+                        </Select.Content>
+                      </Select.Root>
+                    </label>
+
+                    <label class="space-y-1.5 text-sm font-medium">
+                      <span>{$t(i18nKeys.console.quickDeploy.healthCheckHost)}</span>
+                      <Input bind:value={healthHost} autocomplete="off" disabled={!healthEnabled} />
+                    </label>
+
+                    <label class="space-y-1.5 text-sm font-medium">
+                      <span>{$t(i18nKeys.console.quickDeploy.healthCheckPath)}</span>
+                      <Input bind:value={healthPath} autocomplete="off" disabled={!healthEnabled} />
+                    </label>
+
+                    <label class="space-y-1.5 text-sm font-medium">
+                      <span>{$t(i18nKeys.console.quickDeploy.healthCheckPort)}</span>
+                      <Input bind:value={healthPort} autocomplete="off" disabled={!healthEnabled} />
+                    </label>
+
+                    <label class="space-y-1.5 text-sm font-medium">
+                      <span>{$t(i18nKeys.console.quickDeploy.healthCheckExpectedStatusCode)}</span>
+                      <Input
+                        bind:value={healthExpectedStatus}
+                        autocomplete="off"
+                        disabled={!healthEnabled}
+                      />
+                    </label>
+
+                    <label class="space-y-1.5 text-sm font-medium">
+                      <span>{$t(i18nKeys.console.quickDeploy.healthCheckIntervalSeconds)}</span>
+                      <Input bind:value={healthIntervalSeconds} autocomplete="off" />
+                    </label>
+
+                    <label class="space-y-1.5 text-sm font-medium">
+                      <span>{$t(i18nKeys.console.quickDeploy.healthCheckTimeoutSeconds)}</span>
+                      <Input bind:value={healthTimeoutSeconds} autocomplete="off" />
+                    </label>
+
+                    <label class="space-y-1.5 text-sm font-medium">
+                      <span>{$t(i18nKeys.console.quickDeploy.healthCheckRetries)}</span>
+                      <Input bind:value={healthRetries} autocomplete="off" />
+                    </label>
+
+                    <label class="space-y-1.5 text-sm font-medium">
+                      <span>{$t(i18nKeys.console.quickDeploy.healthCheckStartPeriodSeconds)}</span>
+                      <Input bind:value={healthStartPeriodSeconds} autocomplete="off" />
+                    </label>
+
+                    <label class="space-y-1.5 text-sm font-medium sm:col-span-2">
+                      <span>{$t(i18nKeys.console.quickDeploy.healthCheckResponseText)}</span>
+                      <Input
+                        bind:value={healthExpectedText}
+                        autocomplete="off"
+                        disabled={!healthEnabled}
+                      />
+                    </label>
+                  </div>
+
+                  {#if healthFeedback}
+                    <div
+                      class={[
+                        "mt-4 rounded-md border px-3 py-2 text-sm",
+                        healthFeedback.kind === "success"
+                          ? "border-primary/25 bg-primary/5"
+                          : "border-destructive/30 bg-destructive/5 text-destructive",
+                      ]}
+                    >
+                      <p class="font-medium">{healthFeedback.title}</p>
+                      <p class="mt-1 break-all text-xs">{healthFeedback.detail}</p>
+                    </div>
+                  {/if}
+
+                  <div class="mt-4 flex justify-end">
+                    <Button
+                      type="submit"
+                      disabled={!canConfigureHealth || configureResourceHealthMutation.isPending}
+                    >
+                      {configureResourceHealthMutation.isPending
+                        ? $t(i18nKeys.common.actions.saving)
+                        : $t(i18nKeys.common.actions.save)}
+                    </Button>
+                  </div>
+                </form>
               </section>
 
               {:else if activeSettingsSection === "proxy"}
@@ -1659,13 +1920,13 @@
                         {$t(i18nKeys.console.resources.diagnosticSummaryCopyFallbackDescription)}
                       </p>
                     </div>
-                    <textarea
+                    <Textarea
                       class="min-h-48 w-full resize-y rounded-md border bg-background p-3 font-mono text-xs leading-5"
                       readonly
                       value={diagnosticSummaryCopyFallback}
                       onclick={selectDiagnosticSummaryFallback}
                       onfocus={selectDiagnosticSummaryFallback}
-                    ></textarea>
+                    />
                   </div>
                 {/if}
               </section>

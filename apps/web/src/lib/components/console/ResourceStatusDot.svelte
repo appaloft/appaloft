@@ -1,8 +1,10 @@
 <script lang="ts">
   import type { ResourceHealthOverall } from "@appaloft/contracts";
 
+  type ResourceHealthViewStatus = ResourceHealthOverall | "loading";
+
   type Props = {
-    status?: ResourceHealthOverall;
+    status?: ResourceHealthViewStatus;
     class?: string;
   };
 
@@ -12,6 +14,8 @@
     switch (status) {
       case "healthy":
         return "bg-emerald-600";
+      case "loading":
+        return "animate-pulse bg-muted-foreground/60";
       case "degraded":
       case "starting":
         return "bg-amber-500";
