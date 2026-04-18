@@ -31,6 +31,8 @@ This command inherits:
 - [ADR-017: Default Access Domain And Proxy Routing](../decisions/ADR-017-default-access-domain-and-proxy-routing.md)
 - [ADR-021: Docker/OCI Workload Substrate](../decisions/ADR-021-docker-oci-workload-substrate.md)
 - [ADR-023: Runtime Orchestration Target Boundary](../decisions/ADR-023-runtime-orchestration-target-boundary.md)
+- [Workload Framework Detection And Planning](../workflows/workload-framework-detection-and-planning.md)
+- [Repository Deployment Config File Bootstrap](../workflows/deployment-config-file-bootstrap.md)
 - [Error Model](../errors/model.md)
 - [neverthrow Conventions](../errors/neverthrow-conventions.md)
 - [Async Lifecycle And Acceptance](../architecture/async-lifecycle-and-acceptance.md)
@@ -127,6 +129,13 @@ Names are unique by derived slug within `(projectId, environmentId)`.
 
 `source` is a `ResourceSourceBinding`. It must include source kind and locator, may include display name and metadata, and is the source used by `deployments.create` to resolve the deployment attempt source descriptor.
 
+Repository deployment config files may provide source/runtime/network/health profile values that
+entry workflows map into `resources.create` for first-deploy resource creation. The file must not
+provide durable project/resource/server/destination identity, and any `resource` name or selector in
+the committed file is not a valid resource identity contract. Entry workflows must choose or
+auto-create resource identity outside the file, then pass only resource-owned profile fields to this
+command.
+
 `source` is a source-kind-specific contract. `kind` is the discriminator and determines which
 metadata fields are meaningful. Source metadata is not a free-form string bag in the normative
 contract; implementation may store it as string metadata during migration, but callers and tests
@@ -194,6 +203,24 @@ commands, and health-check defaults belong to runtime profile language. HTTP hea
 must use `RuntimePlanStrategy = "prebuilt-image"` and must not require Dockerfile or Compose path
 fields.
 
+When entry workflows or source detectors infer a framework/runtime profile, the inferred facts are
+typed planning evidence, not a new deployment command shape. Detection may produce runtime family,
+framework, package manager or build tool, package/project name, runtime version, lockfile/config
+evidence, detected scripts, Dockerfile/Compose paths, static output conventions, and runtime
+endpoint hints. Those facts feed `SourceInspectionSnapshot` and the workload planner registry
+governed by
+[Workload Framework Detection And Planning](../workflows/workload-framework-detection-and-planning.md).
+They may be persisted or snapshotted only as accepted typed resource/runtime planning evidence,
+safe diagnostics, or deployment runtime-plan metadata.
+
+Base image selection belongs to the selected framework/runtime planner or to a future explicit
+resource runtime-profile configuration command. `resources.create` must not store arbitrary
+deployment-specific image strings as loose runtime metadata, and `deployments.create` must not
+accept base image overrides. Package/project names detected from `package.json`, `pyproject.toml`,
+`composer.json`, `go.mod`, Maven/Gradle metadata, `.csproj`, `Cargo.toml`, or similar files may
+seed display names and diagnostics, but they must not become resource id, deployment id, or
+security-boundary state.
+
 For first-class static site deployment, the resource must use `kind = "static-site"` or an
 explicit static runtime profile with `RuntimePlanStrategy = "static"`. Static strategy resources
 must persist a `runtimeProfile.publishDirectory` value before deployment admission. The publish
@@ -254,6 +281,7 @@ All errors use [Resource Lifecycle Error Spec](../errors/resources.lifecycle.md)
 | `resource_slug_conflict` | `resource-admission` | No | A resource with the same slug already exists in the project/environment. |
 | `invariant_violation` | `resource-admission` | No | Resource aggregate rule rejected the requested state, such as invalid multi-service declaration. |
 | `validation_error` | `resource-network-resolution` | No | Network profile input is missing or invalid for a resource that requires an inbound endpoint. |
+| `validation_error` | `config-identity`, `config-secret-validation`, or `config-profile-resolution` | No | Repository config file profile input is invalid before it can be mapped into this command. |
 | `infra_error` | `resource-persistence` or `event-publication` | Conditional | Resource state or event could not be safely recorded. |
 
 ## Handler Boundary

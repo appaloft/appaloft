@@ -29,8 +29,11 @@ This workflow inherits:
 - [resources.diagnostic-summary Query Spec](../queries/resources.diagnostic-summary.md)
 - [Resource Diagnostic Summary Workflow Spec](./resource-diagnostic-summary.md)
 - [deployments.create Workflow Spec](./deployments.create.md)
+- [Workload Framework Detection And Planning](./workload-framework-detection-and-planning.md)
+- [Repository Deployment Config File Bootstrap](./deployment-config-file-bootstrap.md)
 - [Workflow Spec Format](./WORKFLOW_SPEC_FORMAT.md)
 - [Quick Deploy Test Matrix](../testing/quick-deploy-test-matrix.md)
+- [Deployment Config File Test Matrix](../testing/deployment-config-file-test-matrix.md)
 
 ## Purpose
 
@@ -49,6 +52,18 @@ It may collect or create enough context for a first deployment:
 - final deployment request.
 
 When Quick Deploy collects source/runtime/health values, those values are entry-flow draft fields for `resources.create` or a future resource profile update command. They must not be submitted to `deployments.create`.
+
+When Quick Deploy uses a repository deployment config file, the file contributes source-adjacent
+profile defaults only. It must not select project, resource, server, destination, credential,
+organization, or secret identity from committed file content. Quick Deploy may auto-create project
+and resource on first run, but the seed for that identity must come from source/provider metadata,
+trusted Appaloft link/source state, explicit operator input, or the interactive prompt, not from a
+mutable `project` or resource selector in the repo file.
+
+Config file values follow the same resource-boundary rules as manually entered Quick Deploy drafts:
+runtime fields map to `ResourceRuntimeProfile`, listener and exposure fields map to
+`ResourceNetworkProfile`, health fields map to resource health/runtime profile, and final deployment
+admission remains ids-only.
 
 When Quick Deploy collects domain/TLS intent, it must sequence an explicit `domain-bindings.create` or certificate command after the required resource, server, and destination context exists. It must not submit domain/TLS intent to `deployments.create`.
 
@@ -76,6 +91,13 @@ Quick Deploy must use the ADR-012 domain language while collecting draft values:
 - runtime selection must resolve to a Docker/OCI-backed deployment substrate for v1. Dockerfile,
   Docker Compose, prebuilt image, static, auto/buildpack-style, and workspace-command choices are
   all image or Compose artifact planning choices, not separate host-process runtime substrates;
+- framework/runtime detection is a draft-normalization and deployment-planning aid. Quick Deploy may
+  inspect package manifests, framework config, lockfiles, package/project name, scripts, runtime
+  version files, Dockerfile/Compose paths, and static output conventions to suggest a resource
+  kind, `RuntimePlanStrategy`, install/build/start commands, publish directory, and internal port.
+  Those suggestions must normalize to resource source/runtime/network profile fields before
+  command dispatch; base image and planner selection remain planner output, not user-facing
+  deployment command fields.
 - runtime target selection is not a Quick Deploy draft field. Quick Deploy selects or creates a
   deployment target/server and optional destination; `deployments.create` then resolves the
   registered runtime target backend. Kubernetes, Swarm, Helm, namespace, manifest, ingress-class,
@@ -296,7 +318,9 @@ asserting UI copy or prompt text as domain behavior.
 | Step | Owner | Command/query | Required behavior |
 | --- | --- | --- | --- |
 | Source selection | Web/CLI workflow | Source/provider queries as needed | Produce a `ResourceSourceBinding` draft and optional provider metadata. |
+| Repository config discovery | Web/CLI/local workflow | Config file reader/parser | Optionally read a source-adjacent Appaloft config profile, reject identity/secret/unsupported fields, and merge profile defaults before resource command dispatch. |
 | Source variant normalization | Web/CLI workflow | Local draft parser; provider branch/tag lookup when available | Convert deep Git URLs, local folder base directories, Docker image tags/digests, and build-file paths into resource source/runtime profile fields. |
+| Framework/runtime detection | Web/CLI workflow and deployment planner | Source inspection adapter; planner registry | Detect package/project name, runtime family, framework, package manager/build tool, scripts, version files, build outputs, and framework config. Use those facts to suggest resource profile defaults and later select a Docker/OCI workload planner. Do not send framework, package name, or base image as `deployments.create` input. |
 | Static runtime draft | Web/CLI workflow | Local draft validation; optional source/runtime detection | For static site drafts, require `runtimeProfile.strategy = "static"` and `runtimeProfile.publishDirectory`, preserve optional install/build commands, and default the HTTP network profile to port 80. |
 | Network draft | Web/CLI workflow | Local draft validation; optional source/runtime detection | Produce a `ResourceNetworkProfile` draft with `internalPort` for inbound resources. |
 | Health check draft | Web/CLI workflow | Local draft validation; optional runtime defaults | Produce optional `ResourceRuntimeProfile.healthCheck` for newly created resources, including HTTP path, expected status, interval, timeout, retries, and start period. |
@@ -510,6 +534,12 @@ Current Web and CLI entry fields may still accept Git URLs as a single raw input
 `resources.create` normalizes common GitHub tree URLs into repository locator, `gitRef`,
 `baseDirectory`, and `originalLocator` before persistence. Docker image tag/digest identity is
 typed on the source binding.
+
+Repository config file support now has a profile-only JSON/YAML parser, profile-only CLI `init`,
+CLI `--config`, implicit source-root discovery, identity/secret/unsupported-field rejection, and
+targeted executable tests. Profile-drift handling, secret lookup/application, durable source
+link/relink state, environment overlays, and config-origin diagnostics remain follow-up work
+governed by [Deployment Config File Test Matrix](../testing/deployment-config-file-test-matrix.md).
 
 Provider-backed disambiguation for slash-containing Git refs and user-facing typed fields for
 Dockerfile path, Docker Compose path, and build target remain follow-up work. Static publish

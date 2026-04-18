@@ -14,6 +14,9 @@ Deployment-specific canonical assertions:
   destination, provider key, target kind, and registered capabilities instead of Web/CLI/API input;
 - Docker runtime verification failures persist actionable container diagnostics, including container
   state and recent application logs when the container started or exited before verification;
+- framework/runtime detection uses typed source inspection evidence and planner registry output for
+  base image, package manager/build tool, install/build/start/package commands, and artifact
+  output; it must not add framework-specific fields to `deployments.create`;
 - HTTP verification failures persist the last observed HTTP status or fetch error instead of only a
   generic timeout;
 - reverse-proxy deployments allow different resources to share the same `internalPort` on the same
@@ -39,11 +42,14 @@ This test matrix inherits:
 - [ADR-017: Default Access Domain And Proxy Routing](../decisions/ADR-017-default-access-domain-and-proxy-routing.md)
 - [ADR-021: Docker/OCI Workload Substrate](../decisions/ADR-021-docker-oci-workload-substrate.md)
 - [ADR-023: Runtime Orchestration Target Boundary](../decisions/ADR-023-runtime-orchestration-target-boundary.md)
+- [Workload Framework Detection And Planning](../workflows/workload-framework-detection-and-planning.md)
+- [Repository Deployment Config File Bootstrap](../workflows/deployment-config-file-bootstrap.md)
 - [Error Model](../errors/model.md)
 - [neverthrow Conventions](../errors/neverthrow-conventions.md)
 - [Async Lifecycle And Acceptance](../architecture/async-lifecycle-and-acceptance.md)
 - [Spec-Driven Testing](./SPEC_DRIVEN_TESTING.md)
 - [Quick Deploy Test Matrix](./quick-deploy-test-matrix.md)
+- [Deployment Config File Test Matrix](./deployment-config-file-test-matrix.md)
 
 This file defines deployment-specific test cases and expected business outcomes.
 
@@ -114,6 +120,14 @@ Then:
 | DEP-CREATE-ADM-025 | integration | Invalid runtime plan | Plan has no executable steps or invalid VO state | `err` | `validation_error` or `invariant_violation` | None for accepted request | No accepted deployment |
 | DEP-CREATE-ADM-026 | integration | Static strategy resolves image artifact | Context ids resolve; resource has `kind = static-site`, source binding, `runtimeProfile.strategy = static`, `publishDirectory`, and `networkProfile.internalPort = 80` | `ok({ id })` | None | `deployment-requested -> build-requested` | Deployment snapshot records static artifact intent, source root, publish directory, and HTTP endpoint metadata |
 | DEP-CREATE-ADM-027 | integration | Static strategy missing publish directory | Context ids resolve, but selected static resource has no `runtimeProfile.publishDirectory` | `err` | `validation_error`, phase `runtime-plan-resolution` or `runtime-artifact-resolution` | None for accepted request | No accepted deployment |
+| DEP-CREATE-ADM-028 | integration | Framework planner from typed inspection | Context ids resolve; source inspection detects a supported framework, package/project name, package manager/build tool, runtime version, and scripts | `ok({ id })` when the selected planner can produce a containerizable plan | None | `deployment-requested -> build-requested` when build/package is required | Deployment snapshot records Docker/OCI artifact intent and safe planner metadata such as `plannerKey`, `runtimeFamily`, `framework`, `packageManager`, `baseImage`, and project name |
+| DEP-CREATE-ADM-029 | integration | Unsupported detected framework without fallback | Context ids resolve; source inspection detects a framework/runtime family with no registered planner and no explicit custom install/build/start commands sufficient for a containerizable plan | `err` | `validation_error`, phase `runtime-plan-resolution` | None for accepted request | No accepted deployment; error details include safe `runtimeFamily`, `framework`, `packageManager`, and detected file/script evidence when available |
+| DEP-CREATE-ADM-030 | integration | Explicit custom commands fallback | Context ids resolve; detected framework is not first-class but resource runtime profile provides explicit install/build/start commands and network profile needed for a generic containerizable plan | `ok({ id })` | None | `deployment-requested -> build-requested` when build/package is required | Deployment snapshot records custom planner metadata and Docker/OCI image artifact intent, not host-process execution |
+| DEP-CREATE-ADM-031 | integration | Base image policy is planner output | Context ids resolve; selected planner chooses a base image from runtime family, package manager/build tool, and runtime version evidence | `ok({ id })` | None | `deployment-requested`; later async events | Runtime plan metadata records the resolved planner/base-image policy; command input has no `baseImage` field |
+| DEP-CREATE-ADM-032 | integration | Framework-specific deployment input rejected | Input includes framework, package name, base image, runtime preset, buildpack name, or language-version fields as deployment command fields | `err` at command schema/API boundary | `validation_error`, phase `command-validation` | None | No deployment created; framework planning remains resource/planner-owned |
+| DEP-CREATE-ADM-033 | integration | Static framework output detection | Context ids resolve; supported framework static mode detects publish output such as `dist`, `build`, `out`, `.output/public`, or equivalent explicit static output | `ok({ id })` when the output rule is specified and safe | None | `deployment-requested -> build-requested` | Deployment snapshot records static-server image artifact intent and publish directory evidence |
+| DEP-CREATE-ADM-034 | integration | Ambiguous multi-framework workspace | Context ids resolve; source root contains multiple plausible framework apps and no selected base directory or explicit resource runtime profile disambiguates them | `err` | `validation_error`, phase `runtime-plan-resolution` | None for accepted request | No accepted deployment; entry workflow must collect explicit app/base directory or runtime profile selection |
+| DEP-CREATE-ADM-035 | integration | Repository config fields rejected at deployment command | Input attempts to pass config path, source/runtime/network profile, project/resource/server bootstrap, secret, or sizing fields directly to `deployments.create` | `err` at command schema/API boundary | `validation_error`, phase `command-validation` | None | No deployment created; config file handling belongs to entry workflow before dispatch |
 
 ## Async Progression Matrix
 
@@ -136,6 +150,7 @@ Then:
 | DEP-CREATE-ASYNC-015 | integration | Worker crash before state persistence | Worker cannot persist outcome | Original accepted command remains `ok({ id })` | No terminal event until recovery | Process state records retryable processing error |
 | DEP-CREATE-ASYNC-016 | integration | Public route verification failure preserves previous runtime | A reverse-proxy resource has a previously successful runtime and the replacement candidate starts, but generated or durable public route verification fails because DNS, proxy route readiness, or HTTP verification is not ready | `ok({ id })` | `deployment-failed` for the new attempt | Previous successful runtime and route remain active; failed candidate is removed or isolated; failure details include the observed public route error |
 | DEP-CREATE-ASYNC-017 | integration | Static artifact package failure | Accepted static deployment resolves source, but static package/build step cannot produce the publish directory image artifact | `ok({ id })` | `deployment-failed` | Terminal `failed` with `failurePhase = image-build` or `runtime-artifact-resolution`; no replacement runtime is promoted |
+| DEP-CREATE-ASYNC-018 | integration | Git source resolved commit snapshot | Accepted Git-backed deployment clones or checks out source for a new attempt | `ok({ id })` | Later terminal event according to execution result | Deployment execution metadata and read model expose the exact resolved commit SHA; Web and CLI surfaces display it for the attempt |
 
 ## Event Matrix
 
@@ -156,6 +171,8 @@ Then:
 | DEP-CREATE-ENTRY-003 | e2e-preferred | CLI non-interactive | Flags/options build the same command input as API. |
 | DEP-CREATE-ENTRY-004 | e2e-preferred | CLI interactive | Prompts collect input before dispatch; related creation uses separate commands; governed by Quick Deploy workflow. |
 | DEP-CREATE-ENTRY-005 | e2e-preferred | Web QuickDeploy | UI preflight does not change command semantics; final dispatch uses shared command input; governed by Quick Deploy workflow. |
+| DEP-CREATE-ENTRY-006 | e2e-preferred | CLI repository config deploy | CLI reads config before command dispatch, rejects identity/secret/unsupported fields, runs explicit resource/environment commands when needed, and final `CreateDeploymentCommandInput` contains ids only. |
+| DEP-CREATE-ENTRY-007 | contract | HTTP repository config non-support | HTTP `POST /api/deployments` does not read a repository config file or accept config-file profile fields; clients must call explicit operations. |
 
 ## Deployment Error Assertion Example
 
@@ -219,6 +236,20 @@ Current code accepts the static runtime plan strategy, resolves static artifact 
 adapter-owned static-server Dockerfile generation in
 `packages/adapters/runtime/test/runtime-plan-resolver.test.ts`. Executable static smoke coverage
 now includes the local Docker generated-nginx path and an opt-in generic-SSH Docker path.
+
+Framework planner rows `DEP-CREATE-ADM-028` through `DEP-CREATE-ADM-034` define the target contract
+for mainstream web framework expansion. Current executable coverage covers Next.js, Vite static,
+Astro static, Nuxt generate static, explicit SvelteKit static, Remix, FastAPI, Django, Flask,
+generic Node framework metadata, generic Python, generic Java, and custom command fallback in
+runtime planner tests. Additional remaining-family detectors, planner implementations, Web/CLI
+draft fields, and Docker/SSH smoke paths are required before the broader catalog can be marked
+implemented.
+
+Repository config file deployment rows `DEP-CREATE-ADM-035`, `DEP-CREATE-ENTRY-006`, and
+`DEP-CREATE-ENTRY-007` are target contract rows. Current implementation keeps HTTP ids-only, but
+CLI config deploy is now aligned at the parser/entry-seed boundary: `--config` is exposed, the
+schema is profile-only, and executable coverage proves config fields cannot enter
+`deployments.create`. Broader CLI e2e and HTTP schema-contract coverage remains follow-up.
 
 ## Open Questions
 

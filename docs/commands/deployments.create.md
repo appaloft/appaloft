@@ -31,6 +31,8 @@ This command inherits the shared platform contracts:
 - [ADR-017: Default Access Domain And Proxy Routing](../decisions/ADR-017-default-access-domain-and-proxy-routing.md)
 - [ADR-021: Docker/OCI Workload Substrate](../decisions/ADR-021-docker-oci-workload-substrate.md)
 - [ADR-023: Runtime Orchestration Target Boundary](../decisions/ADR-023-runtime-orchestration-target-boundary.md)
+- [Workload Framework Detection And Planning](../workflows/workload-framework-detection-and-planning.md)
+- [Repository Deployment Config File Bootstrap](../workflows/deployment-config-file-bootstrap.md)
 - [Error Model](../errors/model.md)
 - [neverthrow Conventions](../errors/neverthrow-conventions.md)
 - [Async Lifecycle And Acceptance](../architecture/async-lifecycle-and-acceptance.md)
@@ -79,6 +81,12 @@ The command input is the deployment admission reference set. Source, runtime, he
 
 Schema validation handles shape-level constraints. Application admission handles context resolution, consistency, and deployment-specific invariants.
 
+Repository deployment config files are not part of this input model. CLI, Web/local-agent,
+automation, and future MCP entry workflows may read a config file before dispatch, but they must
+normalize the file into explicit project/environment/server/resource selections and resource-owned
+profile commands before creating this command. HTTP/oRPC deployment admission remains strict and
+non-interactive.
+
 ## Domain Language Boundary
 
 The command must preserve these terms:
@@ -117,6 +125,12 @@ The command must perform or delegate these admission steps before returning acce
 15. Return `ok({ id })`.
 
 Build, rollout, verify, failure recording, and retry progression belong to the async workflow owner, process manager, event handler, worker, or runtime adapter boundary. They must not be hidden inside Web/CLI/API entry logic.
+
+For Git-backed sources, runtime source materialization must record the exact resolved Git object id
+after clone/checkout. The resolved source commit is deployment-attempt metadata, must be persisted
+with the deployment snapshot/read model, and must be visible to Web and CLI consumers. When a branch
+or tag is redeployed without a pinned commit, each new deployment attempt may resolve a newer
+commit; the stored resolved commit is the audit point for that attempt.
 
 ## Deployment-Specific Async Progression
 
@@ -164,6 +178,7 @@ All errors use the shared shape and category rules in [Error Model](../errors/mo
 | `runtime_target_unsupported` | `runtime-target-resolution` | No | The selected target kind/provider key has no registered backend with the required runtime capabilities. |
 | `default_access_route_unavailable` | `default-access-policy-resolution`, `default-access-domain-generation`, `proxy-readiness` | Conditional | A required generated access route cannot be resolved before acceptance. |
 | `proxy_route_realization_failed` | `proxy-route-realization`, `public-route-verification` | Yes | Runtime adapter failed to materialize or verify the resolved route after acceptance; represented as workflow failure. |
+| `unsupported_config_field` | `config-capability-resolution` | No | A repository config file requested a known future capability, such as CPU/memory/replicas/restart policy, that is not backed by accepted resource/runtime-target specs and runtime enforcement. This is an entry-workflow rejection before `deployments.create`. |
 
 Missing or explicitly disabled edge proxy intent makes generated default access unavailable rather than required. The command may continue without a generated route, and it must not publish a direct host-port fallback.
 
@@ -183,6 +198,27 @@ the Docker/OCI artifact class needed by runtime execution:
 | Prebuilt image | Image name plus tag or digest; digest is preferred for immutable snapshots. |
 | Compose stack | Compose project identity, service image/build declarations, target service for inbound traffic, and resource/deployment-scoped project naming. |
 | Static site | Source root, `publishDirectory`, optional install/build command leaves, static-server artifact intent, and HTTP runtime endpoint metadata. |
+
+Framework and package detection is part of runtime plan resolution, not deployment admission input.
+When the selected resource uses `RuntimePlanStrategy = auto` or `workspace-commands`, deployment
+planning may inspect the materialized source root and select a framework/runtime planner using typed
+`SourceInspectionSnapshot` evidence. The snapshot may include runtime family, framework, package
+manager or build tool, package/project name, runtime version, lockfiles, detected scripts,
+Dockerfile/Compose paths, and static/build outputs. The planner resolves base image, install/build,
+start, package, and artifact rules behind the command boundary.
+
+The target support catalog is governed by
+[Workload Framework Detection And Planning](../workflows/workload-framework-detection-and-planning.md).
+Mainstream framework support must be added by extending detectors, source-inspection value objects,
+planner registry entries, Docker/OCI artifact rules, and tests. It must not be implemented by
+adding framework-specific fields such as `framework`, `packageName`, `baseImage`, `nodeVersion`,
+`pythonVersion`, `buildpack`, or `runtimePreset` to `deployments.create`.
+
+If a detected framework/runtime has no supported planner and the resource runtime profile does not
+provide explicit commands sufficient for a custom containerizable plan, deployment admission fails
+with `validation_error` in phase `runtime-plan-resolution`. The error details should include safe
+evidence such as `runtimeFamily`, `framework`, `packageManager`, `projectName`, `plannerKey`, and
+detected file/script identifiers when available.
 
 Static site deployment is a first-class deployment behavior over the existing command boundary. The
 resource owns `kind = "static-site"`, source binding metadata, `RuntimePlanStrategy = "static"`,
@@ -306,6 +342,19 @@ Allowed entry differences:
 - API remains strict and non-interactive.
 - Stream/progress APIs can expose technical progress.
 
+Repository deployment config files are allowed only as entry-workflow profile inputs. The config
+workflow must:
+
+- discover and validate the file before dispatching write commands;
+- reject committed project/resource/server/destination/credential identity fields;
+- reject raw SSH keys, deploy keys, tokens, passwords, certificate keys, and raw secret env values;
+- apply accepted source/runtime/network/health fields through `resources.create`, future explicit
+  resource configuration operations, environment variable commands, or follow-up domain/certificate
+  commands;
+- reject CPU, memory, replicas, restart policy, rollout overlap/drain, or similar target sizing
+  fields until their ADR/spec/test/runtime-enforcement path exists;
+- dispatch this command with ids only.
+
 Not allowed:
 
 - Web/CLI/API changing deployment business rules;
@@ -345,6 +394,11 @@ Migration gaps:
   deployment admission rejects legacy raw GitHub tree URLs before runtime adapters can clone them.
   Provider-backed disambiguation for slash-containing Git refs and typed runtime-profile file paths
   remain future work.
+- repository config file support now has a profile-only parser/schema, YAML discovery, CLI
+  `--config`, profile-only `appaloft init`, and targeted tests proving identity/secret/unsupported
+  field rejection plus ids-only `deployments.create`. Existing-resource profile drift handling,
+  environment/secret command sequencing, and durable source link/relink state remain workflow gaps,
+  not deployment command fields.
 - resource listener port is stored as `networkProfile.internalPort`; deployment admission does not read `runtimeProfile.port`.
 - runtime adapter behavior treats reverse-proxy `internalPort` as a workload-local listener rather
   than a globally unique host port; same-port reverse-proxy resources require resource-scoped

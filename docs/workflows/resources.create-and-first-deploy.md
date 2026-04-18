@@ -30,6 +30,8 @@ This workflow inherits:
 - [Resource Lifecycle Error Spec](../errors/resources.lifecycle.md)
 - [deployments.create Command Spec](../commands/deployments.create.md)
 - [Quick Deploy Workflow Spec](./quick-deploy.md)
+- [Workload Framework Detection And Planning](./workload-framework-detection-and-planning.md)
+- [Repository Deployment Config File Bootstrap](./deployment-config-file-bootstrap.md)
 - [Error Model](../errors/model.md)
 - [neverthrow Conventions](../errors/neverthrow-conventions.md)
 - [Async Lifecycle And Acceptance](../architecture/async-lifecycle-and-acceptance.md)
@@ -51,6 +53,16 @@ user or automation intent
 `resources.create` success is complete when resource state is persisted. Deployment still requires `deployments.create`.
 
 Source binding, runtime profile, and network profile are resource-owned inputs for first-deploy resource creation. Generated default access is resolved from platform policy, server/proxy readiness, and resource network state during deployment planning/execution. Durable custom domain/TLS defaults remain separate domain binding and certificate concerns.
+
+A repository deployment config file may supply first-deploy source/runtime/network/health profile
+defaults, but it must not be the source of project/resource/server/destination/credential identity.
+When no trusted identity exists, the workflow may auto-create the project and resource from
+source-derived defaults or operator input, then persist the resource profile through
+`resources.create` before `deployments.create(resourceId)`.
+
+If a resource already exists and the repository config profile has changed, the workflow must apply
+the change through explicit resource/environment configuration operations once they exist, or fail
+with profile drift. It must not smuggle the changed profile into `deployments.create`.
 
 For v1, first-deploy runtime profile choices must produce a Docker/OCI image artifact or Docker
 Compose project governed by [ADR-021](../decisions/ADR-021-docker-oci-workload-substrate.md). A
@@ -84,6 +96,21 @@ workflow must normalize that draft before dispatching `resources.create`:
 - Dockerfile, Docker Compose, static, and workspace-command choices produce runtime profile fields
   such as `dockerfilePath`, `dockerComposeFilePath`, `publishDirectory`, or command defaults. Those
   fields are combined with the source binding's `baseDirectory` during plan resolution.
+
+Framework/runtime detection is a separate planning capability over the normalized source. Entry
+workflows may inspect source files to suggest a mainstream web framework profile, but the durable
+command boundary remains resource profile plus ids-only deployment admission. Detected package or
+project names may seed resource display names; detected frameworks, package managers, build tools,
+base-image policy, start/build command defaults, and static output conventions feed
+`SourceInspectionSnapshot` and the workload planner registry governed by
+[Workload Framework Detection And Planning](./workload-framework-detection-and-planning.md).
+They must not create `deployments.create` fields.
+
+The first-deploy target support catalog includes JavaScript/TypeScript frameworks on Node or Bun,
+static site generators, Python, Ruby, PHP, Go, Java/JVM, .NET, Elixir, Rust, Dockerfile, Docker
+Compose, and prebuilt image flows. A catalog entry is considered supported only when detection,
+base image policy, typed commands, artifact output, network/health behavior, and tests are specified
+for that entry.
 
 For static site first deploy, the workflow must create or select a `static-site` resource with a
 source binding, `RuntimePlanStrategy = "static"`, and `runtimeProfile.publishDirectory`. Optional
@@ -159,6 +186,11 @@ Current Web/CLI entry code may expose generic port wording, but it must dispatch
 Current `resources.create` normalizes common GitHub tree URLs into repository locator, `gitRef`,
 `baseDirectory`, and `originalLocator`. Deployment admission rejects legacy resources that still
 carry raw GitHub tree locators so runtime adapters do not clone browser URLs.
+
+Repository config file support remains a target contract for first-deploy profile input. Current
+config schema and CLI `init` output still include identity-bearing project/resource/target fields
+and do not yet satisfy the identity and secret rules in
+[Repository Deployment Config File Bootstrap](./deployment-config-file-bootstrap.md).
 
 Provider-backed disambiguation for slash-containing Git refs and typed runtime-profile fields for
 Dockerfile/Compose paths remain future work. Static publish directory is typed for the static

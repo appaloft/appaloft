@@ -109,6 +109,19 @@ files. They must dispatch `resources.create` with canonical source fields. `Reso
 `ResourceSourceBinding` must not reach out to GitHub, the filesystem, Docker, or any provider to
 guess meaning from a raw string.
 
+Repository deployment config files are one entry-workflow source for these resource profile fields.
+They are not durable Appaloft identity records. A committed config file may help produce
+`ResourceSourceBinding`, `ResourceRuntimeProfile`, `ResourceNetworkProfile`, health policy, and
+non-secret environment-variable command inputs, but it must not choose the Appaloft project,
+resource, server, destination, credential, organization, or secret store that receives a deployment.
+Those identities are resolved from explicit entrypoint input, trusted Appaloft link/source state,
+safe source fingerprints, first-run auto-creation, or interactive operator choice outside the file.
+
+Changing a committed repository config file must therefore not silently move future deployments to a
+different project or resource. If an existing resource differs from profile fields in the file, an
+entry workflow must apply the difference through explicit accepted resource configuration
+operations, or reject the deployment as profile drift until those operations exist.
+
 The initial source variants are:
 
 | Source kind | Durable source binding fields | Runtime profile relationship |
@@ -149,6 +162,12 @@ static publish directory, Docker build target, install/build/start commands, and
 defaults describe how the normalized source tree is planned. They must be combined with the
 source binding's `baseDirectory` during runtime plan resolution, not stored as deployment attempt
 input.
+
+Framework/runtime detection is planning evidence over the normalized source tree. Package/project
+name, framework, runtime family, package manager or build tool, runtime version, detected scripts,
+lockfiles, static output, and base-image policy must feed `SourceInspectionSnapshot` and workload
+planner output. They must not become `deployments.create` fields or untyped resource metadata when
+they affect planning.
 
 Reusable source configuration must be modeled by a future explicit resource source operation, for example `resources.bind-source` or `resource-source-bindings.create`.
 
@@ -197,6 +216,10 @@ Future implementation must not add more reusable configuration fields to `deploy
 - [deployments.create Command Spec](../commands/deployments.create.md)
 - [Quick Deploy Workflow Spec](../workflows/quick-deploy.md)
 - [Resource Create And First Deploy Workflow Spec](../workflows/resources.create-and-first-deploy.md)
+- [Repository Deployment Config File Bootstrap Workflow Spec](../workflows/deployment-config-file-bootstrap.md)
+- [Workload Framework Detection And Planning Workflow Spec](../workflows/workload-framework-detection-and-planning.md)
+- [Deployment Config File Test Matrix](../testing/deployment-config-file-test-matrix.md)
+- [Deployment Config File Implementation Plan](../implementation/deployment-config-file-plan.md)
 - [resources.create Implementation Plan](../implementation/resources.create-plan.md)
 - [ADR-014: Deployment Admission Uses Resource Profile](./ADR-014-deployment-admission-uses-resource-profile.md)
 - [ADR-015: Resource Network Profile](./ADR-015-resource-network-profile.md)
@@ -234,6 +257,10 @@ Docker image source variants. Runtime planning still carries source variant valu
 descriptor metadata, and strategy-specific runtime-profile fields such as Dockerfile path, Compose
 path, static publish directory, and build target still need explicit value objects before dedicated
 update operations are exposed.
+
+Current repository config file support still uses a legacy identity-bearing schema and does not yet
+follow the config-file bootstrap workflow. That schema must be narrowed before repository config
+support can be considered aligned with this ADR.
 
 Generated default access policy/provider resolution remains future implementation work governed by ADR-017.
 

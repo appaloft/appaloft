@@ -20,9 +20,12 @@ This test matrix inherits:
 - [ADR-023: Runtime Orchestration Target Boundary](../decisions/ADR-023-runtime-orchestration-target-boundary.md)
 - [deployments.create Command Spec](../commands/deployments.create.md)
 - [resources.create Command Spec](../commands/resources.create.md)
+- [Workload Framework Detection And Planning](../workflows/workload-framework-detection-and-planning.md)
 - [resources.diagnostic-summary Query Spec](../queries/resources.diagnostic-summary.md)
 - [Quick Deploy Workflow Spec](../workflows/quick-deploy.md)
+- [Repository Deployment Config File Bootstrap](../workflows/deployment-config-file-bootstrap.md)
 - [Resource Diagnostic Summary Test Matrix](./resource-diagnostic-summary-test-matrix.md)
+- [Deployment Config File Test Matrix](./deployment-config-file-test-matrix.md)
 - [resources.create Test Matrix](./resources.create-test-matrix.md)
 - [deployments.create Test Matrix](./deployments.create-test-matrix.md)
 - [Spec-Driven Testing](./SPEC_DRIVEN_TESTING.md)
@@ -108,6 +111,15 @@ Then:
 | QUICK-DEPLOY-WF-039 | e2e-preferred | Web workflow step progress | Web QuickDeploy | New context and resource draft | Each in-flight prerequisite request shows loading and succeeded requests show complete; the final deployment step shows deployment phase progress and application output before the command reaches a terminal result | Failed command error shown on failed step | One typed oRPC request per yielded prerequisite workflow step; final deployment command may use the deployment progress stream transport for detect/plan/package/deploy/verify visibility | Workflow progress stops at the failed step or stays visible after accepted deployment | Per command |
 | QUICK-DEPLOY-WF-040 | e2e-preferred | Static site first deploy | Web or CLI | Static source, `publishDirectory`, optional install/build command, and no explicit port | Deployment request accepted when static artifact planning succeeds | None | `resources.create(kind = static-site, runtimeProfile.strategy = static, runtimeProfile.publishDirectory, networkProfile.internalPort = 80)` -> `deployments.create(resourceId)` | Resource persists static runtime/network profile; deployment packages and serves static artifact through Docker/OCI | Per deployment |
 | QUICK-DEPLOY-WF-041 | e2e-preferred | Static site missing publish directory | Web or CLI | Static source selected but publish directory omitted or unsafe | Workflow fails before or during `resources.create` admission | `validation_error`, phase `resource-runtime-resolution` or entry preflight equivalent | No `deployments.create` | No accepted deployment; any already-created context remains | No for same invalid draft |
+| QUICK-DEPLOY-WF-042 | e2e-preferred | Mainstream framework detected | Web or CLI | Source root contains supported framework/package evidence such as framework config, package/project name, package manager/build tool, scripts, lockfiles, runtime version, and build output | Deployment request accepted when the detected planner can produce a Docker/OCI artifact plan and required network profile is available | None | Source inspection -> resource draft defaults -> `resources.create(source, runtimeProfile, networkProfile)` -> `deployments.create(resourceId)` | Resource and deployment preserve provider-neutral profile/snapshot state; planner metadata appears only as safe runtime-plan evidence or diagnostics | Per deployment |
+| QUICK-DEPLOY-WF-043 | e2e-preferred | Unsupported framework requires explicit fallback | Web or CLI | Source root detects a framework/runtime family without an active planner | Workflow requires explicit install/build/start commands or stops before deployment admission | `validation_error`, phase `runtime-plan-resolution` or entry preflight equivalent | No `deployments.create` unless explicit fallback commands are provided | No accepted deployment without a containerizable planner; source/context records may remain if already created | No for same invalid draft |
+| QUICK-DEPLOY-WF-044 | e2e-preferred | Base image is not deployment input | Web or CLI | User or detector suggests runtime family/version/package manager | Workflow may display planner-derived runtime defaults but final command inputs omit base-image fields | None | `resources.create` stores accepted resource profile fields; `deployments.create` remains ids-only | Base image is resolved by planner during deployment planning and appears only in safe runtime-plan metadata/diagnostics | Per deployment |
+| QUICK-DEPLOY-WF-045 | e2e-preferred | Repository config profile first deploy | CLI or local Web agent | Source root has a valid Appaloft config profile with runtime/network/health fields and no trusted project/resource identity | Workflow auto-creates or selects project/resource outside the file, maps profile fields to resource-owned commands, and accepts deployment | None | Config discovery -> identity resolution outside config -> `projects.create` if needed -> `resources.create(source/runtime/network/health)` -> `deployments.create(resourceId)` | Config changes cannot retarget project/resource; deployment input stays ids-only | Per command |
+| QUICK-DEPLOY-WF-046 | e2e-preferred | Repository config identity rejected | CLI or local Web agent | Config contains `project`, `projectId`, `resourceId`, target host, server id, destination id, or credential identity | Workflow fails before mutation | `validation_error`, phase `config-identity` | Config validation only | No project/resource/server/deployment mutation | No |
+| QUICK-DEPLOY-WF-047 | e2e-preferred | Repository config secret rejected | CLI or local Web agent | Config contains raw SSH private key, deploy key, token, password, certificate key, or raw secret env value | Workflow fails before mutation and diagnostics/logs are sanitized | `validation_error`, phase `config-secret-validation` | Config validation only | No write command; no secret value in details/logs | No |
+| QUICK-DEPLOY-WF-048 | e2e-preferred | Repository config required secret reference | CLI or local Web agent | Config declares required secret references without raw values | Workflow proceeds only when referenced secret/credential exists outside the file | None or secret-missing structured error | Secret/credential check -> resource/env commands -> `deployments.create` | Deployment snapshot receives masked/effective environment only after explicit variable/secret resolution | Depends |
+| QUICK-DEPLOY-WF-049 | e2e-preferred | Repository config unsupported sizing | CLI or local Web agent | Config contains CPU, memory, replicas, restart policy, overlap, or drain before accepted sizing/rollout specs exist | Workflow fails before mutation | `unsupported_config_field`, phase `config-capability-resolution` | Config validation only | Unsupported fields are not silently ignored | No |
+| QUICK-DEPLOY-WF-050 | e2e-preferred | Repository config environment overlay | CLI or local Web agent | Config has base profile plus selected-environment overlay | Overlay applies only to the environment selected outside the file; final command remains ids-only | None | Config merge -> explicit operations -> `deployments.create` | Config overlay cannot move deployment to another environment by itself | Per command |
 
 ## Entry Consistency Matrix
 
@@ -121,6 +133,8 @@ Then:
 | QUICK-DEPLOY-ENTRY-006 | e2e-preferred | Final deploy | `deployments.create` | `deployments.create` | `deployments.create` |
 | QUICK-DEPLOY-ENTRY-007 | e2e-preferred | Domain/TLS | Resource/domain binding surface or follow-up command | Separate `domain-bindings.create` command | Durable domain/TLS requires separate commands |
 | QUICK-DEPLOY-ENTRY-008 | e2e-preferred | Static site draft parity | Collects static publish directory, optional build commands, and defaults internal port 80 before `resources.create` | Collects equivalent static draft fields and maps them to the same command schema | API/automation callers create/select a static resource profile explicitly before deployment |
+| QUICK-DEPLOY-ENTRY-009 | e2e-preferred | Framework detection parity | Uses the same source inspection and planner contract as CLI; may suggest resource name, strategy, commands, publish directory, and internal port before dispatch | Uses the same source inspection and planner contract as Web; prompts for missing explicit fallback commands when needed | API/automation callers provide resource source/runtime/network profile explicitly or rely on deployment planning to reject unsupported evidence |
+| QUICK-DEPLOY-ENTRY-010 | e2e-preferred | Repository config file parity | Local Web agent may read a selected file and must follow the config workflow contract | CLI supports explicit `--config` and implicit discovery through the same parser/normalizer | API/automation remains explicit-operation first; no hidden config-file deployment schema |
 
 ## Error Assertion Rules
 
@@ -170,6 +184,19 @@ Docker static path is covered by the opt-in SSH e2e harness.
 CLI non-TTY Quick Deploy must not prompt for omitted optional advanced fields once source and
 context flags are supplied. It should use provided flags plus defaults, then dispatch
 `resources.create` and `deployments.create`.
+
+Framework detection rows `QUICK-DEPLOY-WF-042` through `QUICK-DEPLOY-WF-044` and
+`QUICK-DEPLOY-ENTRY-009` are target contract rows. Current implementation has detector/planner
+coverage for initial JavaScript/TypeScript and Python framework slices, but full browser/CLI e2e
+parity is still required before a framework family is marked first-class.
+
+Repository config file rows `QUICK-DEPLOY-WF-045` through `QUICK-DEPLOY-WF-050` and
+`QUICK-DEPLOY-ENTRY-010` are target contract rows governed by
+[Deployment Config File Test Matrix](./deployment-config-file-test-matrix.md). Current
+implementation covers the parser safety contract, CLI `init` profile-only output, CLI `--config`
+seed mapping, Git-root filesystem discovery, and ids-only deployment command admission. Full
+quick-deploy e2e coverage for first-run project/resource creation, link-state reuse, environment
+overlays, secret lookup/application, and profile drift remains follow-up.
 
 Current Web and CLI do not yet expose all source variant fields as typed drafts. Initial tests may
 cover the parser/normalizer as a unit before full UI coverage, but the workflow contract requires

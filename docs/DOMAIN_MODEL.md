@@ -157,6 +157,12 @@ Boundary rule:
   extraction roots are source-side concerns; Dockerfile path, Compose file path, static publish
   directory, build target, and command defaults are runtime profile concerns; internal listener
   ports and exposure modes are network profile concerns.
+- framework and package detection is typed workload-planning evidence, not a Web/CLI shortcut and
+  not durable deployment identity. `SourceInspectionSnapshot` may record runtime family,
+  framework, package manager/build tool, package/project name, runtime version, lockfiles, scripts,
+  and build-output clues. Framework planners use those facts plus `ResourceRuntimeProfile` to
+  choose base image and typed install/build/start/package steps, but framework-specific package
+  objects, provider SDK types, Docker SDK responses, and raw shell output stay outside core.
 - `RuntimePlanStrategy` describes how a source is planned; the compatibility field name
   `deploymentMethod` must not be treated as a `Deployment` aggregate concept
 - v1 runtime planning is Docker/OCI-backed. A runtime strategy must produce, pull, or reference an

@@ -129,6 +129,8 @@ Current code also implements durable domain readiness for TLS-disabled bindings 
 
 Current code also records retryable route realization failure state by moving affected active
 bindings to `not_ready` and publishing `domain-route-realization-failed`.
+For TLS-disabled bindings, a later successful deployment route realization can recover the binding
+from `not_ready` to `ready`, clear the previous route failure metadata, and publish `domain-ready`.
 
 Readiness expiry and renewal-window scheduling remain follow-up behavior.
 
