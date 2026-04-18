@@ -124,7 +124,9 @@ jobs:
           path: dist/release/appaloft-v${{ env.APPALOFT_APP_VERSION }}-${{ matrix.target }}.*
 
   desktop-artifacts:
-    needs: resolve
+    needs:
+      - resolve
+      - binary-artifacts
     strategy:
       fail-fast: false
       matrix:
@@ -171,25 +173,41 @@ jobs:
       - name: Install
         run: bun install --frozen-lockfile
 
-      - name: Build Desktop Sidecar
+      - name: Download Desktop Sidecar Archive
+        uses: actions/download-artifact@v4
+        with:
+          name: release-binary-${{ matrix.target }}
+          path: dist/release
+
+      - name: Extract Desktop Sidecar
         shell: bash
         run: |
           set -euo pipefail
-          for attempt in 1 2 3; do
-            if bun run package:binary-bundle -- --version "${APPALOFT_APP_VERSION}" --target "${APPALOFT_BINARY_TARGET}"; then
-              exit 0
-            fi
-            if [ "$attempt" = "3" ]; then
-              exit 1
-            fi
-            sleep $((attempt * 10))
-          done
+          archive_base="appaloft-v${APPALOFT_APP_VERSION}-${APPALOFT_BINARY_TARGET}"
+          rm -rf "dist/release/${archive_base}"
+          if [ -f "dist/release/${archive_base}.zip" ]; then
+            powershell -NoProfile -Command "Expand-Archive -LiteralPath 'dist/release/${archive_base}.zip' -DestinationPath 'dist/release' -Force"
+          else
+            tar -xzf "dist/release/${archive_base}.tar.gz" -C "dist/release"
+          fi
 
       - name: Build Desktop App
         working-directory: apps/desktop
         run: |
-          bun run prepare:sidecar
-          bunx tauri build
+          case "${RUNNER_OS}" in
+            Linux)
+              bunx tauri build --bundles deb
+              ;;
+            Windows)
+              bunx tauri build --bundles msi
+              ;;
+            macOS)
+              bunx tauri build --bundles dmg
+              ;;
+            *)
+              bunx tauri build
+              ;;
+          esac
 
       - name: Collect Desktop Artifacts
         shell: bash
