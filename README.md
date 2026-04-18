@@ -69,20 +69,24 @@ bun --cwd apps/web run dev
 ```bash
 bun run build
 bun run package:binary-bundle
-bun run package:artifacts
+bun run package:binary-bundle -- --target linux-x64-gnu --version 0.1.0 --archive
+bun run package:artifacts -- --version 0.1.0 --archives
+bun run release:manifest -- --version 0.1.0
 bun run checksums
-docker build -t appaloft-all-in-one:local .
+docker build --build-arg APPALOFT_APP_VERSION=0.1.0 -t appaloft-all-in-one:local .
 ```
 
-Release outputs currently target:
+Release outputs target:
 
-- `appaloft-backend`
-- `appaloft-web-static`
-- `appaloft-binary-bundle`
-- `Dockerfile` for `appaloft-all-in-one`
+- `appaloft-backend-vX.Y.Z.tar.gz`
+- `appaloft-web-static-vX.Y.Z.tar.gz`
+- `appaloft-vX.Y.Z-<platform>.tar.gz` or `.zip`
+- desktop installers built by Tauri
 - `docker-compose.selfhost.yml`
 - `release-manifest.json`
 - `checksums.txt`
+
+Release Please maintains `CHANGELOG.md`, creates `vX.Y.Z` GitHub releases, and then GitHub Actions publishes GitHub Release assets, GHCR images, npm CLI packages, and Homebrew tap updates. The release workflow is manually triggered: run `Release` once to create or update the release PR, then run it again after merging that PR to publish the release.
 
 ## Runtime Shapes
 

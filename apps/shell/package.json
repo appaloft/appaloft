@@ -7,7 +7,7 @@
   },
   "scripts": {
     "dev": "bun run --watch src/index.ts serve",
-    "build": "mkdir -p dist && bun build src/index.ts --outfile dist/appaloft --target bun",
+    "build": "bun build src/index.ts --outfile dist/appaloft --target bun",
     "lint": "biome check .",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "bun test",

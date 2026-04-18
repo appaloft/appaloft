@@ -23,9 +23,20 @@ bun run package:binary-bundle
 bun run --cwd apps/desktop package:app
 ```
 
-`prepare:sidecar` copies `dist/release/appaloft-binary-bundle/appaloft` to the Tauri sidecar path
-expected by the current host target. Override target detection with `APPALOFT_TAURI_TARGET_TRIPLE`
-when preparing a sidecar for a different target.
+`prepare:sidecar` copies the matching release binary into the Tauri sidecar path expected by the
+target. The default is the current host target and the legacy local bundle path
+`dist/release/appaloft-binary-bundle`.
 
-This package is intentionally not wired into the root `build` or `typecheck` tasks yet. Tauri
-packaging requires a Rust toolchain, while the current CI only installs Bun.
+For release builds, pass `APPALOFT_BINARY_TARGET` after building the matching bundle:
+
+```bash
+bun run package:binary-bundle -- --target darwin-arm64 --version 0.1.0
+APPALOFT_APP_VERSION=0.1.0 APPALOFT_BINARY_TARGET=darwin-arm64 bun run --cwd apps/desktop package
+```
+
+`APPALOFT_TAURI_TARGET_TRIPLE` can still override the sidecar triple when a Tauri build needs an
+explicit Rust target.
+
+This package is intentionally not wired into the root `build` or `typecheck` tasks. Tauri packaging
+requires Rust and native platform dependencies, so release desktop builds run in the dedicated
+GitHub Actions matrix.

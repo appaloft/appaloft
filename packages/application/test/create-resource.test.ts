@@ -294,6 +294,135 @@ describe("CreateResourceUseCase", () => {
     });
   });
 
+  test("[RES-CREATE-ADM-035] creates a static-site resource profile with publish directory", async () => {
+    const { context, eventBus, repositoryContext, resources, useCase } =
+      await seedResourceContext();
+
+    const result = await useCase.execute(context, {
+      projectId: "prj_demo",
+      environmentId: "env_demo",
+      destinationId: "dst_demo",
+      name: "Docs Site",
+      kind: "static-site",
+      source: {
+        kind: "git-public",
+        locator: "https://github.com/acme/docs-site.git",
+        baseDirectory: "/site",
+      },
+      runtimeProfile: {
+        strategy: "static",
+        buildCommand: "pnpm build",
+        publishDirectory: "/dist",
+      },
+      networkProfile: {
+        internalPort: 80,
+        upstreamProtocol: "http",
+        exposureMode: "reverse-proxy",
+      },
+    } as never);
+
+    expect(result.isOk()).toBe(true);
+    const id = result._unsafeUnwrap().id;
+    const persisted = await resources.findOne(
+      repositoryContext,
+      ResourceByIdSpec.create(ResourceId.rehydrate(id)),
+    );
+    const runtimeProfile = persisted?.toState().runtimeProfile as
+      | {
+          strategy: { value: string };
+          buildCommand?: { value: string };
+          publishDirectory?: { value: string };
+        }
+      | undefined;
+    const networkProfile = persisted?.toState().networkProfile;
+
+    expect(persisted?.toState().kind.value).toBe("static-site");
+    expect(runtimeProfile?.strategy.value).toBe("static");
+    expect(runtimeProfile?.buildCommand?.value).toBe("pnpm build");
+    expect(runtimeProfile?.publishDirectory?.value).toBe("/dist");
+    expect(networkProfile?.internalPort.value).toBe(80);
+    expect(networkProfile?.upstreamProtocol.value).toBe("http");
+    expect(networkProfile?.exposureMode.value).toBe("reverse-proxy");
+
+    const event = resourceCreatedEvent(eventBus.events);
+    expect(event.payload).toMatchObject({
+      resourceId: id,
+      kind: "static-site",
+      runtimeProfile: {
+        strategy: "static",
+        buildCommand: "pnpm build",
+        publishDirectory: "/dist",
+      },
+      networkProfile: {
+        internalPort: 80,
+        upstreamProtocol: "http",
+        exposureMode: "reverse-proxy",
+      },
+    });
+  });
+
+  test("[RES-CREATE-ADM-036] rejects static strategy without publish directory", async () => {
+    const { context, eventBus, useCase } = await seedResourceContext();
+
+    const result = await useCase.execute(context, {
+      projectId: "prj_demo",
+      environmentId: "env_demo",
+      name: "Docs Site",
+      kind: "static-site",
+      source: {
+        kind: "local-folder",
+        locator: ".",
+      },
+      runtimeProfile: {
+        strategy: "static",
+      },
+      networkProfile: {
+        internalPort: 80,
+      },
+    } as never);
+
+    expect(result.isErr()).toBe(true);
+    const error = result._unsafeUnwrapErr();
+    expect(error.code).toBe("validation_error");
+    expect(error.details).toMatchObject({
+      phase: "resource-runtime-resolution",
+      runtimePlanStrategy: "static",
+    });
+    expect(eventBus.events).toHaveLength(0);
+  });
+
+  test("[RES-CREATE-ADM-037] rejects unsafe static publish directory", async () => {
+    const { context, eventBus, useCase } = await seedResourceContext();
+
+    const result = await useCase.execute(context, {
+      projectId: "prj_demo",
+      environmentId: "env_demo",
+      name: "Docs Site",
+      kind: "static-site",
+      source: {
+        kind: "local-folder",
+        locator: ".",
+      },
+      runtimeProfile: {
+        strategy: "static",
+        publishDirectory: "../dist",
+      },
+      networkProfile: {
+        internalPort: 80,
+      },
+    } as never);
+
+    expect(result.isErr()).toBe(true);
+    const error = result._unsafeUnwrapErr();
+    expect(error.code).toBe("validation_error");
+    expect(error.details).toMatchObject({
+      phase: "resource-runtime-resolution",
+      runtimePlanStrategy: "static",
+      publishDirectory: "../dist",
+    });
+    expect(eventBus.events).toHaveLength(0);
+  });
+
   test("normalizes GitHub tree URL source into repository ref and base directory", async () => {
     const { context, eventBus, repositoryContext, resources, useCase } =
       await seedResourceContext();

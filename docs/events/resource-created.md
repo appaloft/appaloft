@@ -77,7 +77,7 @@ type ResourceCreatedPayload = {
     };
   };
   runtimeProfile?: {
-    strategy: "auto" | "dockerfile" | "docker-compose" | "prebuilt-image" | "workspace-commands";
+    strategy: "auto" | "dockerfile" | "docker-compose" | "prebuilt-image" | "workspace-commands" | "static";
     installCommand?: string;
     buildCommand?: string;
     startCommand?: string;
@@ -107,6 +107,10 @@ not include provider access tokens, deploy key material, private registry creden
 contents.
 
 When a resource has a network profile, the event payload may include the safe network endpoint metadata needed by read-model and audit consumers. It must not include public domain/TLS state, because that lifecycle is owned by domain binding and certificate commands.
+
+When a `static-site` resource is created for first deploy, the event payload may include the
+non-secret `runtimeProfile.publishDirectory` and static strategy metadata needed by projections and
+audit consumers. It must not include local file contents or concrete static-server image internals.
 
 ## State Progression
 

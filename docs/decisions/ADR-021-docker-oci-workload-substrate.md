@@ -271,8 +271,9 @@ The target contract still has gaps:
   text for user-authored workspace steps. Docker build/run/Compose operations should migrate first
   to typed runtime command specs; compatibility string fields must not become the long-term command
   composition mechanism;
-- Dockerfile, Compose, static publish directory, build target, and richer runtime-profile fields
-  still need typed resource runtime-profile value objects;
+- Dockerfile, Compose, build target, and richer runtime-profile fields still need typed resource
+  runtime-profile value objects. Static publish directory now has a dedicated runtime-profile value
+  object for the first-class static site path;
 - previous runtime identity and rollback candidate retention are not yet a complete public
   rollback contract;
 - stateful volume and database rollback semantics remain out of scope.

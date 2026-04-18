@@ -136,6 +136,7 @@ import {
   SshPrivateKeyText,
   SshPublicKeyText,
   StartedAt,
+  StaticPublishDirectory,
   TargetKindValue,
   TlsModeValue,
   UpdatedAt,
@@ -340,6 +341,7 @@ export interface SerializedResourceRuntimeProfile extends Record<string, unknown
   installCommand?: string;
   buildCommand?: string;
   startCommand?: string;
+  publishDirectory?: string;
   healthCheckPath?: string;
   healthCheck?: SerializedHealthCheckPolicy;
 }
@@ -1328,6 +1330,13 @@ export function rehydrateResourceRow(row: Selectable<Database["resources"]>) {
               : {}),
             ...(runtimeProfile.startCommand
               ? { startCommand: CommandText.rehydrate(runtimeProfile.startCommand) }
+              : {}),
+            ...(runtimeProfile.publishDirectory
+              ? {
+                  publishDirectory: StaticPublishDirectory.rehydrate(
+                    runtimeProfile.publishDirectory,
+                  ),
+                }
               : {}),
             ...(runtimeProfile.healthCheckPath
               ? { healthCheckPath: HealthCheckPathText.rehydrate(runtimeProfile.healthCheckPath) }

@@ -41,6 +41,7 @@ interface DeploymentPromptSeed {
   installCommand?: string;
   buildCommand?: string;
   startCommand?: string;
+  publishDirectory?: string;
   port?: number;
   healthCheckPath?: string;
 }
@@ -70,6 +71,8 @@ const defaultServerHost = "127.0.0.1";
 const defaultServerPort = 22;
 const defaultServerProviderKey = "local-shell";
 const defaultApplicationInternalPort = 3000;
+const defaultStaticInternalPort = 80;
+const defaultStaticPublishDirectory = "/dist";
 
 function trimToUndefined(value: string): string | undefined {
   const trimmed = value.trim();
@@ -90,9 +93,13 @@ function inferGeneratedResourceNameFromSource(sourceLocator: string): string {
   return createQuickDeployGeneratedResourceName(inferNameFromSource(sourceLocator));
 }
 
-function resourceKindForDeploymentMethod(
+export function resourceKindForDeploymentMethod(
   deploymentMethod: DeploymentMethod,
 ): NonNullable<CreateResourceCommandInput["kind"]> {
+  if (deploymentMethod === "static") {
+    return "static-site";
+  }
+
   return deploymentMethod === "docker-compose" ? "compose-stack" : "application";
 }
 
@@ -106,7 +113,7 @@ function inferResourceFromSource(
   };
 }
 
-function sourceKindForDeploymentInput(
+export function sourceKindForDeploymentInput(
   sourceLocator: string,
   deploymentMethod: DeploymentMethod,
 ): ResourceSourceInput["kind"] {
@@ -133,7 +140,7 @@ function sourceKindForDeploymentInput(
   return "local-folder";
 }
 
-function sourceBindingForDeploymentInput(
+export function sourceBindingForDeploymentInput(
   sourceLocator: string,
   deploymentMethod: DeploymentMethod,
 ): ResourceSourceInput {
@@ -144,10 +151,20 @@ function sourceBindingForDeploymentInput(
   };
 }
 
-function runtimeProfileFromDeploymentInput(
+export function runtimeProfileFromDeploymentInput(
   deploymentMethod: DeploymentMethod,
   input: ResourceRuntimeProfileDraftInput,
 ): ResourceRuntimeProfileInput {
+  if (deploymentMethod === "static") {
+    return {
+      strategy: "static",
+      ...(input.installCommand ? { installCommand: input.installCommand } : {}),
+      ...(input.buildCommand ? { buildCommand: input.buildCommand } : {}),
+      ...(input.publishDirectory ? { publishDirectory: input.publishDirectory } : {}),
+      ...(input.healthCheckPath ? { healthCheckPath: input.healthCheckPath } : {}),
+    };
+  }
+
   return {
     strategy: deploymentMethod,
     ...(input.installCommand ? { installCommand: input.installCommand } : {}),
@@ -157,9 +174,14 @@ function runtimeProfileFromDeploymentInput(
   };
 }
 
-function networkProfileFromDeploymentInput(input: { port?: number }): ResourceNetworkProfileInput {
+export function networkProfileFromDeploymentInput(
+  deploymentMethod: DeploymentMethod,
+  input: { port?: number },
+): ResourceNetworkProfileInput {
   return {
-    internalPort: input.port ?? defaultApplicationInternalPort,
+    internalPort:
+      input.port ??
+      (deploymentMethod === "static" ? defaultStaticInternalPort : defaultApplicationInternalPort),
     upstreamProtocol: "http",
     exposureMode: "reverse-proxy",
   };
@@ -586,17 +608,21 @@ function resolveResource(input: {
 function resolveAdvancedDeploymentConfig(input: {
   interaction: CliInteraction;
   seed: DeploymentPromptSeed;
+  deploymentMethod: DeploymentMethod;
 }) {
   return Effect.gen(function* () {
     const canPrompt = Boolean(process.stdin.isTTY && process.stdout.isTTY);
+    const isStatic = input.deploymentMethod === "static";
     const hasSeedAdvancedConfig = Boolean(
       input.seed.installCommand ||
         input.seed.buildCommand ||
         input.seed.startCommand ||
+        input.seed.publishDirectory ||
         input.seed.port ||
         input.seed.healthCheckPath,
     );
     const shouldConfigure =
+      isStatic ||
       hasSeedAdvancedConfig ||
       (canPrompt &&
         (yield* input.interaction.confirm({
@@ -605,7 +631,26 @@ function resolveAdvancedDeploymentConfig(input: {
         })));
 
     if (!shouldConfigure) {
-      return { port: input.seed.port ?? defaultApplicationInternalPort };
+      return {
+        port:
+          input.seed.port ??
+          (isStatic ? defaultStaticInternalPort : defaultApplicationInternalPort),
+      };
+    }
+
+    if (isStatic && !input.seed.publishDirectory && !canPrompt) {
+      yield* Effect.sync(() => {
+        process.exitCode = 1;
+      });
+      return yield* Effect.fail(
+        domainError.validation(
+          "Static deployments require --publish-dir outside an interactive terminal",
+          {
+            phase: "input-collection",
+            runtimePlanStrategy: "static",
+          },
+        ),
+      );
     }
 
     const installCommand =
@@ -628,27 +673,44 @@ function resolveAdvancedDeploymentConfig(input: {
             }),
           )
         : undefined);
-    const startCommand =
-      input.seed.startCommand ??
-      (canPrompt
-        ? trimToUndefined(
-            yield* input.interaction.text({
-              message: "Start command",
-              defaultValue: "",
-            }),
-          )
-        : undefined);
+    const startCommand = isStatic
+      ? undefined
+      : (input.seed.startCommand ??
+        (canPrompt
+          ? trimToUndefined(
+              yield* input.interaction.text({
+                message: "Start command",
+                defaultValue: "",
+              }),
+            )
+          : undefined));
+    const publishDirectory = isStatic
+      ? (input.seed.publishDirectory ??
+        (canPrompt
+          ? trimToUndefined(
+              yield* input.interaction.text({
+                message: "Static publish directory",
+                defaultValue: defaultStaticPublishDirectory,
+                validate: requireNonEmpty("Static publish directory"),
+              }),
+            )
+          : undefined))
+      : undefined;
     const port =
       input.seed.port ??
       (canPrompt
         ? Number(
             yield* input.interaction.text({
-              message: "Application port",
-              defaultValue: String(defaultApplicationInternalPort),
+              message: isStatic ? "Static server port" : "Application port",
+              defaultValue: String(
+                isStatic ? defaultStaticInternalPort : defaultApplicationInternalPort,
+              ),
               validate: requirePositiveInteger("Application port"),
             }),
           )
-        : defaultApplicationInternalPort);
+        : isStatic
+          ? defaultStaticInternalPort
+          : defaultApplicationInternalPort);
     const healthCheckPath =
       input.seed.healthCheckPath ??
       (canPrompt
@@ -664,6 +726,7 @@ function resolveAdvancedDeploymentConfig(input: {
       ...(installCommand ? { installCommand } : {}),
       ...(buildCommand ? { buildCommand } : {}),
       ...(startCommand ? { startCommand } : {}),
+      ...(publishDirectory ? { publishDirectory } : {}),
       ...(Number.isInteger(port) && port > 0 ? { port } : {}),
       ...(healthCheckPath ? { healthCheckPath } : {}),
     };
@@ -719,9 +782,13 @@ export function resolveInteractiveDeploymentInput(
       seed,
       projectId: project.id,
     });
-    const advancedConfig = yield* resolveAdvancedDeploymentConfig({ interaction, seed });
+    const advancedConfig = yield* resolveAdvancedDeploymentConfig({
+      interaction,
+      seed,
+      deploymentMethod,
+    });
     const runtimeProfile = runtimeProfileFromDeploymentInput(deploymentMethod, advancedConfig);
-    const networkProfile = networkProfileFromDeploymentInput(advancedConfig);
+    const networkProfile = networkProfileFromDeploymentInput(deploymentMethod, advancedConfig);
     const resource = yield* resolveResource({
       interaction,
       seed,

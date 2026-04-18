@@ -1,4 +1,21 @@
-import { type Deployment, ok, type Result, StartedAt, safeTry } from "@appaloft/core";
+import {
+  type Deployment,
+  DeploymentLogEntry,
+  DeploymentPhaseValue,
+  type DomainError,
+  ErrorCodeText,
+  ExecutionResult,
+  ExecutionStatusValue,
+  ExitCode,
+  FinishedAt,
+  LogLevelValue,
+  MessageText,
+  OccurredAt,
+  ok,
+  type Result,
+  StartedAt,
+  safeTry,
+} from "@appaloft/core";
 import { inject, injectable } from "tsyringe";
 
 import { type Clock } from "../../ports";
@@ -37,4 +54,91 @@ export class DeploymentLifecycleService {
       return ok(undefined);
     });
   }
+
+  failExecution(deployment: Deployment, error: DomainError): Result<void> {
+    const { clock } = this;
+
+    return safeTry(function* () {
+      const finishedAt = yield* FinishedAt.create(clock.now());
+      const phase =
+        typeof error.details?.phase === "string" ? error.details.phase : "runtime-execution";
+      const step = typeof error.details?.step === "string" ? error.details.step : phase;
+      const result = ExecutionResult.rehydrate({
+        status: ExecutionStatusValue.rehydrate("failed"),
+        exitCode: ExitCode.rehydrate(1),
+        retryable: error.retryable,
+        errorCode: ErrorCodeText.rehydrate(error.code),
+        logs: [
+          DeploymentLogEntry.rehydrate({
+            timestamp: OccurredAt.rehydrate(clock.now()),
+            phase: DeploymentPhaseValue.rehydrate(logPhaseForFailurePhase(phase)),
+            level: LogLevelValue.rehydrate("error"),
+            message: MessageText.rehydrate(error.message),
+          }),
+        ],
+        metadata: {
+          ...metadataFromErrorDetails(error.details),
+          phase,
+          step,
+          message: error.message,
+        },
+      });
+      const applyResult = deployment.applyExecutionResult(finishedAt, result);
+      yield* applyResult;
+      return ok(undefined);
+    });
+  }
+}
+
+function metadataFromErrorDetails(details: DomainError["details"]): Record<string, string> {
+  if (!details) {
+    return {};
+  }
+
+  const metadata: Record<string, string> = {};
+  for (const [key, value] of Object.entries(details)) {
+    if (value !== null) {
+      metadata[key] = String(value);
+    }
+  }
+  return metadata;
+}
+
+function logPhaseForFailurePhase(
+  phase: string,
+): "detect" | "plan" | "package" | "deploy" | "verify" | "rollback" {
+  if (
+    phase === "source-detection" ||
+    phase === "resource-source-resolution" ||
+    phase === "detect"
+  ) {
+    return "detect";
+  }
+
+  if (
+    phase === "runtime-plan-resolution" ||
+    phase === "runtime-target-resolution" ||
+    phase === "plan"
+  ) {
+    return "plan";
+  }
+
+  if (
+    phase === "image-build" ||
+    phase === "image-pull" ||
+    phase === "runtime-artifact-resolution" ||
+    phase === "package"
+  ) {
+    return "package";
+  }
+
+  if (phase === "public-route-verification" || phase === "verify") {
+    return "verify";
+  }
+
+  if (phase === "rollback") {
+    return "rollback";
+  }
+
+  return "deploy";
 }

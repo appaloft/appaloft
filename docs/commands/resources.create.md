@@ -65,7 +65,7 @@ It is not:
 | `destinationId` | Optional | Default destination placement hint for future deployments. |
 | `services` | Optional | Declared resource services. Multiple services are allowed only for `compose-stack`. |
 | `source` | Optional | Durable source binding for first-deploy workflows. |
-| `runtimeProfile` | Optional | Durable runtime plan strategy, command defaults, and health-check defaults for future deployments. |
+| `runtimeProfile` | Optional | Durable runtime plan strategy, strategy-specific planning fields, command defaults, and health-check defaults for future deployments. |
 | `networkProfile` | Optional | Durable workload endpoint profile for first-deploy workflows and future deployments. |
 
 Allowed `kind` values are the platform `ResourceKind` values:
@@ -194,6 +194,20 @@ commands, and health-check defaults belong to runtime profile language. HTTP hea
 must use `RuntimePlanStrategy = "prebuilt-image"` and must not require Dockerfile or Compose path
 fields.
 
+For first-class static site deployment, the resource must use `kind = "static-site"` or an
+explicit static runtime profile with `RuntimePlanStrategy = "static"`. Static strategy resources
+must persist a `runtimeProfile.publishDirectory` value before deployment admission. The publish
+directory is relative to the source binding's `baseDirectory` after optional install/build command
+execution; it must not be a host absolute path, URL, or path containing `..` or shell metacharacters.
+Entry workflows may display the field as "publish directory", but the durable runtime profile owns
+it as strategy-specific planning state.
+
+Static site resources are inbound HTTP resources. Entry workflows should persist
+`networkProfile.internalPort = 80`, `upstreamProtocol = "http"`, and
+`exposureMode = "reverse-proxy"` for the default static server path unless the user explicitly
+selects another accepted network profile. `deployments.create` still consumes the persisted
+resource network profile; it must not accept a deployment command port override for static sites.
+
 `networkProfile` is a `ResourceNetworkProfile` governed by [ADR-015](../decisions/ADR-015-resource-network-profile.md). It owns the workload endpoint used by deployment planning and reverse-proxy upstream resolution.
 
 The minimum network profile fields are:
@@ -234,6 +248,7 @@ All errors use [Resource Lifecycle Error Spec](../errors/resources.lifecycle.md)
 | --- | --- | --- | --- |
 | `validation_error` | `command-validation` | No | Input shape, resource name, kind, description, service name, or service kind is invalid. |
 | `validation_error` | `resource-source-resolution` | No | Source kind, locator normalization, Git ref/base directory split, image tag/digest, or source-variant metadata is invalid or ambiguous. |
+| `validation_error` | `resource-runtime-resolution` | No | Runtime strategy or strategy-specific runtime profile fields are invalid, such as missing or unsafe static publish directory. |
 | `not_found` | `context-resolution` | No | Project, environment, or destination is missing. |
 | `resource_context_mismatch` | `context-resolution` | No | Environment or destination does not belong to the supplied project/environment context. |
 | `resource_slug_conflict` | `resource-admission` | No | A resource with the same slug already exists in the project/environment. |
@@ -299,8 +314,9 @@ invalid source base directories and Docker image tag/digest conflicts.
 
 Current GitHub tree URL normalization handles common single-segment refs; callers should supply
 explicit `gitRef` and `baseDirectory` for slash-containing branch or tag names until provider-backed
-disambiguation is implemented. Dockerfile path, Docker Compose file path, static publish directory,
-and build target are still pending typed runtime-profile fields.
+disambiguation is implemented. Static publish directory is now a typed runtime-profile value for
+the static strategy. Dockerfile path, Docker Compose file path, and build target remain pending
+typed runtime-profile fields.
 
 Generated default access policy and route read-model state are not yet implemented as first-class resource access state.
 

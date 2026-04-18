@@ -25,6 +25,7 @@ test matrices.
 - [resources.create Command Spec](../commands/resources.create.md)
 - [Quick Deploy Workflow Spec](../workflows/quick-deploy.md)
 - [Resource Create And First Deploy Workflow Spec](../workflows/resources.create-and-first-deploy.md)
+- [Static Site Deployment Implementation Plan](./static-site-deployment-plan.md)
 - [deployment-requested Event Spec](../events/deployment-requested.md)
 - [build-requested Event Spec](../events/build-requested.md)
 - [deployment-started Event Spec](../events/deployment-started.md)
@@ -37,7 +38,8 @@ test matrices.
 
 The Code Round should introduce or normalize provider-neutral application DTOs for:
 
-- runtime artifact intent: `build-image`, `prebuilt-image`, or `compose-project`;
+- runtime artifact intent: `build-image`, `prebuilt-image`, `compose-project`, or static-site image
+  package intent;
 - image identity: image name, optional tag, optional digest, and optional local image id;
 - compose identity: resource/deployment-scoped project name, compose file snapshot identity, and
   target service name;
@@ -125,6 +127,8 @@ Required coverage:
 - `prebuilt-image` snapshots image tag/digest and skips `build-requested`;
 - `docker-compose` snapshots project identity, service images/build declarations, and target
   service name for inbound traffic;
+- `static` snapshots source root, publish directory, optional build command leaves, static-server
+  artifact intent, and HTTP endpoint metadata;
 - local Docker adapter starts and verifies a container with resource-scoped labels/names;
 - generic-SSH Docker adapter uses resolved server credentials and reports sanitized failures;
 - same internal port on two reverse-proxy resources does not trigger cross-resource cleanup;
@@ -156,6 +160,10 @@ The minimal Code Round deliverable is:
 - sanitized diagnostics for image build/pull/container start/health failures;
 - resource-scoped cleanup and replacement;
 - tests aligned with the deployment test matrix.
+
+When static site deployment is in scope, the minimal deliverable also includes static artifact
+planning and local Docker static-server packaging aligned with
+[Static Site Deployment Implementation Plan](./static-site-deployment-plan.md).
 
 Public rollback, redeploy, cancel, manual health check, stateful volume rollback, registry
 retention policy editing, Docker Swarm, Kubernetes, and non-Docker runtime adapters remain
@@ -191,6 +199,13 @@ capture, command specs on the durable runtime plan boundary, and richer source-f
 not yet fully implemented across the application and persistence boundary. The remaining generic
 source metadata fields should be narrowed to source-kind-specific typed state or adapter-only
 diagnostics in follow-up rounds.
+
+Static site deployment is partially implemented. Current code has a `static` runtime strategy path,
+typed publish-directory validation at resource creation and deployment admission, static artifact
+planning, post-acceptance failure mapping for static package errors, and adapter-owned static-server
+Dockerfile generation for local/generic-SSH image builds. Local Docker static smoke coverage now
+exercises generated nginx packaging and runtime verification, and generic-SSH Docker static smoke
+coverage exists as an opt-in e2e harness for real SSH targets.
 
 Runtime target abstraction is not implemented yet. Current execution routing still selects local
 and generic-SSH behavior through provider-key checks rather than a registered backend descriptor and

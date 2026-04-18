@@ -103,6 +103,9 @@ Then:
 | RES-CREATE-ADM-032 | integration | Duplicate slug | Existing resource same project/environment/slug | `err` | `resource_slug_conflict`, phase `resource-admission` | None | Existing resource unchanged |
 | RES-CREATE-ADM-033 | integration | Persistence failure | Repository fails before durable state | `err` | `infra_error`, phase `resource-persistence` | None | No accepted resource state |
 | RES-CREATE-ADM-034 | integration | Event publication failure before safe success | Event recording fails before command success | `err` | `infra_error`, phase `event-publication` | None or recovery-specific | Caller does not receive accepted success |
+| RES-CREATE-ADM-035 | integration | Static site resource profile | `kind = static-site`, source binding, `runtimeProfile.strategy = static`, `runtimeProfile.publishDirectory = /dist`, and `networkProfile.internalPort = 80` | `ok({ id })` | None | `resource-created` | Resource persists static runtime profile and HTTP reverse-proxy network profile |
+| RES-CREATE-ADM-036 | integration | Static strategy missing publish directory | Static runtime profile omits `publishDirectory` | `err` | `validation_error`, phase `resource-runtime-resolution` | None | No resource created |
+| RES-CREATE-ADM-037 | integration | Unsafe static publish directory | Static runtime profile uses `publishDirectory` with `..`, URL, shell metacharacter, or host absolute path semantics | `err` | `validation_error`, phase `resource-runtime-resolution` | None | No resource created |
 
 ## Workflow Matrix
 
@@ -114,6 +117,13 @@ Then:
 | RES-CREATE-WF-004 | e2e-preferred | Quick Deploy new resource path | Web/CLI draft uses new resource | Workflow submits explicit resource create before deploy | Resource id is passed to deployment | Context commands -> `resources.create -> deployments.create(resourceId)` |
 | RES-CREATE-WF-005 | e2e-preferred | Quick Deploy with source/runtime/network draft | Web/CLI draft includes source locator, runtime strategy, and internal listener port | Resource creation persists source/runtime/network profile; deployment uses resource id | Resource state owns durable source/runtime/network profile; deployment stores resolved snapshots | `resources.create -> deployments.create(resourceId)` |
 | RES-CREATE-WF-006 | e2e-preferred | Quick Deploy with source variant draft | Web/CLI draft includes deep Git URL, local base directory, Docker image tag/digest, Dockerfile path, or Compose path | Resource creation persists normalized variant fields; deployment uses resource id | Resource state owns source variant identity and runtime strategy-specific file/command fields | Entry normalization -> `resources.create -> deployments.create(resourceId)` |
+| RES-CREATE-WF-007 | e2e-preferred | Static site create then deploy | Web/CLI draft includes static source, publish directory, optional build command, and HTTP port default | Resource creation persists static source/runtime/network profile; deployment uses resource id only | Resource owns `RuntimePlanStrategy = static`, publish directory, and internal port 80 before deployment admission | Entry normalization -> `resources.create(kind = static-site) -> deployments.create(resourceId)` |
+
+## Entry Matrix
+
+| Test ID | Preferred automation | Entry | Expected test focus |
+| --- | --- | --- | --- |
+| RES-CREATE-ENTRY-001 | e2e-preferred | HTTP/oRPC static resource create | `POST /api/resources` reuses the command schema, accepts `kind = static-site`, `runtimeProfile.strategy = static`, `runtimeProfile.publishDirectory`, and HTTP network profile defaults, dispatches `CreateResourceCommand`, and returns a resource id. |
 
 ## Event Matrix
 
@@ -134,7 +144,17 @@ schema is implemented.
 
 Resource creation through deployment bootstrap is a legacy seam and should not be expanded.
 
-`resources.create` has use-case tests. Additional API/oRPC route, CLI command, and Web behavior tests are still pending.
+`resources.create` has use-case tests. Static resource creation now also has HTTP/oRPC route
+coverage for `RES-CREATE-ENTRY-001`. CLI static draft helper coverage exists under
+`packages/adapters/cli/test/deployment-interaction.test.ts`; browser-level Web QuickDeploy entry
+coverage exists under `apps/web/test/e2e-webview/home.webview.test.ts`.
+
+Static site deployment rows `RES-CREATE-ADM-035`, `RES-CREATE-ADM-036`, and
+`RES-CREATE-ADM-037` are covered by `packages/application/test/create-resource.test.ts`.
+`RES-CREATE-WF-007` is covered at the shared Quick Deploy workflow-contract layer. Runtime adapter
+static-server Dockerfile generation is covered by runtime planner tests. Real runtime coverage now
+includes local Docker static smoke under `apps/shell/test/e2e/quick-deploy-static-docker.workflow.e2e.ts`
+and opt-in generic-SSH static smoke under `apps/shell/test/e2e/quick-deploy-ssh.workflow.e2e.ts`.
 
 ## Open Questions
 

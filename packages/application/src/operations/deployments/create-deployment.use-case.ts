@@ -125,6 +125,7 @@ function requestedDeploymentFromResource(resource: Resource): Result<RequestedDe
   const runtimeProfile = resourceState.runtimeProfile;
   const networkProfile = resourceState.networkProfile;
   const internalPort = networkProfile?.internalPort.value;
+  const method = runtimeProfile?.strategy.value ?? "auto";
 
   if (resourceRequiresInternalPort(resource) && !internalPort) {
     return err(
@@ -136,13 +137,26 @@ function requestedDeploymentFromResource(resource: Resource): Result<RequestedDe
     );
   }
 
+  if (method === "static" && !runtimeProfile?.publishDirectory) {
+    return err(
+      domainError.validation("Static runtime profiles require publishDirectory for deployment", {
+        phase: "runtime-plan-resolution",
+        resourceId: resourceState.id.value,
+        runtimePlanStrategy: "static",
+      }),
+    );
+  }
+
   return ok({
-    method: runtimeProfile?.strategy.value ?? "auto",
+    method,
     ...(runtimeProfile?.installCommand
       ? { installCommand: runtimeProfile.installCommand.value }
       : {}),
     ...(runtimeProfile?.buildCommand ? { buildCommand: runtimeProfile.buildCommand.value } : {}),
     ...(runtimeProfile?.startCommand ? { startCommand: runtimeProfile.startCommand.value } : {}),
+    ...(runtimeProfile?.publishDirectory
+      ? { publishDirectory: runtimeProfile.publishDirectory.value }
+      : {}),
     ...(internalPort ? { port: internalPort } : {}),
     ...(networkProfile
       ? {
@@ -399,7 +413,24 @@ export class CreateDeploymentUseCase {
       await publishDomainEventsAndReturn(context, eventBus, logger, deployment, undefined);
 
       const executionResult = await executionBackend.execute(context, deployment);
-      const execution = yield* executionResult;
+      if (executionResult.isErr()) {
+        const failureResult = deploymentLifecycleService.failExecution(
+          deployment,
+          executionResult.error,
+        );
+        yield* failureResult;
+
+        await deploymentRepository.upsert(
+          repositoryContext,
+          deployment,
+          UpsertDeploymentSpec.fromDeployment(deployment),
+        );
+        await publishDomainEventsAndReturn(context, eventBus, logger, deployment, undefined);
+
+        return ok({ id: deployment.toState().id.value });
+      }
+
+      const execution = executionResult.value;
 
       await deploymentRepository.upsert(
         repositoryContext,

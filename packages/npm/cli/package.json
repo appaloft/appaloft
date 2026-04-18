@@ -1,0 +1,29 @@
+{
+  "name": "@appaloft/cli",
+  "version": "0.1.0",
+  "description": "Appaloft CLI and local server launcher.",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "appaloft": "bin/appaloft.js"
+  },
+  "files": [
+    "bin"
+  ],
+  "optionalDependencies": {
+    "@appaloft/cli-darwin-arm64": "0.1.0",
+    "@appaloft/cli-darwin-x64": "0.1.0",
+    "@appaloft/cli-linux-arm64-gnu": "0.1.0",
+    "@appaloft/cli-linux-x64-gnu": "0.1.0",
+    "@appaloft/cli-linux-arm64-musl": "0.1.0",
+    "@appaloft/cli-linux-x64-musl": "0.1.0",
+    "@appaloft/cli-win32-arm64": "0.1.0",
+    "@appaloft/cli-win32-x64": "0.1.0"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

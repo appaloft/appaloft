@@ -7,14 +7,21 @@ import { pythonWorkspacePlanner } from "./python";
 import {
   DockerfileBuilder,
   generatedWorkspaceDockerfileName,
+  renderStaticSiteDockerfile,
   renderWorkspaceDockerfile,
+  staticSiteDockerfileFromExecution,
   type WorkspaceDockerfileInput,
   type WorkspacePlannerInput,
   type WorkspaceRuntimePlan,
   type WorkspaceRuntimePlanner,
 } from "./types";
 
-export { DockerfileBuilder, generatedWorkspaceDockerfileName, renderWorkspaceDockerfile };
+export {
+  DockerfileBuilder,
+  generatedWorkspaceDockerfileName,
+  renderStaticSiteDockerfile,
+  renderWorkspaceDockerfile,
+};
 
 const workspaceRuntimePlanners: WorkspaceRuntimePlanner[] = [
   nextjsWorkspacePlanner,
@@ -52,4 +59,8 @@ function plannerForExecution(execution: RuntimeExecutionPlan): WorkspaceRuntimeP
 
 export function generateWorkspaceDockerfile(input: WorkspaceDockerfileInput): string | null {
   return plannerForExecution(input.execution).dockerfile(input);
+}
+
+export function generateStaticSiteDockerfile(input: WorkspaceDockerfileInput): string | null {
+  return staticSiteDockerfileFromExecution(input);
 }

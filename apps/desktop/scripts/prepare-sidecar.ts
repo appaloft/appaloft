@@ -1,57 +1,60 @@
-import { dirname, join, resolve } from "node:path";
-import { $ } from "bun";
+import { join, resolve } from "node:path";
+
+import { chmodExecutable } from "../../../scripts/release/lib/release-utils";
+import {
+  detectHostReleaseBinaryTarget,
+  findReleaseBinaryTarget,
+  findReleaseBinaryTargetByTauriTriple,
+  normalizeReleaseVersion,
+} from "../../../scripts/release/lib/targets";
 
 const root = resolve(import.meta.dir, "../../..");
 const sidecarDir = join(root, "apps", "desktop", "src-tauri", "binaries");
-const sourceBinaryName = process.platform === "win32" ? "appaloft.exe" : "appaloft";
-const sourceBinaryPath = join(root, "dist", "release", "appaloft-binary-bundle", sourceBinaryName);
 
-function detectTargetTriple(): string {
+function detectReleaseTarget() {
+  const configuredTarget = process.env.APPALOFT_BINARY_TARGET;
+  if (configuredTarget) {
+    const target = findReleaseBinaryTarget(configuredTarget);
+    if (!target) {
+      throw new Error(`Unsupported APPALOFT_BINARY_TARGET=${configuredTarget}`);
+    }
+    return target;
+  }
+
   const configuredTriple = process.env.APPALOFT_TAURI_TARGET_TRIPLE;
   if (configuredTriple) {
-    return configuredTriple;
+    const target = findReleaseBinaryTargetByTauriTriple(configuredTriple);
+    if (!target) {
+      throw new Error(`Unsupported APPALOFT_TAURI_TARGET_TRIPLE=${configuredTriple}`);
+    }
+    return target;
   }
 
-  if (process.platform === "darwin" && process.arch === "arm64") {
-    return "aarch64-apple-darwin";
-  }
-  if (process.platform === "darwin" && process.arch === "x64") {
-    return "x86_64-apple-darwin";
-  }
-  if (process.platform === "linux" && process.arch === "x64") {
-    return "x86_64-unknown-linux-gnu";
-  }
-  if (process.platform === "linux" && process.arch === "arm64") {
-    return "aarch64-unknown-linux-gnu";
-  }
-  if (process.platform === "win32" && process.arch === "x64") {
-    return "x86_64-pc-windows-msvc";
-  }
-  if (process.platform === "win32" && process.arch === "arm64") {
-    return "aarch64-pc-windows-msvc";
-  }
-
-  throw new Error(
-    `Unsupported Tauri sidecar target for platform=${process.platform} arch=${process.arch}. Set APPALOFT_TAURI_TARGET_TRIPLE explicitly.`,
-  );
+  return detectHostReleaseBinaryTarget();
 }
 
-const targetTriple = detectTargetTriple();
+const releaseTarget = detectReleaseTarget();
+const targetTriple = process.env.APPALOFT_TAURI_TARGET_TRIPLE ?? releaseTarget.tauriTriple;
+const version = normalizeReleaseVersion(process.env.APPALOFT_APP_VERSION ?? "0.1.0");
+const bundleDir =
+  process.env.APPALOFT_BINARY_BUNDLE_DIR ??
+  join(root, "dist", "release", `appaloft-v${version}-${releaseTarget.name}`);
+const legacyBundleDir = join(root, "dist", "release", "appaloft-binary-bundle");
+const sourceBundleDir = (await Bun.file(join(bundleDir, releaseTarget.executableName)).exists())
+  ? bundleDir
+  : legacyBundleDir;
+const sourceBinaryPath = join(sourceBundleDir, releaseTarget.executableName);
 const targetBinaryName =
-  process.platform === "win32" ? `appaloft-${targetTriple}.exe` : `appaloft-${targetTriple}`;
+  releaseTarget.os === "win32" ? `appaloft-${targetTriple}.exe` : `appaloft-${targetTriple}`;
 const targetBinaryPath = join(sidecarDir, targetBinaryName);
 
 if (!(await Bun.file(sourceBinaryPath).exists())) {
   throw new Error(
-    `Missing Appaloft backend binary at ${sourceBinaryPath}. Run bun run package:binary-bundle first.`,
+    `Missing Appaloft backend binary at ${sourceBinaryPath}. Run bun run package:binary-bundle -- --target ${releaseTarget.name} first.`,
   );
 }
 
-await $`mkdir -p ${dirname(targetBinaryPath)}`;
 await Bun.write(targetBinaryPath, Bun.file(sourceBinaryPath));
-
-if (process.platform !== "win32") {
-  await $`chmod 755 ${targetBinaryPath}`;
-}
+await chmodExecutable(targetBinaryPath);
 
 console.log(`prepared Tauri sidecar ${targetBinaryPath}`);

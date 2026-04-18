@@ -1,24 +1,17 @@
-import { join, resolve } from "node:path";
-import { $ } from "bun";
+import { join, relative, resolve } from "node:path";
 
-async function walk(path: string): Promise<string[]> {
-  const output = await $`find ${path} -type f`.text();
-  return output
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0)
-    .filter((file) => !file.endsWith("/checksums.txt"))
-    .sort();
-}
+import { listTopLevelFiles } from "./lib/release-utils";
 
 const releaseRoot = resolve(import.meta.dir, "../../dist/release");
-const files = await walk(releaseRoot);
+const files = (await listTopLevelFiles(releaseRoot)).filter(
+  (file) => relative(releaseRoot, file) !== "checksums.txt",
+);
 
 const outputLines = await Promise.all(
   files.map(async (file) => {
     const hasher = new Bun.CryptoHasher("sha256");
     hasher.update(await Bun.file(file).arrayBuffer());
-    return `${hasher.digest("hex")}  ${file.replace(`${releaseRoot}/`, "")}`;
+    return `${hasher.digest("hex")}  ${relative(releaseRoot, file)}`;
   }),
 );
 

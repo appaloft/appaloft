@@ -1,0 +1,21 @@
+{
+  "name": "@appaloft/cli-linux-arm64-gnu",
+  "version": "0.1.0",
+  "description": "Appaloft CLI binary for Linux arm64 glibc.",
+  "license": "MIT",
+  "os": [
+    "linux"
+  ],
+  "cpu": [
+    "arm64"
+  ],
+  "libc": [
+    "glibc"
+  ],
+  "files": [
+    "bin"
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
+}

@@ -3,6 +3,7 @@ import "reflect-metadata";
 import { describe, expect, test } from "bun:test";
 import {
   BuildStrategyKindValue,
+  CommandText,
   ConfigKey,
   ConfigScopeValue,
   ConfigValueText,
@@ -22,6 +23,7 @@ import {
   DestinationName,
   DetectSummary,
   DisplayNameText,
+  domainError,
   Environment,
   EnvironmentId,
   EnvironmentKindValue,
@@ -30,6 +32,7 @@ import {
   ExecutionStatusValue,
   ExecutionStrategyKindValue,
   ExitCode,
+  err,
   FinishedAt,
   GeneratedAt,
   HostAddress,
@@ -58,9 +61,11 @@ import {
   RuntimePlan,
   RuntimePlanId,
   RuntimePlanStrategyValue,
+  SourceBaseDirectory,
   SourceDescriptor,
   SourceKindValue,
   SourceLocator,
+  StaticPublishDirectory,
   TargetKindValue,
   UpdatedAt,
   UpsertDeploymentTargetSpec,
@@ -157,6 +162,15 @@ class StaticRuntimePlanResolver implements RuntimePlanResolver {
   }
 }
 
+class CapturingRuntimePlanResolver implements RuntimePlanResolver {
+  public input?: Parameters<RuntimePlanResolver["resolve"]>[1];
+
+  async resolve(context: ExecutionContext, input: Parameters<RuntimePlanResolver["resolve"]>[1]) {
+    this.input = input;
+    return new StaticRuntimePlanResolver().resolve(context, input);
+  }
+}
+
 class HermeticExecutionBackend implements ExecutionBackend {
   async execute(
     _context: ExecutionContext,
@@ -218,6 +232,23 @@ class HermeticExecutionBackend implements ExecutionBackend {
         }),
       ],
     });
+  }
+}
+
+class FailingStaticPackageExecutionBackend extends HermeticExecutionBackend {
+  async execute(): Promise<Result<{ deployment: Deployment }>> {
+    return err(
+      domainError.provider(
+        "Static artifact package failed",
+        {
+          phase: "image-build",
+          step: "static-package",
+          runtimePlanStrategy: "static",
+          publishDirectory: "/dist",
+        },
+        true,
+      ),
+    );
   }
 }
 
@@ -331,6 +362,10 @@ function createTestContext(): ExecutionContext {
 
 async function createDeploymentFixture(
   defaultsPolicy: DeploymentContextDefaultsPolicy = new LocalEmbeddedDefaultsPolicy(),
+  options: {
+    runtimePlanResolver?: RuntimePlanResolver;
+    executionBackend?: ExecutionBackend;
+  } = {},
 ) {
   const projects = new MemoryProjectRepository();
   const servers = new MemoryServerRepository();
@@ -432,8 +467,8 @@ async function createDeploymentFixture(
       logger,
     ),
     new StaticSourceDetector(),
-    new StaticRuntimePlanResolver(),
-    new HermeticExecutionBackend(),
+    options.runtimePlanResolver ?? new StaticRuntimePlanResolver(),
+    options.executionBackend ?? new HermeticExecutionBackend(),
     eventBus,
     new NoopDeploymentProgressReporter(),
     logger,
@@ -459,6 +494,38 @@ async function createDeploymentFixture(
       resourceId: "res_demo",
     },
   };
+}
+
+function createStaticSiteResource(input: { publishDirectory?: string } = {}): Resource {
+  return Resource.rehydrate({
+    id: ResourceId.rehydrate("res_demo"),
+    projectId: ProjectId.rehydrate("prj_demo"),
+    environmentId: EnvironmentId.rehydrate("env_demo"),
+    destinationId: DestinationId.rehydrate("dst_demo"),
+    name: ResourceName.rehydrate("docs"),
+    slug: ResourceSlug.rehydrate("docs"),
+    kind: ResourceKindValue.rehydrate("static-site"),
+    services: [],
+    sourceBinding: {
+      kind: SourceKindValue.rehydrate("local-folder"),
+      locator: SourceLocator.rehydrate("."),
+      displayName: DisplayNameText.rehydrate("workspace"),
+      baseDirectory: SourceBaseDirectory.rehydrate("/site"),
+    },
+    runtimeProfile: {
+      strategy: RuntimePlanStrategyValue.rehydrate("static"),
+      buildCommand: CommandText.rehydrate("pnpm build"),
+      ...(input.publishDirectory
+        ? { publishDirectory: StaticPublishDirectory.rehydrate(input.publishDirectory) }
+        : {}),
+    },
+    networkProfile: {
+      internalPort: PortNumber.rehydrate(80),
+      upstreamProtocol: ResourceNetworkProtocolValue.rehydrate("http"),
+      exposureMode: ResourceExposureModeValue.rehydrate("reverse-proxy"),
+    },
+    createdAt: CreatedAt.rehydrate("2026-01-01T00:00:00.000Z"),
+  });
 }
 
 describe("CreateDeploymentUseCase", () => {
@@ -768,6 +835,110 @@ describe("CreateDeploymentUseCase", () => {
       phase: "resource-network-resolution",
       resourceId: "res_demo",
       resourceKind: "application",
+    });
+  });
+
+  test("[DEP-CREATE-ADM-026] resolves static resource profile into static artifact planning input", async () => {
+    const runtimePlanResolver = new CapturingRuntimePlanResolver();
+    const {
+      context,
+      createDeploymentInput,
+      createDeploymentUseCase,
+      resources,
+      repositoryContext,
+    } = await createDeploymentFixture(new ExplicitContextRequiredPolicy(), {
+      runtimePlanResolver,
+    });
+    const staticResource = createStaticSiteResource({ publishDirectory: "/dist" });
+
+    await resources.upsert(
+      repositoryContext,
+      staticResource,
+      UpsertResourceSpec.fromResource(staticResource),
+    );
+
+    const result = await createDeploymentUseCase.execute(context, createDeploymentInput);
+
+    expect(result.isOk()).toBe(true);
+    const requestedDeployment = runtimePlanResolver.input?.requestedDeployment as
+      | Record<string, unknown>
+      | undefined;
+    expect(requestedDeployment).toMatchObject({
+      method: "static",
+      publishDirectory: "/dist",
+      buildCommand: "pnpm build",
+      port: 80,
+      exposureMode: "reverse-proxy",
+      upstreamProtocol: "http",
+    });
+  });
+
+  test("[DEP-CREATE-ADM-027] rejects static resource without publish directory before acceptance", async () => {
+    const {
+      context,
+      createDeploymentInput,
+      createDeploymentUseCase,
+      deployments,
+      resources,
+      repositoryContext,
+    } = await createDeploymentFixture(new ExplicitContextRequiredPolicy());
+    const staticResource = createStaticSiteResource();
+
+    await resources.upsert(
+      repositoryContext,
+      staticResource,
+      UpsertResourceSpec.fromResource(staticResource),
+    );
+
+    const result = await createDeploymentUseCase.execute(context, createDeploymentInput);
+
+    expect(result.isErr()).toBe(true);
+    const error = result._unsafeUnwrapErr();
+    expect(error.code).toBe("validation_error");
+    expect(error.details).toMatchObject({
+      phase: "runtime-plan-resolution",
+      resourceId: "res_demo",
+      runtimePlanStrategy: "static",
+    });
+    expect(deployments.items.size).toBe(0);
+  });
+
+  test("[DEP-CREATE-ASYNC-017] keeps accepted static deployment ok when package fails after acceptance", async () => {
+    const {
+      context,
+      createDeploymentInput,
+      createDeploymentUseCase,
+      deployments,
+      resources,
+      repositoryContext,
+    } = await createDeploymentFixture(new ExplicitContextRequiredPolicy(), {
+      executionBackend: new FailingStaticPackageExecutionBackend(),
+    });
+    const staticResource = createStaticSiteResource({ publishDirectory: "/dist" });
+
+    await resources.upsert(
+      repositoryContext,
+      staticResource,
+      UpsertResourceSpec.fromResource(staticResource),
+    );
+
+    const result = await createDeploymentUseCase.execute(context, createDeploymentInput);
+
+    expect(result.isOk()).toBe(true);
+    const deploymentId = result._unsafeUnwrap().id;
+    const deployment = await deployments.findOne(
+      repositoryContext,
+      DeploymentByIdSpec.create(DeploymentId.rehydrate(deploymentId)),
+    );
+    expect(deployment?.toState()).toMatchObject({
+      status: { value: "failed" },
+    });
+    expect(deployment?.toState().logs.at(-1)?.toState().phase.value).toBe("package");
+    expect(deployment?.toState().runtimePlan.toState().execution.toState().metadata).toMatchObject({
+      phase: "image-build",
+      step: "static-package",
+      runtimePlanStrategy: "static",
+      publishDirectory: "/dist",
     });
   });
 

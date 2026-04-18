@@ -50,7 +50,7 @@ import {
   dockerLabelsFromAssignments,
   renderRuntimeCommandString,
 } from "./runtime-commands";
-import { generateWorkspaceDockerfile } from "./workspace-planners";
+import { generateStaticSiteDockerfile, generateWorkspaceDockerfile } from "./workspace-planners";
 
 type LogPhase = "detect" | "plan" | "package" | "deploy" | "verify" | "rollback";
 type LogLevel = "debug" | "info" | "warn" | "error";
@@ -1195,8 +1195,13 @@ export class LocalExecutionBackend implements ExecutionBackend {
   ): Promise<Result<{ deployment: Deployment }>> {
     const state = deployment.toState();
     const runtimeDir = this.runtimeDirectory(state.id.value);
-    const port = await reservePort(state.runtimePlan.execution.port);
-    const env = deploymentEnv(deployment, port);
+    const containerPort = state.runtimePlan.execution.port ?? 3000;
+    const usesDirectHostPort =
+      state.runtimePlan.execution.metadata?.["resource.exposureMode"] === "direct-port";
+    if (usesDirectHostPort) {
+      await reservePort(containerPort);
+    }
+    const env = deploymentEnv(deployment, containerPort);
     const logs: DeploymentLogEntry[] = [
       phaseLog("plan", "Using local docker-container execution"),
     ];
@@ -1250,12 +1255,23 @@ export class LocalExecutionBackend implements ExecutionBackend {
     let image = state.runtimePlan.execution.image;
     const containerName = sanitizeName(`appaloft-${state.id.value}`);
 
-    if (state.runtimePlan.buildStrategy === "dockerfile" || state.runtimePlan.buildStrategy === "workspace-commands") {
+    const shouldBuildImage =
+      state.runtimePlan.buildStrategy === "dockerfile" ||
+      state.runtimePlan.buildStrategy === "workspace-commands" ||
+      state.runtimePlan.buildStrategy === "static-artifact";
+
+    if (shouldBuildImage) {
       image = sanitizeName(`appaloft-image-${state.id.value}`);
       const dockerfilePath =
-        state.runtimePlan.buildStrategy === "workspace-commands"
-          ? resolve(runtimeDir, state.runtimePlan.execution.dockerfilePath ?? "Dockerfile.appaloft")
-          : state.runtimePlan.execution.dockerfilePath ?? "Dockerfile";
+        state.runtimePlan.buildStrategy === "dockerfile"
+          ? (state.runtimePlan.execution.dockerfilePath ?? "Dockerfile")
+          : resolve(
+              runtimeDir,
+              state.runtimePlan.execution.dockerfilePath ??
+                (state.runtimePlan.buildStrategy === "static-artifact"
+                  ? "Dockerfile.appaloft-static"
+                  : "Dockerfile.appaloft"),
+            );
 
       if (state.runtimePlan.buildStrategy === "workspace-commands") {
         const dockerfile = generateWorkspaceDockerfile({
@@ -1287,6 +1303,38 @@ export class LocalExecutionBackend implements ExecutionBackend {
         mkdirSync(runtimeDir, { recursive: true });
         await Bun.write(dockerfilePath, dockerfile);
         logs.push(phaseLog("package", `Generated workspace Dockerfile at ${dockerfilePath}`));
+      }
+
+      if (state.runtimePlan.buildStrategy === "static-artifact") {
+        const dockerfile = generateStaticSiteDockerfile({
+          execution: state.runtimePlan.execution,
+          ...(state.runtimePlan.source.inspection
+            ? { sourceInspection: state.runtimePlan.source.inspection }
+            : {}),
+        });
+        if (!dockerfile) {
+          const message = "Static publish directory is required for static image generation";
+          this.report(context, {
+            deploymentId: state.id.value,
+            phase: "package",
+            status: "failed",
+            level: "error",
+            message,
+          });
+          return ok({
+            deployment: this.applyFailure(deployment, {
+              logs: [
+                ...logs,
+                phaseLog("package", message, "error"),
+              ],
+              errorCode: "static_dockerfile_generation_failed",
+              retryable: false,
+            }).deployment,
+          });
+        }
+        mkdirSync(runtimeDir, { recursive: true });
+        await Bun.write(dockerfilePath, dockerfile);
+        logs.push(phaseLog("package", `Generated static site Dockerfile at ${dockerfilePath}`));
       }
 
       const buildCommand = renderRuntimeCommandString(
@@ -1501,8 +1549,6 @@ export class LocalExecutionBackend implements ExecutionBackend {
     }
 
     const dockerCommandBuilder = RuntimeCommandBuilder.docker();
-    const usesDirectHostPort =
-      state.runtimePlan.execution.metadata?.["resource.exposureMode"] === "direct-port";
     const removeSupersededResourceContainersSpec =
       dockerCommandBuilder.removeResourceContainers({
         resourceId: state.resourceId.value,
@@ -1539,7 +1585,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
             correlationId: context.requestId,
           },
           deploymentId: state.id.value,
-          port,
+          port: containerPort,
           accessRoutes,
         })
       : ok(null);
@@ -1596,7 +1642,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
         : {}),
       publishedPorts: [
         dockerCommandBuilder.publishPort({
-          containerPort: port,
+          containerPort,
           mode: usesDirectHostPort ? "host-same-port" : "loopback-ephemeral",
         }),
       ],
@@ -1656,7 +1702,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
           metadata: {
             image,
             containerName,
-            port: String(port),
+            port: String(containerPort),
             ...preparedSource.metadata,
           },
         }).deployment,
@@ -1774,7 +1820,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
     const publishedPortResult = runSyncCommand({
       command: dockerPublishedPortCommand({
         containerName,
-        containerPort: port,
+        containerPort,
         quote: shellQuote,
       }),
       cwd: workdir,
@@ -1814,7 +1860,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
           metadata: {
             image,
             containerName,
-            port: String(port),
+            port: String(containerPort),
             ...preparedSource.metadata,
           },
         }).deployment,
@@ -1841,7 +1887,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
           metadata: {
             image,
             containerName,
-            port: String(port),
+            port: String(containerPort),
             publishedPort: String(publishedHostPort),
             ...preparedSource.metadata,
           },
@@ -1889,7 +1935,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
           metadata: {
             image,
             containerName,
-            port: String(port),
+            port: String(containerPort),
             publishedPort: String(publishedHostPort),
             url,
             ...preparedSource.metadata,
@@ -1932,7 +1978,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
       metadata: {
         image,
         containerName,
-        port: String(port),
+        port: String(containerPort),
         publishedPort: String(publishedHostPort),
         url,
         ...preparedSource.metadata,

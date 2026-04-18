@@ -69,7 +69,13 @@
   import { orpcClient } from "$lib/orpc";
   import { queryClient } from "$lib/query-client";
 
-  type SourceKind = "local-folder" | "github" | "remote-git" | "docker-image" | "compose";
+  type SourceKind =
+    | "local-folder"
+    | "github"
+    | "remote-git"
+    | "docker-image"
+    | "compose"
+    | "static-site";
   type SourceOptionIcon = Component<{ class?: string }>;
   type GithubSourceMode = "url" | "browser";
   type DraftMode = "existing" | "new";
@@ -154,6 +160,12 @@
       labelKey: i18nKeys.console.quickDeploy.sourceCompose,
       hintKey: i18nKeys.console.quickDeploy.sourceComposeHint,
       icon: Waypoints,
+    },
+    {
+      key: "static-site",
+      labelKey: i18nKeys.console.quickDeploy.sourceStaticSite,
+      hintKey: i18nKeys.console.quickDeploy.sourceStaticSiteHint,
+      icon: Package,
     },
   ];
 
@@ -294,7 +306,15 @@
   let generatedResourceNameBase = $state("");
   let resourceKind = $state<ResourceKind>(parseResourceKind(browser ? page.url.searchParams.get("resourceKind") : null));
   let resourceDescription = $state(browser ? (page.url.searchParams.get("resourceDescription") ?? "") : "");
-  let resourceInternalPort = $state(browser ? (page.url.searchParams.get("resourceInternalPort") ?? "3000") : "3000");
+  let resourceInternalPort = $state(
+    browser
+      ? (page.url.searchParams.get("resourceInternalPort") ??
+        (initialSourceKind === "static-site" ? "80" : "3000"))
+      : "3000",
+  );
+  let staticPublishDirectory = $state(browser ? (page.url.searchParams.get("staticPublishDirectory") ?? "/dist") : "/dist");
+  let staticInstallCommand = $state(browser ? (page.url.searchParams.get("staticInstallCommand") ?? "") : "");
+  let staticBuildCommand = $state(browser ? (page.url.searchParams.get("staticBuildCommand") ?? "") : "");
   let resourceHealthCheckEnabled = $state(
     browser ? page.url.searchParams.get("resourceHealthCheckEnabled") === "true" : false,
   );
@@ -341,6 +361,7 @@
   let remoteGitLocator = $state(browser ? (page.url.searchParams.get("sourceLocator") ?? "") : "");
   let dockerImageLocator = $state(browser ? (page.url.searchParams.get("sourceLocator") ?? "") : "");
   let composeLocator = $state(browser ? (page.url.searchParams.get("sourceLocator") ?? "") : "");
+  let staticSiteLocator = $state(browser ? (page.url.searchParams.get("sourceLocator") ?? ".") : ".");
   let lastAppliedUrlSearch = browser ? page.url.search : "";
   let routerStateReady = $state(false);
   let deployFeedback = $state<{
@@ -486,6 +507,8 @@
         return dockerImageLocator.trim();
       case "compose":
         return composeLocator.trim();
+      case "static-site":
+        return staticSiteLocator.trim();
       default:
         return localFolderLocator.trim();
     }
@@ -500,6 +523,8 @@
         return "ghcr.io/acme/platform:latest";
       case "compose":
         return "./deploy/docker-compose.yml";
+      case "static-site":
+        return ".";
       default:
         return ".";
     }
@@ -528,15 +553,26 @@
     const healthCheckPath = resourceHealthCheckPath.trim();
     const createsResource = !resourceContextEnabled || resourceMode === "new";
 
+    if (createsStaticSiteResource) {
+      segments.push("--method static");
+      segments.push(`--publish-dir ${staticPublishDirectory.trim() || "/dist"}`);
+      if (staticInstallCommand.trim()) {
+        segments.push(`--install ${staticInstallCommand.trim()}`);
+      }
+      if (staticBuildCommand.trim()) {
+        segments.push(`--build ${staticBuildCommand.trim()}`);
+      }
+    }
+
     if (!resourceContextEnabled) {
       segments.push(`--resource-name ${inferredResourceInput.name}`);
-      segments.push(`--port ${resourceInternalPort.trim() || "3000"}`);
+      segments.push(`--port ${resourceInternalPort.trim() || resourceInternalPortDefault}`);
     } else if (resourceMode === "new") {
       segments.push(`--resource-name ${editedResourceInput.name}`);
       if (editedResourceInput.kind) {
         segments.push(`--resource-kind ${editedResourceInput.kind}`);
       }
-      segments.push(`--port ${resourceInternalPort.trim() || "3000"}`);
+      segments.push(`--port ${resourceInternalPort.trim() || resourceInternalPortDefault}`);
     }
 
     if (createsResource && resourceHealthCheckEnabled && healthCheckPath) {
@@ -653,6 +689,25 @@
       ];
     }
 
+    if (sourceKind === "static-site") {
+      return [
+        {
+          label: $t(i18nKeys.console.quickDeploy.staticSource),
+          value: sourceSummary,
+          mono: true,
+        },
+        {
+          label: $t(i18nKeys.console.quickDeploy.staticPublishDirectory),
+          value: staticPublishDirectory.trim() || "/dist",
+          mono: true,
+        },
+        {
+          label: $t(i18nKeys.console.quickDeploy.sourceAccess),
+          value: $t(i18nKeys.console.quickDeploy.sourceAccessLocalFolder),
+        },
+      ];
+    }
+
     return [
       {
         label: $t(i18nKeys.console.quickDeploy.localFolderPath),
@@ -686,7 +741,12 @@
     return /[a-z0-9]/i.test(name) ? name : "local-resource";
   });
   const inferredResourceKind = $derived.by(
-    (): ResourceKind => (sourceKind === "compose" ? "compose-stack" : "application"),
+    (): ResourceKind =>
+      sourceKind === "compose"
+        ? "compose-stack"
+        : sourceKind === "static-site"
+          ? "static-site"
+          : "application",
   );
   const inferredResourceInput = $derived.by((): ResourceDraftInput => ({
     name: generatedResourceName || normalizeQuickDeployGeneratedNameBase(inferredSourceName),
@@ -697,6 +757,19 @@
     kind: resourceKind,
     ...(resourceDescription.trim() ? { description: resourceDescription.trim() } : {}),
   }));
+  const createsStaticSiteResource = $derived.by(() => {
+    if (resourceContextEnabled && resourceMode === "existing") {
+      return false;
+    }
+
+    const draftKind =
+      resourceContextEnabled && resourceMode === "new"
+        ? editedResourceInput.kind
+        : inferredResourceInput.kind;
+
+    return sourceKind === "static-site" || draftKind === "static-site";
+  });
+  const resourceInternalPortDefault = $derived(createsStaticSiteResource ? "80" : "3000");
   const defaultProjectSummary = $derived.by(() => {
     if (selectedProject) {
       return selectedProject.name;
@@ -720,7 +793,7 @@
       }`;
     }
 
-    return `${inferredResourceInput.name} · ${inferredResourceInput.kind ?? "application"} · :${resourceInternalPort.trim() || "3000"}`;
+    return `${inferredResourceInput.name} · ${inferredResourceInput.kind ?? "application"} · :${resourceInternalPort.trim() || resourceInternalPortDefault}`;
   });
   const projectSummary = $derived.by(() => {
     if (projectMode === "existing") {
@@ -789,7 +862,7 @@
         : "未选择资源";
     }
 
-    return `${editedResourceInput.name} · ${editedResourceInput.kind ?? "application"} · :${resourceInternalPort.trim() || "3000"}`;
+    return `${editedResourceInput.name} · ${editedResourceInput.kind ?? "application"} · :${resourceInternalPort.trim() || resourceInternalPortDefault}`;
   });
   const resourceHealthCheckSummary = $derived.by(() => {
     if (resourceContextEnabled && resourceMode === "existing") {
@@ -1136,6 +1209,9 @@
       setSearchParam(params, "generatedResourceName", generatedResourceName);
     }
     setSearchParam(params, "resourceInternalPort", resourceInternalPort, "3000");
+    setSearchParam(params, "staticPublishDirectory", staticPublishDirectory, "/dist");
+    setSearchParam(params, "staticInstallCommand", staticInstallCommand);
+    setSearchParam(params, "staticBuildCommand", staticBuildCommand);
     setSearchParam(params, "resourceHealthCheckEnabled", resourceHealthCheckEnabled ? "true" : "false", "false");
     setSearchParam(params, "resourceHealthCheckMethod", resourceHealthCheckMethod, "GET");
     setSearchParam(params, "resourceHealthCheckScheme", resourceHealthCheckScheme, "http");
@@ -1193,7 +1269,10 @@
     generatedResourceNameBase = "";
     resourceKind = parseResourceKind(params.get("resourceKind"));
     resourceDescription = params.get("resourceDescription") ?? "";
-    resourceInternalPort = params.get("resourceInternalPort") ?? "3000";
+    resourceInternalPort = params.get("resourceInternalPort") ?? (nextSourceKind === "static-site" ? "80" : "3000");
+    staticPublishDirectory = params.get("staticPublishDirectory") ?? "/dist";
+    staticInstallCommand = params.get("staticInstallCommand") ?? "";
+    staticBuildCommand = params.get("staticBuildCommand") ?? "";
     resourceHealthCheckEnabled = params.get("resourceHealthCheckEnabled") === "true";
     resourceHealthCheckMethod = parseHealthCheckMethod(params.get("resourceHealthCheckMethod"));
     resourceHealthCheckScheme = parseHealthCheckScheme(params.get("resourceHealthCheckScheme"));
@@ -1219,6 +1298,7 @@
     remoteGitLocator = nextSourceKind === "remote-git" ? nextSourceLocator : remoteGitLocator;
     dockerImageLocator = nextSourceKind === "docker-image" ? nextSourceLocator : dockerImageLocator;
     composeLocator = nextSourceKind === "compose" ? nextSourceLocator : composeLocator;
+    staticSiteLocator = nextSourceKind === "static-site" ? nextSourceLocator || "." : staticSiteLocator;
   }
 
   function setSourceLocator(value: string): void {
@@ -1239,6 +1319,9 @@
       case "compose":
         composeLocator = value;
         return;
+      case "static-site":
+        staticSiteLocator = value;
+        return;
       default:
         localFolderLocator = value;
     }
@@ -1246,6 +1329,12 @@
 
   function selectSourceKind(kind: SourceKind): void {
     sourceKind = kind;
+    if (kind === "static-site") {
+      resourceKind = "static-site";
+      if (!resourceInternalPort.trim() || resourceInternalPort === "3000") {
+        resourceInternalPort = "80";
+      }
+    }
     if (kind === "github" && githubConnected && !githubLocator.trim()) {
       githubSourceMode = "browser";
       githubSourceModeTouched = false;
@@ -1277,6 +1366,18 @@
     }
 
     return "git-public";
+  }
+
+  function staticSourceKindForLocator(locator: string): ResourceSourceInput["kind"] {
+    if (/^(https?|ssh):\/\//.test(locator) || locator.endsWith(".git")) {
+      return gitSourceKindForLocator(locator);
+    }
+
+    if (locator.endsWith(".zip")) {
+      return "zip-artifact";
+    }
+
+    return "local-folder";
   }
 
   function resourceSourceForSource(): ResourceSourceInput {
@@ -1314,6 +1415,11 @@
       case "compose":
         return {
           kind: "compose",
+          locator,
+        };
+      case "static-site":
+        return {
+          kind: staticSourceKindForLocator(locator),
           locator,
         };
       default:
@@ -1406,13 +1512,30 @@
         return withHealthCheckPath({ strategy: "prebuilt-image" });
       case "compose":
         return withHealthCheckPath({ strategy: "docker-compose" });
+      case "static-site":
+        return withHealthCheckPath({
+          strategy: "static",
+          publishDirectory: staticPublishDirectory.trim() || "/dist",
+          ...(staticInstallCommand.trim() ? { installCommand: staticInstallCommand.trim() } : {}),
+          ...(staticBuildCommand.trim() ? { buildCommand: staticBuildCommand.trim() } : {}),
+        });
       default:
+        if (createsStaticSiteResource) {
+          return withHealthCheckPath({
+            strategy: "static",
+            publishDirectory: staticPublishDirectory.trim() || "/dist",
+            ...(staticInstallCommand.trim()
+              ? { installCommand: staticInstallCommand.trim() }
+              : {}),
+            ...(staticBuildCommand.trim() ? { buildCommand: staticBuildCommand.trim() } : {}),
+          });
+        }
         return withHealthCheckPath({ strategy: "auto" });
     }
   }
 
   function networkProfileForSource(): ResourceNetworkProfileInput {
-    const internalPort = Number(resourceInternalPort.trim() || "3000");
+    const internalPort = Number(resourceInternalPort.trim() || resourceInternalPortDefault);
     if (!Number.isInteger(internalPort) || internalPort < 1 || internalPort > 65535) {
       throw new Error($t(i18nKeys.console.quickDeploy.applicationPortInvalid));
     }
@@ -1428,6 +1551,10 @@
     switch (stepKey) {
       case "source":
         if (!sourceLocator) {
+          return false;
+        }
+
+        if (sourceKind === "static-site" && !staticPublishDirectory.trim()) {
           return false;
         }
 
@@ -1688,6 +1815,10 @@
     try {
       if (!sourceLocator) {
         throw new Error("请先填写来源地址。");
+      }
+
+      if (createsStaticSiteResource && !staticPublishDirectory.trim()) {
+        throw new Error($t(i18nKeys.console.quickDeploy.staticPublishDirectoryHint));
       }
 
       let workflowProject: QuickDeployWorkflowInput["project"];
@@ -2052,6 +2183,46 @@
                     placeholder={sourcePlaceholder}
                   />
                 {/if}
+              </div>
+            {/if}
+            {#if sourceKind === "static-site"}
+              <div class="grid gap-3 sm:grid-cols-3">
+                <div class="space-y-2">
+                  <label class="text-xs font-medium text-muted-foreground" for="static-publish-directory">
+                    {$t(i18nKeys.console.quickDeploy.staticPublishDirectory)}
+                  </label>
+                  <Input
+                    id="static-publish-directory"
+                    class="font-mono text-xs"
+                    bind:value={staticPublishDirectory}
+                    placeholder="/dist"
+                  />
+                </div>
+                <div class="space-y-2">
+                  <label class="text-xs font-medium text-muted-foreground" for="static-install-command">
+                    {$t(i18nKeys.console.quickDeploy.staticInstallCommand)}
+                  </label>
+                  <Input
+                    id="static-install-command"
+                    class="font-mono text-xs"
+                    bind:value={staticInstallCommand}
+                    placeholder="pnpm install"
+                  />
+                </div>
+                <div class="space-y-2">
+                  <label class="text-xs font-medium text-muted-foreground" for="static-build-command">
+                    {$t(i18nKeys.console.quickDeploy.staticBuildCommand)}
+                  </label>
+                  <Input
+                    id="static-build-command"
+                    class="font-mono text-xs"
+                    bind:value={staticBuildCommand}
+                    placeholder="pnpm build"
+                  />
+                </div>
+                <p class="text-xs text-muted-foreground sm:col-span-3">
+                  {$t(i18nKeys.console.quickDeploy.staticPublishDirectoryHint)}
+                </p>
               </div>
             {/if}
           </div>
@@ -2634,6 +2805,9 @@
                                 variant={resourceKind === kind ? "selected" : "outline"}
                                 onclick={() => {
                                   resourceKind = kind;
+                                  if (kind === "static-site" && (!resourceInternalPort.trim() || resourceInternalPort === "3000")) {
+                                    resourceInternalPort = "80";
+                                  }
                                 }}
                               >
                                 {kind}
@@ -2646,12 +2820,56 @@
                         </div>
                       {/if}
                       {#if resourceMode === "new"}
+                        {#if createsStaticSiteResource}
+                          <div class="grid gap-3 sm:grid-cols-3">
+                            <div class="space-y-2">
+                              <label class="text-xs font-medium text-muted-foreground" for="resource-static-publish-directory">
+                                {$t(i18nKeys.console.quickDeploy.staticPublishDirectory)}
+                              </label>
+                              <Input
+                                id="resource-static-publish-directory"
+                                class="font-mono text-xs"
+                                bind:value={staticPublishDirectory}
+                                placeholder="/dist"
+                              />
+                            </div>
+                            <div class="space-y-2">
+                              <label class="text-xs font-medium text-muted-foreground" for="resource-static-install-command">
+                                {$t(i18nKeys.console.quickDeploy.staticInstallCommand)}
+                              </label>
+                              <Input
+                                id="resource-static-install-command"
+                                class="font-mono text-xs"
+                                bind:value={staticInstallCommand}
+                                placeholder="pnpm install"
+                              />
+                            </div>
+                            <div class="space-y-2">
+                              <label class="text-xs font-medium text-muted-foreground" for="resource-static-build-command">
+                                {$t(i18nKeys.console.quickDeploy.staticBuildCommand)}
+                              </label>
+                              <Input
+                                id="resource-static-build-command"
+                                class="font-mono text-xs"
+                                bind:value={staticBuildCommand}
+                                placeholder="pnpm build"
+                              />
+                            </div>
+                            <p class="text-xs text-muted-foreground sm:col-span-3">
+                              {$t(i18nKeys.console.quickDeploy.staticPublishDirectoryHint)}
+                            </p>
+                          </div>
+                        {/if}
                         <div class="grid gap-3 sm:grid-cols-2">
                           <div class="space-y-2">
                             <label class="text-xs font-medium text-muted-foreground" for="resource-internal-port">
                               {$t(i18nKeys.console.quickDeploy.applicationPort)}
                             </label>
-                            <Input id="resource-internal-port" bind:value={resourceInternalPort} placeholder="3000" />
+                            <Input
+                              id="resource-internal-port"
+                              bind:value={resourceInternalPort}
+                              placeholder={resourceInternalPortDefault}
+                            />
                             <p class="text-xs text-muted-foreground">
                               {$t(i18nKeys.console.quickDeploy.applicationPortHint)}
                             </p>
@@ -2738,12 +2956,56 @@
                     </div>
                   {/if}
                   {#if !resourceContextEnabled}
+                    {#if createsStaticSiteResource}
+                      <div class="mt-3 grid gap-3 sm:grid-cols-3">
+                        <div class="space-y-2">
+                          <label class="text-xs font-medium text-muted-foreground" for="resource-default-static-publish-directory">
+                            {$t(i18nKeys.console.quickDeploy.staticPublishDirectory)}
+                          </label>
+                          <Input
+                            id="resource-default-static-publish-directory"
+                            class="font-mono text-xs"
+                            bind:value={staticPublishDirectory}
+                            placeholder="/dist"
+                          />
+                        </div>
+                        <div class="space-y-2">
+                          <label class="text-xs font-medium text-muted-foreground" for="resource-default-static-install-command">
+                            {$t(i18nKeys.console.quickDeploy.staticInstallCommand)}
+                          </label>
+                          <Input
+                            id="resource-default-static-install-command"
+                            class="font-mono text-xs"
+                            bind:value={staticInstallCommand}
+                            placeholder="pnpm install"
+                          />
+                        </div>
+                        <div class="space-y-2">
+                          <label class="text-xs font-medium text-muted-foreground" for="resource-default-static-build-command">
+                            {$t(i18nKeys.console.quickDeploy.staticBuildCommand)}
+                          </label>
+                          <Input
+                            id="resource-default-static-build-command"
+                            class="font-mono text-xs"
+                            bind:value={staticBuildCommand}
+                            placeholder="pnpm build"
+                          />
+                        </div>
+                        <p class="text-xs text-muted-foreground sm:col-span-3">
+                          {$t(i18nKeys.console.quickDeploy.staticPublishDirectoryHint)}
+                        </p>
+                      </div>
+                    {/if}
                     <div class="mt-3 grid gap-3 sm:grid-cols-2">
                       <div class="space-y-2">
                         <label class="text-xs font-medium text-muted-foreground" for="resource-default-internal-port">
                           {$t(i18nKeys.console.quickDeploy.applicationPort)}
                         </label>
-                        <Input id="resource-default-internal-port" bind:value={resourceInternalPort} placeholder="3000" />
+                        <Input
+                          id="resource-default-internal-port"
+                          bind:value={resourceInternalPort}
+                          placeholder={resourceInternalPortDefault}
+                        />
                         <p class="text-xs text-muted-foreground">
                           {$t(i18nKeys.console.quickDeploy.applicationPortHint)}
                         </p>

@@ -2,7 +2,13 @@
 
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 
-type ApiScenario = "dashboard" | "github-connected";
+type ApiScenario = "dashboard" | "github-connected" | "static-quick-deploy";
+
+type RecordedApiRequest = {
+  method: string;
+  pathname: string;
+  body: unknown;
+};
 
 const apiResponses: Record<ApiScenario, Record<string, unknown>> = {
   dashboard: {
@@ -197,6 +203,11 @@ const apiResponses: Record<ApiScenario, Record<string, unknown>> = {
         ],
       },
     },
+    "/api/rpc/credentials/ssh/list": {
+      json: {
+        items: [],
+      },
+    },
   },
   "github-connected": {
     "/api/health": {
@@ -286,6 +297,11 @@ const apiResponses: Record<ApiScenario, Record<string, unknown>> = {
         ],
       },
     },
+    "/api/rpc/credentials/ssh/list": {
+      json: {
+        items: [],
+      },
+    },
     "/api/rpc/integrations/github/repositories/list": {
       json: {
         items: [
@@ -305,9 +321,128 @@ const apiResponses: Record<ApiScenario, Record<string, unknown>> = {
       },
     },
   },
+  "static-quick-deploy": {
+    "/api/health": {
+      status: "ok",
+      service: "appaloft",
+      version: "0.1.0-test",
+      timestamp: "2026-01-01T00:00:00.000Z",
+    },
+    "/api/readiness": {
+      status: "ready",
+      checks: {
+        database: true,
+        migrations: true,
+      },
+      details: {
+        databaseDriver: "pglite",
+      },
+    },
+    "/api/version": {
+      name: "Appaloft",
+      version: "0.1.0-test",
+      apiVersion: "v1",
+      mode: "self-hosted",
+    },
+    "/api/auth/session": {
+      enabled: true,
+      provider: "better-auth",
+      loginRequired: false,
+      deferredAuth: true,
+      session: null,
+      providers: [
+        {
+          key: "github",
+          title: "GitHub",
+          configured: false,
+          connected: false,
+          requiresSignIn: true,
+          deferred: true,
+          reason: "Configure GitHub OAuth to enable import.",
+        },
+      ],
+    },
+    "/api/rpc/projects/list": {
+      json: {
+        items: [
+          {
+            id: "prj_static",
+            name: "Static Project",
+            slug: "static-project",
+            createdAt: "2026-01-01T00:00:00.000Z",
+          },
+        ],
+      },
+    },
+    "/api/rpc/servers/list": {
+      json: {
+        items: [
+          {
+            id: "srv_static",
+            name: "static-edge",
+            host: "127.0.0.1",
+            port: 22,
+            providerKey: "generic-ssh",
+            createdAt: "2026-01-01T00:00:00.000Z",
+          },
+        ],
+      },
+    },
+    "/api/rpc/environments/list": {
+      json: {
+        items: [],
+      },
+    },
+    "/api/rpc/deployments/list": {
+      json: {
+        items: [],
+      },
+    },
+    "/api/rpc/resources/list": {
+      json: {
+        items: [],
+      },
+    },
+    "/api/rpc/domain-bindings/list": {
+      json: {
+        items: [],
+      },
+    },
+    "/api/rpc/providers/list": {
+      json: {
+        items: [
+          {
+            key: "generic-ssh",
+            title: "Generic SSH",
+            category: "deploy-target",
+            capabilities: ["ssh", "single-server"],
+          },
+        ],
+      },
+    },
+    "/api/rpc/credentials/ssh/list": {
+      json: {
+        items: [],
+      },
+    },
+    "/api/rpc/environments/create": {
+      json: {
+        id: "env_static",
+      },
+    },
+    "/api/rpc/resources/create": {
+      json: {
+        id: "res_static",
+      },
+    },
+    "/api/deployments": {
+      id: "dep_static",
+    },
+  },
 };
 
 let activeScenario: ApiScenario = "dashboard";
+const recordedApiRequests: RecordedApiRequest[] = [];
 let apiServer: ReturnType<typeof Bun.serve> | null = null;
 let previewProcess: ReturnType<typeof Bun.spawn> | null = null;
 let previewUrl = "";
@@ -323,6 +458,39 @@ function respondJson(data: unknown, init?: ResponseInit): Response {
       ...init?.headers,
     },
   });
+}
+
+async function readRequestBody(request: Request): Promise<unknown> {
+  if (request.method === "GET" || request.method === "HEAD") {
+    return null;
+  }
+
+  const text = await request.text().catch(() => "");
+  if (!text) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    return text;
+  }
+}
+
+function resetRecordedApiRequests(): void {
+  recordedApiRequests.length = 0;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function readOrpcJsonPayload(body: unknown): unknown {
+  if (isRecord(body) && "json" in body) {
+    return body.json;
+  }
+
+  return body;
 }
 
 async function readProcessStream(stream: ReadableStream<Uint8Array> | null): Promise<void> {
@@ -378,12 +546,27 @@ function reservePort(): number {
 async function setupWebApp(): Promise<void> {
   apiServer = Bun.serve({
     port: 0,
-    fetch(request) {
+    async fetch(request) {
       if (request.method === "OPTIONS") {
         return respondJson(null);
       }
 
       const { pathname } = new URL(request.url);
+      recordedApiRequests.push({
+        method: request.method,
+        pathname,
+        body: await readRequestBody(request),
+      });
+
+      if (pathname.startsWith("/api/deployment-progress/")) {
+        return new Response("", {
+          headers: {
+            "access-control-allow-origin": "*",
+            "content-type": "text/event-stream",
+          },
+        });
+      }
+
       const response = apiResponses[activeScenario][pathname];
 
       if (response === undefined) {
@@ -477,6 +660,20 @@ async function expectText(view: Bun.WebView, text: string): Promise<void> {
   );
 }
 
+async function waitForRecordedRequest(pathname: string): Promise<RecordedApiRequest> {
+  const request = await waitFor<RecordedApiRequest | null>(
+    async () => recordedApiRequests.find((request) => request.pathname === pathname) ?? null,
+    (request) => request !== null,
+    `Expected API request: ${pathname}`,
+  );
+
+  if (!request) {
+    throw new Error(`Expected API request: ${pathname}`);
+  }
+
+  return request;
+}
+
 async function clickButtonByText(view: Bun.WebView, text: string): Promise<void> {
   const found = await waitFor(
     () =>
@@ -543,11 +740,9 @@ describe("console e2e with Bun.WebView", () => {
     activeScenario = "github-connected";
 
     await using view = createWebView();
-    await view.navigate(`${previewUrl}/`);
+    await view.navigate(`${previewUrl}/deploy?source=github&githubMode=browser`);
 
-    await clickButtonByText(view, "新部署");
-    await clickButtonByText(view, "GitHub 仓库");
-
+    await expectText(view, "GitHub 仓库");
     await expectText(view, "acme/platform");
     await clickButtonByText(view, "acme/platform");
 
@@ -555,5 +750,67 @@ describe("console e2e with Bun.WebView", () => {
     await clickButtonByText(view, "下一步");
     await expectText(view, "项目");
     await expectText(view, "octocat");
+  }, 15_000);
+
+  test("[QUICK-DEPLOY-ENTRY-008] maps Web static site draft fields through resources.create", async () => {
+    activeScenario = "static-quick-deploy";
+    resetRecordedApiRequests();
+
+    const deployState = new URL(`${previewUrl}/deploy`);
+    deployState.searchParams.set("step", "review");
+    deployState.searchParams.set("source", "static-site");
+    deployState.searchParams.set("sourceLocator", "https://github.com/acme/docs-site.git");
+    deployState.searchParams.set("staticPublishDirectory", "/dist");
+    deployState.searchParams.set("staticInstallCommand", "pnpm install");
+    deployState.searchParams.set("staticBuildCommand", "pnpm build");
+    deployState.searchParams.set("projectId", "prj_static");
+    deployState.searchParams.set("serverId", "srv_static");
+
+    await using view = createWebView();
+    await view.navigate(deployState.toString());
+
+    await expectText(view, "静态站点");
+    await expectText(view, "--method static");
+    await clickButtonByText(view, "创建并部署");
+
+    const resourcesCreateRequest = await waitForRecordedRequest("/api/rpc/resources/create");
+    const resourceInput = readOrpcJsonPayload(resourcesCreateRequest.body);
+
+    expect(resourceInput).toEqual(
+      expect.objectContaining({
+        projectId: "prj_static",
+        environmentId: "env_static",
+        kind: "static-site",
+        source: expect.objectContaining({
+          kind: "git-public",
+          locator: "https://github.com/acme/docs-site.git",
+        }),
+        runtimeProfile: expect.objectContaining({
+          strategy: "static",
+          installCommand: "pnpm install",
+          buildCommand: "pnpm build",
+          publishDirectory: "/dist",
+        }),
+        networkProfile: expect.objectContaining({
+          internalPort: 80,
+          upstreamProtocol: "http",
+          exposureMode: "reverse-proxy",
+        }),
+      }),
+    );
+
+    const resourceRecord = resourceInput as Record<string, unknown>;
+    const runtimeProfile = resourceRecord.runtimeProfile as Record<string, unknown>;
+    expect(resourceRecord.deploymentMethod).toBeUndefined();
+    expect(resourceRecord.port).toBeUndefined();
+    expect(runtimeProfile.startCommand).toBeUndefined();
+
+    const deploymentRequest = await waitForRecordedRequest("/api/deployments");
+    expect(deploymentRequest.body).toEqual({
+      projectId: "prj_static",
+      serverId: "srv_static",
+      environmentId: "env_static",
+      resourceId: "res_static",
+    });
   }, 15_000);
 });

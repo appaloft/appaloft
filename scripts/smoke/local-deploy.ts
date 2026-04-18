@@ -1,13 +1,18 @@
+import { mkdirSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { $ } from "bun";
 
-type SmokeMethod = "workspace-commands" | "dockerfile";
+type SmokeMethod = "workspace-commands" | "dockerfile" | "static";
 
 function parseMethod(argv: string[]): SmokeMethod {
   const methodFlag = argv.find((argument) => argument.startsWith("--method="));
   const methodValue = methodFlag?.split("=")[1] ?? "workspace-commands";
 
-  if (methodValue === "workspace-commands" || methodValue === "dockerfile") {
+  if (
+    methodValue === "workspace-commands" ||
+    methodValue === "dockerfile" ||
+    methodValue === "static"
+  ) {
     return methodValue;
   }
 
@@ -54,6 +59,19 @@ function parseJson<T>(raw: string): T {
   return JSON.parse(raw) as T;
 }
 
+function dockerName(input: string): string {
+  return input.toLowerCase().replace(/[^a-z0-9_.-]/g, "-");
+}
+
+function expectCliSuccess(
+  result: { exitCode: number; stdout: string; stderr: string },
+  label: string,
+): void {
+  if (result.exitCode !== 0) {
+    throw new Error(`${label} failed\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`);
+  }
+}
+
 async function waitForHealth(url: string): Promise<void> {
   for (let attempt = 0; attempt < 50; attempt += 1) {
     try {
@@ -71,17 +89,71 @@ async function waitForHealth(url: string): Promise<void> {
   throw new Error(`Timed out waiting for ${url}`);
 }
 
+async function createWorkspaceDir(tempRoot: string): Promise<string> {
+  const randomParts = new Uint32Array(2);
+
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    crypto.getRandomValues(randomParts);
+    const suffix = [...randomParts].map((part) => part.toString(16).padStart(8, "0")).join("");
+    const workspaceDir = join(tempRoot, `appaloft-smoke.${Date.now().toString(36)}-${suffix}`);
+    const markerPath = join(workspaceDir, ".created-by-appaloft-smoke");
+
+    if (await Bun.file(markerPath).exists()) {
+      continue;
+    }
+
+    mkdirSync(workspaceDir, { recursive: true });
+    await Bun.write(markerPath, "");
+    return workspaceDir;
+  }
+
+  throw new Error("Failed to create a unique smoke test workspace directory");
+}
+
+async function createStaticSourceDir(workspaceDir: string): Promise<string> {
+  const sourceDir = join(workspaceDir, "static-site");
+  const distDir = join(sourceDir, "dist");
+  mkdirSync(distDir, { recursive: true });
+  await Bun.write(
+    join(distDir, "index.html"),
+    [
+      "<!doctype html>",
+      '<html lang="en">',
+      '<head><meta charset="utf-8"><title>Appaloft Static Smoke</title></head>',
+      "<body>",
+      '<main data-smoke-marker="static-site">appaloft static smoke</main>',
+      "</body>",
+      "</html>",
+    ].join("\n"),
+  );
+
+  return sourceDir;
+}
+
+function parseRuntimeUrl(logs: string): string {
+  const runtimeUrl = /Container is reachable at (http:\/\/127\.0\.0\.1:\d+(?:\/[^"\\\s]*)?)/u.exec(
+    logs,
+  )?.[1];
+  if (!runtimeUrl) {
+    throw new Error(`Could not find runtime URL in deployment logs:\n${logs}`);
+  }
+
+  return runtimeUrl;
+}
+
 async function main(): Promise<void> {
   const method = parseMethod(process.argv.slice(2));
   const port = parsePort(process.argv.slice(2));
   const tempRoot = process.env.TMPDIR ?? "/tmp";
-  const workspaceDir = (
-    await $`mktemp -d ${join(tempRoot, "appaloft-smoke.XXXXXX")}`.text()
-  ).trim();
+  const workspaceDir = await createWorkspaceDir(tempRoot);
   const dataDir = join(workspaceDir, ".appaloft", "data");
   const pgliteDataDir = join(dataDir, "pglite");
-  const sourceDir = resolve("examples/express-hello");
+  const sourceDir =
+    method === "static"
+      ? await createStaticSourceDir(workspaceDir)
+      : resolve("examples/express-hello");
   let serverProcess: Bun.Subprocess | null = null;
+  let deploymentId: string | undefined;
   let preserveWorkspace = false;
 
   try {
@@ -103,32 +175,90 @@ async function main(): Promise<void> {
 
     await waitForHealth("http://127.0.0.1:3001/api/health");
 
+    const suffix = crypto.randomUUID().slice(0, 8);
+    const project = runCli(["project", "create", "--name", `Smoke ${method} ${suffix}`], {
+      dataDir,
+      pgliteDataDir,
+    });
+    expectCliSuccess(project, "create project");
+    const projectId = parseJson<{ id: string }>(project.stdout).id;
+
+    const server = runCli(
+      [
+        "server",
+        "register",
+        "--name",
+        `smoke-local-${suffix}`,
+        "--host",
+        "127.0.0.1",
+        "--provider",
+        "local-shell",
+        "--proxy-kind",
+        "none",
+      ],
+      { dataDir, pgliteDataDir },
+    );
+    expectCliSuccess(server, "register local server");
+    const serverId = parseJson<{ id: string }>(server.stdout).id;
+
+    const environment = runCli(
+      ["env", "create", "--project", projectId, "--name", "local", "--kind", "local"],
+      { dataDir, pgliteDataDir },
+    );
+    expectCliSuccess(environment, "create environment");
+    const environmentId = parseJson<{ id: string }>(environment.stdout).id;
+
     const deployArgs = [
       "deploy",
       sourceDir,
+      "--project",
+      projectId,
+      "--server",
+      serverId,
+      "--environment",
+      environmentId,
       "--method",
       method,
-      "--port",
-      String(port),
-      "--health-path",
-      "/health",
     ];
 
     if (method === "workspace-commands") {
-      deployArgs.push("--build", "bun build.mjs", "--start", "node dist/server.js");
+      deployArgs.push(
+        "--port",
+        String(port),
+        "--health-path",
+        "/health",
+        "--build",
+        "bun build.mjs",
+        "--start",
+        "node dist/server.js",
+      );
+    } else if (method === "dockerfile") {
+      deployArgs.push("--port", String(port), "--health-path", "/health");
+    } else {
+      deployArgs.push("--publish-dir", "/dist", "--health-path", "/");
     }
 
     const deployment = runCli(deployArgs, { dataDir, pgliteDataDir });
-    if (deployment.exitCode !== 0) {
-      throw new Error(deployment.stderr || deployment.stdout);
-    }
+    expectCliSuccess(deployment, "deploy");
 
-    const deploymentId = parseJson<{ id: string }>(deployment.stdout).id;
-    const appUrl = `http://127.0.0.1:${port}/health`;
+    deploymentId = parseJson<{ id: string }>(deployment.stdout).id;
+    const logs = runCli(["logs", deploymentId], { dataDir, pgliteDataDir });
+    expectCliSuccess(logs, "logs");
+
+    const appUrl = parseRuntimeUrl(logs.stdout);
     await waitForHealth(appUrl);
 
     const response = await fetch(appUrl);
-    const payload = await response.json();
+    let payload: unknown;
+    if (method === "static") {
+      const html = await response.text();
+      if (!html.includes("appaloft static smoke")) {
+        throw new Error("Static smoke response did not include marker text");
+      }
+      payload = { htmlIncludesMarker: true };
+    } else {
+      payload = await response.json();
+    }
     preserveWorkspace = true;
     const rollbackCommand = [
       `APPALOFT_DATABASE_DRIVER=pglite`,
@@ -157,6 +287,19 @@ async function main(): Promise<void> {
     serverProcess?.kill();
     await serverProcess?.exited;
     if (!preserveWorkspace) {
+      if (deploymentId) {
+        Bun.spawnSync(["docker", "rm", "-f", dockerName(`appaloft-${deploymentId}`)], {
+          stderr: "ignore",
+          stdout: "ignore",
+        });
+        Bun.spawnSync(
+          ["docker", "image", "rm", "-f", dockerName(`appaloft-image-${deploymentId}`)],
+          {
+            stderr: "ignore",
+            stdout: "ignore",
+          },
+        );
+      }
       await $`rm -rf ${workspaceDir}`;
     }
   }
