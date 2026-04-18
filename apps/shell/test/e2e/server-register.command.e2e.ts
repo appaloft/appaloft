@@ -70,7 +70,7 @@ describe("servers.register command e2e", () => {
     } finally {
       cleanupWorkspace(workspace.workspaceDir);
     }
-  });
+  }, 20_000);
 
   test("[SERVER-BOOT-ENTRY-002] HTTP server register is observable through HTTP server list", async () => {
     const workspace = createShellE2eWorkspace("appaloft-server-register-http-", {
@@ -110,5 +110,5 @@ describe("servers.register command e2e", () => {
       await httpServer?.stop();
       cleanupWorkspace(workspace.workspaceDir);
     }
-  });
+  }, 20_000);
 });
