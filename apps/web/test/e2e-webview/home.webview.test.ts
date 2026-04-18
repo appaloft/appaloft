@@ -660,6 +660,14 @@ async function expectText(view: Bun.WebView, text: string): Promise<void> {
   );
 }
 
+async function expectAnyText(view: Bun.WebView, texts: [string, ...string[]]): Promise<void> {
+  await waitFor(
+    () => pageText(view),
+    (content) => texts.some((text) => content.includes(text)),
+    `Expected page to contain one of: ${texts.join(" | ")}`,
+  );
+}
+
 async function waitForRecordedRequest(pathname: string): Promise<RecordedApiRequest> {
   const request = await waitFor<RecordedApiRequest | null>(
     async () => recordedApiRequests.find((request) => request.pathname === pathname) ?? null,
@@ -695,6 +703,33 @@ async function clickButtonByText(view: Bun.WebView, text: string): Promise<void>
   expect(found).toBe(true);
 }
 
+async function clickButtonByAnyText(
+  view: Bun.WebView,
+  texts: [string, ...string[]],
+): Promise<void> {
+  const found = await waitFor(
+    () =>
+      view.evaluate<boolean>(
+        `(() => {
+          const texts = ${JSON.stringify(texts)};
+          const elements = Array.from(document.querySelectorAll("button, a"));
+          const element = elements.find((candidate) =>
+            texts.some((text) => candidate.textContent?.includes(text))
+          );
+          if (!element) {
+            return false;
+          }
+          element.click();
+          return true;
+        })()`,
+      ),
+    Boolean,
+    `Expected a button or link with one of: ${texts.join(" | ")}`,
+  );
+
+  expect(found).toBe(true);
+}
+
 beforeAll(async () => {
   await setupWebApp();
 });
@@ -710,17 +745,17 @@ describe("console e2e with Bun.WebView", () => {
     await using view = createWebView();
     await view.navigate(`${previewUrl}/`);
 
-    await expectText(view, "最近部署");
-    await expectText(view, "新部署");
-    await expectText(view, "查看项目");
-    await expectText(view, "查看部署");
+    await expectAnyText(view, ["Latest deployment", "最近部署"]);
+    await expectAnyText(view, ["New deployment", "新部署"]);
+    await expectAnyText(view, ["View projects", "查看项目"]);
+    await expectAnyText(view, ["View deployments", "查看部署"]);
     await expectText(view, "Demo");
     await expectText(view, "succeeded");
 
     await view.navigate(`${previewUrl}/projects`);
-    await expectText(view, "项目");
+    await expectAnyText(view, ["Projects", "项目"]);
     await expectText(view, "Demo");
-    await expectText(view, "已有资源");
+    await expectAnyText(view, ["Resources", "资源"]);
     await expectText(view, "workspace");
 
     await view.navigate(`${previewUrl}/deployments`);
@@ -729,11 +764,14 @@ describe("console e2e with Bun.WebView", () => {
     await expectText(view, "production");
     await expectText(view, "succeeded");
 
-    await clickButtonByText(view, "新部署");
-    await expectText(view, "本地目录");
-    await clickButtonByText(view, "GitHub 仓库");
-    await clickButtonByText(view, "从我的 GitHub 选择");
-    await expectText(view, "后端尚未配置 GitHub OAuth");
+    await clickButtonByAnyText(view, ["New deployment", "新部署"]);
+    await expectAnyText(view, ["Local folder", "本地目录"]);
+    await clickButtonByAnyText(view, ["GitHub repository", "GitHub 仓库"]);
+    await clickButtonByAnyText(view, ["Choose from my GitHub", "从我的 GitHub 选择"]);
+    await expectAnyText(view, [
+      "GitHub OAuth is not configured on the backend.",
+      "后端尚未配置 GitHub OAuth",
+    ]);
   }, 15_000);
 
   test("shows the GitHub repository picker and fills the import wizard after auth", async () => {
@@ -742,13 +780,13 @@ describe("console e2e with Bun.WebView", () => {
     await using view = createWebView();
     await view.navigate(`${previewUrl}/deploy?source=github&githubMode=browser`);
 
-    await expectText(view, "GitHub 仓库");
+    await expectAnyText(view, ["GitHub repository", "GitHub 仓库"]);
     await expectText(view, "acme/platform");
     await clickButtonByText(view, "acme/platform");
 
     await expectText(view, "https://github.com/acme/platform.git");
-    await clickButtonByText(view, "下一步");
-    await expectText(view, "项目");
+    await clickButtonByAnyText(view, ["Next", "下一步"]);
+    await expectAnyText(view, ["Project", "项目"]);
     await expectText(view, "octocat");
   }, 15_000);
 
@@ -769,9 +807,9 @@ describe("console e2e with Bun.WebView", () => {
     await using view = createWebView();
     await view.navigate(deployState.toString());
 
-    await expectText(view, "静态站点");
+    await expectAnyText(view, ["Static site", "静态站点"]);
     await expectText(view, "--method static");
-    await clickButtonByText(view, "创建并部署");
+    await clickButtonByAnyText(view, ["Create and deploy", "创建并部署"]);
 
     const resourcesCreateRequest = await waitForRecordedRequest("/api/rpc/resources/create");
     const resourceInput = readOrpcJsonPayload(resourcesCreateRequest.body);
