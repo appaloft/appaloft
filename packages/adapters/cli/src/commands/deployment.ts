@@ -28,6 +28,7 @@ const methodOption = Options.choice("method", deploymentMethods).pipe(Options.op
 const installOption = Options.text("install").pipe(Options.optional);
 const buildOption = Options.text("build").pipe(Options.optional);
 const startOption = Options.text("start").pipe(Options.optional);
+const publishDirOption = Options.text("publish-dir").pipe(Options.optional);
 const portOption = Options.text("port").pipe(Options.optional);
 const healthPathOption = Options.text("health-path").pipe(Options.optional);
 const appLogLinesOption = Options.text("app-log-lines").pipe(Options.withDefault("3"));
@@ -58,6 +59,7 @@ export const deployCommand = EffectCommand.make(
     install: installOption,
     build: buildOption,
     start: startOption,
+    publishDir: publishDirOption,
     port: portOption,
     healthPath: healthPathOption,
     appLogLines: appLogLinesOption,
@@ -73,6 +75,7 @@ export const deployCommand = EffectCommand.make(
     pathOrSource,
     port,
     project,
+    publishDir,
     resource,
     resourceDescription,
     resourceKind,
@@ -95,6 +98,7 @@ export const deployCommand = EffectCommand.make(
       const installCommand = optionalValue(install);
       const buildCommand = optionalValue(build);
       const startCommand = optionalValue(start);
+      const publishDirectory = optionalValue(publishDir);
       const healthCheckPath = optionalValue(healthPath);
 
       if (!sourceLocator && projectId && serverId && environmentId && resourceId) {
@@ -120,7 +124,11 @@ export const deployCommand = EffectCommand.make(
               name: resourceNameValue ?? inferResourceName(normalizedSourceLocator ?? "."),
               kind:
                 resourceKindValue ??
-                (deploymentMethod === "docker-compose" ? "compose-stack" : "application"),
+                (deploymentMethod === "docker-compose"
+                  ? "compose-stack"
+                  : deploymentMethod === "static"
+                    ? "static-site"
+                    : "application"),
               ...(resourceDescriptionValue ? { description: resourceDescriptionValue } : {}),
             }
           : undefined;
@@ -135,6 +143,7 @@ export const deployCommand = EffectCommand.make(
         ...(installCommand ? { installCommand } : {}),
         ...(buildCommand ? { buildCommand } : {}),
         ...(startCommand ? { startCommand } : {}),
+        ...(publishDirectory ? { publishDirectory } : {}),
         ...(portValue === undefined ? {} : { port: portValue }),
         ...(healthCheckPath ? { healthCheckPath } : {}),
       };

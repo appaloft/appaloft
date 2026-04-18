@@ -1,20 +1,19 @@
 import { dirname, join, relative, sep } from "node:path";
-import { $ } from "bun";
 
-import { copyFileIfExists, resetDir, run } from "./release-utils";
+import {
+  chmodExecutable,
+  copyFileIfExists,
+  listFiles,
+  removePath,
+  resetDir,
+  run,
+  runNothrow,
+} from "./release-utils";
+import { detectHostReleaseBinaryTarget, type ReleaseBinaryTarget } from "./targets";
 
 function toImportSpecifier(fromFile: string, toFile: string): string {
   const relativePath = relative(dirname(fromFile), toFile).split(sep).join("/");
   return relativePath.startsWith(".") ? relativePath : `./${relativePath}`;
-}
-
-async function listFiles(root: string): Promise<string[]> {
-  const output = await $`find ${root} -type f`.text();
-  return output
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0)
-    .sort();
 }
 
 async function createEmbeddedWebAssetsModule(input: {
@@ -138,8 +137,11 @@ exec "$SCRIPT_DIR/appaloft" "$@"
 `;
 }
 
-function bundleReadme(): string {
+function bundleReadme(input: { version: string; target: ReleaseBinaryTarget }): string {
   return `Appaloft Binary Bundle
+
+Version: ${input.version}
+Target: ${input.target.name}
 
 Contents:
 - appaloft: Bun-compiled backend/CLI executable
@@ -171,22 +173,24 @@ async function adHocSignDarwinExecutable(binaryPath: string): Promise<void> {
   }
 
   // Bun --compile mutates Bun's signed executable, so replace the stale signature.
-  await $`codesign --remove-signature ${binaryPath}`.quiet().nothrow();
+  await runNothrow(["codesign", "--remove-signature", binaryPath], dirname(binaryPath), {
+    quiet: true,
+  });
   await run(["codesign", "--force", "--sign", "-", binaryPath], dirname(binaryPath));
-}
-
-async function directoryExists(path: string): Promise<boolean> {
-  return (await $`test -d ${path}`.quiet().nothrow()).exitCode === 0;
 }
 
 export async function createBinaryBundle(input: {
   root: string;
   outDir: string;
   skipWebBuild?: boolean;
+  target?: ReleaseBinaryTarget;
+  version?: string;
 }): Promise<void> {
+  const target = input.target ?? detectHostReleaseBinaryTarget();
+  const version = input.version ?? process.env.APPALOFT_APP_VERSION ?? "0.1.0";
   const webRoot = join(input.root, "apps", "web");
   const webBuildDir = join(webRoot, "build");
-  const binaryPath = join(input.outDir, "appaloft");
+  const binaryPath = join(input.outDir, target.executableName);
   const tempBuildRoot = join(input.root, "dist", ".tmp-binary-bundle");
   const embeddedWebAssetsModulePath = join(tempBuildRoot, "embedded-web-assets.generated.ts");
   const binaryEntryPath = join(tempBuildRoot, "binary-entry.ts");
@@ -203,11 +207,11 @@ export async function createBinaryBundle(input: {
   await resetDir(tempBuildRoot);
 
   if (!input.skipWebBuild) {
-    await $`rm -rf ${webBuildDir}`;
+    await removePath(webBuildDir);
     await run(["bun", "run", "build"], webRoot);
   }
 
-  if (!(await directoryExists(webBuildDir))) {
+  if ((await listFiles(webBuildDir)).length === 0) {
     throw new Error(`Missing web build output at ${webBuildDir}`);
   }
 
@@ -224,15 +228,28 @@ export async function createBinaryBundle(input: {
     initdbWasmPath,
   });
 
-  await run(["bun", "build", binaryEntryPath, "--compile", "--outfile", binaryPath], input.root);
-  await adHocSignDarwinExecutable(binaryPath);
+  await run(
+    [
+      "bun",
+      "build",
+      binaryEntryPath,
+      "--compile",
+      `--target=${target.bunTarget}`,
+      "--outfile",
+      binaryPath,
+    ],
+    input.root,
+  );
+  if (target.os === "darwin") {
+    await adHocSignDarwinExecutable(binaryPath);
+  }
 
   await copyFileIfExists(join(input.root, ".env.example"), join(input.outDir, ".env.example"));
 
   await Bun.write(join(input.outDir, "run-appaloft.sh"), bundleLauncher());
-  await $`chmod 755 ${join(input.outDir, "run-appaloft.sh")}`;
+  await chmodExecutable(join(input.outDir, "run-appaloft.sh"));
 
-  await Bun.write(join(input.outDir, "README.txt"), bundleReadme());
+  await Bun.write(join(input.outDir, "README.txt"), bundleReadme({ version, target }));
 
-  await $`rm -rf ${tempBuildRoot}`;
+  await removePath(tempBuildRoot);
 }

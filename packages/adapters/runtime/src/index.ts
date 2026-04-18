@@ -508,6 +508,61 @@ function chooseStrategies(input: {
     });
   }
 
+  if (requestedMethod === "static") {
+    const publishDirectory = requestedDeployment.publishDirectory;
+    if (!publishDirectory) {
+      return err(
+        domainError.validation("Static deployments require publishDirectory", {
+          phase: "runtime-artifact-resolution",
+          runtimePlanStrategy: "static",
+        }),
+      );
+    }
+
+    const dockerfilePath = "Dockerfile.appaloft-static";
+    const port = dockerContainerPort(requestedDeployment);
+    const execution = RuntimeExecutionPlan.rehydrate({
+      kind: ExecutionStrategyKindValue.rehydrate("docker-container"),
+      workingDirectory: FilePathText.rehydrate(source.locator),
+      dockerfilePath: FilePathText.rehydrate(dockerfilePath),
+      ...(requestedDeployment.installCommand
+        ? { installCommand: CommandText.rehydrate(requestedDeployment.installCommand) }
+        : {}),
+      ...(requestedDeployment.buildCommand
+        ? { buildCommand: CommandText.rehydrate(requestedDeployment.buildCommand) }
+        : {}),
+      ...runtimeHealthCheckFields(requestedDeployment),
+      port,
+      metadata: {
+        "artifact.source": "static-site",
+        "static.publishDirectory": publishDirectory,
+        "static.server": "adapter-owned",
+      },
+    });
+
+    return withRequestedAccessRoutes({
+      requestedDeployment,
+      buildStrategy: BuildStrategyKindValue.rehydrate("static-artifact"),
+      packagingMode: PackagingModeValue.rehydrate("all-in-one-docker"),
+      execution,
+      runtimeArtifact: imageRuntimeArtifact({
+        intent: "build-image",
+        metadata: {
+          sourceKind: source.kind,
+          publishDirectory,
+          staticServer: "adapter-owned",
+          dockerfilePath,
+        },
+      }),
+      steps: [
+        PlanStepText.rehydrate("Prepare static site"),
+        PlanStepText.rehydrate("Package static site"),
+        PlanStepText.rehydrate("Run static server container"),
+        PlanStepText.rehydrate("Verify container health"),
+      ],
+    });
+  }
+
   if (requestedMethod === "dockerfile") {
     const port = dockerContainerPort(requestedDeployment);
     const dockerfilePath = source.inspection?.dockerfilePath ?? source.metadata?.dockerfilePath ?? "Dockerfile";

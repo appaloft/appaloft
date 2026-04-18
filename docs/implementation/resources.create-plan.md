@@ -20,6 +20,7 @@ Implementation must preserve the source-of-truth behavior in the governed ADR an
 - [resource-created Event Spec](../events/resource-created.md)
 - [Resource Lifecycle Error Spec](../errors/resources.lifecycle.md)
 - [Resource Create And First Deploy Workflow Spec](../workflows/resources.create-and-first-deploy.md)
+- [Static Site Deployment Implementation Plan](./static-site-deployment-plan.md)
 - [resources.create Test Matrix](../testing/resources.create-test-matrix.md)
 - [Quick Deploy Workflow Spec](../workflows/quick-deploy.md)
 - [Quick Deploy Test Matrix](../testing/quick-deploy-test-matrix.md)
@@ -170,6 +171,8 @@ Required tests:
   uncloneable deep Git locators, Docker image tag/digest conflicts, and path traversal;
 - runtime profile tests assert Dockerfile path, Docker Compose path, static publish directory, and
   command defaults are strategy-specific planning fields rather than source locator suffixes;
+- static resource tests cover `RES-CREATE-ADM-035`, `RES-CREATE-ADM-036`,
+  `RES-CREATE-ADM-037`, and `RES-CREATE-WF-007`;
 - runtime profile tests assert `auto` and `workspace-commands` resolve to Docker/OCI artifact intent
   during deployment planning rather than host-process runtime execution;
 - Quick Deploy auto-generated resource names include a short random suffix before `resources.create`;
@@ -190,7 +193,7 @@ The minimal Code Round deliverable is:
 - read-model visibility through `resources.list`;
 - tests for command admission, duplicate slug, structured errors, event emission, API/CLI dispatch, and Quick Deploy final payload.
 
-`resources.show`, `resources.update`, `resources.archive`, source binding, health policy, resource env var management, domain/TLS management, static-site-specific config, and auto-deploy are follow-up behaviors.
+`resources.show`, `resources.update`, `resources.archive`, source binding, health policy, resource env var management, domain/TLS management, SPA fallback/cache-header static-site policy, and auto-deploy are follow-up behaviors. Minimal static site deployment is governed by [Static Site Deployment Implementation Plan](./static-site-deployment-plan.md) and uses the existing `resources.create -> deployments.create` operation sequence.
 
 Moving `source`, `sourceLocator`, `deploymentMethod`, command overrides, port, and health check path out of `deployments.create` is governed by [ADR-014](../decisions/ADR-014-deployment-admission-uses-resource-profile.md) and [ADR-015](../decisions/ADR-015-resource-network-profile.md). It is implemented by persisting source/runtime/network profile on `resources.create`.
 
@@ -236,8 +239,18 @@ rejects legacy raw GitHub tree locators before runtime planning.
 Current GitHub tree URL normalization handles the common single-segment ref form, such as
 `/tree/v4.x/bun`, and callers may supply explicit `gitRef` and `baseDirectory` for slash-containing
 refs. Provider-backed disambiguation for slash-containing Git refs remains future integration work.
-Dockerfile paths, Compose paths, static publish directories, build targets, and richer runtime
-profile variant fields are still pending typed resource runtime-profile implementation.
+Dockerfile paths, Compose paths, build targets, and richer runtime profile variant fields are still
+pending typed resource runtime-profile implementation. Static publish directory now has a typed
+runtime-profile value for the static strategy.
+
+First-class static site deployment now has `RuntimePlanStrategy = static`, typed
+`publishDirectory`, static artifact planning, HTTP/oRPC resource create coverage, and shared
+Quick Deploy workflow-contract coverage. Local/generic-SSH runtime backends can generate the
+adapter-owned static-server Dockerfile for image builds. Web QuickDeploy and CLI deploy now map
+static draft fields through `resources.create`, with browser-level Web entry coverage and CLI entry
+helper coverage. Local Docker static smoke now exercises generated nginx packaging and runtime
+verification, and generic-SSH Docker static smoke coverage exists as an opt-in harness for real SSH
+targets.
 
 ## Open Questions
 

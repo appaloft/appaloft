@@ -586,11 +586,19 @@ export const createResourceInputSchema = z.object({
   runtimeProfile: z
     .object({
       strategy: z
-        .enum(["auto", "dockerfile", "docker-compose", "prebuilt-image", "workspace-commands"])
+        .enum([
+          "auto",
+          "dockerfile",
+          "docker-compose",
+          "prebuilt-image",
+          "workspace-commands",
+          "static",
+        ])
         .default("auto"),
       installCommand: z.string().min(1).optional(),
       buildCommand: z.string().min(1).optional(),
       startCommand: z.string().min(1).optional(),
+      publishDirectory: z.string().min(1).optional(),
       healthCheckPath: z.string().min(1).optional(),
       healthCheck: resourceHealthCheckPolicySchema.optional(),
     })

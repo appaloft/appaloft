@@ -6,6 +6,7 @@ export type DeploymentMethod =
   | "dockerfile"
   | "docker-compose"
   | "prebuilt-image"
+  | "static"
   | "workspace-commands";
 
 export const deploymentMethods = [
@@ -13,6 +14,7 @@ export const deploymentMethods = [
   "dockerfile",
   "docker-compose",
   "prebuilt-image",
+  "static",
   "workspace-commands",
 ] as const satisfies readonly DeploymentMethod[];
 

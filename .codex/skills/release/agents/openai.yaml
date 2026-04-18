@@ -1,0 +1,4 @@
+interface:
+  display_name: "Release"
+  short_description: "Run Appaloft manual release workflows."
+  default_prompt: "Use $release to prepare, trigger, and monitor an Appaloft release."

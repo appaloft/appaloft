@@ -112,6 +112,9 @@ class KyselyResourceMutationVisitor
           ...(spec.state.runtimeProfile.startCommand
             ? { startCommand: spec.state.runtimeProfile.startCommand.value }
             : {}),
+          ...(spec.state.runtimeProfile.publishDirectory
+            ? { publishDirectory: spec.state.runtimeProfile.publishDirectory.value }
+            : {}),
           ...(spec.state.runtimeProfile.healthCheckPath
             ? { healthCheckPath: spec.state.runtimeProfile.healthCheckPath.value }
             : {}),

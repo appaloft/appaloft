@@ -51,6 +51,7 @@ import {
   SourceOriginalLocator,
   SourceRepositoryFullName,
   SourceRepositoryId,
+  StaticPublishDirectory,
   safeTry,
   UpsertResourceSpec,
 } from "@appaloft/core";
@@ -368,6 +369,13 @@ export class CreateResourceUseCase {
           ...(input.runtimeProfile.startCommand
             ? { startCommand: yield* CommandText.create(input.runtimeProfile.startCommand) }
             : {}),
+          ...(input.runtimeProfile.publishDirectory
+            ? {
+                publishDirectory: yield* StaticPublishDirectory.create(
+                  input.runtimeProfile.publishDirectory,
+                ),
+              }
+            : {}),
           ...(input.runtimeProfile.healthCheckPath
             ? {
                 healthCheckPath: yield* HealthCheckPathText.create(
@@ -425,6 +433,15 @@ export class CreateResourceUseCase {
               }
             : {}),
         };
+
+        if (runtimeProfile.strategy.value === "static" && !runtimeProfile.publishDirectory) {
+          return err(
+            domainError.validation("Static runtime profiles require publishDirectory", {
+              phase: "resource-runtime-resolution",
+              runtimePlanStrategy: "static",
+            }),
+          );
+        }
       }
 
       const networkProfileInput = input.networkProfile;

@@ -1,0 +1,122 @@
+---
+name: release
+description: Appaloft release runbook for manually triggered GitHub Actions releases. Use when Codex is asked to prepare, trigger, publish, monitor, retry, or explain an Appaloft release; create or inspect a Release Please PR; publish GitHub Release assets, npm packages, Homebrew tap updates, GHCR images, desktop bundles, or CLI binaries; or verify release prerequisites and secrets.
+---
+
+# Release
+
+## Core Rules
+
+- Treat release execution as a public publishing action. Before running `gh workflow run release.yml`, clearly state what will happen and get explicit user confirmation.
+- Do not merge PRs, push branches, create tags, publish releases, create tokens, or edit secrets unless the user explicitly asks for that action.
+- Never print token values. Check only secret names and update timestamps.
+- Keep the flow manual. A merge to `main` does not publish by itself.
+- Remember that `workflow_dispatch` requires `.github/workflows/release.yml` to exist on the default branch before GitHub can run it.
+
+## Release Model
+
+- Workflow: `.github/workflows/release.yml`
+- GitHub workflow name: `Release`
+- Default repo: `appaloft/appaloft`
+- Default branch: `main`
+- Stable release input: `prerelease=false`
+- Prerelease npm dist-tag input: `prerelease=true`
+- First manual run creates or updates the Release Please PR.
+- After that PR is merged, the second manual run creates the tag and GitHub Release, then publishes assets, npm packages, Homebrew tap files, GHCR images, desktop bundles, and CLI binaries.
+- Changelog source: `CHANGELOG.md`, maintained by Release Please.
+
+## Preflight
+
+Run read-only checks first:
+
+```bash
+gh auth status -h github.com
+gh repo view appaloft/appaloft --json nameWithOwner,defaultBranchRef,visibility
+gh workflow list -R appaloft/appaloft
+gh secret list -R appaloft/appaloft --app actions
+gh repo view appaloft/homebrew-tap --json nameWithOwner,visibility,url
+```
+
+Confirm these facts before triggering:
+
+- `release.yml` exists on `main`.
+- Actions are enabled and the `Release` workflow is listed.
+- `NPM_TOKEN` exists when npm publishing is expected.
+- `HOMEBREW_TAP_TOKEN` exists when Homebrew publishing is expected.
+- `appaloft/homebrew-tap` is public when public Homebrew distribution is expected.
+
+`RELEASE_PLEASE_TOKEN` is optional; the workflow falls back to `github.token`.
+
+## Trigger Commands
+
+Ask for explicit confirmation before these commands.
+
+Create or update the Release Please PR:
+
+```bash
+gh workflow run release.yml -R appaloft/appaloft -f prerelease=false
+```
+
+Publish after the Release Please PR has been merged:
+
+```bash
+gh workflow run release.yml -R appaloft/appaloft -f prerelease=false
+```
+
+Publish with prerelease npm tagging only when the user asks for prerelease behavior:
+
+```bash
+gh workflow run release.yml -R appaloft/appaloft -f prerelease=true
+```
+
+Use `--ref main` if the user asks for an explicit ref:
+
+```bash
+gh workflow run release.yml -R appaloft/appaloft --ref main -f prerelease=false
+```
+
+## Monitor
+
+Find and watch the latest release run:
+
+```bash
+gh run list -R appaloft/appaloft --workflow release.yml --limit 5
+run_id=$(gh run list -R appaloft/appaloft --workflow release.yml --limit 1 --json databaseId --jq '.[0].databaseId')
+gh run watch -R appaloft/appaloft "$run_id" --exit-status
+```
+
+Inspect failures:
+
+```bash
+gh run view -R appaloft/appaloft "$run_id" --log-failed
+```
+
+Find the Release Please PR:
+
+```bash
+gh pr list -R appaloft/appaloft --state open --json number,title,headRefName,url --jq '.[] | select(.headRefName | contains("release-please"))'
+```
+
+List recent releases:
+
+```bash
+gh release list -R appaloft/appaloft --limit 10
+```
+
+## Retry And Troubleshooting
+
+- If the first run does not create a release, look for an open Release Please PR and report its URL.
+- If the second run skips build jobs, verify the Release Please PR was merged and a release was actually created.
+- If npm publish fails, check whether the package already exists, whether `NPM_TOKEN` exists, and whether trusted publishing is configured for `appaloft/appaloft` workflow filename `release.yml`.
+- If Homebrew fails, verify `HOMEBREW_TAP_TOKEN`, `appaloft/homebrew-tap` access, and whether generated files changed.
+- If GitHub Release asset upload fails, inspect the `publish-release-assets` job and retry with `release-retry.yml` only after explaining the failed job and getting confirmation.
+
+## User Response Shape
+
+When reporting status, include:
+
+- what was triggered or inspected
+- the run URL or PR URL when available
+- whether this was the PR-creation run or the publish run
+- which distribution channels were expected to publish
+- next action needed, if any

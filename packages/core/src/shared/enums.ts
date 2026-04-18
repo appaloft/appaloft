@@ -32,6 +32,7 @@ export const runtimePlanStrategies = [
   "docker-compose",
   "prebuilt-image",
   "workspace-commands",
+  "static",
 ] as const;
 
 export type RuntimePlanStrategy = (typeof runtimePlanStrategies)[number];

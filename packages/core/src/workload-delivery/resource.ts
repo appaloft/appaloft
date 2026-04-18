@@ -36,6 +36,7 @@ import {
   type ResourceServiceName,
   ResourceSlug,
 } from "../shared/text-values";
+import { ScalarValueObject } from "../shared/value-object";
 import {
   cloneResourceSourceBindingState,
   ResourceSourceBinding,
@@ -77,8 +78,101 @@ export interface ResourceRuntimeProfileState {
   installCommand?: CommandText;
   buildCommand?: CommandText;
   startCommand?: CommandText;
+  publishDirectory?: StaticPublishDirectory;
   healthCheckPath?: HealthCheckPathText;
   healthCheck?: ResourceHealthCheckPolicyState;
+}
+
+function resourceRuntimeResolutionError(
+  message: string,
+  details?: Record<string, string | number | boolean>,
+) {
+  return domainError.validation(message, {
+    phase: "resource-runtime-resolution",
+    ...(details ?? {}),
+  });
+}
+
+function normalizeStaticPublishDirectory(value: string): Result<string> {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return err(
+      resourceRuntimeResolutionError("Static publish directory is required", {
+        runtimePlanStrategy: "static",
+      }),
+    );
+  }
+
+  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(trimmed)) {
+    return err(
+      resourceRuntimeResolutionError("Static publish directory must not be a URL", {
+        runtimePlanStrategy: "static",
+        publishDirectory: trimmed,
+      }),
+    );
+  }
+
+  if (/^[a-z]:[\\/]/i.test(trimmed)) {
+    return err(
+      resourceRuntimeResolutionError("Static publish directory must not be a host path", {
+        runtimePlanStrategy: "static",
+        publishDirectory: trimmed,
+      }),
+    );
+  }
+
+  if (/[;&|`$<>]/.test(trimmed)) {
+    return err(
+      resourceRuntimeResolutionError(
+        "Static publish directory contains unsupported shell characters",
+        {
+          runtimePlanStrategy: "static",
+          publishDirectory: trimmed,
+        },
+      ),
+    );
+  }
+
+  const withLeadingSlash = trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
+  const segments = withLeadingSlash.split("/").filter(Boolean);
+  if (segments.some((segment) => segment === "." || segment === "..")) {
+    return err(
+      resourceRuntimeResolutionError("Static publish directory must not contain dot segments", {
+        runtimePlanStrategy: "static",
+        publishDirectory: trimmed,
+      }),
+    );
+  }
+
+  if (segments.length === 0) {
+    return err(
+      resourceRuntimeResolutionError("Static publish directory cannot be the source root", {
+        runtimePlanStrategy: "static",
+        publishDirectory: trimmed,
+      }),
+    );
+  }
+
+  return ok(`/${segments.join("/")}`);
+}
+
+const staticPublishDirectoryBrand: unique symbol = Symbol("StaticPublishDirectory");
+export class StaticPublishDirectory extends ScalarValueObject<string> {
+  private [staticPublishDirectoryBrand]!: void;
+
+  private constructor(value: string) {
+    super(value);
+  }
+
+  static create(value: string): Result<StaticPublishDirectory> {
+    return normalizeStaticPublishDirectory(value).map(
+      (normalized) => new StaticPublishDirectory(normalized),
+    );
+  }
+
+  static rehydrate(value: string): StaticPublishDirectory {
+    return new StaticPublishDirectory(value.trim());
+  }
 }
 
 export interface ResourceNetworkProfileState {
@@ -296,6 +390,9 @@ export class Resource extends AggregateRoot<ResourceState> {
                   : {}),
                 ...(input.runtimeProfile.startCommand
                   ? { startCommand: input.runtimeProfile.startCommand.value }
+                  : {}),
+                ...(input.runtimeProfile.publishDirectory
+                  ? { publishDirectory: input.runtimeProfile.publishDirectory.value }
                   : {}),
                 ...(input.runtimeProfile.healthCheckPath
                   ? { healthCheckPath: input.runtimeProfile.healthCheckPath.value }

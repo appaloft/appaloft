@@ -56,7 +56,7 @@ import {
   renderRuntimeCommandString,
 } from "./runtime-commands";
 import { runStreamingProcess } from "./streaming-process";
-import { generateWorkspaceDockerfile } from "./workspace-planners";
+import { generateStaticSiteDockerfile, generateWorkspaceDockerfile } from "./workspace-planners";
 
 type LogPhase = "detect" | "plan" | "package" | "deploy" | "verify" | "rollback";
 type LogLevel = "debug" | "info" | "warn" | "error";
@@ -1328,7 +1328,12 @@ export class SshExecutionBackend implements ExecutionBackend {
       let image = prepared.source.image ?? state.runtimePlan.execution.image;
       const containerName = sanitizeName(`appaloft-${state.id.value}`);
 
-      if (state.runtimePlan.buildStrategy === "dockerfile" || state.runtimePlan.buildStrategy === "workspace-commands") {
+      const shouldBuildImage =
+        state.runtimePlan.buildStrategy === "dockerfile" ||
+        state.runtimePlan.buildStrategy === "workspace-commands" ||
+        state.runtimePlan.buildStrategy === "static-artifact";
+
+      if (shouldBuildImage) {
         image = sanitizeName(`appaloft-image-${state.id.value}`);
         const remoteWorkdir = prepared.source.remoteWorkdir;
         if (!remoteWorkdir) {
@@ -1336,9 +1341,14 @@ export class SshExecutionBackend implements ExecutionBackend {
         }
 
         const dockerfilePath =
-          state.runtimePlan.buildStrategy === "workspace-commands"
-            ? `${remoteRoot}/${state.runtimePlan.execution.dockerfilePath ?? "Dockerfile.appaloft"}`
-            : state.runtimePlan.execution.dockerfilePath ?? "Dockerfile";
+          state.runtimePlan.buildStrategy === "dockerfile"
+            ? (state.runtimePlan.execution.dockerfilePath ?? "Dockerfile")
+            : `${remoteRoot}/${
+                state.runtimePlan.execution.dockerfilePath ??
+                (state.runtimePlan.buildStrategy === "static-artifact"
+                  ? "Dockerfile.appaloft-static"
+                  : "Dockerfile.appaloft")
+              }`;
 
         if (state.runtimePlan.buildStrategy === "workspace-commands") {
           const dockerfile = generateWorkspaceDockerfile({
@@ -1389,6 +1399,60 @@ export class SshExecutionBackend implements ExecutionBackend {
               }),
             });
           }
+        }
+
+        if (state.runtimePlan.buildStrategy === "static-artifact") {
+          const dockerfile = generateStaticSiteDockerfile({
+            execution: state.runtimePlan.execution,
+            ...(state.runtimePlan.source.inspection
+              ? { sourceInspection: state.runtimePlan.source.inspection }
+              : {}),
+          });
+          if (!dockerfile) {
+            const message = "Static publish directory is required for static image generation";
+            logs.push(phaseLog("package", message, "error"));
+            return ok({
+              deployment: this.applyFailure(deployment, {
+                logs,
+                errorCode: "static_dockerfile_generation_failed",
+                retryable: false,
+                metadata: {
+                  host: target.host,
+                  remoteWorkdir,
+                },
+              }),
+            });
+          }
+
+          const encodedDockerfile = Buffer.from(dockerfile, "utf8").toString("base64");
+          const writeDockerfile = this.runRemoteCommand({
+            target,
+            command: [
+              `mkdir -p ${shellQuote(remoteRoot)}`,
+              `printf %s ${shellQuote(encodedDockerfile)} | base64 -d > ${shellQuote(dockerfilePath)}`,
+            ].join(" && "),
+            cwd: runtimeDir,
+            env,
+          });
+
+          if (writeDockerfile.failed) {
+            const message = "SSH static site Dockerfile write failed";
+            logs.push(phaseLog("package", message, "error"));
+            return ok({
+              deployment: this.applyFailure(deployment, {
+                logs,
+                errorCode: "ssh_static_dockerfile_write_failed",
+                retryable: true,
+                metadata: {
+                  host: target.host,
+                  remoteWorkdir,
+                },
+              }),
+            });
+          }
+          logs.push(
+            phaseLog("package", `Generated static site Dockerfile at ${dockerfilePath}`),
+          );
         }
 
         const buildCommand = renderRuntimeCommandString(

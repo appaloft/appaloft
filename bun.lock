@@ -221,6 +221,55 @@
         "@appaloft/integration-core": "workspace:*",
       },
     },
+    "packages/npm/cli": {
+      "name": "@appaloft/cli",
+      "version": "0.1.0",
+      "bin": {
+        "appaloft": "bin/appaloft.js",
+      },
+      "optionalDependencies": {
+        "@appaloft/cli-darwin-arm64": "0.1.0",
+        "@appaloft/cli-darwin-x64": "0.1.0",
+        "@appaloft/cli-linux-arm64-gnu": "0.1.0",
+        "@appaloft/cli-linux-arm64-musl": "0.1.0",
+        "@appaloft/cli-linux-x64-gnu": "0.1.0",
+        "@appaloft/cli-linux-x64-musl": "0.1.0",
+        "@appaloft/cli-win32-arm64": "0.1.0",
+        "@appaloft/cli-win32-x64": "0.1.0",
+      },
+    },
+    "packages/npm/cli-darwin-arm64": {
+      "name": "@appaloft/cli-darwin-arm64",
+      "version": "0.1.0",
+    },
+    "packages/npm/cli-darwin-x64": {
+      "name": "@appaloft/cli-darwin-x64",
+      "version": "0.1.0",
+    },
+    "packages/npm/cli-linux-arm64-gnu": {
+      "name": "@appaloft/cli-linux-arm64-gnu",
+      "version": "0.1.0",
+    },
+    "packages/npm/cli-linux-arm64-musl": {
+      "name": "@appaloft/cli-linux-arm64-musl",
+      "version": "0.1.0",
+    },
+    "packages/npm/cli-linux-x64-gnu": {
+      "name": "@appaloft/cli-linux-x64-gnu",
+      "version": "0.1.0",
+    },
+    "packages/npm/cli-linux-x64-musl": {
+      "name": "@appaloft/cli-linux-x64-musl",
+      "version": "0.1.0",
+    },
+    "packages/npm/cli-win32-arm64": {
+      "name": "@appaloft/cli-win32-arm64",
+      "version": "0.1.0",
+    },
+    "packages/npm/cli-win32-x64": {
+      "name": "@appaloft/cli-win32-x64",
+      "version": "0.1.0",
+    },
     "packages/observability": {
       "name": "@appaloft/observability",
       "dependencies": {
@@ -374,7 +423,25 @@
 
     "@appaloft/auth-better": ["@appaloft/auth-better@workspace:packages/auth/better"],
 
+    "@appaloft/cli": ["@appaloft/cli@workspace:packages/npm/cli"],
+
+    "@appaloft/cli-darwin-arm64": ["@appaloft/cli-darwin-arm64@workspace:packages/npm/cli-darwin-arm64"],
+
+    "@appaloft/cli-darwin-x64": ["@appaloft/cli-darwin-x64@workspace:packages/npm/cli-darwin-x64"],
+
+    "@appaloft/cli-linux-arm64-gnu": ["@appaloft/cli-linux-arm64-gnu@workspace:packages/npm/cli-linux-arm64-gnu"],
+
+    "@appaloft/cli-linux-arm64-musl": ["@appaloft/cli-linux-arm64-musl@workspace:packages/npm/cli-linux-arm64-musl"],
+
+    "@appaloft/cli-linux-x64-gnu": ["@appaloft/cli-linux-x64-gnu@workspace:packages/npm/cli-linux-x64-gnu"],
+
+    "@appaloft/cli-linux-x64-musl": ["@appaloft/cli-linux-x64-musl@workspace:packages/npm/cli-linux-x64-musl"],
+
     "@appaloft/cli-logging": ["@appaloft/cli-logging@workspace:packages/cli-logging"],
+
+    "@appaloft/cli-win32-arm64": ["@appaloft/cli-win32-arm64@workspace:packages/npm/cli-win32-arm64"],
+
+    "@appaloft/cli-win32-x64": ["@appaloft/cli-win32-x64@workspace:packages/npm/cli-win32-x64"],
 
     "@appaloft/config": ["@appaloft/config@workspace:packages/config"],
 

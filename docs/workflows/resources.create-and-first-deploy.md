@@ -85,6 +85,14 @@ workflow must normalize that draft before dispatching `resources.create`:
   such as `dockerfilePath`, `dockerComposeFilePath`, `publishDirectory`, or command defaults. Those
   fields are combined with the source binding's `baseDirectory` during plan resolution.
 
+For static site first deploy, the workflow must create or select a `static-site` resource with a
+source binding, `RuntimePlanStrategy = "static"`, and `runtimeProfile.publishDirectory`. Optional
+install/build commands belong to the same runtime profile. The default network profile is
+`internalPort = 80`, `upstreamProtocol = "http"`, and `exposureMode = "reverse-proxy"` unless an
+accepted resource network configuration supplies another endpoint. The deployment step packages the
+publish directory into a Docker/OCI static-server artifact; it must not run static files as a raw
+host-process runtime.
+
 The workflow must distinguish the resource internal listener port from host exposure. A collected application "port" is `ResourceNetworkProfile.internalPort`. It is not `deployments.create.port`, and it is not a server host-published port unless an explicit `direct-port` exposure mode is accepted.
 
 When generated default access policy is enabled, the first deployment may produce a provider-neutral generated access URL. The workflow displays it through `ResourceAccessSummary` after route snapshot/read-model state exists; it does not collect generated-domain provider settings during resource creation.
@@ -153,7 +161,16 @@ Current `resources.create` normalizes common GitHub tree URLs into repository lo
 carry raw GitHub tree locators so runtime adapters do not clone browser URLs.
 
 Provider-backed disambiguation for slash-containing Git refs and typed runtime-profile fields for
-Dockerfile/Compose/static paths remain future work.
+Dockerfile/Compose paths remain future work. Static publish directory is typed for the static
+strategy path.
+
+First-class static site deployment is partially implemented: `resources.create` can persist a
+static-site source/runtime/network profile, `deployments.create` remains ids-only and resolves a
+static artifact intent, and the shared Quick Deploy workflow rows are covered by executable tests.
+Local/generic-SSH runtime backends now generate adapter-owned static-server Dockerfiles for image
+builds. Web QuickDeploy and CLI deploy now collect static draft fields and dispatch them through
+`resources.create`. Local Docker static smoke coverage now verifies generated nginx packaging and
+runtime health, and generic-SSH Docker static smoke coverage exists as an opt-in harness.
 
 Generated default access route display and route snapshot persistence are governed by [ADR-017](../decisions/ADR-017-default-access-domain-and-proxy-routing.md) and are not yet implemented as the first-class `ResourceAccessSummary` read-model surface.
 

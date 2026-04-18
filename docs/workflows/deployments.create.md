@@ -113,6 +113,8 @@ profile fields, and deployment planning must convert them into one of these runt
 - build an OCI/Docker image for this deployment attempt;
 - pull or use a prebuilt OCI/Docker image;
 - materialize a Docker Compose project with resource/deployment-scoped identity.
+- package a static publish directory into an OCI/Docker static-server image for this deployment
+  attempt.
 
 Within those artifact paths, runtime work is planned as typed command specs before execution.
 Examples include Docker image build, Docker container run, Docker Compose up/down, Docker inspect,
@@ -156,6 +158,7 @@ provider-neutral.
 | Resource source variant metadata | Entry workflow must normalize deep Git URLs, Git refs, source base directories, local-folder subdirectories, Docker image tag/digest identity, and artifact extraction roots into `ResourceSourceBinding` before deployment admission. Deployment admission must not guess source variants from raw UI URLs. |
 | Resource runtime profile | Entry workflow may create a resource with runtime profile; if omitted, deployment planning uses the resource/default runtime strategy contract. |
 | Strategy-specific build file paths | Entry workflow must persist Dockerfile path, Docker Compose file path, static publish directory, and command defaults as resource runtime profile fields. Deployment admission combines these fields with the source binding base directory during runtime plan resolution. |
+| Static publish directory | Static-site entry workflows must persist `runtimeProfile.publishDirectory` before deployment admission. If a historical or selected static resource lacks it, deployment admission rejects in phase `runtime-plan-resolution` or `runtime-artifact-resolution`. |
 | Resource network profile | Entry workflow must create or select an inbound resource with `networkProfile.internalPort`, or deployment admission rejects in phase `resource-network-resolution`. |
 | project/environment/server/destination/resource context | Entry workflow may collect/create required context; destination may use the compatibility default seam; command admission rejects if still unresolved or inconsistent. |
 | Generated default access | Entry workflow does not collect provider-specific generated-domain settings. Deployment route resolution uses configured policy and the provider-neutral default access domain port. |
@@ -219,8 +222,8 @@ Migration gaps:
 - runtime execution paths must preserve the distinction between `internalPort`, optional private
   health-check mappings, and public direct `hostPort`.
 - current deployment/runtime paths use typed source `baseDirectory` for Git/local source workdirs and
-  reject legacy raw GitHub tree URLs before clone; typed runtime-profile Dockerfile/Compose/static
-  path fields are still pending.
+  reject legacy raw GitHub tree URLs before clone; static publish directory is typed for static
+  runtime profiles, while typed runtime-profile Dockerfile/Compose path fields are still pending.
 - runtime Docker build/run/Compose execution uses typed command specs with adapter renderers for
   local and generic SSH runtime adapters. Legacy workspace command text remains a shell-script leaf
   until runtime profile command fields are remodeled as typed command steps.

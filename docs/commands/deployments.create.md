@@ -182,6 +182,20 @@ the Docker/OCI artifact class needed by runtime execution:
 | Buildable source | Build context, strategy, Dockerfile/buildpack/static/workspace command plan, and expected image tag or digest. |
 | Prebuilt image | Image name plus tag or digest; digest is preferred for immutable snapshots. |
 | Compose stack | Compose project identity, service image/build declarations, target service for inbound traffic, and resource/deployment-scoped project naming. |
+| Static site | Source root, `publishDirectory`, optional install/build command leaves, static-server artifact intent, and HTTP runtime endpoint metadata. |
+
+Static site deployment is a first-class deployment behavior over the existing command boundary. The
+resource owns `kind = "static-site"`, source binding metadata, `RuntimePlanStrategy = "static"`,
+`runtimeProfile.publishDirectory`, optional install/build commands, and
+`ResourceNetworkProfile.internalPort`. Deployment planning packages the resolved publish directory
+into a Docker/OCI image that serves static files over HTTP, typically through an adapter-selected
+static server image. The concrete static server image, generated web-server config, and Docker
+labels are adapter artifacts, not deployment command input.
+
+If a static resource lacks `runtimeProfile.publishDirectory`, or the value cannot be safely
+resolved under the source base directory after optional build commands, deployment admission fails
+with `validation_error` in phase `runtime-plan-resolution` or `runtime-artifact-resolution`
+according to where the invalid profile is detected.
 
 The runtime adapter may store sanitized Docker image ids, container ids, Compose project names, and
 container/health diagnostics in deployment logs, diagnostics, or read models. Those fields are not

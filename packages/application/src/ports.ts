@@ -1499,13 +1499,15 @@ export type RequestedDeploymentMethod =
   | "dockerfile"
   | "docker-compose"
   | "prebuilt-image"
-  | "workspace-commands";
+  | "workspace-commands"
+  | "static";
 
 export interface RequestedDeploymentConfig {
   method: RequestedDeploymentMethod;
   installCommand?: string;
   buildCommand?: string;
   startCommand?: string;
+  publishDirectory?: string;
   port?: number;
   healthCheckPath?: string;
   healthCheck?: RequestedDeploymentHealthCheck;

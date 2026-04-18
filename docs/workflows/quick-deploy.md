@@ -112,6 +112,20 @@ the selected folder. Dockerfile path, Docker Compose file path, publish director
 target, and workspace command fields are runtime profile drafts because they describe how to plan
 the chosen source tree.
 
+For static site drafts, Quick Deploy must collect or infer:
+
+- `kind = "static-site"` for newly created resources;
+- `runtimeProfile.strategy = "static"`;
+- `runtimeProfile.publishDirectory`, relative to the selected source base directory and resolved
+  after any optional build command;
+- optional install/build command fields when the static output must be generated before packaging;
+- `networkProfile.internalPort = 80`, `upstreamProtocol = "http"`, and
+  `exposureMode = "reverse-proxy"` by default.
+
+Quick Deploy must not map static site deployment to `workspace-commands` merely because a build
+command exists. Static build commands are preparation steps for a static Docker/OCI artifact whose
+runtime serves files through an adapter-owned static server.
+
 ## Workflow Boundary
 
 Quick Deploy owns:
@@ -283,6 +297,7 @@ asserting UI copy or prompt text as domain behavior.
 | --- | --- | --- | --- |
 | Source selection | Web/CLI workflow | Source/provider queries as needed | Produce a `ResourceSourceBinding` draft and optional provider metadata. |
 | Source variant normalization | Web/CLI workflow | Local draft parser; provider branch/tag lookup when available | Convert deep Git URLs, local folder base directories, Docker image tags/digests, and build-file paths into resource source/runtime profile fields. |
+| Static runtime draft | Web/CLI workflow | Local draft validation; optional source/runtime detection | For static site drafts, require `runtimeProfile.strategy = "static"` and `runtimeProfile.publishDirectory`, preserve optional install/build commands, and default the HTTP network profile to port 80. |
 | Network draft | Web/CLI workflow | Local draft validation; optional source/runtime detection | Produce a `ResourceNetworkProfile` draft with `internalPort` for inbound resources. |
 | Health check draft | Web/CLI workflow | Local draft validation; optional runtime defaults | Produce optional `ResourceRuntimeProfile.healthCheck` for newly created resources, including HTTP path, expected status, interval, timeout, retries, and start period. |
 | Project context | Web/CLI workflow | `projects.list`; optional `projects.create` | Select or create the project before deployment admission. |
@@ -497,8 +512,17 @@ Current Web and CLI entry fields may still accept Git URLs as a single raw input
 typed on the source binding.
 
 Provider-backed disambiguation for slash-containing Git refs and user-facing typed fields for
-Dockerfile path, Docker Compose path, static publish directory, and build target remain follow-up
-work.
+Dockerfile path, Docker Compose path, and build target remain follow-up work. Static publish
+directory is accepted by the shared resource schema and static workflow tests. Web QuickDeploy and
+CLI deploy expose static draft inputs that map to `resources.create`.
+
+First-class static site deployment is partially aligned at the shared workflow and command
+admission layers. Web and CLI now dispatch
+`resources.create(kind = static-site, runtimeProfile.strategy = static, publishDirectory,
+networkProfile.internalPort = 80)` for static drafts. The deployment runtime generates
+adapter-owned static-server Dockerfiles for local/generic-SSH image builds. Local Docker static
+smoke coverage verifies generated nginx packaging and runtime health, and generic-SSH Docker
+static smoke coverage exists as an opt-in harness.
 
 Until provider-backed disambiguation exists, callers should supply explicit `gitRef` and
 `baseDirectory` when a GitHub tree URL uses a slash-containing branch or tag name.

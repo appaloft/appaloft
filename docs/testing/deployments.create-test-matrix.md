@@ -112,6 +112,8 @@ Then:
 | DEP-CREATE-ADM-023 | integration | Active latest deployment | Latest deployment for same resource is non-terminal | `err` | `deployment_not_redeployable`, phase `redeploy-guard` | None for new attempt | No new deployment created |
 | DEP-CREATE-ADM-024 | integration | Direct host-port collision | Different resource already owns the same effective direct `hostPort` on the same server/destination | `err` when safely detected before acceptance, otherwise accepted attempt later fails | `conflict`, phase `admission-conflict`, or failed deployment with phase `runtime-execution` | No success event for the conflicting attempt | Existing resource runtime is not removed to free the port |
 | DEP-CREATE-ADM-025 | integration | Invalid runtime plan | Plan has no executable steps or invalid VO state | `err` | `validation_error` or `invariant_violation` | None for accepted request | No accepted deployment |
+| DEP-CREATE-ADM-026 | integration | Static strategy resolves image artifact | Context ids resolve; resource has `kind = static-site`, source binding, `runtimeProfile.strategy = static`, `publishDirectory`, and `networkProfile.internalPort = 80` | `ok({ id })` | None | `deployment-requested -> build-requested` | Deployment snapshot records static artifact intent, source root, publish directory, and HTTP endpoint metadata |
+| DEP-CREATE-ADM-027 | integration | Static strategy missing publish directory | Context ids resolve, but selected static resource has no `runtimeProfile.publishDirectory` | `err` | `validation_error`, phase `runtime-plan-resolution` or `runtime-artifact-resolution` | None for accepted request | No accepted deployment |
 
 ## Async Progression Matrix
 
@@ -133,6 +135,7 @@ Then:
 | DEP-CREATE-ASYNC-014 | integration | Runtime failure, permanent | Runtime rollout fails after acceptance with non-retriable error | `ok({ id })` | `deployment-failed` | Terminal `failed`; no retry |
 | DEP-CREATE-ASYNC-015 | integration | Worker crash before state persistence | Worker cannot persist outcome | Original accepted command remains `ok({ id })` | No terminal event until recovery | Process state records retryable processing error |
 | DEP-CREATE-ASYNC-016 | integration | Public route verification failure preserves previous runtime | A reverse-proxy resource has a previously successful runtime and the replacement candidate starts, but generated or durable public route verification fails because DNS, proxy route readiness, or HTTP verification is not ready | `ok({ id })` | `deployment-failed` for the new attempt | Previous successful runtime and route remain active; failed candidate is removed or isolated; failure details include the observed public route error |
+| DEP-CREATE-ASYNC-017 | integration | Static artifact package failure | Accepted static deployment resolves source, but static package/build step cannot produce the publish directory image artifact | `ok({ id })` | `deployment-failed` | Terminal `failed` with `failurePhase = image-build` or `runtime-artifact-resolution`; no replacement runtime is promoted |
 
 ## Event Matrix
 
@@ -208,6 +211,14 @@ Runtime target backend registry unit tests now cover local/generic-SSH single-se
 selection and `runtime_target_unsupported` details. Deployment admission tests still need coverage
 for pre-acceptance unsupported-target rejection once the use case consults the registry before
 accepting the command.
+
+Static site deployment rows `DEP-CREATE-ADM-026`, `DEP-CREATE-ADM-027`, and
+`DEP-CREATE-ASYNC-017` are covered by `packages/application/test/create-deployment.test.ts` and
+the static artifact planning assertion in `packages/adapters/runtime/test/runtime-plan-resolver.test.ts`.
+Current code accepts the static runtime plan strategy, resolves static artifact intent, and covers
+adapter-owned static-server Dockerfile generation in
+`packages/adapters/runtime/test/runtime-plan-resolver.test.ts`. Executable static smoke coverage
+now includes the local Docker generated-nginx path and an opt-in generic-SSH Docker path.
 
 ## Open Questions
 

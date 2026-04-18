@@ -75,6 +75,7 @@ type DeploymentCreateErrorDetails = {
   destinationId?: string;
   resourceSourceKind?: string;
   runtimePlanStrategy?: string;
+  publishDirectory?: string;
   internalPort?: number;
   hostPort?: number;
   publishedHostPort?: number;
@@ -108,7 +109,7 @@ Admission errors reject the command and return `err(DomainError)`.
 
 | Error code | Phase | Retriable | Required deployment details |
 | --- | --- | --- | --- |
-| `validation_error` | `command-validation`, `config-bootstrap`, `context-resolution`, `resource-source-resolution`, `resource-network-resolution`, `source-detection`, `runtime-plan-resolution`, `runtime-artifact-resolution` | No | Field/path when available, `commandName`, safe command context. |
+| `validation_error` | `command-validation`, `config-bootstrap`, `context-resolution`, `resource-source-resolution`, `resource-network-resolution`, `source-detection`, `runtime-plan-resolution`, `runtime-artifact-resolution` | No | Field/path when available, `commandName`, safe command context. Static strategy failures include `publishDirectory` when the value is missing or unsafe. |
 | `not_found` | `context-resolution` | No | Entity type, entity id, `commandName`, `phase`. |
 | `deployment_not_redeployable` | `redeploy-guard` | No | Existing deployment id, resource id, current deployment status. |
 | `conflict` | `admission-conflict` | No | Conflict subject and related state. |
@@ -130,6 +131,11 @@ available.
 
 For reverse-proxy resources, another resource using the same `internalPort` is not an admission
 conflict and must not be reported as a host-port conflict.
+
+For static strategy resources, missing or unsafe `runtimeProfile.publishDirectory` is an admission
+failure when it can be detected before acceptance. Static package/build failures discovered after
+acceptance must be represented as failed deployment state with phase `image-build` or
+`runtime-artifact-resolution`, not as a changed command result.
 
 ## Post-Acceptance Deployment Failures
 
@@ -169,6 +175,8 @@ Deployment tests must assert:
 - `deploymentId`, `resourceId`, or related context when relevant;
 - `internalPort`, `hostPort`, or `publishedHostPort` when a runtime port mapping or direct-port
   conflict is the relevant failure context;
+- `runtimePlanStrategy` and `publishDirectory` when a static artifact planning or packaging failure
+  is relevant;
 - `deployment-failed` plus failed state for post-acceptance failure;
 - a new deployment id for retry.
 

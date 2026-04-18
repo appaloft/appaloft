@@ -29,6 +29,7 @@ type ResourceLifecycleErrorDetails = {
     | "context-resolution"
     | "resource-admission"
     | "resource-source-resolution"
+    | "resource-runtime-resolution"
     | "resource-network-resolution"
     | "health-policy-resolution"
     | "resource-persistence"
@@ -47,6 +48,7 @@ type ResourceLifecycleErrorDetails = {
   baseDirectory?: string;
   dockerfilePath?: string;
   dockerComposeFilePath?: string;
+  publishDirectory?: string;
   imageName?: string;
   imageTag?: string;
   imageDigest?: string;
@@ -78,7 +80,8 @@ Admission errors reject `resources.create` and return `err(DomainError)`.
 | `resource_context_mismatch` | `application` | `context-resolution` | No | Environment or destination does not match the supplied project/environment context. |
 | `resource_slug_conflict` | `conflict` | `resource-admission` | No | A resource with the same slug already exists in the same project/environment. |
 | `invariant_violation` | `domain` | `resource-admission` | No | Resource aggregate rule rejected the requested state. |
-| `validation_error` | `resource-source-resolution` | No | Source variant metadata is invalid, such as an uncloneable deep Git URL, ambiguous Git ref/base-directory split, invalid source-relative path, or invalid Docker image tag/digest pair. |
+| `validation_error` | `validation` | `resource-source-resolution` | No | Source variant metadata is invalid, such as an uncloneable deep Git URL, ambiguous Git ref/base-directory split, invalid source-relative path, or invalid Docker image tag/digest pair. |
+| `validation_error` | `validation` | `resource-runtime-resolution` | No | Runtime profile strategy or strategy-specific fields are invalid, such as missing or unsafe static publish directory. |
 | `validation_error` | `validation` | `resource-network-resolution` | No | Resource network profile is missing, invalid, or ambiguous for an inbound resource endpoint. |
 | `validation_error` | `validation` | `health-policy-resolution` | No | Resource health policy is missing required HTTP fields, has invalid probe fields, or requests an unsupported policy type. |
 | `infra_error` | `infra` | `resource-persistence` | Conditional | Persistence failed before the resource could be safely created. |
@@ -121,6 +124,8 @@ Tests must assert:
 - related entity ids and resource slug when relevant;
 - source variant fields such as `sourceKind`, `gitRef`, `baseDirectory`, `imageTag`, or
   `imageDigest` when a source profile error is relevant;
+- runtime variant fields such as `runtimePlanStrategy`, `dockerfilePath`, `dockerComposeFilePath`,
+  or `publishDirectory` when a runtime profile error is relevant;
 - `internalPort`, `exposureMode`, and `targetServiceName` when a network profile error is relevant;
 - no resource persisted on admission failure;
 - no duplicate `resource-created` effect on duplicate event consumption.

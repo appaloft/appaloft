@@ -106,6 +106,8 @@ Then:
 | QUICK-DEPLOY-WF-037 | e2e-preferred | Shared workflow creates all prerequisites | Shared workflow program | Project/server/environment/resource create inputs plus optional credential and variable | Workflow returns all ids including deployment id | None | `projects.create` -> `servers.register` -> credential steps -> `environments.create` -> `resources.create` -> optional variable -> `deployments.create` | Returned ids are threaded into later inputs | Per command |
 | QUICK-DEPLOY-WF-038 | e2e-preferred | Shared workflow uses existing ids | Shared workflow program | Existing project/server/environment/resource ids | Workflow returns selected ids and deployment id | None | `deployments.create` only | No prerequisite mutation | Deployment retry creates new attempt |
 | QUICK-DEPLOY-WF-039 | e2e-preferred | Web workflow step progress | Web QuickDeploy | New context and resource draft | Each in-flight prerequisite request shows loading and succeeded requests show complete; the final deployment step shows deployment phase progress and application output before the command reaches a terminal result | Failed command error shown on failed step | One typed oRPC request per yielded prerequisite workflow step; final deployment command may use the deployment progress stream transport for detect/plan/package/deploy/verify visibility | Workflow progress stops at the failed step or stays visible after accepted deployment | Per command |
+| QUICK-DEPLOY-WF-040 | e2e-preferred | Static site first deploy | Web or CLI | Static source, `publishDirectory`, optional install/build command, and no explicit port | Deployment request accepted when static artifact planning succeeds | None | `resources.create(kind = static-site, runtimeProfile.strategy = static, runtimeProfile.publishDirectory, networkProfile.internalPort = 80)` -> `deployments.create(resourceId)` | Resource persists static runtime/network profile; deployment packages and serves static artifact through Docker/OCI | Per deployment |
+| QUICK-DEPLOY-WF-041 | e2e-preferred | Static site missing publish directory | Web or CLI | Static source selected but publish directory omitted or unsafe | Workflow fails before or during `resources.create` admission | `validation_error`, phase `resource-runtime-resolution` or entry preflight equivalent | No `deployments.create` | No accepted deployment; any already-created context remains | No for same invalid draft |
 
 ## Entry Consistency Matrix
 
@@ -118,6 +120,7 @@ Then:
 | QUICK-DEPLOY-ENTRY-005 | e2e-preferred | New resource | `resources.create` with source/runtime/network profile when needed | `resources.create` with source/runtime/network profile when needed | Explicit `resources.create` before deployment |
 | QUICK-DEPLOY-ENTRY-006 | e2e-preferred | Final deploy | `deployments.create` | `deployments.create` | `deployments.create` |
 | QUICK-DEPLOY-ENTRY-007 | e2e-preferred | Domain/TLS | Resource/domain binding surface or follow-up command | Separate `domain-bindings.create` command | Durable domain/TLS requires separate commands |
+| QUICK-DEPLOY-ENTRY-008 | e2e-preferred | Static site draft parity | Collects static publish directory, optional build commands, and defaults internal port 80 before `resources.create` | Collects equivalent static draft fields and maps them to the same command schema | API/automation callers create/select a static resource profile explicitly before deployment |
 
 ## Error Assertion Rules
 
@@ -154,6 +157,15 @@ unavailable.
 Current contracts store the listener port as `networkProfile.internalPort`. `runtimeProfile.port` must be rejected by schemas that no longer include it.
 
 Current CLI still exposes `--method` as a user-facing compatibility option. Tests should assert that it maps to resource `RuntimePlanStrategy`, not deployment command input.
+
+`QUICK-DEPLOY-WF-040`, `QUICK-DEPLOY-WF-041`, and `QUICK-DEPLOY-ENTRY-008` are covered at the
+shared workflow-contract/schema layer by `packages/contracts/test/quick-deploy-workflow.test.ts`.
+Web QuickDeploy and CLI deploy now expose first-class static site draft UI/flags that map to
+`resources.create`. Browser-level Web entry coverage exists under
+`apps/web/test/e2e-webview/home.webview.test.ts`, and CLI entry helper coverage exists under
+`packages/adapters/cli/test/deployment-interaction.test.ts`. Local Docker static smoke coverage
+exists under `apps/shell/test/e2e/quick-deploy-static-docker.workflow.e2e.ts`, and the generic-SSH
+Docker static path is covered by the opt-in SSH e2e harness.
 
 CLI non-TTY Quick Deploy must not prompt for omitted optional advanced fields once source and
 context flags are supplied. It should use provided flags plus defaults, then dispatch

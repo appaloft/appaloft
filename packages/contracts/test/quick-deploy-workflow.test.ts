@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import {
   createQuickDeployGeneratedResourceName,
+  createResourceInputSchema,
   normalizeQuickDeployGeneratedNameBase,
   type QuickDeployCreateResourceInput,
   type QuickDeployWorkflowInput,
@@ -254,6 +255,32 @@ describe("quick deploy workflow", () => {
           kind: "compose-stack",
           runtimeProfile: { strategy: "docker-compose" },
           networkProfile: { targetServiceName: "web" },
+        });
+        expectDeploymentInputDoesNotContainWorkflowDrafts(steps);
+      },
+    },
+    {
+      id: "[RES-CREATE-WF-007]",
+      name: "static site first deploy creates resource before ids-only deployment",
+      input: workflowInput({
+        resource: {
+          mode: "create",
+          input: staticSiteResourceInput(),
+        },
+      }),
+      expectedKinds: ["resources.create", "deployments.create"],
+      assert: ({ steps }) => {
+        expect(findStep(steps, "resources.create").input).toMatchObject({
+          kind: "static-site",
+          runtimeProfile: {
+            strategy: "static",
+            publishDirectory: "/dist",
+          },
+          networkProfile: {
+            internalPort: 80,
+            upstreamProtocol: "http",
+            exposureMode: "reverse-proxy",
+          },
         });
         expectDeploymentInputDoesNotContainWorkflowDrafts(steps);
       },
@@ -627,6 +654,37 @@ describe("quick deploy workflow", () => {
       },
     },
     {
+      id: "[QUICK-DEPLOY-WF-040]",
+      name: "static site first deploy maps static draft to resources.create",
+      input: workflowInput({
+        resource: {
+          mode: "create",
+          input: staticSiteResourceInput(),
+        },
+      }),
+      expectedKinds: ["resources.create", "deployments.create"],
+      assert: ({ result, steps }) => {
+        expect(findStep(steps, "resources.create").input).toMatchObject({
+          kind: "static-site",
+          runtimeProfile: {
+            strategy: "static",
+            buildCommand: "pnpm build",
+            publishDirectory: "/dist",
+          },
+          networkProfile: {
+            internalPort: 80,
+          },
+        });
+        expect(findStep(steps, "deployments.create").input).toEqual({
+          projectId: "proj_existing",
+          serverId: "srv_existing",
+          environmentId: "env_existing",
+          resourceId: "res_1",
+        });
+        expect(result.resourceId).toBe("res_1");
+      },
+    },
+    {
       id: "[QUICK-DEPLOY-ENTRY-001]",
       name: "id-only deploy path can skip source while create-resource paths require entry preflight",
       input: existingContextInput(),
@@ -693,6 +751,16 @@ describe("quick deploy workflow", () => {
     expect(createQuickDeployGeneratedResourceName("bun-docker", "a1b2c3")).toBe(
       "bun-docker-a1b2c3",
     );
+  });
+
+  test("[QUICK-DEPLOY-ENTRY-008] static site draft validates through shared resources.create schema", () => {
+    const parsed = createResourceInputSchema.safeParse({
+      projectId: "proj_existing",
+      environmentId: "env_existing",
+      ...staticSiteResourceInput(),
+    });
+
+    expect(parsed.success).toBe(true);
   });
 
   const workflowFailureCases: FailureCase[] = [
@@ -808,6 +876,23 @@ describe("quick deploy workflow", () => {
       error: new StepError("deployment_not_redeployable", "redeploy-guard"),
       expectedKindsBeforeFailure: ["deployments.create"],
     },
+    {
+      id: "[QUICK-DEPLOY-WF-041]",
+      name: "static site missing publish directory stops before accepted deployment",
+      input: workflowInput({
+        resource: {
+          mode: "create",
+          input: staticSiteResourceInput({
+            runtimeProfile: {
+              strategy: "static",
+            } as never,
+          }),
+        },
+      }),
+      failAt: "resources.create",
+      error: new StepError("validation_error", "resource-runtime-resolution"),
+      expectedKindsBeforeFailure: ["resources.create"],
+    },
   ];
 
   test.each(workflowFailureCases)("$id $name", async (workflowCase) => {
@@ -870,6 +955,31 @@ function resourceInput(
     networkProfile:
       overrides.networkProfile === undefined ? base.networkProfile : overrides.networkProfile,
   };
+}
+
+function staticSiteResourceInput(
+  overrides: Partial<QuickDeployCreateResourceInput> = {},
+): QuickDeployCreateResourceInput {
+  return resourceInput({
+    name: "docs-site",
+    kind: "static-site",
+    source: {
+      kind: "local-folder",
+      locator: ".",
+      baseDirectory: "/site",
+    },
+    runtimeProfile: {
+      strategy: "static",
+      buildCommand: "pnpm build",
+      publishDirectory: "/dist",
+    } as never,
+    networkProfile: {
+      internalPort: 80,
+      upstreamProtocol: "http",
+      exposureMode: "reverse-proxy",
+    },
+    ...overrides,
+  });
 }
 
 function workflowInput(

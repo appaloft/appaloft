@@ -10,10 +10,13 @@ import {
 } from "@appaloft/core";
 
 export {
+  type DockerfileBuildContext,
   DockerfileBuilder,
   dockerfileFromExecution,
+  renderStaticSiteDockerfile,
   renderWorkspaceDockerfile,
-  type DockerfileBuildContext,
+  type StaticSiteDockerfileContext,
+  staticSiteDockerfileFromExecution,
 } from "./dockerfile-builder";
 
 export const generatedWorkspaceDockerfileName = "Dockerfile.appaloft";

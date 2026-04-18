@@ -15,6 +15,7 @@ import {
 const enabled = process.env.APPALOFT_E2E_SSH_QUICK_DEPLOY === "true";
 const successfulFixtureDir = fixturePath("docker-express-hello");
 const failingFixtureDir = fixturePath("docker-exits-fast");
+const staticFixtureDir = fixturePath("static-site");
 
 interface SshConfig {
   host: string;
@@ -184,6 +185,7 @@ describe("quick deploy SSH workflow e2e", () => {
   if (!enabled) {
     test.skip("[QUICK-DEPLOY-WF-022] opt-in SSH Docker workflow requires APPALOFT_E2E_SSH_QUICK_DEPLOY=true", () => {});
     test.skip("[QUICK-DEPLOY-WF-034] opt-in SSH failure diagnostics workflow requires APPALOFT_E2E_SSH_QUICK_DEPLOY=true", () => {});
+    test.skip("[QUICK-DEPLOY-WF-040] opt-in SSH static site workflow requires APPALOFT_E2E_SSH_QUICK_DEPLOY=true", () => {});
     return;
   }
 
@@ -267,6 +269,60 @@ describe("quick deploy SSH workflow e2e", () => {
       const logs = runShellCli(["logs", deploymentId], workspace.cliOptions);
       expectCliSuccess(logs, "deployment logs");
       expect(logs.stdout).toContain("Using SSH docker-container execution");
+      expect(logs.stdout).toContain("SSH container is reachable internally");
+      expect(logs.stdout).toContain("SSH public route is reachable");
+    } finally {
+      if (deploymentId) {
+        remoteCleanup(config, deploymentId);
+      }
+    }
+  }, 240000);
+
+  test("[QUICK-DEPLOY-WF-040] quick deploys a static site to an SSH Docker target", () => {
+    let deploymentId: string | undefined;
+
+    try {
+      const deployment = runShellCli(
+        [
+          "deploy",
+          staticFixtureDir,
+          "--project",
+          successfulRuntimeContext.projectId,
+          "--server",
+          successfulRuntimeContext.serverId,
+          "--environment",
+          successfulRuntimeContext.environmentId,
+          "--method",
+          "static",
+          "--publish-dir",
+          "/dist",
+          "--health-path",
+          "/",
+          "--app-log-lines",
+          "8",
+        ],
+        workspace.cliOptions,
+      );
+      expectCliSuccess(deployment, "quick deploy static site");
+      deploymentId = parseJson<{ id: string }>(deployment.stdout).id;
+
+      const deployments = runShellCli(["deployments", "list"], workspace.cliOptions);
+      expectCliSuccess(deployments, "list deployments");
+      expect(
+        parseJson<{ items: Array<{ id: string; status: string }> }>(deployments.stdout).items,
+      ).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            id: deploymentId,
+            status: "succeeded",
+          }),
+        ]),
+      );
+
+      const logs = runShellCli(["logs", deploymentId], workspace.cliOptions);
+      expectCliSuccess(logs, "deployment logs");
+      expect(logs.stdout).toContain("Using SSH docker-container execution");
+      expect(logs.stdout).toContain("Generated static site Dockerfile");
       expect(logs.stdout).toContain("SSH container is reachable internally");
       expect(logs.stdout).toContain("SSH public route is reachable");
     } finally {

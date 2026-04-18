@@ -173,6 +173,50 @@ describe("DefaultRuntimePlanResolver", () => {
     );
   });
 
+  test("renders static site Dockerfiles for prebuilt publish directories", async () => {
+    const { renderStaticSiteDockerfile } = await import("../src/workspace-planners");
+
+    const dockerfile = renderStaticSiteDockerfile({
+      publishDirectory: "/dist",
+    });
+
+    expect(dockerfile).toBe(
+      [
+        "FROM nginx:1.27-alpine",
+        'COPY ["dist/","/usr/share/nginx/html/"]',
+        "EXPOSE 80",
+        'CMD ["nginx","-g","daemon off;"]',
+        "",
+      ].join("\n"),
+    );
+  });
+
+  test("renders static site Dockerfiles with build commands before the server stage", async () => {
+    const { renderStaticSiteDockerfile } = await import("../src/workspace-planners");
+
+    const dockerfile = renderStaticSiteDockerfile({
+      publishDirectory: "/dist",
+      installCommand: "pnpm install",
+      buildCommand: "pnpm build",
+    });
+
+    expect(dockerfile).toBe(
+      [
+        "FROM node:22-alpine AS build",
+        "WORKDIR /app",
+        'RUN ["sh","-lc","corepack enable || true"]',
+        "COPY . .",
+        'RUN ["sh","-lc","pnpm install"]',
+        'RUN ["sh","-lc","pnpm build"]',
+        "FROM nginx:1.27-alpine",
+        'COPY --from=build ["/app/dist/","/usr/share/nginx/html/"]',
+        "EXPOSE 80",
+        'CMD ["nginx","-g","daemon off;"]',
+        "",
+      ].join("\n"),
+    );
+  });
+
   test("selects workspace commands when explicitly requested", async () => {
     ensureReflectMetadata();
     const { DefaultRuntimePlanResolver } = await import("../src");
@@ -601,5 +645,72 @@ describe("DefaultRuntimePlanResolver", () => {
         composeFile: "compose.yml",
       }),
     );
+  });
+
+  test("[DEP-CREATE-ADM-026] static strategy packages publish directory as static server image artifact", async () => {
+    ensureReflectMetadata();
+    const { DefaultRuntimePlanResolver } = await import("../src");
+    const resolver = new DefaultRuntimePlanResolver();
+    const context = createTestExecutionContext();
+
+    const result = await resolver.resolve(context, {
+      id: "plan_static",
+      source: createSource({
+        kind: "local-folder",
+        locator: "/tmp/static-site",
+        displayName: "static-site",
+        metadata: {
+          baseDirectory: "/site",
+        },
+      }),
+      server: {
+        id: "srv_static",
+        providerKey: "local-shell",
+      },
+      environmentSnapshot: createEnvironmentSnapshot("snap_static"),
+      detectedReasoning: ["configured static site"],
+      requestedDeployment: {
+        method: "static",
+        installCommand: "pnpm install",
+        buildCommand: "pnpm build",
+        publishDirectory: "/dist",
+        port: 80,
+        exposureMode: "reverse-proxy",
+        upstreamProtocol: "http",
+      } as never,
+      generatedAt: "2026-01-01T00:00:00.000Z",
+    });
+
+    expect(result.isOk()).toBe(true);
+    const plan = result._unsafeUnwrap();
+
+    expect(plan.buildStrategy).toBe("static-artifact");
+    expect(plan.packagingMode).toBe("all-in-one-docker");
+    expect(plan.runtimeArtifact).toEqual(
+      expect.objectContaining({
+        kind: "image",
+        intent: "build-image",
+        metadata: expect.objectContaining({
+          sourceKind: "local-folder",
+          publishDirectory: "/dist",
+          staticServer: "adapter-owned",
+        }),
+      }),
+    );
+    expect(plan.execution).toEqual(
+      expect.objectContaining({
+        kind: "docker-container",
+        dockerfilePath: "Dockerfile.appaloft-static",
+        installCommand: "pnpm install",
+        buildCommand: "pnpm build",
+        port: 80,
+        metadata: expect.objectContaining({
+          "static.publishDirectory": "/dist",
+          "static.server": "adapter-owned",
+        }),
+      }),
+    );
+    expect(plan.steps).toContain("Package static site");
+    expect(plan.steps).toContain("Run static server container");
   });
 });
