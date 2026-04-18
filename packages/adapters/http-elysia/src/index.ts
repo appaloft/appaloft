@@ -217,6 +217,54 @@ function isApiPath(pathname: string): boolean {
   return pathname === "/api" || pathname.startsWith("/api/");
 }
 
+function isBackendLogPath(pathname: string): boolean {
+  return isApiPath(pathname) || pathname.startsWith("/.well-known/acme-challenge/");
+}
+
+function readRequestPathname(request: Request): string {
+  try {
+    return new URL(request.url).pathname;
+  } catch {
+    return "/";
+  }
+}
+
+function logHttpRequest(input: {
+  durationMs?: number;
+  logger: AppLogger;
+  request: Request;
+  requestId?: string;
+  route?: string;
+  statusCode: number;
+}): void {
+  const pathname = readRequestPathname(input.request);
+
+  if (!isBackendLogPath(pathname)) {
+    return;
+  }
+
+  const context = {
+    method: input.request.method,
+    path: pathname,
+    statusCode: input.statusCode,
+    ...(input.route ? { route: input.route } : {}),
+    ...(input.requestId ? { requestId: input.requestId } : {}),
+    ...(input.durationMs !== undefined ? { durationMs: input.durationMs } : {}),
+  };
+
+  if (input.statusCode >= 500) {
+    input.logger.error("http_request.completed", context);
+    return;
+  }
+
+  if (input.statusCode >= 400) {
+    input.logger.warn("http_request.completed", context);
+    return;
+  }
+
+  input.logger.info("http_request.completed", context);
+}
+
 function resolveRequestHostname(request: Request): string | null {
   const host = request.headers.get("host")?.trim();
 
@@ -389,6 +437,7 @@ export function createHttpApp(input: {
   const allowedOrigins = createAllowedOrigins(input.config.webOrigin);
   const terminalSessionsBySocket = new WeakMap<object, TerminalSession>();
   const terminalSessionsBySessionId = new Map<string, TerminalSession>();
+  const requestStartTimes = new WeakMap<Request, number>();
 
   function staticResponse(pathname: string): Response | null {
     const relativePath = pathname === "/" ? "index.html" : pathname.replace(/^\/+/, "");
@@ -625,6 +674,7 @@ export function createHttpApp(input: {
 
   const baseApp = new Elysia()
     .wrap((handle, request) => {
+      requestStartTimes.set(request, performance.now());
       const requestId = request.headers.get("x-request-id");
 
       return wrapHttpRequestHandlerWithSpan(
@@ -708,11 +758,25 @@ export function createHttpApp(input: {
     })
     .onAfterResponse(({ request, set, route }) => {
       const requestId = request.headers.get("x-request-id");
+      const statusCode = resolveStatusCode(set.status) ?? 200;
       finishActiveHttpServerSpan({
         request,
         route,
-        statusCode: resolveStatusCode(set.status) ?? 200,
+        statusCode,
         ...(requestId ? { requestId } : {}),
+      });
+
+      const startedAt = requestStartTimes.get(request);
+      requestStartTimes.delete(request);
+      logHttpRequest({
+        logger: input.logger,
+        request,
+        route,
+        statusCode,
+        ...(requestId ? { requestId } : {}),
+        ...(startedAt !== undefined
+          ? { durationMs: Math.round(performance.now() - startedAt) }
+          : {}),
       });
     })
     .get("/api/health", () => ({
