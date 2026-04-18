@@ -24,6 +24,8 @@ blob-report
 # Build outputs
 build
 dist
+!apps/shell/test/fixtures/static-site/dist/
+!apps/shell/test/fixtures/static-site/dist/index.html
 *.bun-build
 .svelte-kit
 apps/web/.svelte-kit
