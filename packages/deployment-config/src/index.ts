@@ -77,7 +77,7 @@ const unsupportedConfigFields = new Set([
 ]);
 
 const secretLikeKeyPattern =
-  /(?:secret|password|passwd|token|private[_-]?key|ssh[_-]?key|credential|certificate|cert)/i;
+  /(?:secret|password|passwd|token|api[_-]?key|database[_-]?url|connection[_-]?string|private[_-]?key|ssh[_-]?key|credential|certificate|cert)/i;
 const rawSecretValuePattern =
   /-----BEGIN [A-Z ]*(?:PRIVATE KEY|CERTIFICATE)-----|(?:ssh-rsa|ssh-ed25519) [A-Za-z0-9+/=]+/;
 

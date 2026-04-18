@@ -47,6 +47,12 @@ Implement in ordered slices:
    - Reject raw secret material before mutation.
    - Allow only required secret declarations and references to stored Appaloft/external secrets or
      reusable SSH credentials.
+   - Resolve `ci-env:<NAME>` references from the trusted CI runner environment for headless binary
+     entrypoints, apply them as secret runtime environment variables, and fail required missing or
+     unsupported references before mutation.
+   - Apply plain `env` declarations as non-secret `plain-config` environment variables at
+     environment scope before `deployments.create`; `PUBLIC_` and `VITE_` keys are build-time,
+     other keys are runtime.
    - Ensure errors, logs, diagnostics, and progress events never include raw values.
 
 6. Entrypoints
@@ -87,6 +93,13 @@ Implemented slices:
 - CLI `appaloft deploy --config <path>` and implicit source-root discovery read the same config
   parser, map profile fields into the quick-deploy resource draft, let explicit flags override the
   file, and still dispatch ids-only `deployments.create`.
+- CLI config deploy maps non-secret `env` values to `plain-config` environment variables
+  (`PUBLIC_`/`VITE_` as build-time, other keys as runtime) and resolves required
+  `ci-env:<NAME>` references from the process environment into runtime secret variables before
+  deployment admission.
+- CLI config deploy now supports non-TTY ephemeral GitHub Actions style bootstrap: when durable ids
+  are absent, it creates or reuses local PGlite project/server/environment/resource records from the
+  source/config profile and trusted target flags, then keeps the final deployment command ids-only.
 - `/api/schemas/appaloft-config.json` is regenerated from the current parser schema, while
   `POST /api/deployments` remains strict ids-only.
 
@@ -96,10 +109,12 @@ Remaining gaps:
   implemented yet.
 - Config-file Dockerfile/Compose path selectors are rejected until resource profile fields and
   runtime planner mapping own those paths explicitly.
-- Required secret references and non-secret `env` declarations are parsed but not yet applied
-  through environment/secret commands.
-- Durable source-to-project/resource link state and relink behavior are still open.
+- Stored Appaloft/external secret adapters beyond the headless `ci-env:` resolver are not wired into
+  the config-file entry workflow yet.
+- Durable source-to-project/resource link state and relink behavior are still open; current GitHub
+  Actions bootstrap is intentionally ephemeral unless explicit ids or durable state are supplied.
 - `DeploymentContextBootstrapService` still contains legacy config/default bootstrap helpers, but
   active `deployments.create` remains ids-only.
 - Current coverage is targeted parser/filesystem/CLI/application coverage; broader CLI e2e,
-  HTTP-schema contract, link-state, drift, and environment/secret command coverage remains follow-up.
+  HTTP-schema contract, link-state, drift, and stored/external secret adapter coverage remains
+  follow-up.

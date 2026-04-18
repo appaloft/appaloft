@@ -7,7 +7,7 @@ import {
   ListDeploymentsQuery,
 } from "@appaloft/application";
 import { createQuickDeployGeneratedResourceName } from "@appaloft/contracts";
-import { domainError, err, ok, type Result, resourceKinds } from "@appaloft/core";
+import { domainError, edgeProxyKinds, err, ok, type Result, resourceKinds } from "@appaloft/core";
 import {
   type AppaloftDeploymentConfig,
   appaloftDeploymentConfigFileNames,
@@ -24,6 +24,7 @@ import {
   runQuery,
 } from "../runtime.js";
 import {
+  deploymentEnvironmentVariablesFromConfig,
   deploymentPromptSeedFromConfig,
   resolveInteractiveDeploymentInput,
 } from "./deployment-interaction.js";
@@ -34,6 +35,18 @@ const deploymentIdArg = Args.text({ name: "deploymentId" });
 
 const projectOption = Options.text("project").pipe(Options.optional);
 const serverOption = Options.text("server").pipe(Options.optional);
+const serverHostOption = Options.text("server-host").pipe(Options.optional);
+const serverNameOption = Options.text("server-name").pipe(Options.optional);
+const serverProviderOption = Options.text("server-provider").pipe(Options.optional);
+const serverPortOption = Options.text("server-port").pipe(Options.optional);
+const serverProxyKindOption = Options.choice("server-proxy-kind", edgeProxyKinds).pipe(
+  Options.optional,
+);
+const serverSshUsernameOption = Options.text("server-ssh-username").pipe(Options.optional);
+const serverSshPublicKeyOption = Options.text("server-ssh-public-key").pipe(Options.optional);
+const serverSshPrivateKeyFileOption = Options.text("server-ssh-private-key-file").pipe(
+  Options.optional,
+);
 const destinationOption = Options.text("destination").pipe(Options.optional);
 const environmentOption = Options.text("environment").pipe(Options.optional);
 const resourceOption = Options.text("resource").pipe(Options.optional);
@@ -230,6 +243,14 @@ export const deployCommand = EffectCommand.make(
     pathOrSource: pathOrSourceArg,
     project: projectOption,
     server: serverOption,
+    serverHost: serverHostOption,
+    serverName: serverNameOption,
+    serverProvider: serverProviderOption,
+    serverPort: serverPortOption,
+    serverProxyKind: serverProxyKindOption,
+    serverSshUsername: serverSshUsernameOption,
+    serverSshPublicKey: serverSshPublicKeyOption,
+    serverSshPrivateKeyFile: serverSshPrivateKeyFileOption,
     destination: destinationOption,
     environment: environmentOption,
     resource: resourceOption,
@@ -264,6 +285,14 @@ export const deployCommand = EffectCommand.make(
     resourceKind,
     resourceName,
     server,
+    serverHost,
+    serverName,
+    serverPort,
+    serverProvider,
+    serverProxyKind,
+    serverSshPrivateKeyFile,
+    serverSshPublicKey,
+    serverSshUsername,
     start,
   }) =>
     Effect.gen(function* () {
@@ -273,6 +302,14 @@ export const deployCommand = EffectCommand.make(
       const configFilePath = optionalValue(config);
       const projectId = optionalValue(project);
       const serverId = optionalValue(server);
+      const serverHostValue = optionalValue(serverHost);
+      const serverNameValue = optionalValue(serverName);
+      const serverProviderValue = optionalValue(serverProvider);
+      const serverPortValue = optionalNumber(serverPort);
+      const serverProxyKindValue = optionalValue(serverProxyKind);
+      const serverSshUsernameValue = optionalValue(serverSshUsername);
+      const serverSshPublicKeyValue = optionalValue(serverSshPublicKey);
+      const serverSshPrivateKeyFileValue = optionalValue(serverSshPrivateKeyFile);
       const destinationId = optionalValue(destination);
       const environmentId = optionalValue(environment);
       const resourceId = optionalValue(resource);
@@ -316,6 +353,9 @@ export const deployCommand = EffectCommand.make(
       const configSeed = configResolution
         ? deploymentPromptSeedFromConfig(configResolution.config)
         : {};
+      const configEnvironmentVariables = configResolution
+        ? yield* resultToEffect(deploymentEnvironmentVariablesFromConfig(configResolution.config))
+        : [];
       const deploymentMethod = requestedDeploymentMethod ?? configSeed.deploymentMethod;
       const normalizedSourceLocator = sourceLocator
         ? normalizeCliPathOrSource(sourceLocator, deploymentMethod ?? "auto")
@@ -339,10 +379,48 @@ export const deployCommand = EffectCommand.make(
               ...(resourceDescriptionValue ? { description: resourceDescriptionValue } : {}),
             }
           : undefined;
+      const serverSshPrivateKey = serverSshPrivateKeyFileValue
+        ? yield* Effect.promise(() => Bun.file(serverSshPrivateKeyFileValue).text())
+        : undefined;
+      const serverSpec =
+        serverHostValue ||
+        serverNameValue ||
+        serverProviderValue ||
+        serverPortValue !== undefined ||
+        serverProxyKindValue ||
+        serverSshUsernameValue ||
+        serverSshPublicKeyValue ||
+        serverSshPrivateKey
+          ? {
+              ...(serverNameValue ? { name: serverNameValue } : {}),
+              ...(serverHostValue ? { host: serverHostValue } : {}),
+              ...(serverProviderValue ? { providerKey: serverProviderValue } : {}),
+              ...(serverPortValue === undefined ? {} : { port: serverPortValue }),
+              ...(serverProxyKindValue ? { proxyKind: serverProxyKindValue } : {}),
+              ...(serverSshPrivateKey
+                ? {
+                    credential: {
+                      kind: "ssh-private-key" as const,
+                      ...(serverSshUsernameValue ? { username: serverSshUsernameValue } : {}),
+                      ...(serverSshPublicKeyValue ? { publicKey: serverSshPublicKeyValue } : {}),
+                      privateKey: serverSshPrivateKey,
+                    },
+                  }
+                : serverSshUsernameValue
+                  ? {
+                      credential: {
+                        kind: "local-ssh-agent" as const,
+                        username: serverSshUsernameValue,
+                      },
+                    }
+                  : {}),
+            }
+          : undefined;
       const seed = {
         ...configSeed,
         ...(projectId ? { projectId } : {}),
         ...(serverId ? { serverId } : {}),
+        ...(serverSpec ? { server: serverSpec } : {}),
         ...(destinationId ? { destinationId } : {}),
         ...(environmentId ? { environmentId } : {}),
         ...(resourceId ? { resourceId } : {}),
@@ -354,6 +432,9 @@ export const deployCommand = EffectCommand.make(
         ...(publishDirectory ? { publishDirectory } : {}),
         ...(portValue === undefined ? {} : { port: portValue }),
         ...(healthCheckPath ? { healthCheckPath } : {}),
+        ...(configEnvironmentVariables.length > 0
+          ? { environmentVariables: configEnvironmentVariables }
+          : {}),
       };
       const input = yield* resolveInteractiveDeploymentInput({
         ...seed,

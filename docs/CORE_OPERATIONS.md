@@ -320,6 +320,10 @@ Current boundary:
   environment values, and required secret references only through the owners named in the config
   workflow. Raw SSH keys, deploy keys, tokens, secret env values, and concrete target/server
   credentials are rejected before write commands run.
+- GitHub Actions and other headless binary entrypoints default to embedded PGlite and do not need
+  `DATABASE_URL` unless the caller explicitly selects PostgreSQL or a remote Appaloft control
+  plane. CI secrets must be mapped by the CI workflow into runner environment variables and
+  referenced from config as resolver references such as `ci-env:NAME`, never committed as values.
 - CPU, memory, replicas, restart policy, rollout overlap/drain, and similar runtime-target sizing
   fields must not be silently accepted from repository config files until their resource/runtime
   target ADRs, command specs, runtime enforcement, and tests exist.

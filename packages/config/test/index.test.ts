@@ -36,6 +36,21 @@ describe("resolveConfig", () => {
     expect(config.remoteRuntimeRoot).toBe("/var/lib/appaloft/runtime");
   });
 
+  test("[CONFIG-FILE-ENTRY-008] headless CI defaults to embedded pglite without DATABASE_URL", () => {
+    const config = resolveConfig({
+      env: {
+        GITHUB_ACTIONS: "true",
+        APPDATA: testAppData,
+        HOME: testHome,
+        XDG_DATA_HOME: testXdgDataHome,
+      },
+    });
+
+    expect(config.databaseDriver).toBe("pglite");
+    expect(config.databaseUrl).toBeUndefined();
+    expect(config.pgliteDataDir).toBe(join(expectedDefaultDataDir(), "pglite"));
+  });
+
   test("infers postgres when a database URL is configured", () => {
     const config = resolveConfig({
       env: {

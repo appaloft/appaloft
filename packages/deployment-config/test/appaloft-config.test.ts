@@ -125,6 +125,14 @@ describe("Appaloft deployment config schema", () => {
     });
 
     expect(envSecretName.success).toBe(false);
+
+    const databaseUrl = parseAppaloftDeploymentConfig({
+      env: {
+        DATABASE_URL: "postgres://user:password@example.test/app",
+      },
+    });
+
+    expect(databaseUrl.success).toBe(false);
   });
 
   test("[CONFIG-FILE-UNSUPPORTED-001] rejects resource sizing fields until resource-profile support exists", () => {

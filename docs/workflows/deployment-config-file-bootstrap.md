@@ -14,6 +14,7 @@ source selection
   -> discover and parse repository config profile
   -> resolve trusted Appaloft project/environment/resource/server identity outside the file
   -> create or update resource-owned profile through explicit operations when needed
+  -> apply non-secret env values and resolved secret references through environment commands
   -> deployments.create(projectId, environmentId, resourceId, serverId, destinationId?)
 ```
 
@@ -87,6 +88,28 @@ The HTTP adapter may serve the config schema for tooling, but strict `POST /api/
 ids-only. Reading a local repository config file is a CLI, local Web agent, automation, or future MCP
 entry workflow responsibility unless a future HTTP workflow command is accepted by ADR.
 
+## Headless CI Runtime State
+
+GitHub Actions and other headless CI entrypoints may use only the Appaloft binary plus a repository
+config file. That mode is a local entry workflow over the same commands, not a separate hosted
+control-plane requirement.
+
+Embedded PGlite is the default persistence backend for a single headless binary invocation. A
+`DATABASE_URL` is not required when the selected driver is PGlite. A database URL is required only
+when the caller explicitly selects the PostgreSQL driver, or when the entrypoint is talking to a
+remote Appaloft control plane that owns persistence.
+
+The default headless GitHub Actions flow is ephemeral. It may create or reuse local PGlite project,
+environment, server, and resource records from trusted CLI/action inputs before dispatching the
+final ids-only deployment command. `projectId`, `environmentId`, `resourceId`, `serverId`, and
+`destinationId` are optional stateful inputs for a hosted control plane, self-hosted Appaloft
+service, or intentionally durable local state. They are not required for the one-shot binary flow.
+
+CI-provided secrets are resolver inputs, not committed config values. For GitHub Actions, the
+workflow maps GitHub secrets into runner environment variables, and the Appaloft config references
+them with `ci-env:<NAME>`. Other CI systems may provide equivalent environment variables without
+changing the repository config contract.
+
 ## Identity Resolution
 
 The repository config file must not contain or drive these identity selectors:
@@ -134,8 +157,8 @@ deployment admission.
 | Install/build/start commands | `ResourceRuntimeProfile` | User-authored shell leaves; adapters render typed runtime commands at execution. |
 | `internalPort`, upstream protocol, exposure mode, target service | `ResourceNetworkProfile` | Must become resource network state; never a deployment command field. |
 | Health policy | `ResourceRuntimeProfile` / health policy command | Must be reusable resource configuration. |
-| Plain environment values | `Environment` variable commands | Only for non-secret values; deployment snapshot captures effective environment later. |
-| Required secret names | Secret/credential commands or adapters | Declare requirements or references, not raw values. |
+| Plain environment values | `Environment` variable commands | Only for non-secret values; `PUBLIC_` and `VITE_` keys map to build-time `plain-config`, other keys map to runtime `plain-config`, all at `environment` scope unless a future schema adds explicit kind/exposure/scope fields. |
+| Required secret names | Secret/credential commands or adapters | Declare requirements or references, not raw values. Headless CI supports `ci-env:<NAME>` as an environment-variable resolver reference. |
 | Domains/TLS | `domain-bindings.create` and certificate commands | Must be explicit follow-up operations, not deployment admission fields. |
 | CPU, memory, replicas, restart policy, rollout overlap/drain | Future resource/runtime-target profile specs | Must be rejected until an ADR/spec and runtime enforcement exist; no silent ignore. |
 
@@ -153,6 +176,7 @@ and raw secret environment values.
 Allowed secret-related declarations are:
 
 - required secret keys without values;
+- `ci-env:<NAME>` references that are resolved from the trusted CI runner environment at entry time;
 - references to secrets already stored in Appaloft or a configured external secret adapter;
 - references to reusable SSH credentials created through credential commands;
 - `local-ssh-agent` style credential use when the runtime target supports it;
@@ -161,6 +185,11 @@ Allowed secret-related declarations are:
 If a file contains raw secret material, admission must fail with `validation_error` in phase
 `config-secret-validation` before any write command is dispatched. Error details, logs, progress
 events, diagnostics, and read models must not include the secret value.
+
+If a required `ci-env:<NAME>` reference cannot be resolved from the entrypoint environment,
+admission must fail with `validation_error` in phase `config-secret-resolution` before any write
+command is dispatched. Optional unresolved references are skipped without creating an environment
+variable.
 
 SSH server credentials are target credential state. The config file may declare that a deployment
 requires an SSH-capable target, but it must not register a server with an inline key or password.
@@ -190,9 +219,11 @@ User selects source or passes source path
   -> entrypoint resolves config file path
   -> parse and validate strict config schema
   -> reject identity/secret/unsupported fields
+  -> resolve non-secret env declarations and supported secret references
   -> resolve trusted Appaloft project/environment/resource/server/destination identity outside file
   -> create project/resource on first run when no trusted identity exists
   -> apply profile fields through resources.create or explicit resource/environment config commands
+  -> dispatch environments.set-variable for config env and resolved CI secrets
   -> dispatch deployments.create with ids only
   -> observe progress/read models/diagnostics
 ```
@@ -208,6 +239,7 @@ Config-file errors use stable codes and phases:
 | `validation_error` | `config-schema` | No | Unknown field or invalid field shape. |
 | `validation_error` | `config-identity` | No | File attempted to select project/resource/server/destination/credential identity. |
 | `validation_error` | `config-secret-validation` | No | File contained raw secret material. |
+| `validation_error` | `config-secret-resolution` | No | Required secret reference could not be resolved from the configured entrypoint resolver. |
 | `validation_error` | `config-profile-resolution` | No | Profile field cannot map safely to resource/environment commands. |
 | `unsupported_config_field` | `config-capability-resolution` | No | Known future field such as CPU/memory/replicas is not enforceable by current resource/runtime target specs. |
 | `resource_profile_drift` | `resource-profile-resolution` | No | Existing resource differs from config and no explicit update operation is available. |
@@ -221,8 +253,11 @@ Current CLI `init` writes only profile fields under `runtime` and `network`; it 
 project/resource/server identity or target bootstrap data.
 
 Current CLI deploy supports explicit `--config` and implicit source-root discovery. The CLI maps
-config source/runtime/network/health profile fields into quick-deploy resource creation input, then
-dispatches ids-only `deployments.create`.
+config source/runtime/network/health profile fields into quick-deploy resource creation input,
+supports trusted target flags such as `--server-host` and `--server-ssh-private-key-file`, resolves
+plain `env` declarations and `ci-env:` secret references into environment variable commands,
+bootstraps project/server/environment/resource records in non-TTY PGlite mode when ids are not
+provided, then dispatches ids-only `deployments.create`.
 
 Current `DeploymentContextBootstrapService` contains legacy config/default bootstrap helpers, but
 the active `deployments.create` input schema is ids-only and the service currently only fills the
@@ -232,10 +267,11 @@ Current file parsing supports JSON and YAML. Ambiguous multi-file detection is i
 CLI/filesystem entry paths.
 
 Current executable tests prove parser safety, Git-root filesystem discovery, CLI init shape,
-profile-to-quick-deploy seed mapping, and ids-only `deployments.create`. Broader CLI e2e,
-HTTP-schema contract coverage, existing-resource profile drift handling, environment/secret command
-sequencing, Dockerfile/Compose path mapping, and durable source link/relink behavior remain
-follow-up work.
+profile-to-quick-deploy seed mapping, headless PGlite defaulting, no-id non-TTY context bootstrap,
+`ci-env:` secret resolution, environment command sequencing, and ids-only `deployments.create`.
+Broader CLI e2e, HTTP-schema contract coverage, existing-resource profile drift handling,
+stored/external secret adapters beyond `ci-env:`, Dockerfile/Compose path mapping, and durable
+source link/relink behavior remain follow-up work.
 
 ## Open Questions
 
