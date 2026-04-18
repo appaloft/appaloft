@@ -192,6 +192,7 @@ jobs:
           fi
 
       - name: Build Desktop App
+        shell: bash
         working-directory: apps/desktop
         run: |
           case "${RUNNER_OS}" in
