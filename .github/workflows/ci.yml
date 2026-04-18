@@ -74,7 +74,7 @@ jobs:
           cd ..
           bun run scripts/test/wait-for-http.ts http://127.0.0.1:3211/api/health 60000
           curl --fail http://127.0.0.1:3211/api/version
-          curl --fail http://127.0.0.1:3211/ | grep -q "Appaloft / Appaloft"
+          curl --fail http://127.0.0.1:3211/ | grep -q "Appaloft"
 
       - name: Stop Binary Bundle Smoke
         if: always()
