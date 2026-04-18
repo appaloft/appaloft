@@ -1,6 +1,6 @@
 # Changelog
 
-## [1.0.0](https://github.com/appaloft/appaloft/compare/v0.1.0...v1.0.0) (2026-04-18)
+## [0.1.0](https://github.com/appaloft/appaloft/releases/tag/v0.1.0) (2026-04-18)
 
 
 ### ⚠ BREAKING CHANGES
