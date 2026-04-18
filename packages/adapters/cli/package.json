@@ -6,15 +6,17 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
-    "@effect/cli": "^0.75.0",
-    "@effect/platform-node": "^0.106.0",
     "@appaloft/application": "workspace:*",
     "@appaloft/cli-logging": "workspace:*",
     "@appaloft/contracts": "workspace:*",
+    "@appaloft/deployment-config": "workspace:*",
+    "@effect/cli": "^0.75.0",
+    "@effect/platform-node": "^0.106.0",
     "effect": "^3.21.0"
   },
   "scripts": {
     "lint": "biome check .",
+    "test": "bun test",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   }
 }

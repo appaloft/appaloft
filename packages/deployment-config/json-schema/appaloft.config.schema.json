@@ -6,322 +6,43 @@
       "type": "string",
       "minLength": 1
     },
-    "project": {
+    "source": {
       "type": "object",
       "properties": {
-        "name": {
+        "baseDirectory": {
+          "description": "Relative workspace directory to use as the deployable source root.",
           "type": "string",
           "minLength": 1,
-          "description": "Project name to reuse or create."
+          "pattern": "^(?!\\/)(?![a-zA-Z][a-zA-Z0-9+.-]*:)(?!.*(?:^|[\\\\/])\\.\\.(?:[\\\\/]|$))(?!.*[;&|`$<>]).+$"
         },
-        "description": {
-          "description": "Optional project description.",
+        "gitRef": {
+          "description": "Git ref to record with the source profile.",
+          "type": "string",
+          "minLength": 1
+        },
+        "commitSha": {
+          "description": "Immutable git commit SHA to record with the source profile.",
           "type": "string",
           "minLength": 1
         }
       },
-      "required": ["name"],
       "additionalProperties": false,
-      "description": "Project bootstrap settings."
+      "description": "Source profile fields. This object must not choose projects or resources."
     },
-    "environment": {
+    "runtime": {
       "type": "object",
       "properties": {
-        "name": {
-          "type": "string",
-          "minLength": 1,
-          "description": "Environment name to reuse or create."
-        },
-        "kind": {
-          "description": "Environment kind. Defaults to custom when omitted.",
-          "type": "string",
-          "enum": ["local", "development", "test", "staging", "production", "preview", "custom"]
-        }
-      },
-      "required": ["name"],
-      "additionalProperties": false,
-      "description": "Environment bootstrap settings."
-    },
-    "resource": {
-      "type": "object",
-      "properties": {
-        "name": {
-          "type": "string",
-          "minLength": 1,
-          "description": "Resource name to reuse or create."
-        },
-        "kind": {
-          "description": "Resource kind. Defaults to application.",
+        "strategy": {
+          "description": "Requested runtime plan strategy.",
           "type": "string",
           "enum": [
-            "application",
-            "service",
-            "database",
-            "cache",
-            "compose-stack",
-            "worker",
-            "static-site",
-            "external"
+            "auto",
+            "dockerfile",
+            "docker-compose",
+            "prebuilt-image",
+            "workspace-commands",
+            "static"
           ]
-        },
-        "description": {
-          "description": "Optional resource description.",
-          "type": "string",
-          "minLength": 1
-        },
-        "services": {
-          "description": "Services contained by a compose-stack resource.",
-          "type": "array",
-          "items": {
-            "type": "object",
-            "properties": {
-              "name": {
-                "type": "string",
-                "minLength": 1,
-                "description": "Service name inside a compose-stack resource."
-              },
-              "kind": {
-                "type": "string",
-                "enum": ["web", "api", "worker", "database", "cache", "service"],
-                "description": "Service role inside the resource."
-              }
-            },
-            "required": ["name", "kind"],
-            "additionalProperties": false,
-            "description": "Service entry inside a resource."
-          }
-        }
-      },
-      "required": ["name"],
-      "additionalProperties": false,
-      "description": "Resource bootstrap settings."
-    },
-    "targets": {
-      "type": "array",
-      "items": {
-        "anyOf": [
-          {
-            "type": "object",
-            "properties": {
-              "key": {
-                "description": "Stable target key for deployment.targetKey selection.",
-                "type": "string",
-                "minLength": 1
-              },
-              "name": {
-                "description": "Deployment target display name.",
-                "type": "string",
-                "minLength": 1
-              },
-              "host": {
-                "description": "Target host. Local shell defaults to 127.0.0.1 when omitted.",
-                "type": "string",
-                "minLength": 1
-              },
-              "port": {
-                "description": "Target management port.",
-                "type": "integer",
-                "exclusiveMinimum": 0,
-                "maximum": 9007199254740991
-              },
-              "destination": {
-                "description": "Deployment destination or isolation boundary on the selected server.",
-                "type": "object",
-                "properties": {
-                  "name": {
-                    "type": "string",
-                    "minLength": 1
-                  },
-                  "kind": {
-                    "type": "string",
-                    "enum": ["docker", "compose", "host-process", "generic"]
-                  }
-                },
-                "additionalProperties": false
-              },
-              "providerKey": {
-                "type": "string",
-                "minLength": 1,
-                "description": "Registered provider key, for example local-shell."
-              }
-            },
-            "required": ["providerKey"],
-            "additionalProperties": false
-          },
-          {
-            "type": "object",
-            "properties": {
-              "key": {
-                "description": "Stable target key for deployment.targetKey selection.",
-                "type": "string",
-                "minLength": 1
-              },
-              "name": {
-                "description": "Deployment target display name.",
-                "type": "string",
-                "minLength": 1
-              },
-              "host": {
-                "description": "Target host. Local shell defaults to 127.0.0.1 when omitted.",
-                "type": "string",
-                "minLength": 1
-              },
-              "port": {
-                "description": "Target management port.",
-                "type": "integer",
-                "exclusiveMinimum": 0,
-                "maximum": 9007199254740991
-              },
-              "destination": {
-                "description": "Deployment destination or isolation boundary on the selected server.",
-                "type": "object",
-                "properties": {
-                  "name": {
-                    "type": "string",
-                    "minLength": 1
-                  },
-                  "kind": {
-                    "type": "string",
-                    "enum": ["docker", "compose", "host-process", "generic"]
-                  }
-                },
-                "additionalProperties": false
-              },
-              "provider": {
-                "type": "string",
-                "minLength": 1,
-                "description": "Alias for providerKey."
-              }
-            },
-            "required": ["provider"],
-            "additionalProperties": false
-          }
-        ],
-        "description": "Deployment target bootstrap settings."
-      }
-    },
-    "servers": {
-      "description": "Alias for targets, kept for transport-compatible server wording.",
-      "type": "array",
-      "items": {
-        "anyOf": [
-          {
-            "type": "object",
-            "properties": {
-              "key": {
-                "description": "Stable target key for deployment.targetKey selection.",
-                "type": "string",
-                "minLength": 1
-              },
-              "name": {
-                "description": "Deployment target display name.",
-                "type": "string",
-                "minLength": 1
-              },
-              "host": {
-                "description": "Target host. Local shell defaults to 127.0.0.1 when omitted.",
-                "type": "string",
-                "minLength": 1
-              },
-              "port": {
-                "description": "Target management port.",
-                "type": "integer",
-                "exclusiveMinimum": 0,
-                "maximum": 9007199254740991
-              },
-              "destination": {
-                "description": "Deployment destination or isolation boundary on the selected server.",
-                "type": "object",
-                "properties": {
-                  "name": {
-                    "type": "string",
-                    "minLength": 1
-                  },
-                  "kind": {
-                    "type": "string",
-                    "enum": ["docker", "compose", "host-process", "generic"]
-                  }
-                },
-                "additionalProperties": false
-              },
-              "providerKey": {
-                "type": "string",
-                "minLength": 1,
-                "description": "Registered provider key, for example local-shell."
-              }
-            },
-            "required": ["providerKey"],
-            "additionalProperties": false
-          },
-          {
-            "type": "object",
-            "properties": {
-              "key": {
-                "description": "Stable target key for deployment.targetKey selection.",
-                "type": "string",
-                "minLength": 1
-              },
-              "name": {
-                "description": "Deployment target display name.",
-                "type": "string",
-                "minLength": 1
-              },
-              "host": {
-                "description": "Target host. Local shell defaults to 127.0.0.1 when omitted.",
-                "type": "string",
-                "minLength": 1
-              },
-              "port": {
-                "description": "Target management port.",
-                "type": "integer",
-                "exclusiveMinimum": 0,
-                "maximum": 9007199254740991
-              },
-              "destination": {
-                "description": "Deployment destination or isolation boundary on the selected server.",
-                "type": "object",
-                "properties": {
-                  "name": {
-                    "type": "string",
-                    "minLength": 1
-                  },
-                  "kind": {
-                    "type": "string",
-                    "enum": ["docker", "compose", "host-process", "generic"]
-                  }
-                },
-                "additionalProperties": false
-              },
-              "provider": {
-                "type": "string",
-                "minLength": 1,
-                "description": "Alias for providerKey."
-              }
-            },
-            "required": ["provider"],
-            "additionalProperties": false
-          }
-        ],
-        "description": "Deployment target bootstrap settings."
-      }
-    },
-    "deployment": {
-      "type": "object",
-      "properties": {
-        "targetKey": {
-          "description": "Configured target key, name, or provider alias to deploy to.",
-          "type": "string",
-          "minLength": 1
-        },
-        "target": {
-          "description": "Alias for targetKey.",
-          "type": "string",
-          "minLength": 1
-        },
-        "method": {
-          "description": "Requested deployment method.",
-          "type": "string",
-          "enum": ["auto", "dockerfile", "docker-compose", "prebuilt-image", "workspace-commands"]
         },
         "installCommand": {
           "type": "string",
@@ -335,54 +56,153 @@
           "type": "string",
           "minLength": 1
         },
-        "port": {
-          "description": "Application port.",
-          "type": "integer",
-          "exclusiveMinimum": 0,
-          "maximum": 9007199254740991
+        "publishDirectory": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^(?!\\/)(?![a-zA-Z][a-zA-Z0-9+.-]*:)(?!.*(?:^|[\\\\/])\\.\\.(?:[\\\\/]|$))(?!.*[;&|`$<>]).+$"
         },
         "healthCheckPath": {
           "type": "string",
           "minLength": 1
         },
-        "healthPath": {
-          "description": "Alias for healthCheckPath.",
+        "healthCheck": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "path": {
+              "description": "HTTP path used for readiness checks.",
+              "type": "string",
+              "minLength": 1
+            },
+            "intervalSeconds": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "timeoutSeconds": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "retries": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          "additionalProperties": false,
+          "description": "Health-check profile fields."
+        }
+      },
+      "additionalProperties": false,
+      "description": "Runtime profile fields copied into resource creation for quick deploy."
+    },
+    "network": {
+      "type": "object",
+      "properties": {
+        "internalPort": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "upstreamProtocol": {
+          "type": "string",
+          "enum": ["http", "tcp"]
+        },
+        "exposureMode": {
+          "type": "string",
+          "enum": ["none", "reverse-proxy", "direct-port"]
+        },
+        "targetServiceName": {
           "type": "string",
           "minLength": 1
         },
-        "proxy": {
-          "description": "Edge proxy to configure for public domains. Defaults to traefik when domains are set.",
-          "type": "string",
-          "enum": ["none", "traefik", "caddy"]
+        "hostPort": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "additionalProperties": false,
+      "description": "Network profile fields copied into resource creation for quick deploy."
+    },
+    "health": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
         },
-        "domain": {
-          "description": "Single public domain alias.",
+        "path": {
+          "description": "HTTP path used for readiness checks.",
           "type": "string",
           "minLength": 1
         },
-        "domains": {
-          "description": "Public domains for access routing.",
-          "type": "array",
-          "items": {
+        "intervalSeconds": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "timeoutSeconds": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "retries": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "additionalProperties": false,
+      "description": "Health-check profile fields."
+    },
+    "env": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string"
+      },
+      "additionalProperties": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "number"
+          },
+          {
+            "type": "boolean"
+          }
+        ]
+      }
+    },
+    "secrets": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Secret reference, for example environment-secret:database_url or server-credential:ssh_prod."
+          },
+          "required": {
+            "type": "boolean"
+          },
+          "description": {
             "type": "string",
             "minLength": 1
           }
         },
-        "pathPrefix": {
-          "description": "Public route path prefix.",
-          "type": "string",
-          "minLength": 1
-        },
-        "tlsMode": {
-          "description": "TLS handling for the public access route.",
-          "type": "string",
-          "enum": ["auto", "disabled"]
-        }
-      },
-      "additionalProperties": false,
-      "description": "Deployment command defaults."
+        "required": ["from"],
+        "additionalProperties": false
+      }
     }
   },
   "additionalProperties": false,
-  "description": "Appaloft deployment config file."
+  "description": "Appaloft repository deployment profile config file."
 }

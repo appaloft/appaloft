@@ -1,3 +1,5 @@
+import { existsSync, readFileSync, statSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
 import {
   CreateDeploymentCommand,
   type CreateDeploymentCommandInput,
@@ -5,12 +7,26 @@ import {
   ListDeploymentsQuery,
 } from "@appaloft/application";
 import { createQuickDeployGeneratedResourceName } from "@appaloft/contracts";
-import { resourceKinds } from "@appaloft/core";
+import { domainError, err, ok, type Result, resourceKinds } from "@appaloft/core";
+import {
+  type AppaloftDeploymentConfig,
+  appaloftDeploymentConfigFileNames,
+  parseAppaloftDeploymentConfigText,
+} from "@appaloft/deployment-config";
 import { Args, Command as EffectCommand, Options } from "@effect/cli";
 import { Effect } from "effect";
 
-import { optionalNumber, optionalValue, runDeploymentCommand, runQuery } from "../runtime.js";
-import { resolveInteractiveDeploymentInput } from "./deployment-interaction.js";
+import {
+  optionalNumber,
+  optionalValue,
+  resultToEffect,
+  runDeploymentCommand,
+  runQuery,
+} from "../runtime.js";
+import {
+  deploymentPromptSeedFromConfig,
+  resolveInteractiveDeploymentInput,
+} from "./deployment-interaction.js";
 import { deploymentMethods, normalizeCliPathOrSource } from "./deployment-source.js";
 
 const pathOrSourceArg = Args.text({ name: "pathOrSource" }).pipe(Args.optional);
@@ -25,6 +41,7 @@ const resourceNameOption = Options.text("resource-name").pipe(Options.optional);
 const resourceKindOption = Options.choice("resource-kind", resourceKinds).pipe(Options.optional);
 const resourceDescriptionOption = Options.text("resource-description").pipe(Options.optional);
 const methodOption = Options.choice("method", deploymentMethods).pipe(Options.optional);
+const configOption = Options.text("config").pipe(Options.optional);
 const installOption = Options.text("install").pipe(Options.optional);
 const buildOption = Options.text("build").pipe(Options.optional);
 const startOption = Options.text("start").pipe(Options.optional);
@@ -43,6 +60,170 @@ function inferResourceName(sourceLocator: string): string {
   return createQuickDeployGeneratedResourceName(segments.at(-1) ?? "app");
 }
 
+function resolveLocalSourceDirectory(sourceLocator: string): string | null {
+  const absolutePath = resolve(sourceLocator);
+  if (existsSync(absolutePath) && statSync(absolutePath).isDirectory()) {
+    return absolutePath;
+  }
+
+  if (existsSync(absolutePath) && statSync(absolutePath).isFile()) {
+    return dirname(absolutePath);
+  }
+
+  return null;
+}
+
+function resolveGitRoot(sourceDirectory: string): string | null {
+  const git = Bun.spawnSync(["git", "-C", sourceDirectory, "rev-parse", "--show-toplevel"], {
+    stdout: "pipe",
+    stderr: "pipe",
+  });
+
+  if (!git.success) {
+    return null;
+  }
+
+  const gitRoot = git.stdout.toString().trim();
+  return gitRoot && existsSync(gitRoot) && statSync(gitRoot).isDirectory() ? gitRoot : null;
+}
+
+function discoverDeploymentConfigFile(sourceLocator: string): Result<string | null> {
+  const sourceDirectory = resolveLocalSourceDirectory(sourceLocator);
+  if (!sourceDirectory) {
+    return ok(null);
+  }
+
+  const gitRoot = resolveGitRoot(sourceDirectory);
+  const searchDirectories = [
+    sourceDirectory,
+    ...(gitRoot && gitRoot !== sourceDirectory ? [gitRoot] : []),
+  ];
+  const candidates = new Set<string>();
+
+  for (const directory of searchDirectories) {
+    for (const candidate of appaloftDeploymentConfigFileNames) {
+      const configFilePath = join(directory, candidate);
+      if (existsSync(configFilePath)) {
+        candidates.add(configFilePath);
+      }
+    }
+  }
+
+  const paths = [...candidates];
+  if (paths.length === 0) {
+    return ok(null);
+  }
+
+  if (paths.length > 1) {
+    return err(
+      domainError.validation("Multiple Appaloft deployment config files were found", {
+        phase: "config-discovery",
+        configFilePaths: paths.join(","),
+      }),
+    );
+  }
+
+  return ok(paths[0] ?? null);
+}
+
+function phaseFromConfigIssues(issues: { message: string }[]): string {
+  const messages = issues.map((issue) => issue.message).join("\n");
+
+  if (messages.includes("config_identity_field")) {
+    return "config-identity";
+  }
+
+  if (messages.includes("raw_secret_config_field")) {
+    return "config-secret-validation";
+  }
+
+  if (messages.includes("unsupported_config_field")) {
+    return "config-capability-resolution";
+  }
+
+  if (messages.includes("config_parse_error")) {
+    return "config-parse";
+  }
+
+  return "config-schema";
+}
+
+function readDeploymentConfigForCli(input: {
+  sourceLocator: string;
+  configFilePath?: string;
+}): Result<{
+  config: AppaloftDeploymentConfig;
+  configFilePath: string;
+} | null> {
+  const resolvedPath = input.configFilePath
+    ? existsSync(resolve(input.configFilePath))
+      ? ok(resolve(input.configFilePath))
+      : err(
+          domainError.validation("Deployment config file was not found", {
+            phase: "config-discovery",
+            configFilePath: input.configFilePath,
+          }),
+        )
+    : discoverDeploymentConfigFile(input.sourceLocator);
+
+  return resolvedPath.andThen((configFilePath) => {
+    if (!configFilePath) {
+      return ok(null);
+    }
+
+    let configText: string;
+    try {
+      configText = readFileSync(configFilePath, "utf8");
+    } catch (error) {
+      return err(
+        domainError.validation("Deployment config file could not be read", {
+          phase: "config-read",
+          configFilePath,
+          message: error instanceof Error ? error.message : String(error),
+        }),
+      );
+    }
+
+    const parsedConfig = parseAppaloftDeploymentConfigText(configText, configFilePath);
+
+    if (!parsedConfig.success) {
+      return err(
+        domainError.validation("Appaloft deployment config is invalid", {
+          phase: phaseFromConfigIssues(parsedConfig.error.issues),
+          configFilePath,
+          issues: JSON.stringify(
+            parsedConfig.error.issues.map((issue) => ({
+              path: issue.path.join("."),
+              message: issue.message,
+            })),
+          ),
+        }),
+      );
+    }
+
+    return ok({
+      config: parsedConfig.data,
+      configFilePath,
+    });
+  });
+}
+
+function applyConfigSourceBase(
+  sourceLocator: string,
+  config: AppaloftDeploymentConfig | undefined,
+): string {
+  const baseDirectory = config?.source?.baseDirectory;
+  if (!baseDirectory) {
+    return sourceLocator;
+  }
+
+  if (!existsSync(sourceLocator) || !statSync(sourceLocator).isDirectory()) {
+    return sourceLocator;
+  }
+
+  return resolve(sourceLocator, baseDirectory);
+}
+
 export const deployCommand = EffectCommand.make(
   "deploy",
   {
@@ -56,6 +237,7 @@ export const deployCommand = EffectCommand.make(
     resourceKind: resourceKindOption,
     resourceDescription: resourceDescriptionOption,
     method: methodOption,
+    config: configOption,
     install: installOption,
     build: buildOption,
     start: startOption,
@@ -67,6 +249,7 @@ export const deployCommand = EffectCommand.make(
   ({
     appLogLines,
     build,
+    config,
     destination,
     environment,
     healthPath,
@@ -85,8 +268,9 @@ export const deployCommand = EffectCommand.make(
   }) =>
     Effect.gen(function* () {
       const sourceLocator = optionalValue(pathOrSource);
-      const deploymentMethod = optionalValue(method);
+      const requestedDeploymentMethod = optionalValue(method);
       const portValue = optionalNumber(port);
+      const configFilePath = optionalValue(config);
       const projectId = optionalValue(project);
       const serverId = optionalValue(server);
       const destinationId = optionalValue(destination);
@@ -101,7 +285,14 @@ export const deployCommand = EffectCommand.make(
       const publishDirectory = optionalValue(publishDir);
       const healthCheckPath = optionalValue(healthPath);
 
-      if (!sourceLocator && projectId && serverId && environmentId && resourceId) {
+      if (
+        !sourceLocator &&
+        !configFilePath &&
+        projectId &&
+        serverId &&
+        environmentId &&
+        resourceId
+      ) {
         const input = {
           projectId,
           serverId,
@@ -115,13 +306,29 @@ export const deployCommand = EffectCommand.make(
         });
       }
 
+      const configSourceLocator = sourceLocator ?? ".";
+      const configResolution = yield* resultToEffect(
+        readDeploymentConfigForCli({
+          sourceLocator: configSourceLocator,
+          ...(configFilePath ? { configFilePath } : {}),
+        }),
+      );
+      const configSeed = configResolution
+        ? deploymentPromptSeedFromConfig(configResolution.config)
+        : {};
+      const deploymentMethod = requestedDeploymentMethod ?? configSeed.deploymentMethod;
       const normalizedSourceLocator = sourceLocator
         ? normalizeCliPathOrSource(sourceLocator, deploymentMethod ?? "auto")
+        : configResolution
+          ? normalizeCliPathOrSource(".", deploymentMethod ?? "auto")
+          : undefined;
+      const configuredSourceLocator = normalizedSourceLocator
+        ? applyConfigSourceBase(normalizedSourceLocator, configResolution?.config)
         : undefined;
       const resourceSpec =
-        !resourceId && (resourceNameValue || normalizedSourceLocator)
+        !resourceId && (resourceNameValue || configuredSourceLocator)
           ? {
-              name: resourceNameValue ?? inferResourceName(normalizedSourceLocator ?? "."),
+              name: resourceNameValue ?? inferResourceName(configuredSourceLocator ?? "."),
               kind:
                 resourceKindValue ??
                 (deploymentMethod === "docker-compose"
@@ -133,6 +340,7 @@ export const deployCommand = EffectCommand.make(
             }
           : undefined;
       const seed = {
+        ...configSeed,
         ...(projectId ? { projectId } : {}),
         ...(serverId ? { serverId } : {}),
         ...(destinationId ? { destinationId } : {}),
@@ -149,7 +357,7 @@ export const deployCommand = EffectCommand.make(
       };
       const input = yield* resolveInteractiveDeploymentInput({
         ...seed,
-        ...(sourceLocator ? { sourceLocator: normalizedSourceLocator ?? sourceLocator } : {}),
+        ...(configuredSourceLocator ? { sourceLocator: configuredSourceLocator } : {}),
       });
 
       return yield* runDeploymentCommand(CreateDeploymentCommand.create(input), {

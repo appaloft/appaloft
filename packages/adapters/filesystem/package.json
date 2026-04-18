@@ -12,6 +12,7 @@
   },
   "scripts": {
     "lint": "biome check .",
+    "test": "bun test",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   }
 }
