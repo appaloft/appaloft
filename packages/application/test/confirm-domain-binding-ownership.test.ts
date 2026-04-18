@@ -60,6 +60,7 @@ import {
   CreateDomainBindingUseCase,
   ListDomainBindingsQueryService,
   MarkDomainReadyOnCertificateIssuedHandler,
+  MarkDomainReadyOnDeploymentFinishedHandler,
   MarkDomainReadyOnDomainBoundHandler,
   MarkDomainRouteFailedOnDeploymentFinishedHandler,
 } from "../src/use-cases";
@@ -740,5 +741,104 @@ describe("ConfirmDomainBindingOwnershipUseCase", () => {
         errorMessage: "Proxy reload failed",
       },
     });
+  });
+
+  test("[ROUTE-TLS-EVT-014] successful route retry marks TLS-disabled not_ready binding ready", async () => {
+    const {
+      confirmUseCase,
+      context,
+      domainBindingId,
+      domainBindings,
+      eventBus,
+      logger,
+      readModel,
+      repositoryContext,
+    } = await seedRoutingContext({
+      domainName: "route-recovered.example.com",
+      tlsMode: "disabled",
+    });
+
+    const confirmed = await confirmUseCase.execute(context, { domainBindingId });
+    expect(confirmed.isOk()).toBe(true);
+
+    const candidateReader = new StaticDomainRouteFailureCandidateReader([domainBindingId]);
+    const failedHandler = new MarkDomainRouteFailedOnDeploymentFinishedHandler(
+      domainBindings,
+      candidateReader,
+      eventBus,
+      logger,
+    );
+    const failedEvent: DomainEvent = {
+      type: "deployment.finished",
+      aggregateId: "dep_route_failed",
+      occurredAt: "2026-01-01T00:05:00.000Z",
+      payload: {
+        status: "failed",
+        exitCode: 1,
+        retryable: true,
+        errorCode: "ssh_public_route_health_check_failed",
+        failurePhase: "public-route-verification",
+        errorMessage: "Public route failed",
+      },
+    };
+    const failedHandled = await failedHandler.handle(context, failedEvent);
+    expect(failedHandled.isOk()).toBe(true);
+
+    const notReadyBinding = await domainBindings.findOne(
+      repositoryContext,
+      DomainBindingByIdSpec.create(DomainBindingId.rehydrate(domainBindingId)),
+    );
+    expect(notReadyBinding?.toState().status.value).toBe("not_ready");
+    expect(notReadyBinding?.toState().routeFailure?.deploymentId.value).toBe("dep_route_failed");
+
+    const readyHandler = new MarkDomainReadyOnDeploymentFinishedHandler(
+      domainBindings,
+      candidateReader,
+      eventBus,
+      logger,
+    );
+    const succeededEvent: DomainEvent = {
+      type: "deployment.finished",
+      aggregateId: "dep_route_recovered",
+      occurredAt: "2026-01-01T00:10:00.000Z",
+      payload: {
+        status: "succeeded",
+        exitCode: 0,
+        retryable: false,
+      },
+    };
+
+    const readyHandled = await readyHandler.handle(context, succeededEvent);
+    expect(readyHandled.isOk()).toBe(true);
+
+    const recoveredBinding = await domainBindings.findOne(
+      repositoryContext,
+      DomainBindingByIdSpec.create(DomainBindingId.rehydrate(domainBindingId)),
+    );
+    expect(recoveredBinding?.toState().status.value).toBe("ready");
+    expect(recoveredBinding?.toState().routeFailure).toBeUndefined();
+
+    const domainReadyEvents = eventsByType(eventBus.events, "domain-ready");
+    expect(domainReadyEvents).toHaveLength(1);
+    expect(domainReadyEvents[0]?.payload).toMatchObject({
+      domainBindingId,
+      domainName: "route-recovered.example.com",
+      readyAt: "2026-01-01T00:10:00.000Z",
+      correlationId: "req_domain_binding_confirm_test",
+      causationId: "dep_route_recovered",
+    });
+
+    const repeated = await readyHandler.handle(context, succeededEvent);
+    expect(repeated.isOk()).toBe(true);
+    expect(eventsByType(eventBus.events, "domain-ready")).toHaveLength(1);
+
+    const listed = await new ListDomainBindingsQueryService(readModel).execute(context, {
+      resourceId: "res_demo",
+    });
+    expect(listed.items[0]).toMatchObject({
+      id: domainBindingId,
+      status: "ready",
+    });
+    expect(listed.items[0]?.routeFailure).toBeUndefined();
   });
 });
