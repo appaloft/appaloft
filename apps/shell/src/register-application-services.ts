@@ -44,6 +44,7 @@ import {
   ListServersQueryService,
   ListSshCredentialsQueryService,
   MarkDomainReadyOnCertificateIssuedHandler,
+  MarkDomainReadyOnDeploymentFinishedHandler,
   MarkDomainReadyOnDomainBoundHandler,
   MarkDomainRouteFailedOnDeploymentFinishedHandler,
   OpenTerminalSessionUseCase,
@@ -81,6 +82,7 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(BootstrapServerEdgeProxyOnTargetRegisteredHandler);
   container.registerSingleton(MarkDomainReadyOnDomainBoundHandler);
   container.registerSingleton(MarkDomainReadyOnCertificateIssuedHandler);
+  container.registerSingleton(MarkDomainReadyOnDeploymentFinishedHandler);
   container.registerSingleton(MarkDomainRouteFailedOnDeploymentFinishedHandler);
   container.registerSingleton(IssueCertificateOnCertificateRequestedHandler);
   container.registerSingleton(BootstrapServerProxyCommandHandler);

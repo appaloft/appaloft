@@ -569,7 +569,11 @@ export class DomainBinding extends AggregateRoot<DomainBindingState> {
       return ok(undefined);
     }
 
-    if (this.state.status.value !== "bound" && this.state.status.value !== "certificate_pending") {
+    if (
+      this.state.status.value !== "bound" &&
+      this.state.status.value !== "certificate_pending" &&
+      this.state.status.value !== "not_ready"
+    ) {
       return err(
         domainError.invariant("Domain binding cannot be marked ready from its current state", {
           phase: "domain-ready",
