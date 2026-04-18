@@ -26,12 +26,8 @@
     "active": true,
     "targets": "all",
     "category": "DeveloperTool",
-    "icon": [
-      "icons/icon.png"
-    ],
-    "externalBin": [
-      "binaries/appaloft"
-    ],
+    "icon": ["icons/icon.png"],
+    "externalBin": ["binaries/appaloft"],
     "macOS": {
       "minimumSystemVersion": "11.0"
     }
