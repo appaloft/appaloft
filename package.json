@@ -24,6 +24,7 @@
     "package:binary-bundle": "bun run scripts/release/build-binary-bundle.ts",
     "package:artifacts": "bun run scripts/release/build-artifacts.ts",
     "release:manifest": "bun run scripts/release/generate-release-manifest.ts",
+    "release:notes": "bun run scripts/release/generate-release-notes.ts",
     "release:npm:prepare": "bun run scripts/release/prepare-npm-packages.ts",
     "release:homebrew": "bun run scripts/release/generate-homebrew.ts",
     "desktop:dev": "bun run package:binary-bundle && bun run --cwd apps/desktop dev",

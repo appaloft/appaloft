@@ -398,6 +398,20 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: gh release upload "${{ inputs.tag_name }}" dist/release/* --clobber
 
+      - name: Update Release Notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          bun run release:notes -- \
+            --version "${APPALOFT_APP_VERSION}" \
+            --tag "${{ inputs.tag_name }}" \
+            --release-dir dist/release \
+            --repository "${GITHUB_REPOSITORY}" \
+            --out "${RUNNER_TEMP}/release-notes.md"
+          gh release edit "${{ inputs.tag_name }}" \
+            --title "Appaloft ${APPALOFT_APP_VERSION}" \
+            --notes-file "${RUNNER_TEMP}/release-notes.md"
+
       - name: Upload Final Release Metadata
         uses: actions/upload-artifact@v4
         with:
