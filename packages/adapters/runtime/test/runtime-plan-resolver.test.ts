@@ -339,6 +339,300 @@ describe("DefaultRuntimePlanResolver", () => {
     );
   });
 
+  test("[DEP-CREATE-ADM-028] packages Vite static output with typed planner evidence", async () => {
+    ensureReflectMetadata();
+    const { DefaultRuntimePlanResolver } = await import("../src");
+    const resolver = new DefaultRuntimePlanResolver();
+    const context = createTestExecutionContext();
+
+    const result = await resolver.resolve(context, {
+      id: "plan_vite_static",
+      source: createSource({
+        kind: "local-folder",
+        locator: "/tmp/vite-app",
+        displayName: "vite-app",
+        inspection: createSourceInspection({
+          runtimeFamily: "node",
+          framework: "vite",
+          packageManager: "yarn",
+          runtimeVersion: "20",
+          detectedFiles: ["package-json", "vite-config", "yarn-lock"],
+          detectedScripts: ["build"],
+        }),
+      }),
+      server: {
+        id: "srv_vite",
+        providerKey: "local-shell",
+      },
+      environmentSnapshot: createEnvironmentSnapshot("snap_vite"),
+      detectedReasoning: ["detected vite app"],
+      requestedDeployment: {
+        method: "auto",
+        port: 80,
+      },
+      generatedAt: "2026-01-01T00:00:00.000Z",
+    });
+
+    expect(result.isOk()).toBe(true);
+    const plan = result._unsafeUnwrap();
+
+    expect(plan.buildStrategy).toBe("static-artifact");
+    expect(plan.runtimeArtifact?.metadata).toEqual(
+      expect.objectContaining({
+        planner: "vite-static",
+        runtimeKind: "static",
+        framework: "vite",
+        packageManager: "yarn",
+        baseImage: "node:20-alpine",
+        publishDirectory: "/dist",
+      }),
+    );
+    expect(plan.execution).toEqual(
+      expect.objectContaining({
+        kind: "docker-container",
+        dockerfilePath: "Dockerfile.appaloft-static",
+        installCommand: "yarn install --frozen-lockfile",
+        buildCommand: "yarn build",
+        port: 80,
+      }),
+    );
+    expect(plan.execution.metadata).toEqual(
+      expect.objectContaining({
+        "static.publishDirectory": "/dist",
+        "workspace.planner": "vite-static",
+        "workspace.framework": "vite",
+        "workspace.packageManager": "yarn",
+        "workspace.baseImage": "node:20-alpine",
+      }),
+    );
+  });
+
+  test("[DEP-CREATE-ADM-033] packages Nuxt generate output as static artifact", async () => {
+    ensureReflectMetadata();
+    const { DefaultRuntimePlanResolver } = await import("../src");
+    const resolver = new DefaultRuntimePlanResolver();
+    const context = createTestExecutionContext();
+
+    const result = await resolver.resolve(context, {
+      id: "plan_nuxt_static",
+      source: createSource({
+        kind: "local-folder",
+        locator: "/tmp/nuxt-app",
+        displayName: "nuxt-app",
+        inspection: createSourceInspection({
+          runtimeFamily: "node",
+          framework: "nuxt",
+          packageManager: "pnpm",
+          runtimeVersion: "22",
+          detectedFiles: ["package-json", "nuxt-config", "pnpm-lock"],
+          detectedScripts: ["generate"],
+        }),
+      }),
+      server: {
+        id: "srv_nuxt",
+        providerKey: "local-shell",
+      },
+      environmentSnapshot: createEnvironmentSnapshot("snap_nuxt"),
+      detectedReasoning: ["detected nuxt generate app"],
+      requestedDeployment: {
+        method: "auto",
+        port: 80,
+      },
+      generatedAt: "2026-01-01T00:00:00.000Z",
+    });
+
+    expect(result.isOk()).toBe(true);
+    const plan = result._unsafeUnwrap();
+
+    expect(plan.buildStrategy).toBe("static-artifact");
+    expect(plan.runtimeArtifact?.metadata).toEqual(
+      expect.objectContaining({
+        planner: "nuxt-static",
+        runtimeKind: "static",
+        framework: "nuxt",
+        packageManager: "pnpm",
+        publishDirectory: "/.output/public",
+      }),
+    );
+    expect(plan.execution).toEqual(
+      expect.objectContaining({
+        dockerfilePath: "Dockerfile.appaloft-static",
+        installCommand: "pnpm install",
+        buildCommand: "pnpm generate",
+        port: 80,
+      }),
+    );
+  });
+
+  test("[DEP-CREATE-ADM-033] resolves explicit SvelteKit static output defaults", async () => {
+    ensureReflectMetadata();
+    const { DefaultRuntimePlanResolver } = await import("../src");
+    const resolver = new DefaultRuntimePlanResolver();
+    const context = createTestExecutionContext();
+
+    const result = await resolver.resolve(context, {
+      id: "plan_sveltekit_static",
+      source: createSource({
+        kind: "local-folder",
+        locator: "/tmp/sveltekit-app",
+        displayName: "sveltekit-app",
+        inspection: createSourceInspection({
+          runtimeFamily: "node",
+          framework: "sveltekit",
+          packageManager: "bun",
+          detectedFiles: ["package-json", "svelte-config", "bun-lock"],
+          detectedScripts: ["build"],
+        }),
+      }),
+      server: {
+        id: "srv_sveltekit",
+        providerKey: "local-shell",
+      },
+      environmentSnapshot: createEnvironmentSnapshot("snap_sveltekit"),
+      detectedReasoning: ["detected sveltekit static app"],
+      requestedDeployment: {
+        method: "static",
+        port: 80,
+      },
+      generatedAt: "2026-01-01T00:00:00.000Z",
+    });
+
+    expect(result.isOk()).toBe(true);
+    const plan = result._unsafeUnwrap();
+
+    expect(plan.buildStrategy).toBe("static-artifact");
+    expect(plan.runtimeArtifact?.metadata).toEqual(
+      expect.objectContaining({
+        planner: "sveltekit-static",
+        runtimeKind: "static",
+        framework: "sveltekit",
+        packageManager: "bun",
+        baseImage: "oven/bun:1-alpine",
+        publishDirectory: "/build",
+      }),
+    );
+    expect(plan.execution).toEqual(
+      expect.objectContaining({
+        installCommand: "bun install",
+        buildCommand: "bun run build",
+        port: 80,
+      }),
+    );
+  });
+
+  test("[DEP-CREATE-ADM-028] uses the Remix workspace planner before generic Node", async () => {
+    ensureReflectMetadata();
+    const { DefaultRuntimePlanResolver } = await import("../src");
+    const resolver = new DefaultRuntimePlanResolver();
+    const context = createTestExecutionContext();
+
+    const result = await resolver.resolve(context, {
+      id: "plan_remix",
+      source: createSource({
+        kind: "local-folder",
+        locator: "/tmp/remix-app",
+        displayName: "remix-app",
+        inspection: createSourceInspection({
+          runtimeFamily: "node",
+          framework: "remix",
+          packageManager: "npm",
+          runtimeVersion: "22",
+          detectedFiles: ["package-json", "remix-config", "package-lock"],
+          detectedScripts: ["build", "start"],
+        }),
+      }),
+      server: {
+        id: "srv_remix",
+        providerKey: "local-shell",
+      },
+      environmentSnapshot: createEnvironmentSnapshot("snap_remix"),
+      detectedReasoning: ["detected remix app"],
+      requestedDeployment: {
+        method: "auto",
+        port: 4321,
+      },
+      generatedAt: "2026-01-01T00:00:00.000Z",
+    });
+
+    expect(result.isOk()).toBe(true);
+    const plan = result._unsafeUnwrap();
+
+    expect(plan.buildStrategy).toBe("workspace-commands");
+    expect(plan.runtimeArtifact?.metadata).toEqual(
+      expect.objectContaining({
+        planner: "remix",
+        runtimeKind: "remix",
+        framework: "remix",
+        packageManager: "npm",
+        baseImage: "node:22-alpine",
+      }),
+    );
+    expect(plan.execution).toEqual(
+      expect.objectContaining({
+        installCommand: "npm install",
+        buildCommand: "npm run build",
+        startCommand: "npm run start",
+        port: 4321,
+      }),
+    );
+  });
+
+  test("[DEP-CREATE-ADM-031] keeps framework and base image as planner metadata", async () => {
+    ensureReflectMetadata();
+    const { DefaultRuntimePlanResolver } = await import("../src");
+    const resolver = new DefaultRuntimePlanResolver();
+    const context = createTestExecutionContext();
+
+    const result = await resolver.resolve(context, {
+      id: "plan_express",
+      source: createSource({
+        kind: "local-folder",
+        locator: "/tmp/express-app",
+        displayName: "express-app",
+        inspection: createSourceInspection({
+          runtimeFamily: "node",
+          framework: "express",
+          packageManager: "pnpm",
+          runtimeVersion: "22",
+          detectedFiles: ["package-json", "pnpm-lock"],
+          detectedScripts: ["build", "start"],
+        }),
+      }),
+      server: {
+        id: "srv_express",
+        providerKey: "local-shell",
+      },
+      environmentSnapshot: createEnvironmentSnapshot("snap_express"),
+      detectedReasoning: ["detected express app"],
+      requestedDeployment: {
+        method: "auto",
+        port: 4317,
+      },
+      generatedAt: "2026-01-01T00:00:00.000Z",
+    });
+
+    expect(result.isOk()).toBe(true);
+    const plan = result._unsafeUnwrap();
+
+    expect(plan.buildStrategy).toBe("workspace-commands");
+    expect(plan.runtimeArtifact?.metadata).toEqual(
+      expect.objectContaining({
+        planner: "node",
+        runtimeKind: "node",
+        framework: "express",
+        packageManager: "pnpm",
+        baseImage: "node:22-alpine",
+      }),
+    );
+    expect(plan.execution.metadata).toEqual(
+      expect.objectContaining({
+        "workspace.baseImage": "node:22-alpine",
+        framework: "express",
+        packageManager: "pnpm",
+      }),
+    );
+  });
+
   test("uses the Python workspace planner when Python metadata is detected", async () => {
     ensureReflectMetadata();
     const { DefaultRuntimePlanResolver } = await import("../src");
@@ -388,6 +682,168 @@ describe("DefaultRuntimePlanResolver", () => {
         installCommand: "pip install --no-cache-dir -r requirements.txt",
         startCommand: "python -m app",
         port: 4316,
+      }),
+    );
+  });
+
+  test("[DEP-CREATE-ADM-028] uses the FastAPI workspace planner with uv defaults", async () => {
+    ensureReflectMetadata();
+    const { DefaultRuntimePlanResolver } = await import("../src");
+    const resolver = new DefaultRuntimePlanResolver();
+    const context = createTestExecutionContext();
+
+    const result = await resolver.resolve(context, {
+      id: "plan_fastapi",
+      source: createSource({
+        kind: "local-folder",
+        locator: "/tmp/fastapi-app",
+        displayName: "fastapi-app",
+        inspection: createSourceInspection({
+          runtimeFamily: "python",
+          framework: "fastapi",
+          packageManager: "uv",
+          runtimeVersion: "3.12",
+          detectedFiles: ["pyproject-toml", "uv-lock"],
+        }),
+      }),
+      server: {
+        id: "srv_fastapi",
+        providerKey: "local-shell",
+      },
+      environmentSnapshot: createEnvironmentSnapshot("snap_fastapi"),
+      detectedReasoning: ["detected fastapi app"],
+      requestedDeployment: {
+        method: "auto",
+      },
+      generatedAt: "2026-01-01T00:00:00.000Z",
+    });
+
+    expect(result.isOk()).toBe(true);
+    const plan = result._unsafeUnwrap();
+
+    expect(plan.buildStrategy).toBe("workspace-commands");
+    expect(plan.runtimeArtifact?.metadata).toEqual(
+      expect.objectContaining({
+        planner: "fastapi",
+        runtimeKind: "fastapi",
+        framework: "fastapi",
+        packageManager: "uv",
+        baseImage: "python:3.12-slim",
+      }),
+    );
+    expect(plan.execution).toEqual(
+      expect.objectContaining({
+        installCommand: "pip install --no-cache-dir uv && uv sync --frozen --no-dev",
+        startCommand: "uv run python -m uvicorn main:app --host 0.0.0.0 --port 3000",
+        port: 3000,
+      }),
+    );
+  });
+
+  test("[DEP-CREATE-ADM-028] uses the Django workspace planner with manage.py evidence", async () => {
+    ensureReflectMetadata();
+    const { DefaultRuntimePlanResolver } = await import("../src");
+    const resolver = new DefaultRuntimePlanResolver();
+    const context = createTestExecutionContext();
+
+    const result = await resolver.resolve(context, {
+      id: "plan_django",
+      source: createSource({
+        kind: "local-folder",
+        locator: "/tmp/django-app",
+        displayName: "django-app",
+        inspection: createSourceInspection({
+          runtimeFamily: "python",
+          framework: "django",
+          packageManager: "poetry",
+          runtimeVersion: "3.11",
+          detectedFiles: ["pyproject-toml", "poetry-lock", "django-manage"],
+        }),
+      }),
+      server: {
+        id: "srv_django",
+        providerKey: "local-shell",
+      },
+      environmentSnapshot: createEnvironmentSnapshot("snap_django"),
+      detectedReasoning: ["detected django app"],
+      requestedDeployment: {
+        method: "auto",
+        port: 4319,
+      },
+      generatedAt: "2026-01-01T00:00:00.000Z",
+    });
+
+    expect(result.isOk()).toBe(true);
+    const plan = result._unsafeUnwrap();
+
+    expect(plan.runtimeArtifact?.metadata).toEqual(
+      expect.objectContaining({
+        planner: "django",
+        runtimeKind: "django",
+        framework: "django",
+        packageManager: "poetry",
+        baseImage: "python:3.11-slim",
+      }),
+    );
+    expect(plan.execution).toEqual(
+      expect.objectContaining({
+        installCommand:
+          "pip install --no-cache-dir poetry && poetry install --only main --no-root",
+        startCommand: "poetry run python manage.py runserver 0.0.0.0:4319",
+        port: 4319,
+      }),
+    );
+  });
+
+  test("[DEP-CREATE-ADM-028] uses the Flask workspace planner with pip defaults", async () => {
+    ensureReflectMetadata();
+    const { DefaultRuntimePlanResolver } = await import("../src");
+    const resolver = new DefaultRuntimePlanResolver();
+    const context = createTestExecutionContext();
+
+    const result = await resolver.resolve(context, {
+      id: "plan_flask",
+      source: createSource({
+        kind: "local-folder",
+        locator: "/tmp/flask-app",
+        displayName: "flask-app",
+        inspection: createSourceInspection({
+          runtimeFamily: "python",
+          framework: "flask",
+          packageManager: "pip",
+          detectedFiles: ["requirements-txt"],
+        }),
+      }),
+      server: {
+        id: "srv_flask",
+        providerKey: "local-shell",
+      },
+      environmentSnapshot: createEnvironmentSnapshot("snap_flask"),
+      detectedReasoning: ["detected flask app"],
+      requestedDeployment: {
+        method: "auto",
+        port: 4320,
+      },
+      generatedAt: "2026-01-01T00:00:00.000Z",
+    });
+
+    expect(result.isOk()).toBe(true);
+    const plan = result._unsafeUnwrap();
+
+    expect(plan.runtimeArtifact?.metadata).toEqual(
+      expect.objectContaining({
+        planner: "flask",
+        runtimeKind: "flask",
+        framework: "flask",
+        packageManager: "pip",
+        baseImage: "python:3.12-slim",
+      }),
+    );
+    expect(plan.execution).toEqual(
+      expect.objectContaining({
+        installCommand: "pip install --no-cache-dir -r requirements.txt",
+        startCommand: "python -m flask run --host 0.0.0.0 --port 4320",
+        port: 4320,
       }),
     );
   });

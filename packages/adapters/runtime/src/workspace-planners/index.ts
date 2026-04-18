@@ -1,9 +1,15 @@
 import { domainError, err, type Result, type RuntimeExecutionPlan } from "@appaloft/core";
 import { customWorkspacePlanner } from "./custom";
 import { javaWorkspacePlanner } from "./java";
+import { remixWorkspacePlanner } from "./javascript/remix";
 import { nextjsWorkspacePlanner } from "./nextjs";
 import { nodeWorkspacePlanner } from "./node";
 import { pythonWorkspacePlanner } from "./python";
+import {
+  djangoWorkspacePlanner,
+  fastapiWorkspacePlanner,
+  flaskWorkspacePlanner,
+} from "./python/web-frameworks";
 import {
   DockerfileBuilder,
   generatedWorkspaceDockerfileName,
@@ -25,7 +31,11 @@ export {
 
 const workspaceRuntimePlanners: WorkspaceRuntimePlanner[] = [
   nextjsWorkspacePlanner,
+  remixWorkspacePlanner,
   nodeWorkspacePlanner,
+  fastapiWorkspacePlanner,
+  djangoWorkspacePlanner,
+  flaskWorkspacePlanner,
   pythonWorkspacePlanner,
   javaWorkspacePlanner,
   customWorkspacePlanner,

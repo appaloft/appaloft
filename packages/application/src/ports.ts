@@ -1270,6 +1270,7 @@ export interface DeploymentSummary {
   serverId: string;
   destinationId: string;
   status: DeploymentStatus;
+  sourceCommitSha?: string;
   runtimePlan: {
     id: string;
     source: {
@@ -1277,25 +1278,101 @@ export interface DeploymentSummary {
       locator: string;
       displayName: string;
       inspection?: {
-        runtimeFamily?: "custom" | "java" | "node" | "python";
-        framework?: "nextjs";
-        packageManager?: "bun" | "npm" | "pnpm";
+        runtimeFamily?:
+          | "custom"
+          | "dotnet"
+          | "elixir"
+          | "go"
+          | "java"
+          | "node"
+          | "php"
+          | "python"
+          | "ruby"
+          | "rust"
+          | "static";
+        framework?:
+          | "actix-web"
+          | "angular"
+          | "astro"
+          | "aspnet-core"
+          | "axum"
+          | "chi"
+          | "django"
+          | "echo"
+          | "express"
+          | "fastapi"
+          | "fastify"
+          | "fiber"
+          | "flask"
+          | "gin"
+          | "hono"
+          | "koa"
+          | "laravel"
+          | "micronaut"
+          | "nestjs"
+          | "nextjs"
+          | "nuxt"
+          | "phoenix"
+          | "quarkus"
+          | "rails"
+          | "remix"
+          | "rocket"
+          | "sinatra"
+          | "spring-boot"
+          | "sveltekit"
+          | "symfony"
+          | "vite";
+        packageManager?:
+          | "bun"
+          | "cargo"
+          | "composer"
+          | "dotnet"
+          | "go"
+          | "gradle"
+          | "maven"
+          | "mix"
+          | "npm"
+          | "pip"
+          | "pnpm"
+          | "poetry"
+          | "uv"
+          | "yarn";
         runtimeVersion?: string;
         projectName?: string;
         detectedFiles?: Array<
           | "compose-manifest"
+          | "angular-json"
+          | "astro-config"
+          | "bun-lock"
+          | "cargo-toml"
+          | "composer-json"
+          | "csproj"
+          | "django-manage"
           | "dockerfile"
           | "git-directory"
+          | "go-mod"
           | "gradle-build"
           | "gradle-wrapper"
+          | "mix-exs"
           | "maven-wrapper"
           | "next-config"
+          | "nuxt-config"
+          | "package-lock"
           | "package-json"
+          | "pnpm-lock"
+          | "poetry-lock"
           | "pom-xml"
           | "pyproject-toml"
           | "requirements-txt"
+          | "remix-config"
+          | "svelte-config"
+          | "uv-lock"
+          | "vite-config"
+          | "yarn-lock"
         >;
-        detectedScripts?: Array<"build" | "start" | "start-built">;
+        detectedScripts?: Array<
+          "build" | "dev" | "export" | "generate" | "preview" | "serve" | "start" | "start-built"
+        >;
         dockerfilePath?: string;
         composeFilePath?: string;
         jarPath?: string;

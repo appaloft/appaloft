@@ -1,11 +1,13 @@
 <script lang="ts">
   import { ArrowRight } from "@lucide/svelte";
-  import type {
-    DeploymentSummary,
-    EnvironmentSummary,
-    ProjectSummary,
-    ResourceSummary,
-    ServerSummary,
+  import {
+    shortDeploymentSourceCommitSha,
+    sourceCommitShaForDeployment,
+    type DeploymentSummary,
+    type EnvironmentSummary,
+    type ProjectSummary,
+    type ResourceSummary,
+    type ServerSummary,
   } from "@appaloft/contracts";
 
   import DeploymentStatusBadge from "$lib/components/console/DeploymentStatusBadge.svelte";
@@ -78,6 +80,7 @@
         {@const environment = findEnvironment(environments, deployment.environmentId)}
         {@const resource = findResource(resources, deployment.resourceId)}
         {@const server = findServer(servers, deployment.serverId)}
+        {@const sourceCommitSha = sourceCommitShaForDeployment(deployment)}
         <Table.Row class="group">
           <Table.Cell class="max-w-80">
             <a href={deploymentDetailHref(deployment)} class="block min-w-0 underline-offset-4 group-hover:underline">
@@ -85,6 +88,11 @@
               <span class="mt-1 block truncate text-xs text-muted-foreground">
                 {deployment.runtimePlan.source.locator}
               </span>
+              {#if sourceCommitSha}
+                <span class="mt-1 block truncate font-mono text-xs text-muted-foreground" title={sourceCommitSha}>
+                  {$t(i18nKeys.console.deployments.sourceCommitSha)} {shortDeploymentSourceCommitSha(sourceCommitSha)}
+                </span>
+              {/if}
             </a>
           </Table.Cell>
           <Table.Cell>

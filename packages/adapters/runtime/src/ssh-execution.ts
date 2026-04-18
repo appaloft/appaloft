@@ -46,6 +46,11 @@ import {
 import { classifyEdgeProxyStartFailure } from "./edge-proxy-failure-classification";
 import { executeProxyReloadPlan } from "./proxy-reload-execution";
 import {
+  parseResolvedGitCommitSha,
+  shortGitCommitSha,
+  sourceCommitShaMetadataKey,
+} from "./git-source-metadata";
+import {
   dockerPublishedPortCommand,
   parseDockerPublishedHostPort,
   appaloftDockerContainerLabels,
@@ -1029,11 +1034,50 @@ export class SshExecutionBackend implements ExecutionBackend {
         };
       }
 
+      const commit = this.runRemoteCommand({
+        target: input.target,
+        command: `git -C ${shellQuote(remoteSourceRoot)} rev-parse --verify HEAD`,
+        cwd: input.runtimeDir,
+        env: input.env,
+      });
+      const commitSha = parseResolvedGitCommitSha(commit.stdout);
+
+      if (commit.failed || !commitSha) {
+        const message = commit.failed
+          ? commit.reason
+            ? `Remote git commit resolution failed: ${commit.reason}`
+            : `Remote git commit resolution failed with exit code ${commit.exitCode}`
+          : "Remote git commit resolution returned an invalid object id";
+        logs.push(phaseLog("package", message, "error"));
+        return {
+          prepared: false,
+          deployment: this.applyFailure(deployment, {
+            logs,
+            errorCode: "remote_git_commit_resolution_failed",
+            retryable: true,
+            metadata: {
+              phase: "package",
+              source: source.locator,
+              remoteWorkdir: remoteSourceRoot,
+            },
+          }),
+        };
+      }
+
+      const commitMessage = `Resolved git commit ${shortGitCommitSha(commitSha)}`;
+      logs.push(phaseLog("package", commitMessage));
+      this.report(context, {
+        deploymentId: state.id.value,
+        phase: "package",
+        status: "running",
+        message: commitMessage,
+      });
+
       this.report(context, {
         deploymentId: state.id.value,
         phase: "package",
         status: "succeeded",
-        message: "Target git source workspace is ready",
+        message: `Target git source workspace is ready at ${shortGitCommitSha(commitSha)}`,
       });
 
       return {
@@ -1044,6 +1088,7 @@ export class SshExecutionBackend implements ExecutionBackend {
           metadata: {
             sourceStrategy: source.kind,
             remoteWorkdir,
+            [sourceCommitShaMetadataKey]: commitSha,
             ...(source.metadata?.gitRef ? { gitRef: source.metadata.gitRef } : {}),
             ...(source.metadata?.baseDirectory
               ? { baseDirectory: source.metadata.baseDirectory }

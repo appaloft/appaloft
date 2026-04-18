@@ -271,6 +271,7 @@ export const enUS = {
       snapshotDescription:
         "The immutable environment snapshot captured for this deployment. Secret values stay masked.",
       snapshotTitle: "Environment snapshot",
+      sourceCommitSha: "Commit",
       startCommand: "Start command",
       timelineTitle: "Timeline",
       workingDirectory: "Working directory",

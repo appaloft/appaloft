@@ -16,7 +16,12 @@
     Server,
     ShieldCheck,
   } from "@lucide/svelte";
-  import type { DeploymentProgressEvent, DeploymentSummary } from "@appaloft/contracts";
+  import {
+    shortDeploymentSourceCommitSha,
+    sourceCommitShaForDeployment,
+    type DeploymentProgressEvent,
+    type DeploymentSummary,
+  } from "@appaloft/contracts";
 
   import ConsoleShell from "$lib/components/console/ConsoleShell.svelte";
   import DeploymentStatusBadge from "$lib/components/console/DeploymentStatusBadge.svelte";
@@ -406,6 +411,7 @@
       </div>
     </section>
   {:else}
+    {@const sourceCommitSha = sourceCommitShaForDeployment(deployment)}
     <div class="space-y-8">
       <section class="space-y-6">
         <div class="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
@@ -421,6 +427,12 @@
               <p class="break-all text-sm leading-6 text-muted-foreground">
                 {deployment.runtimePlan.source.locator}
               </p>
+              {#if sourceCommitSha}
+                <p class="font-mono text-sm text-muted-foreground" title={sourceCommitSha}>
+                  {$t(i18nKeys.console.deployments.sourceCommitSha)}
+                  {shortDeploymentSourceCommitSha(sourceCommitSha)}
+                </p>
+              {/if}
             </div>
           </div>
 
@@ -552,11 +564,19 @@
 
           <section class="rounded-md border bg-background p-4">
             <h2 class="text-lg font-semibold">{$t(i18nKeys.common.domain.source)}</h2>
-            <div class="mt-4 grid gap-3 md:grid-cols-[10rem_minmax(0,1fr)]">
+            <div class={sourceCommitSha ? "mt-4 grid gap-3 md:grid-cols-[10rem_14rem_minmax(0,1fr)]" : "mt-4 grid gap-3 md:grid-cols-[10rem_minmax(0,1fr)]"}>
               <div class="rounded-md bg-muted/30 px-3 py-2">
                 <p class="text-xs text-muted-foreground">{$t(i18nKeys.common.domain.kind)}</p>
                 <p class="mt-1 truncate text-sm font-medium">{deployment.runtimePlan.source.kind}</p>
               </div>
+              {#if sourceCommitSha}
+                <div class="rounded-md bg-muted/30 px-3 py-2">
+                  <p class="text-xs text-muted-foreground">{$t(i18nKeys.console.deployments.sourceCommitSha)}</p>
+                  <p class="mt-1 truncate font-mono text-sm font-medium" title={sourceCommitSha}>
+                    {shortDeploymentSourceCommitSha(sourceCommitSha)}
+                  </p>
+                </div>
+              {/if}
               <div class="rounded-md bg-muted/30 px-3 py-2">
                 <p class="text-xs text-muted-foreground">{$t(i18nKeys.common.domain.source)}</p>
                 <p class="mt-1 break-all text-sm font-medium">

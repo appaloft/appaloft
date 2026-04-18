@@ -20,6 +20,8 @@ function runCommandFor(packageManager: NodePackageManager, script: string): stri
       return `bun run ${script}`;
     case "pnpm":
       return `pnpm ${script}`;
+    case "yarn":
+      return `yarn ${script}`;
     case "npm":
       return `npm run ${script}`;
   }
@@ -31,6 +33,8 @@ function installCommandFor(packageManager: NodePackageManager): string {
       return "bun install";
     case "pnpm":
       return "pnpm install";
+    case "yarn":
+      return "yarn install --frozen-lockfile";
     case "npm":
       return "npm install";
   }
