@@ -10,7 +10,9 @@ manually again to create the tag, GitHub Release, and distribution artifacts.
 - Use a single product SemVer version for backend, CLI, desktop, Docker, Homebrew, and npm.
 - Release tags use `vX.Y.Z`.
 - `CHANGELOG.md` is maintained by Release Please in the release PR.
-- The GitHub Release body is generated from the same release notes.
+- The GitHub Release body is generated from `CHANGELOG.md` plus the built release artifact list,
+  so the release page includes install commands, direct download links, known gaps, and the
+  conventional-commit changelog.
 - npm package versions are injected during the publish job so release PRs do not need to rewrite
   workspace package versions or `bun.lock`.
 - Use a `Release-As: X.Y.Z` commit footer only when a hotfix needs an explicit version.
@@ -23,6 +25,7 @@ bun run package:binary-bundle
 bun run package:binary-bundle -- --target linux-x64-gnu --version 0.1.0 --archive
 bun run package:artifacts -- --version 0.1.0 --archives
 bun run release:manifest -- --version 0.1.0
+bun run release:notes -- --version 0.1.0
 bun run checksums
 docker build --build-arg APPALOFT_APP_VERSION=0.1.0 -t appaloft-all-in-one:local .
 ```
