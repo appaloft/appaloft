@@ -1,196 +1,91 @@
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
-import { createInterface, type Interface } from "node:readline/promises";
-import { DoctorQuery, ListProvidersQuery, type ProviderDescriptor } from "@appaloft/application";
-import { type Result } from "@appaloft/core";
+import { DoctorQuery } from "@appaloft/application";
+import { domainError, err, ok, type Result } from "@appaloft/core";
+import { type AppaloftDeploymentConfig } from "@appaloft/deployment-config";
 import { Command as EffectCommand, Options } from "@effect/cli";
 import { Effect } from "effect";
-import { CliRuntime, optionalValue, print, runQuery } from "../runtime.js";
+import { CliRuntime, optionalValue, print, resultToEffect, runQuery } from "../runtime.js";
+import { type DeploymentMethod, deploymentMethods } from "./deployment-source.js";
 
 const initOutputOption = Options.text("output").pipe(Options.withDefault("appaloft.json"));
-const initProjectOption = Options.text("project").pipe(Options.optional);
-const initTargetsOption = Options.text("targets").pipe(Options.optional);
+const initMethodOption = Options.choice("method", deploymentMethods).pipe(
+  Options.withDefault("auto"),
+);
+const initInstallOption = Options.text("install").pipe(Options.optional);
+const initBuildOption = Options.text("build").pipe(Options.optional);
+const initStartOption = Options.text("start").pipe(Options.optional);
+const initPublishDirOption = Options.text("publish-dir").pipe(Options.optional);
+const initPortOption = Options.text("port").pipe(Options.optional);
+const initHealthPathOption = Options.text("health-path").pipe(Options.optional);
 const initForceOption = Options.boolean("force").pipe(Options.withDefault(false));
 
-const initTargetAliases = ["local", "ssh", "aliyun", "tencent"] as const;
-type InitTargetAlias = (typeof initTargetAliases)[number];
+const defaultApplicationInternalPort = 3000;
+const defaultStaticInternalPort = 80;
+const defaultStaticPublishDirectory = "dist";
 
-interface InitConfigTarget {
-  key: string;
-  name: string;
-  providerKey: string;
-  host?: string;
-  port?: number;
+function trimToUndefined(value: string | undefined): string | undefined {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : undefined;
 }
 
-interface InitConfig {
-  project: {
-    name: string;
-  };
-  environment: {
-    name: string;
-    kind: "local";
-  };
-  resource: {
-    name: string;
-    kind: "application";
-  };
-  targets: InitConfigTarget[];
-  deployment: {
-    targetKey: string;
-    method: "auto";
-  };
-}
-
-interface InitRuntime {
-  executeQuery(message: ListProvidersQuery): Promise<Result<{ items: ProviderDescriptor[] }>>;
-}
-
-function normalizeInitProviderKey(alias: InitTargetAlias): string {
-  switch (alias) {
-    case "local":
-      return "local-shell";
-    case "ssh":
-      return "generic-ssh";
-    case "aliyun":
-      return "aliyun";
-    case "tencent":
-      return "tencent-cloud";
+function parseOptionalPositiveInteger(
+  label: string,
+  value: string | undefined,
+): Result<number | undefined> {
+  if (!value) {
+    return ok(undefined);
   }
-}
 
-function parseInitTargets(value: string | undefined): InitTargetAlias[] {
-  const rawTargets = value
-    ? value
-        .split(",")
-        .map((target) => target.trim())
-        .filter((target) => target.length > 0)
-    : ["local"];
-  const selected = rawTargets.filter((target): target is InitTargetAlias =>
-    initTargetAliases.includes(target as InitTargetAlias),
+  const parsed = Number(value);
+  if (Number.isInteger(parsed) && parsed > 0) {
+    return ok(parsed);
+  }
+
+  return err(
+    domainError.validation(`${label} must be a positive integer`, {
+      phase: "config-init",
+    }),
   );
-
-  return selected.length > 0 ? selected : ["local"];
 }
 
-function defaultHostFor(alias: InitTargetAlias): string {
-  return alias === "local" ? "127.0.0.1" : "";
-}
+export function createInitConfig(
+  input: {
+    method?: DeploymentMethod;
+    install?: string;
+    build?: string;
+    start?: string;
+    publishDir?: string;
+    port?: number;
+    healthPath?: string;
+  } = {},
+): AppaloftDeploymentConfig {
+  const method = input.method ?? "auto";
+  const installCommand = trimToUndefined(input.install);
+  const buildCommand = trimToUndefined(input.build);
+  const startCommand = method === "static" ? undefined : trimToUndefined(input.start);
+  const publishDirectory =
+    trimToUndefined(input.publishDir) ??
+    (method === "static" ? defaultStaticPublishDirectory : undefined);
+  const healthCheckPath = trimToUndefined(input.healthPath);
 
-function defaultNameFor(alias: InitTargetAlias): string {
-  switch (alias) {
-    case "local":
-      return "Local Machine";
-    case "ssh":
-      return "SSH Server";
-    case "aliyun":
-      return "Alibaba Cloud Server";
-    case "tencent":
-      return "Tencent Cloud Server";
-  }
-}
-
-async function providerKeys(cli: InitRuntime): Promise<Set<string>> {
-  return await ListProvidersQuery.create().match(
-    async (query) => {
-      const result = await cli.executeQuery(query);
-      return result.match(
-        (value) => new Set(value.items.map((item) => item.key)),
-        () => new Set<string>(),
-      );
+  return {
+    runtime: {
+      strategy: method,
+      ...(installCommand ? { installCommand } : {}),
+      ...(buildCommand ? { buildCommand } : {}),
+      ...(startCommand ? { startCommand } : {}),
+      ...(publishDirectory ? { publishDirectory } : {}),
+      ...(healthCheckPath ? { healthCheckPath } : {}),
     },
-    async () => new Set<string>(),
-  );
-}
-
-async function promptText(
-  reader: Interface,
-  question: string,
-  defaultValue: string,
-): Promise<string> {
-  const answer = (await reader.question(`${question} (${defaultValue}): `)).trim();
-  return answer || defaultValue;
-}
-
-async function createInitConfig(input: {
-  cli: InitRuntime;
-  project?: string;
-  targets?: string;
-}): Promise<InitConfig> {
-  const detectedProviderKeys = await providerKeys(input.cli);
-  const reader =
-    process.stdin.isTTY && process.stdout.isTTY
-      ? createInterface({
-          input: process.stdin,
-          output: process.stdout,
-        })
-      : null;
-
-  try {
-    const projectName = reader
-      ? await promptText(reader, "Project name", input.project ?? "Appaloft Project")
-      : (input.project ?? "Appaloft Project");
-    const targetPrompt = initTargetAliases.join(",");
-    const targetAliases = parseInitTargets(
-      reader
-        ? await promptText(reader, "Targets, comma-separated", input.targets ?? targetPrompt)
-        : input.targets,
-    );
-    const targets: InitConfigTarget[] = [];
-
-    for (const alias of targetAliases) {
-      const providerKey = normalizeInitProviderKey(alias);
-      const host = reader
-        ? await promptText(reader, `${defaultNameFor(alias)} host`, defaultHostFor(alias))
-        : defaultHostFor(alias);
-      const portText = reader
-        ? await promptText(reader, `${defaultNameFor(alias)} port`, "22")
-        : "22";
-      const port = Number(portText);
-
-      if (!detectedProviderKeys.has(providerKey)) {
-        continue;
-      }
-
-      targets.push({
-        key: alias,
-        name: defaultNameFor(alias),
-        providerKey,
-        ...(host ? { host } : {}),
-        ...(Number.isInteger(port) && port > 0 ? { port } : {}),
-      });
-    }
-
-    const fallbackTarget: InitConfigTarget = {
-      key: "local",
-      name: defaultNameFor("local"),
-      providerKey: normalizeInitProviderKey("local"),
-      host: "127.0.0.1",
-      port: 22,
-    };
-    const selectedTargets = targets.length > 0 ? targets : [fallbackTarget];
-
-    return {
-      project: {
-        name: projectName,
-      },
-      environment: {
-        name: "local",
-        kind: "local",
-      },
-      resource: {
-        name: "app",
-        kind: "application",
-      },
-      targets: selectedTargets,
-      deployment: {
-        targetKey: selectedTargets[0]?.key ?? "local",
-        method: "auto",
-      },
-    };
-  } finally {
-    reader?.close();
-  }
+    network: {
+      internalPort:
+        input.port ??
+        (method === "static" ? defaultStaticInternalPort : defaultApplicationInternalPort),
+      upstreamProtocol: "http",
+      exposureMode: "reverse-proxy",
+    },
+  };
 }
 
 export const versionCommand = EffectCommand.make("version", {}, () =>
@@ -217,13 +112,17 @@ export const initCommand = EffectCommand.make(
   "init",
   {
     output: initOutputOption,
-    project: initProjectOption,
-    targets: initTargetsOption,
+    method: initMethodOption,
+    install: initInstallOption,
+    build: initBuildOption,
+    start: initStartOption,
+    publishDir: initPublishDirOption,
+    port: initPortOption,
+    healthPath: initHealthPathOption,
     force: initForceOption,
   },
-  ({ force, output, project, targets }) =>
+  ({ build, force, healthPath, install, method, output, port, publishDir, start }) =>
     Effect.gen(function* () {
-      const cli = yield* CliRuntime;
       const outputPath = resolve(output);
 
       if (existsSync(outputPath) && !force) {
@@ -235,15 +134,23 @@ export const initCommand = EffectCommand.make(
         return;
       }
 
-      const projectValue = optionalValue(project);
-      const targetsValue = optionalValue(targets);
-      const config = yield* Effect.promise(() =>
-        createInitConfig({
-          cli,
-          ...(projectValue ? { project: projectValue } : {}),
-          ...(targetsValue ? { targets: targetsValue } : {}),
-        }),
+      const installValue = optionalValue(install);
+      const buildValue = optionalValue(build);
+      const startValue = optionalValue(start);
+      const publishDirValue = optionalValue(publishDir);
+      const healthPathValue = optionalValue(healthPath);
+      const portValue = yield* resultToEffect(
+        parseOptionalPositiveInteger("Port", optionalValue(port)),
       );
+      const config = createInitConfig({
+        method,
+        ...(installValue ? { install: installValue } : {}),
+        ...(buildValue ? { build: buildValue } : {}),
+        ...(startValue ? { start: startValue } : {}),
+        ...(publishDirValue ? { publishDir: publishDirValue } : {}),
+        ...(portValue ? { port: portValue } : {}),
+        ...(healthPathValue ? { healthPath: healthPathValue } : {}),
+      });
 
       yield* Effect.promise(() => Bun.write(outputPath, `${JSON.stringify(config, null, 2)}\n`));
       yield* print({

@@ -5,7 +5,6 @@ import {
   createAdapterSpanName,
   type DeploymentConfigReader,
   type DeploymentConfigSnapshot,
-  type DeploymentConfiguredTarget,
   type ExecutionContext,
   type SourceDetectionResult,
   type SourceDetector,
@@ -36,14 +35,8 @@ import {
 } from "@appaloft/core";
 import {
   type AppaloftDeploymentConfig,
-  type AppaloftDeploymentTargetConfig,
   appaloftDeploymentConfigFileNames,
-  domainsFromDeploymentConfig,
-  healthCheckPathFromDeploymentConfig,
-  parseAppaloftDeploymentConfig,
-  providerKeyFromTargetConfig,
-  targetKeyFromDeploymentConfig,
-  targetsFromDeploymentConfig,
+  parseAppaloftDeploymentConfigText,
 } from "@appaloft/deployment-config";
 
 interface LocalProjectProfile {
@@ -97,6 +90,262 @@ function readFirstExistingVersion(path: string, fileNames: string[]): string | u
   return undefined;
 }
 
+function stringRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+function hasPackage(
+  dependencies: Record<string, unknown>,
+  devDependencies: Record<string, unknown>,
+  packageName: string,
+): boolean {
+  return packageName in dependencies || packageName in devDependencies;
+}
+
+function hasAnyPackage(
+  dependencies: Record<string, unknown>,
+  devDependencies: Record<string, unknown>,
+  packageNames: readonly string[],
+): boolean {
+  return packageNames.some((packageName) => hasPackage(dependencies, devDependencies, packageName));
+}
+
+function detectNodePackageManager(
+  path: string,
+  packageJson: Record<string, unknown> | null,
+): SourcePackageManager {
+  const configuredPackageManager =
+    typeof packageJson?.packageManager === "string" ? packageJson.packageManager : undefined;
+
+  if (configuredPackageManager?.startsWith("bun")) {
+    return "bun";
+  }
+
+  if (configuredPackageManager?.startsWith("pnpm")) {
+    return "pnpm";
+  }
+
+  if (configuredPackageManager?.startsWith("yarn")) {
+    return "yarn";
+  }
+
+  if (existsSync(join(path, "bun.lock")) || existsSync(join(path, "bun.lockb"))) {
+    return "bun";
+  }
+
+  if (existsSync(join(path, "pnpm-lock.yaml"))) {
+    return "pnpm";
+  }
+
+  if (existsSync(join(path, "yarn.lock"))) {
+    return "yarn";
+  }
+
+  return "npm";
+}
+
+function detectNodeFramework(input: {
+  path: string;
+  dependencies: Record<string, unknown>;
+  devDependencies: Record<string, unknown>;
+}): SourceFramework | undefined {
+  const { path, dependencies, devDependencies } = input;
+
+  if (
+    hasPackage(dependencies, devDependencies, "next") ||
+    existsSync(join(path, "next.config.js")) ||
+    existsSync(join(path, "next.config.mjs")) ||
+    existsSync(join(path, "next.config.ts"))
+  ) {
+    return "nextjs";
+  }
+
+  if (
+    hasPackage(dependencies, devDependencies, "@sveltejs/kit") ||
+    existsSync(join(path, "svelte.config.js")) ||
+    existsSync(join(path, "svelte.config.mjs")) ||
+    existsSync(join(path, "svelte.config.ts"))
+  ) {
+    return "sveltekit";
+  }
+
+  if (
+    hasPackage(dependencies, devDependencies, "nuxt") ||
+    existsSync(join(path, "nuxt.config.js")) ||
+    existsSync(join(path, "nuxt.config.mjs")) ||
+    existsSync(join(path, "nuxt.config.ts"))
+  ) {
+    return "nuxt";
+  }
+
+  if (
+    hasPackage(dependencies, devDependencies, "astro") ||
+    existsSync(join(path, "astro.config.mjs"))
+  ) {
+    return "astro";
+  }
+
+  if (
+    hasAnyPackage(dependencies, devDependencies, ["@remix-run/node", "@remix-run/react"]) ||
+    existsSync(join(path, "remix.config.js"))
+  ) {
+    return "remix";
+  }
+
+  if (
+    hasPackage(dependencies, devDependencies, "@angular/core") ||
+    existsSync(join(path, "angular.json"))
+  ) {
+    return "angular";
+  }
+
+  if (
+    hasPackage(dependencies, devDependencies, "vite") ||
+    existsSync(join(path, "vite.config.js")) ||
+    existsSync(join(path, "vite.config.mjs")) ||
+    existsSync(join(path, "vite.config.ts"))
+  ) {
+    return "vite";
+  }
+
+  if (hasPackage(dependencies, devDependencies, "@nestjs/core")) {
+    return "nestjs";
+  }
+
+  if (hasPackage(dependencies, devDependencies, "fastify")) {
+    return "fastify";
+  }
+
+  if (hasPackage(dependencies, devDependencies, "hono")) {
+    return "hono";
+  }
+
+  if (hasPackage(dependencies, devDependencies, "koa")) {
+    return "koa";
+  }
+
+  if (hasPackage(dependencies, devDependencies, "express")) {
+    return "express";
+  }
+
+  return undefined;
+}
+
+function nodeDetectedFiles(path: string): SourceDetectedFile[] {
+  return [
+    "package-json",
+    ...(existsSync(join(path, "bun.lock")) || existsSync(join(path, "bun.lockb"))
+      ? ["bun-lock" as const]
+      : []),
+    ...(existsSync(join(path, "package-lock.json")) ? ["package-lock" as const] : []),
+    ...(existsSync(join(path, "pnpm-lock.yaml")) ? ["pnpm-lock" as const] : []),
+    ...(existsSync(join(path, "yarn.lock")) ? ["yarn-lock" as const] : []),
+    ...(existsSync(join(path, "next.config.js")) ||
+    existsSync(join(path, "next.config.mjs")) ||
+    existsSync(join(path, "next.config.ts"))
+      ? ["next-config" as const]
+      : []),
+    ...(existsSync(join(path, "vite.config.js")) ||
+    existsSync(join(path, "vite.config.mjs")) ||
+    existsSync(join(path, "vite.config.ts"))
+      ? ["vite-config" as const]
+      : []),
+    ...(existsSync(join(path, "svelte.config.js")) ||
+    existsSync(join(path, "svelte.config.mjs")) ||
+    existsSync(join(path, "svelte.config.ts"))
+      ? ["svelte-config" as const]
+      : []),
+    ...(existsSync(join(path, "nuxt.config.js")) ||
+    existsSync(join(path, "nuxt.config.mjs")) ||
+    existsSync(join(path, "nuxt.config.ts"))
+      ? ["nuxt-config" as const]
+      : []),
+    ...(existsSync(join(path, "astro.config.mjs")) ||
+    existsSync(join(path, "astro.config.js")) ||
+    existsSync(join(path, "astro.config.ts"))
+      ? ["astro-config" as const]
+      : []),
+    ...(existsSync(join(path, "remix.config.js")) ||
+    existsSync(join(path, "remix.config.mjs")) ||
+    existsSync(join(path, "remix.config.ts"))
+      ? ["remix-config" as const]
+      : []),
+    ...(existsSync(join(path, "angular.json")) ? ["angular-json" as const] : []),
+  ];
+}
+
+function nodeDetectedScripts(scripts: Record<string, unknown>): SourceDetectedScript[] {
+  return [
+    ...(typeof scripts.build === "string" ? ["build" as const] : []),
+    ...(typeof scripts.dev === "string" ? ["dev" as const] : []),
+    ...(typeof scripts.export === "string" ? ["export" as const] : []),
+    ...(typeof scripts.generate === "string" ? ["generate" as const] : []),
+    ...(typeof scripts.preview === "string" ? ["preview" as const] : []),
+    ...(typeof scripts.serve === "string" ? ["serve" as const] : []),
+    ...(typeof scripts.start === "string" ? ["start" as const] : []),
+    ...(typeof scripts["start:built"] === "string" ? ["start-built" as const] : []),
+  ];
+}
+
+function textMentionsPackage(text: string | null, packageName: string): boolean {
+  if (!text) {
+    return false;
+  }
+
+  const escaped = packageName.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+  return new RegExp(
+    `(^|[\\s"'=,\\[({])${escaped}(\\[[^\\]]+\\])?([\\s"',<>=!~;)\\]}]|$)`,
+    "imu",
+  ).test(text);
+}
+
+function detectPythonPackageManager(path: string, pyproject: string | null): SourcePackageManager {
+  if (existsSync(join(path, "uv.lock"))) {
+    return "uv";
+  }
+
+  if (existsSync(join(path, "poetry.lock")) || /^\s*\[tool\.poetry\]\s*$/m.test(pyproject ?? "")) {
+    return "poetry";
+  }
+
+  return "pip";
+}
+
+function detectPythonFramework(input: {
+  path: string;
+  pyproject: string | null;
+  requirements: string | null;
+}): SourceFramework | undefined {
+  const { path, pyproject, requirements } = input;
+  const manifests = `${pyproject ?? ""}\n${requirements ?? ""}`;
+
+  if (textMentionsPackage(manifests, "fastapi")) {
+    return "fastapi";
+  }
+
+  if (textMentionsPackage(manifests, "django") || existsSync(join(path, "manage.py"))) {
+    return "django";
+  }
+
+  if (textMentionsPackage(manifests, "flask")) {
+    return "flask";
+  }
+
+  return undefined;
+}
+
+function pythonDetectedFiles(path: string): SourceDetectedFile[] {
+  return [
+    ...(existsSync(join(path, "pyproject.toml")) ? ["pyproject-toml" as const] : []),
+    ...(existsSync(join(path, "requirements.txt")) ? ["requirements-txt" as const] : []),
+    ...(existsSync(join(path, "uv.lock")) ? ["uv-lock" as const] : []),
+    ...(existsSync(join(path, "poetry.lock")) ? ["poetry-lock" as const] : []),
+    ...(existsSync(join(path, "manage.py")) ? ["django-manage" as const] : []),
+  ];
+}
+
 class NodeProjectProfileDetector implements LocalProjectProfileDetector {
   detect(path: string): LocalProjectProfile | null {
     const packageJsonPath = join(path, "package.json");
@@ -106,45 +355,24 @@ class NodeProjectProfileDetector implements LocalProjectProfileDetector {
     }
 
     const packageJson = readJsonObject(packageJsonPath);
-    const scripts =
-      packageJson?.scripts && typeof packageJson.scripts === "object"
-        ? (packageJson.scripts as Record<string, unknown>)
-        : {};
-    const packageManager =
-      typeof packageJson?.packageManager === "string"
-        ? packageJson.packageManager.startsWith("bun")
-          ? "bun"
-          : packageJson.packageManager.startsWith("pnpm")
-            ? "pnpm"
-            : "npm"
-        : "npm";
-    const dependencies =
-      packageJson?.dependencies && typeof packageJson.dependencies === "object"
-        ? (packageJson.dependencies as Record<string, unknown>)
-        : {};
-    const devDependencies =
-      packageJson?.devDependencies && typeof packageJson.devDependencies === "object"
-        ? (packageJson.devDependencies as Record<string, unknown>)
-        : {};
-    const hasNextDependency = "next" in dependencies || "next" in devDependencies;
-    const hasNextConfig =
-      existsSync(join(path, "next.config.js")) ||
-      existsSync(join(path, "next.config.mjs")) ||
-      existsSync(join(path, "next.config.ts"));
-    const detectedScripts: SourceDetectedScript[] = [
-      ...(typeof scripts.build === "string" ? ["build" as const] : []),
-      ...(typeof scripts.start === "string" ? ["start" as const] : []),
-      ...(typeof scripts["start:built"] === "string" ? ["start-built" as const] : []),
-    ];
-    const runtimeVersion = readFirstExistingVersion(path, [".node-version", ".nvmrc"]);
+    const scripts = stringRecord(packageJson?.scripts);
+    const packageManager = detectNodePackageManager(path, packageJson);
+    const dependencies = stringRecord(packageJson?.dependencies);
+    const devDependencies = stringRecord(packageJson?.devDependencies);
+    const framework = detectNodeFramework({ path, dependencies, devDependencies });
+    const detectedScripts = nodeDetectedScripts(scripts);
+    const engines = stringRecord(packageJson?.engines);
+    const runtimeVersion =
+      readFirstExistingVersion(path, [".node-version", ".nvmrc"]) ??
+      (typeof engines.node === "string" ? engines.node : undefined);
 
     return {
       runtimeFamily: "node",
-      ...(hasNextDependency || hasNextConfig ? { framework: "nextjs" as const } : {}),
+      ...(framework ? { framework } : {}),
       packageManager,
       ...(runtimeVersion ? { runtimeVersion } : {}),
       ...(typeof packageJson?.name === "string" ? { projectName: packageJson.name } : {}),
-      detectedFiles: ["package-json", ...(hasNextConfig ? ["next-config" as const] : [])],
+      detectedFiles: nodeDetectedFiles(path),
       detectedScripts,
     };
   }
@@ -160,17 +388,18 @@ class PythonProjectProfileDetector implements LocalProjectProfileDetector {
     }
 
     const pyproject = existsSync(pyprojectPath) ? readText(pyprojectPath) : null;
+    const requirements = existsSync(requirementsPath) ? readText(requirementsPath) : null;
     const projectName = pyproject?.match(/^\s*name\s*=\s*"([^"]+)"/m)?.[1];
     const runtimeVersion = readFirstExistingVersion(path, [".python-version"]);
+    const framework = detectPythonFramework({ path, pyproject, requirements });
 
     return {
       runtimeFamily: "python",
+      ...(framework ? { framework } : {}),
+      packageManager: detectPythonPackageManager(path, pyproject),
       ...(runtimeVersion ? { runtimeVersion } : {}),
       ...(projectName ? { projectName } : {}),
-      detectedFiles: [
-        ...(existsSync(pyprojectPath) ? ["pyproject-toml" as const] : []),
-        ...(existsSync(requirementsPath) ? ["requirements-txt" as const] : []),
-      ],
+      detectedFiles: pythonDetectedFiles(path),
       detectedScripts: [],
     };
   }
@@ -351,85 +580,31 @@ export class FileSystemSourceDetector implements SourceDetector {
   }
 }
 
-function toConfiguredTarget(target: AppaloftDeploymentTargetConfig): DeploymentConfiguredTarget {
-  return {
-    providerKey: providerKeyFromTargetConfig(target),
-    ...(target.key ? { key: target.key } : {}),
-    ...(target.name ? { name: target.name } : {}),
-    ...(target.host ? { host: target.host } : {}),
-    ...(target.port ? { port: target.port } : {}),
-    ...(target.destination
-      ? {
-          destination: {
-            ...(target.destination.name ? { name: target.destination.name } : {}),
-            ...(target.destination.kind ? { kind: target.destination.kind } : {}),
-          },
-        }
-      : {}),
-  };
-}
-
 function toDeploymentConfigSnapshot(
   config: AppaloftDeploymentConfig,
   configFilePath: string,
 ): DeploymentConfigSnapshot {
-  const targets = targetsFromDeploymentConfig(config).map((target) => toConfiguredTarget(target));
-  const healthCheckPath = healthCheckPathFromDeploymentConfig(config);
-  const targetKey = targetKeyFromDeploymentConfig(config);
-  const domains = domainsFromDeploymentConfig(config);
+  const healthCheckPath =
+    config.runtime?.healthCheckPath ?? config.runtime?.healthCheck?.path ?? config.health?.path;
+  const deployment: NonNullable<DeploymentConfigSnapshot["deployment"]> = {
+    ...(config.runtime?.strategy ? { method: config.runtime.strategy } : {}),
+    ...(config.runtime?.installCommand ? { installCommand: config.runtime.installCommand } : {}),
+    ...(config.runtime?.buildCommand ? { buildCommand: config.runtime.buildCommand } : {}),
+    ...(config.runtime?.startCommand ? { startCommand: config.runtime.startCommand } : {}),
+    ...(config.runtime?.publishDirectory
+      ? { publishDirectory: config.runtime.publishDirectory }
+      : {}),
+    ...(config.network?.internalPort ? { port: config.network.internalPort } : {}),
+    ...(config.network?.upstreamProtocol
+      ? { upstreamProtocol: config.network.upstreamProtocol }
+      : {}),
+    ...(config.network?.exposureMode ? { exposureMode: config.network.exposureMode } : {}),
+    ...(healthCheckPath ? { healthCheckPath } : {}),
+  };
 
   return {
     configFilePath,
-    ...(config.project
-      ? {
-          project: {
-            name: config.project.name,
-            ...(config.project.description ? { description: config.project.description } : {}),
-          },
-        }
-      : {}),
-    ...(config.environment
-      ? {
-          environment: {
-            name: config.environment.name,
-            ...(config.environment.kind ? { kind: config.environment.kind } : {}),
-          },
-        }
-      : {}),
-    ...(config.resource
-      ? {
-          resource: {
-            name: config.resource.name,
-            ...(config.resource.kind ? { kind: config.resource.kind } : {}),
-            ...(config.resource.description ? { description: config.resource.description } : {}),
-            ...(config.resource.services ? { services: config.resource.services } : {}),
-          },
-        }
-      : {}),
-    ...(targets.length > 0 ? { targets } : {}),
-    ...(config.deployment
-      ? {
-          deployment: {
-            ...(config.deployment.method ? { method: config.deployment.method } : {}),
-            ...(config.deployment.installCommand
-              ? { installCommand: config.deployment.installCommand }
-              : {}),
-            ...(config.deployment.buildCommand
-              ? { buildCommand: config.deployment.buildCommand }
-              : {}),
-            ...(config.deployment.startCommand
-              ? { startCommand: config.deployment.startCommand }
-              : {}),
-            ...(config.deployment.port ? { port: config.deployment.port } : {}),
-            ...(healthCheckPath ? { healthCheckPath } : {}),
-            ...(config.deployment.proxy ? { proxyKind: config.deployment.proxy } : {}),
-            ...(domains ? { domains } : {}),
-            ...(config.deployment.pathPrefix ? { pathPrefix: config.deployment.pathPrefix } : {}),
-            ...(config.deployment.tlsMode ? { tlsMode: config.deployment.tlsMode } : {}),
-            ...(targetKey ? { targetKey } : {}),
-          },
-        }
-      : {}),
+    ...(Object.keys(deployment).length > 0 ? { deployment } : {}),
   };
 }
 
@@ -446,25 +621,67 @@ function resolveLocalSourceDirectory(sourceLocator: string): string | null {
   return null;
 }
 
-function findConfigFile(sourceLocator: string, configFilePath?: string): string | null {
+type ConfigFileResolution =
+  | {
+      kind: "found";
+      path: string;
+    }
+  | {
+      kind: "missing";
+    }
+  | {
+      kind: "ambiguous";
+      paths: string[];
+    };
+
+function resolveGitRoot(sourceDirectory: string): string | null {
+  const git = Bun.spawnSync(["git", "-C", sourceDirectory, "rev-parse", "--show-toplevel"], {
+    stdout: "pipe",
+    stderr: "pipe",
+  });
+
+  if (!git.success) {
+    return null;
+  }
+
+  const gitRoot = git.stdout.toString().trim();
+  return gitRoot && existsSync(gitRoot) && statSync(gitRoot).isDirectory() ? gitRoot : null;
+}
+
+function findConfigFile(sourceLocator: string, configFilePath?: string): ConfigFileResolution {
   if (configFilePath) {
     const explicitPath = resolve(configFilePath);
-    return existsSync(explicitPath) ? explicitPath : null;
+    return existsSync(explicitPath) ? { kind: "found", path: explicitPath } : { kind: "missing" };
   }
 
   const sourceDirectory = resolveLocalSourceDirectory(sourceLocator);
   if (!sourceDirectory) {
-    return null;
+    return { kind: "missing" };
   }
 
-  for (const candidate of appaloftDeploymentConfigFileNames) {
-    const path = join(sourceDirectory, candidate);
-    if (existsSync(path)) {
-      return path;
+  const gitRoot = resolveGitRoot(sourceDirectory);
+  const searchDirectories = [
+    sourceDirectory,
+    ...(gitRoot && gitRoot !== sourceDirectory ? [gitRoot] : []),
+  ];
+  const candidates = new Set<string>();
+
+  for (const directory of searchDirectories) {
+    for (const candidate of appaloftDeploymentConfigFileNames) {
+      const path = join(directory, candidate);
+      if (existsSync(path)) {
+        candidates.add(path);
+      }
     }
   }
 
-  return null;
+  const paths = [...candidates];
+  if (paths.length === 0) {
+    return { kind: "missing" };
+  }
+
+  const [path] = paths;
+  return paths.length === 1 && path ? { kind: "found", path } : { kind: "ambiguous", paths };
 }
 
 function inferConfigFromLocalSource(sourceLocator: string): DeploymentConfigSnapshot | null {
@@ -486,6 +703,28 @@ function inferConfigFromLocalSource(sourceLocator: string): DeploymentConfigSnap
   };
 }
 
+function phaseFromConfigIssues(issues: { message: string }[]): string {
+  const messages = issues.map((issue) => issue.message).join("\n");
+
+  if (messages.includes("config_identity_field")) {
+    return "config-identity";
+  }
+
+  if (messages.includes("raw_secret_config_field")) {
+    return "config-secret-validation";
+  }
+
+  if (messages.includes("unsupported_config_field")) {
+    return "config-capability-resolution";
+  }
+
+  if (messages.includes("config_parse_error")) {
+    return "config-parse";
+  }
+
+  return "config-schema";
+}
+
 export class FileSystemDeploymentConfigReader implements DeploymentConfigReader {
   async read(
     context: ExecutionContext,
@@ -502,27 +741,48 @@ export class FileSystemDeploymentConfigReader implements DeploymentConfigReader 
         },
       },
       async () => {
-        const configFilePath = findConfigFile(input.sourceLocator, input.configFilePath);
+        const configFile = findConfigFile(input.sourceLocator, input.configFilePath);
         const inferred = inferConfigFromLocalSource(input.sourceLocator);
 
-        if (input.configFilePath && !configFilePath) {
+        if (input.configFilePath && configFile.kind === "missing") {
           return err(
             domainError.validation("Deployment config file was not found", {
+              phase: "config-discovery",
               configFilePath: input.configFilePath,
             }),
           );
         }
 
-        if (!configFilePath) {
+        if (configFile.kind === "ambiguous") {
+          return err(
+            domainError.validation("Multiple Appaloft deployment config files were found", {
+              phase: "config-discovery",
+              configFilePaths: configFile.paths.join(","),
+            }),
+          );
+        }
+
+        if (configFile.kind === "missing") {
           return ok(inferred);
         }
 
-        const parsed = readJsonObject(configFilePath);
-        const parsedConfig = parseAppaloftDeploymentConfig(parsed);
+        const configFilePath = configFile.path;
+        const text = readText(configFilePath);
+        if (text === null) {
+          return err(
+            domainError.validation("Deployment config file could not be read", {
+              phase: "config-read",
+              configFilePath,
+            }),
+          );
+        }
+
+        const parsedConfig = parseAppaloftDeploymentConfigText(text, configFilePath);
 
         if (!parsedConfig.success) {
           return err(
             domainError.validation("Appaloft deployment config is invalid", {
+              phase: phaseFromConfigIssues(parsedConfig.error.issues),
               configFilePath,
               issues: JSON.stringify(
                 parsedConfig.error.issues.map((issue) => ({
@@ -535,12 +795,7 @@ export class FileSystemDeploymentConfigReader implements DeploymentConfigReader 
         }
 
         const config = toDeploymentConfigSnapshot(parsedConfig.data, configFilePath);
-        const project = config.project ?? inferred?.project;
-
-        return ok({
-          ...config,
-          ...(project ? { project } : {}),
-        });
+        return ok(config);
       },
     );
   }

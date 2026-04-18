@@ -100,6 +100,7 @@
         "@appaloft/application": "workspace:*",
         "@appaloft/cli-logging": "workspace:*",
         "@appaloft/contracts": "workspace:*",
+        "@appaloft/deployment-config": "workspace:*",
         "@effect/cli": "^0.75.0",
         "@effect/platform-node": "^0.106.0",
         "effect": "^3.21.0",
@@ -190,6 +191,7 @@
       "name": "@appaloft/deployment-config",
       "dependencies": {
         "@appaloft/core": "workspace:*",
+        "yaml": "^2.8.3",
         "zod": "^4.1.12",
       },
     },

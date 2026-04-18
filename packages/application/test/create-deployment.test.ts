@@ -545,6 +545,23 @@ describe("CreateDeploymentUseCase", () => {
     expect(command._unsafeUnwrapErr().code).toBe("validation_error");
   });
 
+  test("[DEP-CREATE-ADM-035] rejects repository config fields at command schema boundary", () => {
+    const command = CreateDeploymentCommand.create({
+      projectId: "prj_demo",
+      serverId: "srv_demo",
+      destinationId: "dst_demo",
+      environmentId: "env_demo",
+      resourceId: "res_demo",
+      configFilePath: "appaloft.json",
+      runtime: {
+        strategy: "workspace-commands",
+      },
+    } as never);
+
+    expect(command.isErr()).toBe(true);
+    expect(command._unsafeUnwrapErr().code).toBe("validation_error");
+  });
+
   test("creates a deployment with an immutable environment snapshot", async () => {
     const projects = new MemoryProjectRepository();
     const servers = new MemoryServerRepository();

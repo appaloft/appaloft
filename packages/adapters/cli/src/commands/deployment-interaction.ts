@@ -19,6 +19,7 @@ import {
   normalizeQuickDeployGeneratedNameBase,
 } from "@appaloft/contracts";
 import { domainError, type EnvironmentKind, environmentKinds } from "@appaloft/core";
+import { type AppaloftDeploymentConfig } from "@appaloft/deployment-config";
 import { Effect } from "effect";
 
 import { type CliInteraction, effectCliInteraction } from "../interaction.js";
@@ -29,7 +30,7 @@ import {
   normalizeCliPathOrSource,
 } from "./deployment-source.js";
 
-interface DeploymentPromptSeed {
+export interface DeploymentPromptSeed {
   projectId?: string;
   serverId?: string;
   destinationId?: string;
@@ -43,7 +44,13 @@ interface DeploymentPromptSeed {
   startCommand?: string;
   publishDirectory?: string;
   port?: number;
+  upstreamProtocol?: ResourceNetworkProfileInput["upstreamProtocol"];
+  exposureMode?: ResourceNetworkProfileInput["exposureMode"];
+  targetServiceName?: string;
+  hostPort?: number;
   healthCheckPath?: string;
+  healthCheck?: ResourceRuntimeProfileInput["healthCheck"];
+  sourceProfile?: Partial<Pick<ResourceSourceInput, "gitRef" | "commitSha">>;
 }
 
 type ResourceDraftInput = Pick<CreateResourceCommandInput, "name"> &
@@ -143,11 +150,14 @@ export function sourceKindForDeploymentInput(
 export function sourceBindingForDeploymentInput(
   sourceLocator: string,
   deploymentMethod: DeploymentMethod,
+  profile: Partial<Pick<ResourceSourceInput, "gitRef" | "commitSha">> = {},
 ): ResourceSourceInput {
   return {
     kind: sourceKindForDeploymentInput(sourceLocator, deploymentMethod),
     locator: sourceLocator,
     displayName: inferNameFromSource(sourceLocator),
+    ...(profile.gitRef ? { gitRef: profile.gitRef } : {}),
+    ...(profile.commitSha ? { commitSha: profile.commitSha } : {}),
   };
 }
 
@@ -162,6 +172,7 @@ export function runtimeProfileFromDeploymentInput(
       ...(input.buildCommand ? { buildCommand: input.buildCommand } : {}),
       ...(input.publishDirectory ? { publishDirectory: input.publishDirectory } : {}),
       ...(input.healthCheckPath ? { healthCheckPath: input.healthCheckPath } : {}),
+      ...(input.healthCheck ? { healthCheck: input.healthCheck } : {}),
     };
   }
 
@@ -171,19 +182,88 @@ export function runtimeProfileFromDeploymentInput(
     ...(input.buildCommand ? { buildCommand: input.buildCommand } : {}),
     ...(input.startCommand ? { startCommand: input.startCommand } : {}),
     ...(input.healthCheckPath ? { healthCheckPath: input.healthCheckPath } : {}),
+    ...(input.healthCheck ? { healthCheck: input.healthCheck } : {}),
   };
 }
 
 export function networkProfileFromDeploymentInput(
   deploymentMethod: DeploymentMethod,
-  input: { port?: number },
+  input: {
+    port?: number;
+    upstreamProtocol?: ResourceNetworkProfileInput["upstreamProtocol"];
+    exposureMode?: ResourceNetworkProfileInput["exposureMode"];
+    targetServiceName?: string;
+    hostPort?: number;
+  },
 ): ResourceNetworkProfileInput {
   return {
     internalPort:
       input.port ??
       (deploymentMethod === "static" ? defaultStaticInternalPort : defaultApplicationInternalPort),
-    upstreamProtocol: "http",
-    exposureMode: "reverse-proxy",
+    upstreamProtocol: input.upstreamProtocol ?? "http",
+    exposureMode: input.exposureMode ?? "reverse-proxy",
+    ...(input.targetServiceName ? { targetServiceName: input.targetServiceName } : {}),
+    ...(input.hostPort ? { hostPort: input.hostPort } : {}),
+  };
+}
+
+function healthCheckFromConfig(
+  config: AppaloftDeploymentConfig,
+): ResourceRuntimeProfileInput["healthCheck"] | undefined {
+  const healthCheck = config.runtime?.healthCheck ?? config.health;
+  const path = healthCheck?.path ?? config.runtime?.healthCheckPath;
+  if (!healthCheck) {
+    return undefined;
+  }
+
+  return {
+    enabled: healthCheck.enabled ?? true,
+    type: "http",
+    intervalSeconds: healthCheck.intervalSeconds ?? 5,
+    timeoutSeconds: healthCheck.timeoutSeconds ?? 5,
+    retries: healthCheck.retries ?? 10,
+    startPeriodSeconds: 5,
+    http: {
+      method: "GET",
+      scheme: "http",
+      host: "localhost",
+      path: path ?? "/",
+      expectedStatusCode: 200,
+    },
+  };
+}
+
+export function deploymentPromptSeedFromConfig(
+  config: AppaloftDeploymentConfig,
+): DeploymentPromptSeed {
+  const healthCheckPath =
+    config.runtime?.healthCheckPath ?? config.runtime?.healthCheck?.path ?? config.health?.path;
+  const sourceProfile = {
+    ...(config.source?.gitRef ? { gitRef: config.source.gitRef } : {}),
+    ...(config.source?.commitSha ? { commitSha: config.source.commitSha } : {}),
+  };
+  const healthCheck = healthCheckFromConfig(config);
+
+  return {
+    ...(Object.keys(sourceProfile).length > 0 ? { sourceProfile } : {}),
+    ...(config.runtime?.strategy ? { deploymentMethod: config.runtime.strategy } : {}),
+    ...(config.runtime?.installCommand ? { installCommand: config.runtime.installCommand } : {}),
+    ...(config.runtime?.buildCommand ? { buildCommand: config.runtime.buildCommand } : {}),
+    ...(config.runtime?.startCommand ? { startCommand: config.runtime.startCommand } : {}),
+    ...(config.runtime?.publishDirectory
+      ? { publishDirectory: config.runtime.publishDirectory }
+      : {}),
+    ...(config.network?.internalPort ? { port: config.network.internalPort } : {}),
+    ...(config.network?.upstreamProtocol
+      ? { upstreamProtocol: config.network.upstreamProtocol }
+      : {}),
+    ...(config.network?.exposureMode ? { exposureMode: config.network.exposureMode } : {}),
+    ...(config.network?.targetServiceName
+      ? { targetServiceName: config.network.targetServiceName }
+      : {}),
+    ...(config.network?.hostPort ? { hostPort: config.network.hostPort } : {}),
+    ...(healthCheckPath ? { healthCheckPath } : {}),
+    ...(healthCheck ? { healthCheck } : {}),
   };
 }
 
@@ -549,7 +629,11 @@ function resolveResource(input: {
           projectId: input.projectId,
           environmentId: input.environmentId,
           resource,
-          source: sourceBindingForDeploymentInput(input.sourceLocator, input.deploymentMethod),
+          source: sourceBindingForDeploymentInput(
+            input.sourceLocator,
+            input.deploymentMethod,
+            input.seed.sourceProfile,
+          ),
           runtimeProfile: input.runtimeProfile,
           networkProfile: input.networkProfile,
         });
@@ -619,7 +703,12 @@ function resolveAdvancedDeploymentConfig(input: {
         input.seed.startCommand ||
         input.seed.publishDirectory ||
         input.seed.port ||
-        input.seed.healthCheckPath,
+        input.seed.upstreamProtocol ||
+        input.seed.exposureMode ||
+        input.seed.targetServiceName ||
+        input.seed.hostPort ||
+        input.seed.healthCheckPath ||
+        input.seed.healthCheck,
     );
     const shouldConfigure =
       isStatic ||
@@ -635,6 +724,13 @@ function resolveAdvancedDeploymentConfig(input: {
         port:
           input.seed.port ??
           (isStatic ? defaultStaticInternalPort : defaultApplicationInternalPort),
+        ...(input.seed.upstreamProtocol ? { upstreamProtocol: input.seed.upstreamProtocol } : {}),
+        ...(input.seed.exposureMode ? { exposureMode: input.seed.exposureMode } : {}),
+        ...(input.seed.targetServiceName
+          ? { targetServiceName: input.seed.targetServiceName }
+          : {}),
+        ...(input.seed.hostPort ? { hostPort: input.seed.hostPort } : {}),
+        ...(input.seed.healthCheck ? { healthCheck: input.seed.healthCheck } : {}),
       };
     }
 
@@ -728,7 +824,12 @@ function resolveAdvancedDeploymentConfig(input: {
       ...(startCommand ? { startCommand } : {}),
       ...(publishDirectory ? { publishDirectory } : {}),
       ...(Number.isInteger(port) && port > 0 ? { port } : {}),
+      ...(input.seed.upstreamProtocol ? { upstreamProtocol: input.seed.upstreamProtocol } : {}),
+      ...(input.seed.exposureMode ? { exposureMode: input.seed.exposureMode } : {}),
+      ...(input.seed.targetServiceName ? { targetServiceName: input.seed.targetServiceName } : {}),
+      ...(input.seed.hostPort ? { hostPort: input.seed.hostPort } : {}),
       ...(healthCheckPath ? { healthCheckPath } : {}),
+      ...(input.seed.healthCheck ? { healthCheck: input.seed.healthCheck } : {}),
     };
   });
 }

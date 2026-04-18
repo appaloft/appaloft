@@ -8,12 +8,14 @@
   },
   "dependencies": {
     "@appaloft/core": "workspace:*",
+    "yaml": "^2.8.3",
     "zod": "^4.1.12"
   },
   "scripts": {
     "build": "bun run build:schema",
     "build:schema": "bun run scripts/build-json-schema.ts",
     "lint": "biome check .",
+    "test": "bun test",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   }
 }
