@@ -20,6 +20,7 @@ Implementation must preserve the source-of-truth behavior in the governed ADR an
 - [resource-created Event Spec](../events/resource-created.md)
 - [Resource Lifecycle Error Spec](../errors/resources.lifecycle.md)
 - [Resource Create And First Deploy Workflow Spec](../workflows/resources.create-and-first-deploy.md)
+- [Workload Framework Detection And Planning Workflow Spec](../workflows/workload-framework-detection-and-planning.md)
 - [Static Site Deployment Implementation Plan](./static-site-deployment-plan.md)
 - [resources.create Test Matrix](../testing/resources.create-test-matrix.md)
 - [Quick Deploy Workflow Spec](../workflows/quick-deploy.md)
@@ -119,6 +120,12 @@ static, Dockerfile, Docker Compose, prebuilt-image, and workspace-command strate
 Compose artifact planning strategies. They must not be modeled as direct long-lived host-process
 execution.
 
+Framework/runtime detection may suggest runtime profile defaults during resource creation workflows,
+but the persisted resource contract remains source/runtime/network profile state. Detected
+package/project names may seed display defaults; detected framework, package manager/build tool,
+runtime version, scripts, build-output conventions, and base-image policy feed the workload
+planning contract rather than `deployments.create` fields.
+
 Runtime plan resolution must combine `ResourceSourceBinding.baseDirectory` with runtime-profile
 file paths. For example, a Git source with `baseDirectory = "/bun"` and Dockerfile path
 `/Dockerfile` resolves to a build context rooted at `bun` and a Dockerfile inside that context.
@@ -171,6 +178,10 @@ Required tests:
   uncloneable deep Git locators, Docker image tag/digest conflicts, and path traversal;
 - runtime profile tests assert Dockerfile path, Docker Compose path, static publish directory, and
   command defaults are strategy-specific planning fields rather than source locator suffixes;
+- framework-detected resource creation tests cover `RES-CREATE-WF-008` and
+  `RES-CREATE-ENTRY-002`: Web/CLI source inspection may suggest resource profile defaults, but
+  `resources.create` persists only accepted source/runtime/network fields and `deployments.create`
+  remains ids-only;
 - static resource tests cover `RES-CREATE-ADM-035`, `RES-CREATE-ADM-036`,
   `RES-CREATE-ADM-037`, and `RES-CREATE-WF-007`;
 - runtime profile tests assert `auto` and `workspace-commands` resolve to Docker/OCI artifact intent
@@ -242,6 +253,12 @@ refs. Provider-backed disambiguation for slash-containing Git refs remains futur
 Dockerfile paths, Compose paths, build targets, and richer runtime profile variant fields are still
 pending typed resource runtime-profile implementation. Static publish directory now has a typed
 runtime-profile value for the static strategy.
+
+Current framework/runtime detection for first-deploy resource defaults covers initial
+JavaScript/TypeScript planner evidence, FastAPI/Django/Flask Python evidence, Python package
+tooling, and common local Java evidence. Wider mainstream framework support still requires
+planner-specific Web/CLI parity and additional non-JS detectors before it can be treated as
+implemented.
 
 First-class static site deployment now has `RuntimePlanStrategy = static`, typed
 `publishDirectory`, static artifact planning, HTTP/oRPC resource create coverage, and shared

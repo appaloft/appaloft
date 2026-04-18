@@ -90,6 +90,22 @@ This option is accepted.
 
 The use case may use `SourceDetector` against the resource source binding locator when detection enriches the resolved `SourceDescriptor`, but the locator still belongs to the resource profile, not to the deployment command.
 
+When detection enriches framework/runtime evidence, those facts belong to typed
+`SourceInspectionSnapshot` and workload planner output. Framework names, package/project names,
+base image choices, package-manager/build-tool choices, and planner keys must not be accepted as
+deployment command fields.
+
+Repository deployment config files are entry-workflow profile inputs governed by
+[Repository Deployment Config File Bootstrap](../workflows/deployment-config-file-bootstrap.md).
+They must not reintroduce the rejected transitional deployment command shape. A config file may
+provide source/runtime/network/health profile fields that are applied through resource/environment
+operations before deployment admission, but it must not select or create project, resource, server,
+destination, credential, organization, or secret identity from committed file content.
+
+First-run project/resource auto-creation is allowed only through explicit workflow steps that use
+source-derived defaults, trusted Appaloft link/source state, or operator input outside the file.
+Changing a committed config file must not silently retarget deployment ownership.
+
 If a resource lacks a source binding and no legacy migration seam is explicitly in scope, `deployments.create` must reject admission with `validation_error` in phase `resource-source-resolution`.
 
 If a resource source binding contains only an unnormalized entry locator that cannot be directly
@@ -126,8 +142,12 @@ Existing deployments remain valid because their runtime and network plan snapsho
 - [deployments.create Command Spec](../commands/deployments.create.md)
 - [Quick Deploy Workflow Spec](../workflows/quick-deploy.md)
 - [Resource Create And First Deploy Workflow Spec](../workflows/resources.create-and-first-deploy.md)
+- [Repository Deployment Config File Bootstrap Workflow Spec](../workflows/deployment-config-file-bootstrap.md)
+- [Workload Framework Detection And Planning Workflow Spec](../workflows/workload-framework-detection-and-planning.md)
 - [Deployments Create Error Spec](../errors/deployments.create.md)
 - [Deployments Create Test Matrix](../testing/deployments.create-test-matrix.md)
+- [Deployment Config File Test Matrix](../testing/deployment-config-file-test-matrix.md)
+- [Deployment Config File Implementation Plan](../implementation/deployment-config-file-plan.md)
 - [resources.create Implementation Plan](../implementation/resources.create-plan.md)
 - [ADR-015: Resource Network Profile](./ADR-015-resource-network-profile.md)
 - [ADR-016: Deployment Command Surface Reset](./ADR-016-deployment-command-surface-reset.md)
@@ -146,7 +166,9 @@ Current command/schema/API/CLI/Web deployment admission paths are migrated to id
 
 Historical resources may still lack source/runtime/network profile values and need profile backfill or an explicit configuration step before any future redeploy command is reliable.
 
-Existing deployment config bootstrap can still create or infer deployment context and must be narrowed to a compatibility seam.
+Existing deployment config bootstrap can still create or infer deployment context and must be
+narrowed to a compatibility seam. Current config-file support still carries project/resource/target
+identity fields that are rejected by the target repository-config contract.
 
 Current code stores resource listener port under `ResourceNetworkProfile.internalPort`.
 

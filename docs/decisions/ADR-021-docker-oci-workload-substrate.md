@@ -137,6 +137,15 @@ logs intent. The final shell command string is an adapter-rendered representatio
 executor, such as local shell, SSH shell, or a future Docker API executor. The same command spec
 must be able to render sanitized display text and executable text without leaking secret values.
 
+Framework detection is a workload-planning concern. Planners may inspect package manifests,
+lockfiles, framework config, runtime version files, build scripts, package/project names, static
+output conventions, and Dockerfile/Compose files after a source has been normalized and
+materialized. Those facts must be represented as typed `SourceInspectionSnapshot` evidence when
+they affect planner selection, base image policy, install/build/start/package commands, or
+diagnostics. The selected planner resolves a base image and Docker/OCI artifact intent behind the
+resource/deployment contracts; framework name, package name, and base image must not become
+`deployments.create` transport fields.
+
 CQRS command messages and runtime command specifications are distinct concepts. A
 `deployments.create` command asks the application to accept a deployment attempt. A runtime command
 spec describes one adapter-executable step inside the accepted deployment workflow.
@@ -208,6 +217,7 @@ The following remain provider-neutral:
 - [resources.create Command Spec](../commands/resources.create.md)
 - [deployments.create Command Spec](../commands/deployments.create.md)
 - [deployments.create Workflow Spec](../workflows/deployments.create.md)
+- [Workload Framework Detection And Planning Workflow Spec](../workflows/workload-framework-detection-and-planning.md)
 - [Quick Deploy Workflow Spec](../workflows/quick-deploy.md)
 - [Resource Create And First Deploy Workflow Spec](../workflows/resources.create-and-first-deploy.md)
 - [deployment-requested Event Spec](../events/deployment-requested.md)
@@ -247,12 +257,14 @@ execution, runtime logs, health checks, proxy labels/config, and container diagn
 The first Code Round introduced provider-neutral runtime artifact snapshots on `RuntimePlan` and
 the deployment read/contract boundary for active resolver strategies. `workspace-commands` plans
 now produce a Docker image artifact intent and generated-Dockerfile container execution plan rather
-than a host-process runtime plan. The runtime adapter has a strategy-style workspace planner
-registry for common runtimes, including Next.js, Node, Python, Java, and custom command plans.
-Local and generic-SSH Docker execution use the selected planner metadata to generate the Dockerfile
-and build the workspace image before rollout. Source language/framework/package-manager evidence is
-now represented by a typed `SourceInspectionSnapshot`; planner selection must not depend on the
-generic `SourceDescriptor.metadata` bag.
+than a host-process runtime plan. The runtime adapter currently has a strategy-style workspace
+planner registry for Next.js, Vite static, Astro static, Nuxt generate static, explicit SvelteKit
+static, Remix, FastAPI, Django, Flask, generic Node, generic Python, generic Java, and custom
+command plans. Local and generic-SSH Docker execution use the selected planner
+metadata to generate the Dockerfile and build the workspace image or static-server image before
+rollout. Source language/framework/package-manager evidence is represented by a typed
+`SourceInspectionSnapshot`; planner selection must not depend on the generic
+`SourceDescriptor.metadata` bag.
 
 The target contract still has gaps:
 
@@ -264,6 +276,11 @@ The target contract still has gaps:
 - project file analysis is still incomplete; source detection needs to populate richer typed
   inspection evidence for package manager locks, framework-specific build modes, static publish
   directories, Java artifact paths, and buildpack suitability;
+- mainstream web framework support is incomplete. The target support catalog is governed by
+  [Workload Framework Detection And Planning](../workflows/workload-framework-detection-and-planning.md).
+  Current code widens the typed evidence vocabulary and implements initial JavaScript/TypeScript
+  and Python framework slices, but many catalog entries still lack concrete detectors, planner
+  implementations, Web/CLI draft parity, and Docker/SSH smoke coverage;
 - `build-requested` is not yet published as a formal event;
 - runtime execution still happens inside `deployments.create` instead of an acceptance-first
   process manager;

@@ -212,6 +212,13 @@ Current boundary:
   provider repository identity belong to `ResourceSourceBinding`; Dockerfile path, Docker Compose
   path, static publish directory, build target, command defaults, and health-check defaults belong
   to `ResourceRuntimeProfile`; listener ports and exposure belong to `ResourceNetworkProfile`.
+- workload framework detection is an internal planning capability over the resource profile. It
+  records typed source inspection evidence such as runtime family, framework, package manager or
+  build tool, package/project name, lockfiles, scripts, runtime version, Dockerfile/Compose paths,
+  and static/build outputs, then selects a framework/runtime planner that resolves base image and
+  install/build/start/package steps. This capability is governed by
+  [Workload Framework Detection And Planning](./workflows/workload-framework-detection-and-planning.md);
+  it must not add framework, base-image, or package-name fields to `deployments.create`.
 - application listener port belongs to resource network profile language as `internalPort`; UI/CLI
   may display it as "port", but deployment admission must consume it from resource state
 - reverse-proxy resources can be eligible for generated default access routes when the configured
@@ -301,12 +308,28 @@ Current boundary:
   replacement and cleanup must be scoped to the resource/workload identity, not to a shared port
 - direct-port exposure uses an explicit host port as the placement collision boundary and must not
   stop another resource to free that port
-- deployment config files are workflow/bootstrap inputs for creating or configuring related
-  resource/project/environment/server state before deployment admission; they are not
-  `deployments.create` input fields
+- repository deployment config files are workflow/bootstrap inputs for applying source-adjacent
+  resource profile choices before deployment admission; they are not `deployments.create` input
+  fields
+- committed repository config files must not select Appaloft project, resource, server,
+  destination, credential, organization, or secret identity. First-run project/resource creation
+  must use explicit entrypoint choices, trusted link/source state, or source-derived defaults
+  outside the committed file. See
+  [Repository Deployment Config File Bootstrap](./workflows/deployment-config-file-bootstrap.md).
+- repository config files may declare source/runtime/network/health profile fields, non-secret
+  environment values, and required secret references only through the owners named in the config
+  workflow. Raw SSH keys, deploy keys, tokens, secret env values, and concrete target/server
+  credentials are rejected before write commands run.
+- CPU, memory, replicas, restart policy, rollout overlap/drain, and similar runtime-target sizing
+  fields must not be silently accepted from repository config files until their resource/runtime
+  target ADRs, command specs, runtime enforcement, and tests exist.
 - detect and plan happen inside the deployment write flow
 - build/package work produces or resolves the Docker/OCI image artifact used by one deployment
   attempt. Prebuilt image deployments may skip build work but still snapshot image identity.
+- framework/runtime detection feeds deployment planning through typed `SourceInspectionSnapshot`
+  evidence and a planner registry. Mainstream web framework support is a workload-planner concern:
+  planners choose base image, package manager/build tool commands, static output or packaged
+  artifacts, and start commands while keeping Web/API/CLI command schemas provider-neutral.
 - cancel, manual deployment health check, redeploy, reattach, and rollback are not public
   operations in the v1 surface. They must be reintroduced only after new source-of-truth specs,
   test matrices, implementation plans, and Web/API/CLI contracts are accepted.

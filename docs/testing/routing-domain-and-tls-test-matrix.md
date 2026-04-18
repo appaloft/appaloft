@@ -123,6 +123,7 @@ Then:
 | ROUTE-TLS-EVT-010 | integration | Certificate issuance failed duplicate | Same failed attempt | Attempt already failed | `ok` | None | Remains failed | Retry requires new attempt |
 | ROUTE-TLS-EVT-011 | integration | Domain ready duplicate | `domain-ready` repeated | Already ready | `ok` | None | Remains ready | No |
 | ROUTE-TLS-EVT-012 | integration | Route realization failed for active binding | `deployment.finished(status = failed)` with route failure phase | Binding is `bound`, `certificate_pending`, or `ready` for the failed resource route | `ok` after durable state update | `domain-route-realization-failed` | Binding moves to `not_ready` with route failure metadata | Yes when provider/runtime marks the route failure retriable |
+| ROUTE-TLS-EVT-014 | integration | Route realization retry succeeds for TLS-disabled binding | `deployment.finished(status = succeeded)` after a route failure | TLS-disabled binding is `not_ready` for the same resource route | `ok` after durable state update | `domain-ready` | Binding moves to `ready` and clears route failure metadata | No |
 
 ## Read Model Matrix
 

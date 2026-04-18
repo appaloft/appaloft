@@ -25,6 +25,7 @@ test matrices.
 - [resources.create Command Spec](../commands/resources.create.md)
 - [Quick Deploy Workflow Spec](../workflows/quick-deploy.md)
 - [Resource Create And First Deploy Workflow Spec](../workflows/resources.create-and-first-deploy.md)
+- [Workload Framework Detection And Planning Workflow Spec](../workflows/workload-framework-detection-and-planning.md)
 - [Static Site Deployment Implementation Plan](./static-site-deployment-plan.md)
 - [deployment-requested Event Spec](../events/deployment-requested.md)
 - [build-requested Event Spec](../events/build-requested.md)
@@ -50,6 +51,12 @@ The Code Round should introduce or normalize provider-neutral application DTOs f
 - runtime command specs: structured command steps for Docker image build, container run, Compose
   lifecycle, Docker inspect/logs, cleanup, process invocation, and shell-script leaves. Rendered
   command strings are local/SSH executor output and should not be the planning API.
+- source inspection evidence: typed runtime family, framework, package manager/build tool,
+  package/project name, runtime version, detected files, detected scripts, build output, static
+  publish output, Dockerfile/Compose paths, and packaged artifact paths used for planner selection.
+- framework/runtime planner descriptors: planner key, support tier, detection predicates, base
+  image policy, install/build/start/package command specs, artifact output rules, and diagnostic
+  warnings.
 - runtime target backend descriptors: target kind, provider key, required capabilities, and
   normalized render/apply/verify/log/cleanup result shapes. Docker, Swarm, and Kubernetes render
   artifacts remain adapter-owned.
@@ -65,8 +72,9 @@ Expected implementation scope:
 
 - `packages/core/src/release-orchestration`: add or normalize runtime artifact snapshot value
   objects and deployment snapshot state.
-- `packages/core/src/workload-delivery`: ensure runtime profile strategies validate to
-  containerizable artifact plans.
+- `packages/core/src/workload-delivery` and `packages/core/src/release-orchestration`: ensure
+  runtime profile strategies and source inspection value objects validate to containerizable
+  artifact plans without framework or provider dependencies in core.
 - `packages/application/src/operations/deployments`: resolve source/runtime/network profile into
   Docker/OCI artifact intent; preserve command input as ids-only.
 - `packages/application/src/ports.ts` and `packages/application/src/tokens.ts`: keep runtime
@@ -80,6 +88,45 @@ Expected implementation scope:
   write-side state or read models need them.
 - `packages/contracts`, `packages/orpc`, `packages/adapters/cli`, and `apps/web`: expose only
   provider-neutral read/diagnostic fields, never Docker-native command input.
+
+## Framework Planner Contract
+
+The runtime substrate must support mainstream web frameworks through an extensible planner registry
+instead of hardcoding only Node/Bun/Next.js behavior. The target contract is defined in
+[Workload Framework Detection And Planning](../workflows/workload-framework-detection-and-planning.md).
+
+Planner registry requirements:
+
+- each planner has a stable `plannerKey`, supported runtime family/framework values, and detection
+  predicate;
+- framework-specific planners run before generic language planners;
+- explicit Dockerfile, Docker Compose, prebuilt image, and static strategies override inferred
+  framework planners;
+- generic language planners may run only when explicit commands or detected scripts are sufficient
+  to build and start a containerized workload;
+- planner output includes base image policy, install/build/start/package command specs, artifact
+  output rules, and safe diagnostic metadata;
+- source inspection uses typed values rather than generic metadata for fields that affect planner
+  selection or Dockerfile generation;
+- unsupported detected frameworks fail with structured `validation_error` in phase
+  `runtime-plan-resolution` unless explicit custom commands make the plan containerizable.
+
+The first expansion beyond the current implementation should prioritize framework families that
+close common self-hosted web deployments:
+
+- JavaScript/TypeScript: Vite/static SPA, SvelteKit, Nuxt, Astro, Remix, Angular, and generic Node
+  HTTP frameworks in addition to Next.js;
+- static site generation: framework static outputs and generic `dist`/`build` directories through
+  the static-server image path;
+- Python: FastAPI, Django, and Flask;
+- Ruby/PHP/Go/Java/.NET/Elixir/Rust: at least one generic planner per family plus framework
+  detection for Rails, Laravel/Symfony, common Go web services, Spring Boot, ASP.NET Core, Phoenix,
+  and Axum/Actix/Rocket before those families are considered first-class.
+
+Support for a planner family is not complete until Web/CLI Quick Deploy can either collect the
+needed resource profile fields or require explicit fallback commands, and the deployment test
+matrix has rows for detection, base image policy, command generation, artifact output, and
+unsupported evidence.
 
 ## Runtime Flow
 
@@ -129,6 +176,15 @@ Required coverage:
   service name for inbound traffic;
 - `static` snapshots source root, publish directory, optional build command leaves, static-server
   artifact intent, and HTTP endpoint metadata;
+- source inspection detects safe package/project name, package manager/build tool, framework,
+  runtime version, scripts, lockfiles, framework config, and build-output evidence without running
+  untrusted project code;
+- framework planners choose base image and install/build/start/package command specs from typed
+  evidence, not from ad-hoc `SourceDescriptor.metadata`;
+- mainstream framework planners cover the catalog in
+  [Workload Framework Detection And Planning](../workflows/workload-framework-detection-and-planning.md)
+  or fail with structured unsupported-planner errors and explicit custom-command fallback guidance;
+- base image policy changes are covered per planner family;
 - local Docker adapter starts and verifies a container with resource-scoped labels/names;
 - generic-SSH Docker adapter uses resolved server credentials and reports sanitized failures;
 - same internal port on two reverse-proxy resources does not trigger cross-resource cleanup;
@@ -143,6 +199,8 @@ Required coverage:
 - image build/pull failures produce `deployment-failed` with structured phase/details;
 - previous runtime identity is captured as rollback-candidate metadata when available;
 - public Web/API/CLI contracts do not accept Docker-native deployment input fields.
+- public Web/API/CLI contracts do not accept framework-specific deployment fields such as
+  framework, package name, base image, Kubernetes namespace, buildpack name, or runtime preset.
 - target backend registry selects local and generic-SSH backends by provider key/capabilities
   without expanding transport input schemas;
 - unsupported target/provider/capability combinations return structured `runtime-target-resolution`
@@ -193,6 +251,15 @@ container cleanup now flow through those specs before they are rendered to shell
 
 Compatibility command text for workspace install/build/start steps remains a shell-script leaf
 until runtime profile command fields are modeled as command specs end to end.
+
+Current framework/runtime planning supports Next.js, Vite static, Astro static, Nuxt generate
+static, explicit SvelteKit static, Remix, FastAPI, Django, Flask, generic Node, generic Python,
+generic Java, and custom command fallback. Current typed source inspection has been widened for
+the target catalog vocabulary, and local JavaScript/TypeScript detection recognizes common
+framework dependencies/config files and package-manager lockfiles. Local Python detection now
+recognizes FastAPI, Django, Flask, `uv`, Poetry, pip, lockfiles, and `manage.py`. The broader
+mainstream framework catalog in the workflow spec remains target contract and requires future Code
+Rounds for unsupported planner families and Web/CLI parity.
 
 `build-requested`, resolved image ids/digests, runtime instance identity, rollback candidate
 capture, command specs on the durable runtime plan boundary, and richer source-file analysis are

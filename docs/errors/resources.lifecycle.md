@@ -14,6 +14,7 @@ This spec inherits:
 
 - [ADR-011: Resource Create Minimum Lifecycle](../decisions/ADR-011-resource-create-minimum-lifecycle.md)
 - [ADR-015: Resource Network Profile](../decisions/ADR-015-resource-network-profile.md)
+- [Repository Deployment Config File Bootstrap](../workflows/deployment-config-file-bootstrap.md)
 - [Error Model](./model.md)
 - [neverthrow Conventions](./neverthrow-conventions.md)
 - [Async Lifecycle And Acceptance](../architecture/async-lifecycle-and-acceptance.md)
@@ -32,6 +33,9 @@ type ResourceLifecycleErrorDetails = {
     | "resource-runtime-resolution"
     | "resource-network-resolution"
     | "health-policy-resolution"
+    | "config-identity"
+    | "config-secret-validation"
+    | "config-profile-resolution"
     | "resource-persistence"
     | "event-publication"
     | "event-consumption";
@@ -84,6 +88,7 @@ Admission errors reject `resources.create` and return `err(DomainError)`.
 | `validation_error` | `validation` | `resource-runtime-resolution` | No | Runtime profile strategy or strategy-specific fields are invalid, such as missing or unsafe static publish directory. |
 | `validation_error` | `validation` | `resource-network-resolution` | No | Resource network profile is missing, invalid, or ambiguous for an inbound resource endpoint. |
 | `validation_error` | `validation` | `health-policy-resolution` | No | Resource health policy is missing required HTTP fields, has invalid probe fields, or requests an unsupported policy type. |
+| `validation_error` | `validation` | `config-identity`, `config-secret-validation`, `config-profile-resolution` | No | Repository config file profile input cannot be safely mapped into `resources.create`. Error details must identify safe field paths only and must not include secret values. |
 | `infra_error` | `infra` | `resource-persistence` | Conditional | Persistence failed before the resource could be safely created. |
 | `infra_error` | `infra` | `event-publication` | Conditional | Event publication or outbox recording failed before command success could be safely returned. |
 

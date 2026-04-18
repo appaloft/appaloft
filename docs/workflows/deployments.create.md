@@ -18,6 +18,8 @@ This workflow inherits:
 - [ADR-017: Default Access Domain And Proxy Routing](../decisions/ADR-017-default-access-domain-and-proxy-routing.md)
 - [ADR-021: Docker/OCI Workload Substrate](../decisions/ADR-021-docker-oci-workload-substrate.md)
 - [ADR-023: Runtime Orchestration Target Boundary](../decisions/ADR-023-runtime-orchestration-target-boundary.md)
+- [Workload Framework Detection And Planning](./workload-framework-detection-and-planning.md)
+- [Repository Deployment Config File Bootstrap](./deployment-config-file-bootstrap.md)
 - [Error Model](../errors/model.md)
 - [neverthrow Conventions](../errors/neverthrow-conventions.md)
 - [Async Lifecycle And Acceptance](../architecture/async-lifecycle-and-acceptance.md)
@@ -29,12 +31,14 @@ This file defines the deployment-specific workflow sequence and entry boundaries
 ```text
 user intent
   -> entry-specific input collection
+  -> optional repository config file discovery and profile normalization by local entry workflows
   -> explicit project/environment/server/resource selection or creation
   -> explicit deployments.create command input with ids only
   -> command admission
   -> resolve resource network/access snapshots from resource, server, domain, and default access policy state
   -> deployment-requested
   -> runtime target backend is selected from deployment target, destination, provider key, and capabilities
+  -> Git-backed source is materialized and the resolved commit object id is persisted when source cloning is used
   -> build-requested, when an image build/package artifact is required
   -> Docker/OCI image is built, pulled, or otherwise resolved
   -> deployment-started
@@ -47,6 +51,10 @@ user intent
 Prebuilt image deployments skip `build-requested` unless artifact verification is modeled separately.
 
 Post-acceptance runtime/build/deploy/verify failure persists failed state, publishes `deployment-failed`, and is exposed through read models/progress views.
+
+For Git-backed deployments, the source materialization step resolves `HEAD` after clone/checkout and
+persists that commit with the deployment attempt. Web and CLI read surfaces must show the resolved
+commit so a redeploy of a moving branch can be distinguished from the previous attempt.
 
 Retry is an explicit retry command or job that creates a new deployment attempt.
 
@@ -72,6 +80,7 @@ Web must not:
 CLI may:
 
 - accept non-interactive flags/options;
+- discover or read an explicit repository config file as a local entry-workflow profile source;
 - prompt interactively when TTY is available as the CLI form of the Quick Deploy workflow;
 - create/select related records through their own explicit commands before deployment;
 - print progress and final read-model state.
@@ -79,6 +88,8 @@ CLI may:
 CLI must not:
 
 - dispatch an incomplete `deployments.create` command outside a documented input-collection workflow;
+- use committed repository config file fields to select project/resource/server/destination or raw
+  credential identity;
 - implement deployment semantics that differ from API/Web;
 - treat prompt choices as aggregate invariants.
 
@@ -94,6 +105,10 @@ API must:
 - expose follow-up deployment state through query/read-model endpoints or stream/progress APIs.
 
 API must not prompt or define transport-only deployment input shapes.
+
+API must not read a repository config file and use it as a hidden deployment command shape. It may
+serve the config schema for tooling, and future API workflow commands may be added only after they
+are positioned in the business operation map and governed by their own specs.
 
 ## Stream / Progress Workflow
 
@@ -121,6 +136,14 @@ Examples include Docker image build, Docker container run, Docker Compose up/dow
 Docker logs, process invocation, and shell-script leaves for user-authored workspace commands.
 Adapter code renders those specs to local shell, SSH shell, or another executor-specific form only
 at the execution boundary. Workflow logic must not branch on ad-hoc rendered command strings.
+
+For `auto` and `workspace-commands` plans, framework detection must follow
+[Workload Framework Detection And Planning](./workload-framework-detection-and-planning.md).
+The workflow may inspect normalized source evidence such as package manifests, package/project
+name, package manager or build tool, framework config, lockfiles, runtime version files, detected
+scripts, Dockerfile/Compose paths, and static/build output conventions. The selected planner owns
+base image choice and install/build/start/package defaults. Entry workflows and command schemas
+must not collect planner internals as deployment fields.
 
 No v1 entry workflow may treat `workspace-commands`, static hosting, PM2, systemd, or raw host
 processes as a long-lived deployment substrate. Such runtimes require a future ADR before they can
@@ -154,6 +177,7 @@ provider-neutral.
 
 | Missing data | Workflow contract |
 | --- | --- |
+| Repository deployment config file | Local entry workflows may read it before command dispatch. The file may supply profile defaults but must not supply project/resource/server/destination/credential identity, raw secrets, or unsupported target sizing fields. |
 | Resource source binding | Entry workflow must create or select a resource with source binding before deployment admission, or command validation rejects in phase `resource-source-resolution`. |
 | Resource source variant metadata | Entry workflow must normalize deep Git URLs, Git refs, source base directories, local-folder subdirectories, Docker image tag/digest identity, and artifact extraction roots into `ResourceSourceBinding` before deployment admission. Deployment admission must not guess source variants from raw UI URLs. |
 | Resource runtime profile | Entry workflow may create a resource with runtime profile; if omitted, deployment planning uses the resource/default runtime strategy contract. |
@@ -230,6 +254,10 @@ Migration gaps:
 - runtime target execution selection remains single-server, but local-shell and generic-SSH are now
   selected through a target kind/provider/capability registry; admission-time unsupported-target
   checks are still pending before Swarm or Kubernetes are added.
+- repository config file support is currently partial and legacy-shaped: JSON-only config exists,
+  CLI init writes identity-bearing config, CLI deploy does not expose the catalog-advertised
+  `--config` option, and the target config workflow still needs identity rejection, secret
+  rejection, profile mapping, YAML discovery, and tests.
 - generated default access route resolution and provider injection are not yet implemented as a distinct workflow; current runtime adapters still consume runtime-plan access routes directly.
 
 ## Open Questions

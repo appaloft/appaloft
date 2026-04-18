@@ -23,6 +23,7 @@ This spec inherits:
 - [ADR-017: Default Access Domain And Proxy Routing](../decisions/ADR-017-default-access-domain-and-proxy-routing.md)
 - [ADR-021: Docker/OCI Workload Substrate](../decisions/ADR-021-docker-oci-workload-substrate.md)
 - [ADR-023: Runtime Orchestration Target Boundary](../decisions/ADR-023-runtime-orchestration-target-boundary.md)
+- [Repository Deployment Config File Bootstrap](../workflows/deployment-config-file-bootstrap.md)
 - [Error Model](./model.md)
 - [neverthrow Conventions](./neverthrow-conventions.md)
 - [Async Lifecycle And Acceptance](../architecture/async-lifecycle-and-acceptance.md)
@@ -39,6 +40,13 @@ type DeploymentCreateErrorDetails = {
   phase:
     | "command-validation"
     | "config-bootstrap"
+    | "config-discovery"
+    | "config-parse"
+    | "config-schema"
+    | "config-identity"
+    | "config-secret-validation"
+    | "config-profile-resolution"
+    | "config-capability-resolution"
     | "context-resolution"
     | "redeploy-guard"
     | "admission-conflict"
@@ -75,6 +83,15 @@ type DeploymentCreateErrorDetails = {
   destinationId?: string;
   resourceSourceKind?: string;
   runtimePlanStrategy?: string;
+  runtimeFamily?: string;
+  framework?: string;
+  packageManager?: string;
+  buildTool?: string;
+  projectName?: string;
+  plannerKey?: string;
+  baseImage?: string;
+  detectedFiles?: string;
+  detectedScripts?: string;
   publishDirectory?: string;
   internalPort?: number;
   hostPort?: number;
@@ -109,7 +126,9 @@ Admission errors reject the command and return `err(DomainError)`.
 
 | Error code | Phase | Retriable | Required deployment details |
 | --- | --- | --- | --- |
-| `validation_error` | `command-validation`, `config-bootstrap`, `context-resolution`, `resource-source-resolution`, `resource-network-resolution`, `source-detection`, `runtime-plan-resolution`, `runtime-artifact-resolution` | No | Field/path when available, `commandName`, safe command context. Static strategy failures include `publishDirectory` when the value is missing or unsafe. |
+| `validation_error` | `command-validation`, `config-bootstrap`, `context-resolution`, `resource-source-resolution`, `resource-network-resolution`, `source-detection`, `runtime-plan-resolution`, `runtime-artifact-resolution` | No | Field/path when available, `commandName`, safe command context. Framework/planner failures include safe detection evidence such as `runtimeFamily`, `framework`, `packageManager`, `projectName`, `plannerKey`, `baseImage`, and detected file/script identifiers when available. Static strategy failures include `publishDirectory` when the value is missing or unsafe. |
+| `validation_error` | `config-discovery`, `config-parse`, `config-schema`, `config-identity`, `config-secret-validation`, `config-profile-resolution` | No | Repository config file could not be safely used by the entry workflow. Details may include config path, format, safe schema issue paths, or rejected field names, but must not include secret values. |
+| `unsupported_config_field` | `config-capability-resolution` | No | Repository config requested a known future capability that Appaloft cannot enforce yet, such as CPU, memory, replicas, restart policy, rollout overlap, or rollout drain. |
 | `not_found` | `context-resolution` | No | Entity type, entity id, `commandName`, `phase`. |
 | `deployment_not_redeployable` | `redeploy-guard` | No | Existing deployment id, resource id, current deployment status. |
 | `conflict` | `admission-conflict` | No | Conflict subject and related state. |
@@ -137,10 +156,15 @@ failure when it can be detected before acceptance. Static package/build failures
 acceptance must be represented as failed deployment state with phase `image-build` or
 `runtime-artifact-resolution`, not as a changed command result.
 
+For framework/runtime planner selection, a detected framework with no supported planner and no
+explicit custom command fallback is an admission failure in phase `runtime-plan-resolution`. The
+error must report safe planner evidence without leaking package manager auth tokens, registry
+credentials, environment values, or raw provider responses.
+
 ## Post-Acceptance Deployment Failures
 
-Build, runtime target rendering/apply/observation, proxy route realization, public route
-verification, health check, cleanup, or release finalization failures after acceptance are not
+Source materialization, build, runtime target rendering/apply/observation, proxy route realization,
+public route verification, health check, cleanup, or release finalization failures after acceptance are not
 command admission errors.
 
 They must:
@@ -155,6 +179,11 @@ Docker/OCI-specific failure details must be sanitized. It is valid to include im
 digest, container id, Compose project name, container state, exit code, and bounded log excerpts
 when they do not contain secrets. It is not valid to include registry credentials, private key
 material, raw secret environment values, or full unbounded command output.
+
+Git source materialization failures may record `remote_git_clone_failed` or
+`remote_git_commit_resolution_failed` on the failed deployment attempt. Safe failure metadata may
+include source kind, repository locator, selected Git ref, source directory, remote workdir, and the
+package phase, but must not include access tokens, private keys, or credential-bearing clone URLs.
 
 ## Consumer Requirements
 
@@ -177,6 +206,8 @@ Deployment tests must assert:
   conflict is the relevant failure context;
 - `runtimePlanStrategy` and `publishDirectory` when a static artifact planning or packaging failure
   is relevant;
+- `runtimeFamily`, `framework`, `packageManager`, `projectName`, `plannerKey`, and `baseImage`
+  when framework detection or planner selection is relevant;
 - `deployment-failed` plus failed state for post-acceptance failure;
 - a new deployment id for retry.
 
@@ -200,6 +231,8 @@ Migration gaps:
 - runtime target backend registry lookup now returns `runtime_target_unsupported` with
   `runtime-target-resolution` details; `deployments.create` admission does not yet consult that
   registry before accepting the command.
+- repository config file errors are target entry-workflow errors; current implementation does not
+  yet populate these phases uniformly and still carries a legacy config-bootstrap shape.
 
 ## Open Questions
 
