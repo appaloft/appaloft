@@ -173,13 +173,23 @@ jobs:
 
       - name: Build Desktop Sidecar
         shell: bash
-        run: >
-          bun run package:binary-bundle --
-          --version "${APPALOFT_APP_VERSION}"
-          --target "${APPALOFT_BINARY_TARGET}"
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3; do
+            if bun run package:binary-bundle -- --version "${APPALOFT_APP_VERSION}" --target "${APPALOFT_BINARY_TARGET}"; then
+              exit 0
+            fi
+            if [ "$attempt" = "3" ]; then
+              exit 1
+            fi
+            sleep $((attempt * 10))
+          done
 
       - name: Build Desktop App
-        run: bun run --cwd apps/desktop package
+        working-directory: apps/desktop
+        run: |
+          bun run prepare:sidecar
+          bunx tauri build
 
       - name: Collect Desktop Artifacts
         shell: bash
@@ -263,6 +273,7 @@ jobs:
           provenance: true
 
       - name: Attest Container Image
+        if: ${{ github.event.repository.private == false }}
         uses: actions/attest@v4
         with:
           subject-name: ${{ needs.resolve.outputs.image }}
@@ -304,18 +315,24 @@ jobs:
       - name: Prepare npm Packages
         run: bun run release:npm:prepare -- --version "${APPALOFT_APP_VERSION}" --release-dir dist/release
 
-      - name: Publish Platform Packages
+      - name: Publish npm Packages
         shell: bash
         run: |
           set -euo pipefail
-          for package_dir in packages/npm/cli-*; do
+          publish_package() {
+            local package_dir="$1"
+            local package_name
+            package_name="$(node -e "const fs = require('fs'); console.log(JSON.parse(fs.readFileSync(process.argv[1], 'utf8')).name)" "${package_dir}/package.json")"
+            if npm view "${package_name}@${APPALOFT_APP_VERSION}" version >/dev/null 2>&1; then
+              echo "Skipping ${package_name}@${APPALOFT_APP_VERSION}; already published"
+              return
+            fi
             npm publish "$package_dir" --access public --tag "${NPM_TAG}"
+          }
+          for package_dir in packages/npm/cli-*; do
+            publish_package "$package_dir"
           done
-        env:
-          NPM_TAG: ${{ needs.resolve.outputs.npm_tag }}
-
-      - name: Publish Main Package
-        run: npm publish packages/npm/cli --access public --tag "${NPM_TAG}"
+          publish_package packages/npm/cli
         env:
           NPM_TAG: ${{ needs.resolve.outputs.npm_tag }}
 
@@ -354,6 +371,7 @@ jobs:
           bun run checksums
 
       - name: Attest Release Artifacts
+        if: ${{ github.event.repository.private == false }}
         uses: actions/attest@v4
         with:
           subject-checksums: dist/release/checksums.txt
