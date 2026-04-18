@@ -137,8 +137,6 @@ jobs:
             os: macos-15-intel
           - target: linux-x64-gnu
             os: ubuntu-22.04
-          - target: win32-x64
-            os: windows-latest
     runs-on: ${{ matrix.os }}
     env:
       APPALOFT_APP_VERSION: ${{ needs.resolve.outputs.version }}
