@@ -68,6 +68,18 @@ describe("resolveConfig", () => {
     expect(config.remoteRuntimeRoot).toBe("/srv/appaloft/runtime");
   });
 
+  test("uses shared logger environment variables", () => {
+    const config = resolveConfig({
+      env: {
+        APPALOFT_LOG_LEVEL: "debug",
+        APPALOFT_SECRET_MASK: "[masked]",
+      },
+    });
+
+    expect(config.logLevel).toBe("debug");
+    expect(config.secretMask).toBe("[masked]");
+  });
+
   test("keeps an explicit pglite driver even if a database URL exists", () => {
     const config = resolveConfig({
       env: {
