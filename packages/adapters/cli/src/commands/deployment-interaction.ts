@@ -1,9 +1,13 @@
 import {
+  ConfigureServerCredentialCommand,
+  type ConfigureServerCredentialCommandInput,
   type CreateDeploymentCommandInput,
   CreateEnvironmentCommand,
   CreateProjectCommand,
   CreateResourceCommand,
   type CreateResourceCommandInput,
+  CreateSshCredentialCommand,
+  type CreateSshCredentialCommandInput,
   type EnvironmentSummary,
   ListEnvironmentsQuery,
   ListProjectsQuery,
@@ -11,14 +15,24 @@ import {
   ListServersQuery,
   type ProjectSummary,
   RegisterServerCommand,
+  type RegisterServerCommandInput,
   type ResourceSummary,
   type ServerSummary,
+  SetEnvironmentVariableCommand,
+  type SetEnvironmentVariableCommandInput,
 } from "@appaloft/application";
 import {
   createQuickDeployGeneratedResourceName,
   normalizeQuickDeployGeneratedNameBase,
 } from "@appaloft/contracts";
-import { domainError, type EnvironmentKind, environmentKinds } from "@appaloft/core";
+import {
+  domainError,
+  type EnvironmentKind,
+  environmentKinds,
+  err,
+  ok,
+  type Result,
+} from "@appaloft/core";
 import { type AppaloftDeploymentConfig } from "@appaloft/deployment-config";
 import { Effect } from "effect";
 
@@ -36,6 +50,8 @@ export interface DeploymentPromptSeed {
   destinationId?: string;
   environmentId?: string;
   resourceId?: string;
+  server?: DeploymentServerDraft;
+  environmentVariables?: DeploymentEnvironmentVariableSeed[];
   resource?: ResourceDraftInput;
   sourceLocator?: string;
   deploymentMethod?: DeploymentMethod;
@@ -59,6 +75,26 @@ type ResourceSourceInput = NonNullable<CreateResourceCommandInput["source"]>;
 type ResourceRuntimeProfileInput = NonNullable<CreateResourceCommandInput["runtimeProfile"]>;
 type ResourceNetworkProfileInput = NonNullable<CreateResourceCommandInput["networkProfile"]>;
 type ResourceRuntimeProfileDraftInput = Partial<ResourceRuntimeProfileInput>;
+export type DeploymentEnvironmentVariableSeed = Omit<
+  SetEnvironmentVariableCommandInput,
+  "environmentId"
+> & {
+  environmentId?: string;
+};
+
+export interface DeploymentEnvironmentVariablesFromConfigOptions {
+  env?: Record<string, string | undefined>;
+}
+
+export interface DeploymentServerDraft {
+  name?: string;
+  host?: string;
+  providerKey?: string;
+  port?: number;
+  proxyKind?: RegisterServerCommandInput["proxyKind"];
+  credential?: ConfigureServerCredentialCommandInput["credential"];
+  reusableSshCredential?: CreateSshCredentialCommandInput;
+}
 
 interface ResolvedReference {
   id: string;
@@ -77,9 +113,11 @@ const defaultServerName = "local-machine";
 const defaultServerHost = "127.0.0.1";
 const defaultServerPort = 22;
 const defaultServerProviderKey = "local-shell";
+const defaultRemoteServerProviderKey = "generic-ssh";
 const defaultApplicationInternalPort = 3000;
 const defaultStaticInternalPort = 80;
 const defaultStaticPublishDirectory = "/dist";
+const ciEnvSecretReferencePrefix = "ci-env:";
 
 function trimToUndefined(value: string): string | undefined {
   const trimmed = value.trim();
@@ -267,6 +305,105 @@ export function deploymentPromptSeedFromConfig(
   };
 }
 
+function compareConfigKeys([leftKey]: [string, unknown], [rightKey]: [string, unknown]): number {
+  return leftKey.localeCompare(rightKey);
+}
+
+function secretResolutionError(input: {
+  message: string;
+  secretKey: string;
+  secretRef: string;
+}): ReturnType<typeof domainError.validation> {
+  return domainError.validation(input.message, {
+    phase: "config-secret-resolution",
+    secretKey: input.secretKey,
+    secretRef: input.secretRef,
+  });
+}
+
+function exposureForConfigEnvKey(key: string): DeploymentEnvironmentVariableSeed["exposure"] {
+  return /^(PUBLIC_|VITE_)/.test(key) ? "build-time" : "runtime";
+}
+
+export function deploymentEnvironmentVariablesFromConfig(
+  config: AppaloftDeploymentConfig,
+  options: DeploymentEnvironmentVariablesFromConfigOptions = {},
+): Result<DeploymentEnvironmentVariableSeed[]> {
+  const variables: DeploymentEnvironmentVariableSeed[] = [];
+
+  for (const [key, value] of Object.entries(config.env ?? {}).sort(compareConfigKeys)) {
+    variables.push({
+      key,
+      value: String(value),
+      kind: "plain-config",
+      exposure: exposureForConfigEnvKey(key),
+      scope: "environment",
+      isSecret: false,
+    });
+  }
+
+  const env = options.env ?? process.env;
+  for (const [key, reference] of Object.entries(config.secrets ?? {}).sort(compareConfigKeys)) {
+    const secretRef = reference.from.trim();
+    const required = reference.required ?? true;
+
+    if (!secretRef.startsWith(ciEnvSecretReferencePrefix)) {
+      if (!required) {
+        continue;
+      }
+
+      return err(
+        secretResolutionError({
+          message: "Deployment config secret reference uses an unsupported resolver",
+          secretKey: key,
+          secretRef,
+        }),
+      );
+    }
+
+    const envName = secretRef.slice(ciEnvSecretReferencePrefix.length).trim();
+    if (!envName) {
+      if (!required) {
+        continue;
+      }
+
+      return err(
+        secretResolutionError({
+          message: "Deployment config CI secret reference is missing an environment name",
+          secretKey: key,
+          secretRef,
+        }),
+      );
+    }
+
+    const value = env[envName];
+    if (value === undefined) {
+      if (!required) {
+        continue;
+      }
+
+      return err(
+        secretResolutionError({
+          message: "Required deployment config CI secret reference was not found",
+          secretKey: key,
+          secretRef,
+        }),
+      );
+    }
+
+    variables.push({
+      key,
+      value,
+      kind: "secret",
+      exposure: "runtime",
+      scope: "environment",
+      isSecret: true,
+    });
+  }
+
+  return ok(variables);
+}
+
 function requireNonEmpty(label: string) {
   return (value: string) => (value.trim() ? null : `${label} is required`);
 }
@@ -371,12 +508,56 @@ function createProject(input: { name: string }) {
   });
 }
 
-function createServer(input: { name: string; host: string; providerKey: string; port: number }) {
+function createServer(input: RegisterServerCommandInput) {
   return Effect.gen(function* () {
     const cli = yield* CliRuntime;
     const message = yield* resultToEffect(RegisterServerCommand.create(input));
     const result = yield* Effect.promise(() => cli.executeCommand(message));
     return yield* resultToEffect(result);
+  });
+}
+
+function createSshCredential(input: CreateSshCredentialCommandInput) {
+  return Effect.gen(function* () {
+    const cli = yield* CliRuntime;
+    const message = yield* resultToEffect(CreateSshCredentialCommand.create(input));
+    const result = yield* Effect.promise(() => cli.executeCommand(message));
+    return yield* resultToEffect(result);
+  });
+}
+
+function configureServerCredential(input: ConfigureServerCredentialCommandInput) {
+  return Effect.gen(function* () {
+    const cli = yield* CliRuntime;
+    const message = yield* resultToEffect(ConfigureServerCredentialCommand.create(input));
+    const result = yield* Effect.promise(() => cli.executeCommand(message));
+    return yield* resultToEffect(result);
+  });
+}
+
+function applyServerCredential(input: { serverId: string; seed: DeploymentPromptSeed }) {
+  return Effect.gen(function* () {
+    const reusableCredential = input.seed.server?.reusableSshCredential;
+    if (reusableCredential) {
+      const created = yield* createSshCredential(reusableCredential);
+      yield* configureServerCredential({
+        serverId: input.serverId,
+        credential: {
+          kind: "stored-ssh-private-key",
+          credentialId: created.id,
+          ...(reusableCredential.username ? { username: reusableCredential.username } : {}),
+        },
+      });
+      return;
+    }
+
+    const credential = input.seed.server?.credential;
+    if (credential) {
+      yield* configureServerCredential({
+        serverId: input.serverId,
+        credential,
+      });
+    }
   });
 }
 
@@ -419,6 +600,29 @@ function createResource(input: {
   });
 }
 
+function setEnvironmentVariable(input: SetEnvironmentVariableCommandInput) {
+  return Effect.gen(function* () {
+    const cli = yield* CliRuntime;
+    const message = yield* resultToEffect(SetEnvironmentVariableCommand.create(input));
+    const result = yield* Effect.promise(() => cli.executeCommand(message));
+    return yield* resultToEffect(result);
+  });
+}
+
+function applyEnvironmentVariables(input: {
+  environmentId: string;
+  variables?: DeploymentEnvironmentVariableSeed[];
+}) {
+  return Effect.gen(function* () {
+    for (const variable of input.variables ?? []) {
+      yield* setEnvironmentVariable({
+        ...variable,
+        environmentId: variable.environmentId ?? input.environmentId,
+      });
+    }
+  });
+}
+
 function printDeploymentSummary(input: {
   sourceLocator: string;
   deploymentMethod: DeploymentMethod;
@@ -456,11 +660,15 @@ function resolveProject(input: {
       };
     }
 
-    const projectName = yield* input.interaction.text({
-      message: "Project name",
-      defaultValue: inferNameFromSource(input.sourceLocator),
-      validate: requireNonEmpty("Project name"),
-    });
+    const defaultName = inferNameFromSource(input.sourceLocator);
+    const canPrompt = Boolean(process.stdin.isTTY && process.stdout.isTTY);
+    const projectName = canPrompt
+      ? yield* input.interaction.text({
+          message: "Project name",
+          defaultValue: defaultName,
+          validate: requireNonEmpty("Project name"),
+        })
+      : defaultName;
     const existing = findProject(input.projects, projectName);
     if (existing) {
       return {
@@ -484,51 +692,84 @@ function resolveServer(input: {
 }) {
   return Effect.gen(function* () {
     if (input.seed.serverId) {
+      yield* applyServerCredential({
+        serverId: input.seed.serverId,
+        seed: input.seed,
+      });
       return {
         id: input.seed.serverId,
         label: input.seed.serverId,
       };
     }
 
-    const host = yield* input.interaction.text({
-      message: "Server host",
-      defaultValue: defaultServerHost,
-      validate: requireNonEmpty("Server host"),
-    });
-    const providerKey = yield* input.interaction.text({
-      message: "Server provider",
-      defaultValue: defaultServerProviderKey,
-      validate: requireNonEmpty("Server provider"),
-    });
-    const port = Number(
-      yield* input.interaction.text({
-        message: "Server port",
-        defaultValue: String(defaultServerPort),
-        validate: requirePositiveInteger("Server port"),
-      }),
-    );
+    const canPrompt = Boolean(process.stdin.isTTY && process.stdout.isTTY);
+    const defaultProviderKey = input.seed.server?.host
+      ? defaultRemoteServerProviderKey
+      : defaultServerProviderKey;
+    const host =
+      input.seed.server?.host ??
+      (canPrompt
+        ? yield* input.interaction.text({
+            message: "Server host",
+            defaultValue: defaultServerHost,
+            validate: requireNonEmpty("Server host"),
+          })
+        : defaultServerHost);
+    const providerKey =
+      input.seed.server?.providerKey ??
+      (canPrompt
+        ? yield* input.interaction.text({
+            message: "Server provider",
+            defaultValue: defaultProviderKey,
+            validate: requireNonEmpty("Server provider"),
+          })
+        : defaultProviderKey);
+    const port =
+      input.seed.server?.port ??
+      (canPrompt
+        ? Number(
+            yield* input.interaction.text({
+              message: "Server port",
+              defaultValue: String(defaultServerPort),
+              validate: requirePositiveInteger("Server port"),
+            }),
+          )
+        : defaultServerPort);
     const existing = findServer(input.servers, {
       host: host.trim(),
       providerKey: providerKey.trim(),
       port,
     });
     if (existing) {
+      yield* applyServerCredential({
+        serverId: existing.id,
+        seed: input.seed,
+      });
       return {
         id: existing.id,
         label: `${existing.name} ${existing.providerKey} ${existing.host}:${existing.port}`,
       };
     }
 
-    const name = yield* input.interaction.text({
-      message: "Server name",
-      defaultValue: defaultServerName,
-      validate: requireNonEmpty("Server name"),
-    });
+    const name =
+      input.seed.server?.name ??
+      (canPrompt
+        ? yield* input.interaction.text({
+            message: "Server name",
+            defaultValue: defaultServerName,
+            validate: requireNonEmpty("Server name"),
+          })
+        : defaultServerName);
     const created = yield* createServer({
       name: name.trim(),
       host: host.trim(),
       providerKey: providerKey.trim(),
       port,
+      ...(input.seed.server?.proxyKind ? { proxyKind: input.seed.server.proxyKind } : {}),
+    });
+    yield* applyServerCredential({
+      serverId: created.id,
+      seed: input.seed,
     });
     return {
       id: created.id,
@@ -551,18 +792,23 @@ function resolveEnvironment(input: {
     }
 
     const environments = (yield* listEnvironments(input.projectId)).items;
-    const name = yield* input.interaction.text({
-      message: "Environment name",
-      defaultValue: defaultEnvironmentName,
-      validate: requireNonEmpty("Environment name"),
-    });
-    const kind = yield* input.interaction.select<EnvironmentKind>({
-      message: "Environment kind",
-      choices: environmentKinds.map((environmentKind) => ({
-        title: environmentKind,
-        value: environmentKind,
-      })),
-    });
+    const canPrompt = Boolean(process.stdin.isTTY && process.stdout.isTTY);
+    const name = canPrompt
+      ? yield* input.interaction.text({
+          message: "Environment name",
+          defaultValue: defaultEnvironmentName,
+          validate: requireNonEmpty("Environment name"),
+        })
+      : defaultEnvironmentName;
+    const kind = canPrompt
+      ? yield* input.interaction.select<EnvironmentKind>({
+          message: "Environment kind",
+          choices: environmentKinds.map((environmentKind) => ({
+            title: environmentKind,
+            value: environmentKind,
+          })),
+        })
+      : "local";
     const existing = findEnvironment(environments, {
       projectId: input.projectId,
       name,
@@ -899,6 +1145,10 @@ export function resolveInteractiveDeploymentInput(
       deploymentMethod,
       runtimeProfile,
       networkProfile,
+    });
+    yield* applyEnvironmentVariables({
+      environmentId: environment.id,
+      ...(seed.environmentVariables ? { variables: seed.environmentVariables } : {}),
     });
 
     yield* printDeploymentSummary({

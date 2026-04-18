@@ -12,6 +12,8 @@ Canonical assertions:
 - project/resource/server/destination/credential identity is resolved outside the committed file;
 - first-run project/resource creation uses explicit operations and source-derived defaults;
 - resource/runtime/network/health profile fields map to resource-owned commands before deployment;
+- non-secret env values and resolved secret references map to environment commands before
+  deployment;
 - final `deployments.create` input remains ids-only;
 - HTTP remains strict unless a future workflow command is accepted by ADR.
 
@@ -93,11 +95,14 @@ This matrix inherits:
 | --- | --- | --- | --- | --- | --- | --- |
 | CONFIG-FILE-SEC-001 | integration | Raw SSH private key rejected | Config contains an inline private key or password | Workflow stops before mutation and error details are sanitized | `validation_error`, phase `config-secret-validation` | No write commands |
 | CONFIG-FILE-SEC-002 | integration | Raw token or API key rejected | Config contains token/password-like raw secret fields | Workflow stops before mutation and logs do not contain value | `validation_error`, phase `config-secret-validation` | No write commands |
-| CONFIG-FILE-SEC-003 | integration | Required secret reference accepted | Config declares a required secret name/reference without value | Workflow proceeds only if secret exists in configured secret store | None or secret-missing structured error | Secret lookup/check -> resource/env command(s) |
+| CONFIG-FILE-SEC-003 | integration | Required CI secret reference accepted | Config declares `secrets.DATABASE_URL.from: ci-env:DATABASE_URL` and the runner environment provides `DATABASE_URL` | Secret value is applied as an environment secret without appearing in logs or deployment input | None | `environments.set-variable(isSecret=true)` -> `deployments.create` |
 | CONFIG-FILE-SEC-004 | e2e-preferred | SSH credential reference accepted | Config or entry references a reusable SSH credential created outside the file | Credential is resolved through credential/server commands, not raw material | None | credential/server selection -> deployment |
 | CONFIG-FILE-SEC-005 | integration | Secret values masked in diagnostics | Config-origin diagnostics include secret-related fields | Diagnostics show only key/reference/status, never raw value | None | Query diagnostic summary/read model |
-| CONFIG-FILE-SEC-006 | integration | Plain non-secret env values | Config declares non-secret plain config values | Values are applied through environment variable commands before snapshot | None | `environments.set-variable` -> `deployments.create` |
+| CONFIG-FILE-SEC-006 | integration | Plain non-secret env values | Config declares non-secret plain config values, including `PUBLIC_` or `VITE_` build-time keys | Values are applied through environment variable commands before snapshot with build-time exposure only for public-prefixed keys | None | `environments.set-variable` -> `deployments.create` |
 | CONFIG-FILE-SEC-007 | integration | Secret env value inline rejected | Config declares raw value for key marked secret or key matching secret policy | Workflow stops before mutation | `validation_error`, phase `config-secret-validation` | No write commands |
+| CONFIG-FILE-SEC-008 | integration | Required CI secret reference missing | Config declares required `ci-env:API_TOKEN` but the entrypoint environment does not contain `API_TOKEN` | Workflow stops before mutation and does not include the secret key value in details | `validation_error`, phase `config-secret-resolution` | No write commands |
+| CONFIG-FILE-SEC-009 | integration | Optional CI secret reference missing | Config declares optional `ci-env:OPTIONAL_TOKEN` and the entrypoint environment does not contain it | Workflow skips the optional variable and continues | None | No command for missing optional secret -> `deployments.create` |
+| CONFIG-FILE-SEC-010 | integration | Unsupported secret resolver rejected | Config declares required `vault:prod/api` before that adapter is configured | Workflow stops before mutation | `validation_error`, phase `config-secret-resolution` | No write commands |
 
 ## Resource Sizing And Runtime Target Matrix
 
@@ -120,6 +125,7 @@ This matrix inherits:
 | CONFIG-FILE-ENTRY-005 | contract | HTTP schema endpoint | `/api/schemas/appaloft-config.json` exposes the current config schema and stays aligned with the parser. |
 | CONFIG-FILE-ENTRY-006 | e2e-preferred | Web/local agent future | Any Web/local-agent file picker or future desktop workflow uses the same parser and operation sequence as CLI. |
 | CONFIG-FILE-ENTRY-007 | e2e-preferred | Future MCP/automation | MCP tools may pass profile data only through the config workflow or explicit operations, not by extending `deployments.create`. |
+| CONFIG-FILE-ENTRY-008 | integration | GitHub Actions headless binary | CI runs the Appaloft binary with repository config, defaults to embedded PGlite without `DATABASE_URL`, resolves GitHub secrets only after the workflow maps them into runner env vars, can bootstrap temporary project/server/environment/resource records without committed ids, and uses explicit env/resource/deployment commands before ids-only deployment admission. |
 
 ## Current Implementation Notes And Migration Gaps
 
@@ -132,6 +138,15 @@ Current implemented coverage:
   `packages/adapters/filesystem/test/deployment-config-reader.test.ts`.
 - `QUICK-DEPLOY-ENTRY-010` and `CONFIG-FILE-ENTRY-001` profile-to-quick-deploy resource draft
   mapping are covered in `packages/adapters/cli/test/deployment-config.test.ts`.
+- `CONFIG-FILE-SEC-003`, `CONFIG-FILE-SEC-006`, `CONFIG-FILE-SEC-008`, and
+  `CONFIG-FILE-SEC-010` are covered in `packages/adapters/cli/test/deployment-config.test.ts`,
+  proving plain env mapping, public-prefix build-time exposure, supported `ci-env:` resolution,
+  required missing-secret failure, and unsupported required resolver failure.
+- `CONFIG-FILE-ENTRY-008` is covered in `packages/config/test/index.test.ts`, proving headless CI
+  defaults to embedded PGlite without `DATABASE_URL`, and in
+  `packages/adapters/cli/test/deployment-config.test.ts`, proving no-id non-TTY PGlite deploys
+  bootstrap temporary project/server/environment/resource records before ids-only deployment
+  admission.
 - `DEP-CREATE-ADM-035` is covered in `packages/application/test/create-deployment.test.ts`, proving
   `deployments.create` remains ids-only.
 
@@ -146,9 +161,8 @@ Current HTTP adapter serves a config schema endpoint, but strict deployment API 
 ids-only.
 
 Profile drift detection, existing-resource update operation sequencing, durable link/relink state,
-secret-reference lookup, non-secret environment variable application, config-file Dockerfile/Compose
-path mapping, and resource sizing support remain target coverage rows, not implemented baseline
-behavior.
+stored/external secret adapters beyond `ci-env:`, config-file Dockerfile/Compose path mapping, and
+resource sizing support remain target coverage rows, not implemented baseline behavior.
 
 ## Open Questions
 
