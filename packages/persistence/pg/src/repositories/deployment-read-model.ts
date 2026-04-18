@@ -15,6 +15,20 @@ import {
   type SerializedRuntimePlan,
 } from "./shared";
 
+const deploymentSourceCommitShaMetadataKey = "source.commitSha";
+
+function sourceCommitShaFromRuntimePlan(runtimePlan: SerializedRuntimePlan): string | undefined {
+  const executionMetadata = runtimePlan.execution.metadata ?? {};
+  const sourceMetadata = runtimePlan.source.metadata ?? {};
+
+  return (
+    executionMetadata[deploymentSourceCommitShaMetadataKey] ??
+    executionMetadata.commitSha ??
+    sourceMetadata[deploymentSourceCommitShaMetadataKey] ??
+    sourceMetadata.commitSha
+  );
+}
+
 export class PgDeploymentReadModel implements DeploymentReadModel {
   constructor(private readonly db: Kysely<Database>) {}
 
@@ -52,6 +66,7 @@ export class PgDeploymentReadModel implements DeploymentReadModel {
           const environmentSnapshot =
             row.environment_snapshot as unknown as SerializedEnvironmentSnapshot;
           const logs = (row.logs ?? []) as unknown as SerializedDeploymentLog[];
+          const sourceCommitSha = sourceCommitShaFromRuntimePlan(runtimePlan);
 
           return {
             id: row.id,
@@ -63,6 +78,7 @@ export class PgDeploymentReadModel implements DeploymentReadModel {
             status: row.status as Awaited<
               ReturnType<DeploymentReadModel["list"]>
             >[number]["status"],
+            ...(sourceCommitSha ? { sourceCommitSha } : {}),
             runtimePlan: {
               id: runtimePlan.id,
               source: {

@@ -270,6 +270,7 @@ export const zhCN = {
       runtimePlanTitle: "Runtime plan",
       snapshotDescription: "部署时持久化的不可变环境快照，Secret 只显示元信息。",
       snapshotTitle: "环境快照",
+      sourceCommitSha: "提交",
       startCommand: "启动命令",
       timelineTitle: "时间线",
       workingDirectory: "工作目录",

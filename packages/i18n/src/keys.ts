@@ -261,6 +261,7 @@ export const i18nKeys = {
       runtimePlanTitle: "console:deployments.runtimePlanTitle",
       snapshotDescription: "console:deployments.snapshotDescription",
       snapshotTitle: "console:deployments.snapshotTitle",
+      sourceCommitSha: "console:deployments.sourceCommitSha",
       startCommand: "console:deployments.startCommand",
       timelineTitle: "console:deployments.timelineTitle",
       workingDirectory: "console:deployments.workingDirectory",

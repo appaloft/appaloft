@@ -257,6 +257,9 @@ describe("pglite persistence integration", () => {
               message: MessageText.rehydrate("embedded deployment persisted"),
             }),
           ],
+          metadata: {
+            "source.commitSha": "57ea0764b8f0a491fd1d30bedc5cbe281744b36c",
+          },
         }),
       );
 
@@ -288,6 +291,7 @@ describe("pglite persistence integration", () => {
         }),
       ]);
       expect(deployments[0]?.environmentSnapshot.id).toBe(`snap_${suffix}`);
+      expect(deployments[0]?.sourceCommitSha).toBe("57ea0764b8f0a491fd1d30bedc5cbe281744b36c");
       expect(deployments[0]?.logCount).toBe(1);
 
       await reopened.close();

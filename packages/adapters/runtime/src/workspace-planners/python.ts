@@ -11,20 +11,74 @@ import {
   type WorkspaceRuntimePlanner,
 } from "./types";
 
-function pythonBaseImage(inspection?: SourceInspectionSnapshot): string {
+export type PythonPackageManager = "pip" | "poetry" | "uv";
+
+export function resolvePythonPackageManager(
+  inspection?: SourceInspectionSnapshot,
+): PythonPackageManager {
+  const packageManager = inspection?.packageManager;
+
+  if (packageManager === "uv" || packageManager === "poetry" || packageManager === "pip") {
+    return packageManager;
+  }
+
+  if (inspection?.hasDetectedFile("uv-lock")) {
+    return "uv";
+  }
+
+  if (inspection?.hasDetectedFile("poetry-lock")) {
+    return "poetry";
+  }
+
+  return "pip";
+}
+
+export function pythonBaseImage(inspection?: SourceInspectionSnapshot): string {
   const version = inspection?.runtimeVersion ?? "3.12";
   return `python:${version}-slim`;
 }
 
-function pythonInstallCommand(input: WorkspacePlannerInput): string | undefined {
+export function pythonInstallCommand(input: WorkspacePlannerInput): string | undefined {
+  const packageManager = resolvePythonPackageManager(input.source.inspection);
+
   return (
     input.requestedDeployment.installCommand ??
-    (input.source.inspection?.hasDetectedFile("requirements-txt")
-      ? "pip install --no-cache-dir -r requirements.txt"
-      : input.source.inspection?.hasDetectedFile("pyproject-toml")
-        ? "pip install --no-cache-dir ."
-        : undefined)
+    (packageManager === "uv"
+      ? "pip install --no-cache-dir uv && uv sync --frozen --no-dev"
+      : packageManager === "poetry"
+        ? "pip install --no-cache-dir poetry && poetry install --only main --no-root"
+        : input.source.inspection?.hasDetectedFile("requirements-txt")
+          ? "pip install --no-cache-dir -r requirements.txt"
+          : input.source.inspection?.hasDetectedFile("pyproject-toml")
+            ? "pip install --no-cache-dir ."
+            : undefined)
   );
+}
+
+export function pythonRunCommandFor(
+  packageManager: PythonPackageManager,
+  command: string,
+): string {
+  switch (packageManager) {
+    case "uv":
+      return `uv run ${command}`;
+    case "poetry":
+      return `poetry run ${command}`;
+    case "pip":
+      return command;
+  }
+}
+
+export function pythonDockerfile(input: WorkspaceDockerfileInput): string | null {
+  return dockerfileFromExecution({
+    baseImage:
+      input.execution.metadata?.["workspace.baseImage"] ?? pythonBaseImage(input.sourceInspection),
+    execution: input.execution,
+    env: {
+      PYTHONDONTWRITEBYTECODE: "1",
+      PYTHONUNBUFFERED: "1",
+    },
+  });
 }
 
 export const pythonWorkspacePlanner: WorkspaceRuntimePlanner = {
@@ -68,15 +122,6 @@ export const pythonWorkspacePlanner: WorkspaceRuntimePlanner = {
   },
 
   dockerfile(input: WorkspaceDockerfileInput): string | null {
-    return dockerfileFromExecution({
-      baseImage:
-        input.execution.metadata?.["workspace.baseImage"] ??
-        pythonBaseImage(input.sourceInspection),
-      execution: input.execution,
-      env: {
-        PYTHONDONTWRITEBYTECODE: "1",
-        PYTHONUNBUFFERED: "1",
-      },
-    });
+    return pythonDockerfile(input);
   },
 };

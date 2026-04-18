@@ -81,6 +81,7 @@ import {
 import { i18nKeys } from "@appaloft/i18n";
 import { LocalExecutionBackend } from "./local-execution";
 import { SshExecutionBackend } from "./ssh-execution";
+import { resolveStaticFrameworkPlan } from "./workspace-planners/javascript/static-frameworks";
 import { resolveWorkspaceRuntimePlan } from "./workspace-planners";
 
 export { RuntimeServerConnectivityChecker } from "./server-connectivity";
@@ -201,12 +202,24 @@ function workspaceMethodFromInspection(
   source: SourceDescriptor,
   requestedDeployment: RequestedDeploymentConfig,
 ): RequestedDeploymentConfig["method"] {
-  if (hasRequestedWorkspaceCommands(requestedDeployment)) {
+  if (requestedDeployment.publishDirectory) {
+    return "static";
+  }
+
+  if (requestedDeployment.startCommand) {
     return "workspace-commands";
   }
 
   if (source.inspection?.hasDetectedFile("dockerfile")) {
     return "dockerfile";
+  }
+
+  if (resolveStaticFrameworkPlan({ source, requestedDeployment })) {
+    return "static";
+  }
+
+  if (hasRequestedWorkspaceCommands(requestedDeployment)) {
+    return "workspace-commands";
   }
 
   if (source.inspection?.runtimeFamily || source.inspection?.hasDetectedFile("package-json")) {
@@ -509,7 +522,10 @@ function chooseStrategies(input: {
   }
 
   if (requestedMethod === "static") {
-    const publishDirectory = requestedDeployment.publishDirectory;
+    const staticFrameworkPlan = resolveStaticFrameworkPlan({ source, requestedDeployment });
+    const publishDirectory = requestedDeployment.publishDirectory ?? staticFrameworkPlan?.publishDirectory;
+    const installCommand = requestedDeployment.installCommand ?? staticFrameworkPlan?.installCommand;
+    const buildCommand = requestedDeployment.buildCommand ?? staticFrameworkPlan?.buildCommand;
     if (!publishDirectory) {
       return err(
         domainError.validation("Static deployments require publishDirectory", {
@@ -525,18 +541,22 @@ function chooseStrategies(input: {
       kind: ExecutionStrategyKindValue.rehydrate("docker-container"),
       workingDirectory: FilePathText.rehydrate(source.locator),
       dockerfilePath: FilePathText.rehydrate(dockerfilePath),
-      ...(requestedDeployment.installCommand
-        ? { installCommand: CommandText.rehydrate(requestedDeployment.installCommand) }
-        : {}),
-      ...(requestedDeployment.buildCommand
-        ? { buildCommand: CommandText.rehydrate(requestedDeployment.buildCommand) }
-        : {}),
+      ...(installCommand ? { installCommand: CommandText.rehydrate(installCommand) } : {}),
+      ...(buildCommand ? { buildCommand: CommandText.rehydrate(buildCommand) } : {}),
       ...runtimeHealthCheckFields(requestedDeployment),
       port,
       metadata: {
         "artifact.source": "static-site",
         "static.publishDirectory": publishDirectory,
         "static.server": "adapter-owned",
+        ...(staticFrameworkPlan?.metadata
+          ? Object.fromEntries(
+              Object.entries(staticFrameworkPlan.metadata).map(([key, value]) => [
+                `workspace.${key}`,
+                value,
+              ]),
+            )
+          : {}),
       },
     });
 
@@ -552,6 +572,20 @@ function chooseStrategies(input: {
           publishDirectory,
           staticServer: "adapter-owned",
           dockerfilePath,
+          ...(staticFrameworkPlan
+            ? {
+                planner: staticFrameworkPlan.plannerKey,
+                runtimeKind: "static",
+                framework: staticFrameworkPlan.framework,
+                baseImage: staticFrameworkPlan.baseImage,
+                ...(staticFrameworkPlan.metadata.packageManager
+                  ? { packageManager: staticFrameworkPlan.metadata.packageManager }
+                  : {}),
+                ...(staticFrameworkPlan.metadata.projectName
+                  ? { projectName: staticFrameworkPlan.metadata.projectName }
+                  : {}),
+              }
+            : {}),
         },
       }),
       steps: [
@@ -635,6 +669,9 @@ function chooseStrategies(input: {
           planner: plan.planner,
           runtimeKind: plan.runtimeKind,
           baseImage: plan.baseImage,
+          ...(plan.metadata.packageManager ? { packageManager: plan.metadata.packageManager } : {}),
+          ...(plan.metadata.framework ? { framework: plan.metadata.framework } : {}),
+          ...(plan.metadata.projectName ? { projectName: plan.metadata.projectName } : {}),
         },
       }),
       steps: [

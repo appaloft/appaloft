@@ -969,8 +969,16 @@ export class MemoryDeploymentReadModel implements DeploymentReadModel {
       .filter((deployment) =>
         input?.resourceId ? deployment.resourceId.value === input.resourceId : true,
       )
-      .map(
-        (deployment): DeploymentSummary => ({
+      .map((deployment): DeploymentSummary => {
+        const executionMetadata = deployment.runtimePlan.execution.metadata ?? {};
+        const sourceMetadata = deployment.runtimePlan.source.metadata ?? {};
+        const sourceCommitSha =
+          executionMetadata["source.commitSha"] ??
+          executionMetadata.commitSha ??
+          sourceMetadata["source.commitSha"] ??
+          sourceMetadata.commitSha;
+
+        return {
           id: deployment.id.value,
           projectId: deployment.projectId.value,
           environmentId: deployment.environmentId.value,
@@ -978,6 +986,7 @@ export class MemoryDeploymentReadModel implements DeploymentReadModel {
           serverId: deployment.serverId.value,
           destinationId: deployment.destinationId.value,
           status: deployment.status.value,
+          ...(sourceCommitSha ? { sourceCommitSha } : {}),
           runtimePlan: {
             id: deployment.runtimePlan.id,
             source: {
@@ -1153,8 +1162,8 @@ export class MemoryDeploymentReadModel implements DeploymentReadModel {
             message: log.message,
           })),
           logCount: deployment.logs.length,
-        }),
-      );
+        };
+      });
   }
 
   async findLogs(context: RepositoryContext, id: string): Promise<DeploymentLogSummary[]> {

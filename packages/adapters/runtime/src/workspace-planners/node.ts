@@ -11,12 +11,16 @@ import {
   type WorkspaceRuntimePlanner,
 } from "./types";
 
-export type NodePackageManager = "bun" | "npm" | "pnpm";
+export type NodePackageManager = "bun" | "npm" | "pnpm" | "yarn";
 
 export function resolveNodePackageManager(inspection?: SourceInspectionSnapshot): NodePackageManager {
   const packageManager = inspection?.packageManager;
 
   if (packageManager === "bun" || packageManager === "pnpm" || packageManager === "npm") {
+    return packageManager;
+  }
+
+  if (packageManager === "yarn") {
     return packageManager;
   }
 
@@ -29,6 +33,8 @@ function installCommandFor(packageManager: NodePackageManager): string {
       return "bun install";
     case "pnpm":
       return "pnpm install";
+    case "yarn":
+      return "yarn install --frozen-lockfile";
     case "npm":
       return "npm install";
   }
@@ -40,6 +46,8 @@ function runCommandFor(packageManager: NodePackageManager, script: string): stri
       return `bun run ${script}`;
     case "pnpm":
       return `pnpm ${script}`;
+    case "yarn":
+      return `yarn ${script}`;
     case "npm":
       return `npm run ${script}`;
   }
@@ -118,6 +126,12 @@ export const nodeWorkspacePlanner: WorkspaceRuntimePlanner = {
         baseImage,
         extra: {
           packageManager,
+          ...(input.source.inspection?.framework
+            ? { framework: input.source.inspection.framework }
+            : {}),
+          ...(input.source.inspection?.projectName
+            ? { projectName: input.source.inspection.projectName }
+            : {}),
         },
       }),
     });

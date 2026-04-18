@@ -894,29 +894,125 @@ export const runtimePlanSchema = z.object({
     integrationKey: z.string().optional(),
     inspection: z
       .object({
-        runtimeFamily: z.enum(["custom", "java", "node", "python"]).optional(),
-        framework: z.enum(["nextjs"]).optional(),
-        packageManager: z.enum(["bun", "npm", "pnpm"]).optional(),
+        runtimeFamily: z
+          .enum([
+            "custom",
+            "dotnet",
+            "elixir",
+            "go",
+            "java",
+            "node",
+            "php",
+            "python",
+            "ruby",
+            "rust",
+            "static",
+          ])
+          .optional(),
+        framework: z
+          .enum([
+            "actix-web",
+            "angular",
+            "astro",
+            "aspnet-core",
+            "axum",
+            "chi",
+            "django",
+            "echo",
+            "express",
+            "fastapi",
+            "fastify",
+            "fiber",
+            "flask",
+            "gin",
+            "hono",
+            "koa",
+            "laravel",
+            "micronaut",
+            "nestjs",
+            "nextjs",
+            "nuxt",
+            "phoenix",
+            "quarkus",
+            "rails",
+            "remix",
+            "rocket",
+            "sinatra",
+            "spring-boot",
+            "sveltekit",
+            "symfony",
+            "vite",
+          ])
+          .optional(),
+        packageManager: z
+          .enum([
+            "bun",
+            "cargo",
+            "composer",
+            "dotnet",
+            "go",
+            "gradle",
+            "maven",
+            "mix",
+            "npm",
+            "pip",
+            "pnpm",
+            "poetry",
+            "uv",
+            "yarn",
+          ])
+          .optional(),
         runtimeVersion: z.string().optional(),
         projectName: z.string().optional(),
         detectedFiles: z
           .array(
             z.enum([
+              "angular-json",
+              "astro-config",
+              "bun-lock",
+              "cargo-toml",
+              "composer-json",
               "compose-manifest",
+              "csproj",
+              "django-manage",
               "dockerfile",
               "git-directory",
+              "go-mod",
               "gradle-build",
               "gradle-wrapper",
+              "mix-exs",
               "maven-wrapper",
               "next-config",
+              "nuxt-config",
+              "package-lock",
               "package-json",
+              "pnpm-lock",
+              "poetry-lock",
               "pom-xml",
               "pyproject-toml",
               "requirements-txt",
+              "remix-config",
+              "svelte-config",
+              "uv-lock",
+              "vite-config",
+              "yarn-lock",
             ]),
           )
           .optional(),
-        detectedScripts: z.array(z.enum(["build", "start", "start-built"])).optional(),
+        detectedScripts: z
+          .array(
+            z.enum([
+              "build",
+              "dev",
+              "export",
+              "generate",
+              "preview",
+              "serve",
+              "start",
+              "start-built",
+            ]),
+          )
+          .optional(),
         dockerfilePath: z.string().optional(),
         composeFilePath: z.string().optional(),
         jarPath: z.string().optional(),
@@ -1009,6 +1105,7 @@ export const deploymentSummarySchema = z.object({
     "canceled",
     "rolled-back",
   ]),
+  sourceCommitSha: z.string().optional(),
   runtimePlan: runtimePlanSchema,
   environmentSnapshot: z.object({
     id: z.string(),
@@ -1481,3 +1578,36 @@ export type ListProvidersResponse = z.infer<typeof listProvidersResponseSchema>;
 export type ListPluginsResponse = z.infer<typeof listPluginsResponseSchema>;
 export type ListGitHubRepositoriesInput = z.infer<typeof listGitHubRepositoriesInputSchema>;
 export type ListGitHubRepositoriesResponse = z.infer<typeof listGitHubRepositoriesResponseSchema>;
+
+export const deploymentSourceCommitShaMetadataKey = "source.commitSha";
+
+type DeploymentCommitMetadataInput = {
+  sourceCommitSha?: string;
+  runtimePlan: {
+    source: {
+      metadata?: Record<string, string>;
+    };
+    execution: {
+      metadata?: Record<string, string>;
+    };
+  };
+};
+
+export function sourceCommitShaForDeployment(
+  deployment: DeploymentCommitMetadataInput,
+): string | undefined {
+  const executionMetadata = deployment.runtimePlan.execution.metadata ?? {};
+  const sourceMetadata = deployment.runtimePlan.source.metadata ?? {};
+
+  return (
+    deployment.sourceCommitSha ??
+    executionMetadata[deploymentSourceCommitShaMetadataKey] ??
+    executionMetadata.commitSha ??
+    sourceMetadata[deploymentSourceCommitShaMetadataKey] ??
+    sourceMetadata.commitSha
+  );
+}
+
+export function shortDeploymentSourceCommitSha(commitSha: string): string {
+  return commitSha.slice(0, 12);
+}
