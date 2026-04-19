@@ -363,6 +363,21 @@ Current boundary:
   explicit local-only/smoke-test state, not the default for SSH-targeted deploys. CI secrets must be
   mapped by the CI workflow into runner environment variables and referenced from config as
   resolver references such as `ci-env:NAME`, never committed as values.
+- Control-plane mode selection is an entry workflow concern governed by
+  [ADR-025: Control-Plane Modes And Action Execution](./decisions/ADR-025-control-plane-modes-and-action-execution.md).
+  Execution owner and state/control-plane owner are separate dimensions. A GitHub Action may
+  execute a deployment while Appaloft Cloud or a self-hosted Appaloft server owns source links,
+  locks, identity, audit, and managed domain workflow state.
+- Repository config may declare non-secret control-plane connection policy such as
+  `controlPlane.mode: none|auto|cloud|self-hosted` and optional self-host/private endpoint URL
+  metadata after the config schema implements it. It must not contain Cloud tokens, database URLs,
+  project ids, resource ids, server ids, destination ids, credential ids, organization ids, tenant
+  ids, or raw credential material. Control-plane identity comes from trusted entrypoint input,
+  authenticated token/OIDC/login scope, GitHub repository identity, source link state, or explicit
+  relink/adoption operations outside committed config.
+- Cloud and self-hosted control-plane modes require a compatibility handshake before any
+  project/resource/domain/deployment mutation. Until that handshake exists, mode selection may be
+  documented as roadmap and must fail before mutation when selected.
 - The public GitHub Actions install UX is a thin `appaloft/deploy-action` wrapper around the
   released Appaloft CLI binary. It downloads and verifies release assets, maps trusted action inputs
   to CLI flags, writes SSH private key input to a temporary key file, and invokes the same

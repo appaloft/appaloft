@@ -49,6 +49,7 @@ rebuild-required there, update the operation map and required ADR before local s
 | [ADR-022: Operator Terminal Session Boundary](./ADR-022-operator-terminal-session-boundary.md) | Accepted | Ephemeral server/resource terminal sessions use an explicit command and runtime port, with resource scope resolving deployment workspaces by deployment metadata. |
 | [ADR-023: Runtime Orchestration Target Boundary](./ADR-023-runtime-orchestration-target-boundary.md) | Accepted | Deployment runtime target backends consume the Docker/OCI workload substrate behind provider-neutral deployment/resource contracts, enabling future Swarm or Kubernetes support without changing deployment admission. |
 | [ADR-024: Pure CLI SSH State And Server-Applied Domains](./ADR-024-pure-cli-ssh-state-and-server-applied-domains.md) | Accepted | Pure CLI/GitHub Actions SSH deployments default to SSH-server PGlite state and may apply config domains as server-local proxy routes before hosted control-plane migration. |
+| [ADR-025: Control-Plane Modes And Action Execution](./ADR-025-control-plane-modes-and-action-execution.md) | Accepted | Deployment execution owner and control-plane/state owner are separate dimensions; pure Action/CLI, Cloud-assisted Action, self-hosted API mode, and future control-plane runners share one mode-selection contract. |
 
 ## Authoring Rules
 

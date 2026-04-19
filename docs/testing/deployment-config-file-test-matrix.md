@@ -21,6 +21,7 @@ Canonical assertions:
 - SSH-targeted CLI/Action runs default to SSH-server `ssh-pglite` state, not runner-local state;
 - `access.domains[]` declarations become server-applied proxy routes in SSH CLI mode or managed
   domain intent in control-plane mode, and never become `deployments.create` fields;
+- `controlPlane` declarations choose connection policy only, never durable identity or secrets;
 - HTTP remains strict unless a future workflow command is accepted by ADR.
 
 ## Global References
@@ -34,9 +35,11 @@ This matrix inherits:
 - [ADR-014: Deployment Admission Uses Resource Profile](../decisions/ADR-014-deployment-admission-uses-resource-profile.md)
 - [ADR-015: Resource Network Profile](../decisions/ADR-015-resource-network-profile.md)
 - [ADR-024: Pure CLI SSH State And Server-Applied Domains](../decisions/ADR-024-pure-cli-ssh-state-and-server-applied-domains.md)
+- [ADR-025: Control-Plane Modes And Action Execution](../decisions/ADR-025-control-plane-modes-and-action-execution.md)
 - [resources.create Command Spec](../commands/resources.create.md)
 - [deployments.create Command Spec](../commands/deployments.create.md)
 - [Quick Deploy Test Matrix](./quick-deploy-test-matrix.md)
+- [Control-Plane Modes Test Matrix](./control-plane-modes-test-matrix.md)
 - [Source Link State Test Matrix](./source-link-state-test-matrix.md)
 - [resources.create Test Matrix](./resources.create-test-matrix.md)
 - [deployments.create Test Matrix](./deployments.create-test-matrix.md)
@@ -115,6 +118,18 @@ This matrix inherits:
 | CONFIG-FILE-SEC-009 | integration | Optional CI secret reference missing | Config declares optional `ci-env:OPTIONAL_TOKEN` and the entrypoint environment does not contain it | Workflow skips the optional variable and continues | None | No command for missing optional secret -> `deployments.create` |
 | CONFIG-FILE-SEC-010 | integration | Unsupported secret resolver rejected | Config declares required `vault:prod/api` before that adapter is configured | Workflow stops before mutation | `validation_error`, phase `config-secret-resolution` | No write commands |
 
+## Control-Plane Policy Matrix
+
+| Test ID | Preferred automation | Case | Given | Expected result | Expected error | Expected operation sequence |
+| --- | --- | --- | --- | --- | --- | --- |
+| CONFIG-FILE-CONTROL-001 | unit | Omitted control-plane config defaults to none | Config has no `controlPlane` section | Config workflow passes no control-plane selection; resolver uses built-in `none` unless trusted entrypoint overrides exist | None | Config parse -> mode resolution |
+| CONFIG-FILE-CONTROL-002 | integration | Explicit none accepted | Config declares `controlPlane.mode: none` | SSH-targeted deploy keeps pure SSH `ssh-pglite` behavior and does not require Cloud token or `DATABASE_URL` | None | Config parse -> mode resolution -> remote SSH state lifecycle |
+| CONFIG-FILE-CONTROL-003 | integration | Auto without trusted source falls back to none | Config declares `controlPlane.mode: auto`, no trusted endpoint/login/adoption marker is present | Effective mode is `none`; diagnostics record safe fallback | None | Config parse -> mode resolution -> remote SSH state lifecycle when SSH target exists |
+| CONFIG-FILE-CONTROL-004 | integration | Cloud/self-hosted before handshake fails safely | Config declares `cloud` or `self-hosted` before control-plane handshake support exists | Workflow stops before identity/resource/domain/deployment mutation | `control_plane_unsupported`, phase `control-plane-capability`, or `validation_error`, phase `control-plane-resolution` | No write commands |
+| CONFIG-FILE-CONTROL-005 | integration | Control-plane identity selector rejected | Config `controlPlane` contains project/resource/server/destination/credential/org/tenant identity | Workflow stops before mutation | `validation_error`, phase `control-plane-config` or `config-identity` | No write commands |
+| CONFIG-FILE-CONTROL-006 | integration | Control-plane secret value rejected | Config `controlPlane` contains token, database URL, SSH key, certificate material, or raw credential | Workflow stops before mutation and diagnostics are sanitized | `validation_error`, phase `control-plane-config` or `config-secret-validation` | No write commands |
+| CONFIG-FILE-CONTROL-007 | integration | Entrypoint override wins | Config declares `none`, but trusted CLI/action/env selects self-hosted URL | Resolver uses trusted entrypoint selection and records origin metadata | None or later handshake error | Config parse -> mode resolution -> handshake gate |
+
 ## Remote State Matrix
 
 | Test ID | Preferred automation | Case | Given | Expected result | Expected error | Expected operation sequence |
@@ -174,6 +189,7 @@ This matrix inherits:
 | CONFIG-FILE-ENTRY-011 | contract | Deploy action version propagation | `version: vX.Y.Z` downloads that exact Appaloft release, `version: latest` resolves the latest stable release at runtime, and a new CLI release does not require changing the deploy-action repository unless wrapper behavior changes. |
 | CONFIG-FILE-ENTRY-012 | integration | Deploy action no-config mode | When no config path is supplied or discovered, the action invokes the same CLI Quick Deploy path with trusted inputs; it defaults SSH targets to `ssh-pglite`, deploys only when non-interactive context can be inferred, and otherwise fails before mutation with structured validation. |
 | CONFIG-FILE-ENTRY-013 | integration | Deploy action config without domain | Valid config with no `access.domains[]` deploys normally and does not persist server-applied route desired state; access remains generated/default or absent according to selected server policy. |
+| CONFIG-FILE-ENTRY-014 | contract | Deploy action control-plane inputs | Future deploy-action inputs for `control-plane-mode`, `control-plane-url`, token/OIDC behavior, and execution mode mirror CLI resolver semantics; when absent, the action remains pure SSH `none` by default. |
 
 ## Current Implementation Notes And Migration Gaps
 
@@ -252,6 +268,11 @@ status after deployment-finished route outcomes. Resource access, health, and di
 expose the latest server-applied route URL/status. Provider-local TLS diagnostics for
 `tlsMode = auto` routes are exposed through proxy configuration/resource diagnostics. Control-plane
 managed-domain mapping remains follow-up work.
+
+Control-plane policy rows `CONFIG-FILE-CONTROL-001` through `CONFIG-FILE-CONTROL-007` are roadmap
+coverage under ADR-025. Current config schema does not accept `controlPlane` yet; existing
+`postgres/control-plane` resolver tests only prove the older backend-selection branch and must be
+extended or renamed during Phase 1.
 
 Canonical redirect rows `CONFIG-FILE-DOMAIN-007` and `CONFIG-FILE-DOMAIN-008` now have parser,
 remote-state, deployment planning, provider rendering, and proxy-configuration query coverage for

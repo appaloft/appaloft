@@ -36,9 +36,11 @@ This workflow inherits:
 - [ADR-021: Docker/OCI Workload Substrate](../decisions/ADR-021-docker-oci-workload-substrate.md)
 - [ADR-023: Runtime Orchestration Target Boundary](../decisions/ADR-023-runtime-orchestration-target-boundary.md)
 - [ADR-024: Pure CLI SSH State And Server-Applied Domains](../decisions/ADR-024-pure-cli-ssh-state-and-server-applied-domains.md)
+- [ADR-025: Control-Plane Modes And Action Execution](../decisions/ADR-025-control-plane-modes-and-action-execution.md)
 - [resources.create Command Spec](../commands/resources.create.md)
 - [deployments.create Command Spec](../commands/deployments.create.md)
 - [Quick Deploy Workflow Spec](./quick-deploy.md)
+- [Control-Plane Mode Selection And Adoption](./control-plane-mode-selection-and-adoption.md)
 - [Resource Create And First Deploy Workflow Spec](./resources.create-and-first-deploy.md)
 - [Deployment Config File Test Matrix](../testing/deployment-config-file-test-matrix.md)
 - [Deployment Config File Implementation Plan](../implementation/deployment-config-file-plan.md)
@@ -60,9 +62,49 @@ The file exists to make source-adjacent deployment profile choices reproducible:
 - non-secret environment variable declarations and required secret references;
 - provider-neutral server-applied domain intent for SSH CLI mode, using trusted context outside the
   file for identity and credentials;
+- non-secret control-plane connection policy for selecting no control plane, trusted auto
+  detection, Appaloft Cloud, or a self-hosted Appaloft control plane;
 - future provider-neutral resource sizing and rollout policy after their own ADR/spec coverage.
 
 The file does not exist to choose durable Appaloft control-plane identity.
+
+## Control-Plane Mode Policy
+
+Repository config may declare control-plane connection policy, not Appaloft identity:
+
+```yaml
+controlPlane:
+  mode: none
+```
+
+Accepted future shape:
+
+```yaml
+controlPlane:
+  mode: self-hosted
+  url: https://appaloft.internal.example.com
+```
+
+Rules:
+
+- `mode` may be `none`, `auto`, `cloud`, or `self-hosted`.
+- Omitting `controlPlane` is equivalent to `mode: none`.
+- `url` is non-secret connection metadata and is allowed only for self-hosted or future accepted
+  private control-plane endpoints.
+- Tokens, API keys, database URLs, SSH keys, certificate material, project ids, resource ids, server
+  ids, destination ids, credential ids, organization ids, tenant ids, and Cloud project selectors
+  are rejected.
+- Config `controlPlane` cannot retarget source link identity. Identity comes from trusted
+  entrypoint input, authenticated control-plane scope, GitHub repository identity, source link
+  state, adoption markers, or explicit relink/adoption operations.
+- `mode: auto` may use only trusted endpoint/login/adoption-marker sources. Without one, it falls
+  back to `none` and records the fallback in diagnostics.
+- `mode: cloud` and `mode: self-hosted` require a control-plane compatibility handshake before any
+  project, resource, route, domain, environment, or deployment mutation.
+
+Config control-plane mode selection happens before state backend resolution. A GitHub Action may
+remain the execution owner in every mode; Cloud/self-hosted ownership only says where Appaloft
+state, locks, source links, policy, and managed workflows live.
 
 ## Relationship To Quick Deploy
 
@@ -304,6 +346,7 @@ deployment admission.
 | Plain environment values | `Environment` variable commands | Only for non-secret values; `PUBLIC_` and `VITE_` keys map to build-time `plain-config`, other keys map to runtime `plain-config`, all at `environment` scope unless a future schema adds explicit kind/exposure/scope fields. |
 | Required secret names | Secret/credential commands or adapters | Declare requirements or references, not raw values. Headless CI supports `ci-env:<NAME>` as an environment-variable resolver reference. |
 | `access.domains[]` | Server-applied route state in SSH CLI mode; managed `DomainBinding` or managed route intent in control-plane mode | Accepted values describe provider-neutral host/path/TLS route intent and optional canonical redirect aliases. They never enter `deployments.create`, never select identity or credentials, and never contain raw certificate material. |
+| `controlPlane.mode` / `controlPlane.url` | Entry workflow mode resolver | Selects connection policy and non-secret endpoint metadata only. It never enters `deployments.create`, never selects durable identity, and never stores tokens or database URLs. |
 | CPU, memory, replicas, restart policy, rollout overlap/drain | Future resource/runtime-target profile specs | Must be rejected until an ADR/spec and runtime enforcement exist; no silent ignore. |
 
 If a resource already exists and the file changes reusable profile fields, the entry workflow must
@@ -431,6 +474,8 @@ When invoked from deploy-action, install and verify the released Appaloft binary
   -> entrypoint resolves config file path
   -> parse and validate strict config schema
   -> reject identity/secret/unsupported fields
+  -> resolve control-plane mode and execution owner from config, env, flags/action inputs, or local login
+  -> run control-plane handshake before mutation when Cloud/self-hosted is selected
   -> resolve non-secret env declarations and supported secret references
   -> resolve state backend; for SSH deploys, ensure, lock, and migrate remote `ssh-pglite`
   -> resolve source fingerprint link state and trusted Appaloft identity outside file
@@ -457,6 +502,11 @@ Config-file errors use stable codes and phases:
 | `validation_error` | `config-identity` | No | File attempted to select project/resource/server/destination/credential identity. |
 | `validation_error` | `config-secret-validation` | No | File contained raw secret material. |
 | `validation_error` | `config-secret-resolution` | No | Required secret reference could not be resolved from the configured entrypoint resolver. |
+| `validation_error` | `control-plane-config` | No | Config declares an invalid mode, unsafe URL, identity selector, or secret-bearing control-plane field. |
+| `validation_error` | `control-plane-resolution` | No | Selected mode cannot resolve the required URL, credential, trusted source, or login context before mutation. |
+| `control_plane_handshake_failed` | `control-plane-handshake` | Conditional | Selected Cloud/self-hosted control plane is reachable but client/API/schema/feature/auth compatibility failed. |
+| `control_plane_unsupported` | `control-plane-capability` | No | Selected control-plane behavior is not implemented or the endpoint lacks the requested capability. |
+| `control_plane_adoption_required` | `control-plane-resolution` | No | A server adoption marker indicates control-plane ownership, but the entrypoint attempted uncoordinated direct SSH state mutation. |
 | `validation_error` | `config-profile-resolution` | No | Profile field cannot map safely to resource/environment commands. |
 | `validation_error` | `remote-state-resolution` | Conditional | SSH-targeted entrypoint could not resolve or initialize the remote Appaloft state backend. |
 | `infra_error` | `remote-state-lock` | Yes | Remote state mutation lock could not be acquired or was interrupted. |
@@ -471,6 +521,11 @@ Config-file errors use stable codes and phases:
 
 Current code has a deployment-config package and JSON schema for the supported JSON/YAML target
 names listed above.
+
+Current config parsing does not accept `controlPlane.mode` or `controlPlane.url` yet. The CLI
+state backend resolver can observe `APPALOFT_CONTROL_PLANE_URL` and `APPALOFT_DATABASE_URL` as a
+partial backend selection hint, but Cloud/self-hosted mode parsing, compatibility handshake,
+adoption markers, and API-mode deploy execution are future Phase 1+ work under ADR-025.
 
 Current CLI `init` writes only profile fields under `runtime` and `network`; it does not write
 project/resource/server identity or target bootstrap data.

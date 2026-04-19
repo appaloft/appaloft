@@ -84,6 +84,20 @@ export APPALOFT_GITHUB_CLIENT_ID=...
 export APPALOFT_GITHUB_CLIENT_SECRET=...
 ```
 
+Deployment control-plane selection is separate from execution ownership. A repository may continue
+to execute deploys from GitHub Actions while selecting no control plane, Appaloft Cloud, or a
+self-hosted Appaloft server as the state owner. Until the ADR-025 control-plane resolver is
+implemented, this is the target product contract rather than an available config field:
+
+```yaml
+controlPlane:
+  mode: none
+```
+
+Future self-hosted/cloud-assisted deployments will select control-plane mode through repository
+config plus trusted CLI/action/env overrides. Tokens, database URLs, SSH keys, and Appaloft
+project/resource/server ids must stay outside committed config.
+
 GitHub repository import uses a deferred OAuth flow. The operator can open the console without
 signing in, then authorize only after choosing a GitHub source in the deploy flow. Create a GitHub
 OAuth App in GitHub developer settings and set its authorization callback URL to:

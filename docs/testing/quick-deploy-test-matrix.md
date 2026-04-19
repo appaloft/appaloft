@@ -22,15 +22,18 @@ This test matrix inherits:
 - [ADR-021: Docker/OCI Workload Substrate](../decisions/ADR-021-docker-oci-workload-substrate.md)
 - [ADR-023: Runtime Orchestration Target Boundary](../decisions/ADR-023-runtime-orchestration-target-boundary.md)
 - [ADR-024: Pure CLI SSH State And Server-Applied Domains](../decisions/ADR-024-pure-cli-ssh-state-and-server-applied-domains.md)
+- [ADR-025: Control-Plane Modes And Action Execution](../decisions/ADR-025-control-plane-modes-and-action-execution.md)
 - [deployments.create Command Spec](../commands/deployments.create.md)
 - [resources.create Command Spec](../commands/resources.create.md)
 - [Workload Framework Detection And Planning](../workflows/workload-framework-detection-and-planning.md)
 - [resources.diagnostic-summary Query Spec](../queries/resources.diagnostic-summary.md)
 - [Quick Deploy Workflow Spec](../workflows/quick-deploy.md)
 - [Repository Deployment Config File Bootstrap](../workflows/deployment-config-file-bootstrap.md)
+- [Control-Plane Mode Selection And Adoption](../workflows/control-plane-mode-selection-and-adoption.md)
 - [GitHub Action Deploy Wrapper Implementation Plan](../implementation/github-action-deploy-action-plan.md)
 - [Resource Diagnostic Summary Test Matrix](./resource-diagnostic-summary-test-matrix.md)
 - [Deployment Config File Test Matrix](./deployment-config-file-test-matrix.md)
+- [Control-Plane Modes Test Matrix](./control-plane-modes-test-matrix.md)
 - [Source Link State Test Matrix](./source-link-state-test-matrix.md)
 - [resources.create Test Matrix](./resources.create-test-matrix.md)
 - [deployments.create Test Matrix](./deployments.create-test-matrix.md)
@@ -132,6 +135,7 @@ Then:
 | QUICK-DEPLOY-WF-053 | e2e-preferred, opt-in SSH | Repository config server-applied domain | GitHub Actions or CLI non-TTY | Valid `access.domains[]`, reverse-proxy network profile, proxy-ready SSH target | Deployment succeeds or accepts and server-applied route state is realized/observable through access/proxy read models | None or provider route error | SSH state -> context commands -> `deployments.create` -> edge proxy route realization | Remote state records route desired/applied status; no managed `DomainBinding` is created | Per proxy route retry |
 | QUICK-DEPLOY-WF-054 | integration | Control-plane maps config domain to managed workflow | Hosted/self-hosted control-plane entry | Same config `access.domains[]`, selected control-plane state | Config domain intent maps to managed domain binding workflow or fails with stable unsupported managed-mapping error; it does not write SSH server-applied state | None or stable unsupported error | Context commands -> `deployments.create` -> `domain-bindings.create` follow-up when supported | Managed `DomainBinding` state progresses separately from deployment | Per domain/certificate retry rules |
 | QUICK-DEPLOY-WF-055 | e2e-preferred, opt-in SSH | Repository config canonical redirect | GitHub Actions or CLI non-TTY | Valid `access.domains[]` with a served canonical host and an alias host using `redirectTo` | Deployment succeeds or accepts, canonical host serves the workload, alias host redirects with configured status, and access/proxy diagnostics expose redirect state | None or provider route error | SSH state -> context commands -> route desired state with redirect intent -> `deployments.create` -> edge proxy route realization -> redirect verification | Remote state records desired/applied redirect status; no managed `DomainBinding` or `Certificate` is created | Per proxy route retry |
+| QUICK-DEPLOY-WF-056 | integration | Control-plane mode resolved before identity | Web, CLI, local Web agent, or headless binary | Quick Deploy or repository config supplies control-plane mode policy | Workflow resolves execution owner and control-plane/state owner before state backend, source link, identity, env, domain, or deployment mutation; Cloud/self-hosted requires handshake first | `validation_error`, phase `control-plane-resolution`, `control_plane_unsupported`, or `control_plane_handshake_failed` when selected mode is not usable | Mode resolution -> optional handshake -> state/source identity -> Quick Deploy operation order -> `deployments.create` | No project/resource/server/route/deployment mutation occurs before control-plane mode is accepted | Per selected mode policy |
 
 ## Entry Consistency Matrix
 
@@ -148,6 +152,7 @@ Then:
 | QUICK-DEPLOY-ENTRY-009 | e2e-preferred | Framework detection parity | Uses the same source inspection and planner contract as CLI; may suggest resource name, strategy, commands, publish directory, and internal port before dispatch | Uses the same source inspection and planner contract as Web; prompts for missing explicit fallback commands when needed | API/automation callers provide resource source/runtime/network profile explicitly or rely on deployment planning to reject unsupported evidence |
 | QUICK-DEPLOY-ENTRY-010 | e2e-preferred | Repository config file parity | Local Web agent may read a selected file and must follow the config workflow contract | CLI supports explicit `--config` and implicit discovery through the same parser/normalizer; GitHub Actions invokes the binary as a non-interactive CLI executor with SSH-server `ssh-pglite` by default for SSH targets | API/automation remains explicit-operation first; no hidden config-file deployment schema |
 | QUICK-DEPLOY-ENTRY-011 | contract | Deploy action wrapper parity | Not applicable unless a local Web agent shells out to the CLI | `appaloft/deploy-action` installs a verified released binary, maps trusted inputs to the same CLI flags as direct CLI usage, and invokes the same repository config workflow | API/automation still call explicit operations or use direct CLI; the action wrapper must not introduce a hidden business command |
+| QUICK-DEPLOY-ENTRY-012 | contract | Control-plane mode parity | Web shows read-only mode until selection is implemented, then uses an explicit select/radio backed by the same resolver | CLI and deploy-action expose equivalent trusted mode/URL/token inputs and keep pure SSH `none` as default | HTTP/oRPC keeps `deployments.create` ids-only; future backend workflow API requires separate ADR/operation contract |
 
 ## Error Assertion Rules
 
@@ -205,7 +210,8 @@ parity is still required before a framework family is marked first-class.
 
 Repository config file rows `QUICK-DEPLOY-WF-045` through `QUICK-DEPLOY-WF-051` and
 remote-state/domain rows `QUICK-DEPLOY-WF-052` through `QUICK-DEPLOY-WF-054` plus
-`QUICK-DEPLOY-ENTRY-010` are target contract rows governed by
+`QUICK-DEPLOY-WF-056` and `QUICK-DEPLOY-ENTRY-010` through `QUICK-DEPLOY-ENTRY-012` are target
+contract rows governed by
 [Deployment Config File Test Matrix](./deployment-config-file-test-matrix.md). Current
 implementation covers the parser safety contract, CLI `init` profile-only output, CLI `--config`
 seed mapping, Git-root filesystem discovery, headless local PGlite defaulting, no-id non-TTY
@@ -232,6 +238,11 @@ follow-up.
 rendering, and proxy-configuration query coverage for `redirectTo` / `redirectStatus`. A full
 GitHub Actions or CLI non-TTY SSH e2e that asserts real alias HTTP redirect behavior remains target
 coverage.
+
+`QUICK-DEPLOY-WF-056` and `QUICK-DEPLOY-ENTRY-012` are roadmap rows under
+[Control-Plane Modes Test Matrix](./control-plane-modes-test-matrix.md). Current implementation
+does not parse config `controlPlane` fields, run Cloud/self-hosted compatibility handshakes, or
+adopt SSH-server PGlite into a control plane.
 
 Current Web and CLI do not yet expose all source variant fields as typed drafts. Initial tests may
 cover the parser/normalizer as a unit before full UI coverage, but the workflow contract requires
