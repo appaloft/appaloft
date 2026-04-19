@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.1](https://github.com/appaloft/appaloft/compare/v0.2.0...v0.2.1) (2026-04-19)
+
+
+### Bug Fixes
+
+* complete canonical redirect deployment surfaces ([a3b7f44](https://github.com/appaloft/appaloft/commit/a3b7f440d36fb50bc878cb93922d5bfcb27a4685))
+* complete canonical redirect deployment surfaces ([a1e0da0](https://github.com/appaloft/appaloft/commit/a1e0da02bb6f1001275e7c2e5e3a3b053a6802d5))
+
 ## [0.2.0](https://github.com/appaloft/appaloft/compare/v0.1.0...v0.2.0) (2026-04-19)
 
 
