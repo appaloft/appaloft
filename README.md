@@ -142,4 +142,10 @@ docs/
 
 ## License
 
-MIT
+Apache-2.0.
+
+The open source edition covers this repository's source code. Appaloft Cloud and other hosted
+service-specific code may be distributed separately under different terms.
+
+The Appaloft name, logo, and related brand assets are not granted by the Apache-2.0 license; see
+[TRADEMARKS.md](./TRADEMARKS.md).
