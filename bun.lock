@@ -351,6 +351,7 @@
         "@appaloft/application": "workspace:*",
         "@appaloft/core": "workspace:*",
         "acme-client": "^5.4.0",
+        "reflect-metadata": "^0.2.2",
       },
     },
     "packages/providers/core": {
