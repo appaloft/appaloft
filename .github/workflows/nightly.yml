@@ -14,6 +14,12 @@ env:
   APPALOFT_OTEL_ENABLED: "false"
 
 jobs:
+  ssh-remote-state-e2e:
+    uses: ./.github/workflows/ssh-remote-state-e2e.yml
+    with:
+      required: false
+    secrets: inherit
+
   compose-smoke:
     runs-on: ubuntu-latest
     steps:

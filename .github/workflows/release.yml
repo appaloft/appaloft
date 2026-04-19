@@ -8,6 +8,11 @@ on:
         required: false
         default: false
         type: boolean
+      require_ssh_remote_state_e2e:
+        description: Fail the release if SSH remote-state E2E secrets are missing.
+        required: false
+        default: false
+        type: boolean
 
 concurrency:
   group: release-${{ github.ref }}
@@ -32,8 +37,18 @@ jobs:
           config-file: .github/release-please-config.json
           manifest-file: .github/.release-please-manifest.json
 
-  build-release:
+  ssh-remote-state-e2e:
     needs: release-please
+    if: ${{ needs.release-please.outputs.release_created == 'true' }}
+    uses: ./.github/workflows/ssh-remote-state-e2e.yml
+    with:
+      required: ${{ inputs.require_ssh_remote_state_e2e }}
+    secrets: inherit
+
+  build-release:
+    needs:
+      - release-please
+      - ssh-remote-state-e2e
     if: ${{ needs.release-please.outputs.release_created == 'true' }}
     permissions:
       contents: write
