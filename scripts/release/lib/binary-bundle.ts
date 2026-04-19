@@ -45,6 +45,7 @@ ${entries.join("\n")}
 async function createBinaryEntryModule(input: {
   entryPath: string;
   root: string;
+  version: string;
   embeddedWebAssetsModulePath: string;
   pgliteFsBundlePath: string;
   pgliteWasmPath: string;
@@ -68,6 +69,10 @@ import initdbWasmPath from "${initdbWasmSpecifier}" with { type: "file" };
 
 import { runShellCli } from "${runModuleSpecifier}";
 import { embeddedWebAssets } from "${embeddedAssetsSpecifier}";
+
+if (!process.env.APPALOFT_APP_VERSION) {
+	process.env.APPALOFT_APP_VERSION = ${JSON.stringify(input.version)};
+}
 
 async function loadEmbeddedPgliteRuntimeAssets() {
 	const [pgliteWasmModule, initdbWasmModule] = await Promise.all([
@@ -222,6 +227,7 @@ export async function createBinaryBundle(input: {
   await createBinaryEntryModule({
     entryPath: binaryEntryPath,
     root: input.root,
+    version,
     embeddedWebAssetsModulePath,
     pgliteFsBundlePath,
     pgliteWasmPath,

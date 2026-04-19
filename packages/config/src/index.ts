@@ -77,7 +77,7 @@ export interface ConfigSource<TValue> {
 
 const defaults: Omit<AppConfig, "dataDir" | "pgliteDataDir"> = {
   appName: "Appaloft",
-  appVersion: "0.2.0",
+  appVersion: readSourceCheckoutAppVersion(),
   runtimeMode: "self-hosted",
   authProvider: "better-auth",
   betterAuthBaseUrl: "http://localhost:3001",
@@ -117,6 +117,19 @@ const defaults: Omit<AppConfig, "dataDir" | "pgliteDataDir"> = {
   },
   enabledSystemPlugins: [],
 };
+
+function readSourceCheckoutAppVersion(): string {
+  try {
+    const packageJson = JSON.parse(
+      readFileSync(new URL("../../../package.json", import.meta.url), "utf8"),
+    ) as { version?: unknown };
+    return typeof packageJson.version === "string" && packageJson.version.length > 0
+      ? packageJson.version
+      : "0.0.0-dev";
+  } catch {
+    return "0.0.0-dev";
+  }
+}
 
 function defaultUserDataRoot(env: ConfigEnv): string | undefined {
   if (process.platform === "darwin") {
