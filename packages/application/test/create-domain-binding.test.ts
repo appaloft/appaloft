@@ -290,6 +290,86 @@ describe("CreateDomainBindingUseCase", () => {
     expect(eventBus.events).toHaveLength(1);
   });
 
+  test("[ROUTE-TLS-ENTRY-016] accepts a canonical redirect binding to an existing served binding", async () => {
+    const { context, domainBindings, eventBus, readModel, repositoryContext, useCase } =
+      await seedRoutingContext();
+
+    const canonical = await useCase.execute(context, {
+      projectId: "prj_demo",
+      environmentId: "env_demo",
+      resourceId: "res_demo",
+      serverId: "srv_demo",
+      destinationId: "dst_demo",
+      domainName: "example.com",
+      proxyKind: "traefik",
+      tlsMode: "auto",
+    });
+    expect(canonical.isOk()).toBe(true);
+
+    const redirect = await useCase.execute(context, {
+      projectId: "prj_demo",
+      environmentId: "env_demo",
+      resourceId: "res_demo",
+      serverId: "srv_demo",
+      destinationId: "dst_demo",
+      domainName: "www.example.com",
+      proxyKind: "traefik",
+      tlsMode: "auto",
+      redirectTo: "example.com",
+      redirectStatus: 308,
+    });
+
+    expect(redirect.isOk()).toBe(true);
+    const redirectId = redirect._unsafeUnwrap().id;
+    const persisted = await domainBindings.findOne(
+      repositoryContext,
+      DomainBindingByIdSpec.create(DomainBindingId.rehydrate(redirectId)),
+    );
+    const persistedState = persisted?.toState();
+    expect(persistedState?.redirectTo?.value).toBe("example.com");
+    expect(persistedState?.redirectStatus?.value).toBe(308);
+
+    const event = domainBindingRequestedEvent(eventBus.events.slice(1));
+    expect(event.payload).toMatchObject({
+      domainBindingId: redirectId,
+      domainName: "www.example.com",
+      redirectTo: "example.com",
+      redirectStatus: 308,
+    });
+
+    const listed = await new ListDomainBindingsQueryService(readModel).execute(context, {
+      resourceId: "res_demo",
+    });
+    expect(listed.items.find((item) => item.id === redirectId)).toMatchObject({
+      domainName: "www.example.com",
+      redirectTo: "example.com",
+      redirectStatus: 308,
+    });
+  });
+
+  test("[ROUTE-TLS-ENTRY-017] rejects a canonical redirect binding without an existing served target", async () => {
+    const { context, eventBus, useCase } = await seedRoutingContext();
+
+    const result = await useCase.execute(context, {
+      projectId: "prj_demo",
+      environmentId: "env_demo",
+      resourceId: "res_demo",
+      serverId: "srv_demo",
+      destinationId: "dst_demo",
+      domainName: "www.example.com",
+      proxyKind: "traefik",
+      redirectTo: "example.com",
+    });
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr().code).toBe("validation_error");
+    expect(result._unsafeUnwrapErr().details).toMatchObject({
+      phase: "domain-binding-admission",
+      redirectTo: "example.com",
+    });
+    expect(eventBus.events).toHaveLength(0);
+  });
+
   test("rejects destination and server context mismatch", async () => {
     const { context, eventBus, useCase } = await seedRoutingContext({
       destinationServerId: "srv_other",

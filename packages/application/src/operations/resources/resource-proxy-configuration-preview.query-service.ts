@@ -52,6 +52,9 @@ function routesFromDeployment(deployment: DeploymentSummary): EdgeProxyRouteInpu
     pathPrefix: route.pathPrefix,
     tlsMode: route.tlsMode,
     ...(route.targetPort === undefined ? {} : { targetPort: route.targetPort }),
+    ...(route.routeBehavior ? { routeBehavior: route.routeBehavior } : {}),
+    ...(route.redirectTo ? { redirectTo: route.redirectTo } : {}),
+    ...(route.redirectStatus ? { redirectStatus: route.redirectStatus } : {}),
   }));
 }
 

@@ -29,7 +29,7 @@ Implementation must preserve the source-of-truth behavior in the governed ADRs a
 
 Expected implementation scope:
 
-- `packages/core/src/runtime-topology`: `DomainBinding` aggregate, domain binding status value object, domain binding id, normalized domain name, route path prefix, owner scope, verification attempt value/entity, and transition rules.
+- `packages/core/src/runtime-topology`: `DomainBinding` aggregate, domain binding status value object, domain binding id, normalized domain name, route path prefix, optional canonical redirect metadata, owner scope, verification attempt value/entity, and transition rules.
 - `packages/application/src/operations/domain-bindings`: command schema, command message, handler, use case, operation-local factories/builders, and result/error translation.
 - `packages/application/src/operation-catalog.ts`: operation catalog entry for `domain-bindings.create`.
 - `packages/application/src/ports.ts` and `packages/application/src/tokens.ts`: domain binding repository, domain binding read-model ports, event publisher/outbox port, clock, and id generator tokens.
@@ -96,6 +96,7 @@ The command must return admission errors synchronously as `err(DomainError)` for
 - missing project/environment/resource/server/destination context;
 - owner-scope mismatch;
 - duplicate active domain binding;
+- missing or redirect-chain canonical redirect target;
 - persistence or outbox failure before acceptance.
 
 Post-acceptance verification, route realization, and readiness failures must be recorded as async-processing state and must not rewrite accepted command success into a later command failure.
@@ -151,6 +152,8 @@ The first implementation slice now covers:
 - PostgreSQL/PGlite `domain_bindings` migrations, repository, and read model;
 - initial `dnsObservation` aggregate state, persistence JSON, contract schema, and read-model
   projection;
+- managed canonical redirect metadata through command schema, aggregate state, persistence, read
+  models, CLI flags, Web route-behavior selects, and deployment route planning;
 - oRPC/OpenAPI `POST /api/domain-bindings` and `GET /api/domain-bindings`;
 - CLI `appaloft domain-binding create` and `appaloft domain-binding list`;
 - Web console standalone domain binding create/list entrypoint and resource-scoped resource detail create/list entrypoint;

@@ -134,12 +134,15 @@ Transport compatibility note:
 - `DeploymentTarget.targetKind` describes the target shape, such as `single-server` or the future
   `orchestrator-cluster`; concrete runtime providers are selected by provider key and capabilities
   rather than provider-specific fields on deployment commands
-- access routes express public-domain intent; provider-specific labels, files, commands, and route
-  manifests are rendered by concrete edge proxy providers, not core aggregates
+- access routes express public-domain intent, including provider-neutral canonical redirect aliases;
+  provider-specific labels, files, commands, redirect middleware, and route manifests are rendered
+  by concrete edge proxy providers, not core aggregates
 - `access.domains[]` from repository config expresses provider-neutral custom domain route intent.
   In pure CLI/SSH mode it becomes target-local server-applied route state owned by the selected
   deployment target and edge proxy provider; in control-plane mode it may be mapped to managed
-  `DomainBinding` lifecycle commands after trusted context exists.
+  `DomainBinding` lifecycle commands after trusted context exists. Redirect entries such as
+  `www.example.com -> example.com` are alias route intent for the same resource context and must not
+  retarget traffic across projects, resources, servers, destinations, or credentials.
 - server registration emits a domain event; application event handlers may soft-fail while asking
   runtime adapters to bootstrap the configured edge proxy and persist the resulting status
 - runtime adapters execute provider-produced shared edge proxy and route realization plans when a
@@ -148,7 +151,8 @@ Transport compatibility note:
   starts a durable routing/domain/TLS lifecycle and publishes `domain-binding-requested`
 - server-applied config domains are also separate from `DomainBinding`; they are migratable
   SSH-target state for pure CLI operation, not proof that Appaloft owns an always-on DNS or
-  certificate scheduler
+  certificate scheduler. Canonical redirect source hosts still require DNS and provider-local TLS
+  coverage when HTTPS redirects are expected.
 - source fingerprint links map a normalized source identity to trusted project/environment/resource
   and optional target placement. They are not resource profile fields and must be changed only
   through explicit relink behavior, not by editing `appaloft.yml`.
@@ -445,6 +449,8 @@ Rules:
 - owner scope is governed by ADR-005: project, environment, resource, destination, server, domain,
   path prefix, proxy kind, TLS mode, and certificate policy are explicit
 - active bindings must be unique by normalized project/environment/resource/domain/path scope
+- a binding may be a managed canonical redirect alias when `redirectTo` references an existing
+  served binding in the same owner/path scope; redirect aliases still own their source hostname
 - durable bindings require an edge proxy kind; `none` is only valid for deployment runtime
   access-route hints
 - command success means the request is accepted and pending verification, not traffic readiness
@@ -455,6 +461,7 @@ Current scope:
 - created by `domain-bindings.create`
 - publishes `domain-binding-requested`
 - records pending verification state and first manual verification attempt
+- records optional canonical redirect target/status metadata for redirect-only route realization
 - DNS verification, certificate issuance, and domain-ready transitions remain future workflow work
 
 ### SSH Credential

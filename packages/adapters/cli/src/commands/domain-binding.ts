@@ -18,6 +18,13 @@ const domainBindingIdArg = Args.text({ name: "domainBindingId" });
 const pathPrefixOption = Options.text("path-prefix").pipe(Options.withDefault("/"));
 const proxyKindOption = Options.choice("proxy-kind", edgeProxyKinds);
 const tlsModeOption = Options.choice("tls-mode", tlsModes).pipe(Options.withDefault("auto"));
+const redirectToOption = Options.text("redirect-to").pipe(Options.optional);
+const redirectStatusOption = Options.choice("redirect-status", [
+  "301",
+  "302",
+  "307",
+  "308",
+] as const).pipe(Options.optional);
 const certificatePolicyOption = Options.choice("certificate-policy", certificatePolicies).pipe(
   Options.optional,
 );
@@ -44,6 +51,8 @@ const createCommand = EffectCommand.make(
     pathPrefix: pathPrefixOption,
     proxyKind: proxyKindOption,
     tlsMode: tlsModeOption,
+    redirectTo: redirectToOption,
+    redirectStatus: redirectStatusOption,
     certificatePolicy: certificatePolicyOption,
     idempotencyKey: idempotencyKeyOption,
   },
@@ -56,12 +65,16 @@ const createCommand = EffectCommand.make(
     pathPrefix,
     projectId,
     proxyKind,
+    redirectStatus,
+    redirectTo,
     resourceId,
     serverId,
     tlsMode,
   }) => {
     const certificatePolicyValue = optionalValue(certificatePolicy);
     const idempotencyKeyValue = optionalValue(idempotencyKey);
+    const redirectToValue = optionalValue(redirectTo);
+    const redirectStatusValue = optionalValue(redirectStatus);
 
     return runCommand(
       CreateDomainBindingCommand.create({
@@ -74,6 +87,10 @@ const createCommand = EffectCommand.make(
         pathPrefix,
         proxyKind,
         tlsMode,
+        ...(redirectToValue ? { redirectTo: redirectToValue } : {}),
+        ...(redirectStatusValue
+          ? { redirectStatus: Number(redirectStatusValue) as 301 | 302 | 307 | 308 }
+          : {}),
         ...(certificatePolicyValue ? { certificatePolicy: certificatePolicyValue } : {}),
         ...(idempotencyKeyValue ? { idempotencyKey: idempotencyKeyValue } : {}),
       }),

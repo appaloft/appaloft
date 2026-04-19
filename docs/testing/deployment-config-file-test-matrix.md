@@ -143,6 +143,9 @@ This matrix inherits:
 | CONFIG-FILE-DOMAIN-004 | integration | Domain host shape rejected | Domain host includes scheme, port, path, wildcard syntax not accepted by policy, or an invalid domain label | Workflow stops before mutation | `validation_error`, phase `config-domain-resolution` | No write commands |
 | CONFIG-FILE-DOMAIN-005 | e2e-preferred, opt-in SSH | Server-applied route reaches deployed service | SSH deploy has reverse-proxy network profile and `access.domains[]` with TLS disabled or provider-local TLS test mode | After deployment/proxy realization, request to target edge with `Host: <domain>` reaches the service and read model reports applied route | None or structured proxy error | Remote state -> `deployments.create` -> provider route apply/reload -> route verification/read model |
 | CONFIG-FILE-DOMAIN-006 | integration | Control-plane mode maps config domain to managed workflow | Same config runs against hosted/self-hosted control-plane state | Executor creates managed domain intent through `domain-bindings.create` or reports unsupported managed mapping; it does not write server-applied SSH route state | None or stable unsupported mapping error until implemented | Config parse -> trusted context -> `deployments.create` -> managed domain follow-up command |
+| CONFIG-FILE-DOMAIN-007 | integration | Canonical redirect config accepted | Config declares one served domain and one alias domain with `redirectTo` and optional `redirectStatus` | Parser normalizes redirect intent, persists server-applied route desired state in SSH mode, and keeps final deployment ids-only | None when redirect target is valid and route-state storage is available | Config parse -> trusted context -> route desired state with serve and redirect entries -> `deployments.create` -> edge proxy route realization |
+| CONFIG-FILE-DOMAIN-008 | integration | Canonical redirect graph rejected | Config redirects to itself, to a missing host, to another redirect entry, or forms a loop | Workflow stops before mutation | `validation_error`, phase `config-domain-resolution` | No write commands |
+| CONFIG-FILE-DOMAIN-009 | e2e-preferred, opt-in SSH | Canonical redirect reaches canonical host | SSH deploy has reverse-proxy network profile, a served canonical host, and an alias host redirecting to it | Request to target edge with `Host: <alias>` returns the configured redirect status and `Location` for the canonical host while `Host: <canonical>` reaches the service; read/proxy diagnostics report applied redirect route state | None or structured proxy error | Remote state -> `deployments.create` -> provider redirect route apply/reload -> alias redirect verification -> canonical route verification/read model |
 
 ## Resource Sizing And Runtime Target Matrix
 
@@ -249,6 +252,11 @@ status after deployment-finished route outcomes. Resource access, health, and di
 expose the latest server-applied route URL/status. Provider-local TLS diagnostics for
 `tlsMode = auto` routes are exposed through proxy configuration/resource diagnostics. Control-plane
 managed-domain mapping remains follow-up work.
+
+Canonical redirect rows `CONFIG-FILE-DOMAIN-007` and `CONFIG-FILE-DOMAIN-008` now have parser,
+remote-state, deployment planning, provider rendering, and proxy-configuration query coverage for
+`redirectTo` / `redirectStatus`. `CONFIG-FILE-DOMAIN-009` remains opt-in SSH e2e target coverage for
+real HTTP redirect behavior against an external target.
 
 Current HTTP adapter serves a config schema endpoint, but strict deployment API behavior remains
 ids-only.

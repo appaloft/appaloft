@@ -20,6 +20,24 @@ function expectedDefaultDataDir(): string {
 }
 
 describe("resolveConfig", () => {
+  test("defaults the runtime app version to the current package version", () => {
+    const config = resolveConfig({
+      env: {},
+    });
+
+    expect(config.appVersion).toBe("0.2.0");
+  });
+
+  test("allows overriding the runtime app version through environment", () => {
+    const config = resolveConfig({
+      env: {
+        APPALOFT_APP_VERSION: "0.2.0-dev.1",
+      },
+    });
+
+    expect(config.appVersion).toBe("0.2.0-dev.1");
+  });
+
   test("defaults to embedded pglite with user-level storage", () => {
     const config = resolveConfig({
       env: {

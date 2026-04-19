@@ -43,7 +43,8 @@ It consumes:
 - deployment target public address and runtime access metadata;
 - resource network profile;
 - generated or durable access route snapshot;
-- server-applied config domain route desired state in pure CLI/SSH mode;
+- server-applied config domain route desired state in pure CLI/SSH mode, including canonical
+  redirect aliases;
 - deployment attempt id;
 - provider registry configuration;
 - execution context and correlation ids.
@@ -150,12 +151,22 @@ managed `DomainBinding` or `Certificate` aggregates in pure CLI mode.
 
 The provider must treat server-applied config domains as provider-neutral route input:
 
-- host, path prefix, TLS mode, resource network snapshot, server/destination context, and
-  deployment/resource identity are supplied by the workflow;
+- host, path prefix, TLS mode, optional `redirectTo` host, optional redirect status, resource
+  network snapshot, server/destination context, and deployment/resource identity are supplied by the
+  workflow;
 - provider-specific files, labels, ACME storage, reload behavior, and diagnostics stay inside the
   provider/runtime adapter boundary;
 - raw certificate material, DNS provider credentials, and target credentials are never accepted
   from repository config route input.
+
+Canonical redirect route input must be rendered as redirect-only configuration for the source host.
+It must not attach the redirect source host to the workload upstream. Providers must preserve path
+and query by default, use the provider-neutral redirect status, and choose the target scheme from
+the resolved target route TLS policy unless a future route-profile ADR adds an explicit scheme
+field. Redirect source hosts still participate in TLS automation when `tlsMode = auto`, because a
+browser must complete TLS negotiation before it can receive the redirect response. Provider-specific
+implementations such as Traefik middleware or Caddy `redir` directives stay inside the concrete
+provider package.
 
 Server-applied route realization records applied/failed state in the SSH-server Appaloft state
 backend. It does not create managed `DomainBinding` or `Certificate` aggregates. In control-plane
@@ -244,6 +255,12 @@ Canonical phases:
 
 Provider errors must return structured `DomainError` values with category, phase, retriable flag, correlation id, causation id, and related server/resource/deployment ids.
 
+Invalid redirect graph errors that are discovered before provider rendering use
+`validation_error`, phase `config-domain-resolution`. Provider rendering failures for accepted
+redirect input use the existing proxy phases, usually `proxy-route-plan-render` or
+`proxy-route-realization`, and must include safe redirect source/target host metadata without
+secrets.
+
 Post-acceptance route realization failure must persist deployment failure or degraded route state. It must not rewrite the original accepted command result.
 
 When the failed route belongs to one or more active durable domain bindings, a route realization
@@ -281,6 +298,11 @@ now expose the latest server-applied route URL/status separately from generated 
 durable domain routes. Provider-local TLS diagnostics for `tlsMode = auto` routes now identify the
 resident edge proxy as the TLS automation owner and explicitly state that no Appaloft `Certificate`
 aggregate is created by pure CLI server-applied routes.
+
+Server-applied canonical redirect aliases now use the same provider route realization path, avoid
+upstream attachment for redirect hosts, and expose redirect source/target/status in proxy
+configuration and diagnostics. External public redirect probing, exact provider-native redirect
+status verification, and provider-owned ACME history remain follow-up provider/e2e coverage.
 
 `resources.proxy-configuration.preview` exists for Web/API/CLI. Provider diagnostics now include
 route-level provider-local TLS summaries, while real HTTPS public validation, provider-owned ACME

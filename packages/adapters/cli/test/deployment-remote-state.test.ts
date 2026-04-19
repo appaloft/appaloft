@@ -359,6 +359,50 @@ describe("CLI server-applied route desired state", () => {
     }
   });
 
+  test("[CONFIG-FILE-DOMAIN-007] server-applied route desired state preserves canonical redirect metadata", async () => {
+    const root = await tempStateRoot();
+    try {
+      const store = new FileSystemServerAppliedRouteDesiredStateStore(root);
+      const target = {
+        projectId: "proj_1",
+        environmentId: "env_1",
+        resourceId: "res_1",
+        serverId: "srv_1",
+      };
+      const domains = [
+        {
+          host: "example.com",
+          pathPrefix: "/",
+          tlsMode: "auto" as const,
+        },
+        {
+          host: "www.example.com",
+          pathPrefix: "/",
+          tlsMode: "auto" as const,
+          redirectTo: "example.com",
+          redirectStatus: 308 as const,
+        },
+      ];
+
+      const persisted = await store.upsertDesired({
+        target,
+        updatedAt: "2026-04-19T00:00:00.000Z",
+        domains,
+      });
+      const readBack = await store.read(target);
+
+      expect(persisted.isOk()).toBe(true);
+      expect(readBack.isOk()).toBe(true);
+      if (persisted.isErr() || readBack.isErr()) {
+        throw new Error("Expected canonical redirect route state persistence to succeed");
+      }
+      expect(persisted.value.domains).toEqual(domains);
+      expect(readBack.value?.domains).toEqual(domains);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
   test("[EDGE-PROXY-ROUTE-005] server-applied route state records applied status", async () => {
     const root = await tempStateRoot();
     try {

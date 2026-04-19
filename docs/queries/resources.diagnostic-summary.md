@@ -125,7 +125,8 @@ Required top-level behavior:
 - `deployment` includes attempt status, lifecycle phase, terminal timestamps, request/correlation id
   when available, and last structured error summary when available.
 - `access` includes generated and durable access route status, public URL when safe, route
-  realization status, and the structured reason when no access URL is available.
+  realization status, server-applied canonical redirect status when present, and the structured
+  reason when no access URL is available.
 - `proxy` includes provider key, proxy readiness, configuration view availability, and safe warnings
   or last structured provider error.
 - `deploymentLogs` and `runtimeLogs` report whether logs are available, empty, unavailable, or not

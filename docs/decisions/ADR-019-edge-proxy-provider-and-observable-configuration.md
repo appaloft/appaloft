@@ -21,6 +21,8 @@ Concrete edge proxy providers own provider-specific decisions:
 
 - how the shared proxy is installed or ensured on a deployment target;
 - whether route realization is expressed as Docker labels, config files, commands, provider API calls, or runtime manifests;
+- how provider-neutral canonical redirects are rendered, including redirect middleware, redirect
+  status code, source-host certificate coverage, and path/query preservation;
 - whether realized route or certificate changes become active through automatic provider reload,
   dynamic-provider watching, or an explicit reload command;
 - how logs, health checks, diagnostics, and generated configuration sections are collected;
@@ -167,6 +169,7 @@ The v1 ownership model is:
 | Proxy bootstrap attempts | Server bootstrap/process workflow state |
 | Resource upstream endpoint | `ResourceNetworkProfile` |
 | Generated access hostname | Default access domain provider and route snapshot |
+| Canonical redirect intent | Provider-neutral route state from server-applied config or future managed route configuration |
 | Per-deployment route realization snapshot | Deployment/runtime plan snapshot |
 | Provider-rendered visible config | Query/read model derived from provider output and snapshots |
 

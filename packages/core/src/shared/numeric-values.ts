@@ -24,6 +24,36 @@ export class PortNumber extends ScalarValueObject<number> {
   }
 }
 
+export const canonicalRedirectStatusCodes = [301, 302, 307, 308] as const;
+
+const canonicalRedirectStatusCodeBrand: unique symbol = Symbol("CanonicalRedirectStatusCode");
+export class CanonicalRedirectStatusCode extends ScalarValueObject<
+  (typeof canonicalRedirectStatusCodes)[number]
+> {
+  private [canonicalRedirectStatusCodeBrand]!: void;
+
+  private constructor(value: (typeof canonicalRedirectStatusCodes)[number]) {
+    super(value);
+  }
+
+  static create(value: number): Result<CanonicalRedirectStatusCode> {
+    const status = canonicalRedirectStatusCodes.find((item) => item === value);
+    if (!status) {
+      return err(
+        domainError.validation("Canonical redirect status must be one of 301, 302, 307, or 308"),
+      );
+    }
+
+    return ok(new CanonicalRedirectStatusCode(status));
+  }
+
+  static rehydrate(
+    value: (typeof canonicalRedirectStatusCodes)[number],
+  ): CanonicalRedirectStatusCode {
+    return new CanonicalRedirectStatusCode(value);
+  }
+}
+
 function createPositiveIntegerValue<TValue>(
   value: number,
   label: string,

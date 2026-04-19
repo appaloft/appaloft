@@ -295,6 +295,8 @@ export function deploymentPromptSeedFromConfig(
     host: domain.host,
     pathPrefix: domain.pathPrefix,
     tlsMode: domain.tlsMode,
+    ...(domain.redirectTo ? { redirectTo: domain.redirectTo } : {}),
+    ...(domain.redirectStatus ? { redirectStatus: domain.redirectStatus } : {}),
   }));
 
   return {
