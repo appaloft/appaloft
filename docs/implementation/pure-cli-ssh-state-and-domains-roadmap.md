@@ -100,6 +100,10 @@ selection overrides, not required setup.
    - Map `access.domains[]` to managed `domain-bindings.create` and certificate workflows when the
      user selects hosted/self-hosted control-plane mode.
    - Add GitHub App/webhook preview environment behavior as a separate product line.
+   - Follow [ADR-025](../decisions/ADR-025-control-plane-modes-and-action-execution.md): GitHub
+     Actions may remain execution owner after Cloud/self-hosted adoption, but the Action must switch
+     to API/control-plane mode rather than directly mutating the adopted SSH PGlite state unless an
+     explicit break-glass path coordinates ownership.
 
 ## Required Gap Classification
 

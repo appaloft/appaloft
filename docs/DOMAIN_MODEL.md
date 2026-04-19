@@ -126,6 +126,12 @@ Accepted target model:
   Appaloft state backend under
   [ADR-024](./decisions/ADR-024-pure-cli-ssh-state-and-server-applied-domains.md); runner-local
   PGlite is explicit local-only state, not the source of truth for SSH-targeted deployments
+- control-plane mode selection under
+  [ADR-025](./decisions/ADR-025-control-plane-modes-and-action-execution.md) is not an aggregate
+  root and not a deployment command field. It is entry workflow state that decides whether
+  Appaloft state is owned by SSH-server `ssh-pglite`, Appaloft Cloud, a self-hosted Appaloft
+  control plane, or an advanced external Postgres backend before identity and deployment commands
+  run.
 
 Transport compatibility note:
 - CLI / HTTP still expose `server` naming for backward compatibility
@@ -137,6 +143,13 @@ Transport compatibility note:
 - access routes express public-domain intent, including provider-neutral canonical redirect aliases;
   provider-specific labels, files, commands, redirect middleware, and route manifests are rendered
   by concrete edge proxy providers, not core aggregates
+- execution owner and control-plane/state owner are independent. GitHub Actions, CLI, a
+  local-Web-agent, or a future MCP tool may execute an entry workflow while a Cloud or self-hosted
+  control plane owns source links, locks, identity, audit, and managed domain workflow state.
+- repository config may express non-secret control-plane connection policy, but it must not select
+  project, resource, server, destination, credential, organization, or tenant identity. Those
+  identities come from trusted entrypoint inputs, authenticated control-plane state, source
+  fingerprint links, adoption markers, or explicit relink/adoption operations.
 - `access.domains[]` from repository config expresses provider-neutral custom domain route intent.
   In pure CLI/SSH mode it becomes target-local server-applied route state owned by the selected
   deployment target and edge proxy provider; in control-plane mode it may be mapped to managed
