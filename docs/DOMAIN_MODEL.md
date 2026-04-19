@@ -93,6 +93,7 @@ Owns:
 - target capability and provider-facing endpoint metadata
 - deployment placement / isolation boundaries on a target
 - runtime orchestration target shape and provider capability selection
+- SSH-server Appaloft state placement for pure CLI/GitHub Actions deployments
 
 Implemented now:
 - `DeploymentTarget`
@@ -103,6 +104,10 @@ Implemented now:
 - runtime-plan access routes with proxy route intent and provider-facing route metadata
 - durable `DomainBinding` state for resource-scoped public domain ownership and pending
   verification
+- server-applied proxy route desired/applied state for pure CLI/SSH config domains, persisted in
+  SSH-server Appaloft state rather than as managed `DomainBinding` lifecycle records
+- source fingerprint link state for pure CLI/SSH repeatability, persisted as application state in
+  the selected Appaloft state backend rather than as committed repository config
 
 Accepted target model:
 - generated default access domains are resolved through a provider-neutral application port and
@@ -117,6 +122,10 @@ Accepted target model:
   to concrete edge proxy providers and runtime executors, not command handlers or Web/CLI code
 - edge proxy is not a standalone aggregate root in v1; `DeploymentTarget` owns edge proxy intent,
   current status, and readiness summary
+- pure CLI and GitHub Actions deployments to an SSH target use SSH-server PGlite as the default
+  Appaloft state backend under
+  [ADR-024](./decisions/ADR-024-pure-cli-ssh-state-and-server-applied-domains.md); runner-local
+  PGlite is explicit local-only state, not the source of truth for SSH-targeted deployments
 
 Transport compatibility note:
 - CLI / HTTP still expose `server` naming for backward compatibility
@@ -127,12 +136,22 @@ Transport compatibility note:
   rather than provider-specific fields on deployment commands
 - access routes express public-domain intent; provider-specific labels, files, commands, and route
   manifests are rendered by concrete edge proxy providers, not core aggregates
+- `access.domains[]` from repository config expresses provider-neutral custom domain route intent.
+  In pure CLI/SSH mode it becomes target-local server-applied route state owned by the selected
+  deployment target and edge proxy provider; in control-plane mode it may be mapped to managed
+  `DomainBinding` lifecycle commands after trusted context exists.
 - server registration emits a domain event; application event handlers may soft-fail while asking
   runtime adapters to bootstrap the configured edge proxy and persist the resulting status
 - runtime adapters execute provider-produced shared edge proxy and route realization plans when a
   runtime plan carries access routes
 - `DomainBinding` is separate from generated default access and deployment route snapshots; it
   starts a durable routing/domain/TLS lifecycle and publishes `domain-binding-requested`
+- server-applied config domains are also separate from `DomainBinding`; they are migratable
+  SSH-target state for pure CLI operation, not proof that Appaloft owns an always-on DNS or
+  certificate scheduler
+- source fingerprint links map a normalized source identity to trusted project/environment/resource
+  and optional target placement. They are not resource profile fields and must be changed only
+  through explicit relink behavior, not by editing `appaloft.yml`.
 
 ### Workload Delivery
 
@@ -380,6 +399,8 @@ Rules:
 - target kind describes placement shape, not vendor-specific execution details
 - runtime target provider capabilities decide whether the target can execute single-server
   Docker/Compose now or future cluster orchestration such as Docker Swarm or Kubernetes
+- pure CLI SSH state is target-local Appaloft metadata/state, not user workload data, and must be
+  migrated or adopted explicitly when moving the same server to a hosted/self-hosted control plane
 
 Current scope:
 - single-node target metadata
@@ -388,6 +409,8 @@ Current scope:
   layer; provider SDK specifics remain outside the aggregate
 - owns current edge proxy intent/status summary for server readiness and proxy-backed deployment
   admission/read-model display
+- may host the default `ssh-pglite` Appaloft state backend for CLI/GitHub Actions deployments,
+  including source link state and server-applied proxy route desired/applied state
 - current code includes provisional future target-kind values; they must be replaced with the
   canonical target model from ADR-023 before cluster targets become public or persisted by new
   features

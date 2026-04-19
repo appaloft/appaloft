@@ -2,9 +2,9 @@
 
 ## Normative Contract
 
-A repository deployment config file is a versioned deployment profile for the source tree. It is an
-entry-workflow input, not a business command, not a resource identity record, and not a
-`deployments.create` input shape.
+A repository deployment config file is a versioned deployment profile for the source tree and the
+non-interactive expression of a Quick Deploy resource-profile draft. It is an entry-workflow input,
+not a business command, not a resource identity record, and not a `deployments.create` input shape.
 
 Every entrypoint that claims support for repository deployment config files must prove the complete
 file flow in the test matrix:
@@ -12,10 +12,13 @@ file flow in the test matrix:
 ```text
 source selection
   -> discover and parse repository config profile
+  -> resolve state backend; for SSH deploys, ensure, lock, and migrate remote `ssh-pglite`
   -> resolve trusted Appaloft project/environment/resource/server identity outside the file
   -> create or update resource-owned profile through explicit operations when needed
   -> apply non-secret env values and resolved secret references through environment commands
   -> deployments.create(projectId, environmentId, resourceId, serverId, destinationId?)
+  -> apply server-applied proxy routes from trusted config domain intent when supported by the
+     selected state/backend mode
 ```
 
 Changing a committed config file must not silently redirect deployments to a different Appaloft
@@ -32,12 +35,14 @@ This workflow inherits:
 - [ADR-017: Default Access Domain And Proxy Routing](../decisions/ADR-017-default-access-domain-and-proxy-routing.md)
 - [ADR-021: Docker/OCI Workload Substrate](../decisions/ADR-021-docker-oci-workload-substrate.md)
 - [ADR-023: Runtime Orchestration Target Boundary](../decisions/ADR-023-runtime-orchestration-target-boundary.md)
+- [ADR-024: Pure CLI SSH State And Server-Applied Domains](../decisions/ADR-024-pure-cli-ssh-state-and-server-applied-domains.md)
 - [resources.create Command Spec](../commands/resources.create.md)
 - [deployments.create Command Spec](../commands/deployments.create.md)
 - [Quick Deploy Workflow Spec](./quick-deploy.md)
 - [Resource Create And First Deploy Workflow Spec](./resources.create-and-first-deploy.md)
 - [Deployment Config File Test Matrix](../testing/deployment-config-file-test-matrix.md)
 - [Deployment Config File Implementation Plan](../implementation/deployment-config-file-plan.md)
+- [GitHub Action Deploy Wrapper Implementation Plan](../implementation/github-action-deploy-action-plan.md)
 - [Error Model](../errors/model.md)
 - [neverthrow Conventions](../errors/neverthrow-conventions.md)
 - [Async Lifecycle And Acceptance](../architecture/async-lifecycle-and-acceptance.md)
@@ -53,9 +58,28 @@ The file exists to make source-adjacent deployment profile choices reproducible:
   target service;
 - reusable health-check defaults;
 - non-secret environment variable declarations and required secret references;
+- provider-neutral server-applied domain intent for SSH CLI mode, using trusted context outside the
+  file for identity and credentials;
 - future provider-neutral resource sizing and rollout policy after their own ADR/spec coverage.
 
 The file does not exist to choose durable Appaloft control-plane identity.
+
+## Relationship To Quick Deploy
+
+Config-file bootstrap is the headless/non-interactive form of Quick Deploy draft normalization. A
+Web/local-agent file picker, CLI `appaloft deploy --config`, GitHub Actions binary run, and future
+MCP tool must all normalize config profile fields into the same project/server/environment/resource
+operation sequence that interactive Quick Deploy uses.
+
+The config file is not a separate deploy API and does not introduce a hidden workflow command. A
+headless executor may skip prompts by using trusted action inputs, CLI flags, link state, or
+source-derived defaults, but it must still dispatch explicit operations and keep the final
+deployment admission ids-only.
+
+When the entrypoint targets an SSH server without a selected control plane, the config workflow must
+resolve the SSH-server `ssh-pglite` state backend before identity resolution. Repository config
+does not become the state store; it is a versioned desired profile that is reconciled into
+server-local Appaloft state and route/proxy state.
 
 ## Discovery And Format
 
@@ -94,21 +118,104 @@ GitHub Actions and other headless CI entrypoints may use only the Appaloft binar
 config file. That mode is a local entry workflow over the same commands, not a separate hosted
 control-plane requirement.
 
-Embedded PGlite is the default persistence backend for a single headless binary invocation. A
-`DATABASE_URL` is not required when the selected driver is PGlite. A database URL is required only
-when the caller explicitly selects the PostgreSQL driver, or when the entrypoint is talking to a
-remote Appaloft control plane that owns persistence.
+When a headless entrypoint targets an SSH server, the default state backend is `ssh-pglite`: PGlite
+files persisted under the configured Appaloft data root on that SSH server. The runner-local
+filesystem is not the default source of truth. Runner-local PGlite is allowed only when the
+entrypoint explicitly selects a local-only, dry-run, smoke-test, or no-SSH state mode.
 
-The default headless GitHub Actions flow is ephemeral. It may create or reuse local PGlite project,
-environment, server, and resource records from trusted CLI/action inputs before dispatching the
-final ids-only deployment command. `projectId`, `environmentId`, `resourceId`, `serverId`, and
-`destinationId` are optional stateful inputs for a hosted control plane, self-hosted Appaloft
-service, or intentionally durable local state. They are not required for the one-shot binary flow.
+`DATABASE_URL` is not required for `ssh-pglite`. A database URL is required only when the caller
+explicitly selects PostgreSQL, or when the entrypoint is talking to a remote Appaloft control plane
+that owns persistence.
+
+The default headless GitHub Actions flow is durable on the SSH server. It must ensure the remote
+state root, acquire an exclusive remote state lock, run state migrations, resolve or create
+project/environment/server/resource records from trusted CLI/action inputs and source fingerprints,
+then dispatch the final ids-only deployment command. `projectId`, `environmentId`, `resourceId`,
+`serverId`, and `destinationId` are optional trusted selection overrides for hosted/self-hosted
+control planes or explicit operator selection. They are not required for the pure SSH CLI flow.
+
+Remote state lifecycle is mandatory for production pure CLI mode:
+
+```text
+trusted SSH target and credential
+  -> resolve remote Appaloft data root
+  -> ensure data root, schema-version marker, lock area, backup/journal area, and permissions
+  -> acquire exclusive mutation lock with owner/correlation metadata
+  -> create pre-migration backup or journal when schema version differs
+  -> run migrations
+  -> verify state integrity and migration marker
+  -> resolve source link and workflow identity
+  -> run explicit Appaloft operations
+  -> persist source link, route desired/applied state, and safe diagnostics
+  -> release lock
+```
+
+Recovery requirements:
+
+- abandoned locks must be visible through diagnostics and recoverable by a deliberate operator
+  action or safe stale-lock policy;
+- failed migrations must leave either the previous state readable or an explicit recovery marker
+  with the backup/journal location;
+- deploy commands must not continue after a failed ensure, lock, migration, or integrity check;
+- `system.doctor` or equivalent CLI diagnostics must expose state backend origin, schema version,
+  lock status, migration status, and last safe backup marker without leaking credentials.
 
 CI-provided secrets are resolver inputs, not committed config values. For GitHub Actions, the
 workflow maps GitHub secrets into runner environment variables, and the Appaloft config references
 them with `ci-env:<NAME>`. Other CI systems may provide equivalent environment variables without
 changing the repository config contract.
+
+## GitHub Action Wrapper Install UX
+
+The public GitHub Actions install surface is a thin wrapper around the released Appaloft CLI
+binary. It is not a hosted control plane, not a GitHub App webhook listener, and not a new Appaloft
+business command.
+
+The wrapper is expected to live in `appaloft/deploy-action` so Marketplace metadata, wrapper
+versioning, and install scripts can evolve independently from the main Appaloft repository. The
+main repository remains the source of truth for CLI release assets, checksums, release manifest,
+and behavior specs.
+
+The wrapper must perform only entrypoint work:
+
+```text
+action.yml inputs and GitHub Secrets
+  -> select Appaloft CLI version and platform release asset
+  -> download CLI archive, checksums.txt, and optional release-manifest.json
+  -> verify archive SHA-256 before extraction
+  -> write SSH private key input to a temporary 0600 file when supplied
+  -> invoke appaloft deploy <source> --config <path> with trusted SSH/state flags
+  -> remove temporary key material when possible
+```
+
+The wrapper must not rebuild Appaloft from source, parse human CLI output as a durable business
+contract, or resolve GitHub Secrets implicitly. GitHub Secrets become action inputs or workflow
+environment variables only when the workflow author maps them explicitly.
+
+The minimal supported action inputs are:
+
+- `version`, defaulting to `latest` for quickstarts but recommended as an exact tag for production;
+- `config`, defaulting to `appaloft.yml` when present;
+- `source`, defaulting to `.`;
+- `ssh-host`, `ssh-user`, `ssh-port`, and either `ssh-private-key` or `ssh-private-key-file`;
+- `server-proxy-kind` and `state-backend` as optional trusted entrypoint overrides;
+- `args` as a last-resort pass-through for CLI flags not modeled as action inputs yet.
+
+`ssh-private-key` is a secret value and must be written to a runner temp file before invocation.
+Only the file path may be passed to `appaloft deploy --server-ssh-private-key-file`. The raw key
+must never appear in command arguments, logs, release metadata, config-origin metadata, diagnostic
+payloads, or read models.
+
+The action's primary invocation remains config-driven. If no config file is supplied or discovered,
+the action may still run `appaloft deploy`, but only with enough trusted input or CLI detection to
+satisfy the non-interactive Quick Deploy contract. Missing non-interactive context must fail before
+mutation. If no config domain intent is supplied, no custom server-applied domain route is created;
+the deployment may still use generated/default access according to the selected server policy.
+
+Publishing a new Appaloft CLI release must not normally require a new action wrapper release. A
+pinned `version: vX.Y.Z` downloads that exact CLI release, and `version: latest` resolves the
+latest stable main-repo release at runtime. The deploy-action repository should release only when
+wrapper inputs, download verification, docs, or security behavior change.
 
 ## Identity Resolution
 
@@ -139,6 +246,43 @@ or operator input as the seed, not a mutable committed `project` section. Subseq
 must reuse the existing trusted Appaloft identity unless the operator explicitly relinks or selects
 a different identity outside the config file.
 
+## Source Fingerprint Link State And Relink
+
+Pure CLI/SSH mode must persist source fingerprint link state in the selected `ssh-pglite` backend.
+This link state is the durable non-versioned mapping that lets repeated GitHub Actions runs deploy
+the same app without committed Appaloft ids.
+
+The source fingerprint must be stable and secret-free:
+
+- for Git sources, prefer provider repository id/full name when available, normalized clone locator,
+  source base directory, and config file identity;
+- for local-folder sources, use a normalized selected root identity only for local-state or
+  operator-controlled workflows, not cross-run CI identity unless a stable remote source is also
+  known;
+- for Docker image sources, use image repository/name plus tag or digest according to the source
+  binding rules;
+- do not include runner temp paths, raw credentials, access tokens, or every commit SHA for normal
+  branch deployments;
+- future preview environment links may include PR or branch identity explicitly.
+
+The source link maps a fingerprint and selected environment/source scope to:
+
+- project id;
+- environment id or environment key;
+- resource id;
+- server id and destination id when the entrypoint owns default target selection;
+- last safe source metadata and config origin metadata for diagnostics.
+
+First-run deploy may create the link after the project/environment/server/resource context is
+created by explicit operations. Later deploys must reuse it. If a link exists but the operator wants
+another project/resource/server context, the workflow must stop and require explicit relink. A
+committed config change must never retarget an existing link.
+
+The active relink boundary is `source-links.relink`. It is a public CLI command/workflow, not a
+hidden deploy side effect. Relink may update link state only; it must not mutate resource
+source/runtime/network profile fields, deployment history, environment variables, or server
+credentials.
+
 Environment-specific config overlays are allowed only as overlays for an environment selected by
 the entrypoint or trusted link state. A committed config file must not be the only reason a
 deployment moves from `staging` to `production`.
@@ -159,7 +303,7 @@ deployment admission.
 | Health policy | `ResourceRuntimeProfile` / health policy command | Must be reusable resource configuration. |
 | Plain environment values | `Environment` variable commands | Only for non-secret values; `PUBLIC_` and `VITE_` keys map to build-time `plain-config`, other keys map to runtime `plain-config`, all at `environment` scope unless a future schema adds explicit kind/exposure/scope fields. |
 | Required secret names | Secret/credential commands or adapters | Declare requirements or references, not raw values. Headless CI supports `ci-env:<NAME>` as an environment-variable resolver reference. |
-| Domains/TLS | `domain-bindings.create` and certificate commands | Must be explicit follow-up operations, not deployment admission fields. |
+| `access.domains[]` | Server-applied route state in SSH CLI mode; managed `DomainBinding` intent in control-plane mode | Accepted values describe provider-neutral host/path/TLS route intent. They never enter `deployments.create`, never select identity or credentials, and never contain raw certificate material. |
 | CPU, memory, replicas, restart policy, rollout overlap/drain | Future resource/runtime-target profile specs | Must be rejected until an ADR/spec and runtime enforcement exist; no silent ignore. |
 
 If a resource already exists and the file changes reusable profile fields, the entry workflow must
@@ -194,6 +338,54 @@ variable.
 SSH server credentials are target credential state. The config file may declare that a deployment
 requires an SSH-capable target, but it must not register a server with an inline key or password.
 
+## Server-Applied Domains And Managed Domain Bindings
+
+The target repository config schema may accept provider-neutral domain intent under
+`access.domains[]`.
+
+Each domain entry must stay within this shape:
+
+```yaml
+access:
+  domains:
+    - host: www.example.com
+      pathPrefix: /
+      tlsMode: auto
+```
+
+Rules:
+
+- `host` is a domain name only; schemes, ports, and path fragments are rejected.
+- `pathPrefix` defaults to `/` when omitted.
+- `tlsMode` is provider-neutral and initially allows `auto` or `disabled`.
+- Raw certificate material, private keys, DNS provider credentials, certificate provider account
+  ids, server ids, destination ids, and credential selectors are rejected.
+- A domain entry requires a reverse-proxy-capable resource network profile and selected SSH/control
+  plane target context.
+
+When the entrypoint uses `ssh-pglite`, config domain intent becomes server-applied proxy route
+state:
+
+```text
+access.domains[]
+  -> trusted resource/server/destination context
+  -> remote SSH PGlite route desired state
+  -> edge proxy provider route/certificate rendering
+  -> runtime adapter applies provider-owned config on the SSH server
+  -> remote state records applied route and verification status
+```
+
+This mode does not create a managed `DomainBinding` aggregate. TLS renewal is delegated to the
+resident edge proxy/provider when the provider supports it. One-shot CLI/Action executions observe,
+repair, or reapply on deploy, verify, or doctor; they do not imply an always-running Appaloft DNS or
+certificate scheduler.
+
+When the entrypoint uses a hosted or self-hosted control plane, the same config intent may map to
+managed `domain-bindings.create`, DNS observation, certificate, and read-model workflows after
+trusted resource/server/destination context exists. Domain/TLS failure must be reported through the
+appropriate route/domain read models and errors; it must not mutate an already accepted deployment
+request or imply rollback of created project/resource/environment records.
+
 ## Precedence
 
 Profile precedence is:
@@ -215,16 +407,22 @@ models, such as config path and JSON/YAML pointer. Origin metadata must not incl
 ## Entry Workflow Sequence
 
 ```text
-User selects source or passes source path
+When invoked from deploy-action, install and verify the released Appaloft binary
+  -> user selects source or passes source path
   -> entrypoint resolves config file path
   -> parse and validate strict config schema
   -> reject identity/secret/unsupported fields
   -> resolve non-secret env declarations and supported secret references
-  -> resolve trusted Appaloft project/environment/resource/server/destination identity outside file
+  -> resolve state backend; for SSH deploys, ensure, lock, and migrate remote `ssh-pglite`
+  -> resolve source fingerprint link state and trusted Appaloft identity outside file
   -> create project/resource on first run when no trusted identity exists
+  -> persist source fingerprint link state after first-run identity is created
   -> apply profile fields through resources.create or explicit resource/environment config commands
   -> dispatch environments.set-variable for config env and resolved CI secrets
+  -> resolve config `access.domains[]` into server-applied route intent or managed domain intent
   -> dispatch deployments.create with ids only
+  -> apply/observe server-applied route state in SSH mode, or dispatch managed domain follow-up
+     commands in control-plane mode
   -> observe progress/read models/diagnostics
 ```
 
@@ -241,8 +439,14 @@ Config-file errors use stable codes and phases:
 | `validation_error` | `config-secret-validation` | No | File contained raw secret material. |
 | `validation_error` | `config-secret-resolution` | No | Required secret reference could not be resolved from the configured entrypoint resolver. |
 | `validation_error` | `config-profile-resolution` | No | Profile field cannot map safely to resource/environment commands. |
-| `unsupported_config_field` | `config-capability-resolution` | No | Known future field such as CPU/memory/replicas is not enforceable by current resource/runtime target specs. |
+| `validation_error` | `remote-state-resolution` | Conditional | SSH-targeted entrypoint could not resolve or initialize the remote Appaloft state backend. |
+| `infra_error` | `remote-state-lock` | Yes | Remote state mutation lock could not be acquired or was interrupted. |
+| `infra_error` | `remote-state-migration` | Conditional | Remote state migration failed before workflow commands were dispatched. |
+| `validation_error` | `source-link-resolution` | No | Source fingerprint is ambiguous, missing required stable identity, or points at another context without explicit relink. |
+| `validation_error` | `config-domain-resolution` | No | Config domain intent cannot map safely to server-applied or managed domain workflow state. |
+| `unsupported_config_field` | `config-capability-resolution` | No | Known future field such as CPU/memory/replicas or rollout policy is not enforceable by current workflow/resource/runtime target specs. |
 | `resource_profile_drift` | `resource-profile-resolution` | No | Existing resource differs from config and no explicit update operation is available. |
+| `infra_error` | `proxy-domain-realization` | Conditional | Server-applied proxy domain route could not be rendered, applied, reloaded, or verified on the target. |
 
 ## Current Implementation Notes And Migration Gaps
 
@@ -256,8 +460,15 @@ Current CLI deploy supports explicit `--config` and implicit source-root discove
 config source/runtime/network/health profile fields into quick-deploy resource creation input,
 supports trusted target flags such as `--server-host` and `--server-ssh-private-key-file`, resolves
 plain `env` declarations and `ci-env:` secret references into environment variable commands,
-bootstraps project/server/environment/resource records in non-TTY PGlite mode when ids are not
-provided, then dispatches ids-only `deployments.create`.
+bootstraps project/server/environment/resource records in explicit local PGlite mode when ids are
+not provided, then dispatches ids-only `deployments.create`. For config-driven SSH targets, the CLI
+now resolves `ssh-pglite` as the default state backend, carries a trusted SSH target into the state
+decision, and shell-built CLI programs run an SSH transport-backed remote-state lifecycle adapter
+before identity queries or mutations. The shell CLI also mirrors the selected SSH server's PGlite
+state into a target-scoped local data directory before composition opens the database, and uploads
+that PGlite directory back to the SSH server after the command shuts down. A custom CLI runtime
+without that adapter fails with `validation_error`, phase `remote-state-resolution`, rather than
+falling back to runner-local PGlite.
 
 Current `DeploymentContextBootstrapService` contains legacy config/default bootstrap helpers, but
 the active `deployments.create` input schema is ids-only and the service currently only fills the
@@ -267,16 +478,52 @@ Current file parsing supports JSON and YAML. Ambiguous multi-file detection is i
 CLI/filesystem entry paths.
 
 Current executable tests prove parser safety, Git-root filesystem discovery, CLI init shape,
-profile-to-quick-deploy seed mapping, headless PGlite defaulting, no-id non-TTY context bootstrap,
-`ci-env:` secret resolution, environment command sequencing, and ids-only `deployments.create`.
-Broader CLI e2e, HTTP-schema contract coverage, existing-resource profile drift handling,
-stored/external secret adapters beyond `ci-env:`, Dockerfile/Compose path mapping, and durable
-source link/relink behavior remain follow-up work.
+profile-to-quick-deploy seed mapping, headless local PGlite defaulting, no-id non-TTY context
+bootstrap, `ci-env:` secret resolution, environment command sequencing, and ids-only
+`deployments.create`. After ADR-024, local PGlite bootstrap is narrowed to explicit local-only mode.
+
+CLI resolver-level tests now cover state backend selection for `ssh-pglite`, `local-pglite`, and
+`postgres/control-plane`, plus source fingerprint normalization. CLI config workflow tests also
+cover the remote-state lifecycle hook ordering, release after config bootstrap mutations, and the
+safe failure path when no remote lifecycle adapter is wired. CLI adapter-level tests cover
+filesystem remote state ensure, mutation lock, migration, recovery marker, lock diagnostics, source
+link create/reuse, retarget rejection, relink store semantics, and SSH transport command
+construction/error mapping. Shell tests cover pre-composition remote PGlite mirror planning and
+tar-over-SSH download/upload command sequencing, including staged local download extraction and
+remote upload backup/restore/recovery command sequencing. CLI config workflow tests cover first-run
+source link creation and repeated config deploy reuse through the source fingerprint link hook.
+Application and CLI tests cover `source-links.relink` command dispatch, context validation,
+optimistic guard conflicts, and SSH remote-state mirror planning for relink.
+
+An opt-in shell e2e harness in
+`apps/shell/test/e2e/github-action-ssh-state.workflow.e2e.ts` covers the GitHub Actions style
+process boundary for SSH-server `ssh-pglite`: two separate CLI processes with different local
+PGlite directories deploy the same repository/config to the same trusted SSH target and the second
+process reuses the remote source link/resource identity.
+`.github/workflows/ssh-remote-state-e2e.yml` wires that harness into manual runs, nightly smoke,
+and release gating when the repository has the SSH target secrets configured.
+
+Current config parsing accepts `access.domains[]` declarations with provider-neutral `host`,
+`pathPrefix`, and `tlsMode` fields, and rejects domain identity selectors, raw TLS/secret material,
+and unsafe host/path shapes before mutation. SSH CLI config deploy now persists valid
+`access.domains[]` as server-applied route desired state in the selected SSH-server state backend
+before ids-only deployment admission. First-run bootstrap may store the desired state at the
+project/environment/resource/server default-destination key when no explicit destination id has been
+selected yet; deployment planning falls back to that key after checking the resolved destination
+key. A custom runtime without route-state storage fails at `config-domain-resolution` instead of
+silently ignoring the declaration. Deployment planning now reads that desired state back from
+SSH-server state, groups entries by `pathPrefix` and `tlsMode`, and forwards each group to
+provider-neutral edge proxy route input without creating managed `DomainBinding` rows.
+Deployment-finished handling records applied/failed route status back into
+the same server-applied route state. The opt-in SSH e2e harness verifies Traefik-backed
+server-applied route reachability for `CONFIG-FILE-DOMAIN-005`. Broader CLI e2e, HTTP-schema
+contract coverage, existing-resource profile drift handling, stored/external secret adapters beyond
+`ci-env:`, Dockerfile/Compose path mapping, operational provisioning of the external SSH e2e
+secrets/target, real HTTPS public validation, provider-owned ACME history, and managed domain
+control-plane mapping remain follow-up work.
 
 ## Open Questions
 
-- What command should own local link/relink behavior when a source repository must be intentionally
-  moved to another Appaloft project or resource?
 - What exact operation names should update source/runtime/network profile fields on an existing
   resource when a config file changes after first deploy?
 - Which resource sizing fields should be admitted first for the single-server Docker/Compose

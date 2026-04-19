@@ -25,6 +25,7 @@ This workflow inherits:
 - [ADR-017: Default Access Domain And Proxy Routing](../decisions/ADR-017-default-access-domain-and-proxy-routing.md)
 - [ADR-004: Server Readiness State Storage](../decisions/ADR-004-server-readiness-state-storage.md)
 - [ADR-015: Resource Network Profile](../decisions/ADR-015-resource-network-profile.md)
+- [ADR-024: Pure CLI SSH State And Server-Applied Domains](../decisions/ADR-024-pure-cli-ssh-state-and-server-applied-domains.md)
 - [Default Access Domain And Proxy Routing Workflow](./default-access-domain-and-proxy-routing.md)
 - [Server Bootstrap And Proxy Workflow](./server-bootstrap-and-proxy.md)
 - [resources.proxy-configuration.preview Query Spec](../queries/resources.proxy-configuration.preview.md)
@@ -42,6 +43,7 @@ It consumes:
 - deployment target public address and runtime access metadata;
 - resource network profile;
 - generated or durable access route snapshot;
+- server-applied config domain route desired state in pure CLI/SSH mode;
 - deployment attempt id;
 - provider registry configuration;
 - execution context and correlation ids.
@@ -54,6 +56,7 @@ It produces:
 - provider-rendered configuration sections;
 - progress/log events or deployment progress entries;
 - route realization status in read models/snapshots.
+- server-applied route applied/failed status for SSH-server Appaloft state.
 
 ## Provider Resolution
 
@@ -119,7 +122,8 @@ ports.
 
 For every accepted deployment attempt with reverse-proxy routes:
 
-1. Resolve route snapshot from resource network profile, default access policy, durable domain bindings, and deployment target state.
+1. Resolve route snapshot from resource network profile, default access policy, durable domain
+   bindings, server-applied config domain desired state, and deployment target state.
 2. Resolve edge proxy provider.
 3. Ask the provider to render a route realization plan.
 4. Execute the provider-produced plan through the runtime adapter.
@@ -129,6 +133,34 @@ For every accepted deployment attempt with reverse-proxy routes:
 7. Project the result into resource/deployment read models.
 
 The provider must target `ResourceNetworkProfile.internalPort` or the immutable network snapshot derived from it. It must not read deployment command transport fields for port/domain/proxy/TLS behavior.
+
+## Server-Applied Config Domains
+
+In pure CLI/SSH mode, repository config `access.domains[]` is normalized into server-applied route
+desired state before or during Quick Deploy execution. Edge proxy provider route realization owns
+the concrete rendering and application of that desired state on the selected SSH target.
+
+Deployment planning must read the selected server/destination/resource desired route state from the
+SSH-server Appaloft state backend and translate it into the same provider-neutral route input used
+by generated and durable domain routes. When first-run config bootstrap persisted route desired
+state before an explicit destination id existed, the backend must fall back from the exact
+destination-scoped key to the same project/environment/resource/server default-destination key.
+Exact destination-scoped route state wins when both records exist. The desired state must not create
+managed `DomainBinding` or `Certificate` aggregates in pure CLI mode.
+
+The provider must treat server-applied config domains as provider-neutral route input:
+
+- host, path prefix, TLS mode, resource network snapshot, server/destination context, and
+  deployment/resource identity are supplied by the workflow;
+- provider-specific files, labels, ACME storage, reload behavior, and diagnostics stay inside the
+  provider/runtime adapter boundary;
+- raw certificate material, DNS provider credentials, and target credentials are never accepted
+  from repository config route input.
+
+Server-applied route realization records applied/failed state in the SSH-server Appaloft state
+backend. It does not create managed `DomainBinding` or `Certificate` aggregates. In control-plane
+mode, managed durable domain routes still flow through `domain-bindings.create` and the
+routing/domain/TLS workflow before this edge proxy provider workflow realizes those routes.
 
 ## Proxy Reload
 
@@ -240,7 +272,19 @@ configuration changes.
 Durable domain binding route failure state is handled by a process manager that consumes failed
 deployment/route facts and records affected bindings as `not_ready`.
 
-`resources.proxy-configuration.preview` exists for Web/API/CLI, but provider diagnostics are limited to generated configuration sections and basic metadata.
+Pure CLI SSH mode now reads server-applied config domain desired state from the selected
+server/destination/resource state, groups entries by `pathPrefix` and `tlsMode`, and passes each
+group into deployment planning and provider route realization input. Deployment-finished handling
+records applied status after successful deployments and failed status for route realization, proxy
+reload, and public route verification failures. Resource access, health, and diagnostic summaries
+now expose the latest server-applied route URL/status separately from generated access and managed
+durable domain routes. Provider-local TLS diagnostics for `tlsMode = auto` routes now identify the
+resident edge proxy as the TLS automation owner and explicitly state that no Appaloft `Certificate`
+aggregate is created by pure CLI server-applied routes.
+
+`resources.proxy-configuration.preview` exists for Web/API/CLI. Provider diagnostics now include
+route-level provider-local TLS summaries, while real HTTPS public validation, provider-owned ACME
+history, and long-running certificate renewal diagnostics remain future provider capabilities.
 
 ## Open Questions
 

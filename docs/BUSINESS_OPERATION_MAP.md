@@ -67,7 +67,7 @@ create/select project
   -> create/configure credential when needed
   -> create/select resource with source/runtime/network profile
   -> deployments.create
-  -> observe deployment progress, status, logs, and generated access route when policy allows it
+  -> observe deployment progress, status, logs, and generated or server-applied access route when policy allows it
   -> observe current resource health and access/proxy state
   -> observe resource runtime logs when an application instance is running
   -> copy resource diagnostic summary when access, logs, or proxy state need support/debug context
@@ -76,8 +76,17 @@ create/select project
   -> observe domain readiness
 ```
 
-Quick Deploy and CLI interactive deploy are workflow entrypoints over this loop. They must not
-become hidden aggregate commands.
+Quick Deploy, CLI interactive deploy, and repository config driven headless deploys are workflow
+entrypoints over this loop. A source-adjacent Appaloft config file is the non-interactive profile
+expression of the same Quick Deploy draft normalization, not a separate deployment command or a
+shortcut around the explicit operations.
+
+For pure CLI and GitHub Actions deployments to an SSH server, Appaloft state is durable on that SSH
+server by default through the `ssh-pglite` backend governed by
+[ADR-024](./decisions/ADR-024-pure-cli-ssh-state-and-server-applied-domains.md). A config file may
+declare provider-neutral server-applied domain intent for the target's edge proxy; this is
+server-local route desired/applied state in pure CLI mode and is distinct from managed
+`DomainBinding` lifecycle state.
 
 ## Relationship Diagram
 
@@ -94,6 +103,9 @@ flowchart TD
   Certificate["Certificate"]
   AccessPolicy["Default Access Domain Policy"]
   Proxy["Edge Proxy State"]
+  RemoteState["SSH PGlite Appaloft State"]
+  SourceLink["Source Fingerprint Link"]
+  ServerRoute["Server-Applied Proxy Route"]
 
   Project --> Environment
   Project --> Resource
@@ -104,8 +116,17 @@ flowchart TD
   Destination --> Deployment
   Target --> Deployment
   Target --> Proxy
+  Target --> RemoteState
+  RemoteState --> SourceLink
+  SourceLink --> Project
+  SourceLink --> Resource
+  RemoteState --> Project
+  RemoteState --> Deployment
   AccessPolicy --> Deployment
   Proxy --> Deployment
+  Resource --> ServerRoute
+  Target --> ServerRoute
+  ServerRoute --> Proxy
   Resource --> DomainBinding
   Destination --> DomainBinding
   Target --> DomainBinding
@@ -163,6 +184,7 @@ flowchart TD
 | Read resource diagnostic summary | Active query | `resources.diagnostic-summary` | Resource observation/read model | Produces a copyable support/debug payload with stable ids, deployment/access/proxy/log statuses, source errors, and safe local/system context when access or logs are missing. | [resources.diagnostic-summary](./queries/resources.diagnostic-summary.md), [Resource Diagnostic Summary](./workflows/resource-diagnostic-summary.md), [Resource Diagnostic Summary Test Matrix](./testing/resource-diagnostic-summary-test-matrix.md), [Resource Diagnostic Summary Implementation Plan](./implementation/resource-diagnostic-summary-plan.md) |
 | Read resource health | Active query | `resources.health` | Resource health observation | Produces the current resource health summary from latest deployment/runtime context, configured health policy, proxy route, and public access observations. | [ADR-020](./decisions/ADR-020-resource-health-observation.md), [resources.health](./queries/resources.health.md), [Resource Health Observation](./workflows/resource-health-observation.md), [Resource Health Test Matrix](./testing/resource-health-test-matrix.md), [Resource Health Implementation Plan](./implementation/resource-health-plan.md) |
 | Open resource terminal session | Command | `terminal-sessions.open` | TerminalSession/resource operator access | Opens an ephemeral interactive shell on the resource's selected or latest deployment target, starting in the resolved deployment workspace directory. | [Operator Terminal Session](./workflows/operator-terminal-session.md), [terminal-sessions.open](./commands/terminal-sessions.open.md), [Operator Terminal Session Test Matrix](./testing/operator-terminal-session-test-matrix.md), [ADR-022](./decisions/ADR-022-operator-terminal-session-boundary.md) |
+| Relink source fingerprint | Active command | `source-links.relink` | Source link application state | Explicitly moves a normalized source fingerprint to a selected project/environment/resource/server context so future config deploys reuse the intended identity. | [source-links.relink](./commands/source-links.relink.md), [ADR-024](./decisions/ADR-024-pure-cli-ssh-state-and-server-applied-domains.md), [Repository Deployment Config File Bootstrap](./workflows/deployment-config-file-bootstrap.md), [Source Link State Test Matrix](./testing/source-link-state-test-matrix.md) |
 
 ### Deployment
 
@@ -189,7 +211,7 @@ flowchart TD
 | Record domain route realization failure | Internal capability | no public operation | Domain binding route readiness process manager | Consumes route/deployment failure facts, marks affected active domain bindings `not_ready`, and publishes `domain-route-realization-failed`. | [ADR-019](./decisions/ADR-019-edge-proxy-provider-and-observable-configuration.md), [Routing Domain TLS Workflow](./workflows/routing-domain-and-tls.md), [domain-route-realization-failed](./events/domain-route-realization-failed.md) |
 | Configure default access domain policy | Accepted candidate command | `default-access-domain-policies.configure` | Default access policy | Configures provider-neutral generated access domain policy before Web/CLI/API expose policy editing. | [default-access-domain-policies.configure](./commands/default-access-domain-policies.configure.md), [ADR-017](./decisions/ADR-017-default-access-domain-and-proxy-routing.md), [Default Access Domain And Proxy Routing](./workflows/default-access-domain-and-proxy-routing.md) |
 | Resolve generated access route | Internal capability | no public operation | Resource access/runtime topology | Resolves provider-neutral generated access hostnames from resource, server, proxy readiness, and policy state. | [ADR-017](./decisions/ADR-017-default-access-domain-and-proxy-routing.md), [Default Access Domain And Proxy Routing](./workflows/default-access-domain-and-proxy-routing.md) |
-| Realize edge proxy route | Internal capability | no public operation | Edge proxy provider/runtime topology | Converts route snapshots into provider-produced proxy ensure/route/reload plans and executes them idempotently. | [ADR-019](./decisions/ADR-019-edge-proxy-provider-and-observable-configuration.md), [Edge Proxy Provider And Route Realization](./workflows/edge-proxy-provider-and-route-realization.md) |
+| Realize edge proxy route | Internal capability | no public operation | Edge proxy provider/runtime topology | Converts route snapshots, generated access routes, durable domain routes, and SSH-mode server-applied config domain routes into provider-produced proxy ensure/route/reload plans and executes them idempotently. | [ADR-019](./decisions/ADR-019-edge-proxy-provider-and-observable-configuration.md), [ADR-024](./decisions/ADR-024-pure-cli-ssh-state-and-server-applied-domains.md), [Edge Proxy Provider And Route Realization](./workflows/edge-proxy-provider-and-route-realization.md) |
 
 ### System
 
@@ -208,9 +230,10 @@ Workflows coordinate commands and queries. They do not own aggregate invariants.
 
 | Workflow | Type | Operation sequence | Final business operation | Governing docs |
 | --- | --- | --- | --- | --- |
-| Quick Deploy | Entry workflow | Select/create project, server, credential, environment, resource, optional variable, then deploy through the Docker/OCI-backed workload substrate and selected runtime target backend. | `deployments.create` | [Quick Deploy](./workflows/quick-deploy.md), [ADR-010](./decisions/ADR-010-quick-deploy-workflow-boundary.md), [ADR-021](./decisions/ADR-021-docker-oci-workload-substrate.md), [ADR-023](./decisions/ADR-023-runtime-orchestration-target-boundary.md) |
-| Repository deployment config file bootstrap | Entry workflow | Discover and validate a source-adjacent Appaloft config profile, resolve project/resource/server identity outside the committed file, apply profile fields through explicit resource/environment commands when needed, then deploy with ids only. | `deployments.create` | [Repository Deployment Config File Bootstrap](./workflows/deployment-config-file-bootstrap.md), [Deployment Config File Test Matrix](./testing/deployment-config-file-test-matrix.md), [Deployment Config File Plan](./implementation/deployment-config-file-plan.md), [ADR-012](./decisions/ADR-012-resource-runtime-profile-and-deployment-snapshot-boundary.md), [ADR-014](./decisions/ADR-014-deployment-admission-uses-resource-profile.md) |
-| Headless CI deploy from repository config | Entry workflow | CI runner invokes the Appaloft binary, uses embedded PGlite state by default unless an external database/control plane is explicitly configured, resolves `ci-env:` secret references from runner environment variables, applies environment variables through `environments.set-variable`, then deploys with ids only. | `deployments.create` | [Repository Deployment Config File Bootstrap](./workflows/deployment-config-file-bootstrap.md), [Deployment Config File Test Matrix](./testing/deployment-config-file-test-matrix.md), [Deployment Config File Plan](./implementation/deployment-config-file-plan.md), [ADR-010](./decisions/ADR-010-quick-deploy-workflow-boundary.md), [ADR-014](./decisions/ADR-014-deployment-admission-uses-resource-profile.md) |
+| Quick Deploy | Entry workflow | Select/create project, server, credential, environment, resource, optional config/profile defaults, and optional variable, then deploy through the Docker/OCI-backed workload substrate and selected runtime target backend. Optional custom domains become server-applied proxy routes in SSH CLI mode or managed routing/domain/TLS follow-up work in control-plane mode; they are not deployment admission fields. | `deployments.create` | [Quick Deploy](./workflows/quick-deploy.md), [ADR-010](./decisions/ADR-010-quick-deploy-workflow-boundary.md), [ADR-021](./decisions/ADR-021-docker-oci-workload-substrate.md), [ADR-023](./decisions/ADR-023-runtime-orchestration-target-boundary.md), [ADR-024](./decisions/ADR-024-pure-cli-ssh-state-and-server-applied-domains.md) |
+| Repository deployment config file bootstrap | Entry workflow | Non-interactive Quick Deploy profile input: discover and validate a source-adjacent Appaloft config profile, resolve project/resource/server identity outside the committed file, apply profile fields through explicit resource/environment commands when needed, resolve `access.domains[]` as server-applied proxy routes for SSH CLI mode or managed domain intent for control-plane mode, then deploy with ids only. | `deployments.create` | [Repository Deployment Config File Bootstrap](./workflows/deployment-config-file-bootstrap.md), [Deployment Config File Test Matrix](./testing/deployment-config-file-test-matrix.md), [Deployment Config File Plan](./implementation/deployment-config-file-plan.md), [Pure CLI SSH State And Domains Roadmap](./implementation/pure-cli-ssh-state-and-domains-roadmap.md), [Quick Deploy](./workflows/quick-deploy.md), [ADR-010](./decisions/ADR-010-quick-deploy-workflow-boundary.md), [ADR-012](./decisions/ADR-012-resource-runtime-profile-and-deployment-snapshot-boundary.md), [ADR-014](./decisions/ADR-014-deployment-admission-uses-resource-profile.md), [ADR-024](./decisions/ADR-024-pure-cli-ssh-state-and-server-applied-domains.md) |
+| Headless CI deploy from repository config | Entry workflow | Headless Quick Deploy executor: CI runner invokes the Appaloft binary directly or through the thin `appaloft/deploy-action` install wrapper, resolves the SSH target, uses SSH-server PGlite state by default unless local-only or control-plane state is explicitly selected, resolves `ci-env:` secret references from runner environment variables, applies environment variables through `environments.set-variable`, applies config domains through the target edge proxy when declared, then deploys with ids only. | `deployments.create` | [Repository Deployment Config File Bootstrap](./workflows/deployment-config-file-bootstrap.md), [Deployment Config File Test Matrix](./testing/deployment-config-file-test-matrix.md), [Deployment Config File Plan](./implementation/deployment-config-file-plan.md), [GitHub Action Deploy Wrapper Plan](./implementation/github-action-deploy-action-plan.md), [Pure CLI SSH State And Domains Roadmap](./implementation/pure-cli-ssh-state-and-domains-roadmap.md), [Quick Deploy](./workflows/quick-deploy.md), [ADR-010](./decisions/ADR-010-quick-deploy-workflow-boundary.md), [ADR-014](./decisions/ADR-014-deployment-admission-uses-resource-profile.md), [ADR-024](./decisions/ADR-024-pure-cli-ssh-state-and-server-applied-domains.md) |
+| Pure CLI SSH state and server-applied domain routing | Entry/runtime workflow | Resolve SSH target and credential from trusted entrypoint inputs, ensure and lock remote `ssh-pglite` state, migrate remote state, resolve/create project/environment/server/resource identity from source fingerprint link state or trusted state, normalize config `access.domains[]` into server-applied proxy route desired state, run explicit Quick Deploy operations, realize proxy route state on the SSH target, and expose route status through resource/proxy read models. | `deployments.create` plus proxy route realization state | [ADR-024](./decisions/ADR-024-pure-cli-ssh-state-and-server-applied-domains.md), [Repository Deployment Config File Bootstrap](./workflows/deployment-config-file-bootstrap.md), [Quick Deploy](./workflows/quick-deploy.md), [source-links.relink](./commands/source-links.relink.md), [Source Link State Test Matrix](./testing/source-link-state-test-matrix.md), [Edge Proxy Provider And Route Realization](./workflows/edge-proxy-provider-and-route-realization.md), [Deployment Config File Test Matrix](./testing/deployment-config-file-test-matrix.md), [Quick Deploy Test Matrix](./testing/quick-deploy-test-matrix.md), [Edge Proxy Provider And Route Configuration Test Matrix](./testing/edge-proxy-provider-and-route-configuration-test-matrix.md), [Pure CLI SSH State And Domains Roadmap](./implementation/pure-cli-ssh-state-and-domains-roadmap.md) |
 | Resource create and first deploy | Entry workflow | `resources.create -> deployments.create` after context selection. | `deployments.create` | [Resource Create And First Deploy](./workflows/resources.create-and-first-deploy.md) |
 | Static site first deploy | Entry/runtime workflow | Create/select a `static-site` resource with source base directory, static publish directory, optional build commands, and a reverse-proxy HTTP network profile, then deploy as a static-server Docker/OCI artifact. | `deployments.create` | [Static Site Deployment Plan](./implementation/static-site-deployment-plan.md), [Resource Create And First Deploy](./workflows/resources.create-and-first-deploy.md), [Quick Deploy](./workflows/quick-deploy.md), [ADR-012](./decisions/ADR-012-resource-runtime-profile-and-deployment-snapshot-boundary.md), [ADR-015](./decisions/ADR-015-resource-network-profile.md), [ADR-021](./decisions/ADR-021-docker-oci-workload-substrate.md), [ADR-023](./decisions/ADR-023-runtime-orchestration-target-boundary.md) |
 | Workload framework detection and planning | Internal workflow | `ResourceSourceBinding + ResourceRuntimeProfile + ResourceNetworkProfile -> SourceInspectionSnapshot -> framework/runtime planner -> Docker/OCI artifact intent`. | no public operation | [Workload Framework Detection And Planning](./workflows/workload-framework-detection-and-planning.md), [Deployment Runtime Substrate Plan](./implementation/deployment-runtime-substrate-plan.md), [ADR-021](./decisions/ADR-021-docker-oci-workload-substrate.md) |

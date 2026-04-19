@@ -25,6 +25,7 @@ This workflow inherits:
 - [ADR-014: Deployment Admission Uses Resource Profile](../decisions/ADR-014-deployment-admission-uses-resource-profile.md)
 - [ADR-015: Resource Network Profile](../decisions/ADR-015-resource-network-profile.md)
 - [ADR-017: Default Access Domain And Proxy Routing](../decisions/ADR-017-default-access-domain-and-proxy-routing.md)
+- [ADR-024: Pure CLI SSH State And Server-Applied Domains](../decisions/ADR-024-pure-cli-ssh-state-and-server-applied-domains.md)
 - [resources.create Command Spec](../commands/resources.create.md)
 - [resource-created Event Spec](../events/resource-created.md)
 - [Resource Lifecycle Error Spec](../errors/resources.lifecycle.md)
@@ -187,9 +188,14 @@ Current `resources.create` normalizes common GitHub tree URLs into repository lo
 `baseDirectory`, and `originalLocator`. Deployment admission rejects legacy resources that still
 carry raw GitHub tree locators so runtime adapters do not clone browser URLs.
 
-Repository config file support remains a target contract for first-deploy profile input. Current
-config schema and CLI `init` output still include identity-bearing project/resource/target fields
-and do not yet satisfy the identity and secret rules in
+Repository config file support is first-deploy profile input and the headless/non-interactive
+expression of Quick Deploy draft normalization. Current config schema and CLI `init` output are
+profile-only, reject identity/secret/unsupported fields before mutation, and map source/runtime,
+network, health, non-secret env, and supported `ci-env:` secret references through the config
+bootstrap workflow before ids-only deployment admission. ADR-024 changes the target for
+SSH-targeted CLI/Action runs: config `access.domains[]` should become server-applied proxy route
+state on the SSH target by default, while hosted/control-plane mode can map the same intent into
+managed routing/domain/TLS commands. See
 [Repository Deployment Config File Bootstrap](./deployment-config-file-bootstrap.md).
 
 Provider-backed disambiguation for slash-containing Git refs and typed runtime-profile fields for

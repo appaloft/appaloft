@@ -6,6 +6,9 @@ Quick Deploy tests must verify that guided entry workflows call explicit operati
 
 Tests must not treat Web wizard steps or CLI prompts as domain rules. Domain assertions belong to the commands they dispatch.
 
+Repository config files and headless GitHub Actions binary runs are non-interactive Quick Deploy
+entry forms when they normalize source-adjacent profile input before ids-only deployment admission.
+
 ## Global References
 
 This test matrix inherits:
@@ -18,14 +21,17 @@ This test matrix inherits:
 - [ADR-017: Default Access Domain And Proxy Routing](../decisions/ADR-017-default-access-domain-and-proxy-routing.md)
 - [ADR-021: Docker/OCI Workload Substrate](../decisions/ADR-021-docker-oci-workload-substrate.md)
 - [ADR-023: Runtime Orchestration Target Boundary](../decisions/ADR-023-runtime-orchestration-target-boundary.md)
+- [ADR-024: Pure CLI SSH State And Server-Applied Domains](../decisions/ADR-024-pure-cli-ssh-state-and-server-applied-domains.md)
 - [deployments.create Command Spec](../commands/deployments.create.md)
 - [resources.create Command Spec](../commands/resources.create.md)
 - [Workload Framework Detection And Planning](../workflows/workload-framework-detection-and-planning.md)
 - [resources.diagnostic-summary Query Spec](../queries/resources.diagnostic-summary.md)
 - [Quick Deploy Workflow Spec](../workflows/quick-deploy.md)
 - [Repository Deployment Config File Bootstrap](../workflows/deployment-config-file-bootstrap.md)
+- [GitHub Action Deploy Wrapper Implementation Plan](../implementation/github-action-deploy-action-plan.md)
 - [Resource Diagnostic Summary Test Matrix](./resource-diagnostic-summary-test-matrix.md)
 - [Deployment Config File Test Matrix](./deployment-config-file-test-matrix.md)
+- [Source Link State Test Matrix](./source-link-state-test-matrix.md)
 - [resources.create Test Matrix](./resources.create-test-matrix.md)
 - [deployments.create Test Matrix](./deployments.create-test-matrix.md)
 - [Spec-Driven Testing](./SPEC_DRIVEN_TESTING.md)
@@ -40,6 +46,7 @@ This test matrix inherits:
 | Shared workflow program | Side-effect-free step order, id-threading, and final `deployments.create` input composition. |
 | Web workflow | Wizard draft state, preflight validation, explicit operation calls, final `deployments.create` payload. |
 | CLI workflow | Prompt resolution, non-TTY rejection, explicit operation calls, final `CreateDeploymentCommandInput`. |
+| Config/headless workflow | Repository config parsing, trusted identity resolution outside the file, SSH-server `ssh-pglite` default state for SSH-targeted deploys, explicit local-only PGlite, server-applied config domains, and parity with the shared Quick Deploy operation order. |
 | API/automation contract | No hidden Quick Deploy business command; explicit operations or complete `deployments.create` input only. |
 | Command integration | Underlying commands keep their own error/result semantics. |
 | E2E | First deploy path reaches an accepted deployment and exposes progress/read-model state. |
@@ -78,7 +85,7 @@ Then:
 | QUICK-DEPLOY-WF-006 | e2e-preferred | Auto-generated resource name | Web or CLI | Source/repository name without user-supplied resource name | Generated resource name includes normalized source base plus short random suffix | None | `resources.create(name = "<base>-<suffix>")` -> `deployments.create(resourceId)` | Resource slug is unlikely to collide with previous Quick Deploy defaults; command still enforces uniqueness | Per command |
 | QUICK-DEPLOY-WF-007 | e2e-preferred | User-supplied duplicate resource name | Web or CLI | User explicitly enters a name whose slug already exists in the project/environment | Workflow fails at `resources.create` | `resource_slug_conflict`, phase `resource-admission` | `resources.create` returns `err`; no deployment command | Existing resource remains; no accepted deployment | No for same invalid name |
 | QUICK-DEPLOY-WF-008 | e2e-preferred | First variable supplied | Web or CLI | Environment variable key/value | Deployment request accepted | None | `environments.set-variable` before `deployments.create` | Variable is included in deployment snapshot after acceptance | Retry from persisted environment state |
-| QUICK-DEPLOY-WF-009 | e2e-preferred | Domain/TLS follow-up requested | Web or CLI | Domain/proxy/path/TLS draft after resource context exists | Domain binding remains a separate follow-up operation | None | Context commands -> `resources.create` if needed -> `deployments.create`; explicit domain-binding surfaces dispatch `domain-bindings.create` separately | Deployment input has no domain/TLS fields; domain binding state progresses independently when the follow-up command is dispatched | Domain/certificate retry rules |
+| QUICK-DEPLOY-WF-009 | e2e-preferred | Domain/TLS follow-up requested | Web, CLI, or headless executor | Domain/proxy/path/TLS draft after resource/server/destination context exists | Domain input stays out of deployment admission; SSH CLI mode applies server-local route state, while control-plane mode uses managed domain binding follow-up | None | Context commands -> `resources.create` if needed -> `deployments.create`; SSH CLI mode realizes server-applied proxy route; control-plane executors dispatch `domain-bindings.create` separately | Deployment input has no domain/TLS fields; server-applied route state or managed domain binding state progresses independently | Domain/certificate/proxy retry rules |
 | QUICK-DEPLOY-WF-010 | e2e-preferred | Source/runtime/network draft supplied | Web or CLI | Source locator/source descriptor plus runtime plan strategy hint, optional health check policy, and internal listener port | Deployment request accepted when compatible | None | Context commands -> `resources.create(source, runtimeProfile.healthCheck, networkProfile)` -> `deployments.create(resourceId)` | Resource owns source/runtime/network profile; deployment carries resolved runtime, health check, and network snapshots | Deployment retry creates new attempt |
 | QUICK-DEPLOY-WF-011 | e2e-preferred | Docker/OCI substrate draft | Web or CLI | Dockerfile, Compose, Docker image, static, auto/buildpack-style, or workspace-command choice | Deployment request accepted when the choice can produce or reference a Docker/OCI image or Compose project | None | Source/runtime normalization -> `resources.create(runtimeProfile.strategy)` -> `deployments.create(resourceId)` | Runtime profile records strategy; deployment planning resolves image or Compose artifact intent, not host-process execution | Per deployment |
 | QUICK-DEPLOY-WF-012 | e2e-preferred | Runtime target stays target-owned | Web or CLI | User selects or creates deployment target/server and destination | Deployment request accepted when the selected target has a registered runtime backend | None | Context commands -> `resources.create` if needed -> `deployments.create` | Quick Deploy does not send Kubernetes, Swarm, Helm, namespace, manifest, ingress-class, replica, or pull-secret fields as deployment input | Per target/backend error |
@@ -114,12 +121,16 @@ Then:
 | QUICK-DEPLOY-WF-042 | e2e-preferred | Mainstream framework detected | Web or CLI | Source root contains supported framework/package evidence such as framework config, package/project name, package manager/build tool, scripts, lockfiles, runtime version, and build output | Deployment request accepted when the detected planner can produce a Docker/OCI artifact plan and required network profile is available | None | Source inspection -> resource draft defaults -> `resources.create(source, runtimeProfile, networkProfile)` -> `deployments.create(resourceId)` | Resource and deployment preserve provider-neutral profile/snapshot state; planner metadata appears only as safe runtime-plan evidence or diagnostics | Per deployment |
 | QUICK-DEPLOY-WF-043 | e2e-preferred | Unsupported framework requires explicit fallback | Web or CLI | Source root detects a framework/runtime family without an active planner | Workflow requires explicit install/build/start commands or stops before deployment admission | `validation_error`, phase `runtime-plan-resolution` or entry preflight equivalent | No `deployments.create` unless explicit fallback commands are provided | No accepted deployment without a containerizable planner; source/context records may remain if already created | No for same invalid draft |
 | QUICK-DEPLOY-WF-044 | e2e-preferred | Base image is not deployment input | Web or CLI | User or detector suggests runtime family/version/package manager | Workflow may display planner-derived runtime defaults but final command inputs omit base-image fields | None | `resources.create` stores accepted resource profile fields; `deployments.create` remains ids-only | Base image is resolved by planner during deployment planning and appears only in safe runtime-plan metadata/diagnostics | Per deployment |
-| QUICK-DEPLOY-WF-045 | e2e-preferred | Repository config profile first deploy | CLI or local Web agent | Source root has a valid Appaloft config profile with runtime/network/health fields and no trusted project/resource identity | Workflow auto-creates or selects project/resource outside the file, maps profile fields to resource-owned commands, and accepts deployment | None | Config discovery -> identity resolution outside config -> `projects.create` if needed -> `resources.create(source/runtime/network/health)` -> `deployments.create(resourceId)` | Config changes cannot retarget project/resource; deployment input stays ids-only | Per command |
+| QUICK-DEPLOY-WF-045 | e2e-preferred | Repository config as non-interactive Quick Deploy profile | CLI, local Web agent, or headless binary | Source root has a valid Appaloft config profile with runtime/network/health fields and no trusted project/resource identity | Workflow auto-creates or selects project/resource outside the file, maps profile fields to the same resource-owned commands as interactive Quick Deploy, and accepts deployment | None | Config discovery -> identity resolution outside config -> shared Quick Deploy operation order -> `projects.create` if needed -> `resources.create(source/runtime/network/health)` -> `deployments.create(resourceId)` | Config changes cannot retarget project/resource; deployment input stays ids-only | Per command |
 | QUICK-DEPLOY-WF-046 | e2e-preferred | Repository config identity rejected | CLI or local Web agent | Config contains `project`, `projectId`, `resourceId`, target host, server id, destination id, or credential identity | Workflow fails before mutation | `validation_error`, phase `config-identity` | Config validation only | No project/resource/server/deployment mutation | No |
 | QUICK-DEPLOY-WF-047 | e2e-preferred | Repository config secret rejected | CLI or local Web agent | Config contains raw SSH private key, deploy key, token, password, certificate key, or raw secret env value | Workflow fails before mutation and diagnostics/logs are sanitized | `validation_error`, phase `config-secret-validation` | Config validation only | No write command; no secret value in details/logs | No |
 | QUICK-DEPLOY-WF-048 | e2e-preferred | Repository config required secret reference | CLI or local Web agent | Config declares required secret references without raw values | Workflow proceeds only when referenced secret/credential exists outside the file | None or secret-missing structured error | Secret/credential check -> resource/env commands -> `deployments.create` | Deployment snapshot receives masked/effective environment only after explicit variable/secret resolution | Depends |
 | QUICK-DEPLOY-WF-049 | e2e-preferred | Repository config unsupported sizing | CLI or local Web agent | Config contains CPU, memory, replicas, restart policy, overlap, or drain before accepted sizing/rollout specs exist | Workflow fails before mutation | `unsupported_config_field`, phase `config-capability-resolution` | Config validation only | Unsupported fields are not silently ignored | No |
 | QUICK-DEPLOY-WF-050 | e2e-preferred | Repository config environment overlay | CLI or local Web agent | Config has base profile plus selected-environment overlay | Overlay applies only to the environment selected outside the file; final command remains ids-only | None | Config merge -> explicit operations -> `deployments.create` | Config overlay cannot move deployment to another environment by itself | Per command |
+| QUICK-DEPLOY-WF-051 | e2e-preferred | Repository config domain/TLS declaration | CLI, local Web agent, or headless binary | Config contains `access.domains[]` | Workflow accepts provider-neutral domain intent only when it can persist server-applied SSH route desired state or map to managed control-plane domain commands; otherwise fails before mutation | None when the selected mapping is supported, or `validation_error`, phase `config-domain-resolution` | SSH mode: context commands -> route desired state -> `deployments.create` -> proxy realization. Control-plane mode: context commands -> `deployments.create` -> `domain-bindings.create` follow-up | No domain/TLS fields enter `deployments.create`; committed config cannot select domain binding identity context | Per proxy/domain command |
+| QUICK-DEPLOY-WF-052 | e2e-preferred | Headless SSH remote state default | GitHub Actions or CLI non-TTY | Repository config plus trusted SSH target inputs, no Appaloft ids, no `DATABASE_URL` | Workflow uses SSH-server PGlite state, creates or reuses identity there, persists/reuses source link state, and accepts deployment | None | SSH state ensure/lock/migrate -> source link resolution -> Quick Deploy operation order -> persist link if first run -> `deployments.create` | Repeated runs reuse remote project/resource/server/environment state | Per remote lock/migration policy |
+| QUICK-DEPLOY-WF-053 | e2e-preferred, opt-in SSH | Repository config server-applied domain | GitHub Actions or CLI non-TTY | Valid `access.domains[]`, reverse-proxy network profile, proxy-ready SSH target | Deployment succeeds or accepts and server-applied route state is realized/observable through access/proxy read models | None or provider route error | SSH state -> context commands -> `deployments.create` -> edge proxy route realization | Remote state records route desired/applied status; no managed `DomainBinding` is created | Per proxy route retry |
+| QUICK-DEPLOY-WF-054 | integration | Control-plane maps config domain to managed workflow | Hosted/self-hosted control-plane entry | Same config `access.domains[]`, selected control-plane state | Config domain intent maps to managed domain binding workflow or fails with stable unsupported managed-mapping error; it does not write SSH server-applied state | None or stable unsupported error | Context commands -> `deployments.create` -> `domain-bindings.create` follow-up when supported | Managed `DomainBinding` state progresses separately from deployment | Per domain/certificate retry rules |
 
 ## Entry Consistency Matrix
 
@@ -134,7 +145,8 @@ Then:
 | QUICK-DEPLOY-ENTRY-007 | e2e-preferred | Domain/TLS | Resource/domain binding surface or follow-up command | Separate `domain-bindings.create` command | Durable domain/TLS requires separate commands |
 | QUICK-DEPLOY-ENTRY-008 | e2e-preferred | Static site draft parity | Collects static publish directory, optional build commands, and defaults internal port 80 before `resources.create` | Collects equivalent static draft fields and maps them to the same command schema | API/automation callers create/select a static resource profile explicitly before deployment |
 | QUICK-DEPLOY-ENTRY-009 | e2e-preferred | Framework detection parity | Uses the same source inspection and planner contract as CLI; may suggest resource name, strategy, commands, publish directory, and internal port before dispatch | Uses the same source inspection and planner contract as Web; prompts for missing explicit fallback commands when needed | API/automation callers provide resource source/runtime/network profile explicitly or rely on deployment planning to reject unsupported evidence |
-| QUICK-DEPLOY-ENTRY-010 | e2e-preferred | Repository config file parity | Local Web agent may read a selected file and must follow the config workflow contract | CLI supports explicit `--config` and implicit discovery through the same parser/normalizer | API/automation remains explicit-operation first; no hidden config-file deployment schema |
+| QUICK-DEPLOY-ENTRY-010 | e2e-preferred | Repository config file parity | Local Web agent may read a selected file and must follow the config workflow contract | CLI supports explicit `--config` and implicit discovery through the same parser/normalizer; GitHub Actions invokes the binary as a non-interactive CLI executor with SSH-server `ssh-pglite` by default for SSH targets | API/automation remains explicit-operation first; no hidden config-file deployment schema |
+| QUICK-DEPLOY-ENTRY-011 | contract | Deploy action wrapper parity | Not applicable unless a local Web agent shells out to the CLI | `appaloft/deploy-action` installs a verified released binary, maps trusted inputs to the same CLI flags as direct CLI usage, and invokes the same repository config workflow | API/automation still call explicit operations or use direct CLI; the action wrapper must not introduce a hidden business command |
 
 ## Error Assertion Rules
 
@@ -190,13 +202,30 @@ Framework detection rows `QUICK-DEPLOY-WF-042` through `QUICK-DEPLOY-WF-044` and
 coverage for initial JavaScript/TypeScript and Python framework slices, but full browser/CLI e2e
 parity is still required before a framework family is marked first-class.
 
-Repository config file rows `QUICK-DEPLOY-WF-045` through `QUICK-DEPLOY-WF-050` and
+Repository config file rows `QUICK-DEPLOY-WF-045` through `QUICK-DEPLOY-WF-051` and
+remote-state/domain rows `QUICK-DEPLOY-WF-052` through `QUICK-DEPLOY-WF-054` plus
 `QUICK-DEPLOY-ENTRY-010` are target contract rows governed by
 [Deployment Config File Test Matrix](./deployment-config-file-test-matrix.md). Current
 implementation covers the parser safety contract, CLI `init` profile-only output, CLI `--config`
-seed mapping, Git-root filesystem discovery, and ids-only deployment command admission. Full
-quick-deploy e2e coverage for first-run project/resource creation, link-state reuse, environment
-overlays, secret lookup/application, and profile drift remains follow-up.
+seed mapping, Git-root filesystem discovery, headless local PGlite defaulting, no-id non-TTY
+bootstrap, `ci-env:` secret resolution, environment command sequencing, and ids-only deployment
+command admission. After ADR-024, local PGlite defaulting is migration coverage for explicit
+local-only mode. CLI config deploy now defaults trusted SSH-targeted config deploys to
+`ssh-pglite` and shell-built CLI programs run an SSH transport-backed remote-state lifecycle
+adapter before identity queries or mutations; shell startup mirrors remote PGlite state into a
+target-scoped local data directory before database composition, uses staged download extraction,
+and uploads it after shutdown with remote backup/restore/recovery command sequencing.
+Current config schema accepts provider-neutral `access.domains[]`, and SSH CLI config deploy
+persists server-applied route desired state before ids-only deployment admission when route-state
+storage is wired. Deployment planning consumes that desired state and deployment-finished handling
+records applied/failed route status for route outcomes. Resource access, health, and diagnostic
+summaries expose the latest server-applied route URL/status. The opt-in SSH e2e harness covers
+Traefik-backed server-applied route apply/reload/verify for `CONFIG-FILE-DOMAIN-005`.
+Provider-local TLS diagnostics for `tlsMode = auto` routes are visible through proxy configuration
+and resource diagnostics. Operational provisioning of the external SSH e2e secrets/target,
+control-plane domain mapping, first-run project/resource creation e2e, deploy-action wrapper install
+UX, environment overlays, stored/external secret lookup/application, and profile drift remain
+follow-up.
 
 Current Web and CLI do not yet expose all source variant fields as typed drafts. Initial tests may
 cover the parser/normalizer as a unit before full UI coverage, but the workflow contract requires
@@ -221,9 +250,19 @@ environment because Docker/OCI is the v1 deployment substrate.
 
 `apps/shell/test/e2e/quick-deploy-ssh.workflow.e2e.ts` is the workflow-named executable e2e harness
 for the real SSH/Docker path. It remains opt-in through environment variables because it mutates a
-real external SSH target, while still using embedded PGlite for Appaloft state. Its successful path
-must exercise the Traefik-backed generated public route so proxy image compatibility and Docker
-label discovery are covered by a real deployment.
+real external SSH target. After ADR-024, the successful SSH path must use SSH-server `ssh-pglite`
+state by default, while explicit local PGlite remains a separate smoke mode. Its successful path
+must exercise the Traefik-backed generated public route and, when `access.domains[]` is configured,
+the server-applied custom route so proxy image compatibility and Docker label discovery are covered
+by a real deployment.
+
+`apps/shell/test/e2e/github-action-ssh-state.workflow.e2e.ts` is the opt-in harness for
+`QUICK-DEPLOY-WF-052` and the GitHub Actions style process boundary. It runs two separate CLI
+processes with different runner-local PGlite directories and verifies that the second deploy reuses
+remote SSH state/source link identity instead of creating a duplicate resource.
+`.github/workflows/ssh-remote-state-e2e.yml` exposes that harness as a manual workflow and wires it
+into nightly smoke plus release gating when `APPALOFT_E2E_SSH_HOST` and
+`APPALOFT_E2E_SSH_PRIVATE_KEY` secrets are configured.
 
 ## Open Questions
 

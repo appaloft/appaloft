@@ -396,9 +396,9 @@ Migration gaps:
   remain future work.
 - repository config file support now has a profile-only parser/schema, YAML discovery, CLI
   `--config`, profile-only `appaloft init`, and targeted tests proving identity/secret/unsupported
-  field rejection plus ids-only `deployments.create`. Existing-resource profile drift handling,
-  environment/secret command sequencing, and durable source link/relink state remain workflow gaps,
-  not deployment command fields.
+  field rejection plus ids-only `deployments.create`. Existing-resource profile drift handling and
+  environment/secret command sequencing remain workflow gaps, not deployment command fields. Durable
+  source link creation/reuse and explicit relink are handled outside `deployments.create`.
 - resource listener port is stored as `networkProfile.internalPort`; deployment admission does not read `runtimeProfile.port`.
 - runtime adapter behavior treats reverse-proxy `internalPort` as a workload-local listener rather
   than a globally unique host port; same-port reverse-proxy resources require resource-scoped
