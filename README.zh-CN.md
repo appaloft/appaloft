@@ -134,4 +134,9 @@ docs/
 
 ## License
 
-MIT
+Apache-2.0。
+
+本仓库的源代码属于开源版本。Appaloft Cloud 以及其他托管服务专属代码可能会以不同条款单独分发。
+
+Apache-2.0 license 不授予 Appaloft 名称、logo 和相关品牌资产的使用权；参见
+[TRADEMARKS.md](./TRADEMARKS.md)。

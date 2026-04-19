@@ -2,7 +2,7 @@
   "name": "@appaloft/cli",
   "version": "0.1.0",
   "description": "Appaloft CLI and local server launcher.",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "type": "module",
   "bin": {
     "appaloft": "bin/appaloft.js"
