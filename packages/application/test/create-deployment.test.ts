@@ -24,6 +24,7 @@ import {
   DetectSummary,
   DisplayNameText,
   domainError,
+  EdgeProxyKindValue,
   Environment,
   EnvironmentId,
   EnvironmentKindValue,
@@ -103,6 +104,9 @@ import {
   type ProviderDescriptor,
   type ProviderRegistry,
   type RuntimePlanResolver,
+  type ServerAppliedRouteDesiredStateReader,
+  type ServerAppliedRouteDesiredStateRecord,
+  type ServerAppliedRouteDesiredStateTarget,
   type SourceDetector,
 } from "../src/ports";
 import {
@@ -168,6 +172,19 @@ class CapturingRuntimePlanResolver implements RuntimePlanResolver {
   async resolve(context: ExecutionContext, input: Parameters<RuntimePlanResolver["resolve"]>[1]) {
     this.input = input;
     return new StaticRuntimePlanResolver().resolve(context, input);
+  }
+}
+
+class StaticServerAppliedRouteDesiredStateReader implements ServerAppliedRouteDesiredStateReader {
+  public targets: ServerAppliedRouteDesiredStateTarget[] = [];
+
+  constructor(private readonly record: ServerAppliedRouteDesiredStateRecord | null) {}
+
+  async read(
+    target: ServerAppliedRouteDesiredStateTarget,
+  ): Promise<Result<ServerAppliedRouteDesiredStateRecord | null>> {
+    this.targets.push(target);
+    return ok(this.record);
   }
 }
 
@@ -365,6 +382,8 @@ async function createDeploymentFixture(
   options: {
     runtimePlanResolver?: RuntimePlanResolver;
     executionBackend?: ExecutionBackend;
+    edgeProxyKind?: "traefik" | "caddy";
+    serverAppliedRouteDesiredStateReader?: ServerAppliedRouteDesiredStateReader;
   } = {},
 ) {
   const projects = new MemoryProjectRepository();
@@ -391,8 +410,16 @@ async function createDeploymentFixture(
     host: HostAddress.rehydrate("127.0.0.1"),
     port: PortNumber.rehydrate(22),
     providerKey: ProviderKey.rehydrate("generic-ssh"),
+    ...(options.edgeProxyKind
+      ? { edgeProxyKind: EdgeProxyKindValue.rehydrate(options.edgeProxyKind) }
+      : {}),
     createdAt: CreatedAt.rehydrate(clock.now()),
   })._unsafeUnwrap();
+  if (options.edgeProxyKind) {
+    server.markEdgeProxyReady({
+      completedAt: UpdatedAt.rehydrate(clock.now()),
+    });
+  }
   const destination = Destination.register({
     id: DestinationId.rehydrate("dst_demo"),
     serverId: DeploymentTargetId.rehydrate("srv_demo"),
@@ -476,6 +503,8 @@ async function createDeploymentFixture(
     new RuntimePlanResolutionInputBuilder(clock, idGenerator),
     new DeploymentFactory(clock, idGenerator),
     new DeploymentLifecycleService(clock),
+    undefined,
+    options.serverAppliedRouteDesiredStateReader,
   );
   return {
     clock,
@@ -887,6 +916,139 @@ describe("CreateDeploymentUseCase", () => {
       port: 80,
       exposureMode: "reverse-proxy",
       upstreamProtocol: "http",
+    });
+  });
+
+  test("[EDGE-PROXY-ROUTE-005] resolves server-applied config domains into deployment planning input", async () => {
+    const runtimePlanResolver = new CapturingRuntimePlanResolver();
+    const desiredRoutes = new StaticServerAppliedRouteDesiredStateReader({
+      routeSetId: "prj_demo:env_demo:res_demo:srv_demo:dst_demo",
+      projectId: "prj_demo",
+      environmentId: "env_demo",
+      resourceId: "res_demo",
+      serverId: "srv_demo",
+      destinationId: "dst_demo",
+      sourceFingerprint: "local-folder:demo",
+      domains: [
+        {
+          host: "www.example.test",
+          pathPrefix: "/",
+          tlsMode: "auto",
+        },
+        {
+          host: "app.example.test",
+          pathPrefix: "/",
+          tlsMode: "auto",
+        },
+      ],
+      status: "desired",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    });
+    const { context, createDeploymentInput, createDeploymentUseCase } =
+      await createDeploymentFixture(new ExplicitContextRequiredPolicy(), {
+        runtimePlanResolver,
+        edgeProxyKind: "traefik",
+        serverAppliedRouteDesiredStateReader: desiredRoutes,
+      });
+
+    const result = await createDeploymentUseCase.execute(context, createDeploymentInput);
+
+    expect(result.isOk()).toBe(true);
+    expect(desiredRoutes.targets).toEqual([
+      {
+        projectId: "prj_demo",
+        environmentId: "env_demo",
+        resourceId: "res_demo",
+        serverId: "srv_demo",
+        destinationId: "dst_demo",
+      },
+    ]);
+    expect(runtimePlanResolver.input?.requestedDeployment).toMatchObject({
+      proxyKind: "traefik",
+      domains: ["www.example.test", "app.example.test"],
+      pathPrefix: "/",
+      tlsMode: "auto",
+      accessRoutes: [
+        {
+          proxyKind: "traefik",
+          domains: ["www.example.test", "app.example.test"],
+          pathPrefix: "/",
+          tlsMode: "auto",
+        },
+      ],
+      accessRouteMetadata: {
+        "access.routeSource": "server-applied-config-domain",
+        "access.serverAppliedRouteSetId": "prj_demo:env_demo:res_demo:srv_demo:dst_demo",
+        "access.hostname": "www.example.test",
+        "access.scheme": "https",
+        "access.routeCount": "2",
+        "access.routeGroupCount": "1",
+        "access.sourceFingerprint": "local-folder:demo",
+      },
+    });
+  });
+
+  test("[EDGE-PROXY-ROUTE-005] resolves mixed server-applied config domain route groups", async () => {
+    const runtimePlanResolver = new CapturingRuntimePlanResolver();
+    const desiredRoutes = new StaticServerAppliedRouteDesiredStateReader({
+      routeSetId: "prj_demo:env_demo:res_demo:srv_demo:dst_demo",
+      projectId: "prj_demo",
+      environmentId: "env_demo",
+      resourceId: "res_demo",
+      serverId: "srv_demo",
+      destinationId: "dst_demo",
+      domains: [
+        {
+          host: "www.example.test",
+          pathPrefix: "/",
+          tlsMode: "auto",
+        },
+        {
+          host: "admin.example.test",
+          pathPrefix: "/admin",
+          tlsMode: "auto",
+        },
+      ],
+      status: "desired",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    });
+    const { context, createDeploymentInput, createDeploymentUseCase } =
+      await createDeploymentFixture(new ExplicitContextRequiredPolicy(), {
+        runtimePlanResolver,
+        edgeProxyKind: "traefik",
+        serverAppliedRouteDesiredStateReader: desiredRoutes,
+      });
+
+    const result = await createDeploymentUseCase.execute(context, createDeploymentInput);
+
+    expect(result.isOk()).toBe(true);
+    expect(runtimePlanResolver.input?.requestedDeployment).toMatchObject({
+      proxyKind: "traefik",
+      domains: ["www.example.test"],
+      pathPrefix: "/",
+      tlsMode: "auto",
+      accessRoutes: [
+        {
+          proxyKind: "traefik",
+          domains: ["www.example.test"],
+          pathPrefix: "/",
+          tlsMode: "auto",
+        },
+        {
+          proxyKind: "traefik",
+          domains: ["admin.example.test"],
+          pathPrefix: "/admin",
+          tlsMode: "auto",
+        },
+      ],
+      accessRouteMetadata: {
+        "access.routeSource": "server-applied-config-domain",
+        "access.serverAppliedRouteSetId": "prj_demo:env_demo:res_demo:srv_demo:dst_demo",
+        "access.hostname": "www.example.test",
+        "access.scheme": "https",
+        "access.routeCount": "2",
+        "access.routeGroupCount": "2",
+      },
     });
   });
 

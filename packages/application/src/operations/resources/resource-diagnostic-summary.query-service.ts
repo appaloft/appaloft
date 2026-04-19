@@ -158,7 +158,11 @@ function sourceErrorFromUnknown(input: {
 function accessStatus(resource: ResourceSummary): ResourceDiagnosticSectionStatus {
   const access = resource.accessSummary;
 
-  if (access?.latestGeneratedAccessRoute || access?.latestDurableDomainRoute) {
+  if (
+    access?.latestGeneratedAccessRoute ||
+    access?.latestDurableDomainRoute ||
+    access?.latestServerAppliedDomainRoute
+  ) {
     return "available";
   }
 
@@ -211,6 +215,7 @@ function proxyProviderKey(
   const proxyKind =
     resource.accessSummary?.latestGeneratedAccessRoute?.proxyKind ??
     resource.accessSummary?.latestDurableDomainRoute?.proxyKind ??
+    resource.accessSummary?.latestServerAppliedDomainRoute?.proxyKind ??
     resource.accessSummary?.plannedGeneratedAccessRoute?.proxyKind ??
     deployment?.runtimePlan.execution.accessRoutes?.find((route) => route.proxyKind !== "none")
       ?.proxyKind;
@@ -478,6 +483,9 @@ export class ResourceDiagnosticSummaryQueryService {
       ...(access?.latestDurableDomainRoute?.url
         ? { durableUrl: access.latestDurableDomainRoute.url }
         : {}),
+      ...(access?.latestServerAppliedDomainRoute?.url
+        ? { serverAppliedUrl: access.latestServerAppliedDomainRoute.url }
+        : {}),
       ...(access?.plannedGeneratedAccessRoute?.url
         ? { plannedUrl: access.plannedGeneratedAccessRoute.url }
         : {}),
@@ -517,7 +525,7 @@ export class ResourceDiagnosticSummaryQueryService {
       resourceId: resource.id,
       ...(deployment ? { deploymentId: deployment.id } : {}),
       routeScope: "latest",
-      includeDiagnostics: false,
+      includeDiagnostics: true,
     });
     if (proxyQuery.isErr()) {
       sourceErrors.push(
@@ -593,6 +601,20 @@ export class ResourceDiagnosticSummaryQueryService {
         redacted: section.redacted,
         source: section.source,
       })),
+      ...(view.diagnostics?.tlsRoutes
+        ? {
+            tlsRoutes: view.diagnostics.tlsRoutes.map((route) => ({
+              hostname: route.hostname,
+              pathPrefix: route.pathPrefix,
+              tlsMode: route.tlsMode,
+              scheme: route.scheme,
+              automation: route.automation,
+              certificateSource: route.certificateSource,
+              appaloftCertificateManaged: route.appaloftCertificateManaged,
+              message: route.message,
+            })),
+          }
+        : {}),
       warnings: view.warnings,
     };
   }

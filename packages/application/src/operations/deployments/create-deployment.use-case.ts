@@ -26,6 +26,9 @@ import {
   type RequestedDeploymentConfig,
   type RequestedDeploymentHealthCheck,
   type RuntimePlanResolver,
+  type ServerAppliedRouteDesiredStateDomain,
+  type ServerAppliedRouteDesiredStateReader,
+  type ServerAppliedRouteDesiredStateRecord,
   type SourceDetector,
 } from "../../ports";
 import { tokens } from "../../tokens";
@@ -191,7 +194,8 @@ function requestedDeploymentWithDurableDomainBindings(
 ): RequestedDeploymentConfig {
   if (
     requestedDeployment.accessContext?.exposureMode !== "reverse-proxy" ||
-    (requestedDeployment.domains?.length ?? 0) > 0
+    (requestedDeployment.domains?.length ?? 0) > 0 ||
+    (requestedDeployment.accessRoutes?.length ?? 0) > 0
   ) {
     return requestedDeployment;
   }
@@ -229,6 +233,109 @@ function requestedDeploymentWithDurableDomainBindings(
   };
 }
 
+function proxyKindFromServer(
+  server: Parameters<RuntimePlanResolutionInputBuilder["build"]>[0]["server"],
+): NonNullable<RequestedDeploymentConfig["proxyKind"]> | undefined {
+  const edgeProxy = server.toState().edgeProxy;
+
+  if (!edgeProxy || edgeProxy.kind.value === "none" || edgeProxy.status.value === "disabled") {
+    return undefined;
+  }
+
+  return edgeProxy.kind.value;
+}
+
+interface ServerAppliedRouteGroup {
+  domains: string[];
+  pathPrefix: string;
+  tlsMode: ServerAppliedRouteDesiredStateDomain["tlsMode"];
+}
+
+function serverAppliedRouteGroups(
+  domains: ServerAppliedRouteDesiredStateDomain[],
+): ServerAppliedRouteGroup[] {
+  const groups: ServerAppliedRouteGroup[] = [];
+  const groupIndexes = new Map<string, number>();
+
+  for (const domain of domains) {
+    const groupKey = `${domain.pathPrefix}\u0000${domain.tlsMode}`;
+    const existingIndex = groupIndexes.get(groupKey);
+
+    if (existingIndex === undefined) {
+      groupIndexes.set(groupKey, groups.length);
+      groups.push({
+        domains: [domain.host],
+        pathPrefix: domain.pathPrefix,
+        tlsMode: domain.tlsMode,
+      });
+      continue;
+    }
+
+    const group = groups[existingIndex];
+    if (group) {
+      group.domains.push(domain.host);
+    }
+  }
+
+  return groups;
+}
+
+function requestedDeploymentWithServerAppliedRoutes(input: {
+  requestedDeployment: RequestedDeploymentConfig;
+  desiredState: ServerAppliedRouteDesiredStateRecord | null;
+  proxyKind: NonNullable<RequestedDeploymentConfig["proxyKind"]> | undefined;
+}): Result<RequestedDeploymentConfig> {
+  if (
+    input.requestedDeployment.accessContext?.exposureMode !== "reverse-proxy" ||
+    (input.requestedDeployment.domains?.length ?? 0) > 0 ||
+    (input.requestedDeployment.accessRoutes?.length ?? 0) > 0 ||
+    !input.desiredState ||
+    input.desiredState.domains.length === 0 ||
+    !input.proxyKind
+  ) {
+    return ok(input.requestedDeployment);
+  }
+
+  const primaryRoute = input.desiredState.domains[0];
+  if (!primaryRoute) {
+    return ok(input.requestedDeployment);
+  }
+
+  const proxyKind = input.proxyKind;
+  const routeGroups = serverAppliedRouteGroups(input.desiredState.domains);
+  const primaryRouteGroup = routeGroups[0];
+
+  if (!primaryRouteGroup) {
+    return ok(input.requestedDeployment);
+  }
+
+  return ok({
+    ...input.requestedDeployment,
+    proxyKind,
+    domains: primaryRouteGroup.domains,
+    pathPrefix: primaryRouteGroup.pathPrefix,
+    tlsMode: primaryRouteGroup.tlsMode,
+    accessRoutes: routeGroups.map((group) => ({
+      proxyKind,
+      domains: group.domains,
+      pathPrefix: group.pathPrefix,
+      tlsMode: group.tlsMode,
+    })),
+    accessRouteMetadata: {
+      ...(input.requestedDeployment.accessRouteMetadata ?? {}),
+      "access.routeSource": "server-applied-config-domain",
+      "access.serverAppliedRouteSetId": input.desiredState.routeSetId,
+      "access.hostname": primaryRoute.host,
+      "access.scheme": primaryRoute.tlsMode === "auto" ? "https" : "http",
+      "access.routeCount": String(input.desiredState.domains.length),
+      "access.routeGroupCount": String(routeGroups.length),
+      ...(input.desiredState.sourceFingerprint
+        ? { "access.sourceFingerprint": input.desiredState.sourceFingerprint }
+        : {}),
+    },
+  });
+}
+
 @injectable()
 export class CreateDeploymentUseCase {
   constructor(
@@ -260,6 +367,8 @@ export class CreateDeploymentUseCase {
     private readonly deploymentLifecycleService: DeploymentLifecycleService,
     @inject(tokens.domainRouteBindingReader)
     private readonly domainRouteBindingReader?: DomainRouteBindingReader,
+    @inject(tokens.serverAppliedRouteDesiredStateReader)
+    private readonly serverAppliedRouteDesiredStateReader?: ServerAppliedRouteDesiredStateReader,
   ) {}
 
   async execute(
@@ -280,6 +389,7 @@ export class CreateDeploymentUseCase {
       deploymentProgressReporter,
       runtimePlanResolutionInputBuilder,
       runtimePlanResolver,
+      serverAppliedRouteDesiredStateReader,
       sourceDetector,
     } = this;
     const repositoryContext = toRepositoryContext(context);
@@ -347,17 +457,33 @@ export class CreateDeploymentUseCase {
       const snapshotResult = deploymentSnapshotFactory.create(environment);
       const snapshot = yield* snapshotResult;
       const requestedDeploymentBase = yield* requestedDeploymentFromResource(resource);
+      const targetContext = {
+        projectId: project.toState().id.value,
+        environmentId: environment.toState().id.value,
+        resourceId: resource.toState().id.value,
+        serverId: server.toState().id.value,
+        destinationId: destination.toState().id.value,
+      };
+      const serverAppliedRouteDesiredState = serverAppliedRouteDesiredStateReader
+        ? yield* await serverAppliedRouteDesiredStateReader.read(targetContext)
+        : null;
       const routeBindings = domainRouteBindingReader
         ? await domainRouteBindingReader.listDeployableBindings(repositoryContext, {
-            projectId: project.toState().id.value,
-            environmentId: environment.toState().id.value,
-            resourceId: resource.toState().id.value,
-            serverId: server.toState().id.value,
-            destinationId: destination.toState().id.value,
+            projectId: targetContext.projectId,
+            environmentId: targetContext.environmentId,
+            resourceId: targetContext.resourceId,
+            serverId: targetContext.serverId,
+            destinationId: targetContext.destinationId,
           })
         : [];
+      const requestedDeploymentWithServerAppliedRoute =
+        yield* requestedDeploymentWithServerAppliedRoutes({
+          requestedDeployment: requestedDeploymentBase,
+          desiredState: serverAppliedRouteDesiredState,
+          proxyKind: proxyKindFromServer(server),
+        });
       const requestedDeployment = requestedDeploymentWithDurableDomainBindings(
-        requestedDeploymentBase,
+        requestedDeploymentWithServerAppliedRoute,
         routeBindings,
       );
       const runtimePlanInputResult = runtimePlanResolutionInputBuilder.build({

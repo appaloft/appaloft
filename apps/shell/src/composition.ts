@@ -1,8 +1,15 @@
 import "reflect-metadata";
 
+import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { createCliProgram } from "@appaloft/adapter-cli";
+import {
+  createCliProgram,
+  FileSystemServerAppliedRouteDesiredStateStore,
+  FileSystemSourceLinkStore,
+  SshRemoteStateLifecycle,
+  sshRemoteStateTargetFromDecision,
+} from "@appaloft/adapter-cli";
 import { createHttpApp } from "@appaloft/adapter-http-elysia";
 import {
   type AppLogger,
@@ -18,6 +25,7 @@ import {
 } from "@appaloft/application";
 import { createBetterAuthRuntime } from "@appaloft/auth-better";
 import { type AppConfig, resolveConfig } from "@appaloft/config";
+import { err, ok } from "@appaloft/core";
 import {
   bootstrapOpenTelemetry,
   createExecutionContextFactory,
@@ -30,6 +38,7 @@ import { createCertificateRetrySchedulerRunner } from "./certificate-retry-sched
 import { ShellDeploymentProgressReporter } from "./deployment-progress-reporter";
 import { registerApplicationServices } from "./register-application-services";
 import { registerRuntimeDependencies } from "./register-runtime-dependencies";
+import { type RemotePgliteStateSyncSession } from "./remote-pglite-state-sync";
 
 export interface AppComposition {
   config: AppConfig;
@@ -44,6 +53,7 @@ export interface AppComposition {
 export interface ShellRuntimeOptions {
   embeddedWebAssets?: Readonly<Record<string, Blob>>;
   pgliteRuntimeAssets?: PgliteRuntimeAssets;
+  remotePgliteStateSyncSession?: RemotePgliteStateSyncSession;
 }
 
 interface RequestContextRunner extends IntegrationAuthPort {
@@ -95,6 +105,16 @@ export async function createAppComposition(
   if (config.databaseDriver === "pglite") {
     await migrator.migrateToLatest();
   }
+  const localPgliteStateRoot =
+    options?.remotePgliteStateSyncSession?.localDataRoot ?? dirname(config.pgliteDataDir);
+  const sourceLinkStore =
+    config.databaseDriver === "pglite"
+      ? new FileSystemSourceLinkStore(localPgliteStateRoot)
+      : undefined;
+  const serverAppliedRouteStore =
+    config.databaseDriver === "pglite"
+      ? new FileSystemServerAppliedRouteDesiredStateStore(localPgliteStateRoot)
+      : undefined;
 
   const authRuntime = createBetterAuthRuntime({
     enabled: config.authProvider === "better-auth",
@@ -116,6 +136,10 @@ export async function createAppComposition(
     migrator,
     authRuntime,
     deploymentProgressReporter,
+    ...(sourceLinkStore ? { sourceLinkStore } : {}),
+    ...(serverAppliedRouteStore
+      ? { serverAppliedRouteDesiredStateReader: serverAppliedRouteStore }
+      : {}),
   });
   registerApplicationServices(childContainer);
   const idGenerator = resolveToken<IdGenerator>(childContainer, tokens.idGenerator);
@@ -195,6 +219,37 @@ export async function createAppComposition(
     queryBus,
     executionContextFactory,
     deploymentProgressObserver: deploymentProgressReporter,
+    ...(sourceLinkStore ? { sourceLinkStore } : {}),
+    ...(serverAppliedRouteStore ? { serverAppliedRouteStore } : {}),
+    prepareDeploymentStateBackend: async (decision) => {
+      if (options?.remotePgliteStateSyncSession && decision.kind === "ssh-pglite") {
+        return ok({
+          dataRoot: options.remotePgliteStateSyncSession.dataRoot,
+          schemaVersion: 1,
+          release: options.remotePgliteStateSyncSession.releaseForCliRuntime,
+        });
+      }
+
+      if (!decision.requiresRemoteStateLifecycle) {
+        return ok({
+          dataRoot: "",
+          schemaVersion: 0,
+          release: async () => ok(undefined),
+        });
+      }
+
+      const target = sshRemoteStateTargetFromDecision(decision);
+      if (target.isErr()) {
+        return err(target.error);
+      }
+
+      return await new SshRemoteStateLifecycle({
+        target: target.value,
+        dataRoot: `${config.remoteRuntimeRoot.replace(/\/+$/, "")}/state`,
+        owner: "appaloft-cli",
+        correlationId: idGenerator.next("remote_state"),
+      }).prepare();
+    },
   });
 
   return {

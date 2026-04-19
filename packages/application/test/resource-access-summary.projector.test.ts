@@ -242,4 +242,96 @@ describe("projectResourceAccessSummary", () => {
       updatedAt: "2026-01-01T01:05:00.000Z",
     });
   });
+
+  test("[EDGE-PROXY-ROUTE-005] projects latest server-applied config domain route", () => {
+    const summary = projectResourceAccessSummary([
+      {
+        id: "dep_config_domain",
+        status: "succeeded",
+        createdAt: "2026-01-01T01:00:00.000Z",
+        runtimePlan: {
+          execution: {
+            accessRoutes: [
+              {
+                proxyKind: "traefik",
+                domains: ["www.example.test"],
+                pathPrefix: "/",
+                tlsMode: "disabled",
+                targetPort: 3000,
+              },
+              {
+                proxyKind: "traefik",
+                domains: ["www.example.test"],
+                pathPrefix: "/admin",
+                tlsMode: "disabled",
+                targetPort: 3000,
+              },
+            ],
+            metadata: {
+              "access.routeSource": "server-applied-config-domain",
+              "access.serverAppliedRouteSetId": "prj_demo:env_demo:res_demo:srv_demo:dst_demo",
+              "access.hostname": "www.example.test",
+              "access.scheme": "http",
+              "access.routeCount": "2",
+              "access.routeGroupCount": "2",
+            },
+          },
+        },
+      },
+    ]);
+
+    expect(summary).toEqual({
+      latestServerAppliedDomainRoute: {
+        url: "http://www.example.test",
+        hostname: "www.example.test",
+        scheme: "http",
+        deploymentId: "dep_config_domain",
+        deploymentStatus: "succeeded",
+        pathPrefix: "/",
+        proxyKind: "traefik",
+        targetPort: 3000,
+        updatedAt: "2026-01-01T01:00:00.000Z",
+      },
+      proxyRouteStatus: "ready",
+      lastRouteRealizationDeploymentId: "dep_config_domain",
+    });
+  });
+
+  test("[EDGE-PROXY-ROUTE-007] projects failed server-applied config domain route status", () => {
+    const summary = projectResourceAccessSummary([
+      {
+        id: "dep_config_domain_failed",
+        status: "failed",
+        createdAt: "2026-01-01T01:00:00.000Z",
+        runtimePlan: {
+          execution: {
+            accessRoutes: [
+              {
+                proxyKind: "traefik",
+                domains: ["www.example.test"],
+                pathPrefix: "/",
+                tlsMode: "auto",
+                targetPort: 3000,
+              },
+            ],
+            metadata: {
+              "access.routeSource": "server-applied-config-domain",
+              "access.hostname": "www.example.test",
+              "access.scheme": "https",
+            },
+          },
+        },
+      },
+    ]);
+
+    expect(summary?.latestServerAppliedDomainRoute).toMatchObject({
+      url: "https://www.example.test",
+      hostname: "www.example.test",
+      scheme: "https",
+      deploymentId: "dep_config_domain_failed",
+      deploymentStatus: "failed",
+    });
+    expect(summary?.proxyRouteStatus).toBe("failed");
+    expect(summary?.lastRouteRealizationDeploymentId).toBe("dep_config_domain_failed");
+  });
 });

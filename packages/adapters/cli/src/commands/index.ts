@@ -10,6 +10,7 @@ import { doctorCommand, initCommand, serveCommand, versionCommand } from "./life
 import { projectCommand } from "./project.js";
 import { resourceCommand } from "./resource.js";
 import { serverCommand } from "./server.js";
+import { sourceLinksCommand } from "./source-link.js";
 
 export const mainCommand = EffectCommand.make("appaloft").pipe(
   EffectCommand.withDescription("AI Native local-to-cloud deployment platform"),
@@ -28,6 +29,7 @@ export const mainCommand = EffectCommand.make("appaloft").pipe(
     deployCommand,
     logsCommand,
     envCommand,
+    sourceLinksCommand,
     pluginsCommand,
     providersCommand,
   ]),

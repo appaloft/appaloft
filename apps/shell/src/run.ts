@@ -1,4 +1,8 @@
 import { createAppComposition, type ShellRuntimeOptions } from "./composition";
+import {
+  prepareRemotePgliteStateSync,
+  type RemotePgliteStateSyncSession,
+} from "./remote-pglite-state-sync";
 
 function readExitCode(): number {
   const value = process.exitCode;
@@ -6,7 +10,25 @@ function readExitCode(): number {
 }
 
 export async function runShellCli(options?: ShellRuntimeOptions): Promise<void> {
-  const app = await createAppComposition(undefined, options);
+  const remotePgliteStateSync = await prepareRemotePgliteStateSync({
+    argv: process.argv,
+    env: process.env,
+  });
+  if (remotePgliteStateSync.isErr()) {
+    process.stderr.write(`${remotePgliteStateSync.error.message}\n`);
+    process.exit(1);
+  }
+
+  const remotePgliteStateSyncSession: RemotePgliteStateSyncSession | undefined =
+    remotePgliteStateSync.value ?? options?.remotePgliteStateSyncSession;
+  if (remotePgliteStateSyncSession) {
+    process.env.APPALOFT_PGLITE_DATA_DIR = remotePgliteStateSyncSession.localPgliteDataDir;
+  }
+
+  const app = await createAppComposition(undefined, {
+    ...options,
+    ...(remotePgliteStateSyncSession ? { remotePgliteStateSyncSession } : {}),
+  });
   let exitCode = 0;
 
   try {
@@ -18,6 +40,14 @@ export async function runShellCli(options?: ShellRuntimeOptions): Promise<void> 
   } finally {
     if (!process.argv.includes("serve")) {
       await app.shutdown();
+    }
+
+    if (remotePgliteStateSyncSession) {
+      const synced = await remotePgliteStateSyncSession.syncBackAndRelease();
+      if (synced.isErr()) {
+        process.stderr.write(`${synced.error.message}\n`);
+        exitCode = exitCode === 0 ? 1 : exitCode;
+      }
     }
   }
 

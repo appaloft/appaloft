@@ -12,8 +12,17 @@ import {
   type DeploymentSummary,
   type DestinationRepository,
   type DiagnosticsPort,
+  type EdgeProxyEnsureInput,
+  type EdgeProxyEnsurePlan,
+  type EdgeProxyExecutionContext,
   type EdgeProxyProvider,
   type EdgeProxyProviderRegistry,
+  type ProxyConfigurationView,
+  type ProxyConfigurationViewInput,
+  type ProxyReloadInput,
+  type ProxyReloadPlan,
+  type ProxyRouteRealizationInput,
+  type ProxyRouteRealizationPlan,
   type ResourceReadModel,
   type ResourceRuntimeLogContext,
   type ResourceRuntimeLogEvent,
@@ -146,6 +155,104 @@ class UnregisteredEdgeProxyProviderRegistry implements EdgeProxyProviderRegistry
 
   defaultFor(): Result<EdgeProxyProvider | null> {
     return err(domainError.proxyProviderUnavailable("Edge proxy provider is not registered"));
+  }
+}
+
+class TlsDiagnosticEdgeProxyProvider implements EdgeProxyProvider {
+  readonly key = "traefik";
+  readonly displayName = "Traefik";
+  readonly capabilities = {
+    ensureProxy: true,
+    dockerLabels: true,
+    reloadProxy: true,
+    configurationView: true,
+    runtimeLogs: false,
+    diagnostics: true,
+  };
+
+  async ensureProxy(
+    _context: EdgeProxyExecutionContext,
+    _input: EdgeProxyEnsureInput,
+  ): Promise<Result<EdgeProxyEnsurePlan>> {
+    return err(domainError.provider("not used"));
+  }
+
+  async diagnoseProxy(): Promise<Result<never>> {
+    return err(domainError.provider("not used"));
+  }
+
+  async realizeRoutes(
+    _context: EdgeProxyExecutionContext,
+    input: ProxyRouteRealizationInput,
+  ): Promise<Result<ProxyRouteRealizationPlan>> {
+    return ok({
+      providerKey: this.key,
+      networkName: "appaloft-edge",
+      labels: [
+        `traefik.http.services.${input.deploymentId}.loadbalancer.server.port=${input.port}`,
+      ],
+    });
+  }
+
+  async reloadProxy(
+    _context: EdgeProxyExecutionContext,
+    input: ProxyReloadInput,
+  ): Promise<Result<ProxyReloadPlan>> {
+    return ok({
+      providerKey: this.key,
+      proxyKind: input.proxyKind,
+      displayName: this.displayName,
+      required: false,
+      steps: [],
+    });
+  }
+
+  async renderConfigurationView(
+    _context: EdgeProxyExecutionContext,
+    input: ProxyConfigurationViewInput,
+  ): Promise<Result<ProxyConfigurationView>> {
+    return ok({
+      resourceId: input.resourceId,
+      ...(input.deploymentId ? { deploymentId: input.deploymentId } : {}),
+      providerKey: this.key,
+      routeScope: input.routeScope,
+      status: input.status,
+      generatedAt: input.generatedAt,
+      stale: input.stale,
+      routes: [],
+      sections: [],
+      warnings: [],
+      diagnostics: {
+        providerKey: this.key,
+        routeCount: input.accessRoutes.length,
+        tlsRoutes: input.accessRoutes.flatMap((route) =>
+          route.domains.map((hostname) => ({
+            hostname,
+            pathPrefix: route.pathPrefix,
+            tlsMode: route.tlsMode,
+            scheme: route.tlsMode === "auto" ? ("https" as const) : ("http" as const),
+            automation:
+              route.tlsMode === "auto" ? ("provider-local" as const) : ("disabled" as const),
+            certificateSource:
+              route.tlsMode === "auto" ? ("provider-local" as const) : ("none" as const),
+            appaloftCertificateManaged: false,
+            message: "TLS is handled by the resident edge proxy provider",
+          })),
+        ),
+      },
+    });
+  }
+}
+
+class StaticEdgeProxyProviderRegistry implements EdgeProxyProviderRegistry {
+  constructor(private readonly provider: EdgeProxyProvider) {}
+
+  resolve(): Result<EdgeProxyProvider> {
+    return ok(this.provider);
+  }
+
+  defaultFor(): Result<EdgeProxyProvider | null> {
+    return ok(this.provider);
   }
 }
 
@@ -405,6 +512,126 @@ describe("ResourceDiagnosticSummaryQueryService", () => {
     expect(summary.copy.json).not.toContain("secret-token");
     expect(summary.system.databaseDriver).toBe("pglite");
     expect(summary.copy.json).not.toContain("databaseLocation");
+  });
+
+  test("[EDGE-PROXY-ROUTE-005] includes server-applied route access in diagnostics", async () => {
+    const context = createTestContext();
+    const { service } = createService({
+      resources: [
+        resourceSummary({
+          accessSummary: {
+            latestServerAppliedDomainRoute: {
+              url: "https://www.example.test/admin",
+              hostname: "www.example.test",
+              scheme: "https",
+              deploymentId: "dep_web",
+              deploymentStatus: "succeeded",
+              pathPrefix: "/admin",
+              proxyKind: "traefik",
+              targetPort: 3000,
+              updatedAt: "2026-01-01T00:00:05.000Z",
+            },
+            proxyRouteStatus: "ready",
+            lastRouteRealizationDeploymentId: "dep_web",
+          },
+        }),
+      ],
+    });
+    const query = ResourceDiagnosticSummaryQuery.create({
+      resourceId: "res_web",
+      includeDeploymentLogTail: false,
+      includeRuntimeLogTail: false,
+      includeProxyConfiguration: false,
+      tailLines: 10,
+    })._unsafeUnwrap();
+
+    const result = await service.execute(context, query);
+
+    expect(result.isOk()).toBe(true);
+    const summary = result._unsafeUnwrap();
+    expect(summary.access).toMatchObject({
+      status: "available",
+      serverAppliedUrl: "https://www.example.test/admin",
+      proxyRouteStatus: "ready",
+      lastRouteRealizationDeploymentId: "dep_web",
+    });
+    expect(summary.proxy).toMatchObject({
+      status: "available",
+      providerKey: "traefik",
+      proxyRouteStatus: "ready",
+    });
+    expect(summary.copy.json).toContain('"serverAppliedUrl": "https://www.example.test/admin"');
+  });
+
+  test("[EDGE-PROXY-ROUTE-006] includes provider-local TLS diagnostics in resource diagnostics", async () => {
+    const context = createTestContext();
+    const { service } = createService({
+      resources: [
+        resourceSummary({
+          accessSummary: {
+            latestServerAppliedDomainRoute: {
+              url: "https://www.example.test",
+              hostname: "www.example.test",
+              scheme: "https",
+              deploymentId: "dep_web",
+              deploymentStatus: "succeeded",
+              pathPrefix: "/",
+              proxyKind: "traefik",
+              targetPort: 3000,
+              updatedAt: "2026-01-01T00:00:05.000Z",
+            },
+            proxyRouteStatus: "ready",
+            lastRouteRealizationDeploymentId: "dep_web",
+          },
+        }),
+      ],
+      deployments: [
+        deploymentSummary({
+          runtimePlan: {
+            ...deploymentSummary().runtimePlan,
+            execution: {
+              kind: "host-process",
+              port: 3000,
+              accessRoutes: [
+                {
+                  proxyKind: "traefik",
+                  domains: ["www.example.test"],
+                  pathPrefix: "/",
+                  tlsMode: "auto",
+                  targetPort: 3000,
+                },
+              ],
+            },
+          },
+        }),
+      ],
+      edgeProxyProviderRegistry: new StaticEdgeProxyProviderRegistry(
+        new TlsDiagnosticEdgeProxyProvider(),
+      ),
+    });
+    const query = ResourceDiagnosticSummaryQuery.create({
+      resourceId: "res_web",
+      includeDeploymentLogTail: false,
+      includeRuntimeLogTail: false,
+      includeProxyConfiguration: true,
+      tailLines: 10,
+    })._unsafeUnwrap();
+
+    const result = await service.execute(context, query);
+
+    expect(result.isOk()).toBe(true);
+    const summary = result._unsafeUnwrap();
+    expect(summary.proxy.tlsRoutes).toEqual([
+      expect.objectContaining({
+        hostname: "www.example.test",
+        tlsMode: "auto",
+        automation: "provider-local",
+        certificateSource: "provider-local",
+        appaloftCertificateManaged: false,
+      }),
+    ]);
+    expect(summary.copy.json).toContain('"automation": "provider-local"');
+    expect(summary.copy.json).toContain('"appaloftCertificateManaged": false');
   });
 
   test("keeps missing access and unrequested runtime logs as section state", async () => {

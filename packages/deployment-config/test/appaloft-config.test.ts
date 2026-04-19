@@ -192,4 +192,118 @@ describe("Appaloft deployment config schema", () => {
 
     expect(safePath.success).toBe(true);
   });
+
+  test("[CONFIG-FILE-DOMAIN-001] accepts provider-neutral access domains", () => {
+    const parsed = parseAppaloftDeploymentConfig({
+      access: {
+        domains: [
+          {
+            host: "WWW.Example.COM",
+          },
+          {
+            host: "api.example.com",
+            pathPrefix: "/api",
+            tlsMode: "disabled",
+          },
+        ],
+      },
+    });
+
+    expect(parsed.success).toBe(true);
+    if (parsed.success) {
+      expect(parsed.data.access?.domains).toEqual([
+        {
+          host: "www.example.com",
+          pathPrefix: "/",
+          tlsMode: "auto",
+        },
+        {
+          host: "api.example.com",
+          pathPrefix: "/api",
+          tlsMode: "disabled",
+        },
+      ]);
+    }
+  });
+
+  test("[CONFIG-FILE-DOMAIN-002] rejects domain identity selectors", () => {
+    const parsed = parseAppaloftDeploymentConfig({
+      access: {
+        domains: [
+          {
+            host: "www.example.com",
+            serverId: "srv_prod",
+          },
+        ],
+      },
+    });
+
+    expect(parsed.success).toBe(false);
+    if (!parsed.success) {
+      expect(parsed.error.issues[0]?.message).toContain("config_identity_field");
+      expect(parsed.error.issues[0]?.path).toEqual(["access", "domains", 0, "serverId"]);
+    }
+  });
+
+  test("[CONFIG-FILE-DOMAIN-003] rejects raw TLS material in access domains", () => {
+    const parsed = parseAppaloftDeploymentConfig({
+      access: {
+        domains: [
+          {
+            host: "www.example.com",
+            privateKey: "-----BEGIN PRIVATE KEY-----\nsecret\n-----END PRIVATE KEY-----",
+          },
+        ],
+      },
+    });
+
+    expect(parsed.success).toBe(false);
+    if (!parsed.success) {
+      expect(parsed.error.issues[0]?.message).toContain("raw_secret_config_field");
+      expect(parsed.error.issues[0]?.path).toEqual(["access", "domains", 0, "privateKey"]);
+    }
+  });
+
+  test("[CONFIG-FILE-DOMAIN-004] rejects unsafe access domain host and path shapes", () => {
+    for (const host of [
+      "https://www.example.com",
+      "www.example.com:443",
+      "www.example.com/path",
+      "*.example.com",
+      "bad_domain",
+    ]) {
+      const parsed = parseAppaloftDeploymentConfig({
+        access: {
+          domains: [
+            {
+              host,
+            },
+          ],
+        },
+      });
+
+      expect(parsed.success, host).toBe(false);
+      if (!parsed.success) {
+        expect(parsed.error.issues[0]?.message).toContain("config_domain_resolution");
+        expect(parsed.error.issues[0]?.path).toEqual(["access", "domains", 0, "host"]);
+      }
+    }
+
+    const path = parseAppaloftDeploymentConfig({
+      access: {
+        domains: [
+          {
+            host: "www.example.com",
+            pathPrefix: "admin",
+          },
+        ],
+      },
+    });
+
+    expect(path.success).toBe(false);
+    if (!path.success) {
+      expect(path.error.issues[0]?.message).toContain("config_domain_resolution");
+      expect(path.error.issues[0]?.path).toEqual(["access", "domains", 0, "pathPrefix"]);
+    }
+  });
 });

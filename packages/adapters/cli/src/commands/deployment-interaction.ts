@@ -34,15 +34,20 @@ import {
   type Result,
 } from "@appaloft/core";
 import { type AppaloftDeploymentConfig } from "@appaloft/deployment-config";
-import { Effect } from "effect";
+import { Effect, Either } from "effect";
 
 import { type CliInteraction, effectCliInteraction } from "../interaction.js";
 import { CliRuntime, resultToEffect } from "../runtime.js";
+import {
+  type RemoteStateSession,
+  type ServerAppliedRouteDomainIntent,
+} from "./deployment-remote-state.js";
 import {
   type DeploymentMethod,
   deploymentMethods,
   normalizeCliPathOrSource,
 } from "./deployment-source.js";
+import { type DeploymentStateBackendDecision } from "./deployment-state.js";
 
 export interface DeploymentPromptSeed {
   projectId?: string;
@@ -67,6 +72,10 @@ export interface DeploymentPromptSeed {
   healthCheckPath?: string;
   healthCheck?: ResourceRuntimeProfileInput["healthCheck"];
   sourceProfile?: Partial<Pick<ResourceSourceInput, "gitRef" | "commitSha">>;
+  sourceFingerprint?: string;
+  stateBackend?: DeploymentStateBackendDecision;
+  stateBackendPrepared?: boolean;
+  serverAppliedRoutes?: DeploymentServerAppliedRouteSeed[];
 }
 
 type ResourceDraftInput = Pick<CreateResourceCommandInput, "name"> &
@@ -81,6 +90,7 @@ export type DeploymentEnvironmentVariableSeed = Omit<
 > & {
   environmentId?: string;
 };
+export type DeploymentServerAppliedRouteSeed = ServerAppliedRouteDomainIntent;
 
 export interface DeploymentEnvironmentVariablesFromConfigOptions {
   env?: Record<string, string | undefined>;
@@ -281,6 +291,11 @@ export function deploymentPromptSeedFromConfig(
     ...(config.source?.commitSha ? { commitSha: config.source.commitSha } : {}),
   };
   const healthCheck = healthCheckFromConfig(config);
+  const serverAppliedRoutes = config.access?.domains.map((domain) => ({
+    host: domain.host,
+    pathPrefix: domain.pathPrefix,
+    tlsMode: domain.tlsMode,
+  }));
 
   return {
     ...(Object.keys(sourceProfile).length > 0 ? { sourceProfile } : {}),
@@ -302,6 +317,7 @@ export function deploymentPromptSeedFromConfig(
     ...(config.network?.hostPort ? { hostPort: config.network.hostPort } : {}),
     ...(healthCheckPath ? { healthCheckPath } : {}),
     ...(healthCheck ? { healthCheck } : {}),
+    ...(serverAppliedRoutes && serverAppliedRoutes.length > 0 ? { serverAppliedRoutes } : {}),
   };
 }
 
@@ -1080,6 +1096,253 @@ function resolveAdvancedDeploymentConfig(input: {
   });
 }
 
+function releaseDeploymentStateSession(session: RemoteStateSession) {
+  return Effect.gen(function* () {
+    const released = yield* Effect.promise(() => session.release());
+    yield* resultToEffect(released);
+  });
+}
+
+function prepareDeploymentStateBackendIfNeeded(seed: DeploymentPromptSeed) {
+  return Effect.gen(function* () {
+    const decision = seed.stateBackend;
+    if (!decision?.requiresRemoteStateLifecycle || seed.stateBackendPrepared) {
+      return undefined;
+    }
+
+    const cli = yield* CliRuntime;
+    if (!cli.prepareDeploymentStateBackend) {
+      return yield* Effect.fail(
+        domainError.validation(
+          "SSH remote state lifecycle is required before deployment config bootstrap",
+          {
+            phase: "remote-state-resolution",
+            stateBackend: decision.kind,
+            storageScope: decision.storageScope,
+            reason: "remote_state_lifecycle_adapter_missing",
+          },
+        ),
+      );
+    }
+
+    const prepare = cli.prepareDeploymentStateBackend;
+    const result = yield* Effect.promise(() => prepare(decision));
+    return yield* resultToEffect(result);
+  });
+}
+
+function configDomainResolutionError(input: {
+  message: string;
+  reason: string;
+  domainCount: number;
+}) {
+  return domainError.validation(input.message, {
+    phase: "config-domain-resolution",
+    reason: input.reason,
+    domainCount: String(input.domainCount),
+  });
+}
+
+function requireServerAppliedRouteStateSupportIfNeeded(seed: DeploymentPromptSeed) {
+  return Effect.gen(function* () {
+    const routes = seed.serverAppliedRoutes ?? [];
+    if (routes.length === 0) {
+      return;
+    }
+
+    if (seed.stateBackend?.kind === "postgres-control-plane") {
+      return yield* Effect.fail(
+        configDomainResolutionError({
+          message: "Config access domains require managed domain workflow mapping",
+          reason: "managed_config_domains_not_implemented",
+          domainCount: routes.length,
+        }),
+      );
+    }
+
+    if (seed.stateBackend?.kind !== "ssh-pglite") {
+      return yield* Effect.fail(
+        configDomainResolutionError({
+          message: "Config access domains require SSH-server route state",
+          reason: "server_applied_config_domains_require_ssh_pglite",
+          domainCount: routes.length,
+        }),
+      );
+    }
+
+    const cli = yield* CliRuntime;
+    if (!cli.serverAppliedRouteStore) {
+      return yield* Effect.fail(
+        configDomainResolutionError({
+          message: "Config access domains require server-applied route state storage",
+          reason: "server_applied_route_store_missing",
+          domainCount: routes.length,
+        }),
+      );
+    }
+  });
+}
+
+function validateServerAppliedRouteNetworkIfNeeded(input: {
+  seed: DeploymentPromptSeed;
+  networkProfile: ResourceNetworkProfileInput;
+}) {
+  return Effect.gen(function* () {
+    const routes = input.seed.serverAppliedRoutes ?? [];
+    if (routes.length === 0 || input.networkProfile.exposureMode === "reverse-proxy") {
+      return;
+    }
+
+    return yield* Effect.fail(
+      configDomainResolutionError({
+        message: "Config access domains require a reverse-proxy resource network profile",
+        reason: "server_applied_config_domains_require_reverse_proxy",
+        domainCount: routes.length,
+      }),
+    );
+  });
+}
+
+function sourceLinkConflictError(input: { field: string; expected: string; actual: string }) {
+  return domainError.validation("Source link points at another deployment context", {
+    phase: "source-link-resolution",
+    field: input.field,
+    expected: input.expected,
+    actual: input.actual,
+  });
+}
+
+function mergeSourceLinkSeed(seed: DeploymentPromptSeed) {
+  return Effect.gen(function* () {
+    if (!seed.sourceFingerprint) {
+      return seed;
+    }
+    const sourceFingerprint = seed.sourceFingerprint;
+
+    const cli = yield* CliRuntime;
+    const recordResult = yield* Effect.promise(
+      () => cli.sourceLinkStore?.read(sourceFingerprint) ?? Promise.resolve(ok(null)),
+    );
+    const record = yield* resultToEffect(recordResult);
+    if (!record) {
+      return seed;
+    }
+
+    const expectedFields = [
+      ["projectId", seed.projectId, record.projectId],
+      ["environmentId", seed.environmentId, record.environmentId],
+      ["resourceId", seed.resourceId, record.resourceId],
+      ["serverId", seed.serverId, record.serverId],
+      ["destinationId", seed.destinationId, record.destinationId],
+    ] as const;
+
+    for (const [field, expected, actual] of expectedFields) {
+      if (expected && actual && expected !== actual) {
+        return yield* Effect.fail(sourceLinkConflictError({ field, expected, actual }));
+      }
+    }
+
+    return {
+      ...seed,
+      projectId: seed.projectId ?? record.projectId,
+      environmentId: seed.environmentId ?? record.environmentId,
+      resourceId: seed.resourceId ?? record.resourceId,
+      ...((seed.serverId ?? record.serverId) ? { serverId: seed.serverId ?? record.serverId } : {}),
+      ...((seed.destinationId ?? record.destinationId)
+        ? { destinationId: seed.destinationId ?? record.destinationId }
+        : {}),
+    } satisfies DeploymentPromptSeed;
+  });
+}
+
+function persistSourceLinkIfNeeded(input: {
+  seed: DeploymentPromptSeed;
+  projectId: string;
+  serverId: string;
+  destinationId?: string;
+  environmentId: string;
+  resourceId: string;
+}) {
+  return Effect.gen(function* () {
+    if (!input.seed.sourceFingerprint) {
+      return;
+    }
+
+    const cli = yield* CliRuntime;
+    if (!cli.sourceLinkStore) {
+      return;
+    }
+    const sourceLinkStore = cli.sourceLinkStore;
+
+    const target = {
+      projectId: input.projectId,
+      environmentId: input.environmentId,
+      resourceId: input.resourceId,
+      serverId: input.serverId,
+      ...(input.destinationId ? { destinationId: input.destinationId } : {}),
+    };
+    const sameTargetResult = yield* Effect.promise(() =>
+      sourceLinkStore.requireSameTargetOrMissing(input.seed.sourceFingerprint ?? "", target),
+    );
+    yield* resultToEffect(sameTargetResult);
+
+    const created = yield* Effect.promise(() =>
+      sourceLinkStore.createIfMissing({
+        sourceFingerprint: input.seed.sourceFingerprint ?? "",
+        target,
+        updatedAt: new Date().toISOString(),
+      }),
+    );
+    yield* resultToEffect(created);
+  });
+}
+
+function persistServerAppliedRouteDesiredStateIfNeeded(input: {
+  seed: DeploymentPromptSeed;
+  projectId: string;
+  serverId: string;
+  destinationId?: string;
+  environmentId: string;
+  resourceId: string;
+}) {
+  return Effect.gen(function* () {
+    const routes = input.seed.serverAppliedRoutes ?? [];
+    if (routes.length === 0) {
+      return;
+    }
+
+    const cli = yield* CliRuntime;
+    if (!cli.serverAppliedRouteStore) {
+      return yield* Effect.fail(
+        configDomainResolutionError({
+          message: "Config access domains require server-applied route state storage",
+          reason: "server_applied_route_store_missing",
+          domainCount: routes.length,
+        }),
+      );
+    }
+
+    const serverAppliedRouteStore = cli.serverAppliedRouteStore;
+    const persisted = yield* Effect.promise(() =>
+      serverAppliedRouteStore.upsertDesired({
+        target: {
+          projectId: input.projectId,
+          environmentId: input.environmentId,
+          resourceId: input.resourceId,
+          serverId: input.serverId,
+          ...(input.destinationId ? { destinationId: input.destinationId } : {}),
+        },
+        domains: routes,
+        ...(input.seed.sourceFingerprint
+          ? { sourceFingerprint: input.seed.sourceFingerprint }
+          : {}),
+        updatedAt: new Date().toISOString(),
+      }),
+    );
+    yield* resultToEffect(persisted);
+  });
+}
+
 export function resolveInteractiveDeploymentInput(
   seed: DeploymentPromptSeed,
   interaction: CliInteraction = effectCliInteraction,
@@ -1111,61 +1374,101 @@ export function resolveInteractiveDeploymentInput(
         })),
       }));
     const normalizedSourceLocator = normalizeCliPathOrSource(sourceLocator, deploymentMethod);
-    const projects = (yield* listProjects()).items;
-    const servers = (yield* listServers()).items;
-    const project = yield* resolveProject({
-      interaction,
-      projects,
-      seed,
-      sourceLocator: normalizedSourceLocator,
-    });
-    const server = yield* resolveServer({
-      interaction,
-      servers,
-      seed,
-    });
-    const environment = yield* resolveEnvironment({
-      interaction,
-      seed,
-      projectId: project.id,
-    });
-    const advancedConfig = yield* resolveAdvancedDeploymentConfig({
-      interaction,
-      seed,
-      deploymentMethod,
-    });
-    const runtimeProfile = runtimeProfileFromDeploymentInput(deploymentMethod, advancedConfig);
-    const networkProfile = networkProfileFromDeploymentInput(deploymentMethod, advancedConfig);
-    const resource = yield* resolveResource({
-      interaction,
-      seed,
-      projectId: project.id,
-      environmentId: environment.id,
-      sourceLocator: normalizedSourceLocator,
-      deploymentMethod,
-      runtimeProfile,
-      networkProfile,
-    });
-    yield* applyEnvironmentVariables({
-      environmentId: environment.id,
-      ...(seed.environmentVariables ? { variables: seed.environmentVariables } : {}),
+    const stateSession = yield* prepareDeploymentStateBackendIfNeeded(seed);
+
+    const resolveInput = Effect.gen(function* () {
+      yield* requireServerAppliedRouteStateSupportIfNeeded(seed);
+      const resolvedSeed = yield* mergeSourceLinkSeed(seed);
+      const projects = (yield* listProjects()).items;
+      const servers = (yield* listServers()).items;
+      const project = yield* resolveProject({
+        interaction,
+        projects,
+        seed: resolvedSeed,
+        sourceLocator: normalizedSourceLocator,
+      });
+      const server = yield* resolveServer({
+        interaction,
+        servers,
+        seed: resolvedSeed,
+      });
+      const environment = yield* resolveEnvironment({
+        interaction,
+        seed: resolvedSeed,
+        projectId: project.id,
+      });
+      const advancedConfig = yield* resolveAdvancedDeploymentConfig({
+        interaction,
+        seed: resolvedSeed,
+        deploymentMethod,
+      });
+      const runtimeProfile = runtimeProfileFromDeploymentInput(deploymentMethod, advancedConfig);
+      const networkProfile = networkProfileFromDeploymentInput(deploymentMethod, advancedConfig);
+      yield* validateServerAppliedRouteNetworkIfNeeded({
+        seed: resolvedSeed,
+        networkProfile,
+      });
+      const resource = yield* resolveResource({
+        interaction,
+        seed: resolvedSeed,
+        projectId: project.id,
+        environmentId: environment.id,
+        sourceLocator: normalizedSourceLocator,
+        deploymentMethod,
+        runtimeProfile,
+        networkProfile,
+      });
+      yield* applyEnvironmentVariables({
+        environmentId: environment.id,
+        ...(resolvedSeed.environmentVariables
+          ? { variables: resolvedSeed.environmentVariables }
+          : {}),
+      });
+      yield* persistSourceLinkIfNeeded({
+        seed: resolvedSeed,
+        projectId: project.id,
+        serverId: server.id,
+        ...(resolvedSeed.destinationId ? { destinationId: resolvedSeed.destinationId } : {}),
+        environmentId: environment.id,
+        resourceId: resource.id,
+      });
+      yield* persistServerAppliedRouteDesiredStateIfNeeded({
+        seed: resolvedSeed,
+        projectId: project.id,
+        serverId: server.id,
+        ...(resolvedSeed.destinationId ? { destinationId: resolvedSeed.destinationId } : {}),
+        environmentId: environment.id,
+        resourceId: resource.id,
+      });
+
+      yield* printDeploymentSummary({
+        sourceLocator: normalizedSourceLocator,
+        deploymentMethod,
+        project,
+        server,
+        environment,
+        resource,
+      });
+
+      return {
+        projectId: project.id,
+        serverId: server.id,
+        ...(resolvedSeed.destinationId ? { destinationId: resolvedSeed.destinationId } : {}),
+        environmentId: environment.id,
+        resourceId: resource.id,
+      } satisfies CreateDeploymentCommandInput;
     });
 
-    yield* printDeploymentSummary({
-      sourceLocator: normalizedSourceLocator,
-      deploymentMethod,
-      project,
-      server,
-      environment,
-      resource,
-    });
+    if (!stateSession) {
+      return yield* resolveInput;
+    }
 
-    return {
-      projectId: project.id,
-      serverId: server.id,
-      ...(seed.destinationId ? { destinationId: seed.destinationId } : {}),
-      environmentId: environment.id,
-      resourceId: resource.id,
-    } satisfies CreateDeploymentCommandInput;
+    const result = yield* Effect.either(resolveInput);
+    yield* releaseDeploymentStateSession(stateSession);
+    if (Either.isLeft(result)) {
+      return yield* Effect.fail(result.left);
+    }
+
+    return result.right;
   });
 }

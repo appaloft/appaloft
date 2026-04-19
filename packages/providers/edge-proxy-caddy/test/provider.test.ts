@@ -106,4 +106,63 @@ describe("CaddyEdgeProxyProvider", () => {
     expect(view._unsafeUnwrap().routes[0]?.source).toBe("generated-default");
     expect(view._unsafeUnwrap().sections[0]?.content).toContain("caddy.reverse_proxy");
   });
+
+  test("[EDGE-PROXY-ROUTE-006] reports provider-local TLS diagnostics for TLS auto routes", async () => {
+    const provider = new CaddyEdgeProxyProvider();
+    const realized = await provider.realizeRoutes(
+      { correlationId: "req_caddy_tls_diagnostic_test" },
+      {
+        deploymentId: "dep_tls",
+        port: 3000,
+        accessRoutes: [
+          {
+            proxyKind: "caddy",
+            domains: ["www.example.test"],
+            pathPrefix: "/",
+            tlsMode: "auto",
+            targetPort: 3000,
+          },
+        ],
+      },
+    );
+    const view = await provider.renderConfigurationView(
+      {
+        correlationId: "req_caddy_tls_diagnostic_test",
+      },
+      {
+        resourceId: "res_tls",
+        deploymentId: "dep_tls",
+        routeScope: "deployment-snapshot",
+        status: "applied",
+        generatedAt: "2026-01-01T00:00:00.000Z",
+        stale: false,
+        accessRoutes: [
+          {
+            proxyKind: "caddy",
+            domains: ["www.example.test"],
+            pathPrefix: "/",
+            tlsMode: "auto",
+            targetPort: 3000,
+          },
+        ],
+        port: 3000,
+        includeDiagnostics: true,
+      },
+    );
+
+    expect(realized.isOk()).toBe(true);
+    expect(realized._unsafeUnwrap().labels).toContain("caddy=https://www.example.test");
+    expect(view.isOk()).toBe(true);
+    expect(view._unsafeUnwrap().diagnostics?.tlsRoutes).toEqual([
+      expect.objectContaining({
+        hostname: "www.example.test",
+        pathPrefix: "/",
+        tlsMode: "auto",
+        scheme: "https",
+        automation: "provider-local",
+        certificateSource: "provider-local",
+        appaloftCertificateManaged: false,
+      }),
+    ]);
+  });
 });

@@ -13,6 +13,26 @@ import {
 import { createCliLogRenderer } from "@appaloft/cli-logging";
 import { type DomainError, domainError, type Result } from "@appaloft/core";
 import { Context, Effect, Layer, Option } from "effect";
+import {
+  type RemoteStateSession,
+  type ServerAppliedRouteDesiredStateStore,
+  type SourceLinkRecord,
+  type SourceLinkTarget,
+} from "./commands/deployment-remote-state.js";
+import { type DeploymentStateBackendDecision } from "./commands/deployment-state.js";
+
+export interface CliSourceLinkStore {
+  read(sourceFingerprint: string): Promise<Result<SourceLinkRecord | null>>;
+  requireSameTargetOrMissing(
+    sourceFingerprint: string,
+    target: SourceLinkTarget,
+  ): Promise<Result<SourceLinkRecord | null>>;
+  createIfMissing(input: {
+    sourceFingerprint: string;
+    target: SourceLinkTarget;
+    updatedAt: string;
+  }): Promise<Result<SourceLinkRecord>>;
+}
 
 export interface CliProgram {
   parseAsync(argv?: string[]): Promise<void>;
@@ -25,6 +45,11 @@ export interface CliProgramInput {
   queryBus: QueryBus;
   executionContextFactory: ExecutionContextFactory;
   deploymentProgressObserver?: DeploymentProgressObserver;
+  prepareDeploymentStateBackend?: (
+    decision: DeploymentStateBackendDecision,
+  ) => Promise<Result<RemoteStateSession>>;
+  sourceLinkStore?: CliSourceLinkStore;
+  serverAppliedRouteStore?: ServerAppliedRouteDesiredStateStore;
 }
 
 export interface ExecuteCommandOptions {
@@ -45,6 +70,11 @@ export class CliRuntime extends Context.Tag("CliRuntime")<
       options?: ExecuteCommandOptions,
     ) => Promise<Result<T>>;
     readonly executeQuery: <T>(message: AppQuery<T>) => Promise<Result<T>>;
+    readonly prepareDeploymentStateBackend?: (
+      decision: DeploymentStateBackendDecision,
+    ) => Promise<Result<RemoteStateSession>>;
+    readonly sourceLinkStore?: CliSourceLinkStore;
+    readonly serverAppliedRouteStore?: ServerAppliedRouteDesiredStateStore;
   }
 >() {}
 
@@ -94,6 +124,13 @@ export const CliRuntimeLive = (input: CliProgramInput) =>
         message,
       );
     },
+    ...(input.prepareDeploymentStateBackend
+      ? { prepareDeploymentStateBackend: input.prepareDeploymentStateBackend }
+      : {}),
+    ...(input.sourceLinkStore ? { sourceLinkStore: input.sourceLinkStore } : {}),
+    ...(input.serverAppliedRouteStore
+      ? { serverAppliedRouteStore: input.serverAppliedRouteStore }
+      : {}),
   });
 
 export const optionalValue = <T>(value: Option.Option<T>): T | undefined =>

@@ -4,6 +4,7 @@ export const tokens = {
   logger: Symbol.for("appaloft.logger"),
   eventBus: Symbol.for("appaloft.event_bus"),
   deploymentProgressReporter: Symbol.for("appaloft.deployment_progress_reporter"),
+  sourceLinkStore: Symbol.for("appaloft.source_link_store"),
   serverConnectivityChecker: Symbol.for("appaloft.server_connectivity_checker"),
   serverEdgeProxyBootstrapper: Symbol.for("appaloft.server_edge_proxy_bootstrapper"),
   deploymentConfigReader: Symbol.for("appaloft.deployment_config_reader"),
@@ -17,6 +18,9 @@ export const tokens = {
   domainOwnershipVerifier: Symbol.for("appaloft.domain_ownership_verifier"),
   domainRouteFailureCandidateReader: Symbol.for("appaloft.domain_route_failure_candidate_reader"),
   domainRouteBindingReader: Symbol.for("appaloft.domain_route_binding_reader"),
+  serverAppliedRouteDesiredStateReader: Symbol.for(
+    "appaloft.server_applied_route_desired_state_reader",
+  ),
   certificateRepository: Symbol.for("appaloft.certificate_repository"),
   certificateRetryCandidateReader: Symbol.for("appaloft.certificate_retry_candidate_reader"),
   sshCredentialRepository: Symbol.for("appaloft.ssh_credential_repository"),
@@ -55,6 +59,7 @@ export const tokens = {
   resourceHealthProbeRunner: Symbol.for("appaloft.resource_health_probe_runner"),
   resourceRuntimeLogsQueryService: Symbol.for("appaloft.resource_runtime_logs_query_service"),
   openTerminalSessionUseCase: Symbol.for("appaloft.open_terminal_session_use_case"),
+  relinkSourceLinkUseCase: Symbol.for("appaloft.relink_source_link_use_case"),
   resourceProxyConfigurationPreviewQueryService: Symbol.for(
     "appaloft.resource_proxy_configuration_preview_query_service",
   ),

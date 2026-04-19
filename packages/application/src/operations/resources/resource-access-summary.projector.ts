@@ -79,6 +79,7 @@ export function projectResourceAccessSummary(
       }
     | undefined;
   let latestGeneratedRoute: typeof latestRoute;
+  let latestServerAppliedRoute: typeof latestRoute;
 
   for (const deployment of sortedDeployments) {
     const metadata = deployment.runtimePlan.execution.metadata ?? {};
@@ -95,13 +96,21 @@ export function projectResourceAccessSummary(
     if (metadata["access.routeSource"] === "generated-default") {
       latestGeneratedRoute ??= { deployment, route, metadata };
     }
+
+    if (metadata["access.routeSource"] === "server-applied-config-domain") {
+      latestServerAppliedRoute ??= { deployment, route, metadata };
+    }
   }
 
   const readyDurableBinding = [...domainBindings]
     .filter((binding) => binding.status === "ready" && binding.proxyKind !== "none")
     .sort((left, right) => right.createdAt.localeCompare(left.createdAt))[0];
 
-  if (!latestGeneratedRoute && (!readyDurableBinding || !latestRoute)) {
+  if (
+    !latestGeneratedRoute &&
+    !latestServerAppliedRoute &&
+    (!readyDurableBinding || !latestRoute)
+  ) {
     return undefined;
   }
 
@@ -152,10 +161,33 @@ export function projectResourceAccessSummary(
     };
   }
 
+  if (latestServerAppliedRoute) {
+    const { deployment, metadata, route } = latestServerAppliedRoute;
+    const hostname = metadata["access.hostname"] ?? route.domains[0];
+
+    if (hostname) {
+      const scheme =
+        metadata["access.scheme"] === "https" || route.tlsMode === "auto" ? "https" : "http";
+
+      summary.latestServerAppliedDomainRoute = {
+        url: routeUrl({ hostname, scheme, pathPrefix: route.pathPrefix }),
+        hostname,
+        scheme,
+        ...(metadata["access.providerKey"] ? { providerKey: metadata["access.providerKey"] } : {}),
+        deploymentId: deployment.id,
+        deploymentStatus: deployment.status,
+        pathPrefix: route.pathPrefix,
+        proxyKind: route.proxyKind,
+        ...(typeof route.targetPort === "number" ? { targetPort: route.targetPort } : {}),
+        updatedAt: deployment.createdAt,
+      };
+    }
+  }
+
   const routeStatusDeployment =
     summary.latestDurableDomainRoute && latestRoute
       ? latestRoute.deployment
-      : latestGeneratedRoute?.deployment;
+      : (latestServerAppliedRoute?.deployment ?? latestGeneratedRoute?.deployment);
 
   if (routeStatusDeployment) {
     summary.proxyRouteStatus = proxyRouteStatusFor(routeStatusDeployment.status);

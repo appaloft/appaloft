@@ -14,9 +14,10 @@ import {
   parseAppaloftDeploymentConfigText,
 } from "@appaloft/deployment-config";
 import { Args, Command as EffectCommand, Options } from "@effect/cli";
-import { Effect } from "effect";
+import { Effect, Either } from "effect";
 
 import {
+  CliRuntime,
   optionalNumber,
   optionalValue,
   resultToEffect,
@@ -28,7 +29,14 @@ import {
   deploymentPromptSeedFromConfig,
   resolveInteractiveDeploymentInput,
 } from "./deployment-interaction.js";
+import { type RemoteStateSession } from "./deployment-remote-state.js";
 import { deploymentMethods, normalizeCliPathOrSource } from "./deployment-source.js";
+import {
+  createSourceFingerprint,
+  type DeploymentStateBackendKind,
+  resolveDeploymentStateBackend,
+  type SourceFingerprintScope,
+} from "./deployment-state.js";
 
 const pathOrSourceArg = Args.text({ name: "pathOrSource" }).pipe(Args.optional);
 const deploymentIdArg = Args.text({ name: "deploymentId" });
@@ -62,6 +70,14 @@ const publishDirOption = Options.text("publish-dir").pipe(Options.optional);
 const portOption = Options.text("port").pipe(Options.optional);
 const healthPathOption = Options.text("health-path").pipe(Options.optional);
 const appLogLinesOption = Options.text("app-log-lines").pipe(Options.withDefault("3"));
+const deploymentStateBackendKinds = [
+  "ssh-pglite",
+  "local-pglite",
+  "postgres-control-plane",
+] as const satisfies readonly DeploymentStateBackendKind[];
+const stateBackendOption = Options.choice("state-backend", deploymentStateBackendKinds).pipe(
+  Options.optional,
+);
 function parseAppLogLines(value: string): number {
   const parsed = Number(value);
   return Number.isInteger(parsed) && parsed >= 0 ? parsed : 3;
@@ -148,6 +164,10 @@ function phaseFromConfigIssues(issues: { message: string }[]): string {
 
   if (messages.includes("raw_secret_config_field")) {
     return "config-secret-validation";
+  }
+
+  if (messages.includes("config_domain_resolution")) {
+    return "config-domain-resolution";
   }
 
   if (messages.includes("unsupported_config_field")) {
@@ -237,6 +257,88 @@ function applyConfigSourceBase(
   return resolve(sourceLocator, baseDirectory);
 }
 
+function githubScopeFromEnv(env: Record<string, string | undefined>): SourceFingerprintScope {
+  const ref = env.GITHUB_REF;
+  const pullRequestMatch = ref?.match(/^refs\/pull\/(\d+)\/(?:merge|head)$/);
+  if (pullRequestMatch?.[1]) {
+    return {
+      kind: "preview",
+      pullRequestNumber: Number(pullRequestMatch[1]),
+      ...(env.GITHUB_HEAD_REF ? { branch: env.GITHUB_HEAD_REF } : {}),
+    };
+  }
+
+  if (env.GITHUB_HEAD_REF) {
+    return { kind: "preview", branch: env.GITHUB_HEAD_REF };
+  }
+
+  if (ref?.startsWith("refs/heads/")) {
+    return { kind: "branch", branch: ref };
+  }
+
+  return { kind: "default" };
+}
+
+function sourceFingerprintForConfigDeploy(input: {
+  sourceLocator: string;
+  configResolution?: { config: AppaloftDeploymentConfig; configFilePath: string };
+}): string {
+  const env = Bun.env;
+  const repositoryLocator = env.GITHUB_REPOSITORY
+    ? `https://github.com/${env.GITHUB_REPOSITORY}`
+    : input.sourceLocator;
+  const sourceDirectory = resolveLocalSourceDirectory(input.sourceLocator) ?? process.cwd();
+  const workspaceRoot = env.GITHUB_WORKSPACE ?? resolveGitRoot(sourceDirectory) ?? sourceDirectory;
+
+  return createSourceFingerprint({
+    provider: env.GITHUB_REPOSITORY ? "github" : "local",
+    ...(env.GITHUB_REPOSITORY_ID ? { providerRepositoryId: env.GITHUB_REPOSITORY_ID } : {}),
+    repositoryLocator,
+    baseDirectory: input.configResolution?.config.source?.baseDirectory ?? ".",
+    configPath: input.configResolution?.configFilePath ?? "appaloft.yml",
+    workspaceRoot,
+    ...(env.GITHUB_REF ? { gitRef: env.GITHUB_REF } : {}),
+    ...(env.GITHUB_SHA ? { commitSha: env.GITHUB_SHA } : {}),
+    scope: env.GITHUB_REPOSITORY ? githubScopeFromEnv(env) : { kind: "default" },
+  }).key;
+}
+
+function prepareDeploymentStateSessionIfNeeded(
+  stateBackendDecision: ReturnType<typeof resolveDeploymentStateBackend> | undefined,
+) {
+  return Effect.gen(function* () {
+    if (!stateBackendDecision?.requiresRemoteStateLifecycle) {
+      return undefined;
+    }
+
+    const cli = yield* CliRuntime;
+    if (!cli.prepareDeploymentStateBackend) {
+      return yield* Effect.fail(
+        domainError.validation(
+          "SSH remote state lifecycle is required before deployment config bootstrap",
+          {
+            phase: "remote-state-resolution",
+            stateBackend: stateBackendDecision.kind,
+            storageScope: stateBackendDecision.storageScope,
+            reason: "remote_state_lifecycle_adapter_missing",
+          },
+        ),
+      );
+    }
+
+    const prepare = cli.prepareDeploymentStateBackend;
+    const prepared = yield* Effect.promise(() => prepare(stateBackendDecision));
+    return yield* resultToEffect(prepared);
+  });
+}
+
+function releaseDeploymentStateSession(session: RemoteStateSession) {
+  return Effect.gen(function* () {
+    const released = yield* Effect.promise(() => session.release());
+    yield* resultToEffect(released);
+  });
+}
+
 export const deployCommand = EffectCommand.make(
   "deploy",
   {
@@ -265,6 +367,7 @@ export const deployCommand = EffectCommand.make(
     publishDir: publishDirOption,
     port: portOption,
     healthPath: healthPathOption,
+    stateBackend: stateBackendOption,
     appLogLines: appLogLinesOption,
   },
   ({
@@ -294,6 +397,7 @@ export const deployCommand = EffectCommand.make(
     serverSshPublicKey,
     serverSshUsername,
     start,
+    stateBackend,
   }) =>
     Effect.gen(function* () {
       const sourceLocator = optionalValue(pathOrSource);
@@ -321,6 +425,7 @@ export const deployCommand = EffectCommand.make(
       const startCommand = optionalValue(start);
       const publishDirectory = optionalValue(publishDir);
       const healthCheckPath = optionalValue(healthPath);
+      const requestedStateBackend = optionalValue(stateBackend);
 
       if (
         !sourceLocator &&
@@ -416,6 +521,38 @@ export const deployCommand = EffectCommand.make(
                   : {}),
             }
           : undefined;
+      const stateBackendDecision =
+        configResolution || requestedStateBackend
+          ? resolveDeploymentStateBackend({
+              ...(requestedStateBackend ? { explicitBackend: requestedStateBackend } : {}),
+              ...(Bun.env.APPALOFT_DATABASE_URL
+                ? { databaseUrl: Bun.env.APPALOFT_DATABASE_URL }
+                : {}),
+              ...(Bun.env.APPALOFT_CONTROL_PLANE_URL
+                ? { controlPlaneUrl: Bun.env.APPALOFT_CONTROL_PLANE_URL }
+                : {}),
+              ...(serverSpec?.host
+                ? {
+                    trustedSshTarget: {
+                      host: serverSpec.host,
+                      ...(serverSpec.port === undefined ? {} : { port: serverSpec.port }),
+                      ...(serverSpec.providerKey ? { providerKey: serverSpec.providerKey } : {}),
+                      ...(serverSshUsernameValue ? { username: serverSshUsernameValue } : {}),
+                      ...(serverSshPrivateKeyFileValue
+                        ? { identityFile: serverSshPrivateKeyFileValue }
+                        : {}),
+                    },
+                  }
+                : {}),
+            })
+          : undefined;
+      const sourceFingerprint =
+        configResolution || requestedStateBackend
+          ? sourceFingerprintForConfigDeploy({
+              sourceLocator: configuredSourceLocator ?? configSourceLocator,
+              ...(configResolution ? { configResolution } : {}),
+            })
+          : undefined;
       const seed = {
         ...configSeed,
         ...(projectId ? { projectId } : {}),
@@ -435,15 +572,34 @@ export const deployCommand = EffectCommand.make(
         ...(configEnvironmentVariables.length > 0
           ? { environmentVariables: configEnvironmentVariables }
           : {}),
+        ...(sourceFingerprint ? { sourceFingerprint } : {}),
+        ...(stateBackendDecision ? { stateBackend: stateBackendDecision } : {}),
       };
-      const input = yield* resolveInteractiveDeploymentInput({
-        ...seed,
-        ...(configuredSourceLocator ? { sourceLocator: configuredSourceLocator } : {}),
+
+      const stateSession = yield* prepareDeploymentStateSessionIfNeeded(stateBackendDecision);
+      const runResolvedDeployment = Effect.gen(function* () {
+        const input = yield* resolveInteractiveDeploymentInput({
+          ...seed,
+          ...(stateSession ? { stateBackendPrepared: true } : {}),
+          ...(configuredSourceLocator ? { sourceLocator: configuredSourceLocator } : {}),
+        });
+
+        return yield* runDeploymentCommand(CreateDeploymentCommand.create(input), {
+          appLogLines: parseAppLogLines(appLogLines),
+        });
       });
 
-      return yield* runDeploymentCommand(CreateDeploymentCommand.create(input), {
-        appLogLines: parseAppLogLines(appLogLines),
-      });
+      if (!stateSession) {
+        return yield* runResolvedDeployment;
+      }
+
+      const result = yield* Effect.either(runResolvedDeployment);
+      yield* releaseDeploymentStateSession(stateSession);
+      if (Either.isLeft(result)) {
+        return yield* Effect.fail(result.left);
+      }
+
+      return result.right;
     }),
 ).pipe(EffectCommand.withDescription("Create a deployment"));
 
