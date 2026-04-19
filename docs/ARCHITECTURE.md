@@ -51,6 +51,23 @@ flowchart LR
   API --> Targets["User-owned Servers"]
 ```
 
+Headless GitHub Action with optional control plane:
+
+```mermaid
+flowchart LR
+  Repo["GitHub Repository"] --> Action["GitHub Action / Appaloft CLI"]
+  Action --> Target["User-owned SSH Server"]
+  Action -. "mode none: lock/sync ssh-pglite" .-> RemoteState["SSH-server Appaloft State"]
+  Action -. "mode cloud/self-hosted: handshake/report/API" .-> CP["Appaloft Cloud or Self-hosted Control Plane"]
+  CP --> PG["Control-plane PostgreSQL"]
+  CP --> Target
+```
+
+Execution owner and control-plane/state owner are independent under
+[ADR-025](./decisions/ADR-025-control-plane-modes-and-action-execution.md). A GitHub Action can
+remain the execution owner while Appaloft Cloud or a self-hosted Appaloft server owns state,
+identity, locks, policy, audit, and managed domain workflows.
+
 ## Layering
 
 ```mermaid
