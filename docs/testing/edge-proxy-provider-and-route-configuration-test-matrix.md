@@ -9,6 +9,7 @@ Tests for edge proxy provider and route configuration must prove that proxy beha
 This test matrix inherits:
 
 - [ADR-019: Edge Proxy Provider And Observable Configuration](../decisions/ADR-019-edge-proxy-provider-and-observable-configuration.md)
+- [ADR-024: Pure CLI SSH State And Server-Applied Domains](../decisions/ADR-024-pure-cli-ssh-state-and-server-applied-domains.md)
 - [Edge Proxy Provider And Route Realization Workflow](../workflows/edge-proxy-provider-and-route-realization.md)
 - [resources.proxy-configuration.preview Query Spec](../queries/resources.proxy-configuration.preview.md)
 - [Default Access Domain And Proxy Routing Test Matrix](./default-access-domain-and-proxy-routing-test-matrix.md)
@@ -26,6 +27,7 @@ This test matrix inherits:
 | Application boundary | Command/query/process code imports only provider-neutral ports, not concrete provider packages. |
 | Server bootstrap | Proxy bootstrap consumes provider ensure plan and records ready/failed state. |
 | Deployment route realization | Runtime execution consumes provider route plan and targets resource `internalPort`. |
+| Server-applied config domains | Provider renders and applies route state from `access.domains[]` without creating managed `DomainBinding` records. |
 | Proxy reload | Runtime applies provider-produced reload plans after route/certificate config changes and before public route verification. |
 | Query/read model | `resources.proxy-configuration.preview` returns read-only planned/latest/snapshot config. |
 | Web/API/CLI | Entry points display query output and do not reimplement provider rendering. |
@@ -91,6 +93,9 @@ Then:
 | EDGE-PROXY-ROUTE-002 | integration | Durable domain route | Ready domain binding route exists | Route plan applied | Provider-specific route uses durable hostname/path | Deployment continues or succeeds | Per deployment |
 | EDGE-PROXY-ROUTE-003 | integration | Duplicate route realization | Same deployment and route are realized again | Idempotent no duplicate | Same desired config | No duplicate route state | No |
 | EDGE-PROXY-ROUTE-004 | integration | Route realization fails after acceptance | Runtime executor fails | Deployment failure/degraded route state | Config not marked applied | `deployment-failed` or degraded status | Yes |
+| EDGE-PROXY-ROUTE-005 | integration | Server-applied config domain route | SSH-server remote state has `access.domains[]` desired route for a deployed resource | Provider route plan receives config domain route input and applies when supported | Provider-specific route uses config hostname/path and resource internal port | Desired state is consumed without creating managed `DomainBinding`; successful deployment records applied status in server-applied route state | Per route realization |
+| EDGE-PROXY-ROUTE-006 | integration | Server-applied TLS auto delegated to provider | Config domain has `tlsMode = auto` and provider supports resident TLS automation | Provider renders TLS-enabled route/config without requiring raw cert material from config | Provider-specific ACME/storage details stay inside provider output | Proxy configuration and resource diagnostic summaries expose provider-local TLS status/diagnostics without creating managed `Certificate` state | Per provider policy |
+| EDGE-PROXY-ROUTE-007 | integration | Server-applied route realization failure | Provider cannot render, apply, reload, or verify config domain route | Route realization fails with structured error | Config not marked applied | Remote state/read model exposes failed route with `proxy-domain-realization` or provider phase | Yes when provider marks retriable |
 
 ## Proxy Reload Matrix
 
@@ -132,6 +137,19 @@ Application and provider tests cover the query service, provider-rendered sectio
 reload plans, and the guard
 that generated default-access domain provider keys such as `sslip` do not override edge proxy
 provider selection. Broader API/Web/CLI regression coverage remains a follow-up.
+
+`EDGE-PROXY-ROUTE-005` now has application/runtime coverage for consuming SSH-server
+server-applied config domain desired state as provider-neutral route input and recording applied
+status after a successful deployment. The current slice supports multiple path/TLS route groups by
+expanding config domains into distinct provider-neutral access routes. Resource access, health, and
+diagnostic summary tests cover observable server-applied route URL/status.
+
+`EDGE-PROXY-ROUTE-007` now has application/store coverage for structured failed status persistence
+when deployment failure is in route realization, reload, or public-route verification phases.
+
+`EDGE-PROXY-ROUTE-006` now has provider coverage for Traefik and Caddy TLS-auto route rendering
+and application diagnostic coverage for surfacing provider-local TLS summaries through resource
+diagnostics. Real HTTPS public validation and provider-owned ACME history remain follow-up work.
 
 ## Open Questions
 

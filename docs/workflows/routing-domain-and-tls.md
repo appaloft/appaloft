@@ -18,6 +18,17 @@ create durable domain binding
 
 `deployments.create` must not carry domain/proxy/TLS input. It may persist resolved generated or durable route snapshots for one deployment attempt. It must not create durable domain bindings or issue certificates as hidden side effects.
 
+Quick Deploy, repository config bootstrap, GitHub Actions binary deploys, and future automation may
+hand off managed domain/TLS intent into this workflow by dispatching the same explicit domain and
+certificate commands after trusted resource/server/destination context exists. They do not get a
+special deployment shortcut.
+
+Pure CLI/SSH config domains governed by
+[ADR-024](../decisions/ADR-024-pure-cli-ssh-state-and-server-applied-domains.md) are a different
+mode: `access.domains[]` becomes server-applied proxy route state on the selected SSH target and
+does not create managed `DomainBinding` records. A hosted or self-hosted control plane may later
+map the same config intent into this durable workflow.
+
 ## Global References
 
 This workflow inherits:
@@ -29,10 +40,13 @@ This workflow inherits:
 - [ADR-008: Renewal Trigger Model](../decisions/ADR-008-renewal-trigger-model.md)
 - [ADR-009: Certificates Import Command](../decisions/ADR-009-certificates-import-command.md)
 - [ADR-017: Default Access Domain And Proxy Routing](../decisions/ADR-017-default-access-domain-and-proxy-routing.md)
+- [ADR-024: Pure CLI SSH State And Server-Applied Domains](../decisions/ADR-024-pure-cli-ssh-state-and-server-applied-domains.md)
 - [Error Model](../errors/model.md)
 - [neverthrow Conventions](../errors/neverthrow-conventions.md)
 - [Async Lifecycle And Acceptance](../architecture/async-lifecycle-and-acceptance.md)
 - [Workflow Spec Format](./WORKFLOW_SPEC_FORMAT.md)
+- [Quick Deploy Workflow Spec](./quick-deploy.md)
+- [Repository Deployment Config File Bootstrap](./deployment-config-file-bootstrap.md)
 - [Routing Domain And TLS Test Matrix](../testing/routing-domain-and-tls-test-matrix.md)
 
 ## End-To-End Workflow
@@ -206,6 +220,21 @@ renewal scheduler/process manager
   -> certificate-requested
   -> certificate-issued | certificate-issuance-failed
 ```
+
+## Boundary With Server-Applied Config Domains
+
+Server-applied config domains in pure CLI/SSH mode are not managed domain bindings.
+
+They are represented as target-local proxy route desired/applied state in the SSH-server Appaloft
+state backend. The edge proxy provider may manage TLS automation locally, but Appaloft one-shot CLI
+processes do not own a background DNS observer, certificate retry scheduler, or managed domain
+read-model lifecycle after the process exits.
+
+When a hosted/self-hosted control plane adopts the same project/resource/server state, the migration
+path is explicit: import or sync remote `ssh-pglite` identity and route state, then create managed
+`DomainBinding` and certificate records if the operator wants cloud-managed DNS/certificate
+lifecycle. The presence of a server-applied route must not be treated as proof that a managed
+`DomainBinding` already exists.
 
 ## Synchronous Admission
 

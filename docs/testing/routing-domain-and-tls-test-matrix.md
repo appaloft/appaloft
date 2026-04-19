@@ -16,6 +16,10 @@ domain-bindings.create
 
 Tests must distinguish deployment runtime plan access-route snapshots from durable domain binding and certificate lifecycle state.
 
+Pure CLI/SSH `access.domains[]` server-applied routes are also distinct from durable managed domain
+bindings. They are tested primarily through the deployment config and edge proxy matrices unless a
+hosted/self-hosted control-plane mode maps the same intent into `domain-bindings.create`.
+
 Workflow-level tests must prove the cross-operation path, not only isolated command success. The
 minimal v1 workflow path is:
 
@@ -41,9 +45,12 @@ This test matrix inherits:
 - [ADR-008: Renewal Trigger Model](../decisions/ADR-008-renewal-trigger-model.md)
 - [ADR-009: Certificates Import Command](../decisions/ADR-009-certificates-import-command.md)
 - [ADR-017: Default Access Domain And Proxy Routing](../decisions/ADR-017-default-access-domain-and-proxy-routing.md)
+- [ADR-024: Pure CLI SSH State And Server-Applied Domains](../decisions/ADR-024-pure-cli-ssh-state-and-server-applied-domains.md)
 - [Error Model](../errors/model.md)
 - [neverthrow Conventions](../errors/neverthrow-conventions.md)
 - [Async Lifecycle And Acceptance](../architecture/async-lifecycle-and-acceptance.md)
+- [Quick Deploy Workflow Spec](../workflows/quick-deploy.md)
+- [Repository Deployment Config File Bootstrap](../workflows/deployment-config-file-bootstrap.md)
 - [Spec-Driven Testing](./SPEC_DRIVEN_TESTING.md)
 
 ## Test Layers
@@ -203,6 +210,7 @@ Then:
 | ROUTE-TLS-BOUNDARY-002 | integration | `deployments.create` with edge proxy route fields | Deployment command carries proxy route fields | Command schema rejects the input; no durable domain/certificate state is created. |
 | ROUTE-TLS-BOUNDARY-003 | integration | `domain-bindings.create` with same domain | Durable binding command creates binding lifecycle state | Domain event chain starts independently of deployment attempt. |
 | ROUTE-TLS-BOUNDARY-004 | integration | Generated default access route | Default access policy resolves a generated hostname | No `DomainBinding` is created unless an explicit command is dispatched. |
+| ROUTE-TLS-BOUNDARY-005 | integration | Server-applied config domain route | Pure CLI/SSH config deploy applies `access.domains[]` through target proxy state | No managed `DomainBinding` or `Certificate` aggregate is created; route state is target-local until a control-plane adoption flow maps it explicitly. |
 
 ## Entry Surface Matrix
 
@@ -222,6 +230,7 @@ Then:
 | ROUTE-TLS-ENTRY-012 | e2e-preferred | CLI observes TLS-disabled ready route | CLI creates a TLS-disabled binding, confirms ownership, then lists resources | `ok({ id, verificationAttemptId })` is printed | Per command error contract | `domain-bound` then `domain-ready` | `resource list` shows `accessSummary.latestDurableDomainRoute.url` for the custom domain |
 | ROUTE-TLS-ENTRY-013 | e2e-preferred | CLI requests certificate issuance | CLI creates and confirms a TLS-auto binding, then runs `certificate issue-or-renew` | `ok({ certificateId, attemptId })` is printed | Per command error contract | `certificate-requested`, then `certificate-issuance-failed` when no provider is configured | `certificate list` shows the certificate and latest attempt; in the default shell profile this is `failed`/`retry_scheduled` with `certificate_provider_unavailable` |
 | ROUTE-TLS-ENTRY-014 | e2e-preferred | API requests certificate issuance | HTTP/oRPC creates and confirms a TLS-auto binding, then posts `/api/certificates/issue-or-renew` | `ok({ certificateId, attemptId })` response | Per command error contract | `certificate-requested`, then `certificate-issuance-failed` when no provider is configured | `GET /api/certificates` shows the certificate and latest attempt; in the default shell profile this is `failed`/`retry_scheduled` with `certificate_provider_unavailable` |
+| ROUTE-TLS-ENTRY-015 | e2e-preferred | Quick Deploy or config managed handoff | Quick Deploy, a config-aware local agent, or a headless executor runs in hosted/self-hosted control-plane mode with trusted resource/server/destination context and accepted managed domain/TLS intent | Executor dispatches `domain-bindings.create` as a separate command with explicit input; no domain/TLS fields are sent to `deployments.create` | Per command error contract | `domain-binding-requested` on success | Binding appears in the same read models as CLI/API/Web-created bindings |
 
 ## Idempotency Assertions
 
@@ -255,6 +264,11 @@ DNS-gated confirmation, explicit manual override, DNS mismatch/lookup-failure re
 projection. Shell e2e coverage also verifies CLI and HTTP confirmation entrypoints through the public
 domain binding list read model.
 
+`ROUTE-TLS-BOUNDARY-005` is target coverage for ADR-024. Current SSH CLI implementation can persist
+server-applied config domain desired state without creating managed `DomainBinding` or `Certificate`
+aggregates, but applied/ready route state still depends on the future edge proxy route realization
+slice.
+
 Current tests cover `ROUTE-TLS-EVT-004`, `ROUTE-TLS-READMODEL-001`,
 `ROUTE-TLS-READMODEL-002`, `ROUTE-TLS-READMODEL-003`, and `ROUTE-TLS-ENTRY-012`.
 
@@ -283,6 +297,12 @@ Current workflow tests cover `ROUTE-TLS-WORKFLOW-001` through the default CLI e2
 `ROUTE-TLS-WORKFLOW-002` proxy reachability test is opt-in through `APPALOFT_E2E_PROXY_DOCKER=true`
 because it needs Docker and host ports; it proves routing with a local Host header rather than a
 public DNS purchase.
+
+Quick Deploy/config managed handoff coverage for `ROUTE-TLS-ENTRY-015` remains a target row.
+Current repository config parsing rejects domain/TLS-like fields before mutation. After ADR-024,
+pure CLI/SSH `access.domains[]` should be covered by server-applied route rows instead of this
+managed domain-binding entry row; resource-scoped domain binding surfaces remain the active managed
+follow-up path.
 
 Current tests cover `ROUTE-TLS-CHALLENGE-001`, `ROUTE-TLS-CHALLENGE-002`, and
 `ROUTE-TLS-CHALLENGE-003` for HTTP-01 challenge token serving through the HTTP adapter and injected

@@ -184,7 +184,10 @@ The minimal deliverable is complete when:
 
 `deployments.create` now passes resource-owned network/access context to runtime planning while keeping the command input ids-only.
 
-Runtime adapter route hint fields such as `domains`, `proxyKind`, `pathPrefix`, and `tlsMode` remain an adapter-facing migration seam. They are populated by the default access route resolver instead of transport command input, but durable domain binding precedence has not yet been wired into the same resolver.
+Runtime adapter route hint fields such as `domains`, `proxyKind`, `pathPrefix`, and `tlsMode`
+remain an adapter-facing migration seam. They are populated by the default access route resolver
+instead of transport command input, but durable domain binding precedence and ADR-024
+server-applied config-domain precedence have not yet been wired into the same resolver.
 
 Existing proxy label/config generation is reused behind the route snapshot boundary. Reverse-proxy deployments bind workload ports to loopback for local health and proxy access rather than requiring a stable public host application port.
 

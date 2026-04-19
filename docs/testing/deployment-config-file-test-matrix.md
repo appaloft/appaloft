@@ -3,7 +3,8 @@
 ## Normative Contract
 
 Repository deployment config file tests must prove that config files are entry-workflow profile
-inputs and never hidden `deployments.create` schemas.
+inputs, the non-interactive Quick Deploy draft expression, and never hidden `deployments.create`
+schemas.
 
 Canonical assertions:
 
@@ -11,10 +12,15 @@ Canonical assertions:
 - the parser is strict and rejects unknown, identity, secret, and unsupported fields;
 - project/resource/server/destination/credential identity is resolved outside the committed file;
 - first-run project/resource creation uses explicit operations and source-derived defaults;
+- config-driven runs follow the same Quick Deploy project/server/environment/resource operation
+  order as interactive entrypoints;
 - resource/runtime/network/health profile fields map to resource-owned commands before deployment;
 - non-secret env values and resolved secret references map to environment commands before
   deployment;
 - final `deployments.create` input remains ids-only;
+- SSH-targeted CLI/Action runs default to SSH-server `ssh-pglite` state, not runner-local state;
+- `access.domains[]` declarations become server-applied proxy routes in SSH CLI mode or managed
+  domain intent in control-plane mode, and never become `deployments.create` fields;
 - HTTP remains strict unless a future workflow command is accepted by ADR.
 
 ## Global References
@@ -22,13 +28,16 @@ Canonical assertions:
 This matrix inherits:
 
 - [Repository Deployment Config File Bootstrap Workflow Spec](../workflows/deployment-config-file-bootstrap.md)
+- [GitHub Action Deploy Wrapper Implementation Plan](../implementation/github-action-deploy-action-plan.md)
 - [ADR-010: Quick Deploy Workflow Boundary](../decisions/ADR-010-quick-deploy-workflow-boundary.md)
 - [ADR-012: Resource Runtime Profile And Deployment Snapshot Boundary](../decisions/ADR-012-resource-runtime-profile-and-deployment-snapshot-boundary.md)
 - [ADR-014: Deployment Admission Uses Resource Profile](../decisions/ADR-014-deployment-admission-uses-resource-profile.md)
 - [ADR-015: Resource Network Profile](../decisions/ADR-015-resource-network-profile.md)
+- [ADR-024: Pure CLI SSH State And Server-Applied Domains](../decisions/ADR-024-pure-cli-ssh-state-and-server-applied-domains.md)
 - [resources.create Command Spec](../commands/resources.create.md)
 - [deployments.create Command Spec](../commands/deployments.create.md)
 - [Quick Deploy Test Matrix](./quick-deploy-test-matrix.md)
+- [Source Link State Test Matrix](./source-link-state-test-matrix.md)
 - [resources.create Test Matrix](./resources.create-test-matrix.md)
 - [deployments.create Test Matrix](./deployments.create-test-matrix.md)
 - [Spec-Driven Testing](./SPEC_DRIVEN_TESTING.md)
@@ -42,6 +51,8 @@ This matrix inherits:
 | Parser/schema | Supported names, JSON/YAML parsing, strict unknown-field rejection, identity/secret/unsupported-field rejection. |
 | Source/root resolver | Git root discovery, explicit path behavior, monorepo base directory safety, ambiguous file handling. |
 | Entry workflow | Precedence, profile mapping, explicit operation sequencing, no hidden deployment fields. |
+| Remote state | SSH-server `ssh-pglite` default, local-only override, locking, migration, and source identity reuse. |
+| Quick Deploy parity | Config profile normalization must feed the same operation order and id-threading as interactive Quick Deploy. |
 | Resource command | Resource source/runtime/network/health profile created or updated through resource-owned contracts. |
 | Environment command | Non-secret variables and required secret references are handled before deployment snapshot. |
 | CLI | `appaloft deploy --config` and implicit discovery are local entry workflows. |
@@ -73,7 +84,7 @@ This matrix inherits:
 | CONFIG-FILE-ID-005 | integration | Config target/server selector rejected | Committed config contains `serverId`, target host, destination id, destination name, provider account, or region as selector | Workflow stops before mutation | `validation_error`, phase `config-identity` | No write commands |
 | CONFIG-FILE-ID-006 | e2e-preferred | Explicit ids override config profile | CLI/API/Web passes explicit project/environment/resource/server ids and config has only profile fields | Explicit ids are used; config cannot redirect identity | None | Profile normalization -> `deployments.create` ids-only |
 | CONFIG-FILE-ID-007 | integration | Environment overlay does not select environment | Config has `environments.production` overlay but entry selected staging | Production overlay is not applied | None | Staging profile resolution only |
-| CONFIG-FILE-ID-008 | e2e-preferred | Relink requires explicit operation | Existing source is linked to one resource and operator wants another | Deploy does not move implicitly; relink command/spec is required | Future relink-specific code or preflight error | No accidental project/resource mutation |
+| CONFIG-FILE-ID-008 | e2e-preferred | Relink requires explicit operation | Existing source is linked to one resource and operator wants another | Deploy does not move implicitly; `source-links.relink` is required | `validation_error`, phase `source-link-resolution`, or relink-specific guidance | No accidental project/resource mutation |
 
 ## Profile Mapping Matrix
 
@@ -86,7 +97,7 @@ This matrix inherits:
 | CONFIG-FILE-PROFILE-005 | integration | Monorepo base directory | Config selects `/apps/api` under the source root | Resource source binding uses safe source-root-relative base directory | None | `resources.create(source.baseDirectory)` -> `deployments.create` |
 | CONFIG-FILE-PROFILE-006 | integration | Existing resource profile drift without update operation | Existing resource profile differs from config and no accepted update operation exists | Workflow stops before deployment | `resource_profile_drift`, phase `resource-profile-resolution` | No `deployments.create` |
 | CONFIG-FILE-PROFILE-007 | e2e-preferred | Existing resource profile update after operation exists | Existing resource profile differs and explicit profile update operations are active | Profile update commands run before deployment | None | Resource profile update command(s) -> `deployments.create` |
-| CONFIG-FILE-PROFILE-008 | integration | Domains/TLS stay follow-up operations | Config declares desired domain/TLS behavior after specs allow it | Values do not enter `deployments.create`; explicit domain/certificate commands are required | None or structured unsupported error until implemented | `domain-bindings.create` separate from deployment |
+| CONFIG-FILE-PROFILE-008 | integration | Domains/TLS stay out of deployment admission | Config declares `access.domains[]` | Values do not enter `deployments.create`; SSH mode persists server-applied route desired state and control-plane mode maps to managed domain intent | None when SSH route desired-state storage is available; `validation_error`, phase `config-domain-resolution` when the selected backend has no supported route-state or managed-domain mapping | SSH mode: route desired state -> `deployments.create` -> proxy realization. Control-plane mode: `domain-bindings.create` separate from deployment. |
 | CONFIG-FILE-PROFILE-009 | integration | Final deployment input is ids-only | Config contains valid source/runtime/network/health profile fields | Final command input contains only project/server/destination/environment/resource ids | None | Assert no source/runtime/network fields on `deployments.create` |
 
 ## Secrets Matrix
@@ -103,6 +114,35 @@ This matrix inherits:
 | CONFIG-FILE-SEC-008 | integration | Required CI secret reference missing | Config declares required `ci-env:API_TOKEN` but the entrypoint environment does not contain `API_TOKEN` | Workflow stops before mutation and does not include the secret key value in details | `validation_error`, phase `config-secret-resolution` | No write commands |
 | CONFIG-FILE-SEC-009 | integration | Optional CI secret reference missing | Config declares optional `ci-env:OPTIONAL_TOKEN` and the entrypoint environment does not contain it | Workflow skips the optional variable and continues | None | No command for missing optional secret -> `deployments.create` |
 | CONFIG-FILE-SEC-010 | integration | Unsupported secret resolver rejected | Config declares required `vault:prod/api` before that adapter is configured | Workflow stops before mutation | `validation_error`, phase `config-secret-resolution` | No write commands |
+
+## Remote State Matrix
+
+| Test ID | Preferred automation | Case | Given | Expected result | Expected error | Expected operation sequence |
+| --- | --- | --- | --- | --- | --- | --- |
+| CONFIG-FILE-STATE-001 | unit | State backend resolver defaults SSH target to remote PGlite | GitHub Actions or CLI non-TTY deploy has trusted SSH target inputs, with no `DATABASE_URL` and no explicit state override | Resolver selects `ssh-pglite`, reports no `DATABASE_URL` requirement, and marks remote state lifecycle required | None | State backend selection only |
+| CONFIG-FILE-STATE-002 | integration | Remote state ensure prepares durable root | SSH target has no Appaloft state root or has incomplete directories | Workflow creates/verifies data root, schema marker, lock area, backup/journal area, and permissions before identity resolution | `validation_error`, phase `remote-state-resolution` when ensure cannot make a safe state root | Ensure remote state -> identity resolution |
+| CONFIG-FILE-STATE-003 | integration | Remote state lock serializes concurrent deploys | Two config deploys target the same SSH-server state root | One workflow owns mutation at a time; the second waits or fails with retriable lock error according to policy | `infra_error`, phase `remote-state-lock` when lock cannot be acquired | Lock before identity/resource/env/deployment writes |
+| CONFIG-FILE-STATE-004 | integration | Remote migrations run before workflow state resolution | SSH-server state exists at an older schema version | Migrations complete before project/resource/server/environment lookup or creation | `infra_error`, phase `remote-state-migration` when migration fails | Ensure remote state -> backup/journal -> migrate -> integrity check -> identity resolution |
+| CONFIG-FILE-STATE-005 | integration | Remote migration recovery marker | Migration fails after backup/journal is created | Workflow stops before mutation and exposes recovery marker through diagnostics | `infra_error`, phase `remote-state-migration` | No identity/resource/deployment writes after failed migration |
+| CONFIG-FILE-STATE-006 | integration | Abandoned lock recovery visible | Previous workflow left a stale lock or recovery marker | Workflow reports lock owner/correlation and requires safe stale-lock recovery policy or operator action | `infra_error`, phase `remote-state-lock` until recovered | No write commands while lock is unsafe |
+| CONFIG-FILE-STATE-007 | unit | State backend resolver honors explicit local-only mode | SSH target exists but entrypoint explicitly selects local-only/dry-run/smoke state | Resolver selects `local-pglite`, reports local-process scope, and does not require remote state lifecycle | None | State backend selection only |
+| CONFIG-FILE-STATE-008 | unit | State backend resolver honors PostgreSQL/control-plane override | Entrypoint supplies `DATABASE_URL` or a control-plane endpoint | Resolver selects `postgres-control-plane`, reports control-plane scope, and does not initialize SSH PGlite | None or control-plane connection error when the selected backend is contacted later | State backend selection only |
+| CONFIG-FILE-STATE-009 | e2e-preferred | Repeated CI deploy reuses remote identity | Two GitHub Actions runs deploy the same source/config to the same SSH target with no Appaloft ids | Second run reuses project/environment/server/resource identity from remote state/source fingerprint | None | First run creates identity and source link; second run resolves existing link before `deployments.create` |
+| CONFIG-FILE-STATE-010 | e2e-preferred, opt-in SSH | SSH config deploy uses remote state before deployment | GitHub Actions or CLI non-TTY deploy has repository config and trusted SSH target inputs, with no `DATABASE_URL` and no explicit state override | Workflow uses SSH-server `ssh-pglite` as the Appaloft state source of truth, not runner-local PGlite | None | Resolve SSH target -> ensure remote state -> lock -> migrate -> identity resolution -> explicit operations -> `deployments.create` |
+| CONFIG-FILE-STATE-011 | integration | Interrupted download preserves local mirror | SSH archive download succeeds but local archive extraction fails before composition opens PGlite | Workflow returns sync download error and leaves the previous target-scoped local mirror intact | `infra_error`, phase `remote-state-sync-download` | Remote archive -> staged local extract fails -> keep previous mirror -> no command dispatch |
+| CONFIG-FILE-STATE-012 | integration | Interrupted upload restores remote backup | Local archive creation succeeds but remote extraction/upload fails after command shutdown | Workflow returns sync upload error, remote command restores the pre-upload `pglite`/`source-links` backup when possible, and writes recovery metadata | `infra_error`, phase `remote-state-sync-upload` | Local archive -> remote backup -> staged remote extract fails -> restore backup -> recovery marker -> release lock |
+| CONFIG-FILE-STATE-013 | e2e-preferred, opt-in SSH | Isolated GitHub Action runner process boundary | Two separate non-interactive CLI processes use different runner-local PGlite directories, the same GitHub repository identity, and the same trusted SSH target | First run creates remote state/source link; second run downloads the SSH-server state, reuses the linked project/environment/server/resource, and records a second deployment without duplicate resources | None | Runner A ensure/lock/migrate/download -> first deploy -> upload/release; Runner B ensure/lock/migrate/download -> source link reuse -> second deploy -> upload/release |
+
+## Server-Applied Domain Matrix
+
+| Test ID | Preferred automation | Case | Given | Expected result | Expected error | Expected operation sequence |
+| --- | --- | --- | --- | --- | --- | --- |
+| CONFIG-FILE-DOMAIN-001 | integration | Valid server-applied domain config | Config contains `access.domains[].host`, optional `pathPrefix`, and `tlsMode`, selected target supports reverse-proxy routes | Parser normalizes provider-neutral domain intent; SSH workflow persists server-applied route desired state and keeps final deployment ids-only; deployment planning reads exact destination state first and falls back to default-destination route state for first-run config bootstrap | None when SSH route desired-state storage is available; `validation_error`, phase `config-domain-resolution` when the selected backend has no route-state or managed-domain mapping | Config parse -> trusted context -> route desired state -> `deployments.create` -> edge proxy route realization |
+| CONFIG-FILE-DOMAIN-002 | integration | Domain config rejects identity selectors | Domain entry contains server id, destination id, credential id, provider account, or DNS provider credential selector | Workflow stops before mutation | `validation_error`, phase `config-identity` or `config-domain-resolution` | No write commands |
+| CONFIG-FILE-DOMAIN-003 | integration | Domain config rejects raw TLS material | Domain entry contains certificate private key, certificate body, token, password, or raw DNS credential | Workflow stops before mutation and diagnostics are sanitized | `validation_error`, phase `config-secret-validation` | No write commands |
+| CONFIG-FILE-DOMAIN-004 | integration | Domain host shape rejected | Domain host includes scheme, port, path, wildcard syntax not accepted by policy, or an invalid domain label | Workflow stops before mutation | `validation_error`, phase `config-domain-resolution` | No write commands |
+| CONFIG-FILE-DOMAIN-005 | e2e-preferred, opt-in SSH | Server-applied route reaches deployed service | SSH deploy has reverse-proxy network profile and `access.domains[]` with TLS disabled or provider-local TLS test mode | After deployment/proxy realization, request to target edge with `Host: <domain>` reaches the service and read model reports applied route | None or structured proxy error | Remote state -> `deployments.create` -> provider route apply/reload -> route verification/read model |
+| CONFIG-FILE-DOMAIN-006 | integration | Control-plane mode maps config domain to managed workflow | Same config runs against hosted/self-hosted control-plane state | Executor creates managed domain intent through `domain-bindings.create` or reports unsupported managed mapping; it does not write server-applied SSH route state | None or stable unsupported mapping error until implemented | Config parse -> trusted context -> `deployments.create` -> managed domain follow-up command |
 
 ## Resource Sizing And Runtime Target Matrix
 
@@ -125,7 +165,12 @@ This matrix inherits:
 | CONFIG-FILE-ENTRY-005 | contract | HTTP schema endpoint | `/api/schemas/appaloft-config.json` exposes the current config schema and stays aligned with the parser. |
 | CONFIG-FILE-ENTRY-006 | e2e-preferred | Web/local agent future | Any Web/local-agent file picker or future desktop workflow uses the same parser and operation sequence as CLI. |
 | CONFIG-FILE-ENTRY-007 | e2e-preferred | Future MCP/automation | MCP tools may pass profile data only through the config workflow or explicit operations, not by extending `deployments.create`. |
-| CONFIG-FILE-ENTRY-008 | integration | GitHub Actions headless binary | CI runs the Appaloft binary with repository config, defaults to embedded PGlite without `DATABASE_URL`, resolves GitHub secrets only after the workflow maps them into runner env vars, can bootstrap temporary project/server/environment/resource records without committed ids, and uses explicit env/resource/deployment commands before ids-only deployment admission. |
+| CONFIG-FILE-ENTRY-008 | integration | GitHub Actions headless binary | CI runs the Appaloft binary as a non-interactive Quick Deploy executor with repository config, defaults to SSH-server `ssh-pglite` when an SSH target is selected, does not require `DATABASE_URL`, resolves GitHub secrets only after the workflow maps them into runner env vars, reuses or bootstraps project/server/environment/resource records from remote state without committed ids, applies `access.domains[]` through server-applied proxy routes when declared, and uses explicit env/resource/deployment commands before ids-only deployment admission. |
+| CONFIG-FILE-ENTRY-009 | contract | Deploy action install verifies binary | `appaloft/deploy-action` resolves the requested Appaloft CLI version and runner target, downloads the matching release archive plus `checksums.txt`, verifies SHA-256 before extraction, and adds the installed CLI to the job PATH only after verification. |
+| CONFIG-FILE-ENTRY-010 | contract | Deploy action maps SSH secret safely | `ssh-private-key` input is written to a runner temp file with mode `0600`, only the file path is passed to `appaloft deploy --server-ssh-private-key-file`, and raw key material never appears in command args, logs, outputs, or diagnostics. |
+| CONFIG-FILE-ENTRY-011 | contract | Deploy action version propagation | `version: vX.Y.Z` downloads that exact Appaloft release, `version: latest` resolves the latest stable release at runtime, and a new CLI release does not require changing the deploy-action repository unless wrapper behavior changes. |
+| CONFIG-FILE-ENTRY-012 | integration | Deploy action no-config mode | When no config path is supplied or discovered, the action invokes the same CLI Quick Deploy path with trusted inputs; it defaults SSH targets to `ssh-pglite`, deploys only when non-interactive context can be inferred, and otherwise fails before mutation with structured validation. |
+| CONFIG-FILE-ENTRY-013 | integration | Deploy action config without domain | Valid config with no `access.domains[]` deploys normally and does not persist server-applied route desired state; access remains generated/default or absent according to selected server policy. |
 
 ## Current Implementation Notes And Migration Gaps
 
@@ -142,11 +187,52 @@ Current implemented coverage:
   `CONFIG-FILE-SEC-010` are covered in `packages/adapters/cli/test/deployment-config.test.ts`,
   proving plain env mapping, public-prefix build-time exposure, supported `ci-env:` resolution,
   required missing-secret failure, and unsupported required resolver failure.
-- `CONFIG-FILE-ENTRY-008` is covered in `packages/config/test/index.test.ts`, proving headless CI
-  defaults to embedded PGlite without `DATABASE_URL`, and in
-  `packages/adapters/cli/test/deployment-config.test.ts`, proving no-id non-TTY PGlite deploys
-  bootstrap temporary project/server/environment/resource records before ids-only deployment
-  admission.
+- `CONFIG-FILE-ENTRY-008` has migration coverage in `packages/config/test/index.test.ts`, proving
+  the old headless CI default to embedded local PGlite without `DATABASE_URL`. After ADR-024, that
+  coverage is local-only migration coverage, not the SSH target behavior.
+- `CONFIG-FILE-STATE-001`, `CONFIG-FILE-STATE-007`, and `CONFIG-FILE-STATE-008` have resolver-level
+  coverage in `packages/adapters/cli/test/deployment-state.test.ts`.
+- `CONFIG-FILE-STATE-002` has CLI workflow coverage in
+  `packages/adapters/cli/test/deployment-config.test.ts`, proving the remote-state lifecycle hook
+  runs before identity queries and mutations when `ssh-pglite` is selected and releases after the
+  config bootstrap mutation sequence.
+- `CONFIG-FILE-STATE-002` through `CONFIG-FILE-STATE-006` have adapter-level coverage in
+  `packages/adapters/cli/test/deployment-remote-state.test.ts`, proving durable root ensure,
+  mutation lock, migration backup/journal, recovery marker, and lock diagnostics.
+- `CONFIG-FILE-STATE-002`, `CONFIG-FILE-STATE-003`, and `CONFIG-FILE-STATE-010` have SSH transport
+  adapter coverage in `packages/adapters/cli/test/deployment-ssh-remote-state.test.ts`, proving
+  remote ensure/lock/migrate command construction, lock-conflict error mapping, SSH process
+  arguments, and identity-file-only credential handling.
+- `CONFIG-FILE-STATE-010` through `CONFIG-FILE-STATE-012` have shell-level remote PGlite mirror coverage in
+  `apps/shell/test/remote-pglite-state-sync.test.ts`, proving SSH deploys plan a target-scoped
+  local PGlite mirror before composition, skip remote sync for local/control-plane state, and
+  download/upload the PGlite directory over SSH archive commands. The same file proves failed
+  download extraction keeps the existing local mirror and failed remote upload uses remote
+  backup/restore/recovery command sequencing.
+- `SOURCE-LINK-STATE-004` and `SOURCE-LINK-STATE-005` have config workflow coverage in
+  `packages/adapters/cli/test/deployment-config.test.ts`, proving first-run source link creation
+  and repeated config deploy reuse through the CLI source link hook.
+- `CONFIG-FILE-STATE-010` has current safe-failure coverage in
+  `packages/adapters/cli/test/deployment-config.test.ts`, proving an SSH-targeted config deploy
+  fails at `remote-state-resolution` before mutation when no remote lifecycle adapter is wired. The
+  custom-runtime failure path stays explicit rather than falling back to runner-local PGlite.
+- `CONFIG-FILE-STATE-009`, `CONFIG-FILE-STATE-010`, and `CONFIG-FILE-STATE-013` have an opt-in
+  external SSH e2e harness in
+  `apps/shell/test/e2e/github-action-ssh-state.workflow.e2e.ts`. The harness is disabled unless
+  `APPALOFT_E2E_SSH_REMOTE_STATE=true` and proves the GitHub Actions style process boundary when
+  run against a provisioned SSH/Docker target.
+- The external SSH harness is wired into `.github/workflows/ssh-remote-state-e2e.yml`, the nightly
+  smoke workflow, and the release workflow before release artifact publication. It runs when
+  `APPALOFT_E2E_SSH_HOST` and `APPALOFT_E2E_SSH_PRIVATE_KEY` secrets are configured; release
+  dispatch can set `require_ssh_remote_state_e2e=true` to fail fast when the secrets are missing.
+- `CONFIG-FILE-DOMAIN-001` through `CONFIG-FILE-DOMAIN-004` have parser/schema coverage in
+  `packages/deployment-config/test/appaloft-config.test.ts`, proving `access.domains[]` accepts
+  safe host/path/TLS intent, normalizes defaults, rejects identity selectors, rejects raw TLS/secret
+  material, and rejects unsafe host/path shapes. `packages/adapters/cli/test/deployment-config.test.ts`
+  proves CLI config deploy maps invalid domain shape to `config-domain-resolution`, persists valid
+  SSH server-applied route desired state before ids-only deployment admission when route-state
+  storage is wired, and fails before mutation with `server_applied_route_store_missing` when a
+  custom runtime cannot persist the desired state.
 - `DEP-CREATE-ADM-035` is covered in `packages/application/test/create-deployment.test.ts`, proving
   `deployments.create` remains ids-only.
 
@@ -154,19 +240,31 @@ Current implementation supports JSON and YAML target names in `@appaloft/deploym
 CLI/filesystem discovery use the same parser.
 
 Current config schema rejects `project`, `environment`, `resource`, `targets`, `servers`, raw
-secret material, secret-looking inline env values, unknown fields, and unsupported sizing/rollout
-fields before mutation.
+secret material, secret-looking inline env values, unknown fields, unsafe domain/TLS-like fields,
+and unsupported sizing/rollout fields before mutation. It now accepts `access.domains[]` with
+provider-neutral `host`, `pathPrefix`, and `tlsMode` fields. SSH CLI config deploy now persists
+server-applied route desired state under the selected SSH-server state backend before
+`deployments.create`; deployment planning consumes that desired state and records applied/failed
+status after deployment-finished route outcomes. Resource access, health, and diagnostic summaries
+expose the latest server-applied route URL/status. Provider-local TLS diagnostics for
+`tlsMode = auto` routes are exposed through proxy configuration/resource diagnostics. Control-plane
+managed-domain mapping remains follow-up work.
 
 Current HTTP adapter serves a config schema endpoint, but strict deployment API behavior remains
 ids-only.
 
-Profile drift detection, existing-resource update operation sequencing, durable link/relink state,
-stored/external secret adapters beyond `ci-env:`, config-file Dockerfile/Compose path mapping, and
-resource sizing support remain target coverage rows, not implemented baseline behavior.
+Public `appaloft/deploy-action` wrapper coverage is not implemented yet. The main repository
+release workflow already produces CLI archives, `checksums.txt`, `release-manifest.json`, and
+release notes, but `CONFIG-FILE-ENTRY-009` through `CONFIG-FILE-ENTRY-013` still need a wrapper
+repository, action metadata, install/checksum scripts, SSH secret temp-key handling, and tests.
+
+Profile drift detection, existing-resource update operation sequencing, stored/external secret
+adapters beyond `ci-env:`, config-file Dockerfile/Compose path mapping, operational provisioning of
+the external SSH e2e secrets/target, server-applied domain route realization e2e, managed
+control-plane domain mapping, and resource sizing support remain target coverage rows, not
+implemented baseline behavior.
 
 ## Open Questions
 
-- Which link-state store should be the durable non-versioned source-to-project/resource binding for
-  CLI and future MCP/local-agent workflows?
 - Should config-origin metadata appear first on deployment diagnostics, resource diagnostics, or a
   dedicated config resolution query?

@@ -1,0 +1,292 @@
+# GitHub Action Deploy Wrapper Implementation Plan
+
+## Goal
+
+Make repository-driven GitHub Actions deployment a release-ready product entrypoint for pure CLI
+SSH deployments.
+
+The first public shape is a thin `appaloft/deploy-action` wrapper around the released Appaloft CLI
+binary. The wrapper installs a selected CLI release, verifies the artifact, maps trusted GitHub
+Secrets into runner-local files or environment variables, and invokes the existing
+`appaloft deploy` config workflow. It must not introduce a new deployment command, hidden hosted
+service requirement, or parallel config schema.
+
+## Product Boundary
+
+`appaloft/deploy-action` is an entrypoint wrapper, not a business operation.
+
+It must follow these boundaries:
+
+- final deployment admission remains `deployments.create`;
+- repository config remains the non-interactive Quick Deploy profile input;
+- `appaloft.yml` must not contain project/resource/server/destination/credential identity or raw
+  secret values;
+- SSH-targeted runs default to `ssh-pglite` and do not require `DATABASE_URL`;
+- `APPALOFT_PROJECT_ID`, `APPALOFT_RESOURCE_ID`, `APPALOFT_SERVER_ID`, and similar ids are optional
+  trusted overrides, not required one-shot setup;
+- domain intent in `appaloft.yml` maps to server-applied proxy route state in SSH mode and must not
+  create managed `DomainBinding` or `Certificate` aggregates;
+- hosted/self-hosted control-plane mode is selected explicitly through a control-plane endpoint or
+  PostgreSQL state backend.
+
+The action wrapper may live in a separate public repository because its release cadence and
+Marketplace metadata are different from the main Appaloft repository. The wrapper should remain
+small enough that Appaloft CLI releases do not require action-repo code changes unless the install
+contract itself changes.
+
+## Repository Shape
+
+Recommended first repository:
+
+```text
+appaloft/deploy-action
+  action.yml
+  README.md
+  scripts/install-appaloft.sh
+  scripts/run-deploy.sh
+  test/fixtures/minimal-workflow.yml
+```
+
+The main Appaloft repository owns:
+
+- release assets for platform CLI archives;
+- `checksums.txt`;
+- `release-manifest.json`;
+- release notes;
+- CLI behavior, config parsing, remote state, and deployment semantics;
+- docs and test matrices that define the wrapper contract.
+
+The action repository owns:
+
+- action metadata and Marketplace-facing README;
+- binary download and checksum verification;
+- GitHub runner secret mapping;
+- shell-level invocation of the released binary;
+- wrapper-level tests for install and command construction.
+
+## Default Usage
+
+Minimal config-driven deployment:
+
+```yaml
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: appaloft/deploy-action@v1
+        with:
+          version: v0.1.0
+          config: appaloft.yml
+          ssh-host: ${{ secrets.APPALOFT_SSH_HOST }}
+          ssh-user: ${{ secrets.APPALOFT_SSH_USER }}
+          ssh-private-key: ${{ secrets.APPALOFT_SSH_PRIVATE_KEY }}
+```
+
+Recommended production workflows pin both:
+
+- the action major version through `uses: appaloft/deploy-action@v1`;
+- the Appaloft CLI version through `with.version`.
+
+`version: latest` is allowed for quickstarts, but generated examples for production should prefer
+an exact CLI release tag for repeatability.
+
+## Action Inputs
+
+Initial inputs:
+
+| Input | Required | Rule |
+| --- | --- | --- |
+| `version` | No | CLI release tag such as `v0.1.0`; `latest` resolves the latest non-prerelease Appaloft release. |
+| `config` | No | Path passed to `appaloft deploy --config`; defaults to `appaloft.yml` when present. |
+| `source` | No | Source path or locator passed as the deploy positional argument; defaults to `.`. |
+| `ssh-host` | Yes for SSH mode | Trusted target host, mapped to `--server-host`. |
+| `ssh-user` | No | Trusted SSH username, mapped to `--server-ssh-username`. |
+| `ssh-port` | No | Trusted SSH port, mapped to `--server-port`. |
+| `ssh-private-key` | Yes when no key file is supplied | Secret value written to a runner temp file with mode `0600`; the file path is passed to `--server-ssh-private-key-file`. |
+| `ssh-private-key-file` | No | Existing runner-local private key path; mutually exclusive with `ssh-private-key`. |
+| `server-proxy-kind` | No | Trusted proxy selection such as `traefik` or `caddy`, mapped to `--server-proxy-kind`. |
+| `state-backend` | No | Optional explicit backend: `ssh-pglite`, `local-pglite`, or `postgres-control-plane`. |
+| `appaloft-data-root` | No | Future install/runtime hint for local cache; must not change committed config semantics. |
+| `args` | No | Escape hatch for additional CLI flags; examples should prefer explicit inputs. |
+
+The wrapper must not accept raw `project`, `resource`, `server`, or `destination` values from
+`appaloft.yml`. If it offers trusted id overrides later, they must be action inputs or workflow env
+values documented as operator-selected state, and the CLI must still treat them as selection
+overrides outside the committed config file.
+
+## Secret And Environment Handling
+
+GitHub Secrets are mapped by the workflow into action inputs or environment variables. The action
+does not read repository secrets implicitly.
+
+Rules:
+
+- SSH private key input is written to a temporary file and never passed as a command-line argument.
+- The temporary key file must be removed at the end of the action step when possible.
+- The action must avoid echoing secrets, private key paths with secret-bearing names, or resolved
+  `ci-env:` values.
+- Application secrets referenced by `appaloft.yml` use `ci-env:<NAME>` and are provided by the
+  workflow `env` block, for example `DATABASE_URL: ${{ secrets.DATABASE_URL }}`.
+- `DATABASE_URL` as an application secret is separate from Appaloft state. It is applied to the
+  target application environment through `environments.set-variable` when referenced by config.
+- `APPALOFT_DATABASE_URL` selects Appaloft PostgreSQL/control-plane state and is not required for
+  SSH `ssh-pglite` mode.
+
+Example application secret mapping:
+
+```yaml
+- uses: appaloft/deploy-action@v1
+  env:
+    DATABASE_URL: ${{ secrets.APP_DATABASE_URL }}
+  with:
+    version: v0.1.0
+    ssh-host: ${{ secrets.APPALOFT_SSH_HOST }}
+    ssh-user: ${{ secrets.APPALOFT_SSH_USER }}
+    ssh-private-key: ${{ secrets.APPALOFT_SSH_PRIVATE_KEY }}
+```
+
+The matching config may reference the key without containing the value:
+
+```yaml
+secrets:
+  DATABASE_URL:
+    from: ci-env:DATABASE_URL
+```
+
+## Binary Install And Checksum Verification
+
+The wrapper downloads release assets from the main Appaloft repository.
+
+For `version: latest`, the wrapper resolves the latest non-prerelease release, then downloads:
+
+- the platform-specific `appaloft-v<version>-<target>.tar.gz` or `.zip`;
+- `checksums.txt`;
+- optionally `release-manifest.json` for target discovery and diagnostics.
+
+For an exact version, the wrapper downloads from that release tag directly.
+
+Required verification:
+
+- target selection must be deterministic from runner OS and architecture;
+- the archive SHA-256 must match the corresponding `checksums.txt` entry before extraction;
+- extraction must install the CLI into a runner temp directory or tool cache and prepend it to
+  `PATH` only for the current job;
+- install diagnostics must include version, target, asset name, and checksum source, but not
+  secrets.
+
+The main release workflow already generates `checksums.txt`, `release-manifest.json`, release notes,
+and platform CLI archives. The wrapper must consume those artifacts instead of rebuilding the CLI.
+
+## Version Propagation
+
+Publishing a new Appaloft CLI release does not normally require a new `deploy-action` release.
+
+Expected propagation model:
+
+- `appaloft/deploy-action@v1` stays stable across many Appaloft CLI releases.
+- `with.version: vX.Y.Z` downloads exactly that CLI release.
+- `with.version: latest` resolves the newest stable Appaloft CLI release at runtime.
+- The deploy-action repository releases only when wrapper inputs, install logic, Marketplace docs,
+  or security behavior changes.
+- A future docs automation may update example snippets to a newer pinned CLI version, but runtime
+  users are not forced to update the action wrapper for every CLI release.
+
+## No-Config Behavior
+
+If no config file is supplied or discovered, the action may still invoke `appaloft deploy`, but the
+workflow must provide enough trusted input through action inputs or `args` to create/select context
+and resource profile safely.
+
+Rules:
+
+- No-config SSH deploy still defaults to `ssh-pglite` when `ssh-host` is supplied.
+- The source defaults to `.` when omitted.
+- Missing source/profile/network information may be satisfied by CLI detection and defaults only
+  when the existing CLI Quick Deploy contract allows it.
+- If required non-interactive context cannot be inferred, the CLI must fail before mutation with a
+  structured validation error rather than prompting.
+- If no config and no `access.domains[]` equivalent is supplied, Appaloft deploys without a custom
+  domain route. Generated/default access behavior still follows the selected server/proxy policy.
+
+The action should document config-driven deployment as the primary path. No-config mode is a
+compatibility path for simple repositories and smoke tests, not the recommended production shape.
+
+## Output Contract
+
+Initial outputs:
+
+| Output | Rule |
+| --- | --- |
+| `appaloft-version` | The installed CLI version. |
+| `appaloft-target` | The selected release target. |
+| `deployment-id` | Present when the CLI emits a parseable accepted deployment id. |
+| `resource-id` | Present when the CLI emits a parseable resource id. |
+| `diagnostic-path` | Optional path to a sanitized diagnostic summary artifact when generated. |
+
+The first implementation may omit structured outputs if the CLI does not yet expose stable
+machine-readable deploy output. In that case, the gap must remain explicit and the wrapper should
+not parse human text.
+
+## Failure Semantics
+
+Wrapper failures are entrypoint failures:
+
+| Failure | Expected mapping |
+| --- | --- |
+| Missing version or asset | Action step fails before invoking Appaloft. |
+| Checksum mismatch | Action step fails before extraction. |
+| Missing SSH host for SSH mode | Action step or CLI fails before mutation. |
+| Missing private key or unreadable key file | Action step fails before invoking Appaloft. |
+| Config validation failure | CLI returns structured Appaloft error. |
+| Remote state ensure/lock/migration failure | CLI returns structured Appaloft error with remote-state phase. |
+| Deployment accepted but runtime fails | CLI follows deployment workflow semantics; accepted id remains valid and failure is observed through state/read models. |
+
+## Out Of Scope
+
+- GitHub App webhooks and preview-environment lifecycle.
+- Automatic PR environment cleanup.
+- Managed DNS/certificate lifecycle without a hosted/self-hosted control plane.
+- Creating or rotating GitHub Secrets.
+- Running an Appaloft cloud service.
+- Rebuilding Appaloft from source inside the action.
+- Parsing human CLI output as a durable contract.
+
+## Test Matrix Anchors
+
+Next Test-First Round should add or cover these rows:
+
+- `CONFIG-FILE-ENTRY-008` for headless binary behavior through the action contract;
+- `CONFIG-FILE-ENTRY-009` for action install and checksum verification;
+- `CONFIG-FILE-ENTRY-010` for action SSH secret to temp key mapping;
+- `CONFIG-FILE-ENTRY-011` for action `version` resolution;
+- `CONFIG-FILE-ENTRY-012` for no-config action deploy behavior;
+- `CONFIG-FILE-ENTRY-013` for config without domains deploying without custom route mutation;
+- `QUICK-DEPLOY-ENTRY-011` for deploy-action parity with CLI config workflow.
+
+## Current Implementation Notes And Migration Gaps
+
+The main repository already publishes release artifacts with CLI platform archives, checksums,
+release manifest, release notes, and release asset upload.
+
+The main repository already has an opt-in SSH e2e harness that simulates GitHub Actions process
+boundaries by running two separate CLI processes against the same SSH-server state. That proves the
+underlying CLI behavior but not the public `deploy-action` install/download/checksum wrapper.
+
+Missing pieces before public release:
+
+- create the `appaloft/deploy-action` repository;
+- add `action.yml`, install scripts, README examples, and wrapper tests;
+- add a main-repo doc page that links release assets, action usage, and minimal `appaloft.yml`;
+- add a wrapper-level CI test that verifies exact-version install from a fixture or real release;
+- decide whether generated docs examples use `version: latest` or a pinned version by default;
+- add structured CLI deploy output if action outputs need deployment/resource ids.

@@ -6,6 +6,10 @@ Quick Deploy is an entry workflow for guiding a user from an initial deployment 
 
 Quick Deploy is not a domain command, not an aggregate, and not a separate operation-catalog business operation. It coordinates input collection and explicit commands owned by existing operations.
 
+Repository deployment config files, GitHub Actions binary invocations, the `appaloft/deploy-action`
+install wrapper, and other headless deploy entrypoints are non-interactive forms of the same Quick
+Deploy draft normalization when they derive resource profile input before `deployments.create`.
+
 ## Global References
 
 This workflow inherits:
@@ -21,6 +25,7 @@ This workflow inherits:
 - [ADR-017: Default Access Domain And Proxy Routing](../decisions/ADR-017-default-access-domain-and-proxy-routing.md)
 - [ADR-021: Docker/OCI Workload Substrate](../decisions/ADR-021-docker-oci-workload-substrate.md)
 - [ADR-023: Runtime Orchestration Target Boundary](../decisions/ADR-023-runtime-orchestration-target-boundary.md)
+- [ADR-024: Pure CLI SSH State And Server-Applied Domains](../decisions/ADR-024-pure-cli-ssh-state-and-server-applied-domains.md)
 - [Error Model](../errors/model.md)
 - [neverthrow Conventions](../errors/neverthrow-conventions.md)
 - [Async Lifecycle And Acceptance](../architecture/async-lifecycle-and-acceptance.md)
@@ -31,6 +36,7 @@ This workflow inherits:
 - [deployments.create Workflow Spec](./deployments.create.md)
 - [Workload Framework Detection And Planning](./workload-framework-detection-and-planning.md)
 - [Repository Deployment Config File Bootstrap](./deployment-config-file-bootstrap.md)
+- [GitHub Action Deploy Wrapper Implementation Plan](../implementation/github-action-deploy-action-plan.md)
 - [Workflow Spec Format](./WORKFLOW_SPEC_FORMAT.md)
 - [Quick Deploy Test Matrix](../testing/quick-deploy-test-matrix.md)
 - [Deployment Config File Test Matrix](../testing/deployment-config-file-test-matrix.md)
@@ -53,19 +59,26 @@ It may collect or create enough context for a first deployment:
 
 When Quick Deploy collects source/runtime/health values, those values are entry-flow draft fields for `resources.create` or a future resource profile update command. They must not be submitted to `deployments.create`.
 
-When Quick Deploy uses a repository deployment config file, the file contributes source-adjacent
-profile defaults only. It must not select project, resource, server, destination, credential,
-organization, or secret identity from committed file content. Quick Deploy may auto-create project
-and resource on first run, but the seed for that identity must come from source/provider metadata,
-trusted Appaloft link/source state, explicit operator input, or the interactive prompt, not from a
-mutable `project` or resource selector in the repo file.
+When Quick Deploy uses a repository deployment config file, the file is a source-adjacent
+non-interactive expression of the Quick Deploy resource-profile draft. It contributes profile
+defaults only. It must not select project, resource, server, destination, credential, organization,
+or secret identity from committed file content. Quick Deploy may auto-create project and resource on
+first run, but the seed for that identity must come from source/provider metadata, trusted Appaloft
+link/source state, explicit operator input, trusted CI/action inputs, or the interactive prompt, not
+from a mutable `project` or resource selector in the repo file.
 
 Config file values follow the same resource-boundary rules as manually entered Quick Deploy drafts:
 runtime fields map to `ResourceRuntimeProfile`, listener and exposure fields map to
 `ResourceNetworkProfile`, health fields map to resource health/runtime profile, and final deployment
 admission remains ids-only.
 
-When Quick Deploy collects domain/TLS intent, it must sequence an explicit `domain-bindings.create` or certificate command after the required resource, server, and destination context exists. It must not submit domain/TLS intent to `deployments.create`.
+When Quick Deploy collects custom domain/TLS intent, the handling depends on the selected state
+backend. In pure CLI/SSH mode, provider-neutral `access.domains[]` intent from `appaloft.yml` is a
+server-applied proxy route request persisted in SSH-server Appaloft state and realized by the edge
+proxy provider. In hosted or self-hosted control-plane mode, the same user intent may become
+managed `domain-bindings.create` and certificate workflow steps after the required resource,
+server, and destination context exists. In every mode, Quick Deploy must not submit domain/TLS
+intent to `deployments.create`.
 
 When generated default access is enabled by platform policy, Quick Deploy may display the generated URL after the resource access summary projection is available. It must not collect concrete generated-domain provider fields from the user and must not send generated domain/proxy/TLS fields to `deployments.create`.
 
@@ -104,7 +117,9 @@ Quick Deploy must use the ADR-012 domain language while collecting draft values:
   and replica settings must not be collected as deployment command fields.
 - build/start/health values are runtime profile drafts;
 - listener port, upstream protocol, exposure mode, and compose target service are network profile drafts;
-- domain/path/TLS values belong to durable domain binding/certificate commands and must not become deployment-owned state.
+- domain/path/TLS values belong to server-applied route state in SSH CLI mode or durable
+  domain-binding/certificate commands in control-plane mode; they must not become
+  deployment-owned state.
 
 For Git sources, Quick Deploy may accept repository browser URLs as user input. A URL that points to
 a repository subpath, such as a GitHub `/tree/<ref>/<path>` URL, must be parsed as a convenience
@@ -178,14 +193,23 @@ The reusable program owns only the operation order and id-threading between step
 
 ```text
 workflow input
+  -> optionally read and normalize repository config profile into the same draft shape as interactive input
+  -> require state context from the entry executor; SSH executors must ensure/lock/migrate
+     SSH-server `ssh-pglite` state before identity resolution
   -> yield projects.create when project must be created
   -> yield servers.register when server must be created
   -> yield credentials.ssh.create and servers.configureCredential when credential setup is requested
   -> yield environments.create when environment must be created
   -> yield resources.create when resource must be created, including source/runtime/network profile drafts when they are part of first deploy
   -> yield environments.setVariable when first variable is supplied
+  -> optionally persist provider-neutral server-applied route desired state for `access.domains[]`
+     in SSH CLI mode
   -> yield deployments.create
-  -> return projectId, serverId, environmentId, resourceId, deploymentId
+  -> optionally realize and verify server-applied routes through the edge proxy provider in SSH CLI
+     mode
+  -> optionally yield domain-bindings.create and certificate commands only as explicit managed
+     follow-up steps in control-plane mode
+  -> return projectId, serverId, environmentId, resourceId, deploymentId, and any follow-up ids
 ```
 
 Each yielded step is an explicit operation step. The program must not call HTTP clients, CommandBus, QueryBus, repositories, prompts, or UI APIs directly.
@@ -194,11 +218,22 @@ Entry points supply executors:
 
 - Web executors call typed oRPC/HTTP client methods and refresh Web query state.
 - CLI executors dispatch command/query messages through the CLI runtime and CommandBus/QueryBus.
+- Headless GitHub Actions executors invoke the same binary/CLI workflow directly or through the
+  thin `appaloft/deploy-action` install wrapper. SSH-targeted deploys default to SSH-server PGlite
+  unless explicit local-only or control-plane state is selected, and CI secrets are resolved only
+  from trusted runner environment variables or explicit action inputs.
 - A future backend convenience executor may dispatch explicit commands through the accepted backend application boundary, but it must still preserve partial failure semantics and must not become a hidden domain command.
 
 The Web executor must use one request per yielded workflow step. It must show workflow step progress from those explicit requests: the running step is loading, succeeded steps are marked complete, and a failed step stops the workflow with the underlying command error. User-facing copy must describe the operation being performed, not the fact that the implementation uses separate requests.
 
-The final deployment step is still the `deployments.create` command. Web may use the deployment progress stream transport for that final step so the user can see detect, plan, package, deploy, verify, rollback, Appaloft log, and application output while the command runs. `deployments.createStream` must not be used to execute project, server, environment, resource, credential, or variable workflow steps, and it must not become a hidden Quick Deploy workflow command.
+The final deployment step is still the `deployments.create` command. Optional server-applied route
+realization or managed domain/TLS follow-up steps may run only after deployment context exists and
+must not change deployment admission semantics. Web may use the deployment progress stream
+transport for that final deployment step so the user can see detect, plan, package, deploy, verify,
+rollback, Appaloft log, and application output while the command runs. `deployments.createStream`
+must not be used to execute project, server, environment, resource, credential, variable,
+server-applied route, or managed domain/TLS follow-up workflow steps, and it must not become a
+hidden Quick Deploy workflow command.
 
 The Web QuickDeploy wizard must collect project context immediately after source selection. When no project exists, the project step may stay on the new-project path and use the default first-project name if the user does not override it. When projects exist, the project step must default to selecting an existing project and still allow the user to switch to creating a new project.
 
@@ -318,7 +353,8 @@ asserting UI copy or prompt text as domain behavior.
 | Step | Owner | Command/query | Required behavior |
 | --- | --- | --- | --- |
 | Source selection | Web/CLI workflow | Source/provider queries as needed | Produce a `ResourceSourceBinding` draft and optional provider metadata. |
-| Repository config discovery | Web/CLI/local workflow | Config file reader/parser | Optionally read a source-adjacent Appaloft config profile, reject identity/secret/unsupported fields, and merge profile defaults before resource command dispatch. |
+| Repository config discovery | Web/CLI/local/headless workflow | Config file reader/parser | Optionally read a source-adjacent Appaloft config profile as a non-interactive Quick Deploy draft expression, reject identity/secret/unsupported fields, and merge profile defaults before resource command dispatch. |
+| State backend context | CLI/local/headless workflow | Persistence/state adapter | For SSH-targeted CLI/Action deploys without a control plane, ensure/lock/migrate SSH-server `ssh-pglite` before project/resource/server identity resolution. |
 | Source variant normalization | Web/CLI workflow | Local draft parser; provider branch/tag lookup when available | Convert deep Git URLs, local folder base directories, Docker image tags/digests, and build-file paths into resource source/runtime profile fields. |
 | Framework/runtime detection | Web/CLI workflow and deployment planner | Source inspection adapter; planner registry | Detect package/project name, runtime family, framework, package manager/build tool, scripts, version files, build outputs, and framework config. Use those facts to suggest resource profile defaults and later select a Docker/OCI workload planner. Do not send framework, package name, or base image as `deployments.create` input. |
 | Static runtime draft | Web/CLI workflow | Local draft validation; optional source/runtime detection | For static site drafts, require `runtimeProfile.strategy = "static"` and `runtimeProfile.publishDirectory`, preserve optional install/build commands, and default the HTTP network profile to port 80. |
@@ -331,8 +367,9 @@ asserting UI copy or prompt text as domain behavior.
 | Environment context | Web/CLI workflow | `environments.list`; optional `environments.create` | Select or create the environment before deployment admission. |
 | Resource context | Web/CLI workflow | `resources.list`; `resources.create` | Prefer existing `resourceId`; use explicit `resources.create` with source/runtime/network profile when creating a new first-deploy resource. |
 | First variable | Web/CLI workflow | `environments.set-variable` | Persist environment-scoped variable before deployment snapshot if the user supplies it. |
-| Domain/TLS context | Web/CLI workflow | `domain-bindings.create`; certificate commands when in scope | Bind domains through explicit routing/domain/TLS commands, not through deployment admission. |
 | Deployment admission | Application command | `deployments.create` | Dispatch ids-only deployment admission and accept or reject the deployment request according to the command spec. |
+| Server-applied config domains | CLI/local/headless SSH workflow | Edge proxy provider route realization over remote `ssh-pglite` state | Normalize `access.domains[]` into server-applied proxy route desired state, apply it through the selected target's provider, and keep it out of `deployments.create` and managed `DomainBinding` state. |
+| Managed domain/TLS follow-up | Web/CLI/local/headless control-plane workflow | `domain-bindings.create`; certificate commands when in scope | Bind domains through explicit routing/domain/TLS commands after deployment context exists, not through deployment admission. |
 | Generated access observation | Web/CLI workflow | `ResourceAccessSummary` after route snapshot resolution | Display generated access URL and proxy route status when policy/provider resolved one. |
 | Progress observation | Web/CLI workflow | deployment progress stream during the final deployment command; deployment read/progress queries after acceptance | Observe durable state or technical progress without treating progress events as Quick Deploy workflow steps. |
 | Diagnostic summary observation | Web/CLI workflow | `resources.diagnostic-summary` after resource/deployment ids are known | Provide a copyable support/debug payload with stable ids and access/proxy/log section statuses. |
@@ -389,10 +426,14 @@ completed | deployment_failed
 
 Durable state belongs to the underlying aggregates and read models:
 
+- for pure CLI/SSH entrypoints, the default source of truth for those aggregates/read models is the
+  selected SSH server's `ssh-pglite` Appaloft state backend, not the CI runner filesystem;
 - project, server, credential, environment, resource, and environment-variable state after their
   explicit commands succeed;
 - deployment state after `deployments.create` accepts the request and runtime execution progresses;
 - resource access summary state after route snapshots/read-model projections update;
+- server-applied proxy route desired/applied state after config `access.domains[]` is reconciled in
+  SSH CLI mode;
 - diagnostic summary state as a query result, not as a workflow aggregate.
 
 There is no `QuickDeploy` aggregate in v1.
@@ -408,7 +449,8 @@ There is no `QuickDeploy` aggregate in v1.
 | `deployments.create` | Final deployment request accepted. | Deployment attempt exists and progresses according to deployment lifecycle specs. |
 | Deployment progress/read-model updates | Runtime execution is observable. | Entry can show progress, terminal succeeded/failed state, and route/access projections. |
 | `resources.diagnostic-summary` | Support/debug payload queried after ids are known. | Entry can expose copyable stable ids and safe section statuses. |
-| Domain/TLS follow-up command | Custom domain lifecycle starts outside Quick Deploy. | State is governed by the routing/domain/TLS workflow, not by deployment admission. |
+| Server-applied config domain realization | Pure CLI/SSH custom domain route is applied on the selected target. | State is target-local proxy route desired/applied state in remote `ssh-pglite`, not deployment admission and not managed `DomainBinding` lifecycle. |
+| Managed domain/TLS follow-up command | Control-plane custom domain lifecycle starts outside Quick Deploy. | State is governed by the routing/domain/TLS workflow, not by deployment admission. |
 
 ## Failure Visibility
 
@@ -432,6 +474,7 @@ Quick Deploy must surface the failure at the boundary where it happened:
 | CLI `appaloft deploy` with source/options | May create/select a resource with source/runtime/network profile, then dispatch ids-only `deployments.create`. |
 | CLI `appaloft deploy` without source in TTY | May prompt for missing source/context, call prerequisite commands, and dispatch `deployments.create`. |
 | CLI `appaloft deploy` without source outside TTY | May dispatch ids-only `deployments.create` when project/server/environment/resource ids are supplied; otherwise must reject before dispatch because non-interactive input collection cannot complete. |
+| CLI/GitHub Actions with repository config and SSH target | Must resolve SSH-server `ssh-pglite` state by default, use config profile fields as non-interactive Quick Deploy draft input, resolve `ci-env:` from trusted runner environment variables, persist/reuse identity in remote state, and apply `access.domains[]` as server-applied proxy routes when declared. |
 | HTTP API | Does not expose hidden prompts; clients call explicit operations or submit a complete `deployments.create` input. |
 | Automation/MCP | Must call explicit operations in sequence or use a future durable workflow command if one is accepted by ADR. |
 
@@ -537,9 +580,26 @@ typed on the source binding.
 
 Repository config file support now has a profile-only JSON/YAML parser, profile-only CLI `init`,
 CLI `--config`, implicit source-root discovery, identity/secret/unsupported-field rejection, and
-targeted executable tests. Profile-drift handling, secret lookup/application, durable source
-link/relink state, environment overlays, and config-origin diagnostics remain follow-up work
-governed by [Deployment Config File Test Matrix](../testing/deployment-config-file-test-matrix.md).
+targeted executable tests. It is the current headless/non-interactive Quick Deploy profile path for
+GitHub Actions style binary deployments. After ADR-024, current headless local PGlite behavior is a
+migration gap: SSH-targeted CLI/Action deploys must default to SSH-server `ssh-pglite` state,
+perform remote state ensure/lock/migrate/recovery before command dispatch, and resolve durable
+source fingerprint link state. Normal deploys may create the first source link or reuse an existing
+link, but must not retarget it; retargeting belongs to the active CLI command
+`source-links.relink`. SSH CLI config deploy can persist `access.domains[]` as server-applied route
+desired state before ids-only deployment admission, deployment planning consumes that state, and
+deployment-finished handling records applied/failed route status for route outcomes. Resource
+access, health, and diagnostic summaries expose the latest server-applied route URL/status.
+The opt-in SSH e2e harness covers server-applied route realization through a Traefik-backed target.
+Provider-local TLS diagnostics for `tlsMode = auto` routes are visible through proxy configuration
+and resource diagnostics.
+The public `appaloft/deploy-action` wrapper is not implemented yet; current tests cover the
+underlying binary process boundary but not release download, checksum verification, action inputs,
+or SSH secret temp-key handling.
+Profile-drift handling, stored/external secret lookup/application beyond `ci-env:`, environment
+overlays, managed control-plane domain mapping, and config-origin diagnostics remain follow-up work
+governed by [Deployment Config File Test Matrix](../testing/deployment-config-file-test-matrix.md)
+and [Source Link State Test Matrix](../testing/source-link-state-test-matrix.md).
 
 Provider-backed disambiguation for slash-containing Git refs and user-facing typed fields for
 Dockerfile path, Docker Compose path, and build target remain follow-up work. Static publish

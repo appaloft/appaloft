@@ -258,6 +258,31 @@ Core next operations expected here:
 - declare compose-stack services from compose metadata
 - archive resource
 
+## Source Links
+
+Business meaning:
+- source link state maps a stable, secret-free source fingerprint to the Appaloft
+  project/environment/resource context used by repeated CLI and GitHub Actions deploys
+- pure CLI/SSH mode persists this state outside the repository config in the selected state
+  backend, normally the SSH server's Appaloft PGlite state
+- relink is the explicit operator escape hatch for retargeting a source fingerprint; regular
+  deploys may create or reuse a link, but must not move it implicitly
+
+Implemented operations:
+
+| Capability | Kind | Operation Key | Message | Schema | CLI | oRPC / HTTP |
+| --- | --- | --- | --- | --- | --- | --- |
+| Relink source fingerprint | Command | `source-links.relink` | `RelinkSourceLinkCommand` | `RelinkSourceLinkCommandInput` | `appaloft source-links relink <sourceFingerprint>` | Not exposed |
+
+Current boundary:
+- `source-links.relink` updates source link mapping only. It does not mutate resource profiles,
+  environment variables, credentials, deployment history, domain bindings, or server-applied route
+  state.
+- CLI SSH mode uses the same remote PGlite state lock/download/upload path as config deploy when
+  the relink command is invoked with trusted SSH target options such as `--server-host`.
+- Hosted/self-hosted control-plane storage for source links is future work. PostgreSQL-backed
+  relink must use a dedicated persistence adapter before an API/oRPC or Web surface is exposed.
+
 ## Deployments
 
 Business meaning:
@@ -311,19 +336,43 @@ Current boundary:
 - repository deployment config files are workflow/bootstrap inputs for applying source-adjacent
   resource profile choices before deployment admission; they are not `deployments.create` input
   fields
+- repository config bootstrap is the non-interactive/headless expression of Quick Deploy draft
+  normalization. Web QuickDeploy, CLI interactive deploy, GitHub Actions binary invocation, future
+  local agents, and MCP tools must converge on the same explicit project/server/environment/resource
+  operation sequence before ids-only deployment admission.
 - committed repository config files must not select Appaloft project, resource, server,
   destination, credential, organization, or secret identity. First-run project/resource creation
   must use explicit entrypoint choices, trusted link/source state, or source-derived defaults
   outside the committed file. See
   [Repository Deployment Config File Bootstrap](./workflows/deployment-config-file-bootstrap.md).
 - repository config files may declare source/runtime/network/health profile fields, non-secret
-  environment values, and required secret references only through the owners named in the config
-  workflow. Raw SSH keys, deploy keys, tokens, secret env values, and concrete target/server
-  credentials are rejected before write commands run.
-- GitHub Actions and other headless binary entrypoints default to embedded PGlite and do not need
-  `DATABASE_URL` unless the caller explicitly selects PostgreSQL or a remote Appaloft control
-  plane. CI secrets must be mapped by the CI workflow into runner environment variables and
-  referenced from config as resolver references such as `ci-env:NAME`, never committed as values.
+  environment values, required secret references, and provider-neutral `access.domains[]` intent
+  only through the owners named in the config workflow. Raw SSH keys, deploy keys, tokens, secret
+  env values, certificate material, provider account ids, and concrete target/server credentials
+  are rejected before write commands run.
+- config `access.domains[]` intent is not a deployment command field. In pure CLI/SSH mode, it
+  becomes server-applied proxy route desired/applied state persisted in the selected SSH target's
+  Appaloft state backend. In hosted or self-hosted control-plane mode, the same intent may map to
+  explicit managed `domain-bindings.create` and certificate workflow steps after trusted
+  resource/server/destination context exists.
+- GitHub Actions and other headless binary entrypoints that deploy to an SSH server default to
+  SSH-server PGlite state and do not need `DATABASE_URL`. `DATABASE_URL` is required only when the
+  caller explicitly selects PostgreSQL or a remote Appaloft control plane. Runner-local PGlite is
+  explicit local-only/smoke-test state, not the default for SSH-targeted deploys. CI secrets must be
+  mapped by the CI workflow into runner environment variables and referenced from config as
+  resolver references such as `ci-env:NAME`, never committed as values.
+- The public GitHub Actions install UX is a thin `appaloft/deploy-action` wrapper around the
+  released Appaloft CLI binary. It downloads and verifies release assets, maps trusted action inputs
+  to CLI flags, writes SSH private key input to a temporary key file, and invokes the same
+  repository config deploy workflow. It is not a new operation, not a hidden Quick Deploy API, and
+  not a hosted control plane.
+- `APPALOFT_PROJECT_ID`, `APPALOFT_RESOURCE_ID`, `APPALOFT_SERVER_ID`, and similar ids are optional
+  trusted selection overrides for CLI/Action mode. They are required only when the operator wants to
+  select existing control-plane identity explicitly; pure SSH CLI mode may reuse or create identity
+  from source fingerprints stored in SSH-server Appaloft state.
+- source fingerprint link state is required for production pure CLI repeatability. Regular deploy
+  may create the first link or reuse an existing link, but it must not retarget an existing link.
+  Retargeting requires the active CLI command `source-links.relink`.
 - CPU, memory, replicas, restart policy, rollout overlap/drain, and similar runtime-target sizing
   fields must not be silently accepted from repository config files until their resource/runtime
   target ADRs, command specs, runtime enforcement, and tests exist.
@@ -417,6 +466,11 @@ Current boundary:
   no-proxy targets are rejected by durable domain binding admission
 - generated default access routes are not durable domain bindings and are governed by
   [ADR-017](./decisions/ADR-017-default-access-domain-and-proxy-routing.md)
+- server-applied config domains in pure CLI/SSH mode are not durable managed `DomainBinding`
+  records. They are target-local proxy route desired/applied state governed by
+  [ADR-024](./decisions/ADR-024-pure-cli-ssh-state-and-server-applied-domains.md), and may later be
+  imported or mapped into managed domain binding lifecycle when a hosted/self-hosted control plane
+  is selected.
 - generated default access policy editing must become the public command
   `default-access-domain-policies.configure` before Web/CLI/API expose it
 - `domain-bindings.list` exposes the read model used by CLI, API, and Web to observe accepted

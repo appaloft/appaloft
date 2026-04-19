@@ -23,6 +23,7 @@ This workflow inherits:
 
 - [ADR-017: Default Access Domain And Proxy Routing](../decisions/ADR-017-default-access-domain-and-proxy-routing.md)
 - [ADR-019: Edge Proxy Provider And Observable Configuration](../decisions/ADR-019-edge-proxy-provider-and-observable-configuration.md)
+- [ADR-024: Pure CLI SSH State And Server-Applied Domains](../decisions/ADR-024-pure-cli-ssh-state-and-server-applied-domains.md)
 - [default-access-domain-policies.configure Command Spec](../commands/default-access-domain-policies.configure.md)
 - [ADR-014: Deployment Admission Uses Resource Profile](../decisions/ADR-014-deployment-admission-uses-resource-profile.md)
 - [ADR-015: Resource Network Profile](../decisions/ADR-015-resource-network-profile.md)
@@ -43,6 +44,7 @@ It consumes existing state:
 - deployment target/server public address and edge proxy readiness;
 - default access domain policy;
 - durable domain bindings when present;
+- server-applied config domain route state in pure CLI/SSH mode when present;
 - deployment attempt id and runtime plan snapshot context.
 
 It produces deployment/resource access snapshots and edge-proxy provider route realization input. It does not create projects, environments, resources, servers, domain bindings, or certificates.
@@ -131,10 +133,12 @@ Route resolution must apply this precedence:
 
 1. Durable ready domain binding for the resource/destination/target/path.
 2. Durable accepted-but-not-ready domain binding only when the workflow explicitly allows pending-route realization.
-3. Generated default access route when policy is enabled and no durable binding should take precedence.
-4. No public route when policy is disabled or route resolution fails with a non-retriable policy result.
+3. Server-applied config domain route for pure CLI/SSH mode when present and valid for the selected target.
+4. Generated default access route when policy is enabled and no durable binding or server-applied custom route should take precedence.
+5. No public route when policy is disabled or route resolution fails with a non-retriable policy result.
 
-Generated routes must not overwrite or remove durable domain bindings.
+Generated routes must not overwrite or remove durable domain bindings or server-applied custom
+routes.
 
 ## Resource Network Requirements
 
@@ -283,6 +287,8 @@ Route inputs still use adapter/deployment-config shaped fields internally after 
 Generated default access route status is separated into a resource-scoped `ResourceAccessSummary` projection. The projection now has a planned pre-deployment route and a latest realized post-deployment route. It is visible through the resource read model/API, resource detail Web page, and Quick Deploy completion feedback when the projection is available.
 
 Durable domain binding precedence is not yet merged into the default access route resolver.
+
+Server-applied config domain precedence from ADR-024 is not yet merged into the route resolver.
 
 The future public `default-access-domain-policies.configure` command is not yet implemented; shell/static configuration selects the current provider.
 

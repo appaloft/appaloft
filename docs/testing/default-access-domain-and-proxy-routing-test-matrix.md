@@ -2,7 +2,12 @@
 
 ## Normative Contract
 
-Tests for generated default access and proxy routing must prove that default public URLs are resolved from resource/server/policy state and realized by runtime adapters without adding domain/proxy/TLS fields back to `deployments.create`.
+Tests for generated default access and proxy routing must prove that default public URLs are
+resolved from resource/server/policy state and realized by runtime adapters without adding
+domain/proxy/TLS fields back to `deployments.create`.
+
+Generated default access must also yield to explicit custom routes, including managed durable
+domain bindings and pure CLI/SSH server-applied config domain routes.
 
 ## Global References
 
@@ -10,6 +15,7 @@ This test matrix inherits:
 
 - [ADR-017: Default Access Domain And Proxy Routing](../decisions/ADR-017-default-access-domain-and-proxy-routing.md)
 - [ADR-019: Edge Proxy Provider And Observable Configuration](../decisions/ADR-019-edge-proxy-provider-and-observable-configuration.md)
+- [ADR-024: Pure CLI SSH State And Server-Applied Domains](../decisions/ADR-024-pure-cli-ssh-state-and-server-applied-domains.md)
 - [Default Access Domain And Proxy Routing Workflow Spec](../workflows/default-access-domain-and-proxy-routing.md)
 - [Edge Proxy Provider And Route Realization Workflow Spec](../workflows/edge-proxy-provider-and-route-realization.md)
 - [resources.proxy-configuration.preview Query Spec](../queries/resources.proxy-configuration.preview.md)
@@ -30,7 +36,7 @@ This test matrix inherits:
 | Provider adapter contract | Concrete provider implementation generates a valid hostname from provider-neutral input and never leaks provider-specific types into core/application. |
 | Policy command | Future `default-access-domain-policies.configure` validates scope/mode/provider and persists provider-neutral policy state without route side effects. |
 | Application port boundary | Application uses a generic provider port and handles `Result` errors by code/phase. |
-| Route resolver | Durable domain bindings take precedence over generated routes; disabled policy yields no route. |
+| Route resolver | Durable domain bindings and server-applied config routes take precedence over generated routes; disabled policy yields no route. |
 | Deployment admission/planning | `deployments.create` remains ids-only and resolves route snapshots from state. |
 | Runtime adapter | Executes provider-produced proxy plans that target `networkProfile.internalPort` and do not require public host-port exposure. |
 | Edge proxy provider | Provider contract renders proxy ensure plan, route realization plan, and read-only configuration view. |
@@ -46,6 +52,7 @@ Given:
 - Edge proxy status:
 - Default access domain policy:
 - Durable domain bindings:
+- Server-applied config domain routes:
 - Provider adapter behavior:
 - Runtime adapter behavior:
 
@@ -78,6 +85,7 @@ Then:
 | DEF-ACCESS-ROUTE-010 | integration | Resource has no internal port | Inbound app lacks `networkProfile.internalPort` | Command rejects | `validation_error`, phase `resource-network-resolution` | No generated route | No deployment | No |
 | DEF-ACCESS-ROUTE-011 | integration | Direct-port exposure | Resource has `exposureMode = direct-port` and `hostPort` | Generated route resolver skipped | None | No generated reverse-proxy route | Direct-port behavior belongs to separate path | No |
 | DEF-ACCESS-ROUTE-012 | integration | Worker/internal resource | Resource has `exposureMode = none` | Deployment accepted | None | No public route | No proxy route | No |
+| DEF-ACCESS-ROUTE-013 | integration | Server-applied config domain exists | SSH CLI mode has valid server-applied config domain route for same resource/path | Deployment accepted | None | Server-applied custom route takes precedence over generated default route | Proxy config uses config hostname/path and does not create a managed `DomainBinding` | Per route realization |
 
 ## Pre-Deployment Read Model Matrix
 
@@ -151,9 +159,14 @@ Runtime adapter helper coverage now covers reverse-proxy deployments not creatin
 host-port routes, reverse-proxy resources sharing the same `internalPort`, resource-scoped runtime
 cleanup command construction, and direct-port exposure still creating direct routes.
 
-`ResourceAccessSummary` projection has focused coverage for selecting the latest generated route from deployment snapshots, and `resources.list` has focused coverage for exposing a planned generated route before the first deployment.
+`ResourceAccessSummary` projection has focused coverage for selecting the latest generated route
+from deployment snapshots, exposing server-applied config domains separately from generated and
+durable managed routes, and `resources.list` has focused coverage for exposing a planned generated
+route before the first deployment.
 
-Remaining gaps: policy-disabled behavior, provider injection through shell composition, durable-domain precedence over generated routes, persistence-backed planned-route projection, a real Docker/SSH same-`internalPort` e2e assertion, and an end-to-end Web/CLI assertion.
+Remaining gaps: policy-disabled behavior, provider injection through shell composition,
+durable-domain precedence over generated routes, persistence-backed planned-route projection, a real
+Docker/SSH same-`internalPort` e2e assertion, and an end-to-end Web/CLI assertion.
 
 Web typecheck covers the resource detail and Quick Deploy generated URL surfaces, but there is not yet a browser/e2e assertion for those screens.
 
