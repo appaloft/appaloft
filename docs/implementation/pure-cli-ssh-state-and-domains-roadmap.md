@@ -67,13 +67,18 @@ selection overrides, not required setup.
 
 4. Config domain schema
    - Add `access.domains[]` with `host`, optional `pathPrefix`, and `tlsMode`.
+   - Add canonical redirect aliases with `redirectTo` and optional `redirectStatus`, requiring the
+     target host to be a served entry in the same route set.
    - Reject schemes, ports, raw cert/key material, DNS provider credentials, provider account ids,
-     server/destination ids, and credential selectors.
+     server/destination ids, credential selectors, self-redirects, redirect loops,
+     redirect-to-redirect chains, and missing redirect targets.
    - Require reverse-proxy-compatible resource network state.
 
 5. Server-applied route realization
    - Persist desired route state in remote PGlite.
    - Ask the edge proxy provider to render/apply route and TLS configuration.
+   - Ask the edge proxy provider to render redirect-only configuration for alias hosts without
+     attaching those hosts to workload upstreams.
    - Record applied, stale, failed, and verification status in remote state/read models.
    - Delegate renewal to the resident proxy/provider where supported.
 
@@ -108,6 +113,7 @@ selection overrides, not required setup.
 | Source fingerprint link state | Yes | Yes | Useful | Required for repeat deployments without committed ids. |
 | Explicit relink command/workflow | Yes | Yes | Useful | Required operator escape hatch for mistaken or intentional retargeting. |
 | `access.domains[]` parser | No for first remote-state slice; yes for CLI product value | Yes | Useful | Domain support can follow remote state foundation but is part of the CLI product thesis. |
+| Canonical redirect route intent | No for first remote-state slice; yes for CLI product value | Yes for www/apex parity | Useful | Needed for common www/non-www canonical host behavior. Requires parser, remote state shape, provider rendering, proxy config/read-model visibility, and e2e redirect assertion. |
 | Server-applied route desired/applied state | No for first remote-state slice; yes for domain support | Yes | No | Desired state persistence, deployment-time desired state consumption, and applied/failed status persistence exist for SSH CLI mode. |
 | Edge proxy route realization for config domains | No for first remote-state slice; yes for domain support | Yes | No | Desired routes now enter provider-neutral route input, deployment-finished status writeback, mixed path/TLS route groups, and provider-local TLS diagnostics. |
 | GitHub Action wrapper docs | Yes before public release | Yes before public release | No | Binary can be used manually first, but public UX needs `appaloft/deploy-action`, version selection, checksum verification, SSH secret mapping, and examples. |
@@ -139,11 +145,17 @@ selection overrides, not required setup.
 - The public CLI `source-links.relink` command now dispatches the application command, validates
   target context against Appaloft state, and uses the same SSH remote-state mirror/lock path when a
   trusted SSH target is supplied.
-- Current parser accepts provider-neutral `access.domains[]` with `host`, `pathPrefix`, and
-  `tlsMode`, and rejects domain identity selectors, raw TLS/secret material, and unsafe host/path
-  shapes. SSH CLI config deploy persists server-applied route desired state before ids-only
-  deployment admission when route-state storage is wired, and fails at `config-domain-resolution`
-  when the selected runtime/backend cannot persist or map the route intent.
+- Current parser accepts provider-neutral `access.domains[]` with `host`, `pathPrefix`, `tlsMode`,
+  optional `redirectTo`, and optional `redirectStatus`, and rejects domain identity selectors, raw
+  TLS/secret material, unsafe host/path shapes, invalid redirect targets, self-redirects,
+  redirect-to-redirect chains, and redirect loops. SSH CLI config deploy persists server-applied
+  route desired state before ids-only deployment admission when route-state storage is wired, and
+  fails at `config-domain-resolution` when the selected runtime/backend cannot persist or map the
+  route intent.
+- Canonical redirect aliases now flow through parser validation, remote-state persistence,
+  deployment route grouping, runtime/provider route inputs, Traefik/Caddy provider rendering, and
+  proxy configuration visibility. Remaining follow-up is an opt-in SSH e2e assertion for
+  `www -> apex` or `apex -> www`, plus public HTTPS validation of resident-provider TLS behavior.
 - An opt-in external SSH e2e harness now covers two isolated GitHub Actions style CLI processes
   using different runner-local PGlite directories against the same SSH-server `ssh-pglite` state.
   `.github/workflows/ssh-remote-state-e2e.yml` runs it manually, from nightly smoke, and before
@@ -175,11 +187,12 @@ selection overrides, not required setup.
 The next Test-First Round should start from:
 
 - `CONFIG-FILE-STATE-001` through `CONFIG-FILE-STATE-013`
-- `CONFIG-FILE-DOMAIN-001` through `CONFIG-FILE-DOMAIN-006`
+- `CONFIG-FILE-DOMAIN-001` through `CONFIG-FILE-DOMAIN-009`
 - `SOURCE-LINK-STATE-001` through `SOURCE-LINK-STATE-014`
 - `CONFIG-FILE-ENTRY-008`
-- `QUICK-DEPLOY-WF-052` through `QUICK-DEPLOY-WF-054`
-- `ROUTE-TLS-BOUNDARY-005`
-- `EDGE-PROXY-ROUTE-005` through `EDGE-PROXY-ROUTE-007`
+- `QUICK-DEPLOY-WF-052` through `QUICK-DEPLOY-WF-055`
+- `ROUTE-TLS-BOUNDARY-005` through `ROUTE-TLS-BOUNDARY-006`
+- `EDGE-PROXY-ROUTE-005` through `EDGE-PROXY-ROUTE-008`
+- `EDGE-PROXY-QRY-007`
 - `CONFIG-FILE-ENTRY-009` through `CONFIG-FILE-ENTRY-013`
 - `QUICK-DEPLOY-ENTRY-011`

@@ -165,4 +165,90 @@ describe("CaddyEdgeProxyProvider", () => {
       }),
     ]);
   });
+
+  test("[EDGE-PROXY-ROUTE-008] renders canonical redirect aliases without proxying alias hosts", async () => {
+    const provider = new CaddyEdgeProxyProvider();
+    const accessRoutes = [
+      {
+        proxyKind: "caddy" as const,
+        domains: ["example.test"],
+        pathPrefix: "/",
+        tlsMode: "auto" as const,
+        targetPort: 3000,
+      },
+      {
+        proxyKind: "caddy" as const,
+        domains: ["www.example.test"],
+        pathPrefix: "/",
+        tlsMode: "auto" as const,
+        redirectTo: "example.test",
+        redirectStatus: 308 as const,
+      },
+    ];
+
+    const realized = await provider.realizeRoutes(
+      { correlationId: "req_caddy_canonical_redirect_test" },
+      {
+        deploymentId: "dep_canonical",
+        port: 3000,
+        accessRoutes,
+      },
+    );
+
+    expect(realized.isOk()).toBe(true);
+    const labels = realized._unsafeUnwrap().labels.join("\n");
+    expect(labels).toContain("www.example.test");
+    expect(labels).toContain("example.test");
+    expect(labels).toContain("redir");
+    expect(labels).toContain("308");
+    expect(labels).not.toContain("caddy_1.reverse_proxy");
+  });
+
+  test("[EDGE-PROXY-QRY-007] exposes canonical redirect route views", async () => {
+    const provider = new CaddyEdgeProxyProvider();
+    const accessRoutes = [
+      {
+        proxyKind: "caddy" as const,
+        domains: ["example.test"],
+        pathPrefix: "/",
+        tlsMode: "auto" as const,
+        targetPort: 3000,
+      },
+      {
+        proxyKind: "caddy" as const,
+        domains: ["www.example.test"],
+        pathPrefix: "/",
+        tlsMode: "auto" as const,
+        redirectTo: "example.test",
+        redirectStatus: 308 as const,
+      },
+    ];
+
+    const view = await provider.renderConfigurationView(
+      { correlationId: "req_caddy_canonical_redirect_view_test" },
+      {
+        resourceId: "res_canonical",
+        deploymentId: "dep_canonical",
+        routeScope: "deployment-snapshot",
+        status: "applied",
+        generatedAt: "2026-01-01T00:00:00.000Z",
+        stale: false,
+        accessRoutes,
+        port: 3000,
+        includeDiagnostics: true,
+      },
+    );
+
+    expect(view.isOk()).toBe(true);
+    expect(view._unsafeUnwrap().routes).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          hostname: "www.example.test",
+          routeBehavior: "redirect",
+          redirectTo: "example.test",
+          redirectStatus: 308,
+        }),
+      ]),
+    );
+  });
 });

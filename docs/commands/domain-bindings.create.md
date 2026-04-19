@@ -4,7 +4,10 @@
 
 `domain-bindings.create` is the source-of-truth command for creating a durable domain binding.
 
-A domain binding is a long-lived routing business object. It binds a public domain name and optional path prefix to a project/environment/resource placement policy. It is not the same thing as a deployment route snapshot or generated default access route.
+A domain binding is a long-lived routing business object. It binds a public domain name and
+optional path prefix to a project/environment/resource placement policy. It may serve traffic
+directly or redirect to an existing served binding in the same owner/path scope. It is not the same
+thing as a deployment route snapshot or generated default access route.
 
 Command success means the domain binding request has been accepted and a binding id is available. It does not mean DNS ownership is verified, certificate issuance has completed, or the domain is ready for traffic.
 
@@ -58,6 +61,13 @@ The standalone domain bindings page may remain as a cross-resource management an
 
 CLI and API remain strict operation entrypoints. CLI may collect missing values interactively in the future; API must require explicit input and must not prompt.
 
+Web create surfaces must expose route behavior as an explicit select: serve traffic or redirect to
+canonical. CLI must expose the same managed redirect behavior through `--redirect-to` and
+`--redirect-status`. Repository config files expose the pure CLI/SSH server-applied equivalent with
+`access.domains[].redirectTo` and `access.domains[].redirectStatus`; that config route state remains
+separate from managed `DomainBinding` lifecycle unless a control plane explicitly dispatches this
+command.
+
 ## Input Model
 
 | Field | Requirement | Meaning |
@@ -71,6 +81,8 @@ CLI and API remain strict operation entrypoints. CLI may collect missing values 
 | `pathPrefix` | Optional | Route path prefix. Defaults to `/`. |
 | `edgeProxyProviderKey` | Optional | Opaque provider key. When omitted, the binding uses the target/server's resolved edge proxy provider. |
 | `tlsMode` | Optional | `auto` or `disabled`. Defaults to `auto`. |
+| `redirectTo` | Optional | Existing served domain binding target for a managed canonical redirect. Must be a hostname in the same project/environment/resource/path owner scope. |
+| `redirectStatus` | Optional | One of `301`, `302`, `307`, or `308`. Defaults to `308` when `redirectTo` is supplied. |
 | `certificatePolicy` | Optional | `auto`, `manual`, or `disabled`. Defaults from `tlsMode`. |
 | `idempotencyKey` | Optional but recommended | Caller-supplied dedupe key for repeated create attempts. |
 
@@ -84,12 +96,13 @@ The command must:
 4. Resolve project, environment, resource, server, and destination.
 5. Reject cross-project/environment/destination mismatches.
 6. Reject duplicate active bindings for the same normalized `domainName`, `pathPrefix`, and environment/resource scope.
-7. Reject durable bindings when the target resolves to no edge proxy provider or to a provider that does not support durable domain routes.
-8. Persist a durable binding in `requested` or `pending_verification`.
-9. Allocate and persist the first domain verification attempt id according to ADR-006.
-10. Persist initial DNS observation state such as `pending` with the expected Appaloft edge target.
-11. Publish or record `domain-binding-requested` with the verification attempt id.
-12. Return `ok({ id })`.
+7. When `redirectTo` is supplied, reject missing redirect targets, self redirects, and redirect chains; the target must be an existing served binding in the same project/environment/resource/path owner scope.
+8. Reject durable bindings when the target resolves to no edge proxy provider or to a provider that does not support durable domain routes.
+9. Persist a durable binding in `requested` or `pending_verification`.
+10. Allocate and persist the first domain verification attempt id according to ADR-006.
+11. Persist initial DNS observation state such as `pending` with the expected Appaloft edge target.
+12. Publish or record `domain-binding-requested` with the verification attempt id and redirect metadata when present.
+13. Return `ok({ id })`.
 
 ## Async Progression
 
@@ -154,6 +167,10 @@ It must not:
 
 `domain-bindings.create` creates durable domain ownership and readiness state. Future deployment admission may reuse a ready domain binding, but deployment creation must not implicitly create one.
 
+When a durable binding has `redirectTo`, future deployment planning may realize it as a redirect
+route alongside served bindings. The redirect source binding still follows normal ownership,
+DNS-observation, certificate, and readiness rules for its own hostname.
+
 Generated default access routes are governed by [ADR-017](../decisions/ADR-017-default-access-domain-and-proxy-routing.md). They may provide a convenience public URL without creating a `DomainBinding`.
 
 Manual ownership confirmation after creation is governed by
@@ -170,7 +187,12 @@ Current runtime adapters generate concrete proxy Docker labels and can ensure an
 
 Current persistence snapshots deployment access routes on deployment runtime plan/read model data; those snapshots remain separate from durable domain bindings.
 
-Current code now includes a first-class `DomainBinding` aggregate, repository port, PostgreSQL/PGlite persistence, `domain-bindings.create` command schema/message/handler/use case, operation catalog entry, oRPC/OpenAPI create route, CLI create command, `domain-bindings.list` read/query surface, a standalone Web console create/list entrypoint, and a resource-scoped Web detail-page entrypoint.
+Current code now includes a first-class `DomainBinding` aggregate, repository port,
+PostgreSQL/PGlite persistence, `domain-bindings.create` command schema/message/handler/use case,
+operation catalog entry, oRPC/OpenAPI create route, CLI create command, `domain-bindings.list`
+read/query surface, a standalone Web console create/list entrypoint, and a resource-scoped Web
+detail-page entrypoint. The CLI and Web surfaces accept managed canonical redirect input through
+the same command schema.
 
 Current `domain-bindings.create` persists the binding in `pending_verification`, allocates the first manual verification attempt, publishes `domain-binding-requested`, returns `ok({ id })`, rejects `proxyKind = none`, detects active owner-scope duplicates, and supports idempotency key reuse. The `proxyKind` field is now provider-selection migration data; the target command resolves edge proxy provider eligibility through server/target state and optional `edgeProxyProviderKey`.
 

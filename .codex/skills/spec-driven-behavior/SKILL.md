@@ -86,6 +86,24 @@ Minimum round todo contents:
   alignment, entrypoint bus/schema alignment, migration gaps, Open Questions/ADR decision,
   ready/not-ready result.
 
+## Entrypoint Surface Gate
+
+When a behavior becomes user-visible or changes user-controlled input, treat Web, CLI, API/oRPC,
+repository config files, and future MCP/tool entrypoints as separate surfaces over the same
+operation. The governing specs, test matrix, and Code Round todo must explicitly decide the state of
+each relevant surface:
+
+- implemented input or selection affordance;
+- read-only/status-only affordance;
+- intentionally not applicable, with the domain reason;
+- deferred migration gap, with the missing schema/command/UI work named.
+
+Do not call a behavior fully exposed if only one surface can accept the new input while another
+first-class surface for the same workflow silently cannot. For Web surfaces, identify whether the
+user needs a text input, select/radio choice, checkbox, or read-only display. For CLI surfaces,
+identify whether the user needs flags, positional arguments, interactive prompts, or config-file
+fields. For repository config files, identify the canonical field names and validation behavior.
+
 ## Round Types
 
 ### 1. Discover Round

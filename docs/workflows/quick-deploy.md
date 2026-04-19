@@ -80,6 +80,12 @@ managed `domain-bindings.create` and certificate workflow steps after the requir
 server, and destination context exists. In every mode, Quick Deploy must not submit domain/TLS
 intent to `deployments.create`.
 
+Canonical redirects, such as `www.example.com` redirecting to `example.com`, are route intent in
+the same boundary. They must be validated before mutation, persisted as server-applied route state
+in pure CLI/SSH mode, and rendered only by the selected edge proxy provider. Quick Deploy must not
+implement redirect logic itself and must not use redirect entries to retarget a deploy to a
+different resource or server.
+
 When generated default access is enabled by platform policy, Quick Deploy may display the generated URL after the resource access summary projection is available. It must not collect concrete generated-domain provider fields from the user and must not send generated domain/proxy/TLS fields to `deployments.create`.
 
 When the final workflow has a resource id and deployment id, Quick Deploy should expose a copyable
@@ -117,8 +123,8 @@ Quick Deploy must use the ADR-012 domain language while collecting draft values:
   and replica settings must not be collected as deployment command fields.
 - build/start/health values are runtime profile drafts;
 - listener port, upstream protocol, exposure mode, and compose target service are network profile drafts;
-- domain/path/TLS values belong to server-applied route state in SSH CLI mode or durable
-  domain-binding/certificate commands in control-plane mode; they must not become
+- domain/path/TLS/redirect values belong to server-applied route state in SSH CLI mode or durable
+  domain-binding/certificate/route commands in control-plane mode; they must not become
   deployment-owned state.
 
 For Git sources, Quick Deploy may accept repository browser URLs as user input. A URL that points to
@@ -368,7 +374,7 @@ asserting UI copy or prompt text as domain behavior.
 | Resource context | Web/CLI workflow | `resources.list`; `resources.create` | Prefer existing `resourceId`; use explicit `resources.create` with source/runtime/network profile when creating a new first-deploy resource. |
 | First variable | Web/CLI workflow | `environments.set-variable` | Persist environment-scoped variable before deployment snapshot if the user supplies it. |
 | Deployment admission | Application command | `deployments.create` | Dispatch ids-only deployment admission and accept or reject the deployment request according to the command spec. |
-| Server-applied config domains | CLI/local/headless SSH workflow | Edge proxy provider route realization over remote `ssh-pglite` state | Normalize `access.domains[]` into server-applied proxy route desired state, apply it through the selected target's provider, and keep it out of `deployments.create` and managed `DomainBinding` state. |
+| Server-applied config domains | CLI/local/headless SSH workflow | Edge proxy provider route realization over remote `ssh-pglite` state | Normalize `access.domains[]`, including canonical redirect aliases, into server-applied proxy route desired state, apply it through the selected target's provider, and keep it out of `deployments.create` and managed `DomainBinding` state. |
 | Managed domain/TLS follow-up | Web/CLI/local/headless control-plane workflow | `domain-bindings.create`; certificate commands when in scope | Bind domains through explicit routing/domain/TLS commands after deployment context exists, not through deployment admission. |
 | Generated access observation | Web/CLI workflow | `ResourceAccessSummary` after route snapshot resolution | Display generated access URL and proxy route status when policy/provider resolved one. |
 | Progress observation | Web/CLI workflow | deployment progress stream during the final deployment command; deployment read/progress queries after acceptance | Observe durable state or technical progress without treating progress events as Quick Deploy workflow steps. |
@@ -449,7 +455,7 @@ There is no `QuickDeploy` aggregate in v1.
 | `deployments.create` | Final deployment request accepted. | Deployment attempt exists and progresses according to deployment lifecycle specs. |
 | Deployment progress/read-model updates | Runtime execution is observable. | Entry can show progress, terminal succeeded/failed state, and route/access projections. |
 | `resources.diagnostic-summary` | Support/debug payload queried after ids are known. | Entry can expose copyable stable ids and safe section statuses. |
-| Server-applied config domain realization | Pure CLI/SSH custom domain route is applied on the selected target. | State is target-local proxy route desired/applied state in remote `ssh-pglite`, not deployment admission and not managed `DomainBinding` lifecycle. |
+| Server-applied config domain realization | Pure CLI/SSH custom domain route or canonical redirect is applied on the selected target. | State is target-local proxy route desired/applied state in remote `ssh-pglite`, not deployment admission and not managed `DomainBinding` lifecycle. |
 | Managed domain/TLS follow-up command | Control-plane custom domain lifecycle starts outside Quick Deploy. | State is governed by the routing/domain/TLS workflow, not by deployment admission. |
 
 ## Failure Visibility
@@ -593,6 +599,9 @@ access, health, and diagnostic summaries expose the latest server-applied route 
 The opt-in SSH e2e harness covers server-applied route realization through a Traefik-backed target.
 Provider-local TLS diagnostics for `tlsMode = auto` routes are visible through proxy configuration
 and resource diagnostics.
+Canonical redirect aliases now flow through config parsing, SSH server-applied route state,
+deployment planning, provider route rendering, and proxy configuration queries. Real external
+HTTP/HTTPS redirect verification remains opt-in SSH e2e follow-up.
 The public `appaloft/deploy-action` wrapper is not implemented yet; current tests cover the
 underlying binary process boundary but not release download, checksum verification, action inputs,
 or SSH secret temp-key handling.

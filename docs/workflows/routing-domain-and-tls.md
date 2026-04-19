@@ -26,8 +26,10 @@ special deployment shortcut.
 Pure CLI/SSH config domains governed by
 [ADR-024](../decisions/ADR-024-pure-cli-ssh-state-and-server-applied-domains.md) are a different
 mode: `access.domains[]` becomes server-applied proxy route state on the selected SSH target and
-does not create managed `DomainBinding` records. A hosted or self-hosted control plane may later
-map the same config intent into this durable workflow.
+does not create managed `DomainBinding` records. That server-applied state may include canonical
+redirect aliases, such as `www.example.com -> example.com`, but those aliases are still target-local
+route intent until a hosted or self-hosted control plane explicitly maps the same config intent into
+managed domain/route lifecycle.
 
 ## Global References
 
@@ -230,11 +232,20 @@ state backend. The edge proxy provider may manage TLS automation locally, but Ap
 processes do not own a background DNS observer, certificate retry scheduler, or managed domain
 read-model lifecycle after the process exits.
 
+Canonical redirect aliases in pure CLI/SSH mode are also target-local server-applied route state.
+They require:
+
+- a served target host entry in the same route set;
+- DNS for both source and target hosts to point at the selected edge address;
+- provider-local TLS coverage for both hosts when HTTPS redirects are expected;
+- provider-rendered redirect behavior that preserves path and query and does not proxy the alias
+  host to the workload.
+
 When a hosted/self-hosted control plane adopts the same project/resource/server state, the migration
 path is explicit: import or sync remote `ssh-pglite` identity and route state, then create managed
 `DomainBinding` and certificate records if the operator wants cloud-managed DNS/certificate
-lifecycle. The presence of a server-applied route must not be treated as proof that a managed
-`DomainBinding` already exists.
+lifecycle or managed canonical redirect policy. The presence of a server-applied route or redirect
+alias must not be treated as proof that a managed `DomainBinding` already exists.
 
 ## Synchronous Admission
 
@@ -385,6 +396,10 @@ turns a confirmed binding into proxy configuration on the next deployment or red
 `requested`, `pending_verification`, or `failed` must not be used for route realization. Bindings in
 `not_ready` may be included so a redeploy can act as the route retry attempt.
 
+Redirect-only durable bindings must be realized as redirect routes alongside served bindings. The
+served target must remain the primary access route; redirect aliases must not proxy the redirecting
+hostname to the workload.
+
 When a durable domain route or certificate-backed proxy configuration changes, route readiness must
 use the edge proxy provider reload behavior governed by
 [Edge Proxy Provider And Route Realization](./edge-proxy-provider-and-route-realization.md). A
@@ -517,7 +532,13 @@ Generated default access routes are convenience routes resolved from provider-ne
 
 Deployment route snapshots may shape Docker labels, edge proxy requirements, public health URLs, and deployment runtime metadata for one deployment attempt. They must be derived from resource/domain/default-access state rather than submitted through `deployments.create`.
 
-Durable domain binding and certificate lifecycle must use `domain-bindings.create`, `certificates.issue-or-renew`, `certificates.import`, and their event flows.
+Durable domain binding and certificate lifecycle must use `domain-bindings.create`,
+`certificates.issue-or-renew`, `certificates.import`, and their event flows.
+
+A durable domain binding may be created as a managed canonical redirect alias by supplying
+`redirectTo` and optional `redirectStatus` to `domain-bindings.create`. The redirect source remains
+a managed domain binding for ownership, DNS observation, TLS coverage, and readiness; only the edge
+proxy route behavior changes from serving traffic to redirecting to the canonical binding.
 
 Ownership confirmation must use `domain-bindings.confirm-ownership`. DNS-gated confirmation is the
 default path. Explicit manual override may be exposed for operators and trusted automation, but entry
@@ -526,7 +547,11 @@ runtime route snapshots.
 
 ## Entry Boundaries
 
-Web must treat resource detail pages as the primary resource-scoped domain binding surface when the binding belongs to a resource. The resource page may preload project, environment, resource, destination, and recent placement context, then dispatch `domain-bindings.create` with the same command contract.
+Web must treat resource detail pages as the primary resource-scoped domain binding surface when the
+binding belongs to a resource. The resource page may preload project, environment, resource,
+destination, and recent placement context, then dispatch `domain-bindings.create` with the same
+command contract. When canonical redirect is supported, Web must expose route behavior as a select
+and must choose the redirect target from existing served bindings in the same owner/path scope.
 
 Web may also keep a standalone domain bindings page for cross-resource listing, filtering, and creation. The standalone page must reuse the same command/query contracts and must not create a separate global binding model.
 
@@ -536,7 +561,11 @@ Web must present generated default access and custom domain binding as separate 
 sslip/default access URL is read from `ResourceAccessSummary`; it is not a row in
 `domain-bindings.list` and it does not satisfy ownership confirmation for a custom domain.
 
-CLI may expose separate commands for binding domains, confirming ownership, issuing/renewing certificates, checking status, and retrying failed attempts.
+CLI may expose separate commands for binding domains, confirming ownership, issuing/renewing
+certificates, checking status, and retrying failed attempts. Managed canonical redirects are
+supplied to `domain-binding create` through `--redirect-to` and `--redirect-status`, while
+repository config expresses the pure CLI/SSH server-applied variant with
+`access.domains[].redirectTo` and `access.domains[].redirectStatus`.
 
 API must expose strict command inputs and read-model status; it must not prompt.
 

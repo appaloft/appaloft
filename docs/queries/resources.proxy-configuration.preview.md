@@ -73,6 +73,27 @@ type ProxyConfigurationView = {
 };
 ```
 
+Route views use this provider-neutral shape:
+
+```ts
+type ProxyConfigurationRouteView = {
+  hostname: string;
+  scheme: "http" | "https";
+  url: string;
+  pathPrefix: string;
+  tlsMode: "auto" | "disabled";
+  targetPort?: number;
+  source: "generated-default" | "deployment-snapshot" | "server-applied" | "durable-domain";
+  routeBehavior?: "serve" | "redirect";
+  redirectTo?: string;
+  redirectStatus?: 301 | 302 | 307 | 308;
+};
+```
+
+When `routeBehavior = "redirect"`, `url` is the redirect source URL and `redirectTo` is the
+provider-neutral target host. The query may include provider-specific redirect syntax only in
+read-only sections; Web, CLI, and API clients must not reconstruct redirect middleware locally.
+
 Provider-rendered sections use this shape:
 
 ```ts

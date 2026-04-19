@@ -200,7 +200,8 @@ function requestedDeploymentWithDurableDomainBindings(
     return requestedDeployment;
   }
 
-  const primaryBinding = bindings
+  const servedBindings = bindings.filter((binding) => !binding.redirectTo);
+  const primaryBinding = servedBindings
     .filter((binding) => binding.proxyKind !== "none")
     .sort((left, right) => right.createdAt.localeCompare(left.createdAt))[0];
 
@@ -208,29 +209,105 @@ function requestedDeploymentWithDurableDomainBindings(
     return requestedDeployment;
   }
 
-  const domains = bindings
-    .filter(
-      (binding) =>
-        binding.proxyKind === primaryBinding.proxyKind &&
-        binding.pathPrefix === primaryBinding.pathPrefix &&
-        binding.tlsMode === primaryBinding.tlsMode,
-    )
-    .map((binding) => binding.domainName);
+  const routeGroups = domainBindingRouteGroups(bindings, primaryBinding.proxyKind);
+  const primaryRouteGroup = routeGroups.find(
+    (group) =>
+      !group.redirectTo &&
+      group.pathPrefix === primaryBinding.pathPrefix &&
+      group.tlsMode === primaryBinding.tlsMode,
+  );
+
+  if (!primaryRouteGroup) {
+    return requestedDeployment;
+  }
 
   return {
     ...requestedDeployment,
     proxyKind: primaryBinding.proxyKind,
-    domains,
+    domains: primaryRouteGroup.domains,
     pathPrefix: primaryBinding.pathPrefix,
     tlsMode: primaryBinding.tlsMode,
+    accessRoutes: routeGroups.map((group) => ({
+      proxyKind: primaryBinding.proxyKind,
+      domains: group.domains,
+      pathPrefix: group.pathPrefix,
+      tlsMode: group.tlsMode,
+      ...(group.redirectTo
+        ? {
+            routeBehavior: "redirect" as const,
+            redirectTo: group.redirectTo,
+            redirectStatus: group.redirectStatus ?? 308,
+          }
+        : {}),
+    })),
     accessRouteMetadata: {
       ...(requestedDeployment.accessRouteMetadata ?? {}),
       "access.routeSource": "durable-domain-binding",
       "access.domainBindingId": primaryBinding.id,
       "access.hostname": primaryBinding.domainName,
       "access.scheme": primaryBinding.tlsMode === "auto" ? "https" : "http",
+      "access.routeGroupCount": String(routeGroups.length),
+      ...(routeGroups.some((group) => group.redirectTo)
+        ? {
+            "access.redirectRouteCount": String(
+              routeGroups.filter((group) => group.redirectTo).length,
+            ),
+          }
+        : {}),
     },
   };
+}
+
+interface DomainBindingRouteGroup {
+  domains: string[];
+  pathPrefix: string;
+  tlsMode: DomainRouteBindingCandidate["tlsMode"];
+  redirectTo?: string;
+  redirectStatus?: 301 | 302 | 307 | 308;
+}
+
+function domainBindingRouteGroups(
+  bindings: DomainRouteBindingCandidate[],
+  proxyKind: DomainRouteBindingCandidate["proxyKind"],
+): DomainBindingRouteGroup[] {
+  const groups: DomainBindingRouteGroup[] = [];
+  const groupIndexes = new Map<string, number>();
+
+  for (const binding of bindings) {
+    if (binding.proxyKind !== proxyKind) {
+      continue;
+    }
+
+    if (binding.redirectTo) {
+      groups.push({
+        domains: [binding.domainName],
+        pathPrefix: binding.pathPrefix,
+        tlsMode: binding.tlsMode,
+        redirectTo: binding.redirectTo,
+        redirectStatus: binding.redirectStatus ?? 308,
+      });
+      continue;
+    }
+
+    const groupKey = `${binding.pathPrefix}\u0000${binding.tlsMode}`;
+    const existingIndex = groupIndexes.get(groupKey);
+    if (existingIndex === undefined) {
+      groupIndexes.set(groupKey, groups.length);
+      groups.push({
+        domains: [binding.domainName],
+        pathPrefix: binding.pathPrefix,
+        tlsMode: binding.tlsMode,
+      });
+      continue;
+    }
+
+    const group = groups[existingIndex];
+    if (group) {
+      group.domains.push(binding.domainName);
+    }
+  }
+
+  return groups;
 }
 
 function proxyKindFromServer(
@@ -249,6 +326,8 @@ interface ServerAppliedRouteGroup {
   domains: string[];
   pathPrefix: string;
   tlsMode: ServerAppliedRouteDesiredStateDomain["tlsMode"];
+  redirectTo?: string;
+  redirectStatus?: 301 | 302 | 307 | 308;
 }
 
 function serverAppliedRouteGroups(
@@ -258,6 +337,17 @@ function serverAppliedRouteGroups(
   const groupIndexes = new Map<string, number>();
 
   for (const domain of domains) {
+    if (domain.redirectTo) {
+      groups.push({
+        domains: [domain.host],
+        pathPrefix: domain.pathPrefix,
+        tlsMode: domain.tlsMode,
+        redirectTo: domain.redirectTo,
+        redirectStatus: domain.redirectStatus ?? 308,
+      });
+      continue;
+    }
+
     const groupKey = `${domain.pathPrefix}\u0000${domain.tlsMode}`;
     const existingIndex = groupIndexes.get(groupKey);
 
@@ -297,17 +387,23 @@ function requestedDeploymentWithServerAppliedRoutes(input: {
   }
 
   const primaryRoute = input.desiredState.domains[0];
+  const primaryServedRoute = input.desiredState.domains.find((domain) => !domain.redirectTo);
   if (!primaryRoute) {
     return ok(input.requestedDeployment);
   }
 
   const proxyKind = input.proxyKind;
   const routeGroups = serverAppliedRouteGroups(input.desiredState.domains);
-  const primaryRouteGroup = routeGroups[0];
+  const primaryRouteGroup = routeGroups.find((group) => !group.redirectTo) ?? routeGroups[0];
 
   if (!primaryRouteGroup) {
     return ok(input.requestedDeployment);
   }
+
+  const primaryHostname = primaryServedRoute?.host ?? primaryRoute.host;
+  const primaryScheme =
+    (primaryServedRoute?.tlsMode ?? primaryRoute.tlsMode) === "auto" ? "https" : "http";
+  const redirectRouteCount = routeGroups.filter((group) => group.redirectTo).length;
 
   return ok({
     ...input.requestedDeployment,
@@ -320,15 +416,25 @@ function requestedDeploymentWithServerAppliedRoutes(input: {
       domains: group.domains,
       pathPrefix: group.pathPrefix,
       tlsMode: group.tlsMode,
+      ...(group.redirectTo
+        ? {
+            routeBehavior: "redirect" as const,
+            redirectTo: group.redirectTo,
+            redirectStatus: group.redirectStatus ?? 308,
+          }
+        : {}),
     })),
     accessRouteMetadata: {
       ...(input.requestedDeployment.accessRouteMetadata ?? {}),
       "access.routeSource": "server-applied-config-domain",
       "access.serverAppliedRouteSetId": input.desiredState.routeSetId,
-      "access.hostname": primaryRoute.host,
-      "access.scheme": primaryRoute.tlsMode === "auto" ? "https" : "http",
+      "access.hostname": primaryHostname,
+      "access.scheme": primaryScheme,
       "access.routeCount": String(input.desiredState.domains.length),
       "access.routeGroupCount": String(routeGroups.length),
+      ...(redirectRouteCount > 0
+        ? { "access.redirectRouteCount": String(redirectRouteCount) }
+        : {}),
       ...(input.desiredState.sourceFingerprint
         ? { "access.sourceFingerprint": input.desiredState.sourceFingerprint }
         : {}),

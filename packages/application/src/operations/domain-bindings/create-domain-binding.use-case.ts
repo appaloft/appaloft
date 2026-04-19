@@ -1,5 +1,6 @@
 import {
   ActiveDomainBindingByOwnerAndRouteSpec,
+  CanonicalRedirectStatusCode,
   CertificatePolicyValue,
   CreatedAt,
   DeploymentTargetByIdSpec,
@@ -110,6 +111,20 @@ export class CreateDomainBindingUseCase {
       const pathPrefix = yield* RoutePathPrefix.create(input.pathPrefix ?? "/");
       const proxyKind = yield* EdgeProxyKindValue.create(input.proxyKind);
       const tlsMode = yield* TlsModeValue.create(input.tlsMode ?? "auto");
+      if (input.redirectStatus && !input.redirectTo) {
+        return err(
+          domainError.validation("Canonical redirect status requires redirect target", {
+            phase: "domain-binding-admission",
+            domainName: domainName.value,
+          }),
+        );
+      }
+      const redirectTo = input.redirectTo
+        ? yield* PublicDomainName.create(input.redirectTo)
+        : undefined;
+      const redirectStatus = redirectTo
+        ? yield* CanonicalRedirectStatusCode.create(input.redirectStatus ?? 308)
+        : undefined;
       const certificatePolicy = input.certificatePolicy
         ? yield* CertificatePolicyValue.create(input.certificatePolicy)
         : undefined;
@@ -221,6 +236,45 @@ export class CreateDomainBindingUseCase {
         );
       }
 
+      if (redirectTo) {
+        const redirectTarget = await domainBindingRepository.findOne(
+          repositoryContext,
+          ActiveDomainBindingByOwnerAndRouteSpec.create({
+            projectId,
+            environmentId,
+            resourceId,
+            domainName: redirectTo,
+            pathPrefix,
+          }),
+        );
+
+        if (!redirectTarget) {
+          return err(
+            domainError.validation("Canonical redirect target domain binding must exist", {
+              phase: "domain-binding-admission",
+              domainName: domainName.value,
+              redirectTo: redirectTo.value,
+              pathPrefix: pathPrefix.value,
+            }),
+          );
+        }
+
+        const redirectTargetState = redirectTarget.toState();
+        if (redirectTargetState.redirectTo) {
+          return err(
+            domainError.validation(
+              "Canonical redirect target must be a served domain binding, not another redirect",
+              {
+                phase: "domain-binding-admission",
+                domainName: domainName.value,
+                redirectTo: redirectTo.value,
+                pathPrefix: pathPrefix.value,
+              },
+            ),
+          );
+        }
+      }
+
       const createdAt = yield* CreatedAt.create(clock.now());
       const domainBindingId = yield* DomainBindingId.create(idGenerator.next("dmb"));
       const verificationAttemptId = yield* DomainVerificationAttemptId.create(
@@ -242,6 +296,8 @@ export class CreateDomainBindingUseCase {
         pathPrefix,
         proxyKind,
         tlsMode,
+        ...(redirectTo ? { redirectTo } : {}),
+        ...(redirectStatus ? { redirectStatus } : {}),
         ...(certificatePolicy ? { certificatePolicy } : {}),
         verificationAttemptId,
         verificationExpectedTarget,

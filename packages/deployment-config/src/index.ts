@@ -32,6 +32,8 @@ const domainHostError =
   "config_domain_resolution: access.domains[].host must be a domain name without scheme, port, path, or wildcard";
 const domainPathPrefixError =
   "config_domain_resolution: access.domains[].pathPrefix must start with / and must not include query, fragment, control characters, or parent traversal";
+const domainRedirectToError =
+  "config_domain_resolution: access.domains[].redirectTo must be a domain name without scheme, port, path, or wildcard";
 
 const identityConfigFields = new Set([
   "organization",
@@ -219,6 +221,13 @@ const appaloftDeploymentAccessDomainConfigSchema = z
       .default("/")
       .pipe(z.string().refine(isSafeDomainPathPrefix, domainPathPrefixError)),
     tlsMode: z.enum(["auto", "disabled"]).optional().default("auto"),
+    redirectTo: nonEmptyStringSchema
+      .transform((value) => value.toLowerCase())
+      .pipe(z.string().refine(isDomainName, domainRedirectToError))
+      .optional(),
+    redirectStatus: z
+      .union([z.literal(301), z.literal(302), z.literal(307), z.literal(308)])
+      .optional(),
   })
   .strict()
   .describe("Provider-neutral server-applied domain intent.");
@@ -228,6 +237,66 @@ export const appaloftDeploymentAccessConfigSchema = z
     domains: z.array(appaloftDeploymentAccessDomainConfigSchema).min(1),
   })
   .strict()
+  .superRefine((value, context) => {
+    const byHost = new Map<string, (typeof value.domains)[number]>();
+    for (const domain of value.domains) {
+      const existing = byHost.get(domain.host);
+      if (existing) {
+        context.addIssue({
+          code: "custom",
+          path: ["domains"],
+          message: "config_domain_resolution: access.domains[] cannot contain duplicate hosts",
+        });
+        return;
+      }
+      byHost.set(domain.host, domain);
+    }
+
+    for (const domain of value.domains) {
+      if (domain.redirectStatus && !domain.redirectTo) {
+        context.addIssue({
+          code: "custom",
+          path: ["domains"],
+          message: "config_domain_resolution: access.domains[].redirectStatus requires redirectTo",
+        });
+        return;
+      }
+
+      if (!domain.redirectTo) {
+        continue;
+      }
+
+      const target = byHost.get(domain.redirectTo);
+      if (!target) {
+        context.addIssue({
+          code: "custom",
+          path: ["domains"],
+          message:
+            "config_domain_resolution: canonical redirect target must exist in access.domains[]",
+        });
+        return;
+      }
+
+      if (target.host === domain.host) {
+        context.addIssue({
+          code: "custom",
+          path: ["domains"],
+          message: "config_domain_resolution: canonical redirect cannot point to itself",
+        });
+        return;
+      }
+
+      if (target.redirectTo) {
+        context.addIssue({
+          code: "custom",
+          path: ["domains"],
+          message:
+            "config_domain_resolution: canonical redirect target must be a served domain, not another redirect",
+        });
+        return;
+      }
+    }
+  })
   .describe("Access intent resolved outside deployments.create.");
 
 const nonSecretEnvironmentValueSchema = z.union([z.string(), z.number(), z.boolean()]);
@@ -258,6 +327,26 @@ export const appaloftDeploymentConfigSchema = z
 
 export type AppaloftDeploymentConfigInput = z.input<typeof appaloftDeploymentConfigSchema>;
 export type AppaloftDeploymentConfig = z.output<typeof appaloftDeploymentConfigSchema>;
+
+function normalizeDeploymentConfig(config: AppaloftDeploymentConfig): AppaloftDeploymentConfig {
+  if (!config.access) {
+    return config;
+  }
+
+  return {
+    ...config,
+    access: {
+      domains: config.access.domains.map((domain) =>
+        domain.redirectTo && !domain.redirectStatus
+          ? {
+              ...domain,
+              redirectStatus: 308,
+            }
+          : domain,
+      ),
+    },
+  };
+}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
@@ -391,7 +480,15 @@ export function parseAppaloftDeploymentConfig(input: unknown) {
     return configError(violations);
   }
 
-  return appaloftDeploymentConfigSchema.safeParse(input);
+  const parsed = appaloftDeploymentConfigSchema.safeParse(input);
+  if (!parsed.success) {
+    return parsed;
+  }
+
+  return {
+    success: true as const,
+    data: normalizeDeploymentConfig(parsed.data),
+  };
 }
 
 function isYamlConfigFile(fileName: string): boolean {

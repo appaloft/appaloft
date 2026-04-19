@@ -634,7 +634,12 @@ export const proxyConfigurationRouteViewSchema = z.object({
   pathPrefix: z.string(),
   tlsMode: z.enum(["auto", "disabled"]),
   targetPort: z.number().int().positive().optional(),
-  source: z.enum(["generated-default", "domain-binding", "deployment-snapshot"]),
+  source: z.enum(["generated-default", "domain-binding", "deployment-snapshot", "server-applied"]),
+  routeBehavior: z.enum(["serve", "redirect"]).optional(),
+  redirectTo: z.string().optional(),
+  redirectStatus: z
+    .union([z.literal(301), z.literal(302), z.literal(307), z.literal(308)])
+    .optional(),
 });
 
 export const proxyConfigurationSectionSchema = z.object({
@@ -701,6 +706,10 @@ export const createDomainBindingInputSchema = z.object({
   pathPrefix: z.string().min(1).default("/"),
   proxyKind: z.enum(["none", "traefik", "caddy"]),
   tlsMode: z.enum(["auto", "disabled"]).default("auto"),
+  redirectTo: z.string().min(1).optional(),
+  redirectStatus: z
+    .union([z.literal(301), z.literal(302), z.literal(307), z.literal(308)])
+    .optional(),
   certificatePolicy: z.enum(["auto", "manual", "disabled"]).optional(),
   idempotencyKey: z.string().min(1).optional(),
 });
@@ -734,6 +743,10 @@ export const domainBindingSummarySchema = z.object({
   pathPrefix: z.string(),
   proxyKind: z.enum(["none", "traefik", "caddy"]),
   tlsMode: z.enum(["auto", "disabled"]),
+  redirectTo: z.string().optional(),
+  redirectStatus: z
+    .union([z.literal(301), z.literal(302), z.literal(307), z.literal(308)])
+    .optional(),
   certificatePolicy: z.enum(["auto", "manual", "disabled"]),
   status: z.enum([
     "requested",

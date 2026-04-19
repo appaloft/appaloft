@@ -77,7 +77,7 @@ export interface ConfigSource<TValue> {
 
 const defaults: Omit<AppConfig, "dataDir" | "pgliteDataDir"> = {
   appName: "Appaloft",
-  appVersion: "0.1.0",
+  appVersion: "0.2.0",
   runtimeMode: "self-hosted",
   authProvider: "better-auth",
   betterAuthBaseUrl: "http://localhost:3001",
