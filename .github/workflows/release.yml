@@ -19,6 +19,7 @@ concurrency:
   cancel-in-progress: false
 
 permissions:
+  actions: write
   contents: write
   pull-requests: write
   issues: write
@@ -36,6 +37,24 @@ jobs:
           token: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
           config-file: .github/release-please-config.json
           manifest-file: .github/.release-please-manifest.json
+
+      - name: Dispatch CI for release pull requests
+        if: ${{ steps.release.outputs.prs_created == 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_PLEASE_PRS: ${{ steps.release.outputs.prs }}
+        run: |
+          node <<'NODE' | while IFS= read -r pr_number; do
+          const prs = JSON.parse(process.env.RELEASE_PLEASE_PRS || "[]");
+          for (const pr of prs) {
+            if (pr.number) {
+              console.log(pr.number);
+            }
+          }
+          NODE
+            branch="$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${pr_number}" --jq '.head.ref')"
+            gh workflow run ci.yml --repo "${GITHUB_REPOSITORY}" --ref "${branch}"
+          done
 
   ssh-remote-state-e2e:
     needs: release-please
