@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.2.0](https://github.com/appaloft/appaloft/compare/v0.1.0...v0.2.0) (2026-04-19)
+
+
+### Features
+
+* add cli ssh state and domain routing ([c95f265](https://github.com/appaloft/appaloft/commit/c95f265e3c656d2840863c5748b6f674401da42f))
+
+
+### Documentation
+
+* specify cli ssh state and domains ([d387952](https://github.com/appaloft/appaloft/commit/d387952d376cf8e0bb5562ba72d95445871c5466))
+
+
+### Miscellaneous
+
+* add ui ux pro max skill ([eec1e37](https://github.com/appaloft/appaloft/commit/eec1e377a6a66e35fd389693497921af8d12a5b3))
+* switch open source license to apache 2 ([34850d9](https://github.com/appaloft/appaloft/commit/34850d9091f680b69dfac4077e6439afa9fd135a))
+
 ## [0.1.0](https://github.com/appaloft/appaloft/releases/tag/v0.1.0) (2026-04-18)
 
 
