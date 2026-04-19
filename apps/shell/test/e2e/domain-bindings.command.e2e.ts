@@ -195,6 +195,87 @@ describe("domain-bindings command e2e", () => {
     }
   }, 60000);
 
+  test("[ROUTE-TLS-ENTRY-016] CLI creates canonical redirect binding", () => {
+    const suffix = crypto.randomUUID().slice(0, 6);
+    const context = fixture.deployWorkspaceResource({
+      appPort: 4750 + Math.floor(Math.random() * 100),
+      suffix,
+    });
+    const canonicalDomain = `${suffix}.example.dev`;
+    const redirectDomain = `www-${suffix}.example.dev`;
+
+    const canonicalCreated = runShellCli(
+      [
+        "domain-binding",
+        "create",
+        canonicalDomain,
+        "--project-id",
+        context.projectId,
+        "--environment-id",
+        context.environmentId,
+        "--resource-id",
+        context.resourceId,
+        "--server-id",
+        context.serverId,
+        "--destination-id",
+        context.destinationId,
+        "--proxy-kind",
+        "traefik",
+        "--tls-mode",
+        "auto",
+      ],
+      fixture.cliOptions,
+    );
+    expectCliSuccess(canonicalCreated, "create canonical domain binding through CLI");
+
+    const redirectCreated = runShellCli(
+      [
+        "domain-binding",
+        "create",
+        redirectDomain,
+        "--project-id",
+        context.projectId,
+        "--environment-id",
+        context.environmentId,
+        "--resource-id",
+        context.resourceId,
+        "--server-id",
+        context.serverId,
+        "--destination-id",
+        context.destinationId,
+        "--proxy-kind",
+        "traefik",
+        "--tls-mode",
+        "auto",
+        "--redirect-to",
+        canonicalDomain,
+        "--redirect-status",
+        "308",
+      ],
+      fixture.cliOptions,
+    );
+    expectCliSuccess(redirectCreated, "create redirect domain binding through CLI");
+    const redirectBindingId = parseJson<{ id: string }>(redirectCreated.stdout).id;
+
+    const listed = runShellCli(
+      ["domain-binding", "list", "--resource", context.resourceId],
+      fixture.cliOptions,
+    );
+    expectCliSuccess(listed, "list redirect domain bindings through CLI");
+    expect(
+      findDomainBinding({
+        domainBindingId: redirectBindingId,
+        items: parseJson<DomainBindingListResponse>(listed.stdout).items,
+      }),
+    ).toMatchObject({
+      domainName: redirectDomain,
+      redirectTo: canonicalDomain,
+      redirectStatus: 308,
+      resourceId: context.resourceId,
+      status: "pending_verification",
+    });
+  }, 60000);
+
   test("[ROUTE-TLS-ENTRY-012] CLI observes a TLS-disabled ready durable route through resource list", async () => {
     const suffix = crypto.randomUUID().slice(0, 6);
     const context = fixture.deployWorkspaceResource({

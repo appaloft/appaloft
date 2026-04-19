@@ -271,6 +271,8 @@ export interface DomainRouteBindingCandidate {
   pathPrefix: string;
   proxyKind: EdgeProxyKind;
   tlsMode: TlsMode;
+  redirectTo?: string;
+  redirectStatus?: 301 | 302 | 307 | 308;
   status: DomainBindingStatus;
   createdAt: string;
 }
@@ -300,6 +302,8 @@ export interface ServerAppliedRouteDesiredStateDomain {
   host: string;
   pathPrefix: string;
   tlsMode: TlsMode;
+  redirectTo?: string;
+  redirectStatus?: 301 | 302 | 307 | 308;
 }
 
 export type ServerAppliedRouteDesiredStateStatus = "desired" | "applied" | "failed";
@@ -632,6 +636,9 @@ export interface EdgeProxyRouteInput {
   tlsMode: TlsMode;
   targetPort?: number;
   providerKey?: string;
+  routeBehavior?: "serve" | "redirect";
+  redirectTo?: string;
+  redirectStatus?: 301 | 302 | 307 | 308;
 }
 
 export interface ProxyRouteRealizationInput {
@@ -697,7 +704,10 @@ export interface ProxyConfigurationRouteView {
   pathPrefix: string;
   tlsMode: TlsMode;
   targetPort?: number;
-  source: "generated-default" | "domain-binding" | "deployment-snapshot";
+  source: "generated-default" | "domain-binding" | "deployment-snapshot" | "server-applied";
+  routeBehavior?: "serve" | "redirect";
+  redirectTo?: string;
+  redirectStatus?: 301 | 302 | 307 | 308;
 }
 
 export interface ProxyConfigurationSection {
@@ -1545,6 +1555,9 @@ export interface DeploymentSummary {
         pathPrefix: string;
         tlsMode: TlsMode;
         targetPort?: number;
+        routeBehavior?: "serve" | "redirect";
+        redirectTo?: string;
+        redirectStatus?: 301 | 302 | 307 | 308;
       }>;
       verificationSteps?: Array<{
         kind: "internal-http" | "public-http";
@@ -1595,6 +1608,8 @@ export interface DomainBindingSummary {
   pathPrefix: string;
   proxyKind: EdgeProxyKind;
   tlsMode: TlsMode;
+  redirectTo?: string;
+  redirectStatus?: 301 | 302 | 307 | 308;
   certificatePolicy: CertificatePolicy;
   status: DomainBindingStatus;
   dnsObservation?: {
@@ -1723,6 +1738,9 @@ export interface RequestedAccessRouteConfig {
   domains: string[];
   pathPrefix: string;
   tlsMode: TlsMode;
+  routeBehavior?: "serve" | "redirect";
+  redirectTo?: string;
+  redirectStatus?: 301 | 302 | 307 | 308;
 }
 
 export interface RequestedDeploymentConfig {

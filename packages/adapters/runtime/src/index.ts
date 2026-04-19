@@ -1,6 +1,7 @@
 import {
   AccessRoute,
   BuildStrategyKindValue,
+  CanonicalRedirectStatusCode,
   CommandText,
   DisplayNameText,
   DeploymentTargetDescriptor,
@@ -279,6 +280,16 @@ function createAccessRoutes(input: {
             pathPrefix: yield* RoutePathPrefix.create(requestedAccessRoute.pathPrefix),
             tlsMode: TlsModeValue.rehydrate(requestedAccessRoute.tlsMode),
             ...(input.fallbackPort ? { targetPort: PortNumber.rehydrate(input.fallbackPort) } : {}),
+            ...(requestedAccessRoute.redirectTo
+              ? { redirectTo: yield* PublicDomainName.create(requestedAccessRoute.redirectTo) }
+              : {}),
+            ...(requestedAccessRoute.redirectStatus
+              ? {
+                  redirectStatus: yield* CanonicalRedirectStatusCode.create(
+                    requestedAccessRoute.redirectStatus,
+                  ),
+                }
+              : {}),
           }),
         );
       }

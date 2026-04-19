@@ -6,6 +6,10 @@ Routing/domain/TLS workflows use the shared platform error model and neverthrow 
 
 Generated default access and deployment route snapshot errors stay within deployment/access-route planning and execution unless the caller uses explicit domain binding or certificate commands.
 
+Pure CLI/SSH server-applied config domain errors, including canonical redirect graph validation,
+belong to the repository config workflow and edge proxy route realization phases unless the intent
+is explicitly mapped into managed `DomainBinding` lifecycle by a hosted/self-hosted control plane.
+
 ## Global References
 
 This spec inherits:

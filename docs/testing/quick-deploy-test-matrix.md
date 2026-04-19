@@ -131,6 +131,7 @@ Then:
 | QUICK-DEPLOY-WF-052 | e2e-preferred | Headless SSH remote state default | GitHub Actions or CLI non-TTY | Repository config plus trusted SSH target inputs, no Appaloft ids, no `DATABASE_URL` | Workflow uses SSH-server PGlite state, creates or reuses identity there, persists/reuses source link state, and accepts deployment | None | SSH state ensure/lock/migrate -> source link resolution -> Quick Deploy operation order -> persist link if first run -> `deployments.create` | Repeated runs reuse remote project/resource/server/environment state | Per remote lock/migration policy |
 | QUICK-DEPLOY-WF-053 | e2e-preferred, opt-in SSH | Repository config server-applied domain | GitHub Actions or CLI non-TTY | Valid `access.domains[]`, reverse-proxy network profile, proxy-ready SSH target | Deployment succeeds or accepts and server-applied route state is realized/observable through access/proxy read models | None or provider route error | SSH state -> context commands -> `deployments.create` -> edge proxy route realization | Remote state records route desired/applied status; no managed `DomainBinding` is created | Per proxy route retry |
 | QUICK-DEPLOY-WF-054 | integration | Control-plane maps config domain to managed workflow | Hosted/self-hosted control-plane entry | Same config `access.domains[]`, selected control-plane state | Config domain intent maps to managed domain binding workflow or fails with stable unsupported managed-mapping error; it does not write SSH server-applied state | None or stable unsupported error | Context commands -> `deployments.create` -> `domain-bindings.create` follow-up when supported | Managed `DomainBinding` state progresses separately from deployment | Per domain/certificate retry rules |
+| QUICK-DEPLOY-WF-055 | e2e-preferred, opt-in SSH | Repository config canonical redirect | GitHub Actions or CLI non-TTY | Valid `access.domains[]` with a served canonical host and an alias host using `redirectTo` | Deployment succeeds or accepts, canonical host serves the workload, alias host redirects with configured status, and access/proxy diagnostics expose redirect state | None or provider route error | SSH state -> context commands -> route desired state with redirect intent -> `deployments.create` -> edge proxy route realization -> redirect verification | Remote state records desired/applied redirect status; no managed `DomainBinding` or `Certificate` is created | Per proxy route retry |
 
 ## Entry Consistency Matrix
 
@@ -226,6 +227,11 @@ and resource diagnostics. Operational provisioning of the external SSH e2e secre
 control-plane domain mapping, first-run project/resource creation e2e, deploy-action wrapper install
 UX, environment overlays, stored/external secret lookup/application, and profile drift remain
 follow-up.
+
+`QUICK-DEPLOY-WF-055` now has lower-level parser, remote-state, deployment planning, provider
+rendering, and proxy-configuration query coverage for `redirectTo` / `redirectStatus`. A full
+GitHub Actions or CLI non-TTY SSH e2e that asserts real alias HTTP redirect behavior remains target
+coverage.
 
 Current Web and CLI do not yet expose all source variant fields as typed drafts. Initial tests may
 cover the parser/normalizer as a unit before full UI coverage, but the workflow contract requires

@@ -42,6 +42,8 @@ export class PgDomainRouteBindingReader implements DomainRouteBindingReader {
             "path_prefix",
             "proxy_kind",
             "tls_mode",
+            "redirect_to",
+            "redirect_status",
             "status",
             "created_at",
           ])
@@ -60,6 +62,10 @@ export class PgDomainRouteBindingReader implements DomainRouteBindingReader {
           pathPrefix: row.path_prefix,
           proxyKind: row.proxy_kind as DomainRouteBindingCandidate["proxyKind"],
           tlsMode: row.tls_mode as DomainRouteBindingCandidate["tlsMode"],
+          ...(row.redirect_to ? { redirectTo: row.redirect_to } : {}),
+          ...(row.redirect_status
+            ? { redirectStatus: row.redirect_status as 301 | 302 | 307 | 308 }
+            : {}),
           status: row.status as DomainRouteBindingCandidate["status"],
           createdAt: normalizeTimestamp(row.created_at) ?? row.created_at,
         }));

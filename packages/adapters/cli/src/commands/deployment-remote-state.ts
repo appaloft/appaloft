@@ -58,6 +58,8 @@ export interface ServerAppliedRouteDomainIntent {
   host: string;
   pathPrefix: string;
   tlsMode: ServerAppliedRouteTlsMode;
+  redirectTo?: string;
+  redirectStatus?: 301 | 302 | 307 | 308;
 }
 
 export type ServerAppliedRouteDesiredStateStatus = "desired" | "applied" | "failed";
@@ -309,6 +311,67 @@ function validateServerAppliedRouteDomains(
           phase: "config-domain-resolution",
           host: domain.host,
         }),
+      );
+    }
+  }
+
+  const byHost = new Map<string, ServerAppliedRouteDomainIntent>();
+  for (const domain of domains) {
+    if (byHost.has(domain.host)) {
+      return err(
+        domainError.validation("Server-applied route domains cannot contain duplicate hosts", {
+          phase: "config-domain-resolution",
+          host: domain.host,
+        }),
+      );
+    }
+    byHost.set(domain.host, domain);
+  }
+
+  for (const domain of domains) {
+    if (domain.redirectStatus && !domain.redirectTo) {
+      return err(
+        domainError.validation("Server-applied route redirect status requires redirect target", {
+          phase: "config-domain-resolution",
+          host: domain.host,
+        }),
+      );
+    }
+
+    if (!domain.redirectTo) {
+      continue;
+    }
+
+    const target = byHost.get(domain.redirectTo);
+    if (!target) {
+      return err(
+        domainError.validation("Server-applied route redirect target is missing", {
+          phase: "config-domain-resolution",
+          host: domain.host,
+          redirectTo: domain.redirectTo,
+        }),
+      );
+    }
+
+    if (target.host === domain.host) {
+      return err(
+        domainError.validation("Server-applied route redirect cannot target itself", {
+          phase: "config-domain-resolution",
+          host: domain.host,
+        }),
+      );
+    }
+
+    if (target.redirectTo) {
+      return err(
+        domainError.validation(
+          "Server-applied route redirect target must be a served domain, not another redirect",
+          {
+            phase: "config-domain-resolution",
+            host: domain.host,
+            redirectTo: domain.redirectTo,
+          },
+        ),
       );
     }
   }
@@ -784,6 +847,8 @@ export class FileSystemServerAppliedRouteDesiredStateStore
         host: domain.host,
         pathPrefix: domain.pathPrefix,
         tlsMode: domain.tlsMode,
+        ...(domain.redirectTo ? { redirectTo: domain.redirectTo } : {}),
+        ...(domain.redirectStatus ? { redirectStatus: domain.redirectStatus } : {}),
       })),
       status: "desired",
       updatedAt: input.updatedAt,

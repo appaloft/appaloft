@@ -26,6 +26,9 @@ Implement in ordered slices:
    - Add provider-neutral `access.domains[]` for host/path/TLS route intent while rejecting raw
      certificate material, provider account ids, DNS credentials, server ids, destination ids, and
      credential selectors.
+   - Add provider-neutral canonical redirect fields on domain entries (`redirectTo` and optional
+     `redirectStatus`) while rejecting self-redirects, redirect loops, redirect-to-redirect chains,
+     missing targets, and cross-context redirect targets.
    - Keep schema strict so unsupported CPU/memory/replica/restart/rollout fields fail until their
      own ADR/spec/runtime enforcement exists.
 
@@ -101,6 +104,8 @@ Implement in ordered slices:
    - Persist provider-neutral route desired state in SSH-server Appaloft state for pure CLI mode.
    - Realize route state through the edge proxy provider and runtime adapter, including provider
      owned TLS automation when `tlsMode = auto`.
+   - Render canonical redirect aliases through the selected edge proxy provider so alias hosts
+     redirect to served target hosts without proxying the alias host to the workload.
    - Keep managed `DomainBinding` creation out of pure CLI mode; map the same intent to managed
      domain commands only when a hosted/self-hosted control plane is selected.
 
@@ -157,14 +162,14 @@ Remaining gaps:
 - Existing-resource profile drift detection and explicit profile update command sequencing are not
   implemented yet.
 - Config-file `access.domains[]` parser support is implemented for provider-neutral `host`,
-  `pathPrefix`, and `tlsMode` intent. SSH CLI config deploy persists server-applied route desired
-  state before ids-only deployment admission when route-state storage is wired. Deployment planning
-  consumes that desired state as one or more `pathPrefix`/`tlsMode` route groups, and
-  deployment-finished handling records applied/failed status for route realization outcomes.
-  Resource access, health, and diagnostic summaries expose the latest server-applied route
-  URL/status. Provider-local TLS diagnostics for `tlsMode = auto` routes are visible through proxy
-  configuration and resource diagnostics. Control-plane managed domain mapping is not implemented
-  yet.
+  `pathPrefix`, `tlsMode`, optional `redirectTo`, and optional `redirectStatus` intent. SSH CLI
+  config deploy persists server-applied route desired state before ids-only deployment admission
+  when route-state storage is wired. Deployment planning consumes that desired state as serve and
+  redirect route groups, and deployment-finished handling records applied/failed status for route
+  realization outcomes. Resource access, health, and diagnostic summaries expose the latest
+  server-applied route URL/status. Provider-local TLS diagnostics for `tlsMode = auto` routes are
+  visible through proxy configuration and resource diagnostics. Control-plane managed domain mapping
+  is not implemented yet.
 - Config-file Dockerfile/Compose path selectors are rejected until resource profile fields and
   runtime planner mapping own those paths explicitly.
 - Stored Appaloft/external secret adapters beyond the headless `ci-env:` resolver are not wired into
