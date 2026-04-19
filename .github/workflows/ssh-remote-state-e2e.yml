@@ -1,0 +1,92 @@
+name: SSH Remote State E2E
+
+on:
+  workflow_call:
+    inputs:
+      required:
+        description: Fail when the SSH remote-state E2E secrets are not configured.
+        required: false
+        default: false
+        type: boolean
+    secrets:
+      APPALOFT_E2E_SSH_HOST:
+        required: false
+      APPALOFT_E2E_SSH_PRIVATE_KEY:
+        required: false
+      APPALOFT_E2E_SSH_PORT:
+        required: false
+      APPALOFT_E2E_SSH_USERNAME:
+        required: false
+      APPALOFT_E2E_PUBLIC_ROUTE_HOST:
+        required: false
+  workflow_dispatch:
+    inputs:
+      required:
+        description: Fail when the SSH remote-state E2E secrets are not configured.
+        required: false
+        default: true
+        type: boolean
+
+concurrency:
+  group: ssh-remote-state-e2e-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  BUN_VERSION: 1.3.12
+  APPALOFT_OTEL_ENABLED: "false"
+
+jobs:
+  ssh-remote-state-e2e:
+    runs-on: ubuntu-latest
+    env:
+      HAS_SSH_REMOTE_STATE_SECRETS: ${{ secrets.APPALOFT_E2E_SSH_HOST != '' && secrets.APPALOFT_E2E_SSH_PRIVATE_KEY != '' }}
+    steps:
+      - name: Require SSH Remote State E2E Secrets
+        if: ${{ env.HAS_SSH_REMOTE_STATE_SECRETS != 'true' && inputs.required == true }}
+        run: |
+          echo "::error::Missing APPALOFT_E2E_SSH_HOST or APPALOFT_E2E_SSH_PRIVATE_KEY."
+          echo "::error::Configure repository or organization secrets, or dispatch with required=false."
+          exit 1
+
+      - name: Skip SSH Remote State E2E
+        if: ${{ env.HAS_SSH_REMOTE_STATE_SECRETS != 'true' && inputs.required != true }}
+        run: |
+          echo "Skipping SSH remote-state E2E because APPALOFT_E2E_SSH_HOST or APPALOFT_E2E_SSH_PRIVATE_KEY is not configured."
+
+      - uses: actions/checkout@v4
+        if: ${{ env.HAS_SSH_REMOTE_STATE_SECRETS == 'true' }}
+
+      - uses: oven-sh/setup-bun@v2
+        if: ${{ env.HAS_SSH_REMOTE_STATE_SECRETS == 'true' }}
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Install
+        if: ${{ env.HAS_SSH_REMOTE_STATE_SECRETS == 'true' }}
+        run: bun install --frozen-lockfile
+
+      - name: Prepare SSH Key
+        if: ${{ env.HAS_SSH_REMOTE_STATE_SECRETS == 'true' }}
+        shell: bash
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.APPALOFT_E2E_SSH_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "${RUNNER_TEMP}/appaloft-ssh"
+          printf '%s\n' "${SSH_PRIVATE_KEY}" > "${RUNNER_TEMP}/appaloft-ssh/key"
+          chmod 600 "${RUNNER_TEMP}/appaloft-ssh/key"
+          echo "APPALOFT_E2E_SSH_PRIVATE_KEY=${RUNNER_TEMP}/appaloft-ssh/key" >> "${GITHUB_ENV}"
+          echo "APPALOFT_E2E_REMOTE_STATE_ROOT=/tmp/appaloft-github-ssh-state-e2e/${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" >> "${GITHUB_ENV}"
+
+      - name: Run SSH Remote State E2E
+        if: ${{ env.HAS_SSH_REMOTE_STATE_SECRETS == 'true' }}
+        env:
+          APPALOFT_E2E_SSH_REMOTE_STATE: "true"
+          APPALOFT_E2E_SSH_HOST: ${{ secrets.APPALOFT_E2E_SSH_HOST }}
+          APPALOFT_E2E_SSH_PORT: ${{ secrets.APPALOFT_E2E_SSH_PORT || '22' }}
+          APPALOFT_E2E_SSH_USERNAME: ${{ secrets.APPALOFT_E2E_SSH_USERNAME || 'root' }}
+          APPALOFT_E2E_PUBLIC_ROUTE_HOST: ${{ secrets.APPALOFT_E2E_PUBLIC_ROUTE_HOST }}
+        run: bun test ./apps/shell/test/e2e/github-action-ssh-state.workflow.e2e.ts
