@@ -56,6 +56,23 @@ function traefikRule(route: EdgeProxyRouteInput): string {
     : `(${hostRule}) && PathPrefix(\`${route.pathPrefix}\`)`;
 }
 
+function isRedirectRoute(route: EdgeProxyRouteInput): boolean {
+  return route.routeBehavior === "redirect" || Boolean(route.redirectTo);
+}
+
+function regexEscape(input: string): string {
+  return input.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function redirectStatus(route: EdgeProxyRouteInput): 301 | 302 | 307 | 308 {
+  return route.redirectStatus ?? 308;
+}
+
+function redirectReplacement(route: EdgeProxyRouteInput): string {
+  const scheme = route.tlsMode === "auto" ? "https" : "http";
+  return [`${scheme}://${route.redirectTo}/$$`, "{1}"].join("");
+}
+
 function routeProbeCommand(input: {
   httpPort: number;
   networkName: string;
@@ -132,6 +149,29 @@ function labelsForTraefik(input: {
     deploymentId: input.deploymentId,
     ...(input.index === 0 ? {} : { suffix: String(input.index) }),
   });
+  if (isRedirectRoute(input.route) && input.route.redirectTo) {
+    const middleware = `${router}-redirect`;
+    const entrypoint = input.route.tlsMode === "auto" ? "websecure" : "web";
+    const sourceHost = input.route.domains[0] ?? "";
+    const sourcePath = input.route.pathPrefix === "/" ? "/" : input.route.pathPrefix;
+    const regex = `^https?://${regexEscape(sourceHost)}${regexEscape(sourcePath)}(.*)`;
+    const status = redirectStatus(input.route);
+
+    return [
+      "traefik.enable=true",
+      `traefik.docker.network=${traefikEdgeNetworkName}`,
+      `traefik.http.routers.${router}.rule=${traefikRule(input.route)}`,
+      `traefik.http.routers.${router}.entrypoints=${entrypoint}`,
+      ...(input.route.tlsMode === "auto" ? [`traefik.http.routers.${router}.tls=true`] : []),
+      `traefik.http.routers.${router}.middlewares=${middleware}`,
+      `traefik.http.routers.${router}.service=noop@internal`,
+      `traefik.http.middlewares.${middleware}.redirectregex.regex=${regex}`,
+      `traefik.http.middlewares.${middleware}.redirectregex.replacement=${redirectReplacement(input.route)}`,
+      `traefik.http.middlewares.${middleware}.redirectregex.permanent=${status === 301 || status === 308}`,
+      `appaloft.redirect.status=${status}`,
+    ];
+  }
+
   const service = `${router}-svc`;
   const entrypoint = input.route.tlsMode === "auto" ? "websecure" : "web";
 
@@ -169,6 +209,7 @@ function routeViews(input: ProxyConfigurationViewInput): ProxyConfigurationRoute
   return input.accessRoutes.flatMap((route) =>
     route.domains.map((hostname) => {
       const scheme = routeScheme(route);
+      const redirect = isRedirectRoute(route);
       return {
         hostname,
         scheme,
@@ -177,6 +218,9 @@ function routeViews(input: ProxyConfigurationViewInput): ProxyConfigurationRoute
         tlsMode: route.tlsMode,
         ...(route.targetPort === undefined ? {} : { targetPort: route.targetPort }),
         source,
+        routeBehavior: redirect ? "redirect" : "serve",
+        ...(route.redirectTo ? { redirectTo: route.redirectTo } : {}),
+        ...(route.redirectStatus ? { redirectStatus: route.redirectStatus } : {}),
       };
     }),
   );

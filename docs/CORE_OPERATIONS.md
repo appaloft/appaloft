@@ -354,7 +354,9 @@ Current boundary:
   becomes server-applied proxy route desired/applied state persisted in the selected SSH target's
   Appaloft state backend. In hosted or self-hosted control-plane mode, the same intent may map to
   explicit managed `domain-bindings.create` and certificate workflow steps after trusted
-  resource/server/destination context exists.
+  resource/server/destination context exists. A domain entry may also describe a canonical redirect
+  alias with `redirectTo` and optional `redirectStatus`; redirect source hosts are target-local
+  proxy route state in SSH mode and managed route/domain follow-up intent in control-plane mode.
 - GitHub Actions and other headless binary entrypoints that deploy to an SSH server default to
   SSH-server PGlite state and do not need `DATABASE_URL`. `DATABASE_URL` is required only when the
   caller explicitly selects PostgreSQL or a remote Appaloft control plane. Runner-local PGlite is
@@ -417,7 +419,7 @@ Implemented operations:
 
 | Capability | Kind | Operation Key | Message | Schema | CLI | oRPC / HTTP |
 | --- | --- | --- | --- | --- | --- | --- |
-| Create domain binding | Command | `domain-bindings.create` | `CreateDomainBindingCommand` | `CreateDomainBindingCommandInput` | `appaloft domain-binding create <domainName>` | `POST /api/domain-bindings` |
+| Create domain binding | Command | `domain-bindings.create` | `CreateDomainBindingCommand` | `CreateDomainBindingCommandInput` | `appaloft domain-binding create <domainName> [--redirect-to <domain>] [--redirect-status 301\|302\|307\|308]` | `POST /api/domain-bindings` |
 | Confirm domain binding ownership | Command | `domain-bindings.confirm-ownership` | `ConfirmDomainBindingOwnershipCommand` | `ConfirmDomainBindingOwnershipCommandInput` | `appaloft domain-binding confirm-ownership <domainBindingId> [--verification-mode dns\|manual]` | `POST /api/domain-bindings/{domainBindingId}/ownership-confirmations` |
 | List domain bindings | Query | `domain-bindings.list` | `ListDomainBindingsQuery` | `ListDomainBindingsQueryInput` | `appaloft domain-binding list` | `GET /api/domain-bindings` |
 | Issue or renew certificate | Command | `certificates.issue-or-renew` | `IssueOrRenewCertificateCommand` | `IssueOrRenewCertificateCommandInput` | `appaloft certificate issue-or-renew <domainBindingId>` | `POST /api/certificates/issue-or-renew` |
@@ -462,6 +464,10 @@ Current boundary:
 - `deployments.create` must not carry domain, proxy, path prefix, or TLS fields
 - duplicate active bindings are rejected for the same project/environment/resource/domain/path
   owner scope
+- durable canonical redirect bindings are accepted through `domain-bindings.create` when
+  `redirectTo` points at an existing served binding for the same project/environment/resource/path;
+  redirect-only bindings still own their source hostname and require DNS/TLS lifecycle coverage for
+  that hostname
 - durable domain bindings require a target edge proxy provider that supports durable domain routes;
   no-proxy targets are rejected by durable domain binding admission
 - generated default access routes are not durable domain bindings and are governed by
@@ -470,7 +476,9 @@ Current boundary:
   records. They are target-local proxy route desired/applied state governed by
   [ADR-024](./decisions/ADR-024-pure-cli-ssh-state-and-server-applied-domains.md), and may later be
   imported or mapped into managed domain binding lifecycle when a hosted/self-hosted control plane
-  is selected.
+  is selected. Canonical redirect aliases such as `www -> apex` are part of that route state; they
+  require DNS and TLS coverage for the redirecting host but do not create a separate deployment
+  command or managed certificate record in pure CLI mode.
 - generated default access policy editing must become the public command
   `default-access-domain-policies.configure` before Web/CLI/API expose it
 - `domain-bindings.list` exposes the read model used by CLI, API, and Web to observe accepted
@@ -478,6 +486,10 @@ Current boundary:
 - Web exposes domain binding from both the resource detail page and the standalone domain bindings
   page; the resource detail page is the owner-scoped affordance, while the standalone page is
   cross-resource management over the same command/query contracts
+- Web create forms expose route behavior as a select: serve traffic or redirect to canonical. CLI
+  exposes the same managed intent through `--redirect-to` and `--redirect-status`. Repository config
+  exposes the pure CLI/server-applied equivalent through `access.domains[].redirectTo` and
+  `access.domains[].redirectStatus`.
 - generated sslip/default access hostnames are not durable domain bindings and must be displayed as
   generated access state, not as rows in the custom domain binding list
 

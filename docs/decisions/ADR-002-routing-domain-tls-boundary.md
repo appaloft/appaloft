@@ -19,7 +19,17 @@ Routing, domain ownership, generated default access, and TLS lifecycle are separ
 
 Deployment attempts may still carry an immutable resolved access-route snapshot. That snapshot is derived from resource, server, domain binding, certificate, and default access domain policy state during deployment planning/execution. It is not submitted by the caller as deployment command input.
 
-Durable custom domains must use `domain-bindings.create`. Certificate issuance, renewal, and import must use certificate commands. Generated default access domains are governed by [ADR-017](./ADR-017-default-access-domain-and-proxy-routing.md) and must be provided through provider-neutral ports/adapters instead of deployment input.
+Durable custom domains must use `domain-bindings.create`. A durable binding may either serve
+traffic or act as a canonical redirect alias to another served durable binding in the same
+resource/path owner scope. Certificate issuance, renewal, and import must use certificate commands.
+Generated default access domains are governed by
+[ADR-017](./ADR-017-default-access-domain-and-proxy-routing.md) and must be provided through
+provider-neutral ports/adapters instead of deployment input.
+
+Pure CLI/SSH server-applied config domains are governed by
+[ADR-024](./ADR-024-pure-cli-ssh-state-and-server-applied-domains.md). Their route state may include
+provider-neutral canonical redirect aliases, but those aliases remain server-local route intent in
+pure CLI mode and must not be submitted to `deployments.create`.
 
 Future routing commands may include:
 
@@ -47,7 +57,8 @@ Deployment route snapshots may contain generated or durable access routes, runti
 Route snapshots must be resolved from:
 
 - `ResourceNetworkProfile`;
-- ready or pending durable `DomainBinding` state when explicitly allowed;
+- ready or pending durable `DomainBinding` state when explicitly allowed, including redirect-only
+  aliases that still require ownership and TLS coverage for the redirecting host;
 - configured default access domain policy;
 - selected deployment target/server public address and proxy readiness;
 - certificate/TLS state when TLS is required.
@@ -73,7 +84,7 @@ The routing boundary remains clear:
 
 - deployment attempts carry resolved snapshots;
 - resources own source/runtime/network profile;
-- `DomainBinding` owns durable custom domain state;
+- `DomainBinding` owns durable custom domain state and managed canonical redirect policy;
 - certificate workflows own TLS state;
 - provider adapters own concrete generated-domain behavior.
 

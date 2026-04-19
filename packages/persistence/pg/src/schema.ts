@@ -137,6 +137,8 @@ export interface DomainBindingsTable {
   path_prefix: string;
   proxy_kind: string;
   tls_mode: string;
+  redirect_to: string | null;
+  redirect_status: number | null;
   certificate_policy: string;
   status: string;
   verification_attempts: ColumnType<

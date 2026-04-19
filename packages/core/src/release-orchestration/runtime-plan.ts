@@ -7,6 +7,7 @@ import {
   type RuntimePlanId,
 } from "../shared/identifiers";
 import {
+  type CanonicalRedirectStatusCode,
   type ExitCode,
   type HealthCheckExpectedStatusCode,
   type HealthCheckIntervalSeconds,
@@ -237,6 +238,8 @@ export interface AccessRouteState {
   pathPrefix: RoutePathPrefix;
   tlsMode: TlsModeValue;
   targetPort?: PortNumber;
+  redirectTo?: PublicDomainName;
+  redirectStatus?: CanonicalRedirectStatusCode;
 }
 
 export interface RuntimeVerificationStepState {
@@ -690,6 +693,17 @@ export class AccessRoute extends ValueObject<AccessRouteState> {
       return err(domainError.validation("Access routes require at least one domain"));
     }
 
+    if (input.redirectStatus && !input.redirectTo) {
+      return err(domainError.validation("Canonical redirect status requires redirect target"));
+    }
+
+    if (
+      input.redirectTo &&
+      input.domains.some((domain) => domain.value === input.redirectTo?.value)
+    ) {
+      return err(domainError.validation("Canonical redirect cannot target its source domain"));
+    }
+
     return ok(new AccessRoute(input));
   }
 
@@ -717,6 +731,18 @@ export class AccessRoute extends ValueObject<AccessRouteState> {
     return this.state.targetPort?.value;
   }
 
+  get routeBehavior(): "serve" | "redirect" {
+    return this.state.redirectTo ? "redirect" : "serve";
+  }
+
+  get redirectTo(): string | undefined {
+    return this.state.redirectTo?.value;
+  }
+
+  get redirectStatus(): 301 | 302 | 307 | 308 | undefined {
+    return this.state.redirectStatus?.value;
+  }
+
   toState(): AccessRouteState {
     return {
       proxyKind: this.state.proxyKind,
@@ -724,6 +750,8 @@ export class AccessRoute extends ValueObject<AccessRouteState> {
       pathPrefix: this.state.pathPrefix,
       tlsMode: this.state.tlsMode,
       ...(this.state.targetPort ? { targetPort: this.state.targetPort } : {}),
+      ...(this.state.redirectTo ? { redirectTo: this.state.redirectTo } : {}),
+      ...(this.state.redirectStatus ? { redirectStatus: this.state.redirectStatus } : {}),
     };
   }
 }

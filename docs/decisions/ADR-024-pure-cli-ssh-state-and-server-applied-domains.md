@@ -121,9 +121,12 @@ Repository config domain intent is provider-neutral and must normalize to route 
 ```yaml
 access:
   domains:
-    - host: www.example.com
+    - host: example.com
       pathPrefix: /
       tlsMode: auto
+    - host: www.example.com
+      redirectTo: example.com
+      redirectStatus: 308
 ```
 
 The exact parser schema belongs to the deployment-config package, but accepted fields must stay in
@@ -132,6 +135,12 @@ this boundary:
 - `host` is a domain name without scheme, port, or path;
 - `pathPrefix` defaults to `/` when omitted;
 - `tlsMode` is provider-neutral, initially `auto` or `disabled`;
+- `redirectTo`, when present, is a domain name in the same resolved route set and means this host is
+  an alias that redirects to the target host instead of proxying to the workload;
+- `redirectStatus`, when present, must be one of `301`, `302`, `307`, or `308`, and defaults to
+  `308` for canonical host redirects;
+- redirect entries must not point to themselves, to another redirect entry, to a host outside the
+  same trusted project/environment/resource/server/destination route context, or form loops;
 - raw certificate material, private keys, provider account ids, DNS provider credentials, server
   ids, destination ids, and credential selectors are rejected.
 
@@ -152,6 +161,15 @@ state owned by the selected SSH target and edge proxy provider. TLS renewal in p
 delegated to the resident edge proxy/provider when possible, for example Caddy or Traefik with
 provider-owned ACME storage. One-shot CLI deploys observe and repair on deploy, verify, or doctor;
 they must not pretend to run a hidden always-on Appaloft scheduler after the process exits.
+
+Canonical redirect support is part of the same server-applied route state, not a separate
+deployment command. The target host still needs a normal served route entry so the workload remains
+reachable. Redirect source hosts still require DNS to point at the selected edge address, and
+HTTPS redirects require the resident provider to obtain or serve valid certificate coverage for the
+redirect source host before a browser can follow the redirect without a certificate warning. The
+provider owns the concrete redirect implementation, such as Traefik redirect middleware or Caddy
+`redir` rules; application, CLI, Web, and HTTP code must only carry provider-neutral redirect
+intent.
 
 When first-run config bootstrap has resolved the project, environment, resource, and server but the
 entrypoint has not selected an explicit destination id, the SSH state backend may persist route

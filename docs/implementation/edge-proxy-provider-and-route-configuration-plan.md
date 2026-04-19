@@ -77,7 +77,8 @@ provider plan -> local shell executor | ssh executor | future runtime executor
 Provider packages render plans:
 
 ```text
-resource/server/route snapshot -> provider-specific commands, labels, files, reload steps, diagnostics
+resource/server/route snapshot -> provider-specific commands, labels, files, redirect rules,
+reload steps, diagnostics
 ```
 
 ## Write-Side State Changes
@@ -89,6 +90,8 @@ Write-side changes are limited to:
 - replacing direct proxy-specific route/bootstrap construction with provider-produced plans;
 - applying provider-produced reload plans after route/certificate-related proxy configuration
   changes and before public route verification;
+- preserving provider-neutral canonical redirect metadata through route realization snapshots and
+  read-only proxy configuration views;
 - recording route realization status and provider key in deployment snapshots/read models where needed;
 - recording durable domain binding `not_ready` state when a failed route realization affects active
   custom domain bindings;
@@ -141,6 +144,8 @@ Minimum tests:
 - deployment planning includes deployable durable domain bindings in the runtime access-route
   snapshot for the same project/environment/resource/server/destination;
 - deployment route realization uses provider route and reload plans;
+- provider route realization renders canonical redirect aliases without proxying redirect source
+  hosts to workload upstreams;
 - failed route realization marks affected active domain bindings `not_ready` with safe failure
   metadata and publishes `domain-route-realization-failed`;
 - `resources.proxy-configuration.preview` returns planned/latest/deployment-snapshot views without side effects;

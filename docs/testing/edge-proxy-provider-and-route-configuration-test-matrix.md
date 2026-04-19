@@ -28,6 +28,7 @@ This test matrix inherits:
 | Server bootstrap | Proxy bootstrap consumes provider ensure plan and records ready/failed state. |
 | Deployment route realization | Runtime execution consumes provider route plan and targets resource `internalPort`. |
 | Server-applied config domains | Provider renders and applies route state from `access.domains[]` without creating managed `DomainBinding` records. |
+| Canonical redirects | Provider renders redirect-only route state from `redirectTo` aliases without attaching alias hosts to workload upstreams. |
 | Proxy reload | Runtime applies provider-produced reload plans after route/certificate config changes and before public route verification. |
 | Query/read model | `resources.proxy-configuration.preview` returns read-only planned/latest/snapshot config. |
 | Web/API/CLI | Entry points display query output and do not reimplement provider rendering. |
@@ -96,6 +97,7 @@ Then:
 | EDGE-PROXY-ROUTE-005 | integration | Server-applied config domain route | SSH-server remote state has `access.domains[]` desired route for a deployed resource | Provider route plan receives config domain route input and applies when supported | Provider-specific route uses config hostname/path and resource internal port | Desired state is consumed without creating managed `DomainBinding`; successful deployment records applied status in server-applied route state | Per route realization |
 | EDGE-PROXY-ROUTE-006 | integration | Server-applied TLS auto delegated to provider | Config domain has `tlsMode = auto` and provider supports resident TLS automation | Provider renders TLS-enabled route/config without requiring raw cert material from config | Provider-specific ACME/storage details stay inside provider output | Proxy configuration and resource diagnostic summaries expose provider-local TLS status/diagnostics without creating managed `Certificate` state | Per provider policy |
 | EDGE-PROXY-ROUTE-007 | integration | Server-applied route realization failure | Provider cannot render, apply, reload, or verify config domain route | Route realization fails with structured error | Config not marked applied | Remote state/read model exposes failed route with `proxy-domain-realization` or provider phase | Yes when provider marks retriable |
+| EDGE-PROXY-ROUTE-008 | integration | Server-applied canonical redirect | Provider receives a served canonical host plus alias host with `redirectTo` and `redirectStatus` | Provider route plan renders redirect-only configuration for the alias host and upstream proxy configuration for the canonical host | Provider-specific redirect rule preserves path/query and uses the requested status; alias host is not attached to workload upstream | Successful deployment records applied redirect route status and proxy configuration view exposes source host, target host, and status | Per route realization |
 
 ## Proxy Reload Matrix
 
@@ -116,6 +118,7 @@ Then:
 | EDGE-PROXY-QRY-004 | integration | No proxy route | Resource has no inbound route | `ok`, status `not-configured` | None | Empty sections. |
 | EDGE-PROXY-QRY-005 | integration | Missing provider | Provider key unavailable | `err` | `proxy_provider_unavailable` | None. |
 | EDGE-PROXY-QRY-006 | integration | Sensitive diagnostic values | Provider returns secrets in diagnostics | `ok` | None | Values redacted. |
+| EDGE-PROXY-QRY-007 | integration | Canonical redirect visible | Latest or planned route state contains an alias redirect | `ok`, status `planned` or `applied` | None | Route view includes `routeBehavior = redirect`, `redirectTo`, and `redirectStatus`; provider-specific redirect syntax appears only in read-only sections. |
 
 ## Entry Surface Matrix
 
@@ -150,6 +153,10 @@ when deployment failure is in route realization, reload, or public-route verific
 `EDGE-PROXY-ROUTE-006` now has provider coverage for Traefik and Caddy TLS-auto route rendering
 and application diagnostic coverage for surfacing provider-local TLS summaries through resource
 diagnostics. Real HTTPS public validation and provider-owned ACME history remain follow-up work.
+
+`EDGE-PROXY-ROUTE-008` and `EDGE-PROXY-QRY-007` now have provider route input, Traefik/Caddy
+renderer, runtime planning, and proxy configuration query coverage for canonical redirect aliases.
+External runtime reload and public redirect probing remain e2e follow-up coverage.
 
 ## Open Questions
 

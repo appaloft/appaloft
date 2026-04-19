@@ -53,6 +53,8 @@ type DomainBindingRequestedPayload = {
   pathPrefix: string;
   edgeProxyProviderKey?: string;
   tlsMode: "auto" | "disabled";
+  redirectTo?: string;
+  redirectStatus?: 301 | 302 | 307 | 308;
   certificatePolicy: "auto" | "manual" | "disabled";
   verificationAttemptId: string;
   requestedAt: string;
@@ -62,6 +64,9 @@ type DomainBindingRequestedPayload = {
 ```
 
 Payload must not contain DNS provider credentials, certificate private keys, or raw secret material.
+
+When `redirectTo` is present, the event still represents ownership verification for the source
+hostname. It does not mean the redirect route has been realized by the edge proxy.
 
 ## State Progression
 

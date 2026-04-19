@@ -2,6 +2,7 @@ import { type RepositoryContext } from "@appaloft/application";
 import {
   AccessRoute,
   BuildStrategyKindValue,
+  CanonicalRedirectStatusCode,
   CertificateAttemptId,
   CertificateAttemptIdempotencyKeyValue,
   type CertificateAttemptState,
@@ -1072,6 +1073,14 @@ export function rehydrateDomainBindingRow(row: Selectable<Database["domain_bindi
     pathPrefix: RoutePathPrefix.rehydrate(row.path_prefix),
     proxyKind: EdgeProxyKindValue.rehydrate(row.proxy_kind as EdgeProxyKindInput),
     tlsMode: TlsModeValue.rehydrate(row.tls_mode as TlsModeInput),
+    ...(row.redirect_to ? { redirectTo: PublicDomainName.rehydrate(row.redirect_to) } : {}),
+    ...(row.redirect_status
+      ? {
+          redirectStatus: CanonicalRedirectStatusCode.rehydrate(
+            row.redirect_status as 301 | 302 | 307 | 308,
+          ),
+        }
+      : {}),
     certificatePolicy: CertificatePolicyValue.rehydrate(
       row.certificate_policy as CertificatePolicyInput,
     ),

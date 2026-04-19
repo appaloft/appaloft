@@ -195,6 +195,8 @@ Deployment route realization must use:
 - `ResourceNetworkProfile.internalPort` or the resolved network snapshot as the upstream target;
 - `pathPrefix` only from durable domain binding or future resource access profile state;
 - TLS mode only from durable domain binding/certificate state or a provider-neutral default policy.
+- redirect behavior only from provider-neutral route state owned by server-applied config domains,
+  durable route configuration, or a future resource access profile command.
 
 It must not read domain/proxy/TLS fields from `deployments.create` input.
 

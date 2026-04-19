@@ -27,6 +27,9 @@
   import { orpcClient } from "$lib/orpc";
   import { queryClient } from "$lib/query-client";
 
+  type DomainRouteMode = "serve" | "redirect";
+  type RedirectStatusText = "301" | "302" | "307" | "308";
+
   const {
     projectsQuery,
     environmentsQuery,
@@ -58,6 +61,9 @@
   let pathPrefix = $state("/");
   let proxyKind = $state<CreateDomainBindingInput["proxyKind"]>("traefik");
   let tlsMode = $state<NonNullable<CreateDomainBindingInput["tlsMode"]>>("auto");
+  let routeMode = $state<DomainRouteMode>("serve");
+  let redirectTo = $state("");
+  let redirectStatus = $state<RedirectStatusText>("308");
   let certificatePolicy = $state<NonNullable<CreateDomainBindingInput["certificatePolicy"]>>(
     "auto",
   );
@@ -93,6 +99,20 @@
   const selectedProjectFilter = $derived(
     projectFilter ? findProject(projects, projectFilter) : null,
   );
+  const canonicalRedirectTargets = $derived.by(() =>
+    domainBindings.filter(
+      (binding) =>
+        !binding.redirectTo &&
+        binding.projectId === projectId &&
+        binding.environmentId === environmentId &&
+        binding.resourceId === resourceId &&
+        binding.domainName !== domainName.trim().toLowerCase() &&
+        binding.pathPrefix === (pathPrefix.trim() || "/"),
+    ),
+  );
+  const selectedCanonicalRedirectTarget = $derived(
+    canonicalRedirectTargets.find((binding) => binding.domainName === redirectTo) ?? null,
+  );
   const projectFilterSelectValue = $derived(projectFilter || allProjectsFilterValue);
   const visibleDomainBindings = $derived.by(() =>
     projectFilter
@@ -108,7 +128,8 @@
         destinationId &&
         domainName.trim() &&
         pathPrefix.trim() &&
-        proxyKind !== "none",
+        proxyKind !== "none" &&
+        (routeMode === "serve" || redirectTo),
     ),
   );
 
@@ -121,6 +142,7 @@
         detail: result.id,
       };
       domainName = "";
+      redirectTo = "";
       void queryClient.invalidateQueries({ queryKey: ["domain-bindings"] });
     },
     onError: (error) => {
@@ -195,6 +217,18 @@
     destinationId = selectedResource.destinationId;
   });
 
+  $effect(() => {
+    if (!browser || routeMode !== "redirect") {
+      return;
+    }
+
+    if (canonicalRedirectTargets.some((binding) => binding.domainName === redirectTo)) {
+      return;
+    }
+
+    redirectTo = canonicalRedirectTargets[0]?.domainName ?? "";
+  });
+
   function createDomainBinding(event: SubmitEvent): void {
     event.preventDefault();
 
@@ -213,8 +247,27 @@
       pathPrefix: pathPrefix.trim() || "/",
       proxyKind,
       tlsMode,
+      ...(routeMode === "redirect"
+        ? {
+            redirectTo,
+            redirectStatus: parseRedirectStatus(redirectStatus),
+          }
+        : {}),
       certificatePolicy,
     });
+  }
+
+  function parseRedirectStatus(value: RedirectStatusText): 301 | 302 | 307 | 308 {
+    switch (value) {
+      case "301":
+        return 301;
+      case "302":
+        return 302;
+      case "307":
+        return 307;
+      case "308":
+        return 308;
+    }
   }
 
   function domainBindingStatusLabel(status: DomainBindingSummary["status"]): string {
@@ -435,6 +488,59 @@
                 </Select.Root>
               </label>
 
+              <label class="space-y-1.5 text-sm font-medium">
+                <span>{$t(i18nKeys.common.domain.routeBehavior)}</span>
+                <Select.Root bind:value={routeMode} type="single">
+                  <Select.Trigger class="w-full">
+                    {routeMode === "redirect"
+                      ? $t(i18nKeys.console.domainBindings.routeModeRedirect)
+                      : $t(i18nKeys.console.domainBindings.routeModeServe)}
+                  </Select.Trigger>
+                  <Select.Content>
+                    <Select.Item value="serve">
+                      {$t(i18nKeys.console.domainBindings.routeModeServe)}
+                    </Select.Item>
+                    <Select.Item value="redirect">
+                      {$t(i18nKeys.console.domainBindings.routeModeRedirect)}
+                    </Select.Item>
+                  </Select.Content>
+                </Select.Root>
+              </label>
+
+              {#if routeMode === "redirect"}
+                <label class="space-y-1.5 text-sm font-medium">
+                  <span>{$t(i18nKeys.common.domain.redirectTo)}</span>
+                  <Select.Root
+                    bind:value={redirectTo}
+                    type="single"
+                    disabled={canonicalRedirectTargets.length === 0}
+                  >
+                    <Select.Trigger class="w-full">
+                      {selectedCanonicalRedirectTarget?.domainName ??
+                        $t(i18nKeys.console.domainBindings.noCanonicalDomainOptions)}
+                    </Select.Trigger>
+                    <Select.Content>
+                      {#each canonicalRedirectTargets as binding (binding.id)}
+                        <Select.Item value={binding.domainName}>{binding.domainName}</Select.Item>
+                      {/each}
+                    </Select.Content>
+                  </Select.Root>
+                </label>
+
+                <label class="space-y-1.5 text-sm font-medium">
+                  <span>{$t(i18nKeys.common.domain.redirectStatus)}</span>
+                  <Select.Root bind:value={redirectStatus} type="single">
+                    <Select.Trigger class="w-full">{redirectStatus}</Select.Trigger>
+                    <Select.Content>
+                      <Select.Item value="308">308</Select.Item>
+                      <Select.Item value="301">301</Select.Item>
+                      <Select.Item value="307">307</Select.Item>
+                      <Select.Item value="302">302</Select.Item>
+                    </Select.Content>
+                  </Select.Root>
+                </label>
+              {/if}
+
               <label class="space-y-1.5 text-sm font-medium sm:col-span-2">
                 <span>{$t(i18nKeys.common.domain.destination)}</span>
                 <Input bind:value={destinationId} autocomplete="off" placeholder="dst_..." />
@@ -572,6 +678,10 @@
                       <p class="mt-1 truncate text-sm font-medium">
                         {binding.pathPrefix} · {binding.proxyKind} · {$t(i18nKeys.common.domain.tls)}
                         {binding.tlsMode}
+                        {#if binding.redirectTo}
+                          · {$t(i18nKeys.common.domain.redirectTo)} {binding.redirectTo}
+                          ({binding.redirectStatus ?? 308})
+                        {/if}
                       </p>
                     </div>
                   </div>

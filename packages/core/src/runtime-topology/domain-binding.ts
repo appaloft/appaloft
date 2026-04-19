@@ -10,6 +10,7 @@ import {
   type ProjectId,
   type ResourceId,
 } from "../shared/identifiers";
+import { CanonicalRedirectStatusCode } from "../shared/numeric-values";
 import { err, ok, type Result } from "../shared/result";
 import { type EdgeProxyKindValue, type TlsModeValue } from "../shared/state-machine";
 import { type CreatedAt } from "../shared/temporal";
@@ -309,6 +310,8 @@ export interface DomainBindingState {
   pathPrefix: RoutePathPrefix;
   proxyKind: EdgeProxyKindValue;
   tlsMode: TlsModeValue;
+  redirectTo?: PublicDomainName;
+  redirectStatus?: CanonicalRedirectStatusCode;
   certificatePolicy: CertificatePolicyValue;
   status: DomainBindingStatusValue;
   verificationAttempts: DomainVerificationAttemptState[];
@@ -338,6 +341,8 @@ export class DomainBinding extends AggregateRoot<DomainBindingState> {
     pathPrefix: RoutePathPrefix;
     proxyKind: EdgeProxyKindValue;
     tlsMode: TlsModeValue;
+    redirectTo?: PublicDomainName;
+    redirectStatus?: CanonicalRedirectStatusCode;
     certificatePolicy?: CertificatePolicyValue;
     verificationAttemptId: DomainVerificationAttemptId;
     verificationExpectedTarget: MessageText;
@@ -356,8 +361,30 @@ export class DomainBinding extends AggregateRoot<DomainBindingState> {
       );
     }
 
+    if (input.redirectStatus && !input.redirectTo) {
+      return err(
+        domainError.validation("Domain binding redirect status requires redirect target", {
+          phase: "domain-binding-admission",
+          domainName: input.domainName.value,
+        }),
+      );
+    }
+
+    if (input.redirectTo && input.redirectTo.value === input.domainName.value) {
+      return err(
+        domainError.validation("Domain binding canonical redirect cannot point to itself", {
+          phase: "domain-binding-admission",
+          domainName: input.domainName.value,
+          redirectTo: input.redirectTo.value,
+        }),
+      );
+    }
+
     const certificatePolicy =
       input.certificatePolicy ?? CertificatePolicyValue.defaultForTlsMode(input.tlsMode);
+    const redirectStatus = input.redirectTo
+      ? (input.redirectStatus ?? CanonicalRedirectStatusCode.rehydrate(308))
+      : undefined;
 
     const domainBinding = new DomainBinding({
       id: input.id,
@@ -370,6 +397,8 @@ export class DomainBinding extends AggregateRoot<DomainBindingState> {
       pathPrefix: input.pathPrefix,
       proxyKind: input.proxyKind,
       tlsMode: input.tlsMode,
+      ...(input.redirectTo ? { redirectTo: input.redirectTo } : {}),
+      ...(redirectStatus ? { redirectStatus } : {}),
       certificatePolicy,
       status: DomainBindingStatusValue.pendingVerification(),
       verificationAttempts: [
@@ -406,6 +435,12 @@ export class DomainBinding extends AggregateRoot<DomainBindingState> {
       pathPrefix: input.pathPrefix.value,
       proxyKind: input.proxyKind.value,
       tlsMode: input.tlsMode.value,
+      ...(input.redirectTo
+        ? {
+            redirectTo: input.redirectTo.value,
+            redirectStatus: redirectStatus?.value ?? 308,
+          }
+        : {}),
       certificatePolicy: certificatePolicy.value,
       verificationAttemptId: input.verificationAttemptId.value,
       requestedAt: input.createdAt.value,
