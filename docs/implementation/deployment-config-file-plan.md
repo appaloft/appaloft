@@ -29,6 +29,9 @@ Implement in ordered slices:
    - Add provider-neutral canonical redirect fields on domain entries (`redirectTo` and optional
      `redirectStatus`) while rejecting self-redirects, redirect loops, redirect-to-redirect chains,
      missing targets, and cross-context redirect targets.
+   - Add non-secret `controlPlane.mode` and optional `controlPlane.url` after ADR-025. Reject
+     project/resource/server/destination/credential/org/tenant identity, tokens, database URLs, SSH
+     keys, and raw credential material under `controlPlane`.
    - Keep schema strict so unsupported CPU/memory/replica/restart/rollout fields fail until their
      own ADR/spec/runtime enforcement exists.
 
@@ -82,6 +85,9 @@ Implement in ordered slices:
      default to SSH-server `ssh-pglite` when an SSH target is selected, require no `DATABASE_URL`
      for that mode, resolve `ci-env:` through runner environment variables, and use the same
      explicit operation sequence as interactive Quick Deploy.
+   - Resolve `controlPlane.mode` before state backend and identity resolution. Keep pure SSH
+     `none` as the default, let trusted CLI/action/env inputs override config, and fail before
+     mutation when Cloud/self-hosted is selected before the compatibility handshake exists.
 
 7. GitHub Action wrapper
    - Create a separate `appaloft/deploy-action` repository for action metadata, install scripts,
@@ -126,6 +132,9 @@ Implement in ordered slices:
   fields.
 - Managed `DomainBinding` lifecycle from pure CLI mode. Server-applied config domains are
   target-local proxy routes; cloud/self-hosted control-plane adoption is a later slice.
+- Cloud-assisted Action, self-hosted API mode, SSH PGlite adoption, and control-plane-owned
+  execution are governed by
+  [Control-Plane Modes Roadmap](./control-plane-modes-roadmap.md).
 - Always-on DNS observation, Appaloft-owned certificate renewal scheduling, and automatic preview
   cleanup without a server agent or hosted/self-hosted control plane.
 - A hidden backend convenience endpoint that reads repository config and performs multiple writes.
@@ -138,6 +147,8 @@ Implemented slices:
   It accepts source/runtime/network/health profile fields, non-secret `env` values, and secret
   references, while rejecting committed identity selectors, raw secret material, unknown fields, and
   unsupported CPU/memory/replica/restart/rollout fields.
+- `controlPlane.mode` and `controlPlane.url` are not implemented in the parser yet. Current
+  control-plane behavior is limited to environment/backend hints in the CLI state resolver.
 - `FileSystemDeploymentConfigReader` supports explicit config paths, Git-root discovery for nested
   local sources, YAML parsing, ambiguous-file rejection, and profile snapshot mapping.
 - CLI `appaloft init` writes a profile-only config and no longer writes project/resource/server

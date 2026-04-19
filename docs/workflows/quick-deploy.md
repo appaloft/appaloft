@@ -26,6 +26,7 @@ This workflow inherits:
 - [ADR-021: Docker/OCI Workload Substrate](../decisions/ADR-021-docker-oci-workload-substrate.md)
 - [ADR-023: Runtime Orchestration Target Boundary](../decisions/ADR-023-runtime-orchestration-target-boundary.md)
 - [ADR-024: Pure CLI SSH State And Server-Applied Domains](../decisions/ADR-024-pure-cli-ssh-state-and-server-applied-domains.md)
+- [ADR-025: Control-Plane Modes And Action Execution](../decisions/ADR-025-control-plane-modes-and-action-execution.md)
 - [Error Model](../errors/model.md)
 - [neverthrow Conventions](../errors/neverthrow-conventions.md)
 - [Async Lifecycle And Acceptance](../architecture/async-lifecycle-and-acceptance.md)
@@ -36,6 +37,7 @@ This workflow inherits:
 - [deployments.create Workflow Spec](./deployments.create.md)
 - [Workload Framework Detection And Planning](./workload-framework-detection-and-planning.md)
 - [Repository Deployment Config File Bootstrap](./deployment-config-file-bootstrap.md)
+- [Control-Plane Mode Selection And Adoption](./control-plane-mode-selection-and-adoption.md)
 - [GitHub Action Deploy Wrapper Implementation Plan](../implementation/github-action-deploy-action-plan.md)
 - [Workflow Spec Format](./WORKFLOW_SPEC_FORMAT.md)
 - [Quick Deploy Test Matrix](../testing/quick-deploy-test-matrix.md)
@@ -56,6 +58,12 @@ It may collect or create enough context for a first deployment:
 - first environment variable;
 - optional follow-up domain binding entrypoint;
 - final deployment request.
+
+Quick Deploy may collect or inherit control-plane connection policy before it resolves state or
+identity. That policy selects where Appaloft state and locks live, not what deployment command
+fields are accepted. GitHub Actions and CLI can remain execution owners when the state owner is
+`none`, Appaloft Cloud, or a self-hosted Appaloft control plane. If no mode is selected, Quick
+Deploy uses `controlPlane.mode = none`.
 
 When Quick Deploy collects source/runtime/health values, those values are entry-flow draft fields for `resources.create` or a future resource profile update command. They must not be submitted to `deployments.create`.
 
@@ -200,6 +208,8 @@ The reusable program owns only the operation order and id-threading between step
 ```text
 workflow input
   -> optionally read and normalize repository config profile into the same draft shape as interactive input
+  -> resolve execution owner and control-plane/state owner before state or identity resolution
+  -> run control-plane compatibility handshake before mutation when Cloud/self-hosted is selected
   -> require state context from the entry executor; SSH executors must ensure/lock/migrate
      SSH-server `ssh-pglite` state before identity resolution
   -> yield projects.create when project must be created

@@ -28,6 +28,9 @@ It must follow these boundaries:
   create managed `DomainBinding` or `Certificate` aggregates;
 - hosted/self-hosted control-plane mode is selected explicitly through a control-plane endpoint or
   PostgreSQL state backend.
+- control-plane mode selection follows ADR-025: GitHub Actions may remain the execution owner even
+  when Appaloft Cloud or a self-hosted Appaloft server owns state, locks, source links, policy, and
+  managed domain workflow state.
 
 The action wrapper may live in a separate public repository because its release cadence and
 Marketplace metadata are different from the main Appaloft repository. The wrapper should remain
@@ -116,6 +119,10 @@ Initial inputs:
 | `ssh-private-key-file` | No | Existing runner-local private key path; mutually exclusive with `ssh-private-key`. |
 | `server-proxy-kind` | No | Trusted proxy selection such as `traefik` or `caddy`, mapped to `--server-proxy-kind`. |
 | `state-backend` | No | Optional explicit backend: `ssh-pglite`, `local-pglite`, or `postgres-control-plane`. |
+| `control-plane-mode` | No | Future explicit mode: `none`, `auto`, `cloud`, or `self-hosted`. Defaults to `none` when absent. |
+| `control-plane-url` | No | Future trusted endpoint for self-hosted/private control planes, mapped to CLI/env outside committed config. |
+| `appaloft-token` | No | Future secret token for Cloud/self-hosted API mode; must never be logged or written to config. |
+| `use-oidc` | No | Future boolean for GitHub OIDC exchange when the Cloud auth ADR accepts it. |
 | `appaloft-data-root` | No | Future install/runtime hint for local cache; must not change committed config semantics. |
 | `args` | No | Escape hatch for additional CLI flags; examples should prefer explicit inputs. |
 
@@ -123,6 +130,11 @@ The wrapper must not accept raw `project`, `resource`, `server`, or `destination
 `appaloft.yml`. If it offers trusted id overrides later, they must be action inputs or workflow env
 values documented as operator-selected state, and the CLI must still treat them as selection
 overrides outside the committed config file.
+
+Control-plane inputs are also trusted entrypoint inputs, not repository config identity selectors.
+When absent, the wrapper must keep the current pure SSH behavior. When present before the matching
+CLI/control-plane handshake implementation exists, the wrapper or CLI must fail before mutation with
+structured control-plane errors rather than falling back silently.
 
 ## Secret And Environment Handling
 
@@ -200,6 +212,8 @@ Expected propagation model:
   or security behavior changes.
 - A future docs automation may update example snippets to a newer pinned CLI version, but runtime
   users are not forced to update the action wrapper for every CLI release.
+- Adding Cloud/self-hosted API support to the Appaloft CLI should not require a new action release
+  unless the wrapper needs new inputs, token/OIDC handling, output handling, or security behavior.
 
 ## No-Config Behavior
 
@@ -247,6 +261,7 @@ Wrapper failures are entrypoint failures:
 | Checksum mismatch | Action step fails before extraction. |
 | Missing SSH host for SSH mode | Action step or CLI fails before mutation. |
 | Missing private key or unreadable key file | Action step fails before invoking Appaloft. |
+| Unsupported control-plane mode | CLI returns structured Appaloft error before mutation until the selected Cloud/self-hosted handshake exists. |
 | Config validation failure | CLI returns structured Appaloft error. |
 | Remote state ensure/lock/migration failure | CLI returns structured Appaloft error with remote-state phase. |
 | Deployment accepted but runtime fails | CLI follows deployment workflow semantics; accepted id remains valid and failure is observed through state/read models. |
@@ -257,7 +272,8 @@ Wrapper failures are entrypoint failures:
 - Automatic PR environment cleanup.
 - Managed DNS/certificate lifecycle without a hosted/self-hosted control plane.
 - Creating or rotating GitHub Secrets.
-- Running an Appaloft cloud service.
+- Running an Appaloft cloud service or self-hosted control plane.
+- GitHub App/webhook execution where the control plane, not the action, owns execution.
 - Rebuilding Appaloft from source inside the action.
 - Parsing human CLI output as a durable contract.
 
@@ -271,7 +287,9 @@ Next Test-First Round should add or cover these rows:
 - `CONFIG-FILE-ENTRY-011` for action `version` resolution;
 - `CONFIG-FILE-ENTRY-012` for no-config action deploy behavior;
 - `CONFIG-FILE-ENTRY-013` for config without domains deploying without custom route mutation;
+- `CONFIG-FILE-ENTRY-014` and `CONTROL-PLANE-ENTRY-002` for future control-plane mode inputs;
 - `QUICK-DEPLOY-ENTRY-011` for deploy-action parity with CLI config workflow.
+- `QUICK-DEPLOY-ENTRY-012` for control-plane mode parity across entrypoints.
 
 ## Current Implementation Notes And Migration Gaps
 
@@ -289,4 +307,6 @@ Missing pieces before public release:
 - add a main-repo doc page that links release assets, action usage, and minimal `appaloft.yml`;
 - add a wrapper-level CI test that verifies exact-version install from a fixture or real release;
 - decide whether generated docs examples use `version: latest` or a pinned version by default;
+- add control-plane mode inputs only after the CLI resolver/parser and structured unsupported
+  errors exist;
 - add structured CLI deploy output if action outputs need deployment/resource ids.
