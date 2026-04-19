@@ -303,7 +303,7 @@ deployment admission.
 | Health policy | `ResourceRuntimeProfile` / health policy command | Must be reusable resource configuration. |
 | Plain environment values | `Environment` variable commands | Only for non-secret values; `PUBLIC_` and `VITE_` keys map to build-time `plain-config`, other keys map to runtime `plain-config`, all at `environment` scope unless a future schema adds explicit kind/exposure/scope fields. |
 | Required secret names | Secret/credential commands or adapters | Declare requirements or references, not raw values. Headless CI supports `ci-env:<NAME>` as an environment-variable resolver reference. |
-| `access.domains[]` | Server-applied route state in SSH CLI mode; managed `DomainBinding` intent in control-plane mode | Accepted values describe provider-neutral host/path/TLS route intent. They never enter `deployments.create`, never select identity or credentials, and never contain raw certificate material. |
+| `access.domains[]` | Server-applied route state in SSH CLI mode; managed `DomainBinding` or managed route intent in control-plane mode | Accepted values describe provider-neutral host/path/TLS route intent and optional canonical redirect aliases. They never enter `deployments.create`, never select identity or credentials, and never contain raw certificate material. |
 | CPU, memory, replicas, restart policy, rollout overlap/drain | Future resource/runtime-target profile specs | Must be rejected until an ADR/spec and runtime enforcement exist; no silent ignore. |
 
 If a resource already exists and the file changes reusable profile fields, the entry workflow must
@@ -348,9 +348,12 @@ Each domain entry must stay within this shape:
 ```yaml
 access:
   domains:
-    - host: www.example.com
+    - host: example.com
       pathPrefix: /
       tlsMode: auto
+    - host: www.example.com
+      redirectTo: example.com
+      redirectStatus: 308
 ```
 
 Rules:
@@ -358,6 +361,15 @@ Rules:
 - `host` is a domain name only; schemes, ports, and path fragments are rejected.
 - `pathPrefix` defaults to `/` when omitted.
 - `tlsMode` is provider-neutral and initially allows `auto` or `disabled`.
+- `redirectTo`, when present, is a domain name only and must point to another non-redirect domain
+  entry in the same normalized route set for the same trusted resource/server/destination context.
+- `redirectStatus` defaults to `308` and may be `301`, `302`, `307`, or `308`.
+- Redirect entries preserve the request path and query by default. If `pathPrefix` is set on the
+  redirect source, only that prefix is redirected and the suffix is preserved under the target
+  host.
+- Redirect entries must not create loops, self-redirect, redirect to missing hosts, redirect to
+  another redirect entry, or redirect across resource, server, destination, project, environment,
+  credential, or organization boundaries.
 - Raw certificate material, private keys, DNS provider credentials, certificate provider account
   ids, server ids, destination ids, and credential selectors are rejected.
 - A domain entry requires a reverse-proxy-capable resource network profile and selected SSH/control
@@ -379,6 +391,13 @@ This mode does not create a managed `DomainBinding` aggregate. TLS renewal is de
 resident edge proxy/provider when the provider supports it. One-shot CLI/Action executions observe,
 repair, or reapply on deploy, verify, or doctor; they do not imply an always-running Appaloft DNS or
 certificate scheduler.
+
+Canonical redirects in SSH mode are applied by the same provider route realization path. The target
+host must have a served route entry; the redirecting host must still resolve to the selected edge
+address. When `tlsMode = auto`, the resident provider must be able to obtain or serve certificate
+coverage for both the canonical host and redirect source host. Appaloft records redirect desired,
+applied, or failed status in server-applied route state and exposes it through access/proxy
+diagnostics, but does not create `DomainBinding` or `Certificate` aggregates.
 
 When the entrypoint uses a hosted or self-hosted control plane, the same config intent may map to
 managed `domain-bindings.create`, DNS observation, certificate, and read-model workflows after
@@ -443,7 +462,7 @@ Config-file errors use stable codes and phases:
 | `infra_error` | `remote-state-lock` | Yes | Remote state mutation lock could not be acquired or was interrupted. |
 | `infra_error` | `remote-state-migration` | Conditional | Remote state migration failed before workflow commands were dispatched. |
 | `validation_error` | `source-link-resolution` | No | Source fingerprint is ambiguous, missing required stable identity, or points at another context without explicit relink. |
-| `validation_error` | `config-domain-resolution` | No | Config domain intent cannot map safely to server-applied or managed domain workflow state. |
+| `validation_error` | `config-domain-resolution` | No | Config domain intent cannot map safely to server-applied or managed domain workflow state, including invalid host/path/TLS shape, missing redirect target, self-redirect, redirect loop, redirect-to-redirect, or unsupported redirect policy. |
 | `unsupported_config_field` | `config-capability-resolution` | No | Known future field such as CPU/memory/replicas or rollout policy is not enforceable by current workflow/resource/runtime target specs. |
 | `resource_profile_drift` | `resource-profile-resolution` | No | Existing resource differs from config and no explicit update operation is available. |
 | `infra_error` | `proxy-domain-realization` | Conditional | Server-applied proxy domain route could not be rendered, applied, reloaded, or verified on the target. |
@@ -519,8 +538,8 @@ the same server-applied route state. The opt-in SSH e2e harness verifies Traefik
 server-applied route reachability for `CONFIG-FILE-DOMAIN-005`. Broader CLI e2e, HTTP-schema
 contract coverage, existing-resource profile drift handling, stored/external secret adapters beyond
 `ci-env:`, Dockerfile/Compose path mapping, operational provisioning of the external SSH e2e
-secrets/target, real HTTPS public validation, provider-owned ACME history, and managed domain
-control-plane mapping remain follow-up work.
+secrets/target, real HTTP/HTTPS public validation for canonical redirects, provider-owned ACME
+history, and managed domain control-plane mapping remain follow-up work.
 
 ## Open Questions
 

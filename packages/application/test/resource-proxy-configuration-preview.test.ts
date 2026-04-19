@@ -16,6 +16,7 @@ import {
   type EdgeProxyProvider,
   type EdgeProxyProviderRegistry,
   type EdgeProxyProviderSelectionInput,
+  type ProxyConfigurationRouteView,
   type ProxyConfigurationView,
   type ProxyConfigurationViewInput,
   type ProxyReloadInput,
@@ -148,6 +149,29 @@ class FakeEdgeProxyProvider implements EdgeProxyProvider {
     input: ProxyConfigurationViewInput,
   ): Promise<Result<ProxyConfigurationView>> {
     this.lastConfigurationInput = input;
+    const routes: ProxyConfigurationRouteView[] = input.accessRoutes.flatMap((route) =>
+      route.domains.map((hostname) => {
+        const redirect = route as typeof route & {
+          routeBehavior?: "serve" | "redirect";
+          redirectTo?: string;
+          redirectStatus?: 301 | 302 | 307 | 308;
+        };
+        const scheme = route.tlsMode === "auto" ? "https" : "http";
+        return {
+          hostname,
+          scheme,
+          url: `${scheme}://${hostname}`,
+          pathPrefix: route.pathPrefix,
+          tlsMode: route.tlsMode,
+          ...(route.targetPort === undefined ? {} : { targetPort: route.targetPort }),
+          source: input.routeScope === "planned" ? "generated-default" : "deployment-snapshot",
+          ...(redirect.routeBehavior ? { routeBehavior: redirect.routeBehavior } : {}),
+          ...(redirect.redirectTo ? { redirectTo: redirect.redirectTo } : {}),
+          ...(redirect.redirectStatus ? { redirectStatus: redirect.redirectStatus } : {}),
+        };
+      }),
+    );
+
     return ok({
       resourceId: input.resourceId,
       ...(input.deploymentId ? { deploymentId: input.deploymentId } : {}),
@@ -156,7 +180,7 @@ class FakeEdgeProxyProvider implements EdgeProxyProvider {
       status: input.status,
       generatedAt: input.generatedAt,
       stale: input.stale,
-      routes: [],
+      routes,
       sections: [
         {
           id: "labels",
@@ -432,5 +456,76 @@ describe("ResourceProxyConfigurationPreviewQueryService", () => {
       status: "not-configured",
       sections: [],
     });
+  });
+
+  test("[EDGE-PROXY-QRY-007] preserves canonical redirect metadata in proxy configuration queries", async () => {
+    type RedirectAccessRoute = NonNullable<
+      DeploymentSummary["runtimePlan"]["execution"]["accessRoutes"]
+    >[number] & {
+      routeBehavior?: "serve" | "redirect";
+      redirectTo?: string;
+      redirectStatus?: 301 | 302 | 307 | 308;
+    };
+
+    const context = createTestContext();
+    const deployment = deploymentSummary();
+    const accessRoutes: RedirectAccessRoute[] = [
+      {
+        proxyKind: "traefik",
+        domains: ["example.test"],
+        pathPrefix: "/",
+        tlsMode: "auto",
+        targetPort: 3000,
+      },
+      {
+        proxyKind: "traefik",
+        domains: ["www.example.test"],
+        pathPrefix: "/",
+        tlsMode: "auto",
+        routeBehavior: "redirect",
+        redirectTo: "example.test",
+        redirectStatus: 308,
+      },
+    ];
+    const service = new ResourceProxyConfigurationPreviewQueryService(
+      new ListResourcesQueryService(
+        new StaticResourceReadModel([resourceSummary()]),
+        new EmptyDestinationRepository(),
+        new EmptyServerRepository(),
+        new DisabledDefaultAccessDomainProvider(),
+      ),
+      new StaticDeploymentReadModel([
+        {
+          ...deployment,
+          runtimePlan: {
+            ...deployment.runtimePlan,
+            execution: {
+              ...deployment.runtimePlan.execution,
+              accessRoutes,
+            },
+          },
+        },
+      ]),
+      new StaticEdgeProxyProviderRegistry(new FakeEdgeProxyProvider()),
+      new FixedClock(),
+    );
+    const query = ResourceProxyConfigurationPreviewQuery.create({
+      resourceId: "res_web",
+      routeScope: "latest",
+    })._unsafeUnwrap();
+
+    const result = await service.execute(context, query);
+
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap().routes).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          hostname: "www.example.test",
+          routeBehavior: "redirect",
+          redirectTo: "example.test",
+          redirectStatus: 308,
+        }),
+      ]),
+    );
   });
 });

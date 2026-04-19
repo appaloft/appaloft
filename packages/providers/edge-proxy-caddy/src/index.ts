@@ -51,6 +51,19 @@ function labelsForCaddy(input: {
   const scheme = input.route.tlsMode === "auto" ? "https" : "http";
   const site = input.route.domains.map((domain) => `${scheme}://${domain}`).join(", ");
   const path = input.route.pathPrefix === "/" ? "" : `${input.route.pathPrefix}*`;
+  const redirect = input.route.routeBehavior === "redirect" || Boolean(input.route.redirectTo);
+
+  if (redirect && input.route.redirectTo) {
+    const target = `${scheme}://${input.route.redirectTo}{uri} ${input.route.redirectStatus ?? 308}`;
+    return path
+      ? [
+          `caddy${suffix}=${site}`,
+          `caddy${suffix}.handle_path=${path}`,
+          `caddy${suffix}.handle_path.redir=${target}`,
+        ]
+      : [`caddy${suffix}=${site}`, `caddy${suffix}.redir=${target}`];
+  }
+
   const reverseProxy = `{{upstreams ${input.route.targetPort ?? input.port}}}`;
 
   return path
@@ -85,6 +98,7 @@ function routeViews(input: ProxyConfigurationViewInput): ProxyConfigurationRoute
   return input.accessRoutes.flatMap((route) =>
     route.domains.map((hostname) => {
       const scheme = routeScheme(route);
+      const redirect = route.routeBehavior === "redirect" || Boolean(route.redirectTo);
       return {
         hostname,
         scheme,
@@ -93,6 +107,9 @@ function routeViews(input: ProxyConfigurationViewInput): ProxyConfigurationRoute
         tlsMode: route.tlsMode,
         ...(route.targetPort === undefined ? {} : { targetPort: route.targetPort }),
         source,
+        routeBehavior: redirect ? "redirect" : "serve",
+        ...(route.redirectTo ? { redirectTo: route.redirectTo } : {}),
+        ...(route.redirectStatus ? { redirectStatus: route.redirectStatus } : {}),
       };
     }),
   );

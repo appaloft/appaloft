@@ -27,6 +27,8 @@ export class CreateDomainBindingCommandHandler
       pathPrefix: command.pathPrefix,
       proxyKind: command.proxyKind,
       tlsMode: command.tlsMode,
+      ...(command.redirectTo ? { redirectTo: command.redirectTo } : {}),
+      ...(command.redirectStatus ? { redirectStatus: command.redirectStatus } : {}),
       ...(command.certificatePolicy ? { certificatePolicy: command.certificatePolicy } : {}),
       ...(command.idempotencyKey ? { idempotencyKey: command.idempotencyKey } : {}),
     });

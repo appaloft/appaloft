@@ -42,6 +42,8 @@ export interface DomainBindingSummary {
   };
   domainName: string;
   id: string;
+  redirectStatus?: 301 | 302 | 307 | 308;
+  redirectTo?: string;
   resourceId: string;
   status: string;
   verificationAttemptCount: number;

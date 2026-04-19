@@ -100,6 +100,8 @@ import {
   type DeploymentConfigSnapshot,
   type DeploymentContextDefaultsPolicy,
   type DeploymentProgressReporter,
+  type DomainRouteBindingCandidate,
+  type DomainRouteBindingReader,
   type ExecutionBackend,
   type ProviderDescriptor,
   type ProviderRegistry,
@@ -185,6 +187,20 @@ class StaticServerAppliedRouteDesiredStateReader implements ServerAppliedRouteDe
   ): Promise<Result<ServerAppliedRouteDesiredStateRecord | null>> {
     this.targets.push(target);
     return ok(this.record);
+  }
+}
+
+class StaticDomainRouteBindingReader implements DomainRouteBindingReader {
+  public targets: Parameters<DomainRouteBindingReader["listDeployableBindings"]>[1][] = [];
+
+  constructor(private readonly bindings: DomainRouteBindingCandidate[]) {}
+
+  async listDeployableBindings(
+    _context: Parameters<DomainRouteBindingReader["listDeployableBindings"]>[0],
+    input: Parameters<DomainRouteBindingReader["listDeployableBindings"]>[1],
+  ): Promise<DomainRouteBindingCandidate[]> {
+    this.targets.push(input);
+    return this.bindings;
   }
 }
 
@@ -383,6 +399,7 @@ async function createDeploymentFixture(
     runtimePlanResolver?: RuntimePlanResolver;
     executionBackend?: ExecutionBackend;
     edgeProxyKind?: "traefik" | "caddy";
+    domainRouteBindingReader?: DomainRouteBindingReader;
     serverAppliedRouteDesiredStateReader?: ServerAppliedRouteDesiredStateReader;
   } = {},
 ) {
@@ -503,7 +520,7 @@ async function createDeploymentFixture(
     new RuntimePlanResolutionInputBuilder(clock, idGenerator),
     new DeploymentFactory(clock, idGenerator),
     new DeploymentLifecycleService(clock),
-    undefined,
+    options.domainRouteBindingReader,
     options.serverAppliedRouteDesiredStateReader,
   );
   return {
@@ -1048,6 +1065,156 @@ describe("CreateDeploymentUseCase", () => {
         "access.scheme": "https",
         "access.routeCount": "2",
         "access.routeGroupCount": "2",
+      },
+    });
+  });
+
+  test("[EDGE-PROXY-ROUTE-008] preserves server-applied canonical redirect route intent", async () => {
+    type ServerAppliedCanonicalRedirectDomain =
+      ServerAppliedRouteDesiredStateRecord["domains"][number] & {
+        redirectTo?: string;
+        redirectStatus?: 301 | 302 | 307 | 308;
+      };
+
+    const runtimePlanResolver = new CapturingRuntimePlanResolver();
+    const domains: ServerAppliedCanonicalRedirectDomain[] = [
+      {
+        host: "example.test",
+        pathPrefix: "/",
+        tlsMode: "auto",
+      },
+      {
+        host: "www.example.test",
+        pathPrefix: "/",
+        tlsMode: "auto",
+        redirectTo: "example.test",
+        redirectStatus: 308,
+      },
+    ];
+    const desiredRoutes = new StaticServerAppliedRouteDesiredStateReader({
+      routeSetId: "prj_demo:env_demo:res_demo:srv_demo:dst_demo",
+      projectId: "prj_demo",
+      environmentId: "env_demo",
+      resourceId: "res_demo",
+      serverId: "srv_demo",
+      destinationId: "dst_demo",
+      domains,
+      status: "desired",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    });
+    const { context, createDeploymentInput, createDeploymentUseCase } =
+      await createDeploymentFixture(new ExplicitContextRequiredPolicy(), {
+        runtimePlanResolver,
+        edgeProxyKind: "traefik",
+        serverAppliedRouteDesiredStateReader: desiredRoutes,
+      });
+
+    const result = await createDeploymentUseCase.execute(context, createDeploymentInput);
+
+    expect(result.isOk()).toBe(true);
+    expect(runtimePlanResolver.input?.requestedDeployment).toMatchObject({
+      proxyKind: "traefik",
+      domains: ["example.test"],
+      pathPrefix: "/",
+      tlsMode: "auto",
+      accessRoutes: [
+        {
+          proxyKind: "traefik",
+          domains: ["example.test"],
+          pathPrefix: "/",
+          tlsMode: "auto",
+        },
+        {
+          proxyKind: "traefik",
+          domains: ["www.example.test"],
+          pathPrefix: "/",
+          tlsMode: "auto",
+          routeBehavior: "redirect",
+          redirectTo: "example.test",
+          redirectStatus: 308,
+        },
+      ],
+      accessRouteMetadata: {
+        "access.routeSource": "server-applied-config-domain",
+        "access.hostname": "example.test",
+        "access.routeCount": "2",
+        "access.routeGroupCount": "2",
+        "access.redirectRouteCount": "1",
+      },
+    });
+  });
+
+  test("[ROUTE-TLS-ENTRY-016] preserves durable domain canonical redirect route intent", async () => {
+    const runtimePlanResolver = new CapturingRuntimePlanResolver();
+    const routeBindingReader = new StaticDomainRouteBindingReader([
+      {
+        id: "dmb_canonical",
+        domainName: "example.test",
+        pathPrefix: "/",
+        proxyKind: "traefik",
+        tlsMode: "auto",
+        status: "ready",
+        createdAt: "2026-01-01T00:00:00.000Z",
+      },
+      {
+        id: "dmb_www",
+        domainName: "www.example.test",
+        pathPrefix: "/",
+        proxyKind: "traefik",
+        tlsMode: "auto",
+        redirectTo: "example.test",
+        redirectStatus: 308,
+        status: "ready",
+        createdAt: "2026-01-01T00:01:00.000Z",
+      },
+    ]);
+    const { context, createDeploymentInput, createDeploymentUseCase } =
+      await createDeploymentFixture(new ExplicitContextRequiredPolicy(), {
+        runtimePlanResolver,
+        edgeProxyKind: "traefik",
+        domainRouteBindingReader: routeBindingReader,
+      });
+
+    const result = await createDeploymentUseCase.execute(context, createDeploymentInput);
+
+    expect(result.isOk()).toBe(true);
+    expect(routeBindingReader.targets).toEqual([
+      {
+        projectId: "prj_demo",
+        environmentId: "env_demo",
+        resourceId: "res_demo",
+        serverId: "srv_demo",
+        destinationId: "dst_demo",
+      },
+    ]);
+    expect(runtimePlanResolver.input?.requestedDeployment).toMatchObject({
+      proxyKind: "traefik",
+      domains: ["example.test"],
+      pathPrefix: "/",
+      tlsMode: "auto",
+      accessRoutes: [
+        {
+          proxyKind: "traefik",
+          domains: ["example.test"],
+          pathPrefix: "/",
+          tlsMode: "auto",
+        },
+        {
+          proxyKind: "traefik",
+          domains: ["www.example.test"],
+          pathPrefix: "/",
+          tlsMode: "auto",
+          routeBehavior: "redirect",
+          redirectTo: "example.test",
+          redirectStatus: 308,
+        },
+      ],
+      accessRouteMetadata: {
+        "access.routeSource": "durable-domain-binding",
+        "access.domainBindingId": "dmb_canonical",
+        "access.hostname": "example.test",
+        "access.routeGroupCount": "2",
+        "access.redirectRouteCount": "1",
       },
     });
   });

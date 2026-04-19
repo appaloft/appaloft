@@ -19,6 +19,8 @@ Tests must distinguish deployment runtime plan access-route snapshots from durab
 Pure CLI/SSH `access.domains[]` server-applied routes are also distinct from durable managed domain
 bindings. They are tested primarily through the deployment config and edge proxy matrices unless a
 hosted/self-hosted control-plane mode maps the same intent into `domain-bindings.create`.
+Canonical redirect aliases in pure CLI/SSH mode are also tested through those matrices; they must
+not be inferred as managed domain ownership or certificate lifecycle.
 
 Workflow-level tests must prove the cross-operation path, not only isolated command success. The
 minimal v1 workflow path is:
@@ -211,6 +213,7 @@ Then:
 | ROUTE-TLS-BOUNDARY-003 | integration | `domain-bindings.create` with same domain | Durable binding command creates binding lifecycle state | Domain event chain starts independently of deployment attempt. |
 | ROUTE-TLS-BOUNDARY-004 | integration | Generated default access route | Default access policy resolves a generated hostname | No `DomainBinding` is created unless an explicit command is dispatched. |
 | ROUTE-TLS-BOUNDARY-005 | integration | Server-applied config domain route | Pure CLI/SSH config deploy applies `access.domains[]` through target proxy state | No managed `DomainBinding` or `Certificate` aggregate is created; route state is target-local until a control-plane adoption flow maps it explicitly. |
+| ROUTE-TLS-BOUNDARY-006 | integration | Server-applied canonical redirect alias | Pure CLI/SSH config deploy applies `redirectTo` alias route state through target proxy state | No managed `DomainBinding`, `Certificate`, or route-ownership aggregate is created for the alias; route state is target-local until a control-plane adoption flow maps it explicitly. |
 
 ## Entry Surface Matrix
 
@@ -231,6 +234,8 @@ Then:
 | ROUTE-TLS-ENTRY-013 | e2e-preferred | CLI requests certificate issuance | CLI creates and confirms a TLS-auto binding, then runs `certificate issue-or-renew` | `ok({ certificateId, attemptId })` is printed | Per command error contract | `certificate-requested`, then `certificate-issuance-failed` when no provider is configured | `certificate list` shows the certificate and latest attempt; in the default shell profile this is `failed`/`retry_scheduled` with `certificate_provider_unavailable` |
 | ROUTE-TLS-ENTRY-014 | e2e-preferred | API requests certificate issuance | HTTP/oRPC creates and confirms a TLS-auto binding, then posts `/api/certificates/issue-or-renew` | `ok({ certificateId, attemptId })` response | Per command error contract | `certificate-requested`, then `certificate-issuance-failed` when no provider is configured | `GET /api/certificates` shows the certificate and latest attempt; in the default shell profile this is `failed`/`retry_scheduled` with `certificate_provider_unavailable` |
 | ROUTE-TLS-ENTRY-015 | e2e-preferred | Quick Deploy or config managed handoff | Quick Deploy, a config-aware local agent, or a headless executor runs in hosted/self-hosted control-plane mode with trusted resource/server/destination context and accepted managed domain/TLS intent | Executor dispatches `domain-bindings.create` as a separate command with explicit input; no domain/TLS fields are sent to `deployments.create` | Per command error contract | `domain-binding-requested` on success | Binding appears in the same read models as CLI/API/Web-created bindings |
+| ROUTE-TLS-ENTRY-016 | e2e-preferred | Managed canonical redirect binding | Web/API/CLI creates a served binding, then creates another binding with `redirectTo` and optional `redirectStatus` for the same owner/path scope | `domain-bindings.create` accepts the redirect alias, list/read models expose redirect metadata, and redeploy planning realizes a redirect route beside the served route | None | `domain-binding-requested` includes redirect metadata | Redirect binding remains a managed `DomainBinding` with normal ownership/DNS/TLS lifecycle |
+| ROUTE-TLS-ENTRY-017 | integration | Managed canonical redirect target missing | Web/API/CLI submits `redirectTo` without an existing served target binding in the same owner/path scope | Command rejects before persistence | `validation_error`, phase `domain-binding-admission` | None | No redirect binding is created |
 
 ## Idempotency Assertions
 
@@ -303,6 +308,10 @@ Current repository config parsing rejects domain/TLS-like fields before mutation
 pure CLI/SSH `access.domains[]` should be covered by server-applied route rows instead of this
 managed domain-binding entry row; resource-scoped domain binding surfaces remain the active managed
 follow-up path.
+
+`ROUTE-TLS-BOUNDARY-006` now has pure CLI route-state and edge proxy route realization coverage for
+canonical redirect aliases. External DNS/TLS/public HTTP redirect verification remains opt-in e2e
+coverage, and no managed `DomainBinding` or `Certificate` aggregate is created for the alias.
 
 Current tests cover `ROUTE-TLS-CHALLENGE-001`, `ROUTE-TLS-CHALLENGE-002`, and
 `ROUTE-TLS-CHALLENGE-003` for HTTP-01 challenge token serving through the HTTP adapter and injected

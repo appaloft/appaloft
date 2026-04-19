@@ -306,4 +306,107 @@ describe("Appaloft deployment config schema", () => {
       expect(path.error.issues[0]?.path).toEqual(["access", "domains", 0, "pathPrefix"]);
     }
   });
+
+  test("[CONFIG-FILE-DOMAIN-007] accepts canonical redirect config", () => {
+    const parsed = parseAppaloftDeploymentConfig({
+      access: {
+        domains: [
+          {
+            host: "Example.COM",
+            pathPrefix: "/",
+            tlsMode: "auto",
+          },
+          {
+            host: "WWW.Example.COM",
+            redirectTo: "Example.COM",
+            redirectStatus: 308,
+          },
+        ],
+      },
+    });
+
+    expect(parsed.success).toBe(true);
+    if (parsed.success) {
+      expect(parsed.data.access?.domains).toEqual([
+        {
+          host: "example.com",
+          pathPrefix: "/",
+          tlsMode: "auto",
+        },
+        {
+          host: "www.example.com",
+          pathPrefix: "/",
+          tlsMode: "auto",
+          redirectTo: "example.com",
+          redirectStatus: 308,
+        },
+      ]);
+    }
+  });
+
+  test("[CONFIG-FILE-DOMAIN-008] rejects invalid canonical redirect graph", () => {
+    const cases = [
+      {
+        name: "self redirect",
+        domains: [
+          {
+            host: "www.example.com",
+            redirectTo: "www.example.com",
+          },
+        ],
+      },
+      {
+        name: "missing target",
+        domains: [
+          {
+            host: "www.example.com",
+            redirectTo: "example.com",
+          },
+        ],
+      },
+      {
+        name: "redirect-to-redirect",
+        domains: [
+          {
+            host: "example.com",
+          },
+          {
+            host: "www.example.com",
+            redirectTo: "example.com",
+          },
+          {
+            host: "legacy.example.com",
+            redirectTo: "www.example.com",
+          },
+        ],
+      },
+      {
+        name: "loop",
+        domains: [
+          {
+            host: "www.example.com",
+            redirectTo: "example.com",
+          },
+          {
+            host: "example.com",
+            redirectTo: "www.example.com",
+          },
+        ],
+      },
+    ];
+
+    for (const entry of cases) {
+      const parsed = parseAppaloftDeploymentConfig({
+        access: {
+          domains: entry.domains,
+        },
+      });
+
+      expect(parsed.success, entry.name).toBe(false);
+      if (!parsed.success) {
+        expect(parsed.error.issues[0]?.message).toContain("config_domain_resolution");
+        expect(parsed.error.issues[0]?.path).toEqual(["access", "domains"]);
+      }
+    }
+  });
 });
