@@ -14,7 +14,8 @@ function shouldResolveDefaultAccessRoute(requestedDeployment: RequestedDeploymen
     requestedDeployment.accessContext?.routePurpose === "default-resource-access" &&
     requestedDeployment.accessContext.exposureMode === "reverse-proxy" &&
     typeof requestedDeployment.port === "number" &&
-    (requestedDeployment.domains?.length ?? 0) === 0
+    (requestedDeployment.domains?.length ?? 0) === 0 &&
+    (requestedDeployment.accessRoutes?.length ?? 0) === 0
   );
 }
 

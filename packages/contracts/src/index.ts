@@ -284,6 +284,7 @@ export const resourceAccessSummarySchema = z.object({
   plannedGeneratedAccessRoute: plannedResourceAccessRouteSummarySchema.optional(),
   latestGeneratedAccessRoute: resourceAccessRouteSummarySchema.optional(),
   latestDurableDomainRoute: resourceAccessRouteSummarySchema.optional(),
+  latestServerAppliedDomainRoute: resourceAccessRouteSummarySchema.optional(),
   proxyRouteStatus: z.enum(["unknown", "ready", "not-ready", "failed"]).optional(),
   lastRouteRealizationDeploymentId: z.string().optional(),
 });
@@ -398,7 +399,9 @@ export const resourceHealthSummarySchema = z.object({
   publicAccess: z.object({
     status: z.enum(["ready", "not-ready", "failed", "unknown", "not-configured"]),
     url: z.string().optional(),
-    kind: z.enum(["durable-domain", "generated-latest", "generated-planned"]).optional(),
+    kind: z
+      .enum(["durable-domain", "server-applied-domain", "generated-latest", "generated-planned"])
+      .optional(),
     reasonCode: z.string().optional(),
     phase: z.string().optional(),
   }),
@@ -653,10 +656,23 @@ export const proxyConfigurationWarningSchema = z.object({
     .optional(),
 });
 
+export const proxyConfigurationTlsDiagnosticSchema = z.object({
+  hostname: z.string(),
+  pathPrefix: z.string(),
+  tlsMode: z.enum(["auto", "disabled"]),
+  scheme: z.enum(["http", "https"]),
+  automation: z.enum(["disabled", "provider-local"]),
+  certificateSource: z.enum(["none", "provider-local"]),
+  appaloftCertificateManaged: z.boolean(),
+  message: z.string(),
+  details: z.record(z.string(), z.string()).optional(),
+});
+
 export const proxyConfigurationDiagnosticsSchema = z.object({
   providerKey: z.string(),
   routeCount: z.number(),
   networkName: z.string().optional(),
+  tlsRoutes: z.array(proxyConfigurationTlsDiagnosticSchema).optional(),
   metadata: z.record(z.string(), z.string()).optional(),
 });
 
@@ -1370,6 +1386,7 @@ export const resourceDiagnosticAccessSchema = z.object({
   status: resourceDiagnosticSectionStatusSchema,
   generatedUrl: z.string().optional(),
   durableUrl: z.string().optional(),
+  serverAppliedUrl: z.string().optional(),
   plannedUrl: z.string().optional(),
   proxyRouteStatus: z.enum(["unknown", "ready", "not-ready", "failed"]).optional(),
   lastRouteRealizationDeploymentId: z.string().optional(),
@@ -1396,6 +1413,13 @@ export const resourceDiagnosticProxySchema = z.object({
         format: z.enum(["docker-labels", "file", "command", "yaml", "json", "text"]),
         redacted: z.boolean(),
         source: z.enum(["provider-rendered", "snapshot", "diagnostic"]),
+      }),
+    )
+    .optional(),
+  tlsRoutes: z
+    .array(
+      proxyConfigurationTlsDiagnosticSchema.omit({
+        details: true,
       }),
     )
     .optional(),

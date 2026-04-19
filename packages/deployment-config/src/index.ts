@@ -27,6 +27,11 @@ const safeRelativePathSchema = nonEmptyStringSchema.regex(
   safeRelativePathPattern,
   "Path must be relative to the selected source root and must not escape it",
 );
+const domainLabelPattern = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
+const domainHostError =
+  "config_domain_resolution: access.domains[].host must be a domain name without scheme, port, path, or wildcard";
+const domainPathPrefixError =
+  "config_domain_resolution: access.domains[].pathPrefix must start with / and must not include query, fragment, control characters, or parent traversal";
 
 const identityConfigFields = new Set([
   "organization",
@@ -50,6 +55,16 @@ const identityConfigFields = new Set([
   "destinationId",
   "provider",
   "providerKey",
+  "providerAccount",
+  "providerAccountId",
+  "certificateProvider",
+  "certificateProviderId",
+  "certificateProviderAccount",
+  "certificateProviderAccountId",
+  "dnsProvider",
+  "dnsProviderId",
+  "dnsProviderAccount",
+  "dnsProviderAccountId",
   "credential",
   "credentialId",
 ]);
@@ -150,6 +165,71 @@ export const appaloftDeploymentNetworkConfigSchema = z
   })
   .describe("Network profile fields copied into resource creation for quick deploy.");
 
+function isDomainName(value: string): boolean {
+  const normalized = value.trim().toLowerCase();
+
+  if (
+    normalized.length > 253 ||
+    normalized.includes("://") ||
+    normalized.includes("/") ||
+    normalized.includes(":") ||
+    normalized.includes("*") ||
+    normalized.endsWith(".")
+  ) {
+    return false;
+  }
+
+  const labels = normalized.split(".");
+  if (labels.length < 2) {
+    return false;
+  }
+
+  return labels.every((label) => domainLabelPattern.test(label));
+}
+
+function isSafeDomainPathPrefix(value: string): boolean {
+  const normalized = value.trim();
+
+  return (
+    normalized.startsWith("/") &&
+    !normalized.startsWith("//") &&
+    !normalized.includes("..") &&
+    !hasUnsafePathPrefixCharacter(normalized)
+  );
+}
+
+function hasUnsafePathPrefixCharacter(value: string): boolean {
+  for (const character of value) {
+    const code = character.charCodeAt(0);
+    if (character === "?" || character === "#" || code <= 32 || code === 127) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+const appaloftDeploymentAccessDomainConfigSchema = z
+  .object({
+    host: nonEmptyStringSchema
+      .transform((value) => value.toLowerCase())
+      .pipe(z.string().refine(isDomainName, domainHostError)),
+    pathPrefix: nonEmptyStringSchema
+      .optional()
+      .default("/")
+      .pipe(z.string().refine(isSafeDomainPathPrefix, domainPathPrefixError)),
+    tlsMode: z.enum(["auto", "disabled"]).optional().default("auto"),
+  })
+  .strict()
+  .describe("Provider-neutral server-applied domain intent.");
+
+export const appaloftDeploymentAccessConfigSchema = z
+  .object({
+    domains: z.array(appaloftDeploymentAccessDomainConfigSchema).min(1),
+  })
+  .strict()
+  .describe("Access intent resolved outside deployments.create.");
+
 const nonSecretEnvironmentValueSchema = z.union([z.string(), z.number(), z.boolean()]);
 
 export const appaloftDeploymentSecretReferenceSchema = z
@@ -169,6 +249,7 @@ export const appaloftDeploymentConfigSchema = z
     runtime: appaloftDeploymentRuntimeConfigSchema.optional(),
     network: appaloftDeploymentNetworkConfigSchema.optional(),
     health: appaloftDeploymentHealthCheckConfigSchema.optional(),
+    access: appaloftDeploymentAccessConfigSchema.optional(),
     env: z.record(z.string(), nonSecretEnvironmentValueSchema).optional(),
     secrets: z.record(z.string(), appaloftDeploymentSecretReferenceSchema).optional(),
   })
@@ -192,7 +273,13 @@ function shouldTreatIdentityField(path: (string | number)[], key: string): boole
   }
 
   const root = String(path[0]);
-  return root === "runtime" || root === "deployment" || root === "network" || root === "source";
+  return (
+    root === "runtime" ||
+    root === "deployment" ||
+    root === "network" ||
+    root === "source" ||
+    root === "access"
+  );
 }
 
 function isAllowedSecretReference(path: (string | number)[], value: unknown): boolean {

@@ -123,6 +123,42 @@ export interface DeploymentProgressObserver {
   subscribe(listener: DeploymentProgressListener): () => void;
 }
 
+export interface SourceLinkTarget {
+  projectId: string;
+  environmentId: string;
+  resourceId: string;
+  serverId?: string;
+  destinationId?: string;
+}
+
+export interface SourceLinkRecord extends SourceLinkTarget {
+  sourceFingerprint: string;
+  updatedAt: string;
+  reason?: string;
+}
+
+export interface SourceLinkStore {
+  read(sourceFingerprint: string): Promise<Result<SourceLinkRecord | null>>;
+  requireSameTargetOrMissing(
+    sourceFingerprint: string,
+    target: SourceLinkTarget,
+  ): Promise<Result<SourceLinkRecord | null>>;
+  createIfMissing(input: {
+    sourceFingerprint: string;
+    target: SourceLinkTarget;
+    updatedAt: string;
+  }): Promise<Result<SourceLinkRecord>>;
+  relink(input: {
+    sourceFingerprint: string;
+    target: SourceLinkTarget;
+    updatedAt: string;
+    expectedCurrentProjectId?: string;
+    expectedCurrentEnvironmentId?: string;
+    expectedCurrentResourceId?: string;
+    reason?: string;
+  }): Promise<Result<SourceLinkRecord>>;
+}
+
 export interface ProjectRepository {
   findOne(context: RepositoryContext, spec: ProjectSelectionSpec): Promise<Project | null>;
   upsert(context: RepositoryContext, project: Project, spec: ProjectMutationSpec): Promise<void>;
@@ -250,6 +286,79 @@ export interface DomainRouteBindingReader {
       destinationId: string;
     },
   ): Promise<DomainRouteBindingCandidate[]>;
+}
+
+export interface ServerAppliedRouteDesiredStateTarget {
+  projectId: string;
+  environmentId: string;
+  resourceId: string;
+  serverId: string;
+  destinationId?: string;
+}
+
+export interface ServerAppliedRouteDesiredStateDomain {
+  host: string;
+  pathPrefix: string;
+  tlsMode: TlsMode;
+}
+
+export type ServerAppliedRouteDesiredStateStatus = "desired" | "applied" | "failed";
+
+export interface ServerAppliedRouteAppliedState {
+  deploymentId: string;
+  appliedAt: string;
+  providerKey?: string;
+  proxyKind?: EdgeProxyKind;
+}
+
+export interface ServerAppliedRouteFailureState {
+  deploymentId: string;
+  failedAt: string;
+  phase: string;
+  errorCode: string;
+  message?: string;
+  retryable: boolean;
+  providerKey?: string;
+  proxyKind?: EdgeProxyKind;
+}
+
+export interface ServerAppliedRouteDesiredStateRecord extends ServerAppliedRouteDesiredStateTarget {
+  routeSetId: string;
+  sourceFingerprint?: string;
+  domains: ServerAppliedRouteDesiredStateDomain[];
+  status: ServerAppliedRouteDesiredStateStatus;
+  updatedAt: string;
+  lastApplied?: ServerAppliedRouteAppliedState;
+  lastFailure?: ServerAppliedRouteFailureState;
+}
+
+export interface ServerAppliedRouteDesiredStateReader {
+  read(
+    target: ServerAppliedRouteDesiredStateTarget,
+  ): Promise<Result<ServerAppliedRouteDesiredStateRecord | null>>;
+}
+
+export interface ServerAppliedRouteStateStore extends ServerAppliedRouteDesiredStateReader {
+  markApplied(input: {
+    target: ServerAppliedRouteDesiredStateTarget;
+    deploymentId: string;
+    updatedAt: string;
+    routeSetId?: string;
+    providerKey?: string;
+    proxyKind?: EdgeProxyKind;
+  }): Promise<Result<ServerAppliedRouteDesiredStateRecord | null>>;
+  markFailed(input: {
+    target: ServerAppliedRouteDesiredStateTarget;
+    deploymentId: string;
+    updatedAt: string;
+    phase: string;
+    errorCode: string;
+    message?: string;
+    retryable: boolean;
+    routeSetId?: string;
+    providerKey?: string;
+    proxyKind?: EdgeProxyKind;
+  }): Promise<Result<ServerAppliedRouteDesiredStateRecord | null>>;
 }
 
 export interface CertificateRepository {
@@ -608,10 +717,26 @@ export interface ProxyConfigurationWarning {
   details?: Record<string, string | number | boolean | null>;
 }
 
+export type ProxyConfigurationTlsAutomation = "disabled" | "provider-local";
+export type ProxyConfigurationTlsCertificateSource = "none" | "provider-local";
+
+export interface ProxyConfigurationTlsDiagnostic {
+  hostname: string;
+  pathPrefix: string;
+  tlsMode: TlsMode;
+  scheme: "http" | "https";
+  automation: ProxyConfigurationTlsAutomation;
+  certificateSource: ProxyConfigurationTlsCertificateSource;
+  appaloftCertificateManaged: boolean;
+  message: string;
+  details?: Record<string, string>;
+}
+
 export interface ProxyConfigurationDiagnostics {
   providerKey: string;
   routeCount: number;
   networkName?: string;
+  tlsRoutes?: ProxyConfigurationTlsDiagnostic[];
   metadata?: Record<string, string>;
 }
 
@@ -762,6 +887,7 @@ export interface ResourceAccessSummary {
   plannedGeneratedAccessRoute?: PlannedResourceAccessRouteSummary;
   latestGeneratedAccessRoute?: ResourceAccessRouteSummary;
   latestDurableDomainRoute?: ResourceAccessRouteSummary;
+  latestServerAppliedDomainRoute?: ResourceAccessRouteSummary;
   proxyRouteStatus?: "unknown" | "ready" | "not-ready" | "failed";
   lastRouteRealizationDeploymentId?: string;
 }
@@ -848,7 +974,7 @@ export interface ResourceHealthPolicySection {
 export interface ResourcePublicAccessHealthSection {
   status: "ready" | "not-ready" | "failed" | "unknown" | "not-configured";
   url?: string;
-  kind?: "durable-domain" | "generated-latest" | "generated-planned";
+  kind?: "durable-domain" | "server-applied-domain" | "generated-latest" | "generated-planned";
   reasonCode?: string;
   phase?: string;
 }
@@ -1153,6 +1279,7 @@ export interface ResourceDiagnosticAccess {
   status: ResourceDiagnosticSectionStatus;
   generatedUrl?: string;
   durableUrl?: string;
+  serverAppliedUrl?: string;
   plannedUrl?: string;
   proxyRouteStatus?: ResourceAccessSummary["proxyRouteStatus"];
   lastRouteRealizationDeploymentId?: string;
@@ -1168,6 +1295,17 @@ export interface ResourceDiagnosticProxySectionSummary {
   source: ProxyConfigurationSection["source"];
 }
 
+export interface ResourceDiagnosticProxyTlsRouteSummary {
+  hostname: string;
+  pathPrefix: string;
+  tlsMode: TlsMode;
+  scheme: "http" | "https";
+  automation: ProxyConfigurationTlsAutomation;
+  certificateSource: ProxyConfigurationTlsCertificateSource;
+  appaloftCertificateManaged: boolean;
+  message: string;
+}
+
 export interface ResourceDiagnosticProxy {
   status: ResourceDiagnosticSectionStatus;
   providerKey?: string;
@@ -1178,6 +1316,7 @@ export interface ResourceDiagnosticProxy {
   routeCount?: number;
   sectionCount?: number;
   sections?: ResourceDiagnosticProxySectionSummary[];
+  tlsRoutes?: ResourceDiagnosticProxyTlsRouteSummary[];
   warnings?: ProxyConfigurationWarning[];
   reasonCode?: string;
   phase?: string;
@@ -1579,6 +1718,13 @@ export type RequestedDeploymentMethod =
   | "workspace-commands"
   | "static";
 
+export interface RequestedAccessRouteConfig {
+  proxyKind: EdgeProxyKind;
+  domains: string[];
+  pathPrefix: string;
+  tlsMode: TlsMode;
+}
+
 export interface RequestedDeploymentConfig {
   method: RequestedDeploymentMethod;
   installCommand?: string;
@@ -1596,6 +1742,7 @@ export interface RequestedDeploymentConfig {
   domains?: string[];
   pathPrefix?: string;
   tlsMode?: TlsMode;
+  accessRoutes?: RequestedAccessRouteConfig[];
 }
 
 export interface RequestedDeploymentHealthCheck {

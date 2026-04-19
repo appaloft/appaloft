@@ -47,9 +47,12 @@ import {
   MarkDomainReadyOnDeploymentFinishedHandler,
   MarkDomainReadyOnDomainBoundHandler,
   MarkDomainRouteFailedOnDeploymentFinishedHandler,
+  MarkServerAppliedRouteStatusOnDeploymentFinishedHandler,
   OpenTerminalSessionUseCase,
   PromoteEnvironmentUseCase,
   RegisterServerUseCase,
+  RelinkSourceLinkCommandHandler,
+  RelinkSourceLinkUseCase,
   ResourceDiagnosticSummaryQueryService,
   ResourceHealthQueryService,
   ResourceProxyConfigurationPreviewQueryService,
@@ -84,10 +87,12 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(MarkDomainReadyOnCertificateIssuedHandler);
   container.registerSingleton(MarkDomainReadyOnDeploymentFinishedHandler);
   container.registerSingleton(MarkDomainRouteFailedOnDeploymentFinishedHandler);
+  container.registerSingleton(MarkServerAppliedRouteStatusOnDeploymentFinishedHandler);
   container.registerSingleton(IssueCertificateOnCertificateRequestedHandler);
   container.registerSingleton(BootstrapServerProxyCommandHandler);
   container.registerSingleton(ConfigureResourceHealthCommandHandler);
   container.registerSingleton(IssueOrRenewCertificateCommandHandler);
+  container.registerSingleton(RelinkSourceLinkCommandHandler);
   container.registerSingleton(ListCertificatesQueryHandler);
   container.registerSingleton(
     tokens.certificateProviderSelectionPolicy,
@@ -169,6 +174,7 @@ export function registerApplicationServices(container: DependencyContainer): voi
     ResourceRuntimeLogsQueryService,
   );
   container.registerSingleton(tokens.openTerminalSessionUseCase, OpenTerminalSessionUseCase);
+  container.registerSingleton(tokens.relinkSourceLinkUseCase, RelinkSourceLinkUseCase);
   container.registerSingleton(
     tokens.resourceProxyConfigurationPreviewQueryService,
     ResourceProxyConfigurationPreviewQueryService,

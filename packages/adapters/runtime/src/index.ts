@@ -252,6 +252,41 @@ function createAccessRoutes(input: {
   requestedDeployment: RequestedDeploymentConfig;
   fallbackPort?: number;
 }): Result<AccessRoute[]> {
+  const requestedAccessRoutes = input.requestedDeployment.accessRoutes ?? [];
+
+  if (requestedAccessRoutes.length > 0) {
+    return safeTry(function* () {
+      const accessRoutes: AccessRoute[] = [];
+
+      for (const requestedAccessRoute of requestedAccessRoutes) {
+        if (requestedAccessRoute.proxyKind === "none") {
+          return err(domainError.validation("Access routing domains require an enabled proxy"));
+        }
+
+        if (requestedAccessRoute.domains.length === 0) {
+          return err(domainError.validation("Access routing requires at least one domain"));
+        }
+
+        const publicDomains: PublicDomainName[] = [];
+        for (const domain of requestedAccessRoute.domains) {
+          publicDomains.push(yield* PublicDomainName.create(domain));
+        }
+
+        accessRoutes.push(
+          yield* AccessRoute.create({
+            proxyKind: EdgeProxyKindValue.rehydrate(requestedAccessRoute.proxyKind),
+            domains: publicDomains,
+            pathPrefix: yield* RoutePathPrefix.create(requestedAccessRoute.pathPrefix),
+            tlsMode: TlsModeValue.rehydrate(requestedAccessRoute.tlsMode),
+            ...(input.fallbackPort ? { targetPort: PortNumber.rehydrate(input.fallbackPort) } : {}),
+          }),
+        );
+      }
+
+      return ok(accessRoutes);
+    });
+  }
+
   const domains = input.requestedDeployment.domains ?? [];
   const proxyKind = input.requestedDeployment.proxyKind ?? (domains.length > 0 ? "traefik" : "none");
 

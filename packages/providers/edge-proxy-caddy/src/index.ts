@@ -8,6 +8,7 @@ import {
   type EdgeProxyProviderCapabilities,
   type EdgeProxyRouteInput,
   type ProxyConfigurationRouteView,
+  type ProxyConfigurationTlsDiagnostic,
   type ProxyConfigurationView,
   type ProxyConfigurationViewInput,
   type ProxyReloadInput,
@@ -92,6 +93,37 @@ function routeViews(input: ProxyConfigurationViewInput): ProxyConfigurationRoute
         tlsMode: route.tlsMode,
         ...(route.targetPort === undefined ? {} : { targetPort: route.targetPort }),
         source,
+      };
+    }),
+  );
+}
+
+function tlsDiagnostics(input: ProxyConfigurationViewInput): ProxyConfigurationTlsDiagnostic[] {
+  return input.accessRoutes.flatMap((route) =>
+    route.domains.map((hostname) => {
+      const scheme = routeScheme(route);
+      const enabled = route.tlsMode === "auto";
+
+      return {
+        hostname,
+        pathPrefix: route.pathPrefix,
+        tlsMode: route.tlsMode,
+        scheme,
+        automation: enabled ? "provider-local" : "disabled",
+        certificateSource: enabled ? "provider-local" : "none",
+        appaloftCertificateManaged: false,
+        message: enabled
+          ? "Caddy terminates TLS through resident provider-local certificate automation; no Appaloft Certificate aggregate is created for this route."
+          : "TLS is disabled for this Caddy route.",
+        details: enabled
+          ? {
+              siteScheme: "https",
+              certificateStore: "appaloft-caddy-data",
+              automationOwner: "caddy-docker-proxy",
+            }
+          : {
+              siteScheme: "http",
+            },
       };
     }),
   );
@@ -283,11 +315,13 @@ export class CaddyEdgeProxyProvider implements EdgeProxyProvider {
       return err(realized.error);
     }
 
+    const routeTlsDiagnostics = tlsDiagnostics(input);
     const diagnostics = input.includeDiagnostics
       ? {
           providerKey: this.key,
           routeCount: input.accessRoutes.length,
           ...(realized.value.networkName ? { networkName: realized.value.networkName } : {}),
+          tlsRoutes: routeTlsDiagnostics,
           ...(realized.value.metadata ? { metadata: realized.value.metadata } : {}),
         }
       : undefined;

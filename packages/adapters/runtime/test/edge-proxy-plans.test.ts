@@ -34,6 +34,7 @@ class ReloadAwareProvider implements EdgeProxyProvider {
   };
 
   lastReloadInput: ProxyReloadInput | null = null;
+  lastRealizeInput: ProxyRouteRealizationInput | null = null;
 
   async ensureProxy(
     _context: EdgeProxyExecutionContext,
@@ -51,8 +52,9 @@ class ReloadAwareProvider implements EdgeProxyProvider {
 
   async realizeRoutes(
     _context: EdgeProxyExecutionContext,
-    _input: ProxyRouteRealizationInput,
+    input: ProxyRouteRealizationInput,
   ): Promise<Result<ProxyRouteRealizationPlan>> {
+    this.lastRealizeInput = input;
     return ok({
       providerKey: this.key,
       networkName: "appaloft-edge",
@@ -149,5 +151,41 @@ describe("edge proxy plans", () => {
       command: "printf reload-ok",
     });
     expect(provider.lastReloadInput?.routePlan.labels).toEqual(["traefik.enable=true"]);
+  });
+
+  test("[EDGE-PROXY-ROUTE-005] forwards config domain access routes to the selected provider", async () => {
+    const provider = new ReloadAwareProvider();
+    const registry = new StaticRegistry(provider);
+
+    const routePlan = await createProxyRouteRealizationPlan({
+      providerRegistry: registry,
+      context: { correlationId: "req_server_applied_routes_test" },
+      deploymentId: "dep_config_domain",
+      port: 3000,
+      accessRoutes: [
+        {
+          proxyKind: "traefik" as const,
+          domains: ["www.example.test", "app.example.test"],
+          pathPrefix: "/",
+          tlsMode: "auto" as const,
+          targetPort: 3000,
+        },
+      ],
+    });
+
+    expect(routePlan.isOk()).toBe(true);
+    expect(provider.lastRealizeInput).toMatchObject({
+      deploymentId: "dep_config_domain",
+      port: 3000,
+      accessRoutes: [
+        {
+          proxyKind: "traefik",
+          domains: ["www.example.test", "app.example.test"],
+          pathPrefix: "/",
+          tlsMode: "auto",
+          targetPort: 3000,
+        },
+      ],
+    });
   });
 });

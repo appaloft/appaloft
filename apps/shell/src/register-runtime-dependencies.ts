@@ -40,6 +40,11 @@ import {
   InMemoryEdgeProxyProviderRegistry,
   type IntegrationAuthPort,
   QueryBus,
+  type ServerAppliedRouteDesiredStateRecord,
+  type ServerAppliedRouteDesiredStateTarget,
+  type ServerAppliedRouteStateStore,
+  type SourceLinkRecord,
+  type SourceLinkStore,
   tokens,
 } from "@appaloft/application";
 import { type AuthRuntime } from "@appaloft/auth-better";
@@ -272,6 +277,49 @@ class InMemoryEventBus implements EventBus {
   }
 }
 
+class UnavailableSourceLinkStore implements SourceLinkStore {
+  private unavailable() {
+    return err(
+      domainError.validation("Source link state is not configured for this runtime", {
+        phase: "source-link-resolution",
+        reason: "source_link_store_unavailable",
+      }),
+    );
+  }
+
+  async read(): Promise<Result<SourceLinkRecord | null, DomainError>> {
+    return this.unavailable();
+  }
+
+  async requireSameTargetOrMissing(): Promise<Result<SourceLinkRecord | null, DomainError>> {
+    return this.unavailable();
+  }
+
+  async createIfMissing(): Promise<Result<SourceLinkRecord, DomainError>> {
+    return this.unavailable();
+  }
+
+  async relink(): Promise<Result<SourceLinkRecord, DomainError>> {
+    return this.unavailable();
+  }
+}
+
+class NoopServerAppliedRouteStateStore implements ServerAppliedRouteStateStore {
+  async read(
+    _target: ServerAppliedRouteDesiredStateTarget,
+  ): Promise<Result<ServerAppliedRouteDesiredStateRecord | null>> {
+    return ok(null);
+  }
+
+  async markApplied(): Promise<Result<ServerAppliedRouteDesiredStateRecord | null>> {
+    return ok(null);
+  }
+
+  async markFailed(): Promise<Result<ServerAppliedRouteDesiredStateRecord | null>> {
+    return ok(null);
+  }
+}
+
 class RequestScopedIntegrationAuthPort implements IntegrationAuthPort {
   private readonly storage = new AsyncLocalStorage<{
     context: ExecutionContext;
@@ -336,6 +384,8 @@ export interface RegisterRuntimeDependenciesInput {
   migrator: ConstructorParameters<typeof PgDiagnostics>[1];
   authRuntime: AuthRuntime;
   deploymentProgressReporter: DeploymentProgressReporter;
+  sourceLinkStore?: SourceLinkStore;
+  serverAppliedRouteDesiredStateReader?: ServerAppliedRouteStateStore;
 }
 
 export function registerRuntimeDependencies(
@@ -356,6 +406,14 @@ export function registerRuntimeDependencies(
     ),
   });
   container.registerInstance(tokens.deploymentProgressReporter, input.deploymentProgressReporter);
+  container.registerInstance(
+    tokens.sourceLinkStore,
+    input.sourceLinkStore ?? new UnavailableSourceLinkStore(),
+  );
+  container.registerInstance(
+    tokens.serverAppliedRouteDesiredStateReader,
+    input.serverAppliedRouteDesiredStateReader ?? new NoopServerAppliedRouteStateStore(),
+  );
   container.register(tokens.serverConnectivityChecker, {
     useFactory: instanceCachingFactory(
       (dependencyContainer) =>

@@ -30,6 +30,7 @@ import { listServersQueryInputSchema } from "./operations/servers/list-servers.q
 import { listSshCredentialsQueryInputSchema } from "./operations/servers/list-ssh-credentials.query";
 import { registerServerCommandInputSchema } from "./operations/servers/register-server.command";
 import { testServerConnectivityCommandInputSchema } from "./operations/servers/test-server-connectivity.command";
+import { relinkSourceLinkCommandInputSchema } from "./operations/source-links/relink-source-link.command";
 import { listGitHubRepositoriesQueryInputSchema } from "./operations/system/list-github-repositories.query";
 import { openTerminalSessionCommandInputSchema } from "./operations/terminal-sessions/open-terminal-session.command";
 import { tokens } from "./tokens";
@@ -44,6 +45,7 @@ type OperationDomain =
   | "deployments"
   | "domain-bindings"
   | "certificates"
+  | "source-links"
   | "system"
   | "terminal-sessions";
 
@@ -466,6 +468,19 @@ export const operationCatalog = [
     transports: {
       cli: "appaloft logs <deploymentId>",
       orpc: { method: "GET", path: "/api/deployments/{deploymentId}/logs" },
+    },
+  },
+  {
+    key: "source-links.relink",
+    kind: "command",
+    domain: "source-links",
+    messageName: "RelinkSourceLinkCommand",
+    handlerName: "RelinkSourceLinkCommandHandler",
+    serviceName: "RelinkSourceLinkUseCase",
+    inputSchema: relinkSourceLinkCommandInputSchema,
+    serviceToken: tokens.relinkSourceLinkUseCase,
+    transports: {
+      cli: "appaloft source-links relink",
     },
   },
   {

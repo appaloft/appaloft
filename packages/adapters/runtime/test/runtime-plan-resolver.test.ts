@@ -1011,6 +1011,77 @@ describe("DefaultRuntimePlanResolver", () => {
     expect(plan.steps).toContain("Verify public access route");
   });
 
+  test("[EDGE-PROXY-ROUTE-005] adds multiple requested access route groups", async () => {
+    ensureReflectMetadata();
+    const { DefaultRuntimePlanResolver } = await import("../src");
+    const resolver = new DefaultRuntimePlanResolver();
+    const context = createTestExecutionContext();
+
+    const result = await resolver.resolve(context, {
+      id: "plan_multi_routes",
+      source: createSource({
+        kind: "docker-image",
+        locator: "docker://ghcr.io/example/app:latest",
+        displayName: "app",
+      }),
+      server: {
+        id: "srv_multi_routes",
+        providerKey: "generic-ssh",
+      },
+      environmentSnapshot: createEnvironmentSnapshot("snap_multi_routes"),
+      detectedReasoning: ["detected docker image"],
+      requestedDeployment: {
+        method: "prebuilt-image",
+        port: 4312,
+        accessRoutes: [
+          {
+            proxyKind: "traefik",
+            domains: ["www.example.com"],
+            pathPrefix: "/",
+            tlsMode: "auto",
+          },
+          {
+            proxyKind: "traefik",
+            domains: ["www.example.com"],
+            pathPrefix: "/admin",
+            tlsMode: "disabled",
+          },
+        ],
+      },
+      generatedAt: "2026-01-01T00:00:00.000Z",
+    });
+
+    expect(result.isOk()).toBe(true);
+    const plan = result._unsafeUnwrap();
+
+    expect(
+      plan.execution.accessRoutes.map((route) => ({
+        proxyKind: route.proxyKind,
+        domains: route.domains,
+        pathPrefix: route.pathPrefix,
+        tlsMode: route.tlsMode,
+        targetPort: route.targetPort,
+      })),
+    ).toEqual([
+      {
+        proxyKind: "traefik",
+        domains: ["www.example.com"],
+        pathPrefix: "/",
+        tlsMode: "auto",
+        targetPort: 4312,
+      },
+      {
+        proxyKind: "traefik",
+        domains: ["www.example.com"],
+        pathPrefix: "/admin",
+        tlsMode: "disabled",
+        targetPort: 4312,
+      },
+    ]);
+    expect(plan.steps).toContain("Configure edge proxy");
+    expect(plan.steps).toContain("Verify public access route");
+  });
+
   test("defaults public git sources to target-side dockerfile builds", async () => {
     ensureReflectMetadata();
     const { DefaultRuntimePlanResolver } = await import("../src");

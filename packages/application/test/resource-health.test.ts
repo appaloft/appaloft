@@ -374,6 +374,45 @@ describe("ResourceHealthQueryService", () => {
     );
   });
 
+  test("[EDGE-PROXY-ROUTE-005] reports server-applied domain as public access route", async () => {
+    const service = createService({
+      resources: [
+        resourceSummary({
+          accessSummary: {
+            latestServerAppliedDomainRoute: {
+              url: "https://www.example.test",
+              hostname: "www.example.test",
+              scheme: "https",
+              deploymentId: "dep_web",
+              deploymentStatus: "succeeded",
+              pathPrefix: "/",
+              proxyKind: "traefik",
+              targetPort: 3000,
+              updatedAt: "2026-01-01T00:00:05.000Z",
+            },
+            proxyRouteStatus: "ready",
+            lastRouteRealizationDeploymentId: "dep_web",
+          },
+        }),
+      ],
+    });
+
+    const result = await service.execute(createTestContext(), createQuery());
+
+    expect(result.isOk()).toBe(true);
+    const summary = result._unsafeUnwrap();
+    expect(summary.publicAccess).toMatchObject({
+      status: "ready",
+      url: "https://www.example.test",
+      kind: "server-applied-domain",
+    });
+    expect(summary.proxy).toMatchObject({
+      status: "ready",
+      providerKey: "traefik",
+      lastRouteRealizationDeploymentId: "dep_web",
+    });
+  });
+
   test("degrades current health when public access or proxy route state failed", async () => {
     const service = createService({
       resources: [

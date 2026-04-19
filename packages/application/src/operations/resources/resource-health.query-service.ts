@@ -105,6 +105,7 @@ function sourceError(input: {
 function proxyProviderKey(accessSummary: ResourceAccessSummary | undefined): string | undefined {
   return (
     accessSummary?.latestDurableDomainRoute?.proxyKind ??
+    accessSummary?.latestServerAppliedDomainRoute?.proxyKind ??
     accessSummary?.latestGeneratedAccessRoute?.proxyKind ??
     accessSummary?.plannedGeneratedAccessRoute?.proxyKind
   );
@@ -364,16 +365,19 @@ function publicAccessSection(
   const access = resource.accessSummary;
   const route =
     access?.latestDurableDomainRoute ??
+    access?.latestServerAppliedDomainRoute ??
     access?.latestGeneratedAccessRoute ??
     access?.plannedGeneratedAccessRoute;
   const kind: ResourcePublicAccessHealthSection["kind"] | undefined =
     route === access?.latestDurableDomainRoute
       ? "durable-domain"
-      : route === access?.latestGeneratedAccessRoute
-        ? "generated-latest"
-        : route === access?.plannedGeneratedAccessRoute
-          ? "generated-planned"
-          : undefined;
+      : route === access?.latestServerAppliedDomainRoute
+        ? "server-applied-domain"
+        : route === access?.latestGeneratedAccessRoute
+          ? "generated-latest"
+          : route === access?.plannedGeneratedAccessRoute
+            ? "generated-planned"
+            : undefined;
 
   if (!route) {
     if (resource.networkProfile?.exposureMode === "reverse-proxy") {
@@ -688,6 +692,7 @@ function runtimeProbeUrl(input: {
 
   const publicRoute =
     input.resource.accessSummary?.latestDurableDomainRoute ??
+    input.resource.accessSummary?.latestServerAppliedDomainRoute ??
     input.resource.accessSummary?.latestGeneratedAccessRoute;
   return publicRoute ? withPolicyPath(publicRoute.url, input.policy.path) : undefined;
 }
