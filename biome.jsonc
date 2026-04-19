@@ -22,7 +22,8 @@
       "!**/runtime",
       "!**/.appaloft",
       "!**/.tmp",
-      "!**/*.svelte"
+      "!**/*.svelte",
+      "!apps/desktop/src-tauri/tauri.conf.json"
     ]
   },
   "formatter": {
