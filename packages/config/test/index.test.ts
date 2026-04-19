@@ -1,8 +1,12 @@
 import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { resolveConfig } from "../src";
 
+const rootPackageJson = JSON.parse(
+  readFileSync(new URL("../../../package.json", import.meta.url), "utf8"),
+) as { version: string };
 const testHome = "/Users/appaloft";
 const testXdgDataHome = "/var/lib/xdg-data";
 const testAppData = "C:\\Users\\appaloft\\AppData\\Roaming";
@@ -20,12 +24,12 @@ function expectedDefaultDataDir(): string {
 }
 
 describe("resolveConfig", () => {
-  test("defaults the runtime app version to the current package version", () => {
+  test("defaults the runtime app version to the source checkout package version", () => {
     const config = resolveConfig({
       env: {},
     });
 
-    expect(config.appVersion).toBe("0.2.0");
+    expect(config.appVersion).toBe(rootPackageJson.version);
   });
 
   test("allows overriding the runtime app version through environment", () => {
