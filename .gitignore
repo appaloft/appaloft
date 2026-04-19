@@ -46,6 +46,8 @@ yarn-error.log*
 
 # Misc
 .DS_Store
+__pycache__/
+*.pyc
 *.pem
 *.tsbuildinfo
 bun.lockb
