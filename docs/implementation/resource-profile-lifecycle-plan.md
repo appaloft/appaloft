@@ -251,8 +251,7 @@ The source-link blocker closure is implemented through the dedicated
 the `source_links` PG/PGlite table, PG `SourceLinkStore`, and `source-link` delete blocker coverage
 are present for PostgreSQL/PGlite state backends.
 
-The next specified blocker closure is server-applied route state, governed by
-[Server-Applied Route Durable Persistence Implementation Plan](./server-applied-route-durable-persistence-plan.md).
-That Code Round must add the `server_applied_route_states` PG/PGlite table, route-state adapter,
-shell wiring, and `server-applied-route` blocker coverage before `resources.delete` can treat this
-blocker kind as durable PG state.
+The server-applied route blocker closure is implemented through
+[Server-Applied Route Durable Persistence Implementation Plan](./server-applied-route-durable-persistence-plan.md):
+the `server_applied_route_states` PG/PGlite table, route-state adapter, shell wiring, and
+`server-applied-route` blocker coverage are present for PostgreSQL/PGlite state backends.

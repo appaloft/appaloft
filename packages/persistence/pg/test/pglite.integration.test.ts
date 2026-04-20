@@ -694,6 +694,403 @@ describe("pglite persistence integration", () => {
     }
   }, 15000);
 
+  test("[SERVER-APPLIED-ROUTE-STATE-001] pg route store upserts and reads desired state", async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), "appaloft-pglite-route-state-"));
+    const pgliteDataDir = join(workspaceDir, ".appaloft", "data", "pglite");
+    let closeDatabase: (() => Promise<void>) | undefined;
+
+    try {
+      const { createDatabase, createMigrator, PgServerAppliedRouteStateStore } = await import(
+        "../src/index"
+      );
+      const database = await createDatabase({
+        driver: "pglite",
+        pgliteDataDir,
+      });
+      closeDatabase = () => database.close();
+      const migrator = createMigrator(database.db);
+      const migrationResult = await migrator.migrateToLatest();
+      expect(migrationResult.error).toBeUndefined();
+
+      const target = await seedSourceLinkContext(database.db, "route_persist");
+      const store = new PgServerAppliedRouteStateStore(database.db);
+
+      const desired = await store.upsertDesired({
+        target,
+        sourceFingerprint: "source-fingerprint:v1:branch%3Aroute-persist",
+        updatedAt: "2026-01-01T00:04:00.000Z",
+        domains: [
+          {
+            host: "example.test",
+            pathPrefix: "/",
+            tlsMode: "auto",
+          },
+          {
+            host: "www.example.test",
+            pathPrefix: "/",
+            tlsMode: "auto",
+            redirectTo: "example.test",
+            redirectStatus: 308,
+          },
+        ],
+      });
+
+      expect(desired.isOk()).toBe(true);
+      expect(desired._unsafeUnwrap()).toMatchObject({
+        routeSetId: `${target.projectId}:${target.environmentId}:${target.resourceId}:${target.serverId}:${target.destinationId}`,
+        ...target,
+        sourceFingerprint: "source-fingerprint:v1:branch%3Aroute-persist",
+        status: "desired",
+        updatedAt: "2026-01-01T00:04:00.000Z",
+      });
+
+      const read = await store.read(target);
+      expect(read.isOk()).toBe(true);
+      expect(read._unsafeUnwrap()).toEqual(desired._unsafeUnwrap());
+
+      const row = await database.db
+        .selectFrom("server_applied_route_states")
+        .selectAll()
+        .where("route_set_id", "=", desired._unsafeUnwrap().routeSetId)
+        .executeTakeFirstOrThrow();
+      expect(row.metadata).toEqual({});
+      expect(row.domains).toEqual([
+        {
+          host: "example.test",
+          pathPrefix: "/",
+          tlsMode: "auto",
+        },
+        {
+          host: "www.example.test",
+          pathPrefix: "/",
+          tlsMode: "auto",
+          redirectTo: "example.test",
+          redirectStatus: 308,
+        },
+      ]);
+    } finally {
+      await closeDatabase?.();
+      rmSync(workspaceDir, { recursive: true, force: true });
+    }
+  }, 15000);
+
+  test("[SERVER-APPLIED-ROUTE-STATE-002] pg route store prefers exact destination over fallback", async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), "appaloft-pglite-route-fallback-"));
+    const pgliteDataDir = join(workspaceDir, ".appaloft", "data", "pglite");
+    let closeDatabase: (() => Promise<void>) | undefined;
+
+    try {
+      const { createDatabase, createMigrator, PgServerAppliedRouteStateStore } = await import(
+        "../src/index"
+      );
+      const database = await createDatabase({
+        driver: "pglite",
+        pgliteDataDir,
+      });
+      closeDatabase = () => database.close();
+      const migrator = createMigrator(database.db);
+      const migrationResult = await migrator.migrateToLatest();
+      expect(migrationResult.error).toBeUndefined();
+
+      const target = await seedSourceLinkContext(database.db, "route_fallback");
+      const store = new PgServerAppliedRouteStateStore(database.db);
+      const defaultTarget = {
+        projectId: target.projectId,
+        environmentId: target.environmentId,
+        resourceId: target.resourceId,
+        serverId: target.serverId,
+      };
+
+      const fallback = await store.upsertDesired({
+        target: defaultTarget,
+        updatedAt: "2026-01-01T00:04:00.000Z",
+        domains: [
+          {
+            host: "fallback.example.test",
+            pathPrefix: "/",
+            tlsMode: "disabled",
+          },
+        ],
+      });
+      expect(fallback.isOk()).toBe(true);
+
+      const fallbackRead = await store.read({
+        ...target,
+        destinationId: "dst_missing_exact",
+      });
+      expect(fallbackRead.isOk()).toBe(true);
+      expect(fallbackRead._unsafeUnwrap()?.domains[0]?.host).toBe("fallback.example.test");
+
+      const exact = await store.upsertDesired({
+        target,
+        updatedAt: "2026-01-01T00:05:00.000Z",
+        domains: [
+          {
+            host: "exact.example.test",
+            pathPrefix: "/",
+            tlsMode: "auto",
+          },
+        ],
+      });
+      expect(exact.isOk()).toBe(true);
+
+      const exactRead = await store.read(target);
+      expect(exactRead.isOk()).toBe(true);
+      expect(exactRead._unsafeUnwrap()?.domains[0]?.host).toBe("exact.example.test");
+      expect(exactRead._unsafeUnwrap()?.routeSetId).toBe(
+        `${target.projectId}:${target.environmentId}:${target.resourceId}:${target.serverId}:${target.destinationId}`,
+      );
+    } finally {
+      await closeDatabase?.();
+      rmSync(workspaceDir, { recursive: true, force: true });
+    }
+  }, 15000);
+
+  test("[SERVER-APPLIED-ROUTE-STATE-003] pg route store persists status writeback and conflicts", async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), "appaloft-pglite-route-status-"));
+    const pgliteDataDir = join(workspaceDir, ".appaloft", "data", "pglite");
+    let closeDatabase: (() => Promise<void>) | undefined;
+
+    try {
+      const { createDatabase, createMigrator, PgServerAppliedRouteStateStore } = await import(
+        "../src/index"
+      );
+      const database = await createDatabase({
+        driver: "pglite",
+        pgliteDataDir,
+      });
+      closeDatabase = () => database.close();
+      const migrator = createMigrator(database.db);
+      const migrationResult = await migrator.migrateToLatest();
+      expect(migrationResult.error).toBeUndefined();
+
+      const target = await seedSourceLinkContext(database.db, "route_status");
+      const store = new PgServerAppliedRouteStateStore(database.db);
+      const desired = await store.upsertDesired({
+        target,
+        updatedAt: "2026-01-01T00:04:00.000Z",
+        domains: [
+          {
+            host: "status.example.test",
+            pathPrefix: "/",
+            tlsMode: "auto",
+          },
+        ],
+      });
+      expect(desired.isOk()).toBe(true);
+
+      const applied = await store.markApplied({
+        target,
+        deploymentId: "dep_route_status",
+        updatedAt: "2026-01-01T00:05:00.000Z",
+        routeSetId: desired._unsafeUnwrap().routeSetId,
+        providerKey: "traefik",
+        proxyKind: "traefik",
+      });
+      expect(applied.isOk()).toBe(true);
+      expect(applied._unsafeUnwrap()).toMatchObject({
+        status: "applied",
+        lastApplied: {
+          deploymentId: "dep_route_status",
+          appliedAt: "2026-01-01T00:05:00.000Z",
+          providerKey: "traefik",
+          proxyKind: "traefik",
+        },
+      });
+
+      const failed = await store.markFailed({
+        target,
+        deploymentId: "dep_route_status",
+        updatedAt: "2026-01-01T00:06:00.000Z",
+        phase: "proxy-route-realization",
+        errorCode: "proxy_configuration_render_failed",
+        message: "provider rejected route",
+        retryable: true,
+        routeSetId: desired._unsafeUnwrap().routeSetId,
+        providerKey: "traefik",
+        proxyKind: "traefik",
+      });
+      expect(failed.isOk()).toBe(true);
+      expect(failed._unsafeUnwrap()).toMatchObject({
+        status: "failed",
+        lastApplied: {
+          deploymentId: "dep_route_status",
+        },
+        lastFailure: {
+          deploymentId: "dep_route_status",
+          failedAt: "2026-01-01T00:06:00.000Z",
+          phase: "proxy-route-realization",
+          errorCode: "proxy_configuration_render_failed",
+          message: "provider rejected route",
+          retryable: true,
+          providerKey: "traefik",
+          proxyKind: "traefik",
+        },
+      });
+
+      const conflict = await store.markApplied({
+        target,
+        deploymentId: "dep_route_status",
+        updatedAt: "2026-01-01T00:07:00.000Z",
+        routeSetId: "wrong_route_set",
+      });
+      expect(conflict.isErr()).toBe(true);
+      if (conflict.isOk()) {
+        throw new Error("Expected server-applied route state conflict");
+      }
+      expect(conflict.error.code).toBe("server_applied_route_state_conflict");
+      expect(conflict.error.details).toMatchObject({
+        phase: "proxy-route-realization",
+        expectedRouteSetId: "wrong_route_set",
+        actualRouteSetId: desired._unsafeUnwrap().routeSetId,
+      });
+    } finally {
+      await closeDatabase?.();
+      rmSync(workspaceDir, { recursive: true, force: true });
+    }
+  }, 15000);
+
+  test("[SERVER-APPLIED-ROUTE-STATE-004] resource delete sees pg route-state blocker", async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), "appaloft-pglite-route-blocker-"));
+    const pgliteDataDir = join(workspaceDir, ".appaloft", "data", "pglite");
+    const context = createRepositoryContext();
+    let closeDatabase: (() => Promise<void>) | undefined;
+
+    try {
+      const {
+        createDatabase,
+        createMigrator,
+        PgResourceDeletionBlockerReader,
+        PgServerAppliedRouteStateStore,
+      } = await import("../src/index");
+      const database = await createDatabase({
+        driver: "pglite",
+        pgliteDataDir,
+      });
+      closeDatabase = () => database.close();
+      const migrator = createMigrator(database.db);
+      const migrationResult = await migrator.migrateToLatest();
+      expect(migrationResult.error).toBeUndefined();
+
+      const target = await seedSourceLinkContext(database.db, "route_blocker", {
+        lifecycleStatus: "archived",
+        archivedAt: "2026-01-01T00:02:00.000Z",
+      });
+      const store = new PgServerAppliedRouteStateStore(database.db);
+      const desired = await store.upsertDesired({
+        target,
+        updatedAt: "2026-01-01T00:04:00.000Z",
+        domains: [
+          {
+            host: "blocker.example.test",
+            pathPrefix: "/",
+            tlsMode: "auto",
+          },
+        ],
+      });
+      expect(desired.isOk()).toBe(true);
+
+      const reader = new PgResourceDeletionBlockerReader(database.db);
+      const result = await reader.findBlockers(context, {
+        resourceId: target.resourceId,
+      });
+
+      expect(result.isOk()).toBe(true);
+      expect(result._unsafeUnwrap()).toContainEqual({
+        kind: "server-applied-route",
+        relatedEntityId: desired._unsafeUnwrap().routeSetId,
+        relatedEntityType: "server-applied-route",
+        count: 1,
+      });
+    } finally {
+      await closeDatabase?.();
+      rmSync(workspaceDir, { recursive: true, force: true });
+    }
+  }, 15000);
+
+  test("[SERVER-APPLIED-ROUTE-STATE-005] pg route-state migration blocks unsafe cascades", async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), "appaloft-pglite-route-migration-"));
+    const pgliteDataDir = join(workspaceDir, ".appaloft", "data", "pglite");
+    let closeDatabase: (() => Promise<void>) | undefined;
+
+    try {
+      const { createDatabase, createMigrator, PgServerAppliedRouteStateStore } = await import(
+        "../src/index"
+      );
+      const database = await createDatabase({
+        driver: "pglite",
+        pgliteDataDir,
+      });
+      closeDatabase = () => database.close();
+      const migrator = createMigrator(database.db);
+      const migrationResult = await migrator.migrateToLatest();
+      expect(migrationResult.error).toBeUndefined();
+
+      const indexes = await sql<{ indexname: string }>`
+        SELECT indexname
+        FROM pg_indexes
+        WHERE tablename = 'server_applied_route_states'
+      `.execute(database.db);
+      expect(indexes.rows.map((row) => row.indexname)).toEqual(
+        expect.arrayContaining([
+          "server_applied_route_states_target_idx",
+          "server_applied_route_states_default_target_idx",
+          "server_applied_route_states_resource_id_idx",
+          "server_applied_route_states_server_id_idx",
+        ]),
+      );
+
+      const target = await seedSourceLinkContext(database.db, "route_migration");
+      const store = new PgServerAppliedRouteStateStore(database.db);
+      const desired = await store.upsertDesired({
+        target,
+        updatedAt: "2026-01-01T00:04:00.000Z",
+        domains: [
+          {
+            host: "migration.example.test",
+            pathPrefix: "/",
+            tlsMode: "auto",
+          },
+        ],
+      });
+      expect(desired.isOk()).toBe(true);
+
+      await database.db
+        .updateTable("resources")
+        .set({
+          lifecycle_status: "deleted",
+          deleted_at: "2026-01-01T00:05:00.000Z",
+        })
+        .where("id", "=", target.resourceId)
+        .execute();
+
+      const retainedAfterTombstone = await database.db
+        .selectFrom("server_applied_route_states")
+        .select("route_set_id")
+        .where("route_set_id", "=", desired._unsafeUnwrap().routeSetId)
+        .executeTakeFirst();
+      expect(retainedAfterTombstone?.route_set_id).toBe(desired._unsafeUnwrap().routeSetId);
+
+      let physicalDeleteBlocked = false;
+      try {
+        await database.db.deleteFrom("resources").where("id", "=", target.resourceId).execute();
+      } catch {
+        physicalDeleteBlocked = true;
+      }
+      expect(physicalDeleteBlocked).toBe(true);
+
+      const retainedAfterDeleteAttempt = await database.db
+        .selectFrom("server_applied_route_states")
+        .select("route_set_id")
+        .where("route_set_id", "=", desired._unsafeUnwrap().routeSetId)
+        .executeTakeFirst();
+      expect(retainedAfterDeleteAttempt?.route_set_id).toBe(desired._unsafeUnwrap().routeSetId);
+    } finally {
+      await closeDatabase?.();
+      rmSync(workspaceDir, { recursive: true, force: true });
+    }
+  }, 15000);
+
   test("backfills legacy server edge proxy intent during migration", async () => {
     const workspaceDir = mkdtempSync(join(tmpdir(), "appaloft-pglite-migration-"));
     const pgliteDataDir = join(workspaceDir, ".appaloft", "data", "pglite");

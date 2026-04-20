@@ -588,9 +588,8 @@ The PG `resources.delete` blocker reader reports `source-link` blockers from dur
 
 PG/PGlite server-applied route persistence is specified in
 [Server-Applied Route Durable Persistence Plan](../implementation/server-applied-route-durable-persistence-plan.md)
-but not implemented yet. Until that Code Round lands, hosted/self-hosted or embedded PG/PGlite
-state backends do not have durable route-state rows for `resources.delete` to report as
-`server-applied-route` blockers.
+and is implemented through the selected PostgreSQL/PGlite backend. `resources.delete` reports
+`server-applied-route` blockers from durable route-state rows.
 
 An opt-in shell e2e harness in
 `apps/shell/test/e2e/github-action-ssh-state.workflow.e2e.ts` covers the GitHub Actions style

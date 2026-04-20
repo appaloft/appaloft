@@ -1,11 +1,9 @@
 import "reflect-metadata";
 
-import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
   createCliProgram,
-  FileSystemServerAppliedRouteDesiredStateStore,
   SshRemoteStateLifecycle,
   sshRemoteStateTargetFromDecision,
 } from "@appaloft/adapter-cli";
@@ -34,6 +32,7 @@ import {
   createDatabase,
   createMigrator,
   type PgliteRuntimeAssets,
+  PgServerAppliedRouteStateStore,
   PgSourceLinkStore,
 } from "@appaloft/persistence-pg";
 import { type LocalPluginHost } from "@appaloft/plugin-host";
@@ -109,13 +108,8 @@ export async function createAppComposition(
   if (config.databaseDriver === "pglite") {
     await migrator.migrateToLatest();
   }
-  const localPgliteStateRoot =
-    options?.remotePgliteStateSyncSession?.localDataRoot ?? dirname(config.pgliteDataDir);
   const sourceLinkStore = new PgSourceLinkStore(database.db);
-  const serverAppliedRouteStore =
-    config.databaseDriver === "pglite"
-      ? new FileSystemServerAppliedRouteDesiredStateStore(localPgliteStateRoot)
-      : undefined;
+  const serverAppliedRouteStore = new PgServerAppliedRouteStateStore(database.db);
 
   const authRuntime = createBetterAuthRuntime({
     enabled: config.authProvider === "better-auth",
@@ -138,9 +132,7 @@ export async function createAppComposition(
     authRuntime,
     deploymentProgressReporter,
     ...(sourceLinkStore ? { sourceLinkStore } : {}),
-    ...(serverAppliedRouteStore
-      ? { serverAppliedRouteDesiredStateReader: serverAppliedRouteStore }
-      : {}),
+    serverAppliedRouteDesiredStateReader: serverAppliedRouteStore,
   });
   registerApplicationServices(childContainer);
   const idGenerator = resolveToken<IdGenerator>(childContainer, tokens.idGenerator);
@@ -221,7 +213,7 @@ export async function createAppComposition(
     executionContextFactory,
     deploymentProgressObserver: deploymentProgressReporter,
     ...(sourceLinkStore ? { sourceLinkStore } : {}),
-    ...(serverAppliedRouteStore ? { serverAppliedRouteStore } : {}),
+    serverAppliedRouteStore,
     prepareDeploymentStateBackend: async (decision) => {
       if (options?.remotePgliteStateSyncSession && decision.kind === "ssh-pglite") {
         return ok({

@@ -361,10 +361,11 @@ upstream attachment for redirect hosts, and expose redirect source/target/status
 configuration and diagnostics. External public redirect probing, exact provider-native redirect
 status verification, and provider-owned ACME history remain follow-up provider/e2e coverage.
 
-The PostgreSQL/PGlite durable route-state slice is specified in
-[Server-Applied Route Durable Persistence Plan](../implementation/server-applied-route-durable-persistence-plan.md)
-but not implemented yet. Current shell wiring still relies on file-backed SSH route-state storage
-for server-applied route desired/applied status, and PG `resources.delete` blocker reads do not yet
+The PostgreSQL/PGlite durable route-state slice is implemented through
+[Server-Applied Route Durable Persistence Plan](../implementation/server-applied-route-durable-persistence-plan.md).
+Shell command execution now uses the selected PostgreSQL/PGlite backend for server-applied route
+desired/applied status, while file-backed SSH route-state storage remains available for
+adapter-level transfer mechanics and explicit legacy wiring. PG `resources.delete` blocker reads
 report `server-applied-route` blockers from durable route-state rows.
 
 `resources.proxy-configuration.preview` exists for Web/API/CLI. Provider diagnostics now include

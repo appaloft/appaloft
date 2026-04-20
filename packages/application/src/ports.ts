@@ -374,6 +374,12 @@ export interface ServerAppliedRouteDesiredStateReader {
 }
 
 export interface ServerAppliedRouteStateStore extends ServerAppliedRouteDesiredStateReader {
+  upsertDesired(input: {
+    target: ServerAppliedRouteDesiredStateTarget;
+    domains: ServerAppliedRouteDesiredStateDomain[];
+    sourceFingerprint?: string;
+    updatedAt: string;
+  }): Promise<Result<ServerAppliedRouteDesiredStateRecord>>;
   markApplied(input: {
     target: ServerAppliedRouteDesiredStateTarget;
     deploymentId: string;

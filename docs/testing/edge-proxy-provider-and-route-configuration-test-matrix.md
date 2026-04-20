@@ -169,10 +169,8 @@ diagnostics. Real HTTPS public validation and provider-owned ACME history remain
 renderer, runtime planning, and proxy configuration query coverage for canonical redirect aliases.
 External runtime reload and public redirect probing remain e2e follow-up coverage.
 
-`SERVER-APPLIED-ROUTE-STATE-001` through `SERVER-APPLIED-ROUTE-STATE-005` are specified for the
-next durable persistence Code Round. Current implementation still uses file-backed SSH route-state
-storage for shell route desired/applied status, and PG/PGlite blocker reads do not yet report
-`server-applied-route` rows because the durable table and adapter do not exist.
+`SERVER-APPLIED-ROUTE-STATE-001` through `SERVER-APPLIED-ROUTE-STATE-005` have PG/PGlite
+integration coverage in `packages/persistence/pg/test/pglite.integration.test.ts`.
 
 ## Open Questions
 

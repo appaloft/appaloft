@@ -189,9 +189,10 @@ Remaining gaps:
   is not implemented yet.
 - PG/PGlite durable server-applied route persistence is specified in
   [Server-Applied Route Durable Persistence Plan](./server-applied-route-durable-persistence-plan.md)
-  but not implemented yet. Until that Code Round lands, route-state storage remains file-backed for
-  the current SSH CLI slice and `resources.delete` cannot detect `server-applied-route` blockers
-  from durable PG/PGlite rows.
+  and implemented through the selected PostgreSQL/PGlite state backend. File-backed route-state
+  storage remains available for adapter-level mechanics and explicit legacy wiring; shell command
+  execution uses the PG/PGlite route-state store and `resources.delete` detects
+  `server-applied-route` blockers from durable rows.
 - Config-file Dockerfile/Compose path selectors are rejected until resource profile fields and
   runtime planner mapping own those paths explicitly.
 - Stored Appaloft/external secret adapters beyond the headless `ci-env:` resolver are not wired into

@@ -306,6 +306,15 @@ class UnavailableSourceLinkStore implements SourceLinkStore {
 }
 
 class NoopServerAppliedRouteStateStore implements ServerAppliedRouteStateStore {
+  async upsertDesired(): Promise<Result<ServerAppliedRouteDesiredStateRecord>> {
+    return err(
+      domainError.validation("Server-applied route state is not configured for this runtime", {
+        phase: "config-domain-resolution",
+        reason: "server_applied_route_store_missing",
+      }),
+    );
+  }
+
   async read(
     _target: ServerAppliedRouteDesiredStateTarget,
   ): Promise<Result<ServerAppliedRouteDesiredStateRecord | null>> {

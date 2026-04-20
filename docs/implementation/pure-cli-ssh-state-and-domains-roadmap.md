@@ -118,7 +118,7 @@ selection overrides, not required setup.
 | Explicit relink command/workflow | Yes | Yes | Useful | Required operator escape hatch for mistaken or intentional retargeting. |
 | `access.domains[]` parser | No for first remote-state slice; yes for CLI product value | Yes | Useful | Domain support can follow remote state foundation but is part of the CLI product thesis. |
 | Canonical redirect route intent | No for first remote-state slice; yes for CLI product value | Yes for www/apex parity | Useful | Needed for common www/non-www canonical host behavior. Requires parser, remote state shape, provider rendering, proxy config/read-model visibility, and e2e redirect assertion. |
-| Server-applied route desired/applied state | No for first remote-state slice; yes for domain support | Yes | Useful | File-backed SSH route state exists for CLI mode. PG/PGlite durable persistence for selected hosted/self-hosted, embedded, and SSH-mirrored state backends is specified in the server-applied route persistence plan. |
+| Server-applied route desired/applied state | No for first remote-state slice; yes for domain support | Yes | Useful | File-backed SSH route state exists for adapter-level mechanics. PG/PGlite durable persistence for selected hosted/self-hosted, embedded, and SSH-mirrored state backends is implemented through the server-applied route persistence plan. |
 | Edge proxy route realization for config domains | No for first remote-state slice; yes for domain support | Yes | No | Desired routes now enter provider-neutral route input, deployment-finished status writeback, mixed path/TLS route groups, and provider-local TLS diagnostics. |
 | GitHub Action wrapper docs | Yes before public release | Yes before public release | No | Binary can be used manually first, but public UX needs `appaloft/deploy-action`, version selection, checksum verification, SSH secret mapping, and examples. |
 | Appaloft always-on DNS observer | No | No | Yes for managed domains | Pure CLI delegates observation to deploy/doctor and resident proxy/provider. |
@@ -150,11 +150,10 @@ selection overrides, not required setup.
   implemented through the `source_links` migration and PG `SourceLinkStore`; shell command
   execution uses that adapter while SSH remote PGlite sync still moves the selected state backend.
 - PostgreSQL/PGlite server-applied route persistence for hosted/self-hosted, embedded, and
-  SSH-mirrored state backends is specified in
-  [Server-Applied Route Durable Persistence Plan](./server-applied-route-durable-persistence-plan.md)
-  but not implemented yet. The next Code Round must add the route-state table, PG adapter, shell
-  wiring, exact/default lookup, applied/failed status writeback, and `server-applied-route`
-  deletion blocker closure.
+  SSH-mirrored state backends is implemented through
+  [Server-Applied Route Durable Persistence Plan](./server-applied-route-durable-persistence-plan.md):
+  the route-state table, PG adapter, shell wiring, exact/default lookup, applied/failed status
+  writeback, and `server-applied-route` deletion blocker closure are present.
 - The public CLI `source-links.relink` command now dispatches the application command, validates
   target context against Appaloft state, and uses the same SSH remote-state mirror/lock path when a
   trusted SSH target is supplied.

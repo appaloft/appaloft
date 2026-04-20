@@ -64,6 +64,25 @@ class CapturingServerAppliedRouteStateStore implements ServerAppliedRouteStateSt
   readonly applied: Array<Parameters<ServerAppliedRouteStateStore["markApplied"]>[0]> = [];
   readonly failed: Array<Parameters<ServerAppliedRouteStateStore["markFailed"]>[0]> = [];
 
+  async upsertDesired(
+    input: Parameters<ServerAppliedRouteStateStore["upsertDesired"]>[0],
+  ): Promise<Result<ServerAppliedRouteDesiredStateRecord>> {
+    return ok({
+      routeSetId: [
+        input.target.projectId,
+        input.target.environmentId,
+        input.target.resourceId,
+        input.target.serverId,
+        input.target.destinationId ?? "default",
+      ].join(":"),
+      ...input.target,
+      ...(input.sourceFingerprint ? { sourceFingerprint: input.sourceFingerprint } : {}),
+      domains: input.domains,
+      status: "desired",
+      updatedAt: input.updatedAt,
+    });
+  }
+
   async read(
     _target: ServerAppliedRouteDesiredStateTarget,
   ): Promise<Result<ServerAppliedRouteDesiredStateRecord | null>> {

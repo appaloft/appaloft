@@ -274,7 +274,7 @@ PG/PGlite durable server-applied route persistence is specified in
 [Server-Applied Route Durable Persistence Plan](../implementation/server-applied-route-durable-persistence-plan.md).
 The durable table, PG adapter, shell wiring, and `resources.delete` blocker coverage are tracked by
 `SERVER-APPLIED-ROUTE-STATE-001` through `SERVER-APPLIED-ROUTE-STATE-005` in the edge proxy test
-matrix and remain a Code Round gap.
+matrix and now have PG/PGlite integration coverage.
 
 Control-plane policy rows `CONFIG-FILE-CONTROL-001` through `CONFIG-FILE-CONTROL-007` are roadmap
 coverage under ADR-025. Current config schema does not accept `controlPlane` yet; existing
