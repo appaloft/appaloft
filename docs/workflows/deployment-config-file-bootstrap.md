@@ -14,7 +14,7 @@ source selection
   -> discover and parse repository config profile
   -> resolve state backend; for SSH deploys, ensure, lock, and migrate remote `ssh-pglite`
   -> resolve trusted Appaloft project/environment/resource/server identity outside the file
-  -> create or update resource-owned profile through explicit operations when needed
+  -> create resource-owned profile or configure source/runtime/network profile through explicit operations when needed
   -> apply non-secret env values and resolved secret references through environment commands
   -> deployments.create(projectId, environmentId, resourceId, serverId, destinationId?)
   -> apply server-applied proxy routes from trusted config domain intent when supported by the
@@ -216,7 +216,7 @@ business command.
 The wrapper is expected to live in `appaloft/deploy-action` so Marketplace metadata, wrapper
 versioning, and install scripts can evolve independently from the main Appaloft repository. The
 main repository remains the source of truth for CLI release assets, checksums, release manifest,
-and behavior specs.
+the static Docker self-host install script, and behavior specs.
 
 The wrapper must perform only entrypoint work:
 
@@ -514,7 +514,7 @@ Config-file errors use stable codes and phases:
 | `validation_error` | `source-link-resolution` | No | Source fingerprint is ambiguous, missing required stable identity, or points at another context without explicit relink. |
 | `validation_error` | `config-domain-resolution` | No | Config domain intent cannot map safely to server-applied or managed domain workflow state, including invalid host/path/TLS shape, missing redirect target, self-redirect, redirect loop, redirect-to-redirect, or unsupported redirect policy. |
 | `unsupported_config_field` | `config-capability-resolution` | No | Known future field such as CPU/memory/replicas or rollout policy is not enforceable by current workflow/resource/runtime target specs. |
-| `resource_profile_drift` | `resource-profile-resolution` | No | Existing resource differs from config and no explicit update operation is available. |
+| `resource_profile_drift` | `resource-profile-resolution` | No | Existing resource differs from config and the required explicit profile configuration command is not active. |
 | `infra_error` | `proxy-domain-realization` | Conditional | Server-applied proxy domain route could not be rendered, applied, reloaded, or verified on the target. |
 
 ## Current Implementation Notes And Migration Gaps
@@ -598,7 +598,8 @@ history, and managed domain control-plane mapping remain follow-up work.
 
 ## Open Questions
 
-- What exact operation names should update source/runtime/network profile fields on an existing
-  resource when a config file changes after first deploy?
+- Config-file changes to an existing resource must sequence the accepted candidate commands
+  `resources.configure-source`, `resources.configure-runtime`, and `resources.configure-network`
+  when those profile fields drift after first deploy.
 - Which resource sizing fields should be admitted first for the single-server Docker/Compose
   backend, and how should unsupported target backends report capability mismatch?

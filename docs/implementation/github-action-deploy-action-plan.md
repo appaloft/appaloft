@@ -293,8 +293,8 @@ Next Test-First Round should add or cover these rows:
 
 ## Current Implementation Notes And Migration Gaps
 
-The main repository already publishes release artifacts with CLI platform archives, checksums,
-release manifest, release notes, and release asset upload.
+The main repository already publishes release artifacts with CLI platform archives, the static
+Docker self-host installer, checksums, release manifest, release notes, and release asset upload.
 
 The main repository already has an opt-in SSH e2e harness that simulates GitHub Actions process
 boundaries by running two separate CLI processes against the same SSH-server state. That proves the

@@ -127,7 +127,8 @@ Purpose: users can run Appaloft as their own control plane.
 
 Deliverables:
 
-- `appaloft install` or install script provisions an Appaloft server.
+- The public website `install.sh` provisions the basic single-node Docker Compose control plane.
+  Future `appaloft install` work can add richer operator workflows on top of that bootstrap path.
 - Production self-hosted stack uses PostgreSQL by default.
 - The self-hosted server exposes the same control-plane handshake as Cloud.
 - Adoption command imports SSH-server `ssh-pglite` source links, identities, deployments, and

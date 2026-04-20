@@ -60,8 +60,11 @@ Implement in ordered slices:
 4. Profile mapper
    - Map config source/runtime/network/health profile fields into `resources.create` for first
      deploy.
-   - When profile update commands exist, sequence them before deployment for existing resources.
-   - Until update commands exist, detect profile drift and fail before `deployments.create`.
+   - When `resources.configure-source`, `resources.configure-runtime`, and
+     `resources.configure-network` are active, sequence the relevant commands before deployment for
+     existing resources.
+   - Until those profile configuration commands are active, detect profile drift and fail before
+     `deployments.create`.
 
 5. Secret handling
    - Reject raw secret material before mutation.
@@ -170,7 +173,8 @@ Implemented slices:
 
 Remaining gaps:
 
-- Existing-resource profile drift detection and explicit profile update command sequencing are not
+- Existing-resource profile drift detection and explicit `resources.configure-source`,
+  `resources.configure-runtime`, and `resources.configure-network` command sequencing are not
   implemented yet.
 - Config-file `access.domains[]` parser support is implemented for provider-neutral `host`,
   `pathPrefix`, `tlsMode`, optional `redirectTo`, and optional `redirectStatus` intent. SSH CLI
@@ -186,9 +190,9 @@ Remaining gaps:
 - Stored Appaloft/external secret adapters beyond the headless `ci-env:` resolver are not wired into
   the config-file entry workflow yet.
 - Public GitHub Action wrapper install UX is not implemented yet. The main repository publishes
-  CLI release archives, checksums, release manifest, and release notes, but `appaloft/deploy-action`
-  still needs its own repository, action metadata, install/checksum scripts, README examples, and
-  wrapper-level tests.
+  CLI release archives, the static Docker self-host installer, checksums, release manifest, and release notes,
+  but `appaloft/deploy-action` still needs its own repository, action metadata, README examples,
+  and wrapper-level tests.
 - CLI config deploy now resolves state backend selection, defaults trusted SSH-targeted config
   deploys to `ssh-pglite`, invokes a remote-state lifecycle hook before identity queries/mutations,
   and uses SSH remote-state lifecycle and mirror sync in shell-built CLI programs.
