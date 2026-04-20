@@ -130,6 +130,7 @@ export function translateDomainError(error: LocalizableDomainError, t: AppaloftT
   switch (error.code) {
     case "conflict":
     case "resource_slug_conflict":
+    case "resource_archived":
       return t(i18nKeys.errors.domain.conflict, { message: error.message });
     case "deployment_not_redeployable":
       return t(i18nKeys.errors.domain.deploymentNotRedeployable, {

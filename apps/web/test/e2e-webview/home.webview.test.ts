@@ -268,6 +268,11 @@ const apiResponses: Record<ApiScenario, Record<string, unknown>> = {
         id: "res_demo",
       },
     },
+    "/api/rpc/resources/archive": {
+      json: {
+        id: "res_demo",
+      },
+    },
     "/api/rpc/domain-bindings/list": {
       json: {
         items: [],
@@ -1051,6 +1056,24 @@ describe("console e2e with Bun.WebView", () => {
         strategy: "workspace-commands",
         startCommand: "bun run preview",
       },
+    });
+  }, 15_000);
+
+  test("[RES-PROFILE-ENTRY-002] submits resource archive through Web", async () => {
+    activeScenario = "dashboard";
+    resetRecordedApiRequests();
+
+    await using view = createWebView();
+    await view.navigate(`${previewUrl}/resources/res_demo`);
+    await expectAnyText(view, ["Runtime profile", "运行时配置"]);
+    await view.evaluate("window.confirm = () => true");
+    await clickButtonByAnyText(view, ["Archive", "归档"]);
+
+    const archiveRequest = await waitForRecordedRequest("/api/rpc/resources/archive");
+    const archiveInput = readOrpcJsonPayload(archiveRequest.body);
+
+    expect(archiveInput).toEqual({
+      resourceId: "res_demo",
     });
   }, 15_000);
 

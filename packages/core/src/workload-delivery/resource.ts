@@ -21,12 +21,14 @@ import {
   type HealthCheckTypeValue,
   type ResourceExposureModeValue,
   type ResourceKindValue,
+  ResourceLifecycleStatusValue,
   type ResourceNetworkProtocolValue,
   type ResourceServiceKindValue,
   type RuntimePlanStrategyValue,
 } from "../shared/state-machine";
-import { type CreatedAt, type UpdatedAt } from "../shared/temporal";
+import { type ArchivedAt, type CreatedAt, type UpdatedAt } from "../shared/temporal";
 import {
+  type ArchiveReason,
   type CommandText,
   type DescriptionText,
   type HealthCheckHostText,
@@ -332,6 +334,9 @@ export interface ResourceState {
   sourceBinding?: ResourceSourceBindingState;
   runtimeProfile?: ResourceRuntimeProfileState;
   networkProfile?: ResourceNetworkProfileState;
+  lifecycleStatus: ResourceLifecycleStatusValue;
+  archivedAt?: ArchivedAt;
+  archiveReason?: ArchiveReason;
   createdAt: CreatedAt;
   description?: DescriptionText;
 }
@@ -380,6 +385,20 @@ function resourceNetworkResolutionError(
   return domainError.validation(message, {
     phase: "resource-network-resolution",
     ...(details ?? {}),
+  });
+}
+
+function resourceArchivedError(input: {
+  resourceId: ResourceId;
+  commandName: string;
+  archivedAt?: ArchivedAt;
+}) {
+  return domainError.resourceArchived("Archived resources cannot accept new mutations", {
+    phase: "resource-lifecycle-guard",
+    resourceId: input.resourceId.value,
+    lifecycleStatus: "archived",
+    commandName: input.commandName,
+    ...(input.archivedAt ? { archivedAt: input.archivedAt.value } : {}),
   });
 }
 
@@ -548,6 +567,12 @@ export interface ResourceVisitor<TContext, TResult> {
   visitResource(resource: Resource, context: TContext): TResult;
 }
 
+type ResourceRehydrateState = Omit<
+  ResourceState,
+  "archiveReason" | "archivedAt" | "lifecycleStatus"
+> &
+  Partial<Pick<ResourceState, "archiveReason" | "archivedAt" | "lifecycleStatus">>;
+
 export class Resource extends AggregateRoot<ResourceState> {
   private constructor(state: ResourceState) {
     super(state);
@@ -624,6 +649,7 @@ export class Resource extends AggregateRoot<ResourceState> {
         ...(input.networkProfile
           ? { networkProfile: cloneResourceNetworkProfileState(input.networkProfile) }
           : {}),
+        lifecycleStatus: ResourceLifecycleStatusValue.active(),
         createdAt: input.createdAt,
         ...(input.description ? { description: input.description } : {}),
       });
@@ -665,7 +691,7 @@ export class Resource extends AggregateRoot<ResourceState> {
     });
   }
 
-  static rehydrate(state: ResourceState): Resource {
+  static rehydrate(state: ResourceRehydrateState): Resource {
     return new Resource({
       ...state,
       services: [...state.services],
@@ -682,13 +708,69 @@ export class Resource extends AggregateRoot<ResourceState> {
       ...(state.networkProfile
         ? { networkProfile: cloneResourceNetworkProfileState(state.networkProfile) }
         : {}),
+      lifecycleStatus: state.lifecycleStatus ?? ResourceLifecycleStatusValue.active(),
+      ...(state.archivedAt ? { archivedAt: state.archivedAt } : {}),
+      ...(state.archiveReason ? { archiveReason: state.archiveReason } : {}),
     });
+  }
+
+  private rejectArchivedResource(commandName: string): Result<void> {
+    if (!this.state.lifecycleStatus.isArchived()) {
+      return ok(undefined);
+    }
+
+    return err(
+      resourceArchivedError({
+        resourceId: this.state.id,
+        commandName,
+        ...(this.state.archivedAt ? { archivedAt: this.state.archivedAt } : {}),
+      }),
+    );
+  }
+
+  ensureCanCreateDeployment(): Result<void> {
+    return this.rejectArchivedResource("deployments.create");
+  }
+
+  archive(input: { archivedAt: ArchivedAt; reason?: ArchiveReason }): Result<{ changed: boolean }> {
+    if (this.state.lifecycleStatus.isArchived()) {
+      return ok({ changed: false });
+    }
+
+    const lifecycleStatus = this.state.lifecycleStatus.archive();
+    if (lifecycleStatus.isErr()) {
+      return err(lifecycleStatus.error);
+    }
+
+    this.state.lifecycleStatus = lifecycleStatus.value;
+    this.state.archivedAt = input.archivedAt;
+    if (input.reason) {
+      this.state.archiveReason = input.reason;
+    } else {
+      delete this.state.archiveReason;
+    }
+
+    this.recordDomainEvent("resource-archived", input.archivedAt, {
+      resourceId: this.state.id.value,
+      projectId: this.state.projectId.value,
+      environmentId: this.state.environmentId.value,
+      resourceSlug: this.state.slug.value,
+      archivedAt: input.archivedAt.value,
+      ...(input.reason ? { reason: input.reason.value } : {}),
+    });
+
+    return ok({ changed: true });
   }
 
   configureRuntimeProfile(input: {
     runtimeProfile: ResourceRuntimeProfileState;
     configuredAt: UpdatedAt;
   }): Result<void> {
+    const lifecycleGuard = this.rejectArchivedResource("resources.configure-runtime");
+    if (lifecycleGuard.isErr()) {
+      return err(lifecycleGuard.error);
+    }
+
     if (input.runtimeProfile.healthCheckPath || input.runtimeProfile.healthCheck) {
       return err(
         resourceRuntimeResolutionError(
@@ -739,6 +821,11 @@ export class Resource extends AggregateRoot<ResourceState> {
     configuredAt: UpdatedAt;
     defaultStrategy: RuntimePlanStrategyValue;
   }): Result<void> {
+    const lifecycleGuard = this.rejectArchivedResource("resources.configure-health");
+    if (lifecycleGuard.isErr()) {
+      return err(lifecycleGuard.error);
+    }
+
     if (input.policy.enabled && input.policy.type.value !== "http") {
       return err(
         domainError.validation("Only HTTP resource health policies are supported", {
@@ -814,6 +901,11 @@ export class Resource extends AggregateRoot<ResourceState> {
     networkProfile: ResourceNetworkProfileState;
     configuredAt: UpdatedAt;
   }): Result<void> {
+    const lifecycleGuard = this.rejectArchivedResource("resources.configure-network");
+    if (lifecycleGuard.isErr()) {
+      return err(lifecycleGuard.error);
+    }
+
     const validation = validateResourceNetworkProfile({
       resourceId: this.state.id,
       kind: this.state.kind,
@@ -842,6 +934,11 @@ export class Resource extends AggregateRoot<ResourceState> {
     sourceBinding: ResourceSourceBindingState;
     configuredAt: UpdatedAt;
   }): Result<void> {
+    const lifecycleGuard = this.rejectArchivedResource("resources.configure-source");
+    if (lifecycleGuard.isErr()) {
+      return err(lifecycleGuard.error);
+    }
+
     const sourceBinding = ResourceSourceBinding.create(input.sourceBinding);
     if (sourceBinding.isErr()) {
       return err(sourceBinding.error);

@@ -20,6 +20,7 @@ import { certificatesMigration } from "./migrations/012_certificates";
 import { domainBindingRouteFailureMigration } from "./migrations/013_domain_binding_route_failure";
 import { domainBindingDnsObservationMigration } from "./migrations/014_domain_binding_dns_observation";
 import { domainBindingCanonicalRedirectMigration } from "./migrations/015_domain_binding_canonical_redirect";
+import { resourceLifecycleMigration } from "./migrations/016_resource_lifecycle";
 import { PgliteDialect } from "./pglite-dialect";
 import { type Database } from "./schema";
 import { TracingDialect } from "./tracing-dialect";
@@ -129,6 +130,7 @@ class StaticMigrationProvider implements MigrationProvider {
       "013_domain_binding_route_failure": domainBindingRouteFailureMigration,
       "014_domain_binding_dns_observation": domainBindingDnsObservationMigration,
       "015_domain_binding_canonical_redirect": domainBindingCanonicalRedirectMigration,
+      "016_resource_lifecycle": resourceLifecycleMigration,
     };
   }
 }

@@ -16,6 +16,7 @@ import { showEnvironmentQueryInputSchema } from "./operations/environments/show-
 import { unsetEnvironmentVariableCommandInputSchema } from "./operations/environments/unset-environment-variable.command";
 import { createProjectCommandInputSchema } from "./operations/projects/create-project.command";
 import { listProjectsQueryInputSchema } from "./operations/projects/list-projects.query";
+import { archiveResourceCommandInputSchema } from "./operations/resources/archive-resource.command";
 import { configureResourceHealthCommandInputSchema } from "./operations/resources/configure-resource-health.command";
 import { configureResourceNetworkCommandInputSchema } from "./operations/resources/configure-resource-network.command";
 import { configureResourceRuntimeCommandInputSchema } from "./operations/resources/configure-resource-runtime.command";
@@ -257,6 +258,20 @@ export const operationCatalog = [
     transports: {
       cli: "appaloft resource create",
       orpc: { method: "POST", path: "/api/resources" },
+    },
+  },
+  {
+    key: "resources.archive",
+    kind: "command",
+    domain: "resources",
+    messageName: "ArchiveResourceCommand",
+    handlerName: "ArchiveResourceCommandHandler",
+    serviceName: "ArchiveResourceUseCase",
+    inputSchema: archiveResourceCommandInputSchema,
+    serviceToken: tokens.archiveResourceUseCase,
+    transports: {
+      cli: "appaloft resource archive <resourceId>",
+      orpc: { method: "POST", path: "/api/resources/{resourceId}/archive" },
     },
   },
   {

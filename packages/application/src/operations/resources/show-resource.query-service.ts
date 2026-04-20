@@ -334,7 +334,8 @@ export class ShowResourceQueryService {
         ...(accessSummary ? { accessSummary } : {}),
         ...(deployment ? { latestDeployment: deploymentContextFromSummary(deployment) } : {}),
         lifecycle: {
-          status: "active",
+          status: state.lifecycleStatus.value,
+          ...(state.archivedAt ? { archivedAt: state.archivedAt.value } : {}),
         },
         diagnostics: query.includeProfileDiagnostics ? diagnosticsFromState(state) : [],
         generatedAt: this.clock.now(),

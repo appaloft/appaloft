@@ -1,4 +1,5 @@
 import {
+  type ArchiveResourceCommandInput,
   type BootstrapServerProxyCommandInput,
   type ConfigureResourceHealthCommandInput,
   type ConfigureResourceNetworkCommandInput,
@@ -36,6 +37,7 @@ import {
   type UnsetEnvironmentVariableCommandInput,
 } from "@appaloft/application/schemas";
 import {
+  type ArchiveResourceResponse,
   type BootstrapServerProxyResponse,
   type ConfigureResourceHealthResponse,
   type ConfigureResourceNetworkResponse,
@@ -201,6 +203,12 @@ export type AppaloftOrpcClientContract = {
       AppaloftClientContext,
       CreateResourceCommandInput,
       CreateResourceResponse,
+      AppaloftClientError
+    >;
+    archive: Client<
+      AppaloftClientContext,
+      ArchiveResourceCommandInput,
+      ArchiveResourceResponse,
       AppaloftClientError
     >;
     configureHealth: Client<

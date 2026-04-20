@@ -1,4 +1,6 @@
 import {
+  ArchiveResourceCommandHandler,
+  ArchiveResourceUseCase,
   BootstrapServerEdgeProxyOnTargetRegisteredHandler,
   BootstrapServerProxyCommandHandler,
   BootstrapServerProxyUseCase,
@@ -102,6 +104,7 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(ConfigureResourceNetworkCommandHandler);
   container.registerSingleton(ConfigureResourceRuntimeCommandHandler);
   container.registerSingleton(ConfigureResourceSourceCommandHandler);
+  container.registerSingleton(ArchiveResourceCommandHandler);
   container.registerSingleton(ShowResourceQueryHandler);
   container.registerSingleton(IssueOrRenewCertificateCommandHandler);
   container.registerSingleton(RelinkSourceLinkCommandHandler);
@@ -114,6 +117,7 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(tokens.createProjectUseCase, CreateProjectUseCase);
   container.registerSingleton(tokens.listProjectsQueryService, ListProjectsQueryService);
   container.registerSingleton(tokens.createResourceUseCase, CreateResourceUseCase);
+  container.registerSingleton(tokens.archiveResourceUseCase, ArchiveResourceUseCase);
   container.registerSingleton(
     tokens.configureResourceSourceUseCase,
     ConfigureResourceSourceUseCase,

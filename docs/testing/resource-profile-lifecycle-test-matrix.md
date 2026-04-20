@@ -59,14 +59,14 @@ command and that no entrypoint exposes a generic `resources.update`.
 | RES-PROFILE-ARCHIVE-002 | `resources.archive` | Command use case | Already archived resource. | Returns idempotent `ok({ id })` without duplicate state effect or duplicate event. |
 | RES-PROFILE-ARCHIVE-003 | `resources.archive` | Command use case | Resource has deployment history or runtime logs. | Archive succeeds and retains history; no cleanup side effects. |
 | RES-PROFILE-ARCHIVE-004 | `deployments.create` | Command guard | Archived resource selected for deployment. | Rejects with structured lifecycle error. |
-| RES-PROFILE-ARCHIVE-005 | `resource-archived` | Event payload | Archive has safe reason. | Event includes resource ids, slug, archived timestamp, and normalized reason; excludes secrets and logs. |
+| RES-PROFILE-ARCHIVE-005 | `resource-archived` | Event payload | Archive has safe reason. | Event includes resource ids, `resourceSlug`, archived timestamp, and normalized reason; excludes secrets and logs. |
 | RES-PROFILE-DELETE-001 | `resources.delete` | Command use case | Archived resource has no blockers and matching slug confirmation. | Deletes/tombstones resource, publishes `resource-deleted`, returns `ok({ id })`. |
 | RES-PROFILE-DELETE-002 | `resources.delete` | Command use case | Active resource. | Rejects with `resource_delete_blocked`. |
 | RES-PROFILE-DELETE-003 | `resources.delete` | Command use case | Confirmation slug mismatch. | Rejects with validation/conflict error and no mutation. |
 | RES-PROFILE-DELETE-004 | `resources.delete` | Command use case | Deployment history, domain binding, runtime instance, source link, or retained blocker exists. | Rejects with `resource_delete_blocked` and safe blocker details. |
 | RES-PROFILE-DELETE-005 | `resources.delete` | Read model | Deleted resource queried by normal `resources.show`/`resources.list`. | `resources.show` returns `not_found`; list omits the resource. |
 | RES-PROFILE-ENTRY-001 | Web | Entrypoint | Resource detail page loads durable profile. | Dispatches `resources.show`; does not synthesize full detail from list-only data. |
-| RES-PROFILE-ENTRY-002 | Web | Entrypoint | Source/runtime/network/health forms submitted independently. | Each form dispatches its matching command and refetches detail/health. |
+| RES-PROFILE-ENTRY-002 | Web | Entrypoint | Source/runtime/network/archive actions submitted independently. | Each form/action dispatches its matching command and refetches detail/health. |
 | RES-PROFILE-ENTRY-003 | CLI | Entrypoint | Resource profile commands are listed. | CLI exposes separate subcommands and no generic `resource update`. |
 | RES-PROFILE-ENTRY-004 | HTTP/oRPC | Entrypoint | Routes accept show/source/runtime/network/archive/delete requests. | Each route reuses the application schema; no transport-only schema. |
 | RES-PROFILE-ENTRY-005 | Operation catalog | Catalog | Public exposure in Code Round. | Each active operation appears in `CORE_OPERATIONS.md` and `operation-catalog.ts` in the same change. |
@@ -93,23 +93,32 @@ Automated coverage now exists for:
 
 - `RES-PROFILE-SHOW-001`, `RES-PROFILE-SHOW-002`, `RES-PROFILE-SHOW-004`, and
   `RES-PROFILE-SHOW-005` in `packages/application/test/show-resource.test.ts`;
-- `RES-PROFILE-SOURCE-001`, `RES-PROFILE-SOURCE-002`, `RES-PROFILE-SOURCE-003`, and
-  `RES-PROFILE-SOURCE-004` in `packages/application/test/configure-resource-source.test.ts`;
-- `RES-PROFILE-RUNTIME-001`, `RES-PROFILE-RUNTIME-002`, `RES-PROFILE-RUNTIME-003`, and
-  `RES-PROFILE-RUNTIME-004` in `packages/application/test/configure-resource-runtime.test.ts`;
+- `RES-PROFILE-SHOW-003` in `packages/application/test/show-resource.test.ts`;
+- `RES-PROFILE-SOURCE-001`, `RES-PROFILE-SOURCE-002`, `RES-PROFILE-SOURCE-003`,
+  `RES-PROFILE-SOURCE-004`, and `RES-PROFILE-SOURCE-005` in
+  `packages/application/test/configure-resource-source.test.ts`;
+- `RES-PROFILE-RUNTIME-001`, `RES-PROFILE-RUNTIME-002`, `RES-PROFILE-RUNTIME-003`,
+  `RES-PROFILE-RUNTIME-004`, and `RES-PROFILE-RUNTIME-005` in
+  `packages/application/test/configure-resource-runtime.test.ts`;
+- `RES-PROFILE-NETWORK-006` in
+  `packages/application/test/configure-resource-network.test.ts`;
+- `RES-PROFILE-HEALTH-001` in `packages/application/test/configure-resource-health.test.ts`;
+- `RES-PROFILE-ARCHIVE-001`, `RES-PROFILE-ARCHIVE-002`, `RES-PROFILE-ARCHIVE-003`, and
+  `RES-PROFILE-ARCHIVE-005` in `packages/application/test/archive-resource.test.ts`;
+- `RES-PROFILE-ARCHIVE-004` in `packages/application/test/create-deployment.test.ts`;
 - HTTP/oRPC dispatch for `resources.show` in `packages/orpc/test/resource-show.http.test.ts`;
 - HTTP/oRPC dispatch for `resources.configure-source` in
   `packages/orpc/test/resource-source-profile.http.test.ts`;
 - HTTP/oRPC dispatch for `resources.configure-runtime` in
   `packages/orpc/test/resource-runtime-profile.http.test.ts`;
+- HTTP/oRPC dispatch for `resources.archive` in
+  `packages/orpc/test/resource-archive.http.test.ts`;
 - CLI dispatch for `resources.configure-runtime` in
   `packages/adapters/cli/test/resource-command.test.ts`;
+- CLI dispatch for `resources.archive` in `packages/adapters/cli/test/resource-command.test.ts`;
 - Web detail dispatch for `resources.show` in `apps/web/test/e2e-webview/home.webview.test.ts`;
-- Web source, runtime, and network profile submissions in
+- Web source, runtime, network, and archive submissions in
   `apps/web/test/e2e-webview/home.webview.test.ts`.
 
-`RES-PROFILE-SHOW-003` remains blocked until `resources.archive` introduces explicit lifecycle
-state. `RES-PROFILE-SOURCE-005`, `RES-PROFILE-RUNTIME-005`, `RES-PROFILE-NETWORK-006`,
-`RES-PROFILE-HEALTH-001`, and `RES-PROFILE-ARCHIVE-004` remain blocked for the same reason.
-`RES-PROFILE-SOURCE-006` remains future event-consumer projection work. Archive rows are the next
-Resource Profile Lifecycle Code Round target; delete rows remain a later Code Round.
+`RES-PROFILE-SOURCE-006` remains future event-consumer projection work. Delete rows remain a later
+Code Round.

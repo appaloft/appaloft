@@ -2,6 +2,7 @@ import "reflect-metadata";
 
 import { describe, expect, test } from "bun:test";
 import {
+  ArchivedAt,
   CreatedAt,
   type DomainEvent,
   EnvironmentId,
@@ -38,6 +39,16 @@ function applicationResourceFixture(id = "res_web", name = "Web"): Resource {
     services: [],
     createdAt: CreatedAt.rehydrate("2026-01-01T00:00:00.000Z"),
   });
+}
+
+function archivedApplicationResourceFixture(): Resource {
+  const resource = applicationResourceFixture();
+  resource
+    .archive({
+      archivedAt: ArchivedAt.rehydrate("2026-01-01T00:00:05.000Z"),
+    })
+    ._unsafeUnwrap();
+  return resource;
 }
 
 function composeStackResourceFixture(): Resource {
@@ -216,6 +227,32 @@ describe("ConfigureResourceNetworkUseCase", () => {
       ResourceByIdSpec.create(ResourceId.rehydrate("res_api")),
     );
     expect(persisted?.toState().networkProfile?.internalPort.value).toBe(3000);
+  });
+
+  test("[RES-PROFILE-NETWORK-006] rejects network changes for archived resources", async () => {
+    const { context, eventBus, useCase } = await createHarness([
+      archivedApplicationResourceFixture(),
+    ]);
+
+    const result = await useCase.execute(context, {
+      resourceId: "res_web",
+      networkProfile: {
+        internalPort: 3000,
+        upstreamProtocol: "http",
+        exposureMode: "reverse-proxy",
+      },
+    });
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "resource_archived",
+      details: {
+        phase: "resource-lifecycle-guard",
+        resourceId: "res_web",
+        commandName: "resources.configure-network",
+      },
+    });
+    expect(eventBus.events).toHaveLength(0);
   });
 
   test("[RES-PROFILE-NETWORK-007] rejects missing resource without publishing event", async () => {

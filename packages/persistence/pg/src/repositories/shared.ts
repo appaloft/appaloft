@@ -1,6 +1,8 @@
 import { type RepositoryContext } from "@appaloft/application";
 import {
   AccessRoute,
+  ArchivedAt,
+  ArchiveReason,
   BuildStrategyKindValue,
   CanonicalRedirectStatusCode,
   CertificateAttemptId,
@@ -105,6 +107,7 @@ import {
   ResourceExposureModeValue,
   ResourceId,
   ResourceKindValue,
+  ResourceLifecycleStatusValue,
   ResourceName,
   ResourceNetworkProtocolValue,
   ResourceServiceKindValue,
@@ -170,6 +173,7 @@ type DestinationKindInput = Parameters<typeof DestinationKindValue.rehydrate>[0]
 type DeploymentPhaseInput = Parameters<typeof DeploymentPhaseValue.rehydrate>[0];
 type LogLevelInput = Parameters<typeof LogLevelValue.rehydrate>[0];
 type ResourceKindInput = Parameters<typeof ResourceKindValue.rehydrate>[0];
+type ResourceLifecycleStatusInput = Parameters<typeof ResourceLifecycleStatusValue.rehydrate>[0];
 type ResourceServiceKindInput = Parameters<typeof ResourceServiceKindValue.rehydrate>[0];
 type ResourceNetworkProtocolInput = Parameters<typeof ResourceNetworkProtocolValue.rehydrate>[0];
 type ResourceExposureModeInput = Parameters<typeof ResourceExposureModeValue.rehydrate>[0];
@@ -1403,6 +1407,13 @@ export function rehydrateResourceRow(row: Selectable<Database["resources"]>) {
           },
         }
       : {}),
+    lifecycleStatus: ResourceLifecycleStatusValue.rehydrate(
+      row.lifecycle_status as ResourceLifecycleStatusInput,
+    ),
+    ...(row.archived_at
+      ? { archivedAt: ArchivedAt.rehydrate(normalizeTimestamp(row.archived_at) ?? row.archived_at) }
+      : {}),
+    ...(row.archive_reason ? { archiveReason: ArchiveReason.rehydrate(row.archive_reason) } : {}),
     createdAt: CreatedAt.rehydrate(normalizeTimestamp(row.created_at) ?? row.created_at),
     ...(row.description ? { description: DescriptionText.rehydrate(row.description) } : {}),
   };

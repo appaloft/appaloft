@@ -5,7 +5,7 @@
 - Event name: `resource-archived`
 - Publisher: `resources.archive`
 - Aggregate owner: Resource
-- Current status: accepted candidate event for the next archive Code Round
+- Current status: active event
 
 ## Normative Contract
 

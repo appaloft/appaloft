@@ -195,6 +195,7 @@ Implemented operations:
 | Configure resource health policy | Command | `resources.configure-health` | `ConfigureResourceHealthCommand` | `ConfigureResourceHealthCommandInput` | `appaloft resource configure-health <resourceId>` | `POST /api/resources/{resourceId}/health-policy` |
 | Configure resource runtime profile | Command | `resources.configure-runtime` | `ConfigureResourceRuntimeCommand` | `ConfigureResourceRuntimeCommandInput` | `appaloft resource configure-runtime <resourceId>` | `POST /api/resources/{resourceId}/runtime-profile` |
 | Configure resource network profile | Command | `resources.configure-network` | `ConfigureResourceNetworkCommand` | `ConfigureResourceNetworkCommandInput` | `appaloft resource configure-network <resourceId>` | `POST /api/resources/{resourceId}/network-profile` |
+| Archive resource | Command | `resources.archive` | `ArchiveResourceCommand` | `ArchiveResourceCommandInput` | `appaloft resource archive <resourceId>` | `POST /api/resources/{resourceId}/archive` |
 | List resources | Query | `resources.list` | `ListResourcesQuery` | `ListResourcesQueryInput` | `appaloft resource list` | `GET /api/resources` |
 | Show resource profile | Query | `resources.show` | `ShowResourceQuery` | `ShowResourceQueryInput` | `appaloft resource show <resourceId>` | `GET /api/resources/{resourceId}` |
 | Read resource runtime logs | Query | `resources.runtime-logs` | `ResourceRuntimeLogsQuery` | `ResourceRuntimeLogsQueryInput` | `appaloft resource logs <resourceId>` | `GET /api/resources/{resourceId}/runtime-logs`; stream: `GET /api/resources/{resourceId}/runtime-logs/stream` |
@@ -267,6 +268,10 @@ Current boundary:
   command replaces the durable workload endpoint profile for future deployment admission and route
   planning without binding domains, applying proxy routes, restarting runtime, or mutating
   deployment snapshots.
+- resource archive is resource-owned through `resources.archive`; the command moves lifecycle
+  state to `archived`, publishes `resource-archived` on the first transition, and blocks future
+  profile mutations and deployments without stopping runtime or deleting retained history,
+  domains, logs, diagnostics, or source links.
 - durable domain bindings belong to the resource. Deployment snapshots may record the route used
   by one attempt, but they are not the domain ownership boundary. Generated default access should
   be exposed through resource-scoped access summaries and should prefer stable resource-scoped
@@ -274,7 +279,6 @@ Current boundary:
 
 Core next operations expected here:
 - declare compose-stack services from compose metadata
-- `resources.archive`
 - `resources.delete`
 
 ## Source Links

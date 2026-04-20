@@ -127,6 +127,10 @@ export const domainError = {
     message: string,
     details?: Record<string, string | number | boolean | null>,
   ): DomainError => createError("resource_slug_conflict", "user", message, details),
+  resourceArchived: (
+    message: string,
+    details?: Record<string, string | number | boolean | null>,
+  ): DomainError => createError("resource_archived", "user", message, details),
   deploymentNotRedeployable: (
     message: string,
     details?: Record<string, string | number | boolean | null>,

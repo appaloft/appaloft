@@ -1,4 +1,5 @@
 import {
+  ArchiveResourceCommand,
   ConfigureResourceHealthCommand,
   ConfigureResourceNetworkCommand,
   ConfigureResourceRuntimeCommand,
@@ -38,6 +39,7 @@ const nameOption = Options.text("name");
 const kindOption = Options.choice("kind", resourceKinds).pipe(Options.withDefault("application"));
 const destinationOption = Options.text("destination").pipe(Options.optional);
 const descriptionOption = Options.text("description").pipe(Options.optional);
+const archiveReasonOption = Options.text("reason").pipe(Options.optional);
 const internalPortOption = Options.text("internal-port").pipe(Options.optional);
 const configureNetworkInternalPortOption = Options.text("internal-port");
 const sourceKindOption = Options.choice("kind", sourceKinds);
@@ -207,6 +209,24 @@ const logsCommand = EffectCommand.make(
       }),
     ),
 ).pipe(EffectCommand.withDescription("Show resource runtime logs"));
+
+const archiveCommand = EffectCommand.make(
+  "archive",
+  {
+    resourceId: resourceIdArg,
+    reason: archiveReasonOption,
+    json: jsonOption,
+  },
+  ({ json, reason, resourceId }) => {
+    void json;
+    return runCommand(
+      ArchiveResourceCommand.create({
+        resourceId,
+        reason: optionalValue(reason),
+      }),
+    );
+  },
+).pipe(EffectCommand.withDescription("Archive a resource"));
 
 const terminalCommand = EffectCommand.make(
   "terminal",
@@ -531,6 +551,7 @@ export const resourceCommand = EffectCommand.make("resource").pipe(
     createCommand,
     listCommand,
     showCommand,
+    archiveCommand,
     terminalCommand,
     logsCommand,
     healthCommand,

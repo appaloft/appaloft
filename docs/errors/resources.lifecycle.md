@@ -219,10 +219,10 @@ fail later during source detection, Git clone, Docker image pull, or runtime pla
 `resources.configure-network` are active public surfaces with focused command/query, HTTP/oRPC, CLI
 or Web coverage in the resource profile lifecycle slice.
 
-`resources.archive` and `resources.delete` are accepted candidate operations. Their error mappings
-remain normative for future Code Rounds but are not yet active public surfaces. The
-`resource_archived` guard for source/runtime/network configuration remains blocked until
-`resources.archive` introduces explicit lifecycle state.
+`resources.archive` is an active public surface with `resource_archived` guard coverage for
+source/runtime/network/health configuration and deployment admission. `resources.delete` remains an
+accepted candidate operation; its error mappings remain normative for a future guarded cleanup Code
+Round.
 
 ## Open Questions
 

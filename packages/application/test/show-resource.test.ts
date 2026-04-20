@@ -2,6 +2,7 @@ import "reflect-metadata";
 
 import { describe, expect, test } from "bun:test";
 import {
+  ArchivedAt,
   CommandText,
   CreatedAt,
   DescriptionText,
@@ -223,6 +224,16 @@ function incompleteResource(): Resource {
   });
 }
 
+function archivedDetailedResource(): Resource {
+  const resource = detailedResource();
+  resource
+    .archive({
+      archivedAt: ArchivedAt.rehydrate("2026-01-01T00:00:08.000Z"),
+    })
+    ._unsafeUnwrap();
+  return resource;
+}
+
 function resourceSummary(overrides?: Partial<ResourceSummary>): ResourceSummary {
   return {
     id: "res_web",
@@ -401,6 +412,18 @@ describe("ShowResourceQueryService", () => {
         phase: "resource-read",
         resourceId: "res_web",
       },
+    });
+  });
+
+  test("[RES-PROFILE-SHOW-003] returns archived lifecycle state", async () => {
+    const result = await createService({
+      resources: [archivedDetailedResource()],
+    }).execute(createTestContext(), createQuery());
+
+    const detail = unwrap(result);
+    expect(detail.lifecycle).toEqual({
+      status: "archived",
+      archivedAt: "2026-01-01T00:00:08.000Z",
     });
   });
 
