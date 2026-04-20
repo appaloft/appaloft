@@ -26,6 +26,21 @@ This spec inherits:
 ## Error Details
 
 ```ts
+type ResourceDeletionBlockerKind =
+  | "active-resource"
+  | "deployment-history"
+  | "runtime-instance"
+  | "domain-binding"
+  | "certificate"
+  | "source-link"
+  | "dependency-binding"
+  | "terminal-session"
+  | "runtime-log-retention"
+  | "audit-retention"
+  | "generated-access-route"
+  | "server-applied-route"
+  | "proxy-route";
+
 type ResourceLifecycleErrorDetails = {
   commandName?:
     | "resources.create"
@@ -89,7 +104,8 @@ type ResourceLifecycleErrorDetails = {
   upstreamProtocol?: "http" | "tcp";
   targetServiceName?: string;
   lifecycleStatus?: "active" | "archived" | "deleted";
-  deletionBlockers?: string[];
+  deletedAt?: string;
+  deletionBlockers?: ResourceDeletionBlockerKind[];
   relatedEntityId?: string;
   relatedEntityType?:
     | "project"
@@ -147,7 +163,7 @@ state.
 | `validation_error` | `validation` | `resource-source-resolution` | No | Source profile update is invalid, ambiguous, unsafe, or contains forbidden secret/credential material. |
 | `validation_error` | `validation` | `resource-runtime-resolution` | No | Runtime profile update is invalid, unsafe, includes health-policy mutation, or includes unsupported runtime target fields. |
 | `validation_error` | `validation` | `resource-network-resolution` | No | Network profile update is invalid, unsafe, missing required endpoint data, or requests unsupported direct-port exposure. |
-| `resource_delete_blocked` | `conflict` | `resource-deletion-guard` | No | Delete was requested for an active resource or an archived resource with retained blockers such as deployments, runtime instances, source links, domain bindings, certificates, terminal sessions, dependency bindings, logs, or audit requirements. |
+| `resource_delete_blocked` | `conflict` | `resource-deletion-guard` | No | Delete was requested for an active resource or an archived resource with retained blockers such as deployments, runtime instances, source links, domain bindings, certificates, terminal sessions, dependency bindings, routes, logs, or audit requirements. |
 | `validation_error` | `validation` | `resource-deletion-guard` | No | Delete confirmation did not match the resource slug. |
 | `infra_error` | `infra` | `resource-persistence` | Conditional | Profile/lifecycle state could not be safely persisted. |
 | `infra_error` | `infra` | `event-publication` | Conditional | Profile/lifecycle event publication or outbox recording failed before command success could be safely returned. |
@@ -221,8 +237,9 @@ or Web coverage in the resource profile lifecycle slice.
 
 `resources.archive` is an active public surface with `resource_archived` guard coverage for
 source/runtime/network/health configuration and deployment admission. `resources.delete` remains an
-accepted candidate operation; its error mappings remain normative for a future guarded cleanup Code
-Round.
+accepted candidate operation. Its deletion blocker kinds, confirmation mismatch behavior, deleted
+lifecycle status, and event publication mapping are specified for the next guarded cleanup Code
+Round but are not yet active public surfaces.
 
 ## Open Questions
 

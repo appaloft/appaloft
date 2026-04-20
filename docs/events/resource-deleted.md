@@ -1,9 +1,16 @@
 # resource-deleted Event Spec
 
+## Metadata
+
+- Event name: `resource-deleted`
+- Publisher: `resources.delete`
+- Aggregate owner: Resource
+- Current status: accepted candidate event for the next delete Code Round
+
 ## Normative Contract
 
-`resource-deleted` records that `resources.delete` permanently removed an archived, unreferenced
-resource from normal active resource state.
+`resource-deleted` records that `resources.delete` removed an archived, unreferenced resource from
+normal active resource state.
 
 The event is a durable lifecycle fact, not proof that any dependent data was cascaded or cleaned up.
 Deletion guards must pass before the event is published.
@@ -24,6 +31,23 @@ type ResourceDeletedEventPayload = {
 
 Payloads must not include secrets, source credentials, provider credentials, runtime logs,
 deployment log lines, certificate material, or provider-native route configs.
+
+## Publication And Idempotency
+
+The event is published or recorded only when a resource transitions from archived to deleted.
+
+Repeated `resources.delete` calls against a resolvable deleted tombstone are idempotent command
+successes and must not publish duplicate `resource-deleted` events.
+
+Consumers must handle duplicate event delivery idempotently by resource id and deleted lifecycle
+state. Duplicate delivery must not duplicate audit records, navigation removal, cache invalidation,
+or deleted-resource tombstones.
+
+## Read Model Semantics
+
+Consumers may remove active resource read-model rows or mark them deleted so normal read paths
+omit them. Consumers must preserve enough safe audit/tombstone state to explain that the resource
+was deleted when a future audit-only query exists.
 
 ## Consumers
 

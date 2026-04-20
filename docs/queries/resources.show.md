@@ -8,8 +8,8 @@
 - Handler: `ShowResourceQueryHandler`
 - Query service: `ShowResourceQueryService`
 - Domain / bounded context: Workload Delivery / Resource read model
-- Current status: accepted candidate query
-- Source classification: normative contract for the next Resource Profile Lifecycle Code Round
+- Current status: active query
+- Source classification: normative contract
 
 ## Normative Contract
 
@@ -142,9 +142,10 @@ must use `resource-read` for read-model resolution failures after input validati
 detail page. The query service assembles durable profile fields from the `Resource` aggregate and
 uses read-side deployment/access summaries only as contextual observation data.
 
-Archived and deleted lifecycle states remain future Resource Profile Lifecycle work. Until
-`resources.archive` and `resources.delete` introduce explicit aggregate lifecycle state, the query
-returns `lifecycle.status = "active"` for persisted resources and `not_found` for missing resources.
+Archived lifecycle state is active and returned as `lifecycle.status = "archived"` for retained
+resources. Deleted lifecycle state remains future Resource Profile Lifecycle work; after
+`resources.delete` lands, normal `resources.show` must return `not_found` for deleted resources
+unless a future audit-only query is introduced.
 
 ## Open Questions
 

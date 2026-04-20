@@ -67,7 +67,7 @@ cleanup.
 | Change internal listener/exposure profile | `resources.configure-network` | `ResourceNetworkProfile` | Domains, generated access policy, proxy routes, current runtime |
 | Change health probe policy | `resources.configure-health` | Resource health policy | Source/runtime/network profile outside health policy fields |
 | Retire resource | `resources.archive` | Resource lifecycle status | Runtime stop, route/domain/certificate/source-link cleanup |
-| Permanently remove unused resource | `resources.delete` | Archived unreferenced resource identity | Cascading cleanup of blockers |
+| Remove unused archived resource from active state | `resources.delete` | Archived unreferenced resource identity | Cascading cleanup of blockers |
 
 ## Entry Flow
 
@@ -125,7 +125,7 @@ Delete:
 ```text
 resources.show(resourceId)
   -> resources.archive(resourceId) when needed
-  -> resources.delete(resourceId, confirmation)
+  -> resources.delete(resourceId, confirmation.resourceSlug)
   -> resources.list(project/environment filter)
 ```
 
@@ -152,6 +152,8 @@ Deleted resources:
 
 - are omitted from normal resource lists;
 - return `not_found` from normal `resources.show`;
+- may return idempotent `ok({ id })` from `resources.delete` only when a write-side deleted
+  tombstone can be resolved;
 - require a separate future audit query if deleted-resource inspection is needed.
 
 ## Deployment Relationship
@@ -189,9 +191,10 @@ dispatches `resources.show` for durable profile data, dispatches source/runtime/
 forms through separate commands, and dispatches archive through the dedicated lifecycle action.
 
 Archived-resource guards are active for source/runtime/network/health mutations and deployment
-admission. `resources.delete` remains a later guarded cleanup slice. Each future Code Round must
-update `CORE_OPERATIONS.md` and `operation-catalog.ts` in the same change that exposes the
-operation.
+admission. `resources.delete` is specified as the next guarded cleanup slice: it may delete only
+archived resources with matching slug confirmation and no retained blockers. Each future Code
+Round must update `CORE_OPERATIONS.md` and `operation-catalog.ts` in the same change that exposes
+the operation.
 
 ## Open Questions
 
