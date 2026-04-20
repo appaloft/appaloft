@@ -14,6 +14,7 @@ This test matrix inherits:
 
 - [resources.diagnostic-summary Query Spec](../queries/resources.diagnostic-summary.md)
 - [Resource Diagnostic Summary Workflow Spec](../workflows/resource-diagnostic-summary.md)
+- [Resource Access Failure Diagnostics Test Matrix](./resource-access-failure-diagnostics-test-matrix.md)
 - [Resource Diagnostic Summary Error Spec](../errors/resources.diagnostic-summary.md)
 - [Resource Diagnostic Summary Implementation Plan](../implementation/resource-diagnostic-summary-plan.md)
 - [Project Resource Console Workflow Spec](../workflows/project-resource-console.md)
@@ -81,6 +82,8 @@ Then:
 | RES-DIAG-QRY-012 | integration | Core read model failure | Resource context cannot be safely loaded | `err(resource_diagnostic_unavailable)` | None | No partial unsafe summary is returned. |
 | RES-DIAG-QRY-013 | integration | Redaction failure | Redactor cannot prove safety | `err(resource_diagnostic_redaction_failed)` | None | No copy payload is returned. |
 | RES-DIAG-QRY-014 | integration | Copy markdown failure | Optional markdown render fails but JSON succeeds | `ok` | `resource_diagnostic_copy_render_failed` | `copy.json` remains present. |
+| RES-DIAG-QRY-015 | integration | Edge access failure attached | Latest safe edge failure envelope exists for the resource | `ok` with access/proxy failure diagnostic | `resource_access_*` source error | Summary preserves request id, code, phase, owner hint, and safe related ids without raw proxy text. |
+| RES-DIAG-QRY-016 | integration | Edge failure has operation cause | Edge failure references a deployment, proxy, or health cause code | `ok` with edge diagnostic and `causeCode` | Owning source error remains unchanged | Copy payload keeps both edge code and operation-owned cause code. |
 
 ## Entrypoint Matrix
 
@@ -130,6 +133,7 @@ Remaining coverage gaps:
 - CLI output tests;
 - Web clipboard/e2e coverage for the resource detail affordance and future Quick Deploy
   completion affordance.
+- edge access failure envelope composition rows `RES-DIAG-QRY-015` and `RES-DIAG-QRY-016`.
 
 ## Open Questions
 

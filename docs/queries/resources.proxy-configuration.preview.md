@@ -17,6 +17,7 @@ This query inherits:
 - [ADR-015: Resource Network Profile](../decisions/ADR-015-resource-network-profile.md)
 - [Default Access Domain And Proxy Routing Workflow](../workflows/default-access-domain-and-proxy-routing.md)
 - [Edge Proxy Provider And Route Realization Workflow](../workflows/edge-proxy-provider-and-route-realization.md)
+- [Resource Access Failure Diagnostics Workflow](../workflows/resource-access-failure-diagnostics.md)
 - [Error Model](../errors/model.md)
 - [neverthrow Conventions](../errors/neverthrow-conventions.md)
 
@@ -110,6 +111,11 @@ type ProxyConfigurationSection = {
 ```
 
 The wrapper fields are provider-neutral. Section `content` may be provider-specific because this is an operator-facing read model.
+
+Per-request edge failures, such as a recent gateway timeout or upstream connection failure, belong
+to [Resource Access Failure Diagnostics](../workflows/resource-access-failure-diagnostics.md). The
+proxy configuration query may show provider-rendered diagnostic sections and route readiness, but it
+must not become the primary request-failure event store.
 
 ## Query Flow
 

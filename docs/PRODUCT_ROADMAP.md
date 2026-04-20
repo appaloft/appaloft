@@ -445,6 +445,9 @@ Required:
 - [ ] Broaden API/Web/CLI regression coverage for provider-rendered proxy configuration preview.
 - [ ] Broaden API/Web/CLI regression coverage for server-applied domains and durable domain routes.
 - [ ] Broaden API/Web/CLI regression coverage for diagnostic copy.
+- [ ] Close `resource-access-failure` diagnostics: real Traefik error-middleware e2e, request-id
+  envelope lookup, health/diagnostic-summary composition, and companion/static renderer support for
+  one-shot CLI or remote SSH runtimes without a reachable Appaloft backend service.
 - [ ] Keep access/proxy/log/health failures visible through read models, proxy preview, and
   diagnostics.
 

@@ -14,6 +14,7 @@ This spec inherits:
 
 - [resources.diagnostic-summary Query Spec](../queries/resources.diagnostic-summary.md)
 - [Resource Diagnostic Summary Workflow Spec](../workflows/resource-diagnostic-summary.md)
+- [Resource Access Failure Diagnostics Error Spec](./resource-access-failure-diagnostics.md)
 - [Error Model](./model.md)
 - [neverthrow Conventions](./neverthrow-conventions.md)
 - [Async Lifecycle And Acceptance](../architecture/async-lifecycle-and-acceptance.md)
@@ -29,6 +30,7 @@ type ResourceDiagnosticSummaryErrorDetails = {
     | "deployment-resolution"
     | "read-model-load"
     | "access-summary"
+    | "edge-access-failure"
     | "proxy-summary"
     | "deployment-log-tail"
     | "runtime-log-tail"
@@ -76,6 +78,7 @@ type ResourceDiagnosticSourceError = {
   source:
     | "deployment"
     | "access"
+    | "edge-access"
     | "proxy"
     | "deployment-logs"
     | "runtime-logs"
@@ -96,6 +99,16 @@ Typical source errors:
 | Source | Error code | Phase | Meaning |
 | --- | --- | --- | --- |
 | `access` | `default_access_route_unavailable` | `access-summary` | No generated or durable access URL is currently available. |
+| `edge-access` | `resource_access_route_not_found` | `edge-request-routing` | Recent edge request reached Appaloft but no active route matched the host/path. |
+| `edge-access` | `resource_access_proxy_unavailable` | `proxy-route-observation` | Recent edge request reached a route that required unavailable proxy infrastructure. |
+| `edge-access` | `resource_access_route_unavailable` | `proxy-route-observation` | Recent edge request reached a known route that was not applied, ready, or current. |
+| `edge-access` | `resource_access_upstream_unavailable` | `upstream-connection` | Recent edge request matched a route but no current upstream target was available. |
+| `edge-access` | `resource_access_upstream_connect_failed` | `upstream-connection` | Recent edge request could not connect to the resource endpoint. |
+| `edge-access` | `resource_access_upstream_timeout` | `upstream-connection` | Recent edge request timed out waiting for the resource endpoint. |
+| `edge-access` | `resource_access_upstream_reset` | `upstream-response` | Recent edge request's upstream connection reset before a complete response. |
+| `edge-access` | `resource_access_upstream_tls_failed` | `upstream-connection` | Recent edge request failed upstream TLS or protocol negotiation. |
+| `edge-access` | `resource_access_edge_error` | `diagnostic-page-render` | The edge diagnostic service failed while handling a gateway error. |
+| `edge-access` | `resource_access_unknown` | `diagnostic-page-render` | Recent edge request failed, but the edge provider could not classify the failure safely. |
 | `proxy` | `proxy_provider_unavailable` | `proxy-summary` | The required edge proxy provider is not registered or not available. |
 | `proxy` | `proxy_configuration_render_failed` | `proxy-summary` | Provider failed to render a safe read-only configuration view. |
 | `deployment-logs` | `deployment_logs_unavailable` | `deployment-log-tail` | Deployment-attempt logs cannot be loaded or are missing. |

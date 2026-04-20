@@ -15,6 +15,7 @@ This test matrix inherits:
 - [ADR-020: Resource Health Observation](../decisions/ADR-020-resource-health-observation.md)
 - [resources.health Query Spec](../queries/resources.health.md)
 - [Resource Health Observation Workflow Spec](../workflows/resource-health-observation.md)
+- [Resource Access Failure Diagnostics Test Matrix](./resource-access-failure-diagnostics-test-matrix.md)
 - [Resource Health Error Spec](../errors/resources.health.md)
 - [Resource Health Implementation Plan](../implementation/resource-health-plan.md)
 - [Project Resource Console Workflow Spec](../workflows/project-resource-console.md)
@@ -86,6 +87,8 @@ Then:
 | RES-HEALTH-QRY-015 | integration | Durable domain pending | Domain binding exists but is not ready | `ok(overall = "degraded")` when public access is required | Domain state is not hidden by generated route unless policy allows fallback. |
 | RES-HEALTH-QRY-016 | integration | Runtime inspection fails | Runtime provider inspect fails | `ok(overall = "unknown")` | Source error records runtime inspection failure. |
 | RES-HEALTH-QRY-017 | integration | Read model failure | Required resource context cannot be safely loaded | `err(resource_health_unavailable)` | No partial unsafe summary is returned. |
+| RES-HEALTH-QRY-018 | integration | Edge upstream timeout observed | Latest deployment succeeded, internal health is unknown or healthy, latest edge failure is `resource_access_upstream_timeout` | `ok(overall = "degraded")` | Source error/check record includes request id, code, phase, retriable flag, and does not mark deployment success as reachable. |
+| RES-HEALTH-QRY-019 | integration | Edge proxy route unavailable observed | Latest deployment exists, edge failure is `resource_access_route_unavailable` or `resource_access_proxy_unavailable` | `ok(overall = "degraded")` | Proxy/public access sections use `resource_access_*` code and keep category out of `domain`. |
 
 ## Status Aggregation Matrix
 
@@ -144,7 +147,8 @@ attempt-scoped and new tests should cover the resource-owned observation contrac
 
 Remaining test gaps include provider-native runtime inspection, Docker health state, command policy
 support/unsupported cases, durable-domain precedence inside the health query, and Web e2e mocking
-of mixed resource health states.
+of mixed resource health states. Edge access failure diagnostic source rows `RES-HEALTH-QRY-018`
+and `RES-HEALTH-QRY-019` are also future coverage.
 
 ## Open Questions
 

@@ -678,10 +678,17 @@ export interface EdgeProxyRouteInput {
   redirectStatus?: 301 | 302 | 307 | 308;
 }
 
+export interface ResourceAccessFailureRendererTarget {
+  url: string;
+  middlewareName?: string;
+  serviceName?: string;
+}
+
 export interface ProxyRouteRealizationInput {
   deploymentId: string;
   port: number;
   accessRoutes: EdgeProxyRouteInput[];
+  resourceAccessFailureRenderer?: ResourceAccessFailureRendererTarget;
 }
 
 export interface ProxyRouteRealizationPlan {
@@ -813,6 +820,7 @@ export interface ProxyConfigurationViewInput {
   accessRoutes: EdgeProxyRouteInput[];
   port: number;
   includeDiagnostics: boolean;
+  resourceAccessFailureRenderer?: ResourceAccessFailureRendererTarget;
 }
 
 export interface EdgeProxyProvider {

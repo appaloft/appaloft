@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { TraefikEdgeProxyProvider } from "../src";
+import { renderTraefikResourceAccessFailureMiddleware, TraefikEdgeProxyProvider } from "../src";
 
 describe("TraefikEdgeProxyProvider", () => {
   test("renders provider-owned Docker labels and ensure plan", async () => {
@@ -79,6 +79,9 @@ describe("TraefikEdgeProxyProvider", () => {
       containerName: "appaloft-traefik",
     });
     expect(ensure._unsafeUnwrap().containerCommand).toContain("traefik:v3.6.2");
+    expect(ensure._unsafeUnwrap().containerCommand).toContain(
+      "--add-host host.docker.internal:host-gateway",
+    );
     expect(ensure._unsafeUnwrap().metadata).toMatchObject({
       image: "traefik:v3.6.2",
     });
@@ -258,5 +261,120 @@ describe("TraefikEdgeProxyProvider", () => {
         }),
       ]),
     );
+  });
+
+  test("[EDGE-PROXY-PROVIDER-010] renders provider-neutral access failure middleware labels", () => {
+    const config = renderTraefikResourceAccessFailureMiddleware({
+      middlewareName: "appaloft-errors",
+      rendererPath: "/.appaloft/resource-access-failure",
+      serviceName: "appaloft-backend",
+      serviceUrl: "http://appaloft.internal:3001",
+    });
+
+    expect(config).toMatchObject({
+      middlewareName: "appaloft-errors",
+      serviceName: "appaloft-backend",
+      query: "/.appaloft/resource-access-failure?status={status}",
+      serviceUrl: "http://appaloft.internal:3001",
+      statusList: "404,502,503,504",
+    });
+    expect(config.labels).toEqual([
+      "traefik.http.middlewares.appaloft-errors.errors.status=404,502,503,504",
+      "traefik.http.middlewares.appaloft-errors.errors.service=appaloft-backend",
+      "traefik.http.middlewares.appaloft-errors.errors.query=/.appaloft/resource-access-failure?status={status}",
+      "traefik.http.services.appaloft-backend.loadbalancer.server.url=http://appaloft.internal:3001",
+      "traefik.http.services.appaloft-backend.loadbalancer.passhostheader=false",
+    ]);
+    expect(config.labels.join("\n")).not.toContain("resource_access_upstream_timeout");
+  });
+
+  test("[RES-ACCESS-DIAG-ROUTE-001] attaches access failure middleware to served routes only", async () => {
+    const provider = new TraefikEdgeProxyProvider();
+    const accessRoutes = [
+      {
+        proxyKind: "traefik" as const,
+        domains: ["example.test"],
+        pathPrefix: "/",
+        tlsMode: "disabled" as const,
+        targetPort: 3000,
+      },
+      {
+        proxyKind: "traefik" as const,
+        domains: ["www.example.test"],
+        pathPrefix: "/",
+        tlsMode: "disabled" as const,
+        redirectTo: "example.test",
+        redirectStatus: 308 as const,
+      },
+    ];
+
+    const realized = await provider.realizeRoutes(
+      { correlationId: "req_traefik_access_failure_route_test" },
+      {
+        deploymentId: "dep_access_failure",
+        port: 3000,
+        accessRoutes,
+        resourceAccessFailureRenderer: {
+          url: "http://appaloft.internal:3001",
+          middlewareName: "appaloft-access-errors",
+          serviceName: "appaloft-backend",
+        },
+      },
+    );
+    const view = await provider.renderConfigurationView(
+      { correlationId: "req_traefik_access_failure_view_test" },
+      {
+        resourceId: "res_access_failure",
+        deploymentId: "dep_access_failure",
+        routeScope: "deployment-snapshot",
+        status: "applied",
+        generatedAt: "2026-04-20T00:00:00.000Z",
+        stale: false,
+        accessRoutes,
+        port: 3000,
+        includeDiagnostics: true,
+        resourceAccessFailureRenderer: {
+          url: "http://appaloft.internal:3001/ignored/path?token=secret",
+          middlewareName: "appaloft-access-errors",
+          serviceName: "appaloft-backend",
+        },
+      },
+    );
+
+    expect(realized.isOk()).toBe(true);
+    const labels = realized._unsafeUnwrap().labels;
+    expect(labels).toEqual(
+      expect.arrayContaining([
+        "traefik.http.routers.dep-access-failure.middlewares=appaloft-access-errors",
+        "traefik.http.routers.dep-access-failure-1.middlewares=dep-access-failure-1-redirect",
+        "traefik.http.middlewares.appaloft-access-errors.errors.status=404,502,503,504",
+        "traefik.http.middlewares.appaloft-access-errors.errors.service=appaloft-backend",
+        "traefik.http.middlewares.appaloft-access-errors.errors.query=/.appaloft/resource-access-failure?status={status}",
+        "traefik.http.services.appaloft-backend.loadbalancer.server.url=http://appaloft.internal:3001",
+        "traefik.http.services.appaloft-backend.loadbalancer.passhostheader=false",
+      ]),
+    );
+    expect(labels).not.toContain(
+      "traefik.http.routers.dep-access-failure-1.middlewares=appaloft-access-errors",
+    );
+    expect(
+      labels.filter(
+        (label) =>
+          label === "traefik.http.middlewares.appaloft-access-errors.errors.status=404,502,503,504",
+      ),
+    ).toHaveLength(1);
+    expect(realized._unsafeUnwrap().metadata).toMatchObject({
+      routeCount: "2",
+      resourceAccessFailureMiddleware: "appaloft-access-errors",
+    });
+    expect(view.isOk()).toBe(true);
+    const content = view._unsafeUnwrap().sections[0]?.content ?? "";
+    expect(content).toContain(
+      "traefik.http.routers.dep-access-failure.middlewares=appaloft-access-errors",
+    );
+    expect(content).toContain(
+      "traefik.http.services.appaloft-backend.loadbalancer.server.url=http://appaloft.internal:3001",
+    );
+    expect(content).not.toContain("token=secret");
   });
 });

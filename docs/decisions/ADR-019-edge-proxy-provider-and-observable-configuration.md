@@ -26,6 +26,8 @@ Concrete edge proxy providers own provider-specific decisions:
 - whether realized route or certificate changes become active through automatic provider reload,
   dynamic-provider watching, or an explicit reload command;
 - how logs, health checks, diagnostics, and generated configuration sections are collected;
+- how concrete gateway/request failure signals are translated into provider-neutral resource
+  access failure diagnostics;
 - how resource routes target destination-local workloads.
 
 The first concrete provider packages must live under:
@@ -157,6 +159,74 @@ The view must support:
 
 Viewing proxy configuration must not apply proxy configuration.
 
+### Resource Access Failure Diagnostics
+
+Appaloft may render a Cloudflare-style diagnostic response when an HTML browser request reaches the
+Appaloft edge proxy but the proxy cannot complete the request to a resource route.
+
+This is an adapter/read-model diagnostic surface. It is not a new aggregate, not a new public
+command, and not a replacement for `resources.health`, `resources.diagnostic-summary`, or
+`resources.proxy-configuration.preview`.
+
+Concrete edge proxy providers must translate provider-specific gateway failures into a
+provider-neutral failure envelope before Web, CLI, HTTP, or future MCP consumers display it:
+
+```ts
+type ResourceAccessFailureDiagnostic = {
+  code: string;
+  category: "infra" | "integration" | "timeout" | "not-found" | "async-processing";
+  phase:
+    | "edge-request-routing"
+    | "proxy-route-observation"
+    | "upstream-connection"
+    | "upstream-response"
+    | "proxy-route-realization"
+    | "public-route-verification"
+    | "diagnostic-page-render";
+  httpStatus: 404 | 502 | 503 | 504;
+  retriable: boolean;
+  ownerHint: "platform" | "resource" | "operator-config" | "unknown";
+  requestId: string;
+  resourceId?: string;
+  deploymentId?: string;
+  serverId?: string;
+  destinationId?: string;
+  providerKey?: string;
+  routeId?: string;
+};
+```
+
+The page may show a three-hop status such as browser, Appaloft edge, and resource deployment. The
+machine contract is still the stable diagnostic code, category, phase, retriable flag, request id,
+and safe related ids.
+
+The diagnostic taxonomy maps outer gateway failures into the shared platform error model:
+
+| Code | Category | Phase | Owner hint | Meaning |
+| --- | --- | --- | --- | --- |
+| `resource_access_route_not_found` | `not-found` | `edge-request-routing` | `platform` or `operator-config` | The edge request reached Appaloft but no active route could be matched for the host/path. |
+| `resource_access_proxy_unavailable` | `infra` | `proxy-route-observation` | `platform` | The route requires edge proxy infrastructure that is unavailable or not ready. |
+| `resource_access_route_unavailable` | `infra` | `proxy-route-observation` | `platform` or `operator-config` | A known resource route exists but is not applied, stale, failed, or not ready. |
+| `resource_access_upstream_unavailable` | `infra` | `upstream-connection` | `resource` | The route is known, but no current upstream target is available for the resource. |
+| `resource_access_upstream_connect_failed` | `infra` | `upstream-connection` | `resource` | The edge proxy could not connect to the resource endpoint. |
+| `resource_access_upstream_timeout` | `timeout` | `upstream-connection` | `resource` | The resource endpoint did not respond within the gateway timeout. |
+| `resource_access_upstream_reset` | `infra` | `upstream-response` | `resource` | The upstream connection was reset before a complete response. |
+| `resource_access_upstream_tls_failed` | `integration` | `upstream-connection` | `operator-config` | The proxy could not complete TLS or protocol negotiation to the upstream endpoint. |
+| `resource_access_edge_error` | `infra` | `diagnostic-page-render` | `platform` | The edge diagnostic service or provider boundary failed while handling the gateway error. |
+| `resource_access_unknown` | `infra` | `diagnostic-page-render` | `unknown` | The edge provider could not classify the gateway failure safely. |
+
+These codes are outer observation codes. They must not be categorized as `domain` unless the
+underlying cause is a true aggregate invariant or state-machine rejection from a command/query. If
+a related deployment, server bootstrap, route realization, health, or diagnostic summary already
+has a structured `DomainError`, the diagnostic response may link that code as `causeCode`, but it
+must not replace the original operation's error contract.
+
+The edge diagnostic response must not override user application responses by default. It is
+eligible only for gateway-generated failures such as 404, 502, 503, or 504 where the edge proxy did
+not successfully serve the upstream response. API callers should receive a structured problem
+response with the same code/request id instead of an HTML page when the request does not accept
+HTML.
+
 ### State Ownership
 
 Edge proxy is not a standalone aggregate root in v1.
@@ -194,10 +264,14 @@ Future user-editable proxy overrides require a separate ADR and command boundary
 - [Default Access Domain And Proxy Routing Workflow](../workflows/default-access-domain-and-proxy-routing.md)
 - [Server Bootstrap And Proxy Workflow](../workflows/server-bootstrap-and-proxy.md)
 - [Edge Proxy Provider And Route Realization Workflow](../workflows/edge-proxy-provider-and-route-realization.md)
+- [Resource Access Failure Diagnostics Workflow](../workflows/resource-access-failure-diagnostics.md)
 - [resources.proxy-configuration.preview Query Spec](../queries/resources.proxy-configuration.preview.md)
+- [Resource Access Failure Diagnostics Error Spec](../errors/resource-access-failure-diagnostics.md)
 - [Default Access Domain And Proxy Routing Test Matrix](../testing/default-access-domain-and-proxy-routing-test-matrix.md)
 - [Edge Proxy Provider And Route Configuration Test Matrix](../testing/edge-proxy-provider-and-route-configuration-test-matrix.md)
+- [Resource Access Failure Diagnostics Test Matrix](../testing/resource-access-failure-diagnostics-test-matrix.md)
 - [Edge Proxy Provider And Route Configuration Implementation Plan](../implementation/edge-proxy-provider-and-route-configuration-plan.md)
+- [Resource Access Failure Diagnostics Implementation Plan](../implementation/resource-access-failure-diagnostics-plan.md)
 
 ## Superseded Open Questions
 

@@ -1,0 +1,131 @@
+# Resource Access Failure Diagnostics Test Matrix
+
+## Normative Contract
+
+Tests for resource access failure diagnostics must prove that gateway-generated public access
+failures are classified with stable Appaloft codes, rendered safely, and linked to existing
+resource observation surfaces without creating a new business command.
+
+## Global References
+
+This test matrix inherits:
+
+- [Resource Access Failure Diagnostics Workflow](../workflows/resource-access-failure-diagnostics.md)
+- [Resource Access Failure Diagnostics Error Spec](../errors/resource-access-failure-diagnostics.md)
+- [ADR-019: Edge Proxy Provider And Observable Configuration](../decisions/ADR-019-edge-proxy-provider-and-observable-configuration.md)
+- [Resource Health Test Matrix](./resource-health-test-matrix.md)
+- [Resource Diagnostic Summary Test Matrix](./resource-diagnostic-summary-test-matrix.md)
+- [Edge Proxy Provider And Route Configuration Test Matrix](./edge-proxy-provider-and-route-configuration-test-matrix.md)
+- [Spec-Driven Testing](./SPEC_DRIVEN_TESTING.md)
+- [Error Model](../errors/model.md)
+- [neverthrow Conventions](../errors/neverthrow-conventions.md)
+
+## Test Layers
+
+| Layer | Focus |
+| --- | --- |
+| Provider adapter contract | Concrete edge provider maps gateway failure signals into `ResourceAccessFailureDiagnostic`. |
+| Diagnostic renderer | HTML and problem responses share the same stable code/request id and stay redacted. |
+| Edge routing integration | Error response is used only for gateway-generated 404, 502, 503, and 504 paths. |
+| Resource observation integration | Known resource failures are reflected in `resources.health` and `resources.diagnostic-summary`. |
+| Security/redaction | Public page hides internal ids, logs, headers, cookies, paths, commands, and provider-native output. |
+| Web/API behavior | Browser navigation gets HTML; API/non-HTML callers get structured problem responses. |
+
+## Given / When / Then Template
+
+```md
+Given:
+- Request host/path:
+- Accept header:
+- Matched route state:
+- Resource/access/proxy/health state:
+- Provider failure signal:
+- Authentication state:
+
+When:
+- The edge proxy cannot serve the request.
+
+Then:
+- Diagnostic code:
+- HTTP status:
+- Response format:
+- Request id:
+- Public details:
+- Owner details:
+- Source errors / related cause codes:
+- Expected absence of mutations:
+```
+
+## Classification Matrix
+
+| Test ID | Preferred automation | Case | Input/signal | Expected diagnostic | Required assertion |
+| --- | --- | --- | --- | --- | --- |
+| RES-ACCESS-DIAG-CLASS-001 | contract | Route not found | No active route for host/path | `resource_access_route_not_found`, phase `edge-request-routing` | Category is `not-found`; HTTP status is 404; no resource-specific details leak to public response. |
+| RES-ACCESS-DIAG-CLASS-002 | contract | Proxy unavailable | Route requires proxy but proxy state is failed/not ready | `resource_access_proxy_unavailable`, phase `proxy-route-observation` | Related server/provider ids are included only in owner-safe context. |
+| RES-ACCESS-DIAG-CLASS-003 | contract | Route unavailable | Route exists but applied state is failed/stale/unapplied | `resource_access_route_unavailable`, phase `proxy-route-observation` | Cause code may reference route realization failure. |
+| RES-ACCESS-DIAG-CLASS-004 | contract | No upstream target | Route is known but no current runtime target exists | `resource_access_upstream_unavailable`, phase `upstream-connection` | Owner hint is `resource` and category is not `domain`. |
+| RES-ACCESS-DIAG-CLASS-005 | contract | Upstream connect refused | Provider reports connect refused or network connect failure | `resource_access_upstream_connect_failed`, phase `upstream-connection` | Raw provider error text is not part of the response contract. |
+| RES-ACCESS-DIAG-CLASS-006 | contract | Upstream timeout | Provider reports upstream timeout | `resource_access_upstream_timeout`, phase `upstream-connection` | HTTP status is 504 and `retriable = true`. |
+| RES-ACCESS-DIAG-CLASS-007 | contract | Upstream reset | Provider reports reset before complete response | `resource_access_upstream_reset`, phase `upstream-response` | HTTP status is 502. |
+| RES-ACCESS-DIAG-CLASS-008 | contract | Upstream TLS/protocol failure | Provider reports TLS/protocol negotiation failure | `resource_access_upstream_tls_failed`, phase `upstream-connection` | Owner hint is `operator-config`. |
+| RES-ACCESS-DIAG-CLASS-009 | contract | Unknown provider signal | Provider cannot safely classify the signal | `resource_access_unknown` | Response still includes request id and redacted generic guidance. |
+
+## Rendering Matrix
+
+| Test ID | Preferred automation | Case | Input | Expected response | Required assertion |
+| --- | --- | --- | --- | --- | --- |
+| RES-ACCESS-DIAG-RENDER-001 | integration | HTML browser failure | `Accept: text/html`, gateway-generated 502 | HTML diagnostic page | Page includes request id, code, timestamp, and three-hop status without secrets. |
+| RES-ACCESS-DIAG-RENDER-002 | integration | API failure | `Accept: application/json` or non-HTML request | `application/problem+json` or equivalent structured error | Problem response includes same code, phase, request id, retriable flag. |
+| RES-ACCESS-DIAG-RENDER-003 | integration | User app response | Upstream application successfully returns 500/503 response | No Appaloft replacement by default | User response is preserved unless a future explicit policy opts in. |
+| RES-ACCESS-DIAG-RENDER-004 | integration | Renderer failure | Diagnostic renderer fails while handling gateway failure | Safe fallback with `resource_access_edge_error` | No stack trace, provider log, or raw exception text leaks. |
+| RES-ACCESS-DIAG-RENDER-005 | integration | Authenticated owner details | Request maps to a resource and owner is authenticated | Owner-safe link/context is available | Owner link points to resource health or diagnostic summary, not a mutating action. |
+
+## Edge Routing Integration Matrix
+
+| Test ID | Preferred automation | Case | Input | Expected route configuration | Required assertion |
+| --- | --- | --- | --- | --- | --- |
+| RES-ACCESS-DIAG-ROUTE-001 | contract | Traefik served route with diagnostic renderer target | Provider route realization receives a safe renderer service URL | Served router references the access failure middleware and the middleware points at `/.appaloft/resource-access-failure` | Error middleware covers gateway-generated 404, 502, 503, and 504 statuses and does not expose raw provider text. |
+| RES-ACCESS-DIAG-ROUTE-002 | contract | Redirect-only route with diagnostic renderer target | Provider route realization receives canonical serve route plus alias redirect route | Serve router can use access failure middleware; alias redirect router remains redirect-only | Redirect alias is not accidentally attached to the upstream error middleware or workload service. |
+| RES-ACCESS-DIAG-ROUTE-003 | contract | Running service renderer target | Appaloft backend service is listening and provider-backed route realization runs | Runtime passes a safe renderer target into provider route realization | A wildcard-bound service derives `host.docker.internal:<port>` automatically; loopback-only one-shot CLI style runtime does not inject a target unless an explicit reachable override is configured. |
+
+## Resource Observation Matrix
+
+| Test ID | Preferred automation | Case | Input/read state | Expected query relationship | Required assertion |
+| --- | --- | --- | --- | --- | --- |
+| RES-ACCESS-DIAG-OBS-001 | integration | Edge failure appears in diagnostic summary | Known resource has latest edge failure envelope | `resources.diagnostic-summary` includes access/proxy source error | Source error reuses `resource_access_*` code and phase. |
+| RES-ACCESS-DIAG-OBS-002 | integration | Edge failure appears in health | Known resource has public access edge failure | `resources.health` reports degraded public/proxy access | Latest deployment success does not override the edge failure. |
+| RES-ACCESS-DIAG-OBS-003 | integration | Existing cause code preserved | Route realization or health has structured cause code | Edge diagnostic includes `causeCode` | Original operation-owned error code remains unchanged. |
+
+## Redaction Matrix
+
+| Test ID | Preferred automation | Sensitive source | Expected result |
+| --- | --- | --- |
+| RES-ACCESS-DIAG-REDACT-001 | integration | Raw proxy log containing internal upstream URL | Public and problem responses omit it. |
+| RES-ACCESS-DIAG-REDACT-002 | integration | Cookies or authorization headers | Not present in diagnostic envelope or rendered output. |
+| RES-ACCESS-DIAG-REDACT-003 | integration | Container name, private IP, host path, or command string | Omitted unless a future security ADR allows redacted owner-only display. |
+| RES-ACCESS-DIAG-REDACT-004 | integration | Application stack trace in upstream body | Not displayed by the edge page. |
+
+## Current Implementation Notes And Migration Gaps
+
+Executable tests now cover:
+
+- `RES-ACCESS-DIAG-CLASS-001`;
+- `RES-ACCESS-DIAG-CLASS-006`;
+- parser/status fallback coverage for safe codes, signals, and HTTP status inputs;
+- `RES-ACCESS-DIAG-RENDER-001`;
+- `RES-ACCESS-DIAG-RENDER-002`;
+- `RES-ACCESS-DIAG-RENDER-004`;
+- `RES-ACCESS-DIAG-ROUTE-001`;
+- `RES-ACCESS-DIAG-ROUTE-002` through the same provider route-label assertion;
+- `RES-ACCESS-DIAG-ROUTE-003`;
+- `EDGE-PROXY-PROVIDER-010` as the Traefik provider contract row.
+
+Remaining gaps include broader classification rows, a companion/static renderer path for one-shot
+CLI remote SSH execution, real Traefik end-to-end error-middleware probing, route/resource context
+lookup, resource health/diagnostic summary composition rows `RES-ACCESS-DIAG-OBS-001` through
+`RES-ACCESS-DIAG-OBS-003`, and redaction rows beyond the current renderer-level assertions.
+
+## Open Questions
+
+- Should end-to-end browser coverage use a real Traefik error middleware path or a provider-neutral
+  fake edge provider for deterministic failures?
