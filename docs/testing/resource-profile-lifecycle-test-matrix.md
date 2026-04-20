@@ -118,8 +118,8 @@ Automated coverage now exists for:
   `packages/application/test/delete-resource.test.ts`;
 - PG audit-retention blocker coverage for `RES-PROFILE-DELETE-006` in
   `packages/persistence/pg/test/pglite.integration.test.ts`;
-- PG source-link blocker coverage for `RES-PROFILE-DELETE-006` is specified under
-  `SOURCE-LINK-STATE-017` and remains a Code Round gap until `source_links` persistence exists;
+- PG source-link blocker coverage for `RES-PROFILE-DELETE-006` is covered by
+  `SOURCE-LINK-STATE-017` in `packages/persistence/pg/test/pglite.integration.test.ts`;
 - HTTP/oRPC dispatch for `resources.show` in `packages/orpc/test/resource-show.http.test.ts`;
 - HTTP/oRPC dispatch for `resources.configure-source` in
   `packages/orpc/test/resource-source-profile.http.test.ts`;

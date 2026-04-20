@@ -8,7 +8,6 @@ import {
   type RepositoryContext,
   toRepositoryContext,
 } from "@appaloft/application";
-
 import {
   BuildStrategyKindValue,
   ConfigKey,
@@ -76,6 +75,8 @@ import {
   VariableExposureValue,
   VariableKindValue,
 } from "@appaloft/core";
+import { type Kysely, sql } from "kysely";
+import { type Database } from "../src/schema";
 
 function createRepositoryContext(): RepositoryContext {
   return toRepositoryContext(
@@ -97,6 +98,116 @@ function createRepositoryContext(): RepositoryContext {
       },
     }),
   );
+}
+
+async function seedSourceLinkContext(
+  db: Kysely<Database>,
+  suffix: string,
+  input?: {
+    lifecycleStatus?: string;
+    archivedAt?: string;
+  },
+): Promise<{
+  projectId: string;
+  environmentId: string;
+  resourceId: string;
+  serverId: string;
+  destinationId: string;
+}> {
+  const projectId = `prj_source_${suffix}`;
+  const serverId = `srv_source_${suffix}`;
+  const destinationId = `dst_source_${suffix}`;
+  const environmentId = `env_source_${suffix}`;
+  const resourceId = `res_source_${suffix}`;
+  const createdAt = "2026-01-01T00:00:00.000Z";
+
+  await db
+    .insertInto("projects")
+    .values({
+      id: projectId,
+      name: `Source ${suffix}`,
+      slug: `source-${suffix}`,
+      description: null,
+      created_at: createdAt,
+    })
+    .execute();
+
+  await db
+    .insertInto("servers")
+    .values({
+      id: serverId,
+      name: `source-${suffix}`,
+      host: "127.0.0.1",
+      port: 22,
+      provider_key: "generic-ssh",
+      edge_proxy_kind: null,
+      edge_proxy_status: null,
+      edge_proxy_last_attempt_at: null,
+      edge_proxy_last_succeeded_at: null,
+      edge_proxy_last_error_code: null,
+      edge_proxy_last_error_message: null,
+      credential_id: null,
+      credential_kind: null,
+      credential_username: null,
+      credential_public_key: null,
+      credential_private_key: null,
+      created_at: createdAt,
+    })
+    .execute();
+
+  await db
+    .insertInto("destinations")
+    .values({
+      id: destinationId,
+      server_id: serverId,
+      name: "default",
+      kind: "generic",
+      created_at: createdAt,
+    })
+    .execute();
+
+  await db
+    .insertInto("environments")
+    .values({
+      id: environmentId,
+      project_id: projectId,
+      name: "production",
+      kind: "production",
+      parent_environment_id: null,
+      created_at: createdAt,
+    })
+    .execute();
+
+  await db
+    .insertInto("resources")
+    .values({
+      id: resourceId,
+      project_id: projectId,
+      environment_id: environmentId,
+      destination_id: destinationId,
+      name: "web",
+      slug: `web-${suffix}`,
+      kind: "application",
+      description: null,
+      services: [],
+      source_binding: null,
+      runtime_profile: null,
+      network_profile: null,
+      lifecycle_status: input?.lifecycleStatus ?? "active",
+      archived_at: input?.archivedAt ?? null,
+      archive_reason: null,
+      deleted_at: null,
+      created_at: createdAt,
+    })
+    .execute();
+
+  return {
+    projectId,
+    environmentId,
+    resourceId,
+    serverId,
+    destinationId,
+  };
 }
 
 describe("pglite persistence integration", () => {
@@ -344,6 +455,239 @@ describe("pglite persistence integration", () => {
         relatedEntityType: "audit-log",
         count: 1,
       });
+    } finally {
+      await closeDatabase?.();
+      rmSync(workspaceDir, { recursive: true, force: true });
+    }
+  }, 15000);
+
+  test("[SOURCE-LINK-STATE-015] pg source link store persists and reads mappings", async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), "appaloft-pglite-source-links-"));
+    const pgliteDataDir = join(workspaceDir, ".appaloft", "data", "pglite");
+    let closeDatabase: (() => Promise<void>) | undefined;
+
+    try {
+      const { createDatabase, createMigrator, PgSourceLinkStore } = await import("../src/index");
+      const database = await createDatabase({
+        driver: "pglite",
+        pgliteDataDir,
+      });
+      closeDatabase = () => database.close();
+      const migrator = createMigrator(database.db);
+      const migrationResult = await migrator.migrateToLatest();
+      expect(migrationResult.error).toBeUndefined();
+
+      const target = await seedSourceLinkContext(database.db, "persist");
+      const store = new PgSourceLinkStore(database.db);
+      const sourceFingerprint = "source-fingerprint:v1:branch%3Apersist";
+
+      const created = await store.createIfMissing({
+        sourceFingerprint,
+        target,
+        updatedAt: "2026-01-01T00:01:00.000Z",
+      });
+      expect(created.isOk()).toBe(true);
+      expect(created._unsafeUnwrap()).toEqual({
+        sourceFingerprint,
+        ...target,
+        updatedAt: "2026-01-01T00:01:00.000Z",
+      });
+
+      const row = await database.db
+        .selectFrom("source_links")
+        .selectAll()
+        .where("source_fingerprint", "=", sourceFingerprint)
+        .executeTakeFirstOrThrow();
+      expect(row.metadata).toEqual({});
+
+      const read = await store.read(sourceFingerprint);
+      expect(read.isOk()).toBe(true);
+      expect(read._unsafeUnwrap()).toEqual(created._unsafeUnwrap());
+    } finally {
+      await closeDatabase?.();
+      rmSync(workspaceDir, { recursive: true, force: true });
+    }
+  }, 15000);
+
+  test("[SOURCE-LINK-STATE-016] pg source link relink is idempotent and guarded", async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), "appaloft-pglite-source-link-guard-"));
+    const pgliteDataDir = join(workspaceDir, ".appaloft", "data", "pglite");
+    let closeDatabase: (() => Promise<void>) | undefined;
+
+    try {
+      const { createDatabase, createMigrator, PgSourceLinkStore } = await import("../src/index");
+      const database = await createDatabase({
+        driver: "pglite",
+        pgliteDataDir,
+      });
+      closeDatabase = () => database.close();
+      const migrator = createMigrator(database.db);
+      const migrationResult = await migrator.migrateToLatest();
+      expect(migrationResult.error).toBeUndefined();
+
+      const target = await seedSourceLinkContext(database.db, "guard");
+      const store = new PgSourceLinkStore(database.db);
+      const sourceFingerprint = "source-fingerprint:v1:branch%3Aguard";
+      const initial = await store.createIfMissing({
+        sourceFingerprint,
+        target,
+        updatedAt: "2026-01-01T00:01:00.000Z",
+      });
+      expect(initial.isOk()).toBe(true);
+
+      const sameTarget = await store.relink({
+        sourceFingerprint,
+        target,
+        updatedAt: "2026-01-01T00:02:00.000Z",
+        expectedCurrentResourceId: target.resourceId,
+        reason: "same target",
+      });
+      expect(sameTarget.isOk()).toBe(true);
+      expect(sameTarget._unsafeUnwrap().updatedAt).toBe("2026-01-01T00:01:00.000Z");
+
+      const conflict = await store.relink({
+        sourceFingerprint,
+        target,
+        updatedAt: "2026-01-01T00:03:00.000Z",
+        expectedCurrentResourceId: "res_expected_elsewhere",
+      });
+      expect(conflict.isErr()).toBe(true);
+      if (conflict.isOk()) {
+        throw new Error("Expected source link conflict");
+      }
+      expect(conflict.error.code).toBe("source_link_conflict");
+      expect(conflict.error.details).toMatchObject({
+        phase: "source-link-resolution",
+        expectedCurrentResourceId: "res_expected_elsewhere",
+        actualResourceId: target.resourceId,
+      });
+
+      const rows = await database.db
+        .selectFrom("source_links")
+        .selectAll()
+        .where("source_fingerprint", "=", sourceFingerprint)
+        .execute();
+      expect(rows).toHaveLength(1);
+      expect(rows[0]?.resource_id).toBe(target.resourceId);
+      expect(new Date(rows[0]?.updated_at ?? "").toISOString()).toBe("2026-01-01T00:01:00.000Z");
+    } finally {
+      await closeDatabase?.();
+      rmSync(workspaceDir, { recursive: true, force: true });
+    }
+  }, 15000);
+
+  test("[SOURCE-LINK-STATE-017] resource delete sees pg source link blocker", async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), "appaloft-pglite-source-link-blocker-"));
+    const pgliteDataDir = join(workspaceDir, ".appaloft", "data", "pglite");
+    const context = createRepositoryContext();
+    let closeDatabase: (() => Promise<void>) | undefined;
+
+    try {
+      const { createDatabase, createMigrator, PgResourceDeletionBlockerReader, PgSourceLinkStore } =
+        await import("../src/index");
+      const database = await createDatabase({
+        driver: "pglite",
+        pgliteDataDir,
+      });
+      closeDatabase = () => database.close();
+      const migrator = createMigrator(database.db);
+      const migrationResult = await migrator.migrateToLatest();
+      expect(migrationResult.error).toBeUndefined();
+
+      const target = await seedSourceLinkContext(database.db, "blocker", {
+        lifecycleStatus: "archived",
+        archivedAt: "2026-01-01T00:02:00.000Z",
+      });
+      const sourceFingerprint = "source-fingerprint:v1:branch%3Ablocker";
+      const store = new PgSourceLinkStore(database.db);
+      const created = await store.createIfMissing({
+        sourceFingerprint,
+        target,
+        updatedAt: "2026-01-01T00:03:00.000Z",
+      });
+      expect(created.isOk()).toBe(true);
+
+      const reader = new PgResourceDeletionBlockerReader(database.db);
+      const result = await reader.findBlockers(context, {
+        resourceId: target.resourceId,
+      });
+
+      expect(result.isOk()).toBe(true);
+      expect(result._unsafeUnwrap()).toContainEqual({
+        kind: "source-link",
+        relatedEntityId: sourceFingerprint,
+        relatedEntityType: "source-link",
+        count: 1,
+      });
+    } finally {
+      await closeDatabase?.();
+      rmSync(workspaceDir, { recursive: true, force: true });
+    }
+  }, 15000);
+
+  test("[SOURCE-LINK-STATE-018] pg source link migration blocks unsafe cascades", async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), "appaloft-pglite-source-link-migration-"));
+    const pgliteDataDir = join(workspaceDir, ".appaloft", "data", "pglite");
+    let closeDatabase: (() => Promise<void>) | undefined;
+
+    try {
+      const { createDatabase, createMigrator, PgSourceLinkStore } = await import("../src/index");
+      const database = await createDatabase({
+        driver: "pglite",
+        pgliteDataDir,
+      });
+      closeDatabase = () => database.close();
+      const migrator = createMigrator(database.db);
+      const migrationResult = await migrator.migrateToLatest();
+      expect(migrationResult.error).toBeUndefined();
+
+      const indexes = await sql<{ indexname: string }>`
+        SELECT indexname
+        FROM pg_indexes
+        WHERE tablename = 'source_links'
+      `.execute(database.db);
+      expect(indexes.rows.map((row) => row.indexname)).toContain("source_links_resource_id_idx");
+
+      const target = await seedSourceLinkContext(database.db, "migration");
+      const sourceFingerprint = "source-fingerprint:v1:branch%3Amigration";
+      const store = new PgSourceLinkStore(database.db);
+      const created = await store.createIfMissing({
+        sourceFingerprint,
+        target,
+        updatedAt: "2026-01-01T00:01:00.000Z",
+      });
+      expect(created.isOk()).toBe(true);
+
+      await database.db
+        .updateTable("resources")
+        .set({
+          lifecycle_status: "deleted",
+          deleted_at: "2026-01-01T00:02:00.000Z",
+        })
+        .where("id", "=", target.resourceId)
+        .execute();
+
+      const retainedAfterTombstone = await database.db
+        .selectFrom("source_links")
+        .select("source_fingerprint")
+        .where("source_fingerprint", "=", sourceFingerprint)
+        .executeTakeFirst();
+      expect(retainedAfterTombstone?.source_fingerprint).toBe(sourceFingerprint);
+
+      let physicalDeleteBlocked = false;
+      try {
+        await database.db.deleteFrom("resources").where("id", "=", target.resourceId).execute();
+      } catch {
+        physicalDeleteBlocked = true;
+      }
+      expect(physicalDeleteBlocked).toBe(true);
+
+      const retainedAfterDeleteAttempt = await database.db
+        .selectFrom("source_links")
+        .select("source_fingerprint")
+        .where("source_fingerprint", "=", sourceFingerprint)
+        .executeTakeFirst();
+      expect(retainedAfterDeleteAttempt?.source_fingerprint).toBe(sourceFingerprint);
     } finally {
       await closeDatabase?.();
       rmSync(workspaceDir, { recursive: true, force: true });

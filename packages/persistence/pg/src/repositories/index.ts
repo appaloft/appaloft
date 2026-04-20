@@ -17,5 +17,6 @@ export * from "./resource-read-model";
 export * from "./resource-repository";
 export * from "./server-read-model";
 export * from "./server-repository";
+export * from "./source-link-store";
 export * from "./ssh-credential-read-model";
 export * from "./ssh-credential-repository";
