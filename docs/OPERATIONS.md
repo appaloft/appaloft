@@ -166,6 +166,11 @@ The public `https://appaloft.com/install.sh` quick-start script is the Docker se
 It installs or verifies Docker Engine plus the compose plugin on Linux, writes the Compose stack and
 environment file under `/opt/appaloft`, and starts Appaloft with PostgreSQL.
 
+`install.sh` is authored in the Appaloft main repository and published as a GitHub Release asset.
+The website route should redirect or proxy to
+`https://github.com/appaloft/appaloft/releases/latest/download/install.sh` rather than copying from a
+local checkout during the website build.
+
 For production hosts with stricter package-management requirements, install Docker Engine through
 Docker's official package repository first, then run:
 

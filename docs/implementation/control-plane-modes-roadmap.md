@@ -67,11 +67,22 @@ Deliverables:
 - `appaloft.yml` can express resource profile, env references, and server-applied domains.
 - Repeated CI deploys reuse source link state from the SSH server.
 - No `DATABASE_URL`, Cloud token, or resident Appaloft server is required.
+- GitHub Actions may deploy PR previews from a user-authored `pull_request` workflow by deriving
+  trusted preview context from the GitHub event, creating preview-scoped source links and
+  environment/resource identity, and relying on generated/default access or user-owned wildcard DNS
+  for preview URLs.
+- Action PR preview examples should use an explicit preview config path when root `appaloft.yml` is
+  production-oriented. Pure Action must not assume root config domains or environment values are
+  preview-safe, and future overlay support must apply only after trusted PR context has selected
+  the preview environment.
 
 Remaining gaps:
 
 - host fingerprint pinning and recovery UX need hardening;
 - public docs must clearly explain DNS, SSH key, and route/TLS responsibilities;
+- Action-only PR preview cleanup remains future until a cleanup/delete operation exists; product
+  docs must not imply PR close events are reliably cleaned up by Appaloft without that operation or
+  a control plane;
 - direct `ssh-pglite` is single-writer through Appaloft locks, not multi-process shared DB.
 
 ### Phase 1: Control-Plane Selection Parser And Diagnostics
@@ -152,7 +163,7 @@ Purpose: Cloud/self-hosted can run deploys without a user-maintained GitHub Acti
 Deliverables:
 
 - GitHub App/webhook source event handling.
-- Preview environment creation and cleanup.
+- Product-grade preview environment creation, policy, status/comments, and cleanup.
 - Runner/agent model for build/deploy execution.
 - Scheduler for DNS observation, certificate retries, route repair, cleanup, and background
   verification.
@@ -164,6 +175,8 @@ Exit criteria:
 - The same repository config and operation contracts apply to both.
 - Preview environments no longer require a custom workflow file when GitHub App execution is
   selected.
+- PR close cleanup is retried by a control-plane scheduler or agent instead of depending only on a
+  single GitHub Actions close-event run.
 
 ### Phase 5: Enterprise And Advanced Backends
 
@@ -196,6 +209,7 @@ Deliverables:
 | API mode deploy-action | 3 | Yes after adoption | Action calls control-plane API, not direct PGlite mutation. |
 | GitHub App runner | 4 | Yes for no-action preview UX | Separate from Cloud-assisted Action. |
 | Scheduler/agent | 4 | Yes for cleanup and continuous DNS/cert behavior | Not needed for pure Action. |
+| Preview policy/read model operations | 4 | Yes for product-grade previews | Needed for list/show/update/delete policy, scoped env, cleanup status, and audit. |
 | External Postgres direct mode | 5 | No | Advanced, not default product path. |
 
 ## Non-Goals For Early Phases

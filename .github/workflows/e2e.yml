@@ -51,7 +51,7 @@ jobs:
       - name: Install
         run: bun install --frozen-lockfile
 
-      - name: Install Playwright Browser
+      - name: Install Chromium For WebView
         working-directory: apps/web
         run: bunx playwright install --with-deps chromium
 
@@ -73,7 +73,7 @@ jobs:
         working-directory: apps/shell
         run: bun run test:e2e
 
-      - name: Web Playwright Smoke
+      - name: Web WebView Smoke
         working-directory: apps/web
         run: bun run test:e2e
 

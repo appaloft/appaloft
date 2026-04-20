@@ -416,6 +416,28 @@ Current boundary:
   to CLI flags, writes SSH private key input to a temporary key file, and invokes the same
   repository config deploy workflow. It is not a new operation, not a hidden Quick Deploy API, and
   not a hosted control plane.
+- GitHub Action PR preview deploy is also an entry workflow over the same commands, not a new
+  operation. A repository must add a workflow with `on.pull_request` before GitHub will attempt a
+  preview deploy. The action may use trusted GitHub event context, such as PR number and head SHA,
+  to create a preview-scoped source fingerprint and environment/resource selection outside
+  committed config, then dispatch ids-only `deployments.create`.
+- Action/CLI profile flags are a first-class profile source alongside repository config files.
+  Runtime commands, network profile, health path, non-secret env values, `ci-env:` secret
+  references, and preview route policy passed as trusted inputs feed the same Quick Deploy/config
+  bootstrap path and take precedence over selected config values. They must not become
+  `deployments.create` fields, and workflows should not generate temporary config files for values
+  already modeled as trusted flags.
+- Action-only preview access uses the existing generated/default access and server-applied route
+  rules. If the configured default access provider is usable, for example an `sslip` provider with a
+  public IPv4 server address, the user does not need to create DNS records for the generated URL. If
+  the user wants a stable hostname such as `pr-123.preview.example.com`, they must configure
+  wildcard DNS to the selected server and provide the preview host template as trusted action or
+  installation policy. Appaloft does not mutate public DNS in `controlPlane.mode: none`.
+- Action-only PR close cleanup is future behavior until a preview cleanup/delete operation exists.
+  Product-grade preview environments with GitHub App webhooks, comments/checks, policy, cleanup
+  retries, audit, and managed domain lifecycle require Appaloft Cloud or a self-hosted control
+  plane. That future product line must still reuse repository config and explicit operations rather
+  than adding preview fields to `deployments.create`.
 - `APPALOFT_PROJECT_ID`, `APPALOFT_RESOURCE_ID`, `APPALOFT_SERVER_ID`, and similar ids are optional
   trusted selection overrides for CLI/Action mode. They are required only when the operator wants to
   select existing control-plane identity explicitly; pure SSH CLI mode may reuse or create identity

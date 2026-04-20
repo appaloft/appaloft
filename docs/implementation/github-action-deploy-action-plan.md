@@ -103,6 +103,79 @@ Recommended production workflows pin both:
 `version: latest` is allowed for quickstarts, but generated examples for production should prefer
 an exact CLI release tag for repeatability.
 
+## Pull Request Preview Usage
+
+Action-based PR previews require a user-authored workflow. The action does not install a webhook
+or cause GitHub to run on pull requests by itself.
+
+Recommended first preview workflow:
+
+```yaml
+name: Appaloft Preview
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize]
+
+jobs:
+  preview:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    environment:
+      name: preview-pr-${{ github.event.pull_request.number }}
+      url: ${{ steps.deploy.outputs.preview-url }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - uses: appaloft/deploy-action@v1
+        id: deploy
+        with:
+          version: v0.1.0
+          config: appaloft.preview.yml
+          preview: pull-request
+          preview-id: pr-${{ github.event.pull_request.number }}
+          ssh-host: ${{ secrets.APPALOFT_SSH_HOST }}
+          ssh-user: ${{ secrets.APPALOFT_SSH_USER }}
+          ssh-private-key: ${{ secrets.APPALOFT_SSH_PRIVATE_KEY }}
+```
+
+This workflow deploys or updates a preview when a PR is opened, reopened, or receives new commits.
+It intentionally skips fork PRs in the default example. Fork previews require a separate security
+policy and reduced credentials because PR code is unmerged and may be untrusted.
+
+The recommended preview example uses `appaloft.preview.yml` because the root `appaloft.yml` may be
+production-oriented. The action must not mutate repository config files and must not assume the root
+config is safe for PR deploys. Repositories that keep `appaloft.yml` environment-neutral may pass
+that file deliberately, but preview docs should make the choice explicit.
+
+Preview-specific application values should come from GitHub environment variables or secrets
+selected by the job environment and referenced from config with `ci-env:<NAME>`. A future
+config-profile or environment-overlay input may select overlay fields after the parser supports
+them, but overlays must apply only after the action has selected the PR preview environment from
+trusted GitHub event context.
+
+The first preview mode creates or reuses preview-scoped source link state and dispatches the same
+ids-only `deployments.create` command. It does not automatically delete preview resources on PR
+close until an explicit cleanup/delete operation is accepted and implemented.
+
+Preview URL behavior:
+
+- without `preview-domain-template`, the action relies on generated/default access and may output an
+  `sslip` generated URL when the selected server has a public IPv4 address and proxy ingress works;
+- with `preview-domain-template`, the user must configure wildcard DNS such as
+  `*.preview.example.com` to the selected server in Action-only mode;
+- production `access.domains[]` from a root config must not be reinterpreted as PR preview host
+  intent; preview route intent must come from generated/default access, trusted
+  `preview-domain-template`, an explicitly selected preview config file, or a future selected
+  preview overlay;
+- when no public route can be resolved and `require-preview-url` is false, deployment may still
+  succeed with no `preview-url` output and a diagnostic explanation;
+- when `require-preview-url` is true, missing access is a structured route-resolution failure.
+
 ## Action Inputs
 
 Initial inputs:
@@ -110,7 +183,7 @@ Initial inputs:
 | Input | Required | Rule |
 | --- | --- | --- |
 | `version` | No | CLI release tag such as `v0.1.0`; `latest` resolves the latest non-prerelease Appaloft release. |
-| `config` | No | Path passed to `appaloft deploy --config`; defaults to `appaloft.yml` when present. |
+| `config` | No | Path passed to `appaloft deploy --config`; defaults to `appaloft.yml` when present. PR preview examples should pass `appaloft.preview.yml` when the root config is production-oriented. |
 | `source` | No | Source path or locator passed as the deploy positional argument; defaults to `.`. |
 | `ssh-host` | Yes for SSH mode | Trusted target host, mapped to `--server-host`. |
 | `ssh-user` | No | Trusted SSH username, mapped to `--server-ssh-username`. |
@@ -123,6 +196,10 @@ Initial inputs:
 | `control-plane-url` | No | Future trusted endpoint for self-hosted/private control planes, mapped to CLI/env outside committed config. |
 | `appaloft-token` | No | Future secret token for Cloud/self-hosted API mode; must never be logged or written to config. |
 | `use-oidc` | No | Future boolean for GitHub OIDC exchange when the Cloud auth ADR accepts it. |
+| `preview` | No | Accepted value `pull-request` enables preview-scoped source link and environment/resource identity behavior. |
+| `preview-id` | Required when `preview=pull-request` | Trusted preview scope such as `pr-123`; examples derive it from `github.event.pull_request.number`. |
+| `preview-domain-template` | No | Trusted preview hostname template rendered by the workflow/action, for example `pr-123.preview.example.com`; requires user-owned DNS in Action-only mode. |
+| `require-preview-url` | No | Boolean that fails the workflow when no generated or custom public route is resolved. Defaults to false. |
 | `appaloft-data-root` | No | Future install/runtime hint for local cache; must not change committed config semantics. |
 | `args` | No | Escape hatch for additional CLI flags; examples should prefer explicit inputs. |
 
@@ -243,6 +320,8 @@ Initial outputs:
 | --- | --- |
 | `appaloft-version` | The installed CLI version. |
 | `appaloft-target` | The selected release target. |
+| `preview-id` | Present when preview mode is selected. |
+| `preview-url` | Present when generated/default access or custom preview route realization yields a public URL. |
 | `deployment-id` | Present when the CLI emits a parseable accepted deployment id. |
 | `resource-id` | Present when the CLI emits a parseable resource id. |
 | `diagnostic-path` | Optional path to a sanitized diagnostic summary artifact when generated. |
@@ -262,14 +341,17 @@ Wrapper failures are entrypoint failures:
 | Missing SSH host for SSH mode | Action step or CLI fails before mutation. |
 | Missing private key or unreadable key file | Action step fails before invoking Appaloft. |
 | Unsupported control-plane mode | CLI returns structured Appaloft error before mutation until the selected Cloud/self-hosted handshake exists. |
+| Missing PR context for preview mode | Action step or CLI fails before mutation with `validation_error`, phase `preview-context-resolution`. |
+| Missing preview URL when required | CLI returns structured route/access error; no fake direct-port URL is emitted. |
+| Preview cleanup requested before cleanup support | Action step or CLI fails before mutation with `preview_cleanup_unsupported`, phase `preview-cleanup`. |
 | Config validation failure | CLI returns structured Appaloft error. |
 | Remote state ensure/lock/migration failure | CLI returns structured Appaloft error with remote-state phase. |
 | Deployment accepted but runtime fails | CLI follows deployment workflow semantics; accepted id remains valid and failure is observed through state/read models. |
 
 ## Out Of Scope
 
-- GitHub App webhooks and preview-environment lifecycle.
-- Automatic PR environment cleanup.
+- GitHub App webhooks and product-grade preview-environment lifecycle.
+- Automatic PR environment cleanup before an explicit cleanup/delete operation exists.
 - Managed DNS/certificate lifecycle without a hosted/self-hosted control plane.
 - Creating or rotating GitHub Secrets.
 - Running an Appaloft cloud service or self-hosted control plane.
@@ -288,6 +370,18 @@ Next Test-First Round should add or cover these rows:
 - `CONFIG-FILE-ENTRY-012` for no-config action deploy behavior;
 - `CONFIG-FILE-ENTRY-013` for config without domains deploying without custom route mutation;
 - `CONFIG-FILE-ENTRY-014` and `CONTROL-PLANE-ENTRY-002` for future control-plane mode inputs;
+- `CONFIG-FILE-ENTRY-015` for Action PR preview trigger and trusted preview context mapping;
+- `CONFIG-FILE-ENTRY-016` for Action PR preview generated access without user DNS;
+- `CONFIG-FILE-ENTRY-017` for Action PR preview custom wildcard domain template behavior;
+- `CONFIG-FILE-ENTRY-018` for Action PR preview fork-safety defaults;
+- `CONFIG-FILE-ENTRY-019` for Action preview cleanup mode returning unsupported until a cleanup
+  operation exists;
+- `CONFIG-FILE-ENTRY-020` for Action PR preview using an explicit preview config path instead of
+  the root config;
+- `CONFIG-FILE-ENTRY-021` for Action PR preview refusing to reinterpret production root custom
+  domains as preview hosts;
+- `CONFIG-FILE-ENTRY-022` for future preview overlay boundaries after trusted preview environment
+  selection;
 - `QUICK-DEPLOY-ENTRY-011` for deploy-action parity with CLI config workflow.
 - `QUICK-DEPLOY-ENTRY-012` for control-plane mode parity across entrypoints.
 
@@ -305,8 +399,17 @@ Missing pieces before public release:
 - create the `appaloft/deploy-action` repository;
 - add `action.yml`, install scripts, README examples, and wrapper tests;
 - add a main-repo doc page that links release assets, action usage, and minimal `appaloft.yml`;
+- add PR preview examples that explicitly require `on.pull_request`, skip fork PRs by default, and
+  explain explicit preview config paths, generated/default access, and user-owned wildcard preview
+  domains;
 - add a wrapper-level CI test that verifies exact-version install from a fixture or real release;
 - decide whether generated docs examples use `version: latest` or a pinned version by default;
+- map wrapper preview inputs to the CLI `--preview`, `--preview-id`, and
+  `--preview-domain-template` options;
+- add stable CLI JSON output or diagnostic file support so the wrapper can expose `preview-url`
+  without parsing human text;
+- keep PR close cleanup documented as future until a cleanup/delete command and route cleanup
+  workflow are accepted;
 - add control-plane mode inputs only after the CLI resolver/parser and structured unsupported
   errors exist;
 - add structured CLI deploy output if action outputs need deployment/resource ids.

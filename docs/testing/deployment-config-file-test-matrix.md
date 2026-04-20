@@ -15,6 +15,9 @@ Canonical assertions:
 - config-driven runs follow the same Quick Deploy project/server/environment/resource operation
   order as interactive entrypoints;
 - resource/runtime/network/health profile fields map to resource-owned commands before deployment;
+- trusted CLI/Action/Web/future-tool profile inputs mirror the repository config profile fields,
+  override selected config values, and feed the same Quick Deploy bootstrap path without generating
+  temporary config files;
 - non-secret env values and resolved secret references map to environment commands before
   deployment;
 - final `deployments.create` input remains ids-only;
@@ -29,6 +32,7 @@ Canonical assertions:
 This matrix inherits:
 
 - [Repository Deployment Config File Bootstrap Workflow Spec](../workflows/deployment-config-file-bootstrap.md)
+- [GitHub Action PR Preview Deploy Workflow Spec](../workflows/github-action-pr-preview-deploy.md)
 - [GitHub Action Deploy Wrapper Implementation Plan](../implementation/github-action-deploy-action-plan.md)
 - [ADR-010: Quick Deploy Workflow Boundary](../decisions/ADR-010-quick-deploy-workflow-boundary.md)
 - [ADR-012: Resource Runtime Profile And Deployment Snapshot Boundary](../decisions/ADR-012-resource-runtime-profile-and-deployment-snapshot-boundary.md)
@@ -191,6 +195,16 @@ This matrix inherits:
 | CONFIG-FILE-ENTRY-012 | integration | Deploy action no-config mode | When no config path is supplied or discovered, the action invokes the same CLI Quick Deploy path with trusted inputs; it defaults SSH targets to `ssh-pglite`, deploys only when non-interactive context can be inferred, and otherwise fails before mutation with structured validation. |
 | CONFIG-FILE-ENTRY-013 | integration | Deploy action config without domain | Valid config with no `access.domains[]` deploys normally and does not persist server-applied route desired state; access remains generated/default or absent according to selected server policy. |
 | CONFIG-FILE-ENTRY-014 | contract | Deploy action control-plane inputs | Future deploy-action inputs for `control-plane-mode`, `control-plane-url`, token/OIDC behavior, and execution mode mirror CLI resolver semantics; when absent, the action remains pure SSH `none` by default. |
+| CONFIG-FILE-ENTRY-015 | integration | Deploy action PR preview context | User-authored workflow supplies trusted GitHub PR number, head SHA, repository identity, and `preview=pull-request`; the action/CLI builds a preview-scoped source fingerprint, creates or reuses preview environment/resource identity outside committed config, and dispatches ids-only `deployments.create`. |
+| CONFIG-FILE-ENTRY-016 | integration | Deploy action PR preview generated access | With no custom preview domain, default access provider enabled, public IPv4 server address, and ready proxy ingress, preview deploy emits `preview-url` from generated/default access, requires no user DNS, and creates no `DomainBinding`. |
+| CONFIG-FILE-ENTRY-017 | integration | Deploy action PR preview wildcard domain template | With trusted `preview-domain-template` and user-configured wildcard DNS, the rendered host is stored as server-applied route desired state in SSH mode, realized through the edge proxy, emitted as `preview-url`, and kept out of `deployments.create`. |
+| CONFIG-FILE-ENTRY-018 | contract | Deploy action PR preview fork safety | Default example workflow skips fork PR preview deployment before secrets or SSH credentials are exposed, and docs explain that fork previews require explicit reduced-credential policy. |
+| CONFIG-FILE-ENTRY-019 | integration | Deploy action PR preview cleanup unsupported | A future cleanup mode invoked before an accepted cleanup/delete operation exists fails before mutation with `preview_cleanup_unsupported`, phase `preview-cleanup`; server resources and route state are not silently deleted. |
+| CONFIG-FILE-ENTRY-020 | integration | Deploy action PR preview explicit config path | With `preview=pull-request` and `config: appaloft.preview.yml`, the action/CLI uses the preview config origin, does not read production-only root config fields, creates/reuses preview environment/resource identity from trusted PR context, and dispatches ids-only `deployments.create`. |
+| CONFIG-FILE-ENTRY-021 | integration | Deploy action PR preview avoids production root domains | With preview mode selected and an implicitly discovered root config that contains production `access.domains[]`, the action/CLI must not render those hosts as PR preview URLs; preview access comes from generated/default access, trusted `preview-domain-template`, explicitly selected preview config, or future selected preview overlay. |
+| CONFIG-FILE-ENTRY-022 | integration | Deploy action PR preview overlay boundary | Future preview config overlays apply only after trusted PR entrypoint context selects the preview environment; a committed overlay cannot select environment/project/resource/server/destination identity or credentials and cannot retarget an existing preview source link. |
+| CONFIG-FILE-ENTRY-023 | integration | Deploy action PR preview profile flag parity | Trusted CLI/Action flags provide or override runtime commands, network profile, health path, non-secret env values, `ci-env:` secret references, preview domain template, and preview TLS mode; the workflow persists env and route state through the same commands as config bootstrap and dispatches ids-only `deployments.create`. |
+| CONFIG-FILE-ENTRY-024 | integration | Deploy action PR preview URL required | With `require-preview-url=true`, the CLI/action fails the workflow when the created deployment read model cannot expose a public route or the deployment finished failed during preview route verification; without the flag, the deployment may be accepted with diagnostics and no `preview-url`. |
 
 ## Current Implementation Notes And Migration Gaps
 
@@ -289,11 +303,23 @@ real HTTP redirect behavior against an external target.
 Current HTTP adapter serves a config schema endpoint, but strict deployment API behavior remains
 ids-only.
 
+`CONFIG-FILE-ENTRY-015`, `CONFIG-FILE-ENTRY-017`, `CONFIG-FILE-ENTRY-020`, and
+`CONFIG-FILE-ENTRY-021` have CLI integration coverage in
+`packages/adapters/cli/test/deployment-config.test.ts`, proving `appaloft deploy` accepts trusted
+preview context inputs, creates preview-scoped source link/environment context outside committed
+config, keeps `deployments.create` ids-only, persists `preview-domain-template` as server-applied
+route desired state, uses explicit `appaloft.preview.yml` without reading root production-only
+fields, and does not reinterpret implicitly discovered root `access.domains[]` as PR preview hosts.
+`CONFIG-FILE-ENTRY-023` and `CONFIG-FILE-ENTRY-024` add flag-only preview profile parity and
+required-preview-URL gating coverage in the same file.
+
 Public `appaloft/deploy-action` wrapper coverage is not implemented yet. The main repository
-release workflow already produces CLI archives, the static Docker self-host installer, `checksums.txt`,
-`release-manifest.json`, and release notes, but `CONFIG-FILE-ENTRY-009` through
-`CONFIG-FILE-ENTRY-013` still need a wrapper repository, action metadata, SSH secret temp-key
-handling, and tests.
+release workflow already produces CLI archives, the static Docker self-host installer,
+`checksums.txt`, `release-manifest.json`, and release notes, but `CONFIG-FILE-ENTRY-009` through
+`CONFIG-FILE-ENTRY-014`, `CONFIG-FILE-ENTRY-016`, `CONFIG-FILE-ENTRY-018`,
+`CONFIG-FILE-ENTRY-019`, and `CONFIG-FILE-ENTRY-022` still need wrapper repository coverage,
+action metadata, SSH secret temp-key handling, generated access output handling, cleanup
+unsupported behavior, future overlay behavior, and tests.
 
 Profile drift detection, existing-resource profile operation sequencing through
 `resources.configure-source`, `resources.configure-runtime`, and `resources.configure-network`,

@@ -38,7 +38,7 @@ curl -fsSL https://appaloft.com/install.sh | sudo sh
 curl -fsSL https://appaloft.com/install.sh | sudo sh -s -- --version 0.2.1
 ```
 
-官网 installer 会在 Linux 上安装或校验 Docker Engine 和 compose plugin，在 `/opt/appaloft` 写入
+公开 installer 会在 Linux 上安装或校验 Docker Engine 和 compose plugin，在 `/opt/appaloft` 写入
 self-hosted Compose stack，并启动 Appaloft 后端、static console 和 PostgreSQL。生产机器如果要更严格
 的安装链路，可以先通过 Docker 官方 package repository 安装 Docker Engine，再用
 `--skip-docker-install` 只做校验和启动。
