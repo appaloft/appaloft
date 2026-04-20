@@ -6,7 +6,6 @@ import { fileURLToPath } from "node:url";
 import {
   createCliProgram,
   FileSystemServerAppliedRouteDesiredStateStore,
-  FileSystemSourceLinkStore,
   SshRemoteStateLifecycle,
   sshRemoteStateTargetFromDecision,
 } from "@appaloft/adapter-cli";
@@ -31,7 +30,12 @@ import {
   createExecutionContextFactory,
   createLogger,
 } from "@appaloft/observability";
-import { createDatabase, createMigrator, type PgliteRuntimeAssets } from "@appaloft/persistence-pg";
+import {
+  createDatabase,
+  createMigrator,
+  type PgliteRuntimeAssets,
+  PgSourceLinkStore,
+} from "@appaloft/persistence-pg";
 import { type LocalPluginHost } from "@appaloft/plugin-host";
 import { container, type DependencyContainer } from "tsyringe";
 import { createCertificateRetrySchedulerRunner } from "./certificate-retry-scheduler-runner";
@@ -107,10 +111,7 @@ export async function createAppComposition(
   }
   const localPgliteStateRoot =
     options?.remotePgliteStateSyncSession?.localDataRoot ?? dirname(config.pgliteDataDir);
-  const sourceLinkStore =
-    config.databaseDriver === "pglite"
-      ? new FileSystemSourceLinkStore(localPgliteStateRoot)
-      : undefined;
+  const sourceLinkStore = new PgSourceLinkStore(database.db);
   const serverAppliedRouteStore =
     config.databaseDriver === "pglite"
       ? new FileSystemServerAppliedRouteDesiredStateStore(localPgliteStateRoot)

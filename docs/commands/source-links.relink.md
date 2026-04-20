@@ -170,13 +170,14 @@ CLI entrypoint accepts explicit target ids and SSH remote-state options, and she
 the selected SSH server's PGlite/source-link state before dispatching the command.
 
 The current implementation validates project/environment/resource/server/destination relationships
-against the active Appaloft state backend before updating the source link. CLI SSH mode persists
-source links through the file-backed SSH remote-state mirror.
+against the active Appaloft state backend before updating the source link. Shell runtime uses the
+PG/PGlite `SourceLinkStore` adapter for command execution, including SSH remote PGlite mirrors.
+The file-backed source-link store remains available for adapter-level remote-state transfer and
+legacy explicit wiring, but it is not the shell runtime's authoritative source-link store.
 
-PostgreSQL/PGlite source-link persistence is now specified for the next Code Round but not yet
-implemented. Until that adapter and migration land, `resources.delete` cannot report `source-link`
-blockers from PG state. API/oRPC and Web relink entrypoints remain future work even after PG
-persistence exists.
+PostgreSQL/PGlite source-link persistence is implemented through the `source_links` migration and
+PG adapter in `packages/persistence/pg`. `resources.delete` reports `source-link` blockers from
+that durable state. API/oRPC and Web relink entrypoints remain future work.
 
 The CLI currently accepts an explicit `sourceFingerprint`; deriving the fingerprint from a
 structured `sourceSelector` in the relink command is future entrypoint work.

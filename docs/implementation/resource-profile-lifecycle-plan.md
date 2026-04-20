@@ -246,7 +246,7 @@ bindings, certificates, provider runtime-log retention, and audit logs whose `ag
 resource id; blocker kinds without durable PG tables remain explicit extension points on
 `ResourceDeletionBlockerReader`.
 
-The next specified blocker closure is source links. The dedicated
-[Source Link Durable Persistence Implementation Plan](./source-link-durable-persistence-plan.md)
-defines the `source_links` PG/PGlite table, PG `SourceLinkStore`, and `source-link` delete blocker
-coverage needed before that blocker kind can be treated as implemented for `resources.delete`.
+The source-link blocker closure is implemented through the dedicated
+[Source Link Durable Persistence Implementation Plan](./source-link-durable-persistence-plan.md):
+the `source_links` PG/PGlite table, PG `SourceLinkStore`, and `source-link` delete blocker coverage
+are present for PostgreSQL/PGlite state backends.

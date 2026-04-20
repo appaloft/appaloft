@@ -147,9 +147,8 @@ selection overrides, not required setup.
 - Config deploy now reads source fingerprint link state before identity resolution and writes a
   first-run link after project/server/environment/resource identity is resolved.
 - PostgreSQL/PGlite source-link persistence for hosted/self-hosted and embedded state backends is
-  specified in
-  [Source Link Durable Persistence Implementation Plan](./source-link-durable-persistence-plan.md)
-  but is not implemented yet.
+  implemented through the `source_links` migration and PG `SourceLinkStore`; shell command
+  execution uses that adapter while SSH remote PGlite sync still moves the selected state backend.
 - The public CLI `source-links.relink` command now dispatches the application command, validates
   target context against Appaloft state, and uses the same SSH remote-state mirror/lock path when a
   trusted SSH target is supplied.

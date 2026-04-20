@@ -102,10 +102,11 @@ in `packages/application/test/relink-source-link.test.ts` and
 `packages/adapters/cli/test/source-link-command.test.ts`. Shell startup plans the same SSH remote
 PGlite mirror for relink in `apps/shell/test/remote-pglite-state-sync.test.ts`.
 
-`SOURCE-LINK-STATE-015` through `SOURCE-LINK-STATE-018` are the next PG durable persistence slice.
-They are specified but not implemented yet. The Code Round should add a PG `SourceLinkStore`
-adapter, `source_links` migration, delete-blocker integration, and PGlite persistence tests before
-treating `source-link` blockers as closed for `resources.delete`.
+`SOURCE-LINK-STATE-015` through `SOURCE-LINK-STATE-018` are covered in
+`packages/persistence/pg/test/pglite.integration.test.ts`. The implementation includes the PG
+`SourceLinkStore` adapter, `019_source_links` migration, delete-blocker integration, and PGlite
+persistence tests. `source-link` blockers are closed for `resources.delete` when the selected state
+backend is PostgreSQL/PGlite.
 
 An opt-in external SSH e2e harness in
 `apps/shell/test/e2e/github-action-ssh-state.workflow.e2e.ts` proves source link state across a

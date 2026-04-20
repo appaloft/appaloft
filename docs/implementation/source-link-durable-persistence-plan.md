@@ -18,12 +18,11 @@ regular config deploys may continue to create or reuse source links through the 
 - [Resource Profile Lifecycle Test Matrix](../testing/resource-profile-lifecycle-test-matrix.md)
 - [Repository Deployment Config File Bootstrap](../workflows/deployment-config-file-bootstrap.md)
 
-## Code Round Target
+## Implemented Code Round Target
 
-The next Code Round should make source link state durable in the selected PostgreSQL-compatible
-state backend.
+The Code Round makes source link state durable in the selected PostgreSQL-compatible state backend.
 
-The minimum coherent slice is:
+The implemented coherent slice is:
 
 1. Add a `source_links` migration in `packages/persistence/pg`:
    - `source_fingerprint` primary key;
@@ -34,8 +33,7 @@ The minimum coherent slice is:
    - no cascade that can erase source link identity when a resource is deleted or tombstoned.
 2. Add a PG `SourceLinkStore` adapter in `packages/persistence/pg`.
 3. Register the PG adapter in shell composition whenever the selected database backend is
-   PostgreSQL/PGlite and no SSH remote-state file mirror has been explicitly selected for the
-   command.
+   PostgreSQL/PGlite, including SSH remote PGlite mirrors.
 4. Keep SSH remote-state file stores for transfer/mirror mechanics, but ensure command execution
    reads and writes through the selected Appaloft state backend.
 5. Extend `PgResourceDeletionBlockerReader` so `source_links.resource_id = resourceId` reports a
@@ -45,7 +43,7 @@ The minimum coherent slice is:
 
 ## Tests
 
-The Code Round must cover:
+Automated coverage:
 
 - `SOURCE-LINK-STATE-015`: PG source link store persists and reads mappings.
 - `SOURCE-LINK-STATE-016`: PG relink is idempotent and guard conflicts preserve existing rows.
@@ -54,17 +52,20 @@ The Code Round must cover:
 - `SOURCE-LINK-STATE-018`: migration shape supports reverse lookup and does not define an unsafe
   cascade from resource deletion to source links.
 
-Existing tests for CLI file-backed source link state must remain valid. The new PG tests should
-prefer PGlite integration coverage so the migration and Kysely adapter are exercised without a
-required external Postgres URL.
+Existing tests for CLI file-backed source link state remain valid. The PG tests use PGlite
+integration coverage so the migration and Kysely adapter are exercised without a required external
+Postgres URL.
 
 ## Current Implementation Notes And Migration Gaps
 
-CLI SSH mode currently persists source links through file-backed remote-state mirror files.
+The PG/PGlite persistence slice is implemented in `packages/persistence/pg`: migration
+`019_source_links` creates the durable table, `PgSourceLinkStore` implements the application port,
+shell composition uses that store for command execution, and `PgResourceDeletionBlockerReader`
+reports source-link blockers.
 
-PG/PGlite source-link persistence is not implemented yet. Because there is no `source_links` table,
-`resources.delete` currently cannot detect `source-link` blockers from PG state. The blocker kind
-is already part of the normative delete contract; this plan defines the missing durable source.
+CLI SSH remote-state sync still transfers the selected PGlite state backend across the process and
+network boundary. The file-backed source-link store remains available for adapter-level or legacy
+explicit wiring, but it is not the shell runtime's authoritative source-link store.
 
 API/oRPC and Web surfaces for reviewing or relinking source links remain future work after this
 persistence slice.

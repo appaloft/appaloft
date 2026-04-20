@@ -574,10 +574,9 @@ source link creation and repeated config deploy reuse through the source fingerp
 Application and CLI tests cover `source-links.relink` command dispatch, context validation,
 optimistic guard conflicts, and SSH remote-state mirror planning for relink.
 
-PG/PGlite source-link persistence is specified in
-[Source Link Durable Persistence Implementation Plan](../implementation/source-link-durable-persistence-plan.md)
-but is not implemented yet. Until that slice lands, the PG `resources.delete` blocker reader cannot
-report `source-link` blockers from durable PG state.
+PG/PGlite source-link persistence is implemented through
+[Source Link Durable Persistence Implementation Plan](../implementation/source-link-durable-persistence-plan.md).
+The PG `resources.delete` blocker reader reports `source-link` blockers from durable PG state.
 
 An opt-in shell e2e harness in
 `apps/shell/test/e2e/github-action-ssh-state.workflow.e2e.ts` covers the GitHub Actions style
