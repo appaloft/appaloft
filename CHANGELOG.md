@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.2.3](https://github.com/appaloft/appaloft/compare/v0.2.2...v0.2.3) (2026-04-20)
+
+
+### Features
+
+* **cli:** add preview deploy profile flags ([10aedb4](https://github.com/appaloft/appaloft/commit/10aedb4a5e0aa02ee11ab82e22f51fb8f472ce43))
+
+
+### Documentation
+
+* align roadmap for preview flag release ([7a8da5a](https://github.com/appaloft/appaloft/commit/7a8da5a8e71f1104b6225e26096e046d78189197))
+
 ## [0.2.2](https://github.com/appaloft/appaloft/compare/v0.2.1...v0.2.2) (2026-04-20)
 
 
