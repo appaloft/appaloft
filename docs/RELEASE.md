@@ -50,8 +50,15 @@ GitHub Release assets include:
 - desktop installers for macOS, Linux, and Windows when the Tauri job succeeds
 - `docker-compose.selfhost.yml`
 - `Dockerfile`
+- `install.sh` Docker self-host installer
 - `release-manifest.json`
 - `checksums.txt`
+
+The root `install.sh` file is the source of truth for the public quick-start script. Release builds
+upload it as the `install.sh` GitHub Release asset. The website should serve
+`https://appaloft.com/install.sh` by redirecting or proxying to the latest release asset URL:
+`https://github.com/appaloft/appaloft/releases/latest/download/install.sh`. Do not copy the script
+from a local checkout during website builds.
 
 The CLI binary bundle embeds:
 

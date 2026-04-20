@@ -186,9 +186,9 @@ Remaining gaps:
 - Stored Appaloft/external secret adapters beyond the headless `ci-env:` resolver are not wired into
   the config-file entry workflow yet.
 - Public GitHub Action wrapper install UX is not implemented yet. The main repository publishes
-  CLI release archives, checksums, release manifest, and release notes, but `appaloft/deploy-action`
-  still needs its own repository, action metadata, install/checksum scripts, README examples, and
-  wrapper-level tests.
+  CLI release archives, the static Docker self-host installer, checksums, release manifest, and
+  release notes, but `appaloft/deploy-action` still needs its own repository, action metadata,
+  install/checksum scripts, README examples, and wrapper-level tests.
 - CLI config deploy now resolves state backend selection, defaults trusted SSH-targeted config
   deploys to `ssh-pglite`, invokes a remote-state lifecycle hook before identity queries/mutations,
   and uses SSH remote-state lifecycle and mirror sync in shell-built CLI programs.
