@@ -29,6 +29,168 @@ function ensureReflectMetadata(): void {
   reflectObject.metadata ??= () => () => {};
 }
 
+async function withMutedProcessOutput<T>(callback: () => Promise<T>): Promise<T> {
+  const writeStdout = process.stdout.write;
+  const writeStderr = process.stderr.write;
+
+  try {
+    process.stdout.write = (() => true) as typeof process.stdout.write;
+    process.stderr.write = (() => true) as typeof process.stderr.write;
+    return await callback();
+  } finally {
+    process.stdout.write = writeStdout;
+    process.stderr.write = writeStderr;
+    process.exitCode = 0;
+  }
+}
+
+async function withBunEnv<T>(
+  values: Record<string, string | undefined>,
+  callback: () => Promise<T>,
+): Promise<T> {
+  const previous = new Map<string, string | undefined>();
+
+  for (const key of Object.keys(values)) {
+    previous.set(key, Bun.env[key]);
+    const value = values[key];
+    if (value === undefined) {
+      delete Bun.env[key];
+    } else {
+      Bun.env[key] = value;
+    }
+  }
+
+  try {
+    return await callback();
+  } finally {
+    for (const [key, value] of previous) {
+      if (value === undefined) {
+        delete Bun.env[key];
+      } else {
+        Bun.env[key] = value;
+      }
+    }
+  }
+}
+
+async function createPreviewDeployCliHarness(input: { withRouteStore?: boolean } = {}) {
+  const { createExecutionContext } = await import("@appaloft/application");
+  const { createCliProgram } = await import("../src");
+  const commands: AppCommand<unknown>[] = [];
+  const queries: AppQuery<unknown>[] = [];
+  const operations: string[] = [];
+  const desiredRoutes: unknown[] = [];
+  const sourceLinkCalls: string[] = [];
+  const createdLinks: unknown[] = [];
+  const commandBus = {
+    execute: async <T>(_context: unknown, command: AppCommand<T>) => {
+      operations.push(command.constructor.name);
+      commands.push(command as AppCommand<unknown>);
+      switch (command.constructor.name) {
+        case "CreateProjectCommand":
+          return ok({ id: "proj_1" } as T);
+        case "RegisterServerCommand":
+          return ok({ id: "srv_1" } as T);
+        case "CreateEnvironmentCommand":
+          return ok({ id: "env_1" } as T);
+        case "CreateResourceCommand":
+          return ok({ id: "res_1" } as T);
+        case "CreateDeploymentCommand":
+          return ok({ id: "dep_1" } as T);
+        default:
+          return ok(null as T);
+      }
+    },
+  } as unknown as CommandBus;
+  const queryBus = {
+    execute: async <T>(_context: unknown, query: AppQuery<T>) => {
+      operations.push(query.constructor.name);
+      queries.push(query as AppQuery<unknown>);
+      return ok({ items: [] } as T);
+    },
+  } as unknown as QueryBus;
+  const executionContextFactory: ExecutionContextFactory = {
+    create: (contextInput) =>
+      createExecutionContext({
+        ...contextInput,
+        requestId: "req_cli_preview_deploy_test",
+      }),
+  };
+  const program = createCliProgram({
+    version: "0.1.0-test",
+    startServer: async () => {},
+    commandBus,
+    queryBus,
+    executionContextFactory,
+    prepareDeploymentStateBackend: async (decision) => {
+      operations.push(`PrepareState:${decision.kind}`);
+      return ok({
+        dataRoot: "/var/lib/appaloft/runtime/state",
+        schemaVersion: 1,
+        release: async () => {
+          operations.push(`ReleaseState:${decision.kind}`);
+          return ok(undefined);
+        },
+      });
+    },
+    sourceLinkStore: {
+      read: async (sourceFingerprint) => {
+        sourceLinkCalls.push(`read:${sourceFingerprint}`);
+        return ok(null);
+      },
+      requireSameTargetOrMissing: async (sourceFingerprint) => {
+        sourceLinkCalls.push(`requireSameTargetOrMissing:${sourceFingerprint}`);
+        return ok(null);
+      },
+      createIfMissing: async (sourceLinkInput) => {
+        sourceLinkCalls.push(`createIfMissing:${sourceLinkInput.sourceFingerprint}`);
+        createdLinks.push(sourceLinkInput);
+        return ok({
+          sourceFingerprint: sourceLinkInput.sourceFingerprint,
+          updatedAt: sourceLinkInput.updatedAt,
+          ...sourceLinkInput.target,
+        });
+      },
+    },
+    ...(input.withRouteStore
+      ? {
+          serverAppliedRouteStore: {
+            upsertDesired: async (routeInput) => {
+              operations.push("UpsertServerAppliedRoutes");
+              desiredRoutes.push(routeInput);
+              return ok({
+                routeSetId: [
+                  routeInput.target.projectId,
+                  routeInput.target.environmentId,
+                  routeInput.target.resourceId,
+                  routeInput.target.serverId,
+                  routeInput.target.destinationId ?? "default",
+                ].join(":"),
+                ...routeInput.target,
+                ...(routeInput.sourceFingerprint
+                  ? { sourceFingerprint: routeInput.sourceFingerprint }
+                  : {}),
+                domains: routeInput.domains,
+                status: "desired" as const,
+                updatedAt: routeInput.updatedAt,
+              });
+            },
+          },
+        }
+      : {}),
+  });
+
+  return {
+    commands,
+    createdLinks,
+    desiredRoutes,
+    operations,
+    program,
+    queries,
+    sourceLinkCalls,
+  };
+}
+
 describe("CLI deployment config entry workflow", () => {
   test("[QUICK-DEPLOY-ENTRY-010] init writes a profile-only config", async () => {
     ensureReflectMetadata();
@@ -660,6 +822,287 @@ describe("CLI deployment config entry workflow", () => {
     expect(commands).toHaveLength(0);
     expect(queries).toHaveLength(0);
     expect(operations).toEqual(["PrepareState:ssh-pglite", "ReleaseState:ssh-pglite"]);
+  });
+
+  test("[CONFIG-FILE-ENTRY-015] deploy action PR preview context selects preview scope and ids-only deployment", async () => {
+    ensureReflectMetadata();
+    const workspace = mkdtempSync(join(tmpdir(), "appaloft-preview-config-"));
+    const configPath = join(workspace, "appaloft.preview.yml");
+    writeFileSync(
+      configPath,
+      [
+        "runtime:",
+        "  strategy: workspace-commands",
+        "network:",
+        "  internalPort: 4310",
+        "  exposureMode: reverse-proxy",
+        "",
+      ].join("\n"),
+    );
+    const harness = await createPreviewDeployCliHarness();
+
+    try {
+      await withBunEnv(
+        {
+          GITHUB_REPOSITORY: "acme/app",
+          GITHUB_REPOSITORY_ID: "R_preview_repo",
+          GITHUB_REF: "refs/heads/main",
+          GITHUB_HEAD_REF: "feature/preview",
+          GITHUB_SHA: "abc123",
+          GITHUB_WORKSPACE: workspace,
+        },
+        () =>
+          withMutedProcessOutput(async () => {
+            await harness.program.parseAsync([
+              "node",
+              "appaloft",
+              "deploy",
+              workspace,
+              "--config",
+              configPath,
+              "--preview",
+              "pull-request",
+              "--preview-id",
+              "pr-123",
+              "--server-host",
+              "203.0.113.10",
+              "--server-provider",
+              "generic-ssh",
+            ]);
+          }),
+      );
+    } finally {
+      rmSync(workspace, { recursive: true, force: true });
+    }
+
+    const createdEnvironment = harness.commands.find(
+      (command) => command.constructor.name === "CreateEnvironmentCommand",
+    );
+    expect(createdEnvironment).toMatchObject({
+      name: "preview-pr-123",
+      kind: "preview",
+    });
+    expect(harness.sourceLinkCalls.some((call) => call.includes("preview%3Apr%3A123"))).toBe(true);
+    expect(harness.sourceLinkCalls.some((call) => call.includes("appaloft.preview.yml"))).toBe(
+      true,
+    );
+    const deployment = harness.commands.find(
+      (command) => command.constructor.name === "CreateDeploymentCommand",
+    );
+    expect(deployment).toMatchObject({
+      projectId: "proj_1",
+      serverId: "srv_1",
+      environmentId: "env_1",
+      resourceId: "res_1",
+    });
+    expect("preview" in (deployment as Record<string, unknown>)).toBe(false);
+    expect("pullRequestNumber" in (deployment as Record<string, unknown>)).toBe(false);
+  });
+
+  test("[CONFIG-FILE-ENTRY-017] deploy action PR preview domain template persists server-applied route intent", async () => {
+    ensureReflectMetadata();
+    const workspace = mkdtempSync(join(tmpdir(), "appaloft-preview-domain-"));
+    const configPath = join(workspace, "appaloft.preview.yml");
+    writeFileSync(
+      configPath,
+      [
+        "runtime:",
+        "  strategy: workspace-commands",
+        "network:",
+        "  internalPort: 4310",
+        "  exposureMode: reverse-proxy",
+        "",
+      ].join("\n"),
+    );
+    const harness = await createPreviewDeployCliHarness({ withRouteStore: true });
+
+    try {
+      await withBunEnv(
+        {
+          GITHUB_REPOSITORY: "acme/app",
+          GITHUB_REPOSITORY_ID: "R_preview_repo",
+          GITHUB_REF: "refs/pull/123/merge",
+          GITHUB_HEAD_REF: "feature/preview",
+          GITHUB_SHA: "abc123",
+          GITHUB_WORKSPACE: workspace,
+        },
+        () =>
+          withMutedProcessOutput(async () => {
+            await harness.program.parseAsync([
+              "node",
+              "appaloft",
+              "deploy",
+              workspace,
+              "--config",
+              configPath,
+              "--preview",
+              "pull-request",
+              "--preview-id",
+              "pr-123",
+              "--preview-domain-template",
+              "pr-123.preview.example.com",
+              "--server-host",
+              "203.0.113.10",
+              "--server-provider",
+              "generic-ssh",
+            ]);
+          }),
+      );
+    } finally {
+      rmSync(workspace, { recursive: true, force: true });
+    }
+
+    expect(harness.desiredRoutes).toHaveLength(1);
+    expect(harness.desiredRoutes[0]).toMatchObject({
+      domains: [
+        {
+          host: "pr-123.preview.example.com",
+          pathPrefix: "/",
+          tlsMode: "auto",
+        },
+      ],
+      target: {
+        projectId: "proj_1",
+        environmentId: "env_1",
+        resourceId: "res_1",
+        serverId: "srv_1",
+      },
+    });
+    const deployment = harness.commands.find(
+      (command) => command.constructor.name === "CreateDeploymentCommand",
+    );
+    expect("domains" in (deployment as Record<string, unknown>)).toBe(false);
+    expect("tlsMode" in (deployment as Record<string, unknown>)).toBe(false);
+  });
+
+  test("[CONFIG-FILE-ENTRY-020] deploy action PR preview explicit config path ignores production root config", async () => {
+    ensureReflectMetadata();
+    const workspace = mkdtempSync(join(tmpdir(), "appaloft-preview-explicit-config-"));
+    writeFileSync(
+      join(workspace, "appaloft.yml"),
+      [
+        "runtime:",
+        "  strategy: workspace-commands",
+        "access:",
+        "  domains:",
+        "    - host: www.example.com",
+        "",
+      ].join("\n"),
+    );
+    const previewConfigPath = join(workspace, "appaloft.preview.yml");
+    writeFileSync(
+      previewConfigPath,
+      ["runtime:", "  strategy: workspace-commands", "network:", "  internalPort: 4310", ""].join(
+        "\n",
+      ),
+    );
+    const harness = await createPreviewDeployCliHarness();
+
+    try {
+      await withBunEnv(
+        {
+          GITHUB_REPOSITORY: "acme/app",
+          GITHUB_REPOSITORY_ID: "R_preview_repo",
+          GITHUB_REF: "refs/pull/20/merge",
+          GITHUB_HEAD_REF: "feature/preview-config",
+          GITHUB_SHA: "abc123",
+          GITHUB_WORKSPACE: workspace,
+        },
+        () =>
+          withMutedProcessOutput(async () => {
+            await harness.program.parseAsync([
+              "node",
+              "appaloft",
+              "deploy",
+              workspace,
+              "--config",
+              previewConfigPath,
+              "--preview",
+              "pull-request",
+              "--preview-id",
+              "pr-20",
+              "--server-host",
+              "203.0.113.10",
+              "--server-provider",
+              "generic-ssh",
+            ]);
+          }),
+      );
+    } finally {
+      rmSync(workspace, { recursive: true, force: true });
+    }
+
+    expect(harness.desiredRoutes).toHaveLength(0);
+    expect(harness.operations).not.toContain("UpsertServerAppliedRoutes");
+    expect(harness.sourceLinkCalls.some((call) => call.includes("appaloft.preview.yml"))).toBe(
+      true,
+    );
+    expect(harness.sourceLinkCalls.some((call) => call.includes("appaloft.yml"))).toBe(false);
+  });
+
+  test("[CONFIG-FILE-ENTRY-021] deploy action PR preview does not reinterpret implicit root production domains", async () => {
+    ensureReflectMetadata();
+    const workspace = mkdtempSync(join(tmpdir(), "appaloft-preview-root-domain-"));
+    writeFileSync(
+      join(workspace, "appaloft.yml"),
+      [
+        "runtime:",
+        "  strategy: workspace-commands",
+        "network:",
+        "  internalPort: 4310",
+        "  exposureMode: reverse-proxy",
+        "access:",
+        "  domains:",
+        "    - host: www.example.com",
+        "      tlsMode: disabled",
+        "",
+      ].join("\n"),
+    );
+    const harness = await createPreviewDeployCliHarness();
+
+    try {
+      await withBunEnv(
+        {
+          GITHUB_REPOSITORY: "acme/app",
+          GITHUB_REPOSITORY_ID: "R_preview_repo",
+          GITHUB_REF: "refs/pull/21/merge",
+          GITHUB_HEAD_REF: "feature/implicit-root",
+          GITHUB_SHA: "abc123",
+          GITHUB_WORKSPACE: workspace,
+        },
+        () =>
+          withMutedProcessOutput(async () => {
+            await harness.program.parseAsync([
+              "node",
+              "appaloft",
+              "deploy",
+              workspace,
+              "--preview",
+              "pull-request",
+              "--preview-id",
+              "pr-21",
+              "--server-host",
+              "203.0.113.10",
+              "--server-provider",
+              "generic-ssh",
+            ]);
+          }),
+      );
+    } finally {
+      rmSync(workspace, { recursive: true, force: true });
+    }
+
+    expect(harness.desiredRoutes).toHaveLength(0);
+    expect(harness.operations).not.toContain("UpsertServerAppliedRoutes");
+    const deployment = harness.commands.find(
+      (command) => command.constructor.name === "CreateDeploymentCommand",
+    );
+    expect(deployment).toMatchObject({
+      projectId: "proj_1",
+      serverId: "srv_1",
+      environmentId: "env_1",
+      resourceId: "res_1",
+    });
   });
 
   test("[CONFIG-FILE-ENTRY-001] config env variables dispatch before ids-only deployment input returns", async () => {
