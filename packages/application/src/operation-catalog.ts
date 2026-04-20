@@ -18,6 +18,7 @@ import { createProjectCommandInputSchema } from "./operations/projects/create-pr
 import { listProjectsQueryInputSchema } from "./operations/projects/list-projects.query";
 import { configureResourceHealthCommandInputSchema } from "./operations/resources/configure-resource-health.command";
 import { configureResourceNetworkCommandInputSchema } from "./operations/resources/configure-resource-network.command";
+import { configureResourceRuntimeCommandInputSchema } from "./operations/resources/configure-resource-runtime.command";
 import { configureResourceSourceCommandInputSchema } from "./operations/resources/configure-resource-source.command";
 import { createResourceCommandInputSchema } from "./operations/resources/create-resource.command";
 import { listResourcesQueryInputSchema } from "./operations/resources/list-resources.query";
@@ -284,6 +285,20 @@ export const operationCatalog = [
     transports: {
       cli: "appaloft resource configure-source <resourceId>",
       orpc: { method: "POST", path: "/api/resources/{resourceId}/source" },
+    },
+  },
+  {
+    key: "resources.configure-runtime",
+    kind: "command",
+    domain: "resources",
+    messageName: "ConfigureResourceRuntimeCommand",
+    handlerName: "ConfigureResourceRuntimeCommandHandler",
+    serviceName: "ConfigureResourceRuntimeUseCase",
+    inputSchema: configureResourceRuntimeCommandInputSchema,
+    serviceToken: tokens.configureResourceRuntimeUseCase,
+    transports: {
+      cli: "appaloft resource configure-runtime <resourceId>",
+      orpc: { method: "POST", path: "/api/resources/{resourceId}/runtime-profile" },
     },
   },
   {

@@ -250,7 +250,10 @@ Current `DeploymentContextBootstrapService` can create or reuse resources during
 
 Public redeploy behavior is removed from the v1 deployment command surface by [ADR-016](./ADR-016-deployment-command-surface-reset.md). Any future redeploy behavior must rebuild its own command spec, workflow, test matrix, and resource-profile snapshot rules before re-entering the public Web/API/CLI surface.
 
-Resource-side source binding, runtime profile, and network profile persistence are being introduced through the first-deploy `resources.create` path. Dedicated update/configuration commands are accepted candidates named `resources.configure-source`, `resources.configure-runtime`, and `resources.configure-network`; they remain future work until implemented and added to the active public catalog.
+Resource-side source binding, runtime profile, and network profile persistence are active through
+`resources.create` and dedicated configuration commands named `resources.configure-source`,
+`resources.configure-runtime`, and `resources.configure-network`. Each command mutates exactly one
+resource-owned concern and appears in the active public catalog.
 
 Current code stores the resource listener port as `ResourceNetworkProfile.internalPort`.
 
@@ -260,9 +263,9 @@ the resource profile/read-model side of the boundary.
 
 Current code has explicit source value objects and command/schema fields for the initial Git and
 Docker image source variants. Runtime planning still carries source variant values through source
-descriptor metadata, and strategy-specific runtime-profile fields such as Dockerfile path, Compose
-path, static publish directory, and build target still need explicit value objects before dedicated
-configuration commands are exposed.
+descriptor metadata in some planner paths, but resource runtime-profile fields now use explicit
+value objects for Dockerfile path, Compose file path, static publish directory, and Docker build
+target at the aggregate boundary.
 
 Current repository config file support still uses a legacy identity-bearing schema and does not yet
 follow the config-file bootstrap workflow. That schema must be narrowed before repository config

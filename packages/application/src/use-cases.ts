@@ -32,6 +32,7 @@ export * from "./operations/projects/create-project.use-case";
 export * from "./operations/projects/list-projects.query-service";
 export * from "./operations/resources/configure-resource-health.use-case";
 export * from "./operations/resources/configure-resource-network.use-case";
+export * from "./operations/resources/configure-resource-runtime.use-case";
 export * from "./operations/resources/configure-resource-source.use-case";
 export * from "./operations/resources/create-resource.use-case";
 export * from "./operations/resources/list-resources.query-service";

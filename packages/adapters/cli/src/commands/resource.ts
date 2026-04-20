@@ -1,6 +1,7 @@
 import {
   ConfigureResourceHealthCommand,
   ConfigureResourceNetworkCommand,
+  ConfigureResourceRuntimeCommand,
   ConfigureResourceSourceCommand,
   CreateResourceCommand,
   ListResourcesQuery,
@@ -15,6 +16,7 @@ import {
   resourceExposureModes,
   resourceKinds,
   resourceNetworkProtocols,
+  runtimePlanStrategies,
   sourceKinds,
 } from "@appaloft/core";
 import { Args, Command as EffectCommand, Options } from "@effect/cli";
@@ -51,6 +53,18 @@ const sourceDefaultBranchOption = Options.text("default-branch").pipe(Options.op
 const sourceImageNameOption = Options.text("image-name").pipe(Options.optional);
 const sourceImageTagOption = Options.text("image-tag").pipe(Options.optional);
 const sourceImageDigestOption = Options.text("image-digest").pipe(Options.optional);
+const runtimeStrategyOption = Options.choice("strategy", runtimePlanStrategies).pipe(
+  Options.withDefault("auto"),
+);
+const runtimeInstallCommandOption = Options.text("install-command").pipe(Options.optional);
+const runtimeBuildCommandOption = Options.text("build-command").pipe(Options.optional);
+const runtimeStartCommandOption = Options.text("start-command").pipe(Options.optional);
+const runtimePublishDirectoryOption = Options.text("publish-directory").pipe(Options.optional);
+const runtimeDockerfilePathOption = Options.text("dockerfile-path").pipe(Options.optional);
+const runtimeDockerComposeFilePathOption = Options.text("docker-compose-file-path").pipe(
+  Options.optional,
+);
+const runtimeBuildTargetOption = Options.text("build-target").pipe(Options.optional);
 const portOption = Options.text("port").pipe(Options.optional);
 const upstreamProtocolOption = Options.choice("upstream-protocol", resourceNetworkProtocols).pipe(
   Options.withDefault("http"),
@@ -384,6 +398,61 @@ const configureNetworkCommand = EffectCommand.make(
   },
 ).pipe(EffectCommand.withDescription("Configure resource network profile"));
 
+const configureRuntimeCommand = EffectCommand.make(
+  "configure-runtime",
+  {
+    resourceId: resourceIdArg,
+    strategy: runtimeStrategyOption,
+    installCommand: runtimeInstallCommandOption,
+    buildCommand: runtimeBuildCommandOption,
+    startCommand: runtimeStartCommandOption,
+    publishDirectory: runtimePublishDirectoryOption,
+    dockerfilePath: runtimeDockerfilePathOption,
+    dockerComposeFilePath: runtimeDockerComposeFilePathOption,
+    buildTarget: runtimeBuildTargetOption,
+    json: jsonOption,
+  },
+  ({
+    buildCommand,
+    buildTarget,
+    dockerComposeFilePath,
+    dockerfilePath,
+    installCommand,
+    json,
+    publishDirectory,
+    resourceId,
+    startCommand,
+    strategy,
+  }) => {
+    void json;
+    const installCommandValue = optionalValue(installCommand);
+    const buildCommandValue = optionalValue(buildCommand);
+    const startCommandValue = optionalValue(startCommand);
+    const publishDirectoryValue = optionalValue(publishDirectory);
+    const dockerfilePathValue = optionalValue(dockerfilePath);
+    const dockerComposeFilePathValue = optionalValue(dockerComposeFilePath);
+    const buildTargetValue = optionalValue(buildTarget);
+
+    return runCommand(
+      ConfigureResourceRuntimeCommand.create({
+        resourceId,
+        runtimeProfile: {
+          strategy,
+          ...(installCommandValue ? { installCommand: installCommandValue } : {}),
+          ...(buildCommandValue ? { buildCommand: buildCommandValue } : {}),
+          ...(startCommandValue ? { startCommand: startCommandValue } : {}),
+          ...(publishDirectoryValue ? { publishDirectory: publishDirectoryValue } : {}),
+          ...(dockerfilePathValue ? { dockerfilePath: dockerfilePathValue } : {}),
+          ...(dockerComposeFilePathValue
+            ? { dockerComposeFilePath: dockerComposeFilePathValue }
+            : {}),
+          ...(buildTargetValue ? { buildTarget: buildTargetValue } : {}),
+        },
+      }),
+    );
+  },
+).pipe(EffectCommand.withDescription("Configure resource runtime profile"));
+
 const configureSourceCommand = EffectCommand.make(
   "configure-source",
   {
@@ -466,6 +535,7 @@ export const resourceCommand = EffectCommand.make("resource").pipe(
     logsCommand,
     healthCommand,
     configureSourceCommand,
+    configureRuntimeCommand,
     configureHealthCommand,
     configureNetworkCommand,
     proxyConfigCommand,

@@ -178,13 +178,13 @@ network profile, but they keep their own commands and lifecycle events.
 ## Current Implementation Notes And Migration Gaps
 
 Current implementation has active resource create/list, `resources.show`,
-`resources.configure-source`, `resources.configure-health`, and `resources.configure-network`
-surfaces. The Web resource detail page dispatches `resources.show` for durable profile data and
-dispatches `resources.configure-source` and `resources.configure-network` from separate profile
-forms.
+`resources.configure-source`, `resources.configure-runtime`, `resources.configure-health`, and
+`resources.configure-network` surfaces. The Web resource detail page dispatches `resources.show`
+for durable profile data and dispatches `resources.configure-source`,
+`resources.configure-runtime`, and `resources.configure-network` from separate profile forms.
 
-Runtime/archive/delete profile lifecycle operations remain accepted candidates. Archived-resource
-guards for source/network mutations remain migration gaps until `resources.archive` introduces
+Archive/delete profile lifecycle operations remain accepted candidates. Archived-resource guards
+for source/runtime/network mutations remain migration gaps until `resources.archive` introduces
 explicit lifecycle state. Each future Code Round must update `CORE_OPERATIONS.md` and
 `operation-catalog.ts` in the same change that exposes the operation.
 

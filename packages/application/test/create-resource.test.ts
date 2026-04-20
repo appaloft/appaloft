@@ -440,6 +440,7 @@ describe("CreateResourceUseCase", () => {
       },
       runtimeProfile: {
         strategy: "dockerfile",
+        dockerfilePath: "Dockerfile",
       },
       networkProfile: {
         internalPort: 3000,

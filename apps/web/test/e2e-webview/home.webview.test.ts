@@ -258,6 +258,11 @@ const apiResponses: Record<ApiScenario, Record<string, unknown>> = {
         id: "res_demo",
       },
     },
+    "/api/rpc/resources/configureRuntime": {
+      json: {
+        id: "res_demo",
+      },
+    },
     "/api/rpc/resources/configureSource": {
       json: {
         id: "res_demo",
@@ -1020,6 +1025,31 @@ describe("console e2e with Bun.WebView", () => {
         kind: "local-folder",
         locator: "workspace-updated",
         displayName: "workspace updated",
+      },
+    });
+  }, 15_000);
+
+  test("[RES-PROFILE-ENTRY-002] submits resource runtime profile changes through Web", async () => {
+    activeScenario = "dashboard";
+    resetRecordedApiRequests();
+
+    await using view = createWebView();
+    await view.navigate(`${previewUrl}/resources/res_demo`);
+
+    await expectAnyText(view, ["Runtime profile", "运行时配置"]);
+    await setInputValue(view, "#resource-runtime-start-command", "bun run preview");
+    await clickFormSubmit(view, "#resource-runtime-profile-form");
+
+    const configureRuntimeRequest = await waitForRecordedRequest(
+      "/api/rpc/resources/configureRuntime",
+    );
+    const configureRuntimeInput = readOrpcJsonPayload(configureRuntimeRequest.body);
+
+    expect(configureRuntimeInput).toEqual({
+      resourceId: "res_demo",
+      runtimeProfile: {
+        strategy: "workspace-commands",
+        startCommand: "bun run preview",
       },
     });
   }, 15_000);

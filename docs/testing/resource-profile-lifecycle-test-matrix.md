@@ -93,14 +93,20 @@ Automated coverage now exists for:
   `RES-PROFILE-SHOW-005` in `packages/application/test/show-resource.test.ts`;
 - `RES-PROFILE-SOURCE-001`, `RES-PROFILE-SOURCE-002`, `RES-PROFILE-SOURCE-003`, and
   `RES-PROFILE-SOURCE-004` in `packages/application/test/configure-resource-source.test.ts`;
+- `RES-PROFILE-RUNTIME-001`, `RES-PROFILE-RUNTIME-002`, `RES-PROFILE-RUNTIME-003`, and
+  `RES-PROFILE-RUNTIME-004` in `packages/application/test/configure-resource-runtime.test.ts`;
 - HTTP/oRPC dispatch for `resources.show` in `packages/orpc/test/resource-show.http.test.ts`;
 - HTTP/oRPC dispatch for `resources.configure-source` in
   `packages/orpc/test/resource-source-profile.http.test.ts`;
+- HTTP/oRPC dispatch for `resources.configure-runtime` in
+  `packages/orpc/test/resource-runtime-profile.http.test.ts`;
+- CLI dispatch for `resources.configure-runtime` in
+  `packages/adapters/cli/test/resource-command.test.ts`;
 - Web detail dispatch for `resources.show` in `apps/web/test/e2e-webview/home.webview.test.ts`;
-- Web source and network profile submissions in
+- Web source, runtime, and network profile submissions in
   `apps/web/test/e2e-webview/home.webview.test.ts`.
 
 `RES-PROFILE-SHOW-003` remains blocked until `resources.archive` introduces explicit lifecycle
-state. `RES-PROFILE-SOURCE-005` remains blocked for the same reason. `RES-PROFILE-SOURCE-006`
-remains future event-consumer projection work. Runtime/archive/delete profile lifecycle rows remain
-future Code Rounds.
+state. `RES-PROFILE-SOURCE-005`, `RES-PROFILE-RUNTIME-005`, and `RES-PROFILE-NETWORK-006` remain
+blocked for the same reason. `RES-PROFILE-SOURCE-006` remains future event-consumer projection
+work. Archive/delete profile lifecycle rows remain future Code Rounds.

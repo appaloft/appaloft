@@ -1,5 +1,6 @@
 export * from "./operations/resources/configure-resource-health.handler";
 export * from "./operations/resources/configure-resource-network.handler";
+export * from "./operations/resources/configure-resource-runtime.handler";
 export * from "./operations/resources/configure-resource-source.handler";
 export * from "./operations/resources/create-resource.handler";
 export * from "./operations/resources/list-resources.handler";

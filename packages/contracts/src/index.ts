@@ -631,6 +631,30 @@ export const resourceSourceBindingInputSchema = z.object({
   metadata: z.record(z.string(), z.string()).optional(),
 });
 
+export const resourceRuntimeProfileInputSchema = z
+  .object({
+    strategy: z
+      .enum([
+        "auto",
+        "dockerfile",
+        "docker-compose",
+        "prebuilt-image",
+        "workspace-commands",
+        "static",
+      ])
+      .default("auto"),
+    installCommand: z.string().min(1).optional(),
+    buildCommand: z.string().min(1).optional(),
+    startCommand: z.string().min(1).optional(),
+    publishDirectory: z.string().min(1).optional(),
+    dockerfilePath: z.string().min(1).optional(),
+    dockerComposeFilePath: z.string().min(1).optional(),
+    buildTarget: z.string().min(1).optional(),
+    healthCheckPath: z.string().min(1).optional(),
+    healthCheck: resourceHealthCheckPolicySchema.optional(),
+  })
+  .strict();
+
 export const resourceDetailRuntimeProfileSchema = z.object({
   strategy: z.enum([
     "auto",
@@ -644,6 +668,9 @@ export const resourceDetailRuntimeProfileSchema = z.object({
   buildCommand: z.string().optional(),
   startCommand: z.string().optional(),
   publishDirectory: z.string().optional(),
+  dockerfilePath: z.string().optional(),
+  dockerComposeFilePath: z.string().optional(),
+  buildTarget: z.string().optional(),
   healthCheckPath: z.string().optional(),
   healthCheck: requestedDeploymentHealthCheckSchema.optional(),
 });
@@ -706,27 +733,7 @@ export const createResourceInputSchema = z.object({
     )
     .optional(),
   source: resourceSourceBindingInputSchema.optional(),
-  runtimeProfile: z
-    .object({
-      strategy: z
-        .enum([
-          "auto",
-          "dockerfile",
-          "docker-compose",
-          "prebuilt-image",
-          "workspace-commands",
-          "static",
-        ])
-        .default("auto"),
-      installCommand: z.string().min(1).optional(),
-      buildCommand: z.string().min(1).optional(),
-      startCommand: z.string().min(1).optional(),
-      publishDirectory: z.string().min(1).optional(),
-      healthCheckPath: z.string().min(1).optional(),
-      healthCheck: resourceHealthCheckPolicySchema.optional(),
-    })
-    .strict()
-    .optional(),
+  runtimeProfile: resourceRuntimeProfileInputSchema.optional(),
   networkProfile: resourceNetworkProfileSchema.optional(),
 });
 
@@ -749,6 +756,19 @@ export const configureResourceNetworkInputSchema = z.object({
 });
 
 export const configureResourceNetworkResponseSchema = z.object({
+  id: z.string(),
+});
+
+export const configureResourceRuntimeInputSchema = z.object({
+  resourceId: z.string().min(1),
+  runtimeProfile: resourceRuntimeProfileInputSchema.omit({
+    healthCheckPath: true,
+    healthCheck: true,
+  }),
+  idempotencyKey: z.string().min(1).optional(),
+});
+
+export const configureResourceRuntimeResponseSchema = z.object({
   id: z.string(),
 });
 
@@ -1720,6 +1740,7 @@ export type ResourceDetail = z.infer<typeof resourceDetailSchema>;
 export type ShowResourceInput = z.infer<typeof showResourceInputSchema>;
 export type ShowResourceResponse = z.infer<typeof showResourceResponseSchema>;
 export type ResourceSourceBindingInput = z.infer<typeof resourceSourceBindingInputSchema>;
+export type ResourceRuntimeProfileInput = z.infer<typeof resourceRuntimeProfileInputSchema>;
 export type CreateResourceInput = z.infer<typeof createResourceInputSchema>;
 export type CreateResourceResponse = z.infer<typeof createResourceResponseSchema>;
 export type ConfigureResourceHealthInput = z.infer<typeof configureResourceHealthInputSchema>;
@@ -1727,6 +1748,10 @@ export type ConfigureResourceHealthResponse = z.infer<typeof configureResourceHe
 export type ConfigureResourceNetworkInput = z.infer<typeof configureResourceNetworkInputSchema>;
 export type ConfigureResourceNetworkResponse = z.infer<
   typeof configureResourceNetworkResponseSchema
+>;
+export type ConfigureResourceRuntimeInput = z.infer<typeof configureResourceRuntimeInputSchema>;
+export type ConfigureResourceRuntimeResponse = z.infer<
+  typeof configureResourceRuntimeResponseSchema
 >;
 export type ConfigureResourceSourceInput = z.infer<typeof configureResourceSourceInputSchema>;
 export type ConfigureResourceSourceResponse = z.infer<typeof configureResourceSourceResponseSchema>;

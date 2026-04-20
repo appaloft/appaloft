@@ -84,10 +84,12 @@ policy storage even if the current persistence model stores health under runtime
 Initial implementation status: `resources.show` is active for application query handling,
 operation catalog, CLI, HTTP/oRPC, and the Web resource detail page. `resources.configure-source`
 is active for core aggregate mutation, application command handling, operation catalog, CLI,
-HTTP/oRPC, and the Web resource detail source profile form. `resources.configure-network` is
-active for application command handling, operation catalog, CLI, HTTP/oRPC, and the Web resource
-detail profile form for reverse-proxy network profile changes. Direct-port exposure remains
-follow-up work governed by the same specs.
+HTTP/oRPC, and the Web resource detail source profile form. `resources.configure-runtime` is active
+for core aggregate mutation, application command handling, operation catalog, CLI, HTTP/oRPC, and
+the Web resource detail runtime profile form. `resources.configure-network` is active for
+application command handling, operation catalog, CLI, HTTP/oRPC, and the Web resource detail profile
+form for reverse-proxy network profile changes. Direct-port exposure remains follow-up work
+governed by the same specs.
 
 `resources.archive` updates resource lifecycle status and optional safe reason.
 
@@ -165,6 +167,7 @@ operations without changing deployment command boundaries.
 Direct-port user-facing configuration remains blocked until placement conflict guards, adapter
 behavior, and tests are implemented in the same Code Round.
 
-`resources.configure-source` archived-resource blocking remains blocked until explicit resource
-lifecycle state lands with `resources.archive`; duplicate `resource-source-configured` consumer
-idempotency remains future read-model projection work.
+`resources.configure-source`, `resources.configure-runtime`, and `resources.configure-network`
+archived-resource blocking remains blocked until explicit resource lifecycle state lands with
+`resources.archive`; duplicate configured-event consumer idempotency remains future read-model
+projection work.
