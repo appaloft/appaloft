@@ -54,10 +54,12 @@ command and that no entrypoint exposes a generic `resources.update`.
 | RES-PROFILE-NETWORK-004 | `resources.configure-network` | Command use case | `direct-port` requested without implemented placement guards. | Rejects before persistence. |
 | RES-PROFILE-NETWORK-005 | `resources.configure-network` | Command use case | Two reverse-proxy resources share the same `internalPort`. | Command accepts; no port-collision failure for reverse proxy. |
 | RES-PROFILE-NETWORK-006 | `resources.configure-network` | Command use case | Archived resource. | Returns `resource_archived`, no event. |
+| RES-PROFILE-HEALTH-001 | `resources.configure-health` | Command use case | Archived resource. | Returns `resource_archived`, no event. |
 | RES-PROFILE-ARCHIVE-001 | `resources.archive` | Command use case | Active resource archived. | Persists archived lifecycle, publishes `resource-archived`, returns `ok({ id })`. |
-| RES-PROFILE-ARCHIVE-002 | `resources.archive` | Command use case | Already archived resource. | Returns idempotent `ok({ id })` without duplicate state effect. |
+| RES-PROFILE-ARCHIVE-002 | `resources.archive` | Command use case | Already archived resource. | Returns idempotent `ok({ id })` without duplicate state effect or duplicate event. |
 | RES-PROFILE-ARCHIVE-003 | `resources.archive` | Command use case | Resource has deployment history or runtime logs. | Archive succeeds and retains history; no cleanup side effects. |
 | RES-PROFILE-ARCHIVE-004 | `deployments.create` | Command guard | Archived resource selected for deployment. | Rejects with structured lifecycle error. |
+| RES-PROFILE-ARCHIVE-005 | `resource-archived` | Event payload | Archive has safe reason. | Event includes resource ids, slug, archived timestamp, and normalized reason; excludes secrets and logs. |
 | RES-PROFILE-DELETE-001 | `resources.delete` | Command use case | Archived resource has no blockers and matching slug confirmation. | Deletes/tombstones resource, publishes `resource-deleted`, returns `ok({ id })`. |
 | RES-PROFILE-DELETE-002 | `resources.delete` | Command use case | Active resource. | Rejects with `resource_delete_blocked`. |
 | RES-PROFILE-DELETE-003 | `resources.delete` | Command use case | Confirmation slug mismatch. | Rejects with validation/conflict error and no mutation. |
@@ -107,6 +109,7 @@ Automated coverage now exists for:
   `apps/web/test/e2e-webview/home.webview.test.ts`.
 
 `RES-PROFILE-SHOW-003` remains blocked until `resources.archive` introduces explicit lifecycle
-state. `RES-PROFILE-SOURCE-005`, `RES-PROFILE-RUNTIME-005`, and `RES-PROFILE-NETWORK-006` remain
-blocked for the same reason. `RES-PROFILE-SOURCE-006` remains future event-consumer projection
-work. Archive/delete profile lifecycle rows remain future Code Rounds.
+state. `RES-PROFILE-SOURCE-005`, `RES-PROFILE-RUNTIME-005`, `RES-PROFILE-NETWORK-006`,
+`RES-PROFILE-HEALTH-001`, and `RES-PROFILE-ARCHIVE-004` remain blocked for the same reason.
+`RES-PROFILE-SOURCE-006` remains future event-consumer projection work. Archive rows are the next
+Resource Profile Lifecycle Code Round target; delete rows remain a later Code Round.

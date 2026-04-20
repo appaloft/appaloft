@@ -69,6 +69,8 @@ type ResourceLifecycleErrorDetails = {
   resourceId?: string;
   resourceSlug?: string;
   resourceKind?: string;
+  archivedAt?: string;
+  archiveReason?: string;
   sourceKind?: string;
   sourceLocator?: string;
   gitRef?: string;
@@ -130,7 +132,9 @@ Admission errors reject `resources.create` and return `err(DomainError)`.
 ## Profile Lifecycle Errors
 
 These errors apply to `resources.show`, `resources.configure-source`, `resources.configure-runtime`,
-`resources.configure-network`, `resources.archive`, and `resources.delete`.
+`resources.configure-network`, `resources.configure-health`, `resources.archive`,
+`resources.delete`, and `deployments.create` where deployment admission reads resource lifecycle
+state.
 
 | Error code | Category | Phase | Retriable | Meaning |
 | --- | --- | --- | --- | --- |
@@ -138,7 +142,7 @@ These errors apply to `resources.show`, `resources.configure-source`, `resources
 | `not_found` | `not-found` | `resource-read` | No | Resource cannot be found or is not visible. |
 | `infra_error` | `infra` | `resource-read` | Conditional | Resource detail read model cannot be safely read or assembled. |
 | `validation_error` | `validation` | `command-validation` | No | Profile command input shape, idempotency key, confirmation value, or lifecycle reason is invalid. |
-| `resource_archived` | `conflict` | `resource-lifecycle-guard` | No | A profile mutation or deployment command targeted an archived resource. |
+| `resource_archived` | `conflict` | `resource-lifecycle-guard` | No | A source, runtime, network, health, or deployment command targeted an archived resource. |
 | `invariant_violation` | `domain` | `resource-lifecycle-guard` | No | Resource aggregate lifecycle transition rejected the requested change. |
 | `validation_error` | `validation` | `resource-source-resolution` | No | Source profile update is invalid, ambiguous, unsafe, or contains forbidden secret/credential material. |
 | `validation_error` | `validation` | `resource-runtime-resolution` | No | Runtime profile update is invalid, unsafe, includes health-policy mutation, or includes unsupported runtime target fields. |

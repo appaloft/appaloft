@@ -143,6 +143,11 @@ Archived resources:
 - reject `resources.configure-health`;
 - may be passed to `resources.delete` after deletion guards pass.
 
+`resources.archive` is synchronous lifecycle-state mutation. Command success means archived state
+was durably persisted and `resource-archived` was recorded or published. It does not mean runtime,
+domain, certificate, proxy, source-link, deployment, log, terminal-session, or dependency cleanup
+has happened.
+
 Deleted resources:
 
 - are omitted from normal resource lists;
@@ -184,9 +189,11 @@ for durable profile data and dispatches `resources.configure-source`,
 `resources.configure-runtime`, and `resources.configure-network` from separate profile forms.
 
 Archive/delete profile lifecycle operations remain accepted candidates. Archived-resource guards
-for source/runtime/network mutations remain migration gaps until `resources.archive` introduces
-explicit lifecycle state. Each future Code Round must update `CORE_OPERATIONS.md` and
-`operation-catalog.ts` in the same change that exposes the operation.
+for source/runtime/network/health mutations and deployment admission remain migration gaps until
+`resources.archive` introduces explicit lifecycle state. The archive command spec and
+`resource-archived` event spec are ready for Code Round; `resources.delete` remains a later guarded
+cleanup slice. Each future Code Round must update `CORE_OPERATIONS.md` and `operation-catalog.ts`
+in the same change that exposes the operation.
 
 ## Open Questions
 
