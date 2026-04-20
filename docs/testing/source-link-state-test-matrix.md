@@ -68,6 +68,15 @@ This matrix inherits:
 | SOURCE-LINK-STATE-011 | integration | Relink validates context | Target resource does not belong to target project/environment or destination does not belong to target server | Command rejects without mutation | `source_link_context_mismatch`, phase `source-link-admission` | Existing link unchanged |
 | SOURCE-LINK-STATE-012 | integration | Relink uses remote state lock | Another deploy/relink owns remote mutation lock | Command waits or fails with retriable lock error according to policy | `infra_error`, phase `remote-state-lock` when lock cannot be acquired | Existing link unchanged |
 
+## PostgreSQL / PGlite Persistence Matrix
+
+| Test ID | Preferred automation | Case | Given | Expected result | Expected error |
+| --- | --- | --- | --- | --- | --- |
+| SOURCE-LINK-STATE-015 | integration | PG source link store persists and reads mapping | A PostgreSQL-compatible Appaloft backend is selected and `SourceLinkStore.createIfMissing` is called for a new fingerprint. | `source_links` persists project/environment/resource/server/destination ids, safe metadata, and `updatedAt`; read returns the same mapping. | None |
+| SOURCE-LINK-STATE-016 | integration | PG source link relink is idempotent and guarded | Existing `source_links` row points at a resource and `source-links.relink` is called with same or guarded target ids. | Same target returns ok without duplicate rows; mismatched optimistic guard rejects and leaves the row unchanged. | `source_link_conflict`, phase `source-link-resolution` for guard mismatch |
+| SOURCE-LINK-STATE-017 | integration | Resource delete sees PG source link blocker | `source_links.resource_id` points at an archived resource being deleted. | `ResourceDeletionBlockerReader` reports `source-link` with safe id/count details and `resources.delete` rejects before tombstoning. | `resource_delete_blocked`, phase `resource-deletion-guard` |
+| SOURCE-LINK-STATE-018 | integration | PG source link migration blocks unsafe cascades | Schema migration creates `source_links` with resource reverse lookup and non-cascading resource reference. | Deleting/tombstoning a resource cannot erase source-link identity as a storage side effect; source links remain explicit relink/unlink state. | None |
+
 ## Diagnostics Matrix
 
 | Test ID | Preferred automation | Case | Given | Expected result |
@@ -92,6 +101,11 @@ Current implementation has application command and CLI dispatch coverage for `so
 in `packages/application/test/relink-source-link.test.ts` and
 `packages/adapters/cli/test/source-link-command.test.ts`. Shell startup plans the same SSH remote
 PGlite mirror for relink in `apps/shell/test/remote-pglite-state-sync.test.ts`.
+
+`SOURCE-LINK-STATE-015` through `SOURCE-LINK-STATE-018` are the next PG durable persistence slice.
+They are specified but not implemented yet. The Code Round should add a PG `SourceLinkStore`
+adapter, `source_links` migration, delete-blocker integration, and PGlite persistence tests before
+treating `source-link` blockers as closed for `resources.delete`.
 
 An opt-in external SSH e2e harness in
 `apps/shell/test/e2e/github-action-ssh-state.workflow.e2e.ts` proves source link state across a

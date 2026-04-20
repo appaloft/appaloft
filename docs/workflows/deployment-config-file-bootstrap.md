@@ -294,6 +294,11 @@ Pure CLI/SSH mode must persist source fingerprint link state in the selected `ss
 This link state is the durable non-versioned mapping that lets repeated GitHub Actions runs deploy
 the same app without committed Appaloft ids.
 
+Hosted/self-hosted and explicit PostgreSQL/PGlite state backends use the same application
+`SourceLinkStore` contract. The durable PG slice must persist link state in a `source_links` table
+owned by the selected Appaloft state backend, not in repository config and not in the `Resource`
+aggregate.
+
 The source fingerprint must be stable and secret-free:
 
 - for Git sources, prefer provider repository id/full name when available, normalized clone locator,
@@ -568,6 +573,11 @@ remote upload backup/restore/recovery command sequencing. CLI config workflow te
 source link creation and repeated config deploy reuse through the source fingerprint link hook.
 Application and CLI tests cover `source-links.relink` command dispatch, context validation,
 optimistic guard conflicts, and SSH remote-state mirror planning for relink.
+
+PG/PGlite source-link persistence is specified in
+[Source Link Durable Persistence Implementation Plan](../implementation/source-link-durable-persistence-plan.md)
+but is not implemented yet. Until that slice lands, the PG `resources.delete` blocker reader cannot
+report `source-link` blockers from durable PG state.
 
 An opt-in shell e2e harness in
 `apps/shell/test/e2e/github-action-ssh-state.workflow.e2e.ts` covers the GitHub Actions style

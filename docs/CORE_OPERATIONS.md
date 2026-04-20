@@ -308,8 +308,10 @@ Current boundary:
   state.
 - CLI SSH mode uses the same remote PGlite state lock/download/upload path as config deploy when
   the relink command is invoked with trusted SSH target options such as `--server-host`.
-- Hosted/self-hosted control-plane storage for source links is future work. PostgreSQL-backed
-  relink must use a dedicated persistence adapter before an API/oRPC or Web surface is exposed.
+- PostgreSQL/PGlite source-link storage is the next specified persistence slice for
+  hosted/self-hosted and embedded state backends. It must use a dedicated adapter under
+  `packages/persistence/pg` and must also feed `resources.delete` source-link blocker checks.
+  API/oRPC and Web relink surfaces remain future work until the PG adapter and review UX exist.
 
 ## Deployments
 

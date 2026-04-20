@@ -114,7 +114,7 @@ selection overrides, not required setup.
 | Remote state lock | Yes | Yes | No | Lock acquisition is held across remote PGlite download, local command execution, upload, and release in shell CLI mode. |
 | Remote state migrate | Yes | Yes | No | Migration command construction exists before identity resolution; external SSH execution is wired through the secret-gated e2e workflow. |
 | Remote state recovery | Yes | Yes | No | Includes stale lock handling, failed migration restore/journal, and `doctor` diagnostics. |
-| Source fingerprint link state | Yes | Yes | Useful | Required for repeat deployments without committed ids. |
+| Source fingerprint link state | Yes | Yes | Useful | Required for repeat deployments without committed ids. SSH file-backed mirror exists; PG/PGlite durable adapter is specified in the source-link persistence plan. |
 | Explicit relink command/workflow | Yes | Yes | Useful | Required operator escape hatch for mistaken or intentional retargeting. |
 | `access.domains[]` parser | No for first remote-state slice; yes for CLI product value | Yes | Useful | Domain support can follow remote state foundation but is part of the CLI product thesis. |
 | Canonical redirect route intent | No for first remote-state slice; yes for CLI product value | Yes for www/apex parity | Useful | Needed for common www/non-www canonical host behavior. Requires parser, remote state shape, provider rendering, proxy config/read-model visibility, and e2e redirect assertion. |
@@ -146,6 +146,10 @@ selection overrides, not required setup.
   sequencing around remote extraction.
 - Config deploy now reads source fingerprint link state before identity resolution and writes a
   first-run link after project/server/environment/resource identity is resolved.
+- PostgreSQL/PGlite source-link persistence for hosted/self-hosted and embedded state backends is
+  specified in
+  [Source Link Durable Persistence Implementation Plan](./source-link-durable-persistence-plan.md)
+  but is not implemented yet.
 - The public CLI `source-links.relink` command now dispatches the application command, validates
   target context against Appaloft state, and uses the same SSH remote-state mirror/lock path when a
   trusted SSH target is supplied.
