@@ -26,7 +26,12 @@ import {
   type ResourceServiceKindValue,
   type RuntimePlanStrategyValue,
 } from "../shared/state-machine";
-import { type ArchivedAt, type CreatedAt, type UpdatedAt } from "../shared/temporal";
+import {
+  type ArchivedAt,
+  type CreatedAt,
+  type DeletedAt,
+  type UpdatedAt,
+} from "../shared/temporal";
 import {
   type ArchiveReason,
   type CommandText,
@@ -337,6 +342,7 @@ export interface ResourceState {
   lifecycleStatus: ResourceLifecycleStatusValue;
   archivedAt?: ArchivedAt;
   archiveReason?: ArchiveReason;
+  deletedAt?: DeletedAt;
   createdAt: CreatedAt;
   description?: DescriptionText;
 }
@@ -400,6 +406,10 @@ function resourceArchivedError(input: {
     commandName: input.commandName,
     ...(input.archivedAt ? { archivedAt: input.archivedAt.value } : {}),
   });
+}
+
+function resourceDeletedNotFoundError(input: { resourceId: ResourceId }) {
+  return domainError.notFound("resource", input.resourceId.value);
 }
 
 function validateResourceNetworkProfile(input: {
@@ -569,9 +579,9 @@ export interface ResourceVisitor<TContext, TResult> {
 
 type ResourceRehydrateState = Omit<
   ResourceState,
-  "archiveReason" | "archivedAt" | "lifecycleStatus"
+  "archiveReason" | "archivedAt" | "deletedAt" | "lifecycleStatus"
 > &
-  Partial<Pick<ResourceState, "archiveReason" | "archivedAt" | "lifecycleStatus">>;
+  Partial<Pick<ResourceState, "archiveReason" | "archivedAt" | "deletedAt" | "lifecycleStatus">>;
 
 export class Resource extends AggregateRoot<ResourceState> {
   private constructor(state: ResourceState) {
@@ -711,25 +721,30 @@ export class Resource extends AggregateRoot<ResourceState> {
       lifecycleStatus: state.lifecycleStatus ?? ResourceLifecycleStatusValue.active(),
       ...(state.archivedAt ? { archivedAt: state.archivedAt } : {}),
       ...(state.archiveReason ? { archiveReason: state.archiveReason } : {}),
+      ...(state.deletedAt ? { deletedAt: state.deletedAt } : {}),
     });
   }
 
-  private rejectArchivedResource(commandName: string): Result<void> {
-    if (!this.state.lifecycleStatus.isArchived()) {
-      return ok(undefined);
+  private rejectInactiveResource(commandName: string): Result<void> {
+    if (this.state.lifecycleStatus.isDeleted()) {
+      return err(resourceDeletedNotFoundError({ resourceId: this.state.id }));
     }
 
-    return err(
-      resourceArchivedError({
-        resourceId: this.state.id,
-        commandName,
-        ...(this.state.archivedAt ? { archivedAt: this.state.archivedAt } : {}),
-      }),
-    );
+    if (this.state.lifecycleStatus.isArchived()) {
+      return err(
+        resourceArchivedError({
+          resourceId: this.state.id,
+          commandName,
+          ...(this.state.archivedAt ? { archivedAt: this.state.archivedAt } : {}),
+        }),
+      );
+    }
+
+    return ok(undefined);
   }
 
   ensureCanCreateDeployment(): Result<void> {
-    return this.rejectArchivedResource("deployments.create");
+    return this.rejectInactiveResource("deployments.create");
   }
 
   archive(input: { archivedAt: ArchivedAt; reason?: ArchiveReason }): Result<{ changed: boolean }> {
@@ -762,11 +777,46 @@ export class Resource extends AggregateRoot<ResourceState> {
     return ok({ changed: true });
   }
 
+  delete(input: { deletedAt: DeletedAt }): Result<{ changed: boolean }> {
+    if (this.state.lifecycleStatus.isDeleted()) {
+      return ok({ changed: false });
+    }
+
+    if (this.state.lifecycleStatus.isActive()) {
+      return err(
+        domainError.resourceDeleteBlocked("Active resources must be archived before deletion", {
+          phase: "resource-deletion-guard",
+          resourceId: this.state.id.value,
+          lifecycleStatus: "active",
+          deletionBlockers: ["active-resource"],
+        }),
+      );
+    }
+
+    const lifecycleStatus = this.state.lifecycleStatus.delete();
+    if (lifecycleStatus.isErr()) {
+      return err(lifecycleStatus.error);
+    }
+
+    this.state.lifecycleStatus = lifecycleStatus.value;
+    this.state.deletedAt = input.deletedAt;
+
+    this.recordDomainEvent("resource-deleted", input.deletedAt, {
+      resourceId: this.state.id.value,
+      projectId: this.state.projectId.value,
+      environmentId: this.state.environmentId.value,
+      resourceSlug: this.state.slug.value,
+      deletedAt: input.deletedAt.value,
+    });
+
+    return ok({ changed: true });
+  }
+
   configureRuntimeProfile(input: {
     runtimeProfile: ResourceRuntimeProfileState;
     configuredAt: UpdatedAt;
   }): Result<void> {
-    const lifecycleGuard = this.rejectArchivedResource("resources.configure-runtime");
+    const lifecycleGuard = this.rejectInactiveResource("resources.configure-runtime");
     if (lifecycleGuard.isErr()) {
       return err(lifecycleGuard.error);
     }
@@ -821,7 +871,7 @@ export class Resource extends AggregateRoot<ResourceState> {
     configuredAt: UpdatedAt;
     defaultStrategy: RuntimePlanStrategyValue;
   }): Result<void> {
-    const lifecycleGuard = this.rejectArchivedResource("resources.configure-health");
+    const lifecycleGuard = this.rejectInactiveResource("resources.configure-health");
     if (lifecycleGuard.isErr()) {
       return err(lifecycleGuard.error);
     }
@@ -901,7 +951,7 @@ export class Resource extends AggregateRoot<ResourceState> {
     networkProfile: ResourceNetworkProfileState;
     configuredAt: UpdatedAt;
   }): Result<void> {
-    const lifecycleGuard = this.rejectArchivedResource("resources.configure-network");
+    const lifecycleGuard = this.rejectInactiveResource("resources.configure-network");
     if (lifecycleGuard.isErr()) {
       return err(lifecycleGuard.error);
     }
@@ -934,7 +984,7 @@ export class Resource extends AggregateRoot<ResourceState> {
     sourceBinding: ResourceSourceBindingState;
     configuredAt: UpdatedAt;
   }): Result<void> {
-    const lifecycleGuard = this.rejectArchivedResource("resources.configure-source");
+    const lifecycleGuard = this.rejectInactiveResource("resources.configure-source");
     if (lifecycleGuard.isErr()) {
       return err(lifecycleGuard.error);
     }

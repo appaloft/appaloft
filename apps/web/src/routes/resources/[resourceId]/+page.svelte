@@ -16,6 +16,7 @@
     RefreshCw,
     Route,
     Terminal,
+    Trash2,
   } from "@lucide/svelte";
   import type {
     ArchiveResourceInput,
@@ -25,6 +26,7 @@
     ConfigureResourceSourceInput,
     ConfirmDomainBindingOwnershipInput,
     CreateDomainBindingInput,
+    DeleteResourceInput,
     DomainBindingSummary,
     ProxyConfigurationView,
     ResourceDetail,
@@ -602,6 +604,34 @@
       };
     },
   }));
+  let deleteFeedback = $state<{
+    kind: "success" | "error";
+    title: string;
+    detail: string;
+  } | null>(null);
+  const deleteResourceMutation = createMutation(() => ({
+    mutationFn: (input: DeleteResourceInput) => orpcClient.resources.delete(input),
+    onSuccess: (result) => {
+      deleteFeedback = {
+        kind: "success",
+        title: $t(i18nKeys.console.resources.deleteSucceeded),
+        detail: result.id,
+      };
+      void queryClient.invalidateQueries({ queryKey: ["resources"] });
+      void queryClient.invalidateQueries({ queryKey: ["resources", "show", resourceId] });
+      void queryClient.invalidateQueries({
+        queryKey: ["resources", "health", resourceId, "detail"],
+      });
+      void goto(project ? projectDetailHref(project.id) : "/projects");
+    },
+    onError: (error) => {
+      deleteFeedback = {
+        kind: "error",
+        title: $t(i18nKeys.console.resources.deleteFailed),
+        detail: readErrorMessage(error),
+      };
+    },
+  }));
 
   let defaultedResourceId = $state("");
 
@@ -912,6 +942,27 @@
     archiveFeedback = null;
     archiveResourceMutation.mutate({
       resourceId: resource.id,
+    });
+  }
+
+  function deleteResource(): void {
+    if (!browser || !resource || !isResourceArchived || deleteResourceMutation.isPending) {
+      return;
+    }
+
+    const resourceSlug = window.prompt(
+      `${$t(i18nKeys.console.resources.deleteConfirmPrompt)}\n${resource.slug}`,
+    );
+    if (resourceSlug === null) {
+      return;
+    }
+
+    deleteFeedback = null;
+    deleteResourceMutation.mutate({
+      resourceId: resource.id,
+      confirmation: {
+        resourceSlug,
+      },
     });
   }
 
@@ -1762,6 +1813,19 @@
                 <p class="mt-1 break-all text-xs">{archiveFeedback.detail}</p>
               </div>
             {/if}
+            {#if deleteFeedback}
+              <div
+                class={[
+                  "max-w-3xl rounded-md border px-3 py-2 text-sm",
+                  deleteFeedback.kind === "success"
+                    ? "border-primary/25 bg-primary/5"
+                    : "border-destructive/30 bg-destructive/5 text-destructive",
+                ]}
+              >
+                <p class="font-medium">{deleteFeedback.title}</p>
+                <p class="mt-1 break-all text-xs">{deleteFeedback.detail}</p>
+              </div>
+            {/if}
           </div>
 
           <div class="flex shrink-0 flex-wrap gap-2">
@@ -1862,6 +1926,20 @@
                 ? $t(i18nKeys.common.actions.saving)
                 : $t(i18nKeys.console.resources.archiveAction)}
             </Button>
+            {#if isResourceArchived}
+              <Button
+                id="resource-delete-action"
+                type="button"
+                variant="destructive"
+                disabled={deleteResourceMutation.isPending}
+                onclick={deleteResource}
+              >
+                <Trash2 class="size-4" />
+                {deleteResourceMutation.isPending
+                  ? $t(i18nKeys.common.actions.saving)
+                  : $t(i18nKeys.console.resources.deleteAction)}
+              </Button>
+            {/if}
           </div>
         </div>
       </section>

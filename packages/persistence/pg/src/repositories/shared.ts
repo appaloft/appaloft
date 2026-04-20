@@ -29,6 +29,7 @@ import {
   ConfigScopeValue,
   ConfigValueText,
   CreatedAt,
+  DeletedAt,
   DeploymentId,
   DeploymentLogEntry,
   type DeploymentLogEntry as DeploymentLogEntryType,
@@ -1414,6 +1415,9 @@ export function rehydrateResourceRow(row: Selectable<Database["resources"]>) {
       ? { archivedAt: ArchivedAt.rehydrate(normalizeTimestamp(row.archived_at) ?? row.archived_at) }
       : {}),
     ...(row.archive_reason ? { archiveReason: ArchiveReason.rehydrate(row.archive_reason) } : {}),
+    ...(row.deleted_at
+      ? { deletedAt: DeletedAt.rehydrate(normalizeTimestamp(row.deleted_at) ?? row.deleted_at) }
+      : {}),
     createdAt: CreatedAt.rehydrate(normalizeTimestamp(row.created_at) ?? row.created_at),
     ...(row.description ? { description: DescriptionText.rehydrate(row.description) } : {}),
   };

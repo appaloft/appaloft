@@ -26,6 +26,8 @@ import {
   CreateSshCredentialUseCase,
   DbMigrateUseCase,
   DbStatusQueryService,
+  DeleteResourceCommandHandler,
+  DeleteResourceUseCase,
   DeploymentContextBootstrapService,
   DeploymentContextDefaultsFactory,
   DeploymentContextResolver,
@@ -105,6 +107,7 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(ConfigureResourceRuntimeCommandHandler);
   container.registerSingleton(ConfigureResourceSourceCommandHandler);
   container.registerSingleton(ArchiveResourceCommandHandler);
+  container.registerSingleton(DeleteResourceCommandHandler);
   container.registerSingleton(ShowResourceQueryHandler);
   container.registerSingleton(IssueOrRenewCertificateCommandHandler);
   container.registerSingleton(RelinkSourceLinkCommandHandler);
@@ -118,6 +121,7 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(tokens.listProjectsQueryService, ListProjectsQueryService);
   container.registerSingleton(tokens.createResourceUseCase, CreateResourceUseCase);
   container.registerSingleton(tokens.archiveResourceUseCase, ArchiveResourceUseCase);
+  container.registerSingleton(tokens.deleteResourceUseCase, DeleteResourceUseCase);
   container.registerSingleton(
     tokens.configureResourceSourceUseCase,
     ConfigureResourceSourceUseCase,

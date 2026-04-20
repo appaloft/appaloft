@@ -163,6 +163,7 @@ class KyselyResourceMutationVisitor
         lifecycle_status: spec.state.lifecycleStatus.value,
         archived_at: spec.state.archivedAt?.value ?? null,
         archive_reason: spec.state.archiveReason?.value ?? null,
+        deleted_at: spec.state.deletedAt?.value ?? null,
         created_at: spec.state.createdAt.value,
       },
     };
@@ -206,6 +207,7 @@ export class PgResourceRepository implements ResourceRepository {
               lifecycle_status: mutation.values.lifecycle_status,
               archived_at: mutation.values.archived_at ?? null,
               archive_reason: mutation.values.archive_reason ?? null,
+              deleted_at: mutation.values.deleted_at ?? null,
             }),
           )
           .execute();

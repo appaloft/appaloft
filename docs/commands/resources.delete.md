@@ -8,7 +8,7 @@
 - Handler: `DeleteResourceCommandHandler`
 - Use case: `DeleteResourceUseCase`
 - Domain / bounded context: Workload Delivery / Resource lifecycle
-- Current status: accepted candidate command and next Resource Profile Lifecycle Code Round target
+- Current status: active command
 - Source classification: normative contract for delete implementation
 
 ## Normative Contract
@@ -239,9 +239,9 @@ All errors use [Resource Lifecycle Error Spec](../errors/resources.lifecycle.md)
 
 | Entrypoint | Mapping | Status |
 | --- | --- | --- |
-| Web | Resource detail destructive action dispatches this command only for archived resources after typed slug confirmation. | Required in Code Round |
-| CLI | `appaloft resource delete <resourceId> --confirm-slug <slug> [--json]`. | Required in Code Round |
-| oRPC / HTTP | `DELETE /api/resources/{resourceId}` using the command schema; JSON body carries `confirmation.resourceSlug`. | Required in Code Round |
+| Web | Resource detail destructive action dispatches this command only for archived resources after typed slug confirmation. | Active |
+| CLI | `appaloft resource delete <resourceId> --confirm-slug <slug> [--json]`. | Active |
+| oRPC / HTTP | `DELETE /api/resources/{resourceId}` using the command schema; JSON body carries `confirmation.resourceSlug`. | Active |
 | Repository config files | Not applicable. Repository config cannot request destructive control-plane lifecycle deletion. | Not applicable |
 | Automation / MCP | Future command/tool over the same operation key. | Future |
 
@@ -254,12 +254,14 @@ Canonical event spec:
 
 ## Current Implementation Notes And Migration Gaps
 
-Resource deletion is not active until this command appears in `CORE_OPERATIONS.md`,
-`operation-catalog.ts`, application slices, transports, read-model deletion/tombstone behavior, and
-tests.
+Resource deletion is active in `CORE_OPERATIONS.md`, `operation-catalog.ts`, application slices,
+HTTP/oRPC, CLI, Web, Resource repository tombstone state, and normal read-model omission.
 
-The next Code Round must add authoritative deletion blocker reads before exposing any Web, CLI, or
-HTTP/oRPC delete entrypoint.
+The v1 PG deletion blocker reader covers retained deployments, durable domain bindings,
+certificates tied through domain bindings, and retained provider runtime logs. Source-link,
+dependency, terminal-session, audit-retention, and external route-store blocker detection remain
+extension points on the same `ResourceDeletionBlockerReader` port where no durable PG table exists
+yet.
 
 ## Open Questions
 

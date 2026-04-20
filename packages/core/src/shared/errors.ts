@@ -1,18 +1,22 @@
 export type ErrorCategory = "user" | "infra" | "provider" | "retryable" | "timeout";
 
+export type DomainErrorDetailValue = string | number | boolean | null | readonly string[];
+
+export type DomainErrorDetails = Record<string, DomainErrorDetailValue>;
+
 export interface DomainError {
   code: string;
   category: ErrorCategory;
   message: string;
   retryable: boolean;
-  details?: Record<string, string | number | boolean | null>;
+  details?: DomainErrorDetails;
 }
 
 function createError(
   code: string,
   category: ErrorCategory,
   message: string,
-  details?: Record<string, string | number | boolean | null>,
+  details?: DomainErrorDetails,
   retryable = false,
 ): DomainError {
   return {
@@ -25,30 +29,22 @@ function createError(
 }
 
 export const domainError = {
-  validation: (
-    message: string,
-    details?: Record<string, string | number | boolean | null>,
-  ): DomainError => createError("validation_error", "user", message, details),
-  invariant: (
-    message: string,
-    details?: Record<string, string | number | boolean | null>,
-  ): DomainError => createError("invariant_violation", "user", message, details),
+  validation: (message: string, details?: DomainErrorDetails): DomainError =>
+    createError("validation_error", "user", message, details),
+  invariant: (message: string, details?: DomainErrorDetails): DomainError =>
+    createError("invariant_violation", "user", message, details),
   notFound: (entity: string, id: string): DomainError =>
     createError("not_found", "user", `${entity} ${id} was not found`, {
       entity,
       id,
     }),
-  conflict: (
-    message: string,
-    details?: Record<string, string | number | boolean | null>,
-  ): DomainError => createError("conflict", "user", message, details),
-  resourceContextMismatch: (
-    message: string,
-    details?: Record<string, string | number | boolean | null>,
-  ): DomainError => createError("resource_context_mismatch", "user", message, details),
+  conflict: (message: string, details?: DomainErrorDetails): DomainError =>
+    createError("conflict", "user", message, details),
+  resourceContextMismatch: (message: string, details?: DomainErrorDetails): DomainError =>
+    createError("resource_context_mismatch", "user", message, details),
   resourceRuntimeLogsContextMismatch: (
     message: string,
-    details?: Record<string, string | number | boolean | null>,
+    details?: DomainErrorDetails,
   ): DomainError => createError("resource_runtime_logs_context_mismatch", "user", message, details),
   resourceRuntimeLogsUnavailable: (
     message: string,
@@ -131,6 +127,8 @@ export const domainError = {
     message: string,
     details?: Record<string, string | number | boolean | null>,
   ): DomainError => createError("resource_archived", "user", message, details),
+  resourceDeleteBlocked: (message: string, details?: DomainErrorDetails): DomainError =>
+    createError("resource_delete_blocked", "user", message, details),
   deploymentNotRedeployable: (
     message: string,
     details?: Record<string, string | number | boolean | null>,

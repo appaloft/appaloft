@@ -5,7 +5,7 @@
 - Event name: `resource-deleted`
 - Publisher: `resources.delete`
 - Aggregate owner: Resource
-- Current status: accepted candidate event for the next delete Code Round
+- Current status: active event for the guarded delete lifecycle
 
 ## Normative Contract
 

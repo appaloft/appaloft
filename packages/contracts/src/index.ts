@@ -750,6 +750,17 @@ export const archiveResourceResponseSchema = z.object({
   id: z.string(),
 });
 
+export const deleteResourceInputSchema = z.object({
+  resourceId: z.string().min(1),
+  confirmation: z.object({
+    resourceSlug: z.string().min(1),
+  }),
+});
+
+export const deleteResourceResponseSchema = z.object({
+  id: z.string(),
+});
+
 export const configureResourceHealthInputSchema = z.object({
   resourceId: z.string().min(1),
   healthCheck: resourceHealthCheckPolicySchema,
@@ -1366,14 +1377,20 @@ export const resourceRuntimeLogLineSchema = z.object({
   masked: z.boolean(),
 });
 
+export const domainErrorDetailValueSchema = z.union([
+  z.string(),
+  z.number(),
+  z.boolean(),
+  z.null(),
+  z.array(z.string()).readonly(),
+]);
+
 export const domainErrorResponseSchema = z.object({
   code: z.string(),
   category: z.enum(["user", "infra", "provider", "retryable", "timeout"]),
   message: z.string(),
   retryable: z.boolean(),
-  details: z
-    .record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()]))
-    .optional(),
+  details: z.record(z.string(), domainErrorDetailValueSchema).optional(),
 });
 
 export const resourceRuntimeLogEventSchema = z.discriminatedUnion("kind", [
@@ -1754,6 +1771,8 @@ export type CreateResourceInput = z.infer<typeof createResourceInputSchema>;
 export type CreateResourceResponse = z.infer<typeof createResourceResponseSchema>;
 export type ArchiveResourceInput = z.infer<typeof archiveResourceInputSchema>;
 export type ArchiveResourceResponse = z.infer<typeof archiveResourceResponseSchema>;
+export type DeleteResourceInput = z.infer<typeof deleteResourceInputSchema>;
+export type DeleteResourceResponse = z.infer<typeof deleteResourceResponseSchema>;
 export type ConfigureResourceHealthInput = z.infer<typeof configureResourceHealthInputSchema>;
 export type ConfigureResourceHealthResponse = z.infer<typeof configureResourceHealthResponseSchema>;
 export type ConfigureResourceNetworkInput = z.infer<typeof configureResourceNetworkInputSchema>;

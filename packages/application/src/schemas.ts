@@ -20,6 +20,7 @@ export * from "./operations/resources/configure-resource-network.schema";
 export * from "./operations/resources/configure-resource-runtime.schema";
 export * from "./operations/resources/configure-resource-source.schema";
 export * from "./operations/resources/create-resource.schema";
+export * from "./operations/resources/delete-resource.schema";
 export * from "./operations/resources/list-resources.schema";
 export * from "./operations/resources/resource-diagnostic-summary.schema";
 export * from "./operations/resources/resource-health.schema";

@@ -13,6 +13,7 @@ import {
   type CreateProjectCommandInput,
   type CreateResourceCommandInput,
   type CreateSshCredentialCommandInput,
+  type DeleteResourceCommandInput,
   type DeploymentLogsQueryInput,
   type DiffEnvironmentsQueryInput,
   type IssueOrRenewCertificateCommandInput,
@@ -50,6 +51,7 @@ import {
   type CreateProjectResponse,
   type CreateResourceResponse,
   type CreateSshCredentialResponse,
+  type DeleteResourceResponse,
   type DeploymentLogsResponse,
   type DeploymentProgressEvent,
   type DiffEnvironmentResponse,
@@ -209,6 +211,12 @@ export type AppaloftOrpcClientContract = {
       AppaloftClientContext,
       ArchiveResourceCommandInput,
       ArchiveResourceResponse,
+      AppaloftClientError
+    >;
+    delete: Client<
+      AppaloftClientContext,
+      DeleteResourceCommandInput,
+      DeleteResourceResponse,
       AppaloftClientError
     >;
     configureHealth: Client<

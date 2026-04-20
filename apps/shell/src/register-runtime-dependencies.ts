@@ -70,6 +70,7 @@ import {
   PgEnvironmentRepository,
   PgProjectReadModel,
   PgProjectRepository,
+  PgResourceDeletionBlockerReader,
   PgResourceReadModel,
   PgResourceRepository,
   PgServerReadModel,
@@ -447,6 +448,11 @@ export function registerRuntimeDependencies(
   });
   container.register(tokens.resourceRepository, {
     useFactory: instanceCachingFactory(() => new PgResourceRepository(input.database.db)),
+  });
+  container.register(tokens.resourceDeletionBlockerReader, {
+    useFactory: instanceCachingFactory(
+      () => new PgResourceDeletionBlockerReader(input.database.db),
+    ),
   });
   container.register(tokens.deploymentRepository, {
     useFactory: instanceCachingFactory(() => new PgDeploymentRepository(input.database.db)),

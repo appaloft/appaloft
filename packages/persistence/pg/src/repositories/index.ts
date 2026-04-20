@@ -12,6 +12,7 @@ export * from "./environment-read-model";
 export * from "./environment-repository";
 export * from "./project-read-model";
 export * from "./project-repository";
+export * from "./resource-deletion-blocker-reader";
 export * from "./resource-read-model";
 export * from "./resource-repository";
 export * from "./server-read-model";

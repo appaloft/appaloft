@@ -5,6 +5,7 @@ import {
   ArchivedAt,
   CommandText,
   CreatedAt,
+  DeletedAt,
   DescriptionText,
   DisplayNameText,
   EnvironmentId,
@@ -234,6 +235,16 @@ function archivedDetailedResource(): Resource {
   return resource;
 }
 
+function deletedDetailedResource(): Resource {
+  const resource = archivedDetailedResource();
+  resource
+    .delete({
+      deletedAt: DeletedAt.rehydrate("2026-01-01T00:00:09.000Z"),
+    })
+    ._unsafeUnwrap();
+  return resource;
+}
+
 function resourceSummary(overrides?: Partial<ResourceSummary>): ResourceSummary {
   return {
     id: "res_web",
@@ -424,6 +435,21 @@ describe("ShowResourceQueryService", () => {
     expect(detail.lifecycle).toEqual({
       status: "archived",
       archivedAt: "2026-01-01T00:00:08.000Z",
+    });
+  });
+
+  test("[RES-PROFILE-DELETE-008] hides deleted resources from resources.show", async () => {
+    const result = await createService({
+      resources: [deletedDetailedResource()],
+    }).execute(createTestContext(), createQuery());
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "not_found",
+      details: {
+        phase: "resource-read",
+        resourceId: "res_web",
+      },
     });
   });
 

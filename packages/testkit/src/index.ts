@@ -425,6 +425,7 @@ export class MemoryResourceReadModel implements ResourceReadModel {
     void context;
     return [...this.repository.items.values()]
       .map((resource) => resource.toState())
+      .filter((resource) => !resource.lifecycleStatus.isDeleted())
       .filter((resource) =>
         input?.projectId ? resource.projectId.value === input.projectId : true,
       )

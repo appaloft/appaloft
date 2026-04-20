@@ -196,6 +196,7 @@ Implemented operations:
 | Configure resource runtime profile | Command | `resources.configure-runtime` | `ConfigureResourceRuntimeCommand` | `ConfigureResourceRuntimeCommandInput` | `appaloft resource configure-runtime <resourceId>` | `POST /api/resources/{resourceId}/runtime-profile` |
 | Configure resource network profile | Command | `resources.configure-network` | `ConfigureResourceNetworkCommand` | `ConfigureResourceNetworkCommandInput` | `appaloft resource configure-network <resourceId>` | `POST /api/resources/{resourceId}/network-profile` |
 | Archive resource | Command | `resources.archive` | `ArchiveResourceCommand` | `ArchiveResourceCommandInput` | `appaloft resource archive <resourceId>` | `POST /api/resources/{resourceId}/archive` |
+| Delete resource | Command | `resources.delete` | `DeleteResourceCommand` | `DeleteResourceCommandInput` | `appaloft resource delete <resourceId> --confirm-slug <slug>` | `DELETE /api/resources/{resourceId}` |
 | List resources | Query | `resources.list` | `ListResourcesQuery` | `ListResourcesQueryInput` | `appaloft resource list` | `GET /api/resources` |
 | Show resource profile | Query | `resources.show` | `ShowResourceQuery` | `ShowResourceQueryInput` | `appaloft resource show <resourceId>` | `GET /api/resources/{resourceId}` |
 | Read resource runtime logs | Query | `resources.runtime-logs` | `ResourceRuntimeLogsQuery` | `ResourceRuntimeLogsQueryInput` | `appaloft resource logs <resourceId>` | `GET /api/resources/{resourceId}/runtime-logs`; stream: `GET /api/resources/{resourceId}/runtime-logs/stream` |
@@ -272,6 +273,10 @@ Current boundary:
   state to `archived`, publishes `resource-archived` on the first transition, and blocks future
   profile mutations and deployments without stopping runtime or deleting retained history,
   domains, logs, diagnostics, or source links.
+- resource delete is resource-owned through `resources.delete`; the command moves an archived,
+  unreferenced resource to deleted/tombstone lifecycle state after typed slug confirmation and
+  deletion blocker checks, publishes `resource-deleted` on the first transition, and omits deleted
+  resources from normal resource read models without cascading cleanup.
 - durable domain bindings belong to the resource. Deployment snapshots may record the route used
   by one attempt, but they are not the domain ownership boundary. Generated default access should
   be exposed through resource-scoped access summaries and should prefer stable resource-scoped
