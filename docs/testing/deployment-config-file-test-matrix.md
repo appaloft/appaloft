@@ -38,6 +38,7 @@ This matrix inherits:
 - [ADR-025: Control-Plane Modes And Action Execution](../decisions/ADR-025-control-plane-modes-and-action-execution.md)
 - [resources.create Command Spec](../commands/resources.create.md)
 - [deployments.create Command Spec](../commands/deployments.create.md)
+- [Workload Framework Detection And Planning Test Matrix](./workload-framework-detection-and-planning-test-matrix.md)
 - [Quick Deploy Test Matrix](./quick-deploy-test-matrix.md)
 - [Control-Plane Modes Test Matrix](./control-plane-modes-test-matrix.md)
 - [Source Link State Test Matrix](./source-link-state-test-matrix.md)

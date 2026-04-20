@@ -97,6 +97,9 @@ export class PgDeploymentReadModel implements DeploymentReadModel {
                         ...(runtimePlan.source.inspection.packageManager
                           ? { packageManager: runtimePlan.source.inspection.packageManager }
                           : {}),
+                        ...(runtimePlan.source.inspection.applicationShape
+                          ? { applicationShape: runtimePlan.source.inspection.applicationShape }
+                          : {}),
                         ...(runtimePlan.source.inspection.runtimeVersion
                           ? { runtimeVersion: runtimePlan.source.inspection.runtimeVersion }
                           : {}),

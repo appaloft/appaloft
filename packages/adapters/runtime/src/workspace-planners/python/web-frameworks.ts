@@ -90,6 +90,7 @@ function createPythonWebFrameworkPlanner(
         runtimeKind: this.runtimeKind,
         dockerfilePath: generatedWorkspaceDockerfileName,
         baseImage,
+        applicationShape: "serverful-http",
         ...(installCommand ? { installCommand } : {}),
         ...(buildCommand ? { buildCommand } : {}),
         startCommand: startCommand.value,
@@ -97,6 +98,7 @@ function createPythonWebFrameworkPlanner(
           planner: this.name,
           runtimeKind: this.runtimeKind,
           baseImage,
+          applicationShape: "serverful-http",
           extra: {
             packageManager,
             framework: defaults.framework,

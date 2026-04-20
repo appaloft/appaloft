@@ -526,6 +526,7 @@ function chooseStrategies(input: {
         composeFile,
         metadata: {
           sourceKind: source.kind,
+          applicationShape: "container-native",
         },
       }),
       steps: [
@@ -556,6 +557,7 @@ function chooseStrategies(input: {
         image,
         metadata: {
           sourceKind: source.kind,
+          applicationShape: "container-native",
         },
       }),
       steps: [
@@ -593,6 +595,7 @@ function chooseStrategies(input: {
       port,
       metadata: {
         "artifact.source": "static-site",
+        "workspace.applicationShape": "static",
         "static.publishDirectory": publishDirectory,
         "static.server": "adapter-owned",
         ...(staticFrameworkPlan?.metadata
@@ -618,6 +621,7 @@ function chooseStrategies(input: {
           publishDirectory,
           staticServer: "adapter-owned",
           dockerfilePath,
+          applicationShape: staticFrameworkPlan?.applicationShape ?? "static",
           ...(staticFrameworkPlan
             ? {
                 planner: staticFrameworkPlan.plannerKey,
@@ -663,6 +667,7 @@ function chooseStrategies(input: {
         metadata: {
           sourceKind: source.kind,
           dockerfilePath,
+          applicationShape: "container-native",
         },
       }),
       steps: [
@@ -715,6 +720,7 @@ function chooseStrategies(input: {
           planner: plan.planner,
           runtimeKind: plan.runtimeKind,
           baseImage: plan.baseImage,
+          applicationShape: plan.applicationShape,
           ...(plan.metadata.packageManager ? { packageManager: plan.metadata.packageManager } : {}),
           ...(plan.metadata.framework ? { framework: plan.metadata.framework } : {}),
           ...(plan.metadata.projectName ? { projectName: plan.metadata.projectName } : {}),

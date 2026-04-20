@@ -16,6 +16,8 @@ import {
   FilePathText,
   ok,
   type Result,
+  type SourceApplicationShape,
+  SourceApplicationShapeValue,
   SourceDescriptor,
   type SourceDetectedFile,
   SourceDetectedFileValue,
@@ -43,6 +45,7 @@ interface LocalProjectProfile {
   runtimeFamily: Extract<SourceRuntimeFamily, "java" | "node" | "python">;
   framework?: SourceFramework;
   packageManager?: SourcePackageManager;
+  applicationShape?: SourceApplicationShape;
   runtimeVersion?: string;
   projectName?: string;
   detectedFiles: SourceDetectedFile[];
@@ -70,6 +73,17 @@ function readText(path: string): string | null {
   } catch {
     return null;
   }
+}
+
+function readFirstExistingText(path: string, fileNames: string[]): string | null {
+  for (const fileName of fileNames) {
+    const text = readText(join(path, fileName));
+    if (text !== null) {
+      return text;
+    }
+  }
+
+  return null;
 }
 
 function firstLine(text: string | null): string | undefined {
@@ -233,6 +247,82 @@ function detectNodeFramework(input: {
   return undefined;
 }
 
+function applicationShapeForFramework(
+  framework: SourceFramework | undefined,
+): SourceApplicationShape | undefined {
+  switch (framework) {
+    case "angular":
+    case "astro":
+    case "vite":
+      return "static";
+    case "nextjs":
+    case "nuxt":
+    case "remix":
+      return "ssr";
+    case "sveltekit":
+      return "hybrid-static-server";
+    case "django":
+    case "express":
+    case "fastapi":
+    case "fastify":
+    case "flask":
+    case "hono":
+    case "koa":
+    case "nestjs":
+      return "serverful-http";
+    default:
+      return undefined;
+  }
+}
+
+function applicationShapeForNodeProject(input: {
+  path: string;
+  framework: SourceFramework | undefined;
+  detectedScripts: SourceDetectedScript[];
+}): SourceApplicationShape | undefined {
+  switch (input.framework) {
+    case "nextjs":
+      if (input.detectedScripts.includes("export") || hasNextStaticExportConfig(input.path)) {
+        return "static";
+      }
+      break;
+    case "nuxt":
+      if (input.detectedScripts.includes("generate")) {
+        return "static";
+      }
+      break;
+    case "sveltekit":
+      if (hasSvelteKitStaticAdapter(input.path)) {
+        return "static";
+      }
+      break;
+    default:
+      break;
+  }
+
+  return applicationShapeForFramework(input.framework);
+}
+
+function hasNextStaticExportConfig(path: string): boolean {
+  const config = readFirstExistingText(path, [
+    "next.config.js",
+    "next.config.mjs",
+    "next.config.ts",
+  ]);
+
+  return /\boutput\s*:\s*["']export["']/u.test(config ?? "");
+}
+
+function hasSvelteKitStaticAdapter(path: string): boolean {
+  const config = readFirstExistingText(path, [
+    "svelte.config.js",
+    "svelte.config.mjs",
+    "svelte.config.ts",
+  ]);
+
+  return /@sveltejs\/adapter-static\b/u.test(config ?? "");
+}
+
 function nodeDetectedFiles(path: string): SourceDetectedFile[] {
   return [
     "package-json",
@@ -361,6 +451,7 @@ class NodeProjectProfileDetector implements LocalProjectProfileDetector {
     const devDependencies = stringRecord(packageJson?.devDependencies);
     const framework = detectNodeFramework({ path, dependencies, devDependencies });
     const detectedScripts = nodeDetectedScripts(scripts);
+    const applicationShape = applicationShapeForNodeProject({ path, framework, detectedScripts });
     const engines = stringRecord(packageJson?.engines);
     const runtimeVersion =
       readFirstExistingVersion(path, [".node-version", ".nvmrc"]) ??
@@ -369,6 +460,7 @@ class NodeProjectProfileDetector implements LocalProjectProfileDetector {
     return {
       runtimeFamily: "node",
       ...(framework ? { framework } : {}),
+      ...(applicationShape ? { applicationShape } : {}),
       packageManager,
       ...(runtimeVersion ? { runtimeVersion } : {}),
       ...(typeof packageJson?.name === "string" ? { projectName: packageJson.name } : {}),
@@ -392,10 +484,12 @@ class PythonProjectProfileDetector implements LocalProjectProfileDetector {
     const projectName = pyproject?.match(/^\s*name\s*=\s*"([^"]+)"/m)?.[1];
     const runtimeVersion = readFirstExistingVersion(path, [".python-version"]);
     const framework = detectPythonFramework({ path, pyproject, requirements });
+    const applicationShape = applicationShapeForFramework(framework);
 
     return {
       runtimeFamily: "python",
       ...(framework ? { framework } : {}),
+      ...(applicationShape ? { applicationShape } : {}),
       packageManager: detectPythonPackageManager(path, pyproject),
       ...(runtimeVersion ? { runtimeVersion } : {}),
       ...(projectName ? { projectName } : {}),
@@ -477,6 +571,11 @@ function detectLocalInspection(path: string): SourceInspectionSnapshot {
     ...(profile?.packageManager
       ? { packageManager: SourcePackageManagerValue.rehydrate(profile.packageManager) }
       : {}),
+    ...(profile?.applicationShape
+      ? { applicationShape: SourceApplicationShapeValue.rehydrate(profile.applicationShape) }
+      : detectedFiles.includes("compose-manifest") || detectedFiles.includes("dockerfile")
+        ? { applicationShape: SourceApplicationShapeValue.rehydrate("container-native") }
+        : {}),
     ...(profile?.runtimeVersion
       ? { runtimeVersion: SourceRuntimeVersionText.rehydrate(profile.runtimeVersion) }
       : {}),

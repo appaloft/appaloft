@@ -98,6 +98,7 @@ export const remixWorkspacePlanner: WorkspaceRuntimePlanner = {
       runtimeKind: this.runtimeKind,
       dockerfilePath: generatedWorkspaceDockerfileName,
       baseImage,
+      applicationShape: "ssr",
       ...(installCommand ? { installCommand } : {}),
       ...(buildCommand ? { buildCommand } : {}),
       startCommand: startCommand.value,
@@ -105,6 +106,7 @@ export const remixWorkspacePlanner: WorkspaceRuntimePlanner = {
         planner: this.name,
         runtimeKind: this.runtimeKind,
         baseImage,
+        applicationShape: "ssr",
         extra: {
           packageManager,
           framework: "remix",

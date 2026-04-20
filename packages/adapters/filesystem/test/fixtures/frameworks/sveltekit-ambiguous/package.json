@@ -1,0 +1,14 @@
+{
+  "name": "sveltekit-ambiguous",
+  "private": true,
+  "packageManager": "pnpm@10.6.0",
+  "scripts": {
+    "build": "vite build",
+    "start": "node build/index.js"
+  },
+  "dependencies": {
+    "@sveltejs/kit": "2.16.1",
+    "svelte": "5.19.7",
+    "vite": "6.1.0"
+  }
+}

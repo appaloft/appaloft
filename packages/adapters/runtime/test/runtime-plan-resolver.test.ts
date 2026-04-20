@@ -283,7 +283,7 @@ describe("DefaultRuntimePlanResolver", () => {
     expect(plan.steps).toContain("Run docker container");
   });
 
-  test("uses the Next.js workspace planner when framework metadata is detected", async () => {
+  test("[WF-PLAN-DET-007][WF-PLAN-CAT-001] classifies Next.js workspace plans as SSR", async () => {
     ensureReflectMetadata();
     const { DefaultRuntimePlanResolver } = await import("../src");
     const resolver = new DefaultRuntimePlanResolver();
@@ -326,6 +326,7 @@ describe("DefaultRuntimePlanResolver", () => {
         planner: "nextjs",
         runtimeKind: "nextjs",
         baseImage: "node:22-alpine",
+        applicationShape: "ssr",
       }),
     );
     expect(plan.execution).toEqual(
@@ -337,9 +338,80 @@ describe("DefaultRuntimePlanResolver", () => {
         port: 4315,
       }),
     );
+    expect(plan.execution.metadata).toEqual(
+      expect.objectContaining({
+        "workspace.applicationShape": "ssr",
+      }),
+    );
   });
 
-  test("[DEP-CREATE-ADM-028] packages Vite static output with typed planner evidence", async () => {
+  test("[WF-PLAN-DET-007][WF-PLAN-CAT-002] packages detected Next.js static export as static artifact", async () => {
+    ensureReflectMetadata();
+    const { DefaultRuntimePlanResolver } = await import("../src");
+    const resolver = new DefaultRuntimePlanResolver();
+    const context = createTestExecutionContext();
+
+    const result = await resolver.resolve(context, {
+      id: "plan_next_static",
+      source: createSource({
+        kind: "local-folder",
+        locator: "/tmp/next-static-app",
+        displayName: "next-static-app",
+        inspection: createSourceInspection({
+          runtimeFamily: "node",
+          framework: "nextjs",
+          packageManager: "pnpm",
+          runtimeVersion: "22",
+          detectedFiles: ["package-json", "next-config", "pnpm-lock"],
+          detectedScripts: ["build", "export"],
+        }),
+      }),
+      server: {
+        id: "srv_next_static",
+        providerKey: "local-shell",
+      },
+      environmentSnapshot: createEnvironmentSnapshot("snap_next_static"),
+      detectedReasoning: ["detected next static export app"],
+      requestedDeployment: {
+        method: "auto",
+        port: 80,
+      },
+      generatedAt: "2026-01-01T00:00:00.000Z",
+    });
+
+    expect(result.isOk()).toBe(true);
+    const plan = result._unsafeUnwrap();
+
+    expect(plan.buildStrategy).toBe("static-artifact");
+    expect(plan.runtimeArtifact?.metadata).toEqual(
+      expect.objectContaining({
+        planner: "nextjs-static",
+        runtimeKind: "static",
+        framework: "nextjs",
+        packageManager: "pnpm",
+        baseImage: "node:22-alpine",
+        publishDirectory: "/out",
+        applicationShape: "static",
+      }),
+    );
+    expect(plan.execution).toEqual(
+      expect.objectContaining({
+        dockerfilePath: "Dockerfile.appaloft-static",
+        installCommand: "pnpm install",
+        buildCommand: "pnpm build",
+        port: 80,
+      }),
+    );
+    expect(plan.execution.metadata).toEqual(
+      expect.objectContaining({
+        "static.publishDirectory": "/out",
+        "workspace.planner": "nextjs-static",
+        "workspace.applicationShape": "static",
+      }),
+    );
+  });
+
+  test("[DEP-CREATE-ADM-028][WF-PLAN-DET-007][WF-PLAN-CAT-007] packages Vite static output with typed planner evidence", async () => {
     ensureReflectMetadata();
     const { DefaultRuntimePlanResolver } = await import("../src");
     const resolver = new DefaultRuntimePlanResolver();
@@ -385,6 +457,7 @@ describe("DefaultRuntimePlanResolver", () => {
         packageManager: "yarn",
         baseImage: "node:20-alpine",
         publishDirectory: "/dist",
+        applicationShape: "static",
       }),
     );
     expect(plan.execution).toEqual(
@@ -403,6 +476,7 @@ describe("DefaultRuntimePlanResolver", () => {
         "workspace.framework": "vite",
         "workspace.packageManager": "yarn",
         "workspace.baseImage": "node:20-alpine",
+        "workspace.applicationShape": "static",
       }),
     );
   });
@@ -464,6 +538,51 @@ describe("DefaultRuntimePlanResolver", () => {
     );
   });
 
+  test("[WF-PLAN-DET-007][WF-PLAN-CAT-005] refuses ambiguous SvelteKit auto planning without explicit strategy or start command", async () => {
+    ensureReflectMetadata();
+    const { DefaultRuntimePlanResolver } = await import("../src");
+    const resolver = new DefaultRuntimePlanResolver();
+    const context = createTestExecutionContext();
+
+    const result = await resolver.resolve(context, {
+      id: "plan_sveltekit_ambiguous",
+      source: createSource({
+        kind: "local-folder",
+        locator: "/tmp/sveltekit-ambiguous-app",
+        displayName: "sveltekit-ambiguous-app",
+        inspection: createSourceInspection({
+          runtimeFamily: "node",
+          framework: "sveltekit",
+          packageManager: "pnpm",
+          detectedFiles: ["package-json", "svelte-config", "pnpm-lock"],
+          detectedScripts: ["build", "start"],
+        }),
+      }),
+      server: {
+        id: "srv_sveltekit_ambiguous",
+        providerKey: "local-shell",
+      },
+      environmentSnapshot: createEnvironmentSnapshot("snap_sveltekit_ambiguous"),
+      detectedReasoning: ["detected sveltekit app without adapter evidence"],
+      requestedDeployment: {
+        method: "auto",
+        port: 3000,
+      },
+      generatedAt: "2026-01-01T00:00:00.000Z",
+    });
+
+    expect(result.isErr()).toBe(true);
+    const error = result._unsafeUnwrapErr();
+    expect(error.code).toBe("validation_error");
+    expect(error.details).toEqual(
+      expect.objectContaining({
+        phase: "runtime-plan-resolution",
+        framework: "sveltekit",
+        applicationShape: "hybrid-static-server",
+      }),
+    );
+  });
+
   test("[DEP-CREATE-ADM-033] resolves explicit SvelteKit static output defaults", async () => {
     ensureReflectMetadata();
     const { DefaultRuntimePlanResolver } = await import("../src");
@@ -520,7 +639,7 @@ describe("DefaultRuntimePlanResolver", () => {
     );
   });
 
-  test("[DEP-CREATE-ADM-028] uses the Remix workspace planner before generic Node", async () => {
+  test("[DEP-CREATE-ADM-028][WF-PLAN-DET-007][WF-PLAN-CAT-003] uses the Remix workspace planner before generic Node", async () => {
     ensureReflectMetadata();
     const { DefaultRuntimePlanResolver } = await import("../src");
     const resolver = new DefaultRuntimePlanResolver();
@@ -565,6 +684,7 @@ describe("DefaultRuntimePlanResolver", () => {
         framework: "remix",
         packageManager: "npm",
         baseImage: "node:22-alpine",
+        applicationShape: "ssr",
       }),
     );
     expect(plan.execution).toEqual(
@@ -577,7 +697,7 @@ describe("DefaultRuntimePlanResolver", () => {
     );
   });
 
-  test("[DEP-CREATE-ADM-031] keeps framework and base image as planner metadata", async () => {
+  test("[DEP-CREATE-ADM-031][WF-PLAN-DET-007][WF-PLAN-CAT-008] keeps serverful framework planner metadata", async () => {
     ensureReflectMetadata();
     const { DefaultRuntimePlanResolver } = await import("../src");
     const resolver = new DefaultRuntimePlanResolver();
@@ -622,11 +742,13 @@ describe("DefaultRuntimePlanResolver", () => {
         framework: "express",
         packageManager: "pnpm",
         baseImage: "node:22-alpine",
+        applicationShape: "serverful-http",
       }),
     );
     expect(plan.execution.metadata).toEqual(
       expect.objectContaining({
         "workspace.baseImage": "node:22-alpine",
+        "workspace.applicationShape": "serverful-http",
         framework: "express",
         packageManager: "pnpm",
       }),
@@ -686,7 +808,7 @@ describe("DefaultRuntimePlanResolver", () => {
     );
   });
 
-  test("[DEP-CREATE-ADM-028] uses the FastAPI workspace planner with uv defaults", async () => {
+  test("[DEP-CREATE-ADM-028][WF-PLAN-DET-007][WF-PLAN-CAT-009] uses the FastAPI workspace planner with uv defaults", async () => {
     ensureReflectMetadata();
     const { DefaultRuntimePlanResolver } = await import("../src");
     const resolver = new DefaultRuntimePlanResolver();
@@ -729,6 +851,7 @@ describe("DefaultRuntimePlanResolver", () => {
         framework: "fastapi",
         packageManager: "uv",
         baseImage: "python:3.12-slim",
+        applicationShape: "serverful-http",
       }),
     );
     expect(plan.execution).toEqual(
@@ -848,7 +971,7 @@ describe("DefaultRuntimePlanResolver", () => {
     );
   });
 
-  test("prefers dockerfile deployment when Dockerfile is present", async () => {
+  test("[WF-PLAN-DET-009][WF-PLAN-CAT-016] prefers container-native Dockerfile deployment when Dockerfile is present", async () => {
     ensureReflectMetadata();
     const { DefaultRuntimePlanResolver } = await import("../src");
     const resolver = new DefaultRuntimePlanResolver();
@@ -890,6 +1013,7 @@ describe("DefaultRuntimePlanResolver", () => {
         intent: "build-image",
         metadata: expect.objectContaining({
           dockerfilePath: "Dockerfile",
+          applicationShape: "container-native",
         }),
       }),
     );
