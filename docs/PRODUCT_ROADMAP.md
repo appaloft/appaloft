@@ -479,9 +479,12 @@ Required:
   specified.
 - [ ] Add source binding and auto-deploy.
 - [ ] Add push webhook and generic signed deploy webhook.
-- [ ] Add deploy-action wrapper behavior.
+- [ ] Add deploy-action wrapper behavior, including PR preview deploy/update from a user-authored
+  GitHub Actions workflow.
 - [ ] Add existing-resource profile-drift handling.
-- [ ] Add preview deployments after source binding and webhook ingestion are durable.
+- [ ] Add product-grade preview deployments after source binding and webhook ingestion are durable,
+  including GitHub App/webhook triggers, scoped preview env, list/show/policy/delete, and cleanup
+  retries.
 - [ ] Add scheduled task/cron resource shape with run history and logs after workload service
   semantics are specified.
 
@@ -611,7 +614,10 @@ work below before GA.
 - [ ] Resource binding: bind/unbind/list/show/rotate, immutable deployment snapshot.
 - [ ] Webhook/auto-deploy: create/list/show/update/delete, delivery attempts, replay, secret
   rotation.
-- [ ] Preview deployment: create from PR event, list/show/update policy/delete on close, scoped env.
+- [ ] Action PR preview: deploy/update from a user-authored GitHub Actions workflow with generated
+  or user-owned wildcard preview access.
+- [ ] Product-grade preview deployment: create from PR event, list/show/update policy/delete on
+  close, scoped env, GitHub App status/comments, and cleanup retries.
 - [ ] Scheduled task: create/list/show/update/delete, run now, run history/logs.
 - [x] Terminal session: open.
 - [ ] Terminal session: list/show/attach/close/expire, audit and redaction.
@@ -677,7 +683,8 @@ External baseline research points to this practical minimum:
 - [ ] Full HTTPS/ACME, force HTTPS, and redirect lifecycle closure.
 - [ ] Environment variables, build-time arguments, build secrets, and secret masking.
 - [ ] Persistent storage and databases with service binding, backup/restore, and deletion behavior.
-- [ ] Git source binding, webhooks, auto-deploy, and preview deployments.
+- [ ] Git source binding, webhooks, auto-deploy, Action PR previews, and product-grade preview
+  deployments.
 - [ ] Deployment history, standalone event stream, health checks, rollbacks, and resource limits.
 - [ ] Framework auto-detection broad enough for modern frontend frameworks and common backend
   frameworks.

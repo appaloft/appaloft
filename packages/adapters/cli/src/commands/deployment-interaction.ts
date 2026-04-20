@@ -56,6 +56,7 @@ export interface DeploymentPromptSeed {
   environmentId?: string;
   resourceId?: string;
   server?: DeploymentServerDraft;
+  environment?: DeploymentEnvironmentDraft;
   environmentVariables?: DeploymentEnvironmentVariableSeed[];
   resource?: ResourceDraftInput;
   sourceLocator?: string;
@@ -104,6 +105,11 @@ export interface DeploymentServerDraft {
   proxyKind?: RegisterServerCommandInput["proxyKind"];
   credential?: ConfigureServerCredentialCommandInput["credential"];
   reusableSshCredential?: CreateSshCredentialCommandInput;
+}
+
+export interface DeploymentEnvironmentDraft {
+  name: string;
+  kind: EnvironmentKind;
 }
 
 interface ResolvedReference {
@@ -811,22 +817,26 @@ function resolveEnvironment(input: {
 
     const environments = (yield* listEnvironments(input.projectId)).items;
     const canPrompt = Boolean(process.stdin.isTTY && process.stdout.isTTY);
-    const name = canPrompt
-      ? yield* input.interaction.text({
-          message: "Environment name",
-          defaultValue: defaultEnvironmentName,
-          validate: requireNonEmpty("Environment name"),
-        })
-      : defaultEnvironmentName;
-    const kind = canPrompt
-      ? yield* input.interaction.select<EnvironmentKind>({
-          message: "Environment kind",
-          choices: environmentKinds.map((environmentKind) => ({
-            title: environmentKind,
-            value: environmentKind,
-          })),
-        })
-      : "local";
+    const name =
+      input.seed.environment?.name ??
+      (canPrompt
+        ? yield* input.interaction.text({
+            message: "Environment name",
+            defaultValue: defaultEnvironmentName,
+            validate: requireNonEmpty("Environment name"),
+          })
+        : defaultEnvironmentName);
+    const kind =
+      input.seed.environment?.kind ??
+      (canPrompt
+        ? yield* input.interaction.select<EnvironmentKind>({
+            message: "Environment kind",
+            choices: environmentKinds.map((environmentKind) => ({
+              title: environmentKind,
+              value: environmentKind,
+            })),
+          })
+        : "local");
     const existing = findEnvironment(environments, {
       projectId: input.projectId,
       name,
