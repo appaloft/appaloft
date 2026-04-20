@@ -280,6 +280,11 @@ Boundary rule:
 - support/debug diagnostics are exposed through a resource-scoped read/query view such as
   `ResourceDiagnosticSummary`; it composes read-model state and safe adapter/system context, and is
   not `Resource` aggregate state
+- edge request access failure diagnostics are adapter/read-model observations over public access
+  failures. They map concrete proxy/upstream failures into stable `ResourceAccessFailureDiagnostic`
+  codes and optional owner hints, but they are not `Resource` aggregate state and are not
+  `domain`-category errors unless they reference a true aggregate invariant failure from another
+  operation.
 
 ### Dependency Resources
 

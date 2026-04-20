@@ -40,6 +40,7 @@ import {
   InMemoryEdgeProxyProviderRegistry,
   type IntegrationAuthPort,
   QueryBus,
+  type ResourceAccessFailureRendererTarget,
   type ServerAppliedRouteDesiredStateRecord,
   type ServerAppliedRouteDesiredStateTarget,
   type ServerAppliedRouteStateStore,
@@ -396,6 +397,7 @@ export interface RegisterRuntimeDependenciesInput {
   deploymentProgressReporter: DeploymentProgressReporter;
   sourceLinkStore?: SourceLinkStore;
   serverAppliedRouteDesiredStateReader?: ServerAppliedRouteStateStore;
+  resourceAccessFailureRenderer?: () => ResourceAccessFailureRendererTarget | undefined;
 }
 
 export function registerRuntimeDependencies(
@@ -595,6 +597,7 @@ export function registerRuntimeDependencies(
           dependencyContainer.resolve(tokens.deploymentProgressReporter),
           dependencyContainer.resolve(tokens.integrationAuthPort),
           dependencyContainer.resolve(tokens.edgeProxyProviderRegistry),
+          input.resourceAccessFailureRenderer,
         ),
         sshBackend: new SshExecutionBackend(
           join(input.config.dataDir, "runtime"),
@@ -604,6 +607,7 @@ export function registerRuntimeDependencies(
           dependencyContainer.resolve(tokens.serverRepository),
           dependencyContainer.resolve(tokens.edgeProxyProviderRegistry),
           input.config.remoteRuntimeRoot,
+          input.resourceAccessFailureRenderer,
         ),
       }),
     ),
