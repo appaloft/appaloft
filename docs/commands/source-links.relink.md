@@ -34,6 +34,7 @@ This command inherits:
 - [ADR-024: Pure CLI SSH State And Server-Applied Domains](../decisions/ADR-024-pure-cli-ssh-state-and-server-applied-domains.md)
 - [Repository Deployment Config File Bootstrap](../workflows/deployment-config-file-bootstrap.md)
 - [Quick Deploy Workflow](../workflows/quick-deploy.md)
+- [Source Link Durable Persistence Implementation Plan](../implementation/source-link-durable-persistence-plan.md)
 - [Source Link State Test Matrix](../testing/source-link-state-test-matrix.md)
 - [Deployment Config File Test Matrix](../testing/deployment-config-file-test-matrix.md)
 - [Error Model](../errors/model.md)
@@ -92,6 +93,43 @@ The command must:
 - Relink should record safe audit metadata so `system.doctor` or future source-link queries can
   explain why a repeated deploy selected a resource.
 
+## Persistence Model
+
+`SourceLinkStore` is application state in the selected Appaloft state backend. It is not a
+`Resource` aggregate field and it is not committed repository config.
+
+For PostgreSQL-compatible backends, the canonical v1 table shape is:
+
+```text
+source_links
+  source_fingerprint text primary key
+  project_id text not null references projects(id)
+  environment_id text not null references environments(id)
+  resource_id text not null references resources(id)
+  server_id text null references servers(id)
+  destination_id text null references destinations(id)
+  updated_at timestamptz not null
+  reason text null
+  metadata jsonb not null default '{}'
+```
+
+Indexes must support:
+
+- exact lookup by `source_fingerprint`;
+- reverse lookup by `resource_id` for `resources.delete` deletion guards.
+
+The table must not cascade-delete resources. A link pointing at a resource is a retained identity
+record and must be reported as a `source-link` deletion blocker until a future explicit unlink or
+relink behavior changes that record.
+
+PG/PGlite source-link persistence must be implemented inside `packages/persistence/pg`; no Kysely
+or Postgres driver types may leak into `application`, CLI, shell business logic, or core.
+
+The existing file-backed SSH mirror source-link store remains valid for SSH remote-state transfer,
+but when the selected Appaloft backend is PostgreSQL/PGlite, command execution must use the PG
+adapter so `source-links.relink`, repository config bootstrap, and `resources.delete` see the same
+authoritative state.
+
 ## Entrypoints
 
 | Entrypoint | Contract |
@@ -132,9 +170,14 @@ CLI entrypoint accepts explicit target ids and SSH remote-state options, and she
 the selected SSH server's PGlite/source-link state before dispatching the command.
 
 The current implementation validates project/environment/resource/server/destination relationships
-against the active Appaloft state backend before updating the source link. It does not yet expose
-API/oRPC or Web relink entrypoints, and PostgreSQL/control-plane source-link persistence is future
-work.
+against the active Appaloft state backend before updating the source link. Shell runtime uses the
+PG/PGlite `SourceLinkStore` adapter for command execution, including SSH remote PGlite mirrors.
+The file-backed source-link store remains available for adapter-level remote-state transfer and
+legacy explicit wiring, but it is not the shell runtime's authoritative source-link store.
+
+PostgreSQL/PGlite source-link persistence is implemented through the `source_links` migration and
+PG adapter in `packages/persistence/pg`. `resources.delete` reports `source-link` blockers from
+that durable state. API/oRPC and Web relink entrypoints remain future work.
 
 The CLI currently accepts an explicit `sourceFingerprint`; deriving the fingerprint from a
 structured `sourceSelector` in the relink command is future entrypoint work.

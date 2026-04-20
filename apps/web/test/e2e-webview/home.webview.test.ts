@@ -131,6 +131,153 @@ const apiResponses: Record<ApiScenario, Record<string, unknown>> = {
         ],
       },
     },
+    "/api/rpc/resources/show": {
+      json: {
+        schemaVersion: "resources.show/v1",
+        resource: {
+          id: "res_demo",
+          projectId: "prj_demo",
+          environmentId: "env_demo",
+          destinationId: "dst_demo",
+          name: "workspace",
+          slug: "workspace",
+          kind: "application",
+          services: [
+            {
+              name: "web",
+              kind: "web",
+            },
+          ],
+          deploymentCount: 1,
+          lastDeploymentId: "dep_demo",
+          lastDeploymentStatus: "succeeded",
+          createdAt: "2026-01-01T00:00:00.000Z",
+        },
+        source: {
+          kind: "local-folder",
+          locator: ".",
+          displayName: "workspace",
+        },
+        runtimeProfile: {
+          strategy: "workspace-commands",
+          startCommand: "bun run start",
+          healthCheckPath: "/health",
+        },
+        networkProfile: {
+          internalPort: 3000,
+          upstreamProtocol: "http",
+          exposureMode: "reverse-proxy",
+        },
+        healthPolicy: {
+          enabled: true,
+          type: "http",
+          intervalSeconds: 5,
+          timeoutSeconds: 5,
+          retries: 10,
+          startPeriodSeconds: 5,
+          http: {
+            method: "GET",
+            scheme: "http",
+            host: "localhost",
+            path: "/health",
+            expectedStatusCode: 200,
+          },
+        },
+        accessSummary: {
+          proxyRouteStatus: "ready",
+          lastRouteRealizationDeploymentId: "dep_demo",
+        },
+        latestDeployment: {
+          id: "dep_demo",
+          status: "succeeded",
+          createdAt: "2026-01-01T00:00:00.000Z",
+          serverId: "srv_demo",
+          destinationId: "dst_demo",
+        },
+        lifecycle: {
+          status: "active",
+        },
+        diagnostics: [],
+        generatedAt: "2026-01-01T00:00:00.000Z",
+      },
+    },
+    "/api/rpc/resources/health": {
+      json: {
+        schemaVersion: "resources.health/v1",
+        resourceId: "res_demo",
+        generatedAt: "2026-01-01T00:00:00.000Z",
+        observedAt: "2026-01-01T00:00:00.000Z",
+        overall: "healthy",
+        runtime: {
+          lifecycle: "running",
+          health: "healthy",
+          observedAt: "2026-01-01T00:00:00.000Z",
+          runtimeKind: "docker-container",
+        },
+        healthPolicy: {
+          status: "configured",
+          enabled: true,
+          type: "http",
+          path: "/health",
+          expectedStatusCode: 200,
+          intervalSeconds: 5,
+          timeoutSeconds: 5,
+          retries: 10,
+          startPeriodSeconds: 5,
+        },
+        publicAccess: {
+          status: "ready",
+          url: "http://workspace-demo.example.test",
+          kind: "generated-latest",
+        },
+        proxy: {
+          status: "ready",
+          providerKey: "traefik",
+          lastRouteRealizationDeploymentId: "dep_demo",
+        },
+        checks: [],
+        sourceErrors: [],
+      },
+    },
+    "/api/rpc/resources/proxyConfiguration": {
+      json: {
+        resourceId: "res_demo",
+        deploymentId: "dep_demo",
+        providerKey: "traefik",
+        routeScope: "latest",
+        status: "planned",
+        generatedAt: "2026-01-01T00:00:00.000Z",
+        stale: false,
+        routes: [],
+        sections: [],
+        warnings: [],
+      },
+    },
+    "/api/rpc/resources/configureNetwork": {
+      json: {
+        id: "res_demo",
+      },
+    },
+    "/api/rpc/resources/configureRuntime": {
+      json: {
+        id: "res_demo",
+      },
+    },
+    "/api/rpc/resources/configureSource": {
+      json: {
+        id: "res_demo",
+      },
+    },
+    "/api/rpc/resources/archive": {
+      json: {
+        id: "res_demo",
+      },
+    },
+    "/api/rpc/resources/delete": {
+      json: {
+        id: "res_demo",
+      },
+    },
     "/api/rpc/domain-bindings/list": {
       json: {
         items: [],
@@ -672,7 +819,9 @@ async function waitForRecordedRequest(pathname: string): Promise<RecordedApiRequ
   const request = await waitFor<RecordedApiRequest | null>(
     async () => recordedApiRequests.find((request) => request.pathname === pathname) ?? null,
     (request) => request !== null,
-    `Expected API request: ${pathname}`,
+    `Expected API request: ${pathname}\nRecorded: ${recordedApiRequests
+      .map((request) => `${request.method} ${request.pathname}`)
+      .join(", ")}`,
   );
 
   if (!request) {
@@ -730,6 +879,49 @@ async function clickButtonByAnyText(
   expect(found).toBe(true);
 }
 
+async function setInputValue(view: Bun.WebView, selector: string, value: string): Promise<void> {
+  const found = await waitFor(
+    () =>
+      view.evaluate<boolean>(
+        `(() => {
+          const input = document.querySelector(${JSON.stringify(selector)});
+          if (!(input instanceof HTMLInputElement)) {
+            return false;
+          }
+          input.value = ${JSON.stringify(value)};
+          input.dispatchEvent(new Event("input", { bubbles: true }));
+          input.dispatchEvent(new Event("change", { bubbles: true }));
+          return true;
+        })()`,
+      ),
+    Boolean,
+    `Expected input: ${selector}`,
+  );
+
+  expect(found).toBe(true);
+}
+
+async function clickFormSubmit(view: Bun.WebView, selector: string): Promise<void> {
+  const found = await waitFor(
+    () =>
+      view.evaluate<boolean>(
+        `(() => {
+          const form = document.querySelector(${JSON.stringify(selector)});
+          const button = form?.querySelector("button[type='submit']");
+          if (!(button instanceof HTMLButtonElement)) {
+            return false;
+          }
+          button.click();
+          return true;
+        })()`,
+      ),
+    Boolean,
+    `Expected submit button in form: ${selector}`,
+  );
+
+  expect(found).toBe(true);
+}
+
 beforeAll(async () => {
   await setupWebApp();
 });
@@ -772,6 +964,175 @@ describe("console e2e with Bun.WebView", () => {
       "GitHub OAuth is not configured on the backend.",
       "后端尚未配置 GitHub OAuth",
     ]);
+  }, 15_000);
+
+  test("[RES-PROFILE-ENTRY-001] loads resource detail through resources.show", async () => {
+    activeScenario = "dashboard";
+    resetRecordedApiRequests();
+
+    await using view = createWebView();
+    await view.navigate(`${previewUrl}/resources/res_demo`);
+
+    await expectAnyText(view, ["Network profile", "网络配置"]);
+
+    const showRequest = await waitForRecordedRequest("/api/rpc/resources/show");
+    const showInput = readOrpcJsonPayload(showRequest.body);
+
+    expect(showInput).toEqual({
+      resourceId: "res_demo",
+      includeLatestDeployment: true,
+      includeAccessSummary: true,
+      includeProfileDiagnostics: true,
+    });
+  }, 15_000);
+
+  test("[RES-PROFILE-ENTRY-002] submits resource network profile changes through Web", async () => {
+    activeScenario = "dashboard";
+    resetRecordedApiRequests();
+
+    await using view = createWebView();
+    await view.navigate(`${previewUrl}/resources/res_demo`);
+
+    await expectAnyText(view, ["Network profile", "网络配置"]);
+    await setInputValue(view, "#resource-network-internal-port", "8080");
+    await clickFormSubmit(view, "#resource-network-profile-form");
+
+    const configureNetworkRequest = await waitForRecordedRequest(
+      "/api/rpc/resources/configureNetwork",
+    );
+    const configureNetworkInput = readOrpcJsonPayload(configureNetworkRequest.body);
+
+    expect(configureNetworkInput).toEqual({
+      resourceId: "res_demo",
+      networkProfile: {
+        internalPort: 8080,
+        upstreamProtocol: "http",
+        exposureMode: "reverse-proxy",
+      },
+    });
+  }, 15_000);
+
+  test("[RES-PROFILE-ENTRY-002] submits resource source profile changes through Web", async () => {
+    activeScenario = "dashboard";
+    resetRecordedApiRequests();
+
+    await using view = createWebView();
+    await view.navigate(`${previewUrl}/resources/res_demo`);
+
+    await expectAnyText(view, ["Source profile", "来源配置"]);
+    await setInputValue(view, "#resource-source-locator", "workspace-updated");
+    await setInputValue(view, "#resource-source-display-name", "workspace updated");
+    await clickFormSubmit(view, "#resource-source-profile-form");
+
+    const configureSourceRequest = await waitForRecordedRequest(
+      "/api/rpc/resources/configureSource",
+    );
+    const configureSourceInput = readOrpcJsonPayload(configureSourceRequest.body);
+
+    expect(configureSourceInput).toEqual({
+      resourceId: "res_demo",
+      source: {
+        kind: "local-folder",
+        locator: "workspace-updated",
+        displayName: "workspace updated",
+      },
+    });
+  }, 15_000);
+
+  test("[RES-PROFILE-ENTRY-002] submits resource runtime profile changes through Web", async () => {
+    activeScenario = "dashboard";
+    resetRecordedApiRequests();
+
+    await using view = createWebView();
+    await view.navigate(`${previewUrl}/resources/res_demo`);
+
+    await expectAnyText(view, ["Runtime profile", "运行时配置"]);
+    await setInputValue(view, "#resource-runtime-start-command", "bun run preview");
+    await clickFormSubmit(view, "#resource-runtime-profile-form");
+
+    const configureRuntimeRequest = await waitForRecordedRequest(
+      "/api/rpc/resources/configureRuntime",
+    );
+    const configureRuntimeInput = readOrpcJsonPayload(configureRuntimeRequest.body);
+
+    expect(configureRuntimeInput).toEqual({
+      resourceId: "res_demo",
+      runtimeProfile: {
+        strategy: "workspace-commands",
+        startCommand: "bun run preview",
+      },
+    });
+  }, 15_000);
+
+  test("[RES-PROFILE-ENTRY-002] submits resource archive through Web", async () => {
+    activeScenario = "dashboard";
+    resetRecordedApiRequests();
+
+    await using view = createWebView();
+    await view.navigate(`${previewUrl}/resources/res_demo`);
+    await expectAnyText(view, ["Runtime profile", "运行时配置"]);
+    await view.evaluate("window.confirm = () => true");
+    await clickButtonByAnyText(view, ["Archive", "归档"]);
+
+    const archiveRequest = await waitForRecordedRequest("/api/rpc/resources/archive");
+    const archiveInput = readOrpcJsonPayload(archiveRequest.body);
+
+    expect(archiveInput).toEqual({
+      resourceId: "res_demo",
+    });
+  }, 15_000);
+
+  test("[RES-PROFILE-ENTRY-008] submits archived resource delete through Web", async () => {
+    activeScenario = "dashboard";
+    resetRecordedApiRequests();
+    const showResponse = apiResponses.dashboard["/api/rpc/resources/show"] as {
+      json: {
+        lifecycle: {
+          status: string;
+          archivedAt?: string;
+        };
+      };
+    };
+    const previousLifecycle = { ...showResponse.json.lifecycle };
+    showResponse.json.lifecycle = {
+      status: "archived",
+      archivedAt: "2026-01-01T00:00:00.000Z",
+    };
+
+    try {
+      await using view = createWebView();
+      await view.navigate(`${previewUrl}/resources/res_demo`);
+      await expectAnyText(view, ["Archived", "已归档"]);
+      await view.evaluate("window.prompt = () => 'workspace'");
+      const clicked = await waitFor(
+        () =>
+          view.evaluate<boolean>(
+            `(() => {
+              const button = document.querySelector("#resource-delete-action");
+              if (!(button instanceof HTMLButtonElement)) {
+                return false;
+              }
+              button.click();
+              return true;
+            })()`,
+          ),
+        Boolean,
+        "Expected archived resource delete action",
+      );
+      expect(clicked).toBe(true);
+
+      const deleteRequest = await waitForRecordedRequest("/api/rpc/resources/delete");
+      const deleteInput = readOrpcJsonPayload(deleteRequest.body);
+
+      expect(deleteInput).toEqual({
+        resourceId: "res_demo",
+        confirmation: {
+          resourceSlug: "workspace",
+        },
+      });
+    } finally {
+      showResponse.json.lifecycle = previousLifecycle;
+    }
   }, 15_000);
 
   test("shows the GitHub repository picker and fills the import wizard after auth", async () => {

@@ -122,6 +122,10 @@ export const resourceExposureModes = ["none", "reverse-proxy", "direct-port"] as
 
 export type ResourceExposureMode = (typeof resourceExposureModes)[number];
 
+export const resourceLifecycleStatuses = ["active", "archived", "deleted"] as const;
+
+export type ResourceLifecycleStatus = (typeof resourceLifecycleStatuses)[number];
+
 export const healthCheckTypes = ["http", "command"] as const;
 
 export type HealthCheckType = (typeof healthCheckTypes)[number];

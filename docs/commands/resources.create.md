@@ -328,7 +328,10 @@ Current deployment bootstrap can create resources internally through deployment 
 
 Focused transport/UI contract tests beyond typecheck are still pending.
 
-Dedicated source/runtime/network update operations and reusable access-profile operations do not exist yet and must be added as separate future behavior slices.
+Dedicated source/runtime/network configuration operations are accepted candidate behavior slices named
+`resources.configure-source`, `resources.configure-runtime`, and `resources.configure-network`.
+They remain inactive until implemented and added to the public operation catalog. Reusable
+access-profile operations remain separate future behavior slices.
 
 Dedicated resource create page and Project -> Resource sidebar navigation are governed by ADR-013
 and are not fully implemented yet.
@@ -348,9 +351,12 @@ typed runtime-profile fields.
 
 Generated default access routes are now exposed through the provider-neutral
 `ResourceAccessSummary` projection for planned and realized resource access. Public default access
-policy editing and dedicated resource access-profile update operations remain future behavior
+policy editing and dedicated resource access-profile configuration operations remain future behavior
 slices.
 
 ## Open Questions
 
-- Exact operation names for resource source binding, runtime profile, network profile, and access profile configuration are governed by [ADR-012](../decisions/ADR-012-resource-runtime-profile-and-deployment-snapshot-boundary.md) and [ADR-015](../decisions/ADR-015-resource-network-profile.md).
+- Resource source/runtime/network operation names are resolved as accepted candidates:
+  `resources.configure-source`, `resources.configure-runtime`, and `resources.configure-network`.
+  Access profile configuration remains a future separate operation governed by ADR-017 and the
+  routing/domain/TLS specs.

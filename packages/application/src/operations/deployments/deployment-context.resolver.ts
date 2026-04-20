@@ -137,6 +137,8 @@ export class DeploymentContextResolver {
         );
       }
 
+      yield* resource.ensureCanCreateDeployment();
+
       const server = explicitServer;
       if (!server) {
         return err(domainError.validation("serverId is required for this deployment context"));

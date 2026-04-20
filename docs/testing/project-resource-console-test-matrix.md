@@ -147,4 +147,5 @@ alignment.
 
 - Which read model should own compact resource health and latest deployment context for resource
   navigation?
-- Should dedicated create-resource flow immediately offer a "create and deploy" continuation before dedicated resource source/runtime/network update commands exist?
+- Should dedicated create-resource flow immediately offer a "create and deploy" continuation before
+  dedicated resource source/runtime/network configuration commands are active?

@@ -70,6 +70,7 @@ import {
   PgEnvironmentRepository,
   PgProjectReadModel,
   PgProjectRepository,
+  PgResourceDeletionBlockerReader,
   PgResourceReadModel,
   PgResourceRepository,
   PgServerReadModel,
@@ -305,6 +306,15 @@ class UnavailableSourceLinkStore implements SourceLinkStore {
 }
 
 class NoopServerAppliedRouteStateStore implements ServerAppliedRouteStateStore {
+  async upsertDesired(): Promise<Result<ServerAppliedRouteDesiredStateRecord>> {
+    return err(
+      domainError.validation("Server-applied route state is not configured for this runtime", {
+        phase: "config-domain-resolution",
+        reason: "server_applied_route_store_missing",
+      }),
+    );
+  }
+
   async read(
     _target: ServerAppliedRouteDesiredStateTarget,
   ): Promise<Result<ServerAppliedRouteDesiredStateRecord | null>> {
@@ -447,6 +457,11 @@ export function registerRuntimeDependencies(
   });
   container.register(tokens.resourceRepository, {
     useFactory: instanceCachingFactory(() => new PgResourceRepository(input.database.db)),
+  });
+  container.register(tokens.resourceDeletionBlockerReader, {
+    useFactory: instanceCachingFactory(
+      () => new PgResourceDeletionBlockerReader(input.database.db),
+    ),
   });
   container.register(tokens.deploymentRepository, {
     useFactory: instanceCachingFactory(() => new PgDeploymentRepository(input.database.db)),

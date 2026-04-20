@@ -1,6 +1,13 @@
 import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { type DomainError, domainError, err, ok, type Result } from "@appaloft/core";
+import {
+  type DomainError,
+  domainError,
+  type EdgeProxyKind,
+  err,
+  ok,
+  type Result,
+} from "@appaloft/core";
 
 export interface RemoteStateLifecycleOptions {
   dataRoot: string;
@@ -68,7 +75,7 @@ export interface ServerAppliedRouteAppliedState {
   deploymentId: string;
   appliedAt: string;
   providerKey?: string;
-  proxyKind?: "traefik" | "caddy";
+  proxyKind?: EdgeProxyKind;
 }
 
 export interface ServerAppliedRouteFailureState {
@@ -79,7 +86,7 @@ export interface ServerAppliedRouteFailureState {
   message?: string;
   retryable: boolean;
   providerKey?: string;
-  proxyKind?: "traefik" | "caddy";
+  proxyKind?: EdgeProxyKind;
 }
 
 export interface ServerAppliedRouteDesiredStateRecord extends ServerAppliedRouteTarget {
@@ -108,7 +115,7 @@ export interface ServerAppliedRouteDesiredStateStore {
     updatedAt: string;
     routeSetId?: string;
     providerKey?: string;
-    proxyKind?: "traefik" | "caddy";
+    proxyKind?: EdgeProxyKind;
   }): Promise<Result<ServerAppliedRouteDesiredStateRecord | null>>;
   markFailed(input: {
     target: ServerAppliedRouteTarget;
@@ -120,7 +127,7 @@ export interface ServerAppliedRouteDesiredStateStore {
     retryable: boolean;
     routeSetId?: string;
     providerKey?: string;
-    proxyKind?: "traefik" | "caddy";
+    proxyKind?: EdgeProxyKind;
   }): Promise<Result<ServerAppliedRouteDesiredStateRecord | null>>;
 }
 
@@ -893,7 +900,7 @@ export class FileSystemServerAppliedRouteDesiredStateStore
     updatedAt: string;
     routeSetId?: string;
     providerKey?: string;
-    proxyKind?: "traefik" | "caddy";
+    proxyKind?: EdgeProxyKind;
   }): Promise<Result<ServerAppliedRouteDesiredStateRecord | null>> {
     const existing = await this.readForStatusUpdate(input.target, input.routeSetId);
     if (existing.isErr() || !existing.value) {
@@ -931,7 +938,7 @@ export class FileSystemServerAppliedRouteDesiredStateStore
     retryable: boolean;
     routeSetId?: string;
     providerKey?: string;
-    proxyKind?: "traefik" | "caddy";
+    proxyKind?: EdgeProxyKind;
   }): Promise<Result<ServerAppliedRouteDesiredStateRecord | null>> {
     const existing = await this.readForStatusUpdate(input.target, input.routeSetId);
     if (existing.isErr() || !existing.value) {

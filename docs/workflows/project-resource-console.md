@@ -24,6 +24,12 @@ This workflow inherits:
 - [ADR-020: Resource Health Observation](../decisions/ADR-020-resource-health-observation.md)
 - [ADR-022: Operator Terminal Session Boundary](../decisions/ADR-022-operator-terminal-session-boundary.md)
 - [resources.create Command Spec](../commands/resources.create.md)
+- [resources.show Query Spec](../queries/resources.show.md)
+- [resources.configure-source Command Spec](../commands/resources.configure-source.md)
+- [resources.configure-runtime Command Spec](../commands/resources.configure-runtime.md)
+- [resources.configure-network Command Spec](../commands/resources.configure-network.md)
+- [resources.archive Command Spec](../commands/resources.archive.md)
+- [resources.delete Command Spec](../commands/resources.delete.md)
 - [deployments.create Command Spec](../commands/deployments.create.md)
 - [terminal-sessions.open Command Spec](../commands/terminal-sessions.open.md)
 - [resources.health Query Spec](../queries/resources.health.md)
@@ -91,10 +97,11 @@ Resource detail pages must be the primary owner-scoped surface for:
   and a safe deployment workspace can be resolved;
 - copyable diagnostic summary through `resources.diagnostic-summary` when support/debug context is
   needed, especially when access, proxy configuration, or runtime logs are empty or unavailable;
-- source binding, runtime profile, and network profile setup;
+- source binding, runtime profile, and network profile setup through their dedicated commands when
+  those accepted candidates are active;
 - domain binding and TLS affordances;
 - resource-scoped variables or configuration affordances when supported;
-- resource lifecycle actions such as archive/update when supported.
+- resource lifecycle actions such as archive and guarded delete when supported.
 
 Deployment history shown on the resource page must be filtered by `resourceId`.
 
@@ -169,10 +176,10 @@ A dedicated create-resource page or panel may collect:
   install/build/start commands, Docker build target, and health check;
 - network draft such as internal listener port, upstream protocol, exposure mode, and compose target service.
 
-Resource-owned source/runtime/network profile input may be persisted by `resources.create` when the create flow is part of a first-deploy workflow. Dedicated profile update commands remain future behavior slices.
+Resource-owned source/runtime/network profile input may be persisted by `resources.create` when the create flow is part of a first-deploy workflow. Post-create profile changes must dispatch the dedicated accepted candidate commands `resources.configure-source`, `resources.configure-runtime`, and `resources.configure-network` once those operations are active. The console must not expose a generic resource update mutation.
 
 If the project-scoped create-resource flow collects source/runtime/network drafts before dedicated
-update operations exist, it must treat them as resource-owned create input and continue as a
+configuration commands are active, it must treat them as resource-owned create input and continue as a
 first-deploy workflow:
 
 ```text
@@ -216,8 +223,14 @@ Allowed entry differences:
 | Resource page new deployment | Dispatches `deployments.create` with the selected `resourceId` after collecting allowed attempt inputs. |
 | Resource page deployment history | Queries deployments filtered by resource. |
 | Resource page health | Queries `resources.health` or reads a compact health projection when available; latest deployment status remains context. |
+| Resource page show profile | Queries `resources.show` for the durable detail/profile surface. |
+| Resource page source settings | Dispatches `resources.configure-source`; must not mutate runtime, network, health, source links, or deployments. |
+| Resource page runtime settings | Dispatches `resources.configure-runtime`; must not mutate health policy, source, network, or deployments. |
+| Resource page network settings | Dispatches `resources.configure-network`; must not mutate domains, certificates, proxy routes, or current runtime. |
 | Resource page diagnostic summary | Queries `resources.diagnostic-summary` with `resourceId` and optional `deploymentId`; copies structured support/debug context. |
 | Resource page terminal | Dispatches `terminal-sessions.open` with resource scope and attaches to the returned terminal transport; starts in the resolved deployment workspace. |
+| Resource page archive | Dispatches `resources.archive` after confirmation; must not stop runtime or delete retained state. |
+| Resource page delete | Dispatches `resources.delete` only for archived resources after typed slug confirmation and deletion guards. |
 | Sidebar resource item | Navigates to resource detail and displays read-model status. |
 | Global deployments page | Read-model rollup/filter view, not owner of deployment write actions. |
 

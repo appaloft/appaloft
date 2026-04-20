@@ -207,6 +207,37 @@ export interface ResourceRepository {
   upsert(context: RepositoryContext, resource: Resource, spec: ResourceMutationSpec): Promise<void>;
 }
 
+export type ResourceDeletionBlockerKind =
+  | "active-resource"
+  | "deployment-history"
+  | "runtime-instance"
+  | "domain-binding"
+  | "certificate"
+  | "source-link"
+  | "dependency-binding"
+  | "terminal-session"
+  | "runtime-log-retention"
+  | "audit-retention"
+  | "generated-access-route"
+  | "server-applied-route"
+  | "proxy-route";
+
+export interface ResourceDeletionBlocker {
+  kind: ResourceDeletionBlockerKind;
+  relatedEntityId?: string;
+  relatedEntityType?: string;
+  count?: number;
+}
+
+export interface ResourceDeletionBlockerReader {
+  findBlockers(
+    context: RepositoryContext,
+    input: {
+      resourceId: string;
+    },
+  ): Promise<Result<ResourceDeletionBlocker[]>>;
+}
+
 export interface DeploymentRepository {
   findOne(context: RepositoryContext, spec: DeploymentSelectionSpec): Promise<Deployment | null>;
   upsert(
@@ -343,6 +374,12 @@ export interface ServerAppliedRouteDesiredStateReader {
 }
 
 export interface ServerAppliedRouteStateStore extends ServerAppliedRouteDesiredStateReader {
+  upsertDesired(input: {
+    target: ServerAppliedRouteDesiredStateTarget;
+    domains: ServerAppliedRouteDesiredStateDomain[];
+    sourceFingerprint?: string;
+    updatedAt: string;
+  }): Promise<Result<ServerAppliedRouteDesiredStateRecord>>;
   markApplied(input: {
     target: ServerAppliedRouteDesiredStateTarget;
     deploymentId: string;
@@ -900,6 +937,103 @@ export interface ResourceAccessSummary {
   latestServerAppliedDomainRoute?: ResourceAccessRouteSummary;
   proxyRouteStatus?: "unknown" | "ready" | "not-ready" | "failed";
   lastRouteRealizationDeploymentId?: string;
+}
+
+export interface ResourceDetailIdentity {
+  id: string;
+  projectId: string;
+  environmentId: string;
+  destinationId?: string;
+  name: string;
+  slug: string;
+  kind: ResourceKind;
+  description?: string;
+  createdAt: string;
+  services: Array<{
+    name: string;
+    kind: ResourceServiceKind;
+  }>;
+  deploymentCount: number;
+  lastDeploymentId?: string;
+  lastDeploymentStatus?: DeploymentStatus;
+}
+
+export interface ResourceDetailSourceProfile {
+  kind: SourceKind;
+  locator: string;
+  displayName: string;
+  gitRef?: string;
+  commitSha?: string;
+  baseDirectory?: string;
+  originalLocator?: string;
+  repositoryId?: string;
+  repositoryFullName?: string;
+  defaultBranch?: string;
+  imageName?: string;
+  imageTag?: string;
+  imageDigest?: string;
+  metadata?: Record<string, string>;
+}
+
+export interface ResourceDetailRuntimeProfile {
+  strategy: RequestedDeploymentMethod;
+  installCommand?: string;
+  buildCommand?: string;
+  startCommand?: string;
+  publishDirectory?: string;
+  dockerfilePath?: string;
+  dockerComposeFilePath?: string;
+  buildTarget?: string;
+  healthCheckPath?: string;
+  healthCheck?: RequestedDeploymentHealthCheck;
+}
+
+export interface ResourceDetailNetworkProfile {
+  internalPort: number;
+  upstreamProtocol: ResourceNetworkProtocol;
+  exposureMode: ResourceExposureMode;
+  targetServiceName?: string;
+  hostPort?: number;
+}
+
+export type ResourceDetailHealthPolicy = RequestedDeploymentHealthCheck;
+export type ResourceDetailAccessSummary = ResourceAccessSummary;
+
+export interface ResourceDetailDeploymentContext {
+  id: string;
+  status: DeploymentStatus;
+  createdAt: string;
+  startedAt?: string;
+  finishedAt?: string;
+  serverId: string;
+  destinationId: string;
+}
+
+export interface ResourceDetailLifecycle {
+  status: "active" | "archived" | "deleted";
+  archivedAt?: string;
+  deletedAt?: string;
+}
+
+export interface ResourceDetailProfileDiagnostic {
+  code: string;
+  severity: "info" | "warning" | "error";
+  message: string;
+  path?: string;
+}
+
+export interface ResourceDetail {
+  schemaVersion: "resources.show/v1";
+  resource: ResourceDetailIdentity;
+  source?: ResourceDetailSourceProfile;
+  runtimeProfile?: ResourceDetailRuntimeProfile;
+  networkProfile?: ResourceDetailNetworkProfile;
+  healthPolicy?: ResourceDetailHealthPolicy;
+  accessSummary?: ResourceDetailAccessSummary;
+  latestDeployment?: ResourceDetailDeploymentContext;
+  lifecycle: ResourceDetailLifecycle;
+  diagnostics: ResourceDetailProfileDiagnostic[];
+  generatedAt: string;
 }
 
 export type ResourceHealthOverall =
@@ -1756,6 +1890,9 @@ export interface RequestedDeploymentConfig {
   buildCommand?: string;
   startCommand?: string;
   publishDirectory?: string;
+  dockerfilePath?: string;
+  dockerComposeFilePath?: string;
+  buildTarget?: string;
   port?: number;
   healthCheckPath?: string;
   healthCheck?: RequestedDeploymentHealthCheck;

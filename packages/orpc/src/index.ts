@@ -1,10 +1,15 @@
 import {
   type AppLogger,
+  ArchiveResourceCommand,
+  archiveResourceCommandInputSchema,
   BootstrapServerProxyCommand,
   bootstrapServerProxyCommandInputSchema,
   type Command,
   type CommandBus,
   ConfigureResourceHealthCommand,
+  ConfigureResourceNetworkCommand,
+  ConfigureResourceRuntimeCommand,
+  ConfigureResourceSourceCommand,
   ConfigureServerCredentialCommand,
   ConfirmDomainBindingOwnershipCommand,
   CreateDeploymentCommand,
@@ -15,6 +20,9 @@ import {
   CreateResourceCommand,
   CreateSshCredentialCommand,
   configureResourceHealthCommandInputSchema,
+  configureResourceNetworkCommandInputSchema,
+  configureResourceRuntimeCommandInputSchema,
+  configureResourceSourceCommandInputSchema,
   configureServerCredentialCommandInputSchema,
   confirmDomainBindingOwnershipCommandInputSchema,
   createDeploymentCommandInputSchema,
@@ -23,10 +31,12 @@ import {
   createProjectCommandInputSchema,
   createResourceCommandInputSchema,
   createSshCredentialCommandInputSchema,
+  DeleteResourceCommand,
   DeploymentLogsQuery,
   type DeploymentProgressEvent,
   type DeploymentProgressObserver,
   DiffEnvironmentsQuery,
+  deleteResourceCommandInputSchema,
   deploymentLogsQueryInputSchema,
   diffEnvironmentsQueryInputSchema,
   type ExecutionContext,
@@ -72,16 +82,22 @@ import {
   resourceRuntimeLogsQueryInputSchema,
   SetEnvironmentVariableCommand,
   ShowEnvironmentQuery,
+  ShowResourceQuery,
   setEnvironmentVariableCommandInputSchema,
   showEnvironmentQueryInputSchema,
+  showResourceQueryInputSchema,
   TestServerConnectivityCommand,
   testServerConnectivityCommandInputSchema,
   UnsetEnvironmentVariableCommand,
   unsetEnvironmentVariableCommandInputSchema,
 } from "@appaloft/application";
 import {
+  archiveResourceResponseSchema,
   bootstrapServerProxyResponseSchema,
   configureResourceHealthResponseSchema,
+  configureResourceNetworkResponseSchema,
+  configureResourceRuntimeResponseSchema,
+  configureResourceSourceResponseSchema,
   confirmDomainBindingOwnershipResponseSchema,
   createDeploymentResponseSchema,
   createDomainBindingResponseSchema,
@@ -89,6 +105,7 @@ import {
   createProjectResponseSchema,
   createResourceResponseSchema,
   createSshCredentialResponseSchema,
+  deleteResourceResponseSchema,
   deploymentLogsResponseSchema,
   deploymentProgressEventSchema,
   diffEnvironmentResponseSchema,
@@ -108,6 +125,7 @@ import {
   promoteEnvironmentResponseSchema,
   proxyConfigurationViewSchema,
   registerServerResponseSchema,
+  resourceDetailSchema,
   resourceDiagnosticSummarySchema,
   resourceHealthSummarySchema,
   resourceRuntimeLogEventSchema,
@@ -311,6 +329,8 @@ function toOrpcError(error: DomainError, context: ExecutionContext) {
     case "conflict":
     case "certificate_attempt_conflict":
     case "resource_slug_conflict":
+    case "resource_archived":
+    case "resource_delete_blocked":
     case "deployment_not_redeployable":
       return new ORPCError("CONFLICT", {
         message,
@@ -729,6 +749,16 @@ export const listResourcesProcedure = base
   .output(listResourcesResponseSchema)
   .handler(async ({ input, context }) => executeQuery(context, ListResourcesQuery.create(input)));
 
+export const showResourceProcedure = base
+  .route({
+    method: "GET",
+    path: "/resources/{resourceId}",
+    successStatus: 200,
+  })
+  .input(showResourceQueryInputSchema)
+  .output(resourceDetailSchema)
+  .handler(async ({ input, context }) => executeQuery(context, ShowResourceQuery.create(input)));
+
 export const createResourceProcedure = base
   .route({
     method: "POST",
@@ -741,6 +771,30 @@ export const createResourceProcedure = base
     executeCommand(context, CreateResourceCommand.create(input)),
   );
 
+export const archiveResourceProcedure = base
+  .route({
+    method: "POST",
+    path: "/resources/{resourceId}/archive",
+    successStatus: 200,
+  })
+  .input(archiveResourceCommandInputSchema)
+  .output(archiveResourceResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, ArchiveResourceCommand.create(input)),
+  );
+
+export const deleteResourceProcedure = base
+  .route({
+    method: "DELETE",
+    path: "/resources/{resourceId}",
+    successStatus: 200,
+  })
+  .input(deleteResourceCommandInputSchema)
+  .output(deleteResourceResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, DeleteResourceCommand.create(input)),
+  );
+
 export const configureResourceHealthProcedure = base
   .route({
     method: "POST",
@@ -751,6 +805,42 @@ export const configureResourceHealthProcedure = base
   .output(configureResourceHealthResponseSchema)
   .handler(async ({ input, context }) =>
     executeCommand(context, ConfigureResourceHealthCommand.create(input)),
+  );
+
+export const configureResourceNetworkProcedure = base
+  .route({
+    method: "POST",
+    path: "/resources/{resourceId}/network-profile",
+    successStatus: 200,
+  })
+  .input(configureResourceNetworkCommandInputSchema)
+  .output(configureResourceNetworkResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, ConfigureResourceNetworkCommand.create(input)),
+  );
+
+export const configureResourceRuntimeProcedure = base
+  .route({
+    method: "POST",
+    path: "/resources/{resourceId}/runtime-profile",
+    successStatus: 200,
+  })
+  .input(configureResourceRuntimeCommandInputSchema)
+  .output(configureResourceRuntimeResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, ConfigureResourceRuntimeCommand.create(input)),
+  );
+
+export const configureResourceSourceProcedure = base
+  .route({
+    method: "POST",
+    path: "/resources/{resourceId}/source",
+    successStatus: 200,
+  })
+  .input(configureResourceSourceCommandInputSchema)
+  .output(configureResourceSourceResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, ConfigureResourceSourceCommand.create(input)),
   );
 
 export const createDomainBindingProcedure = base
@@ -1060,8 +1150,14 @@ export const appaloftOrpcRouter = {
   },
   resources: {
     list: listResourcesProcedure,
+    show: showResourceProcedure,
     create: createResourceProcedure,
+    archive: archiveResourceProcedure,
+    delete: deleteResourceProcedure,
     configureHealth: configureResourceHealthProcedure,
+    configureNetwork: configureResourceNetworkProcedure,
+    configureRuntime: configureResourceRuntimeProcedure,
+    configureSource: configureResourceSourceProcedure,
     diagnosticSummary: resourceDiagnosticSummaryProcedure,
     health: resourceHealthProcedure,
     proxyConfiguration: resourceProxyConfigurationPreviewProcedure,
@@ -1220,8 +1316,13 @@ export function mountAppaloftOrpcRoutes(
     "/api/environments/:environmentId/promote",
     "/api/environments/:environmentId/diff/:otherEnvironmentId",
     "/api/resources",
+    "/api/resources/:resourceId",
+    "/api/resources/:resourceId/archive",
+    "/api/resources/:resourceId/source",
     "/api/resources/:resourceId/health",
     "/api/resources/:resourceId/health-policy",
+    "/api/resources/:resourceId/network-profile",
+    "/api/resources/:resourceId/runtime-profile",
     "/api/resources/:resourceId/diagnostic-summary",
     "/api/resources/:resourceId/proxy-configuration",
     "/api/resources/:resourceId/runtime-logs",

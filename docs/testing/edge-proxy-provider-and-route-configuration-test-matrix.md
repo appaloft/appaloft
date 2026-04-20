@@ -28,6 +28,7 @@ This test matrix inherits:
 | Server bootstrap | Proxy bootstrap consumes provider ensure plan and records ready/failed state. |
 | Deployment route realization | Runtime execution consumes provider route plan and targets resource `internalPort`. |
 | Server-applied config domains | Provider renders and applies route state from `access.domains[]` without creating managed `DomainBinding` records. |
+| Server-applied route persistence | Selected PostgreSQL/PGlite backends persist desired/applied route state and expose reverse lookup for delete blockers. |
 | Canonical redirects | Provider renders redirect-only route state from `redirectTo` aliases without attaching alias hosts to workload upstreams. |
 | Proxy reload | Runtime applies provider-produced reload plans after route/certificate config changes and before public route verification. |
 | Query/read model | `resources.proxy-configuration.preview` returns read-only planned/latest/snapshot config. |
@@ -130,6 +131,16 @@ Then:
 | EDGE-PROXY-ENTRY-004 | e2e-preferred | Deployment progress | May link to route realization status but does not replace the configuration query. |
 | EDGE-PROXY-ENTRY-005 | e2e-preferred | Resource access summary | Continues to show URL/status; full proxy config lives in the configuration query. |
 
+## Server-Applied Route Persistence Matrix
+
+| Test ID | Preferred automation | Case | Input/state | Expected result | Expected error | Required assertion |
+| --- | --- | --- | --- | --- | --- | --- |
+| SERVER-APPLIED-ROUTE-STATE-001 | integration | PG desired route upsert/read | Selected PostgreSQL/PGlite backend, trusted project/environment/resource/server target, served host, and redirect alias | Desired state is durable and readable with provider-neutral domains, target ids, status, and updated timestamp | None | Store writes through an application-level `upsertDesired` operation and does not require the CLI file store. |
+| SERVER-APPLIED-ROUTE-STATE-002 | integration | Exact destination wins over default fallback | Default-destination row exists, then exact destination row exists for the same resource/server | Exact destination read returns the exact row; fallback row is used only when no exact row exists | None | Lookup order is exact target first, default-destination second. |
+| SERVER-APPLIED-ROUTE-STATE-003 | integration | Applied/failed status writeback | Desired row exists and route realization succeeds or fails; one write uses a mismatched target/route-set id | Applied/failed safe metadata is persisted; mismatched write is rejected | `server_applied_route_state_conflict`, phase `proxy-route-realization` | `markApplied` and `markFailed` are separate writes and do not overwrite another route set. |
+| SERVER-APPLIED-ROUTE-STATE-004 | integration | Delete blocker from route state | Archived resource has a row in `server_applied_route_states` | `resources.delete` rejects before tombstone and reports `server-applied-route` | `resource_delete_blocked`, phase `resource-deletion-guard` | Blocker comes from PG route-state reverse lookup by `resource_id`; no route state is cascaded away. |
+| SERVER-APPLIED-ROUTE-STATE-005 | integration | Migration shape supports durable lookups | PG/PGlite migrations are applied | Table and indexes support exact lookup, fallback lookup, resource reverse lookup, and server diagnostics | None | Schema has no unsafe cascade from resource deletion to route state. |
+
 ## Current Implementation Notes And Migration Gaps
 
 Existing runtime tests assert concrete proxy bootstrap plans and route labels. Those tests should move down into concrete provider package contract tests.
@@ -157,6 +168,9 @@ diagnostics. Real HTTPS public validation and provider-owned ACME history remain
 `EDGE-PROXY-ROUTE-008` and `EDGE-PROXY-QRY-007` now have provider route input, Traefik/Caddy
 renderer, runtime planning, and proxy configuration query coverage for canonical redirect aliases.
 External runtime reload and public redirect probing remain e2e follow-up coverage.
+
+`SERVER-APPLIED-ROUTE-STATE-001` through `SERVER-APPLIED-ROUTE-STATE-005` have PG/PGlite
+integration coverage in `packages/persistence/pg/test/pglite.integration.test.ts`.
 
 ## Open Questions
 

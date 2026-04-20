@@ -75,7 +75,10 @@ Allowed operation calls include:
 - `credentials.list-ssh` and `credentials.create-ssh`;
 - `environments.list`, `environments.create`, and `environments.set-variable`;
 - `resources.list`;
-- future `resources.create` or `resources.update` when first-class resource configuration is implemented;
+- `resources.create` for first-class resource creation;
+- future `resources.show`, `resources.configure-source`, `resources.configure-runtime`,
+  `resources.configure-network`, `resources.configure-health`, `resources.archive`, and
+  `resources.delete` when those resource profile lifecycle operations are active;
 - `deployments.create`;
 - deployment read/progress queries after acceptance.
 

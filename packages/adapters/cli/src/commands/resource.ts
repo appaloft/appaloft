@@ -1,14 +1,26 @@
 import {
+  ArchiveResourceCommand,
   ConfigureResourceHealthCommand,
+  ConfigureResourceNetworkCommand,
+  ConfigureResourceRuntimeCommand,
+  ConfigureResourceSourceCommand,
   CreateResourceCommand,
+  DeleteResourceCommand,
   ListResourcesQuery,
   OpenTerminalSessionCommand,
   ResourceDiagnosticSummaryQuery,
   ResourceHealthQuery,
   ResourceProxyConfigurationPreviewQuery,
   ResourceRuntimeLogsQuery,
+  ShowResourceQuery,
 } from "@appaloft/application";
-import { resourceKinds } from "@appaloft/core";
+import {
+  resourceExposureModes,
+  resourceKinds,
+  resourceNetworkProtocols,
+  runtimePlanStrategies,
+  sourceKinds,
+} from "@appaloft/core";
 import { Args, Command as EffectCommand, Options } from "@effect/cli";
 
 import {
@@ -28,8 +40,44 @@ const nameOption = Options.text("name");
 const kindOption = Options.choice("kind", resourceKinds).pipe(Options.withDefault("application"));
 const destinationOption = Options.text("destination").pipe(Options.optional);
 const descriptionOption = Options.text("description").pipe(Options.optional);
+const archiveReasonOption = Options.text("reason").pipe(Options.optional);
+const confirmSlugOption = Options.text("confirm-slug");
 const internalPortOption = Options.text("internal-port").pipe(Options.optional);
+const configureNetworkInternalPortOption = Options.text("internal-port");
+const sourceKindOption = Options.choice("kind", sourceKinds);
+const sourceLocatorOption = Options.text("locator");
+const sourceDisplayNameOption = Options.text("display-name").pipe(Options.optional);
+const sourceGitRefOption = Options.text("git-ref").pipe(Options.optional);
+const sourceCommitShaOption = Options.text("commit-sha").pipe(Options.optional);
+const sourceBaseDirectoryOption = Options.text("base-directory").pipe(Options.optional);
+const sourceOriginalLocatorOption = Options.text("original-locator").pipe(Options.optional);
+const sourceRepositoryIdOption = Options.text("repository-id").pipe(Options.optional);
+const sourceRepositoryFullNameOption = Options.text("repository-full-name").pipe(Options.optional);
+const sourceDefaultBranchOption = Options.text("default-branch").pipe(Options.optional);
+const sourceImageNameOption = Options.text("image-name").pipe(Options.optional);
+const sourceImageTagOption = Options.text("image-tag").pipe(Options.optional);
+const sourceImageDigestOption = Options.text("image-digest").pipe(Options.optional);
+const runtimeStrategyOption = Options.choice("strategy", runtimePlanStrategies).pipe(
+  Options.withDefault("auto"),
+);
+const runtimeInstallCommandOption = Options.text("install-command").pipe(Options.optional);
+const runtimeBuildCommandOption = Options.text("build-command").pipe(Options.optional);
+const runtimeStartCommandOption = Options.text("start-command").pipe(Options.optional);
+const runtimePublishDirectoryOption = Options.text("publish-directory").pipe(Options.optional);
+const runtimeDockerfilePathOption = Options.text("dockerfile-path").pipe(Options.optional);
+const runtimeDockerComposeFilePathOption = Options.text("docker-compose-file-path").pipe(
+  Options.optional,
+);
+const runtimeBuildTargetOption = Options.text("build-target").pipe(Options.optional);
 const portOption = Options.text("port").pipe(Options.optional);
+const upstreamProtocolOption = Options.choice("upstream-protocol", resourceNetworkProtocols).pipe(
+  Options.withDefault("http"),
+);
+const exposureModeOption = Options.choice("exposure-mode", resourceExposureModes).pipe(
+  Options.withDefault("reverse-proxy"),
+);
+const targetServiceOption = Options.text("target-service").pipe(Options.optional);
+const hostPortOption = Options.text("host-port").pipe(Options.optional);
 const deploymentOption = Options.text("deployment").pipe(Options.optional);
 const directoryOption = Options.text("directory").pipe(Options.optional);
 const rowsOption = Options.text("rows").pipe(Options.withDefault("24"));
@@ -88,6 +136,25 @@ const listCommand = EffectCommand.make(
     ),
 ).pipe(EffectCommand.withDescription("List resources"));
 
+const showCommand = EffectCommand.make(
+  "show",
+  {
+    resourceId: resourceIdArg,
+    json: jsonOption,
+  },
+  ({ json, resourceId }) => {
+    void json;
+    return runQuery(
+      ShowResourceQuery.create({
+        resourceId,
+        includeLatestDeployment: true,
+        includeAccessSummary: true,
+        includeProfileDiagnostics: true,
+      }),
+    );
+  },
+).pipe(EffectCommand.withDescription("Show resource profile"));
+
 const createCommand = EffectCommand.make(
   "create",
   {
@@ -144,6 +211,44 @@ const logsCommand = EffectCommand.make(
       }),
     ),
 ).pipe(EffectCommand.withDescription("Show resource runtime logs"));
+
+const archiveCommand = EffectCommand.make(
+  "archive",
+  {
+    resourceId: resourceIdArg,
+    reason: archiveReasonOption,
+    json: jsonOption,
+  },
+  ({ json, reason, resourceId }) => {
+    void json;
+    return runCommand(
+      ArchiveResourceCommand.create({
+        resourceId,
+        reason: optionalValue(reason),
+      }),
+    );
+  },
+).pipe(EffectCommand.withDescription("Archive a resource"));
+
+const deleteCommand = EffectCommand.make(
+  "delete",
+  {
+    resourceId: resourceIdArg,
+    confirmSlug: confirmSlugOption,
+    json: jsonOption,
+  },
+  ({ confirmSlug, json, resourceId }) => {
+    void json;
+    return runCommand(
+      DeleteResourceCommand.create({
+        resourceId,
+        confirmation: {
+          resourceSlug: confirmSlug,
+        },
+      }),
+    );
+  },
+).pipe(EffectCommand.withDescription("Delete an archived resource"));
 
 const terminalCommand = EffectCommand.make(
   "terminal",
@@ -304,15 +409,179 @@ const configureHealthCommand = EffectCommand.make(
   },
 ).pipe(EffectCommand.withDescription("Configure resource health policy"));
 
+const configureNetworkCommand = EffectCommand.make(
+  "configure-network",
+  {
+    resourceId: resourceIdArg,
+    internalPort: configureNetworkInternalPortOption,
+    upstreamProtocol: upstreamProtocolOption,
+    exposureMode: exposureModeOption,
+    targetService: targetServiceOption,
+    hostPort: hostPortOption,
+    json: jsonOption,
+  },
+  ({ exposureMode, hostPort, internalPort, json, resourceId, targetService, upstreamProtocol }) => {
+    void json;
+    const targetServiceName = optionalValue(targetService);
+    const hostPortRaw = optionalValue(hostPort);
+
+    return runCommand(
+      ConfigureResourceNetworkCommand.create({
+        resourceId,
+        networkProfile: {
+          internalPort: Number(internalPort),
+          upstreamProtocol,
+          exposureMode,
+          ...(targetServiceName ? { targetServiceName } : {}),
+          ...(hostPortRaw !== undefined ? { hostPort: Number(hostPortRaw) } : {}),
+        },
+      }),
+    );
+  },
+).pipe(EffectCommand.withDescription("Configure resource network profile"));
+
+const configureRuntimeCommand = EffectCommand.make(
+  "configure-runtime",
+  {
+    resourceId: resourceIdArg,
+    strategy: runtimeStrategyOption,
+    installCommand: runtimeInstallCommandOption,
+    buildCommand: runtimeBuildCommandOption,
+    startCommand: runtimeStartCommandOption,
+    publishDirectory: runtimePublishDirectoryOption,
+    dockerfilePath: runtimeDockerfilePathOption,
+    dockerComposeFilePath: runtimeDockerComposeFilePathOption,
+    buildTarget: runtimeBuildTargetOption,
+    json: jsonOption,
+  },
+  ({
+    buildCommand,
+    buildTarget,
+    dockerComposeFilePath,
+    dockerfilePath,
+    installCommand,
+    json,
+    publishDirectory,
+    resourceId,
+    startCommand,
+    strategy,
+  }) => {
+    void json;
+    const installCommandValue = optionalValue(installCommand);
+    const buildCommandValue = optionalValue(buildCommand);
+    const startCommandValue = optionalValue(startCommand);
+    const publishDirectoryValue = optionalValue(publishDirectory);
+    const dockerfilePathValue = optionalValue(dockerfilePath);
+    const dockerComposeFilePathValue = optionalValue(dockerComposeFilePath);
+    const buildTargetValue = optionalValue(buildTarget);
+
+    return runCommand(
+      ConfigureResourceRuntimeCommand.create({
+        resourceId,
+        runtimeProfile: {
+          strategy,
+          ...(installCommandValue ? { installCommand: installCommandValue } : {}),
+          ...(buildCommandValue ? { buildCommand: buildCommandValue } : {}),
+          ...(startCommandValue ? { startCommand: startCommandValue } : {}),
+          ...(publishDirectoryValue ? { publishDirectory: publishDirectoryValue } : {}),
+          ...(dockerfilePathValue ? { dockerfilePath: dockerfilePathValue } : {}),
+          ...(dockerComposeFilePathValue
+            ? { dockerComposeFilePath: dockerComposeFilePathValue }
+            : {}),
+          ...(buildTargetValue ? { buildTarget: buildTargetValue } : {}),
+        },
+      }),
+    );
+  },
+).pipe(EffectCommand.withDescription("Configure resource runtime profile"));
+
+const configureSourceCommand = EffectCommand.make(
+  "configure-source",
+  {
+    resourceId: resourceIdArg,
+    kind: sourceKindOption,
+    locator: sourceLocatorOption,
+    displayName: sourceDisplayNameOption,
+    gitRef: sourceGitRefOption,
+    commitSha: sourceCommitShaOption,
+    baseDirectory: sourceBaseDirectoryOption,
+    originalLocator: sourceOriginalLocatorOption,
+    repositoryId: sourceRepositoryIdOption,
+    repositoryFullName: sourceRepositoryFullNameOption,
+    defaultBranch: sourceDefaultBranchOption,
+    imageName: sourceImageNameOption,
+    imageTag: sourceImageTagOption,
+    imageDigest: sourceImageDigestOption,
+    json: jsonOption,
+  },
+  ({
+    baseDirectory,
+    commitSha,
+    defaultBranch,
+    displayName,
+    gitRef,
+    imageDigest,
+    imageName,
+    imageTag,
+    json,
+    kind,
+    locator,
+    originalLocator,
+    repositoryFullName,
+    repositoryId,
+    resourceId,
+  }) => {
+    void json;
+    const displayNameValue = optionalValue(displayName);
+    const gitRefValue = optionalValue(gitRef);
+    const commitShaValue = optionalValue(commitSha);
+    const baseDirectoryValue = optionalValue(baseDirectory);
+    const originalLocatorValue = optionalValue(originalLocator);
+    const repositoryIdValue = optionalValue(repositoryId);
+    const repositoryFullNameValue = optionalValue(repositoryFullName);
+    const defaultBranchValue = optionalValue(defaultBranch);
+    const imageNameValue = optionalValue(imageName);
+    const imageTagValue = optionalValue(imageTag);
+    const imageDigestValue = optionalValue(imageDigest);
+
+    return runCommand(
+      ConfigureResourceSourceCommand.create({
+        resourceId,
+        source: {
+          kind,
+          locator,
+          ...(displayNameValue ? { displayName: displayNameValue } : {}),
+          ...(gitRefValue ? { gitRef: gitRefValue } : {}),
+          ...(commitShaValue ? { commitSha: commitShaValue } : {}),
+          ...(baseDirectoryValue ? { baseDirectory: baseDirectoryValue } : {}),
+          ...(originalLocatorValue ? { originalLocator: originalLocatorValue } : {}),
+          ...(repositoryIdValue ? { repositoryId: repositoryIdValue } : {}),
+          ...(repositoryFullNameValue ? { repositoryFullName: repositoryFullNameValue } : {}),
+          ...(defaultBranchValue ? { defaultBranch: defaultBranchValue } : {}),
+          ...(imageNameValue ? { imageName: imageNameValue } : {}),
+          ...(imageTagValue ? { imageTag: imageTagValue } : {}),
+          ...(imageDigestValue ? { imageDigest: imageDigestValue } : {}),
+        },
+      }),
+    );
+  },
+).pipe(EffectCommand.withDescription("Configure resource source profile"));
+
 export const resourceCommand = EffectCommand.make("resource").pipe(
   EffectCommand.withDescription("Resource operations"),
   EffectCommand.withSubcommands([
     createCommand,
     listCommand,
+    showCommand,
+    archiveCommand,
+    deleteCommand,
     terminalCommand,
     logsCommand,
     healthCommand,
+    configureSourceCommand,
+    configureRuntimeCommand,
     configureHealthCommand,
+    configureNetworkCommand,
     proxyConfigCommand,
     diagnoseCommand,
   ]),

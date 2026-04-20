@@ -31,6 +31,7 @@ This command inherits the shared platform contracts:
 - [ADR-017: Default Access Domain And Proxy Routing](../decisions/ADR-017-default-access-domain-and-proxy-routing.md)
 - [ADR-021: Docker/OCI Workload Substrate](../decisions/ADR-021-docker-oci-workload-substrate.md)
 - [ADR-023: Runtime Orchestration Target Boundary](../decisions/ADR-023-runtime-orchestration-target-boundary.md)
+- [resources.archive Command Spec](./resources.archive.md)
 - [Workload Framework Detection And Planning](../workflows/workload-framework-detection-and-planning.md)
 - [Repository Deployment Config File Bootstrap](../workflows/deployment-config-file-bootstrap.md)
 - [Error Model](../errors/model.md)
@@ -111,18 +112,19 @@ The command must perform or delegate these admission steps before returning acce
 2. Resolve or create the server default destination when `destinationId` is omitted and the compatibility seam is in scope.
 3. Resolve project, environment, resource, server, and destination.
 4. Reject inconsistent context, including cross-project/environment/resource/destination mismatches.
-5. Reject deployment when the latest deployment for the same resource is non-terminal.
-6. Resolve the source descriptor from `ResourceSourceBinding`.
-7. Resolve runtime plan configuration from `ResourceRuntimeProfile`.
-8. Resolve network endpoint configuration from `ResourceNetworkProfile`.
-9. Create an immutable environment snapshot.
-10. Resolve default generated and durable access route snapshots from resource/domain/server/policy state when the resource requires public reverse-proxy access.
-11. Resolve the runtime plan, Docker/OCI artifact requirements, and network/access snapshots.
-12. Resolve that the selected deployment target/destination has a runtime target backend with the
+5. Reject archived resources with `resource_archived`.
+6. Reject deployment when the latest deployment for the same resource is non-terminal.
+7. Resolve the source descriptor from `ResourceSourceBinding`.
+8. Resolve runtime plan configuration from `ResourceRuntimeProfile`.
+9. Resolve network endpoint configuration from `ResourceNetworkProfile`.
+10. Create an immutable environment snapshot.
+11. Resolve default generated and durable access route snapshots from resource/domain/server/policy state when the resource requires public reverse-proxy access.
+12. Resolve the runtime plan, Docker/OCI artifact requirements, and network/access snapshots.
+13. Resolve that the selected deployment target/destination has a runtime target backend with the
     required capabilities.
-13. Create durable deployment state.
-14. Publish or record `deployment-requested`.
-15. Return `ok({ id })`.
+14. Create durable deployment state.
+15. Publish or record `deployment-requested`.
+16. Return `ok({ id })`.
 
 Build, rollout, verify, failure recording, and retry progression belong to the async workflow owner, process manager, event handler, worker, or runtime adapter boundary. They must not be hidden inside Web/CLI/API entry logic.
 
@@ -170,6 +172,7 @@ All errors use the shared shape and category rules in [Error Model](../errors/mo
 | `validation_error` | `resource-source-resolution` | No | Resource source binding or source variant metadata cannot produce a cloneable/materializable source descriptor. |
 | `validation_error` | `resource-network-resolution` | No | Resource network profile cannot produce a resolved deployment network snapshot. |
 | `not_found` | `context-resolution` | No | Referenced project, environment, server, destination, or resource is missing or inaccessible. |
+| `resource_archived` | `resource-lifecycle-guard` | No | Referenced resource is archived and cannot accept new deployment attempts. |
 | `deployment_not_redeployable` | `redeploy-guard` | No | Latest deployment for the same resource is non-terminal. |
 | `conflict` | `admission-conflict` | No | A deployment-specific admission conflict not covered by redeployability. |
 | `invariant_violation` | `planning-transition`, `execution-start-transition`, `finalization` | No | Deployment state transition was attempted out of order. |
@@ -400,6 +403,8 @@ Migration gaps:
   environment/secret command sequencing remain workflow gaps, not deployment command fields. Durable
   source link creation/reuse and explicit relink are handled outside `deployments.create`.
 - resource listener port is stored as `networkProfile.internalPort`; deployment admission does not read `runtimeProfile.port`.
+- archived-resource admission blocking is specified through `resources.archive`, but remains a
+  future implementation gap until explicit resource lifecycle state lands.
 - runtime adapter behavior treats reverse-proxy `internalPort` as a workload-local listener rather
   than a globally unique host port; same-port reverse-proxy resources require resource-scoped
   cleanup/replacement.
@@ -413,4 +418,8 @@ Migration gaps:
 
 ## Open Questions
 
-- Dedicated update operation names for resource source binding, runtime profile, network profile, and access profile configuration remain future work under [ADR-012](../decisions/ADR-012-resource-runtime-profile-and-deployment-snapshot-boundary.md) and [ADR-015](../decisions/ADR-015-resource-network-profile.md).
+- Resource source/runtime/network operation names are resolved as accepted candidates:
+  `resources.configure-source`, `resources.configure-runtime`, and `resources.configure-network`.
+  Access profile configuration remains a separate future behavior governed by ADR-017 and the
+  routing/domain/TLS specs. Generic aggregate update commands are forbidden by
+  [ADR-026](../decisions/ADR-026-aggregate-mutation-command-boundary.md).

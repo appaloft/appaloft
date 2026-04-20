@@ -27,6 +27,7 @@ This command inherits:
 
 - [ADR-012: Resource Runtime Profile And Deployment Snapshot Boundary](../decisions/ADR-012-resource-runtime-profile-and-deployment-snapshot-boundary.md)
 - [ADR-020: Resource Health Observation](../decisions/ADR-020-resource-health-observation.md)
+- [resources.archive Command Spec](./resources.archive.md)
 - [resources.health Query Spec](../queries/resources.health.md)
 - [Resource Health Observation Workflow](../workflows/resource-health-observation.md)
 - [Resource Health Error Spec](../errors/resources.health.md)
@@ -96,11 +97,12 @@ The command must:
 1. Validate command input.
 2. Resolve `resourceId`.
 3. Reject missing or invisible resource with `not_found`.
-4. Normalize HTTP policy fields through value objects.
-5. Preserve existing resource runtime profile fields that are not health-policy fields.
-6. Persist the updated `Resource` aggregate through the resource repository.
-7. Publish or record `resource-health-policy-configured`.
-8. Return `ok({ id })`.
+4. Reject archived resources with `resource_archived`.
+5. Normalize HTTP policy fields through value objects.
+6. Preserve existing resource runtime profile fields that are not health-policy fields.
+7. Persist the updated `Resource` aggregate through the resource repository.
+8. Publish or record `resource-health-policy-configured`.
+9. Return `ok({ id })`.
 
 ## Resource-Specific Rules
 
@@ -113,6 +115,9 @@ network, route, domain, or runtime-target state.
 
 When `enabled = false`, the policy is stored as disabled and `resources.health` reports health
 policy `not-configured`; this is distinct from a missing resource.
+
+Archived resources reject this command. Operators may still use `resources.health` to inspect
+retained health context when the read model/runtime observation can safely provide it.
 
 The command must not store raw probe response bodies, credentials, request headers, environment
 variables, local file paths, provider tokens, or deployment logs.
@@ -133,6 +138,9 @@ remain blocked until a stronger command sandbox model is accepted.
 
 Configuring the policy does not automatically rerun a deployment. `resources.health({ mode:
 "live" })` can evaluate the policy against the current runtime when a safe URL can be resolved.
+
+Archived-resource blocking remains a migration gap until `resources.archive` introduces explicit
+resource lifecycle state.
 
 ## Open Questions
 

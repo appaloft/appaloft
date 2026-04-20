@@ -1,6 +1,10 @@
 import {
+  type ArchiveResourceCommandInput,
   type BootstrapServerProxyCommandInput,
   type ConfigureResourceHealthCommandInput,
+  type ConfigureResourceNetworkCommandInput,
+  type ConfigureResourceRuntimeCommandInput,
+  type ConfigureResourceSourceCommandInput,
   type ConfigureServerCredentialCommandInput,
   type ConfirmDomainBindingOwnershipCommandInput,
   type CreateDeploymentCommandInput,
@@ -9,6 +13,7 @@ import {
   type CreateProjectCommandInput,
   type CreateResourceCommandInput,
   type CreateSshCredentialCommandInput,
+  type DeleteResourceCommandInput,
   type DeploymentLogsQueryInput,
   type DiffEnvironmentsQueryInput,
   type IssueOrRenewCertificateCommandInput,
@@ -28,12 +33,17 @@ import {
   type ResourceRuntimeLogsQueryInput,
   type SetEnvironmentVariableCommandInput,
   type ShowEnvironmentQueryInput,
+  type ShowResourceQueryInput,
   type TestServerConnectivityCommandInput,
   type UnsetEnvironmentVariableCommandInput,
 } from "@appaloft/application/schemas";
 import {
+  type ArchiveResourceResponse,
   type BootstrapServerProxyResponse,
   type ConfigureResourceHealthResponse,
+  type ConfigureResourceNetworkResponse,
+  type ConfigureResourceRuntimeResponse,
+  type ConfigureResourceSourceResponse,
   type ConfirmDomainBindingOwnershipResponse,
   type CreateDeploymentResponse,
   type CreateDomainBindingResponse,
@@ -41,6 +51,7 @@ import {
   type CreateProjectResponse,
   type CreateResourceResponse,
   type CreateSshCredentialResponse,
+  type DeleteResourceResponse,
   type DeploymentLogsResponse,
   type DeploymentProgressEvent,
   type DiffEnvironmentResponse,
@@ -60,6 +71,7 @@ import {
   type PromoteEnvironmentResponse,
   type ProxyConfigurationView,
   type RegisterServerResponse,
+  type ResourceDetail,
   type ResourceDiagnosticSummary,
   type ResourceHealthSummary,
   type ResourceRuntimeLogEvent,
@@ -183,16 +195,52 @@ export type AppaloftOrpcClientContract = {
       ListResourcesResponse,
       AppaloftClientError
     >;
+    show: Client<
+      AppaloftClientContext,
+      ShowResourceQueryInput,
+      ResourceDetail,
+      AppaloftClientError
+    >;
     create: Client<
       AppaloftClientContext,
       CreateResourceCommandInput,
       CreateResourceResponse,
       AppaloftClientError
     >;
+    archive: Client<
+      AppaloftClientContext,
+      ArchiveResourceCommandInput,
+      ArchiveResourceResponse,
+      AppaloftClientError
+    >;
+    delete: Client<
+      AppaloftClientContext,
+      DeleteResourceCommandInput,
+      DeleteResourceResponse,
+      AppaloftClientError
+    >;
     configureHealth: Client<
       AppaloftClientContext,
       ConfigureResourceHealthCommandInput,
       ConfigureResourceHealthResponse,
+      AppaloftClientError
+    >;
+    configureNetwork: Client<
+      AppaloftClientContext,
+      ConfigureResourceNetworkCommandInput,
+      ConfigureResourceNetworkResponse,
+      AppaloftClientError
+    >;
+    configureRuntime: Client<
+      AppaloftClientContext,
+      ConfigureResourceRuntimeCommandInput,
+      ConfigureResourceRuntimeResponse,
+      AppaloftClientError
+    >;
+    configureSource: Client<
+      AppaloftClientContext,
+      ConfigureResourceSourceCommandInput,
+      ConfigureResourceSourceResponse,
       AppaloftClientError
     >;
     diagnosticSummary: Client<

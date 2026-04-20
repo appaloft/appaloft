@@ -93,6 +93,19 @@ operation coverage by themselves. If an operation has separate command, CLI, HTT
 entrypoints, the matrix should split those boundaries into separate rows when each boundary has
 distinct behavior or transport mapping to verify.
 
+## Aggregate Mutation Command Naming
+
+Mutation tests must follow
+[ADR-026: Aggregate Mutation Command Boundary](../decisions/ADR-026-aggregate-mutation-command-boundary.md).
+
+Do not add test matrices or automated tests for generic aggregate-root operations such as
+`projects.update`, `servers.update`, `resources.update`, `{aggregate}.patch`, or
+`Update{Aggregate}Command`. If a behavior changes several fields, split the matrix into rows for
+the specific domain commands or specify a workflow that sequences those commands.
+
+Every new aggregate mutation matrix should include at least one entrypoint or contract row proving
+that the public surface does not expose a generic update command when that risk exists.
+
 ## Test Name Binding
 
 Automated tests that implement a behavior matrix row must include the matrix id in the test name.

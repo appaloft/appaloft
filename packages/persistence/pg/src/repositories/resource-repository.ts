@@ -115,6 +115,15 @@ class KyselyResourceMutationVisitor
           ...(spec.state.runtimeProfile.publishDirectory
             ? { publishDirectory: spec.state.runtimeProfile.publishDirectory.value }
             : {}),
+          ...(spec.state.runtimeProfile.dockerfilePath
+            ? { dockerfilePath: spec.state.runtimeProfile.dockerfilePath.value }
+            : {}),
+          ...(spec.state.runtimeProfile.dockerComposeFilePath
+            ? { dockerComposeFilePath: spec.state.runtimeProfile.dockerComposeFilePath.value }
+            : {}),
+          ...(spec.state.runtimeProfile.buildTarget
+            ? { buildTarget: spec.state.runtimeProfile.buildTarget.value }
+            : {}),
           ...(spec.state.runtimeProfile.healthCheckPath
             ? { healthCheckPath: spec.state.runtimeProfile.healthCheckPath.value }
             : {}),
@@ -151,6 +160,10 @@ class KyselyResourceMutationVisitor
         source_binding: sourceBinding,
         runtime_profile: runtimeProfile,
         network_profile: networkProfile,
+        lifecycle_status: spec.state.lifecycleStatus.value,
+        archived_at: spec.state.archivedAt?.value ?? null,
+        archive_reason: spec.state.archiveReason?.value ?? null,
+        deleted_at: spec.state.deletedAt?.value ?? null,
         created_at: spec.state.createdAt.value,
       },
     };
@@ -191,6 +204,10 @@ export class PgResourceRepository implements ResourceRepository {
               source_binding: mutation.values.source_binding,
               runtime_profile: mutation.values.runtime_profile,
               network_profile: mutation.values.network_profile,
+              lifecycle_status: mutation.values.lifecycle_status,
+              archived_at: mutation.values.archived_at ?? null,
+              archive_reason: mutation.values.archive_reason ?? null,
+              deleted_at: mutation.values.deleted_at ?? null,
             }),
           )
           .execute();
