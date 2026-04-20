@@ -40,6 +40,16 @@ Version selection rules:
 - [ ] If planned work is intentionally deferred, leave it unchecked and add or update the release
   note/migration gap that explains why the version can still ship.
 
+Current release alignment:
+
+- [x] On 2026-04-20, latest public release, Release Please state, and package manifests agree on the
+  `0.2.x` line at `0.2.1`.
+- [x] On 2026-04-20, Phase 1 remains incomplete, so the next stable release is limited to the next
+  `0.2.x` patch.
+- [x] Release Please keeps pre-`1.0.0` feature commits on the current patch line by default; an
+  explicit `Release-As` is required only when the roadmap gate allows a target minor or explicit
+  hotfix version.
+
 ## Source-Of-Truth Inputs
 
 Internal governing sources:
@@ -203,12 +213,12 @@ Already done:
 
 Required:
 
-- [ ] Verify the latest public release, Release Please state, and package manifests agree on the
+- [x] Verify the latest public release, Release Please state, and package manifests agree on the
   current `0.2.x` line.
 - [ ] Commit the roadmap and release-skill alignment work before any `0.3.0` release.
-- [ ] Add or update the release checklist so `docs/PRODUCT_ROADMAP.md` is part of every release
+- [x] Add or update the release checklist so `docs/PRODUCT_ROADMAP.md` is part of every release
   preflight.
-- [ ] Ensure `docs/PRODUCT_ROADMAP.md` is referenced by the release flow used by maintainers.
+- [x] Ensure `docs/PRODUCT_ROADMAP.md` is referenced by the release flow used by maintainers.
 - [ ] Confirm no release workflow can be intentionally triggered without explicit user confirmation.
 
 Exit criteria:

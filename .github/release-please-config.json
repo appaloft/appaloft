@@ -3,7 +3,7 @@
   "packages": {
     ".": {
       "release-type": "node",
-      "bump-minor-pre-major": true,
+      "bump-minor-pre-major": false,
       "package-name": "appaloft",
       "changelog-path": "CHANGELOG.md",
       "include-component-in-tag": false,
