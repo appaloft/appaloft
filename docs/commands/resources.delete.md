@@ -263,6 +263,11 @@ certificates tied through domain bindings, retained provider runtime logs, and a
 route-store blocker detection remain extension points on the same `ResourceDeletionBlockerReader`
 port where no durable PG table exists yet.
 
+The next specified blocker closure is source links: once the `source_links` PG/PGlite table from
+[Source Link Durable Persistence Implementation Plan](../implementation/source-link-durable-persistence-plan.md)
+lands, `ResourceDeletionBlockerReader` must report `source-link` blockers from rows whose
+`resource_id` is the resource being deleted.
+
 ## Open Questions
 
 - None for the guarded delete boundary. Cleanup of retained blockers remains separate future

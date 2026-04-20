@@ -200,6 +200,10 @@ Transport compatibility note:
 - source fingerprint links map a normalized source identity to trusted project/environment/resource
   and optional target placement. They are not resource profile fields and must be changed only
   through explicit relink behavior, not by editing `appaloft.yml`.
+- source fingerprint links are application state in the selected Appaloft state backend. File-backed
+  SSH remote-state mirrors may move this state across a CLI process boundary, but
+  PostgreSQL/PGlite backends must persist it through a dedicated persistence adapter rather than a
+  `Resource` repository or resource aggregate field.
 
 ### Workload Delivery
 
