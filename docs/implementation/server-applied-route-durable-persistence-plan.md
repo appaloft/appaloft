@@ -28,7 +28,7 @@ SSH/PGlite workflows, ADR-025 governs selected state owner/control-plane mode, a
 provider-owned route realization. This plan narrows the durable persistence mechanism and deletion
 blocker closure for an existing internal capability.
 
-## Code Round Target
+## Implemented Code Round Target
 
 The Code Round makes server-applied route state durable in the selected PostgreSQL-compatible state
 backend.
@@ -112,10 +112,11 @@ blocker reads are exercised without a required external PostgreSQL URL.
 
 ## Current Implementation Notes And Migration Gaps
 
-The file-backed SSH route state store exists and supports config deploy desired-state writes,
-deployment planning reads, and applied/failed status writeback for SSH CLI mode.
+The PG/PGlite persistence slice is implemented in `packages/persistence/pg`: migration
+`020_server_applied_route_states` creates the durable table, `PgServerAppliedRouteStateStore`
+implements the application port, shell composition uses that store for command execution, and
+`PgResourceDeletionBlockerReader` reports `server-applied-route` blockers from durable PG state.
 
-The PG/PGlite durable persistence slice is specified here but not implemented yet. Until the Code
-Round lands the table, adapter, shell wiring, and blocker reader extension, PostgreSQL/PGlite
-hosted/self-hosted or embedded state backends cannot report `server-applied-route` blockers from
-durable route state.
+CLI file-backed SSH route state storage remains available for adapter-level remote-state mechanics
+and explicit legacy wiring, but it is not the shell runtime's authoritative server-applied route
+store when a selected PostgreSQL/PGlite backend is open.

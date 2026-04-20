@@ -15,6 +15,7 @@ export * from "./project-repository";
 export * from "./resource-deletion-blocker-reader";
 export * from "./resource-read-model";
 export * from "./resource-repository";
+export * from "./server-applied-route-state-store";
 export * from "./server-read-model";
 export * from "./server-repository";
 export * from "./source-link-store";

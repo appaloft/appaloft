@@ -212,6 +212,24 @@ export interface SourceLinksTable {
   metadata: ColumnType<Record<string, unknown>, Record<string, unknown>, Record<string, unknown>>;
 }
 
+type JsonRecord = Record<string, unknown>;
+
+export interface ServerAppliedRouteStatesTable {
+  route_set_id: string;
+  project_id: string;
+  environment_id: string;
+  resource_id: string;
+  server_id: string;
+  destination_id: string | null;
+  source_fingerprint: string | null;
+  domains: ColumnType<JsonRecord[], JsonRecord[], JsonRecord[]>;
+  status: string;
+  updated_at: UpdatableTimestampColumn;
+  last_applied: ColumnType<JsonRecord | null, JsonRecord | null, JsonRecord | null>;
+  last_failure: ColumnType<JsonRecord | null, JsonRecord | null, JsonRecord | null>;
+  metadata: ColumnType<JsonRecord, JsonRecord, JsonRecord>;
+}
+
 export interface Database {
   projects: ProjectsTable;
   servers: ServersTable;
@@ -226,4 +244,5 @@ export interface Database {
   audit_logs: AuditLogsTable;
   provider_job_logs: ProviderJobLogsTable;
   source_links: SourceLinksTable;
+  server_applied_route_states: ServerAppliedRouteStatesTable;
 }
