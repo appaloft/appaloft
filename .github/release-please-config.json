@@ -4,6 +4,7 @@
     ".": {
       "release-type": "node",
       "bump-minor-pre-major": false,
+      "bump-patch-for-minor-pre-major": true,
       "package-name": "appaloft",
       "changelog-path": "CHANGELOG.md",
       "include-component-in-tag": false,
