@@ -41,6 +41,11 @@ to an explicit application operation.
    in the same change.
 6. Infrastructure endpoints such as `/api/health`, `/api/readiness`, and `/api/version` are not
    business operations. They belong to the HTTP adapter layer.
+7. Aggregate-root mutations must be intention-revealing domain commands governed by
+   [ADR-026: Aggregate Mutation Command Boundary](./decisions/ADR-026-aggregate-mutation-command-boundary.md).
+   Generic business operations such as `projects.update`, `servers.update`, `resources.update`,
+   `{aggregate}.patch`, or `{aggregate}.save` are forbidden. If a future operation cannot be named
+   without a generic update verb, it needs a Spec Round before implementation.
 
 ## Business Capability Model
 
@@ -86,10 +91,10 @@ Current boundary:
   [ADR-013: Project Resource Navigation And Deployment Ownership](./decisions/ADR-013-project-resource-navigation-and-deployment-ownership.md)
 
 Core next operations expected here:
-- update project profile
-- bind or change project source
-- show project details
-- archive project
+- `projects.show`
+- `projects.rename`
+- `projects.configure-source` if project source binding becomes a first-class aggregate concept
+- `projects.archive`
 
 Those are expected domain operations, but they are not implemented yet and must not be assumed by
 transports until added here and to the operation catalog.
@@ -135,9 +140,10 @@ Implemented operations:
   injection, not by core/application command input
 
 Core next operations expected here:
-- show server details
-- update server profile
-- deactivate server
+- `servers.show`
+- `servers.rename`
+- `servers.configure-edge-proxy`
+- `servers.deactivate`
 - rotate reusable SSH credential
 - delete reusable SSH credential when unused
 
@@ -185,8 +191,11 @@ Implemented operations:
 | Capability | Kind | Operation Key | Message | Schema | CLI | oRPC / HTTP |
 | --- | --- | --- | --- | --- | --- | --- |
 | Create resource | Command | `resources.create` | `CreateResourceCommand` | `CreateResourceCommandInput` | `appaloft resource create` | `POST /api/resources` |
+| Configure resource source profile | Command | `resources.configure-source` | `ConfigureResourceSourceCommand` | `ConfigureResourceSourceCommandInput` | `appaloft resource configure-source <resourceId>` | `POST /api/resources/{resourceId}/source` |
 | Configure resource health policy | Command | `resources.configure-health` | `ConfigureResourceHealthCommand` | `ConfigureResourceHealthCommandInput` | `appaloft resource configure-health <resourceId>` | `POST /api/resources/{resourceId}/health-policy` |
+| Configure resource network profile | Command | `resources.configure-network` | `ConfigureResourceNetworkCommand` | `ConfigureResourceNetworkCommandInput` | `appaloft resource configure-network <resourceId>` | `POST /api/resources/{resourceId}/network-profile` |
 | List resources | Query | `resources.list` | `ListResourcesQuery` | `ListResourcesQueryInput` | `appaloft resource list` | `GET /api/resources` |
+| Show resource profile | Query | `resources.show` | `ShowResourceQuery` | `ShowResourceQueryInput` | `appaloft resource show <resourceId>` | `GET /api/resources/{resourceId}` |
 | Read resource runtime logs | Query | `resources.runtime-logs` | `ResourceRuntimeLogsQuery` | `ResourceRuntimeLogsQueryInput` | `appaloft resource logs <resourceId>` | `GET /api/resources/{resourceId}/runtime-logs`; stream: `GET /api/resources/{resourceId}/runtime-logs/stream` |
 | Preview resource proxy configuration | Query | `resources.proxy-configuration.preview` | `ResourceProxyConfigurationPreviewQuery` | `ResourceProxyConfigurationPreviewQueryInput` | `appaloft resource proxy-config <resourceId>` | `GET /api/resources/{resourceId}/proxy-configuration` |
 | Read resource diagnostic summary | Query | `resources.diagnostic-summary` | `ResourceDiagnosticSummaryQuery` | `ResourceDiagnosticSummaryQueryInput` | `appaloft resource diagnose <resourceId>` | `GET /api/resources/{resourceId}/diagnostic-summary` |
@@ -246,17 +255,24 @@ Current boundary:
   `resources.health` is the active current health source for resource detail, project resource
   lists, sidebar navigation, CLI, and HTTP API. Latest deployment status remains contextual
   history, not proof that the resource is reachable.
+- resource source profile changes are resource-owned through `resources.configure-source`; the
+  command replaces the durable source binding for future deployment admission without pulling
+  source, retargeting source links, creating deployments, restarting runtime, or mutating
+  deployment snapshots.
+- resource network profile changes are resource-owned through `resources.configure-network`; the
+  command replaces the durable workload endpoint profile for future deployment admission and route
+  planning without binding domains, applying proxy routes, restarting runtime, or mutating
+  deployment snapshots.
 - durable domain bindings belong to the resource. Deployment snapshots may record the route used
   by one attempt, but they are not the domain ownership boundary. Generated default access should
   be exposed through resource-scoped access summaries and should prefer stable resource-scoped
   hostnames unless a provider explicitly requires deployment-scoped hostnames.
 
 Core next operations expected here:
-- show resource details
-- update resource profile/source
-- configure resource network profile
+- `resources.configure-runtime`
 - declare compose-stack services from compose metadata
-- archive resource
+- `resources.archive`
+- `resources.delete`
 
 ## Source Links
 

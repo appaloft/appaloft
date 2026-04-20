@@ -51,6 +51,37 @@ dispatching explicit operations. The final deployment write remains `deployments
 - aggregate root state and entity state use branded value objects instead of raw strings, numbers, or status literals
 - Appaloft uses `unique symbol` branded classes for IDs, temporal values, statuses, names, slugs, addresses, and other domain-significant values
 - state transitions live inside state-machine value objects such as `DeploymentStatusValue`, not in aggregate-level string-switch logic
+- aggregate root mutations are domain operations, not generic updates; public commands must use
+  intention-revealing names governed by
+  [ADR-026: Aggregate Mutation Command Boundary](./decisions/ADR-026-aggregate-mutation-command-boundary.md)
+
+## Aggregate Mutation Command Boundary
+
+Every aggregate root mutation is part of the domain model.
+
+Public write operations must name the domain intent, invariant, lifecycle transition, or owned
+sub-profile being changed. Generic update operations such as `projects.update`, `servers.update`,
+`resources.update`, `domain-bindings.update`, or `UpdateResourceCommand` are forbidden.
+
+Allowed mutation names are specific to the aggregate language, for example:
+
+- `projects.rename` instead of `projects.update`;
+- `environments.set-variable` and `environments.unset-variable` instead of
+  `environments.update`;
+- `servers.configure-credential` and `servers.bootstrap-proxy` instead of `servers.update`;
+- `resources.configure-source`, `resources.configure-runtime`, `resources.configure-network`,
+  `resources.configure-health`, and `resources.archive` instead of `resources.update`;
+- `domain-bindings.confirm-ownership` instead of `domain-bindings.update`;
+- `certificates.issue-or-renew` instead of `certificates.update`.
+
+If a future behavior appears to require one broad update command, the model is not specific enough.
+The behavior must be split into separate domain commands or first receive an ADR/spec that defines a
+cohesive aggregate-owned concept and its invariants.
+
+Repository methods, persistence adapters, read-model projectors, and migrations may use storage
+terms such as update/upsert internally. Those technical verbs must not leak into business operation
+keys, command names, domain events, Web/API/CLI entrypoints, future MCP tools, or aggregate method
+names.
 
 ## Bounded Contexts
 

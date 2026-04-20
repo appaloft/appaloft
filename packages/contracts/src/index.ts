@@ -530,6 +530,155 @@ export const requestedDeploymentHealthCheckSchema = z.object({
     .optional(),
 });
 
+export const showResourceInputSchema = z.object({
+  resourceId: z.string().min(1),
+  includeLatestDeployment: z.boolean().default(true),
+  includeAccessSummary: z.boolean().default(true),
+  includeProfileDiagnostics: z.boolean().default(false),
+});
+
+export const resourceDetailIdentitySchema = z.object({
+  id: z.string(),
+  projectId: z.string(),
+  environmentId: z.string(),
+  destinationId: z.string().optional(),
+  name: z.string(),
+  slug: z.string(),
+  kind: z.enum([
+    "application",
+    "service",
+    "database",
+    "cache",
+    "compose-stack",
+    "worker",
+    "static-site",
+    "external",
+  ]),
+  description: z.string().optional(),
+  createdAt: z.string(),
+  services: z.array(resourceServiceSummarySchema),
+  deploymentCount: z.number(),
+  lastDeploymentId: z.string().optional(),
+  lastDeploymentStatus: z
+    .enum([
+      "created",
+      "planning",
+      "planned",
+      "running",
+      "succeeded",
+      "failed",
+      "canceled",
+      "rolled-back",
+    ])
+    .optional(),
+});
+
+export const resourceDetailSourceProfileSchema = z.object({
+  kind: z.enum([
+    "local-folder",
+    "local-git",
+    "remote-git",
+    "git-public",
+    "git-github-app",
+    "git-deploy-key",
+    "zip-artifact",
+    "dockerfile-inline",
+    "docker-compose-inline",
+    "docker-image",
+    "compose",
+  ]),
+  locator: z.string(),
+  displayName: z.string(),
+  gitRef: z.string().optional(),
+  commitSha: z.string().optional(),
+  baseDirectory: z.string().optional(),
+  originalLocator: z.string().optional(),
+  repositoryId: z.string().optional(),
+  repositoryFullName: z.string().optional(),
+  defaultBranch: z.string().optional(),
+  imageName: z.string().optional(),
+  imageTag: z.string().optional(),
+  imageDigest: z.string().optional(),
+  metadata: z.record(z.string(), z.string()).optional(),
+});
+
+export const resourceSourceBindingInputSchema = z.object({
+  kind: z.enum([
+    "local-folder",
+    "local-git",
+    "remote-git",
+    "git-public",
+    "git-github-app",
+    "git-deploy-key",
+    "zip-artifact",
+    "dockerfile-inline",
+    "docker-compose-inline",
+    "docker-image",
+    "compose",
+  ]),
+  locator: z.string().min(1),
+  displayName: z.string().min(1).optional(),
+  gitRef: z.string().min(1).optional(),
+  commitSha: z.string().min(1).optional(),
+  baseDirectory: z.string().min(1).optional(),
+  originalLocator: z.string().min(1).optional(),
+  repositoryId: z.string().min(1).optional(),
+  repositoryFullName: z.string().min(1).optional(),
+  defaultBranch: z.string().min(1).optional(),
+  imageName: z.string().min(1).optional(),
+  imageTag: z.string().min(1).optional(),
+  imageDigest: z.string().min(1).optional(),
+  metadata: z.record(z.string(), z.string()).optional(),
+});
+
+export const resourceDetailRuntimeProfileSchema = z.object({
+  strategy: z.enum([
+    "auto",
+    "dockerfile",
+    "docker-compose",
+    "prebuilt-image",
+    "workspace-commands",
+    "static",
+  ]),
+  installCommand: z.string().optional(),
+  buildCommand: z.string().optional(),
+  startCommand: z.string().optional(),
+  publishDirectory: z.string().optional(),
+  healthCheckPath: z.string().optional(),
+  healthCheck: requestedDeploymentHealthCheckSchema.optional(),
+});
+
+export const resourceDetailDeploymentContextSchema = resourceHealthDeploymentContextSchema.omit({
+  lastError: true,
+});
+
+export const resourceDetailProfileDiagnosticSchema = z.object({
+  code: z.string(),
+  severity: z.enum(["info", "warning", "error"]),
+  message: z.string(),
+  path: z.string().optional(),
+});
+
+export const resourceDetailSchema = z.object({
+  schemaVersion: z.literal("resources.show/v1"),
+  resource: resourceDetailIdentitySchema,
+  source: resourceDetailSourceProfileSchema.optional(),
+  runtimeProfile: resourceDetailRuntimeProfileSchema.optional(),
+  networkProfile: resourceNetworkProfileSchema.optional(),
+  healthPolicy: requestedDeploymentHealthCheckSchema.optional(),
+  accessSummary: resourceAccessSummarySchema.optional(),
+  latestDeployment: resourceDetailDeploymentContextSchema.optional(),
+  lifecycle: z.object({
+    status: z.enum(["active", "archived", "deleted"]),
+    archivedAt: z.string().optional(),
+    deletedAt: z.string().optional(),
+  }),
+  diagnostics: z.array(resourceDetailProfileDiagnosticSchema),
+  generatedAt: z.string(),
+});
+
+export const showResourceResponseSchema = resourceDetailSchema;
+
 export const createResourceInputSchema = z.object({
   projectId: z.string().min(1),
   environmentId: z.string().min(1),
@@ -556,36 +705,7 @@ export const createResourceInputSchema = z.object({
       }),
     )
     .optional(),
-  source: z
-    .object({
-      kind: z.enum([
-        "local-folder",
-        "local-git",
-        "remote-git",
-        "git-public",
-        "git-github-app",
-        "git-deploy-key",
-        "zip-artifact",
-        "dockerfile-inline",
-        "docker-compose-inline",
-        "docker-image",
-        "compose",
-      ]),
-      locator: z.string().min(1),
-      displayName: z.string().min(1).optional(),
-      gitRef: z.string().min(1).optional(),
-      commitSha: z.string().min(1).optional(),
-      baseDirectory: z.string().min(1).optional(),
-      originalLocator: z.string().min(1).optional(),
-      repositoryId: z.string().min(1).optional(),
-      repositoryFullName: z.string().min(1).optional(),
-      defaultBranch: z.string().min(1).optional(),
-      imageName: z.string().min(1).optional(),
-      imageTag: z.string().min(1).optional(),
-      imageDigest: z.string().min(1).optional(),
-      metadata: z.record(z.string(), z.string()).optional(),
-    })
-    .optional(),
+  source: resourceSourceBindingInputSchema.optional(),
   runtimeProfile: z
     .object({
       strategy: z
@@ -620,6 +740,25 @@ export const configureResourceHealthInputSchema = z.object({
 });
 
 export const configureResourceHealthResponseSchema = z.object({
+  id: z.string(),
+});
+
+export const configureResourceNetworkInputSchema = z.object({
+  resourceId: z.string().min(1),
+  networkProfile: resourceNetworkProfileSchema,
+});
+
+export const configureResourceNetworkResponseSchema = z.object({
+  id: z.string(),
+});
+
+export const configureResourceSourceInputSchema = z.object({
+  resourceId: z.string().min(1),
+  source: resourceSourceBindingInputSchema,
+  idempotencyKey: z.string().min(1).optional(),
+});
+
+export const configureResourceSourceResponseSchema = z.object({
   id: z.string(),
 });
 
@@ -1577,10 +1716,20 @@ export type ResourceAccessSummary = z.infer<typeof resourceAccessSummarySchema>;
 export type ResourceHealthOverall = z.infer<typeof resourceHealthOverallSchema>;
 export type ResourceHealthSummary = z.infer<typeof resourceHealthSummarySchema>;
 export type ResourceSummary = z.infer<typeof resourceSummarySchema>;
+export type ResourceDetail = z.infer<typeof resourceDetailSchema>;
+export type ShowResourceInput = z.infer<typeof showResourceInputSchema>;
+export type ShowResourceResponse = z.infer<typeof showResourceResponseSchema>;
+export type ResourceSourceBindingInput = z.infer<typeof resourceSourceBindingInputSchema>;
 export type CreateResourceInput = z.infer<typeof createResourceInputSchema>;
 export type CreateResourceResponse = z.infer<typeof createResourceResponseSchema>;
 export type ConfigureResourceHealthInput = z.infer<typeof configureResourceHealthInputSchema>;
 export type ConfigureResourceHealthResponse = z.infer<typeof configureResourceHealthResponseSchema>;
+export type ConfigureResourceNetworkInput = z.infer<typeof configureResourceNetworkInputSchema>;
+export type ConfigureResourceNetworkResponse = z.infer<
+  typeof configureResourceNetworkResponseSchema
+>;
+export type ConfigureResourceSourceInput = z.infer<typeof configureResourceSourceInputSchema>;
+export type ConfigureResourceSourceResponse = z.infer<typeof configureResourceSourceResponseSchema>;
 export type CreateEnvironmentInput = z.infer<typeof createEnvironmentInputSchema>;
 export type CreateEnvironmentResponse = z.infer<typeof createEnvironmentResponseSchema>;
 export type ListEnvironmentsResponse = z.infer<typeof listEnvironmentsResponseSchema>;

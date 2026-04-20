@@ -413,4 +413,8 @@ Migration gaps:
 
 ## Open Questions
 
-- Dedicated update operation names for resource source binding, runtime profile, network profile, and access profile configuration remain future work under [ADR-012](../decisions/ADR-012-resource-runtime-profile-and-deployment-snapshot-boundary.md) and [ADR-015](../decisions/ADR-015-resource-network-profile.md).
+- Resource source/runtime/network operation names are resolved as accepted candidates:
+  `resources.configure-source`, `resources.configure-runtime`, and `resources.configure-network`.
+  Access profile configuration remains a separate future behavior governed by ADR-017 and the
+  routing/domain/TLS specs. Generic aggregate update commands are forbidden by
+  [ADR-026](../decisions/ADR-026-aggregate-mutation-command-boundary.md).

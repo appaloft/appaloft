@@ -29,7 +29,11 @@ The minimum command owns only profile-level resource data:
 - optional description;
 - optional declared services for compose-stack or service-aware resources.
 
-Durable source binding, build configuration, runtime configuration, domain/TLS configuration, health policy, storage, auto-deploy, webhook policy, and archive/update lifecycle are future explicit operations. They must not be hidden inside the minimum `resources.create` command.
+Durable source binding, build configuration, runtime configuration, domain/TLS configuration,
+health policy, storage, auto-deploy, webhook policy, archive, and other lifecycle transitions are
+future explicit operations. They must not be hidden inside the minimum `resources.create` command,
+and they must not be modeled as a generic `resources.update` command under
+[ADR-026](./ADR-026-aggregate-mutation-command-boundary.md).
 
 First-deploy workflows may persist resource-owned source/runtime/network profile input through `resources.create` only where governed by [ADR-014](./ADR-014-deployment-admission-uses-resource-profile.md) and [ADR-015](./ADR-015-resource-network-profile.md). That exception exists to keep `deployments.create` ids-only; it must not turn deployment attempt fields back into resource-agnostic transport fields.
 

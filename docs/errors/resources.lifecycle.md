@@ -2,9 +2,11 @@
 
 ## Normative Contract
 
-Resource lifecycle commands use the shared platform error model and neverthrow conventions. This
-file defines the resource-specific error profile for `resources.create`,
-`resources.configure-health`, and the minimum resource lifecycle.
+Resource lifecycle commands and queries use the shared platform error model and neverthrow
+conventions. This file defines the resource-specific error profile for `resources.create`,
+`resources.show`, `resources.configure-source`, `resources.configure-runtime`,
+`resources.configure-network`, `resources.configure-health`, `resources.archive`,
+`resources.delete`, and the minimum resource lifecycle.
 
 Resource errors must use stable `code`, `category`, `phase`, `retriable`, and related entity details. They must not rely on message text as the contract.
 
@@ -13,7 +15,9 @@ Resource errors must use stable `code`, `category`, `phase`, `retriable`, and re
 This spec inherits:
 
 - [ADR-011: Resource Create Minimum Lifecycle](../decisions/ADR-011-resource-create-minimum-lifecycle.md)
+- [ADR-012: Resource Runtime Profile And Deployment Snapshot Boundary](../decisions/ADR-012-resource-runtime-profile-and-deployment-snapshot-boundary.md)
 - [ADR-015: Resource Network Profile](../decisions/ADR-015-resource-network-profile.md)
+- [Resource Profile Lifecycle](../workflows/resource-profile-lifecycle.md)
 - [Repository Deployment Config File Bootstrap](../workflows/deployment-config-file-bootstrap.md)
 - [Error Model](./model.md)
 - [neverthrow Conventions](./neverthrow-conventions.md)
@@ -23,16 +27,35 @@ This spec inherits:
 
 ```ts
 type ResourceLifecycleErrorDetails = {
-  commandName?: "resources.create" | "resources.configure-health";
-  eventName?: "resource-created" | "resource-health-policy-configured";
+  commandName?:
+    | "resources.create"
+    | "resources.configure-source"
+    | "resources.configure-runtime"
+    | "resources.configure-network"
+    | "resources.configure-health"
+    | "resources.archive"
+    | "resources.delete";
+  queryName?: "resources.show";
+  eventName?:
+    | "resource-created"
+    | "resource-source-configured"
+    | "resource-runtime-configured"
+    | "resource-network-configured"
+    | "resource-health-policy-configured"
+    | "resource-archived"
+    | "resource-deleted";
   phase:
     | "command-validation"
+    | "query-validation"
     | "context-resolution"
+    | "resource-read"
     | "resource-admission"
     | "resource-source-resolution"
     | "resource-runtime-resolution"
     | "resource-network-resolution"
     | "health-policy-resolution"
+    | "resource-lifecycle-guard"
+    | "resource-deletion-guard"
     | "config-identity"
     | "config-secret-validation"
     | "config-profile-resolution"
@@ -63,8 +86,20 @@ type ResourceLifecycleErrorDetails = {
   exposureMode?: "none" | "reverse-proxy" | "direct-port";
   upstreamProtocol?: "http" | "tcp";
   targetServiceName?: string;
+  lifecycleStatus?: "active" | "archived" | "deleted";
+  deletionBlockers?: string[];
   relatedEntityId?: string;
-  relatedEntityType?: "project" | "environment" | "destination" | "resource";
+  relatedEntityType?:
+    | "project"
+    | "environment"
+    | "destination"
+    | "resource"
+    | "deployment"
+    | "domain-binding"
+    | "certificate"
+    | "source-link"
+    | "runtime-instance"
+    | "terminal-session";
   relatedState?: string;
   correlationId?: string;
   causationId?: string;
@@ -92,17 +127,40 @@ Admission errors reject `resources.create` and return `err(DomainError)`.
 | `infra_error` | `infra` | `resource-persistence` | Conditional | Persistence failed before the resource could be safely created. |
 | `infra_error` | `infra` | `event-publication` | Conditional | Event publication or outbox recording failed before command success could be safely returned. |
 
+## Profile Lifecycle Errors
+
+These errors apply to `resources.show`, `resources.configure-source`, `resources.configure-runtime`,
+`resources.configure-network`, `resources.archive`, and `resources.delete`.
+
+| Error code | Category | Phase | Retriable | Meaning |
+| --- | --- | --- | --- | --- |
+| `validation_error` | `validation` | `query-validation` | No | `resources.show` input is invalid. |
+| `not_found` | `not-found` | `resource-read` | No | Resource cannot be found or is not visible. |
+| `infra_error` | `infra` | `resource-read` | Conditional | Resource detail read model cannot be safely read or assembled. |
+| `validation_error` | `validation` | `command-validation` | No | Profile command input shape, idempotency key, confirmation value, or lifecycle reason is invalid. |
+| `resource_archived` | `conflict` | `resource-lifecycle-guard` | No | A profile mutation or deployment command targeted an archived resource. |
+| `invariant_violation` | `domain` | `resource-lifecycle-guard` | No | Resource aggregate lifecycle transition rejected the requested change. |
+| `validation_error` | `validation` | `resource-source-resolution` | No | Source profile update is invalid, ambiguous, unsafe, or contains forbidden secret/credential material. |
+| `validation_error` | `validation` | `resource-runtime-resolution` | No | Runtime profile update is invalid, unsafe, includes health-policy mutation, or includes unsupported runtime target fields. |
+| `validation_error` | `validation` | `resource-network-resolution` | No | Network profile update is invalid, unsafe, missing required endpoint data, or requests unsupported direct-port exposure. |
+| `resource_delete_blocked` | `conflict` | `resource-deletion-guard` | No | Delete was requested for an active resource or an archived resource with retained blockers such as deployments, runtime instances, source links, domain bindings, certificates, terminal sessions, dependency bindings, logs, or audit requirements. |
+| `validation_error` | `validation` | `resource-deletion-guard` | No | Delete confirmation did not match the resource slug. |
+| `infra_error` | `infra` | `resource-persistence` | Conditional | Profile/lifecycle state could not be safely persisted. |
+| `infra_error` | `infra` | `event-publication` | Conditional | Profile/lifecycle event publication or outbox recording failed before command success could be safely returned. |
+
 ## Async Error Profile
 
-`resources.create` is a synchronous creation command. It does not start long-running resource provisioning in the minimum lifecycle.
+`resources.create` and the profile lifecycle mutation commands are synchronous resource-state
+commands. They do not start long-running resource provisioning in the minimum lifecycle.
 
-Event consumer failures after `resource-created` is recorded are projection/event-processing failures. They must not reinterpret the original command result.
+Event consumer failures after a resource lifecycle event is recorded are projection/event-processing
+failures. They must not reinterpret the original command result.
 
 | Error condition | Required representation | Retriable |
 | --- | --- | --- |
-| Read-model projection fails after `resource-created` | Event consumer monitoring records `phase = event-consumption`; resource remains created. | Yes when projection can be retried. |
+| Read-model projection fails after resource lifecycle event | Event consumer monitoring records `phase = event-consumption`; resource command result remains accepted. | Yes when projection can be retried. |
 | Duplicate event consumed | Consumer returns `ok` or no-op; resource read model is not duplicated. | Not applicable |
-| Event publication cannot be recorded before command success | `resources.create` returns `err` with `code = infra_error`, `phase = event-publication`. | Conditional |
+| Event publication cannot be recorded before command success | Command returns `err` with `code = infra_error`, `phase = event-publication`. | Conditional |
 
 ## Consumer Mapping
 
@@ -114,6 +172,8 @@ Resource consumers additionally must:
 - distinguish missing project/environment/destination from context mismatch;
 - distinguish invalid source variant configuration from runtime-plan failure;
 - distinguish invalid resource listener port from deployment runtime failure;
+- distinguish archived-resource guards from missing resources;
+- distinguish delete blockers from validation failures;
 - avoid retry affordances for validation, not-found, conflict, and invariant errors;
 - expose `resourceId`, `projectId`, `environmentId`, and `resourceSlug` in structured debug/test contexts when available.
 
@@ -132,8 +192,10 @@ Tests must assert:
 - runtime variant fields such as `runtimePlanStrategy`, `dockerfilePath`, `dockerComposeFilePath`,
   or `publishDirectory` when a runtime profile error is relevant;
 - `internalPort`, `exposureMode`, and `targetServiceName` when a network profile error is relevant;
+- `lifecycleStatus` when archived-resource or deletion guard behavior is relevant;
+- safe `deletionBlockers` when `resource_delete_blocked` is relevant;
 - no resource persisted on admission failure;
-- no duplicate `resource-created` effect on duplicate event consumption.
+- no duplicate read-model or audit effect on duplicate resource lifecycle event consumption.
 
 ## Current Implementation Notes And Migration Gaps
 
@@ -148,6 +210,14 @@ Current code stores listener port under `networkProfile.internalPort`. [ADR-015]
 Current code does not yet have typed source variant validation for `resource-source-resolution`.
 Until implemented, many invalid source variant cases may be accepted as generic source metadata and
 fail later during source detection, Git clone, Docker image pull, or runtime plan resolution.
+
+`resources.show`, `resources.configure-source`, and `resources.configure-network` are active public
+surfaces with focused command/query, HTTP/oRPC, CLI or Web coverage in the resource profile
+lifecycle slice.
+
+`resources.configure-runtime`, `resources.archive`, and `resources.delete` are accepted candidate
+operations. Their error mappings remain normative for future Code Rounds but are not yet active
+public surfaces.
 
 ## Open Questions
 

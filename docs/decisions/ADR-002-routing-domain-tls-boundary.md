@@ -34,7 +34,7 @@ pure CLI mode and must not be submitted to `deployments.create`.
 Future routing commands may include:
 
 - `resource-access.configure-default-route`;
-- `domain-bindings.update-route`;
+- `domain-bindings.configure-route`;
 - `domain-bindings.remove`;
 - `certificates.issue-or-renew`;
 - `certificates.import`.

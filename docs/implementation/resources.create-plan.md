@@ -204,7 +204,12 @@ The minimal Code Round deliverable is:
 - read-model visibility through `resources.list`;
 - tests for command admission, duplicate slug, structured errors, event emission, API/CLI dispatch, and Quick Deploy final payload.
 
-`resources.show`, `resources.update`, `resources.archive`, source binding, health policy, resource env var management, domain/TLS management, SPA fallback/cache-header static-site policy, and auto-deploy are follow-up behaviors. Minimal static site deployment is governed by [Static Site Deployment Implementation Plan](./static-site-deployment-plan.md) and uses the existing `resources.create -> deployments.create` operation sequence.
+`resources.show`, `resources.configure-source`, `resources.configure-runtime`,
+`resources.configure-network`, `resources.archive`, `resources.delete`, resource env var
+management, domain/TLS management, SPA fallback/cache-header static-site policy, and auto-deploy
+are follow-up behaviors. Minimal static site deployment is governed by
+[Static Site Deployment Implementation Plan](./static-site-deployment-plan.md) and uses the
+existing `resources.create -> deployments.create` operation sequence.
 
 Moving `source`, `sourceLocator`, `deploymentMethod`, command overrides, port, and health check path out of `deployments.create` is governed by [ADR-014](../decisions/ADR-014-deployment-admission-uses-resource-profile.md) and [ADR-015](../decisions/ADR-015-resource-network-profile.md). It is implemented by persisting source/runtime/network profile on `resources.create`.
 
@@ -271,4 +276,7 @@ targets.
 
 ## Open Questions
 
-- Exact operation names for resource source binding, runtime profile, network profile, and access profile configuration remain open under [ADR-012](../decisions/ADR-012-resource-runtime-profile-and-deployment-snapshot-boundary.md) and [ADR-015](../decisions/ADR-015-resource-network-profile.md).
+- Resource source/runtime/network operation names are resolved as accepted candidates:
+  `resources.configure-source`, `resources.configure-runtime`, and `resources.configure-network`.
+  Access profile configuration remains a separate future behavior governed by ADR-017 and the
+  routing/domain/TLS specs.

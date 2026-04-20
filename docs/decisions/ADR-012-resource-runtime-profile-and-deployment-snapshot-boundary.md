@@ -216,11 +216,17 @@ Future implementation must not add more reusable configuration fields to `deploy
 - [deployments.create Command Spec](../commands/deployments.create.md)
 - [Quick Deploy Workflow Spec](../workflows/quick-deploy.md)
 - [Resource Create And First Deploy Workflow Spec](../workflows/resources.create-and-first-deploy.md)
+- [Resource Profile Lifecycle Workflow Spec](../workflows/resource-profile-lifecycle.md)
+- [resources.show Query Spec](../queries/resources.show.md)
+- [resources.configure-source Command Spec](../commands/resources.configure-source.md)
+- [resources.configure-runtime Command Spec](../commands/resources.configure-runtime.md)
 - [Repository Deployment Config File Bootstrap Workflow Spec](../workflows/deployment-config-file-bootstrap.md)
 - [Workload Framework Detection And Planning Workflow Spec](../workflows/workload-framework-detection-and-planning.md)
+- [Resource Profile Lifecycle Test Matrix](../testing/resource-profile-lifecycle-test-matrix.md)
 - [Deployment Config File Test Matrix](../testing/deployment-config-file-test-matrix.md)
 - [Deployment Config File Implementation Plan](../implementation/deployment-config-file-plan.md)
 - [resources.create Implementation Plan](../implementation/resources.create-plan.md)
+- [Resource Profile Lifecycle Implementation Plan](../implementation/resource-profile-lifecycle-plan.md)
 - [ADR-014: Deployment Admission Uses Resource Profile](./ADR-014-deployment-admission-uses-resource-profile.md)
 - [ADR-015: Resource Network Profile](./ADR-015-resource-network-profile.md)
 - [ADR-017: Default Access Domain And Proxy Routing](./ADR-017-default-access-domain-and-proxy-routing.md)
@@ -244,7 +250,7 @@ Current `DeploymentContextBootstrapService` can create or reuse resources during
 
 Public redeploy behavior is removed from the v1 deployment command surface by [ADR-016](./ADR-016-deployment-command-surface-reset.md). Any future redeploy behavior must rebuild its own command spec, workflow, test matrix, and resource-profile snapshot rules before re-entering the public Web/API/CLI surface.
 
-Resource-side source binding, runtime profile, and network profile persistence are being introduced through the first-deploy `resources.create` path. Dedicated update/configuration commands remain future work.
+Resource-side source binding, runtime profile, and network profile persistence are being introduced through the first-deploy `resources.create` path. Dedicated update/configuration commands are accepted candidates named `resources.configure-source`, `resources.configure-runtime`, and `resources.configure-network`; they remain future work until implemented and added to the active public catalog.
 
 Current code stores the resource listener port as `ResourceNetworkProfile.internalPort`.
 
@@ -256,7 +262,7 @@ Current code has explicit source value objects and command/schema fields for the
 Docker image source variants. Runtime planning still carries source variant values through source
 descriptor metadata, and strategy-specific runtime-profile fields such as Dockerfile path, Compose
 path, static publish directory, and build target still need explicit value objects before dedicated
-update operations are exposed.
+configuration commands are exposed.
 
 Current repository config file support still uses a legacy identity-bearing schema and does not yet
 follow the config-file bootstrap workflow. That schema must be narrowed before repository config
@@ -266,4 +272,5 @@ Generated default access policy/provider resolution remains future implementatio
 
 ## Open Questions
 
-- What exact operation names should be used for resource source binding and resource runtime profile configuration?
+- None for source/runtime operation names. They are resolved as accepted candidates
+  `resources.configure-source` and `resources.configure-runtime`.

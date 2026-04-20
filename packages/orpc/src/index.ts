@@ -5,6 +5,8 @@ import {
   type Command,
   type CommandBus,
   ConfigureResourceHealthCommand,
+  ConfigureResourceNetworkCommand,
+  ConfigureResourceSourceCommand,
   ConfigureServerCredentialCommand,
   ConfirmDomainBindingOwnershipCommand,
   CreateDeploymentCommand,
@@ -15,6 +17,8 @@ import {
   CreateResourceCommand,
   CreateSshCredentialCommand,
   configureResourceHealthCommandInputSchema,
+  configureResourceNetworkCommandInputSchema,
+  configureResourceSourceCommandInputSchema,
   configureServerCredentialCommandInputSchema,
   confirmDomainBindingOwnershipCommandInputSchema,
   createDeploymentCommandInputSchema,
@@ -72,8 +76,10 @@ import {
   resourceRuntimeLogsQueryInputSchema,
   SetEnvironmentVariableCommand,
   ShowEnvironmentQuery,
+  ShowResourceQuery,
   setEnvironmentVariableCommandInputSchema,
   showEnvironmentQueryInputSchema,
+  showResourceQueryInputSchema,
   TestServerConnectivityCommand,
   testServerConnectivityCommandInputSchema,
   UnsetEnvironmentVariableCommand,
@@ -82,6 +88,8 @@ import {
 import {
   bootstrapServerProxyResponseSchema,
   configureResourceHealthResponseSchema,
+  configureResourceNetworkResponseSchema,
+  configureResourceSourceResponseSchema,
   confirmDomainBindingOwnershipResponseSchema,
   createDeploymentResponseSchema,
   createDomainBindingResponseSchema,
@@ -108,6 +116,7 @@ import {
   promoteEnvironmentResponseSchema,
   proxyConfigurationViewSchema,
   registerServerResponseSchema,
+  resourceDetailSchema,
   resourceDiagnosticSummarySchema,
   resourceHealthSummarySchema,
   resourceRuntimeLogEventSchema,
@@ -729,6 +738,16 @@ export const listResourcesProcedure = base
   .output(listResourcesResponseSchema)
   .handler(async ({ input, context }) => executeQuery(context, ListResourcesQuery.create(input)));
 
+export const showResourceProcedure = base
+  .route({
+    method: "GET",
+    path: "/resources/{resourceId}",
+    successStatus: 200,
+  })
+  .input(showResourceQueryInputSchema)
+  .output(resourceDetailSchema)
+  .handler(async ({ input, context }) => executeQuery(context, ShowResourceQuery.create(input)));
+
 export const createResourceProcedure = base
   .route({
     method: "POST",
@@ -751,6 +770,30 @@ export const configureResourceHealthProcedure = base
   .output(configureResourceHealthResponseSchema)
   .handler(async ({ input, context }) =>
     executeCommand(context, ConfigureResourceHealthCommand.create(input)),
+  );
+
+export const configureResourceNetworkProcedure = base
+  .route({
+    method: "POST",
+    path: "/resources/{resourceId}/network-profile",
+    successStatus: 200,
+  })
+  .input(configureResourceNetworkCommandInputSchema)
+  .output(configureResourceNetworkResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, ConfigureResourceNetworkCommand.create(input)),
+  );
+
+export const configureResourceSourceProcedure = base
+  .route({
+    method: "POST",
+    path: "/resources/{resourceId}/source",
+    successStatus: 200,
+  })
+  .input(configureResourceSourceCommandInputSchema)
+  .output(configureResourceSourceResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, ConfigureResourceSourceCommand.create(input)),
   );
 
 export const createDomainBindingProcedure = base
@@ -1060,8 +1103,11 @@ export const appaloftOrpcRouter = {
   },
   resources: {
     list: listResourcesProcedure,
+    show: showResourceProcedure,
     create: createResourceProcedure,
     configureHealth: configureResourceHealthProcedure,
+    configureNetwork: configureResourceNetworkProcedure,
+    configureSource: configureResourceSourceProcedure,
     diagnosticSummary: resourceDiagnosticSummaryProcedure,
     health: resourceHealthProcedure,
     proxyConfiguration: resourceProxyConfigurationPreviewProcedure,
@@ -1220,8 +1266,11 @@ export function mountAppaloftOrpcRoutes(
     "/api/environments/:environmentId/promote",
     "/api/environments/:environmentId/diff/:otherEnvironmentId",
     "/api/resources",
+    "/api/resources/:resourceId",
+    "/api/resources/:resourceId/source",
     "/api/resources/:resourceId/health",
     "/api/resources/:resourceId/health-policy",
+    "/api/resources/:resourceId/network-profile",
     "/api/resources/:resourceId/diagnostic-summary",
     "/api/resources/:resourceId/proxy-configuration",
     "/api/resources/:resourceId/runtime-logs",

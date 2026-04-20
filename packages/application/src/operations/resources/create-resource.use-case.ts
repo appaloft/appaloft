@@ -4,16 +4,10 @@ import {
   DescriptionText,
   DestinationByIdSpec,
   DestinationId,
-  DisplayNameText,
-  DockerImageDigest,
-  DockerImageName,
-  DockerImageTag,
   domainError,
   EnvironmentByIdSpec,
   EnvironmentId,
   err,
-  GitCommitShaText,
-  GitRefText,
   HealthCheckExpectedStatusCode,
   HealthCheckHostText,
   HealthCheckHttpMethodValue,
@@ -31,12 +25,9 @@ import {
   ProjectId,
   Resource,
   ResourceByEnvironmentAndSlugSpec,
-  ResourceExposureModeValue,
   ResourceId,
   ResourceKindValue,
   ResourceName,
-  type ResourceNetworkProfileState,
-  ResourceNetworkProtocolValue,
   type ResourceRuntimeProfileState,
   ResourceServiceKindValue,
   ResourceServiceName,
@@ -45,12 +36,6 @@ import {
   type ResourceSourceBindingState,
   type Result,
   RuntimePlanStrategyValue,
-  SourceBaseDirectory,
-  SourceKindValue,
-  SourceLocator,
-  SourceOriginalLocator,
-  SourceRepositoryFullName,
-  SourceRepositoryId,
   StaticPublishDirectory,
   safeTry,
   UpsertResourceSpec,
@@ -71,114 +56,8 @@ import {
 import { tokens } from "../../tokens";
 import { publishDomainEventsAndReturn } from "../publish-domain-events";
 import { type CreateResourceCommandInput } from "./create-resource.command";
-import { type CreateResourceSourceBindingInput } from "./create-resource.schema";
-
-const gitSourceInputKinds = [
-  "remote-git",
-  "git-public",
-  "git-github-app",
-  "git-deploy-key",
-  "local-git",
-] as const;
-
-function isGitSourceInputKind(kind: string): boolean {
-  return gitSourceInputKinds.some((candidate) => candidate === kind);
-}
-
-function parseGitHubTreeLocator(locator: string):
-  | {
-      repositoryLocator: string;
-      treeSegments: string[];
-    }
-  | undefined {
-  try {
-    const url = new URL(locator);
-    const host = url.hostname.toLowerCase();
-    const segments = url.pathname.split("/").filter(Boolean);
-    if (
-      (host !== "github.com" && host !== "www.github.com") ||
-      segments.length < 4 ||
-      segments[2] !== "tree"
-    ) {
-      return undefined;
-    }
-
-    const owner = segments[0];
-    const repository = segments[1]?.replace(/\.git$/, "");
-    if (!owner || !repository) {
-      return undefined;
-    }
-
-    return {
-      repositoryLocator: `${url.protocol}//github.com/${owner}/${repository}`,
-      treeSegments: segments.slice(3),
-    };
-  } catch {
-    return undefined;
-  }
-}
-
-function baseDirectoryForExplicitRef(treeSegments: string[], gitRef: string): string | undefined {
-  const refSegments = gitRef.split("/").filter(Boolean);
-  const matchesRef = refSegments.every((segment, index) => treeSegments[index] === segment);
-  if (!matchesRef) {
-    return undefined;
-  }
-
-  const remaining = treeSegments.slice(refSegments.length);
-  return remaining.length > 0 ? `/${remaining.join("/")}` : "/";
-}
-
-function normalizeResourceSourceInput(
-  input: CreateResourceSourceBindingInput,
-): Result<CreateResourceSourceBindingInput> {
-  if (!isGitSourceInputKind(input.kind)) {
-    return ok(input);
-  }
-
-  const parsed = parseGitHubTreeLocator(input.locator);
-  if (!parsed) {
-    return ok(input);
-  }
-
-  const explicitGitRef = input.gitRef ?? input.metadata?.gitRef;
-  const explicitBaseDirectory = input.baseDirectory ?? input.metadata?.baseDirectory;
-  const gitRef = explicitGitRef ?? parsed.treeSegments[0];
-  if (!gitRef) {
-    return err(
-      domainError.validation("GitHub tree URL must include a branch or tag path", {
-        phase: "resource-source-resolution",
-        sourceLocator: input.locator,
-      }),
-    );
-  }
-
-  const inferredBaseDirectory =
-    explicitBaseDirectory ??
-    (explicitGitRef
-      ? baseDirectoryForExplicitRef(parsed.treeSegments, explicitGitRef)
-      : parsed.treeSegments.length > 1
-        ? `/${parsed.treeSegments.slice(1).join("/")}`
-        : "/");
-
-  if (!inferredBaseDirectory) {
-    return err(
-      domainError.validation("GitHub tree URL ref does not match the supplied gitRef", {
-        phase: "resource-source-resolution",
-        sourceLocator: input.locator,
-        gitRef,
-      }),
-    );
-  }
-
-  return ok({
-    ...input,
-    locator: parsed.repositoryLocator,
-    gitRef,
-    baseDirectory: inferredBaseDirectory,
-    originalLocator: input.originalLocator ?? input.locator,
-  });
-}
+import { resourceNetworkProfileFromInput } from "./resource-network-profile.mapper";
+import { resourceSourceBindingFromInput } from "./resource-source-binding.mapper";
 
 @injectable()
 export class CreateResourceUseCase {
@@ -311,47 +190,7 @@ export class CreateResourceUseCase {
 
       let sourceBinding: ResourceSourceBindingState | undefined;
       if (input.source) {
-        const normalizedSourceInput = yield* normalizeResourceSourceInput(input.source);
-        const sourceKind = yield* SourceKindValue.create(normalizedSourceInput.kind);
-        const sourceLocator = yield* SourceLocator.create(normalizedSourceInput.locator);
-        const sourceDisplayName = yield* DisplayNameText.create(
-          normalizedSourceInput.displayName ?? normalizedSourceInput.locator,
-        );
-        const metadata = normalizedSourceInput.metadata;
-        const gitRef = normalizedSourceInput.gitRef ?? metadata?.gitRef;
-        const commitSha = normalizedSourceInput.commitSha ?? metadata?.commitSha;
-        const baseDirectory = normalizedSourceInput.baseDirectory ?? metadata?.baseDirectory;
-        const originalLocator = normalizedSourceInput.originalLocator ?? metadata?.originalLocator;
-        const repositoryId = normalizedSourceInput.repositoryId ?? metadata?.repositoryId;
-        const repositoryFullName =
-          normalizedSourceInput.repositoryFullName ?? metadata?.repositoryFullName;
-        const defaultBranch = normalizedSourceInput.defaultBranch ?? metadata?.defaultBranch;
-        const imageName = normalizedSourceInput.imageName ?? metadata?.imageName;
-        const imageTag = normalizedSourceInput.imageTag ?? metadata?.imageTag;
-        const imageDigest = normalizedSourceInput.imageDigest ?? metadata?.imageDigest;
-
-        sourceBinding = {
-          kind: sourceKind,
-          locator: sourceLocator,
-          displayName: sourceDisplayName,
-          ...(gitRef ? { gitRef: yield* GitRefText.create(gitRef) } : {}),
-          ...(commitSha ? { commitSha: yield* GitCommitShaText.create(commitSha) } : {}),
-          ...(baseDirectory
-            ? { baseDirectory: yield* SourceBaseDirectory.create(baseDirectory) }
-            : {}),
-          ...(originalLocator
-            ? { originalLocator: yield* SourceOriginalLocator.create(originalLocator) }
-            : {}),
-          ...(repositoryId ? { repositoryId: yield* SourceRepositoryId.create(repositoryId) } : {}),
-          ...(repositoryFullName
-            ? { repositoryFullName: yield* SourceRepositoryFullName.create(repositoryFullName) }
-            : {}),
-          ...(defaultBranch ? { defaultBranch: yield* GitRefText.create(defaultBranch) } : {}),
-          ...(imageName ? { imageName: yield* DockerImageName.create(imageName) } : {}),
-          ...(imageTag ? { imageTag: yield* DockerImageTag.create(imageTag) } : {}),
-          ...(imageDigest ? { imageDigest: yield* DockerImageDigest.create(imageDigest) } : {}),
-          ...(metadata ? { metadata: { ...metadata } } : {}),
-        };
+        sourceBinding = yield* resourceSourceBindingFromInput(input.source);
       }
 
       let runtimeProfile: ResourceRuntimeProfileState | undefined;
@@ -444,29 +283,9 @@ export class CreateResourceUseCase {
         }
       }
 
-      const networkProfileInput = input.networkProfile;
-      let networkProfile: ResourceNetworkProfileState | undefined;
-      if (networkProfileInput) {
-        networkProfile = {
-          internalPort: yield* PortNumber.create(networkProfileInput.internalPort),
-          upstreamProtocol: yield* ResourceNetworkProtocolValue.create(
-            networkProfileInput.upstreamProtocol ?? "http",
-          ),
-          exposureMode: yield* ResourceExposureModeValue.create(
-            networkProfileInput.exposureMode ?? "reverse-proxy",
-          ),
-          ...(networkProfileInput.targetServiceName
-            ? {
-                targetServiceName: yield* ResourceServiceName.create(
-                  networkProfileInput.targetServiceName,
-                ),
-              }
-            : {}),
-          ...(networkProfileInput.hostPort
-            ? { hostPort: yield* PortNumber.create(networkProfileInput.hostPort) }
-            : {}),
-        };
-      }
+      const networkProfile = input.networkProfile
+        ? yield* resourceNetworkProfileFromInput(input.networkProfile)
+        : undefined;
 
       const resourceId = yield* ResourceId.create(idGenerator.next("res"));
       const createdAt = yield* CreatedAt.create(clock.now());

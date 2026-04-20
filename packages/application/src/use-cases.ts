@@ -31,6 +31,8 @@ export * from "./operations/environments/unset-environment-variable.use-case";
 export * from "./operations/projects/create-project.use-case";
 export * from "./operations/projects/list-projects.query-service";
 export * from "./operations/resources/configure-resource-health.use-case";
+export * from "./operations/resources/configure-resource-network.use-case";
+export * from "./operations/resources/configure-resource-source.use-case";
 export * from "./operations/resources/create-resource.use-case";
 export * from "./operations/resources/list-resources.query-service";
 export * from "./operations/resources/resource-access-summary.projector";
@@ -38,6 +40,7 @@ export * from "./operations/resources/resource-diagnostic-summary.query-service"
 export * from "./operations/resources/resource-health.query-service";
 export * from "./operations/resources/resource-proxy-configuration-preview.query-service";
 export * from "./operations/resources/resource-runtime-logs.query-service";
+export * from "./operations/resources/show-resource.query-service";
 export * from "./operations/servers/bootstrap-server-proxy.use-case";
 export * from "./operations/servers/configure-server-credential.use-case";
 export * from "./operations/servers/create-ssh-credential.use-case";

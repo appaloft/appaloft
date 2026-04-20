@@ -8,6 +8,10 @@ import {
   CertificateRetryScheduler,
   ConfigureResourceHealthCommandHandler,
   ConfigureResourceHealthUseCase,
+  ConfigureResourceNetworkCommandHandler,
+  ConfigureResourceNetworkUseCase,
+  ConfigureResourceSourceCommandHandler,
+  ConfigureResourceSourceUseCase,
   ConfigureServerCredentialUseCase,
   ConfirmDomainBindingOwnershipUseCase,
   CreateDeploymentUseCase,
@@ -60,6 +64,8 @@ import {
   RuntimePlanResolutionInputBuilder,
   SetEnvironmentVariableUseCase,
   ShowEnvironmentQueryService,
+  ShowResourceQueryHandler,
+  ShowResourceQueryService,
   TestServerConnectivityUseCase,
   tokens,
   UnsetEnvironmentVariableUseCase,
@@ -91,6 +97,9 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(IssueCertificateOnCertificateRequestedHandler);
   container.registerSingleton(BootstrapServerProxyCommandHandler);
   container.registerSingleton(ConfigureResourceHealthCommandHandler);
+  container.registerSingleton(ConfigureResourceNetworkCommandHandler);
+  container.registerSingleton(ConfigureResourceSourceCommandHandler);
+  container.registerSingleton(ShowResourceQueryHandler);
   container.registerSingleton(IssueOrRenewCertificateCommandHandler);
   container.registerSingleton(RelinkSourceLinkCommandHandler);
   container.registerSingleton(ListCertificatesQueryHandler);
@@ -103,10 +112,19 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(tokens.listProjectsQueryService, ListProjectsQueryService);
   container.registerSingleton(tokens.createResourceUseCase, CreateResourceUseCase);
   container.registerSingleton(
+    tokens.configureResourceSourceUseCase,
+    ConfigureResourceSourceUseCase,
+  );
+  container.registerSingleton(
     tokens.configureResourceHealthUseCase,
     ConfigureResourceHealthUseCase,
   );
+  container.registerSingleton(
+    tokens.configureResourceNetworkUseCase,
+    ConfigureResourceNetworkUseCase,
+  );
   container.registerSingleton(tokens.listResourcesQueryService, ListResourcesQueryService);
+  container.registerSingleton(tokens.showResourceQueryService, ShowResourceQueryService);
   container.registerSingleton(tokens.registerServerUseCase, RegisterServerUseCase);
   container.registerSingleton(
     tokens.configureServerCredentialUseCase,
