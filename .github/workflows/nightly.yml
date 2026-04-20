@@ -32,8 +32,11 @@ jobs:
       - name: Install
         run: bun install --frozen-lockfile
 
+      - name: Build Local Image
+        run: docker build -t appaloft-all-in-one:nightly .
+
       - name: Compose Up
-        run: docker compose -f docker-compose.selfhost.yml up -d --build
+        run: APPALOFT_IMAGE_REF=appaloft-all-in-one:nightly docker compose -f docker-compose.selfhost.yml up -d
 
       - name: Wait For Compose Backend
         run: bun run scripts/test/wait-for-http.ts http://127.0.0.1:3001/api/health 90000

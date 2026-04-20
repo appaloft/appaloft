@@ -24,7 +24,26 @@ Milestone 1 已打通：
 - GitHub integration skeleton、Generic SSH provider skeleton、plugin host skeleton 已落地
 - 已包含 release artifacts、Dockerfile、Compose、自测脚本与 GitHub Actions
 
-## 本地启动
+## 快速开始
+
+以 self-hosted Docker stack 运行 Appaloft：
+
+```bash
+curl -fsSL https://appaloft.com/install.sh | sudo sh
+```
+
+固定发布镜像版本：
+
+```bash
+curl -fsSL https://appaloft.com/install.sh | sudo sh -s -- --version 0.2.1
+```
+
+官网 installer 会在 Linux 上安装或校验 Docker Engine 和 compose plugin，在 `/opt/appaloft` 写入
+self-hosted Compose stack，并启动 Appaloft 后端、static console 和 PostgreSQL。生产机器如果要更严格
+的安装链路，可以先通过 Docker 官方 package repository 安装 Docker Engine，再用
+`--skip-docker-install` 只做校验和启动。
+
+## 本地开发启动
 
 1. 安装依赖
 
@@ -79,6 +98,7 @@ docker build -t appaloft-all-in-one:local .
 - `appaloft-binary-bundle`
 - `Dockerfile`
 - `docker-compose.selfhost.yml`
+- `install.sh` Docker self-host installer
 - `release-manifest.json`
 - `checksums.txt`
 

@@ -1,36 +1,35 @@
 services:
   app:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    image: appaloft-all-in-one:latest
+    image: ${APPALOFT_IMAGE_REF:-ghcr.io/appaloft/appaloft:latest}
+    restart: unless-stopped
     environment:
       APPALOFT_APP_NAME: Appaloft
-      APPALOFT_APP_VERSION: 0.1.0
+      APPALOFT_APP_VERSION: ${APPALOFT_APP_VERSION:-latest}
       APPALOFT_HTTP_HOST: 0.0.0.0
       APPALOFT_HTTP_PORT: 3001
       APPALOFT_WEB_STATIC_DIR: /app/web
-      APPALOFT_DATABASE_URL: postgres://postgres:postgres@postgres:5432/appaloft
-      APPALOFT_WEB_ORIGIN: http://localhost:3001
+      APPALOFT_DATABASE_URL: postgres://${POSTGRES_USER:-appaloft}:${POSTGRES_PASSWORD:-appaloft}@postgres:5432/${POSTGRES_DB:-appaloft}
+      APPALOFT_WEB_ORIGIN: ${APPALOFT_WEB_ORIGIN:-http://localhost:3001}
     ports:
-      - "3001:3001"
+      - "${APPALOFT_HTTP_HOST:-0.0.0.0}:${APPALOFT_HTTP_PORT:-3001}:3001"
     depends_on:
       postgres:
         condition: service_healthy
 
   postgres:
-    image: postgres:16
+    image: ${APPALOFT_POSTGRES_IMAGE:-postgres:16}
+    restart: unless-stopped
     environment:
-      POSTGRES_DB: appaloft
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: ${POSTGRES_DB:-appaloft}
+      POSTGRES_USER: ${POSTGRES_USER:-appaloft}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-appaloft}
     volumes:
-      - appaloft_pg_selfhost:/var/lib/postgresql/data
+      - postgres-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d appaloft"]
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
       interval: 5s
       timeout: 5s
-      retries: 10
+      retries: 20
 
 volumes:
-  appaloft_pg_selfhost:
+  postgres-data:

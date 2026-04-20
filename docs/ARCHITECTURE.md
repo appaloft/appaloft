@@ -241,7 +241,8 @@ Important:
 - binary mode is only a distribution choice
 - PostgreSQL remains the main hosted and production backend
 - PGlite is an embedded option for single-instance installs and defaults to platform user-level storage
-- release artifacts currently map to `appaloft-backend`, `appaloft-web-static`, `Dockerfile`, and `docker-compose.selfhost.yml`
+- release artifacts currently map to `appaloft-backend`, `appaloft-web-static`, `Dockerfile`,
+  `docker-compose.selfhost.yml`, and the static Docker self-host installer `install.sh`
 - hosted auth is optional and additive; self-hosted/local mode can remain anonymous
 
 ## Anonymous vs Hosted Mode
@@ -262,5 +263,6 @@ The release form does not change the data model:
 
 - `appaloft-backend` can talk to external PostgreSQL or embedded PGlite depending on config
 - all-in-one Docker usually talks to external PostgreSQL
-- `docker-compose.selfhost.yml` provides a recommended self-hosted stack with PostgreSQL as a separate service
+- `docker-compose.selfhost.yml` and `install.sh` provide a recommended self-hosted Docker stack with
+  PostgreSQL as a separate service
 - a future optional binary can use embedded PGlite for local-first installs without changing application/core layers
