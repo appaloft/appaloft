@@ -6,6 +6,7 @@
   import { createMutation, createQuery, queryOptions } from "@tanstack/svelte-query";
   import {
     ArrowLeft,
+    Archive,
     Check,
     Clipboard,
     Copy,
@@ -17,6 +18,7 @@
     Terminal,
   } from "@lucide/svelte";
   import type {
+    ArchiveResourceInput,
     ConfigureResourceHealthInput,
     ConfigureResourceNetworkInput,
     ConfigureResourceRuntimeInput,
@@ -158,6 +160,7 @@
       resourceDetailQuery.isPending,
   );
   const resourceDetail = $derived(resourceDetailQuery.data ?? null);
+  const isResourceArchived = $derived(resourceDetail?.lifecycle.status === "archived");
   const resource = $derived(resourceDetail ? resourceSummaryFromDetail(resourceDetail) : null);
   const project = $derived(resource ? findProject(projects, resource.projectId) : null);
   const environment = $derived(
@@ -384,6 +387,7 @@
   const canConfigureSource = $derived(
     Boolean(
       resource &&
+        !isResourceArchived &&
         sourceKind &&
         sourceLocator.trim() &&
         (!sourceKindIsDockerImage || !(sourceImageTag.trim() && sourceImageDigest.trim())),
@@ -408,6 +412,7 @@
   const canConfigureRuntime = $derived(
     Boolean(
       resource &&
+        !isResourceArchived &&
         runtimeStrategy &&
         (runtimeStrategy !== "static" || runtimePublishDirectory.trim()) &&
         (runtimeStrategy !== "dockerfile" || runtimeDockerfilePath.trim()) &&
@@ -417,6 +422,7 @@
   const canConfigureNetwork = $derived(
     Boolean(
       resource &&
+        !isResourceArchived &&
         isPortNumberText(networkInternalPort) &&
         (networkExposureMode === "none" || networkExposureMode === "reverse-proxy") &&
         (!networkTargetServiceRequired || networkTargetServiceName.trim()) &&
@@ -427,6 +433,7 @@
   const canConfigureHealth = $derived(
     Boolean(
       resource &&
+        !isResourceArchived &&
         (!healthEnabled ||
           (healthPath.trim() &&
             isPositiveIntegerText(healthExpectedStatus) &&
@@ -564,6 +571,33 @@
       networkFeedback = {
         kind: "error",
         title: $t(i18nKeys.console.resources.networkProfileSaveFailed),
+        detail: readErrorMessage(error),
+      };
+    },
+  }));
+  let archiveFeedback = $state<{
+    kind: "success" | "error";
+    title: string;
+    detail: string;
+  } | null>(null);
+  const archiveResourceMutation = createMutation(() => ({
+    mutationFn: (input: ArchiveResourceInput) => orpcClient.resources.archive(input),
+    onSuccess: (result) => {
+      archiveFeedback = {
+        kind: "success",
+        title: $t(i18nKeys.console.resources.archiveSucceeded),
+        detail: result.id,
+      };
+      void queryClient.invalidateQueries({ queryKey: ["resources"] });
+      void queryClient.invalidateQueries({ queryKey: ["resources", "show", resourceId] });
+      void queryClient.invalidateQueries({
+        queryKey: ["resources", "health", resourceId, "detail"],
+      });
+    },
+    onError: (error) => {
+      archiveFeedback = {
+        kind: "error",
+        title: $t(i18nKeys.console.resources.archiveFailed),
         detail: readErrorMessage(error),
       };
     },
@@ -864,6 +898,21 @@
     } catch {
       markAccessUrlCopyState("failed");
     }
+  }
+
+  function archiveResource(): void {
+    if (!browser || !resource || isResourceArchived || archiveResourceMutation.isPending) {
+      return;
+    }
+
+    if (!window.confirm($t(i18nKeys.console.resources.archiveConfirm))) {
+      return;
+    }
+
+    archiveFeedback = null;
+    archiveResourceMutation.mutate({
+      resourceId: resource.id,
+    });
   }
 
   $effect(() => {
@@ -1682,11 +1731,36 @@
             <div class="flex flex-wrap items-center gap-2">
               <h1 class="break-words text-2xl font-semibold md:text-3xl">{resource.name}</h1>
               <Badge variant="secondary">{resource.kind}</Badge>
+              {#if isResourceArchived}
+                <Badge variant="outline">{$t(i18nKeys.console.resources.archived)}</Badge>
+              {/if}
             </div>
             {#if resource.description}
               <p class="max-w-3xl text-sm leading-6 text-muted-foreground">
                 {resource.description}
               </p>
+            {/if}
+            {#if isResourceArchived}
+              <p class="text-sm leading-6 text-muted-foreground">
+                {$t(i18nKeys.console.resources.archiveNotice)}
+                {#if resourceDetail?.lifecycle.archivedAt}
+                  {$t(i18nKeys.console.resources.archivedAt)}
+                  {formatTime(resourceDetail.lifecycle.archivedAt)}
+                {/if}
+              </p>
+            {/if}
+            {#if archiveFeedback}
+              <div
+                class={[
+                  "max-w-3xl rounded-md border px-3 py-2 text-sm",
+                  archiveFeedback.kind === "success"
+                    ? "border-primary/25 bg-primary/5"
+                    : "border-destructive/30 bg-destructive/5 text-destructive",
+                ]}
+              >
+                <p class="font-medium">{archiveFeedback.title}</p>
+                <p class="mt-1 break-all text-xs">{archiveFeedback.detail}</p>
+              </div>
             {/if}
           </div>
 
@@ -1773,9 +1847,20 @@
                 {/if}
               </Popover.Content>
             </Popover.Root>
-            <Button href={resourceDeploymentHref()}>
+            <Button href={resourceDeploymentHref()} disabled={isResourceArchived}>
               <Plus class="size-4" />
               {$t(i18nKeys.common.actions.newDeployment)}
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={isResourceArchived || archiveResourceMutation.isPending}
+              onclick={archiveResource}
+            >
+              <Archive class="size-4" />
+              {archiveResourceMutation.isPending
+                ? $t(i18nKeys.common.actions.saving)
+                : $t(i18nKeys.console.resources.archiveAction)}
             </Button>
           </div>
         </div>
@@ -1807,7 +1892,7 @@
                   {$t(i18nKeys.console.resources.deploymentsDescription)}
                 </p>
               </div>
-              <Button href={resourceDeploymentHref()}>
+              <Button href={resourceDeploymentHref()} disabled={isResourceArchived}>
                 <Plus class="size-4" />
                 {$t(i18nKeys.common.actions.newDeployment)}
               </Button>

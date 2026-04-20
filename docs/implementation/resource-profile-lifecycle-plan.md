@@ -98,9 +98,9 @@ governed by the same specs.
 No governed command mutates deployments, runtime instances, proxy routes, domain bindings,
 certificates, source links, environment variables, dependency resources, or logs.
 
-## Next Code Round Target: `resources.archive`
+## Completed Code Round: `resources.archive`
 
-`resources.archive` is the next implementation slice. Its minimal deliverable is:
+`resources.archive` is implemented with:
 
 1. Add Resource lifecycle value objects and aggregate transition:
    - `ResourceLifecycleStatus` with `active` and `archived`;
@@ -201,6 +201,9 @@ Direct-port user-facing configuration remains blocked until placement conflict g
 behavior, and tests are implemented in the same Code Round.
 
 `resources.configure-source`, `resources.configure-runtime`, `resources.configure-network`,
-`resources.configure-health`, and `deployments.create` archived-resource blocking remains blocked
-until explicit resource lifecycle state lands with `resources.archive`; duplicate configured-event
-consumer idempotency remains future read-model projection work.
+`resources.configure-health`, and `deployments.create` archived-resource blocking is active through
+Resource lifecycle state. Duplicate configured-event consumer idempotency remains future read-model
+projection work.
+
+Next lifecycle Code Round target: `resources.delete`, including deletion-blocker reads and
+`resource-deleted` publication.

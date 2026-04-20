@@ -2,6 +2,7 @@ import "reflect-metadata";
 
 import { describe, expect, test } from "bun:test";
 import {
+  ArchivedAt,
   CreatedAt,
   type DomainEvent,
   EnvironmentId,
@@ -37,6 +38,16 @@ function applicationResourceFixture(): Resource {
   });
 }
 
+function archivedApplicationResourceFixture(): Resource {
+  const resource = applicationResourceFixture();
+  resource
+    .archive({
+      archivedAt: ArchivedAt.rehydrate("2026-01-01T00:00:05.000Z"),
+    })
+    ._unsafeUnwrap();
+  return resource;
+}
+
 function configuredEvent(events: unknown[]): DomainEvent {
   const event = events.find(
     (candidate): candidate is DomainEvent =>
@@ -52,7 +63,7 @@ function configuredEvent(events: unknown[]): DomainEvent {
   return event;
 }
 
-async function createHarness() {
+async function createHarness(resource: Resource = applicationResourceFixture()) {
   const context = createExecutionContext({
     requestId: "req_configure_resource_source_test",
     entrypoint: "system",
@@ -62,7 +73,6 @@ async function createHarness() {
   const eventBus = new CapturedEventBus();
   const clock = new FixedClock("2026-01-01T00:00:10.000Z");
   const logger = new NoopLogger();
-  const resource = applicationResourceFixture();
 
   await resources.upsert(repositoryContext, resource, UpsertResourceSpec.fromResource(resource));
 
@@ -183,6 +193,31 @@ describe("ConfigureResourceSourceUseCase", () => {
       },
     });
     expect(JSON.stringify(error)).not.toContain(secretValue);
+    expect(eventBus.events).toHaveLength(0);
+  });
+
+  test("[RES-PROFILE-SOURCE-005] rejects source changes for archived resources", async () => {
+    const { context, eventBus, useCase } = await createHarness(
+      archivedApplicationResourceFixture(),
+    );
+
+    const result = await useCase.execute(context, {
+      resourceId: "res_web",
+      source: {
+        kind: "git-public",
+        locator: "https://github.com/acme/web.git",
+      },
+    });
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "resource_archived",
+      details: {
+        phase: "resource-lifecycle-guard",
+        resourceId: "res_web",
+        commandName: "resources.configure-source",
+      },
+    });
     expect(eventBus.events).toHaveLength(0);
   });
 });

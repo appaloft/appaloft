@@ -452,6 +452,15 @@ export const enUS = {
       applicationProfileDescription:
         "Entry resources focus on listener port, protocol, and default routing.",
       applicationProfileTitle: "Application entry",
+      archiveAction: "Archive",
+      archiveConfirm:
+        "Archive this resource? Profile edits and new deployments will be blocked, while existing deployments, logs, routes, and bindings remain visible.",
+      archiveFailed: "Resource was not archived",
+      archiveNotice:
+        "Profile edits and new deployments are blocked. Existing deployments, logs, routes, and bindings remain visible.",
+      archiveSucceeded: "Resource archived",
+      archived: "Archived",
+      archivedAt: "Archived at",
       composeProfileDescription:
         "Compose resources group multiple services and choose a target service for traffic.",
       composeProfileTitle: "Compose stack",

@@ -15,6 +15,7 @@ import {
   logLevels,
   packagingModes,
   resourceExposureModes,
+  resourceLifecycleStatuses,
   resourceNetworkProtocols,
   runtimePlanStrategies,
   sourceKinds,
@@ -44,6 +45,7 @@ export {
   logLevels,
   packagingModes,
   resourceExposureModes,
+  resourceLifecycleStatuses,
   resourceNetworkProtocols,
   runtimePlanStrategies,
   sourceKinds,
@@ -1109,6 +1111,46 @@ export class OrganizationPlanTierValue extends EnumValueObject<
 
   static rehydrate(value: "community" | "team" | "enterprise"): OrganizationPlanTierValue {
     return new OrganizationPlanTierValue(value);
+  }
+}
+
+const resourceLifecycleStatusBrand: unique symbol = Symbol("ResourceLifecycleStatusValue");
+export class ResourceLifecycleStatusValue extends StateMachineValueObject<
+  (typeof resourceLifecycleStatuses)[number]
+> {
+  private [resourceLifecycleStatusBrand]!: void;
+
+  private constructor(value: (typeof resourceLifecycleStatuses)[number]) {
+    super(value);
+  }
+
+  static create(value: string): Result<ResourceLifecycleStatusValue> {
+    return createEnumValue(
+      value,
+      resourceLifecycleStatuses,
+      "Resource lifecycle status",
+      (validated) => new ResourceLifecycleStatusValue(validated),
+    );
+  }
+
+  static rehydrate(
+    value: (typeof resourceLifecycleStatuses)[number],
+  ): ResourceLifecycleStatusValue {
+    return new ResourceLifecycleStatusValue(value);
+  }
+
+  static active(): ResourceLifecycleStatusValue {
+    return new ResourceLifecycleStatusValue("active");
+  }
+
+  archive(): Result<ResourceLifecycleStatusValue> {
+    return this.ensureCurrent(["active"], "Only active resources can be archived").map(
+      () => new ResourceLifecycleStatusValue("archived"),
+    );
+  }
+
+  isArchived(): boolean {
+    return this.value === "archived";
   }
 }
 

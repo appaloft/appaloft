@@ -50,6 +50,7 @@ export const tokens = {
   listEnvironmentsQueryService: Symbol.for("appaloft.list_environments_query_service"),
   showEnvironmentQueryService: Symbol.for("appaloft.show_environment_query_service"),
   createResourceUseCase: Symbol.for("appaloft.create_resource_use_case"),
+  archiveResourceUseCase: Symbol.for("appaloft.archive_resource_use_case"),
   configureResourceSourceUseCase: Symbol.for("appaloft.configure_resource_source_use_case"),
   configureResourceHealthUseCase: Symbol.for("appaloft.configure_resource_health_use_case"),
   configureResourceNetworkUseCase: Symbol.for("appaloft.configure_resource_network_use_case"),

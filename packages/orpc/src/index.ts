@@ -1,5 +1,7 @@
 import {
   type AppLogger,
+  ArchiveResourceCommand,
+  archiveResourceCommandInputSchema,
   BootstrapServerProxyCommand,
   bootstrapServerProxyCommandInputSchema,
   type Command,
@@ -88,6 +90,7 @@ import {
   unsetEnvironmentVariableCommandInputSchema,
 } from "@appaloft/application";
 import {
+  archiveResourceResponseSchema,
   bootstrapServerProxyResponseSchema,
   configureResourceHealthResponseSchema,
   configureResourceNetworkResponseSchema,
@@ -323,6 +326,7 @@ function toOrpcError(error: DomainError, context: ExecutionContext) {
     case "conflict":
     case "certificate_attempt_conflict":
     case "resource_slug_conflict":
+    case "resource_archived":
     case "deployment_not_redeployable":
       return new ORPCError("CONFLICT", {
         message,
@@ -763,6 +767,18 @@ export const createResourceProcedure = base
     executeCommand(context, CreateResourceCommand.create(input)),
   );
 
+export const archiveResourceProcedure = base
+  .route({
+    method: "POST",
+    path: "/resources/{resourceId}/archive",
+    successStatus: 200,
+  })
+  .input(archiveResourceCommandInputSchema)
+  .output(archiveResourceResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, ArchiveResourceCommand.create(input)),
+  );
+
 export const configureResourceHealthProcedure = base
   .route({
     method: "POST",
@@ -1120,6 +1136,7 @@ export const appaloftOrpcRouter = {
     list: listResourcesProcedure,
     show: showResourceProcedure,
     create: createResourceProcedure,
+    archive: archiveResourceProcedure,
     configureHealth: configureResourceHealthProcedure,
     configureNetwork: configureResourceNetworkProcedure,
     configureRuntime: configureResourceRuntimeProcedure,
@@ -1283,6 +1300,7 @@ export function mountAppaloftOrpcRoutes(
     "/api/environments/:environmentId/diff/:otherEnvironmentId",
     "/api/resources",
     "/api/resources/:resourceId",
+    "/api/resources/:resourceId/archive",
     "/api/resources/:resourceId/source",
     "/api/resources/:resourceId/health",
     "/api/resources/:resourceId/health-policy",

@@ -2,6 +2,7 @@ import "reflect-metadata";
 
 import { describe, expect, test } from "bun:test";
 import {
+  ArchivedAt,
   CommandText,
   CreatedAt,
   type DomainEvent,
@@ -69,6 +70,16 @@ function applicationResourceFixture(): Resource {
   });
 }
 
+function archivedApplicationResourceFixture(): Resource {
+  const resource = applicationResourceFixture();
+  resource
+    .archive({
+      archivedAt: ArchivedAt.rehydrate("2026-01-01T00:00:05.000Z"),
+    })
+    ._unsafeUnwrap();
+  return resource;
+}
+
 function configuredEvent(events: unknown[]): DomainEvent {
   const event = events.find(
     (candidate): candidate is DomainEvent =>
@@ -84,7 +95,7 @@ function configuredEvent(events: unknown[]): DomainEvent {
   return event;
 }
 
-async function createHarness() {
+async function createHarness(resource: Resource = applicationResourceFixture()) {
   const context = createExecutionContext({
     requestId: "req_configure_resource_runtime_test",
     entrypoint: "system",
@@ -94,7 +105,6 @@ async function createHarness() {
   const eventBus = new CapturedEventBus();
   const clock = new FixedClock("2026-01-01T00:00:10.000Z");
   const logger = new NoopLogger();
-  const resource = applicationResourceFixture();
 
   await resources.upsert(repositoryContext, resource, UpsertResourceSpec.fromResource(resource));
 
@@ -210,6 +220,31 @@ describe("ConfigureResourceRuntimeUseCase", () => {
       details: {
         phase: "resource-runtime-resolution",
         field: "runtimeProfile.kubernetesNamespace",
+      },
+    });
+    expect(eventBus.events).toHaveLength(0);
+  });
+
+  test("[RES-PROFILE-RUNTIME-005] rejects runtime changes for archived resources", async () => {
+    const { context, eventBus, useCase } = await createHarness(
+      archivedApplicationResourceFixture(),
+    );
+
+    const result = await useCase.execute(context, {
+      resourceId: "res_web",
+      runtimeProfile: {
+        strategy: "static",
+        publishDirectory: "dist",
+      },
+    });
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "resource_archived",
+      details: {
+        phase: "resource-lifecycle-guard",
+        resourceId: "res_web",
+        commandName: "resources.configure-runtime",
       },
     });
     expect(eventBus.events).toHaveLength(0);

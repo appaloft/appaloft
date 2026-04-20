@@ -183,17 +183,15 @@ network profile, but they keep their own commands and lifecycle events.
 ## Current Implementation Notes And Migration Gaps
 
 Current implementation has active resource create/list, `resources.show`,
-`resources.configure-source`, `resources.configure-runtime`, `resources.configure-health`, and
-`resources.configure-network` surfaces. The Web resource detail page dispatches `resources.show`
-for durable profile data and dispatches `resources.configure-source`,
-`resources.configure-runtime`, and `resources.configure-network` from separate profile forms.
+`resources.configure-source`, `resources.configure-runtime`, `resources.configure-health`,
+`resources.configure-network`, and `resources.archive` surfaces. The Web resource detail page
+dispatches `resources.show` for durable profile data, dispatches source/runtime/network/health
+forms through separate commands, and dispatches archive through the dedicated lifecycle action.
 
-Archive/delete profile lifecycle operations remain accepted candidates. Archived-resource guards
-for source/runtime/network/health mutations and deployment admission remain migration gaps until
-`resources.archive` introduces explicit lifecycle state. The archive command spec and
-`resource-archived` event spec are ready for Code Round; `resources.delete` remains a later guarded
-cleanup slice. Each future Code Round must update `CORE_OPERATIONS.md` and `operation-catalog.ts`
-in the same change that exposes the operation.
+Archived-resource guards are active for source/runtime/network/health mutations and deployment
+admission. `resources.delete` remains a later guarded cleanup slice. Each future Code Round must
+update `CORE_OPERATIONS.md` and `operation-catalog.ts` in the same change that exposes the
+operation.
 
 ## Open Questions
 

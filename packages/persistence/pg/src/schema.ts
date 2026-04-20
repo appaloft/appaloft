@@ -86,6 +86,9 @@ export interface ResourcesTable {
     Record<string, unknown> | null,
     Record<string, unknown> | null
   >;
+  lifecycle_status: string;
+  archived_at: string | null;
+  archive_reason: string | null;
   created_at: TimestampColumn;
 }
 

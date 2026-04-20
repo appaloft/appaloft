@@ -741,6 +741,15 @@ export const createResourceResponseSchema = z.object({
   id: z.string(),
 });
 
+export const archiveResourceInputSchema = z.object({
+  resourceId: z.string().min(1),
+  reason: z.string().min(1).max(280).optional(),
+});
+
+export const archiveResourceResponseSchema = z.object({
+  id: z.string(),
+});
+
 export const configureResourceHealthInputSchema = z.object({
   resourceId: z.string().min(1),
   healthCheck: resourceHealthCheckPolicySchema,
@@ -1743,6 +1752,8 @@ export type ResourceSourceBindingInput = z.infer<typeof resourceSourceBindingInp
 export type ResourceRuntimeProfileInput = z.infer<typeof resourceRuntimeProfileInputSchema>;
 export type CreateResourceInput = z.infer<typeof createResourceInputSchema>;
 export type CreateResourceResponse = z.infer<typeof createResourceResponseSchema>;
+export type ArchiveResourceInput = z.infer<typeof archiveResourceInputSchema>;
+export type ArchiveResourceResponse = z.infer<typeof archiveResourceResponseSchema>;
 export type ConfigureResourceHealthInput = z.infer<typeof configureResourceHealthInputSchema>;
 export type ConfigureResourceHealthResponse = z.infer<typeof configureResourceHealthResponseSchema>;
 export type ConfigureResourceNetworkInput = z.infer<typeof configureResourceNetworkInputSchema>;

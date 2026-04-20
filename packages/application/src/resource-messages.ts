@@ -1,3 +1,4 @@
+export * from "./operations/resources/archive-resource.command";
 export * from "./operations/resources/configure-resource-health.command";
 export * from "./operations/resources/configure-resource-network.command";
 export * from "./operations/resources/configure-resource-runtime.command";

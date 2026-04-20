@@ -2,6 +2,7 @@ import "reflect-metadata";
 
 import { describe, expect, test } from "bun:test";
 import {
+  ArchivedAt,
   BuildStrategyKindValue,
   CommandText,
   ConfigKey,
@@ -50,6 +51,7 @@ import {
   ProjectName,
   ProviderKey,
   Resource,
+  ResourceByIdSpec,
   ResourceExposureModeValue,
   ResourceId,
   ResourceKindValue,
@@ -625,6 +627,43 @@ describe("CreateDeploymentUseCase", () => {
 
     expect(command.isErr()).toBe(true);
     expect(command._unsafeUnwrapErr().code).toBe("validation_error");
+  });
+
+  test("[RES-PROFILE-ARCHIVE-004] rejects deployment creation for archived resources", async () => {
+    const {
+      context,
+      createDeploymentInput,
+      createDeploymentUseCase,
+      eventBus,
+      repositoryContext,
+      resources,
+    } = await createDeploymentFixture();
+    const resource = await resources.findOne(
+      repositoryContext,
+      ResourceByIdSpec.create(ResourceId.rehydrate("res_demo")),
+    );
+    if (!resource) {
+      throw new Error("Expected resource fixture");
+    }
+    resource
+      .archive({
+        archivedAt: ArchivedAt.rehydrate("2026-01-01T00:00:05.000Z"),
+      })
+      ._unsafeUnwrap();
+    await resources.upsert(repositoryContext, resource, UpsertResourceSpec.fromResource(resource));
+
+    const result = await createDeploymentUseCase.execute(context, createDeploymentInput);
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "resource_archived",
+      details: {
+        phase: "resource-lifecycle-guard",
+        resourceId: "res_demo",
+        commandName: "deployments.create",
+      },
+    });
+    expect(eventBus.events).toHaveLength(0);
   });
 
   test("creates a deployment with an immutable environment snapshot", async () => {

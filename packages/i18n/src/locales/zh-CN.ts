@@ -430,6 +430,15 @@ export const zhCN = {
       accessUrlTitle: "访问地址",
       applicationProfileDescription: "入口类资源关注访问端口、协议和默认路由。",
       applicationProfileTitle: "应用入口",
+      archiveAction: "归档",
+      archiveConfirm:
+        "确定归档这个资源吗？归档后不能修改档案或创建新部署，已有部署、日志、路由和绑定仍会保留。",
+      archiveFailed: "资源归档失败",
+      archiveNotice:
+        "这个资源已经归档，不能修改档案或创建新部署，已有部署、日志、路由和绑定仍会保留。",
+      archiveSucceeded: "资源已归档",
+      archived: "已归档",
+      archivedAt: "归档时间",
       composeProfileDescription: "Compose 资源由多个服务组成，部署时会选择目标服务承接流量。",
       composeProfileTitle: "Compose 栈",
       composeServicesDescription: "Compose 文件里的服务边界和当前流量目标。",

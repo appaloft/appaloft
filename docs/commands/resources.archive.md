@@ -8,7 +8,7 @@
 - Handler: `ArchiveResourceCommandHandler`
 - Use case: `ArchiveResourceUseCase`
 - Domain / bounded context: Workload Delivery / Resource lifecycle
-- Current status: accepted candidate command and next Resource Profile Lifecycle Code Round target
+- Current status: active command
 - Source classification: normative contract for archive implementation
 
 ## Normative Contract
@@ -155,9 +155,9 @@ All errors use [Resource Lifecycle Error Spec](../errors/resources.lifecycle.md)
 
 | Entrypoint | Mapping | Status |
 | --- | --- | --- |
-| Web | Resource detail destructive/lifecycle action dispatches this command after confirmation. | Required in Code Round |
-| CLI | `appaloft resource archive <resourceId> [--reason ...]`. | Required in Code Round |
-| oRPC / HTTP | `POST /api/resources/{resourceId}/archive` using the command schema. | Required in Code Round |
+| Web | Resource detail destructive/lifecycle action dispatches this command after confirmation. | Active |
+| CLI | `appaloft resource archive <resourceId> [--reason ...]`. | Active |
+| oRPC / HTTP | `POST /api/resources/{resourceId}/archive` using the command schema. | Active |
 | Automation / MCP | Future command/tool over the same operation key. | Future |
 
 ## Events
@@ -169,12 +169,11 @@ Canonical event spec:
 
 ## Current Implementation Notes And Migration Gaps
 
-Resource archived lifecycle state is not active until this command appears in `CORE_OPERATIONS.md`,
-`operation-catalog.ts`, application slices, transports, read models, and tests.
+Resource archived lifecycle state is active in `CORE_OPERATIONS.md`, `operation-catalog.ts`,
+application slices, persistence, transports, `resources.show`, CLI, Web, and focused tests.
 
-The next Code Round for this command must also add archived-resource guards to
-`deployments.create`, `resources.configure-source`, `resources.configure-runtime`,
-`resources.configure-network`, and `resources.configure-health` in the same behavior slice.
+Archived-resource guards are active for `deployments.create`, `resources.configure-source`,
+`resources.configure-runtime`, `resources.configure-network`, and `resources.configure-health`.
 
 ## Open Questions
 
