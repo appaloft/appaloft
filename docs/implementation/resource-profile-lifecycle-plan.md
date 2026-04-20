@@ -131,9 +131,9 @@ certificates, source links, environment variables, dependency resources, or logs
    `RES-PROFILE-ARCHIVE-001` through `RES-PROFILE-ARCHIVE-005`, and the archive portions of
    `RES-PROFILE-ENTRY-003` through `RES-PROFILE-ENTRY-005`.
 
-## Next Code Round Target: `resources.delete`
+## Completed Code Round: `resources.delete`
 
-`resources.delete` is the next implementation slice. Its minimal deliverable is:
+`resources.delete` is implemented with:
 
 1. Extend Resource lifecycle value objects and aggregate transition:
    - `ResourceLifecycleStatus` with `active`, `archived`, and `deleted`;
@@ -235,10 +235,12 @@ Direct-port user-facing configuration remains blocked until placement conflict g
 behavior, and tests are implemented in the same Code Round.
 
 `resources.configure-source`, `resources.configure-runtime`, `resources.configure-network`,
-`resources.configure-health`, and `deployments.create` archived-resource blocking is active through
-Resource lifecycle state. Duplicate configured-event consumer idempotency remains future read-model
-projection work.
+`resources.configure-health`, `resources.archive`, `resources.delete`, and `deployments.create`
+archived-resource blocking is active through Resource lifecycle state. Duplicate configured-event
+consumer idempotency remains future read-model projection work.
 
-Next lifecycle Code Round target: `resources.delete`, including deletion-blocker reads,
-deleted/tombstone lifecycle state, entrypoints, read-model omission, and `resource-deleted`
-publication.
+`resources.delete` uses deleted/tombstone lifecycle state, omits deleted resources from normal
+read models, exposes HTTP/oRPC, CLI, and Web entrypoints, and publishes `resource-deleted` on the
+first archived-to-deleted transition. The v1 PG blocker reader covers deployments, domain
+bindings, certificates, and provider runtime-log retention; blocker kinds without durable PG tables
+remain explicit extension points on `ResourceDeletionBlockerReader`.

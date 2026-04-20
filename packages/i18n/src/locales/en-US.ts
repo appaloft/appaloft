@@ -461,6 +461,10 @@ export const enUS = {
       archiveSucceeded: "Resource archived",
       archived: "Archived",
       archivedAt: "Archived at",
+      deleteAction: "Delete",
+      deleteConfirmPrompt: "Type the resource slug to confirm deletion.",
+      deleteFailed: "Resource was not deleted",
+      deleteSucceeded: "Resource deleted",
       composeProfileDescription:
         "Compose resources group multiple services and choose a target service for traffic.",
       composeProfileTitle: "Compose stack",

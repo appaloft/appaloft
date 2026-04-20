@@ -186,15 +186,14 @@ network profile, but they keep their own commands and lifecycle events.
 
 Current implementation has active resource create/list, `resources.show`,
 `resources.configure-source`, `resources.configure-runtime`, `resources.configure-health`,
-`resources.configure-network`, and `resources.archive` surfaces. The Web resource detail page
+`resources.configure-network`, `resources.archive`, and `resources.delete` surfaces. The Web resource detail page
 dispatches `resources.show` for durable profile data, dispatches source/runtime/network/health
-forms through separate commands, and dispatches archive through the dedicated lifecycle action.
+forms through separate commands, and dispatches archive/delete through dedicated lifecycle actions.
 
 Archived-resource guards are active for source/runtime/network/health mutations and deployment
-admission. `resources.delete` is specified as the next guarded cleanup slice: it may delete only
-archived resources with matching slug confirmation and no retained blockers. Each future Code
-Round must update `CORE_OPERATIONS.md` and `operation-catalog.ts` in the same change that exposes
-the operation.
+admission. `resources.delete` may delete only archived resources with matching slug confirmation
+and no retained blockers. Each future Code Round must update `CORE_OPERATIONS.md` and
+`operation-catalog.ts` in the same change that exposes the operation.
 
 ## Open Questions
 

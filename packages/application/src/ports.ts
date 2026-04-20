@@ -207,6 +207,37 @@ export interface ResourceRepository {
   upsert(context: RepositoryContext, resource: Resource, spec: ResourceMutationSpec): Promise<void>;
 }
 
+export type ResourceDeletionBlockerKind =
+  | "active-resource"
+  | "deployment-history"
+  | "runtime-instance"
+  | "domain-binding"
+  | "certificate"
+  | "source-link"
+  | "dependency-binding"
+  | "terminal-session"
+  | "runtime-log-retention"
+  | "audit-retention"
+  | "generated-access-route"
+  | "server-applied-route"
+  | "proxy-route";
+
+export interface ResourceDeletionBlocker {
+  kind: ResourceDeletionBlockerKind;
+  relatedEntityId?: string;
+  relatedEntityType?: string;
+  count?: number;
+}
+
+export interface ResourceDeletionBlockerReader {
+  findBlockers(
+    context: RepositoryContext,
+    input: {
+      resourceId: string;
+    },
+  ): Promise<Result<ResourceDeletionBlocker[]>>;
+}
+
 export interface DeploymentRepository {
   findOne(context: RepositoryContext, spec: DeploymentSelectionSpec): Promise<Deployment | null>;
   upsert(

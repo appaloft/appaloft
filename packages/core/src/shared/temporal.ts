@@ -86,6 +86,23 @@ export class ArchivedAt extends DateTimeValue {
   }
 }
 
+const deletedAtBrand: unique symbol = Symbol("DeletedAt");
+export class DeletedAt extends DateTimeValue {
+  private [deletedAtBrand]!: void;
+
+  private constructor(value: string) {
+    super(value);
+  }
+
+  static create(value: string | Date): Result<DeletedAt> {
+    return createDateTimeValue(value, "DeletedAt", (normalized) => new DeletedAt(normalized));
+  }
+
+  static rehydrate(value: string): DeletedAt {
+    return new DeletedAt(new Date(value).toISOString());
+  }
+}
+
 const occurredAtBrand: unique symbol = Symbol("OccurredAt");
 export class OccurredAt extends DateTimeValue {
   private [occurredAtBrand]!: void;

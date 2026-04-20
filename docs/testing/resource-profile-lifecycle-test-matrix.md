@@ -2,7 +2,7 @@
 
 ## Scope
 
-This matrix covers the accepted candidate resource profile lifecycle operations:
+This matrix covers the active resource profile lifecycle operations:
 
 - `resources.show`
 - `resources.configure-source`
@@ -101,6 +101,7 @@ Automated coverage now exists for:
 - `RES-PROFILE-SHOW-001`, `RES-PROFILE-SHOW-002`, `RES-PROFILE-SHOW-004`, and
   `RES-PROFILE-SHOW-005` in `packages/application/test/show-resource.test.ts`;
 - `RES-PROFILE-SHOW-003` in `packages/application/test/show-resource.test.ts`;
+- `RES-PROFILE-DELETE-008` show omission in `packages/application/test/show-resource.test.ts`;
 - `RES-PROFILE-SOURCE-001`, `RES-PROFILE-SOURCE-002`, `RES-PROFILE-SOURCE-003`,
   `RES-PROFILE-SOURCE-004`, and `RES-PROFILE-SOURCE-005` in
   `packages/application/test/configure-resource-source.test.ts`;
@@ -113,6 +114,8 @@ Automated coverage now exists for:
 - `RES-PROFILE-ARCHIVE-001`, `RES-PROFILE-ARCHIVE-002`, `RES-PROFILE-ARCHIVE-003`, and
   `RES-PROFILE-ARCHIVE-005` in `packages/application/test/archive-resource.test.ts`;
 - `RES-PROFILE-ARCHIVE-004` in `packages/application/test/create-deployment.test.ts`;
+- `RES-PROFILE-DELETE-001` through `RES-PROFILE-DELETE-008` in
+  `packages/application/test/delete-resource.test.ts`;
 - HTTP/oRPC dispatch for `resources.show` in `packages/orpc/test/resource-show.http.test.ts`;
 - HTTP/oRPC dispatch for `resources.configure-source` in
   `packages/orpc/test/resource-source-profile.http.test.ts`;
@@ -120,13 +123,15 @@ Automated coverage now exists for:
   `packages/orpc/test/resource-runtime-profile.http.test.ts`;
 - HTTP/oRPC dispatch for `resources.archive` in
   `packages/orpc/test/resource-archive.http.test.ts`;
+- HTTP/oRPC dispatch for `resources.delete` in
+  `packages/orpc/test/resource-delete.http.test.ts`;
 - CLI dispatch for `resources.configure-runtime` in
   `packages/adapters/cli/test/resource-command.test.ts`;
 - CLI dispatch for `resources.archive` in `packages/adapters/cli/test/resource-command.test.ts`;
+- CLI dispatch for `resources.delete` in `packages/adapters/cli/test/resource-command.test.ts`;
 - Web detail dispatch for `resources.show` in `apps/web/test/e2e-webview/home.webview.test.ts`;
-- Web source, runtime, network, and archive submissions in
+- Web source, runtime, network, archive, and delete submissions in
   `apps/web/test/e2e-webview/home.webview.test.ts`.
 
-`RES-PROFILE-SOURCE-006` remains future event-consumer projection work. `RES-PROFILE-DELETE-001`
-through `RES-PROFILE-DELETE-009` and `RES-PROFILE-ENTRY-006` through `RES-PROFILE-ENTRY-008` are
-specified for the next delete Code Round and do not yet have automated coverage.
+`RES-PROFILE-SOURCE-006` remains future event-consumer projection work. `RES-PROFILE-DELETE-009`
+event payload coverage is asserted through the successful delete command test.

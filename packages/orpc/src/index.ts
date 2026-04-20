@@ -31,10 +31,12 @@ import {
   createProjectCommandInputSchema,
   createResourceCommandInputSchema,
   createSshCredentialCommandInputSchema,
+  DeleteResourceCommand,
   DeploymentLogsQuery,
   type DeploymentProgressEvent,
   type DeploymentProgressObserver,
   DiffEnvironmentsQuery,
+  deleteResourceCommandInputSchema,
   deploymentLogsQueryInputSchema,
   diffEnvironmentsQueryInputSchema,
   type ExecutionContext,
@@ -103,6 +105,7 @@ import {
   createProjectResponseSchema,
   createResourceResponseSchema,
   createSshCredentialResponseSchema,
+  deleteResourceResponseSchema,
   deploymentLogsResponseSchema,
   deploymentProgressEventSchema,
   diffEnvironmentResponseSchema,
@@ -327,6 +330,7 @@ function toOrpcError(error: DomainError, context: ExecutionContext) {
     case "certificate_attempt_conflict":
     case "resource_slug_conflict":
     case "resource_archived":
+    case "resource_delete_blocked":
     case "deployment_not_redeployable":
       return new ORPCError("CONFLICT", {
         message,
@@ -779,6 +783,18 @@ export const archiveResourceProcedure = base
     executeCommand(context, ArchiveResourceCommand.create(input)),
   );
 
+export const deleteResourceProcedure = base
+  .route({
+    method: "DELETE",
+    path: "/resources/{resourceId}",
+    successStatus: 200,
+  })
+  .input(deleteResourceCommandInputSchema)
+  .output(deleteResourceResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, DeleteResourceCommand.create(input)),
+  );
+
 export const configureResourceHealthProcedure = base
   .route({
     method: "POST",
@@ -1137,6 +1153,7 @@ export const appaloftOrpcRouter = {
     show: showResourceProcedure,
     create: createResourceProcedure,
     archive: archiveResourceProcedure,
+    delete: deleteResourceProcedure,
     configureHealth: configureResourceHealthProcedure,
     configureNetwork: configureResourceNetworkProcedure,
     configureRuntime: configureResourceRuntimeProcedure,

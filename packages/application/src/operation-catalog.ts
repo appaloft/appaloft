@@ -22,6 +22,7 @@ import { configureResourceNetworkCommandInputSchema } from "./operations/resourc
 import { configureResourceRuntimeCommandInputSchema } from "./operations/resources/configure-resource-runtime.command";
 import { configureResourceSourceCommandInputSchema } from "./operations/resources/configure-resource-source.command";
 import { createResourceCommandInputSchema } from "./operations/resources/create-resource.command";
+import { deleteResourceCommandInputSchema } from "./operations/resources/delete-resource.command";
 import { listResourcesQueryInputSchema } from "./operations/resources/list-resources.query";
 import { resourceDiagnosticSummaryQueryInputSchema } from "./operations/resources/resource-diagnostic-summary.query";
 import { resourceHealthQueryInputSchema } from "./operations/resources/resource-health.query";
@@ -272,6 +273,20 @@ export const operationCatalog = [
     transports: {
       cli: "appaloft resource archive <resourceId>",
       orpc: { method: "POST", path: "/api/resources/{resourceId}/archive" },
+    },
+  },
+  {
+    key: "resources.delete",
+    kind: "command",
+    domain: "resources",
+    messageName: "DeleteResourceCommand",
+    handlerName: "DeleteResourceCommandHandler",
+    serviceName: "DeleteResourceUseCase",
+    inputSchema: deleteResourceCommandInputSchema,
+    serviceToken: tokens.deleteResourceUseCase,
+    transports: {
+      cli: "appaloft resource delete <resourceId> --confirm-slug <slug>",
+      orpc: { method: "DELETE", path: "/api/resources/{resourceId}" },
     },
   },
   {

@@ -273,6 +273,11 @@ const apiResponses: Record<ApiScenario, Record<string, unknown>> = {
         id: "res_demo",
       },
     },
+    "/api/rpc/resources/delete": {
+      json: {
+        id: "res_demo",
+      },
+    },
     "/api/rpc/domain-bindings/list": {
       json: {
         items: [],
@@ -1075,6 +1080,59 @@ describe("console e2e with Bun.WebView", () => {
     expect(archiveInput).toEqual({
       resourceId: "res_demo",
     });
+  }, 15_000);
+
+  test("[RES-PROFILE-ENTRY-008] submits archived resource delete through Web", async () => {
+    activeScenario = "dashboard";
+    resetRecordedApiRequests();
+    const showResponse = apiResponses.dashboard["/api/rpc/resources/show"] as {
+      json: {
+        lifecycle: {
+          status: string;
+          archivedAt?: string;
+        };
+      };
+    };
+    const previousLifecycle = { ...showResponse.json.lifecycle };
+    showResponse.json.lifecycle = {
+      status: "archived",
+      archivedAt: "2026-01-01T00:00:00.000Z",
+    };
+
+    try {
+      await using view = createWebView();
+      await view.navigate(`${previewUrl}/resources/res_demo`);
+      await expectAnyText(view, ["Archived", "已归档"]);
+      await view.evaluate("window.prompt = () => 'workspace'");
+      const clicked = await waitFor(
+        () =>
+          view.evaluate<boolean>(
+            `(() => {
+              const button = document.querySelector("#resource-delete-action");
+              if (!(button instanceof HTMLButtonElement)) {
+                return false;
+              }
+              button.click();
+              return true;
+            })()`,
+          ),
+        Boolean,
+        "Expected archived resource delete action",
+      );
+      expect(clicked).toBe(true);
+
+      const deleteRequest = await waitForRecordedRequest("/api/rpc/resources/delete");
+      const deleteInput = readOrpcJsonPayload(deleteRequest.body);
+
+      expect(deleteInput).toEqual({
+        resourceId: "res_demo",
+        confirmation: {
+          resourceSlug: "workspace",
+        },
+      });
+    } finally {
+      showResponse.json.lifecycle = previousLifecycle;
+    }
   }, 15_000);
 
   test("shows the GitHub repository picker and fills the import wizard after auth", async () => {

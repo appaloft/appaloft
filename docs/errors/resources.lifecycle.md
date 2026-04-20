@@ -236,10 +236,9 @@ fail later during source detection, Git clone, Docker image pull, or runtime pla
 or Web coverage in the resource profile lifecycle slice.
 
 `resources.archive` is an active public surface with `resource_archived` guard coverage for
-source/runtime/network/health configuration and deployment admission. `resources.delete` remains an
-accepted candidate operation. Its deletion blocker kinds, confirmation mismatch behavior, deleted
-lifecycle status, and event publication mapping are specified for the next guarded cleanup Code
-Round but are not yet active public surfaces.
+source/runtime/network/health configuration and deployment admission. `resources.delete` is active
+with `resource_delete_blocked`, confirmation mismatch, deleted/tombstone lifecycle state, normal
+read-model omission, and `resource-deleted` publication coverage.
 
 ## Open Questions
 

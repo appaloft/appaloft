@@ -89,6 +89,7 @@ export interface ResourcesTable {
   lifecycle_status: string;
   archived_at: string | null;
   archive_reason: string | null;
+  deleted_at: string | null;
   created_at: TimestampColumn;
 }
 

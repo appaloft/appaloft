@@ -309,6 +309,10 @@ export class ShowResourceQueryService {
       }
 
       const state = resource.toState();
+      if (state.lifecycleStatus.isDeleted()) {
+        return err(resourceReadNotFound(query.resourceId));
+      }
+
       const summary = (await this.listResourcesQueryService.execute(context)).items.find(
         (candidate) => candidate.id === query.resourceId,
       );

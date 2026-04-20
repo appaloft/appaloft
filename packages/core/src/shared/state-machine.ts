@@ -1143,14 +1143,32 @@ export class ResourceLifecycleStatusValue extends StateMachineValueObject<
     return new ResourceLifecycleStatusValue("active");
   }
 
+  static deleted(): ResourceLifecycleStatusValue {
+    return new ResourceLifecycleStatusValue("deleted");
+  }
+
   archive(): Result<ResourceLifecycleStatusValue> {
     return this.ensureCurrent(["active"], "Only active resources can be archived").map(
       () => new ResourceLifecycleStatusValue("archived"),
     );
   }
 
+  delete(): Result<ResourceLifecycleStatusValue> {
+    return this.ensureCurrent(["archived"], "Only archived resources can be deleted").map(
+      () => new ResourceLifecycleStatusValue("deleted"),
+    );
+  }
+
+  isActive(): boolean {
+    return this.value === "active";
+  }
+
   isArchived(): boolean {
     return this.value === "archived";
+  }
+
+  isDeleted(): boolean {
+    return this.value === "deleted";
   }
 }
 

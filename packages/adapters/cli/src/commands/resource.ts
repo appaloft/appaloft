@@ -5,6 +5,7 @@ import {
   ConfigureResourceRuntimeCommand,
   ConfigureResourceSourceCommand,
   CreateResourceCommand,
+  DeleteResourceCommand,
   ListResourcesQuery,
   OpenTerminalSessionCommand,
   ResourceDiagnosticSummaryQuery,
@@ -40,6 +41,7 @@ const kindOption = Options.choice("kind", resourceKinds).pipe(Options.withDefaul
 const destinationOption = Options.text("destination").pipe(Options.optional);
 const descriptionOption = Options.text("description").pipe(Options.optional);
 const archiveReasonOption = Options.text("reason").pipe(Options.optional);
+const confirmSlugOption = Options.text("confirm-slug");
 const internalPortOption = Options.text("internal-port").pipe(Options.optional);
 const configureNetworkInternalPortOption = Options.text("internal-port");
 const sourceKindOption = Options.choice("kind", sourceKinds);
@@ -227,6 +229,26 @@ const archiveCommand = EffectCommand.make(
     );
   },
 ).pipe(EffectCommand.withDescription("Archive a resource"));
+
+const deleteCommand = EffectCommand.make(
+  "delete",
+  {
+    resourceId: resourceIdArg,
+    confirmSlug: confirmSlugOption,
+    json: jsonOption,
+  },
+  ({ confirmSlug, json, resourceId }) => {
+    void json;
+    return runCommand(
+      DeleteResourceCommand.create({
+        resourceId,
+        confirmation: {
+          resourceSlug: confirmSlug,
+        },
+      }),
+    );
+  },
+).pipe(EffectCommand.withDescription("Delete an archived resource"));
 
 const terminalCommand = EffectCommand.make(
   "terminal",
@@ -552,6 +574,7 @@ export const resourceCommand = EffectCommand.make("resource").pipe(
     listCommand,
     showCommand,
     archiveCommand,
+    deleteCommand,
     terminalCommand,
     logsCommand,
     healthCommand,
