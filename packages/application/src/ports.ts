@@ -1486,6 +1486,13 @@ export interface DeploymentSummary {
           | "poetry"
           | "uv"
           | "yarn";
+        applicationShape?:
+          | "static"
+          | "serverful-http"
+          | "ssr"
+          | "hybrid-static-server"
+          | "worker"
+          | "container-native";
         runtimeVersion?: string;
         projectName?: string;
         detectedFiles?: Array<

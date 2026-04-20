@@ -118,6 +118,7 @@ import {
   type RuntimePlan as RuntimePlanType,
   RuntimeVerificationStep,
   RuntimeVerificationStepKindValue,
+  SourceApplicationShapeValue,
   SourceBaseDirectory,
   SourceDescriptor,
   SourceDetectedFileValue,
@@ -175,6 +176,7 @@ type RuntimeArtifactIntentInput = Parameters<typeof RuntimeArtifactIntentValue.r
 type SourceRuntimeFamilyInput = Parameters<typeof SourceRuntimeFamilyValue.rehydrate>[0];
 type SourceFrameworkInput = Parameters<typeof SourceFrameworkValue.rehydrate>[0];
 type SourcePackageManagerInput = Parameters<typeof SourcePackageManagerValue.rehydrate>[0];
+type SourceApplicationShapeInput = Parameters<typeof SourceApplicationShapeValue.rehydrate>[0];
 type SourceDetectedFileInput = Parameters<typeof SourceDetectedFileValue.rehydrate>[0];
 type SourceDetectedScriptInput = Parameters<typeof SourceDetectedScriptValue.rehydrate>[0];
 type DeploymentTargetCredentialKindInput = Parameters<
@@ -206,6 +208,7 @@ export interface SerializedSourceInspectionSnapshot extends Record<string, unkno
   runtimeFamily?: SourceRuntimeFamilyInput;
   framework?: SourceFrameworkInput;
   packageManager?: SourcePackageManagerInput;
+  applicationShape?: SourceApplicationShapeInput;
   runtimeVersion?: string;
   projectName?: string;
   detectedFiles?: SourceDetectedFileInput[];
@@ -524,6 +527,7 @@ function serializeSourceInspection(
     ...(inspection.runtimeFamily ? { runtimeFamily: inspection.runtimeFamily } : {}),
     ...(inspection.framework ? { framework: inspection.framework } : {}),
     ...(inspection.packageManager ? { packageManager: inspection.packageManager } : {}),
+    ...(inspection.applicationShape ? { applicationShape: inspection.applicationShape } : {}),
     ...(inspection.runtimeVersion ? { runtimeVersion: inspection.runtimeVersion } : {}),
     ...(inspection.projectName ? { projectName: inspection.projectName } : {}),
     ...(inspection.detectedFiles.length > 0 ? { detectedFiles: inspection.detectedFiles } : {}),
@@ -548,6 +552,9 @@ function rehydrateSourceInspection(
       : {}),
     ...(inspection.packageManager
       ? { packageManager: SourcePackageManagerValue.rehydrate(inspection.packageManager) }
+      : {}),
+    ...(inspection.applicationShape
+      ? { applicationShape: SourceApplicationShapeValue.rehydrate(inspection.applicationShape) }
       : {}),
     ...(inspection.runtimeVersion
       ? { runtimeVersion: SourceRuntimeVersionText.rehydrate(inspection.runtimeVersion) }

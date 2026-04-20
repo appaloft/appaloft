@@ -1,0 +1,6 @@
+[project]
+name = "django-pip"
+version = "0.1.0"
+dependencies = [
+  "Django==5.1.7",
+]

@@ -26,6 +26,7 @@ This test matrix inherits:
 - [Resource Lifecycle Error Spec](../errors/resources.lifecycle.md)
 - [Resource Create And First Deploy Workflow Spec](../workflows/resources.create-and-first-deploy.md)
 - [Workload Framework Detection And Planning](../workflows/workload-framework-detection-and-planning.md)
+- [Workload Framework Detection And Planning Test Matrix](./workload-framework-detection-and-planning-test-matrix.md)
 - [Repository Deployment Config File Bootstrap](../workflows/deployment-config-file-bootstrap.md)
 - [Deployment Config File Test Matrix](./deployment-config-file-test-matrix.md)
 - [Spec-Driven Testing](./SPEC_DRIVEN_TESTING.md)
@@ -165,10 +166,11 @@ includes local Docker static smoke under `apps/shell/test/e2e/quick-deploy-stati
 and opt-in generic-SSH static smoke under `apps/shell/test/e2e/quick-deploy-ssh.workflow.e2e.ts`.
 
 Framework-detected resource create rows are target contract rows for the broader mainstream
-framework support catalog. Current implementation can infer local JavaScript/TypeScript framework
-evidence plus FastAPI, Django, Flask, Python package tooling, and Java project evidence. Wider
-framework families still need planner-specific Web/CLI parity and additional detectors before these
-rows are complete.
+framework support catalog. Detailed detection/planning coverage is owned by `WF-PLAN-*` rows in
+[Workload Framework Detection And Planning Test Matrix](./workload-framework-detection-and-planning-test-matrix.md).
+Current implementation can infer local JavaScript/TypeScript framework evidence plus FastAPI,
+Django, Flask, Python package tooling, and Java project evidence. Wider framework families still
+need planner-specific Web/CLI parity and additional detectors before these rows are complete.
 
 Repository config file rows `RES-CREATE-WF-009`, `RES-CREATE-WF-010`, and `RES-CREATE-ENTRY-003`
 are target contract rows. Current implementation rejects identity-bearing fields, raw secrets, and

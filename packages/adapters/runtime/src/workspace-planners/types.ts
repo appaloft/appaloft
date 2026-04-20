@@ -5,6 +5,7 @@ import {
   ok,
   type Result,
   type RuntimeExecutionPlan,
+  type SourceApplicationShape,
   type SourceDescriptor,
   type SourceInspectionSnapshot,
 } from "@appaloft/core";
@@ -42,6 +43,7 @@ export interface WorkspaceRuntimePlan {
   runtimeKind: WorkspaceRuntimeKind;
   dockerfilePath: string;
   baseImage: string;
+  applicationShape: SourceApplicationShape;
   installCommand?: string;
   buildCommand?: string;
   startCommand: string;
@@ -95,12 +97,15 @@ export function workspaceMetadata(input: {
   planner: string;
   runtimeKind: WorkspaceRuntimeKind;
   baseImage: string;
+  applicationShape: SourceApplicationShape;
   extra?: Record<string, string>;
 }): Record<string, string> {
   return {
     "workspace.planner": input.planner,
     "workspace.runtime": input.runtimeKind,
     "workspace.baseImage": input.baseImage,
+    "workspace.applicationShape": input.applicationShape,
+    applicationShape: input.applicationShape,
     ...(input.extra ?? {}),
   };
 }

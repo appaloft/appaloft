@@ -126,9 +126,9 @@ Already implemented or materially present:
   detail.
 - [x] Edge proxy providers render read-only proxy configuration sections from planned/latest/
   deployment-snapshot route input.
-- [x] Runtime planner coverage exists for Next.js, Remix, Vite static, Astro static, Nuxt generate
-  static, explicit SvelteKit static, FastAPI, Django, Flask, generic Node, generic Python, generic
-  Java, and custom command fallback.
+- [x] Runtime planner coverage exists for Next.js SSR and static export, Remix, Vite static,
+  Angular static, Astro static, Nuxt generate static, SvelteKit adapter-static/static, FastAPI,
+  Django, Flask, generic Node, generic Python, generic Java, and custom command fallback.
 - [x] Runtime target backend selection has local-shell and generic-SSH single-server registry
   coverage.
 - [x] Repository config, SSH-server PGlite state, source fingerprint links, server-applied route
@@ -276,9 +276,9 @@ Already done:
 - [x] `resources.proxy-configuration.preview` is active.
 - [x] Server-applied config domains for pure CLI/SSH mode have target-local desired/applied state.
 - [x] Local-shell and generic-SSH single-server runtime target registry coverage exists.
-- [x] Initial framework planner coverage exists for Next.js, Remix, Vite static, Astro static, Nuxt
-  generate static, explicit SvelteKit static, FastAPI, Django, Flask, generic Node, generic Python,
-  generic Java, and custom command fallback.
+- [x] Initial framework planner coverage exists for Next.js SSR and static export, Remix, Vite
+  static, Angular static, Astro static, Nuxt generate static, SvelteKit adapter-static/static,
+  FastAPI, Django, Flask, generic Node, generic Python, generic Java, and custom command fallback.
 
 Required:
 
@@ -349,8 +349,9 @@ Release rule:
 
 Already done:
 
-- [x] Static strategy, Vite static, Astro static, Nuxt generate static, explicit SvelteKit static,
-  and generic static server packaging have implementation coverage.
+- [x] Static strategy, Vite static, Angular static, Astro static, Nuxt generate static, Next.js
+  static export, SvelteKit adapter-static/static, and generic static server packaging have
+  implementation coverage.
 - [x] Next.js baseline planner builds and starts with package manager defaults.
 - [x] Remix, FastAPI, Django, Flask, generic Node, generic Python, generic Java, and custom command
   fallback planner coverage exists.
@@ -631,18 +632,21 @@ mapping, matrix rows, and Web/CLI draft parity are all checked.
 - [x] Container-native: Dockerfile, Compose, and prebuilt image paths exist.
 - [ ] Container-native: harden path/build-target/profile updates, Compose target service selection,
   and image digest visibility.
-- [x] Static sites: static strategy, Vite static, Astro static, Nuxt generate, explicit SvelteKit
-  static, and generic static server packaging exist.
-- [ ] Static sites: add Next static export, common static generators, and generic static generator
-  fallback with explicit publish directory.
+- [x] Static sites: static strategy, Vite static, Angular static, Astro static, Nuxt generate,
+  Next static export, SvelteKit adapter-static/static, and generic static server packaging exist.
+- [ ] Static sites: add common static generators and generic static generator fallback with explicit
+  publish directory.
 - [x] Next.js: baseline `nextjs` planner builds and starts with package manager defaults.
-- [ ] Next.js: add first-class SSR/standalone/static-export modes, output detection, package manager
-  parity, internal port defaults, and Docker/SSH smoke.
-- [x] React/Vue/Svelte/Solid/Angular SPA: Vite static and generic Node/static coverage exist.
-- [ ] React/Vue/Svelte/Solid/Angular SPA: detect framework-specific outputs and route static output
-  through static-server artifacts.
-- [x] Nuxt/SvelteKit/Astro/Remix: Nuxt generate static, explicit SvelteKit static, Astro static, and
-  Remix server planner exist.
+- [ ] Next.js: complete first-class SSR/standalone/static-export support with app/pages/output
+  detection, package manager parity, internal port defaults, and Docker/SSH smoke.
+- [x] Angular SPA: detects `angular.json` output path and routes static output through the
+  `angular-static` planner.
+- [x] React/Vue/Svelte/Solid/Angular SPA baseline: Vite static and generic Node/static coverage
+  exist.
+- [ ] React/Vue/Svelte/Solid SPA: detect framework-specific outputs and route static output through
+  static-server artifacts where Vite evidence is not sufficient.
+- [x] Nuxt/SvelteKit/Astro/Remix: Nuxt generate static, SvelteKit adapter-static/static, Astro
+  static, and Remix server planner exist.
 - [ ] Nuxt/SvelteKit/Astro/Remix: add SSR/server modes where Docker/OCI start command is
   deterministic.
 - [x] Node API frameworks: generic Node and framework metadata baseline exist.
@@ -684,8 +688,10 @@ Recommended next Spec Rounds before broad Code Rounds:
 
 - [ ] Resource profile lifecycle: `resources.show`, source/runtime/network update, archive/delete,
   resource detail workflow, and test matrix.
-- [ ] Framework support tier matrix: promote Next.js and the JavaScript/TypeScript/Python catalog
-  into numbered detection/planner/Web/CLI rows.
+- [x] Framework support tier matrix: fixed-version detector/planner fixtures cover the current
+  Next.js, Vite, Angular, SvelteKit, Nuxt, Astro, Remix, Express, FastAPI, Django, and Flask slice.
+- [ ] Framework support tier matrix: promote Web/CLI draft-field parity and real deploy smoke rows
+  for the JavaScript/TypeScript/Python catalog.
 - [ ] Deployment observation and recovery: `deployments.show`, `deployments.stream-events`,
   retry/redeploy, rollback candidate, and ADR-016 rebuild decisions.
 - [ ] Access/domain/TLS closure: default access policy editing, route precedence hardening, domain

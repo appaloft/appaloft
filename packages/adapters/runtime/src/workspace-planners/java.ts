@@ -74,6 +74,7 @@ export const javaWorkspacePlanner: WorkspaceRuntimePlanner = {
       runtimeKind: this.runtimeKind,
       dockerfilePath: generatedWorkspaceDockerfileName,
       baseImage,
+      applicationShape: "serverful-http",
       ...(installCommand ? { installCommand } : {}),
       ...(buildCommand ? { buildCommand } : {}),
       startCommand: startCommand.value,
@@ -81,6 +82,7 @@ export const javaWorkspacePlanner: WorkspaceRuntimePlanner = {
         planner: this.name,
         runtimeKind: this.runtimeKind,
         baseImage,
+        applicationShape: "serverful-http",
       }),
     });
   },

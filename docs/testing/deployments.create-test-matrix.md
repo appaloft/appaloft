@@ -43,6 +43,7 @@ This test matrix inherits:
 - [ADR-021: Docker/OCI Workload Substrate](../decisions/ADR-021-docker-oci-workload-substrate.md)
 - [ADR-023: Runtime Orchestration Target Boundary](../decisions/ADR-023-runtime-orchestration-target-boundary.md)
 - [Workload Framework Detection And Planning](../workflows/workload-framework-detection-and-planning.md)
+- [Workload Framework Detection And Planning Test Matrix](./workload-framework-detection-and-planning-test-matrix.md)
 - [Repository Deployment Config File Bootstrap](../workflows/deployment-config-file-bootstrap.md)
 - [Error Model](../errors/model.md)
 - [neverthrow Conventions](../errors/neverthrow-conventions.md)
@@ -241,13 +242,17 @@ adapter-owned static-server Dockerfile generation in
 `packages/adapters/runtime/test/runtime-plan-resolver.test.ts`. Executable static smoke coverage
 now includes the local Docker generated-nginx path and an opt-in generic-SSH Docker path.
 
-Framework planner rows `DEP-CREATE-ADM-028` through `DEP-CREATE-ADM-034` define the target contract
-for mainstream web framework expansion. Current executable coverage covers Next.js, Vite static,
-Astro static, Nuxt generate static, explicit SvelteKit static, Remix, FastAPI, Django, Flask,
-generic Node framework metadata, generic Python, generic Java, and custom command fallback in
-runtime planner tests. Additional remaining-family detectors, planner implementations, Web/CLI
-draft fields, and Docker/SSH smoke paths are required before the broader catalog can be marked
-implemented.
+Framework planner rows `DEP-CREATE-ADM-028` through `DEP-CREATE-ADM-034` define the deployment
+admission side of the mainstream web framework expansion. Detailed package-manager precedence,
+framework signal ranking, static/serverful/SSR classification, framework catalog coverage,
+base-image policy, runtime command specs, target capability checks, and entry parity are governed
+by `WF-PLAN-*` rows in
+[Workload Framework Detection And Planning Test Matrix](./workload-framework-detection-and-planning-test-matrix.md).
+Current executable coverage covers Next.js, Vite static, Astro static, Nuxt generate static,
+explicit SvelteKit static, Remix, FastAPI, Django, Flask, generic Node framework metadata, generic
+Python, generic Java, and custom command fallback in runtime planner tests. Additional
+remaining-family detectors, planner implementations, Web/CLI draft fields, and Docker/SSH smoke
+paths are required before the broader catalog can be marked implemented.
 
 Repository config file deployment rows `DEP-CREATE-ADM-035`, `DEP-CREATE-ENTRY-006`, and
 `DEP-CREATE-ENTRY-007` are target contract rows. Current implementation keeps HTTP ids-only, but

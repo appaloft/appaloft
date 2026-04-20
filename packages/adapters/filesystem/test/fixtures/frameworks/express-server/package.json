@@ -1,0 +1,14 @@
+{
+  "name": "express-server",
+  "private": true,
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/server.js"
+  },
+  "dependencies": {
+    "express": "4.21.2"
+  },
+  "devDependencies": {
+    "typescript": "5.8.2"
+  }
+}

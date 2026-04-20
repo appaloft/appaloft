@@ -608,6 +608,25 @@ describe("CreateDeploymentUseCase", () => {
     expect(command._unsafeUnwrapErr().code).toBe("validation_error");
   });
 
+  test("[WF-PLAN-BOUND-001] rejects framework-specific deployment fields at command schema boundary", () => {
+    const command = CreateDeploymentCommand.create({
+      projectId: "prj_demo",
+      serverId: "srv_demo",
+      destinationId: "dst_demo",
+      environmentId: "env_demo",
+      resourceId: "res_demo",
+      framework: "nextjs",
+      packageName: "web",
+      baseImage: "node:22-alpine",
+      runtimePreset: "nextjs",
+      buildpack: "node",
+      nodeVersion: "22",
+    } as never);
+
+    expect(command.isErr()).toBe(true);
+    expect(command._unsafeUnwrapErr().code).toBe("validation_error");
+  });
+
   test("creates a deployment with an immutable environment snapshot", async () => {
     const projects = new MemoryProjectRepository();
     const servers = new MemoryServerRepository();

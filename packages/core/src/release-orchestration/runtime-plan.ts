@@ -125,6 +125,14 @@ export const sourcePackageManagers = [
   "uv",
   "yarn",
 ] as const;
+export const sourceApplicationShapes = [
+  "static",
+  "serverful-http",
+  "ssr",
+  "hybrid-static-server",
+  "worker",
+  "container-native",
+] as const;
 export const sourceDetectedFiles = [
   "angular-json",
   "astro-config",
@@ -172,6 +180,7 @@ export type RuntimeArtifactIntent = (typeof runtimeArtifactIntents)[number];
 export type SourceRuntimeFamily = (typeof sourceRuntimeFamilies)[number];
 export type SourceFramework = (typeof sourceFrameworks)[number];
 export type SourcePackageManager = (typeof sourcePackageManagers)[number];
+export type SourceApplicationShape = (typeof sourceApplicationShapes)[number];
 export type SourceDetectedFile = (typeof sourceDetectedFiles)[number];
 export type SourceDetectedScript = (typeof sourceDetectedScripts)[number];
 
@@ -259,6 +268,7 @@ export interface SourceInspectionSnapshotState {
   runtimeFamily?: SourceRuntimeFamilyValue;
   framework?: SourceFrameworkValue;
   packageManager?: SourcePackageManagerValue;
+  applicationShape?: SourceApplicationShapeValue;
   runtimeVersion?: SourceRuntimeVersionText;
   projectName?: DisplayNameText;
   detectedFiles?: SourceDetectedFileValue[];
@@ -407,6 +417,29 @@ export class SourcePackageManagerValue extends ValueObject<SourcePackageManager>
   }
 }
 
+const sourceApplicationShapeBrand: unique symbol = Symbol("SourceApplicationShapeValue");
+export class SourceApplicationShapeValue extends ValueObject<SourceApplicationShape> {
+  private [sourceApplicationShapeBrand]!: void;
+
+  private constructor(value: SourceApplicationShape) {
+    super(value);
+  }
+
+  static create(value: string): Result<SourceApplicationShapeValue> {
+    return createRuntimeEnumValue(value, sourceApplicationShapes, "Source application shape").map(
+      (validated) => new SourceApplicationShapeValue(validated),
+    );
+  }
+
+  static rehydrate(value: SourceApplicationShape): SourceApplicationShapeValue {
+    return new SourceApplicationShapeValue(value);
+  }
+
+  get value(): SourceApplicationShape {
+    return this.state;
+  }
+}
+
 const sourceDetectedFileBrand: unique symbol = Symbol("SourceDetectedFileValue");
 export class SourceDetectedFileValue extends ValueObject<SourceDetectedFile> {
   private [sourceDetectedFileBrand]!: void;
@@ -504,6 +537,10 @@ export class SourceInspectionSnapshot extends ValueObject<SourceInspectionSnapsh
     return this.state.packageManager?.value;
   }
 
+  get applicationShape(): SourceApplicationShape | undefined {
+    return this.state.applicationShape?.value;
+  }
+
   get runtimeVersion(): string | undefined {
     return this.state.runtimeVersion?.value;
   }
@@ -545,6 +582,7 @@ export class SourceInspectionSnapshot extends ValueObject<SourceInspectionSnapsh
       ...(this.state.runtimeFamily ? { runtimeFamily: this.state.runtimeFamily } : {}),
       ...(this.state.framework ? { framework: this.state.framework } : {}),
       ...(this.state.packageManager ? { packageManager: this.state.packageManager } : {}),
+      ...(this.state.applicationShape ? { applicationShape: this.state.applicationShape } : {}),
       ...(this.state.runtimeVersion ? { runtimeVersion: this.state.runtimeVersion } : {}),
       ...(this.state.projectName ? { projectName: this.state.projectName } : {}),
       ...(this.state.detectedFiles ? { detectedFiles: [...this.state.detectedFiles] } : {}),

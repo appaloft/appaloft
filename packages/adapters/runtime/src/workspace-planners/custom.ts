@@ -42,6 +42,7 @@ export const customWorkspacePlanner: WorkspaceRuntimePlanner = {
       runtimeKind: this.runtimeKind,
       dockerfilePath: generatedWorkspaceDockerfileName,
       baseImage,
+      applicationShape: "serverful-http",
       ...(installCommand ? { installCommand } : {}),
       ...(buildCommand ? { buildCommand } : {}),
       startCommand: startCommand.value,
@@ -49,6 +50,7 @@ export const customWorkspacePlanner: WorkspaceRuntimePlanner = {
         planner: this.name,
         runtimeKind: this.runtimeKind,
         baseImage,
+        applicationShape: "serverful-http",
       }),
     });
   },

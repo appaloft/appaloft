@@ -26,6 +26,7 @@ This test matrix inherits:
 - [deployments.create Command Spec](../commands/deployments.create.md)
 - [resources.create Command Spec](../commands/resources.create.md)
 - [Workload Framework Detection And Planning](../workflows/workload-framework-detection-and-planning.md)
+- [Workload Framework Detection And Planning Test Matrix](./workload-framework-detection-and-planning-test-matrix.md)
 - [resources.diagnostic-summary Query Spec](../queries/resources.diagnostic-summary.md)
 - [Quick Deploy Workflow Spec](../workflows/quick-deploy.md)
 - [Repository Deployment Config File Bootstrap](../workflows/deployment-config-file-bootstrap.md)
@@ -204,9 +205,13 @@ context flags are supplied. It should use provided flags plus defaults, then dis
 `resources.create` and `deployments.create`.
 
 Framework detection rows `QUICK-DEPLOY-WF-042` through `QUICK-DEPLOY-WF-044` and
-`QUICK-DEPLOY-ENTRY-009` are target contract rows. Current implementation has detector/planner
-coverage for initial JavaScript/TypeScript and Python framework slices, but full browser/CLI e2e
-parity is still required before a framework family is marked first-class.
+`QUICK-DEPLOY-ENTRY-009` are Quick Deploy entry-contract rows. Detailed package-manager,
+framework-signal, classification, catalog, base-image, runtime-capability, and boundary coverage is
+owned by `WF-PLAN-*` rows in
+[Workload Framework Detection And Planning Test Matrix](./workload-framework-detection-and-planning-test-matrix.md).
+Current implementation has detector/planner coverage for initial JavaScript/TypeScript and Python
+framework slices, but full browser/CLI e2e parity is still required before a framework family is
+marked first-class.
 
 Repository config file rows `QUICK-DEPLOY-WF-045` through `QUICK-DEPLOY-WF-051` and
 remote-state/domain rows `QUICK-DEPLOY-WF-052` through `QUICK-DEPLOY-WF-054` plus
