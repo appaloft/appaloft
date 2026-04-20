@@ -39,7 +39,11 @@ export class PgResourceReadModel implements ResourceReadModel {
         },
       },
       async () => {
-        let query = executor.selectFrom("resources").selectAll().orderBy("created_at", "desc");
+        let query = executor
+          .selectFrom("resources")
+          .selectAll()
+          .where("lifecycle_status", "!=", "deleted")
+          .orderBy("created_at", "desc");
 
         if (input?.projectId) {
           query = query.where("project_id", "=", input.projectId);

@@ -20,6 +20,11 @@ import { certificatesMigration } from "./migrations/012_certificates";
 import { domainBindingRouteFailureMigration } from "./migrations/013_domain_binding_route_failure";
 import { domainBindingDnsObservationMigration } from "./migrations/014_domain_binding_dns_observation";
 import { domainBindingCanonicalRedirectMigration } from "./migrations/015_domain_binding_canonical_redirect";
+import { resourceLifecycleMigration } from "./migrations/016_resource_lifecycle";
+import { resourceDeleteTombstoneMigration } from "./migrations/017_resource_delete_tombstone";
+import { auditLogAggregateIndexMigration } from "./migrations/018_audit_log_aggregate_index";
+import { sourceLinksMigration } from "./migrations/019_source_links";
+import { serverAppliedRouteStatesMigration } from "./migrations/020_server_applied_route_states";
 import { PgliteDialect } from "./pglite-dialect";
 import { type Database } from "./schema";
 import { TracingDialect } from "./tracing-dialect";
@@ -129,6 +134,11 @@ class StaticMigrationProvider implements MigrationProvider {
       "013_domain_binding_route_failure": domainBindingRouteFailureMigration,
       "014_domain_binding_dns_observation": domainBindingDnsObservationMigration,
       "015_domain_binding_canonical_redirect": domainBindingCanonicalRedirectMigration,
+      "016_resource_lifecycle": resourceLifecycleMigration,
+      "017_resource_delete_tombstone": resourceDeleteTombstoneMigration,
+      "018_audit_log_aggregate_index": auditLogAggregateIndexMigration,
+      "019_source_links": sourceLinksMigration,
+      "020_server_applied_route_states": serverAppliedRouteStatesMigration,
     };
   }
 }

@@ -16,13 +16,19 @@ import { showEnvironmentQueryInputSchema } from "./operations/environments/show-
 import { unsetEnvironmentVariableCommandInputSchema } from "./operations/environments/unset-environment-variable.command";
 import { createProjectCommandInputSchema } from "./operations/projects/create-project.command";
 import { listProjectsQueryInputSchema } from "./operations/projects/list-projects.query";
+import { archiveResourceCommandInputSchema } from "./operations/resources/archive-resource.command";
 import { configureResourceHealthCommandInputSchema } from "./operations/resources/configure-resource-health.command";
+import { configureResourceNetworkCommandInputSchema } from "./operations/resources/configure-resource-network.command";
+import { configureResourceRuntimeCommandInputSchema } from "./operations/resources/configure-resource-runtime.command";
+import { configureResourceSourceCommandInputSchema } from "./operations/resources/configure-resource-source.command";
 import { createResourceCommandInputSchema } from "./operations/resources/create-resource.command";
+import { deleteResourceCommandInputSchema } from "./operations/resources/delete-resource.command";
 import { listResourcesQueryInputSchema } from "./operations/resources/list-resources.query";
 import { resourceDiagnosticSummaryQueryInputSchema } from "./operations/resources/resource-diagnostic-summary.query";
 import { resourceHealthQueryInputSchema } from "./operations/resources/resource-health.query";
 import { resourceProxyConfigurationPreviewQueryInputSchema } from "./operations/resources/resource-proxy-configuration-preview.query";
 import { resourceRuntimeLogsQueryInputSchema } from "./operations/resources/resource-runtime-logs.query";
+import { showResourceQueryInputSchema } from "./operations/resources/show-resource.query";
 import { bootstrapServerProxyCommandInputSchema } from "./operations/servers/bootstrap-server-proxy.command";
 import { configureServerCredentialCommandInputSchema } from "./operations/servers/configure-server-credential.command";
 import { createSshCredentialCommandInputSchema } from "./operations/servers/create-ssh-credential.command";
@@ -228,6 +234,20 @@ export const operationCatalog = [
     },
   },
   {
+    key: "resources.show",
+    kind: "query",
+    domain: "resources",
+    messageName: "ShowResourceQuery",
+    handlerName: "ShowResourceQueryHandler",
+    serviceName: "ShowResourceQueryService",
+    inputSchema: showResourceQueryInputSchema,
+    serviceToken: tokens.showResourceQueryService,
+    transports: {
+      cli: "appaloft resource show <resourceId>",
+      orpc: { method: "GET", path: "/api/resources/{resourceId}" },
+    },
+  },
+  {
     key: "resources.create",
     kind: "command",
     domain: "resources",
@@ -242,6 +262,34 @@ export const operationCatalog = [
     },
   },
   {
+    key: "resources.archive",
+    kind: "command",
+    domain: "resources",
+    messageName: "ArchiveResourceCommand",
+    handlerName: "ArchiveResourceCommandHandler",
+    serviceName: "ArchiveResourceUseCase",
+    inputSchema: archiveResourceCommandInputSchema,
+    serviceToken: tokens.archiveResourceUseCase,
+    transports: {
+      cli: "appaloft resource archive <resourceId>",
+      orpc: { method: "POST", path: "/api/resources/{resourceId}/archive" },
+    },
+  },
+  {
+    key: "resources.delete",
+    kind: "command",
+    domain: "resources",
+    messageName: "DeleteResourceCommand",
+    handlerName: "DeleteResourceCommandHandler",
+    serviceName: "DeleteResourceUseCase",
+    inputSchema: deleteResourceCommandInputSchema,
+    serviceToken: tokens.deleteResourceUseCase,
+    transports: {
+      cli: "appaloft resource delete <resourceId> --confirm-slug <slug>",
+      orpc: { method: "DELETE", path: "/api/resources/{resourceId}" },
+    },
+  },
+  {
     key: "resources.configure-health",
     kind: "command",
     domain: "resources",
@@ -253,6 +301,48 @@ export const operationCatalog = [
     transports: {
       cli: "appaloft resource configure-health <resourceId>",
       orpc: { method: "POST", path: "/api/resources/{resourceId}/health-policy" },
+    },
+  },
+  {
+    key: "resources.configure-source",
+    kind: "command",
+    domain: "resources",
+    messageName: "ConfigureResourceSourceCommand",
+    handlerName: "ConfigureResourceSourceCommandHandler",
+    serviceName: "ConfigureResourceSourceUseCase",
+    inputSchema: configureResourceSourceCommandInputSchema,
+    serviceToken: tokens.configureResourceSourceUseCase,
+    transports: {
+      cli: "appaloft resource configure-source <resourceId>",
+      orpc: { method: "POST", path: "/api/resources/{resourceId}/source" },
+    },
+  },
+  {
+    key: "resources.configure-runtime",
+    kind: "command",
+    domain: "resources",
+    messageName: "ConfigureResourceRuntimeCommand",
+    handlerName: "ConfigureResourceRuntimeCommandHandler",
+    serviceName: "ConfigureResourceRuntimeUseCase",
+    inputSchema: configureResourceRuntimeCommandInputSchema,
+    serviceToken: tokens.configureResourceRuntimeUseCase,
+    transports: {
+      cli: "appaloft resource configure-runtime <resourceId>",
+      orpc: { method: "POST", path: "/api/resources/{resourceId}/runtime-profile" },
+    },
+  },
+  {
+    key: "resources.configure-network",
+    kind: "command",
+    domain: "resources",
+    messageName: "ConfigureResourceNetworkCommand",
+    handlerName: "ConfigureResourceNetworkCommandHandler",
+    serviceName: "ConfigureResourceNetworkUseCase",
+    inputSchema: configureResourceNetworkCommandInputSchema,
+    serviceToken: tokens.configureResourceNetworkUseCase,
+    transports: {
+      cli: "appaloft resource configure-network <resourceId>",
+      orpc: { method: "POST", path: "/api/resources/{resourceId}/network-profile" },
     },
   },
   {
@@ -634,3 +724,85 @@ export const operationCatalog = [
 ] as const satisfies readonly OperationCatalogEntry[];
 
 export type OperationKey = (typeof operationCatalog)[number]["key"];
+
+export type GenericAggregateMutationOperationViolation = {
+  key: string;
+  field:
+    | "key"
+    | "messageName"
+    | "handlerName"
+    | "serviceName"
+    | "transports.cli"
+    | "transports.orpc.path"
+    | "transports.orpcStream.path";
+  value: string;
+};
+
+type OperationCatalogGuardEntry = Pick<
+  OperationCatalogEntry,
+  "domain" | "handlerName" | "key" | "kind" | "messageName" | "serviceName" | "transports"
+>;
+
+const forbiddenGenericMutationTokens = new Set(["update", "patch", "save", "edit"]);
+const forbiddenGenericMutationNamePattern = /^(Update|Patch|Save|Edit)[A-Z]/;
+
+function includesForbiddenGenericMutationToken(value: string): boolean {
+  return value
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .some((token) => forbiddenGenericMutationTokens.has(token));
+}
+
+export function findGenericAggregateMutationOperations(
+  entries: readonly OperationCatalogGuardEntry[] = operationCatalog,
+): GenericAggregateMutationOperationViolation[] {
+  const violations: GenericAggregateMutationOperationViolation[] = [];
+
+  for (const entry of entries) {
+    if (entry.kind !== "command" || entry.domain === "system") {
+      continue;
+    }
+
+    if (includesForbiddenGenericMutationToken(entry.key)) {
+      violations.push({ key: entry.key, field: "key", value: entry.key });
+    }
+
+    for (const [field, value] of [
+      ["messageName", entry.messageName],
+      ["handlerName", entry.handlerName],
+      ["serviceName", entry.serviceName],
+    ] as const) {
+      if (forbiddenGenericMutationNamePattern.test(value)) {
+        violations.push({ key: entry.key, field, value });
+      }
+    }
+
+    if (entry.transports.cli && includesForbiddenGenericMutationToken(entry.transports.cli)) {
+      violations.push({ key: entry.key, field: "transports.cli", value: entry.transports.cli });
+    }
+
+    if (
+      entry.transports.orpc &&
+      includesForbiddenGenericMutationToken(entry.transports.orpc.path)
+    ) {
+      violations.push({
+        key: entry.key,
+        field: "transports.orpc.path",
+        value: entry.transports.orpc.path,
+      });
+    }
+
+    if (
+      entry.transports.orpcStream &&
+      includesForbiddenGenericMutationToken(entry.transports.orpcStream.path)
+    ) {
+      violations.push({
+        key: entry.key,
+        field: "transports.orpcStream.path",
+        value: entry.transports.orpcStream.path,
+      });
+    }
+  }
+
+  return violations;
+}

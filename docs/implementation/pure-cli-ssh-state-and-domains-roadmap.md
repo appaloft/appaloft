@@ -114,11 +114,11 @@ selection overrides, not required setup.
 | Remote state lock | Yes | Yes | No | Lock acquisition is held across remote PGlite download, local command execution, upload, and release in shell CLI mode. |
 | Remote state migrate | Yes | Yes | No | Migration command construction exists before identity resolution; external SSH execution is wired through the secret-gated e2e workflow. |
 | Remote state recovery | Yes | Yes | No | Includes stale lock handling, failed migration restore/journal, and `doctor` diagnostics. |
-| Source fingerprint link state | Yes | Yes | Useful | Required for repeat deployments without committed ids. |
+| Source fingerprint link state | Yes | Yes | Useful | Required for repeat deployments without committed ids. SSH file-backed mirror exists; PG/PGlite durable adapter is specified in the source-link persistence plan. |
 | Explicit relink command/workflow | Yes | Yes | Useful | Required operator escape hatch for mistaken or intentional retargeting. |
 | `access.domains[]` parser | No for first remote-state slice; yes for CLI product value | Yes | Useful | Domain support can follow remote state foundation but is part of the CLI product thesis. |
 | Canonical redirect route intent | No for first remote-state slice; yes for CLI product value | Yes for www/apex parity | Useful | Needed for common www/non-www canonical host behavior. Requires parser, remote state shape, provider rendering, proxy config/read-model visibility, and e2e redirect assertion. |
-| Server-applied route desired/applied state | No for first remote-state slice; yes for domain support | Yes | No | Desired state persistence, deployment-time desired state consumption, and applied/failed status persistence exist for SSH CLI mode. |
+| Server-applied route desired/applied state | No for first remote-state slice; yes for domain support | Yes | Useful | File-backed SSH route state exists for adapter-level mechanics. PG/PGlite durable persistence for selected hosted/self-hosted, embedded, and SSH-mirrored state backends is implemented through the server-applied route persistence plan. |
 | Edge proxy route realization for config domains | No for first remote-state slice; yes for domain support | Yes | No | Desired routes now enter provider-neutral route input, deployment-finished status writeback, mixed path/TLS route groups, and provider-local TLS diagnostics. |
 | GitHub Action wrapper docs | Yes before public release | Yes before public release | No | Binary can be used manually first, but public UX needs `appaloft/deploy-action`, version selection, checksum verification, SSH secret mapping, and examples. |
 | Action PR preview deploy/update | No for first remote-state slice; useful for public Action UX | Useful | No | Uses a user-authored `pull_request` workflow, preview-scoped source links, generated/default access or user-owned wildcard DNS, and no automatic cleanup until a cleanup operation exists. |
@@ -147,6 +147,14 @@ selection overrides, not required setup.
   sequencing around remote extraction.
 - Config deploy now reads source fingerprint link state before identity resolution and writes a
   first-run link after project/server/environment/resource identity is resolved.
+- PostgreSQL/PGlite source-link persistence for hosted/self-hosted and embedded state backends is
+  implemented through the `source_links` migration and PG `SourceLinkStore`; shell command
+  execution uses that adapter while SSH remote PGlite sync still moves the selected state backend.
+- PostgreSQL/PGlite server-applied route persistence for hosted/self-hosted, embedded, and
+  SSH-mirrored state backends is implemented through
+  [Server-Applied Route Durable Persistence Plan](./server-applied-route-durable-persistence-plan.md):
+  the route-state table, PG adapter, shell wiring, exact/default lookup, applied/failed status
+  writeback, and `server-applied-route` deletion blocker closure are present.
 - The public CLI `source-links.relink` command now dispatches the application command, validates
   target context against Appaloft state, and uses the same SSH remote-state mirror/lock path when a
   trusted SSH target is supplied.
@@ -200,5 +208,6 @@ The next Test-First Round should start from:
 - `ROUTE-TLS-BOUNDARY-005` through `ROUTE-TLS-BOUNDARY-006`
 - `EDGE-PROXY-ROUTE-005` through `EDGE-PROXY-ROUTE-008`
 - `EDGE-PROXY-QRY-007`
+- `SERVER-APPLIED-ROUTE-STATE-001` through `SERVER-APPLIED-ROUTE-STATE-005`
 - `CONFIG-FILE-ENTRY-009` through `CONFIG-FILE-ENTRY-013`
 - `QUICK-DEPLOY-ENTRY-011`

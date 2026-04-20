@@ -53,6 +53,61 @@ function createRequiredTextValue<TText>(
   return validateRequiredText(value, label).map(create);
 }
 
+function validateSafeOptionalDomainText(
+  value: string,
+  input: { label: string; maxLength: number; phase: string; field: string },
+): Result<string> {
+  const normalized = value.trim();
+
+  if (!normalized) {
+    return err(
+      domainError.validation(`${input.label} is required`, {
+        phase: input.phase,
+        field: input.field,
+      }),
+    );
+  }
+
+  if (normalized.length > input.maxLength) {
+    return err(
+      domainError.validation(`${input.label} must be at most ${input.maxLength} characters`, {
+        phase: input.phase,
+        field: input.field,
+        maxLength: input.maxLength,
+      }),
+    );
+  }
+
+  if (
+    Array.from(normalized).some((character) => {
+      const code = character.charCodeAt(0);
+      return code < 32 || code === 127;
+    })
+  ) {
+    return err(
+      domainError.validation(`${input.label} must be a single line of printable text`, {
+        phase: input.phase,
+        field: input.field,
+      }),
+    );
+  }
+
+  if (
+    /-----BEGIN [A-Z ]*PRIVATE KEY-----/.test(normalized) ||
+    /\b(?:password|secret|token|private[_ -]?key)\s*[:=]/i.test(normalized) ||
+    /\b(?:ghp_|github_pat_|xox[baprs]-|sk-[A-Za-z0-9_-]{16,})/.test(normalized)
+  ) {
+    return err(
+      domainError.validation(`${input.label} must not contain secret material`, {
+        phase: input.phase,
+        field: input.field,
+      }),
+    );
+  }
+
+  return ok(normalized);
+}
+
 function createSlugTextValue<TText>(
   value: string,
   label: string,
@@ -303,6 +358,33 @@ export class ResourceServiceName extends NonEmptyTextValue {
 
   static rehydrate(value: string): ResourceServiceName {
     return new ResourceServiceName(rehydrateRequiredText(value));
+  }
+}
+
+const archiveReasonBrand: unique symbol = Symbol("ArchiveReason");
+export class ArchiveReason extends NonEmptyTextValue {
+  private [archiveReasonBrand]!: void;
+
+  private constructor(value: string) {
+    super(value);
+  }
+
+  static create(value: string): Result<ArchiveReason> {
+    return validateSafeOptionalDomainText(value, {
+      label: "Archive reason",
+      maxLength: 280,
+      phase: "resource-archive",
+      field: "reason",
+    }).map((normalized) => new ArchiveReason(normalized));
+  }
+
+  static rehydrate(value: string): ArchiveReason {
+    return new ArchiveReason(rehydrateRequiredText(value));
+  }
+
+  static fromOptional(value?: string): Result<ArchiveReason | undefined> {
+    const normalized = value?.trim();
+    return normalized ? ArchiveReason.create(normalized) : ok(undefined);
   }
 }
 

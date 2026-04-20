@@ -132,7 +132,7 @@ Then:
 | --- | --- | --- | --- |
 | RES-CREATE-ENTRY-001 | e2e-preferred | HTTP/oRPC static resource create | `POST /api/resources` reuses the command schema, accepts `kind = static-site`, `runtimeProfile.strategy = static`, `runtimeProfile.publishDirectory`, and HTTP network profile defaults, dispatches `CreateResourceCommand`, and returns a resource id. |
 | RES-CREATE-ENTRY-002 | e2e-preferred | Web/CLI framework-detected resource create | Web and CLI use the same source inspection and planner contract to suggest resource profile defaults, then dispatch `resources.create` through the shared command schema without deployment-owned framework/base-image fields. |
-| RES-CREATE-ENTRY-003 | e2e-preferred | Config-file-backed resource create | CLI/local entry maps repository config profile fields into the existing `resources.create` schema or future resource profile update commands; HTTP resource create remains explicit schema input and does not read local files. |
+| RES-CREATE-ENTRY-003 | e2e-preferred | Config-file-backed resource create | CLI/local entry maps repository config profile fields into the existing `resources.create` schema or future resource profile configuration commands such as `resources.configure-source`, `resources.configure-runtime`, and `resources.configure-network`; HTTP resource create remains explicit schema input and does not read local files. |
 
 ## Event Matrix
 

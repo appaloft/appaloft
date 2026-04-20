@@ -266,6 +266,11 @@ rollout. Source language/framework/package-manager evidence is represented by a 
 `SourceInspectionSnapshot`; planner selection must not depend on the generic
 `SourceDescriptor.metadata` bag.
 
+Resource runtime-profile configuration now models Dockerfile path, Compose file path, static
+publish directory, and Docker build target as explicit aggregate-owned value objects. Public
+runtime-profile mutation stays under `resources.configure-runtime`; target/orchestrator controls
+remain outside that command.
+
 The target contract still has gaps:
 
 - image artifact snapshots do not yet capture resolved image ids, digests, registry push/pull

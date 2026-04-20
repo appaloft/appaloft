@@ -21,12 +21,19 @@ import {
   type HealthCheckTypeValue,
   type ResourceExposureModeValue,
   type ResourceKindValue,
+  ResourceLifecycleStatusValue,
   type ResourceNetworkProtocolValue,
   type ResourceServiceKindValue,
   type RuntimePlanStrategyValue,
 } from "../shared/state-machine";
-import { type CreatedAt, type UpdatedAt } from "../shared/temporal";
 import {
+  type ArchivedAt,
+  type CreatedAt,
+  type DeletedAt,
+  type UpdatedAt,
+} from "../shared/temporal";
+import {
+  type ArchiveReason,
   type CommandText,
   type DescriptionText,
   type HealthCheckHostText,
@@ -79,6 +86,9 @@ export interface ResourceRuntimeProfileState {
   buildCommand?: CommandText;
   startCommand?: CommandText;
   publishDirectory?: StaticPublishDirectory;
+  dockerfilePath?: DockerfilePath;
+  dockerComposeFilePath?: DockerComposeFilePath;
+  buildTarget?: DockerBuildTarget;
   healthCheckPath?: HealthCheckPathText;
   healthCheck?: ResourceHealthCheckPolicyState;
 }
@@ -156,6 +166,83 @@ function normalizeStaticPublishDirectory(value: string): Result<string> {
   return ok(`/${segments.join("/")}`);
 }
 
+function normalizeRuntimeProfileRelativePath(
+  value: string,
+  input: { field: string; runtimePlanStrategy: string },
+): Result<string> {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return err(
+      resourceRuntimeResolutionError("Runtime profile path is required", {
+        field: input.field,
+        runtimePlanStrategy: input.runtimePlanStrategy,
+      }),
+    );
+  }
+
+  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(trimmed)) {
+    return err(
+      resourceRuntimeResolutionError("Runtime profile path must not be a URL", {
+        field: input.field,
+        runtimePlanStrategy: input.runtimePlanStrategy,
+      }),
+    );
+  }
+
+  if (trimmed.startsWith("/") || trimmed.startsWith("\\\\") || /^[a-z]:[\\/]/i.test(trimmed)) {
+    return err(
+      resourceRuntimeResolutionError("Runtime profile path must be source-root-relative", {
+        field: input.field,
+        runtimePlanStrategy: input.runtimePlanStrategy,
+      }),
+    );
+  }
+
+  if (/[;&|`$<>]/.test(trimmed)) {
+    return err(
+      resourceRuntimeResolutionError("Runtime profile path contains unsupported shell characters", {
+        field: input.field,
+        runtimePlanStrategy: input.runtimePlanStrategy,
+      }),
+    );
+  }
+
+  const segments = trimmed.replace(/\\/g, "/").split("/").filter(Boolean);
+  if (segments.length === 0 || segments.some((segment) => segment === "." || segment === "..")) {
+    return err(
+      resourceRuntimeResolutionError("Runtime profile path must not contain dot segments", {
+        field: input.field,
+        runtimePlanStrategy: input.runtimePlanStrategy,
+      }),
+    );
+  }
+
+  return ok(segments.join("/"));
+}
+
+function normalizeDockerBuildTarget(value: string): Result<string> {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return err(
+      resourceRuntimeResolutionError("Docker build target is required", {
+        field: "runtimeProfile.buildTarget",
+        runtimePlanStrategy: "dockerfile",
+      }),
+    );
+  }
+
+  if (!/^[A-Za-z0-9_.-]+$/.test(trimmed)) {
+    return err(
+      resourceRuntimeResolutionError("Docker build target contains unsupported characters", {
+        field: "runtimeProfile.buildTarget",
+        runtimePlanStrategy: "dockerfile",
+      }),
+    );
+  }
+
+  return ok(trimmed);
+}
+
 const staticPublishDirectoryBrand: unique symbol = Symbol("StaticPublishDirectory");
 export class StaticPublishDirectory extends ScalarValueObject<string> {
   private [staticPublishDirectoryBrand]!: void;
@@ -172,6 +259,63 @@ export class StaticPublishDirectory extends ScalarValueObject<string> {
 
   static rehydrate(value: string): StaticPublishDirectory {
     return new StaticPublishDirectory(value.trim());
+  }
+}
+
+const dockerfilePathBrand: unique symbol = Symbol("DockerfilePath");
+export class DockerfilePath extends ScalarValueObject<string> {
+  private [dockerfilePathBrand]!: void;
+
+  private constructor(value: string) {
+    super(value);
+  }
+
+  static create(value: string): Result<DockerfilePath> {
+    return normalizeRuntimeProfileRelativePath(value, {
+      field: "runtimeProfile.dockerfilePath",
+      runtimePlanStrategy: "dockerfile",
+    }).map((normalized) => new DockerfilePath(normalized));
+  }
+
+  static rehydrate(value: string): DockerfilePath {
+    return new DockerfilePath(value.trim());
+  }
+}
+
+const dockerComposeFilePathBrand: unique symbol = Symbol("DockerComposeFilePath");
+export class DockerComposeFilePath extends ScalarValueObject<string> {
+  private [dockerComposeFilePathBrand]!: void;
+
+  private constructor(value: string) {
+    super(value);
+  }
+
+  static create(value: string): Result<DockerComposeFilePath> {
+    return normalizeRuntimeProfileRelativePath(value, {
+      field: "runtimeProfile.dockerComposeFilePath",
+      runtimePlanStrategy: "docker-compose",
+    }).map((normalized) => new DockerComposeFilePath(normalized));
+  }
+
+  static rehydrate(value: string): DockerComposeFilePath {
+    return new DockerComposeFilePath(value.trim());
+  }
+}
+
+const dockerBuildTargetBrand: unique symbol = Symbol("DockerBuildTarget");
+export class DockerBuildTarget extends ScalarValueObject<string> {
+  private [dockerBuildTargetBrand]!: void;
+
+  private constructor(value: string) {
+    super(value);
+  }
+
+  static create(value: string): Result<DockerBuildTarget> {
+    return normalizeDockerBuildTarget(value).map((normalized) => new DockerBuildTarget(normalized));
+  }
+
+  static rehydrate(value: string): DockerBuildTarget {
+    return new DockerBuildTarget(value.trim());
   }
 }
 
@@ -195,6 +339,10 @@ export interface ResourceState {
   sourceBinding?: ResourceSourceBindingState;
   runtimeProfile?: ResourceRuntimeProfileState;
   networkProfile?: ResourceNetworkProfileState;
+  lifecycleStatus: ResourceLifecycleStatusValue;
+  archivedAt?: ArchivedAt;
+  archiveReason?: ArchiveReason;
+  deletedAt?: DeletedAt;
   createdAt: CreatedAt;
   description?: DescriptionText;
 }
@@ -218,6 +366,111 @@ function cloneResourceRuntimeProfileState(
       ? { healthCheck: cloneResourceHealthCheckPolicyState(profile.healthCheck) }
       : {}),
   };
+}
+
+function cloneResourceNetworkProfileState(
+  profile: ResourceNetworkProfileState,
+): ResourceNetworkProfileState {
+  return { ...profile };
+}
+
+function serializedNetworkProfile(profile: ResourceNetworkProfileState): Record<string, unknown> {
+  return {
+    internalPort: profile.internalPort.value,
+    upstreamProtocol: profile.upstreamProtocol.value,
+    exposureMode: profile.exposureMode.value,
+    ...(profile.targetServiceName ? { targetServiceName: profile.targetServiceName.value } : {}),
+    ...(profile.hostPort ? { hostPort: profile.hostPort.value } : {}),
+  };
+}
+
+function resourceNetworkResolutionError(
+  message: string,
+  details?: Record<string, string | number | boolean>,
+) {
+  return domainError.validation(message, {
+    phase: "resource-network-resolution",
+    ...(details ?? {}),
+  });
+}
+
+function resourceArchivedError(input: {
+  resourceId: ResourceId;
+  commandName: string;
+  archivedAt?: ArchivedAt;
+}) {
+  return domainError.resourceArchived("Archived resources cannot accept new mutations", {
+    phase: "resource-lifecycle-guard",
+    resourceId: input.resourceId.value,
+    lifecycleStatus: "archived",
+    commandName: input.commandName,
+    ...(input.archivedAt ? { archivedAt: input.archivedAt.value } : {}),
+  });
+}
+
+function resourceDeletedNotFoundError(input: { resourceId: ResourceId }) {
+  return domainError.notFound("resource", input.resourceId.value);
+}
+
+function validateResourceNetworkProfile(input: {
+  resourceId?: ResourceId;
+  kind: ResourceKindValue;
+  services: ResourceServiceState[];
+  networkProfile: ResourceNetworkProfileState;
+  directPortAllowed: boolean;
+}): Result<void> {
+  const targetServiceName = input.networkProfile.targetServiceName;
+
+  if (
+    targetServiceName &&
+    input.services.length > 0 &&
+    !input.services.some((service) => service.name.equals(targetServiceName))
+  ) {
+    return err(
+      resourceNetworkResolutionError("Network target service must be declared on the resource", {
+        ...(input.resourceId ? { resourceId: input.resourceId.value } : {}),
+        resourceKind: input.kind.value,
+        targetServiceName: targetServiceName.value,
+      }),
+    );
+  }
+
+  if (
+    input.kind.value === "compose-stack" &&
+    input.services.length > 1 &&
+    !input.networkProfile.targetServiceName
+  ) {
+    return err(
+      resourceNetworkResolutionError(
+        "Compose stack network profiles must declare a target service",
+        {
+          ...(input.resourceId ? { resourceId: input.resourceId.value } : {}),
+          resourceKind: input.kind.value,
+          serviceCount: input.services.length,
+        },
+      ),
+    );
+  }
+
+  if (input.networkProfile.hostPort && input.networkProfile.exposureMode.value !== "direct-port") {
+    return err(
+      resourceNetworkResolutionError("Host port is valid only for direct-port resource exposure", {
+        ...(input.resourceId ? { resourceId: input.resourceId.value } : {}),
+        exposureMode: input.networkProfile.exposureMode.value,
+      }),
+    );
+  }
+
+  if (!input.directPortAllowed && input.networkProfile.exposureMode.value === "direct-port") {
+    return err(
+      resourceNetworkResolutionError("Direct-port resource exposure is not implemented", {
+        ...(input.resourceId ? { resourceId: input.resourceId.value } : {}),
+        exposureMode: input.networkProfile.exposureMode.value,
+      }),
+    );
+  }
+
+  return ok(undefined);
 }
 
 function serializedHealthCheckPolicy(
@@ -249,9 +502,86 @@ function serializedHealthCheckPolicy(
   };
 }
 
+function serializedRuntimeProfile(profile: ResourceRuntimeProfileState): Record<string, unknown> {
+  return {
+    strategy: profile.strategy.value,
+    ...(profile.installCommand ? { installCommand: profile.installCommand.value } : {}),
+    ...(profile.buildCommand ? { buildCommand: profile.buildCommand.value } : {}),
+    ...(profile.startCommand ? { startCommand: profile.startCommand.value } : {}),
+    ...(profile.publishDirectory ? { publishDirectory: profile.publishDirectory.value } : {}),
+    ...(profile.dockerfilePath ? { dockerfilePath: profile.dockerfilePath.value } : {}),
+    ...(profile.dockerComposeFilePath
+      ? { dockerComposeFilePath: profile.dockerComposeFilePath.value }
+      : {}),
+    ...(profile.buildTarget ? { buildTarget: profile.buildTarget.value } : {}),
+    ...(profile.healthCheckPath ? { healthCheckPath: profile.healthCheckPath.value } : {}),
+    ...(profile.healthCheck
+      ? { healthCheck: serializedHealthCheckPolicy(profile.healthCheck) }
+      : {}),
+  };
+}
+
+function validateResourceRuntimeProfile(input: {
+  resourceId?: ResourceId;
+  runtimeProfile: ResourceRuntimeProfileState;
+  enforceStrategySpecificPaths?: boolean;
+}): Result<void> {
+  const strategy = input.runtimeProfile.strategy.value;
+  const commonDetails = {
+    ...(input.resourceId ? { resourceId: input.resourceId.value } : {}),
+    runtimePlanStrategy: strategy,
+  };
+
+  if (strategy === "static" && !input.runtimeProfile.publishDirectory) {
+    return err(
+      resourceRuntimeResolutionError("Static runtime profiles require publishDirectory", {
+        ...commonDetails,
+        field: "runtimeProfile.publishDirectory",
+      }),
+    );
+  }
+
+  if (
+    input.enforceStrategySpecificPaths &&
+    strategy === "dockerfile" &&
+    !input.runtimeProfile.dockerfilePath
+  ) {
+    return err(
+      resourceRuntimeResolutionError("Dockerfile runtime profiles require dockerfilePath", {
+        ...commonDetails,
+        field: "runtimeProfile.dockerfilePath",
+      }),
+    );
+  }
+
+  if (
+    input.enforceStrategySpecificPaths &&
+    strategy === "docker-compose" &&
+    !input.runtimeProfile.dockerComposeFilePath
+  ) {
+    return err(
+      resourceRuntimeResolutionError(
+        "Docker Compose runtime profiles require dockerComposeFilePath",
+        {
+          ...commonDetails,
+          field: "runtimeProfile.dockerComposeFilePath",
+        },
+      ),
+    );
+  }
+
+  return ok(undefined);
+}
+
 export interface ResourceVisitor<TContext, TResult> {
   visitResource(resource: Resource, context: TContext): TResult;
 }
+
+type ResourceRehydrateState = Omit<
+  ResourceState,
+  "archiveReason" | "archivedAt" | "deletedAt" | "lifecycleStatus"
+> &
+  Partial<Pick<ResourceState, "archiveReason" | "archivedAt" | "deletedAt" | "lifecycleStatus">>;
 
 export class Resource extends AggregateRoot<ResourceState> {
   private constructor(state: ResourceState) {
@@ -288,47 +618,25 @@ export class Resource extends AggregateRoot<ResourceState> {
         );
       }
 
-      if (
-        input.networkProfile?.targetServiceName &&
-        services.length > 0 &&
-        !services.some((service) =>
-          service.name.equals(input.networkProfile?.targetServiceName as ResourceServiceName),
-        )
-      ) {
-        return err(
-          domainError.validation("Network target service must be declared on the resource", {
-            phase: "resource-network-resolution",
-            resourceKind: input.kind.value,
-            targetServiceName: input.networkProfile.targetServiceName.value,
-          }),
-        );
+      if (input.networkProfile) {
+        const networkProfileValidation = validateResourceNetworkProfile({
+          kind: input.kind,
+          services,
+          networkProfile: input.networkProfile,
+          directPortAllowed: true,
+        });
+        if (networkProfileValidation.isErr()) {
+          return err(networkProfileValidation.error);
+        }
       }
 
-      if (
-        input.networkProfile &&
-        input.kind.value === "compose-stack" &&
-        services.length > 1 &&
-        !input.networkProfile.targetServiceName
-      ) {
-        return err(
-          domainError.validation("Compose stack network profiles must declare a target service", {
-            phase: "resource-network-resolution",
-            resourceKind: input.kind.value,
-            serviceCount: services.length,
-          }),
-        );
-      }
-
-      if (
-        input.networkProfile?.hostPort &&
-        input.networkProfile.exposureMode.value !== "direct-port"
-      ) {
-        return err(
-          domainError.validation("Host port is valid only for direct-port resource exposure", {
-            phase: "resource-network-resolution",
-            exposureMode: input.networkProfile.exposureMode.value,
-          }),
-        );
+      if (input.runtimeProfile) {
+        const runtimeProfileValidation = validateResourceRuntimeProfile({
+          runtimeProfile: input.runtimeProfile,
+        });
+        if (runtimeProfileValidation.isErr()) {
+          return err(runtimeProfileValidation.error);
+        }
       }
 
       const resource = new Resource({
@@ -348,7 +656,10 @@ export class Resource extends AggregateRoot<ResourceState> {
         ...(input.runtimeProfile
           ? { runtimeProfile: cloneResourceRuntimeProfileState(input.runtimeProfile) }
           : {}),
-        ...(input.networkProfile ? { networkProfile: { ...input.networkProfile } } : {}),
+        ...(input.networkProfile
+          ? { networkProfile: cloneResourceNetworkProfileState(input.networkProfile) }
+          : {}),
+        lifecycleStatus: ResourceLifecycleStatusValue.active(),
         createdAt: input.createdAt,
         ...(input.description ? { description: input.description } : {}),
       });
@@ -379,44 +690,10 @@ export class Resource extends AggregateRoot<ResourceState> {
             }
           : {}),
         ...(input.runtimeProfile
-          ? {
-              runtimeProfile: {
-                strategy: input.runtimeProfile.strategy.value,
-                ...(input.runtimeProfile.installCommand
-                  ? { installCommand: input.runtimeProfile.installCommand.value }
-                  : {}),
-                ...(input.runtimeProfile.buildCommand
-                  ? { buildCommand: input.runtimeProfile.buildCommand.value }
-                  : {}),
-                ...(input.runtimeProfile.startCommand
-                  ? { startCommand: input.runtimeProfile.startCommand.value }
-                  : {}),
-                ...(input.runtimeProfile.publishDirectory
-                  ? { publishDirectory: input.runtimeProfile.publishDirectory.value }
-                  : {}),
-                ...(input.runtimeProfile.healthCheckPath
-                  ? { healthCheckPath: input.runtimeProfile.healthCheckPath.value }
-                  : {}),
-                ...(input.runtimeProfile.healthCheck
-                  ? { healthCheck: serializedHealthCheckPolicy(input.runtimeProfile.healthCheck) }
-                  : {}),
-              },
-            }
+          ? { runtimeProfile: serializedRuntimeProfile(input.runtimeProfile) }
           : {}),
         ...(input.networkProfile
-          ? {
-              networkProfile: {
-                internalPort: input.networkProfile.internalPort.value,
-                upstreamProtocol: input.networkProfile.upstreamProtocol.value,
-                exposureMode: input.networkProfile.exposureMode.value,
-                ...(input.networkProfile.targetServiceName
-                  ? { targetServiceName: input.networkProfile.targetServiceName.value }
-                  : {}),
-                ...(input.networkProfile.hostPort
-                  ? { hostPort: input.networkProfile.hostPort.value }
-                  : {}),
-              },
-            }
+          ? { networkProfile: serializedNetworkProfile(input.networkProfile) }
           : {}),
         createdAt: input.createdAt.value,
       });
@@ -424,7 +701,7 @@ export class Resource extends AggregateRoot<ResourceState> {
     });
   }
 
-  static rehydrate(state: ResourceState): Resource {
+  static rehydrate(state: ResourceRehydrateState): Resource {
     return new Resource({
       ...state,
       services: [...state.services],
@@ -438,8 +715,155 @@ export class Resource extends AggregateRoot<ResourceState> {
       ...(state.runtimeProfile
         ? { runtimeProfile: cloneResourceRuntimeProfileState(state.runtimeProfile) }
         : {}),
-      ...(state.networkProfile ? { networkProfile: { ...state.networkProfile } } : {}),
+      ...(state.networkProfile
+        ? { networkProfile: cloneResourceNetworkProfileState(state.networkProfile) }
+        : {}),
+      lifecycleStatus: state.lifecycleStatus ?? ResourceLifecycleStatusValue.active(),
+      ...(state.archivedAt ? { archivedAt: state.archivedAt } : {}),
+      ...(state.archiveReason ? { archiveReason: state.archiveReason } : {}),
+      ...(state.deletedAt ? { deletedAt: state.deletedAt } : {}),
     });
+  }
+
+  private rejectInactiveResource(commandName: string): Result<void> {
+    if (this.state.lifecycleStatus.isDeleted()) {
+      return err(resourceDeletedNotFoundError({ resourceId: this.state.id }));
+    }
+
+    if (this.state.lifecycleStatus.isArchived()) {
+      return err(
+        resourceArchivedError({
+          resourceId: this.state.id,
+          commandName,
+          ...(this.state.archivedAt ? { archivedAt: this.state.archivedAt } : {}),
+        }),
+      );
+    }
+
+    return ok(undefined);
+  }
+
+  ensureCanCreateDeployment(): Result<void> {
+    return this.rejectInactiveResource("deployments.create");
+  }
+
+  archive(input: { archivedAt: ArchivedAt; reason?: ArchiveReason }): Result<{ changed: boolean }> {
+    if (this.state.lifecycleStatus.isArchived()) {
+      return ok({ changed: false });
+    }
+
+    const lifecycleStatus = this.state.lifecycleStatus.archive();
+    if (lifecycleStatus.isErr()) {
+      return err(lifecycleStatus.error);
+    }
+
+    this.state.lifecycleStatus = lifecycleStatus.value;
+    this.state.archivedAt = input.archivedAt;
+    if (input.reason) {
+      this.state.archiveReason = input.reason;
+    } else {
+      delete this.state.archiveReason;
+    }
+
+    this.recordDomainEvent("resource-archived", input.archivedAt, {
+      resourceId: this.state.id.value,
+      projectId: this.state.projectId.value,
+      environmentId: this.state.environmentId.value,
+      resourceSlug: this.state.slug.value,
+      archivedAt: input.archivedAt.value,
+      ...(input.reason ? { reason: input.reason.value } : {}),
+    });
+
+    return ok({ changed: true });
+  }
+
+  delete(input: { deletedAt: DeletedAt }): Result<{ changed: boolean }> {
+    if (this.state.lifecycleStatus.isDeleted()) {
+      return ok({ changed: false });
+    }
+
+    if (this.state.lifecycleStatus.isActive()) {
+      return err(
+        domainError.resourceDeleteBlocked("Active resources must be archived before deletion", {
+          phase: "resource-deletion-guard",
+          resourceId: this.state.id.value,
+          lifecycleStatus: "active",
+          deletionBlockers: ["active-resource"],
+        }),
+      );
+    }
+
+    const lifecycleStatus = this.state.lifecycleStatus.delete();
+    if (lifecycleStatus.isErr()) {
+      return err(lifecycleStatus.error);
+    }
+
+    this.state.lifecycleStatus = lifecycleStatus.value;
+    this.state.deletedAt = input.deletedAt;
+
+    this.recordDomainEvent("resource-deleted", input.deletedAt, {
+      resourceId: this.state.id.value,
+      projectId: this.state.projectId.value,
+      environmentId: this.state.environmentId.value,
+      resourceSlug: this.state.slug.value,
+      deletedAt: input.deletedAt.value,
+    });
+
+    return ok({ changed: true });
+  }
+
+  configureRuntimeProfile(input: {
+    runtimeProfile: ResourceRuntimeProfileState;
+    configuredAt: UpdatedAt;
+  }): Result<void> {
+    const lifecycleGuard = this.rejectInactiveResource("resources.configure-runtime");
+    if (lifecycleGuard.isErr()) {
+      return err(lifecycleGuard.error);
+    }
+
+    if (input.runtimeProfile.healthCheckPath || input.runtimeProfile.healthCheck) {
+      return err(
+        resourceRuntimeResolutionError(
+          "Runtime profile changes must not mutate resource health policy",
+          {
+            resourceId: this.state.id.value,
+            field: input.runtimeProfile.healthCheck
+              ? "runtimeProfile.healthCheck"
+              : "runtimeProfile.healthCheckPath",
+          },
+        ),
+      );
+    }
+
+    const validation = validateResourceRuntimeProfile({
+      resourceId: this.state.id,
+      runtimeProfile: input.runtimeProfile,
+      enforceStrategySpecificPaths: true,
+    });
+    if (validation.isErr()) {
+      return err(validation.error);
+    }
+
+    const currentProfile = this.state.runtimeProfile;
+    this.state.runtimeProfile = {
+      ...cloneResourceRuntimeProfileState(input.runtimeProfile),
+      ...(currentProfile?.healthCheckPath
+        ? { healthCheckPath: currentProfile.healthCheckPath }
+        : {}),
+      ...(currentProfile?.healthCheck
+        ? { healthCheck: cloneResourceHealthCheckPolicyState(currentProfile.healthCheck) }
+        : {}),
+    };
+
+    this.recordDomainEvent("resource-runtime-configured", input.configuredAt, {
+      resourceId: this.state.id.value,
+      projectId: this.state.projectId.value,
+      environmentId: this.state.environmentId.value,
+      runtimePlanStrategy: input.runtimeProfile.strategy.value,
+      configuredAt: input.configuredAt.value,
+    });
+
+    return ok(undefined);
   }
 
   configureHealthPolicy(input: {
@@ -447,6 +871,11 @@ export class Resource extends AggregateRoot<ResourceState> {
     configuredAt: UpdatedAt;
     defaultStrategy: RuntimePlanStrategyValue;
   }): Result<void> {
+    const lifecycleGuard = this.rejectInactiveResource("resources.configure-health");
+    if (lifecycleGuard.isErr()) {
+      return err(lifecycleGuard.error);
+    }
+
     if (input.policy.enabled && input.policy.type.value !== "http") {
       return err(
         domainError.validation("Only HTTP resource health policies are supported", {
@@ -518,6 +947,68 @@ export class Resource extends AggregateRoot<ResourceState> {
     return ok(undefined);
   }
 
+  configureNetworkProfile(input: {
+    networkProfile: ResourceNetworkProfileState;
+    configuredAt: UpdatedAt;
+  }): Result<void> {
+    const lifecycleGuard = this.rejectInactiveResource("resources.configure-network");
+    if (lifecycleGuard.isErr()) {
+      return err(lifecycleGuard.error);
+    }
+
+    const validation = validateResourceNetworkProfile({
+      resourceId: this.state.id,
+      kind: this.state.kind,
+      services: this.state.services,
+      networkProfile: input.networkProfile,
+      directPortAllowed: false,
+    });
+    if (validation.isErr()) {
+      return err(validation.error);
+    }
+
+    this.state.networkProfile = cloneResourceNetworkProfileState(input.networkProfile);
+
+    this.recordDomainEvent("resource-network-configured", input.configuredAt, {
+      resourceId: this.state.id.value,
+      projectId: this.state.projectId.value,
+      environmentId: this.state.environmentId.value,
+      ...serializedNetworkProfile(input.networkProfile),
+      configuredAt: input.configuredAt.value,
+    });
+
+    return ok(undefined);
+  }
+
+  configureSourceBinding(input: {
+    sourceBinding: ResourceSourceBindingState;
+    configuredAt: UpdatedAt;
+  }): Result<void> {
+    const lifecycleGuard = this.rejectInactiveResource("resources.configure-source");
+    if (lifecycleGuard.isErr()) {
+      return err(lifecycleGuard.error);
+    }
+
+    const sourceBinding = ResourceSourceBinding.create(input.sourceBinding);
+    if (sourceBinding.isErr()) {
+      return err(sourceBinding.error);
+    }
+
+    const normalizedSourceBinding = sourceBinding.value.toState();
+    this.state.sourceBinding = cloneResourceSourceBindingState(normalizedSourceBinding);
+
+    this.recordDomainEvent("resource-source-configured", input.configuredAt, {
+      resourceId: this.state.id.value,
+      projectId: this.state.projectId.value,
+      environmentId: this.state.environmentId.value,
+      sourceKind: normalizedSourceBinding.kind.value,
+      sourceLocator: normalizedSourceBinding.locator.value,
+      configuredAt: input.configuredAt.value,
+    });
+
+    return ok(undefined);
+  }
+
   accept<TContext, TResult>(
     visitor: ResourceVisitor<TContext, TResult>,
     context: TContext,
@@ -539,7 +1030,9 @@ export class Resource extends AggregateRoot<ResourceState> {
       ...(this.state.runtimeProfile
         ? { runtimeProfile: cloneResourceRuntimeProfileState(this.state.runtimeProfile) }
         : {}),
-      ...(this.state.networkProfile ? { networkProfile: { ...this.state.networkProfile } } : {}),
+      ...(this.state.networkProfile
+        ? { networkProfile: cloneResourceNetworkProfileState(this.state.networkProfile) }
+        : {}),
     };
   }
 }

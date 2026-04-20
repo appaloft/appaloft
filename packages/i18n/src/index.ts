@@ -15,7 +15,10 @@ export const defaultAppaloftLocale: AppaloftLocale = "zh-CN";
 export const appaloftLocaleStorageKey = "appaloft.locale";
 export const appaloftLocaleHeader = "x-appaloft-locale";
 
-export type TranslationValues = Record<string, string | number | boolean | null | undefined>;
+export type TranslationValues = Record<
+  string,
+  string | number | boolean | null | undefined | readonly string[]
+>;
 
 export type AppaloftTranslate = (key: TranslationKey, values?: TranslationValues) => string;
 
@@ -116,7 +119,7 @@ export interface LocalizableDomainError {
   category: "user" | "infra" | "provider" | "retryable" | "timeout";
   message: string;
   retryable: boolean;
-  details?: Record<string, string | number | boolean | null>;
+  details?: Record<string, string | number | boolean | null | readonly string[]>;
 }
 
 export function translateDomainError(error: LocalizableDomainError, t: AppaloftTranslate): string {
@@ -130,6 +133,8 @@ export function translateDomainError(error: LocalizableDomainError, t: AppaloftT
   switch (error.code) {
     case "conflict":
     case "resource_slug_conflict":
+    case "resource_archived":
+    case "resource_delete_blocked":
       return t(i18nKeys.errors.domain.conflict, { message: error.message });
     case "deployment_not_redeployable":
       return t(i18nKeys.errors.domain.deploymentNotRedeployable, {

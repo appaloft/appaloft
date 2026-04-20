@@ -41,6 +41,11 @@ to an explicit application operation.
    in the same change.
 6. Infrastructure endpoints such as `/api/health`, `/api/readiness`, and `/api/version` are not
    business operations. They belong to the HTTP adapter layer.
+7. Aggregate-root mutations must be intention-revealing domain commands governed by
+   [ADR-026: Aggregate Mutation Command Boundary](./decisions/ADR-026-aggregate-mutation-command-boundary.md).
+   Generic business operations such as `projects.update`, `servers.update`, `resources.update`,
+   `{aggregate}.patch`, or `{aggregate}.save` are forbidden. If a future operation cannot be named
+   without a generic update verb, it needs a Spec Round before implementation.
 
 ## Business Capability Model
 
@@ -86,10 +91,10 @@ Current boundary:
   [ADR-013: Project Resource Navigation And Deployment Ownership](./decisions/ADR-013-project-resource-navigation-and-deployment-ownership.md)
 
 Core next operations expected here:
-- update project profile
-- bind or change project source
-- show project details
-- archive project
+- `projects.show`
+- `projects.rename`
+- `projects.configure-source` if project source binding becomes a first-class aggregate concept
+- `projects.archive`
 
 Those are expected domain operations, but they are not implemented yet and must not be assumed by
 transports until added here and to the operation catalog.
@@ -135,9 +140,10 @@ Implemented operations:
   injection, not by core/application command input
 
 Core next operations expected here:
-- show server details
-- update server profile
-- deactivate server
+- `servers.show`
+- `servers.rename`
+- `servers.configure-edge-proxy`
+- `servers.deactivate`
 - rotate reusable SSH credential
 - delete reusable SSH credential when unused
 
@@ -185,8 +191,14 @@ Implemented operations:
 | Capability | Kind | Operation Key | Message | Schema | CLI | oRPC / HTTP |
 | --- | --- | --- | --- | --- | --- | --- |
 | Create resource | Command | `resources.create` | `CreateResourceCommand` | `CreateResourceCommandInput` | `appaloft resource create` | `POST /api/resources` |
+| Configure resource source profile | Command | `resources.configure-source` | `ConfigureResourceSourceCommand` | `ConfigureResourceSourceCommandInput` | `appaloft resource configure-source <resourceId>` | `POST /api/resources/{resourceId}/source` |
 | Configure resource health policy | Command | `resources.configure-health` | `ConfigureResourceHealthCommand` | `ConfigureResourceHealthCommandInput` | `appaloft resource configure-health <resourceId>` | `POST /api/resources/{resourceId}/health-policy` |
+| Configure resource runtime profile | Command | `resources.configure-runtime` | `ConfigureResourceRuntimeCommand` | `ConfigureResourceRuntimeCommandInput` | `appaloft resource configure-runtime <resourceId>` | `POST /api/resources/{resourceId}/runtime-profile` |
+| Configure resource network profile | Command | `resources.configure-network` | `ConfigureResourceNetworkCommand` | `ConfigureResourceNetworkCommandInput` | `appaloft resource configure-network <resourceId>` | `POST /api/resources/{resourceId}/network-profile` |
+| Archive resource | Command | `resources.archive` | `ArchiveResourceCommand` | `ArchiveResourceCommandInput` | `appaloft resource archive <resourceId>` | `POST /api/resources/{resourceId}/archive` |
+| Delete resource | Command | `resources.delete` | `DeleteResourceCommand` | `DeleteResourceCommandInput` | `appaloft resource delete <resourceId> --confirm-slug <slug>` | `DELETE /api/resources/{resourceId}` |
 | List resources | Query | `resources.list` | `ListResourcesQuery` | `ListResourcesQueryInput` | `appaloft resource list` | `GET /api/resources` |
+| Show resource profile | Query | `resources.show` | `ShowResourceQuery` | `ShowResourceQueryInput` | `appaloft resource show <resourceId>` | `GET /api/resources/{resourceId}` |
 | Read resource runtime logs | Query | `resources.runtime-logs` | `ResourceRuntimeLogsQuery` | `ResourceRuntimeLogsQueryInput` | `appaloft resource logs <resourceId>` | `GET /api/resources/{resourceId}/runtime-logs`; stream: `GET /api/resources/{resourceId}/runtime-logs/stream` |
 | Preview resource proxy configuration | Query | `resources.proxy-configuration.preview` | `ResourceProxyConfigurationPreviewQuery` | `ResourceProxyConfigurationPreviewQueryInput` | `appaloft resource proxy-config <resourceId>` | `GET /api/resources/{resourceId}/proxy-configuration` |
 | Read resource diagnostic summary | Query | `resources.diagnostic-summary` | `ResourceDiagnosticSummaryQuery` | `ResourceDiagnosticSummaryQueryInput` | `appaloft resource diagnose <resourceId>` | `GET /api/resources/{resourceId}/diagnostic-summary` |
@@ -246,17 +258,33 @@ Current boundary:
   `resources.health` is the active current health source for resource detail, project resource
   lists, sidebar navigation, CLI, and HTTP API. Latest deployment status remains contextual
   history, not proof that the resource is reachable.
+- resource source profile changes are resource-owned through `resources.configure-source`; the
+  command replaces the durable source binding for future deployment admission without pulling
+  source, retargeting source links, creating deployments, restarting runtime, or mutating
+  deployment snapshots.
+- resource runtime profile changes are resource-owned through `resources.configure-runtime`; the
+  command replaces durable runtime planning fields for future deployment admission without
+  mutating source, network, health policy, deployment snapshots, or current runtime state.
+- resource network profile changes are resource-owned through `resources.configure-network`; the
+  command replaces the durable workload endpoint profile for future deployment admission and route
+  planning without binding domains, applying proxy routes, restarting runtime, or mutating
+  deployment snapshots.
+- resource archive is resource-owned through `resources.archive`; the command moves lifecycle
+  state to `archived`, publishes `resource-archived` on the first transition, and blocks future
+  profile mutations and deployments without stopping runtime or deleting retained history,
+  domains, logs, diagnostics, or source links.
+- resource delete is resource-owned through `resources.delete`; the command moves an archived,
+  unreferenced resource to deleted/tombstone lifecycle state after typed slug confirmation and
+  deletion blocker checks, publishes `resource-deleted` on the first transition, and omits deleted
+  resources from normal resource read models without cascading cleanup.
 - durable domain bindings belong to the resource. Deployment snapshots may record the route used
   by one attempt, but they are not the domain ownership boundary. Generated default access should
   be exposed through resource-scoped access summaries and should prefer stable resource-scoped
   hostnames unless a provider explicitly requires deployment-scoped hostnames.
 
 Core next operations expected here:
-- show resource details
-- update resource profile/source
-- configure resource network profile
 - declare compose-stack services from compose metadata
-- archive resource
+- `resources.delete`
 
 ## Source Links
 
@@ -280,8 +308,10 @@ Current boundary:
   state.
 - CLI SSH mode uses the same remote PGlite state lock/download/upload path as config deploy when
   the relink command is invoked with trusted SSH target options such as `--server-host`.
-- Hosted/self-hosted control-plane storage for source links is future work. PostgreSQL-backed
-  relink must use a dedicated persistence adapter before an API/oRPC or Web surface is exposed.
+- PostgreSQL/PGlite source-link storage is implemented for hosted/self-hosted and embedded state
+  backends through the dedicated `packages/persistence/pg` adapter. That same durable state feeds
+  `resources.delete` source-link blocker checks. API/oRPC and Web relink surfaces remain future
+  work until the review UX exists.
 
 ## Deployments
 
@@ -357,6 +387,9 @@ Current boundary:
   resource/server/destination context exists. A domain entry may also describe a canonical redirect
   alias with `redirectTo` and optional `redirectStatus`; redirect source hosts are target-local
   proxy route state in SSH mode and managed route/domain follow-up intent in control-plane mode.
+  PostgreSQL/PGlite durable server-applied route persistence is an internal state-backend slice for
+  this route state. It does not add a new deployment input, route mutation command, or Web/API/CLI
+  surface.
 - GitHub Actions and other headless binary entrypoints that deploy to an SSH server default to
   SSH-server PGlite state and do not need `DATABASE_URL`. `DATABASE_URL` is required only when the
   caller explicitly selects PostgreSQL or a remote Appaloft control plane. Runner-local PGlite is
@@ -516,6 +549,9 @@ Current boundary:
   is selected. Canonical redirect aliases such as `www -> apex` are part of that route state; they
   require DNS and TLS coverage for the redirecting host but do not create a separate deployment
   command or managed certificate record in pure CLI mode.
+- server-applied route desired/applied state belongs to the selected Appaloft state backend. A
+  PostgreSQL/PGlite backend must persist it through a dedicated persistence adapter and keep it
+  separate from `Resource`, `DomainBinding`, `Certificate`, and deployment command schemas.
 - generated default access policy editing must become the public command
   `default-access-domain-policies.configure` before Web/CLI/API expose it
 - `domain-bindings.list` exposes the read model used by CLI, API, and Web to observe accepted

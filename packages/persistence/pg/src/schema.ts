@@ -1,6 +1,7 @@
 import { type ColumnType } from "kysely";
 
 type TimestampColumn = ColumnType<string, string | undefined, never>;
+type UpdatableTimestampColumn = ColumnType<string, string, string>;
 
 export interface ProjectsTable {
   id: string;
@@ -86,6 +87,10 @@ export interface ResourcesTable {
     Record<string, unknown> | null,
     Record<string, unknown> | null
   >;
+  lifecycle_status: string;
+  archived_at: string | null;
+  archive_reason: string | null;
+  deleted_at: string | null;
   created_at: TimestampColumn;
 }
 
@@ -195,6 +200,36 @@ export interface ProviderJobLogsTable {
   created_at: TimestampColumn;
 }
 
+export interface SourceLinksTable {
+  source_fingerprint: string;
+  project_id: string;
+  environment_id: string;
+  resource_id: string;
+  server_id: string | null;
+  destination_id: string | null;
+  updated_at: UpdatableTimestampColumn;
+  reason: string | null;
+  metadata: ColumnType<Record<string, unknown>, Record<string, unknown>, Record<string, unknown>>;
+}
+
+type JsonRecord = Record<string, unknown>;
+
+export interface ServerAppliedRouteStatesTable {
+  route_set_id: string;
+  project_id: string;
+  environment_id: string;
+  resource_id: string;
+  server_id: string;
+  destination_id: string | null;
+  source_fingerprint: string | null;
+  domains: ColumnType<JsonRecord[], JsonRecord[], JsonRecord[]>;
+  status: string;
+  updated_at: UpdatableTimestampColumn;
+  last_applied: ColumnType<JsonRecord | null, JsonRecord | null, JsonRecord | null>;
+  last_failure: ColumnType<JsonRecord | null, JsonRecord | null, JsonRecord | null>;
+  metadata: ColumnType<JsonRecord, JsonRecord, JsonRecord>;
+}
+
 export interface Database {
   projects: ProjectsTable;
   servers: ServersTable;
@@ -208,4 +243,6 @@ export interface Database {
   certificates: CertificatesTable;
   audit_logs: AuditLogsTable;
   provider_job_logs: ProviderJobLogsTable;
+  source_links: SourceLinksTable;
+  server_applied_route_states: ServerAppliedRouteStatesTable;
 }

@@ -14,7 +14,7 @@ source selection
   -> discover and parse repository config profile
   -> resolve state backend; for SSH deploys, ensure, lock, and migrate remote `ssh-pglite`
   -> resolve trusted Appaloft project/environment/resource/server identity outside the file
-  -> create or update resource-owned profile through explicit operations when needed
+  -> create resource-owned profile or configure source/runtime/network profile through explicit operations when needed
   -> apply non-secret env values and resolved secret references through environment commands
   -> deployments.create(projectId, environmentId, resourceId, serverId, destinationId?)
   -> apply server-applied proxy routes from trusted config domain intent when supported by the
@@ -381,6 +381,11 @@ Pure CLI/SSH mode must persist source fingerprint link state in the selected `ss
 This link state is the durable non-versioned mapping that lets repeated GitHub Actions runs deploy
 the same app without committed Appaloft ids.
 
+Hosted/self-hosted and explicit PostgreSQL/PGlite state backends use the same application
+`SourceLinkStore` contract. The durable PG slice must persist link state in a `source_links` table
+owned by the selected Appaloft state backend, not in repository config and not in the `Resource`
+aggregate.
+
 The source fingerprint must be stable and secret-free:
 
 - for Git sources, prefer provider repository id/full name when available, normalized clone locator,
@@ -526,6 +531,14 @@ resident edge proxy/provider when the provider supports it. One-shot CLI/Action 
 repair, or reapply on deploy, verify, or doctor; they do not imply an always-running Appaloft DNS or
 certificate scheduler.
 
+Server-applied route desired/applied state must be persisted through the selected Appaloft state
+backend. For SSH remote PGlite this may cross the process boundary through the SSH mirror lifecycle,
+but command execution still reads and writes the selected state backend. PostgreSQL/PGlite hosted,
+self-hosted, embedded, and SSH-mirrored backends must store route state in the dedicated
+`server_applied_route_states` table rather than in `Resource`, `DomainBinding`, `Certificate`, or
+deployment command state. Existing rows referencing a resource are deletion blockers until an
+explicit future cleanup or unlink behavior removes the route state.
+
 Canonical redirects in SSH mode are applied by the same provider route realization path. The target
 host must have a served route entry; the redirecting host must still resolve to the selected edge
 address. When `tlsMode = auto`, the resident provider must be able to obtain or serve certificate
@@ -605,7 +618,7 @@ Config-file errors use stable codes and phases:
 | `validation_error` | `source-link-resolution` | No | Source fingerprint is ambiguous, missing required stable identity, or points at another context without explicit relink. |
 | `validation_error` | `config-domain-resolution` | No | Config domain intent cannot map safely to server-applied or managed domain workflow state, including invalid host/path/TLS shape, missing redirect target, self-redirect, redirect loop, redirect-to-redirect, or unsupported redirect policy. |
 | `unsupported_config_field` | `config-capability-resolution` | No | Known future field such as CPU/memory/replicas or rollout policy is not enforceable by current workflow/resource/runtime target specs. |
-| `resource_profile_drift` | `resource-profile-resolution` | No | Existing resource differs from config and no explicit update operation is available. |
+| `resource_profile_drift` | `resource-profile-resolution` | No | Existing resource differs from config and the required explicit profile configuration command is not active. |
 | `infra_error` | `proxy-domain-realization` | Conditional | Server-applied proxy domain route could not be rendered, applied, reloaded, or verified on the target. |
 
 ## Current Implementation Notes And Migration Gaps
@@ -660,6 +673,15 @@ source link creation and repeated config deploy reuse through the source fingerp
 Application and CLI tests cover `source-links.relink` command dispatch, context validation,
 optimistic guard conflicts, and SSH remote-state mirror planning for relink.
 
+PG/PGlite source-link persistence is implemented through
+[Source Link Durable Persistence Implementation Plan](../implementation/source-link-durable-persistence-plan.md).
+The PG `resources.delete` blocker reader reports `source-link` blockers from durable PG state.
+
+PG/PGlite server-applied route persistence is specified in
+[Server-Applied Route Durable Persistence Plan](../implementation/server-applied-route-durable-persistence-plan.md)
+and is implemented through the selected PostgreSQL/PGlite backend. `resources.delete` reports
+`server-applied-route` blockers from durable route-state rows.
+
 An opt-in shell e2e harness in
 `apps/shell/test/e2e/github-action-ssh-state.workflow.e2e.ts` covers the GitHub Actions style
 process boundary for SSH-server `ssh-pglite`: two separate CLI processes with different local
@@ -689,7 +711,8 @@ history, and managed domain control-plane mapping remain follow-up work.
 
 ## Open Questions
 
-- What exact operation names should update source/runtime/network profile fields on an existing
-  resource when a config file changes after first deploy?
+- Config-file changes to an existing resource must sequence the accepted candidate commands
+  `resources.configure-source`, `resources.configure-runtime`, and `resources.configure-network`
+  when those profile fields drift after first deploy.
 - Which resource sizing fields should be admitted first for the single-server Docker/Compose
   backend, and how should unsupported target backends report capability mismatch?

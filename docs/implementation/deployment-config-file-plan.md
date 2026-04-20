@@ -60,8 +60,11 @@ Implement in ordered slices:
 4. Profile mapper
    - Map config source/runtime/network/health profile fields into `resources.create` for first
      deploy.
-   - When profile update commands exist, sequence them before deployment for existing resources.
-   - Until update commands exist, detect profile drift and fail before `deployments.create`.
+   - When `resources.configure-source`, `resources.configure-runtime`, and
+     `resources.configure-network` are active, sequence the relevant commands before deployment for
+     existing resources.
+   - Until those profile configuration commands are active, detect profile drift and fail before
+     `deployments.create`.
 
 5. Secret handling
    - Reject raw secret material before mutation.
@@ -122,6 +125,8 @@ Implement in ordered slices:
 8. Server-applied domains
    - Parse and validate `access.domains[]`.
    - Persist provider-neutral route desired state in SSH-server Appaloft state for pure CLI mode.
+   - Persist route desired/applied state through the selected PostgreSQL/PGlite state backend when
+     command execution uses hosted/self-hosted, embedded, or SSH-mirrored state.
    - Realize route state through the edge proxy provider and runtime adapter, including provider
      owned TLS automation when `tlsMode = auto`.
    - Render canonical redirect aliases through the selected edge proxy provider so alias hosts
@@ -189,7 +194,8 @@ Implemented slices:
 
 Remaining gaps:
 
-- Existing-resource profile drift detection and explicit profile update command sequencing are not
+- Existing-resource profile drift detection and explicit `resources.configure-source`,
+  `resources.configure-runtime`, and `resources.configure-network` command sequencing are not
   implemented yet.
 - Config-file `access.domains[]` parser support is implemented for provider-neutral `host`,
   `pathPrefix`, `tlsMode`, optional `redirectTo`, and optional `redirectStatus` intent. SSH CLI
@@ -200,6 +206,12 @@ Remaining gaps:
   server-applied route URL/status. Provider-local TLS diagnostics for `tlsMode = auto` routes are
   visible through proxy configuration and resource diagnostics. Control-plane managed domain mapping
   is not implemented yet.
+- PG/PGlite durable server-applied route persistence is specified in
+  [Server-Applied Route Durable Persistence Plan](./server-applied-route-durable-persistence-plan.md)
+  and implemented through the selected PostgreSQL/PGlite state backend. File-backed route-state
+  storage remains available for adapter-level mechanics and explicit legacy wiring; shell command
+  execution uses the PG/PGlite route-state store and `resources.delete` detects
+  `server-applied-route` blockers from durable rows.
 - Config-file Dockerfile/Compose path selectors are rejected until resource profile fields and
   runtime planner mapping own those paths explicitly.
 - Stored Appaloft/external secret adapters beyond the headless `ci-env:` resolver are not wired into

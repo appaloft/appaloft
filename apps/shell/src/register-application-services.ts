@@ -1,4 +1,6 @@
 import {
+  ArchiveResourceCommandHandler,
+  ArchiveResourceUseCase,
   BootstrapServerEdgeProxyOnTargetRegisteredHandler,
   BootstrapServerProxyCommandHandler,
   BootstrapServerProxyUseCase,
@@ -8,6 +10,12 @@ import {
   CertificateRetryScheduler,
   ConfigureResourceHealthCommandHandler,
   ConfigureResourceHealthUseCase,
+  ConfigureResourceNetworkCommandHandler,
+  ConfigureResourceNetworkUseCase,
+  ConfigureResourceRuntimeCommandHandler,
+  ConfigureResourceRuntimeUseCase,
+  ConfigureResourceSourceCommandHandler,
+  ConfigureResourceSourceUseCase,
   ConfigureServerCredentialUseCase,
   ConfirmDomainBindingOwnershipUseCase,
   CreateDeploymentUseCase,
@@ -18,6 +26,8 @@ import {
   CreateSshCredentialUseCase,
   DbMigrateUseCase,
   DbStatusQueryService,
+  DeleteResourceCommandHandler,
+  DeleteResourceUseCase,
   DeploymentContextBootstrapService,
   DeploymentContextDefaultsFactory,
   DeploymentContextResolver,
@@ -60,6 +70,8 @@ import {
   RuntimePlanResolutionInputBuilder,
   SetEnvironmentVariableUseCase,
   ShowEnvironmentQueryService,
+  ShowResourceQueryHandler,
+  ShowResourceQueryService,
   TestServerConnectivityUseCase,
   tokens,
   UnsetEnvironmentVariableUseCase,
@@ -91,6 +103,12 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(IssueCertificateOnCertificateRequestedHandler);
   container.registerSingleton(BootstrapServerProxyCommandHandler);
   container.registerSingleton(ConfigureResourceHealthCommandHandler);
+  container.registerSingleton(ConfigureResourceNetworkCommandHandler);
+  container.registerSingleton(ConfigureResourceRuntimeCommandHandler);
+  container.registerSingleton(ConfigureResourceSourceCommandHandler);
+  container.registerSingleton(ArchiveResourceCommandHandler);
+  container.registerSingleton(DeleteResourceCommandHandler);
+  container.registerSingleton(ShowResourceQueryHandler);
   container.registerSingleton(IssueOrRenewCertificateCommandHandler);
   container.registerSingleton(RelinkSourceLinkCommandHandler);
   container.registerSingleton(ListCertificatesQueryHandler);
@@ -102,11 +120,26 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(tokens.createProjectUseCase, CreateProjectUseCase);
   container.registerSingleton(tokens.listProjectsQueryService, ListProjectsQueryService);
   container.registerSingleton(tokens.createResourceUseCase, CreateResourceUseCase);
+  container.registerSingleton(tokens.archiveResourceUseCase, ArchiveResourceUseCase);
+  container.registerSingleton(tokens.deleteResourceUseCase, DeleteResourceUseCase);
+  container.registerSingleton(
+    tokens.configureResourceSourceUseCase,
+    ConfigureResourceSourceUseCase,
+  );
   container.registerSingleton(
     tokens.configureResourceHealthUseCase,
     ConfigureResourceHealthUseCase,
   );
+  container.registerSingleton(
+    tokens.configureResourceNetworkUseCase,
+    ConfigureResourceNetworkUseCase,
+  );
+  container.registerSingleton(
+    tokens.configureResourceRuntimeUseCase,
+    ConfigureResourceRuntimeUseCase,
+  );
   container.registerSingleton(tokens.listResourcesQueryService, ListResourcesQueryService);
+  container.registerSingleton(tokens.showResourceQueryService, ShowResourceQueryService);
   container.registerSingleton(tokens.registerServerUseCase, RegisterServerUseCase);
   container.registerSingleton(
     tokens.configureServerCredentialUseCase,

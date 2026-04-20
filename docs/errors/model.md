@@ -88,7 +88,7 @@ Codes must be stable identifiers, not localized text. Examples:
 | `provider_error` | `integration` | provider key and operation |
 | `runtime_target_unsupported` | `application` or `integration` | target kind, provider key, missing capability, selected target/destination context |
 | `unsupported_config_field` | `validation` or `application` | config path, field path, requested capability, selected entry/workflow context |
-| `resource_profile_drift` | `application` or `conflict` | resource id, changed profile section, required update operation when known |
+| `resource_profile_drift` | `application` or `conflict` | resource id, changed profile section, required configuration command when known |
 | `infra_error` | `infra` | adapter and operation |
 | `retryable_error` | category by source plus `retriable = true` | retry owner and retry hint when available |
 | `edge_proxy_provider_unsupported` | `integration` | server id, provider key, proxy kind |
