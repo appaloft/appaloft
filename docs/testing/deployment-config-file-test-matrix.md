@@ -99,8 +99,8 @@ This matrix inherits:
 | CONFIG-FILE-PROFILE-003 | e2e-preferred | Health policy from config | Config declares HTTP health policy | Values map to resource runtime/health policy | None | Resource profile/health operation -> `deployments.create` |
 | CONFIG-FILE-PROFILE-004 | integration | Unsafe source base directory | Config base directory contains `..`, URL, shell metacharacter, or host absolute path | Workflow stops before mutation | `validation_error`, phase `config-profile-resolution` | No write commands |
 | CONFIG-FILE-PROFILE-005 | integration | Monorepo base directory | Config selects `/apps/api` under the source root | Resource source binding uses safe source-root-relative base directory | None | `resources.create(source.baseDirectory)` -> `deployments.create` |
-| CONFIG-FILE-PROFILE-006 | integration | Existing resource profile drift without update operation | Existing resource profile differs from config and no accepted update operation exists | Workflow stops before deployment | `resource_profile_drift`, phase `resource-profile-resolution` | No `deployments.create` |
-| CONFIG-FILE-PROFILE-007 | e2e-preferred | Existing resource profile update after operation exists | Existing resource profile differs and explicit profile update operations are active | Profile update commands run before deployment | None | Resource profile update command(s) -> `deployments.create` |
+| CONFIG-FILE-PROFILE-006 | integration | Existing resource profile drift before configuration commands are active | Existing resource profile differs from config and accepted `resources.configure-source` / `resources.configure-runtime` / `resources.configure-network` operations are not active | Workflow stops before deployment | `resource_profile_drift`, phase `resource-profile-resolution` | No `deployments.create` |
+| CONFIG-FILE-PROFILE-007 | e2e-preferred | Existing resource profile configuration after operations are active | Existing resource profile differs and explicit resource profile configuration operations are active | Relevant `resources.configure-*` commands run before deployment | None | Resource profile configuration command(s) -> `deployments.create` |
 | CONFIG-FILE-PROFILE-008 | integration | Domains/TLS stay out of deployment admission | Config declares `access.domains[]` | Values do not enter `deployments.create`; SSH mode persists server-applied route desired state and control-plane mode maps to managed domain intent | None when SSH route desired-state storage is available; `validation_error`, phase `config-domain-resolution` when the selected backend has no supported route-state or managed-domain mapping | SSH mode: route desired state -> `deployments.create` -> proxy realization. Control-plane mode: `domain-bindings.create` separate from deployment. |
 | CONFIG-FILE-PROFILE-009 | integration | Final deployment input is ids-only | Config contains valid source/runtime/network/health profile fields | Final command input contains only project/server/destination/environment/resource ids | None | Assert no source/runtime/network fields on `deployments.create` |
 
@@ -284,15 +284,17 @@ Current HTTP adapter serves a config schema endpoint, but strict deployment API 
 ids-only.
 
 Public `appaloft/deploy-action` wrapper coverage is not implemented yet. The main repository
-release workflow already produces CLI archives, `checksums.txt`, `release-manifest.json`, and
-release notes, but `CONFIG-FILE-ENTRY-009` through `CONFIG-FILE-ENTRY-013` still need a wrapper
-repository, action metadata, install/checksum scripts, SSH secret temp-key handling, and tests.
+release workflow already produces CLI archives, the static Docker self-host installer, `checksums.txt`,
+`release-manifest.json`, and release notes, but `CONFIG-FILE-ENTRY-009` through
+`CONFIG-FILE-ENTRY-013` still need a wrapper repository, action metadata, SSH secret temp-key
+handling, and tests.
 
-Profile drift detection, existing-resource update operation sequencing, stored/external secret
-adapters beyond `ci-env:`, config-file Dockerfile/Compose path mapping, operational provisioning of
-the external SSH e2e secrets/target, server-applied domain route realization e2e, managed
-control-plane domain mapping, and resource sizing support remain target coverage rows, not
-implemented baseline behavior.
+Profile drift detection, existing-resource profile operation sequencing through
+`resources.configure-source`, `resources.configure-runtime`, and `resources.configure-network`,
+stored/external secret adapters beyond `ci-env:`, config-file Dockerfile/Compose path mapping,
+operational provisioning of the external SSH e2e secrets/target, server-applied domain route
+realization e2e, managed control-plane domain mapping, and resource sizing support remain target
+coverage rows, not implemented baseline behavior.
 
 ## Open Questions
 
