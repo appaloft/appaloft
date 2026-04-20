@@ -25,7 +25,7 @@ This roadmap is the release gate for Appaloft versions before `1.0.0`.
 - [ ] Use this roadmap to choose the release version.
 - [ ] Before the next release, verify package manifests, Release Please state, and the latest
   published release agree on the current version line. The roadmap starts from the current public
-  line `0.2.x` because the current release is `0.2.1`.
+  line `0.2.x` because the current release is `0.2.2`.
 
 Version selection rules:
 
@@ -43,7 +43,10 @@ Version selection rules:
 Current release alignment:
 
 - [x] On 2026-04-20, latest public release, Release Please state, and package manifests agree on the
-  `0.2.x` line at `0.2.1`.
+  `0.2.x` line at `0.2.2`.
+- [x] On 2026-04-20, PR preview profile flag support was completed early in the CLI/config
+  bootstrap path, but the public deploy-action wrapper and product-grade GitHub App preview
+  lifecycle remain incomplete.
 - [x] On 2026-04-20, Phase 1 remains incomplete, so the next stable release is limited to the next
   `0.2.x` patch.
 - [x] Release Please keeps pre-`1.0.0` feature and minor bumps on the current patch line by
@@ -143,6 +146,9 @@ Already implemented or materially present:
   coverage.
 - [x] Repository config, SSH-server PGlite state, source fingerprint links, server-applied route
   state, and headless entrypoints have governing specs and partial implementation.
+- [x] CLI preview deploy profile flags can supply or override runtime commands, network profile,
+  health path, non-secret env values, `ci-env:` secret references, preview custom route TLS mode,
+  and required preview URL gating without adding fields to `deployments.create`.
 
 Still blocking 1.0.0:
 
