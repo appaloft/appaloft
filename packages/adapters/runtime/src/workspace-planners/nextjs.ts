@@ -72,6 +72,7 @@ export const nextjsWorkspacePlanner: WorkspaceRuntimePlanner = {
       runtimeKind: this.runtimeKind,
       dockerfilePath: generatedWorkspaceDockerfileName,
       baseImage,
+      applicationShape: "ssr",
       installCommand:
         input.requestedDeployment.installCommand ?? installCommandFor(packageManager),
       buildCommand:
@@ -81,6 +82,7 @@ export const nextjsWorkspacePlanner: WorkspaceRuntimePlanner = {
         planner: this.name,
         runtimeKind: this.runtimeKind,
         baseImage,
+        applicationShape: "ssr",
         extra: {
           packageManager,
           framework: "nextjs",

@@ -1015,6 +1015,12 @@ export class MemoryDeploymentReadModel implements DeploymentReadModel {
                             packageManager: deployment.runtimePlan.source.inspection.packageManager,
                           }
                         : {}),
+                      ...(deployment.runtimePlan.source.inspection.applicationShape
+                        ? {
+                            applicationShape:
+                              deployment.runtimePlan.source.inspection.applicationShape,
+                          }
+                        : {}),
                       ...(deployment.runtimePlan.source.inspection.runtimeVersion
                         ? {
                             runtimeVersion: deployment.runtimePlan.source.inspection.runtimeVersion,

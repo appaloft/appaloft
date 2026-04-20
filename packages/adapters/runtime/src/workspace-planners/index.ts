@@ -44,6 +44,25 @@ const workspaceRuntimePlanners: WorkspaceRuntimePlanner[] = [
 export function resolveWorkspaceRuntimePlan(
   input: WorkspacePlannerInput,
 ): Result<WorkspaceRuntimePlan> {
+  if (
+    (input.source.inspection?.applicationShape === "hybrid-static-server" ||
+      input.source.inspection?.framework === "sveltekit") &&
+    !input.requestedDeployment.startCommand
+  ) {
+    return err(
+      domainError.validation(
+        "Hybrid static/server framework planning requires an explicit static strategy or start command",
+        {
+          phase: "runtime-plan-resolution",
+          ...(input.source.inspection?.framework
+            ? { framework: input.source.inspection.framework }
+            : {}),
+          applicationShape: "hybrid-static-server",
+        },
+      ),
+    );
+  }
+
   for (const planner of workspaceRuntimePlanners) {
     if (!planner.detect(input)) {
       continue;

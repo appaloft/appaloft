@@ -991,6 +991,16 @@ export const runtimePlanSchema = z.object({
             "yarn",
           ])
           .optional(),
+        applicationShape: z
+          .enum([
+            "static",
+            "serverful-http",
+            "ssr",
+            "hybrid-static-server",
+            "worker",
+            "container-native",
+          ])
+          .optional(),
         runtimeVersion: z.string().optional(),
         projectName: z.string().optional(),
         detectedFiles: z

@@ -42,11 +42,32 @@ This workflow inherits:
 - [deployments.create Workflow Spec](./deployments.create.md)
 - [Quick Deploy Workflow Spec](./quick-deploy.md)
 - [Resource Create And First Deploy Workflow Spec](./resources.create-and-first-deploy.md)
+- [Workload Framework Detection And Planning Test Matrix](../testing/workload-framework-detection-and-planning-test-matrix.md)
 - [deployments.create Test Matrix](../testing/deployments.create-test-matrix.md)
 - [Quick Deploy Test Matrix](../testing/quick-deploy-test-matrix.md)
 - [Deployment Runtime Substrate Implementation Plan](../implementation/deployment-runtime-substrate-plan.md)
 - [Error Model](../errors/model.md)
 - [neverthrow Conventions](../errors/neverthrow-conventions.md)
+- [Async Lifecycle And Acceptance](../architecture/async-lifecycle-and-acceptance.md)
+
+## ADR Need Decision
+
+No new ADR is required for this Spec Round. The change refines the planner evidence and support
+catalog governed by the accepted boundaries:
+
+- ADR-012 places source/runtime/profile evidence on the Resource side and keeps deployment
+  snapshots immutable.
+- ADR-014 keeps `deployments.create` ids-only and forbids framework, package, base-image, and
+  runtime preset fields on deployment admission.
+- ADR-015 makes listener ports resource network profile fields.
+- ADR-021 requires every v1 plan to produce, pull, or reference Docker/OCI image artifacts or a
+  Compose project.
+- ADR-023 keeps runtime target capabilities and orchestrator-specific rendering behind runtime
+  target backends.
+
+A new ADR is required before Appaloft accepts non-Docker runtime substrates, public base-image
+override fields, provider-specific buildpack/runtime preset fields, public orchestrator fields, or
+framework-specific deployment commands.
 
 ## Boundary
 
@@ -108,23 +129,120 @@ Detectors must not:
 - persist provider SDK types, Docker SDK responses, or framework package objects in core state;
 - treat a detected package/project name as the resource id, deployment id, or security boundary.
 
+## Detection And Plan Input Contract
+
+Detection produces typed evidence for planning. It does not mutate resource identity by itself and
+does not create transport fields. Entry workflows may use evidence to prefill resource profile
+drafts, but the write boundary remains `resources.create` or a future resource profile update
+operation followed by ids-only `deployments.create`.
+
+### Package Manager And Build Tool Resolution
+
+Planner selection must record the selected package manager or build tool when that choice changes
+install, build, package, start, base-image, cache, or diagnostic behavior.
+
+| Runtime family | Evidence precedence |
+| --- | --- |
+| Node/Bun | Explicit resource runtime profile tool, then `packageManager` from `package.json` when valid, then lockfiles in this order: `bun.lockb`/`bun.lock`, `pnpm-lock.yaml`, `yarn.lock`, `package-lock.json`/`npm-shrinkwrap.json`; conflicting lockfiles are warnings only when an explicit tool resolves the conflict, otherwise ambiguity must be surfaced through diagnostics or `validation_error` when the selected planner requires one tool. |
+| Python | Explicit tool, then `uv.lock`, Poetry metadata/`poetry.lock`, PEP 621 `pyproject.toml`, `requirements.txt`, then generic `pip`. A planner must not install multiple Python toolchains unless the selected planner explicitly owns that behavior. |
+| Ruby | `Gemfile.lock` and `Gemfile` select Bundler. Rails/Sinatra/Rack detection cannot bypass Bundler when a Gemfile exists. |
+| PHP | `composer.lock`/`composer.json` select Composer. PHP-FPM, Laravel, and Symfony planners may add server/runtime packaging, but Composer remains the package dependency tool. |
+| Go | `go.mod` selects Go modules. `go.work` may indicate a workspace, but the selected source base directory still owns the deployable module. |
+| Java/JVM | `pom.xml` selects Maven unless a Gradle file is selected by explicit profile or source root; `build.gradle`, `build.gradle.kts`, and Gradle wrapper files select Gradle. Ambiguous Maven/Gradle roots require explicit profile selection. |
+| .NET | `global.json` and project/solution files select the .NET SDK version and project. Multiple runnable projects require explicit source base directory or project file selection. |
+| Elixir | `mix.exs` and lockfile select Mix; Phoenix detection may add release-specific packaging. |
+| Rust | `Cargo.toml`, `Cargo.lock`, and `rust-toolchain*` select Cargo and the toolchain. Workspaces require selected package/bin evidence. |
+| Static generators outside language package managers | Framework config or well-known generator files, such as Hugo or Jekyll config, select the generator-specific build tool. If the generator needs a language package manager, both facts must be recorded. |
+
+### Framework Signal Strength
+
+Planner selection must rank signals by specificity:
+
+1. Explicit `ResourceRuntimeProfile.strategy` and strategy-specific fields.
+2. Explicit future resource runtime-profile hints, when their specs exist.
+3. Framework config files under the selected source base directory.
+4. Manifest dependencies and declared package/build scripts.
+5. Well-known project files such as `manage.py`, `artisan`, `mix.exs`, or `.csproj`.
+6. Conventional output directories only when paired with a compatible build or framework signal.
+
+Detected dependency names alone are insufficient to choose a production start command when multiple
+frameworks or runnable apps are present. Development scripts such as `dev`, `serve`, `preview`, or
+framework watch modes must not be used as production start commands unless the user explicitly
+accepts them as custom command leaves in a runtime profile.
+
+### Application Shape Classification
+
+Every selected planner must classify the deployable shape because the classification determines the
+artifact rule, required network profile, readiness expectations, and fallback behavior.
+
+| Classification | Meaning | Artifact rule | Network/readiness contract |
+| --- | --- | --- | --- |
+| `static` | Build output is files served by a static HTTP server. | Package `publishDirectory` into a Docker/OCI static-server image. | Default `internalPort = 80`, `upstreamProtocol = http`, `exposureMode = reverse-proxy` for first-deploy drafts. Readiness is static-server HTTP readiness, not the build command finishing. |
+| `serverful-http` | The app starts a long-lived HTTP process. | Build a Docker/OCI image and run the selected start command. | `ResourceNetworkProfile.internalPort` is required unless a deterministic planner hint is persisted before deployment admission. Health policy defaults may target `/`, but explicit resource health policy wins. |
+| `ssr` | The app renders server-side routes at runtime and may also produce client/static assets. | Build a Docker/OCI image containing build output and server runtime entrypoint. | Same as `serverful-http`; static output is not sufficient unless an explicit static-export mode is selected. |
+| `hybrid-static-server` | The framework can produce either static output or a runtime server depending on adapter/config. | Planner must choose static or serverful based on explicit strategy, adapter/config, or safe evidence. | Ambiguous mode fails `runtime-plan-resolution` or requires entry workflow selection. |
+| `worker` | No inbound HTTP endpoint is required. | Build a Docker/OCI image with a long-running worker command. | `exposureMode = none`; no generated access route is expected. Public Web app detection must not silently classify an HTTP app as worker to avoid missing port input. |
+| `container-native` | Dockerfile, Compose, or prebuilt image is explicit. | Use the explicit Docker/OCI or Compose artifact path. | Framework detection may add diagnostics but must not override explicit container intent. |
+
+### Build, Start, And Artifact Rules
+
+Explicit runtime profile commands always win. Inferred commands are valid only when they are
+deterministic for the selected framework and source base directory.
+
+- Static planners require a safe `publishDirectory` or a deterministic framework static output
+  convention. If a build command is required to create the output, the build command is a package
+  step before static-server image packaging.
+- Serverful and SSR planners require a production start command. A detected `start` script is valid
+  when it does not invoke a dev/watch server. Framework-derived start commands are valid only when
+  the required server artifact path or app module is known.
+- Generic language planners may use custom install/build/start commands from
+  `ResourceRuntimeProfile`, but they must still package those commands into a Docker/OCI image.
+- Dockerfile, Compose, and prebuilt image strategies override framework detection for artifact
+  construction. Detection may report warnings, package names, or likely health/port hints, but it
+  must not replace an explicit Dockerfile, Compose project, or image reference.
+
+### Port And Readiness Rules
+
+`ResourceNetworkProfile.internalPort` is the durable resource endpoint. Framework default ports are
+entry-workflow hints only until persisted as `networkProfile.internalPort`.
+
+- Static first-deploy drafts default to `internalPort = 80`.
+- Common serverful hints such as `3000`, `4000`, `5000`, `8000`, `8080`, or `5000/8000` by
+  framework are allowed as draft defaults, but user-supplied `networkProfile.internalPort` wins.
+- If an inbound app has no persisted internal port and the planner cannot infer one
+  deterministically before admission, `deployments.create` fails in phase
+  `resource-network-resolution`.
+- Readiness belongs to deployment verification and resource health observation. The planner may set
+  a default HTTP health path only when it is a known framework contract; otherwise `/` is a safe
+  default only as a probe target, not proof of app-level health.
+
 ## Support Catalog
 
 The target support catalog for mainstream web application deployment is:
 
-| Family | Frameworks and app shapes | Default artifact rule |
-| --- | --- | --- |
-| JavaScript/TypeScript on Node or Bun | Next.js, Remix, Nuxt, SvelteKit, Astro, Vite apps, React/Vue/Svelte/Solid/Angular SPAs, Express, Fastify, NestJS, Hono, Koa, generic `package.json` apps | Build a Docker/OCI image with the detected package manager and framework-specific build/start/static output rules. Static output may use the static-server artifact path. |
-| Static site generators | Vite static, SvelteKit static, Next static export, Nuxt generate, Astro static, Docusaurus, Hugo, Jekyll, generic `dist`/`build` output | Package the publish directory into an OCI static-server image. |
-| Python | FastAPI, Django, Flask, generic ASGI/WSGI apps | Build a Docker/OCI image with detected Python package tooling and explicit or framework-derived start command. |
-| Ruby | Rails, Sinatra/Rack, generic Ruby web apps | Build a Docker/OCI image with Bundler and explicit or framework-derived start command. |
-| PHP | Laravel, Symfony, generic Composer/PHP-FPM apps | Build a Docker/OCI image using Composer and a PHP runtime/server profile. |
-| Go | Go modules, Gin, Echo, Chi, Fiber, generic Go HTTP services | Build a Docker/OCI image with a compiled binary and runtime image. |
-| Java/JVM | Spring Boot, Quarkus, Micronaut, generic Maven/Gradle web services | Build or package a jar/native artifact into a Docker/OCI image. |
-| .NET | ASP.NET Core and generic .NET web apps | Build/publish into a Docker/OCI image with the selected .NET runtime. |
-| Elixir | Phoenix and generic Plug/Cowboy apps | Build a release and package it into a Docker/OCI image. |
-| Rust | Axum, Actix Web, Rocket, generic Rust HTTP services | Build a binary and package it into a Docker/OCI image. |
-| Container-native | Dockerfile, Docker Compose, prebuilt image | Use the explicit Dockerfile, Compose project, or prebuilt OCI image strategy. Framework detection may add diagnostics but does not override explicit container intent. |
+| Family/frameworks | Classification | Required signals | Default build/package and artifact rule | Start/readiness rule |
+| --- | --- | --- | --- | --- |
+| Next.js runtime app | `ssr` or `serverful-http` | `next` dependency or `next.config.*` under selected source root; package manager evidence | Install, run `next build`; prefer standalone/server output when configured; package as Docker/OCI image with Node or Bun base policy selected by package manager/runtime evidence | Start with deterministic Next server/standalone command only when output is known; otherwise require explicit start command. Port hint is 3000 unless resource network profile supplies another port. |
+| Next static export | `static` | Explicit static strategy, `output: "export"`, or safe export/build script evidence | Build static output and package `out` or explicit publish directory into static-server image | Static server on port 80 by default; no Next runtime server is started. |
+| Remix | `ssr` | Remix dependency/config and build script evidence | Install and run selected Remix build; package server artifact and public assets into Docker/OCI image | Start command must be explicit or derived from supported server adapter output; port is resource network input or deterministic adapter hint. |
+| Nuxt | `ssr` or `static` | `nuxt` dependency or `nuxt.config.*`; generate/static evidence when selected | SSR uses `nuxi build` and `.output/server`; static uses `nuxi generate` and `.output/public`; package image or static-server image accordingly | SSR starts Nitro server from `.output`; static starts static server on port 80. |
+| SvelteKit | `hybrid-static-server` | `svelte.config.*`, SvelteKit dependency, and adapter evidence | `adapter-static` or explicit static strategy packages static output; server adapters package the generated server runtime into Docker/OCI image | Static uses port 80; server adapters require a start command or supported adapter entrypoint plus resource network port. |
+| Astro | `static` or `ssr` | `astro.config.*` or Astro dependency; adapter/output mode | Default static output packages `dist`; SSR adapter output packages a server runtime image | Static uses port 80; SSR requires supported adapter start evidence and resource network port. |
+| Vite, Angular, React/Vue/Svelte/Solid SPA, Docusaurus | `static` | Vite/Angular/Docusaurus config or package scripts; output convention | Run build script and package `dist`, `build`, Angular browser output, or explicit publish directory into static-server image | Static server on port 80 by default. Preview/dev servers are not production runtime commands. |
+| Express, Fastify, NestJS, Hono, Koa, generic Node HTTP apps | `serverful-http` | Package manifest plus framework dependency, entrypoint, or non-dev start script | Install/build when script exists; package app into Docker/OCI image with selected Node/Bun base policy | Production `start` script or deterministic framework start is required; internal port must be supplied or inferred from accepted profile evidence. |
+| FastAPI | `serverful-http` | Python project metadata plus FastAPI dependency, ASGI module hint, or explicit start command | Install with detected Python tool; package Docker/OCI image | Start with `uvicorn` only when ASGI module/app can be safely identified; otherwise require explicit start command. |
+| Django | `serverful-http` | `manage.py`, Django dependency, settings/module evidence | Install with detected Python tool; collect/static/package as needed; Docker/OCI image | Start with supported WSGI/ASGI command only when project module is known; otherwise explicit start required. |
+| Flask | `serverful-http` | Flask dependency plus app module or explicit start command | Install with detected Python tool; package Docker/OCI image | Start with supported WSGI command only when module/app object is known; otherwise explicit start required. |
+| Rails, Sinatra, Rack | `serverful-http` | `Gemfile`, Rails/Rack/Sinatra dependencies, `config.ru` or Rails app files | `bundle install`, optional asset build when configured, package Docker/OCI image | Start with Puma/Rails/Rack command when framework output is deterministic; port hint may be 3000 for Rails but resource network profile wins. |
+| Laravel, Symfony, generic PHP web apps | `serverful-http` | `composer.json`, framework files such as `artisan` or Symfony kernel/config | Composer install; package PHP runtime plus web server or PHP-FPM profile into Docker/OCI image | Planner owns PHP server/FPM boundary; resource network endpoint targets the served HTTP port, not PHP internals unless a future profile says otherwise. |
+| Go HTTP services | `serverful-http` | `go.mod`, selected module/package, optional known framework dependency | Compile binary in build stage; package runtime image with binary | Start binary; internal port required unless explicit profile or deterministic binary config provides it. |
+| Spring Boot, Quarkus, Micronaut, generic JVM web services | `serverful-http` | Maven/Gradle project plus framework plugins/dependencies or runnable jar metadata | Build/package jar/native artifact and package runtime image | Start `java -jar` or native binary when artifact is known; common port hints such as 8080 are draft defaults only. |
+| ASP.NET Core | `serverful-http` | Web SDK/project file, solution/project selection, `global.json` when present | `dotnet publish` and package runtime image | Start published assembly; port is resource network input or accepted ASP.NET runtime default from profile. |
+| Phoenix and Plug/Cowboy | `serverful-http` | `mix.exs`, Phoenix/Plug dependencies, release config | Build release and package Docker/OCI image | Start release command; port hint is framework/runtime config only and resource profile wins. |
+| Axum, Actix Web, Rocket, generic Rust HTTP apps | `serverful-http` | `Cargo.toml`, selected package/bin, web framework dependency or explicit start command | Build release binary and package runtime image | Start binary; internal port required unless accepted framework config supplies a deterministic port. |
+| Dockerfile | `container-native` | Explicit Dockerfile strategy/path | Build OCI image from resolved source root and Dockerfile path | Runtime endpoint still comes from resource network profile; detection cannot override Dockerfile intent. |
+| Docker Compose | `container-native` | Explicit Compose strategy/path | Materialize Compose project whose runnable services use/build OCI images | `targetServiceName` is required when inbound target service is ambiguous. |
+| Prebuilt image | `container-native` | Docker image source with tag or digest | Pull or use image identity; skip build unless artifact verification is later modeled | Runtime endpoint and health policy come from resource network/profile, not image metadata unless a future image-inspection spec accepts it. |
 
 Support is complete for a catalog entry only when all of these are specified and tested:
 
@@ -175,6 +293,41 @@ Base image policies must be named and testable. Examples:
 Changing the base image policy for an existing planner changes deployment behavior and must update
 the implementation plan and test matrix in the same change.
 
+## Docker And Runtime Capability Boundary
+
+Framework planners produce provider-neutral artifact intent and typed runtime command specs. They
+do not execute Docker, SSH, package managers, language installers, or framework CLIs during
+admission-time detection.
+
+The boundary is:
+
+```text
+SourceInspectionSnapshot + ResourceRuntimeProfile + ResourceNetworkProfile
+  -> planner output: artifact intent, base image policy, typed install/build/start/package specs
+  -> runtime target backend: render/apply/verify/log/cleanup on local shell, SSH, or future target
+```
+
+Runtime capability checks must be target-backend checks, not transport input checks:
+
+- image build plans require a backend capable of image build/package and runtime apply;
+- prebuilt image plans require image pull/use and runtime apply;
+- Compose plans require Compose project materialization and target service observation;
+- static-server plans require image build/package plus HTTP runtime verification;
+- runtime log and health queries require backend `runtime.logs` and `runtime.health` capabilities
+  before those read surfaces can claim live support.
+
+If a selected target cannot support the resolved artifact or observation capability and that can be
+known before safe acceptance, `deployments.create` fails with `runtime_target_unsupported` in phase
+`runtime-target-resolution`. Post-acceptance render/apply/verify/log/cleanup failures are
+deployment workflow failures and must be persisted as failed or unavailable state with sanitized
+details.
+
+Dockerfile templates, static-server images, generated web-server config, Compose project names,
+container labels, shell commands, Kubernetes manifests, Swarm stacks, and provider SDK response
+objects are adapter-owned artifacts. They may be exposed only through sanitized diagnostics,
+runtime logs, resource health, proxy configuration previews, or deployment read models where those
+read/query specs allow them.
+
 ## Error Contract
 
 Framework detection and planner selection failures use existing deployment error phases:
@@ -199,6 +352,7 @@ Current implementation is narrower than the target catalog.
 Implemented planner families:
 
 - `nextjs`;
+- `nextjs-static` for detected export/static output evidence or explicit static strategy;
 - generic `node`;
 - `vite-static`;
 - `astro-static`;
@@ -216,11 +370,20 @@ Current typed detection is limited to:
 
 - widened runtime family, framework, package-manager/build-tool, detected-file, and
   detected-script value objects covering the target catalog vocabulary;
+- application-shape evidence for supported local JavaScript/TypeScript and Python framework
+  detection, plus planner output metadata for `static`, `serverful-http`, `ssr`, and explicit
+  `container-native` strategies;
 - local JavaScript/TypeScript detection for common framework dependencies/config files and
-  lockfiles;
+  lockfiles, including Next.js `output: "export"`/export-script, Nuxt `generate`, and SvelteKit
+  `adapter-static` classification as `static`;
 - local Python detection for FastAPI, Django, Flask, `uv`, Poetry, pip, lockfiles, and `manage.py`;
 - local Java project detection;
-- Vite, Astro, Nuxt generate, and explicit SvelteKit static artifact planning.
+- fixed-version fixture coverage for Next.js, Vite, Angular, SvelteKit, Nuxt, Astro, Remix,
+  Express, FastAPI, Django, and Flask source inspection;
+- Vite, Angular, Astro, Nuxt generate, Next.js static export, and SvelteKit adapter-static artifact
+  planning.
+- SvelteKit ambiguous auto planning is rejected unless the workflow selects static explicitly or
+  provides an explicit start command.
 
 The following are migration gaps before the mainstream support catalog is complete:
 
@@ -228,7 +391,9 @@ The following are migration gaps before the mainstream support catalog is comple
   static output conventions, and framework config files across the support catalog;
 - add planner implementations for the unsupported catalog entries instead of routing them through
   generic custom commands by accident;
-- model base image policy as explicit planner output and test it per remaining framework family;
+- test base image and application-shape policy per remaining framework family;
+- enforce the remaining `hybrid-static-server` and `worker` shape branches before exposing them as
+  first-class planner results;
 - add Web/CLI Quick Deploy parity for framework/runtime draft fields and manual fallback commands;
 - add deployment and Quick Deploy matrix rows for each support tier before Code Round expands the
   implementation.
