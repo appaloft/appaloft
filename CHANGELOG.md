@@ -1,5 +1,32 @@
 # Changelog
 
+## [0.2.2](https://github.com/appaloft/appaloft/compare/v0.2.1...v0.2.2) (2026-04-20)
+
+
+### Features
+
+* add docker self-host installer ([#11](https://github.com/appaloft/appaloft/issues/11)) ([0cab9c9](https://github.com/appaloft/appaloft/commit/0cab9c90d67f4b63a7ca9fc2911a49153ac81920))
+* add framework fixture planning coverage ([#9](https://github.com/appaloft/appaloft/issues/9)) ([d9dd8a1](https://github.com/appaloft/appaloft/commit/d9dd8a10b9df78dfce481729c0d21f490885ccd7))
+* support github action pr preview deploy ([#14](https://github.com/appaloft/appaloft/issues/14)) ([f184f27](https://github.com/appaloft/appaloft/commit/f184f2742ee079b12fd34e090f849636d64600b1))
+
+
+### Bug Fixes
+
+* embed app version in release binaries ([351ca57](https://github.com/appaloft/appaloft/commit/351ca57f4736dc1d7932825b2c64d31ec6d7400e))
+* embed app version in release binaries ([9e71d53](https://github.com/appaloft/appaloft/commit/9e71d53bacbf908f46bc2c06c0d236b5c7a2944a))
+
+
+### Documentation
+
+* specify control plane modes ([88dfe25](https://github.com/appaloft/appaloft/commit/88dfe25148e65577b16720bce1cd894899c2b6c3))
+* specify control plane modes ([f772f96](https://github.com/appaloft/appaloft/commit/f772f96cc6c338df19cc9df1c48f579a9d7b7c49))
+
+
+### Miscellaneous
+
+* keep pre-1.0 releases on patch line ([#15](https://github.com/appaloft/appaloft/issues/15)) ([540b7c3](https://github.com/appaloft/appaloft/commit/540b7c37871840359f6b67e577eecd50d0f4f522))
+* patch pre-1.0 minor releases ([#17](https://github.com/appaloft/appaloft/issues/17)) ([ffbaf0d](https://github.com/appaloft/appaloft/commit/ffbaf0daa10878e6e83abf5a626eb61363ecf69c))
+
 ## [0.2.1](https://github.com/appaloft/appaloft/compare/v0.2.0...v0.2.1) (2026-04-19)
 
 
