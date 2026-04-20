@@ -60,16 +60,23 @@ command and that no entrypoint exposes a generic `resources.update`.
 | RES-PROFILE-ARCHIVE-003 | `resources.archive` | Command use case | Resource has deployment history or runtime logs. | Archive succeeds and retains history; no cleanup side effects. |
 | RES-PROFILE-ARCHIVE-004 | `deployments.create` | Command guard | Archived resource selected for deployment. | Rejects with structured lifecycle error. |
 | RES-PROFILE-ARCHIVE-005 | `resource-archived` | Event payload | Archive has safe reason. | Event includes resource ids, `resourceSlug`, archived timestamp, and normalized reason; excludes secrets and logs. |
-| RES-PROFILE-DELETE-001 | `resources.delete` | Command use case | Archived resource has no blockers and matching slug confirmation. | Deletes/tombstones resource, publishes `resource-deleted`, returns `ok({ id })`. |
-| RES-PROFILE-DELETE-002 | `resources.delete` | Command use case | Active resource. | Rejects with `resource_delete_blocked`. |
-| RES-PROFILE-DELETE-003 | `resources.delete` | Command use case | Confirmation slug mismatch. | Rejects with validation/conflict error and no mutation. |
-| RES-PROFILE-DELETE-004 | `resources.delete` | Command use case | Deployment history, domain binding, runtime instance, source link, or retained blocker exists. | Rejects with `resource_delete_blocked` and safe blocker details. |
-| RES-PROFILE-DELETE-005 | `resources.delete` | Read model | Deleted resource queried by normal `resources.show`/`resources.list`. | `resources.show` returns `not_found`; list omits the resource. |
+| RES-PROFILE-DELETE-001 | `resources.delete` | Command use case | Archived resource has no blockers and matching slug confirmation. | Transitions/tombstones resource as deleted, publishes `resource-deleted`, returns `ok({ id })`. |
+| RES-PROFILE-DELETE-002 | `resources.delete` | Command use case | Active resource. | Rejects with `resource_delete_blocked`, `lifecycleStatus = "active"`, `deletionBlockers` includes `active-resource`, and no event. |
+| RES-PROFILE-DELETE-003 | `resources.delete` | Command use case | Confirmation slug mismatch. | Rejects with `validation_error`, `phase = resource-deletion-guard`, and no mutation. |
+| RES-PROFILE-DELETE-004 | `resources.delete` | Command use case | Archived resource has deployment history. | Rejects with `resource_delete_blocked`, `deletionBlockers` includes `deployment-history`, and no event. |
+| RES-PROFILE-DELETE-005 | `resources.delete` | Command use case | Archived resource has domain, certificate, access route, or proxy route state. | Rejects with `resource_delete_blocked` and safe blocker details. |
+| RES-PROFILE-DELETE-006 | `resources.delete` | Command use case | Archived resource has source link, dependency binding, terminal session, runtime-log retention, or audit retention. | Rejects with `resource_delete_blocked` and safe blocker details. |
+| RES-PROFILE-DELETE-007 | `resources.delete` | Command use case | Already deleted tombstone is retried. | Returns idempotent `ok({ id })` without duplicate state effect or duplicate event when tombstone can be resolved. |
+| RES-PROFILE-DELETE-008 | `resources.show` / `resources.list` | Read model | Deleted resource queried by normal active read paths. | `resources.show` returns `not_found`; list omits the resource. |
+| RES-PROFILE-DELETE-009 | `resource-deleted` | Event payload | Delete succeeds. | Event includes resource ids, `resourceSlug`, deleted timestamp, and no secrets, logs, certificate material, or provider configs. |
 | RES-PROFILE-ENTRY-001 | Web | Entrypoint | Resource detail page loads durable profile. | Dispatches `resources.show`; does not synthesize full detail from list-only data. |
-| RES-PROFILE-ENTRY-002 | Web | Entrypoint | Source/runtime/network/archive actions submitted independently. | Each form/action dispatches its matching command and refetches detail/health. |
+| RES-PROFILE-ENTRY-002 | Web | Entrypoint | Source/runtime/network/archive/delete actions submitted independently. | Each form/action dispatches its matching command and refetches detail/health/list. |
 | RES-PROFILE-ENTRY-003 | CLI | Entrypoint | Resource profile commands are listed. | CLI exposes separate subcommands and no generic `resource update`. |
 | RES-PROFILE-ENTRY-004 | HTTP/oRPC | Entrypoint | Routes accept show/source/runtime/network/archive/delete requests. | Each route reuses the application schema; no transport-only schema. |
 | RES-PROFILE-ENTRY-005 | Operation catalog | Catalog | Public exposure in Code Round. | Each active operation appears in `CORE_OPERATIONS.md` and `operation-catalog.ts` in the same change. |
+| RES-PROFILE-ENTRY-006 | CLI | Entrypoint | Delete command submitted with `--confirm-slug`. | Dispatches `DeleteResourceCommand` through `CommandBus`; no generic delete/update helper bypass. |
+| RES-PROFILE-ENTRY-007 | HTTP/oRPC | Entrypoint | Delete route submitted with command schema. | Dispatches `DeleteResourceCommand`; a follow-up `resources.show` for the deleted resource returns `not_found`. |
+| RES-PROFILE-ENTRY-008 | Web | Entrypoint | Archived resource delete action submitted after typed slug confirmation. | Dispatches `resources.delete`, invalidates resources/detail/list state, and does not hide cleanup side effects. |
 | RES-PROFILE-ERROR-001 | Error mapping | Contract | Persistence failure before command success. | Returns `infra_error`, `phase = resource-persistence`. |
 | RES-PROFILE-ERROR-002 | Error mapping | Contract | Event publication/outbox failure before command success. | Returns `infra_error`, `phase = event-publication`. |
 | RES-PROFILE-ERROR-003 | Error mapping | Contract | Event consumer projection failure. | Records `phase = event-consumption` and does not reinterpret command success. |
@@ -120,5 +127,6 @@ Automated coverage now exists for:
 - Web source, runtime, network, and archive submissions in
   `apps/web/test/e2e-webview/home.webview.test.ts`.
 
-`RES-PROFILE-SOURCE-006` remains future event-consumer projection work. Delete rows remain a later
-Code Round.
+`RES-PROFILE-SOURCE-006` remains future event-consumer projection work. `RES-PROFILE-DELETE-001`
+through `RES-PROFILE-DELETE-009` and `RES-PROFILE-ENTRY-006` through `RES-PROFILE-ENTRY-008` are
+specified for the next delete Code Round and do not yet have automated coverage.

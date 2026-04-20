@@ -131,6 +131,40 @@ certificates, source links, environment variables, dependency resources, or logs
    `RES-PROFILE-ARCHIVE-001` through `RES-PROFILE-ARCHIVE-005`, and the archive portions of
    `RES-PROFILE-ENTRY-003` through `RES-PROFILE-ENTRY-005`.
 
+## Next Code Round Target: `resources.delete`
+
+`resources.delete` is the next implementation slice. Its minimal deliverable is:
+
+1. Extend Resource lifecycle value objects and aggregate transition:
+   - `ResourceLifecycleStatus` with `active`, `archived`, and `deleted`;
+   - `DeletedAt`;
+   - aggregate method named for the terminal delete transition, not a generic update.
+2. Add `DeleteResourceCommand`, schema, handler, use case, token registration, and
+   `resource-deleted` publication.
+3. Add an authoritative deletion blocker read/application port that can detect:
+   - deployment history;
+   - runtime instances;
+   - domain bindings;
+   - certificates;
+   - source links;
+   - dependency bindings;
+   - terminal sessions;
+   - runtime-log retention;
+   - audit-retention requirements;
+   - generated access routes, server-applied routes, and proxy routes.
+4. Persist deleted lifecycle/tombstone state through the Resource repository and
+   PostgreSQL/PGlite adapter. Normal `resources.show`, `resources.list`, and navigation reads must
+   omit deleted resources.
+5. Add `CORE_OPERATIONS.md` and `operation-catalog.ts` rows in the same Code Round that exposes
+   the public command.
+6. Add HTTP/oRPC route `DELETE /api/resources/{resourceId}` using `DeleteResourceCommandInput`.
+7. Add CLI subcommand `appaloft resource delete <resourceId> --confirm-slug <slug> [--json]`.
+8. Add a Web resource detail delete action visible only for archived resources. The action must
+   require typed slug confirmation, dispatch `resources.delete`, refetch or invalidate resource
+   list/detail state, and must not stop runtime or delete retained blocker state.
+9. Cover matrix rows `RES-PROFILE-DELETE-001` through `RES-PROFILE-DELETE-009` and
+   `RES-PROFILE-ENTRY-006` through `RES-PROFILE-ENTRY-008`.
+
 ## Read-Side State Changes
 
 `resources.show` uses a dedicated query service shape rather than relying on `resources.list` as a
@@ -205,5 +239,6 @@ behavior, and tests are implemented in the same Code Round.
 Resource lifecycle state. Duplicate configured-event consumer idempotency remains future read-model
 projection work.
 
-Next lifecycle Code Round target: `resources.delete`, including deletion-blocker reads and
-`resource-deleted` publication.
+Next lifecycle Code Round target: `resources.delete`, including deletion-blocker reads,
+deleted/tombstone lifecycle state, entrypoints, read-model omission, and `resource-deleted`
+publication.
