@@ -7,6 +7,10 @@ on:
     branches:
       - main
 
+permissions:
+  contents: read
+  pull-requests: read
+
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -18,53 +22,245 @@ env:
   APPALOFT_HTTP_HOST: 127.0.0.1
   APPALOFT_HTTP_PORT: 3101
   APPALOFT_OTEL_ENABLED: "false"
+  TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
+  TURBO_TEAM: ${{ vars.TURBO_TEAM }}
 
 jobs:
-  ci:
+  changes:
+    name: Changes
     runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_DB: appaloft
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U postgres -d appaloft"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 20
+    outputs:
+      docs_only: ${{ steps.classify.outputs.docs_only }}
     steps:
-      - uses: actions/checkout@v4
+      - name: Check out code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - uses: oven-sh/setup-bun@v2
+      - name: Classify changed files
+        id: classify
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          BEFORE_SHA: ${{ github.event.before }}
+        run: |
+          set -euo pipefail
+
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            echo "docs_only=false" >> "$GITHUB_OUTPUT"
+            echo "Workflow dispatch; running full CI."
+            exit 0
+          fi
+
+          if [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]]; then
+            gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/files" --paginate --jq '.[].filename' > changed-files.txt
+          elif [[ -n "${BEFORE_SHA}" && "${BEFORE_SHA}" != "0000000000000000000000000000000000000000" ]]; then
+            git diff --name-only "${BEFORE_SHA}" "${GITHUB_SHA}" > changed-files.txt
+          else
+            git diff --name-only HEAD^ HEAD > changed-files.txt || git ls-files > changed-files.txt
+          fi
+
+          if [[ ! -s changed-files.txt ]]; then
+            echo "docs_only=false" >> "$GITHUB_OUTPUT"
+            echo "No changed files detected; running full CI."
+            exit 0
+          fi
+
+          docs_only=true
+          while IFS= read -r file; do
+            case "$file" in
+              docs/*|*.md|*.mdx|LICENSE|LICENSE.*)
+                ;;
+              *)
+                docs_only=false
+                break
+                ;;
+            esac
+          done < changed-files.txt
+
+          echo "docs_only=${docs_only}" >> "$GITHUB_OUTPUT"
+          {
+            echo "### Changed files"
+            sed 's/^/- `/' changed-files.txt | sed 's/$/`/'
+            echo
+            echo "docs_only=${docs_only}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  biome:
+    name: Biome
+    needs: changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Skip Biome
+        if: ${{ needs.changes.outputs.docs_only == 'true' }}
+        run: echo "Docs-only change; skipping Biome."
+
+      - name: Check out code
+        if: ${{ needs.changes.outputs.docs_only != 'true' }}
+        uses: actions/checkout@v4
+
+      - name: Set up Bun and caches
+        if: ${{ needs.changes.outputs.docs_only != 'true' }}
+        uses: ./.github/actions/setup-bun-turbo
         with:
           bun-version: ${{ env.BUN_VERSION }}
 
-      - name: Install
-        run: bun install --frozen-lockfile
-
       - name: Biome
+        if: ${{ needs.changes.outputs.docs_only != 'true' }}
         run: bun run lint:ci
 
+  typecheck:
+    name: Typecheck
+    needs: changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Skip Typecheck
+        if: ${{ needs.changes.outputs.docs_only == 'true' }}
+        run: echo "Docs-only change; skipping Typecheck."
+
+      - name: Check out code
+        if: ${{ needs.changes.outputs.docs_only != 'true' }}
+        uses: actions/checkout@v4
+
+      - name: Set up Bun and caches
+        if: ${{ needs.changes.outputs.docs_only != 'true' }}
+        uses: ./.github/actions/setup-bun-turbo
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
       - name: Typecheck
+        if: ${{ needs.changes.outputs.docs_only != 'true' }}
         run: bun run typecheck
 
+  unit-tests:
+    name: Unit Tests
+    needs: changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Skip Unit Tests
+        if: ${{ needs.changes.outputs.docs_only == 'true' }}
+        run: echo "Docs-only change; skipping unit tests."
+
+      - name: Check out code
+        if: ${{ needs.changes.outputs.docs_only != 'true' }}
+        uses: actions/checkout@v4
+
+      - name: Set up Bun and caches
+        if: ${{ needs.changes.outputs.docs_only != 'true' }}
+        uses: ./.github/actions/setup-bun-turbo
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
       - name: Unit Tests
+        if: ${{ needs.changes.outputs.docs_only != 'true' }}
         run: bun run test:unit
 
+  integration-tests:
+    name: Integration Tests
+    needs: changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Skip Integration Tests
+        if: ${{ needs.changes.outputs.docs_only == 'true' }}
+        run: echo "Docs-only change; skipping integration tests."
+
+      - name: Check out code
+        if: ${{ needs.changes.outputs.docs_only != 'true' }}
+        uses: actions/checkout@v4
+
+      - name: Set up Bun and caches
+        if: ${{ needs.changes.outputs.docs_only != 'true' }}
+        uses: ./.github/actions/setup-bun-turbo
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Start Postgres
+        if: ${{ needs.changes.outputs.docs_only != 'true' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --detach --name appaloft-postgres \
+            -e POSTGRES_DB=appaloft \
+            -e POSTGRES_USER=postgres \
+            -e POSTGRES_PASSWORD=postgres \
+            -p 5432:5432 \
+            postgres:16
+
+          for _ in {1..30}; do
+            if docker exec appaloft-postgres pg_isready -U postgres -d appaloft; then
+              exit 0
+            fi
+            sleep 2
+          done
+
+          docker logs appaloft-postgres
+          exit 1
+
       - name: Integration Tests
+        if: ${{ needs.changes.outputs.docs_only != 'true' }}
         run: bun run test:integration
 
+      - name: Stop Postgres
+        if: ${{ always() && needs.changes.outputs.docs_only != 'true' }}
+        run: docker rm --force appaloft-postgres || true
+
+  build-smoke:
+    name: Build And Smoke
+    needs: changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Skip Build And Smoke
+        if: ${{ needs.changes.outputs.docs_only == 'true' }}
+        run: echo "Docs-only change; skipping build and smoke checks."
+
+      - name: Check out code
+        if: ${{ needs.changes.outputs.docs_only != 'true' }}
+        uses: actions/checkout@v4
+
+      - name: Set up Bun and caches
+        if: ${{ needs.changes.outputs.docs_only != 'true' }}
+        uses: ./.github/actions/setup-bun-turbo
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
       - name: Build
+        if: ${{ needs.changes.outputs.docs_only != 'true' }}
         run: bun run build
 
       - name: Package Release Artifacts
+        if: ${{ needs.changes.outputs.docs_only != 'true' }}
         run: bun run package:artifacts
 
+      - name: Start Postgres
+        if: ${{ needs.changes.outputs.docs_only != 'true' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --detach --name appaloft-postgres \
+            -e POSTGRES_DB=appaloft \
+            -e POSTGRES_USER=postgres \
+            -e POSTGRES_PASSWORD=postgres \
+            -p 5432:5432 \
+            postgres:16
+
+          for _ in {1..30}; do
+            if docker exec appaloft-postgres pg_isready -U postgres -d appaloft; then
+              exit 0
+            fi
+            sleep 2
+          done
+
+          docker logs appaloft-postgres
+          exit 1
+
       - name: Binary Bundle Smoke
+        if: ${{ needs.changes.outputs.docs_only != 'true' }}
         run: |
           test ! -d dist/release/appaloft-binary-bundle/web-static
           mkdir -p .tmp-binary-smoke
@@ -78,11 +274,61 @@ jobs:
           curl --fail http://127.0.0.1:3211/ | grep -q "Appaloft"
 
       - name: Stop Binary Bundle Smoke
-        if: always()
+        if: ${{ always() && needs.changes.outputs.docs_only != 'true' }}
         run: |
           if [ -f .tmp-binary-smoke/appaloft-binary.pid ]; then
             kill "$(cat .tmp-binary-smoke/appaloft-binary.pid)" || true
           fi
 
+      - name: Stop Postgres
+        if: ${{ always() && needs.changes.outputs.docs_only != 'true' }}
+        run: docker rm --force appaloft-postgres || true
+
       - name: Docker Build Smoke
+        if: ${{ needs.changes.outputs.docs_only != 'true' }}
         run: docker build -t appaloft-all-in-one:ci .
+
+  ci:
+    name: ci
+    needs:
+      - changes
+      - biome
+      - typecheck
+      - unit-tests
+      - integration-tests
+      - build-smoke
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Verify required checks
+        shell: bash
+        env:
+          CHANGES_RESULT: ${{ needs.changes.result }}
+          BIOME_RESULT: ${{ needs.biome.result }}
+          TYPECHECK_RESULT: ${{ needs.typecheck.result }}
+          UNIT_TESTS_RESULT: ${{ needs.unit-tests.result }}
+          INTEGRATION_TESTS_RESULT: ${{ needs.integration-tests.result }}
+          BUILD_SMOKE_RESULT: ${{ needs.build-smoke.result }}
+        run: |
+          set -euo pipefail
+
+          failed=false
+          for check in \
+            "Changes:${CHANGES_RESULT}" \
+            "Biome:${BIOME_RESULT}" \
+            "Typecheck:${TYPECHECK_RESULT}" \
+            "Unit Tests:${UNIT_TESTS_RESULT}" \
+            "Integration Tests:${INTEGRATION_TESTS_RESULT}" \
+            "Build And Smoke:${BUILD_SMOKE_RESULT}"; do
+            name="${check%%:*}"
+            result="${check#*:}"
+            echo "${name}: ${result}"
+            if [[ "${result}" != "success" ]]; then
+              failed=true
+            fi
+          done
+
+          if [[ "${failed}" == "true" ]]; then
+            exit 1
+          fi
