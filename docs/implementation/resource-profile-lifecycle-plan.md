@@ -242,5 +242,6 @@ consumer idempotency remains future read-model projection work.
 `resources.delete` uses deleted/tombstone lifecycle state, omits deleted resources from normal
 read models, exposes HTTP/oRPC, CLI, and Web entrypoints, and publishes `resource-deleted` on the
 first archived-to-deleted transition. The v1 PG blocker reader covers deployments, domain
-bindings, certificates, and provider runtime-log retention; blocker kinds without durable PG tables
-remain explicit extension points on `ResourceDeletionBlockerReader`.
+bindings, certificates, provider runtime-log retention, and audit logs whose `aggregate_id` is the
+resource id; blocker kinds without durable PG tables remain explicit extension points on
+`ResourceDeletionBlockerReader`.

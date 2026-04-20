@@ -300,6 +300,56 @@ describe("pglite persistence integration", () => {
     }
   }, 15000);
 
+  test("[RES-PROFILE-DELETE-006] reads audit-retention deletion blockers", async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), "appaloft-pglite-delete-blockers-"));
+    const pgliteDataDir = join(workspaceDir, ".appaloft", "data", "pglite");
+    const context = createRepositoryContext();
+    let closeDatabase: (() => Promise<void>) | undefined;
+
+    try {
+      const { createDatabase, createMigrator, PgResourceDeletionBlockerReader } = await import(
+        "../src/index"
+      );
+      const database = await createDatabase({
+        driver: "pglite",
+        pgliteDataDir,
+      });
+      closeDatabase = () => database.close();
+      const migrator = createMigrator(database.db);
+      const migrationResult = await migrator.migrateToLatest();
+      expect(migrationResult.error).toBeUndefined();
+
+      await database.db
+        .insertInto("audit_logs")
+        .values({
+          id: "audit_res_web",
+          aggregate_id: "res_web",
+          event_type: "resource-archived",
+          payload: {
+            resourceId: "res_web",
+          },
+          created_at: "2026-01-01T00:00:00.000Z",
+        })
+        .execute();
+
+      const reader = new PgResourceDeletionBlockerReader(database.db);
+      const result = await reader.findBlockers(context, {
+        resourceId: "res_web",
+      });
+
+      expect(result.isOk()).toBe(true);
+      expect(result._unsafeUnwrap()).toContainEqual({
+        kind: "audit-retention",
+        relatedEntityId: "audit_res_web",
+        relatedEntityType: "audit-log",
+        count: 1,
+      });
+    } finally {
+      await closeDatabase?.();
+      rmSync(workspaceDir, { recursive: true, force: true });
+    }
+  }, 15000);
+
   test("backfills legacy server edge proxy intent during migration", async () => {
     const workspaceDir = mkdtempSync(join(tmpdir(), "appaloft-pglite-migration-"));
     const pgliteDataDir = join(workspaceDir, ".appaloft", "data", "pglite");

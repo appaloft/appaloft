@@ -116,6 +116,8 @@ Automated coverage now exists for:
 - `RES-PROFILE-ARCHIVE-004` in `packages/application/test/create-deployment.test.ts`;
 - `RES-PROFILE-DELETE-001` through `RES-PROFILE-DELETE-008` in
   `packages/application/test/delete-resource.test.ts`;
+- PG audit-retention blocker coverage for `RES-PROFILE-DELETE-006` in
+  `packages/persistence/pg/test/pglite.integration.test.ts`;
 - HTTP/oRPC dispatch for `resources.show` in `packages/orpc/test/resource-show.http.test.ts`;
 - HTTP/oRPC dispatch for `resources.configure-source` in
   `packages/orpc/test/resource-source-profile.http.test.ts`;

@@ -22,6 +22,7 @@ import { domainBindingDnsObservationMigration } from "./migrations/014_domain_bi
 import { domainBindingCanonicalRedirectMigration } from "./migrations/015_domain_binding_canonical_redirect";
 import { resourceLifecycleMigration } from "./migrations/016_resource_lifecycle";
 import { resourceDeleteTombstoneMigration } from "./migrations/017_resource_delete_tombstone";
+import { auditLogAggregateIndexMigration } from "./migrations/018_audit_log_aggregate_index";
 import { PgliteDialect } from "./pglite-dialect";
 import { type Database } from "./schema";
 import { TracingDialect } from "./tracing-dialect";
@@ -133,6 +134,7 @@ class StaticMigrationProvider implements MigrationProvider {
       "015_domain_binding_canonical_redirect": domainBindingCanonicalRedirectMigration,
       "016_resource_lifecycle": resourceLifecycleMigration,
       "017_resource_delete_tombstone": resourceDeleteTombstoneMigration,
+      "018_audit_log_aggregate_index": auditLogAggregateIndexMigration,
     };
   }
 }
