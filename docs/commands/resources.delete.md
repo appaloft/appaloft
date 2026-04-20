@@ -264,6 +264,11 @@ resource id. Dependency, terminal-session, and external route-store blocker dete
 extension points on the same `ResourceDeletionBlockerReader` port where no durable PG table exists
 yet.
 
+The next specified blocker closure is server-applied route state. Once the
+`server_applied_route_states` durable table and PG adapter land, rows whose `resource_id` matches
+the target resource must report `server-applied-route` through the same deletion blocker flow and
+must not be cascaded away by resource deletion.
+
 ## Open Questions
 
 - None for the guarded delete boundary. Cleanup of retained blockers remains separate future

@@ -440,6 +440,14 @@ resident edge proxy/provider when the provider supports it. One-shot CLI/Action 
 repair, or reapply on deploy, verify, or doctor; they do not imply an always-running Appaloft DNS or
 certificate scheduler.
 
+Server-applied route desired/applied state must be persisted through the selected Appaloft state
+backend. For SSH remote PGlite this may cross the process boundary through the SSH mirror lifecycle,
+but command execution still reads and writes the selected state backend. PostgreSQL/PGlite hosted,
+self-hosted, embedded, and SSH-mirrored backends must store route state in the dedicated
+`server_applied_route_states` table rather than in `Resource`, `DomainBinding`, `Certificate`, or
+deployment command state. Existing rows referencing a resource are deletion blockers until an
+explicit future cleanup or unlink behavior removes the route state.
+
 Canonical redirects in SSH mode are applied by the same provider route realization path. The target
 host must have a served route entry; the redirecting host must still resolve to the selected edge
 address. When `tlsMode = auto`, the resident provider must be able to obtain or serve certificate
@@ -577,6 +585,12 @@ optimistic guard conflicts, and SSH remote-state mirror planning for relink.
 PG/PGlite source-link persistence is implemented through
 [Source Link Durable Persistence Implementation Plan](../implementation/source-link-durable-persistence-plan.md).
 The PG `resources.delete` blocker reader reports `source-link` blockers from durable PG state.
+
+PG/PGlite server-applied route persistence is specified in
+[Server-Applied Route Durable Persistence Plan](../implementation/server-applied-route-durable-persistence-plan.md)
+but not implemented yet. Until that Code Round lands, hosted/self-hosted or embedded PG/PGlite
+state backends do not have durable route-state rows for `resources.delete` to report as
+`server-applied-route` blockers.
 
 An opt-in shell e2e harness in
 `apps/shell/test/e2e/github-action-ssh-state.workflow.e2e.ts` covers the GitHub Actions style

@@ -387,6 +387,9 @@ Current boundary:
   resource/server/destination context exists. A domain entry may also describe a canonical redirect
   alias with `redirectTo` and optional `redirectStatus`; redirect source hosts are target-local
   proxy route state in SSH mode and managed route/domain follow-up intent in control-plane mode.
+  PostgreSQL/PGlite durable server-applied route persistence is an internal state-backend slice for
+  this route state. It does not add a new deployment input, route mutation command, or Web/API/CLI
+  surface.
 - GitHub Actions and other headless binary entrypoints that deploy to an SSH server default to
   SSH-server PGlite state and do not need `DATABASE_URL`. `DATABASE_URL` is required only when the
   caller explicitly selects PostgreSQL or a remote Appaloft control plane. Runner-local PGlite is
@@ -524,6 +527,9 @@ Current boundary:
   is selected. Canonical redirect aliases such as `www -> apex` are part of that route state; they
   require DNS and TLS coverage for the redirecting host but do not create a separate deployment
   command or managed certificate record in pure CLI mode.
+- server-applied route desired/applied state belongs to the selected Appaloft state backend. A
+  PostgreSQL/PGlite backend must persist it through a dedicated persistence adapter and keep it
+  separate from `Resource`, `DomainBinding`, `Certificate`, and deployment command schemas.
 - generated default access policy editing must become the public command
   `default-access-domain-policies.configure` before Web/CLI/API expose it
 - `domain-bindings.list` exposes the read model used by CLI, API, and Web to observe accepted

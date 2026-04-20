@@ -120,6 +120,9 @@ Automated coverage now exists for:
   `packages/persistence/pg/test/pglite.integration.test.ts`;
 - PG source-link blocker coverage for `RES-PROFILE-DELETE-006` is covered by
   `SOURCE-LINK-STATE-017` in `packages/persistence/pg/test/pglite.integration.test.ts`;
+- PG server-applied route blocker coverage for `RES-PROFILE-DELETE-005` is specified by
+  `SERVER-APPLIED-ROUTE-STATE-004` and remains pending until the durable route-state table and PG
+  adapter exist;
 - HTTP/oRPC dispatch for `resources.show` in `packages/orpc/test/resource-show.http.test.ts`;
 - HTTP/oRPC dispatch for `resources.configure-source` in
   `packages/orpc/test/resource-source-profile.http.test.ts`;
