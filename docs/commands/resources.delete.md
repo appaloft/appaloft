@@ -258,10 +258,10 @@ Resource deletion is active in `CORE_OPERATIONS.md`, `operation-catalog.ts`, app
 HTTP/oRPC, CLI, Web, Resource repository tombstone state, and normal read-model omission.
 
 The v1 PG deletion blocker reader covers retained deployments, durable domain bindings,
-certificates tied through domain bindings, and retained provider runtime logs. Source-link,
-dependency, terminal-session, audit-retention, and external route-store blocker detection remain
-extension points on the same `ResourceDeletionBlockerReader` port where no durable PG table exists
-yet.
+certificates tied through domain bindings, retained provider runtime logs, and audit logs whose
+`aggregate_id` is the resource id. Source-link, dependency, terminal-session, and external
+route-store blocker detection remain extension points on the same `ResourceDeletionBlockerReader`
+port where no durable PG table exists yet.
 
 ## Open Questions
 

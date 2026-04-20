@@ -70,12 +70,18 @@ export class PgResourceDeletionBlockerReader implements ResourceDeletionBlockerR
             .select("provider_job_logs.id as id")
             .where("deployments.resource_id", "=", input.resourceId)
             .execute();
+          const auditRows = await executor
+            .selectFrom("audit_logs")
+            .select("id")
+            .where("aggregate_id", "=", input.resourceId)
+            .execute();
 
           const blockers = [
             blockerFromRows("deployment-history", "deployment", deploymentRows),
             blockerFromRows("domain-binding", "domain-binding", domainBindingRows),
             blockerFromRows("certificate", "certificate", certificateRows),
             blockerFromRows("runtime-log-retention", "runtime-log", runtimeLogRows),
+            blockerFromRows("audit-retention", "audit-log", auditRows),
           ].filter((blocker): blocker is ResourceDeletionBlocker => blocker !== null);
 
           return ok(blockers);
