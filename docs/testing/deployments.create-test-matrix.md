@@ -213,7 +213,11 @@ Current event names are still `deployment.started` and `deployment.finished`. Te
 
 `deployment-requested` and `build-requested` are canonical events and may not exist in current test fixtures yet.
 
-Generated default access route tests are governed by [Default Access Domain And Proxy Routing Test Matrix](./default-access-domain-and-proxy-routing-test-matrix.md) and are not implemented yet.
+Generated default access route tests are governed by
+[Default Access Domain And Proxy Routing Test Matrix](./default-access-domain-and-proxy-routing-test-matrix.md).
+Current focused coverage exists for provider-neutral hostname generation, route snapshot projection,
+and `ResourceAccessSummary` display inputs; broader API/Web/CLI and real Docker/SSH same-port route
+assertions remain follow-up.
 
 Runtime adapter helper tests cover the command construction needed for resource-scoped Docker
 cleanup, loopback ephemeral health-check port publication, and direct-port publication. A real

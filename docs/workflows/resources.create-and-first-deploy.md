@@ -210,7 +210,10 @@ builds. Web QuickDeploy and CLI deploy now collect static draft fields and dispa
 `resources.create`. Local Docker static smoke coverage now verifies generated nginx packaging and
 runtime health, and generic-SSH Docker static smoke coverage exists as an opt-in harness.
 
-Generated default access route display and route snapshot persistence are governed by [ADR-017](../decisions/ADR-017-default-access-domain-and-proxy-routing.md) and are not yet implemented as the first-class `ResourceAccessSummary` read-model surface.
+Generated default access route display and route snapshot persistence are governed by
+[ADR-017](../decisions/ADR-017-default-access-domain-and-proxy-routing.md) and now surface through
+the first-class `ResourceAccessSummary` read-model projection. Remaining first-deploy gaps are
+policy editing, route precedence hardening, and broader API/Web/CLI e2e coverage.
 
 Current Web project detail still needs a fuller ADR-013 alignment pass: resource list should become
 the primary page body, project-level deployment actions should become secondary rollups or Quick

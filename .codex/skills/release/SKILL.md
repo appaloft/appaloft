@@ -1,12 +1,15 @@
 ---
 name: release
-description: Appaloft release runbook for manually triggered GitHub Actions releases. Use when Codex is asked to prepare, trigger, publish, monitor, retry, or explain an Appaloft release; create or inspect a Release Please PR; publish GitHub Release assets, npm packages, Homebrew tap updates, GHCR images, desktop bundles, or CLI binaries; or verify release prerequisites and secrets.
+description: Appaloft release runbook for manually triggered GitHub Actions releases, including mandatory roadmap alignment and version-gate checks before release. Use when Codex is asked to prepare, trigger, publish, monitor, retry, or explain an Appaloft release; choose or verify a release version from docs/PRODUCT_ROADMAP.md; create or inspect a Release Please PR; publish GitHub Release assets, npm packages, Homebrew tap updates, GHCR images, desktop bundles, or CLI binaries; or verify release prerequisites and secrets.
 ---
 
 # Release
 
 ## Core Rules
 
+- Before every release, align `docs/PRODUCT_ROADMAP.md` with the current implementation and use it
+  to decide the allowed version.
+- Do not trigger a release while required roadmap updates are uncommitted.
 - Treat release execution as a public publishing action. Before running `gh workflow run release.yml`, clearly state what will happen and get explicit user confirmation.
 - Do not merge PRs, push branches, create tags, publish releases, create tokens, or edit secrets unless the user explicitly asks for that action.
 - Never print token values. Check only secret names and update timestamps.
@@ -24,6 +27,40 @@ description: Appaloft release runbook for manually triggered GitHub Actions rele
 - First manual run creates or updates the Release Please PR.
 - After that PR is merged, the second manual run creates the tag and GitHub Release, then publishes assets, npm packages, Homebrew tap files, GHCR images, desktop bundles, and CLI binaries.
 - Changelog source: `CHANGELOG.md`, maintained by Release Please.
+
+## Roadmap And Version Gate
+
+Run this before release preflight, Release Please PR creation, or publish runs:
+
+1. Read `docs/PRODUCT_ROADMAP.md`.
+2. Compare the roadmap checklist with:
+   - the latest published release and current package manifests;
+   - `packages/application/src/operation-catalog.ts`;
+   - `docs/BUSINESS_OPERATION_MAP.md`;
+   - `docs/CORE_OPERATIONS.md`;
+   - relevant command/query/workflow/test-matrix/implementation-plan docs;
+   - relevant code and tests for completed or incomplete release claims.
+3. Update `docs/PRODUCT_ROADMAP.md` when work was completed early, not completed as planned,
+   deferred, removed, or newly discovered.
+4. If roadmap changes were made, run `git diff --check`, show the roadmap diff summary, and create
+   a normal commit before triggering any release workflow. Do not create an empty commit when the
+   roadmap already matches the implementation.
+5. Use the roadmap checklist to accept or reject the intended release version.
+
+Version decision rules:
+
+- A target minor version is allowed only when every required checklist item and exit criterion for
+  that phase, and all earlier phases, is checked.
+- If the next target minor is incomplete, choose the next patch version on the current minor line.
+  Example: if the current line is `0.2.x` and any `0.3.0` roadmap item remains unchecked, release
+  `0.2.(x+1)` instead of `0.3.0`.
+- Apply the same rule at every boundary before `1.0.0`.
+- If a later-phase item was implemented early, mark it checked in its owning phase before release;
+  do not move it to the earlier phase unless the roadmap target changed.
+- If a planned item is intentionally deferred, leave it unchecked and record why the selected
+  version can still ship.
+- If Release Please proposes a version that violates the roadmap gate, stop and report the mismatch
+  instead of triggering the publish run.
 
 ## Preflight
 
