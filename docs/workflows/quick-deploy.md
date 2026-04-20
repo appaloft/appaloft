@@ -580,7 +580,10 @@ The shared workflow module is available for Web and future CLI/backend reuse. CL
 
 Quick Deploy domain/TLS input has been removed from the deployment flow. Resource-scoped domain binding remains available through the domain binding surfaces and should become the owner-scoped follow-up action after deployment.
 
-Generated default access URL display is not yet aligned with ADR-017 as a provider-neutral route snapshot/read-model surface.
+Generated default access URL display now reads the provider-neutral `ResourceAccessSummary`
+projection after resource list refresh. Web Quick Deploy displays latest or planned generated
+routes when the projection is available, while CLI/browser e2e regression coverage remains a
+follow-up under the default access test matrix.
 
 Quick Deploy does not yet expose `resources.diagnostic-summary` after deployment acceptance, so
 users may lack a copyable support/debug payload when access or logs are unavailable.

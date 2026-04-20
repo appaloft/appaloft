@@ -1,231 +1,696 @@
-# Product Roadmap
+# Product Roadmap To 1.0.0
 
-> Analysis date: 2026-04-13.
+> Analysis date: 2026-04-20.
 >
-> Scope: deployment platform product requirements, current Appaloft implementation state, local
-> self-hosted PaaS reference inspection, public self-hosted deployment product documentation, and
-> comparable platform patterns. This is Appaloft's product and platform roadmap.
+> Scope: Appaloft product, operation, workflow, framework-planner, day-two
+> operations, and release gates through `1.0.0`.
+>
+> Status format:
+>
+> - `[x]` means implemented, accepted, or complete in the current roadmap state.
+> - `[ ]` means not complete, still needs a Spec Round, still needs Code Round, or must be checked
+>   again before release.
 
-## Why This Exists
+## Release Gate Checklist
 
-Appaloft's intended core is `detect -> plan -> execute -> verify -> rollback`, with CLI, HTTP API,
-and future MCP/tool interfaces as first-class interfaces. This roadmap turns the expected day-two
-application configuration surface for a self-hosted PaaS into Appaloft-owned product work.
+This roadmap is the release gate for Appaloft versions before `1.0.0`.
 
-The key product direction from this review:
+- [x] Keep roadmap entries in Markdown todo format so completed and incomplete work is visible.
+- [x] Keep external baseline research summarized without naming other products in this document.
+- [ ] Before every release, compare implementation, operation catalog, specs, tests, and migration
+  notes against this roadmap.
+- [ ] Before every release, update this roadmap for work that was finished early, deferred, removed,
+  or discovered as incomplete.
+- [ ] Commit the roadmap alignment change before triggering or publishing a release.
+- [ ] Use this roadmap to choose the release version.
+- [ ] Before the next release, verify package manifests, Release Please state, and the latest
+  published release agree on the current version line. The roadmap starts from the current public
+  line `0.2.x` because the current release is `0.2.1`.
 
-- Keep the Appaloft domain model as the source of truth; do not hide deployment behavior in web forms.
-- Add the missing resource configuration operations before adding many one-off UI tabs.
-- Treat static site deployment as an early core resource type.
-- Treat Nixpacks/buildpack support as an onboarding accelerator, not a prerequisite for the first
-  credible deployment loop.
+Version selection rules:
 
-## Inputs
+- [ ] Use a target minor version only when every required item and exit criterion for that target
+  phase, and all earlier phases, is checked.
+- [ ] If the current line is `0.2.x` and the `0.3.0` checklist is not fully checked, release the
+  next patch version on `0.2.x` instead of claiming `0.3.0`.
+- [ ] Apply the same rule for every minor boundary before `1.0.0`: incomplete target-phase checklist
+  means patch the current minor, unless the user explicitly asks for a prerelease.
+- [ ] If later-phase work is completed early, mark it `[x]` in its owning phase before release; do
+  not move it into an earlier phase unless the product target actually changed.
+- [ ] If planned work is intentionally deferred, leave it unchecked and add or update the release
+  note/migration gap that explains why the version can still ship.
 
-- Appaloft source of truth:
-  - [`docs/BUSINESS_OPERATION_MAP.md`](./BUSINESS_OPERATION_MAP.md)
-  - [`docs/CORE_OPERATIONS.md`](./CORE_OPERATIONS.md)
-  - [`docs/DOMAIN_MODEL.md`](./DOMAIN_MODEL.md)
-  - [`docs/RESOURCES.md`](./RESOURCES.md)
-  - [`packages/core/src/shared/enums.ts`](../packages/core/src/shared/enums.ts)
-  - [`packages/adapters/runtime/src/index.ts`](../packages/adapters/runtime/src/index.ts)
-- Product reference inputs:
-  - local self-hosted PaaS UI inspection at `http://127.0.0.1:8000`
-  - [Dokploy providers](https://docs.dokploy.com/docs/core/providers)
-  - [Dokploy domains](https://docs.dokploy.com/docs/core/domains/cloudflare)
-  - [CapRover app configuration](https://caprover.com/docs/app-configuration.html)
-  - [CapRover Docker Compose](https://caprover.com/docs/docker-compose.html)
-  - [Dokku application deployment](https://dokku.com/docs/deployment/application-deployment/)
-  - [Dokku Dockerfile deployment](https://dokku.com/docs/deployment/builders/dockerfiles/)
-  - [Easypanel database backups](https://easypanel.io/docs/database-backups)
+## Source-Of-Truth Inputs
 
-## Priority Rubric
+Internal governing sources:
 
-| Priority | Meaning |
-| --- | --- |
-| P0 | Needed for the core deployment product to be coherent and usable beyond a demo. |
-| P1 | Important for production use and expected by users deploying real services. |
-| P2 | Valuable for team scale, operations, and smoother onboarding, but not blocking the core loop. |
-| P3 | Nice-to-have, later differentiation, or product depth after the core is stable. |
+- [x] [Business Operation Map](./BUSINESS_OPERATION_MAP.md)
+- [x] [Core Operations](./CORE_OPERATIONS.md)
+- [x] [Domain Model](./DOMAIN_MODEL.md)
+- [x] [Error Model](./errors/model.md)
+- [x] [neverthrow Conventions](./errors/neverthrow-conventions.md)
+- [x] [Async Lifecycle And Acceptance](./architecture/async-lifecycle-and-acceptance.md)
+- [x] [Workload Framework Detection And Planning](./workflows/workload-framework-detection-and-planning.md)
+- [x] [Quick Deploy](./workflows/quick-deploy.md)
+- [x] [deployments.create Test Matrix](./testing/deployments.create-test-matrix.md)
+- [x] [Quick Deploy Test Matrix](./testing/quick-deploy-test-matrix.md)
+- [x] [Deployment Runtime Substrate Plan](./implementation/deployment-runtime-substrate-plan.md)
+- [x] [Static Site Deployment Plan](./implementation/static-site-deployment-plan.md)
 
-| Necessity | Meaning |
-| --- | --- |
-| Core | Belongs in the main deployment capability surface. |
-| Production | Needed for serious production use, but can follow the core deployment loop. |
-| Optional | Convenience or advanced workflow; should not block basic product value. |
+Product constraints:
 
-## Target Project And Application Surface
+- [x] Treat Appaloft as a self-hosted deployment control plane, not a web-first CRUD app.
+- [x] Keep `detect -> plan -> execute -> verify -> rollback` as the core product shape.
+- [x] Keep CLI, HTTP/oRPC, Web, and future MCP/tool entrypoints aligned through the same operation
+  catalog.
+- [x] Treat Web as a static console over contracts, not a place to hide business behavior.
+- [x] Treat "CRUD" as CRUD or explicit lifecycle equivalents for durable and internal state.
 
-Appaloft project/environment pages should expose these major surfaces:
+## 1.0.0 Definition Of Done
 
-- Environment resource list with Applications and Services, resource search, tags, clone, and delete
-  environment.
-- New resource catalog split into Git based, Docker based, Databases, and many service templates.
-- Application detail top-level operations: configuration, deployments, logs, terminal, links,
-  redeploy, restart, stop, status refresh, and unapplied-configuration warning.
-- Application configuration sections: General, Advanced, Environment Variables, Persistent Storage,
-  Git Source, Servers, Scheduled Tasks, Webhooks, Preview Deployments, Healthcheck, Rollback,
-  Resource Limits, Resource Operations, Metrics, Tags, and Danger Zone.
-- Build/source options:
-  - Git: public repository, private repository through GitHub App, private repository through deploy
-    key.
-  - Docker: inline Dockerfile, empty Docker Compose, prebuilt Docker image.
-  - Build packs: Nixpacks, Static, Dockerfile, Docker Compose.
-- Day-two configuration:
-  - domains, redirect direction, force HTTPS, gzip, basic auth, labels, build args, build server,
-    Git submodules/LFS/shallow clone, healthcheck policy, rollback image retention, CPU/memory
-    limits, clone/move resource, and metrics behind Sentinel.
+The 1.0.0 product is ready only when all of these are checked:
 
-## Current Appaloft Baseline
+- [ ] A new operator can install Appaloft, connect an SSH/Docker target, create/select a
+  project/environment/resource, deploy an app, and observe status, logs, health, access,
+  diagnostics, and failure reasons.
+- [ ] The minimum loop is executable end to end: project -> environment -> target/server ->
+  credential -> resource profile -> deployment -> resource health/logs/access -> optional
+  domain/TLS.
+- [ ] Every top-level resource has list and show.
+- [ ] Every mutable profile has update/configure.
+- [ ] Every removable resource has archive/delete/deactivate with a documented safety rule.
+- [ ] Every long-running internal state has list/show plus retry/cancel/prune/recovery where it can
+  block or confuse operators.
+- [ ] Web, CLI, and HTTP/oRPC all dispatch the same command/query schemas.
+- [ ] Future MCP/tool contracts can be generated from the same operation catalog without inventing
+  parallel behavior.
+- [ ] Framework/runtime detection covers the mainstream self-hosted web catalog with deterministic
+  planners or explicit fallback errors.
+- [ ] Detected unsupported frameworks fail clearly instead of silently becoming broken host-process
+  deployments.
+- [ ] Deployment artifacts are Docker/OCI-backed, resource-scoped, observable, and preserve enough
+  metadata for rollback candidates, diagnostics, and future target backends.
+- [ ] Specs, test matrices, implementation plans, and migration gaps agree.
+- [ ] Rebuild-required public behaviors from ADR-016 are rebuilt by accepted specs or still absent
+  from public surfaces.
 
-Appaloft already has a stronger domain foundation than a generic UI-only implementation would:
+## Current Baseline
 
-- Projects, environments, resources, destinations, deployment targets, deployments, releases, and
-  rollback plans are modeled in core.
-- Implemented active public operations include project create/list, environment
-  create/list/show/set/unset/diff/promote, resource create/list, server/register/credential/
-  connectivity operations, deployment create/list/logs, domain-binding create/list, and system
-  provider/plugin/GitHub repository/doctor/database operations.
-- Source kinds already include local folder/git, remote git, public git, GitHub App, deploy key,
-  zip artifact, inline Dockerfile, inline Docker Compose, Docker image, and compose.
-- Runtime planning now maps explicit deployment methods:
-  - `dockerfile` -> Docker container.
-  - `docker-compose` -> Docker Compose stack.
-  - `prebuilt-image` -> Docker container.
-  - `workspace-commands` -> host process.
-- Static site and buildpack concepts exist in enums/value objects, but there is no complete
-  static-artifact or buildpack runtime path yet.
-- The web console is currently much narrower than the domain/API surface: it has quick deployment,
-  project/server/resource/deployment/domain-binding pages and deployment logs/details, but not the
-  full resource configuration surface.
+Already implemented or materially present:
 
-## Roadmap Table
+- [x] Core models projects, environments, deployment targets, destinations, resources, resource
+  instances, bindings, releases, deployments, rollback plans, domain bindings, and runtime plans.
+- [x] Active operations cover project create/list.
+- [x] Active operations cover environment create/list/show/set/unset/diff/promote.
+- [x] Active operations cover resource create/list/health/logs/proxy-preview/diagnostics and
+  configure-health.
+- [x] Active operations cover server registration, credentials, connectivity, proxy repair, and
+  terminal open.
+- [x] Active operations cover deployment create/list/logs and create-time progress streaming.
+- [x] Active operations cover domain binding create/confirm/list.
+- [x] Active operations cover certificate issue/list.
+- [x] Active operations cover source-link relink and system diagnostics/migration.
+- [x] `resources.create -> deployments.create` is the canonical first-deploy path.
+- [x] Minimal static-site creation and deployment work through resource runtime/network profiles and
+  Docker/OCI static-server packaging.
+- [x] Generated default access is implemented as a read/projection surface.
+- [x] Default access provider selection exists.
+- [x] `ResourceAccessSummary` exposes planned and latest generated routes.
+- [x] Resource read models/API and Web resource detail consume `ResourceAccessSummary`.
+- [x] Quick Deploy completion refreshes the generated URL when available.
+- [x] Server-applied config domains for pure CLI/SSH mode are implemented as target-local route
+  desired/applied state.
+- [x] Generated, managed durable, and server-applied routes are exposed separately through access,
+  health, proxy, and diagnostic summaries.
+- [x] `resources.proxy-configuration.preview` is active through API/oRPC, CLI, and Web resource
+  detail.
+- [x] Edge proxy providers render read-only proxy configuration sections from planned/latest/
+  deployment-snapshot route input.
+- [x] Runtime planner coverage exists for Next.js, Remix, Vite static, Astro static, Nuxt generate
+  static, explicit SvelteKit static, FastAPI, Django, Flask, generic Node, generic Python, generic
+  Java, and custom command fallback.
+- [x] Runtime target backend selection has local-shell and generic-SSH single-server registry
+  coverage.
+- [x] Repository config, SSH-server PGlite state, source fingerprint links, server-applied route
+  state, and headless entrypoints have governing specs and partial implementation.
 
-| Area | Product signal | Appaloft state | Gap | Priority | Necessity | Roadmap action |
-| --- | --- | --- | --- | --- | --- | --- |
-| Resource create/show/update | Persistent resource configuration must be the center of the application page. | Only `resources.list` is a public operation; deployment can bootstrap a resource. | No first-class operation for creating/editing resource profile, source, build config, routing, storage, or lifecycle. | P0 | Core | Add `resources.create`, `resources.show`, `resources.update`, and `resources.archive`. Keep resource config in application/core slices, then expose in web. |
-| Static site deployment | Static apps are a common first deployment and need explicit base/publish directory semantics. | `static-site`, `static-artifact`, and static workload/runtime value objects exist, but runtime resolver does not implement a static deployment method. | Static assets cannot be deployed as a first-class resource. | P0 | Core | Add `static-site` / `static-artifact` deployment method, `baseDirectory`, `publishDirectory`, SPA fallback, cache headers, static web server image, domain routing, and tests. |
-| Git source binding | Resource redeploy/webhook behavior needs durable source ownership and credential references. | Deployment source can be supplied per deployment; Git source is not yet a persisted project/resource binding. | Redeploy and webhook flows depend on latest deployment state instead of a durable source binding. | P0 | Core | Model resource source binding and credential reference. UI should prefer connected GitHub repositories when available, but allow manual public/private URLs. |
-| Deployment detail and events | Deployment history must show status, start/end/duration, commit, trigger, logs, and reconnectable state. | Appaloft has list/logs/reattach and progress dialog, but explicit show/stream operations are still expected next operations. | UI cannot fully reconstruct or stream execution state as a stable business operation. | P0 | Core | Add `deployments.show` and `deployments.stream-events`; persist enough runtime metadata for reconnect, logs, access routes, and health checks. |
-| Domain/TLS/access routing | Domains/TLS are core app configuration, not deployment form-only hints. | Runtime plans support access route hints and Traefik/Caddy proxy intent. | No durable resource-level routing config UI/API; proxy support is container-only for now. | P0 | Core | Add resource routing config: domains, path prefix, TLS mode, proxy kind, target port, redirect direction. Keep runtime adapter-specific labels outside core. |
-| Environment variables and secrets | Build/runtime variables, shared variables, preview variables, secret handling, and Compose interpolation are production requirements. | Appaloft environment config exists with scopes and deployment snapshots; web quick deploy has variable input. | Resource-specific, preview-specific, and shared variable surfaces are incomplete. | P1 | Production | Add resource env var operations/read models, secret masking, build/runtime exposure controls, `.env` paste/import, and preview scope later. |
-| Healthcheck policy | Health checks need durable HTTP/CMD policy, expected response semantics, interval, timeout, retries, and start period. | Appaloft can check deployment health after deployment using persisted route/runtime metadata. | Healthcheck policy is not yet a resource config with full HTTP/CMD semantics. | P1 | Production | Add resource healthcheck config and pass it into runtime plans. Start with HTTP path/code/timeout; add CMD later. |
-| Persistent storage | Stateful workloads need Docker volumes, bind mounts, destination paths, and backup relationship metadata. | Resource binding concepts exist, but resource storage operations are not implemented. | Stateful apps/databases cannot safely preserve data through resource-level config. | P1 | Production | Add persistent storage config: named volume, bind mount, destination path, file/directory mode, secret-safe read models, and adapter implementation. |
-| Rollback retention | Rollback needs retained artifact/image references and a user-visible candidate list. | Appaloft has rollback plan concepts, but public rollback command behavior is rebuild-required under ADR-016. | Rollback UX, retention policy, and command semantics are not yet resource-level configuration. | P1 | Production | Store last successful artifacts/runtime image refs and rollback retention policy. Rebuild rollback as a spec-driven behavior before exposing it. |
-| Auto deploy and webhooks | Push-to-deploy and signed webhooks are expected deployment automation capabilities. | No durable webhook operation surface yet. | Push-to-deploy and external CI/CD integrations are missing. | P1 | Production | Add integration webhook endpoints and resource-level auto-deploy policy. Start with GitHub App/push, then generic signed deploy webhook. |
-| Static resource front-end UX | Static site deployment needs base/publish directory, web server, and domain routing inputs. | Web quick deploy has resource kind choices but no static deployment path. | Users cannot explicitly deploy static assets or understand output directory requirements. | P1 | Core | Add a "Static site" deployment flow with build command optionality, publish directory required, framework presets for Vite/SvelteKit/Next static, and generated command preview. |
-| Databases and dependency resources | Databases, backups, and explicit binding injection are first-class self-hosted PaaS expectations. | `ResourceInstance` and `ResourceBinding` are modeled but provisioning commands are future. | No database provisioning, binding injection, or restore/backup workflow. | P1 | Production | Add minimal Postgres and Redis provisioning/binding first. Make connection injection explicit instead of plain env vars. |
-| Scheduled tasks / cron | Background jobs and cron need durable workload/resource service semantics. | Workload kinds include scheduler/cron-like concepts, but no operation surface. | Background jobs and cron cannot be managed as deployment resources. | P2 | Production | Add scheduler workload/resource service type, cron expression validation, run history, logs, and manual trigger. |
-| Preview deployments | PR-scoped preview URLs and scoped preview variables are required for mature Git automation. | Environments include `preview`; deployment model can represent separate resources/runs. | No PR ingestion, preview resource lifecycle, or scoped preview env vars. | P2 | Production | Implement after source binding and webhooks. Use GitHub App PR events, wildcard domain template, scoped secrets, and cleanup on PR close/merge. |
-| Nixpacks / buildpack | Buildpack-style auto-detection improves onboarding when a repository has no Dockerfile. | `buildpack` enum exists, but no buildpack adapter. | "No Dockerfile" onboarding is weaker, but the core loop still works through Dockerfile/static/compose/prebuilt/workspace commands. | P2 | Optional | Add Nixpacks as an adapter-owned build strategy later. Do not block static-site or persisted resource config on it. |
-| Build server / registry / cache | Large builds need build placement, registry image/tag, build cache, and commit metadata policy. | Runtime planning builds locally/over SSH; registry/build-cache policy is not first-class. | Large builds may load production servers and cache behavior is opaque. | P2 | Production | Add build placement policy, registry push/pull config, cache mode, and source-commit build arg policy. |
-| Logs, metrics, notifications | Operators need streaming logs, filtering, metrics, health notifications, and stopped/restarted workload signals. | Appaloft has deployment logs and health checks; metrics/notifications are not a full surface. | Operators lack proactive signals and richer log UX. | P2 | Production | Add log streaming, log drain config, metrics read models, and notifications for deploy/health/server events. |
-| Resource limits and advanced Docker config | Production services need CPU/memory, labels, network aliases, basic auth, gzip, and selected advanced options. | Some runtime hints exist; no resource-level advanced config. | Advanced container tuning is unavailable or only implicit. | P2 | Optional | Add targeted fields only after core config is stable: CPU/memory first, then labels/options/network/basic auth. GPU is P3 unless a real target user needs it. |
-| Clone/move resource and environment clone | Users need to duplicate resource and environment configuration safely. | `environments.promote` exists; clone operations are expected but not implemented. | Users cannot duplicate production config for staging/preview easily. | P2 | Production | Add clone operations once resource config is durable. Include copied env vars with secret handling rules. |
-| Teams/RBAC/tags/audit | Team-scale deployments need tags, permissions, and audit trails. | Identity/governance models are foundational only. | Multi-user governance is incomplete. | P2 | Production | Add organization/member/role operations after single-user resource lifecycle is stable. Tags can come earlier as low-risk metadata. |
-| Terminal / remote exec | Browser-side remote exec is useful but requires strong auth/RBAC/audit/redaction first. | Appaloft has CLI/SSH runtime adapters but no terminal product surface. | Browser-side ad hoc operations are missing. | P3 | Optional | Keep CLI-first. Add terminal only after auth/RBAC/audit and redaction policy are clear. |
-| Service template marketplace | One-click service templates need stable resource, variable, domain, mount, and backup models. | ResourceInstance/binding concepts exist; templates are not implemented. | Template breadth is missing. | P3 | Optional | Start with a small curated set after database/resource binding exists. Avoid building a large catalog before the resource model is stable. |
-| Multi-server / Swarm / Kubernetes | Multi-node scheduling is important only after single-server resource lifecycle is reliable. | ADR-023 defines Swarm/Kubernetes as future runtime target backends behind the existing Docker/OCI workload substrate. Current support is single-server oriented. | Multi-node scheduling is not available, and the target backend registry is not implemented yet. | P3 | Optional | Defer until single-server resource lifecycle, storage, routing, rollback, and runtime target backend registry are reliable. |
+Still blocking 1.0.0:
 
-## Static Site Deployment Proposal
+- [ ] Top-level resource CRUD/lifecycle is uneven across projects, servers, credentials, resources,
+  deployments, domain bindings, certificates, default access policy, dependency resources, storage,
+  webhooks, and internal process state.
+- [ ] Resource source/runtime/network profile update is still the major missing horizontal
+  operation.
+- [ ] Deployment show, event stream, retry/redeploy, cancel, and rollback are not public
+  operations.
+- [ ] `deployments.create` progress stream is still create-time observation, not standalone durable
+  deployment observation.
+- [ ] Default access policy editing is not public.
+- [ ] Durable-domain and server-applied route precedence still need hardening inside the default
+  route resolver.
+- [ ] Provider-route projection/retention and route intent update/delete/reconcile surfaces are not
+  complete.
+- [ ] Generated access, proxy preview, server-applied domains, and durable domain routes still need
+  broader API/Web/CLI regression coverage.
+- [ ] Dependency resources and bindings exist in core but lack provisioning, binding, backup, and
+  deletion commands.
+- [ ] Framework coverage is narrower than the target product catalog.
+- [ ] Durable outbox/inbox, job state, process attempts, dead-letter/retry state, remote-state
+  recovery, and audit visibility are not a complete operator surface.
 
-Static site support should be pulled forward because it is a common first deployment and because
-Appaloft already has the vocabulary for it.
+## Phase 0: Spec And Roadmap Alignment
 
-Minimum viable behavior:
+Target: current worktree to the next planning checkpoint.
 
-- New deployment method: `static-site` or `static-artifact`.
-- New/used resource kind: `static-site`.
-- Required inputs:
-  - source locator or source descriptor
-  - base directory
-  - publish directory
-  - domain/routing hints
-- Optional inputs:
-  - install/build commands
-  - SPA fallback
-  - cache headers
-  - custom static server config
-- Runtime strategy:
-  - produce a static-server Docker image or a deterministic static serving container
-  - serve through Nginx/Caddy-like static server on port 80
-  - route through the existing access route/proxy mechanism
-- API/CLI shape:
-  - do not hide this under `workspace-commands`
-  - deployment plan should explicitly show "build static assets" and "serve static artifact"
-- Front-end:
-  - presets for Vite, SvelteKit static, Next static, Nuxt static, and generic `dist`
-  - publish directory preview and validation
-  - show generated route and deploy command before execution
+Required:
 
-This should happen before Nixpacks because it gives Appaloft a simple, explicit resource type with
-less magic and clearer failure modes.
+- [x] Create one roadmap owner document for `1.0.0`.
+- [x] Keep roadmap status in checkbox form.
+- [x] Align generated default access, `ResourceAccessSummary`, static-site, proxy-preview, and
+  current framework planner status with actual implementation.
+- [x] Remove named external product references from the roadmap.
+- [ ] Keep this roadmap synchronized with `BUSINESS_OPERATION_MAP.md`, `CORE_OPERATIONS.md`, and
+  implementation-plan migration notes before every release.
+- [ ] For each future capability, run a Spec Round before Code Round: operation-map placement, ADR
+  decision when needed, command/query spec, workflow spec, error spec, test matrix, implementation
+  plan, and migration notes.
+- [ ] Use the resource/internal-state ledger below as the release checklist for horizontal closure.
 
-## Nixpacks / Buildpack Position
+Exit criteria:
 
-Nixpacks is useful, but it should be a P2 optional accelerator for Appaloft:
+- [x] One roadmap owner document exists.
+- [x] Product priority does not depend on `docs/ai/**`.
+- [ ] Every later phase has concrete source-of-truth docs updated before its implementation is
+  treated as complete.
 
-- It improves onboarding when a repository has no Dockerfile.
-- It introduces opaque auto-detection behavior and generated Dockerfiles.
-- It should live in an adapter/provider package, not in `core`.
-- It should not replace explicit static, Dockerfile, Compose, prebuilt-image, or command-driven
-  deployment methods.
+## Phase 1: Release-Gated Roadmap Baseline
 
-Recommended sequence:
+Target: `0.3.0`.
 
-1. Implement first-class static site deployment.
-2. Persist resource source/build/runtime configuration.
-3. Add Nixpacks as a buildpack adapter with explicit plan output, logs, and override fields.
+Release rule:
 
-## Front-End Resource Detail Information
+- [ ] Select `0.3.0` only when all required Phase 1 items and exit criteria are checked. If any
+  Phase 1 item remains unchecked, release a `0.2.x` patch instead.
 
-The web console should eventually show these items on a resource detail page:
+Already done:
 
-| Section | Important information to show |
-| --- | --- |
-| Header | Resource name, kind, status, server/destination, current public URLs, active commit/image, last deploy time, and "configuration not applied" state. |
-| Source | Source mode, repository URL, branch, commit SHA, credential type, base directory, Dockerfile/Compose path, or image reference. |
-| Build | Deployment method, build strategy, install/build/start commands, publish directory for static sites, build server/registry/cache policy. |
-| Routing | Domains, path prefix, TLS mode, proxy kind, target port, redirect direction, force HTTPS, and generated direct host-port fallback. |
-| Environment | Effective variables, secret masking, build/runtime exposure, shared variable references, and preview overrides when previews exist. |
-| Storage | Volumes/bind mounts, source/destination paths, mount type, backup relationship, and warning when data is not persistent. |
-| Deployments | History with status, trigger, duration, commit/message, logs, current attempt progress, and rebuild-required future rollback/redeploy affordances. |
-| Health | Health policy, latest check result, internal/public check status, and failure reason. |
-| Operations | Future start, stop, restart, redeploy, rollback, clone/move, archive/delete, and danger-zone destructive actions after they are positioned in the business operation map and governed by specs. |
-| Automation | Auto deploy state, signed webhook URLs, preview deployment settings, scheduled tasks, and notification/log-drain hooks. |
+- [x] `docs/PRODUCT_ROADMAP.md` exists.
+- [x] The roadmap uses Markdown checkbox status.
+- [x] The release skill requires roadmap alignment before release execution.
+- [x] The release skill requires roadmap-based version selection.
+- [x] Generated access, `ResourceAccessSummary`, proxy preview, static site, and current framework
+  planner status are reflected as current baseline rather than future work.
 
-The UI should not ask users to pick "public vs private" as the primary mental model when they are
-entering a GitHub source. The better product split is:
+Required:
 
-- choose from connected repositories when a GitHub integration exists
-- enter a repository URL manually when deploying something outside the connected account
-- let the backend/source adapter decide whether public HTTPS, GitHub App, or deploy key credentials
-  are needed
+- [ ] Verify the latest public release, Release Please state, and package manifests agree on the
+  current `0.2.x` line.
+- [ ] Commit the roadmap and release-skill alignment work before any `0.3.0` release.
+- [ ] Add or update the release checklist so `docs/PRODUCT_ROADMAP.md` is part of every release
+  preflight.
+- [ ] Ensure `docs/PRODUCT_ROADMAP.md` is referenced by the release flow used by maintainers.
+- [ ] Confirm no release workflow can be intentionally triggered without explicit user confirmation.
 
-## Next Four Milestones
+Exit criteria:
 
-| Milestone | Goal | Key deliverables |
-| --- | --- | --- |
-| M1 | Durable resource configuration | `resources.create/show/update/archive`, persisted source binding, static-site method, basic resource detail page. |
-| M2 | Production app basics | domains/TLS config, env/secrets resource scope, storage, health policy, deployment show/stream, rollback candidates. |
-| M3 | Git automation | GitHub App/webhooks, auto deploy, signed deploy webhook, preview deployments, scoped preview env vars. |
-| M4 | Operations and scale | minimal Postgres/Redis provisioning, metrics/notifications/log drains, teams/tags, build server/registry policy. |
+- [ ] Maintainers can decide between `0.2.x` patch and `0.3.0` by reading the roadmap checklist.
+- [ ] Release preparation always updates and commits roadmap alignment before workflow dispatch.
+- [ ] No roadmap phase before `0.3.0` remains implicit.
 
-## Immediate Recommendation
+## Phase 2: Minimum Console And Deployment Loop Baseline
 
-Do next:
+Target: `0.4.0`.
 
-1. Add first-class static site deployment.
-2. Add resource create/show/update operations so static/Docker/Git configuration has a durable home.
-3. Add resource detail UI that shows source, build, routing, environment, deployment history, health,
-   and storage placeholders.
+Release rule:
 
-Do not do next:
+- [ ] Select `0.4.0` only when all required Phase 2 items, Phase 1 items, and exit criteria are
+  checked. If any Phase 2 item remains unchecked, release a `0.3.x` patch instead.
 
-- a large service template marketplace
-- full Nixpacks integration
-- GPU/resource-limit-heavy UI
-- browser terminal
+Already done:
 
-Those are useful, but they are not the missing core. The missing core is a durable resource model
-that can own source, build, runtime, routing, config, and operations across CLI/API/web.
+- [x] Projects can be created and listed.
+- [x] Environments can be created, listed, shown, diffed, promoted, and updated through baseline
+  variable set/unset operations.
+- [x] Servers can be registered, listed, tested for connectivity, assigned credentials, and repaired
+  for proxy bootstrap.
+- [x] Resources can be created and listed.
+- [x] Deployments can be created, listed, and inspected through logs.
+- [x] Web Quick Deploy can create a first-deploy resource before `deployments.create`.
+- [x] Web resource detail can read access, health, proxy preview, diagnostics, runtime logs, and
+  resource-scoped domain actions.
+
+Required:
+
+- [ ] Verify Web, CLI, and HTTP/oRPC all dispatch the active operation catalog entries for the
+  minimum loop.
+- [ ] Confirm Quick Deploy still dispatches `resources.create` before ids-only `deployments.create`
+  for new first-deploy resources.
+- [ ] Add or update smoke coverage for the minimum console path from project/environment/server to
+  resource/deployment observation.
+- [ ] Document any intentionally missing show/update/delete commands as post-`0.4.0` gaps in this
+  roadmap.
+
+Exit criteria:
+
+- [ ] A user can complete a minimal first deployment loop from the console or CLI without relying on
+  hidden Web-only behavior.
+- [ ] The current active operations are accurately checked in the resource/internal-state ledger.
+- [ ] Missing CRUD/lifecycle operations are explicitly assigned to later phases.
+
+## Phase 3: Access, Static, SSH Config, And Planner Baseline
+
+Target: `0.5.0`.
+
+Release rule:
+
+- [ ] Select `0.5.0` only when all required Phase 3 items, earlier phase items, and exit criteria
+  are checked. If any Phase 3 item remains unchecked, release a `0.4.x` patch instead.
+
+Already done:
+
+- [x] Minimal static-site deployment works through resource runtime/network profiles and Docker/OCI
+  static-server packaging.
+- [x] Generated default access is visible through `ResourceAccessSummary`.
+- [x] Planned and latest generated routes are projected.
+- [x] Latest durable domain routes and server-applied routes are exposed separately.
+- [x] `resources.proxy-configuration.preview` is active.
+- [x] Server-applied config domains for pure CLI/SSH mode have target-local desired/applied state.
+- [x] Local-shell and generic-SSH single-server runtime target registry coverage exists.
+- [x] Initial framework planner coverage exists for Next.js, Remix, Vite static, Astro static, Nuxt
+  generate static, explicit SvelteKit static, FastAPI, Django, Flask, generic Node, generic Python,
+  generic Java, and custom command fallback.
+
+Required:
+
+- [ ] Verify the checked access/static/SSH/planner items above against current executable tests and
+  migration notes before release.
+- [ ] Confirm generated, durable, and server-applied route states remain visually and semantically
+  separate in Web/resource read models.
+- [ ] Confirm proxy configuration preview still uses the edge proxy provider boundary and does not
+  leak generated-access provider keys into proxy provider selection.
+- [ ] Add release notes for known remaining gaps: access policy editing, route precedence hardening,
+  standalone deployment observation, and broader API/Web/CLI regression coverage.
+
+Exit criteria:
+
+- [ ] `0.5.0` represents the access/static/SSH-config/planner baseline already present in the
+  product, not the future policy/lifecycle closure work.
+- [ ] Any unchecked access/static/SSH/planner hardening work remains assigned to `0.6.0+` phases.
+
+## Phase 4: Resource Ownership And CRUD Foundation
+
+Target: `0.6.0`.
+
+Release rule:
+
+- [ ] Select `0.6.0` only when all required Phase 4 items, earlier phase items, and exit criteria
+  are checked. If any Phase 4 item remains unchecked, release a `0.5.x` patch instead.
+
+Already done:
+
+- [x] `resources.create` exists.
+- [x] Resource read/list, health, runtime logs, proxy preview, diagnostics, configure-health, and Web
+  resource detail observation exist.
+- [x] Environment create/list/show/set/unset/diff/promote exists.
+- [x] Project create/list exists.
+- [x] Server register/list/connectivity/proxy-repair and credential baseline exist.
+
+Required:
+
+- [ ] Add project show/update/archive.
+- [ ] Add server show/update/deactivate/delete safety rules and credential usage visibility.
+- [ ] Add credential show/rotate/delete when unused.
+- [ ] Add resource show/update/archive/delete.
+- [ ] Add separate resource source update semantics where specs require a separate command.
+- [ ] Add separate resource runtime update semantics where specs require a separate command.
+- [ ] Add separate resource network update semantics where specs require a separate command.
+- [ ] Add reusable access-profile update semantics where specs require a separate command.
+- [ ] Add environment update/clone/lock/archive.
+- [ ] Add environment effective-precedence query.
+- [ ] Complete resource detail editing affordances for source/runtime/network profile changes.
+- [ ] Ensure CLI, HTTP/oRPC, Web, and future MCP naming reuse the same command/query schemas.
+
+Exit criteria:
+
+- [ ] A user can create, read, update, and archive/delete project, environment, server, credential,
+  and resource configuration without creating a deployment as a side effect.
+- [ ] `resources.create` is no longer the only durable resource profile write.
+- [ ] Web resource configuration is a projection of resource-owned commands and queries, not a
+  Svelte-only configuration store.
+
+## Phase 5: First-Deploy Engine And Framework Breadth
+
+Target: `0.7.0`.
+
+Release rule:
+
+- [ ] Select `0.7.0` only when all required Phase 5 items, earlier phase items, and exit criteria
+  are checked. If any Phase 5 item remains unchecked, release a `0.6.x` patch instead.
+
+Already done:
+
+- [x] Static strategy, Vite static, Astro static, Nuxt generate static, explicit SvelteKit static,
+  and generic static server packaging have implementation coverage.
+- [x] Next.js baseline planner builds and starts with package manager defaults.
+- [x] Remix, FastAPI, Django, Flask, generic Node, generic Python, generic Java, and custom command
+  fallback planner coverage exists.
+- [x] Dockerfile, Compose, and prebuilt image paths exist.
+- [x] Local-shell and generic-SSH single-server backend registry coverage exists.
+- [x] Repository config parser/entry-seed coverage exists for the current headless/CLI flow.
+
+Required:
+
+- [ ] Finish CLI migration to the shared Quick Deploy workflow program.
+- [ ] Make deployment admission use the runtime target backend registry before acceptance.
+- [ ] Add unsupported-target rejection before acceptance.
+- [ ] Broaden local/generic-SSH Docker/Compose smoke coverage.
+- [ ] Harden generated Dockerfile, Compose, prebuilt image, static artifact, and workspace-command
+  planning as Docker/OCI artifact paths.
+- [ ] Make Next.js first-class across SSR, standalone, and static-export modes.
+- [ ] Add useful Next.js app/pages router and output detection where it affects planning.
+- [ ] Promote JavaScript/TypeScript support to a tested catalog: Next.js, Remix, Nuxt, SvelteKit,
+  Astro, Vite, React, Vue, Svelte, Solid, Angular, Express, Fastify, NestJS, Hono, Koa, and generic
+  package scripts.
+- [ ] Harden Python support for FastAPI, Django, Flask, generic ASGI/WSGI apps, `uv`, Poetry, pip,
+  and explicit start-command fallback.
+- [ ] Add Spring Boot as the first named JVM web framework.
+- [ ] Add framework-family matrix rows for detection, base image policy, install/build/start/package
+  commands, artifact outputs, internal port behavior, unsupported evidence, and Web/CLI draft
+  parity.
+- [ ] Keep buildpack-style detection as an adapter-owned accelerator, not the only way Appaloft
+  supports common frameworks.
+
+Exit criteria:
+
+- [ ] The zero-to-SSH loop works for at least: Next.js, Vite static SPA, Astro static, Nuxt
+  generate, SvelteKit static, Remix, FastAPI, Django, Flask, generic Node, generic Python, generic
+  Java, Dockerfile, Docker Compose, prebuilt image, and explicit custom commands.
+- [ ] Unsupported frameworks fail with structured `validation_error` in `runtime-plan-resolution`
+  unless explicit custom commands make a Docker/OCI image plan possible.
+- [ ] Web and CLI can collect the same draft fields for source base directory, publish directory,
+  Dockerfile path, Compose path, build target, install/build/start commands, and internal port.
+
+## Phase 6: Access Policy, Domain/TLS Lifecycle, And Observability Hardening
+
+Target: `0.8.0`.
+
+Release rule:
+
+- [ ] Select `0.8.0` only when all required Phase 6 items, earlier phase items, and exit criteria
+  are checked. If any Phase 6 item remains unchecked, release a `0.7.x` patch instead.
+
+Already done:
+
+- [x] Generated access is visible through `ResourceAccessSummary`.
+- [x] Planned and latest generated routes are projected.
+- [x] Latest durable domain routes and latest server-applied routes are exposed separately.
+- [x] Web resource detail reads health, access, proxy configuration, diagnostics, runtime logs, and
+  resource-scoped domain binding actions.
+- [x] Quick Deploy displays latest or planned generated routes after resource refresh.
+- [x] `resources.proxy-configuration.preview` is active.
+- [x] Resource health, runtime logs, deployment logs, create-time deployment progress, and diagnostic
+  summary exist as active observation surfaces.
+
+Required:
+
+- [ ] Activate `default-access-domain-policies.configure`.
+- [ ] Add default access policy list/show/update/disable behavior.
+- [ ] Add operation catalog coverage for default access policy operations.
+- [ ] Harden `ResourceAccessSummary` route precedence so durable domain bindings and server-applied
+  config routes consistently win where specs require it.
+- [ ] Add dedicated route intent/status read or repair surfaces only where existing access, proxy,
+  health, and diagnostic surfaces are insufficient.
+- [ ] Add domain binding show/update/delete/retry lifecycle commands where specs allow mutation
+  after creation.
+- [ ] Add certificate show/import/revoke/delete/retry semantics around provider-issued and imported
+  certificates.
+- [ ] Broaden API/Web/CLI regression coverage for generated access display.
+- [ ] Broaden API/Web/CLI regression coverage for provider-rendered proxy configuration preview.
+- [ ] Broaden API/Web/CLI regression coverage for server-applied domains and durable domain routes.
+- [ ] Broaden API/Web/CLI regression coverage for diagnostic copy.
+- [ ] Keep access/proxy/log/health failures visible through read models, proxy preview, and
+  diagnostics.
+
+Exit criteria:
+
+- [ ] A deployed HTTP app keeps exposing generated or configured access through
+  `ResourceAccessSummary`.
+- [ ] Operators can configure or disable the default generated-access policy through explicit
+  operations.
+- [ ] A custom domain can be created, verified, issued/renewed or imported for TLS, observed,
+  retried, and removed through explicit operations.
+- [ ] Access/proxy/log/health failures remain visible through Appaloft operations, not screenshots
+  or raw server commands.
+
+## Phase 7: Day-Two Production Controls
+
+Target: `0.9.0` beta.
+
+Release rule:
+
+- [ ] Select `0.9.0` only when all required Phase 7 items, earlier phase items, and exit criteria
+  are checked. If any Phase 7 item remains unchecked, release a `0.8.x` patch instead.
+
+Already done:
+
+- [x] Environment set/unset variable baseline exists.
+- [x] Core contains dependency resource and binding concepts.
+- [x] Deployment list/logs and resource health/log/diagnostic read surfaces exist.
+
+Required:
+
+- [ ] Add resource-scoped environment variable operations.
+- [ ] Add secret operations with build/runtime exposure rules, masking, `.env` import/paste, and
+  effective config queries.
+- [ ] Add storage/volume create/list/show/update/delete.
+- [ ] Add storage attach/detach, bind mount versus named volume, destination path validation, and
+  backup relationship metadata.
+- [ ] Add Postgres provisioning/import/list/show/update/delete.
+- [ ] Add Redis provisioning/import/list/show/update/delete.
+- [ ] Add dependency bind/unbind and binding secret rotation.
+- [ ] Add backup/restore for the minimum useful dependency-resource loop.
+- [ ] Rebuild deployment show as a first-class query.
+- [ ] Rebuild deployment stream-events as a first-class query.
+- [ ] Rebuild deployment retry/redeploy under ADR-016.
+- [ ] Rebuild rollback under ADR-016 with retained artifacts, rollback candidates, lifecycle
+  transitions, events, errors, Web/API/CLI affordances, and tests.
+- [ ] Add resource restart/stop/start only after runtime ownership and state semantics are
+  specified.
+- [ ] Add source binding and auto-deploy.
+- [ ] Add push webhook and generic signed deploy webhook.
+- [ ] Add deploy-action wrapper behavior.
+- [ ] Add existing-resource profile-drift handling.
+- [ ] Add preview deployments after source binding and webhook ingestion are durable.
+- [ ] Add scheduled task/cron resource shape with run history and logs after workload service
+  semantics are specified.
+
+Exit criteria:
+
+- [ ] A user can manage config, secrets, storage, dependencies, auto-deploy, deployment history, and
+  rollback candidates without editing files on the server.
+- [ ] Postgres has a closed provision -> bind -> deploy -> observe -> backup/restore or delete loop.
+- [ ] Redis has a closed provision -> bind -> deploy -> observe -> backup/restore or delete loop.
+- [ ] Rollback/redeploy are no longer rebuild-required if they are exposed.
+
+## Phase 8: Operator/Internal State Closure And Interface Parity
+
+Target: `1.0.0-rc`.
+
+Release rule:
+
+- [ ] Select `1.0.0-rc` only when all required Phase 8 items, earlier phase items, and exit criteria
+  are checked. If any Phase 8 item remains unchecked, release a `0.9.x` patch or an explicitly
+  requested prerelease instead.
+
+Already done:
+
+- [x] System provider/plugin/doctor/db status/db migrate baseline exists.
+- [x] Terminal session open baseline exists.
+- [x] Remote SSH state and migration/recovery concepts have partial implementation.
+
+Required:
+
+- [ ] Add durable outbox/inbox or equivalent process state for long-running workflows.
+- [ ] Add retry, dedupe, and failure visibility for long-running workflows.
+- [ ] Add operator queries for deployment attempts.
+- [ ] Add operator queries for proxy bootstrap attempts.
+- [ ] Add operator queries for certificate attempts.
+- [ ] Add operator queries for remote SSH state locks, migrations, backups, and recovery markers.
+- [ ] Add operator queries for source links, route realization attempts, and worker/job status.
+- [ ] Add lifecycle commands for retry, cancel, mark-recovered, dead-letter, and prune where state
+  can block deployments or create support load.
+- [ ] Add audit/event read surfaces with retention policy and redaction rules.
+- [ ] Add terminal session list/show/attach/close/expire if terminal sessions remain public.
+- [ ] Ensure provider/plugin/system operations expose capability details and configuration
+  diagnostics without leaking provider SDK types or secrets.
+- [ ] Verify CLI, HTTP/oRPC, Web, and generated MCP/tool contracts against `operation-catalog.ts`.
+- [ ] Harden install/upgrade/release: migrations, backup/recovery, all-in-one packaging, binary
+  release, static console asset serving, and smoke tests.
+
+Exit criteria:
+
+- [ ] Operators can see and repair stuck work through Appaloft operations.
+- [ ] Historical attempts, logs, events, and remote state backups have documented retention/prune
+  behavior.
+- [ ] The release candidate passes local, PGlite, PostgreSQL, Docker, and opt-in SSH smoke suites.
+
+## 1.0.0 GA
+
+Release rule:
+
+- [ ] Select `1.0.0` only when the full `1.0.0 Definition Of Done`, every phase exit criterion, and
+  every release gate item are checked.
+
+Required:
+
+- [ ] Freeze the `1.0.0` active operation catalog.
+- [ ] Close or explicitly defer every temporary implementation gap.
+- [ ] Verify every active operation has command/query docs.
+- [ ] Verify every active operation has workflow/error docs where needed.
+- [ ] Verify every active operation has test matrix rows.
+- [ ] Verify every active operation has executable tests or an explicit accepted gap.
+- [ ] Verify every active operation has Web/API/CLI surface decisions.
+- [ ] Verify every active operation has operation catalog entries.
+- [ ] Publish release notes describing supported deployment strategies, framework tiers, resource
+  lifecycles, known unsupported behavior, and migration constraints.
+
+Exit criteria:
+
+- [ ] No active `1.0.0` feature relies on an undocumented migration gap.
+- [ ] New users can complete the v1 minimum loop from install to reachable deployed app and day-two
+  recovery without private workarounds.
+
+## Resource And Internal State Coverage Ledger
+
+This ledger is the horizontal closure checklist. Each resource or internal state needs the unchecked
+work below before GA.
+
+- [x] Project: `projects.create`, `projects.list`.
+- [ ] Project: show, update profile, archive/delete safety, resource rollup.
+- [x] Environment: create/list/show, set/unset variable, diff, promote.
+- [ ] Environment: update, clone, lock/archive, effective precedence, history.
+- [x] Deployment target/server: register, list, configure credential, connectivity, proxy repair,
+  terminal open.
+- [ ] Deployment target/server: show, update, deactivate/delete safety, proxy status, resource/domain
+  rollups.
+- [x] SSH credential: create/list, attach to server.
+- [ ] SSH credential: show, rotate/update, delete when unused, usage visibility.
+- [x] Resource: create/list, health, logs, proxy preview, diagnostics, configure health, Web detail
+  observation.
+- [ ] Resource: show, update source/runtime/network profile, archive/delete, profile drift
+  visibility.
+- [x] Source link: relink through CLI.
+- [ ] Source link: list/show/delete or archive, PostgreSQL/control-plane persistence before API/Web.
+- [x] Deployment attempt: create/list/logs.
+- [ ] Deployment attempt: show, stream events, retry/redeploy, cancel, rollback candidate/readiness,
+  archive/prune.
+- [x] Runtime artifact/instance: internal snapshot and resource/deployment diagnostic context.
+- [ ] Runtime artifact/instance: cleanup/prune and rollback-candidate retention.
+- [x] Default access policy: static/shell configuration selects provider; generated routes are
+  visible through `ResourceAccessSummary`.
+- [ ] Default access policy: configure, show, update/disable, preserve resource access projection.
+- [x] Generated/server-applied route state: planned/latest generated routes, latest server-applied
+  routes, latest durable routes, proxy status, and proxy preview are visible through read models.
+- [ ] Generated/server-applied route state: precedence hardening, route intent
+  update/delete/reconcile where needed, admin repair/prune diagnostics.
+- [x] Domain binding: create, confirm ownership, list, ready routes projected into resource access
+  summary.
+- [ ] Domain binding: show, update route behavior where allowed, retry verification, delete/archive.
+- [x] Certificate: issue/renew, list.
+- [ ] Certificate: show, import, retry, revoke/delete, renewal attempt visibility.
+- [x] Resource health policy: configure, health query.
+- [ ] Resource health policy: update/delete/reset policy, effective health observation, history.
+- [x] Runtime logs: resource logs/stream and deployment logs.
+- [ ] Runtime logs: bounded logs, unavailable-state diagnostics, retention/prune.
+- [x] Environment/resource secrets: environment set/unset variable baseline.
+- [ ] Environment/resource secrets: secret reference create/list/show/update/delete, masking,
+  build/runtime scope.
+- [ ] Storage volume: create/list/show/update/delete, attach/detach, backup relationship.
+- [ ] Dependency resource instance: provision/import/list/show/update/delete for Postgres and Redis.
+- [ ] Resource binding: bind/unbind/list/show/rotate, immutable deployment snapshot.
+- [ ] Webhook/auto-deploy: create/list/show/update/delete, delivery attempts, replay, secret
+  rotation.
+- [ ] Preview deployment: create from PR event, list/show/update policy/delete on close, scoped env.
+- [ ] Scheduled task: create/list/show/update/delete, run now, run history/logs.
+- [x] Terminal session: open.
+- [ ] Terminal session: list/show/attach/close/expire, audit and redaction.
+- [ ] Outbox/inbox/job/process state: list/show/retry/cancel/dead-letter/prune, attempt ownership.
+- [x] Remote SSH PGlite state: partial config workflow.
+- [ ] Remote SSH PGlite state: show locks/migrations/backups/recovery, retry/repair/prune.
+- [x] Audit/event history: event specs and partial runtime events.
+- [ ] Audit/event history: list/show/filter/export, retention and redaction.
+- [x] Providers/plugins/system: list providers/plugins, doctor, db status/migrate.
+- [ ] Providers/plugins/system: show capabilities/config diagnostics, safe enable/disable only when
+  specs exist.
+
+## Framework And Runtime Support Checklist
+
+A framework family is first-class only when detection, planner output, Docker/OCI execution, error
+mapping, matrix rows, and Web/CLI draft parity are all checked.
+
+- [x] Container-native: Dockerfile, Compose, and prebuilt image paths exist.
+- [ ] Container-native: harden path/build-target/profile updates, Compose target service selection,
+  and image digest visibility.
+- [x] Static sites: static strategy, Vite static, Astro static, Nuxt generate, explicit SvelteKit
+  static, and generic static server packaging exist.
+- [ ] Static sites: add Next static export, common static generators, and generic static generator
+  fallback with explicit publish directory.
+- [x] Next.js: baseline `nextjs` planner builds and starts with package manager defaults.
+- [ ] Next.js: add first-class SSR/standalone/static-export modes, output detection, package manager
+  parity, internal port defaults, and Docker/SSH smoke.
+- [x] React/Vue/Svelte/Solid/Angular SPA: Vite static and generic Node/static coverage exist.
+- [ ] React/Vue/Svelte/Solid/Angular SPA: detect framework-specific outputs and route static output
+  through static-server artifacts.
+- [x] Nuxt/SvelteKit/Astro/Remix: Nuxt generate static, explicit SvelteKit static, Astro static, and
+  Remix server planner exist.
+- [ ] Nuxt/SvelteKit/Astro/Remix: add SSR/server modes where Docker/OCI start command is
+  deterministic.
+- [x] Node API frameworks: generic Node and framework metadata baseline exist.
+- [ ] Node API frameworks: add explicit Express, Fastify, NestJS, Hono, and Koa detection/start
+  defaults with internal port behavior.
+- [x] Python: FastAPI, Django, Flask, generic Python, `uv`, Poetry, and pip baseline exist.
+- [ ] Python: harden ASGI/WSGI app discovery, module/app target selection, collectstatic/static
+  handling, and Docker/SSH smoke.
+- [x] Java/JVM: generic Maven/Gradle planner exists.
+- [ ] Java/JVM: add Spring Boot first, then Quarkus/Micronaut if demand justifies it.
+- [ ] Ruby: add Rails and generic Rack/Sinatra planners or explicit fallback errors.
+- [ ] PHP: add Composer app planner with PHP-FPM or app-server policy.
+- [ ] Go: add generic Go build plus common HTTP framework detection as metadata/defaults.
+- [ ] .NET: add ASP.NET Core planner with `dotnet publish` artifact rules.
+- [ ] Rust: add generic Cargo build plus common HTTP framework metadata/defaults.
+- [ ] Elixir: add Phoenix release planner with `mix` and runtime image policy.
+- [ ] Buildpack-style auto-detection: add only after explicit planners remain deterministic; expose
+  generated plan, logs, overrides, and unsupported-field errors.
+
+## External Baseline Gap Checklist
+
+External baseline research points to this practical minimum:
+
+- [x] Docker substrate with Dockerfile, Compose, and prebuilt image paths.
+- [ ] Buildpack/auto-detect option with explicit plan output.
+- [x] Static site packaging and first-class publish-directory semantics.
+- [x] Generated domains and custom domains as separate concepts.
+- [ ] Full HTTPS/ACME, force HTTPS, and redirect lifecycle closure.
+- [ ] Environment variables, build-time arguments, build secrets, and secret masking.
+- [ ] Persistent storage and databases with service binding, backup/restore, and deletion behavior.
+- [ ] Git source binding, webhooks, auto-deploy, and preview deployments.
+- [ ] Deployment history, standalone event stream, health checks, rollbacks, and resource limits.
+- [ ] Framework auto-detection broad enough for modern frontend frameworks and common backend
+  frameworks.
+
+## Immediate Spec-Round Todo
+
+Recommended next Spec Rounds before broad Code Rounds:
+
+- [ ] Resource profile lifecycle: `resources.show`, source/runtime/network update, archive/delete,
+  resource detail workflow, and test matrix.
+- [ ] Framework support tier matrix: promote Next.js and the JavaScript/TypeScript/Python catalog
+  into numbered detection/planner/Web/CLI rows.
+- [ ] Deployment observation and recovery: `deployments.show`, `deployments.stream-events`,
+  retry/redeploy, rollback candidate, and ADR-016 rebuild decisions.
+- [ ] Access/domain/TLS closure: default access policy editing, route precedence hardening, domain
+  binding show/update/delete/retry, and certificate import/revoke/retry.
+- [ ] Dependency resource lifecycle: Postgres/Redis provision/import, bind/unbind, secret rotation,
+  backup/restore, and delete.
+- [ ] Operator state closure: outbox/inbox/jobs, remote SSH state diagnostics, audit/event
+  retention, and prune/recovery commands.

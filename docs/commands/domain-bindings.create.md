@@ -181,7 +181,8 @@ access URLs such as sslip hostnames must not be interpreted as confirmed custom-
 
 Current code models routing as runtime-plan `accessRoutes` with `proxyKind`, `domains`, `pathPrefix`, and `tlsMode`.
 
-Generated default access routes and their provider-neutral route snapshots are not yet implemented as distinct state from durable `DomainBinding`.
+Generated default access routes and provider-neutral route snapshots are now exposed separately
+from durable `DomainBinding` state through `ResourceAccessSummary`.
 
 Current runtime adapters generate concrete proxy Docker labels and can ensure an edge proxy container/network for proxy-backed access routes. ADR-019 moves those provider-specific decisions behind edge proxy provider packages.
 

@@ -346,7 +346,10 @@ disambiguation is implemented. Static publish directory is now a typed runtime-p
 the static strategy. Dockerfile path, Docker Compose file path, and build target remain pending
 typed runtime-profile fields.
 
-Generated default access policy and route read-model state are not yet implemented as first-class resource access state.
+Generated default access routes are now exposed through the provider-neutral
+`ResourceAccessSummary` projection for planned and realized resource access. Public default access
+policy editing and dedicated resource access-profile update operations remain future behavior
+slices.
 
 ## Open Questions
 

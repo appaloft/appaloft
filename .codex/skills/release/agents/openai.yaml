@@ -1,4 +1,4 @@
 interface:
   display_name: "Release"
-  short_description: "Run Appaloft manual release workflows."
-  default_prompt: "Use $release to prepare, trigger, and monitor an Appaloft release."
+  short_description: "Align the roadmap and run Appaloft releases."
+  default_prompt: "Use $release to align the roadmap, choose the allowed version, and prepare an Appaloft release."

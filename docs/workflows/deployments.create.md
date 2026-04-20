@@ -254,11 +254,14 @@ Migration gaps:
 - runtime target execution selection remains single-server, but local-shell and generic-SSH are now
   selected through a target kind/provider/capability registry; admission-time unsupported-target
   checks are still pending before Swarm or Kubernetes are added.
-- repository config file support is currently partial and legacy-shaped: JSON-only config exists,
-  CLI init writes identity-bearing config, CLI deploy does not expose the catalog-advertised
-  `--config` option, and the target config workflow still needs identity rejection, secret
-  rejection, profile mapping, YAML discovery, and tests.
-- generated default access route resolution and provider injection are not yet implemented as a distinct workflow; current runtime adapters still consume runtime-plan access routes directly.
+- repository config file support now has a profile-only parser/schema, YAML discovery, CLI
+  `--config`, profile-only `appaloft init`, targeted rejection coverage for identity, secret, and
+  unsupported fields, and ids-only `deployments.create` admission. Existing-resource profile drift
+  handling and environment/secret command sequencing remain workflow gaps.
+- generated default access route resolution now has a provider boundary and `ResourceAccessSummary`
+  projection. Remaining deployment workflow gaps are durable-domain/server-applied precedence in the
+  resolver, provider-route projection/retention, and replacing adapter-facing requested route seams
+  with fully provider-neutral route resolution.
 
 ## Open Questions
 
