@@ -902,6 +902,100 @@ export interface ResourceAccessSummary {
   lastRouteRealizationDeploymentId?: string;
 }
 
+export interface ResourceDetailIdentity {
+  id: string;
+  projectId: string;
+  environmentId: string;
+  destinationId?: string;
+  name: string;
+  slug: string;
+  kind: ResourceKind;
+  description?: string;
+  createdAt: string;
+  services: Array<{
+    name: string;
+    kind: ResourceServiceKind;
+  }>;
+  deploymentCount: number;
+  lastDeploymentId?: string;
+  lastDeploymentStatus?: DeploymentStatus;
+}
+
+export interface ResourceDetailSourceProfile {
+  kind: SourceKind;
+  locator: string;
+  displayName: string;
+  gitRef?: string;
+  commitSha?: string;
+  baseDirectory?: string;
+  originalLocator?: string;
+  repositoryId?: string;
+  repositoryFullName?: string;
+  defaultBranch?: string;
+  imageName?: string;
+  imageTag?: string;
+  imageDigest?: string;
+  metadata?: Record<string, string>;
+}
+
+export interface ResourceDetailRuntimeProfile {
+  strategy: RequestedDeploymentMethod;
+  installCommand?: string;
+  buildCommand?: string;
+  startCommand?: string;
+  publishDirectory?: string;
+  healthCheckPath?: string;
+  healthCheck?: RequestedDeploymentHealthCheck;
+}
+
+export interface ResourceDetailNetworkProfile {
+  internalPort: number;
+  upstreamProtocol: ResourceNetworkProtocol;
+  exposureMode: ResourceExposureMode;
+  targetServiceName?: string;
+  hostPort?: number;
+}
+
+export type ResourceDetailHealthPolicy = RequestedDeploymentHealthCheck;
+export type ResourceDetailAccessSummary = ResourceAccessSummary;
+
+export interface ResourceDetailDeploymentContext {
+  id: string;
+  status: DeploymentStatus;
+  createdAt: string;
+  startedAt?: string;
+  finishedAt?: string;
+  serverId: string;
+  destinationId: string;
+}
+
+export interface ResourceDetailLifecycle {
+  status: "active" | "archived" | "deleted";
+  archivedAt?: string;
+  deletedAt?: string;
+}
+
+export interface ResourceDetailProfileDiagnostic {
+  code: string;
+  severity: "info" | "warning" | "error";
+  message: string;
+  path?: string;
+}
+
+export interface ResourceDetail {
+  schemaVersion: "resources.show/v1";
+  resource: ResourceDetailIdentity;
+  source?: ResourceDetailSourceProfile;
+  runtimeProfile?: ResourceDetailRuntimeProfile;
+  networkProfile?: ResourceDetailNetworkProfile;
+  healthPolicy?: ResourceDetailHealthPolicy;
+  accessSummary?: ResourceDetailAccessSummary;
+  latestDeployment?: ResourceDetailDeploymentContext;
+  lifecycle: ResourceDetailLifecycle;
+  diagnostics: ResourceDetailProfileDiagnostic[];
+  generatedAt: string;
+}
+
 export type ResourceHealthOverall =
   | "healthy"
   | "degraded"

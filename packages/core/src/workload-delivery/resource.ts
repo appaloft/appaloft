@@ -220,6 +220,93 @@ function cloneResourceRuntimeProfileState(
   };
 }
 
+function cloneResourceNetworkProfileState(
+  profile: ResourceNetworkProfileState,
+): ResourceNetworkProfileState {
+  return { ...profile };
+}
+
+function serializedNetworkProfile(profile: ResourceNetworkProfileState): Record<string, unknown> {
+  return {
+    internalPort: profile.internalPort.value,
+    upstreamProtocol: profile.upstreamProtocol.value,
+    exposureMode: profile.exposureMode.value,
+    ...(profile.targetServiceName ? { targetServiceName: profile.targetServiceName.value } : {}),
+    ...(profile.hostPort ? { hostPort: profile.hostPort.value } : {}),
+  };
+}
+
+function resourceNetworkResolutionError(
+  message: string,
+  details?: Record<string, string | number | boolean>,
+) {
+  return domainError.validation(message, {
+    phase: "resource-network-resolution",
+    ...(details ?? {}),
+  });
+}
+
+function validateResourceNetworkProfile(input: {
+  resourceId?: ResourceId;
+  kind: ResourceKindValue;
+  services: ResourceServiceState[];
+  networkProfile: ResourceNetworkProfileState;
+  directPortAllowed: boolean;
+}): Result<void> {
+  const targetServiceName = input.networkProfile.targetServiceName;
+
+  if (
+    targetServiceName &&
+    input.services.length > 0 &&
+    !input.services.some((service) => service.name.equals(targetServiceName))
+  ) {
+    return err(
+      resourceNetworkResolutionError("Network target service must be declared on the resource", {
+        ...(input.resourceId ? { resourceId: input.resourceId.value } : {}),
+        resourceKind: input.kind.value,
+        targetServiceName: targetServiceName.value,
+      }),
+    );
+  }
+
+  if (
+    input.kind.value === "compose-stack" &&
+    input.services.length > 1 &&
+    !input.networkProfile.targetServiceName
+  ) {
+    return err(
+      resourceNetworkResolutionError(
+        "Compose stack network profiles must declare a target service",
+        {
+          ...(input.resourceId ? { resourceId: input.resourceId.value } : {}),
+          resourceKind: input.kind.value,
+          serviceCount: input.services.length,
+        },
+      ),
+    );
+  }
+
+  if (input.networkProfile.hostPort && input.networkProfile.exposureMode.value !== "direct-port") {
+    return err(
+      resourceNetworkResolutionError("Host port is valid only for direct-port resource exposure", {
+        ...(input.resourceId ? { resourceId: input.resourceId.value } : {}),
+        exposureMode: input.networkProfile.exposureMode.value,
+      }),
+    );
+  }
+
+  if (!input.directPortAllowed && input.networkProfile.exposureMode.value === "direct-port") {
+    return err(
+      resourceNetworkResolutionError("Direct-port resource exposure is not implemented", {
+        ...(input.resourceId ? { resourceId: input.resourceId.value } : {}),
+        exposureMode: input.networkProfile.exposureMode.value,
+      }),
+    );
+  }
+
+  return ok(undefined);
+}
+
 function serializedHealthCheckPolicy(
   policy: ResourceHealthCheckPolicyState,
 ): Record<string, unknown> {
@@ -288,47 +375,16 @@ export class Resource extends AggregateRoot<ResourceState> {
         );
       }
 
-      if (
-        input.networkProfile?.targetServiceName &&
-        services.length > 0 &&
-        !services.some((service) =>
-          service.name.equals(input.networkProfile?.targetServiceName as ResourceServiceName),
-        )
-      ) {
-        return err(
-          domainError.validation("Network target service must be declared on the resource", {
-            phase: "resource-network-resolution",
-            resourceKind: input.kind.value,
-            targetServiceName: input.networkProfile.targetServiceName.value,
-          }),
-        );
-      }
-
-      if (
-        input.networkProfile &&
-        input.kind.value === "compose-stack" &&
-        services.length > 1 &&
-        !input.networkProfile.targetServiceName
-      ) {
-        return err(
-          domainError.validation("Compose stack network profiles must declare a target service", {
-            phase: "resource-network-resolution",
-            resourceKind: input.kind.value,
-            serviceCount: services.length,
-          }),
-        );
-      }
-
-      if (
-        input.networkProfile?.hostPort &&
-        input.networkProfile.exposureMode.value !== "direct-port"
-      ) {
-        return err(
-          domainError.validation("Host port is valid only for direct-port resource exposure", {
-            phase: "resource-network-resolution",
-            exposureMode: input.networkProfile.exposureMode.value,
-          }),
-        );
+      if (input.networkProfile) {
+        const networkProfileValidation = validateResourceNetworkProfile({
+          kind: input.kind,
+          services,
+          networkProfile: input.networkProfile,
+          directPortAllowed: true,
+        });
+        if (networkProfileValidation.isErr()) {
+          return err(networkProfileValidation.error);
+        }
       }
 
       const resource = new Resource({
@@ -348,7 +404,9 @@ export class Resource extends AggregateRoot<ResourceState> {
         ...(input.runtimeProfile
           ? { runtimeProfile: cloneResourceRuntimeProfileState(input.runtimeProfile) }
           : {}),
-        ...(input.networkProfile ? { networkProfile: { ...input.networkProfile } } : {}),
+        ...(input.networkProfile
+          ? { networkProfile: cloneResourceNetworkProfileState(input.networkProfile) }
+          : {}),
         createdAt: input.createdAt,
         ...(input.description ? { description: input.description } : {}),
       });
@@ -404,19 +462,7 @@ export class Resource extends AggregateRoot<ResourceState> {
             }
           : {}),
         ...(input.networkProfile
-          ? {
-              networkProfile: {
-                internalPort: input.networkProfile.internalPort.value,
-                upstreamProtocol: input.networkProfile.upstreamProtocol.value,
-                exposureMode: input.networkProfile.exposureMode.value,
-                ...(input.networkProfile.targetServiceName
-                  ? { targetServiceName: input.networkProfile.targetServiceName.value }
-                  : {}),
-                ...(input.networkProfile.hostPort
-                  ? { hostPort: input.networkProfile.hostPort.value }
-                  : {}),
-              },
-            }
+          ? { networkProfile: serializedNetworkProfile(input.networkProfile) }
           : {}),
         createdAt: input.createdAt.value,
       });
@@ -438,7 +484,9 @@ export class Resource extends AggregateRoot<ResourceState> {
       ...(state.runtimeProfile
         ? { runtimeProfile: cloneResourceRuntimeProfileState(state.runtimeProfile) }
         : {}),
-      ...(state.networkProfile ? { networkProfile: { ...state.networkProfile } } : {}),
+      ...(state.networkProfile
+        ? { networkProfile: cloneResourceNetworkProfileState(state.networkProfile) }
+        : {}),
     });
   }
 
@@ -518,6 +566,58 @@ export class Resource extends AggregateRoot<ResourceState> {
     return ok(undefined);
   }
 
+  configureNetworkProfile(input: {
+    networkProfile: ResourceNetworkProfileState;
+    configuredAt: UpdatedAt;
+  }): Result<void> {
+    const validation = validateResourceNetworkProfile({
+      resourceId: this.state.id,
+      kind: this.state.kind,
+      services: this.state.services,
+      networkProfile: input.networkProfile,
+      directPortAllowed: false,
+    });
+    if (validation.isErr()) {
+      return err(validation.error);
+    }
+
+    this.state.networkProfile = cloneResourceNetworkProfileState(input.networkProfile);
+
+    this.recordDomainEvent("resource-network-configured", input.configuredAt, {
+      resourceId: this.state.id.value,
+      projectId: this.state.projectId.value,
+      environmentId: this.state.environmentId.value,
+      ...serializedNetworkProfile(input.networkProfile),
+      configuredAt: input.configuredAt.value,
+    });
+
+    return ok(undefined);
+  }
+
+  configureSourceBinding(input: {
+    sourceBinding: ResourceSourceBindingState;
+    configuredAt: UpdatedAt;
+  }): Result<void> {
+    const sourceBinding = ResourceSourceBinding.create(input.sourceBinding);
+    if (sourceBinding.isErr()) {
+      return err(sourceBinding.error);
+    }
+
+    const normalizedSourceBinding = sourceBinding.value.toState();
+    this.state.sourceBinding = cloneResourceSourceBindingState(normalizedSourceBinding);
+
+    this.recordDomainEvent("resource-source-configured", input.configuredAt, {
+      resourceId: this.state.id.value,
+      projectId: this.state.projectId.value,
+      environmentId: this.state.environmentId.value,
+      sourceKind: normalizedSourceBinding.kind.value,
+      sourceLocator: normalizedSourceBinding.locator.value,
+      configuredAt: input.configuredAt.value,
+    });
+
+    return ok(undefined);
+  }
+
   accept<TContext, TResult>(
     visitor: ResourceVisitor<TContext, TResult>,
     context: TContext,
@@ -539,7 +639,9 @@ export class Resource extends AggregateRoot<ResourceState> {
       ...(this.state.runtimeProfile
         ? { runtimeProfile: cloneResourceRuntimeProfileState(this.state.runtimeProfile) }
         : {}),
-      ...(this.state.networkProfile ? { networkProfile: { ...this.state.networkProfile } } : {}),
+      ...(this.state.networkProfile
+        ? { networkProfile: cloneResourceNetworkProfileState(this.state.networkProfile) }
+        : {}),
     };
   }
 }

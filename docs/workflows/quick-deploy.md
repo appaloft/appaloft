@@ -65,7 +65,11 @@ fields are accepted. GitHub Actions and CLI can remain execution owners when the
 `none`, Appaloft Cloud, or a self-hosted Appaloft control plane. If no mode is selected, Quick
 Deploy uses `controlPlane.mode = none`.
 
-When Quick Deploy collects source/runtime/health values, those values are entry-flow draft fields for `resources.create` or a future resource profile update command. They must not be submitted to `deployments.create`.
+When Quick Deploy collects source/runtime/health values, those values are entry-flow draft fields
+for `resources.create` or the accepted candidate resource profile commands such as
+`resources.configure-source`, `resources.configure-runtime`, `resources.configure-network`, and
+`resources.configure-health`. They must not be submitted to `deployments.create`, and they must not
+be hidden behind a generic `resources.update` operation.
 
 When Quick Deploy uses a repository deployment config file, the file is a source-adjacent
 non-interactive expression of the Quick Deploy resource-profile draft. It contributes profile
@@ -642,4 +646,7 @@ Until provider-backed disambiguation exists, callers should supply explicit `git
 ## Open Questions
 
 - Should a future non-durable backend convenience endpoint be allowed for Quick Deploy, or should automation always sequence explicit operations until a durable workflow command exists?
-- Exact operation names for resource source binding, runtime profile, network profile, and access profile configuration remain open under [ADR-012](../decisions/ADR-012-resource-runtime-profile-and-deployment-snapshot-boundary.md) and [ADR-015](../decisions/ADR-015-resource-network-profile.md).
+- Resource source/runtime/network operation names are resolved as accepted candidates:
+  `resources.configure-source`, `resources.configure-runtime`, and `resources.configure-network`.
+  Access profile configuration remains a separate future behavior governed by ADR-017 and the
+  routing/domain/TLS specs.

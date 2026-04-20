@@ -1,6 +1,8 @@
 import {
   type BootstrapServerProxyCommandInput,
   type ConfigureResourceHealthCommandInput,
+  type ConfigureResourceNetworkCommandInput,
+  type ConfigureResourceSourceCommandInput,
   type ConfigureServerCredentialCommandInput,
   type ConfirmDomainBindingOwnershipCommandInput,
   type CreateDeploymentCommandInput,
@@ -28,12 +30,15 @@ import {
   type ResourceRuntimeLogsQueryInput,
   type SetEnvironmentVariableCommandInput,
   type ShowEnvironmentQueryInput,
+  type ShowResourceQueryInput,
   type TestServerConnectivityCommandInput,
   type UnsetEnvironmentVariableCommandInput,
 } from "@appaloft/application/schemas";
 import {
   type BootstrapServerProxyResponse,
   type ConfigureResourceHealthResponse,
+  type ConfigureResourceNetworkResponse,
+  type ConfigureResourceSourceResponse,
   type ConfirmDomainBindingOwnershipResponse,
   type CreateDeploymentResponse,
   type CreateDomainBindingResponse,
@@ -60,6 +65,7 @@ import {
   type PromoteEnvironmentResponse,
   type ProxyConfigurationView,
   type RegisterServerResponse,
+  type ResourceDetail,
   type ResourceDiagnosticSummary,
   type ResourceHealthSummary,
   type ResourceRuntimeLogEvent,
@@ -183,6 +189,12 @@ export type AppaloftOrpcClientContract = {
       ListResourcesResponse,
       AppaloftClientError
     >;
+    show: Client<
+      AppaloftClientContext,
+      ShowResourceQueryInput,
+      ResourceDetail,
+      AppaloftClientError
+    >;
     create: Client<
       AppaloftClientContext,
       CreateResourceCommandInput,
@@ -193,6 +205,18 @@ export type AppaloftOrpcClientContract = {
       AppaloftClientContext,
       ConfigureResourceHealthCommandInput,
       ConfigureResourceHealthResponse,
+      AppaloftClientError
+    >;
+    configureNetwork: Client<
+      AppaloftClientContext,
+      ConfigureResourceNetworkCommandInput,
+      ConfigureResourceNetworkResponse,
+      AppaloftClientError
+    >;
+    configureSource: Client<
+      AppaloftClientContext,
+      ConfigureResourceSourceCommandInput,
+      ConfigureResourceSourceResponse,
       AppaloftClientError
     >;
     diagnosticSummary: Client<

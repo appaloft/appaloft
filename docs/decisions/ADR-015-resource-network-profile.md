@@ -172,10 +172,14 @@ The v1 user-facing path must expose `internalPort`. It may keep `direct-port` an
 - [deployments.create Test Matrix](../testing/deployments.create-test-matrix.md)
 - [Quick Deploy Workflow Spec](../workflows/quick-deploy.md)
 - [Resource Create And First Deploy Workflow Spec](../workflows/resources.create-and-first-deploy.md)
+- [Resource Profile Lifecycle Workflow Spec](../workflows/resource-profile-lifecycle.md)
+- [resources.configure-network Command Spec](../commands/resources.configure-network.md)
 - [resources.create Test Matrix](../testing/resources.create-test-matrix.md)
+- [Resource Profile Lifecycle Test Matrix](../testing/resource-profile-lifecycle-test-matrix.md)
 - [Default Access Domain And Proxy Routing Test Matrix](../testing/default-access-domain-and-proxy-routing-test-matrix.md)
 - [Quick Deploy Test Matrix](../testing/quick-deploy-test-matrix.md)
 - [resources.create Implementation Plan](../implementation/resources.create-plan.md)
+- [Resource Profile Lifecycle Implementation Plan](../implementation/resource-profile-lifecycle-plan.md)
 - [ADR-012: Resource Runtime Profile And Deployment Snapshot Boundary](./ADR-012-resource-runtime-profile-and-deployment-snapshot-boundary.md)
 - [ADR-014: Deployment Admission Uses Resource Profile](./ADR-014-deployment-admission-uses-resource-profile.md)
 - [ADR-017: Default Access Domain And Proxy Routing](./ADR-017-default-access-domain-and-proxy-routing.md)
@@ -199,8 +203,11 @@ Runtime adapters isolate reverse-proxy resources by resource/workload identity a
 loopback-only ephemeral host-port mappings for health checks while keeping `internalPort` as the
 proxy upstream target.
 
-Direct host publication and explicit resource access-profile update commands are not implemented as
-user-facing Web/CLI/API configuration surfaces.
+`resources.configure-network` is accepted as the explicit resource network configuration command.
+It is not implemented as a user-facing Web/CLI/API configuration surface yet.
+
+Direct host publication remains blocked until `resources.configure-network` also implements the
+explicit direct-port placement guards, adapter behavior, and tests required by this ADR.
 
 ## Open Questions
 

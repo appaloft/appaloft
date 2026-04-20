@@ -221,4 +221,7 @@ Deploy entrypoints, and resource detail should own deployment history/actions.
 
 ## Open Questions
 
-- Exact operation names for resource source binding, runtime profile, network profile, and access profile configuration remain open under [ADR-012](../decisions/ADR-012-resource-runtime-profile-and-deployment-snapshot-boundary.md) and [ADR-015](../decisions/ADR-015-resource-network-profile.md).
+- Resource source/runtime/network operation names are resolved as accepted candidates:
+  `resources.configure-source`, `resources.configure-runtime`, and `resources.configure-network`.
+  Access profile configuration remains a separate future behavior governed by ADR-017 and the
+  routing/domain/TLS specs.

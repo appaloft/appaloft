@@ -18,10 +18,13 @@
   } from "@lucide/svelte";
   import type {
     ConfigureResourceHealthInput,
+    ConfigureResourceNetworkInput,
+    ConfigureResourceSourceInput,
     ConfirmDomainBindingOwnershipInput,
     CreateDomainBindingInput,
     DomainBindingSummary,
     ProxyConfigurationView,
+    ResourceDetail,
     ResourceHealthOverall,
     ResourceRuntimeLogEvent,
     ResourceRuntimeLogLine,
@@ -46,7 +49,6 @@
   import {
     findEnvironment,
     findProject,
-    findResource,
     findServer,
     formatTime,
     projectDetailHref,
@@ -83,6 +85,11 @@
   type HealthCheckHttpInput = NonNullable<ConfigureResourceHealthInput["healthCheck"]["http"]>;
   type HealthCheckMethod = HealthCheckHttpInput["method"];
   type HealthCheckScheme = HealthCheckHttpInput["scheme"];
+  type NetworkProfileInput = ConfigureResourceNetworkInput["networkProfile"];
+  type NetworkProtocol = NetworkProfileInput["upstreamProtocol"];
+  type NetworkExposureMode = NetworkProfileInput["exposureMode"];
+  type SourceProfileInput = ConfigureResourceSourceInput["source"];
+  type SourceKind = SourceProfileInput["kind"];
   type DomainRouteMode = "serve" | "redirect";
   type RedirectStatusText = "301" | "302" | "307" | "308";
   type ResourceSettingsSection = "profile" | "domains" | "health" | "proxy" | "diagnostics";
@@ -104,6 +111,20 @@
     domainBindingsQuery,
   } = createConsoleQueries(browser);
   const resourceId = $derived(page.params.resourceId ?? "");
+  const resourceDetailQuery = createQuery(() =>
+    queryOptions({
+      queryKey: ["resources", "show", resourceId],
+      queryFn: () =>
+        orpcClient.resources.show({
+          resourceId,
+          includeLatestDeployment: true,
+          includeAccessSummary: true,
+          includeProfileDiagnostics: true,
+        }),
+      enabled: browser && resourceId.length > 0,
+      staleTime: 5_000,
+    }),
+  );
   const resourceHealthQuery = createQuery(() =>
     queryOptions({
       queryKey: ["resources", "health", resourceId, "detail"],
@@ -121,7 +142,6 @@
 
   const projects = $derived(projectsQuery.data?.items ?? []);
   const environments = $derived(environmentsQuery.data?.items ?? []);
-  const resources = $derived(resourcesQuery.data?.items ?? []);
   const servers = $derived(serversQuery.data?.items ?? []);
   const deployments = $derived(deploymentsQuery.data?.items ?? []);
   const domainBindings = $derived(domainBindingsQuery.data?.items ?? []);
@@ -131,9 +151,11 @@
       resourcesQuery.isPending ||
       serversQuery.isPending ||
       deploymentsQuery.isPending ||
-      domainBindingsQuery.isPending,
+      domainBindingsQuery.isPending ||
+      resourceDetailQuery.isPending,
   );
-  const resource = $derived(findResource(resources, resourceId));
+  const resourceDetail = $derived(resourceDetailQuery.data ?? null);
+  const resource = $derived(resourceDetail ? resourceSummaryFromDetail(resourceDetail) : null);
   const project = $derived(resource ? findProject(projects, resource.projectId) : null);
   const environment = $derived(
     resource ? findEnvironment(environments, resource.environmentId) : null,
@@ -200,6 +222,31 @@
     title: string;
     detail: string;
   } | null>(null);
+  let networkFeedback = $state<{
+    kind: "success" | "error";
+    title: string;
+    detail: string;
+  } | null>(null);
+  let sourceFeedback = $state<{
+    kind: "success" | "error";
+    title: string;
+    detail: string;
+  } | null>(null);
+  let sourceFormResourceId = $state("");
+  let sourceKind = $state<SourceKind>("git-public");
+  let sourceLocator = $state("");
+  let sourceDisplayName = $state("");
+  let sourceGitRef = $state("");
+  let sourceCommitSha = $state("");
+  let sourceBaseDirectory = $state("");
+  let sourceImageName = $state("");
+  let sourceImageTag = $state("");
+  let sourceImageDigest = $state("");
+  let networkFormResourceId = $state("");
+  let networkInternalPort = $state("");
+  let networkUpstreamProtocol = $state<NetworkProtocol>("http");
+  let networkExposureMode = $state<NetworkExposureMode>("reverse-proxy");
+  let networkTargetServiceName = $state("");
   let healthFormResourceId = $state("");
   let healthEnabled = $state(true);
   let healthMethod = $state<HealthCheckMethod>("GET");
@@ -310,6 +357,42 @@
         ? $t(i18nKeys.console.resources.accessUrlCopyFailed)
         : $t(i18nKeys.console.resources.copyAccessUrl),
   );
+  const sourceProfileStatusLabel = $derived(
+    resourceDetail?.source
+      ? $t(i18nKeys.common.status.configured)
+      : $t(i18nKeys.common.status.notConfigured),
+  );
+  const sourceKindIsGit = $derived(isGitSourceKind(sourceKind));
+  const sourceKindIsDockerImage = $derived(sourceKind === "docker-image");
+  const canConfigureSource = $derived(
+    Boolean(
+      resource &&
+        sourceKind &&
+        sourceLocator.trim() &&
+        (!sourceKindIsDockerImage || !(sourceImageTag.trim() && sourceImageDigest.trim())),
+    ),
+  );
+  const networkTargetServiceRequired = $derived(
+    Boolean(resource?.kind === "compose-stack" && resource.services.length > 1),
+  );
+  const selectedNetworkTargetService = $derived(
+    resource?.services.find((service) => service.name === networkTargetServiceName) ?? null,
+  );
+  const networkProfileStatusLabel = $derived(
+    resource?.networkProfile
+      ? $t(i18nKeys.common.status.configured)
+      : $t(i18nKeys.common.status.notConfigured),
+  );
+  const canConfigureNetwork = $derived(
+    Boolean(
+      resource &&
+        isPortNumberText(networkInternalPort) &&
+        (networkExposureMode === "none" || networkExposureMode === "reverse-proxy") &&
+        (!networkTargetServiceRequired || networkTargetServiceName.trim()) &&
+        (!networkTargetServiceName.trim() ||
+          resource.services.some((service) => service.name === networkTargetServiceName.trim())),
+    ),
+  );
   const canConfigureHealth = $derived(
     Boolean(
       resource &&
@@ -336,6 +419,7 @@
       domainName = "";
       redirectTo = "";
       void queryClient.invalidateQueries({ queryKey: ["domain-bindings"] });
+      void queryClient.invalidateQueries({ queryKey: ["resources", "show", resourceId] });
     },
     onError: (error) => {
       createFeedback = {
@@ -355,6 +439,7 @@
         detail: $t(i18nKeys.common.status.bound),
       };
       void queryClient.invalidateQueries({ queryKey: ["domain-bindings"] });
+      void queryClient.invalidateQueries({ queryKey: ["resources", "show", resourceId] });
     },
     onError: (error) => {
       createFeedback = {
@@ -373,6 +458,7 @@
         detail: result.id,
       };
       void queryClient.invalidateQueries({ queryKey: ["resources"] });
+      void queryClient.invalidateQueries({ queryKey: ["resources", "show", resourceId] });
       void queryClient.invalidateQueries({
         queryKey: ["resources", "health", resourceId, "detail"],
       });
@@ -381,6 +467,52 @@
       healthFeedback = {
         kind: "error",
         title: $t(i18nKeys.console.resources.healthPolicySaveFailed),
+        detail: readErrorMessage(error),
+      };
+    },
+  }));
+  const configureResourceSourceMutation = createMutation(() => ({
+    mutationFn: (input: ConfigureResourceSourceInput) =>
+      orpcClient.resources.configureSource(input),
+    onSuccess: (result) => {
+      sourceFeedback = {
+        kind: "success",
+        title: $t(i18nKeys.console.resources.sourceProfileSaved),
+        detail: result.id,
+      };
+      void queryClient.invalidateQueries({ queryKey: ["resources"] });
+      void queryClient.invalidateQueries({ queryKey: ["resources", "show", resourceId] });
+    },
+    onError: (error) => {
+      sourceFeedback = {
+        kind: "error",
+        title: $t(i18nKeys.console.resources.sourceProfileSaveFailed),
+        detail: readErrorMessage(error),
+      };
+    },
+  }));
+  const configureResourceNetworkMutation = createMutation(() => ({
+    mutationFn: (input: ConfigureResourceNetworkInput) =>
+      orpcClient.resources.configureNetwork(input),
+    onSuccess: (result) => {
+      networkFeedback = {
+        kind: "success",
+        title: $t(i18nKeys.console.resources.networkProfileSaved),
+        detail: result.id,
+      };
+      void queryClient.invalidateQueries({ queryKey: ["resources"] });
+      void queryClient.invalidateQueries({ queryKey: ["resources", "show", resourceId] });
+      void queryClient.invalidateQueries({
+        queryKey: ["resources", "health", resourceId, "detail"],
+      });
+      if (resource) {
+        void loadProxyConfiguration(resource.id);
+      }
+    },
+    onError: (error) => {
+      networkFeedback = {
+        kind: "error",
+        title: $t(i18nKeys.console.resources.networkProfileSaveFailed),
         detail: readErrorMessage(error),
       };
     },
@@ -717,6 +849,29 @@
   });
 
   $effect(() => {
+    if (!browser || !resource) {
+      return;
+    }
+
+    if (sourceFormResourceId === resource.id) {
+      return;
+    }
+
+    const source = resourceDetail?.source;
+    sourceFormResourceId = resource.id;
+    sourceKind = source?.kind ?? "git-public";
+    sourceLocator = source?.locator ?? "";
+    sourceDisplayName = source?.displayName ?? "";
+    sourceGitRef = source?.gitRef ?? "";
+    sourceCommitSha = source?.commitSha ?? "";
+    sourceBaseDirectory = source?.baseDirectory ?? "";
+    sourceImageName = source?.imageName ?? "";
+    sourceImageTag = source?.imageTag ?? "";
+    sourceImageDigest = source?.imageDigest ?? "";
+    sourceFeedback = null;
+  });
+
+  $effect(() => {
     if (!browser || !resource || !resourceHealth) {
       return;
     }
@@ -737,6 +892,28 @@
     healthStartPeriodSeconds = policy.startPeriodSeconds
       ? String(policy.startPeriodSeconds)
       : "5";
+  });
+
+  $effect(() => {
+    if (!browser || !resource) {
+      return;
+    }
+
+    if (networkFormResourceId === resource.id) {
+      return;
+    }
+
+    const profile = resource.networkProfile;
+    networkFormResourceId = resource.id;
+    networkInternalPort = profile?.internalPort ? String(profile.internalPort) : "";
+    networkUpstreamProtocol = profile?.upstreamProtocol ?? "http";
+    networkExposureMode = profile?.exposureMode ?? "reverse-proxy";
+    networkTargetServiceName =
+      profile?.targetServiceName ??
+      (resource.kind === "compose-stack" && resource.services.length > 1
+        ? (resource.services[0]?.name ?? "")
+        : "");
+    networkFeedback = null;
   });
 
   $effect(() => {
@@ -794,6 +971,41 @@
     }
   });
 
+  function resourceSummaryFromDetail(detail: ResourceDetail): ResourceSummary {
+    const summary: ResourceSummary = {
+      id: detail.resource.id,
+      projectId: detail.resource.projectId,
+      environmentId: detail.resource.environmentId,
+      name: detail.resource.name,
+      slug: detail.resource.slug,
+      kind: detail.resource.kind,
+      createdAt: detail.resource.createdAt,
+      services: detail.resource.services,
+      deploymentCount: detail.resource.deploymentCount,
+    };
+
+    if (detail.resource.destinationId) {
+      summary.destinationId = detail.resource.destinationId;
+    }
+    if (detail.resource.description) {
+      summary.description = detail.resource.description;
+    }
+    if (detail.resource.lastDeploymentId) {
+      summary.lastDeploymentId = detail.resource.lastDeploymentId;
+    }
+    if (detail.resource.lastDeploymentStatus) {
+      summary.lastDeploymentStatus = detail.resource.lastDeploymentStatus;
+    }
+    if (detail.networkProfile) {
+      summary.networkProfile = detail.networkProfile;
+    }
+    if (detail.accessSummary) {
+      summary.accessSummary = detail.accessSummary;
+    }
+
+    return summary;
+  }
+
   function createResourceDomainBinding(event: SubmitEvent): void {
     event.preventDefault();
 
@@ -840,9 +1052,78 @@
     return Number.isInteger(parsed) && parsed > 0;
   }
 
+  function isPortNumberText(value: string): boolean {
+    const parsed = Number(value);
+    return Number.isInteger(parsed) && parsed >= 1 && parsed <= 65535;
+  }
+
   function isNonNegativeIntegerText(value: string): boolean {
     const parsed = Number(value);
     return Number.isInteger(parsed) && parsed >= 0;
+  }
+
+  function isGitSourceKind(kind: SourceKind): boolean {
+    return (
+      kind === "remote-git" ||
+      kind === "git-public" ||
+      kind === "git-github-app" ||
+      kind === "git-deploy-key" ||
+      kind === "local-git"
+    );
+  }
+
+  function configureResourceSource(event: SubmitEvent): void {
+    event.preventDefault();
+
+    if (!resource || !canConfigureSource || configureResourceSourceMutation.isPending) {
+      return;
+    }
+
+    const displayName = sourceDisplayName.trim();
+    const gitRef = sourceGitRef.trim();
+    const commitSha = sourceCommitSha.trim();
+    const baseDirectory = sourceBaseDirectory.trim();
+    const imageName = sourceImageName.trim();
+    const imageTag = sourceImageTag.trim();
+    const imageDigest = sourceImageDigest.trim();
+    const source: SourceProfileInput = {
+      kind: sourceKind,
+      locator: sourceLocator.trim(),
+      ...(displayName ? { displayName } : {}),
+      ...(gitRef ? { gitRef } : {}),
+      ...(commitSha ? { commitSha } : {}),
+      ...(baseDirectory ? { baseDirectory } : {}),
+      ...(imageName ? { imageName } : {}),
+      ...(imageTag ? { imageTag } : {}),
+      ...(imageDigest ? { imageDigest } : {}),
+    };
+
+    sourceFeedback = null;
+    configureResourceSourceMutation.mutate({
+      resourceId: resource.id,
+      source,
+    });
+  }
+
+  function configureResourceNetwork(event: SubmitEvent): void {
+    event.preventDefault();
+
+    if (!resource || !canConfigureNetwork || configureResourceNetworkMutation.isPending) {
+      return;
+    }
+
+    const targetServiceName = networkTargetServiceName.trim();
+    networkFeedback = null;
+
+    configureResourceNetworkMutation.mutate({
+      resourceId: resource.id,
+      networkProfile: {
+        internalPort: Number(networkInternalPort),
+        upstreamProtocol: networkUpstreamProtocol,
+        exposureMode: networkExposureMode,
+        ...(targetServiceName ? { targetServiceName } : {}),
+      },
+    });
   }
 
   function configureResourceHealth(event: SubmitEvent): void {
@@ -985,6 +1266,48 @@
         return $t(i18nKeys.console.resources.proxyConfigurationTitle);
       case "diagnostics":
         return $t(i18nKeys.console.resources.diagnosticsTitle);
+    }
+  }
+
+  function sourceKindLabel(kind: SourceKind): string {
+    switch (kind) {
+      case "compose":
+      case "docker-compose-inline":
+        return $t(i18nKeys.console.resources.sourceKindCompose);
+      case "docker-image":
+        return $t(i18nKeys.console.resources.sourceKindDockerImage);
+      case "git-public":
+        return $t(i18nKeys.console.resources.sourceKindGitPublic);
+      case "local-folder":
+      case "local-git":
+        return $t(i18nKeys.console.resources.sourceKindLocalFolder);
+      case "remote-git":
+      case "git-github-app":
+      case "git-deploy-key":
+        return $t(i18nKeys.console.resources.sourceKindRemoteGit);
+      case "dockerfile-inline":
+      case "zip-artifact":
+        return kind;
+    }
+  }
+
+  function networkProtocolLabel(protocol: NetworkProtocol): string {
+    switch (protocol) {
+      case "http":
+        return $t(i18nKeys.console.resources.networkProtocolHttp);
+      case "tcp":
+        return $t(i18nKeys.console.resources.networkProtocolTcp);
+    }
+  }
+
+  function networkExposureModeLabel(mode: NetworkExposureMode): string {
+    switch (mode) {
+      case "none":
+        return $t(i18nKeys.console.resources.networkExposureNone);
+      case "reverse-proxy":
+        return $t(i18nKeys.console.resources.networkExposureReverseProxy);
+      case "direct-port":
+        return $t(i18nKeys.console.resources.networkExposureDirectPort);
     }
   }
 
@@ -1421,6 +1744,272 @@
                   environmentName={environment?.name ?? resource.environmentId}
                   destinationId={defaultDestinationId}
                 />
+
+                <form
+                  id="resource-source-profile-form"
+                  class="rounded-md border bg-background p-4"
+                  onsubmit={configureResourceSource}
+                >
+                  <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div class="min-w-0">
+                      <div class="flex flex-wrap items-center gap-2">
+                        <h2 class="text-lg font-semibold">
+                          {$t(i18nKeys.console.resources.sourceProfileTitle)}
+                        </h2>
+                        <Badge variant={resourceDetail?.source ? "default" : "outline"}>
+                          {sourceProfileStatusLabel}
+                        </Badge>
+                      </div>
+                      <p class="mt-1 text-sm leading-6 text-muted-foreground">
+                        {$t(i18nKeys.console.resources.sourceProfileFormDescription)}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div class="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                    <label class="space-y-1.5 text-sm font-medium">
+                      <span>{$t(i18nKeys.console.resources.sourceKind)}</span>
+                      <Select.Root bind:value={sourceKind} type="single">
+                        <Select.Trigger class="w-full">
+                          {sourceKindLabel(sourceKind)}
+                        </Select.Trigger>
+                        <Select.Content>
+                          <Select.Item value="git-public">
+                            {$t(i18nKeys.console.resources.sourceKindGitPublic)}
+                          </Select.Item>
+                          <Select.Item value="remote-git">
+                            {$t(i18nKeys.console.resources.sourceKindRemoteGit)}
+                          </Select.Item>
+                          <Select.Item value="local-folder">
+                            {$t(i18nKeys.console.resources.sourceKindLocalFolder)}
+                          </Select.Item>
+                          <Select.Item value="docker-image">
+                            {$t(i18nKeys.console.resources.sourceKindDockerImage)}
+                          </Select.Item>
+                          <Select.Item value="compose">
+                            {$t(i18nKeys.console.resources.sourceKindCompose)}
+                          </Select.Item>
+                        </Select.Content>
+                      </Select.Root>
+                    </label>
+
+                    <label class="space-y-1.5 text-sm font-medium" for="resource-source-locator">
+                      <span>{$t(i18nKeys.console.resources.sourceLocator)}</span>
+                      <Input
+                        id="resource-source-locator"
+                        bind:value={sourceLocator}
+                        autocomplete="off"
+                      />
+                    </label>
+
+                    <label class="space-y-1.5 text-sm font-medium" for="resource-source-display-name">
+                      <span>{$t(i18nKeys.console.resources.sourceDisplayName)}</span>
+                      <Input
+                        id="resource-source-display-name"
+                        bind:value={sourceDisplayName}
+                        autocomplete="off"
+                      />
+                    </label>
+
+                    {#if sourceKindIsGit}
+                      <label class="space-y-1.5 text-sm font-medium" for="resource-source-git-ref">
+                        <span>{$t(i18nKeys.console.resources.sourceGitRef)}</span>
+                        <Input
+                          id="resource-source-git-ref"
+                          bind:value={sourceGitRef}
+                          autocomplete="off"
+                        />
+                      </label>
+
+                      <label class="space-y-1.5 text-sm font-medium" for="resource-source-base-directory">
+                        <span>{$t(i18nKeys.console.resources.sourceBaseDirectory)}</span>
+                        <Input
+                          id="resource-source-base-directory"
+                          bind:value={sourceBaseDirectory}
+                          autocomplete="off"
+                        />
+                      </label>
+
+                      <label class="space-y-1.5 text-sm font-medium" for="resource-source-commit-sha">
+                        <span>{$t(i18nKeys.console.resources.sourceCommitSha)}</span>
+                        <Input
+                          id="resource-source-commit-sha"
+                          bind:value={sourceCommitSha}
+                          autocomplete="off"
+                        />
+                      </label>
+                    {/if}
+
+                    {#if sourceKindIsDockerImage}
+                      <label class="space-y-1.5 text-sm font-medium" for="resource-source-image-name">
+                        <span>{$t(i18nKeys.console.resources.sourceImageName)}</span>
+                        <Input
+                          id="resource-source-image-name"
+                          bind:value={sourceImageName}
+                          autocomplete="off"
+                        />
+                      </label>
+
+                      <label class="space-y-1.5 text-sm font-medium" for="resource-source-image-tag">
+                        <span>{$t(i18nKeys.console.resources.sourceImageTag)}</span>
+                        <Input
+                          id="resource-source-image-tag"
+                          bind:value={sourceImageTag}
+                          autocomplete="off"
+                        />
+                      </label>
+
+                      <label class="space-y-1.5 text-sm font-medium" for="resource-source-image-digest">
+                        <span>{$t(i18nKeys.console.resources.sourceImageDigest)}</span>
+                        <Input
+                          id="resource-source-image-digest"
+                          bind:value={sourceImageDigest}
+                          autocomplete="off"
+                        />
+                      </label>
+                    {/if}
+                  </div>
+
+                  {#if sourceFeedback}
+                    <div
+                      class={[
+                        "mt-4 rounded-md border px-3 py-2 text-sm",
+                        sourceFeedback.kind === "success"
+                          ? "border-primary/25 bg-primary/5"
+                          : "border-destructive/30 bg-destructive/5 text-destructive",
+                      ]}
+                    >
+                      <p class="font-medium">{sourceFeedback.title}</p>
+                      <p class="mt-1 break-all text-xs">{sourceFeedback.detail}</p>
+                    </div>
+                  {/if}
+
+                  <div class="mt-4 flex justify-end">
+                    <Button
+                      type="submit"
+                      disabled={!canConfigureSource || configureResourceSourceMutation.isPending}
+                    >
+                      {configureResourceSourceMutation.isPending
+                        ? $t(i18nKeys.common.actions.saving)
+                        : $t(i18nKeys.common.actions.save)}
+                    </Button>
+                  </div>
+                </form>
+
+                <form
+                  id="resource-network-profile-form"
+                  class="rounded-md border bg-background p-4"
+                  onsubmit={configureResourceNetwork}
+                >
+                  <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div class="min-w-0">
+                      <div class="flex flex-wrap items-center gap-2">
+                        <h2 class="text-lg font-semibold">
+                          {$t(i18nKeys.console.resources.networkProfileTitle)}
+                        </h2>
+                        <Badge variant={resource.networkProfile ? "default" : "outline"}>
+                          {networkProfileStatusLabel}
+                        </Badge>
+                      </div>
+                      <p class="mt-1 text-sm leading-6 text-muted-foreground">
+                        {$t(i18nKeys.console.resources.networkProfileFormDescription)}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div class="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                    <label class="space-y-1.5 text-sm font-medium" for="resource-network-internal-port">
+                      <span>{$t(i18nKeys.common.domain.port)}</span>
+                      <Input
+                        id="resource-network-internal-port"
+                        bind:value={networkInternalPort}
+                        autocomplete="off"
+                        inputmode="numeric"
+                        placeholder="3000"
+                      />
+                    </label>
+
+                    <label class="space-y-1.5 text-sm font-medium">
+                      <span>{$t(i18nKeys.common.domain.protocol)}</span>
+                      <Select.Root bind:value={networkUpstreamProtocol} type="single">
+                        <Select.Trigger class="w-full">
+                          {networkProtocolLabel(networkUpstreamProtocol)}
+                        </Select.Trigger>
+                        <Select.Content>
+                          <Select.Item value="http">
+                            {$t(i18nKeys.console.resources.networkProtocolHttp)}
+                          </Select.Item>
+                          <Select.Item value="tcp">
+                            {$t(i18nKeys.console.resources.networkProtocolTcp)}
+                          </Select.Item>
+                        </Select.Content>
+                      </Select.Root>
+                    </label>
+
+                    <label class="space-y-1.5 text-sm font-medium">
+                      <span>{$t(i18nKeys.common.domain.exposure)}</span>
+                      <Select.Root bind:value={networkExposureMode} type="single">
+                        <Select.Trigger class="w-full">
+                          {networkExposureModeLabel(networkExposureMode)}
+                        </Select.Trigger>
+                        <Select.Content>
+                          <Select.Item value="reverse-proxy">
+                            {$t(i18nKeys.console.resources.networkExposureReverseProxy)}
+                          </Select.Item>
+                          <Select.Item value="none">
+                            {$t(i18nKeys.console.resources.networkExposureNone)}
+                          </Select.Item>
+                        </Select.Content>
+                      </Select.Root>
+                    </label>
+
+                    {#if resource.services.length > 0}
+                      <label class="space-y-1.5 text-sm font-medium">
+                        <span>{$t(i18nKeys.console.resources.targetServiceName)}</span>
+                        <Select.Root bind:value={networkTargetServiceName} type="single">
+                          <Select.Trigger class="w-full">
+                            {selectedNetworkTargetService?.name ??
+                              $t(i18nKeys.console.resources.networkTargetServicePlaceholder)}
+                          </Select.Trigger>
+                          <Select.Content>
+                            {#each resource.services as service (service.name)}
+                              <Select.Item value={service.name}>{service.name}</Select.Item>
+                            {/each}
+                          </Select.Content>
+                        </Select.Root>
+                      </label>
+                    {/if}
+                  </div>
+
+                  <p class="mt-3 text-xs leading-5 text-muted-foreground">
+                    {$t(i18nKeys.console.resources.networkDirectPortDeferred)}
+                  </p>
+
+                  {#if networkFeedback}
+                    <div
+                      class={[
+                        "mt-4 rounded-md border px-3 py-2 text-sm",
+                        networkFeedback.kind === "success"
+                          ? "border-primary/25 bg-primary/5"
+                          : "border-destructive/30 bg-destructive/5 text-destructive",
+                      ]}
+                    >
+                      <p class="font-medium">{networkFeedback.title}</p>
+                      <p class="mt-1 break-all text-xs">{networkFeedback.detail}</p>
+                    </div>
+                  {/if}
+
+                  <div class="mt-4 flex justify-end">
+                    <Button
+                      type="submit"
+                      disabled={!canConfigureNetwork || configureResourceNetworkMutation.isPending}
+                    >
+                      {configureResourceNetworkMutation.isPending
+                        ? $t(i18nKeys.common.actions.saving)
+                        : $t(i18nKeys.common.actions.save)}
+                    </Button>
+                  </div>
+                </form>
 
                 <section id="resource-overview-access" class="rounded-md border bg-background p-4">
                   <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
