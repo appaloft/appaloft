@@ -284,9 +284,10 @@ Current HTTP adapter serves a config schema endpoint, but strict deployment API 
 ids-only.
 
 Public `appaloft/deploy-action` wrapper coverage is not implemented yet. The main repository
-release workflow already produces CLI archives, `checksums.txt`, `release-manifest.json`, and
-release notes, but `CONFIG-FILE-ENTRY-009` through `CONFIG-FILE-ENTRY-013` still need a wrapper
-repository, action metadata, install/checksum scripts, SSH secret temp-key handling, and tests.
+release workflow already produces CLI archives, the static Docker self-host installer,
+`checksums.txt`, `release-manifest.json`, and release notes, but `CONFIG-FILE-ENTRY-009` through
+`CONFIG-FILE-ENTRY-013` still need a wrapper repository, action metadata, SSH secret temp-key
+handling, and tests.
 
 Profile drift detection, existing-resource update operation sequencing, stored/external secret
 adapters beyond `ci-env:`, config-file Dockerfile/Compose path mapping, operational provisioning of

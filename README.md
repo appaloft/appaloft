@@ -28,6 +28,25 @@ Milestone 1 is implemented:
 
 ## Quick Start
 
+Run Appaloft as a self-hosted Docker stack:
+
+```bash
+curl -fsSL https://appaloft.com/install.sh | sudo sh
+```
+
+Pin a release image:
+
+```bash
+curl -fsSL https://appaloft.com/install.sh | sudo sh -s -- --version 0.2.1
+```
+
+The public installer installs or verifies Docker Engine plus the compose plugin on Linux, writes a
+self-hosted Compose stack under `/opt/appaloft`, and starts the Appaloft backend, static console, and
+PostgreSQL. For hardened production hosts, preinstall Docker Engine through Docker's official
+package repository and run the installer with `--skip-docker-install`.
+
+## Local Development
+
 1. Install dependencies.
 
 ```bash
@@ -83,6 +102,7 @@ Release outputs target:
 - `appaloft-vX.Y.Z-<platform>.tar.gz` or `.zip`
 - desktop installers built by Tauri
 - `docker-compose.selfhost.yml`
+- `install.sh` Docker self-host installer
 - `release-manifest.json`
 - `checksums.txt`
 

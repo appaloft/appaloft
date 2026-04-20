@@ -216,7 +216,7 @@ business command.
 The wrapper is expected to live in `appaloft/deploy-action` so Marketplace metadata, wrapper
 versioning, and install scripts can evolve independently from the main Appaloft repository. The
 main repository remains the source of truth for CLI release assets, checksums, release manifest,
-and behavior specs.
+the static Docker self-host install script, and behavior specs.
 
 The wrapper must perform only entrypoint work:
 

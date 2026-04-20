@@ -9,6 +9,7 @@ type ReleaseArtifactKind =
   | "cli-binary"
   | "desktop-installer"
   | "compose-bundle"
+  | "install-script"
   | "container-image"
   | "checksum"
   | "other";
@@ -54,6 +55,9 @@ function classifyArtifact(fileName: string): ReleaseArtifactKind {
   if (fileName === "docker-compose.selfhost.yml") {
     return "compose-bundle";
   }
+  if (fileName === "install.sh") {
+    return "install-script";
+  }
   return "other";
 }
 
@@ -74,7 +78,7 @@ const artifacts = await Promise.all(
     const fileName = basename(file);
     const entry: ReleaseArtifactEntry = {
       kind: classifyArtifact(fileName),
-      name: fileName.replace(/\.(tar\.gz|zip|dmg|deb|AppImage|msi|exe|yml|txt)$/u, ""),
+      name: fileName.replace(/\.(tar\.gz|zip|dmg|deb|AppImage|msi|exe|yml|txt|sh)$/u, ""),
       file: relative(releaseRoot, file),
     };
     if (fileName !== "checksums.txt") {
