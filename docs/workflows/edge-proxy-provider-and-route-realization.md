@@ -168,10 +168,67 @@ browser must complete TLS negotiation before it can receive the redirect respons
 implementations such as Traefik middleware or Caddy `redir` directives stay inside the concrete
 provider package.
 
-Server-applied route realization records applied/failed state in the SSH-server Appaloft state
+Server-applied route realization records applied/failed state in the selected Appaloft state
 backend. It does not create managed `DomainBinding` or `Certificate` aggregates. In control-plane
 mode, managed durable domain routes still flow through `domain-bindings.create` and the
 routing/domain/TLS workflow before this edge proxy provider workflow realizes those routes.
+
+## Server-Applied Route State Persistence
+
+Server-applied route desired/applied state is application state in the selected Appaloft state
+backend. It is not a `Resource` aggregate field, a managed `DomainBinding`, a `Certificate`, a
+deployment command field, or committed repository config.
+
+The application boundary must expose route state as operation-specific methods:
+
+- `upsertDesired` for normalized desired route intent;
+- `read` for deployment planning and diagnostics;
+- `markApplied` for successful route realization;
+- `markFailed` for route realization, proxy reload, or public verification failures.
+
+Do not expose a generic route-state `update` operation. Each write has different domain meaning,
+input, idempotency, and error semantics.
+
+PostgreSQL/PGlite state backends persist server-applied route state in a dedicated table with this
+canonical shape:
+
+```text
+server_applied_route_states
+  route_set_id text primary key
+  project_id text not null
+  environment_id text not null
+  resource_id text not null
+  server_id text not null
+  destination_id text null
+  source_fingerprint text null
+  domains json/jsonb not null
+  status text not null
+  updated_at timestamp/timestamptz not null
+  last_applied json/jsonb null
+  last_failure json/jsonb null
+  metadata json/jsonb not null default '{}'
+```
+
+The persistence adapter must support:
+
+- exact target lookup by project/environment/resource/server/destination;
+- default-destination fallback lookup for first-run config bootstrap where `destination_id` is
+  null;
+- reverse lookup by `resource_id` for `resources.delete` blockers;
+- server-scoped lookup for diagnostics, export/import, or control-plane adoption.
+
+Exact destination-scoped route state wins when both exact and default-destination rows exist. The
+default-destination row may be used only when no exact row exists for the resolved deployment
+target.
+
+The `domains` JSON stores only provider-neutral route intent: host, path prefix, TLS mode, optional
+canonical redirect target host, and optional redirect status. Provider-specific files, labels,
+ACME storage, reload commands, private keys, DNS provider credentials, target credentials, and raw
+certificate material must stay outside the table.
+
+The table must not cascade-delete resources. Any desired, applied, failed, or stale route state
+referencing a resource is a `server-applied-route` deletion blocker until a future explicit cleanup
+or unlink behavior removes that route state.
 
 ## Proxy Reload
 
@@ -303,6 +360,12 @@ Server-applied canonical redirect aliases now use the same provider route realiz
 upstream attachment for redirect hosts, and expose redirect source/target/status in proxy
 configuration and diagnostics. External public redirect probing, exact provider-native redirect
 status verification, and provider-owned ACME history remain follow-up provider/e2e coverage.
+
+The PostgreSQL/PGlite durable route-state slice is specified in
+[Server-Applied Route Durable Persistence Plan](../implementation/server-applied-route-durable-persistence-plan.md)
+but not implemented yet. Current shell wiring still relies on file-backed SSH route-state storage
+for server-applied route desired/applied status, and PG `resources.delete` blocker reads do not yet
+report `server-applied-route` blockers from durable route-state rows.
 
 `resources.proxy-configuration.preview` exists for Web/API/CLI. Provider diagnostics now include
 route-level provider-local TLS summaries, while real HTTPS public validation, provider-owned ACME

@@ -136,7 +136,7 @@ Implemented now:
 - durable `DomainBinding` state for resource-scoped public domain ownership and pending
   verification
 - server-applied proxy route desired/applied state for pure CLI/SSH config domains, persisted in
-  SSH-server Appaloft state rather than as managed `DomainBinding` lifecycle records
+  the selected Appaloft state backend rather than as managed `DomainBinding` lifecycle records
 - source fingerprint link state for pure CLI/SSH repeatability, persisted as application state in
   the selected Appaloft state backend rather than as committed repository config
 
@@ -197,6 +197,10 @@ Transport compatibility note:
   SSH-target state for pure CLI operation, not proof that Appaloft owns an always-on DNS or
   certificate scheduler. Canonical redirect source hosts still require DNS and provider-local TLS
   coverage when HTTPS redirects are expected.
+- server-applied route desired/applied state is application state in the selected Appaloft state
+  backend. File-backed SSH remote-state mirrors may move this state across a CLI process boundary,
+  but PostgreSQL/PGlite backends must persist it through a dedicated persistence adapter rather
+  than a `Resource` repository, `DomainBinding`, `Certificate`, or deployment aggregate field.
 - source fingerprint links map a normalized source identity to trusted project/environment/resource
   and optional target placement. They are not resource profile fields and must be changed only
   through explicit relink behavior, not by editing `appaloft.yml`.
@@ -462,7 +466,8 @@ Current scope:
 - owns current edge proxy intent/status summary for server readiness and proxy-backed deployment
   admission/read-model display
 - may host the default `ssh-pglite` Appaloft state backend for CLI/GitHub Actions deployments,
-  including source link state and server-applied proxy route desired/applied state
+  while PostgreSQL/PGlite selected backends persist source link state and server-applied proxy route
+  desired/applied state through dedicated application persistence adapters
 - current code includes provisional future target-kind values; they must be replaced with the
   canonical target model from ADR-023 before cluster targets become public or persisted by new
   features
