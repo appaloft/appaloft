@@ -39,7 +39,9 @@ This query inherits:
 - [ADR-018: Resource Runtime Log Observation](../decisions/ADR-018-resource-runtime-log-observation.md)
 - [ADR-019: Edge Proxy Provider And Observable Configuration](../decisions/ADR-019-edge-proxy-provider-and-observable-configuration.md)
 - [Resource Diagnostic Summary Workflow Spec](../workflows/resource-diagnostic-summary.md)
+- [Resource Access Failure Diagnostics Workflow Spec](../workflows/resource-access-failure-diagnostics.md)
 - [Resource Diagnostic Summary Error Spec](../errors/resources.diagnostic-summary.md)
+- [Resource Access Failure Diagnostics Error Spec](../errors/resource-access-failure-diagnostics.md)
 - [Resource Diagnostic Summary Test Matrix](../testing/resource-diagnostic-summary-test-matrix.md)
 - [Resource Diagnostic Summary Implementation Plan](../implementation/resource-diagnostic-summary-plan.md)
 - [Error Model](../errors/model.md)
@@ -125,8 +127,9 @@ Required top-level behavior:
 - `deployment` includes attempt status, lifecycle phase, terminal timestamps, request/correlation id
   when available, and last structured error summary when available.
 - `access` includes generated and durable access route status, public URL when safe, route
-  realization status, server-applied canonical redirect status when present, and the structured
-  reason when no access URL is available.
+  realization status, server-applied canonical redirect status when present, the latest safe edge
+  access failure diagnostic when available, and the structured reason when no access URL is
+  available.
 - `proxy` includes provider key, proxy readiness, configuration view availability, and safe warnings
   or last structured provider error.
 - `deploymentLogs` and `runtimeLogs` report whether logs are available, empty, unavailable, or not
@@ -168,6 +171,32 @@ type ResourceDiagnosticSectionStatus =
 
 Unavailable and failed sections must include a stable `reasonCode` and `phase` when known.
 
+## Edge Access Failure Relationship
+
+When a recent edge request failure envelope can be safely associated with the resource or selected
+deployment, the diagnostic summary should include it as access/proxy evidence rather than as a
+whole-query error.
+
+The embedded diagnostic uses the provider-neutral shape governed by
+[Resource Access Failure Diagnostics](../workflows/resource-access-failure-diagnostics.md):
+
+- stable `resource_access_*` code;
+- global error category;
+- phase;
+- HTTP status;
+- retriable flag;
+- owner hint;
+- request id;
+- safe related ids and route status when available.
+
+This evidence is outer observation state. It may include `causeCode` for a related
+`deployments.create`, server bootstrap, route realization, resource health, or proxy configuration
+error, but it must not rewrite that operation-owned error.
+
+The summary must not expose raw proxy logs, headers, cookies, internal upstream URLs, internal IP
+addresses, container names, private paths, or user application stack traces from edge failure
+captures.
+
 ## Query Flow
 
 The query must:
@@ -180,13 +209,15 @@ The query must:
 5. Read deployment status and last structured error from deployment read models or aggregate
    snapshots.
 6. Read generated/durable access summary and route realization status.
-7. Summarize proxy readiness and optionally call `resources.proxy-configuration.preview` semantics
+7. Read the latest safe edge access failure diagnostic for the resource when such a read source
+   exists.
+8. Summarize proxy readiness and optionally call `resources.proxy-configuration.preview` semantics
    or the same provider-backed read service for redacted configuration sections.
-8. Read a bounded deployment log tail when requested.
-9. Attempt a bounded runtime log tail when requested and an observable runtime instance exists.
-10. Include safe local/system context from an injected diagnostics/system-info port when available.
-11. Redact secrets across all included fields and lines.
-12. Return `ok(ResourceDiagnosticSummary)` with per-section statuses and source errors.
+9. Read a bounded deployment log tail when requested.
+10. Attempt a bounded runtime log tail when requested and an observable runtime instance exists.
+11. Include safe local/system context from an injected diagnostics/system-info port when available.
+12. Redact secrets across all included fields and lines.
+13. Return `ok(ResourceDiagnosticSummary)` with per-section statuses and source errors.
 
 The query must not:
 
@@ -232,6 +263,10 @@ detail do not yet expose the action directly.
 Safe backend/system context currently includes request id, entrypoint, locale, readiness status, and
 database driver/mode from diagnostics. It intentionally omits private database locations and local
 filesystem paths.
+
+No edge request failure envelope is currently attached to the diagnostic summary. Until that read
+source exists, gateway request failures can still appear indirectly through access, proxy, health,
+deployment, and runtime log source errors.
 
 ## Open Questions
 

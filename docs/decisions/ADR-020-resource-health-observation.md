@@ -187,6 +187,7 @@ long-lived current status belongs to resource health observation.
 - [Project Resource Console Workflow Spec](../workflows/project-resource-console.md)
 - [resources.health Query Spec](../queries/resources.health.md)
 - [Resource Health Observation Workflow Spec](../workflows/resource-health-observation.md)
+- [Resource Access Failure Diagnostics Workflow Spec](../workflows/resource-access-failure-diagnostics.md)
 - [Resource Health Error Spec](../errors/resources.health.md)
 - [Resource Health Test Matrix](../testing/resource-health-test-matrix.md)
 - [Resource Health Implementation Plan](../implementation/resource-health-plan.md)
@@ -213,6 +214,10 @@ list use `ResourceHealthSummary.overall` instead of latest deployment status.
 The current implementation runs bounded HTTP health policy probes and optional public access probes
 when callers request `resources.health({ mode: "live" })` and a safe target URL can be resolved.
 Provider-native runtime/container inspection and command health checks remain future adapter work.
+
+Edge request failure diagnostics are a future read source for public-access/proxy health. They map
+gateway-generated failures into `resource_access_*` codes and must enter health summaries as
+source errors/check evidence, not as deployment status changes or aggregate `domain` errors.
 
 `ResourceRuntimeProfile.healthCheck` now exists for first-deploy resource creation and is mirrored
 into runtime plans for deployment-time HTTP verification. Existing resources update this reusable

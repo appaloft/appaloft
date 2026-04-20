@@ -34,6 +34,7 @@ This query inherits:
 - [ADR-017: Default Access Domain And Proxy Routing](../decisions/ADR-017-default-access-domain-and-proxy-routing.md)
 - [ADR-019: Edge Proxy Provider And Observable Configuration](../decisions/ADR-019-edge-proxy-provider-and-observable-configuration.md)
 - [Resource Health Observation Workflow](../workflows/resource-health-observation.md)
+- [Resource Access Failure Diagnostics Workflow](../workflows/resource-access-failure-diagnostics.md)
 - [Resource Health Error Spec](../errors/resources.health.md)
 - [Resource Health Test Matrix](../testing/resource-health-test-matrix.md)
 - [Resource Health Implementation Plan](../implementation/resource-health-plan.md)
@@ -146,7 +147,8 @@ Required top-level behavior:
   available.
 - `healthPolicy` reports whether a health check is enabled, missing, or unsupported.
 - `publicAccess` reports the current resource URL being checked. Durable resource domain bindings
-  take precedence over generated default access.
+  take precedence over generated default access, and recent safe edge access failure diagnostics may
+  explain why a current route failed at the gateway.
 - `proxy` reports route readiness and provider key when the resource uses reverse-proxy exposure.
 - `sourceErrors` records per-source observation failures without failing the whole query when the
   resource can still be identified.
@@ -203,6 +205,11 @@ Public access checks target the resource's current route:
 The query must not treat deployment-scoped route snapshots as domain ownership. A deployment
 snapshot records which route was used by that attempt; the current route belongs to resource access
 summary and domain binding state.
+
+Recent edge access failure diagnostics may be used as public-access/proxy evidence when a safe
+provider-neutral envelope is available. The query maps those `resource_access_*` codes into
+`publicAccess`, `proxy`, `checks`, and `sourceErrors` without changing deployment state and without
+classifying outer gateway failures as aggregate `domain` errors.
 
 ## Error Contract
 

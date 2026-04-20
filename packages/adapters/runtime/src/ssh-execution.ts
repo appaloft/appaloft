@@ -9,6 +9,7 @@ import {
   type ExecutionBackend,
   type ExecutionContext,
   type IntegrationAuthPort,
+  type ResourceAccessFailureRendererTarget,
   type ServerRepository,
   reportDeploymentProgress,
   toRepositoryContext,
@@ -423,6 +424,7 @@ export class SshExecutionBackend implements ExecutionBackend {
     private readonly serverRepository?: ServerRepository,
     private readonly edgeProxyProviderRegistry?: EdgeProxyProviderRegistry,
     private readonly remoteRuntimeRoot = "/var/lib/appaloft/runtime",
+    private readonly resourceAccessFailureRenderer?: () => ResourceAccessFailureRendererTarget | undefined,
   ) {}
 
   private report(
@@ -1669,6 +1671,7 @@ export class SshExecutionBackend implements ExecutionBackend {
         });
       }
 
+      const resourceAccessFailureRenderer = this.resourceAccessFailureRenderer?.();
       const proxyRoutePlanResult = this.edgeProxyProviderRegistry
         ? await createProxyRouteRealizationPlan({
             providerRegistry: this.edgeProxyProviderRegistry,
@@ -1678,6 +1681,7 @@ export class SshExecutionBackend implements ExecutionBackend {
             deploymentId: state.id.value,
             port,
             accessRoutes,
+            ...(resourceAccessFailureRenderer ? { resourceAccessFailureRenderer } : {}),
           })
         : ok(null);
       if (proxyRoutePlanResult.isErr()) {

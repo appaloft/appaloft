@@ -188,4 +188,33 @@ describe("edge proxy plans", () => {
       ],
     });
   });
+
+  test("[RES-ACCESS-DIAG-ROUTE-003] forwards configured diagnostic renderer target to the selected provider", async () => {
+    const provider = new ReloadAwareProvider();
+    const registry = new StaticRegistry(provider);
+
+    const routePlan = await createProxyRouteRealizationPlan({
+      providerRegistry: registry,
+      context: { correlationId: "req_access_failure_renderer_target_test" },
+      deploymentId: "dep_access_failure_renderer",
+      port: 3000,
+      accessRoutes: [
+        {
+          proxyKind: "traefik" as const,
+          domains: ["app.example.test"],
+          pathPrefix: "/",
+          tlsMode: "disabled" as const,
+          targetPort: 3000,
+        },
+      ],
+      resourceAccessFailureRenderer: {
+        url: "http://appaloft.internal:3001/.appaloft/resource-access-failure",
+      },
+    });
+
+    expect(routePlan.isOk()).toBe(true);
+    expect(provider.lastRealizeInput?.resourceAccessFailureRenderer).toEqual({
+      url: "http://appaloft.internal:3001/.appaloft/resource-access-failure",
+    });
+  });
 });
