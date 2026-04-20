@@ -86,10 +86,3 @@ jobs:
 
       - name: Docker Build Smoke
         run: docker build -t appaloft-all-in-one:ci .
-
-      - name: Upload Release Directory
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: appaloft-ci-release-dir
-          path: dist/release
