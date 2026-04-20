@@ -287,3 +287,48 @@ jobs:
       - name: Docker Build Smoke
         if: ${{ needs.changes.outputs.docs_only != 'true' }}
         run: docker build -t appaloft-all-in-one:ci .
+
+  ci:
+    name: ci
+    needs:
+      - changes
+      - biome
+      - typecheck
+      - unit-tests
+      - integration-tests
+      - build-smoke
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Verify required checks
+        shell: bash
+        env:
+          CHANGES_RESULT: ${{ needs.changes.result }}
+          BIOME_RESULT: ${{ needs.biome.result }}
+          TYPECHECK_RESULT: ${{ needs.typecheck.result }}
+          UNIT_TESTS_RESULT: ${{ needs.unit-tests.result }}
+          INTEGRATION_TESTS_RESULT: ${{ needs.integration-tests.result }}
+          BUILD_SMOKE_RESULT: ${{ needs.build-smoke.result }}
+        run: |
+          set -euo pipefail
+
+          failed=false
+          for check in \
+            "Changes:${CHANGES_RESULT}" \
+            "Biome:${BIOME_RESULT}" \
+            "Typecheck:${TYPECHECK_RESULT}" \
+            "Unit Tests:${UNIT_TESTS_RESULT}" \
+            "Integration Tests:${INTEGRATION_TESTS_RESULT}" \
+            "Build And Smoke:${BUILD_SMOKE_RESULT}"; do
+            name="${check%%:*}"
+            result="${check#*:}"
+            echo "${name}: ${result}"
+            if [[ "${result}" != "success" ]]; then
+              failed=true
+            fi
+          done
+
+          if [[ "${failed}" == "true" ]]; then
+            exit 1
+          fi
