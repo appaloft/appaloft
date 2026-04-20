@@ -13,9 +13,9 @@ manually again to create the tag, GitHub Release, and distribution artifacts.
 - `docs/PRODUCT_ROADMAP.md` is the release gate before `1.0.0`; read it before every
   release workflow run and reject any Release Please PR whose version is not allowed by the
   roadmap checklist.
-- Release Please is configured to keep pre-`1.0.0` feature commits on the current patch line by
-  default. Use a `Release-As: X.Y.Z` commit footer only when the roadmap gate explicitly allows a
-  target minor, or when a hotfix needs an explicit version.
+- Release Please is configured to keep pre-`1.0.0` feature and minor bumps on the current patch
+  line by default. Use a `Release-As: X.Y.Z` commit footer only when the roadmap gate explicitly
+  allows a target minor, or when a hotfix needs an explicit version.
 - The GitHub Release body is generated from `CHANGELOG.md` plus the built release artifact list,
   so the release page includes install commands, direct download links, known gaps, and the
   conventional-commit changelog.

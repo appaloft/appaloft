@@ -46,9 +46,9 @@ Current release alignment:
   `0.2.x` line at `0.2.1`.
 - [x] On 2026-04-20, Phase 1 remains incomplete, so the next stable release is limited to the next
   `0.2.x` patch.
-- [x] Release Please keeps pre-`1.0.0` feature commits on the current patch line by default; an
-  explicit `Release-As` is required only when the roadmap gate allows a target minor or explicit
-  hotfix version.
+- [x] Release Please keeps pre-`1.0.0` feature and minor bumps on the current patch line by
+  default; an explicit `Release-As` is required only when the roadmap gate allows a target minor or
+  explicit hotfix version.
 
 ## Source-Of-Truth Inputs
 
