@@ -170,7 +170,10 @@ Docker/SSH same-`internalPort` e2e assertion, and an end-to-end Web/CLI assertio
 
 Web typecheck covers the resource detail and Quick Deploy generated URL surfaces, but there is not yet a browser/e2e assertion for those screens.
 
-Full provider-rendered proxy configuration preview is not yet implemented and has no Web/API/CLI tests.
+`resources.proxy-configuration.preview` is active and renders provider-owned read-only
+configuration sections through the edge proxy provider boundary. Application/provider tests cover
+the query-service path, provider-rendered sections, and generated-access provider-key guard; broader
+API/Web/CLI regression coverage remains follow-up.
 
 ## Open Questions
 

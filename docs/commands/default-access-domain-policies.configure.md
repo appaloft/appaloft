@@ -122,9 +122,12 @@ packages/providers/default-access-domain-*
 
 No active public command currently configures default access domain policy.
 
-The current route generation path is still adapter/runtime-plan shaped and does not use provider-neutral policy state.
+Shell/static configuration currently selects the default access provider and generated access routes
+are projected through provider-neutral `ResourceAccessSummary` state.
 
-`ResourceAccessSummary` does not yet exist as a formal read model.
+The future command must change policy without treating existing generated routes as durable domain
+bindings. Route precedence hardening and policy-driven refresh behavior remain follow-up workflow
+details.
 
 ## Open Questions
 
