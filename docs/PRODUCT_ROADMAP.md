@@ -25,7 +25,7 @@ This roadmap is the release gate for Appaloft versions before `1.0.0`.
 - [ ] Use this roadmap to choose the release version.
 - [ ] Before the next release, verify package manifests, Release Please state, and the latest
   published release agree on the current version line. The roadmap starts from the current public
-  line `0.2.x` because the current release is `0.2.1`.
+  line `0.2.x` because the current release is `0.2.2`.
 
 Version selection rules:
 
@@ -39,6 +39,19 @@ Version selection rules:
   not move it into an earlier phase unless the product target actually changed.
 - [ ] If planned work is intentionally deferred, leave it unchecked and add or update the release
   note/migration gap that explains why the version can still ship.
+
+Current release alignment:
+
+- [x] On 2026-04-20, latest public release, Release Please state, and package manifests agree on the
+  `0.2.x` line at `0.2.2`.
+- [x] On 2026-04-20, PR preview profile flag support was completed early in the CLI/config
+  bootstrap path, but the public deploy-action wrapper and product-grade GitHub App preview
+  lifecycle remain incomplete.
+- [x] On 2026-04-20, Phase 1 remains incomplete, so the next stable release is limited to the next
+  `0.2.x` patch.
+- [x] Release Please keeps pre-`1.0.0` feature and minor bumps on the current patch line by
+  default; an explicit `Release-As` is required only when the roadmap gate allows a target minor or
+  explicit hotfix version.
 
 ## Source-Of-Truth Inputs
 
@@ -133,6 +146,9 @@ Already implemented or materially present:
   coverage.
 - [x] Repository config, SSH-server PGlite state, source fingerprint links, server-applied route
   state, and headless entrypoints have governing specs and partial implementation.
+- [x] CLI preview deploy profile flags can supply or override runtime commands, network profile,
+  health path, non-secret env values, `ci-env:` secret references, preview custom route TLS mode,
+  and required preview URL gating without adding fields to `deployments.create`.
 
 Still blocking 1.0.0:
 
@@ -203,12 +219,12 @@ Already done:
 
 Required:
 
-- [ ] Verify the latest public release, Release Please state, and package manifests agree on the
+- [x] Verify the latest public release, Release Please state, and package manifests agree on the
   current `0.2.x` line.
 - [ ] Commit the roadmap and release-skill alignment work before any `0.3.0` release.
-- [ ] Add or update the release checklist so `docs/PRODUCT_ROADMAP.md` is part of every release
+- [x] Add or update the release checklist so `docs/PRODUCT_ROADMAP.md` is part of every release
   preflight.
-- [ ] Ensure `docs/PRODUCT_ROADMAP.md` is referenced by the release flow used by maintainers.
+- [x] Ensure `docs/PRODUCT_ROADMAP.md` is referenced by the release flow used by maintainers.
 - [ ] Confirm no release workflow can be intentionally triggered without explicit user confirmation.
 
 Exit criteria:
@@ -479,9 +495,12 @@ Required:
   specified.
 - [ ] Add source binding and auto-deploy.
 - [ ] Add push webhook and generic signed deploy webhook.
-- [ ] Add deploy-action wrapper behavior.
+- [ ] Add deploy-action wrapper behavior, including PR preview deploy/update from a user-authored
+  GitHub Actions workflow.
 - [ ] Add existing-resource profile-drift handling.
-- [ ] Add preview deployments after source binding and webhook ingestion are durable.
+- [ ] Add product-grade preview deployments after source binding and webhook ingestion are durable,
+  including GitHub App/webhook triggers, scoped preview env, list/show/policy/delete, and cleanup
+  retries.
 - [ ] Add scheduled task/cron resource shape with run history and logs after workload service
   semantics are specified.
 
@@ -611,7 +630,10 @@ work below before GA.
 - [ ] Resource binding: bind/unbind/list/show/rotate, immutable deployment snapshot.
 - [ ] Webhook/auto-deploy: create/list/show/update/delete, delivery attempts, replay, secret
   rotation.
-- [ ] Preview deployment: create from PR event, list/show/update policy/delete on close, scoped env.
+- [ ] Action PR preview: deploy/update from a user-authored GitHub Actions workflow with generated
+  or user-owned wildcard preview access.
+- [ ] Product-grade preview deployment: create from PR event, list/show/update policy/delete on
+  close, scoped env, GitHub App status/comments, and cleanup retries.
 - [ ] Scheduled task: create/list/show/update/delete, run now, run history/logs.
 - [x] Terminal session: open.
 - [ ] Terminal session: list/show/attach/close/expire, audit and redaction.
@@ -677,7 +699,8 @@ External baseline research points to this practical minimum:
 - [ ] Full HTTPS/ACME, force HTTPS, and redirect lifecycle closure.
 - [ ] Environment variables, build-time arguments, build secrets, and secret masking.
 - [ ] Persistent storage and databases with service binding, backup/restore, and deletion behavior.
-- [ ] Git source binding, webhooks, auto-deploy, and preview deployments.
+- [ ] Git source binding, webhooks, auto-deploy, Action PR previews, and product-grade preview
+  deployments.
 - [ ] Deployment history, standalone event stream, health checks, rollbacks, and resource limits.
 - [ ] Framework auto-detection broad enough for modern frontend frameworks and common backend
   frameworks.

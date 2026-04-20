@@ -41,6 +41,7 @@ This workflow inherits:
 - [deployments.create Command Spec](../commands/deployments.create.md)
 - [Quick Deploy Workflow Spec](./quick-deploy.md)
 - [Control-Plane Mode Selection And Adoption](./control-plane-mode-selection-and-adoption.md)
+- [GitHub Action PR Preview Deploy](./github-action-pr-preview-deploy.md)
 - [Resource Create And First Deploy Workflow Spec](./resources.create-and-first-deploy.md)
 - [Deployment Config File Test Matrix](../testing/deployment-config-file-test-matrix.md)
 - [Deployment Config File Implementation Plan](../implementation/deployment-config-file-plan.md)
@@ -239,6 +240,9 @@ The minimal supported action inputs are:
 - `version`, defaulting to `latest` for quickstarts but recommended as an exact tag for production;
 - `config`, defaulting to `appaloft.yml` when present;
 - `source`, defaulting to `.`;
+- runtime/profile flags that mirror repository config fields: deployment strategy, install/build/
+  start commands, publish directory, network profile, health path, non-secret env values, and
+  `ci-env:` secret references;
 - `ssh-host`, `ssh-user`, `ssh-port`, and either `ssh-private-key` or `ssh-private-key-file`;
 - `server-proxy-kind` and `state-backend` as optional trusted entrypoint overrides;
 - `args` as a last-resort pass-through for CLI flags not modeled as action inputs yet.
@@ -248,11 +252,94 @@ Only the file path may be passed to `appaloft deploy --server-ssh-private-key-fi
 must never appear in command arguments, logs, release metadata, config-origin metadata, diagnostic
 payloads, or read models.
 
-The action's primary invocation remains config-driven. If no config file is supplied or discovered,
-the action may still run `appaloft deploy`, but only with enough trusted input or CLI detection to
-satisfy the non-interactive Quick Deploy contract. Missing non-interactive context must fail before
-mutation. If no config domain intent is supplied, no custom server-applied domain route is created;
-the deployment may still use generated/default access according to the selected server policy.
+The action's primary invocation is profile-driven. A repository config file is one profile source;
+trusted action inputs, workflow environment, CLI flags, and future tool parameters are another
+profile source over the same Quick Deploy bootstrap path. Flags must use the same canonical field
+semantics as config and must win over selected config values. If no config file is supplied or
+discovered, the action may still run `appaloft deploy` with enough trusted profile input or CLI
+detection to satisfy the non-interactive Quick Deploy contract. Missing non-interactive context
+must fail before mutation. If no config domain intent or preview route flag is supplied, no custom
+server-applied domain route is created; the deployment may still use generated/default access
+according to the selected server policy.
+
+## GitHub Action PR Preview Mode
+
+PR preview mode is a specialized action invocation of this same config workflow. It does not add a
+new deployment command.
+
+A repository owner must write a GitHub Actions workflow with `on.pull_request` before GitHub will
+attempt previews. The action wrapper cannot deploy on PR open by itself. The recommended first
+trigger set is:
+
+```yaml
+on:
+  pull_request:
+    types: [opened, reopened, synchronize]
+```
+
+The action may expose preview inputs such as:
+
+| Input | Rule |
+| --- | --- |
+| `preview` | Accepted value `pull-request` selects PR preview identity behavior. |
+| `preview-id` | Trusted preview scope such as `pr-${{ github.event.pull_request.number }}`. |
+| `preview-domain-template` | Optional trusted host template such as `pr-${{ github.event.pull_request.number }}.preview.example.com`; requires user-owned wildcard DNS in Action-only mode. |
+| `preview-tls-mode` | Optional TLS policy for the custom preview host. `auto` requires provider-owned certificate automation; `disabled` emits and verifies an HTTP preview URL. |
+| `require-preview-url` | Optional boolean. When true, missing generated/custom access fails before or during route resolution instead of reporting a deploy without public URL. |
+
+Preview profile selection is explicit. If the repository root `appaloft.yml` contains production
+runtime choices, production environment values, or production custom domains, the workflow should
+either pass a preview-specific path such as:
+
+```yaml
+with:
+  config: appaloft.preview.yml
+  preview: pull-request
+  preview-id: pr-${{ github.event.pull_request.number }}
+```
+
+or omit config and pass the preview runtime/network/env/secret profile through trusted action
+inputs or CLI flags. The action must not edit `appaloft.yml`, generate a temporary config file as
+the primary contract, or infer that root config is preview-safe. When `config` is omitted, normal
+config discovery may find the root file, but preview examples should describe that as an
+intentional environment-neutral config, not the default for repositories whose root config is
+production-oriented.
+
+Preview identity comes from trusted GitHub event metadata and action inputs, not committed config.
+The source fingerprint must include the PR scope so preview deploys do not reuse the normal branch
+resource link. Repeated pushes to the same PR should update the same preview environment/resource
+unless the operator explicitly changes preview scope or relinks state.
+
+Preview examples must skip fork pull requests by default:
+
+```yaml
+if: github.event.pull_request.head.repo.full_name == github.repository
+```
+
+Repositories that deliberately enable fork previews must use reduced preview credentials and must
+not expose production secrets or production deployment targets to untrusted code.
+
+Access behavior:
+
+- When no custom preview domain is configured, the workflow relies on generated/default access. A
+  configured `sslip` provider can work without user DNS records when the selected server has a
+  usable public IPv4 address and proxy ingress is reachable.
+- Custom hostnames such as `pr-123.preview.example.com` require the user to configure wildcard DNS
+  to the selected server. Appaloft stores and realizes only provider-neutral route intent in
+  Action-only mode; it does not update DNS.
+- Production `access.domains[]` from a root config must not be reinterpreted as PR preview domain
+  intent. Preview route intent should come from generated/default access, trusted
+  `preview-domain-template`, an explicitly selected preview config file, or a future selected
+  preview overlay.
+- A public preview URL requires reverse-proxy exposure and edge proxy readiness. The workflow must
+  not publish direct host ports as a fallback.
+- If no generated or custom route is available and `require-preview-url` is false, deployment may
+  still succeed and the action output omits `preview-url` while diagnostics explain why access is
+  unavailable.
+
+PR close cleanup is not part of the first Action-only contract. A future cleanup mode must be
+specified as an explicit operation or workflow before docs promise automatic deletion on
+`pull_request.closed`.
 
 Publishing a new Appaloft CLI release must not normally require a new action wrapper release. A
 pinned `version: vX.Y.Z` downloads that exact CLI release, and `version: latest` resolves the
@@ -333,6 +420,10 @@ credentials.
 Environment-specific config overlays are allowed only as overlays for an environment selected by
 the entrypoint or trusted link state. A committed config file must not be the only reason a
 deployment moves from `staging` to `production`.
+
+The same rule applies to PR preview environments. A future preview overlay may adjust profile fields
+for the already selected `preview-pr-123` environment, but it must not create the preview identity,
+select a different durable environment, or retarget project/resource/server/destination state.
 
 ## Profile Mapping
 

@@ -40,7 +40,7 @@ Pin a release image:
 curl -fsSL https://appaloft.com/install.sh | sudo sh -s -- --version 0.2.1
 ```
 
-The website installer installs or verifies Docker Engine plus the compose plugin on Linux, writes a
+The public installer installs or verifies Docker Engine plus the compose plugin on Linux, writes a
 self-hosted Compose stack under `/opt/appaloft`, and starts the Appaloft backend, static console, and
 PostgreSQL. For hardened production hosts, preinstall Docker Engine through Docker's official
 package repository and run the installer with `--skip-docker-install`.

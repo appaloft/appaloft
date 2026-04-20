@@ -121,6 +121,7 @@ selection overrides, not required setup.
 | Server-applied route desired/applied state | No for first remote-state slice; yes for domain support | Yes | Useful | File-backed SSH route state exists for adapter-level mechanics. PG/PGlite durable persistence for selected hosted/self-hosted, embedded, and SSH-mirrored state backends is implemented through the server-applied route persistence plan. |
 | Edge proxy route realization for config domains | No for first remote-state slice; yes for domain support | Yes | No | Desired routes now enter provider-neutral route input, deployment-finished status writeback, mixed path/TLS route groups, and provider-local TLS diagnostics. |
 | GitHub Action wrapper docs | Yes before public release | Yes before public release | No | Binary can be used manually first, but public UX needs `appaloft/deploy-action`, version selection, checksum verification, SSH secret mapping, and examples. |
+| Action PR preview deploy/update | No for first remote-state slice; useful for public Action UX | Useful | No | Uses a user-authored `pull_request` workflow, preview-scoped source links, generated/default access or user-owned wildcard DNS, and no automatic cleanup until a cleanup operation exists. |
 | Appaloft always-on DNS observer | No | No | Yes for managed domains | Pure CLI delegates observation to deploy/doctor and resident proxy/provider. |
 | Appaloft certificate retry scheduler | No | No | Yes for managed certificates | Pure CLI may delegate renewal to Caddy/Traefik or equivalent provider-owned storage. |
 | PR preview cleanup | No | No | Yes for GitHub App previews | Requires webhook listener/control plane or future server agent. |
@@ -188,8 +189,8 @@ selection overrides, not required setup.
 - Public GitHub Action wrapper install UX is not implemented yet. The main repository release
   workflow publishes CLI archives, the static Docker self-host installer, `checksums.txt`,
   `release-manifest.json`, and release notes; a separate `appaloft/deploy-action` repository still
-  needs action metadata, SSH secret to temp-key handling, wrapper tests, and public README
-  examples.
+  needs action metadata, install/checksum scripts, SSH secret to temp-key handling, wrapper tests,
+  and public README examples.
 - Pure CLI mode has no always-on DNS observer, Appaloft certificate scheduler, or automatic cleanup
   loop after the process exits.
 - Hosted/cloud adoption, GitHub App webhook previews, team auth, audit, and fleet visibility are

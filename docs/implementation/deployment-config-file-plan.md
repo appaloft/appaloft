@@ -100,13 +100,27 @@ Implement in ordered slices:
    - Verify SHA-256 before extraction, install into a runner temp/tool directory, and add the CLI
      to `PATH` only for the job.
    - Map trusted inputs to CLI flags: `config`, `source`, `ssh-host`, `ssh-user`, `ssh-port`,
-     `ssh-private-key` or `ssh-private-key-file`, `server-proxy-kind`, and `state-backend`.
+     `ssh-private-key` or `ssh-private-key-file`, `server-proxy-kind`, `state-backend`, and the
+     same profile fields accepted by repository config: runtime commands, publish directory,
+     network profile, health path, non-secret env values, and `ci-env:` secret references.
    - Write `ssh-private-key` to a temporary `0600` file and pass only the file path to
      `--server-ssh-private-key-file`.
    - Treat `version: latest` as quickstart convenience and exact release tags as the recommended
      production path.
    - Keep action wrapper releases independent from CLI releases; new CLI versions should be
      consumable through the `version` input without action-repo code changes.
+   - Add PR preview inputs only as entrypoint context: `preview`, `preview-id`,
+     `preview-domain-template`, `preview-tls-mode`, and `require-preview-url`. These inputs must
+     affect preview-scoped source link/environment/resource selection and route desired state, not
+     `deployments.create`.
+   - Document preview config selection as optional profile reuse, not as a requirement. When root
+     `appaloft.yml` is production-oriented, Action preview examples should either pass
+     `config: appaloft.preview.yml` deliberately or provide the preview profile entirely through
+     trusted action/CLI flags. The action must not edit root config, generate temporary config as
+     the primary path, or assume root domains/env values are preview-safe.
+   - Treat future preview config-profile or environment overlay support as a follow-up parser slice:
+     overlays may adjust fields only after trusted PR entrypoint context has selected the preview
+     environment, and they must not select identity or credentials.
 
 8. Server-applied domains
    - Parse and validate `access.domains[]`.
@@ -128,7 +142,8 @@ Implement in ordered slices:
    - Add parser/schema tests for discovery, YAML, ambiguity, identity rejection, secret rejection,
      and unsupported sizing rejection.
    - Add deploy-action wrapper tests for version resolution, checksum verification, SSH secret to
-     temp-key mapping, command construction, no-config behavior, and config-without-domain behavior.
+     temp-key mapping, command construction, no-config behavior, config-without-domain behavior,
+     PR preview config-path behavior, and PR preview context/domain behavior.
 
 ## Out Of Scope Until Separate Specs Exist
 
@@ -137,11 +152,15 @@ Implement in ordered slices:
   fields.
 - Managed `DomainBinding` lifecycle from pure CLI mode. Server-applied config domains are
   target-local proxy routes; cloud/self-hosted control-plane adoption is a later slice.
+- Product-grade preview environment lifecycle. Action PR preview deploy may use the config workflow
+  to deploy or update a preview-scoped resource, but policy, automatic cleanup, comments/checks,
+  scheduler retries, scoped preview secret management, and no-workflow GitHub App execution require
+  separate preview/control-plane specs.
 - Cloud-assisted Action, self-hosted API mode, SSH PGlite adoption, and control-plane-owned
   execution are governed by
   [Control-Plane Modes Roadmap](./control-plane-modes-roadmap.md).
 - Always-on DNS observation, Appaloft-owned certificate renewal scheduling, and automatic preview
-  cleanup without a server agent or hosted/self-hosted control plane.
+  cleanup without an explicit cleanup operation, server agent, or hosted/self-hosted control plane.
 - A hidden backend convenience endpoint that reads repository config and performs multiple writes.
 
 ## Current Implementation Notes And Migration Gaps
@@ -198,9 +217,15 @@ Remaining gaps:
 - Stored Appaloft/external secret adapters beyond the headless `ci-env:` resolver are not wired into
   the config-file entry workflow yet.
 - Public GitHub Action wrapper install UX is not implemented yet. The main repository publishes
-  CLI release archives, the static Docker self-host installer, checksums, release manifest, and release notes,
-  but `appaloft/deploy-action` still needs its own repository, action metadata, README examples,
-  and wrapper-level tests.
+  CLI release archives, the static Docker self-host installer, checksums, release manifest, and
+  release notes, but `appaloft/deploy-action` still needs its own repository, action metadata,
+  install/checksum scripts, README examples, and wrapper-level tests.
+- Action PR preview deploy is specified as an entry workflow in
+  [GitHub Action PR Preview Deploy](../workflows/github-action-pr-preview-deploy.md). The CLI now
+  supports preview-scoped source fingerprints, non-interactive preview environment selection,
+  explicit preview config paths, `preview-domain-template` route intent, and implicit root-domain
+  skipping, but the public wrapper inputs, stable `preview-url` output, and cleanup/delete behavior
+  are not implemented yet.
 - CLI config deploy now resolves state backend selection, defaults trusted SSH-targeted config
   deploys to `ssh-pglite`, invokes a remote-state lifecycle hook before identity queries/mutations,
   and uses SSH remote-state lifecycle and mirror sync in shell-built CLI programs.

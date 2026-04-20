@@ -4,13 +4,25 @@ import {
   CreateDeploymentCommand,
   type CreateDeploymentCommandInput,
   DeploymentLogsQuery,
+  type DeploymentSummary,
   ListDeploymentsQuery,
 } from "@appaloft/application";
 import { createQuickDeployGeneratedResourceName } from "@appaloft/contracts";
-import { domainError, edgeProxyKinds, err, ok, type Result, resourceKinds } from "@appaloft/core";
+import {
+  domainError,
+  edgeProxyKinds,
+  err,
+  ok,
+  type Result,
+  resourceExposureModes,
+  resourceKinds,
+  resourceNetworkProtocols,
+} from "@appaloft/core";
 import {
   type AppaloftDeploymentConfig,
+  appaloftDeploymentAccessConfigSchema,
   appaloftDeploymentConfigFileNames,
+  parseAppaloftDeploymentConfig,
   parseAppaloftDeploymentConfigText,
 } from "@appaloft/deployment-config";
 import { Args, Command as EffectCommand, Options } from "@effect/cli";
@@ -21,10 +33,13 @@ import {
   optionalNumber,
   optionalValue,
   resultToEffect,
-  runDeploymentCommand,
+  runDeploymentCommandResult,
   runQuery,
 } from "../runtime.js";
 import {
+  type DeploymentEnvironmentVariableSeed,
+  type DeploymentPromptSeed,
+  type DeploymentServerAppliedRouteSeed,
   deploymentEnvironmentVariablesFromConfig,
   deploymentPromptSeedFromConfig,
   resolveInteractiveDeploymentInput,
@@ -63,12 +78,34 @@ const resourceKindOption = Options.choice("resource-kind", resourceKinds).pipe(O
 const resourceDescriptionOption = Options.text("resource-description").pipe(Options.optional);
 const methodOption = Options.choice("method", deploymentMethods).pipe(Options.optional);
 const configOption = Options.text("config").pipe(Options.optional);
+const previewModes = ["pull-request"] as const;
+const previewOption = Options.choice("preview", previewModes).pipe(Options.optional);
+const previewIdOption = Options.text("preview-id").pipe(Options.optional);
+const previewDomainTemplateOption = Options.text("preview-domain-template").pipe(Options.optional);
+const previewTlsModes = ["auto", "disabled"] as const;
+const previewTlsModeOption = Options.choice("preview-tls-mode", previewTlsModes).pipe(
+  Options.optional,
+);
+const requirePreviewUrlOption = Options.boolean("require-preview-url").pipe(
+  Options.withDefault(false),
+);
 const installOption = Options.text("install").pipe(Options.optional);
 const buildOption = Options.text("build").pipe(Options.optional);
 const startOption = Options.text("start").pipe(Options.optional);
 const publishDirOption = Options.text("publish-dir").pipe(Options.optional);
 const portOption = Options.text("port").pipe(Options.optional);
+const upstreamProtocolOption = Options.choice("upstream-protocol", resourceNetworkProtocols).pipe(
+  Options.optional,
+);
+const exposureModeOption = Options.choice("exposure-mode", resourceExposureModes).pipe(
+  Options.optional,
+);
+const targetServiceNameOption = Options.text("target-service-name").pipe(Options.optional);
+const hostPortOption = Options.text("host-port").pipe(Options.optional);
 const healthPathOption = Options.text("health-path").pipe(Options.optional);
+const envOption = Options.text("env").pipe(Options.repeated);
+const secretOption = Options.text("secret").pipe(Options.repeated);
+const optionalSecretOption = Options.text("optional-secret").pipe(Options.repeated);
 const appLogLinesOption = Options.text("app-log-lines").pipe(Options.withDefault("3"));
 const deploymentStateBackendKinds = [
   "ssh-pglite",
@@ -187,6 +224,7 @@ function readDeploymentConfigForCli(input: {
 }): Result<{
   config: AppaloftDeploymentConfig;
   configFilePath: string;
+  explicit: boolean;
 } | null> {
   const resolvedPath = input.configFilePath
     ? existsSync(resolve(input.configFilePath))
@@ -237,8 +275,134 @@ function readDeploymentConfigForCli(input: {
     return ok({
       config: parsedConfig.data,
       configFilePath,
+      explicit: Boolean(input.configFilePath),
     });
   });
+}
+
+function parseAssignmentFlag(input: {
+  flagName: string;
+  raw: string;
+}): Result<{ key: string; value: string }> {
+  const separatorIndex = input.raw.indexOf("=");
+  if (separatorIndex <= 0) {
+    return err(
+      domainError.validation("Deployment profile flag must use KEY=VALUE syntax", {
+        phase: "profile-flag-resolution",
+        flag: input.flagName,
+      }),
+    );
+  }
+
+  const key = input.raw.slice(0, separatorIndex).trim();
+  if (!key) {
+    return err(
+      domainError.validation("Deployment profile flag key is required", {
+        phase: "profile-flag-resolution",
+        flag: input.flagName,
+      }),
+    );
+  }
+
+  return ok({
+    key,
+    value: input.raw.slice(separatorIndex + 1),
+  });
+}
+
+function parseSecretReferenceFlag(input: {
+  flagName: string;
+  raw: string;
+  required: boolean;
+}): Result<{ key: string; value: { from: string; required?: boolean } }> {
+  const separatorIndex = input.raw.indexOf("=");
+  const key = separatorIndex >= 0 ? input.raw.slice(0, separatorIndex).trim() : input.raw.trim();
+  const reference =
+    separatorIndex >= 0 ? input.raw.slice(separatorIndex + 1).trim() : `ci-env:${key}`;
+
+  if (!key || !reference) {
+    return err(
+      domainError.validation("Deployment secret flag must use KEY=ci-env:NAME syntax", {
+        phase: "profile-flag-resolution",
+        flag: input.flagName,
+      }),
+    );
+  }
+
+  return ok({
+    key,
+    value: {
+      from: reference,
+      ...(input.required ? {} : { required: false }),
+    },
+  });
+}
+
+function deploymentEnvironmentVariablesFromCliFlags(input: {
+  envFlags: string[];
+  secretFlags: string[];
+  optionalSecretFlags: string[];
+  env?: Record<string, string | undefined>;
+}): Result<DeploymentEnvironmentVariableSeed[]> {
+  if (
+    input.envFlags.length === 0 &&
+    input.secretFlags.length === 0 &&
+    input.optionalSecretFlags.length === 0
+  ) {
+    return ok([]);
+  }
+
+  const env: Record<string, string> = {};
+  const secrets: NonNullable<AppaloftDeploymentConfig["secrets"]> = {};
+
+  for (const raw of input.envFlags) {
+    const parsed = parseAssignmentFlag({ flagName: "env", raw });
+    if (parsed.isErr()) {
+      return err(parsed.error);
+    }
+    env[parsed.value.key] = parsed.value.value;
+  }
+
+  for (const raw of input.secretFlags) {
+    const parsed = parseSecretReferenceFlag({ flagName: "secret", raw, required: true });
+    if (parsed.isErr()) {
+      return err(parsed.error);
+    }
+    secrets[parsed.value.key] = parsed.value.value;
+  }
+
+  for (const raw of input.optionalSecretFlags) {
+    const parsed = parseSecretReferenceFlag({
+      flagName: "optional-secret",
+      raw,
+      required: false,
+    });
+    if (parsed.isErr()) {
+      return err(parsed.error);
+    }
+    secrets[parsed.value.key] = parsed.value.value;
+  }
+
+  const parsedConfig = parseAppaloftDeploymentConfig({
+    ...(Object.keys(env).length > 0 ? { env } : {}),
+    ...(Object.keys(secrets).length > 0 ? { secrets } : {}),
+  });
+
+  if (!parsedConfig.success) {
+    return err(
+      domainError.validation("Deployment profile flags are invalid", {
+        phase: phaseFromConfigIssues(parsedConfig.error.issues),
+        issues: JSON.stringify(
+          parsedConfig.error.issues.map((issue) => ({
+            path: issue.path.join("."),
+            message: issue.message,
+          })),
+        ),
+      }),
+    );
+  }
+
+  return deploymentEnvironmentVariablesFromConfig(parsedConfig.data, { env: input.env ?? Bun.env });
 }
 
 function applyConfigSourceBase(
@@ -279,9 +443,165 @@ function githubScopeFromEnv(env: Record<string, string | undefined>): SourceFing
   return { kind: "default" };
 }
 
+interface PreviewDeployContext {
+  mode: (typeof previewModes)[number];
+  previewId: string;
+  pullRequestNumber: number;
+  environmentName: string;
+  sourceScope: SourceFingerprintScope;
+}
+
+function previewContextValidationError(message: string, details: Record<string, string>) {
+  return domainError.validation(message, {
+    phase: "preview-context-resolution",
+    ...details,
+  });
+}
+
+function normalizePullRequestPreviewId(value: string | undefined): string | null {
+  const normalized = value
+    ?.trim()
+    .toLowerCase()
+    .replace(/^preview-/, "");
+  if (!normalized) {
+    return null;
+  }
+
+  if (/^\d+$/.test(normalized)) {
+    return `pr-${normalized}`;
+  }
+
+  return /^pr-\d+$/.test(normalized) ? normalized : null;
+}
+
+function pullRequestNumberFromPreviewId(previewId: string): number {
+  return Number(previewId.replace(/^pr-/, ""));
+}
+
+function resolvePreviewDeployContext(input: {
+  mode?: (typeof previewModes)[number];
+  previewId?: string;
+  previewDomainTemplate?: string;
+  previewTlsMode?: (typeof previewTlsModes)[number];
+  requirePreviewUrl?: boolean;
+  env: Record<string, string | undefined>;
+}): Result<PreviewDeployContext | undefined> {
+  if (!input.mode) {
+    if (
+      input.previewId ||
+      input.previewDomainTemplate ||
+      input.previewTlsMode ||
+      input.requirePreviewUrl
+    ) {
+      return err(
+        previewContextValidationError("Preview inputs require preview mode", {
+          reason: "preview_mode_missing",
+        }),
+      );
+    }
+
+    return ok(undefined);
+  }
+
+  const previewId = normalizePullRequestPreviewId(input.previewId);
+  if (!previewId) {
+    return err(
+      previewContextValidationError("Pull request preview requires a valid preview id", {
+        preview: input.mode,
+        reason: "preview_id_missing_or_invalid",
+      }),
+    );
+  }
+
+  const pullRequestNumber = pullRequestNumberFromPreviewId(previewId);
+  return ok({
+    mode: input.mode,
+    previewId,
+    pullRequestNumber,
+    environmentName: `preview-${previewId}`,
+    sourceScope: {
+      kind: "preview",
+      pullRequestNumber,
+      ...(input.env.GITHUB_HEAD_REF ? { branch: input.env.GITHUB_HEAD_REF } : {}),
+    },
+  });
+}
+
+function resolvePreviewDomainTemplateRoutes(
+  previewDomainTemplate: string | undefined,
+  previewTlsMode: (typeof previewTlsModes)[number] | undefined,
+): Result<DeploymentServerAppliedRouteSeed[] | undefined> {
+  const host = previewDomainTemplate?.trim();
+  if (!host) {
+    return ok(undefined);
+  }
+
+  if (host.includes("${{") || host.includes("}}")) {
+    return err(
+      domainError.validation("Preview domain template contains unresolved GitHub expression", {
+        phase: "preview-domain-template-resolution",
+        reason: "unresolved_github_expression",
+      }),
+    );
+  }
+
+  const parsed = appaloftDeploymentAccessConfigSchema.safeParse({
+    domains: [
+      {
+        host,
+        pathPrefix: "/",
+        tlsMode: previewTlsMode ?? "auto",
+      },
+    ],
+  });
+
+  if (!parsed.success) {
+    return err(
+      domainError.validation("Preview domain template rendered an invalid host", {
+        phase: "preview-domain-template-resolution",
+        previewDomainTemplate: host,
+        issues: JSON.stringify(
+          parsed.error.issues.map((issue) => ({
+            path: issue.path.join("."),
+            message: issue.message,
+          })),
+        ),
+      }),
+    );
+  }
+
+  return ok(
+    parsed.data.domains.map((domain) => ({
+      host: domain.host,
+      pathPrefix: domain.pathPrefix,
+      tlsMode: domain.tlsMode,
+    })),
+  );
+}
+
+function applyPreviewRoutePrecedence(input: {
+  configSeed: DeploymentPromptSeed;
+  configResolution?: { explicit: boolean };
+  previewContext?: PreviewDeployContext;
+  previewDomainRoutes?: DeploymentServerAppliedRouteSeed[];
+}): DeploymentPromptSeed {
+  const { serverAppliedRoutes: configRoutes, ...seedWithoutRoutes } = input.configSeed;
+  const selectedRoutes =
+    input.previewDomainRoutes ??
+    (input.previewContext && input.configResolution && !input.configResolution.explicit
+      ? undefined
+      : configRoutes);
+
+  return {
+    ...seedWithoutRoutes,
+    ...(selectedRoutes && selectedRoutes.length > 0 ? { serverAppliedRoutes: selectedRoutes } : {}),
+  };
+}
+
 function sourceFingerprintForConfigDeploy(input: {
   sourceLocator: string;
   configResolution?: { config: AppaloftDeploymentConfig; configFilePath: string };
+  previewContext?: PreviewDeployContext;
 }): string {
   const env = Bun.env;
   const repositoryLocator = env.GITHUB_REPOSITORY
@@ -299,7 +619,9 @@ function sourceFingerprintForConfigDeploy(input: {
     workspaceRoot,
     ...(env.GITHUB_REF ? { gitRef: env.GITHUB_REF } : {}),
     ...(env.GITHUB_SHA ? { commitSha: env.GITHUB_SHA } : {}),
-    scope: env.GITHUB_REPOSITORY ? githubScopeFromEnv(env) : { kind: "default" },
+    scope:
+      input.previewContext?.sourceScope ??
+      (env.GITHUB_REPOSITORY ? githubScopeFromEnv(env) : { kind: "default" }),
   }).key;
 }
 
@@ -339,6 +661,95 @@ function releaseDeploymentStateSession(session: RemoteStateSession) {
   });
 }
 
+function publicPreviewUrlsFromDeployment(deployment: DeploymentSummary): string[] {
+  const accessRoutes = deployment.runtimePlan.execution.accessRoutes ?? [];
+  const urls: string[] = [];
+
+  for (const route of accessRoutes) {
+    if (route.routeBehavior === "redirect") {
+      continue;
+    }
+
+    const scheme = route.tlsMode === "disabled" ? "http" : "https";
+    const path = route.pathPrefix && route.pathPrefix !== "/" ? route.pathPrefix : "";
+    for (const domain of route.domains) {
+      urls.push(`${scheme}://${domain}${path}`);
+    }
+  }
+
+  return urls;
+}
+
+function requirePreviewUrlForDeployment(input: { deploymentId: string; resourceId: string }) {
+  return Effect.gen(function* () {
+    const cli = yield* CliRuntime;
+    const query = yield* resultToEffect(
+      ListDeploymentsQuery.create({ resourceId: input.resourceId }),
+    );
+    const result = yield* Effect.promise(() => cli.executeQuery(query));
+    const deployments = yield* resultToEffect(result);
+    const deployment = deployments.items.find((item) => item.id === input.deploymentId);
+
+    if (!deployment) {
+      return yield* Effect.fail(
+        domainError.validation("Preview URL is required but the deployment was not observable", {
+          phase: "preview-access-resolution",
+          reason: "preview_url_missing",
+          deploymentId: input.deploymentId,
+          resourceId: input.resourceId,
+        }),
+      );
+    }
+
+    const previewUrls = publicPreviewUrlsFromDeployment(deployment);
+    if (previewUrls.length === 0) {
+      return yield* Effect.fail(
+        domainError.validation("Preview URL is required but no public route was resolved", {
+          phase: "preview-access-resolution",
+          reason: "preview_url_missing",
+          deploymentId: input.deploymentId,
+          resourceId: input.resourceId,
+          status: deployment.status,
+        }),
+      );
+    }
+
+    if (deployment.status !== "succeeded") {
+      return yield* Effect.fail(
+        domainError.validation("Preview URL is required but deployment did not succeed", {
+          phase: "preview-access-resolution",
+          reason: "deployment_failed",
+          deploymentId: input.deploymentId,
+          resourceId: input.resourceId,
+          status: deployment.status,
+          previewUrls: previewUrls.join(","),
+        }),
+      );
+    }
+  });
+}
+
+function runCreateDeploymentCommand(
+  input: CreateDeploymentCommandInput,
+  options: {
+    appLogLines: number;
+    requirePreviewUrl: boolean;
+  },
+) {
+  return Effect.gen(function* () {
+    const output = yield* runDeploymentCommandResult(CreateDeploymentCommand.create(input), {
+      appLogLines: options.appLogLines,
+    });
+
+    if (options.requirePreviewUrl) {
+      yield* requirePreviewUrlForDeployment({
+        deploymentId: output.id,
+        resourceId: input.resourceId,
+      });
+    }
+  });
+}
+
 export const deployCommand = EffectCommand.make(
   "deploy",
   {
@@ -361,12 +772,24 @@ export const deployCommand = EffectCommand.make(
     resourceDescription: resourceDescriptionOption,
     method: methodOption,
     config: configOption,
+    preview: previewOption,
+    previewId: previewIdOption,
+    previewDomainTemplate: previewDomainTemplateOption,
+    previewTlsMode: previewTlsModeOption,
+    requirePreviewUrl: requirePreviewUrlOption,
     install: installOption,
     build: buildOption,
     start: startOption,
     publishDir: publishDirOption,
     port: portOption,
+    upstreamProtocol: upstreamProtocolOption,
+    exposureMode: exposureModeOption,
+    targetServiceName: targetServiceNameOption,
+    hostPort: hostPortOption,
     healthPath: healthPathOption,
+    env: envOption,
+    secret: secretOption,
+    optionalSecret: optionalSecretOption,
     stateBackend: stateBackendOption,
     appLogLines: appLogLinesOption,
   },
@@ -376,17 +799,27 @@ export const deployCommand = EffectCommand.make(
     config,
     destination,
     environment,
+    env,
+    exposureMode,
     healthPath,
+    hostPort,
     install,
     method,
+    optionalSecret,
     pathOrSource,
     port,
+    preview,
+    previewDomainTemplate,
+    previewId,
+    previewTlsMode,
     project,
     publishDir,
+    requirePreviewUrl,
     resource,
     resourceDescription,
     resourceKind,
     resourceName,
+    secret,
     server,
     serverHost,
     serverName,
@@ -398,6 +831,8 @@ export const deployCommand = EffectCommand.make(
     serverSshUsername,
     start,
     stateBackend,
+    targetServiceName,
+    upstreamProtocol,
   }) =>
     Effect.gen(function* () {
       const sourceLocator = optionalValue(pathOrSource);
@@ -424,12 +859,60 @@ export const deployCommand = EffectCommand.make(
       const buildCommand = optionalValue(build);
       const startCommand = optionalValue(start);
       const publishDirectory = optionalValue(publishDir);
+      const upstreamProtocolValue = optionalValue(upstreamProtocol);
+      const exposureModeValue = optionalValue(exposureMode);
+      const targetServiceNameValue = optionalValue(targetServiceName);
+      const hostPortValue = optionalNumber(hostPort);
       const healthCheckPath = optionalValue(healthPath);
       const requestedStateBackend = optionalValue(stateBackend);
+      const requestedPreviewMode = optionalValue(preview);
+      const requestedPreviewId = optionalValue(previewId);
+      const requestedPreviewDomainTemplate = optionalValue(previewDomainTemplate);
+      const requestedPreviewTlsMode = optionalValue(previewTlsMode);
+      const previewContext = yield* resultToEffect(
+        resolvePreviewDeployContext({
+          ...(requestedPreviewMode ? { mode: requestedPreviewMode } : {}),
+          ...(requestedPreviewId ? { previewId: requestedPreviewId } : {}),
+          ...(requestedPreviewDomainTemplate
+            ? { previewDomainTemplate: requestedPreviewDomainTemplate }
+            : {}),
+          ...(requestedPreviewTlsMode ? { previewTlsMode: requestedPreviewTlsMode } : {}),
+          ...(requirePreviewUrl ? { requirePreviewUrl } : {}),
+          env: Bun.env,
+        }),
+      );
+      const previewDomainRoutes = yield* resultToEffect(
+        resolvePreviewDomainTemplateRoutes(requestedPreviewDomainTemplate, requestedPreviewTlsMode),
+      );
+      const flagEnvironmentVariables = yield* resultToEffect(
+        deploymentEnvironmentVariablesFromCliFlags({
+          envFlags: env,
+          secretFlags: secret,
+          optionalSecretFlags: optionalSecret,
+          env: Bun.env,
+        }),
+      );
+      const hasProfileOverrides = Boolean(
+        requestedDeploymentMethod ||
+          installCommand ||
+          buildCommand ||
+          startCommand ||
+          publishDirectory ||
+          portValue !== undefined ||
+          upstreamProtocolValue ||
+          exposureModeValue ||
+          targetServiceNameValue ||
+          hostPortValue !== undefined ||
+          healthCheckPath ||
+          flagEnvironmentVariables.length > 0 ||
+          previewDomainRoutes,
+      );
 
       if (
         !sourceLocator &&
         !configFilePath &&
+        !previewContext &&
+        !hasProfileOverrides &&
         projectId &&
         serverId &&
         environmentId &&
@@ -443,8 +926,9 @@ export const deployCommand = EffectCommand.make(
           ...(destinationId ? { destinationId } : {}),
         } satisfies CreateDeploymentCommandInput;
 
-        return yield* runDeploymentCommand(CreateDeploymentCommand.create(input), {
+        return yield* runCreateDeploymentCommand(input, {
           appLogLines: parseAppLogLines(appLogLines),
+          requirePreviewUrl,
         });
       }
 
@@ -455,12 +939,16 @@ export const deployCommand = EffectCommand.make(
           ...(configFilePath ? { configFilePath } : {}),
         }),
       );
-      const configSeed = configResolution
-        ? deploymentPromptSeedFromConfig(configResolution.config)
-        : {};
+      const configSeed = applyPreviewRoutePrecedence({
+        configSeed: configResolution ? deploymentPromptSeedFromConfig(configResolution.config) : {},
+        ...(configResolution ? { configResolution } : {}),
+        ...(previewContext ? { previewContext } : {}),
+        ...(previewDomainRoutes ? { previewDomainRoutes } : {}),
+      });
       const configEnvironmentVariables = configResolution
         ? yield* resultToEffect(deploymentEnvironmentVariablesFromConfig(configResolution.config))
         : [];
+      const environmentVariables = [...configEnvironmentVariables, ...flagEnvironmentVariables];
       const deploymentMethod = requestedDeploymentMethod ?? configSeed.deploymentMethod;
       const normalizedSourceLocator = sourceLocator
         ? normalizeCliPathOrSource(sourceLocator, deploymentMethod ?? "auto")
@@ -522,7 +1010,7 @@ export const deployCommand = EffectCommand.make(
             }
           : undefined;
       const stateBackendDecision =
-        configResolution || requestedStateBackend
+        configResolution || requestedStateBackend || previewContext || serverSpec?.host
           ? resolveDeploymentStateBackend({
               ...(requestedStateBackend ? { explicitBackend: requestedStateBackend } : {}),
               ...(Bun.env.APPALOFT_DATABASE_URL
@@ -547,10 +1035,11 @@ export const deployCommand = EffectCommand.make(
             })
           : undefined;
       const sourceFingerprint =
-        configResolution || requestedStateBackend
+        configResolution || requestedStateBackend || previewContext || stateBackendDecision
           ? sourceFingerprintForConfigDeploy({
               sourceLocator: configuredSourceLocator ?? configSourceLocator,
               ...(configResolution ? { configResolution } : {}),
+              ...(previewContext ? { previewContext } : {}),
             })
           : undefined;
       const seed = {
@@ -560,6 +1049,9 @@ export const deployCommand = EffectCommand.make(
         ...(serverSpec ? { server: serverSpec } : {}),
         ...(destinationId ? { destinationId } : {}),
         ...(environmentId ? { environmentId } : {}),
+        ...(previewContext && !environmentId
+          ? { environment: { name: previewContext.environmentName, kind: "preview" as const } }
+          : {}),
         ...(resourceId ? { resourceId } : {}),
         ...(resourceSpec ? { resource: resourceSpec } : {}),
         ...(deploymentMethod ? { deploymentMethod } : {}),
@@ -568,10 +1060,12 @@ export const deployCommand = EffectCommand.make(
         ...(startCommand ? { startCommand } : {}),
         ...(publishDirectory ? { publishDirectory } : {}),
         ...(portValue === undefined ? {} : { port: portValue }),
+        ...(upstreamProtocolValue ? { upstreamProtocol: upstreamProtocolValue } : {}),
+        ...(exposureModeValue ? { exposureMode: exposureModeValue } : {}),
+        ...(targetServiceNameValue ? { targetServiceName: targetServiceNameValue } : {}),
+        ...(hostPortValue === undefined ? {} : { hostPort: hostPortValue }),
         ...(healthCheckPath ? { healthCheckPath } : {}),
-        ...(configEnvironmentVariables.length > 0
-          ? { environmentVariables: configEnvironmentVariables }
-          : {}),
+        ...(environmentVariables.length > 0 ? { environmentVariables } : {}),
         ...(sourceFingerprint ? { sourceFingerprint } : {}),
         ...(stateBackendDecision ? { stateBackend: stateBackendDecision } : {}),
       };
@@ -584,8 +1078,9 @@ export const deployCommand = EffectCommand.make(
           ...(configuredSourceLocator ? { sourceLocator: configuredSourceLocator } : {}),
         });
 
-        return yield* runDeploymentCommand(CreateDeploymentCommand.create(input), {
+        return yield* runCreateDeploymentCommand(input, {
           appLogLines: parseAppLogLines(appLogLines),
+          requirePreviewUrl,
         });
       });
 
