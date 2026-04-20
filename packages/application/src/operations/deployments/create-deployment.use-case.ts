@@ -160,6 +160,13 @@ function requestedDeploymentFromResource(resource: Resource): Result<RequestedDe
     ...(runtimeProfile?.publishDirectory
       ? { publishDirectory: runtimeProfile.publishDirectory.value }
       : {}),
+    ...(runtimeProfile?.dockerfilePath
+      ? { dockerfilePath: runtimeProfile.dockerfilePath.value }
+      : {}),
+    ...(runtimeProfile?.dockerComposeFilePath
+      ? { dockerComposeFilePath: runtimeProfile.dockerComposeFilePath.value }
+      : {}),
+    ...(runtimeProfile?.buildTarget ? { buildTarget: runtimeProfile.buildTarget.value } : {}),
     ...(internalPort ? { port: internalPort } : {}),
     ...(networkProfile
       ? {

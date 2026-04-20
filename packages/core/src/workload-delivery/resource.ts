@@ -79,6 +79,9 @@ export interface ResourceRuntimeProfileState {
   buildCommand?: CommandText;
   startCommand?: CommandText;
   publishDirectory?: StaticPublishDirectory;
+  dockerfilePath?: DockerfilePath;
+  dockerComposeFilePath?: DockerComposeFilePath;
+  buildTarget?: DockerBuildTarget;
   healthCheckPath?: HealthCheckPathText;
   healthCheck?: ResourceHealthCheckPolicyState;
 }
@@ -156,6 +159,83 @@ function normalizeStaticPublishDirectory(value: string): Result<string> {
   return ok(`/${segments.join("/")}`);
 }
 
+function normalizeRuntimeProfileRelativePath(
+  value: string,
+  input: { field: string; runtimePlanStrategy: string },
+): Result<string> {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return err(
+      resourceRuntimeResolutionError("Runtime profile path is required", {
+        field: input.field,
+        runtimePlanStrategy: input.runtimePlanStrategy,
+      }),
+    );
+  }
+
+  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(trimmed)) {
+    return err(
+      resourceRuntimeResolutionError("Runtime profile path must not be a URL", {
+        field: input.field,
+        runtimePlanStrategy: input.runtimePlanStrategy,
+      }),
+    );
+  }
+
+  if (trimmed.startsWith("/") || trimmed.startsWith("\\\\") || /^[a-z]:[\\/]/i.test(trimmed)) {
+    return err(
+      resourceRuntimeResolutionError("Runtime profile path must be source-root-relative", {
+        field: input.field,
+        runtimePlanStrategy: input.runtimePlanStrategy,
+      }),
+    );
+  }
+
+  if (/[;&|`$<>]/.test(trimmed)) {
+    return err(
+      resourceRuntimeResolutionError("Runtime profile path contains unsupported shell characters", {
+        field: input.field,
+        runtimePlanStrategy: input.runtimePlanStrategy,
+      }),
+    );
+  }
+
+  const segments = trimmed.replace(/\\/g, "/").split("/").filter(Boolean);
+  if (segments.length === 0 || segments.some((segment) => segment === "." || segment === "..")) {
+    return err(
+      resourceRuntimeResolutionError("Runtime profile path must not contain dot segments", {
+        field: input.field,
+        runtimePlanStrategy: input.runtimePlanStrategy,
+      }),
+    );
+  }
+
+  return ok(segments.join("/"));
+}
+
+function normalizeDockerBuildTarget(value: string): Result<string> {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return err(
+      resourceRuntimeResolutionError("Docker build target is required", {
+        field: "runtimeProfile.buildTarget",
+        runtimePlanStrategy: "dockerfile",
+      }),
+    );
+  }
+
+  if (!/^[A-Za-z0-9_.-]+$/.test(trimmed)) {
+    return err(
+      resourceRuntimeResolutionError("Docker build target contains unsupported characters", {
+        field: "runtimeProfile.buildTarget",
+        runtimePlanStrategy: "dockerfile",
+      }),
+    );
+  }
+
+  return ok(trimmed);
+}
+
 const staticPublishDirectoryBrand: unique symbol = Symbol("StaticPublishDirectory");
 export class StaticPublishDirectory extends ScalarValueObject<string> {
   private [staticPublishDirectoryBrand]!: void;
@@ -172,6 +252,63 @@ export class StaticPublishDirectory extends ScalarValueObject<string> {
 
   static rehydrate(value: string): StaticPublishDirectory {
     return new StaticPublishDirectory(value.trim());
+  }
+}
+
+const dockerfilePathBrand: unique symbol = Symbol("DockerfilePath");
+export class DockerfilePath extends ScalarValueObject<string> {
+  private [dockerfilePathBrand]!: void;
+
+  private constructor(value: string) {
+    super(value);
+  }
+
+  static create(value: string): Result<DockerfilePath> {
+    return normalizeRuntimeProfileRelativePath(value, {
+      field: "runtimeProfile.dockerfilePath",
+      runtimePlanStrategy: "dockerfile",
+    }).map((normalized) => new DockerfilePath(normalized));
+  }
+
+  static rehydrate(value: string): DockerfilePath {
+    return new DockerfilePath(value.trim());
+  }
+}
+
+const dockerComposeFilePathBrand: unique symbol = Symbol("DockerComposeFilePath");
+export class DockerComposeFilePath extends ScalarValueObject<string> {
+  private [dockerComposeFilePathBrand]!: void;
+
+  private constructor(value: string) {
+    super(value);
+  }
+
+  static create(value: string): Result<DockerComposeFilePath> {
+    return normalizeRuntimeProfileRelativePath(value, {
+      field: "runtimeProfile.dockerComposeFilePath",
+      runtimePlanStrategy: "docker-compose",
+    }).map((normalized) => new DockerComposeFilePath(normalized));
+  }
+
+  static rehydrate(value: string): DockerComposeFilePath {
+    return new DockerComposeFilePath(value.trim());
+  }
+}
+
+const dockerBuildTargetBrand: unique symbol = Symbol("DockerBuildTarget");
+export class DockerBuildTarget extends ScalarValueObject<string> {
+  private [dockerBuildTargetBrand]!: void;
+
+  private constructor(value: string) {
+    super(value);
+  }
+
+  static create(value: string): Result<DockerBuildTarget> {
+    return normalizeDockerBuildTarget(value).map((normalized) => new DockerBuildTarget(normalized));
+  }
+
+  static rehydrate(value: string): DockerBuildTarget {
+    return new DockerBuildTarget(value.trim());
   }
 }
 
@@ -336,6 +473,77 @@ function serializedHealthCheckPolicy(
   };
 }
 
+function serializedRuntimeProfile(profile: ResourceRuntimeProfileState): Record<string, unknown> {
+  return {
+    strategy: profile.strategy.value,
+    ...(profile.installCommand ? { installCommand: profile.installCommand.value } : {}),
+    ...(profile.buildCommand ? { buildCommand: profile.buildCommand.value } : {}),
+    ...(profile.startCommand ? { startCommand: profile.startCommand.value } : {}),
+    ...(profile.publishDirectory ? { publishDirectory: profile.publishDirectory.value } : {}),
+    ...(profile.dockerfilePath ? { dockerfilePath: profile.dockerfilePath.value } : {}),
+    ...(profile.dockerComposeFilePath
+      ? { dockerComposeFilePath: profile.dockerComposeFilePath.value }
+      : {}),
+    ...(profile.buildTarget ? { buildTarget: profile.buildTarget.value } : {}),
+    ...(profile.healthCheckPath ? { healthCheckPath: profile.healthCheckPath.value } : {}),
+    ...(profile.healthCheck
+      ? { healthCheck: serializedHealthCheckPolicy(profile.healthCheck) }
+      : {}),
+  };
+}
+
+function validateResourceRuntimeProfile(input: {
+  resourceId?: ResourceId;
+  runtimeProfile: ResourceRuntimeProfileState;
+  enforceStrategySpecificPaths?: boolean;
+}): Result<void> {
+  const strategy = input.runtimeProfile.strategy.value;
+  const commonDetails = {
+    ...(input.resourceId ? { resourceId: input.resourceId.value } : {}),
+    runtimePlanStrategy: strategy,
+  };
+
+  if (strategy === "static" && !input.runtimeProfile.publishDirectory) {
+    return err(
+      resourceRuntimeResolutionError("Static runtime profiles require publishDirectory", {
+        ...commonDetails,
+        field: "runtimeProfile.publishDirectory",
+      }),
+    );
+  }
+
+  if (
+    input.enforceStrategySpecificPaths &&
+    strategy === "dockerfile" &&
+    !input.runtimeProfile.dockerfilePath
+  ) {
+    return err(
+      resourceRuntimeResolutionError("Dockerfile runtime profiles require dockerfilePath", {
+        ...commonDetails,
+        field: "runtimeProfile.dockerfilePath",
+      }),
+    );
+  }
+
+  if (
+    input.enforceStrategySpecificPaths &&
+    strategy === "docker-compose" &&
+    !input.runtimeProfile.dockerComposeFilePath
+  ) {
+    return err(
+      resourceRuntimeResolutionError(
+        "Docker Compose runtime profiles require dockerComposeFilePath",
+        {
+          ...commonDetails,
+          field: "runtimeProfile.dockerComposeFilePath",
+        },
+      ),
+    );
+  }
+
+  return ok(undefined);
+}
+
 export interface ResourceVisitor<TContext, TResult> {
   visitResource(resource: Resource, context: TContext): TResult;
 }
@@ -384,6 +592,15 @@ export class Resource extends AggregateRoot<ResourceState> {
         });
         if (networkProfileValidation.isErr()) {
           return err(networkProfileValidation.error);
+        }
+      }
+
+      if (input.runtimeProfile) {
+        const runtimeProfileValidation = validateResourceRuntimeProfile({
+          runtimeProfile: input.runtimeProfile,
+        });
+        if (runtimeProfileValidation.isErr()) {
+          return err(runtimeProfileValidation.error);
         }
       }
 
@@ -437,29 +654,7 @@ export class Resource extends AggregateRoot<ResourceState> {
             }
           : {}),
         ...(input.runtimeProfile
-          ? {
-              runtimeProfile: {
-                strategy: input.runtimeProfile.strategy.value,
-                ...(input.runtimeProfile.installCommand
-                  ? { installCommand: input.runtimeProfile.installCommand.value }
-                  : {}),
-                ...(input.runtimeProfile.buildCommand
-                  ? { buildCommand: input.runtimeProfile.buildCommand.value }
-                  : {}),
-                ...(input.runtimeProfile.startCommand
-                  ? { startCommand: input.runtimeProfile.startCommand.value }
-                  : {}),
-                ...(input.runtimeProfile.publishDirectory
-                  ? { publishDirectory: input.runtimeProfile.publishDirectory.value }
-                  : {}),
-                ...(input.runtimeProfile.healthCheckPath
-                  ? { healthCheckPath: input.runtimeProfile.healthCheckPath.value }
-                  : {}),
-                ...(input.runtimeProfile.healthCheck
-                  ? { healthCheck: serializedHealthCheckPolicy(input.runtimeProfile.healthCheck) }
-                  : {}),
-              },
-            }
+          ? { runtimeProfile: serializedRuntimeProfile(input.runtimeProfile) }
           : {}),
         ...(input.networkProfile
           ? { networkProfile: serializedNetworkProfile(input.networkProfile) }
@@ -488,6 +683,55 @@ export class Resource extends AggregateRoot<ResourceState> {
         ? { networkProfile: cloneResourceNetworkProfileState(state.networkProfile) }
         : {}),
     });
+  }
+
+  configureRuntimeProfile(input: {
+    runtimeProfile: ResourceRuntimeProfileState;
+    configuredAt: UpdatedAt;
+  }): Result<void> {
+    if (input.runtimeProfile.healthCheckPath || input.runtimeProfile.healthCheck) {
+      return err(
+        resourceRuntimeResolutionError(
+          "Runtime profile changes must not mutate resource health policy",
+          {
+            resourceId: this.state.id.value,
+            field: input.runtimeProfile.healthCheck
+              ? "runtimeProfile.healthCheck"
+              : "runtimeProfile.healthCheckPath",
+          },
+        ),
+      );
+    }
+
+    const validation = validateResourceRuntimeProfile({
+      resourceId: this.state.id,
+      runtimeProfile: input.runtimeProfile,
+      enforceStrategySpecificPaths: true,
+    });
+    if (validation.isErr()) {
+      return err(validation.error);
+    }
+
+    const currentProfile = this.state.runtimeProfile;
+    this.state.runtimeProfile = {
+      ...cloneResourceRuntimeProfileState(input.runtimeProfile),
+      ...(currentProfile?.healthCheckPath
+        ? { healthCheckPath: currentProfile.healthCheckPath }
+        : {}),
+      ...(currentProfile?.healthCheck
+        ? { healthCheck: cloneResourceHealthCheckPolicyState(currentProfile.healthCheck) }
+        : {}),
+    };
+
+    this.recordDomainEvent("resource-runtime-configured", input.configuredAt, {
+      resourceId: this.state.id.value,
+      projectId: this.state.projectId.value,
+      environmentId: this.state.environmentId.value,
+      runtimePlanStrategy: input.runtimeProfile.strategy.value,
+      configuredAt: input.configuredAt.value,
+    });
+
+    return ok(undefined);
   }
 
   configureHealthPolicy(input: {

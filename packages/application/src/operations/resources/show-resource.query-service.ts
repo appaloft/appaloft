@@ -153,6 +153,11 @@ function runtimeProfileFromState(
     ...(profile.buildCommand ? { buildCommand: profile.buildCommand.value } : {}),
     ...(profile.startCommand ? { startCommand: profile.startCommand.value } : {}),
     ...(profile.publishDirectory ? { publishDirectory: profile.publishDirectory.value } : {}),
+    ...(profile.dockerfilePath ? { dockerfilePath: profile.dockerfilePath.value } : {}),
+    ...(profile.dockerComposeFilePath
+      ? { dockerComposeFilePath: profile.dockerComposeFilePath.value }
+      : {}),
+    ...(profile.buildTarget ? { buildTarget: profile.buildTarget.value } : {}),
     ...(profile.healthCheckPath ? { healthCheckPath: profile.healthCheckPath.value } : {}),
     ...(healthCheck ? { healthCheck } : {}),
   };

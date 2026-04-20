@@ -1,5 +1,4 @@
 import {
-  CommandText,
   CreatedAt,
   DescriptionText,
   DestinationByIdSpec,
@@ -8,19 +7,7 @@ import {
   EnvironmentByIdSpec,
   EnvironmentId,
   err,
-  HealthCheckExpectedStatusCode,
-  HealthCheckHostText,
-  HealthCheckHttpMethodValue,
-  HealthCheckIntervalSeconds,
-  HealthCheckPathText,
-  HealthCheckResponseText,
-  HealthCheckRetryCount,
-  HealthCheckSchemeValue,
-  HealthCheckStartPeriodSeconds,
-  HealthCheckTimeoutSeconds,
-  HealthCheckTypeValue,
   ok,
-  PortNumber,
   ProjectByIdSpec,
   ProjectId,
   Resource,
@@ -35,8 +22,6 @@ import {
   ResourceSlug,
   type ResourceSourceBindingState,
   type Result,
-  RuntimePlanStrategyValue,
-  StaticPublishDirectory,
   safeTry,
   UpsertResourceSpec,
 } from "@appaloft/core";
@@ -57,6 +42,7 @@ import { tokens } from "../../tokens";
 import { publishDomainEventsAndReturn } from "../publish-domain-events";
 import { type CreateResourceCommandInput } from "./create-resource.command";
 import { resourceNetworkProfileFromInput } from "./resource-network-profile.mapper";
+import { resourceRuntimeProfileFromInput } from "./resource-runtime-profile.mapper";
 import { resourceSourceBindingFromInput } from "./resource-source-binding.mapper";
 
 @injectable()
@@ -195,92 +181,9 @@ export class CreateResourceUseCase {
 
       let runtimeProfile: ResourceRuntimeProfileState | undefined;
       if (input.runtimeProfile) {
-        const healthCheckInput = input.runtimeProfile.healthCheck;
-        const healthCheckHttpInput = healthCheckInput?.http;
-        runtimeProfile = {
-          strategy: yield* RuntimePlanStrategyValue.create(input.runtimeProfile.strategy ?? "auto"),
-          ...(input.runtimeProfile.installCommand
-            ? { installCommand: yield* CommandText.create(input.runtimeProfile.installCommand) }
-            : {}),
-          ...(input.runtimeProfile.buildCommand
-            ? { buildCommand: yield* CommandText.create(input.runtimeProfile.buildCommand) }
-            : {}),
-          ...(input.runtimeProfile.startCommand
-            ? { startCommand: yield* CommandText.create(input.runtimeProfile.startCommand) }
-            : {}),
-          ...(input.runtimeProfile.publishDirectory
-            ? {
-                publishDirectory: yield* StaticPublishDirectory.create(
-                  input.runtimeProfile.publishDirectory,
-                ),
-              }
-            : {}),
-          ...(input.runtimeProfile.healthCheckPath
-            ? {
-                healthCheckPath: yield* HealthCheckPathText.create(
-                  input.runtimeProfile.healthCheckPath,
-                ),
-              }
-            : {}),
-          ...(healthCheckInput
-            ? {
-                healthCheck: {
-                  enabled: healthCheckInput.enabled ?? true,
-                  type: yield* HealthCheckTypeValue.create(healthCheckInput.type ?? "http"),
-                  intervalSeconds: yield* HealthCheckIntervalSeconds.create(
-                    healthCheckInput.intervalSeconds ?? 5,
-                  ),
-                  timeoutSeconds: yield* HealthCheckTimeoutSeconds.create(
-                    healthCheckInput.timeoutSeconds ?? 5,
-                  ),
-                  retries: yield* HealthCheckRetryCount.create(healthCheckInput.retries ?? 10),
-                  startPeriodSeconds: yield* HealthCheckStartPeriodSeconds.create(
-                    healthCheckInput.startPeriodSeconds ?? 5,
-                  ),
-                  ...(healthCheckHttpInput
-                    ? {
-                        http: {
-                          method: yield* HealthCheckHttpMethodValue.create(
-                            healthCheckHttpInput.method ?? "GET",
-                          ),
-                          scheme: yield* HealthCheckSchemeValue.create(
-                            healthCheckHttpInput.scheme ?? "http",
-                          ),
-                          host: yield* HealthCheckHostText.create(
-                            healthCheckHttpInput.host ?? "localhost",
-                          ),
-                          ...(healthCheckHttpInput.port
-                            ? {
-                                port: yield* PortNumber.create(healthCheckHttpInput.port),
-                              }
-                            : {}),
-                          path: yield* HealthCheckPathText.create(healthCheckHttpInput.path ?? "/"),
-                          expectedStatusCode: yield* HealthCheckExpectedStatusCode.create(
-                            healthCheckHttpInput.expectedStatusCode ?? 200,
-                          ),
-                          ...(healthCheckHttpInput.expectedResponseText
-                            ? {
-                                expectedResponseText: yield* HealthCheckResponseText.create(
-                                  healthCheckHttpInput.expectedResponseText,
-                                ),
-                              }
-                            : {}),
-                        },
-                      }
-                    : {}),
-                },
-              }
-            : {}),
-        };
-
-        if (runtimeProfile.strategy.value === "static" && !runtimeProfile.publishDirectory) {
-          return err(
-            domainError.validation("Static runtime profiles require publishDirectory", {
-              phase: "resource-runtime-resolution",
-              runtimePlanStrategy: "static",
-            }),
-          );
-        }
+        runtimeProfile = yield* resourceRuntimeProfileFromInput(input.runtimeProfile, {
+          allowHealthPolicy: true,
+        });
       }
 
       const networkProfile = input.networkProfile

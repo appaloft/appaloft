@@ -944,6 +944,9 @@ export interface ResourceDetailRuntimeProfile {
   buildCommand?: string;
   startCommand?: string;
   publishDirectory?: string;
+  dockerfilePath?: string;
+  dockerComposeFilePath?: string;
+  buildTarget?: string;
   healthCheckPath?: string;
   healthCheck?: RequestedDeploymentHealthCheck;
 }
@@ -1850,6 +1853,9 @@ export interface RequestedDeploymentConfig {
   buildCommand?: string;
   startCommand?: string;
   publishDirectory?: string;
+  dockerfilePath?: string;
+  dockerComposeFilePath?: string;
+  buildTarget?: string;
   port?: number;
   healthCheckPath?: string;
   healthCheck?: RequestedDeploymentHealthCheck;

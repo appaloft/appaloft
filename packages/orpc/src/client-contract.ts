@@ -2,6 +2,7 @@ import {
   type BootstrapServerProxyCommandInput,
   type ConfigureResourceHealthCommandInput,
   type ConfigureResourceNetworkCommandInput,
+  type ConfigureResourceRuntimeCommandInput,
   type ConfigureResourceSourceCommandInput,
   type ConfigureServerCredentialCommandInput,
   type ConfirmDomainBindingOwnershipCommandInput,
@@ -38,6 +39,7 @@ import {
   type BootstrapServerProxyResponse,
   type ConfigureResourceHealthResponse,
   type ConfigureResourceNetworkResponse,
+  type ConfigureResourceRuntimeResponse,
   type ConfigureResourceSourceResponse,
   type ConfirmDomainBindingOwnershipResponse,
   type CreateDeploymentResponse,
@@ -211,6 +213,12 @@ export type AppaloftOrpcClientContract = {
       AppaloftClientContext,
       ConfigureResourceNetworkCommandInput,
       ConfigureResourceNetworkResponse,
+      AppaloftClientError
+    >;
+    configureRuntime: Client<
+      AppaloftClientContext,
+      ConfigureResourceRuntimeCommandInput,
+      ConfigureResourceRuntimeResponse,
       AppaloftClientError
     >;
     configureSource: Client<

@@ -193,6 +193,7 @@ Implemented operations:
 | Create resource | Command | `resources.create` | `CreateResourceCommand` | `CreateResourceCommandInput` | `appaloft resource create` | `POST /api/resources` |
 | Configure resource source profile | Command | `resources.configure-source` | `ConfigureResourceSourceCommand` | `ConfigureResourceSourceCommandInput` | `appaloft resource configure-source <resourceId>` | `POST /api/resources/{resourceId}/source` |
 | Configure resource health policy | Command | `resources.configure-health` | `ConfigureResourceHealthCommand` | `ConfigureResourceHealthCommandInput` | `appaloft resource configure-health <resourceId>` | `POST /api/resources/{resourceId}/health-policy` |
+| Configure resource runtime profile | Command | `resources.configure-runtime` | `ConfigureResourceRuntimeCommand` | `ConfigureResourceRuntimeCommandInput` | `appaloft resource configure-runtime <resourceId>` | `POST /api/resources/{resourceId}/runtime-profile` |
 | Configure resource network profile | Command | `resources.configure-network` | `ConfigureResourceNetworkCommand` | `ConfigureResourceNetworkCommandInput` | `appaloft resource configure-network <resourceId>` | `POST /api/resources/{resourceId}/network-profile` |
 | List resources | Query | `resources.list` | `ListResourcesQuery` | `ListResourcesQueryInput` | `appaloft resource list` | `GET /api/resources` |
 | Show resource profile | Query | `resources.show` | `ShowResourceQuery` | `ShowResourceQueryInput` | `appaloft resource show <resourceId>` | `GET /api/resources/{resourceId}` |
@@ -259,6 +260,9 @@ Current boundary:
   command replaces the durable source binding for future deployment admission without pulling
   source, retargeting source links, creating deployments, restarting runtime, or mutating
   deployment snapshots.
+- resource runtime profile changes are resource-owned through `resources.configure-runtime`; the
+  command replaces durable runtime planning fields for future deployment admission without
+  mutating source, network, health policy, deployment snapshots, or current runtime state.
 - resource network profile changes are resource-owned through `resources.configure-network`; the
   command replaces the durable workload endpoint profile for future deployment admission and route
   planning without binding domains, applying proxy routes, restarting runtime, or mutating
@@ -269,7 +273,6 @@ Current boundary:
   hostnames unless a provider explicitly requires deployment-scoped hostnames.
 
 Core next operations expected here:
-- `resources.configure-runtime`
 - declare compose-stack services from compose metadata
 - `resources.archive`
 - `resources.delete`

@@ -211,13 +211,14 @@ Current code does not yet have typed source variant validation for `resource-sou
 Until implemented, many invalid source variant cases may be accepted as generic source metadata and
 fail later during source detection, Git clone, Docker image pull, or runtime plan resolution.
 
-`resources.show`, `resources.configure-source`, and `resources.configure-network` are active public
-surfaces with focused command/query, HTTP/oRPC, CLI or Web coverage in the resource profile
-lifecycle slice.
+`resources.show`, `resources.configure-source`, `resources.configure-runtime`, and
+`resources.configure-network` are active public surfaces with focused command/query, HTTP/oRPC, CLI
+or Web coverage in the resource profile lifecycle slice.
 
-`resources.configure-runtime`, `resources.archive`, and `resources.delete` are accepted candidate
-operations. Their error mappings remain normative for future Code Rounds but are not yet active
-public surfaces.
+`resources.archive` and `resources.delete` are accepted candidate operations. Their error mappings
+remain normative for future Code Rounds but are not yet active public surfaces. The
+`resource_archived` guard for source/runtime/network configuration remains blocked until
+`resources.archive` introduces explicit lifecycle state.
 
 ## Open Questions
 

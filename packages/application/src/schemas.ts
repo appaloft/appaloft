@@ -16,6 +16,7 @@ export * from "./operations/environments/unset-environment-variable.schema";
 export * from "./operations/projects/create-project.schema";
 export * from "./operations/resources/configure-resource-health.schema";
 export * from "./operations/resources/configure-resource-network.schema";
+export * from "./operations/resources/configure-resource-runtime.schema";
 export * from "./operations/resources/configure-resource-source.schema";
 export * from "./operations/resources/create-resource.schema";
 export * from "./operations/resources/list-resources.schema";

@@ -135,9 +135,13 @@ Canonical event spec:
 
 ## Current Implementation Notes And Migration Gaps
 
-Current runtime profile persistence exists through `resources.create`. Dedicated runtime mutation
-is not active until this command appears in `CORE_OPERATIONS.md`, `operation-catalog.ts`,
-application slices, transports, and tests.
+`resources.configure-runtime` is active in core, application command handling, operation catalog,
+CLI, HTTP/oRPC, and the Web resource detail runtime profile form. Current implementation persists
+runtime planning fields on the `Resource` aggregate, emits `resource-runtime-configured`, rejects
+health policy mutation through this command, and rejects unsupported target/orchestrator fields.
+
+Archived-resource blocking remains a migration gap until `resources.archive` introduces explicit
+resource lifecycle state.
 
 ## Open Questions
 

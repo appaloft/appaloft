@@ -6,6 +6,7 @@ import {
   type CommandBus,
   ConfigureResourceHealthCommand,
   ConfigureResourceNetworkCommand,
+  ConfigureResourceRuntimeCommand,
   ConfigureResourceSourceCommand,
   ConfigureServerCredentialCommand,
   ConfirmDomainBindingOwnershipCommand,
@@ -18,6 +19,7 @@ import {
   CreateSshCredentialCommand,
   configureResourceHealthCommandInputSchema,
   configureResourceNetworkCommandInputSchema,
+  configureResourceRuntimeCommandInputSchema,
   configureResourceSourceCommandInputSchema,
   configureServerCredentialCommandInputSchema,
   confirmDomainBindingOwnershipCommandInputSchema,
@@ -89,6 +91,7 @@ import {
   bootstrapServerProxyResponseSchema,
   configureResourceHealthResponseSchema,
   configureResourceNetworkResponseSchema,
+  configureResourceRuntimeResponseSchema,
   configureResourceSourceResponseSchema,
   confirmDomainBindingOwnershipResponseSchema,
   createDeploymentResponseSchema,
@@ -784,6 +787,18 @@ export const configureResourceNetworkProcedure = base
     executeCommand(context, ConfigureResourceNetworkCommand.create(input)),
   );
 
+export const configureResourceRuntimeProcedure = base
+  .route({
+    method: "POST",
+    path: "/resources/{resourceId}/runtime-profile",
+    successStatus: 200,
+  })
+  .input(configureResourceRuntimeCommandInputSchema)
+  .output(configureResourceRuntimeResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, ConfigureResourceRuntimeCommand.create(input)),
+  );
+
 export const configureResourceSourceProcedure = base
   .route({
     method: "POST",
@@ -1107,6 +1122,7 @@ export const appaloftOrpcRouter = {
     create: createResourceProcedure,
     configureHealth: configureResourceHealthProcedure,
     configureNetwork: configureResourceNetworkProcedure,
+    configureRuntime: configureResourceRuntimeProcedure,
     configureSource: configureResourceSourceProcedure,
     diagnosticSummary: resourceDiagnosticSummaryProcedure,
     health: resourceHealthProcedure,
@@ -1271,6 +1287,7 @@ export function mountAppaloftOrpcRoutes(
     "/api/resources/:resourceId/health",
     "/api/resources/:resourceId/health-policy",
     "/api/resources/:resourceId/network-profile",
+    "/api/resources/:resourceId/runtime-profile",
     "/api/resources/:resourceId/diagnostic-summary",
     "/api/resources/:resourceId/proxy-configuration",
     "/api/resources/:resourceId/runtime-logs",

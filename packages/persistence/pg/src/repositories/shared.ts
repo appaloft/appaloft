@@ -44,6 +44,9 @@ import {
   DestinationName,
   DetectSummary,
   DisplayNameText,
+  DockerBuildTarget,
+  DockerComposeFilePath,
+  DockerfilePath,
   DockerImageDigest,
   DockerImageName,
   DockerImageTag,
@@ -346,6 +349,9 @@ export interface SerializedResourceRuntimeProfile extends Record<string, unknown
   buildCommand?: string;
   startCommand?: string;
   publishDirectory?: string;
+  dockerfilePath?: string;
+  dockerComposeFilePath?: string;
+  buildTarget?: string;
   healthCheckPath?: string;
   healthCheck?: SerializedHealthCheckPolicy;
 }
@@ -1353,6 +1359,19 @@ export function rehydrateResourceRow(row: Selectable<Database["resources"]>) {
                     runtimeProfile.publishDirectory,
                   ),
                 }
+              : {}),
+            ...(runtimeProfile.dockerfilePath
+              ? { dockerfilePath: DockerfilePath.rehydrate(runtimeProfile.dockerfilePath) }
+              : {}),
+            ...(runtimeProfile.dockerComposeFilePath
+              ? {
+                  dockerComposeFilePath: DockerComposeFilePath.rehydrate(
+                    runtimeProfile.dockerComposeFilePath,
+                  ),
+                }
+              : {}),
+            ...(runtimeProfile.buildTarget
+              ? { buildTarget: DockerBuildTarget.rehydrate(runtimeProfile.buildTarget) }
               : {}),
             ...(runtimeProfile.healthCheckPath
               ? { healthCheckPath: HealthCheckPathText.rehydrate(runtimeProfile.healthCheckPath) }

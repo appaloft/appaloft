@@ -115,6 +115,15 @@ class KyselyResourceMutationVisitor
           ...(spec.state.runtimeProfile.publishDirectory
             ? { publishDirectory: spec.state.runtimeProfile.publishDirectory.value }
             : {}),
+          ...(spec.state.runtimeProfile.dockerfilePath
+            ? { dockerfilePath: spec.state.runtimeProfile.dockerfilePath.value }
+            : {}),
+          ...(spec.state.runtimeProfile.dockerComposeFilePath
+            ? { dockerComposeFilePath: spec.state.runtimeProfile.dockerComposeFilePath.value }
+            : {}),
+          ...(spec.state.runtimeProfile.buildTarget
+            ? { buildTarget: spec.state.runtimeProfile.buildTarget.value }
+            : {}),
           ...(spec.state.runtimeProfile.healthCheckPath
             ? { healthCheckPath: spec.state.runtimeProfile.healthCheckPath.value }
             : {}),

@@ -73,10 +73,24 @@ export const createResourceRuntimeProfileInputSchema = z
     buildCommand: z.string().trim().min(1).optional(),
     startCommand: z.string().trim().min(1).optional(),
     publishDirectory: z.string().trim().min(1).optional(),
+    dockerfilePath: z.string().trim().min(1).optional(),
+    dockerComposeFilePath: z.string().trim().min(1).optional(),
+    buildTarget: z.string().trim().min(1).optional(),
     healthCheckPath: z.string().trim().min(1).optional(),
     healthCheck: resourceHealthCheckPolicyInputSchema.optional(),
   })
   .strict();
+
+export const configureResourceRuntimeProfileInputSchema =
+  createResourceRuntimeProfileInputSchema.extend({
+    kubernetesNamespace: z.unknown().optional(),
+    helmChart: z.unknown().optional(),
+    swarmService: z.unknown().optional(),
+    replicas: z.unknown().optional(),
+    nodeSelector: z.unknown().optional(),
+    ingressClass: z.unknown().optional(),
+    providerOptions: z.unknown().optional(),
+  });
 
 export const createResourceNetworkProfileInputSchema = z
   .object({
@@ -117,6 +131,9 @@ export type CreateResourceSourceBindingInput = z.output<
 >;
 export type CreateResourceRuntimeProfileInput = z.output<
   typeof createResourceRuntimeProfileInputSchema
+>;
+export type ConfigureResourceRuntimeProfileInput = z.output<
+  typeof configureResourceRuntimeProfileInputSchema
 >;
 export type ResourceHealthCheckPolicyInput = z.output<typeof resourceHealthCheckPolicyInputSchema>;
 export type ResourceHealthCheckPolicyCommandInput = z.input<

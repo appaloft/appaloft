@@ -19,6 +19,7 @@
   import type {
     ConfigureResourceHealthInput,
     ConfigureResourceNetworkInput,
+    ConfigureResourceRuntimeInput,
     ConfigureResourceSourceInput,
     ConfirmDomainBindingOwnershipInput,
     CreateDomainBindingInput,
@@ -88,6 +89,8 @@
   type NetworkProfileInput = ConfigureResourceNetworkInput["networkProfile"];
   type NetworkProtocol = NetworkProfileInput["upstreamProtocol"];
   type NetworkExposureMode = NetworkProfileInput["exposureMode"];
+  type RuntimeProfileInput = ConfigureResourceRuntimeInput["runtimeProfile"];
+  type RuntimePlanStrategy = NonNullable<RuntimeProfileInput["strategy"]>;
   type SourceProfileInput = ConfigureResourceSourceInput["source"];
   type SourceKind = SourceProfileInput["kind"];
   type DomainRouteMode = "serve" | "redirect";
@@ -227,6 +230,11 @@
     title: string;
     detail: string;
   } | null>(null);
+  let runtimeFeedback = $state<{
+    kind: "success" | "error";
+    title: string;
+    detail: string;
+  } | null>(null);
   let sourceFeedback = $state<{
     kind: "success" | "error";
     title: string;
@@ -242,6 +250,15 @@
   let sourceImageName = $state("");
   let sourceImageTag = $state("");
   let sourceImageDigest = $state("");
+  let runtimeFormResourceId = $state("");
+  let runtimeStrategy = $state<RuntimePlanStrategy>("auto");
+  let runtimeInstallCommand = $state("");
+  let runtimeBuildCommand = $state("");
+  let runtimeStartCommand = $state("");
+  let runtimePublishDirectory = $state("");
+  let runtimeDockerfilePath = $state("");
+  let runtimeDockerComposeFilePath = $state("");
+  let runtimeBuildTarget = $state("");
   let networkFormResourceId = $state("");
   let networkInternalPort = $state("");
   let networkUpstreamProtocol = $state<NetworkProtocol>("http");
@@ -383,6 +400,20 @@
       ? $t(i18nKeys.common.status.configured)
       : $t(i18nKeys.common.status.notConfigured),
   );
+  const runtimeProfileStatusLabel = $derived(
+    resourceDetail?.runtimeProfile
+      ? $t(i18nKeys.common.status.configured)
+      : $t(i18nKeys.common.status.notConfigured),
+  );
+  const canConfigureRuntime = $derived(
+    Boolean(
+      resource &&
+        runtimeStrategy &&
+        (runtimeStrategy !== "static" || runtimePublishDirectory.trim()) &&
+        (runtimeStrategy !== "dockerfile" || runtimeDockerfilePath.trim()) &&
+        (runtimeStrategy !== "docker-compose" || runtimeDockerComposeFilePath.trim()),
+    ),
+  );
   const canConfigureNetwork = $derived(
     Boolean(
       resource &&
@@ -487,6 +518,26 @@
       sourceFeedback = {
         kind: "error",
         title: $t(i18nKeys.console.resources.sourceProfileSaveFailed),
+        detail: readErrorMessage(error),
+      };
+    },
+  }));
+  const configureResourceRuntimeMutation = createMutation(() => ({
+    mutationFn: (input: ConfigureResourceRuntimeInput) =>
+      orpcClient.resources.configureRuntime(input),
+    onSuccess: (result) => {
+      runtimeFeedback = {
+        kind: "success",
+        title: $t(i18nKeys.console.resources.runtimeProfileSaved),
+        detail: result.id,
+      };
+      void queryClient.invalidateQueries({ queryKey: ["resources"] });
+      void queryClient.invalidateQueries({ queryKey: ["resources", "show", resourceId] });
+    },
+    onError: (error) => {
+      runtimeFeedback = {
+        kind: "error",
+        title: $t(i18nKeys.console.resources.runtimeProfileSaveFailed),
         detail: readErrorMessage(error),
       };
     },
@@ -872,6 +923,28 @@
   });
 
   $effect(() => {
+    if (!browser || !resource) {
+      return;
+    }
+
+    if (runtimeFormResourceId === resource.id) {
+      return;
+    }
+
+    const profile = resourceDetail?.runtimeProfile;
+    runtimeFormResourceId = resource.id;
+    runtimeStrategy = profile?.strategy ?? "auto";
+    runtimeInstallCommand = profile?.installCommand ?? "";
+    runtimeBuildCommand = profile?.buildCommand ?? "";
+    runtimeStartCommand = profile?.startCommand ?? "";
+    runtimePublishDirectory = profile?.publishDirectory ?? "";
+    runtimeDockerfilePath = profile?.dockerfilePath ?? "";
+    runtimeDockerComposeFilePath = profile?.dockerComposeFilePath ?? "";
+    runtimeBuildTarget = profile?.buildTarget ?? "";
+    runtimeFeedback = null;
+  });
+
+  $effect(() => {
     if (!browser || !resource || !resourceHealth) {
       return;
     }
@@ -1105,6 +1178,38 @@
     });
   }
 
+  function configureResourceRuntime(event: SubmitEvent): void {
+    event.preventDefault();
+
+    if (!resource || !canConfigureRuntime || configureResourceRuntimeMutation.isPending) {
+      return;
+    }
+
+    const installCommand = runtimeInstallCommand.trim();
+    const buildCommand = runtimeBuildCommand.trim();
+    const startCommand = runtimeStartCommand.trim();
+    const publishDirectory = runtimePublishDirectory.trim();
+    const dockerfilePath = runtimeDockerfilePath.trim();
+    const dockerComposeFilePath = runtimeDockerComposeFilePath.trim();
+    const buildTarget = runtimeBuildTarget.trim();
+    const runtimeProfile: RuntimeProfileInput = {
+      strategy: runtimeStrategy,
+      ...(installCommand ? { installCommand } : {}),
+      ...(buildCommand ? { buildCommand } : {}),
+      ...(startCommand ? { startCommand } : {}),
+      ...(publishDirectory ? { publishDirectory } : {}),
+      ...(dockerfilePath ? { dockerfilePath } : {}),
+      ...(dockerComposeFilePath ? { dockerComposeFilePath } : {}),
+      ...(buildTarget ? { buildTarget } : {}),
+    };
+
+    runtimeFeedback = null;
+    configureResourceRuntimeMutation.mutate({
+      resourceId: resource.id,
+      runtimeProfile,
+    });
+  }
+
   function configureResourceNetwork(event: SubmitEvent): void {
     event.preventDefault();
 
@@ -1288,6 +1393,23 @@
       case "dockerfile-inline":
       case "zip-artifact":
         return kind;
+    }
+  }
+
+  function runtimeStrategyLabel(strategy: RuntimePlanStrategy): string {
+    switch (strategy) {
+      case "auto":
+        return $t(i18nKeys.console.resources.runtimeStrategyAuto);
+      case "dockerfile":
+        return $t(i18nKeys.console.resources.runtimeStrategyDockerfile);
+      case "docker-compose":
+        return $t(i18nKeys.console.resources.runtimeStrategyDockerCompose);
+      case "prebuilt-image":
+        return $t(i18nKeys.console.resources.runtimeStrategyPrebuiltImage);
+      case "workspace-commands":
+        return $t(i18nKeys.console.resources.runtimeStrategyWorkspaceCommands);
+      case "static":
+        return $t(i18nKeys.console.resources.runtimeStrategyStatic);
     }
   }
 
@@ -1890,6 +2012,158 @@
                       disabled={!canConfigureSource || configureResourceSourceMutation.isPending}
                     >
                       {configureResourceSourceMutation.isPending
+                        ? $t(i18nKeys.common.actions.saving)
+                        : $t(i18nKeys.common.actions.save)}
+                    </Button>
+                  </div>
+                </form>
+
+                <form
+                  id="resource-runtime-profile-form"
+                  class="rounded-md border bg-background p-4"
+                  onsubmit={configureResourceRuntime}
+                >
+                  <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div class="min-w-0">
+                      <div class="flex flex-wrap items-center gap-2">
+                        <h2 class="text-lg font-semibold">
+                          {$t(i18nKeys.console.resources.runtimeProfileTitle)}
+                        </h2>
+                        <Badge variant={resourceDetail?.runtimeProfile ? "default" : "outline"}>
+                          {runtimeProfileStatusLabel}
+                        </Badge>
+                      </div>
+                      <p class="mt-1 text-sm leading-6 text-muted-foreground">
+                        {$t(i18nKeys.console.resources.runtimeProfileFormDescription)}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div class="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                    <label class="space-y-1.5 text-sm font-medium">
+                      <span>{$t(i18nKeys.console.resources.runtimeStrategy)}</span>
+                      <Select.Root bind:value={runtimeStrategy} type="single">
+                        <Select.Trigger class="w-full">
+                          {runtimeStrategyLabel(runtimeStrategy)}
+                        </Select.Trigger>
+                        <Select.Content>
+                          <Select.Item value="auto">
+                            {$t(i18nKeys.console.resources.runtimeStrategyAuto)}
+                          </Select.Item>
+                          <Select.Item value="workspace-commands">
+                            {$t(i18nKeys.console.resources.runtimeStrategyWorkspaceCommands)}
+                          </Select.Item>
+                          <Select.Item value="static">
+                            {$t(i18nKeys.console.resources.runtimeStrategyStatic)}
+                          </Select.Item>
+                          <Select.Item value="dockerfile">
+                            {$t(i18nKeys.console.resources.runtimeStrategyDockerfile)}
+                          </Select.Item>
+                          <Select.Item value="docker-compose">
+                            {$t(i18nKeys.console.resources.runtimeStrategyDockerCompose)}
+                          </Select.Item>
+                          <Select.Item value="prebuilt-image">
+                            {$t(i18nKeys.console.resources.runtimeStrategyPrebuiltImage)}
+                          </Select.Item>
+                        </Select.Content>
+                      </Select.Root>
+                    </label>
+
+                    <label class="space-y-1.5 text-sm font-medium" for="resource-runtime-install-command">
+                      <span>{$t(i18nKeys.console.resources.runtimeInstallCommand)}</span>
+                      <Input
+                        id="resource-runtime-install-command"
+                        bind:value={runtimeInstallCommand}
+                        autocomplete="off"
+                      />
+                    </label>
+
+                    <label class="space-y-1.5 text-sm font-medium" for="resource-runtime-build-command">
+                      <span>{$t(i18nKeys.console.resources.runtimeBuildCommand)}</span>
+                      <Input
+                        id="resource-runtime-build-command"
+                        bind:value={runtimeBuildCommand}
+                        autocomplete="off"
+                      />
+                    </label>
+
+                    <label class="space-y-1.5 text-sm font-medium" for="resource-runtime-start-command">
+                      <span>{$t(i18nKeys.console.resources.runtimeStartCommand)}</span>
+                      <Input
+                        id="resource-runtime-start-command"
+                        bind:value={runtimeStartCommand}
+                        autocomplete="off"
+                      />
+                    </label>
+
+                    {#if runtimeStrategy === "static"}
+                      <label class="space-y-1.5 text-sm font-medium" for="resource-runtime-publish-directory">
+                        <span>{$t(i18nKeys.console.resources.runtimePublishDirectory)}</span>
+                        <Input
+                          id="resource-runtime-publish-directory"
+                          bind:value={runtimePublishDirectory}
+                          autocomplete="off"
+                          placeholder={$t(i18nKeys.console.resources.runtimePublishDirectoryPlaceholder)}
+                        />
+                      </label>
+                    {/if}
+
+                    {#if runtimeStrategy === "dockerfile"}
+                      <label class="space-y-1.5 text-sm font-medium" for="resource-runtime-dockerfile-path">
+                        <span>{$t(i18nKeys.console.resources.runtimeDockerfilePath)}</span>
+                        <Input
+                          id="resource-runtime-dockerfile-path"
+                          bind:value={runtimeDockerfilePath}
+                          autocomplete="off"
+                          placeholder={$t(i18nKeys.console.resources.runtimeDockerfilePathPlaceholder)}
+                        />
+                      </label>
+
+                      <label class="space-y-1.5 text-sm font-medium" for="resource-runtime-build-target">
+                        <span>{$t(i18nKeys.console.resources.runtimeBuildTarget)}</span>
+                        <Input
+                          id="resource-runtime-build-target"
+                          bind:value={runtimeBuildTarget}
+                          autocomplete="off"
+                        />
+                      </label>
+                    {/if}
+
+                    {#if runtimeStrategy === "docker-compose"}
+                      <label class="space-y-1.5 text-sm font-medium" for="resource-runtime-docker-compose-file-path">
+                        <span>{$t(i18nKeys.console.resources.runtimeDockerComposeFilePath)}</span>
+                        <Input
+                          id="resource-runtime-docker-compose-file-path"
+                          bind:value={runtimeDockerComposeFilePath}
+                          autocomplete="off"
+                          placeholder={$t(
+                            i18nKeys.console.resources.runtimeDockerComposeFilePathPlaceholder,
+                          )}
+                        />
+                      </label>
+                    {/if}
+                  </div>
+
+                  {#if runtimeFeedback}
+                    <div
+                      class={[
+                        "mt-4 rounded-md border px-3 py-2 text-sm",
+                        runtimeFeedback.kind === "success"
+                          ? "border-primary/25 bg-primary/5"
+                          : "border-destructive/30 bg-destructive/5 text-destructive",
+                      ]}
+                    >
+                      <p class="font-medium">{runtimeFeedback.title}</p>
+                      <p class="mt-1 break-all text-xs">{runtimeFeedback.detail}</p>
+                    </div>
+                  {/if}
+
+                  <div class="mt-4 flex justify-end">
+                    <Button
+                      type="submit"
+                      disabled={!canConfigureRuntime || configureResourceRuntimeMutation.isPending}
+                    >
+                      {configureResourceRuntimeMutation.isPending
                         ? $t(i18nKeys.common.actions.saving)
                         : $t(i18nKeys.common.actions.save)}
                     </Button>

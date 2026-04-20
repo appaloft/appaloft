@@ -10,6 +10,8 @@ import {
   ConfigureResourceHealthUseCase,
   ConfigureResourceNetworkCommandHandler,
   ConfigureResourceNetworkUseCase,
+  ConfigureResourceRuntimeCommandHandler,
+  ConfigureResourceRuntimeUseCase,
   ConfigureResourceSourceCommandHandler,
   ConfigureResourceSourceUseCase,
   ConfigureServerCredentialUseCase,
@@ -98,6 +100,7 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(BootstrapServerProxyCommandHandler);
   container.registerSingleton(ConfigureResourceHealthCommandHandler);
   container.registerSingleton(ConfigureResourceNetworkCommandHandler);
+  container.registerSingleton(ConfigureResourceRuntimeCommandHandler);
   container.registerSingleton(ConfigureResourceSourceCommandHandler);
   container.registerSingleton(ShowResourceQueryHandler);
   container.registerSingleton(IssueOrRenewCertificateCommandHandler);
@@ -122,6 +125,10 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(
     tokens.configureResourceNetworkUseCase,
     ConfigureResourceNetworkUseCase,
+  );
+  container.registerSingleton(
+    tokens.configureResourceRuntimeUseCase,
+    ConfigureResourceRuntimeUseCase,
   );
   container.registerSingleton(tokens.listResourcesQueryService, ListResourcesQueryService);
   container.registerSingleton(tokens.showResourceQueryService, ShowResourceQueryService);
