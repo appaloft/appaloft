@@ -3,6 +3,7 @@ export type ReleaseArtifactKind =
   | "web-static"
   | "all-in-one-image"
   | "compose-bundle"
+  | "install-script"
   | "binary-bundle";
 
 export interface ReleaseArtifactDescriptor {
@@ -49,6 +50,12 @@ export function createStandardReleaseManifest(input: {
         name: "docker-compose.selfhost.yml",
         path: "docker-compose.selfhost.yml",
         description: "Self-hosted Compose bundle using external PostgreSQL",
+      },
+      {
+        kind: "install-script",
+        name: "install.sh",
+        path: "install.sh",
+        description: "Static quick-start installer for the self-hosted Docker stack",
       },
       {
         kind: "binary-bundle",

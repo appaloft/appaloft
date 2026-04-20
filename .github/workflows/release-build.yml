@@ -74,6 +74,7 @@ jobs:
             dist/release/appaloft-web-static-v*.tar.gz
             dist/release/docker-compose.selfhost.yml
             dist/release/Dockerfile
+            dist/release/install.sh
 
   binary-artifacts:
     needs: resolve
