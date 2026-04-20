@@ -373,11 +373,12 @@ entry helper coverage. Local Docker static smoke coverage now exercises the gene
 path, and the generic-SSH Docker path has opt-in static smoke coverage gated by
 `APPALOFT_E2E_SSH_QUICK_DEPLOY=true`.
 
-Resource profile lifecycle operations are accepted candidates in this map. They are not active
-public operations until the Code Round adds `CORE_OPERATIONS.md` implemented rows,
-`operation-catalog.ts` entries, application slices, transport dispatch, and entrypoint tests. No
-entrypoint may expose a generic `resources.update`; each source, runtime, network, health, archive,
-and delete action must dispatch its own command or query.
+Resource profile lifecycle has an active public subset: `resources.show`,
+`resources.configure-source`, `resources.configure-runtime`, `resources.configure-network`, and
+`resources.configure-health`. `resources.archive` is the next accepted candidate Code Round target,
+and `resources.delete` remains a later guarded cleanup candidate. No entrypoint may expose a
+generic `resources.update`; each source, runtime, network, health, archive, and delete action must
+dispatch its own command or query.
 
 ## Open Questions
 

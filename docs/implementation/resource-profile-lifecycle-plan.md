@@ -98,6 +98,39 @@ governed by the same specs.
 No governed command mutates deployments, runtime instances, proxy routes, domain bindings,
 certificates, source links, environment variables, dependency resources, or logs.
 
+## Next Code Round Target: `resources.archive`
+
+`resources.archive` is the next implementation slice. Its minimal deliverable is:
+
+1. Add Resource lifecycle value objects and aggregate transition:
+   - `ResourceLifecycleStatus` with `active` and `archived`;
+   - `ArchivedAt`;
+   - optional `ArchiveReason`;
+   - aggregate method named for the lifecycle transition, not a generic update.
+2. Persist lifecycle status, archive timestamp, and optional reason through the Resource repository
+   and PostgreSQL/PGlite adapter.
+3. Expose lifecycle state through `resources.show` as `lifecycle.status = "archived"` for
+   retained resources.
+4. Add `ArchiveResourceCommand`, schema, handler, use case, token registration, and
+   `resource-archived` publication.
+5. Add archived-resource guards to:
+   - `resources.configure-source`;
+   - `resources.configure-runtime`;
+   - `resources.configure-network`;
+   - `resources.configure-health`;
+   - `deployments.create`.
+6. Add `CORE_OPERATIONS.md` and `operation-catalog.ts` rows in the same Code Round that exposes
+   the public command.
+7. Add HTTP/oRPC route `POST /api/resources/{resourceId}/archive` and CLI subcommand
+   `appaloft resource archive <resourceId> [--reason ...]`.
+8. Add a Web resource detail archive action with confirmation. The action must dispatch
+   `resources.archive`, refetch `resources.show`, and must not stop runtime or delete retained
+   state.
+9. Cover matrix rows `RES-PROFILE-SHOW-003`, `RES-PROFILE-SOURCE-005`,
+   `RES-PROFILE-RUNTIME-005`, `RES-PROFILE-NETWORK-006`, `RES-PROFILE-HEALTH-001`,
+   `RES-PROFILE-ARCHIVE-001` through `RES-PROFILE-ARCHIVE-005`, and the archive portions of
+   `RES-PROFILE-ENTRY-003` through `RES-PROFILE-ENTRY-005`.
+
 ## Read-Side State Changes
 
 `resources.show` uses a dedicated query service shape rather than relying on `resources.list` as a
@@ -167,7 +200,7 @@ operations without changing deployment command boundaries.
 Direct-port user-facing configuration remains blocked until placement conflict guards, adapter
 behavior, and tests are implemented in the same Code Round.
 
-`resources.configure-source`, `resources.configure-runtime`, and `resources.configure-network`
-archived-resource blocking remains blocked until explicit resource lifecycle state lands with
-`resources.archive`; duplicate configured-event consumer idempotency remains future read-model
-projection work.
+`resources.configure-source`, `resources.configure-runtime`, `resources.configure-network`,
+`resources.configure-health`, and `deployments.create` archived-resource blocking remains blocked
+until explicit resource lifecycle state lands with `resources.archive`; duplicate configured-event
+consumer idempotency remains future read-model projection work.

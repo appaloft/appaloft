@@ -1,5 +1,16 @@
 # resources.archive Command Spec
 
+## Metadata
+
+- Operation key: `resources.archive`
+- Command class: `ArchiveResourceCommand`
+- Input schema: `ArchiveResourceCommandInput`
+- Handler: `ArchiveResourceCommandHandler`
+- Use case: `ArchiveResourceUseCase`
+- Domain / bounded context: Workload Delivery / Resource lifecycle
+- Current status: accepted candidate command and next Resource Profile Lifecycle Code Round target
+- Source classification: normative contract for archive implementation
+
 ## Normative Contract
 
 `resources.archive` is the source-of-truth command for marking a resource unavailable for new
@@ -64,18 +75,50 @@ type ArchiveResourceCommandInput = {
 | `reason` | Optional | Short safe operator note for audit/read models. |
 | `idempotencyKey` | Optional | Deduplicates retries for the same archive request. |
 
+`reason` is not a free-form log field. It must be normalized through an archive reason value
+object before persistence or event publication:
+
+- trim leading and trailing whitespace;
+- reject empty text after trimming when the field is present;
+- reject control characters and multiline values;
+- reject values longer than 280 characters;
+- reject obvious secret material such as private keys, access tokens, passwords, or raw
+  credential-like values.
+
+## Resource Lifecycle State
+
+Archive introduces explicit Resource lifecycle state.
+
+The `Resource` aggregate state must use value objects for lifecycle-significant fields rather than
+raw strings:
+
+- `ResourceLifecycleStatus` with at least `active` and `archived`;
+- `ArchivedAt` for the archive transition timestamp;
+- optional `ArchiveReason` for the normalized safe operator note.
+
+New resources start as `active`. An active resource can transition to `archived` exactly once.
+Archiving preserves the resource identity, slug, project/environment ownership, source profile,
+runtime profile, network profile, health policy, service declarations, deployment history, access
+summaries, diagnostics, logs, and audit context.
+
+Already archived resources are idempotent for this command: the command returns `ok({ id })`,
+does not change `archivedAt` or `reason`, and does not publish a duplicate `resource-archived`
+event.
+
 ## Admission Flow
 
 The command must:
 
 1. Validate command input.
-2. Resolve `resourceId`.
-3. Reject missing or invisible resource with `not_found`.
-4. Treat an already archived resource as idempotent success.
-5. Reject deletion-only or corrupted lifecycle states with `invariant_violation`.
-6. Persist archived lifecycle status and optional safe reason.
-7. Publish or record `resource-archived` when the state changes.
-8. Return `ok({ id })`.
+2. Normalize optional `reason` through `ArchiveReason`.
+3. Resolve `resourceId`.
+4. Reject missing or invisible resource with `not_found`.
+5. Treat an already archived resource as idempotent success.
+6. Reject deletion-only or corrupted lifecycle states with `invariant_violation`.
+7. Capture archive time through the injected clock.
+8. Persist archived lifecycle status, archive timestamp, and optional safe reason.
+9. Publish or record `resource-archived` when the state changes.
+10. Return `ok({ id })`.
 
 ## Resource-Specific Rules
 
@@ -95,6 +138,18 @@ After archive:
 
 If a future runtime stop command exists, archive workflows may recommend running it first, but
 `resources.archive` must not hide that runtime side effect.
+
+## Error Contract
+
+All errors use [Resource Lifecycle Error Spec](../errors/resources.lifecycle.md).
+
+| Error code | Phase | Retriable | Meaning |
+| --- | --- | --- | --- |
+| `validation_error` | `command-validation` | No | `resourceId`, `reason`, or `idempotencyKey` shape is invalid. |
+| `not_found` | `context-resolution` or `resource-read` | No | Resource does not exist or is not visible. |
+| `invariant_violation` | `resource-lifecycle-guard` | No | Resource lifecycle state cannot transition to archived. |
+| `infra_error` | `resource-persistence` | Conditional | Archive state could not be safely persisted. |
+| `infra_error` | `event-publication` | Conditional | `resource-archived` could not be recorded before command success. |
 
 ## Entrypoints
 
@@ -116,6 +171,10 @@ Canonical event spec:
 
 Resource archived lifecycle state is not active until this command appears in `CORE_OPERATIONS.md`,
 `operation-catalog.ts`, application slices, transports, read models, and tests.
+
+The next Code Round for this command must also add archived-resource guards to
+`deployments.create`, `resources.configure-source`, `resources.configure-runtime`,
+`resources.configure-network`, and `resources.configure-health` in the same behavior slice.
 
 ## Open Questions
 
