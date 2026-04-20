@@ -97,7 +97,9 @@ Implement in ordered slices:
    - Verify SHA-256 before extraction, install into a runner temp/tool directory, and add the CLI
      to `PATH` only for the job.
    - Map trusted inputs to CLI flags: `config`, `source`, `ssh-host`, `ssh-user`, `ssh-port`,
-     `ssh-private-key` or `ssh-private-key-file`, `server-proxy-kind`, and `state-backend`.
+     `ssh-private-key` or `ssh-private-key-file`, `server-proxy-kind`, `state-backend`, and the
+     same profile fields accepted by repository config: runtime commands, publish directory,
+     network profile, health path, non-secret env values, and `ci-env:` secret references.
    - Write `ssh-private-key` to a temporary `0600` file and pass only the file path to
      `--server-ssh-private-key-file`.
    - Treat `version: latest` as quickstart convenience and exact release tags as the recommended
@@ -105,11 +107,14 @@ Implement in ordered slices:
    - Keep action wrapper releases independent from CLI releases; new CLI versions should be
      consumable through the `version` input without action-repo code changes.
    - Add PR preview inputs only as entrypoint context: `preview`, `preview-id`,
-     `preview-domain-template`, and `require-preview-url`. These inputs must affect preview-scoped
-     source link/environment/resource selection and route desired state, not `deployments.create`.
-   - Document preview config selection as an explicit path choice. When root `appaloft.yml` is
-     production-oriented, Action preview examples should pass `config: appaloft.preview.yml`; the
-     action must not edit root config or assume root domains/env values are preview-safe.
+     `preview-domain-template`, `preview-tls-mode`, and `require-preview-url`. These inputs must
+     affect preview-scoped source link/environment/resource selection and route desired state, not
+     `deployments.create`.
+   - Document preview config selection as optional profile reuse, not as a requirement. When root
+     `appaloft.yml` is production-oriented, Action preview examples should either pass
+     `config: appaloft.preview.yml` deliberately or provide the preview profile entirely through
+     trusted action/CLI flags. The action must not edit root config, generate temporary config as
+     the primary path, or assume root domains/env values are preview-safe.
    - Treat future preview config-profile or environment overlay support as a follow-up parser slice:
      overlays may adjust fields only after trusted PR entrypoint context has selected the preview
      environment, and they must not select identity or credentials.

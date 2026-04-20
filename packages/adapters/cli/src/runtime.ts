@@ -188,7 +188,7 @@ const runLoggedCommand = <T>(
   options: {
     appLogLines: number;
   },
-): Effect.Effect<void, DomainError, CliRuntime> =>
+): Effect.Effect<T, DomainError, CliRuntime> =>
   Effect.gen(function* () {
     const cli = yield* CliRuntime;
     const command = yield* resultToEffect(message);
@@ -215,18 +215,28 @@ const runLoggedCommand = <T>(
     }
 
     yield* print(output);
+    return output as T;
   });
 
 export const runCommand = <T>(
   message: Result<AppCommand<T>>,
-): Effect.Effect<void, DomainError, CliRuntime> => runLoggedCommand(message, { appLogLines: 3 });
+): Effect.Effect<void, DomainError, CliRuntime> =>
+  Effect.asVoid(runLoggedCommand(message, { appLogLines: 3 }));
 
 export const runDeploymentCommand = <T>(
   message: Result<AppCommand<T>>,
   options: {
     appLogLines: number;
   },
-): Effect.Effect<void, DomainError, CliRuntime> => runLoggedCommand(message, options);
+): Effect.Effect<void, DomainError, CliRuntime> =>
+  Effect.asVoid(runLoggedCommand(message, options));
+
+export const runDeploymentCommandResult = <T>(
+  message: Result<AppCommand<T>>,
+  options: {
+    appLogLines: number;
+  },
+): Effect.Effect<T, DomainError, CliRuntime> => runLoggedCommand(message, options);
 
 export const runQuery = <T>(
   message: Result<AppQuery<T>>,
