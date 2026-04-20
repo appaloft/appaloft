@@ -29,6 +29,7 @@ This workflow inherits:
 - [Default Access Domain And Proxy Routing Workflow](./default-access-domain-and-proxy-routing.md)
 - [Server Bootstrap And Proxy Workflow](./server-bootstrap-and-proxy.md)
 - [resources.proxy-configuration.preview Query Spec](../queries/resources.proxy-configuration.preview.md)
+- [Resource Access Failure Diagnostics Workflow](./resource-access-failure-diagnostics.md)
 - [Error Model](../errors/model.md)
 - [neverthrow Conventions](../errors/neverthrow-conventions.md)
 - [Async Lifecycle And Acceptance](../architecture/async-lifecycle-and-acceptance.md)
@@ -273,6 +274,26 @@ The configuration view may include provider-specific sections such as:
 - warnings.
 
 These sections are read-model output. They are not aggregate state and must not be accepted back as command input.
+
+## Edge Request Failure Diagnostics
+
+Concrete edge proxy providers may observe gateway-generated failures while serving public resource
+traffic. Those request-time failures must be translated into the provider-neutral
+`ResourceAccessFailureDiagnostic` envelope before any product surface displays them.
+
+Provider packages own the mapping from concrete proxy behavior, such as router match failures,
+service/upstream connection failures, gateway timeouts, and upstream protocol errors, into the
+stable `resource_access_*` codes governed by
+[Resource Access Failure Diagnostics](./resource-access-failure-diagnostics.md).
+
+Application, Web, CLI, HTTP, and future MCP code must not parse provider-native logs or error text
+to infer these codes. They may display the provider-neutral code, phase, request id, retriable flag,
+owner hint, and safe related ids. Provider-native raw details stay in bounded logs/traces or
+redacted owner-only diagnostic sections when a future security spec allows them.
+
+Request-time diagnostics do not mutate route realization state. If the same failure also proves a
+route/deployment/domain state transition, that transition must be recorded by the owning workflow
+with its own structured error and event contract.
 
 ## Idempotency
 

@@ -36,6 +36,7 @@ import {
   type SystemPluginWebExtension,
 } from "@appaloft/plugin-sdk";
 import { Elysia } from "elysia";
+import { resourceAccessFailureDiagnosticResponse } from "./resource-access-failure-diagnostics";
 
 interface SystemPluginRuntime {
   listWebExtensions(): Array<
@@ -806,6 +807,9 @@ export function createHttpApp(input: {
       serveHttpChallenge(request, params.token),
     )
     .get("/api/schemas/appaloft-config.json", () => appaloftDeploymentConfigJsonSchema)
+    .get("/.appaloft/resource-access-failure", ({ request }) =>
+      resourceAccessFailureDiagnosticResponse(request),
+    )
     .get("/api/deployment-progress/:requestId", ({ request, params }) =>
       deploymentProgressStream(request, params.requestId),
     )

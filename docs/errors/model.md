@@ -95,6 +95,16 @@ Codes must be stable identifiers, not localized text. Examples:
 | `edge_proxy_network_failed` | `async-processing` or `infra` | server id, proxy kind, attempt id |
 | `edge_proxy_start_failed` | `async-processing` or `infra` | server id, proxy kind, attempt id |
 | `edge_proxy_host_port_conflict` | `async-processing` or `infra` | phase `proxy-container`, provider key, proxy kind, host port when parseable, container name, network name |
+| `resource_access_route_not_found` | `not-found` | request id, host/path scope when safe, phase `edge-request-routing` |
+| `resource_access_proxy_unavailable` | `infra` | request id, provider key, server id when safe, phase `proxy-route-observation` |
+| `resource_access_route_unavailable` | `infra` | request id, route id/status when safe, phase `proxy-route-observation` |
+| `resource_access_upstream_unavailable` | `infra` | request id, resource id/deployment id when safe, phase `upstream-connection` |
+| `resource_access_upstream_connect_failed` | `infra` | request id, resource id/deployment id when safe, phase `upstream-connection` |
+| `resource_access_upstream_timeout` | `timeout` | request id, resource id/deployment id when safe, phase `upstream-connection` |
+| `resource_access_upstream_reset` | `infra` | request id, resource id/deployment id when safe, phase `upstream-response` |
+| `resource_access_upstream_tls_failed` | `integration` | request id, provider key and route metadata when safe, phase `upstream-connection` |
+| `resource_access_edge_error` | `infra` | request id, phase `diagnostic-page-render` |
+| `resource_access_unknown` | `infra` | request id, phase `diagnostic-page-render`, safe provider classification metadata when available |
 
 When introducing a new code, the command/event/workflow spec that owns the branch must define its category, phase, retriable behavior, and consumer mapping.
 

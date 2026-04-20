@@ -154,6 +154,13 @@ docker run --rm -p 3001:3001 \
   appaloft-all-in-one:local
 ```
 
+For Traefik-managed application routes, a running Appaloft backend service can register its public
+resource access failure page with the proxy it manages. When the backend listens on a wildcard host,
+Appaloft derives a Docker host-gateway URL for Traefik automatically. For custom topologies, set
+`APPALOFT_RESOURCE_ACCESS_FAILURE_RENDERER_URL` to an HTTP URL that the edge proxy container can
+reach. One-shot CLI remote SSH deployments do not install this dynamic renderer because no
+Appaloft backend service remains running after the command exits.
+
 ## Self-Hosted Compose
 
 Recommended path:

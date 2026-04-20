@@ -42,6 +42,7 @@ import { ShellDeploymentProgressReporter } from "./deployment-progress-reporter"
 import { registerApplicationServices } from "./register-application-services";
 import { registerRuntimeDependencies } from "./register-runtime-dependencies";
 import { type RemotePgliteStateSyncSession } from "./remote-pglite-state-sync";
+import { resourceAccessFailureRendererTargetForStartedServer } from "./resource-access-failure-renderer-target";
 
 export interface AppComposition {
   config: AppConfig;
@@ -110,6 +111,9 @@ export async function createAppComposition(
   }
   const sourceLinkStore = new PgSourceLinkStore(database.db);
   const serverAppliedRouteStore = new PgServerAppliedRouteStateStore(database.db);
+  let resourceAccessFailureRendererTarget: ReturnType<
+    typeof resourceAccessFailureRendererTargetForStartedServer
+  >;
 
   const authRuntime = createBetterAuthRuntime({
     enabled: config.authProvider === "better-auth",
@@ -133,6 +137,7 @@ export async function createAppComposition(
     deploymentProgressReporter,
     ...(sourceLinkStore ? { sourceLinkStore } : {}),
     serverAppliedRouteDesiredStateReader: serverAppliedRouteStore,
+    resourceAccessFailureRenderer: () => resourceAccessFailureRendererTarget,
   });
   registerApplicationServices(childContainer);
   const idGenerator = resolveToken<IdGenerator>(childContainer, tokens.idGenerator);
@@ -195,6 +200,10 @@ export async function createAppComposition(
       port: config.httpPort,
     });
     started = true;
+    resourceAccessFailureRendererTarget = resourceAccessFailureRendererTargetForStartedServer({
+      config,
+      ...(httpApp.server?.port ? { actualPort: httpApp.server.port } : {}),
+    });
 
     logger.info("http_server.started", {
       host: config.httpHost,

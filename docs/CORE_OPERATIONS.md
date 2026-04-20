@@ -253,6 +253,11 @@ Current boundary:
   `resources.diagnostic-summary`; it composes stable ids, deployment/access/proxy/log statuses,
   source errors, safe system context, and canonical copy JSON for support/debug workflows without
   mutating deployment, runtime, or proxy state
+- edge-rendered resource access failure diagnostics are internal transport/read behavior, not a new
+  public business operation. Gateway-generated 502, 503, and 504 failures may be classified with
+  stable Appaloft codes and rendered as safe HTML or problem responses, while owner-facing detail
+  continues through `resources.health`, `resources.diagnostic-summary`, and
+  `resources.proxy-configuration.preview`.
 - resource health is resource-owned observation governed by
   [ADR-020: Resource Health Observation](./decisions/ADR-020-resource-health-observation.md).
   `resources.health` is the active current health source for resource detail, project resource

@@ -19,6 +19,7 @@ not replace ADRs, query specs, workflow specs, error specs, or test matrices.
 - [Resource Diagnostic Summary Workflow Spec](../workflows/resource-diagnostic-summary.md)
 - [Resource Diagnostic Summary Error Spec](../errors/resources.diagnostic-summary.md)
 - [Resource Diagnostic Summary Test Matrix](../testing/resource-diagnostic-summary-test-matrix.md)
+- [Resource Access Failure Diagnostics Workflow Spec](../workflows/resource-access-failure-diagnostics.md)
 - [Project Resource Console Workflow Spec](../workflows/project-resource-console.md)
 - [Quick Deploy Workflow Spec](../workflows/quick-deploy.md)
 - [Resource Runtime Log Observation Workflow Spec](../workflows/resource-runtime-log-observation.md)
@@ -50,6 +51,7 @@ The query service should compose existing read/query services or read-model port
 - latest or selected deployment state;
 - deployment-attempt log tail;
 - `ResourceAccessSummary`;
+- latest safe edge access failure diagnostic when a provider/read-model source exists;
 - proxy configuration preview sections;
 - bounded runtime log tail;
 - safe backend/system context.
@@ -178,6 +180,10 @@ Application query-service tests cover canonical copy JSON, secret redaction, mis
 section/source error, proxy provider failure as a source error, runtime log reader failure as a
 source error, runtime logs not requested without reader calls, and deployment/resource context
 mismatch.
+
+Edge access failure diagnostics are not yet composed into the summary. The future slice should add
+the latest safe `ResourceAccessFailureDiagnostic` as access/proxy evidence and include
+`resource_access_*` source errors without changing the public query operation key.
 
 Web resource detail prefers the native Desktop clipboard bridge when available, then browser
 clipboard APIs, and only exposes the generated diagnostic JSON textarea when every automatic copy

@@ -15,11 +15,16 @@ import {
   type ProxyReloadPlan,
   type ProxyRouteRealizationInput,
   type ProxyRouteRealizationPlan,
+  type ResourceAccessFailureHttpStatus,
+  type ResourceAccessFailureRendererTarget,
 } from "@appaloft/application";
 import { type DomainError, domainError, err, ok, type Result } from "@appaloft/core";
 
 export const traefikEdgeNetworkName = "appaloft-edge";
 const traefikImage = "traefik:v3.6.2";
+const defaultAccessFailureMiddlewareName = "appaloft-resource-access-errors";
+const defaultAccessFailureRendererPath = "/.appaloft/resource-access-failure";
+const defaultAccessFailureStatuses = [404, 502, 503, 504] as const;
 
 const capabilities: EdgeProxyProviderCapabilities = {
   ensureProxy: true,
@@ -47,6 +52,99 @@ function sanitizeRouteName(input: { deploymentId: string; suffix?: string }): st
 
 function shellQuote(input: string): string {
   return `'${input.replaceAll("'", "'\\''")}'`;
+}
+
+export interface TraefikResourceAccessFailureMiddlewareInput {
+  middlewareName?: string;
+  rendererPath?: string;
+  serviceName?: string;
+  serviceUrl?: string;
+  statuses?: readonly ResourceAccessFailureHttpStatus[];
+}
+
+export interface TraefikResourceAccessFailureMiddlewareConfig {
+  middlewareName: string;
+  serviceName: string;
+  query: string;
+  serviceUrl?: string;
+  statusList: string;
+  labels: string[];
+}
+
+function safeTraefikName(input: string | undefined, fallback: string): string {
+  const normalized = input?.replace(/[^a-zA-Z0-9-]/g, "-").replace(/^-+|-+$/g, "");
+  return normalized && normalized.length > 0 ? normalized : fallback;
+}
+
+function safeRendererPath(input: string | undefined): string {
+  if (!input?.startsWith("/")) {
+    return defaultAccessFailureRendererPath;
+  }
+
+  return input.replace(/[^a-zA-Z0-9._~!$&'()*+,;=:@/?-]/g, "");
+}
+
+function safeRendererServiceUrl(input: string | undefined): string | null {
+  if (!input) {
+    return null;
+  }
+
+  try {
+    const url = new URL(input);
+    if (url.protocol !== "http:" && url.protocol !== "https:") {
+      return null;
+    }
+
+    return url.origin;
+  } catch {
+    return null;
+  }
+}
+
+export function renderTraefikResourceAccessFailureMiddleware(
+  input: TraefikResourceAccessFailureMiddlewareInput = {},
+): TraefikResourceAccessFailureMiddlewareConfig {
+  const middlewareName = safeTraefikName(input.middlewareName, defaultAccessFailureMiddlewareName);
+  const serviceName = safeTraefikName(input.serviceName, "appaloft-diagnostic-renderer");
+  const serviceUrl = safeRendererServiceUrl(input.serviceUrl);
+  const statuses =
+    input.statuses && input.statuses.length > 0 ? input.statuses : defaultAccessFailureStatuses;
+  const statusList = statuses.join(",");
+  const query = `${safeRendererPath(input.rendererPath)}?status={status}`;
+
+  return {
+    middlewareName,
+    serviceName,
+    query,
+    ...(serviceUrl ? { serviceUrl } : {}),
+    statusList,
+    labels: [
+      `traefik.http.middlewares.${middlewareName}.errors.status=${statusList}`,
+      `traefik.http.middlewares.${middlewareName}.errors.service=${serviceName}`,
+      `traefik.http.middlewares.${middlewareName}.errors.query=${query}`,
+      ...(serviceUrl
+        ? [
+            `traefik.http.services.${serviceName}.loadbalancer.server.url=${serviceUrl}`,
+            `traefik.http.services.${serviceName}.loadbalancer.passhostheader=false`,
+          ]
+        : []),
+    ],
+  };
+}
+
+function accessFailureMiddlewareConfig(
+  input: ResourceAccessFailureRendererTarget | undefined,
+): TraefikResourceAccessFailureMiddlewareConfig | null {
+  const serviceUrl = safeRendererServiceUrl(input?.url);
+  if (!input || !serviceUrl) {
+    return null;
+  }
+
+  return renderTraefikResourceAccessFailureMiddleware({
+    serviceUrl,
+    ...(input.middlewareName ? { middlewareName: input.middlewareName } : {}),
+    ...(input.serviceName ? { serviceName: input.serviceName } : {}),
+  });
 }
 
 function traefikRule(route: EdgeProxyRouteInput): string {
@@ -144,6 +242,7 @@ function labelsForTraefik(input: {
   route: EdgeProxyRouteInput;
   port: number;
   index: number;
+  accessFailureMiddlewareName?: string;
 }): string[] {
   const router = sanitizeRouteName({
     deploymentId: input.deploymentId,
@@ -181,6 +280,9 @@ function labelsForTraefik(input: {
     `traefik.http.routers.${router}.rule=${traefikRule(input.route)}`,
     `traefik.http.routers.${router}.entrypoints=${entrypoint}`,
     ...(input.route.tlsMode === "auto" ? [`traefik.http.routers.${router}.tls=true`] : []),
+    ...(input.accessFailureMiddlewareName
+      ? [`traefik.http.routers.${router}.middlewares=${input.accessFailureMiddlewareName}`]
+      : []),
     `traefik.http.routers.${router}.service=${service}`,
     `traefik.http.services.${service}.loadbalancer.server.port=${input.route.targetPort ?? input.port}`,
   ];
@@ -298,6 +400,7 @@ export class TraefikEdgeProxyProvider implements EdgeProxyProvider {
         `--network ${traefikEdgeNetworkName}`,
         `-p ${httpPort}:80`,
         `-p ${httpsPort}:443`,
+        "--add-host host.docker.internal:host-gateway",
         "-v /var/run/docker.sock:/var/run/docker.sock:ro",
         traefikImage,
         "--providers.docker=true",
@@ -397,14 +500,21 @@ export class TraefikEdgeProxyProvider implements EdgeProxyProvider {
     input: ProxyRouteRealizationInput,
   ): Promise<Result<ProxyRouteRealizationPlan, DomainError>> {
     const providerRoutes = input.accessRoutes.filter((route) => route.proxyKind === "traefik");
-    const labels = providerRoutes.flatMap((route, index) =>
+    const accessFailureConfig = providerRoutes.some((route) => !isRedirectRoute(route))
+      ? accessFailureMiddlewareConfig(input.resourceAccessFailureRenderer)
+      : null;
+    const routeLabels = providerRoutes.flatMap((route, index) =>
       labelsForTraefik({
         deploymentId: input.deploymentId,
         route,
         port: input.port,
         index,
+        ...(accessFailureConfig
+          ? { accessFailureMiddlewareName: accessFailureConfig.middlewareName }
+          : {}),
       }),
     );
+    const labels = [...routeLabels, ...(accessFailureConfig ? accessFailureConfig.labels : [])];
 
     return ok({
       providerKey: this.key,
@@ -412,6 +522,9 @@ export class TraefikEdgeProxyProvider implements EdgeProxyProvider {
       ...(labels.length > 0 ? { networkName: traefikEdgeNetworkName } : {}),
       metadata: {
         routeCount: String(providerRoutes.length),
+        ...(accessFailureConfig
+          ? { resourceAccessFailureMiddleware: accessFailureConfig.middlewareName }
+          : {}),
       },
     });
   }
@@ -467,6 +580,9 @@ export class TraefikEdgeProxyProvider implements EdgeProxyProvider {
       deploymentId: input.deploymentId ?? "planned",
       port: input.port,
       accessRoutes: input.accessRoutes,
+      ...(input.resourceAccessFailureRenderer
+        ? { resourceAccessFailureRenderer: input.resourceAccessFailureRenderer }
+        : {}),
     });
 
     if (realized.isErr()) {

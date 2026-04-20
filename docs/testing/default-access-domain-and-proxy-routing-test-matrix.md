@@ -18,6 +18,7 @@ This test matrix inherits:
 - [ADR-024: Pure CLI SSH State And Server-Applied Domains](../decisions/ADR-024-pure-cli-ssh-state-and-server-applied-domains.md)
 - [Default Access Domain And Proxy Routing Workflow Spec](../workflows/default-access-domain-and-proxy-routing.md)
 - [Edge Proxy Provider And Route Realization Workflow Spec](../workflows/edge-proxy-provider-and-route-realization.md)
+- [Resource Access Failure Diagnostics Test Matrix](./resource-access-failure-diagnostics-test-matrix.md)
 - [resources.proxy-configuration.preview Query Spec](../queries/resources.proxy-configuration.preview.md)
 - [default-access-domain-policies.configure Command Spec](../commands/default-access-domain-policies.configure.md)
 - [ADR-015: Resource Network Profile](../decisions/ADR-015-resource-network-profile.md)
@@ -42,6 +43,7 @@ This test matrix inherits:
 | Edge proxy provider | Provider contract renders proxy ensure plan, route realization plan, and read-only configuration view. |
 | Server/proxy workflow | Proxy readiness gates generated reverse-proxy routes. |
 | Resource access read model/UI/CLI | Planned and realized generated URLs plus route status are observable through `ResourceAccessSummary`; full provider-rendered proxy config is observable through `resources.proxy-configuration.preview`. |
+| Edge request diagnostics | Gateway-generated failures after route exposure are classified by `resource_access_*` diagnostics and do not add fields to `deployments.create`. |
 
 ## Given / When / Then Template
 

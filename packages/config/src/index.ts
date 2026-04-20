@@ -45,6 +45,7 @@ export interface AppConfig {
   httpHost: string;
   httpPort: number;
   webOrigin: string;
+  resourceAccessFailureRendererUrl?: string;
   webStaticDir?: string;
   databaseDriver: "postgres" | "pglite";
   databaseUrl?: string;
@@ -212,6 +213,20 @@ function normalizeOtlpTraceEndpointFromBase(endpoint: string): string {
   return `${trimmed}/v1/traces`;
 }
 
+function normalizeHttpUrl(value: string | undefined): string | undefined {
+  const trimmed = value?.trim();
+  if (!trimmed) {
+    return undefined;
+  }
+
+  try {
+    const url = new URL(trimmed);
+    return url.protocol === "http:" || url.protocol === "https:" ? url.toString() : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export function resolveConfig(source: ConfigSource<AppConfig> = {}): AppConfig {
   const env = source.env ?? process.env;
   const fileConfig = readConfigFile(source.configFilePath);
@@ -303,6 +318,11 @@ export function resolveConfig(source: ConfigSource<AppConfig> = {}): AppConfig {
     parsePositiveInteger(env.APPALOFT_CERTIFICATE_RETRY_SCHEDULER_BATCH_SIZE) ??
     parsePositiveInteger(certificateRetryScheduler.batchSize) ??
     defaults.certificateRetryScheduler.batchSize;
+  const resourceAccessFailureRendererUrl = normalizeHttpUrl(
+    source.flags?.resourceAccessFailureRendererUrl ??
+      env.APPALOFT_RESOURCE_ACCESS_FAILURE_RENDERER_URL ??
+      fileConfig.resourceAccessFailureRendererUrl,
+  );
 
   return {
     appName:
@@ -360,6 +380,7 @@ export function resolveConfig(source: ConfigSource<AppConfig> = {}): AppConfig {
       env.APPALOFT_WEB_ORIGIN ??
       fileConfig.webOrigin ??
       defaults.webOrigin,
+    ...(resourceAccessFailureRendererUrl ? { resourceAccessFailureRendererUrl } : {}),
     ...(source.flags?.webStaticDir || env.APPALOFT_WEB_STATIC_DIR || fileConfig.webStaticDir
       ? {
           webStaticDir:
