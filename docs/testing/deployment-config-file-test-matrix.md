@@ -15,6 +15,9 @@ Canonical assertions:
 - config-driven runs follow the same Quick Deploy project/server/environment/resource operation
   order as interactive entrypoints;
 - resource/runtime/network/health profile fields map to resource-owned commands before deployment;
+- trusted CLI/Action/Web/future-tool profile inputs mirror the repository config profile fields,
+  override selected config values, and feed the same Quick Deploy bootstrap path without generating
+  temporary config files;
 - non-secret env values and resolved secret references map to environment commands before
   deployment;
 - final `deployments.create` input remains ids-only;
@@ -200,6 +203,8 @@ This matrix inherits:
 | CONFIG-FILE-ENTRY-020 | integration | Deploy action PR preview explicit config path | With `preview=pull-request` and `config: appaloft.preview.yml`, the action/CLI uses the preview config origin, does not read production-only root config fields, creates/reuses preview environment/resource identity from trusted PR context, and dispatches ids-only `deployments.create`. |
 | CONFIG-FILE-ENTRY-021 | integration | Deploy action PR preview avoids production root domains | With preview mode selected and an implicitly discovered root config that contains production `access.domains[]`, the action/CLI must not render those hosts as PR preview URLs; preview access comes from generated/default access, trusted `preview-domain-template`, explicitly selected preview config, or future selected preview overlay. |
 | CONFIG-FILE-ENTRY-022 | integration | Deploy action PR preview overlay boundary | Future preview config overlays apply only after trusted PR entrypoint context selects the preview environment; a committed overlay cannot select environment/project/resource/server/destination identity or credentials and cannot retarget an existing preview source link. |
+| CONFIG-FILE-ENTRY-023 | integration | Deploy action PR preview profile flag parity | Trusted CLI/Action flags provide or override runtime commands, network profile, health path, non-secret env values, `ci-env:` secret references, preview domain template, and preview TLS mode; the workflow persists env and route state through the same commands as config bootstrap and dispatches ids-only `deployments.create`. |
+| CONFIG-FILE-ENTRY-024 | integration | Deploy action PR preview URL required | With `require-preview-url=true`, the CLI/action fails the workflow when the created deployment read model cannot expose a public route or the deployment finished failed during preview route verification; without the flag, the deployment may be accepted with diagnostics and no `preview-url`. |
 
 ## Current Implementation Notes And Migration Gaps
 
@@ -299,6 +304,8 @@ preview context inputs, creates preview-scoped source link/environment context o
 config, keeps `deployments.create` ids-only, persists `preview-domain-template` as server-applied
 route desired state, uses explicit `appaloft.preview.yml` without reading root production-only
 fields, and does not reinterpret implicitly discovered root `access.domains[]` as PR preview hosts.
+`CONFIG-FILE-ENTRY-023` and `CONFIG-FILE-ENTRY-024` add flag-only preview profile parity and
+required-preview-URL gating coverage in the same file.
 
 Public `appaloft/deploy-action` wrapper coverage is not implemented yet. The main repository
 release workflow already produces CLI archives, the static Docker self-host installer,

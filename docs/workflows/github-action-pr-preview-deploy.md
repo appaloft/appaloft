@@ -106,7 +106,7 @@ Preview mode must not rewrite repository config files. It resolves config in two
 2. Apply the selected profile to the preview environment already chosen by trusted entrypoint
    context.
 
-The first supported shape should use the action `config` input when the repository root config is
+The first supported shape may use the action `config` input when the repository root config is
 not preview-safe:
 
 ```yaml
@@ -120,6 +120,14 @@ Using `appaloft.yml` is valid only when that file is intentionally environment-n
 repository owner explicitly accepts it for previews. Preview docs and generated examples should not
 assume a root config is safe for PR deploys because it may contain production runtime choices,
 environment values, or custom domain intent.
+
+Config files are not required for Action preview deploys. Trusted action inputs, workflow
+environment, CLI flags, and future MCP/tool parameters may provide the same canonical profile
+fields that repository config supports: runtime strategy and commands, publish directory, network
+profile, health path, non-secret env values, `ci-env:` secret references, and preview custom-route
+policy. These inputs feed the same config bootstrap/Quick Deploy profile path and must not be
+translated into `deployments.create` fields. A workflow must not generate a temporary config file as
+the normal way to pass values that the CLI/action input surface already models.
 
 Field precedence after a config file is selected follows the repository config bootstrap contract:
 
@@ -139,7 +147,8 @@ environment/profile overlays, but those overlays may apply only after the PR ent
 resource, server, destination, or credentials.
 
 Application values that differ in preview should be supplied through preview-scoped GitHub
-environment variables or secrets and referenced from config with `ci-env:<NAME>`. The action sees
+environment variables or secrets and referenced either from config with `ci-env:<NAME>` or from a
+trusted action/CLI secret flag that resolves the same `ci-env:<NAME>` reference. The action sees
 only the runner environment after GitHub policy has selected the job environment.
 
 Custom route intent for PR previews should come from one of these sources:
@@ -279,7 +288,10 @@ through the edge proxy. It does not create a managed `DomainBinding`.
 
 If `tlsMode = auto` is used for a custom preview host, the resident edge proxy/provider owns
 certificate automation in Action-only mode. Users remain responsible for DNS pointing at the server
-and for opening the required public challenge/ingress ports.
+and for opening the required public challenge/ingress ports. If the selected provider has not been
+configured for certificate automation yet, the preview workflow should select `tlsMode = disabled`
+through trusted `preview-tls-mode`/route input and publish an HTTP preview URL instead of serving a
+default TLS certificate.
 
 ## Secrets And Fork Safety
 
@@ -401,8 +413,9 @@ database URLs, or resolved application secret values.
 Current implementation supports the underlying CLI config deploy path, SSH-server PGlite state,
 preview-scoped source fingerprints, non-interactive preview environment selection,
 `--preview-domain-template` server-applied route intent, explicit preview config paths, and the
-implicit-root-domain skip rule needed for Action-style execution. The public
-`appaloft/deploy-action` repository is not yet implemented.
+implicit-root-domain skip rule needed for Action-style execution. CLI/action profile flags must
+remain in sync with config profile fields so Action previews can be expressed without generating a
+temporary config file. The public `appaloft/deploy-action` repository is not yet implemented.
 
 Missing pieces before Action PR preview can be documented as supported:
 
