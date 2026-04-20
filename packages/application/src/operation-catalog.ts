@@ -437,7 +437,7 @@ export const operationCatalog = [
     inputSchema: createDeploymentCommandInputSchema,
     serviceToken: tokens.createDeploymentUseCase,
     transports: {
-      cli: "appaloft deploy [path-or-source] [--config appaloft.json]",
+      cli: "appaloft deploy [path-or-source] [--config appaloft.yml] [--env KEY=VALUE] [--secret KEY=ci-env:NAME] [--preview pull-request]",
       orpc: { method: "POST", path: "/api/deployments" },
       orpcStream: { method: "POST", path: "/api/deployments/stream" },
     },

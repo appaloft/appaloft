@@ -388,6 +388,12 @@ Current boundary:
   preview deploy. The action may use trusted GitHub event context, such as PR number and head SHA,
   to create a preview-scoped source fingerprint and environment/resource selection outside
   committed config, then dispatch ids-only `deployments.create`.
+- Action/CLI profile flags are a first-class profile source alongside repository config files.
+  Runtime commands, network profile, health path, non-secret env values, `ci-env:` secret
+  references, and preview route policy passed as trusted inputs feed the same Quick Deploy/config
+  bootstrap path and take precedence over selected config values. They must not become
+  `deployments.create` fields, and workflows should not generate temporary config files for values
+  already modeled as trusted flags.
 - Action-only preview access uses the existing generated/default access and server-applied route
   rules. If the configured default access provider is usable, for example an `sslip` provider with a
   public IPv4 server address, the user does not need to create DNS records for the generated URL. If

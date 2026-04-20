@@ -73,7 +73,9 @@ async function withBunEnv<T>(
   }
 }
 
-async function createPreviewDeployCliHarness(input: { withRouteStore?: boolean } = {}) {
+async function createPreviewDeployCliHarness(
+  input: { withRouteStore?: boolean; deploymentSummaries?: unknown[] } = {},
+) {
   const { createExecutionContext } = await import("@appaloft/application");
   const { createCliProgram } = await import("../src");
   const commands: AppCommand<unknown>[] = [];
@@ -106,6 +108,9 @@ async function createPreviewDeployCliHarness(input: { withRouteStore?: boolean }
     execute: async <T>(_context: unknown, query: AppQuery<T>) => {
       operations.push(query.constructor.name);
       queries.push(query as AppQuery<unknown>);
+      if (query.constructor.name === "ListDeploymentsQuery") {
+        return ok({ items: input.deploymentSummaries ?? [] } as T);
+      }
       return ok({ items: [] } as T);
     },
   } as unknown as QueryBus;
@@ -973,6 +978,324 @@ describe("CLI deployment config entry workflow", () => {
     );
     expect("domains" in (deployment as Record<string, unknown>)).toBe(false);
     expect("tlsMode" in (deployment as Record<string, unknown>)).toBe(false);
+  });
+
+  test("[CONFIG-FILE-ENTRY-023] deploy action PR preview accepts a flag-only profile", async () => {
+    ensureReflectMetadata();
+    const workspace = mkdtempSync(join(tmpdir(), "appaloft-preview-flag-profile-"));
+    const harness = await createPreviewDeployCliHarness({
+      withRouteStore: true,
+      deploymentSummaries: [
+        {
+          id: "dep_1",
+          resourceId: "res_1",
+          status: "succeeded",
+          runtimePlan: {
+            execution: {
+              accessRoutes: [
+                {
+                  proxyKind: "traefik",
+                  domains: ["pr-123.preview.example.com"],
+                  pathPrefix: "/",
+                  tlsMode: "disabled",
+                },
+              ],
+            },
+          },
+        },
+      ],
+    });
+
+    try {
+      await withBunEnv(
+        {
+          APP_SECRET: "resolved-secret",
+          GITHUB_REPOSITORY: "acme/app",
+          GITHUB_REPOSITORY_ID: "R_preview_repo",
+          GITHUB_REF: "refs/pull/123/merge",
+          GITHUB_HEAD_REF: "feature/preview",
+          GITHUB_SHA: "abc123",
+          GITHUB_WORKSPACE: workspace,
+          OPTIONAL_SECRET: undefined,
+        },
+        () =>
+          withMutedProcessOutput(async () => {
+            await harness.program.parseAsync([
+              "node",
+              "appaloft",
+              "deploy",
+              workspace,
+              "--method",
+              "workspace-commands",
+              "--install",
+              "bun install --frozen-lockfile",
+              "--build",
+              "bun run build",
+              "--start",
+              "bun ./dist/server/entry.mjs",
+              "--port",
+              "4321",
+              "--upstream-protocol",
+              "http",
+              "--exposure-mode",
+              "reverse-proxy",
+              "--health-path",
+              "/",
+              "--env",
+              "HOST=0.0.0.0",
+              "--env",
+              "PORT=4321",
+              "--secret",
+              "APP_SECRET=ci-env:APP_SECRET",
+              "--optional-secret",
+              "OPTIONAL_SECRET=ci-env:OPTIONAL_SECRET",
+              "--preview",
+              "pull-request",
+              "--preview-id",
+              "pr-123",
+              "--preview-domain-template",
+              "pr-123.preview.example.com",
+              "--preview-tls-mode",
+              "disabled",
+              "--require-preview-url",
+              "--server-host",
+              "203.0.113.10",
+              "--server-provider",
+              "generic-ssh",
+            ]);
+          }),
+      );
+    } finally {
+      rmSync(workspace, { recursive: true, force: true });
+    }
+
+    expect(harness.operations).toContain("PrepareState:ssh-pglite");
+    expect(harness.operations).toContain("ListDeploymentsQuery");
+    const resource = harness.commands.find(
+      (command) => command.constructor.name === "CreateResourceCommand",
+    );
+    expect(resource).toMatchObject({
+      runtimeProfile: {
+        strategy: "workspace-commands",
+        installCommand: "bun install --frozen-lockfile",
+        buildCommand: "bun run build",
+        startCommand: "bun ./dist/server/entry.mjs",
+        healthCheckPath: "/",
+      },
+      networkProfile: {
+        internalPort: 4321,
+        upstreamProtocol: "http",
+        exposureMode: "reverse-proxy",
+      },
+    });
+    const variables = harness.commands.filter(
+      (command) => command.constructor.name === "SetEnvironmentVariableCommand",
+    );
+    expect(variables).toEqual([
+      expect.objectContaining({
+        key: "HOST",
+        value: "0.0.0.0",
+        kind: "plain-config",
+        isSecret: false,
+      }),
+      expect.objectContaining({
+        key: "PORT",
+        value: "4321",
+        kind: "plain-config",
+        isSecret: false,
+      }),
+      expect.objectContaining({
+        key: "APP_SECRET",
+        value: "resolved-secret",
+        kind: "secret",
+        isSecret: true,
+      }),
+    ]);
+    expect(harness.desiredRoutes).toHaveLength(1);
+    expect(harness.desiredRoutes[0]).toMatchObject({
+      domains: [
+        {
+          host: "pr-123.preview.example.com",
+          pathPrefix: "/",
+          tlsMode: "disabled",
+        },
+      ],
+    });
+    const deployment = harness.commands.find(
+      (command) => command.constructor.name === "CreateDeploymentCommand",
+    );
+    expect(deployment).toMatchObject({
+      projectId: "proj_1",
+      serverId: "srv_1",
+      environmentId: "env_1",
+      resourceId: "res_1",
+    });
+    expect("runtime" in (deployment as Record<string, unknown>)).toBe(false);
+    expect("network" in (deployment as Record<string, unknown>)).toBe(false);
+    expect("env" in (deployment as Record<string, unknown>)).toBe(false);
+    expect("secrets" in (deployment as Record<string, unknown>)).toBe(false);
+  });
+
+  test("[CONFIG-FILE-ENTRY-023] deploy action PR preview flags override selected config profile values", async () => {
+    ensureReflectMetadata();
+    const workspace = mkdtempSync(join(tmpdir(), "appaloft-preview-flag-override-"));
+    const configPath = join(workspace, "appaloft.preview.yml");
+    writeFileSync(
+      configPath,
+      [
+        "runtime:",
+        "  strategy: workspace-commands",
+        "  startCommand: bun run preview-config-start",
+        "network:",
+        "  internalPort: 3000",
+        "env:",
+        "  PORT: 3000",
+        "",
+      ].join("\n"),
+    );
+    const harness = await createPreviewDeployCliHarness();
+
+    try {
+      await withBunEnv(
+        {
+          GITHUB_REPOSITORY: "acme/app",
+          GITHUB_REPOSITORY_ID: "R_preview_repo",
+          GITHUB_REF: "refs/pull/125/merge",
+          GITHUB_HEAD_REF: "feature/preview",
+          GITHUB_SHA: "abc123",
+          GITHUB_WORKSPACE: workspace,
+        },
+        () =>
+          withMutedProcessOutput(async () => {
+            await harness.program.parseAsync([
+              "node",
+              "appaloft",
+              "deploy",
+              workspace,
+              "--config",
+              configPath,
+              "--start",
+              "bun run preview-flag-start",
+              "--port",
+              "4321",
+              "--env",
+              "PORT=4321",
+              "--preview",
+              "pull-request",
+              "--preview-id",
+              "pr-125",
+              "--server-host",
+              "203.0.113.10",
+              "--server-provider",
+              "generic-ssh",
+            ]);
+          }),
+      );
+    } finally {
+      rmSync(workspace, { recursive: true, force: true });
+    }
+
+    const resource = harness.commands.find(
+      (command) => command.constructor.name === "CreateResourceCommand",
+    );
+    expect(resource).toMatchObject({
+      runtimeProfile: {
+        startCommand: "bun run preview-flag-start",
+      },
+      networkProfile: {
+        internalPort: 4321,
+      },
+    });
+    const variables = harness.commands.filter(
+      (command) => command.constructor.name === "SetEnvironmentVariableCommand",
+    );
+    expect(variables).toEqual([
+      expect.objectContaining({
+        key: "PORT",
+        value: "3000",
+      }),
+      expect.objectContaining({
+        key: "PORT",
+        value: "4321",
+      }),
+    ]);
+  });
+
+  test("[CONFIG-FILE-ENTRY-024] deploy action PR preview require-preview-url fails without a public route", async () => {
+    ensureReflectMetadata();
+    const workspace = mkdtempSync(join(tmpdir(), "appaloft-preview-url-required-"));
+    const harness = await createPreviewDeployCliHarness({
+      withRouteStore: true,
+      deploymentSummaries: [
+        {
+          id: "dep_1",
+          resourceId: "res_1",
+          status: "failed",
+          runtimePlan: {
+            execution: {
+              accessRoutes: [],
+            },
+          },
+        },
+      ],
+    });
+
+    try {
+      const result = await withBunEnv(
+        {
+          GITHUB_REPOSITORY: "acme/app",
+          GITHUB_REPOSITORY_ID: "R_preview_repo",
+          GITHUB_REF: "refs/pull/124/merge",
+          GITHUB_HEAD_REF: "feature/preview",
+          GITHUB_SHA: "abc123",
+          GITHUB_WORKSPACE: workspace,
+        },
+        () =>
+          withMutedProcessOutput(async () =>
+            harness.program
+              .parseAsync([
+                "node",
+                "appaloft",
+                "deploy",
+                workspace,
+                "--method",
+                "workspace-commands",
+                "--start",
+                "bun run start",
+                "--port",
+                "4321",
+                "--preview",
+                "pull-request",
+                "--preview-id",
+                "pr-124",
+                "--preview-domain-template",
+                "pr-124.preview.example.com",
+                "--preview-tls-mode",
+                "disabled",
+                "--require-preview-url",
+                "--server-host",
+                "203.0.113.10",
+                "--server-provider",
+                "generic-ssh",
+              ])
+              .then(
+                () => ({ ok: true as const }),
+                (error: unknown) => ({ ok: false as const, error }),
+              ),
+          ),
+      );
+
+      expect(result.ok).toBe(false);
+      if (result.ok) {
+        throw new Error("Expected require-preview-url to fail");
+      }
+      const errorText = String(result.error);
+      expect(errorText).toContain('"phase":"preview-access-resolution"');
+      expect(errorText).toContain("preview_url_missing");
+      expect(errorText).toContain("dep_1");
+    } finally {
+      rmSync(workspace, { recursive: true, force: true });
+    }
   });
 
   test("[CONFIG-FILE-ENTRY-020] deploy action PR preview explicit config path ignores production root config", async () => {
