@@ -50,6 +50,7 @@ GitHub Release assets include:
 - desktop installers for macOS, Linux, and Windows when the Tauri job succeeds
 - `docker-compose.selfhost.yml`
 - `Dockerfile`
+- `install.sh` Docker self-host installer
 - `release-manifest.json`
 - `checksums.txt`
 

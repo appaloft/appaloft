@@ -3,7 +3,7 @@ import { basename, join, relative, resolve } from "node:path";
 import { listTopLevelFiles, parseCliArgs, stringArg } from "./lib/release-utils";
 import { normalizeReleaseVersion, releaseTagName } from "./lib/targets";
 
-type ReleaseAssetGroup = "desktop" | "cli" | "self-host" | "metadata" | "other";
+type ReleaseAssetGroup = "desktop" | "cli" | "install" | "self-host" | "metadata" | "other";
 
 interface ReleaseAsset {
   group: ReleaseAssetGroup;
@@ -19,6 +19,9 @@ function classifyAsset(fileName: string): ReleaseAssetGroup {
   }
   if (fileName.startsWith("appaloft-v")) {
     return "cli";
+  }
+  if (fileName === "install.sh") {
+    return "install";
   }
   if (
     fileName.startsWith("appaloft-backend-") ||
@@ -142,12 +145,19 @@ const lines = [
   "## Install",
   "",
   "```bash",
-  "npm install -g @appaloft/cli",
-  "brew tap appaloft/tap && brew install appaloft",
+  "curl -fsSL https://appaloft.com/install.sh | sudo sh",
+  `curl -fsSL https://appaloft.com/install.sh | sudo sh -s -- --version ${version}`,
   `docker pull ghcr.io/${repository}:${version}`,
   "```",
   "",
   "## Downloads",
+  "",
+  "### Install Script",
+  ...markdownAssetList(
+    assets.filter((asset) => asset.group === "install"),
+    repository,
+    tag,
+  ),
   "",
   "### Desktop Installers",
   ...markdownAssetList(
