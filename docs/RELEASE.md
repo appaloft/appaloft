@@ -10,12 +10,17 @@ manually again to create the tag, GitHub Release, and distribution artifacts.
 - Use a single product SemVer version for backend, CLI, desktop, Docker, Homebrew, and npm.
 - Release tags use `vX.Y.Z`.
 - `CHANGELOG.md` is maintained by Release Please in the release PR.
+- `docs/PRODUCT_ROADMAP.md` is the release gate before `1.0.0`; read it before every
+  release workflow run and reject any Release Please PR whose version is not allowed by the
+  roadmap checklist.
+- Release Please is configured to keep pre-`1.0.0` feature commits on the current patch line by
+  default. Use a `Release-As: X.Y.Z` commit footer only when the roadmap gate explicitly allows a
+  target minor, or when a hotfix needs an explicit version.
 - The GitHub Release body is generated from `CHANGELOG.md` plus the built release artifact list,
   so the release page includes install commands, direct download links, known gaps, and the
   conventional-commit changelog.
 - npm package versions are injected during the publish job so release PRs do not need to rewrite
   workspace package versions or `bun.lock`.
-- Use a `Release-As: X.Y.Z` commit footer only when a hotfix needs an explicit version.
 
 ## Build Locally
 
@@ -91,10 +96,12 @@ flows.
 ## Manual Release Steps
 
 1. Merge normal feature and fix PRs into `main`.
-2. Open GitHub Actions and run `Release` from `main`. This creates or updates the Release Please PR.
-3. Review the generated version and `CHANGELOG.md`.
-4. Merge the Release Please PR when ready to publish.
-5. Run `Release` from `main` again. This creates `vX.Y.Z`, publishes the GitHub Release, and runs
+2. Read `docs/PRODUCT_ROADMAP.md`, compare it with the implementation and release state, and choose
+   the allowed version.
+3. Open GitHub Actions and run `Release` from `main`. This creates or updates the Release Please PR.
+4. Review the generated version and `CHANGELOG.md`; stop if the version violates the roadmap gate.
+5. Merge the Release Please PR when ready to publish.
+6. Run `Release` from `main` again. This creates `vX.Y.Z`, publishes the GitHub Release, and runs
    the artifact/npm/Homebrew/GHCR jobs.
 
 If you do not want to publish yet, do not run `Release`, or leave the Release Please PR unmerged.
