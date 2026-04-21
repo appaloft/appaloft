@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.2.7](https://github.com/appaloft/appaloft/compare/v0.2.6...v0.2.7) (2026-04-21)
+
+
+### Features
+
+* **certificates:** implement manual import workflow ([34c4ee8](https://github.com/appaloft/appaloft/commit/34c4ee878fc1485fced3ee32b5ab340fc1fa6fd2))
+* **certificates:** implement manual import workflow ([4911c06](https://github.com/appaloft/appaloft/commit/4911c06e4874cb81815cbd14ee9b6e85f29c6fa2))
+
+
+### Bug Fixes
+
+* sync remote state for preview cleanup ([#34](https://github.com/appaloft/appaloft/issues/34)) ([8ebaf34](https://github.com/appaloft/appaloft/commit/8ebaf3404a66ca04cef8b3b4ec9adae3edb71fc8))
+
+
+### Documentation
+
+* align roadmap release line to 0.2.6 ([#36](https://github.com/appaloft/appaloft/issues/36)) ([54ec69c](https://github.com/appaloft/appaloft/commit/54ec69cc0fb86023b3b140370d055d8d4e18fcc1))
+
 ## [0.2.6](https://github.com/appaloft/appaloft/compare/v0.2.5...v0.2.6) (2026-04-21)
 
 
