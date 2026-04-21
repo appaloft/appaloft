@@ -214,6 +214,18 @@ export interface SourceLinksTable {
 
 type JsonRecord = Record<string, unknown>;
 
+export interface DefaultAccessDomainPoliciesTable {
+  id: string;
+  scope_key: string;
+  scope_kind: string;
+  server_id: string | null;
+  mode: string;
+  provider_key: string | null;
+  template_ref: string | null;
+  last_idempotency_key: string | null;
+  updated_at: UpdatableTimestampColumn;
+}
+
 export interface ServerAppliedRouteStatesTable {
   route_set_id: string;
   project_id: string;
@@ -244,5 +256,6 @@ export interface Database {
   audit_logs: AuditLogsTable;
   provider_job_logs: ProviderJobLogsTable;
   source_links: SourceLinksTable;
+  default_access_domain_policies: DefaultAccessDomainPoliciesTable;
   server_applied_route_states: ServerAppliedRouteStatesTable;
 }

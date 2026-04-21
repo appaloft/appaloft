@@ -89,6 +89,18 @@ Then:
 | DEF-ACCESS-ROUTE-012 | integration | Worker/internal resource | Resource has `exposureMode = none` | Deployment accepted | None | No public route | No proxy route | No |
 | DEF-ACCESS-ROUTE-013 | integration | Server-applied config domain exists | SSH CLI mode has valid server-applied config domain route for same resource/path, no ready or explicitly deployable durable binding exists, and generated policy is enabled | Deployment accepted | None | Server-applied custom route takes precedence over generated default route | Proxy config uses config hostname/path and does not create a managed `DomainBinding` | Per route realization |
 
+## Policy Command Matrix
+
+| Test ID | Preferred automation | Case | Input/state | Expected result | Expected error | Expected route state | Expected UI/API behavior | Retriable |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| DEF-ACCESS-POLICY-001 | integration | System policy persisted | Configure system scope with supported provider mode | Command succeeds and persists provider-neutral system policy | None | Future route resolution reads system policy when no target override exists | CLI/API/Web can submit the command and receive `{ id }` | No |
+| DEF-ACCESS-POLICY-002 | integration | Deployment-target override persisted | Configure deployment-target scope for an existing server | Command succeeds and persists target override | None | Future route resolution reads target override before system/static fallback | Server detail Web form, CLI, and API dispatch the same command payload | No |
+| DEF-ACCESS-POLICY-003 | integration | Idempotent retry | Same scope and same payload are retried with the same idempotency key | Command succeeds and returns the existing policy id | None | No route side effect | Client can safely retry without duplicate records | No |
+| DEF-ACCESS-POLICY-004 | integration | Idempotency conflict | Same scope is retried with the same idempotency key but different payload | Command rejects | `default_access_policy_conflict` | No route side effect | Client receives conflict without hidden overwrite | No |
+| DEF-ACCESS-POLICY-005 | integration | Unsupported provider | Provider mode references an unregistered/unavailable provider key or unsupported custom-template mode | Command rejects | `default_access_provider_unavailable` | No route side effect | Client receives provider-resolution failure with no hidden fallback write | Conditional |
+| DEF-ACCESS-POLICY-006 | integration | Missing deployment target | Deployment-target scope references a server that does not exist | Command rejects | `not_found` | No route side effect | No policy row is created | No |
+| DEF-ACCESS-POLICY-007 | integration | Durable persistence round-trip | System and deployment-target policy rows are stored in PG/PGlite and read back after migration | Store round-trip succeeds | None | Resolver/runtime can consume durable policy after restart | CLI/API/Web writes survive restart through the selected state backend | Query retry only |
+
 ## Pre-Deployment Read Model Matrix
 
 | Test ID | Preferred automation | Case | Input/state | Expected result | Expected error | Expected route state | Expected UI/API behavior | Retriable |
@@ -147,7 +159,7 @@ Then:
 | DEF-ACCESS-ENTRY-003 | e2e-preferred | CLI deploy | Prints generated URL or route status after resource access read-model observation when available; a resource-scoped proxy-config query prints provider-rendered sections when active. |
 | DEF-ACCESS-ENTRY-004 | e2e-preferred | API | Returns/queries provider-neutral route metadata; strict deployment create input remains ids-only; proxy configuration preview is a read-only query. |
 | DEF-ACCESS-ENTRY-005 | e2e-preferred | Domain binding UI | Keeps custom domain creation separate from generated default access. |
-| DEF-ACCESS-ENTRY-006 | e2e-preferred | Policy configuration | Future Web/CLI/API policy editing dispatches `default-access-domain-policies.configure`; static config is not exposed as a hidden business operation. |
+| DEF-ACCESS-ENTRY-006 | e2e-preferred | Policy configuration | Web/CLI/API policy editing dispatches `default-access-domain-policies.configure`; static config is only fallback state, not a hidden public business operation. |
 
 ## Current Implementation Notes And Migration Gaps
 
@@ -166,16 +178,17 @@ from deployment snapshots, exposing server-applied config domains separately fro
 durable managed routes, and `resources.list` has focused coverage for exposing a planned generated
 route before the first deployment.
 
-Remaining gaps: policy-disabled behavior, provider injection through shell composition,
-durable-domain precedence over generated routes, persistence-backed planned-route projection, a real
-Docker/SSH same-`internalPort` e2e assertion, and an end-to-end Web/CLI assertion.
+Remaining gaps: policy-disabled observation across broader UI copy, durable-domain precedence over
+generated routes in broader regression suites, persistence-backed planned-route projection beyond
+focused tests, a real Docker/SSH same-`internalPort` e2e assertion, and richer end-to-end Web
+assertion coverage.
 
 Web typecheck covers the resource detail and Quick Deploy generated URL surfaces, but there is not yet a browser/e2e assertion for those screens.
 
 `resources.proxy-configuration.preview` is active and renders provider-owned read-only
 configuration sections through the edge proxy provider boundary. Application/provider tests cover
-the query-service path, provider-rendered sections, and generated-access provider-key guard; broader
-API/Web/CLI regression coverage remains follow-up.
+the query-service path, provider-rendered sections, generated-access provider-key guard, and the
+default-access policy command path; broader API/Web/CLI regression coverage remains follow-up.
 
 ## Open Questions
 

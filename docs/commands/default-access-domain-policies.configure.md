@@ -2,9 +2,7 @@
 
 ## Normative Contract
 
-`default-access-domain-policies.configure` is the accepted future command for changing generated default access domain policy.
-
-This command is not active until it is added to `CORE_OPERATIONS.md`, `operation-catalog.ts`, Web/API/CLI entrypoints, and tests in the same Code Round. Until then, static installation/server configuration may select a provider, but user-facing policy editing must not be exposed.
+`default-access-domain-policies.configure` is the active command for changing generated default access domain policy.
 
 Command success means the provider-neutral policy state has been accepted and persisted for the requested scope. It does not reconfigure existing deployment route snapshots and does not create or mutate `DomainBinding` state.
 
@@ -120,14 +118,14 @@ packages/providers/default-access-domain-*
 
 ## Current Implementation Notes And Migration Gaps
 
-No active public command currently configures default access domain policy.
+CLI, API/oRPC, and Web now dispatch `default-access-domain-policies.configure`.
 
-Shell/static configuration currently selects the default access provider and generated access routes
-are projected through provider-neutral `ResourceAccessSummary` state.
+Shell/static configuration remains the fallback seam only when no durable system or deployment-target
+policy record exists.
 
-The future command must change policy without treating existing generated routes as durable domain
-bindings. Route precedence hardening and policy-driven refresh behavior remain follow-up workflow
-details.
+Current Web editing is submit-oriented and does not yet load the persisted policy as a first-class
+query/read model. Route precedence hardening and policy-driven refresh behavior remain governed by
+the routing workflow/read-model specs.
 
 ## Open Questions
 

@@ -1,6 +1,7 @@
 import {
   type ArchiveResourceCommandInput,
   type BootstrapServerProxyCommandInput,
+  type ConfigureDefaultAccessDomainPolicyCommandInput,
   type ConfigureResourceHealthCommandInput,
   type ConfigureResourceNetworkCommandInput,
   type ConfigureResourceRuntimeCommandInput,
@@ -40,6 +41,7 @@ import {
 import {
   type ArchiveResourceResponse,
   type BootstrapServerProxyResponse,
+  type ConfigureDefaultAccessDomainPolicyResponse,
   type ConfigureResourceHealthResponse,
   type ConfigureResourceNetworkResponse,
   type ConfigureResourceRuntimeResponse,
@@ -125,6 +127,14 @@ export type AppaloftOrpcClientContract = {
       AppaloftClientContext,
       BootstrapServerProxyCommandInput,
       BootstrapServerProxyResponse,
+      AppaloftClientError
+    >;
+  };
+  defaultAccessDomainPolicies: {
+    configure: Client<
+      AppaloftClientContext,
+      ConfigureDefaultAccessDomainPolicyCommandInput,
+      ConfigureDefaultAccessDomainPolicyResponse,
       AppaloftClientError
     >;
   };

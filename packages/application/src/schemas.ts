@@ -1,5 +1,6 @@
 export * from "./operations/certificates/issue-or-renew-certificate.schema";
 export * from "./operations/certificates/list-certificates.schema";
+export * from "./operations/default-access-domain-policies/configure-default-access-domain-policy.schema";
 export * from "./operations/deployments/create-deployment.schema";
 export * from "./operations/deployments/deployment-logs.schema";
 export * from "./operations/deployments/list-deployments.schema";

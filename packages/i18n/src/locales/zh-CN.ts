@@ -753,6 +753,22 @@ export const zhCN = {
       createValidationError: "请先填写名称、Host 和有效 SSH 端口，再创建这个服务器。",
       description: "部署目标、Provider 和运行健康检查",
       detailDescription: "服务器详情、关联部署和连通性测试",
+      defaultAccessCustomTemplateOption: "custom-template",
+      defaultAccessDisabledOption: "disabled",
+      defaultAccessModeLabel: "默认访问模式",
+      defaultAccessOverrideDescription:
+        "为这个部署目标写入未来生成访问路由的服务器级策略。已有 route snapshot 不会被改写。",
+      defaultAccessOverrideTitle: "服务器默认访问覆盖策略",
+      defaultAccessProviderKeyLabel: "Provider key",
+      defaultAccessProviderKeyPlaceholder: "sslip",
+      defaultAccessProviderOption: "provider",
+      defaultAccessSaveErrorTitle: "无法保存默认访问策略",
+      defaultAccessSaveSuccessTitle: "默认访问策略已保存",
+      defaultAccessSystemDescription:
+        "为未来生成访问路由写入系统默认策略。已有 deployment snapshot 不会被改写。",
+      defaultAccessSystemTitle: "系统默认访问策略",
+      defaultAccessTemplateRefLabel: "Template ref",
+      defaultAccessTemplateRefPlaceholder: "templates/shared/web",
       emptyBody: "新部署流程可以自动创建本地服务器，也可以先在 CLI 中注册远端 SSH 目标。",
       emptyTitle: "还没有服务器目标。",
       focusDescription:
