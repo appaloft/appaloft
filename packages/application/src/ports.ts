@@ -138,27 +138,53 @@ export interface SourceLinkRecord extends SourceLinkTarget {
   reason?: string;
 }
 
-export interface SourceLinkStore {
-  read(sourceFingerprint: string): Promise<Result<SourceLinkRecord | null>>;
-  requireSameTargetOrMissing(
-    sourceFingerprint: string,
-    target: SourceLinkTarget,
-  ): Promise<Result<SourceLinkRecord | null>>;
-  createIfMissing(input: {
-    sourceFingerprint: string;
-    target: SourceLinkTarget;
-    updatedAt: string;
-  }): Promise<Result<SourceLinkRecord>>;
-  relink(input: {
-    sourceFingerprint: string;
-    target: SourceLinkTarget;
-    updatedAt: string;
-    expectedCurrentProjectId?: string;
-    expectedCurrentEnvironmentId?: string;
-    expectedCurrentResourceId?: string;
-    reason?: string;
-  }): Promise<Result<SourceLinkRecord>>;
-  unlink(sourceFingerprint: string): Promise<Result<boolean>>;
+export interface SourceLinkSelectionSpecVisitor<TResult> {
+  visitSourceLinkBySourceFingerprint(
+    query: TResult,
+    spec: SourceLinkBySourceFingerprintSpec,
+  ): TResult;
+}
+
+export interface SourceLinkUpsertSpecVisitor<TResult> {
+  visitUpsertSourceLink(spec: UpsertSourceLinkSpec): TResult;
+}
+
+export interface SourceLinkSelectionSpec {
+  accept<TResult>(query: TResult, visitor: SourceLinkSelectionSpecVisitor<TResult>): TResult;
+}
+
+export interface SourceLinkUpsertSpec {
+  accept<TResult>(visitor: SourceLinkUpsertSpecVisitor<TResult>): TResult;
+}
+
+export class SourceLinkBySourceFingerprintSpec implements SourceLinkSelectionSpec {
+  private constructor(public readonly sourceFingerprint: string) {}
+
+  static create(sourceFingerprint: string): SourceLinkBySourceFingerprintSpec {
+    return new SourceLinkBySourceFingerprintSpec(sourceFingerprint);
+  }
+
+  accept<TResult>(query: TResult, visitor: SourceLinkSelectionSpecVisitor<TResult>): TResult {
+    return visitor.visitSourceLinkBySourceFingerprint(query, this);
+  }
+}
+
+export class UpsertSourceLinkSpec implements SourceLinkUpsertSpec {
+  private constructor(public readonly record: SourceLinkRecord) {}
+
+  static fromRecord(record: SourceLinkRecord): UpsertSourceLinkSpec {
+    return new UpsertSourceLinkSpec(record);
+  }
+
+  accept<TResult>(visitor: SourceLinkUpsertSpecVisitor<TResult>): TResult {
+    return visitor.visitUpsertSourceLink(this);
+  }
+}
+
+export interface SourceLinkRepository {
+  findOne(spec: SourceLinkSelectionSpec): Promise<Result<SourceLinkRecord | null>>;
+  upsert(record: SourceLinkRecord, spec: SourceLinkUpsertSpec): Promise<Result<SourceLinkRecord>>;
+  deleteOne(spec: SourceLinkSelectionSpec): Promise<Result<boolean>>;
 }
 
 export interface ProjectRepository {
@@ -370,40 +396,192 @@ export interface ServerAppliedRouteDesiredStateRecord extends ServerAppliedRoute
 }
 
 export interface ServerAppliedRouteDesiredStateReader {
-  read(
-    target: ServerAppliedRouteDesiredStateTarget,
+  findOne(
+    spec: ServerAppliedRouteStateSelectionSpec,
   ): Promise<Result<ServerAppliedRouteDesiredStateRecord | null>>;
 }
 
-export interface ServerAppliedRouteStateStore extends ServerAppliedRouteDesiredStateReader {
-  upsertDesired(input: {
-    target: ServerAppliedRouteDesiredStateTarget;
-    domains: ServerAppliedRouteDesiredStateDomain[];
-    sourceFingerprint?: string;
-    updatedAt: string;
-  }): Promise<Result<ServerAppliedRouteDesiredStateRecord>>;
-  markApplied(input: {
-    target: ServerAppliedRouteDesiredStateTarget;
+export interface ServerAppliedRouteStateSelectionSpecVisitor<TResult> {
+  visitServerAppliedRouteStateByTarget(
+    query: TResult,
+    spec: ServerAppliedRouteStateByTargetSpec,
+  ): TResult;
+  visitServerAppliedRouteStateByRouteSetId(
+    query: TResult,
+    spec: ServerAppliedRouteStateByRouteSetIdSpec,
+  ): TResult;
+  visitServerAppliedRouteStateBySourceFingerprint(
+    query: TResult,
+    spec: ServerAppliedRouteStateBySourceFingerprintSpec,
+  ): TResult;
+}
+
+export interface ServerAppliedRouteStateUpsertSpecVisitor<TResult> {
+  visitUpsertServerAppliedRouteDesiredState(
+    spec: UpsertServerAppliedRouteDesiredStateSpec,
+  ): TResult;
+}
+
+export interface ServerAppliedRouteStateUpdateSpecVisitor<TResult> {
+  visitMarkServerAppliedRouteApplied(spec: MarkServerAppliedRouteAppliedSpec): TResult;
+  visitMarkServerAppliedRouteFailed(spec: MarkServerAppliedRouteFailedSpec): TResult;
+}
+
+export interface ServerAppliedRouteStateSelectionSpec {
+  accept<TResult>(
+    query: TResult,
+    visitor: ServerAppliedRouteStateSelectionSpecVisitor<TResult>,
+  ): TResult;
+}
+
+export interface ServerAppliedRouteStateUpsertSpec {
+  accept<TResult>(visitor: ServerAppliedRouteStateUpsertSpecVisitor<TResult>): TResult;
+}
+
+export interface ServerAppliedRouteStateUpdateSpec {
+  accept<TResult>(visitor: ServerAppliedRouteStateUpdateSpecVisitor<TResult>): TResult;
+}
+
+export class ServerAppliedRouteStateByTargetSpec implements ServerAppliedRouteStateSelectionSpec {
+  private constructor(public readonly target: ServerAppliedRouteDesiredStateTarget) {}
+
+  static create(target: ServerAppliedRouteDesiredStateTarget): ServerAppliedRouteStateByTargetSpec {
+    return new ServerAppliedRouteStateByTargetSpec(target);
+  }
+
+  accept<TResult>(
+    query: TResult,
+    visitor: ServerAppliedRouteStateSelectionSpecVisitor<TResult>,
+  ): TResult {
+    return visitor.visitServerAppliedRouteStateByTarget(query, this);
+  }
+}
+
+export class ServerAppliedRouteStateByRouteSetIdSpec
+  implements ServerAppliedRouteStateSelectionSpec
+{
+  private constructor(public readonly routeSetId: string) {}
+
+  static create(routeSetId: string): ServerAppliedRouteStateByRouteSetIdSpec {
+    return new ServerAppliedRouteStateByRouteSetIdSpec(routeSetId);
+  }
+
+  accept<TResult>(
+    query: TResult,
+    visitor: ServerAppliedRouteStateSelectionSpecVisitor<TResult>,
+  ): TResult {
+    return visitor.visitServerAppliedRouteStateByRouteSetId(query, this);
+  }
+}
+
+export class ServerAppliedRouteStateBySourceFingerprintSpec
+  implements ServerAppliedRouteStateSelectionSpec
+{
+  private constructor(public readonly sourceFingerprint: string) {}
+
+  static create(sourceFingerprint: string): ServerAppliedRouteStateBySourceFingerprintSpec {
+    return new ServerAppliedRouteStateBySourceFingerprintSpec(sourceFingerprint);
+  }
+
+  accept<TResult>(
+    query: TResult,
+    visitor: ServerAppliedRouteStateSelectionSpecVisitor<TResult>,
+  ): TResult {
+    return visitor.visitServerAppliedRouteStateBySourceFingerprint(query, this);
+  }
+}
+
+export class UpsertServerAppliedRouteDesiredStateSpec implements ServerAppliedRouteStateUpsertSpec {
+  private constructor(public readonly record: ServerAppliedRouteDesiredStateRecord) {}
+
+  static fromRecord(
+    record: ServerAppliedRouteDesiredStateRecord,
+  ): UpsertServerAppliedRouteDesiredStateSpec {
+    return new UpsertServerAppliedRouteDesiredStateSpec(record);
+  }
+
+  accept<TResult>(visitor: ServerAppliedRouteStateUpsertSpecVisitor<TResult>): TResult {
+    return visitor.visitUpsertServerAppliedRouteDesiredState(this);
+  }
+}
+
+export class MarkServerAppliedRouteAppliedSpec implements ServerAppliedRouteStateUpdateSpec {
+  private constructor(
+    public readonly deploymentId: string,
+    public readonly updatedAt: string,
+    public readonly providerKey?: string,
+    public readonly proxyKind?: EdgeProxyKind,
+  ) {}
+
+  static create(input: {
     deploymentId: string;
     updatedAt: string;
-    routeSetId?: string;
     providerKey?: string;
     proxyKind?: EdgeProxyKind;
-  }): Promise<Result<ServerAppliedRouteDesiredStateRecord | null>>;
-  markFailed(input: {
-    target: ServerAppliedRouteDesiredStateTarget;
+  }): MarkServerAppliedRouteAppliedSpec {
+    return new MarkServerAppliedRouteAppliedSpec(
+      input.deploymentId,
+      input.updatedAt,
+      input.providerKey,
+      input.proxyKind,
+    );
+  }
+
+  accept<TResult>(visitor: ServerAppliedRouteStateUpdateSpecVisitor<TResult>): TResult {
+    return visitor.visitMarkServerAppliedRouteApplied(this);
+  }
+}
+
+export class MarkServerAppliedRouteFailedSpec implements ServerAppliedRouteStateUpdateSpec {
+  private constructor(
+    public readonly deploymentId: string,
+    public readonly updatedAt: string,
+    public readonly phase: string,
+    public readonly errorCode: string,
+    public readonly retryable: boolean,
+    public readonly message?: string,
+    public readonly providerKey?: string,
+    public readonly proxyKind?: EdgeProxyKind,
+  ) {}
+
+  static create(input: {
     deploymentId: string;
     updatedAt: string;
     phase: string;
     errorCode: string;
-    message?: string;
     retryable: boolean;
-    routeSetId?: string;
+    message?: string;
     providerKey?: string;
     proxyKind?: EdgeProxyKind;
-  }): Promise<Result<ServerAppliedRouteDesiredStateRecord | null>>;
-  deleteDesired(target: ServerAppliedRouteDesiredStateTarget): Promise<Result<boolean>>;
-  deleteDesiredBySourceFingerprint(sourceFingerprint: string): Promise<Result<number>>;
+  }): MarkServerAppliedRouteFailedSpec {
+    return new MarkServerAppliedRouteFailedSpec(
+      input.deploymentId,
+      input.updatedAt,
+      input.phase,
+      input.errorCode,
+      input.retryable,
+      input.message,
+      input.providerKey,
+      input.proxyKind,
+    );
+  }
+
+  accept<TResult>(visitor: ServerAppliedRouteStateUpdateSpecVisitor<TResult>): TResult {
+    return visitor.visitMarkServerAppliedRouteFailed(this);
+  }
+}
+
+export interface ServerAppliedRouteStateRepository extends ServerAppliedRouteDesiredStateReader {
+  upsert(
+    record: ServerAppliedRouteDesiredStateRecord,
+    spec: ServerAppliedRouteStateUpsertSpec,
+  ): Promise<Result<ServerAppliedRouteDesiredStateRecord>>;
+  updateOne(
+    spec: ServerAppliedRouteStateSelectionSpec,
+    updateSpec: ServerAppliedRouteStateUpdateSpec,
+  ): Promise<Result<ServerAppliedRouteDesiredStateRecord | null>>;
+  deleteOne(spec: ServerAppliedRouteStateSelectionSpec): Promise<Result<boolean>>;
+  deleteMany(spec: ServerAppliedRouteStateSelectionSpec): Promise<Result<number>>;
 }
 
 export interface CertificateRepository {
@@ -2068,11 +2246,65 @@ export interface DefaultAccessDomainPolicyRecord extends DefaultAccessDomainPoli
   idempotencyKey?: string;
 }
 
-export interface DefaultAccessDomainPolicyStore {
-  read(
-    scope: DefaultAccessDomainPolicyScope,
+export interface DefaultAccessDomainPolicySelectionSpecVisitor<TResult> {
+  visitDefaultAccessDomainPolicyByScope(
+    query: TResult,
+    spec: DefaultAccessDomainPolicyByScopeSpec,
+  ): TResult;
+}
+
+export interface DefaultAccessDomainPolicyUpsertSpecVisitor<TResult> {
+  visitUpsertDefaultAccessDomainPolicy(spec: UpsertDefaultAccessDomainPolicySpec): TResult;
+}
+
+export interface DefaultAccessDomainPolicySelectionSpec {
+  accept<TResult>(
+    query: TResult,
+    visitor: DefaultAccessDomainPolicySelectionSpecVisitor<TResult>,
+  ): TResult;
+}
+
+export interface DefaultAccessDomainPolicyUpsertSpec {
+  accept<TResult>(visitor: DefaultAccessDomainPolicyUpsertSpecVisitor<TResult>): TResult;
+}
+
+export class DefaultAccessDomainPolicyByScopeSpec
+  implements DefaultAccessDomainPolicySelectionSpec
+{
+  private constructor(public readonly scope: DefaultAccessDomainPolicyScope) {}
+
+  static create(scope: DefaultAccessDomainPolicyScope): DefaultAccessDomainPolicyByScopeSpec {
+    return new DefaultAccessDomainPolicyByScopeSpec(scope);
+  }
+
+  accept<TResult>(
+    query: TResult,
+    visitor: DefaultAccessDomainPolicySelectionSpecVisitor<TResult>,
+  ): TResult {
+    return visitor.visitDefaultAccessDomainPolicyByScope(query, this);
+  }
+}
+
+export class UpsertDefaultAccessDomainPolicySpec implements DefaultAccessDomainPolicyUpsertSpec {
+  private constructor(public readonly record: DefaultAccessDomainPolicyRecord) {}
+
+  static fromRecord(record: DefaultAccessDomainPolicyRecord): UpsertDefaultAccessDomainPolicySpec {
+    return new UpsertDefaultAccessDomainPolicySpec(record);
+  }
+
+  accept<TResult>(visitor: DefaultAccessDomainPolicyUpsertSpecVisitor<TResult>): TResult {
+    return visitor.visitUpsertDefaultAccessDomainPolicy(this);
+  }
+}
+
+export interface DefaultAccessDomainPolicyRepository {
+  findOne(
+    spec: DefaultAccessDomainPolicySelectionSpec,
   ): Promise<Result<DefaultAccessDomainPolicyRecord | null>>;
-  upsert(record: DefaultAccessDomainPolicyRecord): Promise<Result<DefaultAccessDomainPolicyRecord>>;
+  upsert(
+    record: DefaultAccessDomainPolicyRecord,
+    spec: DefaultAccessDomainPolicyUpsertSpec,
+  ): Promise<Result<DefaultAccessDomainPolicyRecord>>;
 }
 
 export interface DefaultAccessDomainPolicySupport {

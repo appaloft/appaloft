@@ -1,18 +1,149 @@
 import {
+  type MarkServerAppliedRouteAppliedSpec,
+  type MarkServerAppliedRouteFailedSpec,
   type ServerAppliedRouteAppliedState,
   type ServerAppliedRouteDesiredStateDomain,
   type ServerAppliedRouteDesiredStateRecord,
   type ServerAppliedRouteDesiredStateTarget,
   type ServerAppliedRouteFailureState,
-  type ServerAppliedRouteStateStore,
+  type ServerAppliedRouteStateByRouteSetIdSpec,
+  type ServerAppliedRouteStateBySourceFingerprintSpec,
+  type ServerAppliedRouteStateByTargetSpec,
+  type ServerAppliedRouteStateRepository,
+  type ServerAppliedRouteStateSelectionSpec,
+  type ServerAppliedRouteStateSelectionSpecVisitor,
+  type ServerAppliedRouteStateUpdateSpec,
+  type ServerAppliedRouteStateUpdateSpecVisitor,
+  type ServerAppliedRouteStateUpsertSpec,
+  type ServerAppliedRouteStateUpsertSpecVisitor,
+  type UpsertServerAppliedRouteDesiredStateSpec,
 } from "@appaloft/application";
 import { type DomainError, domainError, err, ok, type Result } from "@appaloft/core";
-import { type Kysely, type Selectable } from "kysely";
+import {
+  type Insertable,
+  type Kysely,
+  type Selectable,
+  type SelectQueryBuilder,
+  type Updateable,
+} from "kysely";
 
 import { type Database, type ServerAppliedRouteStatesTable } from "../schema";
 
 type ServerAppliedRouteStateRow = Selectable<ServerAppliedRouteStatesTable>;
 type JsonRecord = Record<string, unknown>;
+type ServerAppliedRouteStateSelectionQuery = SelectQueryBuilder<
+  Database,
+  "server_applied_route_states",
+  Selectable<Database["server_applied_route_states"]>
+>;
+type WhereCapableQuery<TResult> = {
+  where(column: string, op: "=", value: unknown): TResult;
+};
+
+class KyselyServerAppliedRouteStateSelectionVisitor<TResult extends WhereCapableQuery<TResult>>
+  implements ServerAppliedRouteStateSelectionSpecVisitor<TResult>
+{
+  visitServerAppliedRouteStateByTarget(
+    query: TResult,
+    spec: ServerAppliedRouteStateByTargetSpec,
+  ): TResult {
+    return query.where("route_set_id", "=", routeSetKey(spec.target));
+  }
+
+  visitServerAppliedRouteStateByRouteSetId(
+    query: TResult,
+    spec: ServerAppliedRouteStateByRouteSetIdSpec,
+  ): TResult {
+    return query.where("route_set_id", "=", spec.routeSetId);
+  }
+
+  visitServerAppliedRouteStateBySourceFingerprint(
+    query: TResult,
+    spec: ServerAppliedRouteStateBySourceFingerprintSpec,
+  ): TResult {
+    return query.where("source_fingerprint", "=", spec.sourceFingerprint);
+  }
+}
+
+class KyselyServerAppliedRouteStateUpsertVisitor
+  implements
+    ServerAppliedRouteStateUpsertSpecVisitor<{
+      values: Insertable<Database["server_applied_route_states"]>;
+    }>
+{
+  visitUpsertServerAppliedRouteDesiredState(spec: UpsertServerAppliedRouteDesiredStateSpec) {
+    return {
+      values: {
+        route_set_id: spec.record.routeSetId,
+        project_id: spec.record.projectId,
+        environment_id: spec.record.environmentId,
+        resource_id: spec.record.resourceId,
+        server_id: spec.record.serverId,
+        destination_id: spec.record.destinationId ?? null,
+        source_fingerprint: spec.record.sourceFingerprint ?? null,
+        domains: spec.record.domains.map(domainToJson),
+        status: spec.record.status,
+        updated_at: spec.record.updatedAt,
+        last_applied: spec.record.lastApplied
+          ? appliedToJson({
+              deploymentId: spec.record.lastApplied.deploymentId,
+              appliedAt: spec.record.lastApplied.appliedAt,
+              ...(spec.record.lastApplied.providerKey
+                ? { providerKey: spec.record.lastApplied.providerKey }
+                : {}),
+              ...(spec.record.lastApplied.proxyKind
+                ? { proxyKind: spec.record.lastApplied.proxyKind }
+                : {}),
+            })
+          : null,
+        last_failure: spec.record.lastFailure ? failureToJson(spec.record.lastFailure) : null,
+        metadata: {},
+      },
+    };
+  }
+}
+
+class KyselyServerAppliedRouteStateUpdateVisitor
+  implements
+    ServerAppliedRouteStateUpdateSpecVisitor<{
+      values: Updateable<Database["server_applied_route_states"]>;
+    }>
+{
+  visitMarkServerAppliedRouteApplied(spec: MarkServerAppliedRouteAppliedSpec) {
+    return {
+      values: {
+        status: "applied",
+        updated_at: spec.updatedAt,
+        last_applied: appliedToJson({
+          deploymentId: spec.deploymentId,
+          appliedAt: spec.updatedAt,
+          ...(spec.providerKey ? { providerKey: spec.providerKey } : {}),
+          ...(spec.proxyKind ? { proxyKind: spec.proxyKind } : {}),
+        }),
+        last_failure: null,
+      },
+    };
+  }
+
+  visitMarkServerAppliedRouteFailed(spec: MarkServerAppliedRouteFailedSpec) {
+    return {
+      values: {
+        status: "failed",
+        updated_at: spec.updatedAt,
+        last_failure: failureToJson({
+          deploymentId: spec.deploymentId,
+          failedAt: spec.updatedAt,
+          phase: spec.phase,
+          errorCode: spec.errorCode,
+          retryable: spec.retryable,
+          ...(spec.message ? { message: spec.message } : {}),
+          ...(spec.providerKey ? { providerKey: spec.providerKey } : {}),
+          ...(spec.proxyKind ? { proxyKind: spec.proxyKind } : {}),
+        }),
+      },
+    };
+  }
+}
 
 function routeSetKey(target: ServerAppliedRouteDesiredStateTarget): string {
   return [
@@ -22,20 +153,6 @@ function routeSetKey(target: ServerAppliedRouteDesiredStateTarget): string {
     target.serverId,
     target.destinationId ?? "default",
   ].join(":");
-}
-
-function routeStateError(
-  code: string,
-  message: string,
-  details?: Record<string, string | number | boolean | null>,
-): DomainError {
-  return {
-    code,
-    category: "infra",
-    message,
-    retryable: true,
-    ...(details ? { details } : {}),
-  };
 }
 
 function validateNonEmptyContextValue(input: { label: string; value: string }): Result<void> {
@@ -77,6 +194,10 @@ function validateTarget(target: ServerAppliedRouteDesiredStateTarget): Result<vo
   }
 
   return ok(undefined);
+}
+
+function validateRouteSetId(routeSetId: string): Result<void> {
+  return validateNonEmptyContextValue({ label: "routeSetId", value: routeSetId });
 }
 
 function validateSourceFingerprint(sourceFingerprint: string): Result<void> {
@@ -181,6 +302,48 @@ function validateDomains(domains: readonly ServerAppliedRouteDesiredStateDomain[
   }
 
   return ok(undefined);
+}
+
+function validateRecord(record: ServerAppliedRouteDesiredStateRecord): Result<void> {
+  const targetResult = validateTarget({
+    projectId: record.projectId,
+    environmentId: record.environmentId,
+    resourceId: record.resourceId,
+    serverId: record.serverId,
+    ...(record.destinationId ? { destinationId: record.destinationId } : {}),
+  });
+  if (targetResult.isErr()) {
+    return err(targetResult.error);
+  }
+
+  const routeSetIdResult = validateRouteSetId(record.routeSetId);
+  if (routeSetIdResult.isErr()) {
+    return err(routeSetIdResult.error);
+  }
+
+  const domainsResult = validateDomains(record.domains);
+  if (domainsResult.isErr()) {
+    return err(domainsResult.error);
+  }
+
+  if (record.sourceFingerprint) {
+    const fingerprintResult = validateSourceFingerprint(record.sourceFingerprint);
+    if (fingerprintResult.isErr()) {
+      return err(fingerprintResult.error);
+    }
+  }
+
+  return ok(undefined);
+}
+
+function validateSelectionSpec(spec: ServerAppliedRouteStateSelectionSpec): Result<void> {
+  return spec.accept(ok(undefined), {
+    visitServerAppliedRouteStateByTarget: (_query, targetSpec) => validateTarget(targetSpec.target),
+    visitServerAppliedRouteStateByRouteSetId: (_query, routeSetSpec) =>
+      validateRouteSetId(routeSetSpec.routeSetId),
+    visitServerAppliedRouteStateBySourceFingerprint: (_query, sourceFingerprintSpec) =>
+      validateSourceFingerprint(sourceFingerprintSpec.sourceFingerprint),
+  } satisfies ServerAppliedRouteStateSelectionSpecVisitor<Result<void>>);
 }
 
 function normalizeTimestamp(value: unknown): string {
@@ -358,66 +521,59 @@ function persistenceError(message: string, error: unknown): DomainError {
   });
 }
 
-export class PgServerAppliedRouteStateStore implements ServerAppliedRouteStateStore {
+export class PgServerAppliedRouteStateRepository implements ServerAppliedRouteStateRepository {
   constructor(private readonly db: Kysely<Database>) {}
 
-  async upsertDesired(input: {
-    target: ServerAppliedRouteDesiredStateTarget;
-    domains: ServerAppliedRouteDesiredStateDomain[];
-    sourceFingerprint?: string;
-    updatedAt: string;
-  }): Promise<Result<ServerAppliedRouteDesiredStateRecord>> {
-    const targetResult = validateTarget(input.target);
-    if (targetResult.isErr()) {
-      return err(targetResult.error);
+  async findOne(
+    spec: ServerAppliedRouteStateSelectionSpec,
+  ): Promise<Result<ServerAppliedRouteDesiredStateRecord | null>> {
+    const validation = validateSelectionSpec(spec);
+    if (validation.isErr()) {
+      return err(validation.error);
     }
-
-    const domainsResult = validateDomains(input.domains);
-    if (domainsResult.isErr()) {
-      return err(domainsResult.error);
-    }
-
-    if (input.sourceFingerprint) {
-      const fingerprintResult = validateSourceFingerprint(input.sourceFingerprint);
-      if (fingerprintResult.isErr()) {
-        return err(fingerprintResult.error);
-      }
-    }
-
-    const values = {
-      route_set_id: routeSetKey(input.target),
-      project_id: input.target.projectId,
-      environment_id: input.target.environmentId,
-      resource_id: input.target.resourceId,
-      server_id: input.target.serverId,
-      destination_id: input.target.destinationId ?? null,
-      source_fingerprint: input.sourceFingerprint ?? null,
-      domains: input.domains.map(domainToJson),
-      status: "desired",
-      updated_at: input.updatedAt,
-      last_applied: null,
-      last_failure: null,
-      metadata: {},
-    };
 
     try {
+      const row = await spec
+        .accept(
+          this.db.selectFrom("server_applied_route_states").selectAll(),
+          new KyselyServerAppliedRouteStateSelectionVisitor<ServerAppliedRouteStateSelectionQuery>(),
+        )
+        .executeTakeFirst();
+
+      return ok(row ? mapRow(row) : null);
+    } catch (error) {
+      return err(persistenceError("Server-applied route state could not be read", error));
+    }
+  }
+
+  async upsert(
+    record: ServerAppliedRouteDesiredStateRecord,
+    spec: ServerAppliedRouteStateUpsertSpec,
+  ): Promise<Result<ServerAppliedRouteDesiredStateRecord>> {
+    const recordResult = validateRecord(record);
+    if (recordResult.isErr()) {
+      return err(recordResult.error);
+    }
+
+    try {
+      const mutation = spec.accept(new KyselyServerAppliedRouteStateUpsertVisitor());
       const row = await this.db
         .insertInto("server_applied_route_states")
-        .values(values)
+        .values(mutation.values)
         .onConflict((conflict) =>
           conflict.column("route_set_id").doUpdateSet({
-            project_id: values.project_id,
-            environment_id: values.environment_id,
-            resource_id: values.resource_id,
-            server_id: values.server_id,
-            destination_id: values.destination_id,
-            source_fingerprint: values.source_fingerprint,
-            domains: values.domains,
-            status: values.status,
-            updated_at: values.updated_at,
-            last_applied: null,
-            last_failure: null,
-            metadata: values.metadata,
+            project_id: mutation.values.project_id,
+            environment_id: mutation.values.environment_id,
+            resource_id: mutation.values.resource_id,
+            server_id: mutation.values.server_id,
+            destination_id: mutation.values.destination_id,
+            source_fingerprint: mutation.values.source_fingerprint,
+            domains: mutation.values.domains,
+            status: mutation.values.status,
+            updated_at: mutation.values.updated_at,
+            last_applied: mutation.values.last_applied,
+            last_failure: mutation.values.last_failure,
+            metadata: mutation.values.metadata,
           }),
         )
         .returningAll()
@@ -429,133 +585,46 @@ export class PgServerAppliedRouteStateStore implements ServerAppliedRouteStateSt
     }
   }
 
-  async read(
-    target: ServerAppliedRouteDesiredStateTarget,
+  async updateOne(
+    spec: ServerAppliedRouteStateSelectionSpec,
+    updateSpec: ServerAppliedRouteStateUpdateSpec,
   ): Promise<Result<ServerAppliedRouteDesiredStateRecord | null>> {
-    const targetResult = validateTarget(target);
-    if (targetResult.isErr()) {
-      return err(targetResult.error);
+    const validation = validateSelectionSpec(spec);
+    if (validation.isErr()) {
+      return err(validation.error);
     }
 
     try {
-      const exact = await this.readRouteSet(routeSetKey(target));
-      if (exact || !target.destinationId) {
-        return ok(exact);
-      }
+      const mutation = updateSpec.accept<{
+        values: Updateable<Database["server_applied_route_states"]>;
+      }>(new KyselyServerAppliedRouteStateUpdateVisitor());
+      const updated = await spec
+        .accept(
+          this.db.updateTable("server_applied_route_states"),
+          new KyselyServerAppliedRouteStateSelectionVisitor(),
+        )
+        .set(mutation.values)
+        .returningAll()
+        .executeTakeFirst();
 
-      return ok(
-        await this.readRouteSet(
-          routeSetKey({
-            projectId: target.projectId,
-            environmentId: target.environmentId,
-            resourceId: target.resourceId,
-            serverId: target.serverId,
-          }),
-        ),
-      );
+      return ok(updated ? mapRow(updated) : null);
     } catch (error) {
-      return err(persistenceError("Server-applied route state could not be read", error));
+      return err(persistenceError("Server-applied route state could not be updated", error));
     }
   }
 
-  async markApplied(input: {
-    target: ServerAppliedRouteDesiredStateTarget;
-    deploymentId: string;
-    updatedAt: string;
-    routeSetId?: string;
-    providerKey?: string;
-    proxyKind?: ServerAppliedRouteAppliedState["proxyKind"];
-  }): Promise<Result<ServerAppliedRouteDesiredStateRecord | null>> {
-    const existing = await this.readForStatusUpdate(input.target, input.routeSetId);
-    if (existing.isErr() || !existing.value) {
-      return existing;
+  async deleteOne(spec: ServerAppliedRouteStateSelectionSpec): Promise<Result<boolean>> {
+    const validation = validateSelectionSpec(spec);
+    if (validation.isErr()) {
+      return err(validation.error);
     }
 
     try {
-      return ok(
-        await this.updateStatus(existing.value.routeSetId, {
-          status: "applied",
-          updated_at: input.updatedAt,
-          last_applied: appliedToJson({
-            deploymentId: input.deploymentId,
-            appliedAt: input.updatedAt,
-            ...(input.providerKey ? { providerKey: input.providerKey } : {}),
-            ...(input.proxyKind ? { proxyKind: input.proxyKind } : {}),
-          }),
-          last_failure: null,
-        }),
-      );
-    } catch (error) {
-      return err(
-        persistenceError("Server-applied route applied state could not be persisted", error),
-      );
-    }
-  }
-
-  async markFailed(input: {
-    target: ServerAppliedRouteDesiredStateTarget;
-    deploymentId: string;
-    updatedAt: string;
-    phase: string;
-    errorCode: string;
-    message?: string;
-    retryable: boolean;
-    routeSetId?: string;
-    providerKey?: string;
-    proxyKind?: ServerAppliedRouteFailureState["proxyKind"];
-  }): Promise<Result<ServerAppliedRouteDesiredStateRecord | null>> {
-    const existing = await this.readForStatusUpdate(input.target, input.routeSetId);
-    if (existing.isErr() || !existing.value) {
-      return existing;
-    }
-
-    const record = existing.value;
-    const lastApplied = record.lastApplied
-      ? appliedToJson({
-          deploymentId: record.lastApplied.deploymentId,
-          appliedAt: record.lastApplied.appliedAt,
-          ...(record.lastApplied.providerKey
-            ? { providerKey: record.lastApplied.providerKey }
-            : {}),
-          ...(record.lastApplied.proxyKind ? { proxyKind: record.lastApplied.proxyKind } : {}),
-        })
-      : null;
-
-    try {
-      return ok(
-        await this.updateStatus(record.routeSetId, {
-          status: "failed",
-          updated_at: input.updatedAt,
-          last_applied: lastApplied,
-          last_failure: failureToJson({
-            deploymentId: input.deploymentId,
-            failedAt: input.updatedAt,
-            phase: input.phase,
-            errorCode: input.errorCode,
-            retryable: input.retryable,
-            ...(input.message ? { message: input.message } : {}),
-            ...(input.providerKey ? { providerKey: input.providerKey } : {}),
-            ...(input.proxyKind ? { proxyKind: input.proxyKind } : {}),
-          }),
-        }),
-      );
-    } catch (error) {
-      return err(
-        persistenceError("Server-applied route failed state could not be persisted", error),
-      );
-    }
-  }
-
-  async deleteDesired(target: ServerAppliedRouteDesiredStateTarget): Promise<Result<boolean>> {
-    const targetResult = validateTarget(target);
-    if (targetResult.isErr()) {
-      return err(targetResult.error);
-    }
-
-    try {
-      const deleted = await this.db
-        .deleteFrom("server_applied_route_states")
-        .where("route_set_id", "=", routeSetKey(target))
+      const deleted = await spec
+        .accept(
+          this.db.deleteFrom("server_applied_route_states"),
+          new KyselyServerAppliedRouteStateSelectionVisitor(),
+        )
         .returning("route_set_id")
         .executeTakeFirst();
 
@@ -565,78 +634,23 @@ export class PgServerAppliedRouteStateStore implements ServerAppliedRouteStateSt
     }
   }
 
-  async deleteDesiredBySourceFingerprint(sourceFingerprint: string): Promise<Result<number>> {
-    const fingerprintResult = validateSourceFingerprint(sourceFingerprint);
-    if (fingerprintResult.isErr()) {
-      return err(fingerprintResult.error);
+  async deleteMany(spec: ServerAppliedRouteStateSelectionSpec): Promise<Result<number>> {
+    const validation = validateSelectionSpec(spec);
+    if (validation.isErr()) {
+      return err(validation.error);
     }
 
     try {
-      const deleted = await this.db
-        .deleteFrom("server_applied_route_states")
-        .where("source_fingerprint", "=", sourceFingerprint)
+      const deleted = await spec
+        .accept(
+          this.db.deleteFrom("server_applied_route_states"),
+          new KyselyServerAppliedRouteStateSelectionVisitor(),
+        )
         .executeTakeFirst();
 
       return ok(Number(deleted.numDeletedRows));
     } catch (error) {
       return err(persistenceError("Server-applied route state sweep could not be removed", error));
     }
-  }
-
-  private async readRouteSet(
-    routeSetId: string,
-  ): Promise<ServerAppliedRouteDesiredStateRecord | null> {
-    const row = await this.db
-      .selectFrom("server_applied_route_states")
-      .selectAll()
-      .where("route_set_id", "=", routeSetId)
-      .executeTakeFirst();
-
-    return row ? mapRow(row) : null;
-  }
-
-  private async readForStatusUpdate(
-    target: ServerAppliedRouteDesiredStateTarget,
-    expectedRouteSetId?: string,
-  ): Promise<Result<ServerAppliedRouteDesiredStateRecord | null>> {
-    const existing = await this.read(target);
-    if (existing.isErr() || !existing.value) {
-      return existing;
-    }
-
-    if (expectedRouteSetId && existing.value.routeSetId !== expectedRouteSetId) {
-      return err(
-        routeStateError(
-          "server_applied_route_state_conflict",
-          "Server-applied route state did not match expected route set",
-          {
-            phase: "proxy-route-realization",
-            expectedRouteSetId,
-            actualRouteSetId: existing.value.routeSetId,
-          },
-        ),
-      );
-    }
-
-    return existing;
-  }
-
-  private async updateStatus(
-    routeSetId: string,
-    input: {
-      status: "applied" | "failed";
-      updated_at: string;
-      last_applied: JsonRecord | null;
-      last_failure: JsonRecord | null;
-    },
-  ): Promise<ServerAppliedRouteDesiredStateRecord | null> {
-    const updated = await this.db
-      .updateTable("server_applied_route_states")
-      .set(input)
-      .where("route_set_id", "=", routeSetId)
-      .returningAll()
-      .executeTakeFirst();
-
-    return updated ? mapRow(updated) : null;
   }
 }

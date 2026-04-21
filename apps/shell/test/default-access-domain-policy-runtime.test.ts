@@ -3,9 +3,10 @@ import "reflect-metadata";
 import { describe, expect, test } from "bun:test";
 import {
   createExecutionContext,
+  type DefaultAccessDomainPolicyByScopeSpec,
   type DefaultAccessDomainPolicyRecord,
+  type DefaultAccessDomainPolicyRepository,
   type DefaultAccessDomainPolicyScope,
-  type DefaultAccessDomainPolicyStore,
 } from "@appaloft/application";
 import { type AppConfig } from "@appaloft/config";
 import { ok, type Result } from "@appaloft/core";
@@ -19,13 +20,13 @@ class NoopLogger {
   error(): void {}
 }
 
-class MemoryDefaultAccessDomainPolicyStore implements DefaultAccessDomainPolicyStore {
+class MemoryDefaultAccessDomainPolicyRepository implements DefaultAccessDomainPolicyRepository {
   readonly items = new Map<string, DefaultAccessDomainPolicyRecord>();
 
-  async read(
-    scope: DefaultAccessDomainPolicyScope,
+  async findOne(
+    spec: DefaultAccessDomainPolicyByScopeSpec,
   ): Promise<Result<DefaultAccessDomainPolicyRecord | null>> {
-    return ok(this.items.get(this.scopeKey(scope)) ?? null);
+    return ok(this.items.get(this.scopeKey(spec.scope)) ?? null);
   }
 
   async upsert(
@@ -71,7 +72,7 @@ function requestFixture() {
 
 describe("PolicyAwareDefaultAccessDomainProvider", () => {
   test("[DEF-ACCESS-PROVIDER-001] uses deployment-target policy before system and static fallback", async () => {
-    const store = new MemoryDefaultAccessDomainPolicyStore();
+    const store = new MemoryDefaultAccessDomainPolicyRepository();
     store.items.set("system", {
       id: "dap_system",
       scope: { kind: "system" },
@@ -103,7 +104,7 @@ describe("PolicyAwareDefaultAccessDomainProvider", () => {
   });
 
   test("[DEF-ACCESS-PROVIDER-001] uses system policy before static fallback", async () => {
-    const store = new MemoryDefaultAccessDomainPolicyStore();
+    const store = new MemoryDefaultAccessDomainPolicyRepository();
     store.items.set("system", {
       id: "dap_system",
       scope: { kind: "system" },
@@ -127,7 +128,7 @@ describe("PolicyAwareDefaultAccessDomainProvider", () => {
 
   test("[DEF-ACCESS-PROVIDER-001] falls back to static config when durable policy is missing", async () => {
     const provider = new PolicyAwareDefaultAccessDomainProvider(
-      new MemoryDefaultAccessDomainPolicyStore(),
+      new MemoryDefaultAccessDomainPolicyRepository(),
       configFixture(),
       new NoopLogger(),
     );

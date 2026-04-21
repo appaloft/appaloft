@@ -1,8 +1,9 @@
 import {
   type AppLogger,
   type DefaultAccessDomainGeneration,
+  DefaultAccessDomainPolicyByScopeSpec,
   type DefaultAccessDomainPolicyConfiguration,
-  type DefaultAccessDomainPolicyStore,
+  type DefaultAccessDomainPolicyRepository,
   type DefaultAccessDomainPolicySupport,
   type DefaultAccessDomainProvider,
   type DefaultAccessDomainRequest,
@@ -114,7 +115,7 @@ export class PolicyAwareDefaultAccessDomainProvider implements DefaultAccessDoma
   private readonly providers: Map<string, DefaultAccessDomainProvider>;
 
   constructor(
-    private readonly policyStore: DefaultAccessDomainPolicyStore,
+    private readonly policyRepository: DefaultAccessDomainPolicyRepository,
     private readonly config: AppConfig["defaultAccessDomain"],
     private readonly logger: AppLogger,
   ) {
@@ -125,17 +126,21 @@ export class PolicyAwareDefaultAccessDomainProvider implements DefaultAccessDoma
     context: ExecutionContext,
     input: DefaultAccessDomainRequest,
   ): Promise<Result<DefaultAccessDomainGeneration>> {
-    const serverScoped = await this.policyStore.read({
-      kind: "deployment-target",
-      serverId: input.serverId,
-    });
+    const serverScoped = await this.policyRepository.findOne(
+      DefaultAccessDomainPolicyByScopeSpec.create({
+        kind: "deployment-target",
+        serverId: input.serverId,
+      }),
+    );
     if (serverScoped.isErr()) {
       return err(serverScoped.error);
     }
 
     const systemScoped = serverScoped.value
       ? ok<DefaultAccessDomainPolicyConfiguration | null>(serverScoped.value)
-      : await this.policyStore.read({ kind: "system" });
+      : await this.policyRepository.findOne(
+          DefaultAccessDomainPolicyByScopeSpec.create({ kind: "system" }),
+        );
     if (systemScoped.isErr()) {
       return err(systemScoped.error);
     }

@@ -33,6 +33,7 @@ import {
   type ServerAppliedRouteDesiredStateDomain,
   type ServerAppliedRouteDesiredStateReader,
   type ServerAppliedRouteDesiredStateRecord,
+  ServerAppliedRouteStateByTargetSpec,
   type SourceDetector,
 } from "../../ports";
 import { tokens } from "../../tokens";
@@ -577,8 +578,8 @@ export class CreateDeploymentUseCase {
     private readonly deploymentLifecycleService: DeploymentLifecycleService,
     @inject(tokens.domainRouteBindingReader)
     private readonly domainRouteBindingReader?: DomainRouteBindingReader,
-    @inject(tokens.serverAppliedRouteDesiredStateReader)
-    private readonly serverAppliedRouteDesiredStateReader?: ServerAppliedRouteDesiredStateReader,
+    @inject(tokens.serverAppliedRouteStateRepository)
+    private readonly serverAppliedRouteStateRepository?: ServerAppliedRouteDesiredStateReader,
   ) {}
 
   async execute(
@@ -599,7 +600,7 @@ export class CreateDeploymentUseCase {
       deploymentProgressReporter,
       runtimePlanResolutionInputBuilder,
       runtimePlanResolver,
-      serverAppliedRouteDesiredStateReader,
+      serverAppliedRouteStateRepository,
       sourceDetector,
     } = this;
     const repositoryContext = toRepositoryContext(context);
@@ -674,9 +675,25 @@ export class CreateDeploymentUseCase {
         serverId: server.toState().id.value,
         destinationId: destination.toState().id.value,
       };
-      const serverAppliedRouteDesiredState = serverAppliedRouteDesiredStateReader
-        ? yield* await serverAppliedRouteDesiredStateReader.read(targetContext)
+      let serverAppliedRouteDesiredState = serverAppliedRouteStateRepository
+        ? yield* await serverAppliedRouteStateRepository.findOne(
+            ServerAppliedRouteStateByTargetSpec.create(targetContext),
+          )
         : null;
+      if (
+        !serverAppliedRouteDesiredState &&
+        serverAppliedRouteStateRepository &&
+        targetContext.destinationId
+      ) {
+        serverAppliedRouteDesiredState = yield* await serverAppliedRouteStateRepository.findOne(
+          ServerAppliedRouteStateByTargetSpec.create({
+            projectId: targetContext.projectId,
+            environmentId: targetContext.environmentId,
+            resourceId: targetContext.resourceId,
+            serverId: targetContext.serverId,
+          }),
+        );
+      }
       const routeBindings = domainRouteBindingReader
         ? await domainRouteBindingReader.listDeployableBindings(repositoryContext, {
             projectId: targetContext.projectId,

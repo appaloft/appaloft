@@ -111,6 +111,8 @@ import {
   type ServerAppliedRouteDesiredStateReader,
   type ServerAppliedRouteDesiredStateRecord,
   type ServerAppliedRouteDesiredStateTarget,
+  type ServerAppliedRouteStateSelectionSpec,
+  type ServerAppliedRouteStateSelectionSpecVisitor,
   type SourceDetector,
 } from "../src/ports";
 import {
@@ -184,11 +186,25 @@ class StaticServerAppliedRouteDesiredStateReader implements ServerAppliedRouteDe
 
   constructor(private readonly record: ServerAppliedRouteDesiredStateRecord | null) {}
 
-  async read(
-    target: ServerAppliedRouteDesiredStateTarget,
+  async findOne(
+    spec: ServerAppliedRouteStateSelectionSpec,
   ): Promise<Result<ServerAppliedRouteDesiredStateRecord | null>> {
-    this.targets.push(target);
-    return ok(this.record);
+    const unsupported: Result<ServerAppliedRouteDesiredStateRecord | null> = err(
+      domainError.validation("Unsupported route-state selection spec for test reader", {
+        phase: "test-double",
+      }),
+    );
+
+    return spec.accept(unsupported, {
+      visitServerAppliedRouteStateByTarget: (_query, targetSpec) => {
+        this.targets.push(targetSpec.target);
+        return ok(this.record);
+      },
+      visitServerAppliedRouteStateByRouteSetId: () => unsupported,
+      visitServerAppliedRouteStateBySourceFingerprint: () => unsupported,
+    } satisfies ServerAppliedRouteStateSelectionSpecVisitor<
+      Result<ServerAppliedRouteDesiredStateRecord | null>
+    >);
   }
 }
 

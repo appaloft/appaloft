@@ -4,8 +4,10 @@ export const tokens = {
   logger: Symbol.for("appaloft.logger"),
   eventBus: Symbol.for("appaloft.event_bus"),
   deploymentProgressReporter: Symbol.for("appaloft.deployment_progress_reporter"),
-  sourceLinkStore: Symbol.for("appaloft.source_link_store"),
-  defaultAccessDomainPolicyStore: Symbol.for("appaloft.default_access_domain_policy_store"),
+  sourceLinkRepository: Symbol.for("appaloft.source_link_repository"),
+  defaultAccessDomainPolicyRepository: Symbol.for(
+    "appaloft.default_access_domain_policy_repository",
+  ),
   defaultAccessDomainPolicySupport: Symbol.for("appaloft.default_access_domain_policy_support"),
   serverConnectivityChecker: Symbol.for("appaloft.server_connectivity_checker"),
   serverEdgeProxyBootstrapper: Symbol.for("appaloft.server_edge_proxy_bootstrapper"),
@@ -21,9 +23,7 @@ export const tokens = {
   domainOwnershipVerifier: Symbol.for("appaloft.domain_ownership_verifier"),
   domainRouteFailureCandidateReader: Symbol.for("appaloft.domain_route_failure_candidate_reader"),
   domainRouteBindingReader: Symbol.for("appaloft.domain_route_binding_reader"),
-  serverAppliedRouteDesiredStateReader: Symbol.for(
-    "appaloft.server_applied_route_desired_state_reader",
-  ),
+  serverAppliedRouteStateRepository: Symbol.for("appaloft.server_applied_route_state_repository"),
   certificateRepository: Symbol.for("appaloft.certificate_repository"),
   certificateRetryCandidateReader: Symbol.for("appaloft.certificate_retry_candidate_reader"),
   sshCredentialRepository: Symbol.for("appaloft.ssh_credential_repository"),

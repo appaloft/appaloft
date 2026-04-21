@@ -55,9 +55,13 @@ import {
   type DeploymentReadModel,
   type ExecutionBackend,
   type ServerAppliedRouteDesiredStateRecord,
-  type ServerAppliedRouteStateStore,
+  ServerAppliedRouteStateBySourceFingerprintSpec,
+  type ServerAppliedRouteStateByTargetSpec,
+  type ServerAppliedRouteStateRepository,
+  type ServerAppliedRouteStateSelectionSpec,
+  type SourceLinkBySourceFingerprintSpec,
   type SourceLinkRecord,
-  type SourceLinkStore,
+  type SourceLinkRepository,
 } from "../src/ports";
 import { CleanupPreviewUseCase } from "../src/use-cases";
 
@@ -235,79 +239,88 @@ function createDeploymentSummary(input?: {
   };
 }
 
-class MemorySourceLinkStore implements SourceLinkStore {
-  readonly unlinked: string[] = [];
+class MemorySourceLinkRepository implements SourceLinkRepository {
+  readonly deletedFingerprints: string[] = [];
 
   constructor(private record: SourceLinkRecord | null) {}
 
-  async read(_sourceFingerprint: string): Promise<Result<SourceLinkRecord | null>> {
-    return ok(this.record);
-  }
-
-  async requireSameTargetOrMissing(): Promise<Result<SourceLinkRecord | null>> {
-    return ok(this.record);
-  }
-
-  async createIfMissing(): Promise<Result<SourceLinkRecord>> {
-    if (!this.record) {
-      throw new Error("Unexpected createIfMissing call");
+  async findOne(spec: SourceLinkBySourceFingerprintSpec): Promise<Result<SourceLinkRecord | null>> {
+    if (!this.record || this.record.sourceFingerprint !== spec.sourceFingerprint) {
+      return ok(null);
     }
+
     return ok(this.record);
   }
 
-  async relink(): Promise<Result<SourceLinkRecord>> {
-    if (!this.record) {
-      throw new Error("Unexpected relink call");
-    }
-    return ok(this.record);
+  async upsert(record: SourceLinkRecord): Promise<Result<SourceLinkRecord>> {
+    this.record = record;
+    return ok(record);
   }
 
-  async unlink(sourceFingerprint: string): Promise<Result<boolean>> {
-    if (!this.record || this.record.sourceFingerprint !== sourceFingerprint) {
+  async deleteOne(spec: SourceLinkBySourceFingerprintSpec): Promise<Result<boolean>> {
+    if (!this.record || this.record.sourceFingerprint !== spec.sourceFingerprint) {
       return ok(false);
     }
 
-    this.unlinked.push(sourceFingerprint);
+    this.deletedFingerprints.push(spec.sourceFingerprint);
     this.record = null;
     return ok(true);
   }
 }
 
-class CapturingServerAppliedRouteStateStore implements ServerAppliedRouteStateStore {
-  readonly deletedTargets: Array<Parameters<ServerAppliedRouteStateStore["deleteDesired"]>[0]> = [];
+class CapturingServerAppliedRouteStateRepository implements ServerAppliedRouteStateRepository {
+  readonly deletedTargets: ServerAppliedRouteStateByTargetSpec["target"][] = [];
   readonly deletedSourceFingerprints: string[] = [];
 
   constructor(
     private readonly deleteResult: Result<boolean> = ok(true),
-    private readonly deleteBySourceFingerprintResult: Result<number> = ok(0),
+    private readonly deleteManyResult: Result<number> = ok(0),
   ) {}
 
-  async upsertDesired(): Promise<Result<ServerAppliedRouteDesiredStateRecord>> {
+  async upsert(): Promise<Result<ServerAppliedRouteDesiredStateRecord>> {
     throw new Error("Unexpected upsertDesired call");
   }
 
-  async read(): Promise<Result<ServerAppliedRouteDesiredStateRecord | null>> {
+  async findOne(): Promise<Result<ServerAppliedRouteDesiredStateRecord | null>> {
     return ok(null);
   }
 
-  async markApplied(): Promise<Result<ServerAppliedRouteDesiredStateRecord | null>> {
+  async updateOne(): Promise<Result<ServerAppliedRouteDesiredStateRecord | null>> {
     return ok(null);
   }
 
-  async markFailed(): Promise<Result<ServerAppliedRouteDesiredStateRecord | null>> {
-    return ok(null);
+  async deleteOne(spec: ServerAppliedRouteStateSelectionSpec): Promise<Result<boolean>> {
+    const unsupported: Result<boolean> = err(
+      domainError.validation("Unsupported route-state selection spec for test repository", {
+        phase: "test-double",
+      }),
+    );
+
+    return spec.accept<Result<boolean>>(unsupported, {
+      visitServerAppliedRouteStateByTarget: (_query, targetSpec) => {
+        this.deletedTargets.push(targetSpec.target);
+        return this.deleteResult;
+      },
+      visitServerAppliedRouteStateByRouteSetId: () => unsupported,
+      visitServerAppliedRouteStateBySourceFingerprint: () => unsupported,
+    });
   }
 
-  async deleteDesired(
-    target: Parameters<ServerAppliedRouteStateStore["deleteDesired"]>[0],
-  ): Promise<Result<boolean>> {
-    this.deletedTargets.push(target);
-    return this.deleteResult;
-  }
+  async deleteMany(spec: ServerAppliedRouteStateSelectionSpec): Promise<Result<number>> {
+    const unsupported: Result<number> = err(
+      domainError.validation("Unsupported route-state selection spec for test repository", {
+        phase: "test-double",
+      }),
+    );
 
-  async deleteDesiredBySourceFingerprint(sourceFingerprint: string): Promise<Result<number>> {
-    this.deletedSourceFingerprints.push(sourceFingerprint);
-    return this.deleteBySourceFingerprintResult;
+    return spec.accept<Result<number>>(unsupported, {
+      visitServerAppliedRouteStateByTarget: () => unsupported,
+      visitServerAppliedRouteStateByRouteSetId: () => unsupported,
+      visitServerAppliedRouteStateBySourceFingerprint: (_query, sourceFingerprintSpec) => {
+        this.deletedSourceFingerprints.push(sourceFingerprintSpec.sourceFingerprint);
+        return this.deleteManyResult;
+      },
+    });
   }
 }
 
@@ -344,14 +357,14 @@ class MemoryDeploymentReadModel implements DeploymentReadModel {
 
 describe("CleanupPreviewUseCase", () => {
   test("[DEPLOYMENTS-CLEANUP-PREVIEW-001][CONFIG-FILE-ENTRY-019] returns already-clean when no preview source link exists", async () => {
-    const sourceLinkStore = new MemorySourceLinkStore(null);
-    const routeStore = new CapturingServerAppliedRouteStateStore();
+    const sourceLinkRepository = new MemorySourceLinkRepository(null);
+    const routeRepository = new CapturingServerAppliedRouteStateRepository();
     const executionBackend = new CapturingExecutionBackend();
     const deployments = new MemoryDeploymentRepository();
     const deploymentReadModel = new MemoryDeploymentReadModel();
     const useCase = new CleanupPreviewUseCase(
-      sourceLinkStore,
-      routeStore,
+      sourceLinkRepository,
+      routeRepository,
       deployments,
       deploymentReadModel,
       executionBackend,
@@ -374,13 +387,13 @@ describe("CleanupPreviewUseCase", () => {
       removedSourceLink: false,
     });
     expect(executionBackend.canceledDeploymentIds).toEqual([]);
-    expect(routeStore.deletedTargets).toEqual([]);
-    expect(routeStore.deletedSourceFingerprints).toEqual([]);
-    expect(sourceLinkStore.unlinked).toEqual([]);
+    expect(routeRepository.deletedTargets).toEqual([]);
+    expect(routeRepository.deletedSourceFingerprints).toEqual([]);
+    expect(sourceLinkRepository.deletedFingerprints).toEqual([]);
   });
 
   test("[DEPLOYMENTS-CLEANUP-PREVIEW-002][CONFIG-FILE-ENTRY-019] cleans runtime, route state, and source link for a preview", async () => {
-    const sourceLinkStore = new MemorySourceLinkStore({
+    const sourceLinkRepository = new MemorySourceLinkRepository({
       sourceFingerprint: previewSourceFingerprint,
       projectId: "prj_preview_1",
       environmentId: "env_preview_1",
@@ -389,7 +402,7 @@ describe("CleanupPreviewUseCase", () => {
       destinationId: "dst_preview_1",
       updatedAt: "2026-04-21T00:00:00.000Z",
     });
-    const routeStore = new CapturingServerAppliedRouteStateStore();
+    const routeRepository = new CapturingServerAppliedRouteStateRepository();
     const executionBackend = new CapturingExecutionBackend();
     const deployments = new MemoryDeploymentRepository();
     const deploymentReadModel = new MemoryDeploymentReadModel();
@@ -405,8 +418,8 @@ describe("CleanupPreviewUseCase", () => {
     );
 
     const useCase = new CleanupPreviewUseCase(
-      sourceLinkStore,
-      routeStore,
+      sourceLinkRepository,
+      routeRepository,
       deployments,
       deploymentReadModel,
       executionBackend,
@@ -430,7 +443,7 @@ describe("CleanupPreviewUseCase", () => {
       deploymentId: "dep_preview_1",
     });
     expect(executionBackend.canceledDeploymentIds).toEqual(["dep_preview_1"]);
-    expect(routeStore.deletedTargets).toEqual([
+    expect(routeRepository.deletedTargets).toEqual([
       {
         projectId: "prj_preview_1",
         environmentId: "env_preview_1",
@@ -439,12 +452,12 @@ describe("CleanupPreviewUseCase", () => {
         destinationId: "dst_preview_1",
       },
     ]);
-    expect(routeStore.deletedSourceFingerprints).toEqual([previewSourceFingerprint]);
-    expect(sourceLinkStore.unlinked).toEqual([previewSourceFingerprint]);
+    expect(routeRepository.deletedSourceFingerprints).toEqual([previewSourceFingerprint]);
+    expect(sourceLinkRepository.deletedFingerprints).toEqual([previewSourceFingerprint]);
   });
 
   test("[DEPLOYMENTS-CLEANUP-PREVIEW-003][CONFIG-FILE-ENTRY-019] stops cleanup when runtime cancellation fails", async () => {
-    const sourceLinkStore = new MemorySourceLinkStore({
+    const sourceLinkRepository = new MemorySourceLinkRepository({
       sourceFingerprint: previewSourceFingerprint,
       projectId: "prj_preview_1",
       environmentId: "env_preview_1",
@@ -453,7 +466,7 @@ describe("CleanupPreviewUseCase", () => {
       destinationId: "dst_preview_1",
       updatedAt: "2026-04-21T00:00:00.000Z",
     });
-    const routeStore = new CapturingServerAppliedRouteStateStore();
+    const routeRepository = new CapturingServerAppliedRouteStateRepository();
     const executionBackend = new CapturingExecutionBackend(
       err(
         domainError.infra("Container removal failed", {
@@ -475,8 +488,8 @@ describe("CleanupPreviewUseCase", () => {
     );
 
     const useCase = new CleanupPreviewUseCase(
-      sourceLinkStore,
-      routeStore,
+      sourceLinkRepository,
+      routeRepository,
       deployments,
       deploymentReadModel,
       executionBackend,
@@ -494,13 +507,13 @@ describe("CleanupPreviewUseCase", () => {
         deploymentId: "dep_preview_1",
       },
     });
-    expect(routeStore.deletedTargets).toEqual([]);
-    expect(routeStore.deletedSourceFingerprints).toEqual([]);
-    expect(sourceLinkStore.unlinked).toEqual([]);
+    expect(routeRepository.deletedTargets).toEqual([]);
+    expect(routeRepository.deletedSourceFingerprints).toEqual([]);
+    expect(sourceLinkRepository.deletedFingerprints).toEqual([]);
   });
 
   test("[DEPLOYMENTS-CLEANUP-PREVIEW-004][CONFIG-FILE-ENTRY-019] sweeps stale preview runtime and route state for the same preview fingerprint", async () => {
-    const sourceLinkStore = new MemorySourceLinkStore({
+    const sourceLinkRepository = new MemorySourceLinkRepository({
       sourceFingerprint: previewSourceFingerprint,
       projectId: "prj_preview_1",
       environmentId: "env_preview_1",
@@ -509,7 +522,7 @@ describe("CleanupPreviewUseCase", () => {
       destinationId: "dst_preview_1",
       updatedAt: "2026-04-21T00:00:00.000Z",
     });
-    const routeStore = new CapturingServerAppliedRouteStateStore(ok(true), ok(1));
+    const routeRepository = new CapturingServerAppliedRouteStateRepository(ok(true), ok(1));
     const executionBackend = new CapturingExecutionBackend();
     const deployments = new MemoryDeploymentRepository();
     const deploymentReadModel = new MemoryDeploymentReadModel([
@@ -580,8 +593,8 @@ describe("CleanupPreviewUseCase", () => {
     );
 
     const useCase = new CleanupPreviewUseCase(
-      sourceLinkStore,
-      routeStore,
+      sourceLinkRepository,
+      routeRepository,
       deployments,
       deploymentReadModel,
       executionBackend,
@@ -604,7 +617,7 @@ describe("CleanupPreviewUseCase", () => {
       "dep_preview_current",
       "dep_preview_old",
     ]);
-    expect(routeStore.deletedTargets).toEqual([
+    expect(routeRepository.deletedTargets).toEqual([
       {
         projectId: "prj_preview_1",
         environmentId: "env_preview_1",
@@ -613,7 +626,7 @@ describe("CleanupPreviewUseCase", () => {
         destinationId: "dst_preview_1",
       },
     ]);
-    expect(routeStore.deletedSourceFingerprints).toEqual([previewSourceFingerprint]);
-    expect(sourceLinkStore.unlinked).toEqual([previewSourceFingerprint]);
+    expect(routeRepository.deletedSourceFingerprints).toEqual([previewSourceFingerprint]);
+    expect(sourceLinkRepository.deletedFingerprints).toEqual([previewSourceFingerprint]);
   });
 });

@@ -14,6 +14,8 @@ import {
   type EdgeProxyProviderRegistry,
   type EdgeProxyProviderSelectionInput,
   ListResourcesQueryService,
+  MarkServerAppliedRouteAppliedSpec,
+  MarkServerAppliedRouteFailedSpec,
   type ProxyConfigurationViewInput,
   type ProxyReloadInput,
   type ProxyRouteRealizationInput,
@@ -25,7 +27,15 @@ import {
   ResourceProxyConfigurationPreviewQuery,
   ResourceProxyConfigurationPreviewQueryService,
   ResourceRuntimeLogsQueryService,
+  type ServerAppliedRouteDesiredStateRecord,
+  ServerAppliedRouteStateByRouteSetIdSpec,
+  ServerAppliedRouteStateBySourceFingerprintSpec,
+  ServerAppliedRouteStateByTargetSpec,
+  SourceLinkBySourceFingerprintSpec,
+  type SourceLinkRecord,
   toRepositoryContext,
+  UpsertServerAppliedRouteDesiredStateSpec,
+  UpsertSourceLinkSpec,
 } from "@appaloft/application";
 import {
   BuildStrategyKindValue,
@@ -46,6 +56,7 @@ import {
   DestinationName,
   DetectSummary,
   DisplayNameText,
+  type DomainError,
   domainError,
   EnvironmentId,
   EnvironmentKindValue,
@@ -78,6 +89,7 @@ import {
   ResourceKindValue,
   ResourceName,
   ResourceNetworkProtocolValue,
+  type Result,
   RuntimeExecutionPlan,
   RuntimePlan,
   RuntimePlanId,
@@ -99,6 +111,78 @@ import {
 } from "@appaloft/core";
 import { type Kysely, sql } from "kysely";
 import { type Database } from "../src/schema";
+
+function createRouteSetId(target: {
+  projectId: string;
+  environmentId: string;
+  resourceId: string;
+  serverId: string;
+  destinationId?: string;
+}): string {
+  return [
+    target.projectId,
+    target.environmentId,
+    target.resourceId,
+    target.serverId,
+    target.destinationId ?? "default",
+  ].join(":");
+}
+
+function sameSourceLinkTarget(
+  record: {
+    projectId: string;
+    environmentId: string;
+    resourceId: string;
+    serverId?: string;
+    destinationId?: string;
+  },
+  target: {
+    projectId: string;
+    environmentId: string;
+    resourceId: string;
+    serverId?: string;
+    destinationId?: string;
+  },
+): boolean {
+  return (
+    record.projectId === target.projectId &&
+    record.environmentId === target.environmentId &&
+    record.resourceId === target.resourceId &&
+    record.serverId === target.serverId &&
+    record.destinationId === target.destinationId
+  );
+}
+
+function sourceLinkConflict(
+  expectedCurrentResourceId: string,
+  actualResourceId: string,
+): DomainError {
+  return {
+    code: "source_link_conflict",
+    category: "user",
+    message: "Source link current resource guard did not match",
+    retryable: false,
+    details: {
+      phase: "source-link-resolution",
+      expectedCurrentResourceId,
+      actualResourceId,
+    },
+  };
+}
+
+function routeStateConflict(expectedRouteSetId: string, actualRouteSetId: string): DomainError {
+  return {
+    code: "server_applied_route_state_conflict",
+    category: "user",
+    message: "Server-applied route state did not match expected route set",
+    retryable: false,
+    details: {
+      phase: "proxy-route-realization",
+      expectedRouteSetId,
+      actualRouteSetId,
+    },
+  };
+}
 
 function createTestExecutionContext() {
   return createExecutionContext({
@@ -122,6 +206,253 @@ function createTestExecutionContext() {
 
 function createRepositoryContext(): RepositoryContext {
   return toRepositoryContext(createTestExecutionContext());
+}
+
+function createSourceLinkStore(
+  repository: import("@appaloft/persistence-pg").PgSourceLinkRepository,
+) {
+  return {
+    async createIfMissing(input: {
+      sourceFingerprint: string;
+      target: {
+        projectId: string;
+        environmentId: string;
+        resourceId: string;
+        serverId?: string;
+        destinationId?: string;
+      };
+      updatedAt: string;
+    }): Promise<Result<SourceLinkRecord>> {
+      const existing = await repository.findOne(
+        SourceLinkBySourceFingerprintSpec.create(input.sourceFingerprint),
+      );
+      if (existing.isErr()) {
+        return err(existing.error);
+      }
+
+      if (existing.value) {
+        return ok(existing.value);
+      }
+
+      const record = {
+        sourceFingerprint: input.sourceFingerprint,
+        projectId: input.target.projectId,
+        environmentId: input.target.environmentId,
+        resourceId: input.target.resourceId,
+        updatedAt: input.updatedAt,
+        ...(input.target.serverId ? { serverId: input.target.serverId } : {}),
+        ...(input.target.destinationId ? { destinationId: input.target.destinationId } : {}),
+      };
+      return repository.upsert(record, UpsertSourceLinkSpec.fromRecord(record));
+    },
+    read(sourceFingerprint: string): Promise<Result<SourceLinkRecord | null>> {
+      return repository.findOne(SourceLinkBySourceFingerprintSpec.create(sourceFingerprint));
+    },
+    async relink(input: {
+      sourceFingerprint: string;
+      target: {
+        projectId: string;
+        environmentId: string;
+        resourceId: string;
+        serverId?: string;
+        destinationId?: string;
+      };
+      updatedAt: string;
+      expectedCurrentResourceId?: string;
+      reason?: string;
+    }): Promise<Result<SourceLinkRecord>> {
+      const existing = await repository.findOne(
+        SourceLinkBySourceFingerprintSpec.create(input.sourceFingerprint),
+      );
+      if (existing.isErr()) {
+        return err(existing.error);
+      }
+
+      if (existing.value) {
+        if (
+          input.expectedCurrentResourceId &&
+          existing.value.resourceId !== input.expectedCurrentResourceId
+        ) {
+          return err(
+            sourceLinkConflict(input.expectedCurrentResourceId, existing.value.resourceId),
+          );
+        }
+
+        if (sameSourceLinkTarget(existing.value, input.target)) {
+          return ok(existing.value);
+        }
+      }
+
+      const record = {
+        sourceFingerprint: input.sourceFingerprint,
+        projectId: input.target.projectId,
+        environmentId: input.target.environmentId,
+        resourceId: input.target.resourceId,
+        updatedAt: input.updatedAt,
+        ...(input.target.serverId ? { serverId: input.target.serverId } : {}),
+        ...(input.target.destinationId ? { destinationId: input.target.destinationId } : {}),
+        ...(input.reason ? { reason: input.reason } : {}),
+      };
+      return repository.upsert(record, UpsertSourceLinkSpec.fromRecord(record));
+    },
+    unlink(sourceFingerprint: string): Promise<Result<boolean>> {
+      return repository.deleteOne(SourceLinkBySourceFingerprintSpec.create(sourceFingerprint));
+    },
+  };
+}
+
+function createServerAppliedRouteStateStore(
+  repository: import("@appaloft/persistence-pg").PgServerAppliedRouteStateRepository,
+) {
+  return {
+    upsertDesired(input: {
+      target: {
+        projectId: string;
+        environmentId: string;
+        resourceId: string;
+        serverId: string;
+        destinationId?: string;
+      };
+      domains: Array<{
+        host: string;
+        pathPrefix: string;
+        tlsMode: "auto" | "disabled";
+        redirectTo?: string;
+        redirectStatus?: 301 | 302 | 307 | 308;
+      }>;
+      sourceFingerprint?: string;
+      updatedAt: string;
+    }) {
+      const record = {
+        routeSetId: createRouteSetId(input.target),
+        projectId: input.target.projectId,
+        environmentId: input.target.environmentId,
+        resourceId: input.target.resourceId,
+        serverId: input.target.serverId,
+        ...(input.target.destinationId ? { destinationId: input.target.destinationId } : {}),
+        ...(input.sourceFingerprint ? { sourceFingerprint: input.sourceFingerprint } : {}),
+        domains: input.domains,
+        status: "desired" as const,
+        updatedAt: input.updatedAt,
+      };
+      return repository.upsert(record, UpsertServerAppliedRouteDesiredStateSpec.fromRecord(record));
+    },
+    async read(target: {
+      projectId: string;
+      environmentId: string;
+      resourceId: string;
+      serverId: string;
+      destinationId?: string;
+    }) {
+      const exact = await repository.findOne(ServerAppliedRouteStateByTargetSpec.create(target));
+      if (exact.isErr() || exact.value || !target.destinationId) {
+        return exact;
+      }
+
+      return repository.findOne(
+        ServerAppliedRouteStateByTargetSpec.create({
+          projectId: target.projectId,
+          environmentId: target.environmentId,
+          resourceId: target.resourceId,
+          serverId: target.serverId,
+        }),
+      );
+    },
+    async markApplied(input: {
+      target: {
+        projectId: string;
+        environmentId: string;
+        resourceId: string;
+        serverId: string;
+        destinationId?: string;
+      };
+      deploymentId: string;
+      updatedAt: string;
+      routeSetId?: string;
+      providerKey?: string;
+      proxyKind?: "traefik" | "caddy";
+    }) {
+      const existing = await repository.findOne(
+        ServerAppliedRouteStateByTargetSpec.create(input.target),
+      );
+      if (existing.isErr()) {
+        return existing;
+      }
+
+      const routeSetId = input.routeSetId ?? createRouteSetId(input.target);
+      if (existing.value && existing.value.routeSetId !== routeSetId) {
+        return err(routeStateConflict(routeSetId, existing.value.routeSetId));
+      }
+
+      return repository.updateOne(
+        ServerAppliedRouteStateByRouteSetIdSpec.create(routeSetId),
+        MarkServerAppliedRouteAppliedSpec.create({
+          deploymentId: input.deploymentId,
+          updatedAt: input.updatedAt,
+          ...(input.providerKey ? { providerKey: input.providerKey } : {}),
+          ...(input.proxyKind ? { proxyKind: input.proxyKind } : {}),
+        }),
+      );
+    },
+    async markFailed(input: {
+      target: {
+        projectId: string;
+        environmentId: string;
+        resourceId: string;
+        serverId: string;
+        destinationId?: string;
+      };
+      deploymentId: string;
+      updatedAt: string;
+      phase: string;
+      errorCode: string;
+      message?: string;
+      retryable: boolean;
+      routeSetId?: string;
+      providerKey?: string;
+      proxyKind?: "traefik" | "caddy";
+    }) {
+      const existing = await repository.findOne(
+        ServerAppliedRouteStateByTargetSpec.create(input.target),
+      );
+      if (existing.isErr()) {
+        return existing;
+      }
+
+      const routeSetId = input.routeSetId ?? createRouteSetId(input.target);
+      if (existing.value && existing.value.routeSetId !== routeSetId) {
+        return err(routeStateConflict(routeSetId, existing.value.routeSetId));
+      }
+
+      return repository.updateOne(
+        ServerAppliedRouteStateByRouteSetIdSpec.create(routeSetId),
+        MarkServerAppliedRouteFailedSpec.create({
+          deploymentId: input.deploymentId,
+          updatedAt: input.updatedAt,
+          phase: input.phase,
+          errorCode: input.errorCode,
+          retryable: input.retryable,
+          ...(input.message ? { message: input.message } : {}),
+          ...(input.providerKey ? { providerKey: input.providerKey } : {}),
+          ...(input.proxyKind ? { proxyKind: input.proxyKind } : {}),
+        }),
+      );
+    },
+    deleteDesired(target: {
+      projectId: string;
+      environmentId: string;
+      resourceId: string;
+      serverId: string;
+      destinationId?: string;
+    }) {
+      return repository.deleteOne(ServerAppliedRouteStateByTargetSpec.create(target));
+    },
+    deleteDesiredBySourceFingerprint(sourceFingerprint: string) {
+      return repository.deleteMany(
+        ServerAppliedRouteStateBySourceFingerprintSpec.create(sourceFingerprint),
+      );
+    },
+  };
 }
 
 class FixedClock {
@@ -828,7 +1159,9 @@ describe("pglite persistence integration", () => {
     let closeDatabase: (() => Promise<void>) | undefined;
 
     try {
-      const { createDatabase, createMigrator, PgSourceLinkStore } = await import("../src/index");
+      const { createDatabase, createMigrator, PgSourceLinkRepository } = await import(
+        "../src/index"
+      );
       const database = await createDatabase({
         driver: "pglite",
         pgliteDataDir,
@@ -839,7 +1172,7 @@ describe("pglite persistence integration", () => {
       expect(migrationResult.error).toBeUndefined();
 
       const target = await seedSourceLinkContext(database.db, "persist");
-      const store = new PgSourceLinkStore(database.db);
+      const store = createSourceLinkStore(new PgSourceLinkRepository(database.db));
       const sourceFingerprint = "source-fingerprint:v1:branch%3Apersist";
 
       const created = await store.createIfMissing({
@@ -876,7 +1209,9 @@ describe("pglite persistence integration", () => {
     let closeDatabase: (() => Promise<void>) | undefined;
 
     try {
-      const { createDatabase, createMigrator, PgSourceLinkStore } = await import("../src/index");
+      const { createDatabase, createMigrator, PgSourceLinkRepository } = await import(
+        "../src/index"
+      );
       const database = await createDatabase({
         driver: "pglite",
         pgliteDataDir,
@@ -887,7 +1222,7 @@ describe("pglite persistence integration", () => {
       expect(migrationResult.error).toBeUndefined();
 
       const target = await seedSourceLinkContext(database.db, "guard");
-      const store = new PgSourceLinkStore(database.db);
+      const store = createSourceLinkStore(new PgSourceLinkRepository(database.db));
       const sourceFingerprint = "source-fingerprint:v1:branch%3Aguard";
       const initial = await store.createIfMissing({
         sourceFingerprint,
@@ -944,8 +1279,12 @@ describe("pglite persistence integration", () => {
     let closeDatabase: (() => Promise<void>) | undefined;
 
     try {
-      const { createDatabase, createMigrator, PgResourceDeletionBlockerReader, PgSourceLinkStore } =
-        await import("../src/index");
+      const {
+        createDatabase,
+        createMigrator,
+        PgResourceDeletionBlockerReader,
+        PgSourceLinkRepository,
+      } = await import("../src/index");
       const database = await createDatabase({
         driver: "pglite",
         pgliteDataDir,
@@ -960,7 +1299,7 @@ describe("pglite persistence integration", () => {
         archivedAt: "2026-01-01T00:02:00.000Z",
       });
       const sourceFingerprint = "source-fingerprint:v1:branch%3Ablocker";
-      const store = new PgSourceLinkStore(database.db);
+      const store = createSourceLinkStore(new PgSourceLinkRepository(database.db));
       const created = await store.createIfMissing({
         sourceFingerprint,
         target,
@@ -1141,7 +1480,9 @@ describe("pglite persistence integration", () => {
     let closeDatabase: (() => Promise<void>) | undefined;
 
     try {
-      const { createDatabase, createMigrator, PgSourceLinkStore } = await import("../src/index");
+      const { createDatabase, createMigrator, PgSourceLinkRepository } = await import(
+        "../src/index"
+      );
       const database = await createDatabase({
         driver: "pglite",
         pgliteDataDir,
@@ -1160,7 +1501,7 @@ describe("pglite persistence integration", () => {
 
       const target = await seedSourceLinkContext(database.db, "migration");
       const sourceFingerprint = "source-fingerprint:v1:branch%3Amigration";
-      const store = new PgSourceLinkStore(database.db);
+      const store = createSourceLinkStore(new PgSourceLinkRepository(database.db));
       const created = await store.createIfMissing({
         sourceFingerprint,
         target,
@@ -1210,7 +1551,9 @@ describe("pglite persistence integration", () => {
     let closeDatabase: (() => Promise<void>) | undefined;
 
     try {
-      const { createDatabase, createMigrator, PgSourceLinkStore } = await import("../src/index");
+      const { createDatabase, createMigrator, PgSourceLinkRepository } = await import(
+        "../src/index"
+      );
       const database = await createDatabase({
         driver: "pglite",
         pgliteDataDir,
@@ -1221,7 +1564,7 @@ describe("pglite persistence integration", () => {
       expect(migrationResult.error).toBeUndefined();
 
       const target = await seedSourceLinkContext(database.db, "unlink");
-      const store = new PgSourceLinkStore(database.db);
+      const store = createSourceLinkStore(new PgSourceLinkRepository(database.db));
       const sourceFingerprint = "source-fingerprint:v1:preview%3Apr%3A14";
       const created = await store.createIfMissing({
         sourceFingerprint,
@@ -1252,7 +1595,7 @@ describe("pglite persistence integration", () => {
     let closeDatabase: (() => Promise<void>) | undefined;
 
     try {
-      const { createDatabase, createMigrator, PgServerAppliedRouteStateStore } = await import(
+      const { createDatabase, createMigrator, PgServerAppliedRouteStateRepository } = await import(
         "../src/index"
       );
       const database = await createDatabase({
@@ -1265,7 +1608,9 @@ describe("pglite persistence integration", () => {
       expect(migrationResult.error).toBeUndefined();
 
       const target = await seedSourceLinkContext(database.db, "route_persist");
-      const store = new PgServerAppliedRouteStateStore(database.db);
+      const store = createServerAppliedRouteStateStore(
+        new PgServerAppliedRouteStateRepository(database.db),
+      );
 
       const desired = await store.upsertDesired({
         target,
@@ -1332,7 +1677,7 @@ describe("pglite persistence integration", () => {
     let closeDatabase: (() => Promise<void>) | undefined;
 
     try {
-      const { createDatabase, createMigrator, PgServerAppliedRouteStateStore } = await import(
+      const { createDatabase, createMigrator, PgServerAppliedRouteStateRepository } = await import(
         "../src/index"
       );
       const database = await createDatabase({
@@ -1345,7 +1690,9 @@ describe("pglite persistence integration", () => {
       expect(migrationResult.error).toBeUndefined();
 
       const target = await seedSourceLinkContext(database.db, "route_fallback");
-      const store = new PgServerAppliedRouteStateStore(database.db);
+      const store = createServerAppliedRouteStateStore(
+        new PgServerAppliedRouteStateRepository(database.db),
+      );
       const defaultTarget = {
         projectId: target.projectId,
         environmentId: target.environmentId,
@@ -1404,7 +1751,7 @@ describe("pglite persistence integration", () => {
     let closeDatabase: (() => Promise<void>) | undefined;
 
     try {
-      const { createDatabase, createMigrator, PgServerAppliedRouteStateStore } = await import(
+      const { createDatabase, createMigrator, PgServerAppliedRouteStateRepository } = await import(
         "../src/index"
       );
       const database = await createDatabase({
@@ -1417,7 +1764,9 @@ describe("pglite persistence integration", () => {
       expect(migrationResult.error).toBeUndefined();
 
       const target = await seedSourceLinkContext(database.db, "route_status");
-      const store = new PgServerAppliedRouteStateStore(database.db);
+      const store = createServerAppliedRouteStateStore(
+        new PgServerAppliedRouteStateRepository(database.db),
+      );
       const desired = await store.upsertDesired({
         target,
         updatedAt: "2026-01-01T00:04:00.000Z",
@@ -1513,7 +1862,7 @@ describe("pglite persistence integration", () => {
         createDatabase,
         createMigrator,
         PgResourceDeletionBlockerReader,
-        PgServerAppliedRouteStateStore,
+        PgServerAppliedRouteStateRepository,
       } = await import("../src/index");
       const database = await createDatabase({
         driver: "pglite",
@@ -1528,7 +1877,9 @@ describe("pglite persistence integration", () => {
         lifecycleStatus: "archived",
         archivedAt: "2026-01-01T00:02:00.000Z",
       });
-      const store = new PgServerAppliedRouteStateStore(database.db);
+      const store = createServerAppliedRouteStateStore(
+        new PgServerAppliedRouteStateRepository(database.db),
+      );
       const desired = await store.upsertDesired({
         target,
         updatedAt: "2026-01-01T00:04:00.000Z",
@@ -1566,7 +1917,7 @@ describe("pglite persistence integration", () => {
     let closeDatabase: (() => Promise<void>) | undefined;
 
     try {
-      const { createDatabase, createMigrator, PgServerAppliedRouteStateStore } = await import(
+      const { createDatabase, createMigrator, PgServerAppliedRouteStateRepository } = await import(
         "../src/index"
       );
       const database = await createDatabase({
@@ -1593,7 +1944,9 @@ describe("pglite persistence integration", () => {
       );
 
       const target = await seedSourceLinkContext(database.db, "route_migration");
-      const store = new PgServerAppliedRouteStateStore(database.db);
+      const store = createServerAppliedRouteStateStore(
+        new PgServerAppliedRouteStateRepository(database.db),
+      );
       const desired = await store.upsertDesired({
         target,
         updatedAt: "2026-01-01T00:04:00.000Z",
@@ -1649,7 +2002,7 @@ describe("pglite persistence integration", () => {
     let closeDatabase: (() => Promise<void>) | undefined;
 
     try {
-      const { createDatabase, createMigrator, PgServerAppliedRouteStateStore } = await import(
+      const { createDatabase, createMigrator, PgServerAppliedRouteStateRepository } = await import(
         "../src/index"
       );
       const database = await createDatabase({
@@ -1662,7 +2015,9 @@ describe("pglite persistence integration", () => {
       expect(migrationResult.error).toBeUndefined();
 
       const target = await seedSourceLinkContext(database.db, "route_delete");
-      const store = new PgServerAppliedRouteStateStore(database.db);
+      const store = createServerAppliedRouteStateStore(
+        new PgServerAppliedRouteStateRepository(database.db),
+      );
       const desired = await store.upsertDesired({
         target,
         updatedAt: "2026-01-01T00:04:00.000Z",
@@ -1698,7 +2053,7 @@ describe("pglite persistence integration", () => {
     let closeDatabase: (() => Promise<void>) | undefined;
 
     try {
-      const { createDatabase, createMigrator, PgServerAppliedRouteStateStore } = await import(
+      const { createDatabase, createMigrator, PgServerAppliedRouteStateRepository } = await import(
         "../src/index"
       );
       const database = await createDatabase({
@@ -1711,7 +2066,9 @@ describe("pglite persistence integration", () => {
       expect(migrationResult.error).toBeUndefined();
 
       const sourceFingerprint = "source-fingerprint:v1:preview%3Apr%3A14";
-      const store = new PgServerAppliedRouteStateStore(database.db);
+      const store = createServerAppliedRouteStateStore(
+        new PgServerAppliedRouteStateRepository(database.db),
+      );
       const firstTarget = await seedSourceLinkContext(database.db, "route_sweep_one");
       const secondTarget = await seedSourceLinkContext(database.db, "route_sweep_two");
       const retainedTarget = await seedSourceLinkContext(database.db, "route_sweep_retained");
@@ -1778,7 +2135,7 @@ describe("pglite persistence integration", () => {
         PgDeploymentReadModel,
         PgDomainBindingReadModel,
         PgResourceReadModel,
-        PgServerAppliedRouteStateStore,
+        PgServerAppliedRouteStateRepository,
       } = await import("../src/index");
       const database = await createDatabase({
         driver: "pglite",
@@ -1816,7 +2173,9 @@ describe("pglite persistence integration", () => {
         createdAt: "2026-01-01T00:04:30.000Z",
       });
 
-      const routeStore = new PgServerAppliedRouteStateStore(database.db);
+      const routeStore = createServerAppliedRouteStateStore(
+        new PgServerAppliedRouteStateRepository(database.db),
+      );
       const desired = await routeStore.upsertDesired({
         target,
         updatedAt: "2026-01-01T00:04:45.000Z",

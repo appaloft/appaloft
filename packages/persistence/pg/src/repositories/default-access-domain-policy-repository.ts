@@ -1,15 +1,64 @@
 import {
+  type DefaultAccessDomainPolicyByScopeSpec,
   type DefaultAccessDomainPolicyMode,
   type DefaultAccessDomainPolicyRecord,
+  type DefaultAccessDomainPolicyRepository,
   type DefaultAccessDomainPolicyScope,
-  type DefaultAccessDomainPolicyStore,
+  type DefaultAccessDomainPolicySelectionSpec,
+  type DefaultAccessDomainPolicySelectionSpecVisitor,
+  type DefaultAccessDomainPolicyUpsertSpec,
+  type DefaultAccessDomainPolicyUpsertSpecVisitor,
+  type UpsertDefaultAccessDomainPolicySpec,
 } from "@appaloft/application";
 import { domainError, err, ok, type Result } from "@appaloft/core";
-import { type Kysely, type Selectable } from "kysely";
+import { type Insertable, type Kysely, type Selectable, type SelectQueryBuilder } from "kysely";
 
 import { type Database, type DefaultAccessDomainPoliciesTable } from "../schema";
 
 type DefaultAccessDomainPolicyRow = Selectable<DefaultAccessDomainPoliciesTable>;
+type DefaultAccessDomainPolicySelectionQuery = SelectQueryBuilder<
+  Database,
+  "default_access_domain_policies",
+  Selectable<Database["default_access_domain_policies"]>
+>;
+type WhereCapableQuery<TResult> = {
+  where(column: string, op: "=", value: unknown): TResult;
+};
+
+class KyselyDefaultAccessDomainPolicySelectionVisitor<TResult extends WhereCapableQuery<TResult>>
+  implements DefaultAccessDomainPolicySelectionSpecVisitor<TResult>
+{
+  visitDefaultAccessDomainPolicyByScope(
+    query: TResult,
+    spec: DefaultAccessDomainPolicyByScopeSpec,
+  ): TResult {
+    return query.where("scope_key", "=", scopeKey(spec.scope));
+  }
+}
+
+class KyselyDefaultAccessDomainPolicyUpsertVisitor
+  implements
+    DefaultAccessDomainPolicyUpsertSpecVisitor<{
+      values: Insertable<Database["default_access_domain_policies"]>;
+    }>
+{
+  visitUpsertDefaultAccessDomainPolicy(spec: UpsertDefaultAccessDomainPolicySpec) {
+    return {
+      values: {
+        id: spec.record.id,
+        scope_key: scopeKey(spec.record.scope),
+        scope_kind: spec.record.scope.kind,
+        server_id:
+          spec.record.scope.kind === "deployment-target" ? spec.record.scope.serverId : null,
+        mode: spec.record.mode,
+        provider_key: spec.record.providerKey ?? null,
+        template_ref: spec.record.templateRef ?? null,
+        last_idempotency_key: spec.record.idempotencyKey ?? null,
+        updated_at: spec.record.updatedAt,
+      },
+    };
+  }
+}
 
 function persistenceError(message: string, error: unknown) {
   return domainError.infra(message, {
@@ -113,22 +162,25 @@ function mapRow(row: DefaultAccessDomainPolicyRow): DefaultAccessDomainPolicyRec
   };
 }
 
-export class PgDefaultAccessDomainPolicyStore implements DefaultAccessDomainPolicyStore {
+export class PgDefaultAccessDomainPolicyRepository implements DefaultAccessDomainPolicyRepository {
   constructor(private readonly db: Kysely<Database>) {}
 
-  async read(
-    scope: DefaultAccessDomainPolicyScope,
+  async findOne(
+    spec: DefaultAccessDomainPolicySelectionSpec,
   ): Promise<Result<DefaultAccessDomainPolicyRecord | null>> {
-    const scopeResult = validateScope(scope);
-    if (scopeResult.isErr()) {
-      return err(scopeResult.error);
+    const validation = spec.accept(ok(undefined), {
+      visitDefaultAccessDomainPolicyByScope: (_query, scopeSpec) => validateScope(scopeSpec.scope),
+    } satisfies DefaultAccessDomainPolicySelectionSpecVisitor<Result<void>>);
+    if (validation.isErr()) {
+      return err(validation.error);
     }
 
     try {
-      const row = await this.db
-        .selectFrom("default_access_domain_policies")
-        .selectAll()
-        .where("scope_key", "=", scopeKey(scope))
+      const row = await spec
+        .accept(
+          this.db.selectFrom("default_access_domain_policies").selectAll(),
+          new KyselyDefaultAccessDomainPolicySelectionVisitor<DefaultAccessDomainPolicySelectionQuery>(),
+        )
         .executeTakeFirst();
 
       return ok(row ? mapRow(row) : null);
@@ -139,6 +191,7 @@ export class PgDefaultAccessDomainPolicyStore implements DefaultAccessDomainPoli
 
   async upsert(
     record: DefaultAccessDomainPolicyRecord,
+    spec: DefaultAccessDomainPolicyUpsertSpec,
   ): Promise<Result<DefaultAccessDomainPolicyRecord>> {
     const recordResult = validateRecord(record);
     if (recordResult.isErr()) {
@@ -146,28 +199,19 @@ export class PgDefaultAccessDomainPolicyStore implements DefaultAccessDomainPoli
     }
 
     try {
+      const mutation = spec.accept(new KyselyDefaultAccessDomainPolicyUpsertVisitor());
       const persisted = await this.db
         .insertInto("default_access_domain_policies")
-        .values({
-          id: record.id,
-          scope_key: scopeKey(record.scope),
-          scope_kind: record.scope.kind,
-          server_id: record.scope.kind === "deployment-target" ? record.scope.serverId : null,
-          mode: record.mode,
-          provider_key: record.providerKey ?? null,
-          template_ref: record.templateRef ?? null,
-          last_idempotency_key: record.idempotencyKey ?? null,
-          updated_at: record.updatedAt,
-        })
+        .values(mutation.values)
         .onConflict((conflict) =>
           conflict.column("scope_key").doUpdateSet({
-            scope_kind: record.scope.kind,
-            server_id: record.scope.kind === "deployment-target" ? record.scope.serverId : null,
-            mode: record.mode,
-            provider_key: record.providerKey ?? null,
-            template_ref: record.templateRef ?? null,
-            last_idempotency_key: record.idempotencyKey ?? null,
-            updated_at: record.updatedAt,
+            scope_kind: mutation.values.scope_kind,
+            server_id: mutation.values.server_id,
+            mode: mutation.values.mode,
+            provider_key: mutation.values.provider_key,
+            template_ref: mutation.values.template_ref,
+            last_idempotency_key: mutation.values.last_idempotency_key,
+            updated_at: mutation.values.updated_at,
           }),
         )
         .returningAll()
