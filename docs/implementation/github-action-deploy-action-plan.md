@@ -159,8 +159,9 @@ them, but overlays must apply only after the action has selected the PR preview 
 trusted GitHub event context.
 
 The first preview mode creates or reuses preview-scoped source link state and dispatches the same
-ids-only `deployments.create` command. It does not automatically delete preview resources on PR
-close until an explicit cleanup/delete operation is accepted and implemented.
+ids-only `deployments.create` command. Explicit PR close cleanup now runs through
+`deployments.cleanup-preview` from a user-authored close-event workflow, but pure Action mode still
+has no retry/scheduler if that workflow never runs or fails.
 
 Preview URL behavior:
 
@@ -343,7 +344,7 @@ Wrapper failures are entrypoint failures:
 | Unsupported control-plane mode | CLI returns structured Appaloft error before mutation until the selected Cloud/self-hosted handshake exists. |
 | Missing PR context for preview mode | Action step or CLI fails before mutation with `validation_error`, phase `preview-context-resolution`. |
 | Missing preview URL when required | CLI returns structured route/access error; no fake direct-port URL is emitted. |
-| Preview cleanup requested before cleanup support | Action step or CLI fails before mutation with `preview_cleanup_unsupported`, phase `preview-cleanup`. |
+| Preview cleanup runtime/state failure | Action step or CLI returns structured `preview-cleanup` failure from runtime cleanup, route-state delete, or source-link unlink. |
 | Config validation failure | CLI returns structured Appaloft error. |
 | Remote state ensure/lock/migration failure | CLI returns structured Appaloft error with remote-state phase. |
 | Deployment accepted but runtime fails | CLI follows deployment workflow semantics; accepted id remains valid and failure is observed through state/read models. |
@@ -351,7 +352,7 @@ Wrapper failures are entrypoint failures:
 ## Out Of Scope
 
 - GitHub App webhooks and product-grade preview-environment lifecycle.
-- Automatic PR environment cleanup before an explicit cleanup/delete operation exists.
+- Product-grade PR environment cleanup retries/scheduling beyond one explicit close-event workflow.
 - Managed DNS/certificate lifecycle without a hosted/self-hosted control plane.
 - Creating or rotating GitHub Secrets.
 - Running an Appaloft cloud service or self-hosted control plane.
@@ -374,8 +375,7 @@ Next Test-First Round should add or cover these rows:
 - `CONFIG-FILE-ENTRY-016` for Action PR preview generated access without user DNS;
 - `CONFIG-FILE-ENTRY-017` for Action PR preview custom wildcard domain template behavior;
 - `CONFIG-FILE-ENTRY-018` for Action PR preview fork-safety defaults;
-- `CONFIG-FILE-ENTRY-019` for Action preview cleanup mode returning unsupported until a cleanup
-  operation exists;
+- `CONFIG-FILE-ENTRY-019` for Action preview cleanup through the explicit cleanup command;
 - `CONFIG-FILE-ENTRY-020` for Action PR preview using an explicit preview config path instead of
   the root config;
 - `CONFIG-FILE-ENTRY-021` for Action PR preview refusing to reinterpret production root custom
@@ -408,8 +408,7 @@ Missing pieces before public release:
   `--preview-domain-template` options;
 - add stable CLI JSON output or diagnostic file support so the wrapper can expose `preview-url`
   without parsing human text;
-- keep PR close cleanup documented as future until a cleanup/delete command and route cleanup
-  workflow are accepted;
+- wire wrapper cleanup inputs or `args` examples to the active CLI preview cleanup command;
 - add control-plane mode inputs only after the CLI resolver/parser and structured unsupported
   errors exist;
 - add structured CLI deploy output if action outputs need deployment/resource ids.

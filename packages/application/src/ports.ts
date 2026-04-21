@@ -157,6 +157,7 @@ export interface SourceLinkStore {
     expectedCurrentResourceId?: string;
     reason?: string;
   }): Promise<Result<SourceLinkRecord>>;
+  unlink(sourceFingerprint: string): Promise<Result<boolean>>;
 }
 
 export interface ProjectRepository {
@@ -400,6 +401,7 @@ export interface ServerAppliedRouteStateStore extends ServerAppliedRouteDesiredS
     providerKey?: string;
     proxyKind?: EdgeProxyKind;
   }): Promise<Result<ServerAppliedRouteDesiredStateRecord | null>>;
+  deleteDesired(target: ServerAppliedRouteDesiredStateTarget): Promise<Result<boolean>>;
 }
 
 export interface CertificateRepository {

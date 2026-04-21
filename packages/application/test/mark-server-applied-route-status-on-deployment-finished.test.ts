@@ -102,6 +102,10 @@ class CapturingServerAppliedRouteStateStore implements ServerAppliedRouteStateSt
     this.failed.push(input);
     return ok(null);
   }
+
+  async deleteDesired(): Promise<Result<boolean>> {
+    return ok(false);
+  }
 }
 
 function createTestContext(): ExecutionContext {

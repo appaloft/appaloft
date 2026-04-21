@@ -128,6 +128,15 @@ class MemorySourceLinkStore implements SourceLinkStore {
 
     return ok(this.record);
   }
+
+  async unlink(sourceFingerprint: string): Promise<Result<boolean>> {
+    if (!this.record || this.record.sourceFingerprint !== sourceFingerprint) {
+      return ok(false);
+    }
+
+    this.record = null;
+    return ok(true);
+  }
 }
 
 function sourceLinkConflict(kind: string, expected: string, actual: string): DomainError {

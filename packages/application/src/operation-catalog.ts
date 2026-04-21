@@ -1,6 +1,7 @@
 import { type ZodTypeAny } from "zod";
 import { issueOrRenewCertificateCommandInputSchema } from "./operations/certificates/issue-or-renew-certificate.command";
 import { listCertificatesQueryInputSchema } from "./operations/certificates/list-certificates.query";
+import { cleanupPreviewCommandInputSchema } from "./operations/deployments/cleanup-preview.command";
 import { createDeploymentCommandInputSchema } from "./operations/deployments/create-deployment.command";
 import { deploymentLogsQueryInputSchema } from "./operations/deployments/deployment-logs.query";
 import { listDeploymentsQueryInputSchema } from "./operations/deployments/list-deployments.query";
@@ -515,6 +516,19 @@ export const operationCatalog = [
     transports: {
       cli: "appaloft env promote <environmentId> <targetName>",
       orpc: { method: "POST", path: "/api/environments/{environmentId}/promote" },
+    },
+  },
+  {
+    key: "deployments.cleanup-preview",
+    kind: "command",
+    domain: "deployments",
+    messageName: "CleanupPreviewCommand",
+    handlerName: "CleanupPreviewCommandHandler",
+    serviceName: "CleanupPreviewUseCase",
+    inputSchema: cleanupPreviewCommandInputSchema,
+    serviceToken: tokens.cleanupPreviewUseCase,
+    transports: {
+      cli: "appaloft preview cleanup [path-or-source] --preview pull-request --preview-id pr-123",
     },
   },
   {
