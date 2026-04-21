@@ -145,6 +145,35 @@ describe("ConfigureResourceSourceUseCase", () => {
     expect(eventBus.events).toHaveLength(0);
   });
 
+  test("accepts absolute local-folder source locators", async () => {
+    const { context, eventBus, repositoryContext, resources, useCase } = await createHarness();
+
+    const result = await useCase.execute(context, {
+      resourceId: "res_web",
+      source: {
+        kind: "local-folder",
+        locator: "/tmp/appaloft/workspace-http-app",
+      },
+    });
+
+    expect(result.isOk()).toBe(true);
+    const persisted = await resources.findOne(
+      repositoryContext,
+      ResourceByIdSpec.create(ResourceId.rehydrate("res_web")),
+    );
+    expect(persisted?.toState().sourceBinding?.kind.value).toBe("local-folder");
+    expect(persisted?.toState().sourceBinding?.locator.value).toBe(
+      "/tmp/appaloft/workspace-http-app",
+    );
+
+    const event = configuredEvent(eventBus.events);
+    expect(event.payload).toMatchObject({
+      resourceId: "res_web",
+      sourceKind: "local-folder",
+      sourceLocator: "/tmp/appaloft/workspace-http-app",
+    });
+  });
+
   test("[RES-PROFILE-SOURCE-003] rejects Docker image tag and digest conflicts", async () => {
     const { context, eventBus, useCase } = await createHarness();
 
