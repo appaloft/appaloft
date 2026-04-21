@@ -12,6 +12,8 @@ Tests must prove:
 - missing preview link returns idempotent `already-clean`;
 - runtime cleanup, server-applied route desired-state cleanup, and source-link unlink happen in the
   required order;
+- cleanup sweeps stale preview deployments and preview-fingerprint route rows that remain after
+  preview retargets;
 - runtime cleanup failure stops later cleanup stages;
 - CLI preview cleanup derives the same fingerprint/state-backend context as preview deploy.
 
@@ -36,10 +38,10 @@ This matrix inherits:
 
 | Layer | Required focus |
 | --- | --- |
-| Application command/use case | Idempotent missing-link result, runtime cleanup, route-state delete, source-link unlink, and failure staging. |
+| Application command/use case | Idempotent missing-link result, latest plus stale preview runtime cleanup, route-state delete, source-link unlink, and failure staging. |
 | CLI | Preview fingerprint derivation, preview-id validation, config-path contribution, and remote-state prepare/release. |
-| State adapters | Source-link unlink and route desired-state deletion. |
-| Entry workflow | `pull_request.closed` preview cleanup remains a user-authored workflow over the same CLI command. |
+| State adapters | Source-link unlink and route desired-state deletion by target and by preview source fingerprint. |
+| Entry workflow | `pull_request.closed` preview cleanup remains a user-authored workflow over the same CLI command and may also delete GitHub preview deployment/environment metadata. |
 
 ## Command Matrix
 
@@ -48,6 +50,7 @@ This matrix inherits:
 | DEPLOYMENTS-CLEANUP-PREVIEW-001 | integration | Already clean when preview link is absent | No preview source link exists for the selected preview fingerprint | `ok` with `status = already-clean`; no runtime, route, or link cleanup side effects | None |
 | DEPLOYMENTS-CLEANUP-PREVIEW-002 | integration | Cleanup runtime, route state, and source link | Preview link exists and latest deployment exists for the linked preview resource | `ok` with `status = cleaned`; runtime cleanup runs first, route desired state is deleted, and the preview source link is unlinked | None |
 | DEPLOYMENTS-CLEANUP-PREVIEW-003 | integration | Runtime cleanup failure stops later cleanup | Preview link exists and runtime backend cleanup fails | Command returns error with `phase = preview-cleanup` and `cleanupStage = runtime-cleanup`; route state and source link remain unchanged | `infra_error` or provider-mapped preview-cleanup failure |
+| DEPLOYMENTS-CLEANUP-PREVIEW-004 | integration | Cleanup sweeps stale preview state after retarget | Preview link points at the current preview resource while older preview deployments and route rows still carry the same preview source fingerprint | `ok` with `status = cleaned`; latest and stale preview runtimes are cleaned before linked-target and preview-fingerprint route rows are removed, then the preview source link is unlinked | None |
 
 ## CLI Matrix
 
@@ -57,13 +60,14 @@ This matrix inherits:
 
 ## Current Implementation Notes And Migration Gaps
 
-`DEPLOYMENTS-CLEANUP-PREVIEW-001` through `DEPLOYMENTS-CLEANUP-PREVIEW-003` have application
+`DEPLOYMENTS-CLEANUP-PREVIEW-001` through `DEPLOYMENTS-CLEANUP-PREVIEW-004` have application
 coverage in `packages/application/test/cleanup-preview.test.ts`.
 
 `DEPLOYMENTS-CLEANUP-PREVIEW-CLI-001` has CLI integration coverage in
 `packages/adapters/cli/test/preview-command.test.ts`.
 
-Source-link unlink and server-applied route desired-state delete coverage also live in
+Source-link unlink and server-applied route desired-state delete-by-target and
+delete-by-source-fingerprint coverage also live in
 `packages/adapters/cli/test/deployment-remote-state.test.ts` and
 `packages/persistence/pg/test/pglite.integration.test.ts` under the governing source-link and
 server-applied-route matrices.

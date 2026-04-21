@@ -106,6 +106,10 @@ class CapturingServerAppliedRouteStateStore implements ServerAppliedRouteStateSt
   async deleteDesired(): Promise<Result<boolean>> {
     return ok(false);
   }
+
+  async deleteDesiredBySourceFingerprint(): Promise<Result<number>> {
+    return ok(0);
+  }
 }
 
 function createTestContext(): ExecutionContext {
