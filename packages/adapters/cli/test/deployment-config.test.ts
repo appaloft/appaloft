@@ -1223,6 +1223,169 @@ describe("CLI deployment config entry workflow", () => {
     ]);
   });
 
+  test("[CONFIG-FILE-ENTRY-025] deploy action PR preview accepts empty-string environment overrides", async () => {
+    ensureReflectMetadata();
+    const workspace = mkdtempSync(join(tmpdir(), "appaloft-preview-empty-env-"));
+    const sshKeyPath = join(workspace, "appaloft-preview.key");
+    writeFileSync(
+      sshKeyPath,
+      "-----BEGIN OPENSSH PRIVATE KEY-----\nsecret\n-----END OPENSSH PRIVATE KEY-----\n",
+    );
+    writeFileSync(
+      join(workspace, "appaloft.yml"),
+      [
+        "runtime:",
+        "  strategy: workspace-commands",
+        "  installCommand: bun install --frozen-lockfile",
+        "  buildCommand: bun run build",
+        "  startCommand: bun ./dist/server/entry.mjs",
+        "  healthCheckPath: /",
+        "network:",
+        "  internalPort: 4321",
+        "  upstreamProtocol: http",
+        "  exposureMode: reverse-proxy",
+        "access:",
+        "  domains:",
+        "    - host: www.appaloft.com",
+        "      pathPrefix: /",
+        "      tlsMode: auto",
+        "env:",
+        "  HOST: 0.0.0.0",
+        '  PORT: "4321"',
+        "  APPALOFT_BETTER_AUTH_URL: https://www.appaloft.com",
+        "  APPALOFT_BETTER_AUTH_COOKIE_DOMAIN: .appaloft.com",
+        "  APPALOFT_BETTER_AUTH_TRUSTED_ORIGINS: https://www.appaloft.com,https://appaloft.com",
+        '  APPALOFT_BETTER_AUTH_TRUSTED_PROXY_HEADERS: "true"',
+        "  APPALOFT_LOCALE_COOKIE_DOMAIN: .appaloft.com",
+        "secrets:",
+        "  APPALOFT_BETTER_AUTH_SECRET:",
+        "    from: ci-env:APPALOFT_BETTER_AUTH_SECRET",
+        "    required: true",
+        "",
+      ].join("\n"),
+    );
+    const harness = await createPreviewDeployCliHarness({
+      withRouteStore: true,
+      deploymentSummaries: [
+        {
+          id: "dep_1",
+          resourceId: "res_1",
+          status: "succeeded",
+          runtimePlan: {
+            execution: {
+              accessRoutes: [
+                {
+                  proxyKind: "traefik",
+                  domains: ["pr-5.preview.appaloft.com"],
+                  pathPrefix: "/",
+                  tlsMode: "auto",
+                },
+              ],
+            },
+          },
+        },
+      ],
+    });
+
+    try {
+      await withBunEnv(
+        {
+          APPALOFT_BETTER_AUTH_SECRET: "resolved-secret",
+          GITHUB_REPOSITORY: "appaloft/www",
+          GITHUB_REPOSITORY_ID: "R_www_repo",
+          GITHUB_REF: "refs/pull/5/merge",
+          GITHUB_HEAD_REF: "fix/home-copy-layout",
+          GITHUB_SHA: "abc123",
+          GITHUB_WORKSPACE: workspace,
+        },
+        () =>
+          withMutedProcessOutput(async () => {
+            await harness.program.parseAsync([
+              "node",
+              "appaloft",
+              "deploy",
+              workspace,
+              "--server-host",
+              "203.0.113.10",
+              "--server-provider",
+              "generic-ssh",
+              "--server-ssh-username",
+              "root",
+              "--server-ssh-private-key-file",
+              sshKeyPath,
+              "--server-proxy-kind",
+              "traefik",
+              "--state-backend",
+              "ssh-pglite",
+              "--method",
+              "workspace-commands",
+              "--install",
+              "bun install --frozen-lockfile",
+              "--build",
+              "bun run build",
+              "--start",
+              "bun ./dist/server/entry.mjs",
+              "--port",
+              "4321",
+              "--health-path",
+              "/",
+              "--upstream-protocol",
+              "http",
+              "--exposure-mode",
+              "reverse-proxy",
+              "--preview",
+              "pull-request",
+              "--preview-id",
+              "pr-5",
+              "--preview-domain-template",
+              "5.preview.appaloft.com",
+              "--preview-tls-mode",
+              "auto",
+              "--require-preview-url",
+              "--env",
+              "HOST=0.0.0.0",
+              "--env",
+              "PORT=4321",
+              "--env",
+              "APPALOFT_BETTER_AUTH_URL=https://5.preview.appaloft.com",
+              "--env",
+              "APPALOFT_BETTER_AUTH_TRUSTED_ORIGINS=https://5.preview.appaloft.com",
+              "--env",
+              "APPALOFT_BETTER_AUTH_COOKIE_DOMAIN=",
+              "--env",
+              "APPALOFT_BETTER_AUTH_TRUSTED_PROXY_HEADERS=true",
+              "--env",
+              "APPALOFT_LOCALE_COOKIE_DOMAIN=",
+              "--secret",
+              "APPALOFT_BETTER_AUTH_SECRET=ci-env:APPALOFT_BETTER_AUTH_SECRET",
+            ]);
+          }),
+      );
+    } finally {
+      rmSync(workspace, { recursive: true, force: true });
+    }
+
+    const variables = harness.commands.filter(
+      (command) => command.constructor.name === "SetEnvironmentVariableCommand",
+    );
+    expect(variables).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          key: "APPALOFT_BETTER_AUTH_COOKIE_DOMAIN",
+          value: "",
+          kind: "plain-config",
+          isSecret: false,
+        }),
+        expect.objectContaining({
+          key: "APPALOFT_LOCALE_COOKIE_DOMAIN",
+          value: "",
+          kind: "plain-config",
+          isSecret: false,
+        }),
+      ]),
+    );
+  });
+
   test("[CONFIG-FILE-ENTRY-024] deploy action PR preview require-preview-url fails without a public route", async () => {
     ensureReflectMetadata();
     const workspace = mkdtempSync(join(tmpdir(), "appaloft-preview-url-required-"));
