@@ -566,6 +566,10 @@ class NoopServerAppliedRouteStateStore implements ServerAppliedRouteStateStore {
   async deleteDesired(): Promise<Result<boolean>> {
     return ok(false);
   }
+
+  async deleteDesiredBySourceFingerprint(): Promise<Result<number>> {
+    return ok(0);
+  }
 }
 
 class RequestScopedIntegrationAuthPort implements IntegrationAuthPort {
