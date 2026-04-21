@@ -11,6 +11,7 @@ This test matrix inherits:
 - [ADR-019: Edge Proxy Provider And Observable Configuration](../decisions/ADR-019-edge-proxy-provider-and-observable-configuration.md)
 - [ADR-024: Pure CLI SSH State And Server-Applied Domains](../decisions/ADR-024-pure-cli-ssh-state-and-server-applied-domains.md)
 - [Edge Proxy Provider And Route Realization Workflow](../workflows/edge-proxy-provider-and-route-realization.md)
+- [Resource Access Failure Diagnostics Test Matrix](./resource-access-failure-diagnostics-test-matrix.md)
 - [resources.proxy-configuration.preview Query Spec](../queries/resources.proxy-configuration.preview.md)
 - [Default Access Domain And Proxy Routing Test Matrix](./default-access-domain-and-proxy-routing-test-matrix.md)
 - [Server Bootstrap Test Matrix](./server-bootstrap-test-matrix.md)
@@ -23,6 +24,7 @@ This test matrix inherits:
 | Layer | Required focus |
 | --- | --- |
 | Provider contract | Concrete provider renders ensure plan, route plan, config view, logs/diagnostics from provider-neutral inputs. |
+| Edge request diagnostics | Concrete provider maps gateway-generated request failures into provider-neutral `resource_access_*` diagnostics. |
 | Provider registry | Application resolves providers by key/capability and returns structured errors when missing. |
 | Application boundary | Command/query/process code imports only provider-neutral ports, not concrete provider packages. |
 | Server bootstrap | Proxy bootstrap consumes provider ensure plan and records ready/failed state. |
@@ -71,6 +73,7 @@ Then:
 | EDGE-PROXY-PROVIDER-007 | contract | Provider renders config view | Planned or realized route exists | Read-only sections returned | None | Section content may be provider-specific; wrapper stays provider-neutral. |
 | EDGE-PROXY-PROVIDER-008 | contract | Provider render fails | Provider cannot render safe config | `err` | `proxy_configuration_render_failed` | Error contains code, phase, retriable, provider key. |
 | EDGE-PROXY-PROVIDER-009 | contract | Provider renders reload plan | Route realization changes provider-owned configuration | Reload plan returned | None | Plan uses `automatic` or provider-produced `command` reload steps; application code does not hardcode reload commands. |
+| EDGE-PROXY-PROVIDER-010 | contract | Provider classifies gateway failure | Provider observes a route/upstream gateway failure | `ResourceAccessFailureDiagnostic` returned | None | Provider maps concrete failure to stable `resource_access_*` code without exposing raw proxy text. |
 
 ## Server Bootstrap Matrix
 
@@ -171,6 +174,12 @@ External runtime reload and public redirect probing remain e2e follow-up coverag
 
 `SERVER-APPLIED-ROUTE-STATE-001` through `SERVER-APPLIED-ROUTE-STATE-005` have PG/PGlite
 integration coverage in `packages/persistence/pg/test/pglite.integration.test.ts`.
+
+`EDGE-PROXY-PROVIDER-010` now has Traefik provider coverage for rendering the resource access
+failure middleware and attaching it to served route labels when a safe diagnostic renderer target
+is supplied. Runtime helper coverage now verifies running-service renderer target forwarding,
+explicit override behavior, and loopback/no-service exclusion; real proxy error-page probing
+remains follow-up coverage under the resource access failure diagnostics matrix.
 
 ## Open Questions
 

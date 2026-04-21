@@ -25,6 +25,7 @@ EdgeProxyProvider port/registry
 ## Governed Specs
 
 - [Edge Proxy Provider And Route Realization Workflow](../workflows/edge-proxy-provider-and-route-realization.md)
+- [Resource Access Failure Diagnostics Workflow](../workflows/resource-access-failure-diagnostics.md)
 - [resources.proxy-configuration.preview Query Spec](../queries/resources.proxy-configuration.preview.md)
 - [Default Access Domain And Proxy Routing Workflow](../workflows/default-access-domain-and-proxy-routing.md)
 - [Server Bootstrap And Proxy Workflow](../workflows/server-bootstrap-and-proxy.md)
@@ -39,6 +40,9 @@ Expected implementation areas:
 - `packages/application/src/tokens.ts`: add DI token(s) for edge proxy provider registry/query service.
 - `packages/application/src/operations/resources`: add the `resources.proxy-configuration.preview` query slice when promoted to active operation.
 - `packages/providers/edge-proxy-*`: add concrete provider packages.
+- `packages/providers/edge-proxy-*`: map concrete gateway/request failure signals into
+  provider-neutral `ResourceAccessFailureDiagnostic` envelopes when the access diagnostics slice is
+  implemented.
 - `packages/adapters/runtime`: execute provider-produced plans and reload steps instead of generating concrete proxy config or reload commands through switches.
 - `packages/persistence/pg`: project route realization and resource access/configuration read-model state as needed.
 - `packages/contracts`: expose provider-neutral query schema and view types when the query becomes active.
@@ -131,6 +135,23 @@ Canonical new or reused phases:
 - `proxy-bootstrap`.
 
 No provider-specific error code should mention a concrete proxy product. Provider-specific details may appear in `details.providerKey`, logs, diagnostics, and safe metadata.
+
+Request-time gateway failure codes use the separate resource access diagnostics taxonomy:
+
+- `resource_access_route_not_found`;
+- `resource_access_proxy_unavailable`;
+- `resource_access_route_unavailable`;
+- `resource_access_upstream_unavailable`;
+- `resource_access_upstream_connect_failed`;
+- `resource_access_upstream_timeout`;
+- `resource_access_upstream_reset`;
+- `resource_access_upstream_tls_failed`;
+- `resource_access_edge_error`;
+- `resource_access_unknown`.
+
+Those codes are outer observation errors and should be exposed through the access diagnostics
+renderer, `resources.health`, or `resources.diagnostic-summary`, not as proxy configuration query
+admission errors.
 
 ## Required Tests
 

@@ -588,7 +588,7 @@ describe("ResourceDiagnosticSummaryQueryService", () => {
     expect(summary.copy.json).toContain('"serverAppliedUrl": "https://www.example.test/admin"');
   });
 
-  test("[RES-DIAG-QRY-015] keeps durable route first for diagnostic proxy context", async () => {
+  test("[RES-DIAG-QRY-017] keeps durable route first for diagnostic proxy context", async () => {
     const context = createTestContext();
     const { service } = createService({
       resources: [
@@ -655,7 +655,7 @@ describe("ResourceDiagnosticSummaryQueryService", () => {
     expect(summary.copy.json).toContain('"durableUrl": "https://durable.example.test"');
   });
 
-  test("[RES-DIAG-QRY-016] reports non-ready durable domain without hiding fallback routes", async () => {
+  test("[RES-DIAG-QRY-018] reports non-ready durable domain without hiding fallback routes", async () => {
     const context = createTestContext();
     const { service } = createService({
       domainBindings: [

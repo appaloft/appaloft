@@ -1452,7 +1452,7 @@ describe("pglite persistence integration", () => {
     }
   }, 15000);
 
-  test("[DEF-ACCESS-QRY-002][RES-HEALTH-QRY-014][RES-DIAG-QRY-015][EDGE-PROXY-QRY-002] pglite keeps durable precedence over newer server-applied and generated routes", async () => {
+  test("[DEF-ACCESS-QRY-002][RES-HEALTH-QRY-014][RES-DIAG-QRY-017][EDGE-PROXY-QRY-002] pglite keeps durable precedence over newer server-applied and generated routes", async () => {
     const workspaceDir = mkdtempSync(join(tmpdir(), "appaloft-pglite-route-precedence-"));
     const pgliteDataDir = join(workspaceDir, ".appaloft", "data", "pglite");
     let closeDatabase: (() => Promise<void>) | undefined;
@@ -1634,7 +1634,7 @@ describe("pglite persistence integration", () => {
     }
   }, 15000);
 
-  test("[RES-HEALTH-QRY-015][RES-DIAG-QRY-016] pglite exposes non-ready durable domain state before generated fallback", async () => {
+  test("[RES-HEALTH-QRY-015][RES-DIAG-QRY-018] pglite exposes non-ready durable domain state before generated fallback", async () => {
     const workspaceDir = mkdtempSync(join(tmpdir(), "appaloft-pglite-pending-domain-"));
     const pgliteDataDir = join(workspaceDir, ".appaloft", "data", "pglite");
     let closeDatabase: (() => Promise<void>) | undefined;

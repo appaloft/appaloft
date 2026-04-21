@@ -105,6 +105,25 @@ describe("resolveConfig", () => {
     expect(config.remoteRuntimeRoot).toBe("/srv/appaloft/runtime");
   });
 
+  test("uses an explicit resource access failure renderer URL only when it is HTTP based", () => {
+    const configured = resolveConfig({
+      env: {
+        APPALOFT_RESOURCE_ACCESS_FAILURE_RENDERER_URL:
+          "http://appaloft.internal:3001/.appaloft/resource-access-failure",
+      },
+    });
+    const invalid = resolveConfig({
+      env: {
+        APPALOFT_RESOURCE_ACCESS_FAILURE_RENDERER_URL: "unix:///var/run/appaloft.sock",
+      },
+    });
+
+    expect(configured.resourceAccessFailureRendererUrl).toBe(
+      "http://appaloft.internal:3001/.appaloft/resource-access-failure",
+    );
+    expect(invalid.resourceAccessFailureRendererUrl).toBeUndefined();
+  });
+
   test("uses shared logger environment variables", () => {
     const config = resolveConfig({
       env: {

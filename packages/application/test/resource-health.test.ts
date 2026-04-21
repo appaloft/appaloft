@@ -399,7 +399,7 @@ describe("ResourceHealthQueryService", () => {
     );
   });
 
-  test("[RES-HEALTH-QRY-018][EDGE-PROXY-ROUTE-005] reports server-applied domain before generated route", async () => {
+  test("[RES-HEALTH-QRY-020][EDGE-PROXY-ROUTE-005] reports server-applied domain before generated route", async () => {
     const service = createService({
       resources: [
         resourceSummary({
