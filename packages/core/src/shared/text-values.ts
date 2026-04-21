@@ -16,6 +16,10 @@ function rehydrateRequiredText(value: string): string {
   return value.trim();
 }
 
+function normalizeConfigValueText(value: string): string {
+  return value.trim();
+}
+
 function validateSlug(value: string, label: string): Result<string> {
   const normalized = value.trim().toLowerCase();
 
@@ -938,7 +942,7 @@ export class ConfigKey extends NonEmptyTextValue {
 }
 
 const configValueBrand: unique symbol = Symbol("ConfigValueText");
-export class ConfigValueText extends NonEmptyTextValue {
+export class ConfigValueText extends ScalarValueObject<string> {
   private [configValueBrand]!: void;
 
   private constructor(value: string) {
@@ -946,15 +950,11 @@ export class ConfigValueText extends NonEmptyTextValue {
   }
 
   static create(value: string): Result<ConfigValueText> {
-    return createRequiredTextValue(
-      value,
-      "Config value",
-      (normalized) => new ConfigValueText(normalized),
-    );
+    return ok(new ConfigValueText(normalizeConfigValueText(value)));
   }
 
   static rehydrate(value: string): ConfigValueText {
-    return new ConfigValueText(rehydrateRequiredText(value));
+    return new ConfigValueText(normalizeConfigValueText(value));
   }
 }
 
