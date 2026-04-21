@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.10](https://github.com/appaloft/appaloft/compare/v0.2.9...v0.2.10) (2026-04-21)
+
+
+### Bug Fixes
+
+* harden remote state lock recovery ([#50](https://github.com/appaloft/appaloft/issues/50)) ([c82ff62](https://github.com/appaloft/appaloft/commit/c82ff627376502cd849f3374117824d63961ccac))
+
 ## [0.2.9](https://github.com/appaloft/appaloft/compare/v0.2.8...v0.2.9) (2026-04-21)
 
 
