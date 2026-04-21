@@ -68,8 +68,8 @@ creates project/environment/server/resource identity. The backend must provide:
 - remote state ensure: create or verify the Appaloft data root, permissions, schema-version marker,
   lock location, backup location, and diagnostics metadata before any business command runs;
 - an exclusive remote mutation lock for one deploy/update/relink workflow at a time, with lock
-  owner metadata, correlation id, start time, stale-lock detection, and safe operator-visible
-  recovery;
+  owner metadata, correlation id, start time, heartbeat/last-seen metadata, stale-lock detection,
+  owner-aware release, and safe operator-visible recovery;
 - schema migration before command dispatch, including a pre-migration backup or journal and a
   post-migration integrity check;
 - crash-safe persistence and safe migration backups, journals, or equivalent recovery behavior;

@@ -396,7 +396,7 @@ export async function prepareRemotePgliteStateSync(
     target: plan.value.target,
     dataRoot: plan.value.dataRoot,
     owner: "appaloft-cli",
-    correlationId: "remote_state_shell",
+    correlationId: `remote_state_shell_${process.pid}_${Date.now().toString(36)}`,
   });
   const prepared = await lifecycle.prepare();
   if (prepared.isErr()) {
