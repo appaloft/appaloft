@@ -133,6 +133,8 @@ The first implementation slice covers:
 - Traefik error middleware label output for gateway-generated 404, 502, 503, and 504 responses;
 - optional Traefik served-route attachment when route realization receives a safe diagnostic
   renderer service URL;
+- optional Traefik low-priority catch-all fallback routing for unmatched host/path requests when
+  route realization receives a safe diagnostic renderer service URL;
 - automatic renderer target forwarding while a wildcard-bound Appaloft backend service is running;
 - explicit runtime configuration via `APPALOFT_RESOURCE_ACCESS_FAILURE_RENDERER_URL` as a topology
   override when the proxy manager knows a different reachable backend URL.
