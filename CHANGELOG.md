@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.2.6](https://github.com/appaloft/appaloft/compare/v0.2.5...v0.2.6) (2026-04-21)
+
+
+### Bug Fixes
+
+* **core:** allow empty config values ([#32](https://github.com/appaloft/appaloft/issues/32)) ([e52da5d](https://github.com/appaloft/appaloft/commit/e52da5d208bd7744b6c1cd77c6fcc1a8f43beca2))
+
+
+### Documentation
+
+* require docker swarm for 1.0 ([b06072b](https://github.com/appaloft/appaloft/commit/b06072b49babaf18de085ef8cf76187dd100f9bd))
+
 ## [0.2.5](https://github.com/appaloft/appaloft/compare/v0.2.4...v0.2.5) (2026-04-21)
 
 
