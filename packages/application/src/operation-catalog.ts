@@ -1,4 +1,5 @@
 import { type ZodTypeAny } from "zod";
+import { importCertificateCommandInputSchema } from "./operations/certificates/import-certificate.command";
 import { issueOrRenewCertificateCommandInputSchema } from "./operations/certificates/issue-or-renew-certificate.command";
 import { listCertificatesQueryInputSchema } from "./operations/certificates/list-certificates.query";
 import { configureDefaultAccessDomainPolicyCommandInputSchema } from "./operations/default-access-domain-policies/configure-default-access-domain-policy.command";
@@ -646,6 +647,20 @@ export const operationCatalog = [
     transports: {
       cli: "appaloft domain-binding list",
       orpc: { method: "GET", path: "/api/domain-bindings" },
+    },
+  },
+  {
+    key: "certificates.import",
+    kind: "command",
+    domain: "certificates",
+    messageName: "ImportCertificateCommand",
+    handlerName: "ImportCertificateCommandHandler",
+    serviceName: "ImportCertificateUseCase",
+    inputSchema: importCertificateCommandInputSchema,
+    serviceToken: tokens.importCertificateUseCase,
+    transports: {
+      cli: "appaloft certificate import <domainBindingId>",
+      orpc: { method: "POST", path: "/api/certificates/import" },
     },
   },
   {

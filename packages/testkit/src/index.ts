@@ -1,5 +1,6 @@
 import {
   type AppLogger,
+  type CertificateMaterialValidator,
   type CertificateProviderIssueInput,
   type CertificateProviderIssueResult,
   type CertificateProviderPort,
@@ -28,6 +29,9 @@ import {
   type EventBus,
   type ExecutionContext,
   type IdGenerator,
+  type ImportedCertificateMaterialValidationResult,
+  type ImportedCertificateSecretStoreInput,
+  type ImportedCertificateSecretStoreResult,
   type ProjectReadModel,
   type ProjectRepository,
   projectResourceAccessSummary,
@@ -144,6 +148,7 @@ export class FakeCertificateProvider implements CertificateProviderPort {
 
 export class FakeCertificateSecretStore implements CertificateSecretStore {
   readonly stored: CertificateProviderIssueResult[] = [];
+  readonly importedStored: ImportedCertificateSecretStoreInput[] = [];
 
   constructor(private secretRefPrefix = "secret") {}
 
@@ -156,6 +161,42 @@ export class FakeCertificateSecretStore implements CertificateSecretStore {
     return ok({
       secretRef: `${this.secretRefPrefix}://${material.certificateId}/${material.attemptId}`,
     });
+  }
+
+  async storeImported(
+    context: ExecutionContext,
+    input: ImportedCertificateSecretStoreInput,
+  ): Promise<Result<ImportedCertificateSecretStoreResult, DomainError>> {
+    void context;
+    this.importedStored.push(input);
+    return ok({
+      certificateChainRef: `${this.secretRefPrefix}://${input.certificateId}/${input.attemptId}/chain`,
+      privateKeyRef: `${this.secretRefPrefix}://${input.certificateId}/${input.attemptId}/private-key`,
+      ...(input.passphrase
+        ? {
+            passphraseRef: `${this.secretRefPrefix}://${input.certificateId}/${input.attemptId}/passphrase`,
+          }
+        : {}),
+    });
+  }
+}
+
+export class FakeCertificateMaterialValidator implements CertificateMaterialValidator {
+  readonly inputs: Parameters<CertificateMaterialValidator["validateImported"]>[1][] = [];
+
+  constructor(private result: Result<ImportedCertificateMaterialValidationResult, DomainError>) {}
+
+  setResult(result: Result<ImportedCertificateMaterialValidationResult, DomainError>): void {
+    this.result = result;
+  }
+
+  async validateImported(
+    context: Parameters<CertificateMaterialValidator["validateImported"]>[0],
+    input: Parameters<CertificateMaterialValidator["validateImported"]>[1],
+  ): Promise<Result<ImportedCertificateMaterialValidationResult, DomainError>> {
+    void context;
+    this.inputs.push(input);
+    return this.result;
   }
 }
 
@@ -918,11 +959,24 @@ export class MemoryCertificateReadModel implements CertificateReadModel {
           domainBindingId: certificate.domainBindingId.value,
           domainName: certificate.domainName.value,
           status: certificate.status.value,
+          source: certificate.source.value,
           providerKey: certificate.providerKey.value,
           challengeType: certificate.challengeType.value,
           ...(certificate.issuedAt ? { issuedAt: certificate.issuedAt.value } : {}),
           ...(certificate.expiresAt ? { expiresAt: certificate.expiresAt.value } : {}),
           ...(certificate.fingerprint ? { fingerprint: certificate.fingerprint.value } : {}),
+          ...(certificate.importedMetadata
+            ? {
+                notBefore: certificate.importedMetadata.notBefore.value,
+                keyAlgorithm: certificate.importedMetadata.keyAlgorithm.value,
+                subjectAlternativeNames: certificate.importedMetadata.subjectAlternativeNames.map(
+                  (domainName) => domainName.value,
+                ),
+                ...(certificate.importedMetadata.issuer
+                  ? { issuer: certificate.importedMetadata.issuer.value }
+                  : {}),
+              }
+            : {}),
           ...(latestAttempt
             ? {
                 latestAttempt: {

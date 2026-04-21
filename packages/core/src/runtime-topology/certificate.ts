@@ -22,6 +22,10 @@ export const certificateStatuses = [
 
 export type CertificateStatus = (typeof certificateStatuses)[number];
 
+export const certificateSources = ["managed", "imported"] as const;
+
+export type CertificateSource = (typeof certificateSources)[number];
+
 export const certificateAttemptStatuses = [
   "requested",
   "issuing",
@@ -105,6 +109,28 @@ export class CertificateStatusValue extends ScalarValueObject<CertificateStatus>
 
   static rehydrate(value: CertificateStatus): CertificateStatusValue {
     return new CertificateStatusValue(value);
+  }
+}
+
+const certificateSourceBrand: unique symbol = Symbol("CertificateSourceValue");
+export class CertificateSourceValue extends ScalarValueObject<CertificateSource> {
+  private [certificateSourceBrand]!: void;
+
+  private constructor(value: CertificateSource) {
+    super(value);
+  }
+
+  static create(value: string): Result<CertificateSourceValue> {
+    return createLiteralValue(
+      value,
+      certificateSources,
+      "Certificate source",
+      (validated) => new CertificateSourceValue(validated),
+    );
+  }
+
+  static rehydrate(value: CertificateSource): CertificateSourceValue {
+    return new CertificateSourceValue(value);
   }
 }
 
@@ -223,6 +249,27 @@ export class CertificateIssuedAtValue extends ScalarValueObject<string> {
 
   static rehydrate(value: string): CertificateIssuedAtValue {
     return new CertificateIssuedAtValue(CreatedAt.rehydrate(value).value);
+  }
+}
+
+const certificateNotBeforeBrand: unique symbol = Symbol("CertificateNotBeforeValue");
+export class CertificateNotBeforeValue extends ScalarValueObject<string> {
+  private [certificateNotBeforeBrand]!: void;
+
+  private constructor(value: string) {
+    super(value);
+  }
+
+  static create(value: string): Result<CertificateNotBeforeValue> {
+    return createDateTimeText(
+      value,
+      "Certificate not before",
+      (normalized) => new CertificateNotBeforeValue(normalized),
+    );
+  }
+
+  static rehydrate(value: string): CertificateNotBeforeValue {
+    return new CertificateNotBeforeValue(CreatedAt.rehydrate(value).value);
   }
 }
 
@@ -400,6 +447,76 @@ export class CertificateFailureMessageValue extends ScalarValueObject<string> {
   }
 }
 
+const certificateIssuerBrand: unique symbol = Symbol("CertificateIssuerValue");
+export class CertificateIssuerValue extends ScalarValueObject<string> {
+  private [certificateIssuerBrand]!: void;
+
+  private constructor(value: string) {
+    super(value);
+  }
+
+  static create(value: string): Result<CertificateIssuerValue> {
+    return createRequiredText(
+      value,
+      "Certificate issuer",
+      (normalized) => new CertificateIssuerValue(normalized),
+    );
+  }
+
+  static fromOptional(value?: string): Result<CertificateIssuerValue | undefined> {
+    const normalized = value?.trim();
+    return normalized ? CertificateIssuerValue.create(normalized) : ok(undefined);
+  }
+
+  static rehydrate(value: string): CertificateIssuerValue {
+    return new CertificateIssuerValue(value.trim());
+  }
+}
+
+const certificateKeyAlgorithmBrand: unique symbol = Symbol("CertificateKeyAlgorithmValue");
+export class CertificateKeyAlgorithmValue extends ScalarValueObject<string> {
+  private [certificateKeyAlgorithmBrand]!: void;
+
+  private constructor(value: string) {
+    super(value);
+  }
+
+  static create(value: string): Result<CertificateKeyAlgorithmValue> {
+    return createRequiredText(
+      value,
+      "Certificate key algorithm",
+      (normalized) => new CertificateKeyAlgorithmValue(normalized),
+    );
+  }
+
+  static rehydrate(value: string): CertificateKeyAlgorithmValue {
+    return new CertificateKeyAlgorithmValue(value.trim());
+  }
+}
+
+const certificateMaterialFingerprintBrand: unique symbol = Symbol(
+  "CertificateMaterialFingerprintValue",
+);
+export class CertificateMaterialFingerprintValue extends ScalarValueObject<string> {
+  private [certificateMaterialFingerprintBrand]!: void;
+
+  private constructor(value: string) {
+    super(value);
+  }
+
+  static create(value: string): Result<CertificateMaterialFingerprintValue> {
+    return createRequiredText(
+      value,
+      "Certificate material fingerprint",
+      (normalized) => new CertificateMaterialFingerprintValue(normalized),
+    );
+  }
+
+  static rehydrate(value: string): CertificateMaterialFingerprintValue {
+    return new CertificateMaterialFingerprintValue(value.trim());
+  }
+}
+
 export interface CertificateAttemptState {
   id: CertificateAttemptId;
   reason: CertificateIssueReasonValue;
@@ -416,6 +533,20 @@ export interface CertificateAttemptState {
   retriable?: boolean;
   retryAfter?: CertificateRetryAfterValue;
   idempotencyKey?: CertificateAttemptIdempotencyKeyValue;
+  materialFingerprint?: CertificateMaterialFingerprintValue;
+}
+
+export interface ImportedCertificateMetadataState {
+  subjectAlternativeNames: PublicDomainName[];
+  notBefore: CertificateNotBeforeValue;
+  keyAlgorithm: CertificateKeyAlgorithmValue;
+  issuer?: CertificateIssuerValue;
+}
+
+export interface ImportedCertificateSecretRefsState {
+  certificateChain: CertificateSecretRefValue;
+  privateKey: CertificateSecretRefValue;
+  passphrase?: CertificateSecretRefValue;
 }
 
 export interface CertificateState {
@@ -423,12 +554,15 @@ export interface CertificateState {
   domainBindingId: DomainBindingId;
   domainName: PublicDomainName;
   status: CertificateStatusValue;
+  source: CertificateSourceValue;
   providerKey: ProviderKey;
   challengeType: CertificateChallengeTypeValue;
   issuedAt?: CertificateIssuedAtValue;
   expiresAt?: CertificateExpiresAtValue;
   fingerprint?: CertificateFingerprintValue;
   secretRef?: CertificateSecretRefValue;
+  importedMetadata?: ImportedCertificateMetadataState;
+  importedSecretRefs?: ImportedCertificateSecretRefsState;
   attempts: CertificateAttemptState[];
   createdAt: CreatedAt;
 }
@@ -460,6 +594,7 @@ export class Certificate extends AggregateRoot<CertificateState> {
       domainBindingId: input.domainBindingId,
       domainName: input.domainName,
       status: CertificateStatusValue.rehydrate("pending"),
+      source: CertificateSourceValue.rehydrate("managed"),
       providerKey: input.providerKey,
       challengeType: input.challengeType,
       attempts: [
@@ -480,10 +615,84 @@ export class Certificate extends AggregateRoot<CertificateState> {
     return ok(certificate);
   }
 
+  static importCertificate(input: {
+    id: CertificateId;
+    domainBindingId: DomainBindingId;
+    domainName: PublicDomainName;
+    attemptId: CertificateAttemptId;
+    reason: CertificateIssueReasonValue;
+    providerKey: ProviderKey;
+    challengeType: CertificateChallengeTypeValue;
+    importedAt: CreatedAt;
+    notBefore: CertificateNotBeforeValue;
+    expiresAt: CertificateExpiresAtValue;
+    subjectAlternativeNames: PublicDomainName[];
+    keyAlgorithm: CertificateKeyAlgorithmValue;
+    certificateChainRef: CertificateSecretRefValue;
+    privateKeyRef: CertificateSecretRefValue;
+    fingerprint?: CertificateFingerprintValue;
+    issuer?: CertificateIssuerValue;
+    passphraseRef?: CertificateSecretRefValue;
+    idempotencyKey?: CertificateAttemptIdempotencyKeyValue;
+    materialFingerprint?: CertificateMaterialFingerprintValue;
+    correlationId?: string;
+    causationId?: string;
+  }): Result<Certificate> {
+    const certificate = new Certificate({
+      id: input.id,
+      domainBindingId: input.domainBindingId,
+      domainName: input.domainName,
+      status: CertificateStatusValue.rehydrate("active"),
+      source: CertificateSourceValue.rehydrate("imported"),
+      providerKey: input.providerKey,
+      challengeType: input.challengeType,
+      issuedAt: CertificateIssuedAtValue.rehydrate(input.importedAt.value),
+      expiresAt: input.expiresAt,
+      ...(input.fingerprint ? { fingerprint: input.fingerprint } : {}),
+      importedMetadata: {
+        subjectAlternativeNames: [...input.subjectAlternativeNames],
+        notBefore: input.notBefore,
+        keyAlgorithm: input.keyAlgorithm,
+        ...(input.issuer ? { issuer: input.issuer } : {}),
+      },
+      importedSecretRefs: {
+        certificateChain: input.certificateChainRef,
+        privateKey: input.privateKeyRef,
+        ...(input.passphraseRef ? { passphrase: input.passphraseRef } : {}),
+      },
+      attempts: [
+        {
+          id: input.attemptId,
+          reason: input.reason,
+          status: CertificateAttemptStatusValue.rehydrate("issued"),
+          providerKey: input.providerKey,
+          challengeType: input.challengeType,
+          requestedAt: input.importedAt,
+          issuedAt: CertificateIssuedAtValue.rehydrate(input.importedAt.value),
+          expiresAt: input.expiresAt,
+          ...(input.idempotencyKey ? { idempotencyKey: input.idempotencyKey } : {}),
+          ...(input.materialFingerprint ? { materialFingerprint: input.materialFingerprint } : {}),
+        },
+      ],
+      createdAt: input.importedAt,
+    });
+
+    certificate.recordImported(input);
+    return ok(certificate);
+  }
+
   static rehydrate(state: CertificateState): Certificate {
     return new Certificate({
       ...state,
       attempts: [...state.attempts],
+      ...(state.importedMetadata
+        ? {
+            importedMetadata: {
+              ...state.importedMetadata,
+              subjectAlternativeNames: [...state.importedMetadata.subjectAlternativeNames],
+            },
+          }
+        : {}),
     });
   }
 
@@ -627,9 +836,12 @@ export class Certificate extends AggregateRoot<CertificateState> {
     }
 
     this.state.status = CertificateStatusValue.rehydrate("active");
+    this.state.source = CertificateSourceValue.rehydrate("managed");
     this.state.issuedAt = input.issuedAt;
     this.state.expiresAt = input.expiresAt;
     this.state.secretRef = input.secretRef;
+    delete this.state.importedMetadata;
+    delete this.state.importedSecretRefs;
     if (input.fingerprint) {
       this.state.fingerprint = input.fingerprint;
     }
@@ -655,6 +867,86 @@ export class Certificate extends AggregateRoot<CertificateState> {
       ...(input.causationId ? { causationId: input.causationId } : {}),
     });
 
+    return ok(undefined);
+  }
+
+  markImported(input: {
+    attemptId: CertificateAttemptId;
+    reason: CertificateIssueReasonValue;
+    providerKey: ProviderKey;
+    challengeType: CertificateChallengeTypeValue;
+    importedAt: CreatedAt;
+    notBefore: CertificateNotBeforeValue;
+    expiresAt: CertificateExpiresAtValue;
+    subjectAlternativeNames: PublicDomainName[];
+    keyAlgorithm: CertificateKeyAlgorithmValue;
+    certificateChainRef: CertificateSecretRefValue;
+    privateKeyRef: CertificateSecretRefValue;
+    fingerprint?: CertificateFingerprintValue;
+    issuer?: CertificateIssuerValue;
+    passphraseRef?: CertificateSecretRefValue;
+    idempotencyKey?: CertificateAttemptIdempotencyKeyValue;
+    materialFingerprint?: CertificateMaterialFingerprintValue;
+    correlationId?: string;
+    causationId?: string;
+  }): Result<void> {
+    const conflictingAttempt = this.state.attempts.find(
+      (attempt) => attempt.reason.equals(input.reason) && attempt.status.isInFlight(),
+    );
+
+    if (conflictingAttempt) {
+      return err(
+        domainError.certificateAttemptConflict(
+          "Certificate already has an in-flight attempt for this reason",
+          {
+            phase: "certificate-admission",
+            certificateId: this.state.id.value,
+            attemptId: conflictingAttempt.id.value,
+            reason: input.reason.value,
+          },
+        ),
+      );
+    }
+
+    this.state.status = CertificateStatusValue.rehydrate("active");
+    this.state.source = CertificateSourceValue.rehydrate("imported");
+    this.state.providerKey = input.providerKey;
+    this.state.challengeType = input.challengeType;
+    this.state.issuedAt = CertificateIssuedAtValue.rehydrate(input.importedAt.value);
+    this.state.expiresAt = input.expiresAt;
+    delete this.state.secretRef;
+    this.state.importedMetadata = {
+      subjectAlternativeNames: [...input.subjectAlternativeNames],
+      notBefore: input.notBefore,
+      keyAlgorithm: input.keyAlgorithm,
+      ...(input.issuer ? { issuer: input.issuer } : {}),
+    };
+    this.state.importedSecretRefs = {
+      certificateChain: input.certificateChainRef,
+      privateKey: input.privateKeyRef,
+      ...(input.passphraseRef ? { passphrase: input.passphraseRef } : {}),
+    };
+    if (input.fingerprint) {
+      this.state.fingerprint = input.fingerprint;
+    }
+
+    this.state.attempts = [
+      ...this.state.attempts,
+      {
+        id: input.attemptId,
+        reason: input.reason,
+        status: CertificateAttemptStatusValue.rehydrate("issued"),
+        providerKey: input.providerKey,
+        challengeType: input.challengeType,
+        requestedAt: input.importedAt,
+        issuedAt: CertificateIssuedAtValue.rehydrate(input.importedAt.value),
+        expiresAt: input.expiresAt,
+        ...(input.idempotencyKey ? { idempotencyKey: input.idempotencyKey } : {}),
+        ...(input.materialFingerprint ? { materialFingerprint: input.materialFingerprint } : {}),
+      },
+    ];
+
+    this.recordImported(input);
     return ok(undefined);
   }
 
@@ -737,6 +1029,14 @@ export class Certificate extends AggregateRoot<CertificateState> {
     return {
       ...this.state,
       attempts: [...this.state.attempts],
+      ...(this.state.importedMetadata
+        ? {
+            importedMetadata: {
+              ...this.state.importedMetadata,
+              subjectAlternativeNames: [...this.state.importedMetadata.subjectAlternativeNames],
+            },
+          }
+        : {}),
     };
   }
 
@@ -761,6 +1061,36 @@ export class Certificate extends AggregateRoot<CertificateState> {
       providerKey: input.providerKey.value,
       challengeType: input.challengeType.value,
       requestedAt: input.requestedAt.value,
+      ...(input.correlationId ? { correlationId: input.correlationId } : {}),
+      ...(input.causationId ? { causationId: input.causationId } : {}),
+    });
+  }
+
+  private recordImported(input: {
+    attemptId: CertificateAttemptId;
+    importedAt: CreatedAt;
+    notBefore: CertificateNotBeforeValue;
+    expiresAt: CertificateExpiresAtValue;
+    subjectAlternativeNames: PublicDomainName[];
+    keyAlgorithm: CertificateKeyAlgorithmValue;
+    fingerprint?: CertificateFingerprintValue;
+    issuer?: CertificateIssuerValue;
+    correlationId?: string;
+    causationId?: string;
+  }): void {
+    this.recordDomainEvent("certificate-imported", input.importedAt, {
+      certificateId: this.state.id.value,
+      domainBindingId: this.state.domainBindingId.value,
+      domainName: this.state.domainName.value,
+      attemptId: input.attemptId.value,
+      importedAt: input.importedAt.value,
+      source: "imported",
+      notBefore: input.notBefore.value,
+      expiresAt: input.expiresAt.value,
+      subjectAlternativeNames: input.subjectAlternativeNames.map((domain) => domain.value),
+      keyAlgorithm: input.keyAlgorithm.value,
+      ...(input.issuer ? { issuer: input.issuer.value } : {}),
+      ...(input.fingerprint ? { fingerprint: input.fingerprint.value } : {}),
       ...(input.correlationId ? { correlationId: input.correlationId } : {}),
       ...(input.causationId ? { causationId: input.causationId } : {}),
     });

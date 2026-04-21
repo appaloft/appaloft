@@ -258,7 +258,10 @@ Synchronous admission includes:
 - proxy kind and TLS mode policy checks;
 - pending verification attempt and state transition checks;
 - certificate request eligibility checks;
-- duplicate in-flight certificate attempt checks.
+- duplicate in-flight certificate attempt checks;
+- manual certificate import input validation;
+- manual certificate policy eligibility checks for imported certificates;
+- manual certificate import idempotency conflict checks.
 
 Admission rejection returns `err(DomainError)` and must not publish lifecycle success events.
 
@@ -280,6 +283,7 @@ Async work includes:
   challenge type require it;
 - certificate provider request;
 - certificate storage;
+- domain-ready evaluation after `certificate-imported` or `certificate-issued`;
 - domain readiness finalization.
 
 Async work must persist state and publish formal events after durable transitions.
@@ -337,6 +341,29 @@ failed
 retry_scheduled
 ```
 
+Certificate source:
+
+```text
+managed
+imported
+```
+
+## Imported Certificate Minimum State
+
+Imported certificate state must keep the manual certificate boundary explicit. The minimal durable
+shape is:
+
+- `source = imported`;
+- certificate-to-domain-binding association;
+- safe metadata only:
+  `subjectAlternativeNames`, `issuer`, `notBefore`, `expiresAt`, optional fingerprint, and
+  algorithm;
+- secret references for certificate chain, private key, and optional passphrase;
+- latest import attempt id and idempotency linkage.
+
+Raw PEM bodies, decrypted private keys, and passphrases must not appear in aggregates, events, read
+models, or structured error details.
+
 ## Event / State Mapping
 
 | Event | Meaning | State impact |
@@ -348,6 +375,7 @@ retry_scheduled
 | route readiness evaluation | Route/proxy gates for the binding are satisfied or failed. | Binding may remain `bound`, move to `ready`, or move to `not_ready` when a route failure is recorded. |
 | `certificate-requested` | Certificate attempt accepted. | Certificate attempt moves to `requested` or `issuing`. |
 | `certificate-issued` | Certificate state is active. | Certificate moves to `active`; domain may move to `ready`. |
+| `certificate-imported` | Manual certificate import completed successfully. | Certificate moves to `active` with `source = imported`; domain may move to `ready` when route gates are satisfied. |
 | `certificate-issuance-failed` | Certificate attempt failed. | Certificate attempt moves to `failed` or `retry_scheduled`; domain remains not ready if TLS is required. |
 | `domain-route-realization-failed` | Route/proxy realization failed for an active durable domain binding. | Domain binding moves to `not_ready` with safe route failure metadata. |
 | `domain-ready` | All routing and TLS gates are satisfied. | Domain binding read model reports ready. |
@@ -526,6 +554,32 @@ The scheduler must not replay `certificate-requested` or `certificate-issuance-f
 retry mechanism. It may run from a shell timer, hosted worker, cron job, or future durable scheduler
 adapter, but each execution observes and mutates state only through application ports/use cases.
 
+## Manual Certificate Import Boundary
+
+`certificates.import` is the manual-certificate path for bindings whose certificate policy is
+`manual`.
+
+The command requires:
+
+- a managed `DomainBinding` that is already durably owned;
+- manual certificate policy eligibility;
+- secret-safe certificate chain, private key, and optional passphrase input;
+- validator success for domain match, key match, `notBefore`, expiry, algorithm, and chain shape.
+
+The command must:
+
+- store secret-bearing material through the certificate secret store;
+- persist only safe metadata plus secret references;
+- publish `certificate-imported` on success;
+- never publish `certificate-issued` for import success;
+- trigger `domain-ready` evaluation through the same readiness process path used by certificate
+  state changes.
+
+`certificates.import` is not a renewal mechanism. Renewal continues to use
+`certificates.issue-or-renew` according to ADR-008, even when the current certificate source is
+manual and the operator later decides to replace the imported certificate through another manual
+import.
+
 ## Relationship To Generated Access And Deployment Route Snapshots
 
 Generated default access routes are convenience routes resolved from provider-neutral platform policy. They are not durable domain bindings, and they do not prove domain ownership.
@@ -566,6 +620,12 @@ certificates, checking status, and retrying failed attempts. Managed canonical r
 supplied to `domain-binding create` through `--redirect-to` and `--redirect-status`, while
 repository config expresses the pure CLI/SSH server-applied variant with
 `access.domains[].redirectTo` and `access.domains[].redirectStatus`.
+
+For manual certificate policy, Web/CLI/API may also expose `certificates.import` from a
+resource-scoped binding or certificate surface. Those entrypoints must collect secret-bearing chain,
+private key, and optional passphrase through secret-safe UI/transport handling, must never echo the
+secret values back to the user, and must not expose the import affordance for bindings whose policy
+is not `manual`.
 
 API must expose strict command inputs and read-model status; it must not prompt.
 
@@ -612,6 +672,11 @@ provider adapter is configured, so CLI/API users can observe retryable
 Current code implements certificate-backed domain readiness: `certificate-issued` is consumed for a
 bound TLS-auto binding, marks the binding `ready`, publishes `domain-ready`, and allows resource
 access summaries to project the durable custom domain as HTTPS.
+
+Current code implements `certificates.import`, `certificate-imported`, imported-certificate
+persistence/read models, and manual certificate entrypoints across CLI, HTTP/oRPC, and the
+resource-scoped Web surface. Manual certificate policy is now a business-code-supported path with
+durable secret-store persistence rather than a spec-only branch.
 
 Current code implements HTTP-01 challenge token serving through an injected challenge token store
 and the HTTP adapter path `/.well-known/acme-challenge/{token}`.
