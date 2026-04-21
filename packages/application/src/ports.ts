@@ -1907,6 +1907,7 @@ export interface RequestedDeploymentConfig {
   exposureMode?: ResourceExposureMode;
   upstreamProtocol?: ResourceNetworkProtocol;
   accessContext?: RequestedDeploymentAccessContext;
+  runtimeMetadata?: Record<string, string>;
   accessRouteMetadata?: Record<string, string>;
   proxyKind?: EdgeProxyKind;
   domains?: string[];
