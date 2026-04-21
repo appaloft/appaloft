@@ -330,8 +330,10 @@ GitHub's `environment.url` can display `preview-url` in the PR checks UI. A repo
 separate `actions/github-script` step to comment the URL, but bot comments are not required for the
 first Appaloft Action contract.
 
-Product-grade comments, check runs, deployment status synchronization, preview policies, and PR
-close cleanup belong to the future GitHub App/control-plane track.
+Action-only preview workflows may also own GitHub deployment/environment metadata cleanup when the
+repository uses workflow `environment:` records and grants `deployments: write` to the close-event
+job. Product-grade comments, check runs, richer deployment status synchronization, preview
+policies, and scheduled cleanup remain future GitHub App/control-plane work.
 
 ## Cleanup And Expiration
 
@@ -344,15 +346,19 @@ The close flow is:
 pull_request closed
   -> user workflow runs Appaloft CLI preview cleanup or a thin wrapper over the same CLI command
   -> Appaloft resolves preview-scoped source link
-  -> deployments.cleanup-preview stops preview runtime state when present
-  -> preview server-applied route desired state is deleted
+  -> deployments.cleanup-preview stops current and stale preview runtime state when present
+  -> preview server-applied route desired state is deleted for the linked target and matching preview fingerprint
   -> preview source link is unlinked
+  -> optional GitHub workflow step deletes GitHub preview deployment records for preview-pr-123
+  -> optional GitHub workflow step deletes the GitHub environment preview-pr-123
   -> command returns cleaned or already-clean
 ```
 
 The command is idempotent when the preview source link is already absent. Product-grade GitHub App
 previews still own cleanup through a control plane, scheduler, or server agent rather than relying
-on one GitHub Actions close event always succeeding.
+on one GitHub Actions close event always succeeding. GitHub deployment/environment deletion in the
+Action-only path is metadata cleanup only; it does not replace Appaloft runtime, route, or
+source-link cleanup.
 
 ## Product-Grade Preview Path
 
@@ -424,7 +430,7 @@ Missing pieces before Action PR preview can be documented as supported:
 - stable machine-readable CLI output for `preview-url` or an action-safe diagnostic file the
   wrapper can parse;
 - wrapper tests for install, secret mapping, fork-safety docs, generated access output, and cleanup
-  unsupported behavior;
+  plus GitHub deployment/environment metadata cleanup behavior;
 - public docs that distinguish Action-only preview deploy from product-grade GitHub App previews.
 
 Missing pieces for product-grade previews:

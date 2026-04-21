@@ -17,6 +17,7 @@
 and route/link state after a preview environment is no longer needed.
 
 Command success means the selected preview source fingerprint no longer owns preview runtime state,
+including stale preview deployments still discoverable for the same linked preview scope,
 server-applied preview route desired state, or the preview source link, or that no such preview
 state remained to clean. It does not mean the command deleted project, environment, resource,
 deployment history, logs, domains, certificates, or audit records.
@@ -44,9 +45,11 @@ The command contract is:
 
 - validation failure returns `err(DomainError)`;
 - when no preview source link exists, the command returns `ok({ status: "already-clean", ... })`;
-- when preview state exists, the command stops the latest runtime for the linked resource when one
-  is present, removes preview route desired state for the linked target, unlinks the preview source
-  fingerprint, and returns `ok({ status: "cleaned", ... })`;
+- when preview state exists, the command stops the latest runtime for the linked resource and also
+  stops any additional preview deployments in the same linked preview scope that still carry the
+  selected preview source fingerprint, removes preview route desired state for the linked target
+  and any matching preview-fingerprint route rows, unlinks the preview source fingerprint, and
+  returns `ok({ status: "cleaned", ... })`;
 - runtime cleanup failure is terminal for the command and must stop later cleanup stages so route
   state and source-link identity are not removed ahead of runtime cleanup.
 
@@ -107,11 +110,15 @@ The cleanup boundary is intentionally narrow:
 1. Resolve the preview source link from the selected Appaloft state backend.
 2. Return `already-clean` when no link exists.
 3. Load the latest deployment for the linked preview resource when one exists.
-4. Invoke runtime cleanup against that latest deployment.
-5. Delete server-applied preview route desired state for the linked project/environment/resource/
-   server/destination target when the preview link owns a server target.
-6. Unlink the preview source fingerprint.
-7. Return safe ids describing what was cleaned.
+4. Discover additional preview deployments in the same linked project/environment scope whose
+   runtime metadata still carries the selected preview source fingerprint.
+5. Invoke runtime cleanup against the linked latest deployment first and then any additional stale
+   preview deployments discovered for the same preview fingerprint.
+6. Delete server-applied preview route desired state for the linked project/environment/resource/
+   server/destination target when the preview link owns a server target, and also delete any
+   additional server-applied route rows that still carry the selected preview source fingerprint.
+7. Unlink the preview source fingerprint.
+8. Return safe ids describing what was cleaned.
 
 The command must not:
 
@@ -120,7 +127,8 @@ The command must not:
 - archive or delete the preview environment/project;
 - delete managed `DomainBinding` or `Certificate` aggregates;
 - retarget the preview source link to another resource;
-- remove unrelated route state for another resource or another preview.
+- remove unrelated route state for another resource or another preview;
+- sweep historical preview deployments that do not belong to the selected preview fingerprint.
 
 ## Rules
 
@@ -128,11 +136,12 @@ The command must not:
   scope so regular deploy identity is not accidentally cleaned.
 - Cleanup is idempotent when the preview source link no longer exists or the linked target no
   longer has route desired state.
-- Runtime cleanup happens before route/link deletion. If runtime cleanup fails, later cleanup stages
-  must not run.
+- Runtime cleanup happens before route/link deletion. If any runtime cleanup step fails during the
+  preview sweep, later cleanup stages must not run.
 - Route cleanup deletes provider-neutral desired state keyed by the linked
-  project/environment/resource/server/destination context. It must not delete another resource's
-  route row or any managed domain workflow state.
+  project/environment/resource/server/destination context and may additionally delete stale
+  preview-fingerprint route rows left behind by earlier preview retargets. It must not delete
+  another preview's route row or any managed domain workflow state.
 - Source-link cleanup removes only the selected preview fingerprint. It must not relink or delete
   regular non-preview source identity.
 - The command may use low-level runtime backend cancel/remove support internally, but this does not
@@ -177,7 +186,9 @@ CLI derives the preview-scoped source fingerprint from the same source/config/pr
 by preview deploy, resolves remote state when SSH-targeted state is selected, and dispatches the
 command through the application command bus.
 
-Current implementation cleans preview runtime state through the injected execution backend, deletes
-PG/PGlite or filesystem-backed server-applied preview route desired state, and unlinks the preview
-source fingerprint from the selected state backend. HTTP/oRPC and Web preview cleanup entrypoints
-remain future work.
+Current implementation cleans preview runtime state through the injected execution backend, sweeps
+additional stale preview deployments in the same linked project/environment scope when their runtime
+metadata still carries the selected preview source fingerprint, deletes PG/PGlite or
+filesystem-backed server-applied preview route desired state both for the linked target and for
+additional matching preview-fingerprint route rows, and unlinks the preview source fingerprint from
+the selected state backend. HTTP/oRPC and Web preview cleanup entrypoints remain future work.

@@ -22,6 +22,7 @@ import {
   MarkServerAppliedRouteFailedSpec,
   type QueryBus,
   ServerAppliedRouteStateByRouteSetIdSpec,
+  ServerAppliedRouteStateBySourceFingerprintSpec,
   ServerAppliedRouteStateByTargetSpec,
   type ServerAppliedRouteStateRepository,
   SourceLinkBySourceFingerprintSpec,
@@ -218,6 +219,11 @@ function createCliServerAppliedRouteStore(
     },
     deleteDesired(target) {
       return repository.deleteOne(ServerAppliedRouteStateByTargetSpec.create(target));
+    },
+    deleteDesiredBySourceFingerprint(sourceFingerprint) {
+      return repository.deleteMany(
+        ServerAppliedRouteStateBySourceFingerprintSpec.create(sourceFingerprint),
+      );
     },
   };
 }

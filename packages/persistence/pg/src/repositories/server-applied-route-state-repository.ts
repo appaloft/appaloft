@@ -7,6 +7,7 @@ import {
   type ServerAppliedRouteDesiredStateTarget,
   type ServerAppliedRouteFailureState,
   type ServerAppliedRouteStateByRouteSetIdSpec,
+  type ServerAppliedRouteStateBySourceFingerprintSpec,
   type ServerAppliedRouteStateByTargetSpec,
   type ServerAppliedRouteStateRepository,
   type ServerAppliedRouteStateSelectionSpec,
@@ -54,6 +55,13 @@ class KyselyServerAppliedRouteStateSelectionVisitor<TResult extends WhereCapable
     spec: ServerAppliedRouteStateByRouteSetIdSpec,
   ): TResult {
     return query.where("route_set_id", "=", spec.routeSetId);
+  }
+
+  visitServerAppliedRouteStateBySourceFingerprint(
+    query: TResult,
+    spec: ServerAppliedRouteStateBySourceFingerprintSpec,
+  ): TResult {
+    return query.where("source_fingerprint", "=", spec.sourceFingerprint);
   }
 }
 
@@ -333,6 +341,8 @@ function validateSelectionSpec(spec: ServerAppliedRouteStateSelectionSpec): Resu
     visitServerAppliedRouteStateByTarget: (_query, targetSpec) => validateTarget(targetSpec.target),
     visitServerAppliedRouteStateByRouteSetId: (_query, routeSetSpec) =>
       validateRouteSetId(routeSetSpec.routeSetId),
+    visitServerAppliedRouteStateBySourceFingerprint: (_query, sourceFingerprintSpec) =>
+      validateSourceFingerprint(sourceFingerprintSpec.sourceFingerprint),
   } satisfies ServerAppliedRouteStateSelectionSpecVisitor<Result<void>>);
 }
 
@@ -619,6 +629,26 @@ export class PgServerAppliedRouteStateRepository implements ServerAppliedRouteSt
       return ok(Boolean(deleted));
     } catch (error) {
       return err(persistenceError("Server-applied route state could not be removed", error));
+    }
+  }
+
+  async deleteMany(spec: ServerAppliedRouteStateSelectionSpec): Promise<Result<number>> {
+    const validation = validateSelectionSpec(spec);
+    if (validation.isErr()) {
+      return err(validation.error);
+    }
+
+    try {
+      const deleted = await spec
+        .accept(
+          this.db.deleteFrom("server_applied_route_states"),
+          new KyselyServerAppliedRouteStateSelectionVisitor(),
+        )
+        .executeTakeFirst();
+
+      return ok(Number(deleted.numDeletedRows));
+    } catch (error) {
+      return err(persistenceError("Server-applied route state sweep could not be removed", error));
     }
   }
 }

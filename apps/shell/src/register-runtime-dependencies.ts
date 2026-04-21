@@ -565,6 +565,10 @@ class NoopServerAppliedRouteStateRepository implements ServerAppliedRouteStateRe
   async deleteOne(): Promise<Result<boolean>> {
     return ok(false);
   }
+
+  async deleteMany(): Promise<Result<number>> {
+    return ok(0);
+  }
 }
 
 class RequestScopedIntegrationAuthPort implements IntegrationAuthPort {

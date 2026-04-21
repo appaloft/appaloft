@@ -410,6 +410,10 @@ export interface ServerAppliedRouteStateSelectionSpecVisitor<TResult> {
     query: TResult,
     spec: ServerAppliedRouteStateByRouteSetIdSpec,
   ): TResult;
+  visitServerAppliedRouteStateBySourceFingerprint(
+    query: TResult,
+    spec: ServerAppliedRouteStateBySourceFingerprintSpec,
+  ): TResult;
 }
 
 export interface ServerAppliedRouteStateUpsertSpecVisitor<TResult> {
@@ -467,6 +471,23 @@ export class ServerAppliedRouteStateByRouteSetIdSpec
     visitor: ServerAppliedRouteStateSelectionSpecVisitor<TResult>,
   ): TResult {
     return visitor.visitServerAppliedRouteStateByRouteSetId(query, this);
+  }
+}
+
+export class ServerAppliedRouteStateBySourceFingerprintSpec
+  implements ServerAppliedRouteStateSelectionSpec
+{
+  private constructor(public readonly sourceFingerprint: string) {}
+
+  static create(sourceFingerprint: string): ServerAppliedRouteStateBySourceFingerprintSpec {
+    return new ServerAppliedRouteStateBySourceFingerprintSpec(sourceFingerprint);
+  }
+
+  accept<TResult>(
+    query: TResult,
+    visitor: ServerAppliedRouteStateSelectionSpecVisitor<TResult>,
+  ): TResult {
+    return visitor.visitServerAppliedRouteStateBySourceFingerprint(query, this);
   }
 }
 
@@ -560,6 +581,7 @@ export interface ServerAppliedRouteStateRepository extends ServerAppliedRouteDes
     updateSpec: ServerAppliedRouteStateUpdateSpec,
   ): Promise<Result<ServerAppliedRouteDesiredStateRecord | null>>;
   deleteOne(spec: ServerAppliedRouteStateSelectionSpec): Promise<Result<boolean>>;
+  deleteMany(spec: ServerAppliedRouteStateSelectionSpec): Promise<Result<number>>;
 }
 
 export interface CertificateRepository {

@@ -134,6 +134,10 @@ class CapturingServerAppliedRouteStateRepository implements ServerAppliedRouteSt
   async deleteOne(): Promise<Result<boolean>> {
     return ok(false);
   }
+
+  async deleteMany(): Promise<Result<number>> {
+    return ok(0);
+  }
 }
 
 function createTestContext(): ExecutionContext {

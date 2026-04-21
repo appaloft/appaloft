@@ -555,6 +555,79 @@ describe("CLI server-applied route desired state", () => {
       await rm(root, { recursive: true, force: true });
     }
   });
+
+  test("[SERVER-APPLIED-ROUTE-STATE-007] preview cleanup can sweep server-applied route state by source fingerprint", async () => {
+    const root = await tempStateRoot();
+    const sourceFingerprint = "source-fingerprint:v1:preview%3Apr%3A14";
+    try {
+      const store = new FileSystemServerAppliedRouteDesiredStateStore(root);
+      await store.upsertDesired({
+        target: {
+          projectId: "proj_1",
+          environmentId: "env_1",
+          resourceId: "res_1",
+          serverId: "srv_1",
+        },
+        sourceFingerprint,
+        updatedAt: "2026-04-19T00:00:00.000Z",
+        domains: [
+          {
+            host: "one.preview.example.com",
+            pathPrefix: "/",
+            tlsMode: "auto",
+          },
+        ],
+      });
+      await store.upsertDesired({
+        target: {
+          projectId: "proj_1",
+          environmentId: "env_1",
+          resourceId: "res_2",
+          serverId: "srv_1",
+        },
+        sourceFingerprint,
+        updatedAt: "2026-04-19T00:00:00.000Z",
+        domains: [
+          {
+            host: "two.preview.example.com",
+            pathPrefix: "/",
+            tlsMode: "auto",
+          },
+        ],
+      });
+      const retainedTarget = {
+        projectId: "proj_1",
+        environmentId: "env_1",
+        resourceId: "res_3",
+        serverId: "srv_1",
+      };
+      await store.upsertDesired({
+        target: retainedTarget,
+        sourceFingerprint: "source-fingerprint:v1:preview%3Apr%3A15",
+        updatedAt: "2026-04-19T00:00:00.000Z",
+        domains: [
+          {
+            host: "three.preview.example.com",
+            pathPrefix: "/",
+            tlsMode: "auto",
+          },
+        ],
+      });
+
+      const deleted = await store.deleteDesiredBySourceFingerprint(sourceFingerprint);
+      const retained = await store.read(retainedTarget);
+
+      expect(deleted.isOk()).toBe(true);
+      expect(retained.isOk()).toBe(true);
+      if (deleted.isErr() || retained.isErr()) {
+        throw new Error("Expected server-applied route sweep deletion to succeed");
+      }
+      expect(deleted.value).toBe(2);
+      expect(retained.value?.resourceId).toBe("res_3");
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
 });
 
 describe("CLI source link state", () => {
