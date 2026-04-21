@@ -423,7 +423,7 @@ export class SshRemoteStateLifecycle {
   private readonly staleAfterMs: number;
   private readonly lockAcquireTimeoutMs: number;
   private readonly lockRetryIntervalMs: number;
-  private heartbeatTimer?: ReturnType<typeof setInterval>;
+  private heartbeatTimer: ReturnType<typeof setInterval> | undefined;
   private heartbeatInFlight = false;
 
   constructor(options: SshRemoteStateLifecycleOptions) {

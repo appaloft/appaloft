@@ -470,7 +470,7 @@ export class FileSystemRemoteStateLifecycle {
   private readonly staleAfterMs: number;
   private readonly lockAcquireTimeoutMs: number;
   private readonly lockRetryIntervalMs: number;
-  private heartbeatTimer?: ReturnType<typeof setInterval>;
+  private heartbeatTimer: ReturnType<typeof setInterval> | undefined;
   private heartbeatInFlight = false;
 
   constructor(options: RemoteStateLifecycleOptions) {
@@ -603,6 +603,7 @@ export class FileSystemRemoteStateLifecycle {
       if (error instanceof Error && "code" in error && error.code === "EEXIST") {
         const owner = await this.readLockMetadata(lockPath);
         const staleStatus = await this.staleStatus(lockPath, owner);
+        const staleAfterSeconds = this.lockStaleAfterSeconds(owner);
         if (staleStatus.stale) {
           const recovered = await this.recoverStaleLock(lockPath, owner, staleStatus.ageSeconds);
           if (recovered.isErr()) {
@@ -622,9 +623,7 @@ export class FileSystemRemoteStateLifecycle {
               ...(staleStatus.ageSeconds !== undefined
                 ? { lockAgeSeconds: staleStatus.ageSeconds }
                 : {}),
-              ...(this.lockStaleAfterSeconds(owner) !== undefined
-                ? { staleAfterSeconds: this.lockStaleAfterSeconds(owner) }
-                : {}),
+              ...(staleAfterSeconds !== undefined ? { staleAfterSeconds } : {}),
               retryAfterSeconds: Math.ceil(this.lockRetryIntervalMs / 1_000),
               lockAcquireTimeoutSeconds: Math.ceil(this.lockAcquireTimeoutMs / 1_000),
             }),
@@ -908,12 +907,13 @@ export class FileSystemRemoteStateLifecycle {
         this.stopHeartbeat();
         return;
       }
+      const staleAfterSeconds = this.lockStaleAfterSeconds(owner);
       await this.writeLockMetadata(lockPath, {
         owner: this.owner,
         correlationId: this.correlationId,
         startedAt: owner.startedAt ?? this.now().toISOString(),
         lastHeartbeatAt: this.now().toISOString(),
-        staleAfterSeconds: this.lockStaleAfterSeconds(owner),
+        ...(staleAfterSeconds !== undefined ? { staleAfterSeconds } : {}),
       });
     } catch {
       // Heartbeat is best-effort; release remains owner-aware to avoid deleting a newer lock.
