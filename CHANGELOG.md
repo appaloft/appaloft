@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.2.9](https://github.com/appaloft/appaloft/compare/v0.2.8...v0.2.9) (2026-04-21)
+
+
+### Bug Fixes
+
+* **shell:** adopt legacy pglite state ([#44](https://github.com/appaloft/appaloft/issues/44)) ([20aa424](https://github.com/appaloft/appaloft/commit/20aa4248ae8a4c05aa3a4f955e8cfce02ee08cb3))
+* supersede active deployments with execution fencing ([#41](https://github.com/appaloft/appaloft/issues/41)) ([08c0943](https://github.com/appaloft/appaloft/commit/08c09435fdce010caca6548ac22e395845fed697))
+
+
+### Documentation
+
+* align roadmap for 0.2.8 publish ([#45](https://github.com/appaloft/appaloft/issues/45)) ([f411969](https://github.com/appaloft/appaloft/commit/f41196965aabbfd36fa5567c1ca1cebfe0d0ba27))
+
 ## [0.2.8](https://github.com/appaloft/appaloft/compare/v0.2.7...v0.2.8) (2026-04-21)
 
 
