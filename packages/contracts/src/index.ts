@@ -802,6 +802,56 @@ export const configureResourceSourceResponseSchema = z.object({
   id: z.string(),
 });
 
+export const defaultAccessDomainPolicyScopeSchema = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("system"),
+  }),
+  z.object({
+    kind: z.literal("deployment-target"),
+    serverId: z.string().min(1),
+  }),
+]);
+
+export const configureDefaultAccessDomainPolicyInputSchema = z
+  .object({
+    scope: defaultAccessDomainPolicyScopeSchema,
+    mode: z.enum(["disabled", "provider", "custom-template"]),
+    providerKey: z.string().min(1).optional(),
+    templateRef: z.string().min(1).optional(),
+    idempotencyKey: z.string().min(1).optional(),
+  })
+  .superRefine((value, context) => {
+    if (value.mode === "provider" && !value.providerKey) {
+      context.addIssue({
+        code: "custom",
+        path: ["providerKey"],
+        message: "Provider key is required for provider mode",
+      });
+    }
+
+    if (value.mode === "custom-template") {
+      if (!value.providerKey) {
+        context.addIssue({
+          code: "custom",
+          path: ["providerKey"],
+          message: "Provider key is required for custom-template mode",
+        });
+      }
+
+      if (!value.templateRef) {
+        context.addIssue({
+          code: "custom",
+          path: ["templateRef"],
+          message: "Template ref is required for custom-template mode",
+        });
+      }
+    }
+  });
+
+export const configureDefaultAccessDomainPolicyResponseSchema = z.object({
+  id: z.string(),
+});
+
 export const listResourcesResponseSchema = z.object({
   items: z.array(resourceSummarySchema),
 });
@@ -1785,6 +1835,12 @@ export type ConfigureResourceRuntimeResponse = z.infer<
 >;
 export type ConfigureResourceSourceInput = z.infer<typeof configureResourceSourceInputSchema>;
 export type ConfigureResourceSourceResponse = z.infer<typeof configureResourceSourceResponseSchema>;
+export type ConfigureDefaultAccessDomainPolicyInput = z.infer<
+  typeof configureDefaultAccessDomainPolicyInputSchema
+>;
+export type ConfigureDefaultAccessDomainPolicyResponse = z.infer<
+  typeof configureDefaultAccessDomainPolicyResponseSchema
+>;
 export type CreateEnvironmentInput = z.infer<typeof createEnvironmentInputSchema>;
 export type CreateEnvironmentResponse = z.infer<typeof createEnvironmentResponseSchema>;
 export type ListEnvironmentsResponse = z.infer<typeof listEnvironmentsResponseSchema>;
