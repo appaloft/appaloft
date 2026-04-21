@@ -28,6 +28,7 @@ describe("CLI SSH remote state lifecycle", () => {
       },
       owner: "appaloft-cli",
       correlationId: "run_1",
+      heartbeatIntervalMs: null,
       runner: {
         run: async (input) => {
           commands.push(input);
@@ -52,6 +53,9 @@ describe("CLI SSH remote state lifecycle", () => {
     expect(commands[0]?.command).toContain("mkdir -p");
     expect(commands[0]?.command).toContain("schema-version.json");
     expect(commands[0]?.command).toContain("mutation.lock");
+    expect(commands[0]?.command).toContain("lastHeartbeatAt");
+    expect(commands[0]?.command).toContain("staleAfterSeconds");
+    expect(commands[0]?.command).toContain("locks/recovered");
     expect(commands[0]?.command).toContain("backups");
     expect(commands[0]?.command).toContain("journals");
     expect(commands[0]?.command).toContain("server-applied-routes");
@@ -73,11 +77,14 @@ describe("CLI SSH remote state lifecycle", () => {
         port: 22,
         username: "deploy",
       },
+      heartbeatIntervalMs: null,
+      lockAcquireTimeoutMs: 0,
       runner: {
         run: async () => ({
           exitCode: 73,
           stdout: "",
-          stderr: '{"owner":"first","correlationId":"run_1"}',
+          stderr:
+            '{"owner":"first","correlationId":"run_1","startedAt":"2026-04-19T00:00:00Z","lastHeartbeatAt":"2026-04-19T00:05:00Z","staleAfterSeconds":1200}',
           failed: true,
         }),
       },
@@ -91,14 +98,58 @@ describe("CLI SSH remote state lifecycle", () => {
     }
     expect(prepared.error).toMatchObject({
       code: "infra_error",
+      retryable: true,
       details: {
         phase: "remote-state-lock",
         stateBackend: "ssh-pglite",
         host: "203.0.113.10",
         port: "22",
+        lockOwner: "first",
+        correlationId: "run_1",
+        lockStartedAt: "2026-04-19T00:00:00Z",
+        lockHeartbeatAt: "2026-04-19T00:05:00Z",
+        staleAfterSeconds: 1200,
       },
     });
     expect(JSON.stringify(prepared.error)).not.toContain("OPENSSH PRIVATE KEY");
+  });
+
+  test("[CONFIG-FILE-STATE-003] SSH adapter retries active lock briefly", async () => {
+    let attempts = 0;
+    const lifecycle = new SshRemoteStateLifecycle({
+      dataRoot: "/var/lib/appaloft/runtime/state",
+      target: {
+        host: "203.0.113.10",
+        port: 22,
+        username: "deploy",
+      },
+      heartbeatIntervalMs: null,
+      lockAcquireTimeoutMs: 100,
+      lockRetryIntervalMs: 10,
+      runner: {
+        run: async () => {
+          attempts += 1;
+          if (attempts === 1) {
+            return {
+              exitCode: 73,
+              stdout: "",
+              stderr:
+                '{"owner":"first","correlationId":"run_1","startedAt":"2026-04-19T00:00:00Z","lastHeartbeatAt":"2026-04-19T00:05:00Z","staleAfterSeconds":1200}',
+              failed: true,
+            };
+          }
+          return successfulSshResult();
+        },
+      },
+    });
+
+    const prepared = await lifecycle.prepare();
+
+    expect(prepared.isOk()).toBe(true);
+    expect(attempts).toBe(2);
+    if (prepared.isErr()) {
+      throw new Error(prepared.error.message);
+    }
   });
 
   test("[CONFIG-FILE-STATE-010] SSH process args use identity file without embedding key material", () => {

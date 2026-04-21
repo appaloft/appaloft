@@ -41,11 +41,28 @@ export interface SshRemoteStateLifecycleOptions {
   cwd?: string;
   env?: NodeJS.ProcessEnv;
   runner?: SshRemoteCommandRunner;
+  heartbeatIntervalMs?: number | null;
+  staleAfterMs?: number;
+  lockAcquireTimeoutMs?: number;
+  lockRetryIntervalMs?: number;
 }
 
 const defaultSchemaVersion = 1;
+const defaultLockHeartbeatIntervalMs = 30_000;
+const defaultLockStaleAfterMs = 20 * 60_000;
+const defaultLockAcquireTimeoutMs = 15_000;
+const defaultLockRetryIntervalMs = 1_000;
 const lockConflictExitCode = 73;
 const migrationFailureExitCode = 74;
+const lockOwnershipExitCode = 75;
+
+interface RemoteStateLockMetadata {
+  owner?: string;
+  correlationId?: string;
+  startedAt?: string;
+  lastHeartbeatAt?: string;
+  staleAfterSeconds?: number;
+}
 
 function trimmed(value: string | undefined): string | undefined {
   const result = value?.trim();
@@ -66,6 +83,28 @@ function redactSecrets(input: string, secrets: readonly string[] = []): string {
 function safeOutput(value: string): string | undefined {
   const trimmedValue = value.trim();
   return trimmedValue ? trimmedValue.slice(0, 2_000) : undefined;
+}
+
+function defaultCorrelationId(prefix: string): string {
+  return `${prefix}_${process.pid}_${Date.now().toString(36)}`;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function parseLockMetadata(stderr: string): RemoteStateLockMetadata | null {
+  const trimmedValue = stderr.trim();
+  if (!trimmedValue.startsWith("{")) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(trimmedValue) as RemoteStateLockMetadata;
+    return typeof parsed === "object" && parsed !== null ? parsed : null;
+  } catch {
+    return null;
+  }
 }
 
 function targetHost(target: SshRemoteStateTarget): string {
@@ -121,21 +160,55 @@ function remotePrepareCommand(input: {
   schemaVersion: number;
   owner: string;
   correlationId: string;
+  staleAfterSeconds: number;
 }): string {
   const script = [
     "set -eu",
     `data_root=${shellQuote(input.dataRoot)}`,
     `schema_version=${shellQuote(String(input.schemaVersion))}`,
+    `stale_after_seconds=${shellQuote(String(input.staleAfterSeconds))}`,
     'now="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"',
+    'now_epoch="$(date -u +%s)"',
     'stamp="$(date -u +"%Y-%m-%dT%H-%M-%SZ")"',
     'mkdir -p "$data_root"',
-    'mkdir -p "$data_root/pglite" "$data_root/locks" "$data_root/backups" "$data_root/journals" "$data_root/source-links" "$data_root/server-applied-routes"',
+    'mkdir -p "$data_root/pglite" "$data_root/locks" "$data_root/backups" "$data_root/journals" "$data_root/source-links" "$data_root/server-applied-routes" "$data_root/locks/recovered"',
     'lock_dir="$data_root/locks/mutation.lock"',
+    'owner_file="$lock_dir/owner.json"',
     'if ! mkdir "$lock_dir"; then',
-    '  if [ -f "$lock_dir/owner.json" ]; then cat "$lock_dir/owner.json" >&2; fi',
-    `  exit ${lockConflictExitCode}`,
+    '  last_heartbeat=""',
+    '  recorded_stale_after=""',
+    '  lock_age_seconds=""',
+    '  if [ -f "$owner_file" ]; then',
+    '    last_heartbeat="$(sed -n \'s/.*"lastHeartbeatAt"[[:space:]]*:[[:space:]]*"\\([^"]*\\)".*/\\1/p\' "$owner_file" | head -n 1 || true)"',
+    '    if [ -z "$last_heartbeat" ]; then',
+    '      last_heartbeat="$(sed -n \'s/.*"startedAt"[[:space:]]*:[[:space:]]*"\\([^"]*\\)".*/\\1/p\' "$owner_file" | head -n 1 || true)"',
+    "    fi",
+    '    recorded_stale_after="$(sed -n \'s/.*"staleAfterSeconds"[[:space:]]*:[[:space:]]*\\([0-9][0-9]*\\).*/\\1/p\' "$owner_file" | head -n 1 || true)"',
+    "  fi",
+    '  [ -n "$recorded_stale_after" ] || recorded_stale_after="$stale_after_seconds"',
+    '  if [ -n "$last_heartbeat" ]; then',
+    '    heartbeat_epoch="$(date -u -d "$last_heartbeat" +%s 2>/dev/null || true)"',
+    "  else",
+    '    heartbeat_epoch="$(stat -c %Y "$lock_dir" 2>/dev/null || true)"',
+    "  fi",
+    '  if [ -n "$heartbeat_epoch" ]; then',
+    "    lock_age_seconds=$((now_epoch - heartbeat_epoch))",
+    "  fi",
+    '  if [ -n "$lock_age_seconds" ] && [ "$lock_age_seconds" -ge "$recorded_stale_after" ]; then',
+    '    recovered_path="$data_root/locks/recovered/mutation-$stamp-$$.lock"',
+    '    if mv "$lock_dir" "$recovered_path" 2>/dev/null; then',
+    `      printf '{"phase":"%s","recoveredAt":"%s","recoveredBy":%s,"correlationId":%s,"lockAgeSeconds":%s}\n' "remote-state-lock" "$now" ${shellQuote(jsonString(input.owner))} ${shellQuote(jsonString(input.correlationId))} "$lock_age_seconds" > "$recovered_path/recovered.json"`,
+    '      mkdir "$lock_dir"',
+    "    else",
+    '      if [ -f "$owner_file" ]; then cat "$owner_file" >&2; fi',
+    `      exit ${lockConflictExitCode}`,
+    "    fi",
+    "  else",
+    '    if [ -f "$owner_file" ]; then cat "$owner_file" >&2; fi',
+    `    exit ${lockConflictExitCode}`,
+    "  fi",
     "fi",
-    `printf '{"owner":%s,"correlationId":%s,"startedAt":"%s"}\\n' ${shellQuote(jsonString(input.owner))} ${shellQuote(jsonString(input.correlationId))} "$now" > "$lock_dir/owner.json"`,
+    `printf '{"owner":%s,"correlationId":%s,"startedAt":"%s","lastHeartbeatAt":"%s","staleAfterSeconds":%s}\n' ${shellQuote(jsonString(input.owner))} ${shellQuote(jsonString(input.correlationId))} "$now" "$now" "$stale_after_seconds" > "$owner_file"`,
     'marker="$data_root/schema-version.json"',
     "current_version=0",
     'if [ -f "$marker" ]; then',
@@ -162,10 +235,53 @@ function remotePrepareCommand(input: {
   return `sh -lc ${shellQuote(script)}`;
 }
 
-function remoteReleaseCommand(dataRoot: string): string {
+function remoteHeartbeatCommand(input: {
+  dataRoot: string;
+  owner: string;
+  correlationId: string;
+  staleAfterSeconds: number;
+}): string {
+  const expectedOwnerFragment = `"owner":${jsonString(input.owner)}`;
+  const expectedCorrelationFragment = `"correlationId":${jsonString(input.correlationId)}`;
   const script = [
     "set -eu",
-    `data_root=${shellQuote(dataRoot)}`,
+    `data_root=${shellQuote(input.dataRoot)}`,
+    `stale_after_seconds=${shellQuote(String(input.staleAfterSeconds))}`,
+    `expected_owner_fragment=${shellQuote(expectedOwnerFragment)}`,
+    `expected_correlation_fragment=${shellQuote(expectedCorrelationFragment)}`,
+    'now="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"',
+    'lock_dir="$data_root/locks/mutation.lock"',
+    'owner_file="$lock_dir/owner.json"',
+    '[ -d "$lock_dir" ] || exit 0',
+    '[ -f "$owner_file" ] || exit 0',
+    'grep -F "$expected_owner_fragment" "$owner_file" >/dev/null 2>&1 || { cat "$owner_file" >&2; exit 75; }',
+    'grep -F "$expected_correlation_fragment" "$owner_file" >/dev/null 2>&1 || { cat "$owner_file" >&2; exit 75; }',
+    'started_at="$(sed -n \'s/.*"startedAt"[[:space:]]*:[[:space:]]*"\\([^"]*\\)".*/\\1/p\' "$owner_file" | head -n 1 || true)"',
+    '[ -n "$started_at" ] || started_at="$now"',
+    `printf '{"owner":%s,"correlationId":%s,"startedAt":"%s","lastHeartbeatAt":"%s","staleAfterSeconds":%s}\n' ${shellQuote(jsonString(input.owner))} ${shellQuote(jsonString(input.correlationId))} "$started_at" "$now" "$stale_after_seconds" > "$owner_file"`,
+  ].join("\n");
+
+  return `sh -lc ${shellQuote(script)}`;
+}
+
+function remoteReleaseCommand(input: {
+  dataRoot: string;
+  owner: string;
+  correlationId: string;
+}): string {
+  const expectedOwnerFragment = `"owner":${jsonString(input.owner)}`;
+  const expectedCorrelationFragment = `"correlationId":${jsonString(input.correlationId)}`;
+  const script = [
+    "set -eu",
+    `data_root=${shellQuote(input.dataRoot)}`,
+    `expected_owner_fragment=${shellQuote(expectedOwnerFragment)}`,
+    `expected_correlation_fragment=${shellQuote(expectedCorrelationFragment)}`,
+    'lock_dir="$data_root/locks/mutation.lock"',
+    'owner_file="$lock_dir/owner.json"',
+    '[ -d "$lock_dir" ] || exit 0',
+    '[ -f "$owner_file" ] || { rm -rf "$lock_dir"; exit 0; }',
+    'grep -F "$expected_owner_fragment" "$owner_file" >/dev/null 2>&1 || { cat "$owner_file" >&2; exit 75; }',
+    'grep -F "$expected_correlation_fragment" "$owner_file" >/dev/null 2>&1 || { cat "$owner_file" >&2; exit 75; }',
     'rm -rf "$data_root/locks/mutation.lock"',
     'printf "released %s\\n" "$data_root"',
   ].join("\n");
@@ -192,14 +308,40 @@ function errorDetails(input: {
   stderr: string;
   reason?: string;
 }): Record<string, string | number | boolean | null> {
+  const lockMetadata = input.phase === "remote-state-lock" ? parseLockMetadata(input.stderr) : null;
   return {
     phase: input.phase,
     stateBackend: "ssh-pglite",
     host: input.target.host,
     port: normalizePort(input.target.port),
     exitCode: input.exitCode,
-    ...(safeOutput(input.stderr) ? { stderr: safeOutput(input.stderr) ?? null } : {}),
+    ...(lockMetadata?.owner ? { lockOwner: lockMetadata.owner } : {}),
+    ...(lockMetadata?.correlationId ? { correlationId: lockMetadata.correlationId } : {}),
+    ...(lockMetadata?.startedAt ? { lockStartedAt: lockMetadata.startedAt } : {}),
+    ...(lockMetadata?.lastHeartbeatAt ? { lockHeartbeatAt: lockMetadata.lastHeartbeatAt } : {}),
+    ...(lockMetadata?.staleAfterSeconds !== undefined
+      ? { staleAfterSeconds: lockMetadata.staleAfterSeconds }
+      : {}),
+    ...(input.phase === "remote-state-lock"
+      ? { retryAfterSeconds: defaultLockRetryIntervalMs / 1_000 }
+      : {}),
+    ...(!lockMetadata && safeOutput(input.stderr)
+      ? { stderr: safeOutput(input.stderr) ?? null }
+      : {}),
     ...(input.reason ? { reason: input.reason } : {}),
+  };
+}
+
+function retriableInfraError(
+  message: string,
+  details?: Record<string, string | number | boolean | null>,
+): ReturnType<typeof domainError.infra> {
+  return {
+    code: "infra_error",
+    category: "infra",
+    message,
+    retryable: true,
+    ...(details ? { details } : {}),
   };
 }
 
@@ -277,16 +419,40 @@ export class SshRemoteStateLifecycle {
   private readonly cwd: string;
   private readonly env: NodeJS.ProcessEnv;
   private readonly runner: SshRemoteCommandRunner;
+  private readonly heartbeatIntervalMs: number | null;
+  private readonly staleAfterMs: number;
+  private readonly lockAcquireTimeoutMs: number;
+  private readonly lockRetryIntervalMs: number;
+  private heartbeatTimer: ReturnType<typeof setInterval> | undefined;
+  private heartbeatInFlight = false;
 
   constructor(options: SshRemoteStateLifecycleOptions) {
     this.dataRoot = options.dataRoot;
     this.target = options.target;
     this.schemaVersion = options.schemaVersion ?? defaultSchemaVersion;
     this.owner = options.owner ?? "appaloft-cli";
-    this.correlationId = options.correlationId ?? "cli";
+    this.correlationId = options.correlationId ?? defaultCorrelationId("remote_state");
     this.cwd = options.cwd ?? process.cwd();
     this.env = options.env ?? process.env;
     this.runner = options.runner ?? new BunSshRemoteCommandRunner();
+    this.heartbeatIntervalMs =
+      options.heartbeatIntervalMs === undefined
+        ? defaultLockHeartbeatIntervalMs
+        : options.heartbeatIntervalMs && options.heartbeatIntervalMs > 0
+          ? options.heartbeatIntervalMs
+          : null;
+    this.staleAfterMs =
+      options.staleAfterMs && options.staleAfterMs > 0
+        ? options.staleAfterMs
+        : defaultLockStaleAfterMs;
+    this.lockAcquireTimeoutMs =
+      options.lockAcquireTimeoutMs !== undefined && options.lockAcquireTimeoutMs >= 0
+        ? options.lockAcquireTimeoutMs
+        : defaultLockAcquireTimeoutMs;
+    this.lockRetryIntervalMs =
+      options.lockRetryIntervalMs && options.lockRetryIntervalMs > 0
+        ? options.lockRetryIntervalMs
+        : defaultLockRetryIntervalMs;
   }
 
   async prepare(): Promise<Result<RemoteStateSession>> {
@@ -295,37 +461,12 @@ export class SshRemoteStateLifecycle {
       return err(validation.error);
     }
 
-    const result = await this.runner.run({
-      target: this.target,
-      command: remotePrepareCommand({
-        dataRoot: this.dataRoot,
-        schemaVersion: this.schemaVersion,
-        owner: this.owner,
-        correlationId: this.correlationId,
-      }),
-      cwd: this.cwd,
-      env: this.env,
-      redactions: this.target.identityFile ? [this.target.identityFile] : [],
-    });
-
-    if (result.failed) {
-      const phase = phaseForPrepareFailure(result);
-      return err(
-        domainError.infra(
-          phase === "remote-state-lock"
-            ? "SSH remote state mutation lock is already held"
-            : "SSH remote state could not be prepared",
-          errorDetails({
-            target: this.target,
-            phase,
-            exitCode: result.exitCode,
-            stderr: result.stderr,
-            ...(result.reason ? { reason: result.reason } : {}),
-          }),
-        ),
-      );
+    const prepared = await this.acquireLockWithRetry();
+    if (prepared.isErr()) {
+      return err(prepared.error);
     }
 
+    this.startHeartbeat();
     return ok({
       dataRoot: this.dataRoot,
       schemaVersion: this.schemaVersion,
@@ -333,10 +474,71 @@ export class SshRemoteStateLifecycle {
     });
   }
 
+  private async acquireLockWithRetry(): Promise<Result<void>> {
+    const deadline =
+      this.lockAcquireTimeoutMs > 0 ? Date.now() + this.lockAcquireTimeoutMs : Date.now();
+    const startedAt = Date.now();
+
+    while (true) {
+      const result = await this.runner.run({
+        target: this.target,
+        command: remotePrepareCommand({
+          dataRoot: this.dataRoot,
+          schemaVersion: this.schemaVersion,
+          owner: this.owner,
+          correlationId: this.correlationId,
+          staleAfterSeconds: Math.ceil(this.staleAfterMs / 1_000),
+        }),
+        cwd: this.cwd,
+        env: this.env,
+        redactions: this.target.identityFile ? [this.target.identityFile] : [],
+      });
+
+      if (!result.failed) {
+        return ok(undefined);
+      }
+
+      const phase = phaseForPrepareFailure(result);
+      const error =
+        phase === "remote-state-lock"
+          ? retriableInfraError("SSH remote state mutation lock is already held", {
+              ...errorDetails({
+                target: this.target,
+                phase,
+                exitCode: result.exitCode,
+                stderr: result.stderr,
+                ...(result.reason ? { reason: result.reason } : {}),
+              }),
+              retryAfterSeconds: Math.ceil(this.lockRetryIntervalMs / 1_000),
+              lockAcquireTimeoutSeconds: Math.ceil(this.lockAcquireTimeoutMs / 1_000),
+            })
+          : domainError.infra("SSH remote state could not be prepared", {
+              ...errorDetails({
+                target: this.target,
+                phase,
+                exitCode: result.exitCode,
+                stderr: result.stderr,
+                ...(result.reason ? { reason: result.reason } : {}),
+              }),
+            });
+
+      if (phase !== "remote-state-lock" || Date.now() >= deadline) {
+        return err(this.decorateLockTimeout(error, startedAt));
+      }
+
+      await sleep(Math.min(this.lockRetryIntervalMs, Math.max(0, deadline - Date.now())));
+    }
+  }
+
   private async release(): Promise<Result<void>> {
+    this.stopHeartbeat();
     const result = await this.runner.run({
       target: this.target,
-      command: remoteReleaseCommand(this.dataRoot),
+      command: remoteReleaseCommand({
+        dataRoot: this.dataRoot,
+        owner: this.owner,
+        correlationId: this.correlationId,
+      }),
       cwd: this.cwd,
       env: this.env,
       redactions: this.target.identityFile ? [this.target.identityFile] : [],
@@ -358,5 +560,66 @@ export class SshRemoteStateLifecycle {
     }
 
     return ok(undefined);
+  }
+
+  private startHeartbeat(): void {
+    if (this.heartbeatIntervalMs === null) {
+      return;
+    }
+    this.stopHeartbeat();
+    this.heartbeatTimer = setInterval(() => {
+      void this.refreshHeartbeat();
+    }, this.heartbeatIntervalMs);
+    this.heartbeatTimer.unref?.();
+  }
+
+  private stopHeartbeat(): void {
+    if (!this.heartbeatTimer) {
+      return;
+    }
+    clearInterval(this.heartbeatTimer);
+    this.heartbeatTimer = undefined;
+  }
+
+  private async refreshHeartbeat(): Promise<void> {
+    if (this.heartbeatInFlight) {
+      return;
+    }
+    this.heartbeatInFlight = true;
+    try {
+      const result = await this.runner.run({
+        target: this.target,
+        command: remoteHeartbeatCommand({
+          dataRoot: this.dataRoot,
+          owner: this.owner,
+          correlationId: this.correlationId,
+          staleAfterSeconds: Math.ceil(this.staleAfterMs / 1_000),
+        }),
+        cwd: this.cwd,
+        env: this.env,
+        redactions: this.target.identityFile ? [this.target.identityFile] : [],
+      });
+
+      if (result.failed && result.exitCode === lockOwnershipExitCode) {
+        this.stopHeartbeat();
+      }
+    } finally {
+      this.heartbeatInFlight = false;
+    }
+  }
+
+  private decorateLockTimeout(
+    error: ReturnType<typeof domainError.infra>,
+    startedAt: number,
+  ): ReturnType<typeof domainError.infra> {
+    if (error.code !== "infra_error" || error.details?.phase !== "remote-state-lock") {
+      return error;
+    }
+
+    return retriableInfraError(error.message, {
+      ...(error.details ?? {}),
+      waitedSeconds: Math.max(0, Math.floor((Date.now() - startedAt) / 1_000)),
+      lockAcquireTimeoutSeconds: Math.ceil(this.lockAcquireTimeoutMs / 1_000),
+    });
   }
 }

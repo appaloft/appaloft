@@ -56,11 +56,14 @@ describe("CLI remote state lifecycle", () => {
         dataRoot: root,
         owner: "first",
         correlationId: "run_1",
+        heartbeatIntervalMs: null,
       });
       const second = new FileSystemRemoteStateLifecycle({
         dataRoot: root,
         owner: "second",
         correlationId: "run_2",
+        heartbeatIntervalMs: null,
+        lockAcquireTimeoutMs: 0,
       });
 
       const firstPrepared = await first.prepare();
@@ -73,6 +76,7 @@ describe("CLI remote state lifecycle", () => {
       }
       expect(secondPrepared.error).toMatchObject({
         code: "infra_error",
+        retryable: true,
         details: {
           phase: "remote-state-lock",
           lockOwner: "first",
@@ -82,6 +86,46 @@ describe("CLI remote state lifecycle", () => {
       if (firstPrepared.isOk()) {
         await firstPrepared.value.release();
       }
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  test("[CONFIG-FILE-STATE-003] remote state lock waits briefly for active owner", async () => {
+    const root = await tempStateRoot();
+    try {
+      const first = new FileSystemRemoteStateLifecycle({
+        dataRoot: root,
+        owner: "first",
+        correlationId: "run_1",
+        heartbeatIntervalMs: null,
+        lockAcquireTimeoutMs: 0,
+      });
+      const second = new FileSystemRemoteStateLifecycle({
+        dataRoot: root,
+        owner: "second",
+        correlationId: "run_2",
+        heartbeatIntervalMs: null,
+        lockAcquireTimeoutMs: 100,
+        lockRetryIntervalMs: 10,
+      });
+
+      const firstPrepared = await first.prepare();
+      expect(firstPrepared.isOk()).toBe(true);
+      if (firstPrepared.isErr()) {
+        throw new Error(firstPrepared.error.message);
+      }
+
+      setTimeout(() => {
+        void firstPrepared.value.release();
+      }, 20);
+
+      const secondPrepared = await second.prepare();
+      expect(secondPrepared.isOk()).toBe(true);
+      if (secondPrepared.isErr()) {
+        throw new Error(secondPrepared.error.message);
+      }
+      await secondPrepared.value.release();
     } finally {
       await rm(root, { recursive: true, force: true });
     }
@@ -160,23 +204,55 @@ describe("CLI remote state lifecycle", () => {
         dataRoot: root,
         owner: "abandoned",
         correlationId: "run_old",
+        heartbeatIntervalMs: null,
+        staleAfterMs: 1_000,
+        now: () => new Date("2026-04-19T00:00:00.000Z"),
       }).prepare();
 
       const prepared = await new FileSystemRemoteStateLifecycle({
         dataRoot: root,
         owner: "next",
         correlationId: "run_new",
+        heartbeatIntervalMs: null,
+        staleAfterMs: 1_000,
+        now: () => new Date("2026-04-19T00:10:00.000Z"),
       }).prepare();
 
-      expect(prepared.isErr()).toBe(true);
-      if (prepared.isOk()) {
-        throw new Error("Expected abandoned lock to block next prepare");
+      expect(prepared.isOk()).toBe(true);
+      if (prepared.isErr()) {
+        throw new Error(prepared.error.message);
       }
-      expect(prepared.error.details).toMatchObject({
-        phase: "remote-state-lock",
-        lockOwner: "abandoned",
-        correlationId: "run_old",
+      expect(
+        await readJson<{
+          owner: string;
+          correlationId: string;
+          staleAfterSeconds: number;
+        }>(join(root, "locks", "mutation.lock", "owner.json")),
+      ).toMatchObject({
+        owner: "next",
+        correlationId: "run_new",
+        staleAfterSeconds: 1,
       });
+      expect(
+        await readJson<{
+          previousOwner: string;
+          previousCorrelationId: string;
+          correlationId: string;
+        }>(
+          join(
+            root,
+            "locks",
+            "recovered",
+            "mutation-2026-04-19T00-10-00-000Z-run_new.lock",
+            "recovered.json",
+          ),
+        ),
+      ).toMatchObject({
+        previousOwner: "abandoned",
+        previousCorrelationId: "run_old",
+        correlationId: "run_new",
+      });
+      await prepared.value.release();
     } finally {
       await rm(root, { recursive: true, force: true });
     }
@@ -944,11 +1020,13 @@ describe("CLI source link state", () => {
         dataRoot: root,
         owner: "deploy",
         correlationId: "run_active",
+        lockAcquireTimeoutMs: 0,
       }).prepare();
       const relinkLifecycle = await new FileSystemRemoteStateLifecycle({
         dataRoot: root,
         owner: "relink",
         correlationId: "run_relink",
+        lockAcquireTimeoutMs: 0,
       }).prepare();
       const existing = await store.read(sourceFingerprint);
 
@@ -959,6 +1037,7 @@ describe("CLI source link state", () => {
       }
       expect(relinkLifecycle.error).toMatchObject({
         code: "infra_error",
+        retryable: true,
         details: {
           phase: "remote-state-lock",
           lockOwner: "deploy",

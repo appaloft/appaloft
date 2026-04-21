@@ -189,7 +189,7 @@ Remote state lifecycle is mandatory for production pure CLI mode:
 trusted SSH target and credential
   -> resolve remote Appaloft data root
   -> ensure data root, schema-version marker, lock area, backup/journal area, and permissions
-  -> acquire exclusive mutation lock with owner/correlation metadata
+  -> acquire exclusive mutation lock with owner/correlation/heartbeat metadata
   -> create pre-migration backup or journal when schema version differs
   -> run migrations
   -> verify state integrity and migration marker
@@ -201,8 +201,13 @@ trusted SSH target and credential
 
 Recovery requirements:
 
+- active locks must keep heartbeat/last-seen metadata fresh while the workflow owns the state;
+- entrypoint adapters may wait for a short bounded retry window before returning a retriable
+  `remote-state-lock` error for an active lock;
 - abandoned locks must be visible through diagnostics and recoverable by a deliberate operator
-  action or safe stale-lock policy;
+  action or a safe stale-lock policy that records the recovered lock metadata before continuing;
+- releasing a lock must be owner-aware so an older workflow cannot delete a newer lock after
+  recovery or superseding takeover;
 - failed migrations must leave either the previous state readable or an explicit recovery marker
   with the backup/journal location;
 - deploy commands must not continue after a failed ensure, lock, migration, or integrity check;

@@ -1,4 +1,4 @@
-import { mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import {
   type DomainError,
@@ -16,6 +16,10 @@ export interface RemoteStateLifecycleOptions {
   correlationId?: string;
   now?: () => Date;
   failMigration?: boolean;
+  heartbeatIntervalMs?: number | null;
+  staleAfterMs?: number;
+  lockAcquireTimeoutMs?: number;
+  lockRetryIntervalMs?: number;
 }
 
 export interface RemoteStateSession {
@@ -133,7 +137,19 @@ export interface ServerAppliedRouteDesiredStateStore {
   deleteDesiredBySourceFingerprint(sourceFingerprint: string): Promise<Result<number>>;
 }
 
+interface RemoteStateLockMetadata {
+  owner?: string;
+  correlationId?: string;
+  startedAt?: string;
+  lastHeartbeatAt?: string;
+  staleAfterSeconds?: number;
+}
+
 const defaultSchemaVersion = 1;
+const defaultLockHeartbeatIntervalMs = 30_000;
+const defaultLockStaleAfterMs = 20 * 60_000;
+const defaultLockAcquireTimeoutMs = 15_000;
+const defaultLockRetryIntervalMs = 1_000;
 const stateDirectories = [
   "pglite",
   "locks",
@@ -153,6 +169,14 @@ function isoStamp(now: () => Date): string {
 
 function jsonStringify(value: unknown): string {
   return `${JSON.stringify(value, null, 2)}\n`;
+}
+
+function defaultCorrelationId(prefix: string): string {
+  return `${prefix}_${process.pid}_${Date.now().toString(36)}`;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 async function readJsonFile<T>(path: string): Promise<T | null> {
@@ -200,13 +224,46 @@ function lockErrorDetails(input: {
   dataRoot: string;
   lockOwner?: string;
   correlationId?: string;
-}): Record<string, string> {
+  lockStartedAt?: string;
+  lockHeartbeatAt?: string;
+  lockAgeSeconds?: number;
+  staleAfterSeconds?: number;
+  retryAfterSeconds?: number;
+  waitedSeconds?: number;
+  lockAcquireTimeoutSeconds?: number;
+}): Record<string, string | number> {
   return {
     phase: "remote-state-lock",
     stateBackend: "ssh-pglite",
     dataRoot: input.dataRoot,
     ...(input.lockOwner ? { lockOwner: input.lockOwner } : {}),
     ...(input.correlationId ? { correlationId: input.correlationId } : {}),
+    ...(input.lockStartedAt ? { lockStartedAt: input.lockStartedAt } : {}),
+    ...(input.lockHeartbeatAt ? { lockHeartbeatAt: input.lockHeartbeatAt } : {}),
+    ...(input.lockAgeSeconds !== undefined ? { lockAgeSeconds: input.lockAgeSeconds } : {}),
+    ...(input.staleAfterSeconds !== undefined
+      ? { staleAfterSeconds: input.staleAfterSeconds }
+      : {}),
+    ...(input.retryAfterSeconds !== undefined
+      ? { retryAfterSeconds: input.retryAfterSeconds }
+      : {}),
+    ...(input.waitedSeconds !== undefined ? { waitedSeconds: input.waitedSeconds } : {}),
+    ...(input.lockAcquireTimeoutSeconds !== undefined
+      ? { lockAcquireTimeoutSeconds: input.lockAcquireTimeoutSeconds }
+      : {}),
+  };
+}
+
+function retriableInfraError(
+  message: string,
+  details?: Record<string, string | number | boolean | null>,
+): DomainError {
+  return {
+    code: "infra_error",
+    category: "infra",
+    message,
+    retryable: true,
+    ...(details ? { details } : {}),
   };
 }
 
@@ -409,23 +466,48 @@ export class FileSystemRemoteStateLifecycle {
   private readonly correlationId: string;
   private readonly now: () => Date;
   private readonly failMigration: boolean;
+  private readonly heartbeatIntervalMs: number | null;
+  private readonly staleAfterMs: number;
+  private readonly lockAcquireTimeoutMs: number;
+  private readonly lockRetryIntervalMs: number;
+  private heartbeatTimer: ReturnType<typeof setInterval> | undefined;
+  private heartbeatInFlight = false;
 
   constructor(options: RemoteStateLifecycleOptions) {
     this.dataRoot = options.dataRoot;
     this.schemaVersion = options.schemaVersion ?? defaultSchemaVersion;
     this.owner = options.owner ?? "appaloft-cli";
-    this.correlationId = options.correlationId ?? "cli";
+    this.correlationId = options.correlationId ?? defaultCorrelationId("remote_state");
     this.now = options.now ?? (() => new Date());
     this.failMigration = options.failMigration ?? false;
+    this.heartbeatIntervalMs =
+      options.heartbeatIntervalMs === undefined
+        ? defaultLockHeartbeatIntervalMs
+        : options.heartbeatIntervalMs && options.heartbeatIntervalMs > 0
+          ? options.heartbeatIntervalMs
+          : null;
+    this.staleAfterMs =
+      options.staleAfterMs && options.staleAfterMs > 0
+        ? options.staleAfterMs
+        : defaultLockStaleAfterMs;
+    this.lockAcquireTimeoutMs =
+      options.lockAcquireTimeoutMs !== undefined && options.lockAcquireTimeoutMs >= 0
+        ? options.lockAcquireTimeoutMs
+        : defaultLockAcquireTimeoutMs;
+    this.lockRetryIntervalMs =
+      options.lockRetryIntervalMs && options.lockRetryIntervalMs > 0
+        ? options.lockRetryIntervalMs
+        : defaultLockRetryIntervalMs;
   }
 
   async prepare(): Promise<Result<RemoteStateSession>> {
     try {
       await this.ensureDirectories();
-      const lockResult = await this.acquireLock();
+      const lockResult = await this.acquireLockWithRetry();
       if (lockResult.isErr()) {
         return err(lockResult.error);
       }
+      this.startHeartbeat();
 
       const migrationResult = await this.migrate();
       if (migrationResult.isErr()) {
@@ -486,31 +568,64 @@ export class FileSystemRemoteStateLifecycle {
     }
   }
 
+  private async acquireLockWithRetry(): Promise<Result<void>> {
+    const deadline =
+      this.lockAcquireTimeoutMs > 0 ? Date.now() + this.lockAcquireTimeoutMs : Date.now();
+    const startedAt = Date.now();
+
+    while (true) {
+      const attempt = await this.acquireLock();
+      if (attempt.isOk()) {
+        return attempt;
+      }
+
+      if (!this.shouldRetryLockError(attempt.error) || Date.now() >= deadline) {
+        return err(this.decorateLockTimeout(attempt.error, startedAt));
+      }
+
+      await sleep(Math.min(this.lockRetryIntervalMs, Math.max(0, deadline - Date.now())));
+    }
+  }
+
   private async acquireLock(): Promise<Result<void>> {
-    const lockPath = join(this.dataRoot, lockDirectory);
+    const lockPath = this.lockPath();
     try {
       await mkdir(lockPath);
-      await writeFile(
-        join(lockPath, lockOwnerFile),
-        jsonStringify({
-          owner: this.owner,
-          correlationId: this.correlationId,
-          startedAt: this.now().toISOString(),
-        }),
-      );
+      await this.writeLockMetadata(lockPath, {
+        owner: this.owner,
+        correlationId: this.correlationId,
+        startedAt: this.now().toISOString(),
+        lastHeartbeatAt: this.now().toISOString(),
+        staleAfterSeconds: Math.ceil(this.staleAfterMs / 1_000),
+      });
       return ok(undefined);
     } catch (error) {
       if (error instanceof Error && "code" in error && error.code === "EEXIST") {
-        const owner = await readJsonFile<{ owner?: string; correlationId?: string }>(
-          join(lockPath, lockOwnerFile),
-        );
+        const owner = await this.readLockMetadata(lockPath);
+        const staleStatus = await this.staleStatus(lockPath, owner);
+        const staleAfterSeconds = this.lockStaleAfterSeconds(owner);
+        if (staleStatus.stale) {
+          const recovered = await this.recoverStaleLock(lockPath, owner, staleStatus.ageSeconds);
+          if (recovered.isErr()) {
+            return err(recovered.error);
+          }
+          return await this.acquireLock();
+        }
         return err(
-          domainError.infra(
+          retriableInfraError(
             "Remote state mutation lock is already held",
             lockErrorDetails({
               dataRoot: this.dataRoot,
               ...(owner?.owner ? { lockOwner: owner.owner } : {}),
               ...(owner?.correlationId ? { correlationId: owner.correlationId } : {}),
+              ...(owner?.startedAt ? { lockStartedAt: owner.startedAt } : {}),
+              ...(owner?.lastHeartbeatAt ? { lockHeartbeatAt: owner.lastHeartbeatAt } : {}),
+              ...(staleStatus.ageSeconds !== undefined
+                ? { lockAgeSeconds: staleStatus.ageSeconds }
+                : {}),
+              ...(staleAfterSeconds !== undefined ? { staleAfterSeconds } : {}),
+              retryAfterSeconds: Math.ceil(this.lockRetryIntervalMs / 1_000),
+              lockAcquireTimeoutSeconds: Math.ceil(this.lockAcquireTimeoutMs / 1_000),
             }),
           ),
         );
@@ -520,8 +635,25 @@ export class FileSystemRemoteStateLifecycle {
   }
 
   private async releaseLock(): Promise<Result<void>> {
+    this.stopHeartbeat();
     try {
-      await rm(join(this.dataRoot, lockDirectory), { recursive: true, force: true });
+      const lockPath = this.lockPath();
+      const owner = await this.readLockMetadata(lockPath);
+      if (owner && (owner.owner !== this.owner || owner.correlationId !== this.correlationId)) {
+        return err(
+          domainError.infra(
+            "Remote state mutation lock ownership changed before release",
+            lockErrorDetails({
+              dataRoot: this.dataRoot,
+              ...(owner.owner ? { lockOwner: owner.owner } : {}),
+              ...(owner.correlationId ? { correlationId: owner.correlationId } : {}),
+              ...(owner.startedAt ? { lockStartedAt: owner.startedAt } : {}),
+              ...(owner.lastHeartbeatAt ? { lockHeartbeatAt: owner.lastHeartbeatAt } : {}),
+            }),
+          ),
+        );
+      }
+      await rm(lockPath, { recursive: true, force: true });
       return ok(undefined);
     } catch (error) {
       return err(
@@ -615,6 +747,179 @@ export class FileSystemRemoteStateLifecycle {
         recordedAt: this.now().toISOString(),
       }),
     );
+  }
+
+  private lockPath(): string {
+    return join(this.dataRoot, lockDirectory);
+  }
+
+  private lockOwnerPath(lockPath = this.lockPath()): string {
+    return join(lockPath, lockOwnerFile);
+  }
+
+  private async readLockMetadata(
+    lockPath = this.lockPath(),
+  ): Promise<RemoteStateLockMetadata | null> {
+    return await readJsonFile<RemoteStateLockMetadata>(this.lockOwnerPath(lockPath));
+  }
+
+  private async writeLockMetadata(
+    lockPath: string,
+    metadata: RemoteStateLockMetadata,
+  ): Promise<void> {
+    await writeFile(this.lockOwnerPath(lockPath), jsonStringify(metadata));
+  }
+
+  private lockStaleAfterSeconds(metadata: RemoteStateLockMetadata | null): number | undefined {
+    return metadata?.staleAfterSeconds ?? Math.ceil(this.staleAfterMs / 1_000);
+  }
+
+  private heartbeatSourceTime(metadata: RemoteStateLockMetadata | null): Date | null {
+    const timestamp = metadata?.lastHeartbeatAt ?? metadata?.startedAt;
+    if (!timestamp) {
+      return null;
+    }
+    const parsed = new Date(timestamp);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+
+  private async staleStatus(
+    lockPath: string,
+    metadata: RemoteStateLockMetadata | null,
+  ): Promise<{ stale: boolean; ageSeconds?: number }> {
+    const heartbeatTime = this.heartbeatSourceTime(metadata);
+    const thresholdMs = (this.lockStaleAfterSeconds(metadata) ?? 0) * 1_000;
+    if (thresholdMs <= 0) {
+      return { stale: false };
+    }
+
+    if (heartbeatTime) {
+      const ageMs = this.now().getTime() - heartbeatTime.getTime();
+      return {
+        stale: ageMs >= thresholdMs,
+        ageSeconds: Math.max(0, Math.floor(ageMs / 1_000)),
+      };
+    }
+
+    try {
+      const details = await stat(lockPath);
+      const ageMs = this.now().getTime() - details.mtime.getTime();
+      return {
+        stale: ageMs >= thresholdMs,
+        ageSeconds: Math.max(0, Math.floor(ageMs / 1_000)),
+      };
+    } catch (error) {
+      if (error instanceof Error && "code" in error && error.code === "ENOENT") {
+        return { stale: false };
+      }
+      throw error;
+    }
+  }
+
+  private async recoverStaleLock(
+    lockPath: string,
+    metadata: RemoteStateLockMetadata | null,
+    ageSeconds?: number,
+  ): Promise<Result<void>> {
+    const recoveredRoot = join(this.dataRoot, "locks", "recovered");
+    const recoveredPath = join(
+      recoveredRoot,
+      `mutation-${isoStamp(this.now)}-${this.correlationId}.lock`,
+    );
+    try {
+      await mkdir(recoveredRoot, { recursive: true });
+      await rename(lockPath, recoveredPath);
+      await writeFile(
+        join(recoveredPath, "recovered.json"),
+        jsonStringify({
+          phase: "remote-state-lock",
+          recoveredAt: this.now().toISOString(),
+          recoveredBy: this.owner,
+          correlationId: this.correlationId,
+          ...(metadata?.owner ? { previousOwner: metadata.owner } : {}),
+          ...(metadata?.correlationId ? { previousCorrelationId: metadata.correlationId } : {}),
+          ...(ageSeconds !== undefined ? { lockAgeSeconds: ageSeconds } : {}),
+        }),
+      );
+      return ok(undefined);
+    } catch (error) {
+      if (error instanceof Error && "code" in error && error.code === "ENOENT") {
+        return ok(undefined);
+      }
+      return err(
+        retriableInfraError("Remote state stale lock could not be recovered", {
+          phase: "remote-state-lock",
+          message: error instanceof Error ? error.message : String(error),
+          ...(metadata?.owner ? { lockOwner: metadata.owner } : {}),
+          ...(metadata?.correlationId ? { correlationId: metadata.correlationId } : {}),
+          retryAfterSeconds: Math.ceil(this.lockRetryIntervalMs / 1_000),
+          lockAcquireTimeoutSeconds: Math.ceil(this.lockAcquireTimeoutMs / 1_000),
+        }),
+      );
+    }
+  }
+
+  private shouldRetryLockError(error: DomainError): boolean {
+    return error.code === "infra_error" && error.details?.phase === "remote-state-lock";
+  }
+
+  private decorateLockTimeout(error: DomainError, startedAt: number): DomainError {
+    if (!this.shouldRetryLockError(error)) {
+      return error;
+    }
+
+    const waitedSeconds = Math.max(0, Math.floor((Date.now() - startedAt) / 1_000));
+    return retriableInfraError(error.message, {
+      ...(error.details ?? {}),
+      waitedSeconds,
+      lockAcquireTimeoutSeconds: Math.ceil(this.lockAcquireTimeoutMs / 1_000),
+    });
+  }
+
+  private startHeartbeat(): void {
+    if (this.heartbeatIntervalMs === null) {
+      return;
+    }
+    this.stopHeartbeat();
+    this.heartbeatTimer = setInterval(() => {
+      void this.refreshHeartbeat();
+    }, this.heartbeatIntervalMs);
+    this.heartbeatTimer.unref?.();
+  }
+
+  private stopHeartbeat(): void {
+    if (!this.heartbeatTimer) {
+      return;
+    }
+    clearInterval(this.heartbeatTimer);
+    this.heartbeatTimer = undefined;
+  }
+
+  private async refreshHeartbeat(): Promise<void> {
+    if (this.heartbeatInFlight) {
+      return;
+    }
+    this.heartbeatInFlight = true;
+    try {
+      const lockPath = this.lockPath();
+      const owner = await this.readLockMetadata(lockPath);
+      if (!owner || owner.owner !== this.owner || owner.correlationId !== this.correlationId) {
+        this.stopHeartbeat();
+        return;
+      }
+      const staleAfterSeconds = this.lockStaleAfterSeconds(owner);
+      await this.writeLockMetadata(lockPath, {
+        owner: this.owner,
+        correlationId: this.correlationId,
+        startedAt: owner.startedAt ?? this.now().toISOString(),
+        lastHeartbeatAt: this.now().toISOString(),
+        ...(staleAfterSeconds !== undefined ? { staleAfterSeconds } : {}),
+      });
+    } catch {
+      // Heartbeat is best-effort; release remains owner-aware to avoid deleting a newer lock.
+    } finally {
+      this.heartbeatInFlight = false;
+    }
   }
 }
 
