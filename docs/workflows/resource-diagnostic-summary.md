@@ -20,6 +20,7 @@ This workflow inherits:
 - [ADR-017: Default Access Domain And Proxy Routing](../decisions/ADR-017-default-access-domain-and-proxy-routing.md)
 - [ADR-018: Resource Runtime Log Observation](../decisions/ADR-018-resource-runtime-log-observation.md)
 - [ADR-019: Edge Proxy Provider And Observable Configuration](../decisions/ADR-019-edge-proxy-provider-and-observable-configuration.md)
+- [Resource Access Failure Diagnostics Workflow Spec](./resource-access-failure-diagnostics.md)
 - [resources.diagnostic-summary Query Spec](../queries/resources.diagnostic-summary.md)
 - [Resource Diagnostic Summary Error Spec](../errors/resources.diagnostic-summary.md)
 - [Resource Diagnostic Summary Test Matrix](../testing/resource-diagnostic-summary-test-matrix.md)
@@ -75,6 +76,7 @@ The workflow composes read state from:
 - deployment read model and deployment-attempt logs;
 - resource access summary;
 - proxy configuration preview/read service;
+- resource access failure diagnostic read source when a safe edge request failure envelope exists;
 - runtime log bounded-tail query/read service;
 - safe backend/system diagnostics.
 

@@ -38,6 +38,7 @@ This workflow inherits:
 - [Default Access Domain And Proxy Routing](./default-access-domain-and-proxy-routing.md)
 - [Resource Runtime Log Observation](./resource-runtime-log-observation.md)
 - [Resource Diagnostic Summary](./resource-diagnostic-summary.md)
+- [Resource Access Failure Diagnostics](./resource-access-failure-diagnostics.md)
 - [Error Model](../errors/model.md)
 - [neverthrow Conventions](../errors/neverthrow-conventions.md)
 - [Async Lifecycle And Acceptance](../architecture/async-lifecycle-and-acceptance.md)
@@ -75,6 +76,7 @@ configuration, or health policy.
 | Configured command policy | Bounded command result inside workload runtime. | Future or adapter-dependent |
 | Proxy route state | Whether reverse-proxy route configuration is applied/ready. | Yes when route data exists |
 | Public access probe | Whether the current resource URL responds as expected. | Yes when explicitly requested with live mode |
+| Edge access failure diagnostic | Recent provider-neutral gateway failure envelope for a public route request. | Future read source |
 | Runtime logs | Evidence for diagnostics, not health proof by itself. | Diagnostic-only |
 
 Runtime log text must not be used as the sole health predicate.
@@ -166,6 +168,8 @@ Examples:
 - Docker inspect unavailable: `overall = unknown`, `sourceErrors[]` contains `runtime_inspection_failed`.
 - HTTP check returns 500: `overall = unhealthy`, check status is `failed`.
 - Public route timeout but internal health passes: `overall = degraded`.
+- Edge gateway reports `resource_access_upstream_timeout`: `overall = degraded` unless runtime
+  health also proves an internal failure.
 - No health policy configured: `overall = unknown`, policy status is `not-configured`.
 
 Whole-query `err(DomainError)` is reserved for:

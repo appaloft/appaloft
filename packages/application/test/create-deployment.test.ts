@@ -629,6 +629,35 @@ describe("CreateDeploymentUseCase", () => {
     expect(command._unsafeUnwrapErr().code).toBe("validation_error");
   });
 
+  test("adds runtime context metadata for workload diagnostics", async () => {
+    const runtimePlanResolver = new CapturingRuntimePlanResolver();
+    const { context, createDeploymentInput, createDeploymentUseCase } =
+      await createDeploymentFixture(new ExplicitContextRequiredPolicy(), {
+        runtimePlanResolver,
+      });
+
+    const result = await createDeploymentUseCase.execute(context, createDeploymentInput);
+
+    expect(result.isOk()).toBe(true);
+    expect(runtimePlanResolver.input?.requestedDeployment.runtimeMetadata).toMatchObject({
+      "context.projectName": "Demo",
+      "context.projectSlug": "demo",
+      "context.environmentName": "production",
+      "context.environmentKind": "production",
+      "context.resourceName": "web",
+      "context.resourceSlug": "web",
+      "context.resourceKind": "application",
+      "context.destinationName": "default",
+      "context.destinationKind": "generic",
+      "context.serverName": "demo-server",
+      "context.serverProviderKey": "generic-ssh",
+      "context.serverTargetKind": "single-server",
+    });
+    expect(runtimePlanResolver.input?.requestedDeployment.runtimeMetadata?.["preview.id"]).toBe(
+      undefined,
+    );
+  });
+
   test("[RES-PROFILE-ARCHIVE-004] rejects deployment creation for archived resources", async () => {
     const {
       context,

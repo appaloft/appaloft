@@ -345,6 +345,79 @@ describe("DefaultRuntimePlanResolver", () => {
     );
   });
 
+  test("preserves runtime context metadata in execution plans", async () => {
+    ensureReflectMetadata();
+    const { DefaultRuntimePlanResolver } = await import("../src");
+    const resolver = new DefaultRuntimePlanResolver();
+    const context = createTestExecutionContext();
+
+    const result = await resolver.resolve(context, {
+      id: "plan_labels",
+      source: createSource({
+        kind: "local-folder",
+        locator: "/tmp/demo",
+        displayName: "workspace",
+      }),
+      server: {
+        id: "srv_demo",
+        providerKey: "generic-ssh",
+      },
+      environmentSnapshot: createEnvironmentSnapshot("snap_labels"),
+      detectedReasoning: ["local folder"],
+      requestedDeployment: {
+        method: "workspace-commands",
+        installCommand: "bun install",
+        buildCommand: "bun run build",
+        startCommand: "bun start",
+        port: 4321,
+        exposureMode: "reverse-proxy",
+        upstreamProtocol: "http",
+        accessContext: {
+          projectId: "prj_demo",
+          environmentId: "env_demo",
+          resourceId: "res_demo",
+          resourceSlug: "web",
+          destinationId: "dst_demo",
+          exposureMode: "reverse-proxy",
+          upstreamProtocol: "http",
+          routePurpose: "default-resource-access",
+        },
+        runtimeMetadata: {
+          "context.environmentKind": "preview",
+          "context.environmentName": "preview-pr-14",
+          "context.resourceKind": "application",
+          "preview.id": "pr-14",
+          "preview.number": "14",
+          "preview.mode": "pull-request",
+        },
+        accessRouteMetadata: {
+          "access.routeSource": "server-applied-config-domain",
+          "access.hostname": "14.preview.appaloft.com",
+        },
+      },
+      generatedAt: "2026-01-01T00:00:00.000Z",
+    });
+
+    expect(result.isOk()).toBe(true);
+    const plan = result._unsafeUnwrap();
+    expect(plan.execution.metadata).toEqual(
+      expect.objectContaining({
+        "resource.exposureMode": "reverse-proxy",
+        "resource.upstreamProtocol": "http",
+        "resource.id": "res_demo",
+        "resource.slug": "web",
+        "context.environmentKind": "preview",
+        "context.environmentName": "preview-pr-14",
+        "context.resourceKind": "application",
+        "preview.id": "pr-14",
+        "preview.number": "14",
+        "preview.mode": "pull-request",
+        "access.routeSource": "server-applied-config-domain",
+        "access.hostname": "14.preview.appaloft.com",
+      }),
+    );
+  });
+
   test("[WF-PLAN-DET-007][WF-PLAN-CAT-002] packages detected Next.js static export as static artifact", async () => {
     ensureReflectMetadata();
     const { DefaultRuntimePlanResolver } = await import("../src");

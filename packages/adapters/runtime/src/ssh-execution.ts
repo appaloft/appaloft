@@ -9,6 +9,7 @@ import {
   type ExecutionBackend,
   type ExecutionContext,
   type IntegrationAuthPort,
+  type ResourceAccessFailureRendererTarget,
   type ServerRepository,
   reportDeploymentProgress,
   toRepositoryContext,
@@ -53,7 +54,7 @@ import {
 import {
   dockerPublishedPortCommand,
   parseDockerPublishedHostPort,
-  appaloftDockerContainerLabels,
+  appaloftDockerContainerLabelsForDeployment,
 } from "./docker-container-commands";
 import {
   RuntimeCommandBuilder,
@@ -423,6 +424,7 @@ export class SshExecutionBackend implements ExecutionBackend {
     private readonly serverRepository?: ServerRepository,
     private readonly edgeProxyProviderRegistry?: EdgeProxyProviderRegistry,
     private readonly remoteRuntimeRoot = "/var/lib/appaloft/runtime",
+    private readonly resourceAccessFailureRenderer?: () => ResourceAccessFailureRendererTarget | undefined,
   ) {}
 
   private report(
@@ -1669,6 +1671,7 @@ export class SshExecutionBackend implements ExecutionBackend {
         });
       }
 
+      const resourceAccessFailureRenderer = this.resourceAccessFailureRenderer?.();
       const proxyRoutePlanResult = this.edgeProxyProviderRegistry
         ? await createProxyRouteRealizationPlan({
             providerRegistry: this.edgeProxyProviderRegistry,
@@ -1678,6 +1681,7 @@ export class SshExecutionBackend implements ExecutionBackend {
             deploymentId: state.id.value,
             port,
             accessRoutes,
+            ...(resourceAccessFailureRenderer ? { resourceAccessFailureRenderer } : {}),
           })
         : ok(null);
       if (proxyRoutePlanResult.isErr()) {
@@ -1716,15 +1720,9 @@ export class SshExecutionBackend implements ExecutionBackend {
             value,
             ...(snapshotVariable?.isSecret ? { redacted: true } : {}),
           };
-        });
+      });
       const labels = dockerLabelsFromAssignments([
-        ...appaloftDockerContainerLabels({
-          deploymentId: state.id.value,
-          projectId: state.projectId.value,
-          environmentId: state.environmentId.value,
-          resourceId: state.resourceId.value,
-          destinationId: state.destinationId.value,
-        }),
+        ...appaloftDockerContainerLabelsForDeployment(state),
         ...(proxyRoutePlanResult.value?.labels ?? []),
       ]);
       const usesDirectHostPort =

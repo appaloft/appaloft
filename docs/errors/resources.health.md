@@ -18,6 +18,7 @@ This spec inherits:
 - [ADR-020: Resource Health Observation](../decisions/ADR-020-resource-health-observation.md)
 - [resources.health Query Spec](../queries/resources.health.md)
 - [Resource Health Observation Workflow Spec](../workflows/resource-health-observation.md)
+- [Resource Access Failure Diagnostics Error Spec](./resource-access-failure-diagnostics.md)
 - [Resource Health Test Matrix](../testing/resource-health-test-matrix.md)
 - [Resource Health Implementation Plan](../implementation/resource-health-plan.md)
 - [Error Model](./model.md)
@@ -39,6 +40,9 @@ type ResourceHealthErrorDetails = {
     | "health-check-execution"
     | "proxy-route-observation"
     | "public-access-observation"
+    | "edge-request-routing"
+    | "upstream-connection"
+    | "upstream-response"
     | "aggregation";
   resourceId?: string;
   deploymentId?: string;
@@ -119,6 +123,16 @@ Typical source errors:
 | `proxy` | `resource_proxy_route_unavailable` | `proxy-route-observation` | Required proxy route is missing, unapplied, or not ready. |
 | `public-access` | `resource_public_access_unavailable` | `public-access-observation` | No current durable or generated public route is available. |
 | `public-access` | `resource_public_access_probe_failed` | `public-access-observation` | Current public route timed out or returned an unexpected result. |
+| `public-access` | `resource_access_route_not_found` | `edge-request-routing` | Edge request reached Appaloft but no active route matched the host/path. |
+| `public-access` | `resource_access_upstream_unavailable` | `upstream-connection` | Edge request matched a route but no current upstream target was available. |
+| `public-access` | `resource_access_upstream_connect_failed` | `upstream-connection` | Edge request could not connect to the resource endpoint. |
+| `public-access` | `resource_access_upstream_timeout` | `upstream-connection` | Edge request timed out waiting for the resource endpoint. |
+| `public-access` | `resource_access_upstream_reset` | `upstream-response` | Edge request's upstream connection reset before a complete response. |
+| `public-access` | `resource_access_upstream_tls_failed` | `upstream-connection` | Edge request failed upstream TLS or protocol negotiation. |
+| `public-access` | `resource_access_unknown` | `diagnostic-page-render` | Edge request failed, but the provider could not classify the failure safely. |
+| `proxy` | `resource_access_proxy_unavailable` | `proxy-route-observation` | Edge request requires proxy infrastructure that is unavailable or not ready. |
+| `proxy` | `resource_access_route_unavailable` | `proxy-route-observation` | Edge request matched a route that is not applied, ready, or current. |
+| `proxy` | `resource_access_edge_error` | `diagnostic-page-render` | The edge diagnostic service failed while handling a gateway error. |
 | `domain-binding` | `resource_domain_binding_not_ready` | `public-access-observation` | Durable domain binding exists but is not ready for traffic. |
 
 Source errors must reuse stable codes from the owning query/spec when a source already has one.
@@ -170,6 +184,10 @@ Implemented source errors include:
 
 Current deployment-time verification errors belong to `deployments.create` execution and should not
 be reused as the long-lived resource health error surface without passing through this query model.
+
+Edge request failure diagnostics are not implemented as a health source yet. When added, they must
+enter `resources.health` as public-access/proxy source errors and check records using the
+`resource_access_*` codes from the access-failure diagnostics spec.
 
 ## Open Questions
 

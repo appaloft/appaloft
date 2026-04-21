@@ -14,6 +14,10 @@ Deployment-specific canonical assertions:
   destination, provider key, target kind, and registered capabilities instead of Web/CLI/API input;
 - Docker runtime verification failures persist actionable container diagnostics, including container
   state and recent application logs when the container started or exited before verification;
+- Docker/OCI workload labels include stable Appaloft diagnostic metadata for managed ownership,
+  deployment/project/environment/resource/server/destination identity, environment/resource kind,
+  runtime/source/artifact/route summaries, and preview identity when available; these labels remain
+  runtime-adapter metadata for diagnostics and cleanup, not Web/API/CLI command inputs;
 - framework/runtime detection uses typed source inspection evidence and planner registry output for
   base image, package manager/build tool, install/build/start/package commands, and artifact
   output; it must not add framework-specific fields to `deployments.create`;

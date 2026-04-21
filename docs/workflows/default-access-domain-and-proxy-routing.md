@@ -33,6 +33,7 @@ This workflow inherits:
 - [neverthrow Conventions](../errors/neverthrow-conventions.md)
 - [Async Lifecycle And Acceptance](../architecture/async-lifecycle-and-acceptance.md)
 - [Edge Proxy Provider And Route Realization Workflow](./edge-proxy-provider-and-route-realization.md)
+- [Resource Access Failure Diagnostics Workflow](./resource-access-failure-diagnostics.md)
 
 ## Workflow Position
 
@@ -204,6 +205,10 @@ The edge proxy provider and runtime adapter together must:
 - record failures with structured error codes and phases.
 
 Runtime execution does not imply that the generated-domain provider was called by the runtime adapter. Generated-domain provider calls belong to the route-resolution boundary before or during runtime plan construction. Edge proxy provider calls belong to the route realization and observable configuration boundary governed by ADR-019.
+
+Gateway-generated request failures for an already exposed route are not route-resolution commands.
+They are classified by the resource access failure diagnostics workflow and may feed resource
+health/diagnostic summaries as read-only observation evidence.
 
 ## User-Facing Entry Behavior
 

@@ -7,6 +7,7 @@ import {
   type ProxyReloadPlan,
   type ProxyReloadReason,
   type ProxyRouteRealizationPlan,
+  type ResourceAccessFailureRendererTarget,
 } from "@appaloft/application";
 import { type AccessRoute, type DomainError, err, ok, type Result } from "@appaloft/core";
 
@@ -153,6 +154,7 @@ export async function createProxyRouteRealizationPlan(input: {
   deploymentId: string;
   port: number;
   accessRoutes: AccessRoute[];
+  resourceAccessFailureRenderer?: ResourceAccessFailureRendererTarget;
 }): Promise<Result<ProxyRouteRealizationPlan | null, DomainError>> {
   const routes = routeInputsFromAccessRoutes(input.accessRoutes);
   const route = firstProviderRoute(routes);
@@ -177,6 +179,9 @@ export async function createProxyRouteRealizationPlan(input: {
     deploymentId: input.deploymentId,
     port: input.port,
     accessRoutes: routes,
+    ...(input.resourceAccessFailureRenderer
+      ? { resourceAccessFailureRenderer: input.resourceAccessFailureRenderer }
+      : {}),
   });
   if (planResult.isErr()) {
     return err(planResult.error);

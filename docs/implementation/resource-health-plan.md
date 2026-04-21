@@ -20,6 +20,7 @@ ADRs, query specs, workflow specs, error specs, or test matrices.
 - [Resource Health Observation Workflow Spec](../workflows/resource-health-observation.md)
 - [Resource Health Error Spec](../errors/resources.health.md)
 - [Resource Health Test Matrix](../testing/resource-health-test-matrix.md)
+- [Resource Access Failure Diagnostics Workflow Spec](../workflows/resource-access-failure-diagnostics.md)
 - [Project Resource Console Workflow Spec](../workflows/project-resource-console.md)
 - [Project Resource Console Test Matrix](../testing/project-resource-console-test-matrix.md)
 - [resources.runtime-logs Query Spec](../queries/resources.runtime-logs.md)
@@ -52,6 +53,7 @@ The query service should compose existing read/query services or read-model port
 - resource context and profile;
 - latest deployment/runtime plan context;
 - `ResourceAccessSummary`;
+- latest safe edge access failure diagnostics when a provider/read-model source exists;
 - domain binding readiness;
 - edge proxy route readiness/provider status;
 - runtime/container/process inspection;
@@ -177,6 +179,10 @@ projection is available. They must not drive current resource health in navigati
 Existing generated access route snapshots can be used as historical context. Current access should
 come from resource-scoped access summary and domain binding state.
 
+Edge request failure diagnostics can feed public access/proxy sections as source errors, but they
+must remain read-only observation input. They must not mutate health policy, deployment status,
+route realization state, or domain binding readiness.
+
 ## Current Implementation Notes And Migration Gaps
 
 `resources.health` is implemented as a first aggregation slice with bounded live HTTP/public
@@ -206,6 +212,7 @@ Still deferred:
 - provider-native runtime/container inspection and Docker health state;
 - command health checks;
 - background/scheduled health observation projection.
+- edge request failure diagnostic source composition using `resource_access_*` codes.
 
 ## Open Questions
 

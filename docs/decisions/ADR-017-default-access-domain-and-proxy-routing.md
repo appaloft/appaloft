@@ -244,6 +244,7 @@ A future `ProxyInstallation`, `ProxyRoute`, or `ResourceAccessProfile` aggregate
 - [Routing Domain And TLS Workflow Spec](../workflows/routing-domain-and-tls.md)
 - [Default Access Domain And Proxy Routing Workflow Spec](../workflows/default-access-domain-and-proxy-routing.md)
 - [Edge Proxy Provider And Route Realization Workflow Spec](../workflows/edge-proxy-provider-and-route-realization.md)
+- [Resource Access Failure Diagnostics Workflow Spec](../workflows/resource-access-failure-diagnostics.md)
 - [resources.proxy-configuration.preview Query Spec](../queries/resources.proxy-configuration.preview.md)
 - [Default Access Domain And Proxy Routing Test Matrix](../testing/default-access-domain-and-proxy-routing-test-matrix.md)
 - [Edge Proxy Provider And Route Configuration Test Matrix](../testing/edge-proxy-provider-and-route-configuration-test-matrix.md)
