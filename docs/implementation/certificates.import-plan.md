@@ -2,9 +2,14 @@
 
 ## Source Of Truth
 
-This document is an implementation-planning contract for `certificates.import`. It does not replace the future command/event specs that must be added before implementation begins.
+This document is an implementation-planning contract for `certificates.import`. It does not replace
+the command/event/testing specs that govern implementation.
 
 Manual certificate import is a separate command boundary and must not be folded into `certificates.issue-or-renew`.
+
+Unlike `certificates.issue-or-renew`, the success path for `certificates.import` is completion-based:
+validation, secret storage, durable imported-certificate state, and `certificate-imported` must all
+finish before the command returns `ok({ certificateId, attemptId })`.
 
 ## Governed ADRs
 
@@ -14,6 +19,9 @@ Manual certificate import is a separate command boundary and must not be folded 
 
 ## Governed Specs
 
+- [certificates.import Command Spec](../commands/certificates.import.md)
+- [certificate-imported Event Spec](../events/certificate-imported.md)
+- [certificates.import Test Matrix](../testing/certificates.import-test-matrix.md)
 - [certificate-issued Event Spec](../events/certificate-issued.md)
 - [domain-ready Event Spec](../events/domain-ready.md)
 - [Routing, Domain Binding, And TLS Error Spec](../errors/routing-domain-tls.md)
@@ -22,12 +30,6 @@ Manual certificate import is a separate command boundary and must not be folded 
 - [Error Model](../errors/model.md)
 - [neverthrow Conventions](../errors/neverthrow-conventions.md)
 - [Async Lifecycle And Acceptance](../architecture/async-lifecycle-and-acceptance.md)
-
-Missing governed specs that must be added before code:
-
-- `docs/commands/certificates.import.md`
-- `docs/events/certificate-imported.md`
-- `docs/testing/certificates.import-test-matrix.md`
 
 ## Touched Modules And Packages
 
@@ -132,3 +134,9 @@ Existing runtime TLS behavior and proxy-managed certificate behavior do not crea
 If operators currently rely on external proxy certificates, that path remains an external runtime configuration edge until `certificates.import` is implemented and wired to durable domain bindings.
 
 The migration path must keep manual certificate secret handling isolated from provider issuance code and from deployment runtime access-route planning.
+
+Current post-Code-Round gaps:
+
+- no contract-blocking implementation gaps remain for `certificates.import`;
+- a stronger browser automation layer beyond the current resource-scoped Web Bun.WebView coverage is
+  optional follow-up, not a contract blocker, if the team later wants a full external-browser path.

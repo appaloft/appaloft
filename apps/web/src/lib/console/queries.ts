@@ -1,5 +1,6 @@
 import {
   type AuthSessionResponse,
+  type CertificateSummary,
   type DeploymentSummary,
   type DomainBindingSummary,
   type EnvironmentSummary,
@@ -99,6 +100,13 @@ export function createConsoleQueries(enabled: boolean) {
       enabled,
     }),
   );
+  const certificatesQuery = createQuery(() =>
+    queryOptions({
+      queryKey: ["certificates"],
+      queryFn: () => orpcClient.certificates.list({}),
+      enabled,
+    }),
+  );
   const providersQuery = createQuery(() =>
     queryOptions({
       queryKey: ["providers"],
@@ -118,6 +126,7 @@ export function createConsoleQueries(enabled: boolean) {
     resourcesQuery,
     deploymentsQuery,
     domainBindingsQuery,
+    certificatesQuery,
     providersQuery,
   };
 }
@@ -129,5 +138,6 @@ export type ConsoleQueryData = {
   resources: ResourceSummary[];
   deployments: DeploymentSummary[];
   domainBindings: DomainBindingSummary[];
+  certificates: CertificateSummary[];
   providers: ProviderSummary[];
 };

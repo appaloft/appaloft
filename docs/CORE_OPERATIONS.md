@@ -539,6 +539,10 @@ Current boundary:
 - `certificate-issued` is a first-class event behavior entrypoint for certificate-backed readiness:
   when the referenced domain binding is still bound, the handler marks it ready and publishes
   `domain-ready`
+- `certificates.import` is an active manual-certificate operation for manual-policy bindings:
+  it publishes `certificate-imported` instead of `certificate-issued`, is exposed through the
+  operation catalog plus CLI/API entrypoints and the resource-scoped Web entrypoint, and now uses
+  durable PG/PGlite-backed secret persistence rather than placeholder refs
 - the default shell composition intentionally registers an unavailable certificate provider until a
   real provider adapter is configured; this records retryable `certificate_provider_unavailable`
   state after accepted issue requests rather than pretending HTTPS is active

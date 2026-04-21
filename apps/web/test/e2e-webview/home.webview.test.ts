@@ -3,6 +3,12 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 
 type ApiScenario = "dashboard" | "github-connected" | "static-quick-deploy";
+type ApiRouteResponse = unknown | Response;
+type ApiRouteHandler = (
+  request: Request,
+  body: unknown,
+) => ApiRouteResponse | Promise<ApiRouteResponse>;
+type ApiRoute = ApiRouteResponse | ApiRouteHandler;
 
 type RecordedApiRequest = {
   method: string;
@@ -10,7 +16,7 @@ type RecordedApiRequest = {
   body: unknown;
 };
 
-const apiResponses: Record<ApiScenario, Record<string, unknown>> = {
+const apiResponses: Record<ApiScenario, Record<string, ApiRoute>> = {
   dashboard: {
     "/api/health": {
       status: "ok",
@@ -278,7 +284,12 @@ const apiResponses: Record<ApiScenario, Record<string, unknown>> = {
         id: "res_demo",
       },
     },
-    "/api/rpc/domain-bindings/list": {
+    "/api/rpc/domainBindings/list": {
+      json: {
+        items: [],
+      },
+    },
+    "/api/rpc/certificates/list": {
       json: {
         items: [],
       },
@@ -427,7 +438,12 @@ const apiResponses: Record<ApiScenario, Record<string, unknown>> = {
         items: [],
       },
     },
-    "/api/rpc/domain-bindings/list": {
+    "/api/rpc/domainBindings/list": {
+      json: {
+        items: [],
+      },
+    },
+    "/api/rpc/certificates/list": {
       json: {
         items: [],
       },
@@ -550,7 +566,12 @@ const apiResponses: Record<ApiScenario, Record<string, unknown>> = {
         items: [],
       },
     },
-    "/api/rpc/domain-bindings/list": {
+    "/api/rpc/domainBindings/list": {
+      json: {
+        items: [],
+      },
+    },
+    "/api/rpc/certificates/list": {
       json: {
         items: [],
       },
@@ -632,6 +653,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+function isApiRouteHandler(value: ApiRoute): value is ApiRouteHandler {
+  return typeof value === "function";
+}
+
 function readOrpcJsonPayload(body: unknown): unknown {
   if (isRecord(body) && "json" in body) {
     return body.json;
@@ -699,10 +724,11 @@ async function setupWebApp(): Promise<void> {
       }
 
       const { pathname } = new URL(request.url);
+      const requestBody = await readRequestBody(request);
       recordedApiRequests.push({
         method: request.method,
         pathname,
-        body: await readRequestBody(request),
+        body: requestBody,
       });
 
       if (pathname.startsWith("/api/deployment-progress/")) {
@@ -714,10 +740,18 @@ async function setupWebApp(): Promise<void> {
         });
       }
 
-      const response = apiResponses[activeScenario][pathname];
+      const configuredRoute = apiResponses[activeScenario][pathname];
 
-      if (response === undefined) {
+      if (configuredRoute === undefined) {
         return respondJson({ error: `Unhandled test API route: ${pathname}` }, { status: 404 });
+      }
+
+      const response = isApiRouteHandler(configuredRoute)
+        ? await configuredRoute(request, requestBody)
+        : configuredRoute;
+
+      if (response instanceof Response) {
+        return response;
       }
 
       return respondJson(response);
@@ -885,7 +919,7 @@ async function setInputValue(view: Bun.WebView, selector: string, value: string)
       view.evaluate<boolean>(
         `(() => {
           const input = document.querySelector(${JSON.stringify(selector)});
-          if (!(input instanceof HTMLInputElement)) {
+          if (!(input instanceof HTMLInputElement || input instanceof HTMLTextAreaElement)) {
             return false;
           }
           input.value = ${JSON.stringify(value)};
@@ -1132,6 +1166,190 @@ describe("console e2e with Bun.WebView", () => {
       });
     } finally {
       showResponse.json.lifecycle = previousLifecycle;
+    }
+  }, 15_000);
+
+  test("[CERT-IMPORT-ENTRY-003] imports a manual certificate from the resource detail Web surface", async () => {
+    activeScenario = "dashboard";
+    resetRecordedApiRequests();
+
+    const previousDomainBindingsRoute = apiResponses.dashboard["/api/rpc/domainBindings/list"];
+    const previousCertificatesRoute = apiResponses.dashboard["/api/rpc/certificates/list"];
+    const previousImportRoute = apiResponses.dashboard["/api/rpc/certificates/import"];
+    let imported = false;
+
+    const manualBinding = {
+      id: "dbn_manual",
+      projectId: "prj_demo",
+      environmentId: "env_demo",
+      resourceId: "res_demo",
+      serverId: "srv_demo",
+      destinationId: "dst_demo",
+      domainName: "manual.example.test",
+      pathPrefix: "/",
+      proxyKind: "traefik" as const,
+      tlsMode: "auto" as const,
+      certificatePolicy: "manual" as const,
+      verificationAttemptCount: 1,
+      createdAt: "2026-01-01T00:00:00.000Z",
+    };
+
+    apiResponses.dashboard["/api/rpc/domainBindings/list"] = () => ({
+      json: {
+        items: [
+          {
+            ...manualBinding,
+            status: imported ? ("ready" as const) : ("bound" as const),
+          },
+        ],
+      },
+    });
+    apiResponses.dashboard["/api/rpc/certificates/list"] = () => ({
+      json: {
+        items: imported
+          ? [
+              {
+                id: "crt_manual",
+                domainBindingId: "dbn_manual",
+                domainName: "manual.example.test",
+                status: "active",
+                source: "imported",
+                providerKey: "manual-import",
+                challengeType: "manual-import",
+                issuedAt: "2026-01-01T00:00:00.000Z",
+                expiresAt: "2026-06-01T00:00:00.000Z",
+                fingerprint: "sha256:manual-cert",
+                notBefore: "2025-12-01T00:00:00.000Z",
+                issuer: "CN=manual.example.test, O=Appaloft Test",
+                keyAlgorithm: "rsa",
+                subjectAlternativeNames: ["manual.example.test", "api.manual.example.test"],
+                latestAttempt: {
+                  id: "cat_manual",
+                  status: "issued",
+                  reason: "issue",
+                  providerKey: "manual-import",
+                  challengeType: "manual-import",
+                  requestedAt: "2026-01-01T00:00:00.000Z",
+                  issuedAt: "2026-01-01T00:00:00.000Z",
+                  expiresAt: "2026-06-01T00:00:00.000Z",
+                },
+                createdAt: "2026-01-01T00:00:00.000Z",
+              },
+            ]
+          : [],
+      },
+    });
+    apiResponses.dashboard["/api/rpc/certificates/import"] = () => {
+      imported = true;
+      return {
+        json: {
+          certificateId: "crt_manual",
+          attemptId: "cat_manual",
+        },
+      };
+    };
+
+    try {
+      await using view = createWebView();
+      await view.navigate(`${previewUrl}/resources/res_demo`);
+
+      await clickButtonByAnyText(view, ["Custom domains", "自定义域名"]);
+      await expectAnyText(view, ["Manual certificate", "手动证书"]);
+      await clickButtonByAnyText(view, ["Import certificate", "导入证书"]);
+      await setInputValue(
+        view,
+        "#resource-domain-binding-import-certificate-chain-dbn_manual",
+        "-----BEGIN CERTIFICATE-----\nmanual\n-----END CERTIFICATE-----",
+      );
+      await setInputValue(
+        view,
+        "#resource-domain-binding-import-private-key-dbn_manual",
+        "-----BEGIN PRIVATE KEY-----\nmanual\n-----END PRIVATE KEY-----",
+      );
+      await setInputValue(
+        view,
+        "#resource-domain-binding-import-passphrase-dbn_manual",
+        "secret-passphrase",
+      );
+      await clickFormSubmit(view, "#resource-domain-binding-import-form-dbn_manual");
+
+      const importRequest = await waitForRecordedRequest("/api/rpc/certificates/import");
+      const importInput = readOrpcJsonPayload(importRequest.body);
+
+      expect(importInput).toEqual({
+        domainBindingId: "dbn_manual",
+        certificateChain: "-----BEGIN CERTIFICATE-----\nmanual\n-----END CERTIFICATE-----",
+        privateKey: "-----BEGIN PRIVATE KEY-----\nmanual\n-----END PRIVATE KEY-----",
+        passphrase: "secret-passphrase",
+      });
+
+      await expectText(view, "crt_manual");
+      await expectAnyText(view, ["Imported", "已导入"]);
+      await expectAnyText(view, ["Ready", "已就绪", "就绪"]);
+      await expectText(view, "api.manual.example.test");
+    } finally {
+      if (previousImportRoute === undefined) {
+        delete apiResponses.dashboard["/api/rpc/certificates/import"];
+      } else {
+        apiResponses.dashboard["/api/rpc/certificates/import"] = previousImportRoute;
+      }
+      apiResponses.dashboard["/api/rpc/domainBindings/list"] = previousDomainBindingsRoute;
+      apiResponses.dashboard["/api/rpc/certificates/list"] = previousCertificatesRoute;
+    }
+  }, 15_000);
+
+  test("[CERT-IMPORT-ENTRY-004] does not offer manual import for an auto-policy binding", async () => {
+    activeScenario = "dashboard";
+    resetRecordedApiRequests();
+
+    const previousDomainBindingsRoute = apiResponses.dashboard["/api/rpc/domainBindings/list"];
+    const previousCertificatesRoute = apiResponses.dashboard["/api/rpc/certificates/list"];
+    apiResponses.dashboard["/api/rpc/domainBindings/list"] = {
+      json: {
+        items: [
+          {
+            id: "dbn_auto",
+            projectId: "prj_demo",
+            environmentId: "env_demo",
+            resourceId: "res_demo",
+            serverId: "srv_demo",
+            destinationId: "dst_demo",
+            domainName: "managed.example.test",
+            pathPrefix: "/",
+            proxyKind: "traefik",
+            tlsMode: "auto",
+            certificatePolicy: "auto",
+            status: "bound",
+            verificationAttemptCount: 1,
+            createdAt: "2026-01-01T00:00:00.000Z",
+          },
+        ],
+      },
+    };
+    apiResponses.dashboard["/api/rpc/certificates/list"] = {
+      json: {
+        items: [],
+      },
+    };
+
+    try {
+      await using view = createWebView();
+      await view.navigate(`${previewUrl}/resources/res_demo`);
+
+      await clickButtonByAnyText(view, ["Custom domains", "自定义域名"]);
+      await expectText(view, "managed.example.test");
+      await expectAnyText(view, [
+        "Managed issuance remains responsible for this binding.",
+        "当前绑定仍由托管签发负责。",
+      ]);
+
+      const hasImportToggle = await view.evaluate<boolean>(
+        "Boolean(document.querySelector('#resource-domain-binding-import-toggle-dbn_auto'))",
+      );
+      expect(hasImportToggle).toBe(false);
+    } finally {
+      apiResponses.dashboard["/api/rpc/domainBindings/list"] = previousDomainBindingsRoute;
+      apiResponses.dashboard["/api/rpc/certificates/list"] = previousCertificatesRoute;
     }
   }, 15_000);
 

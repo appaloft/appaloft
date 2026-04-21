@@ -105,7 +105,9 @@ Duplicate `domain-ready` must not duplicate notifications or admission side effe
 
 `domain-ready` must follow `domain-bound`.
 
-If TLS/certificate policy requires issuance, it must also follow `certificate-issued`.
+If TLS/certificate policy requires automatic issuance, it must also follow `certificate-issued`.
+
+If TLS/certificate policy is manual, it must follow `certificate-imported`.
 
 It must not follow `certificate-issuance-failed` for the same certificate attempt unless a later successful attempt occurs.
 

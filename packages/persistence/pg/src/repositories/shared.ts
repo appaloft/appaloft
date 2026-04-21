@@ -20,9 +20,14 @@ import {
   CertificateId,
   CertificateIssuedAtValue,
   CertificateIssueReasonValue,
+  CertificateIssuerValue,
+  CertificateKeyAlgorithmValue,
+  CertificateMaterialFingerprintValue,
+  CertificateNotBeforeValue,
   CertificatePolicyValue,
   CertificateRetryAfterValue,
   CertificateSecretRefValue,
+  CertificateSourceValue,
   CertificateStatusValue,
   CommandText,
   ConfigKey,
@@ -201,6 +206,7 @@ type DomainVerificationAttemptStatusInput = Parameters<
 >[0];
 type CertificatePolicyInput = Parameters<typeof CertificatePolicyValue.rehydrate>[0];
 type CertificateStatusInput = Parameters<typeof CertificateStatusValue.rehydrate>[0];
+type CertificateSourceInput = Parameters<typeof CertificateSourceValue.rehydrate>[0];
 type CertificateAttemptStatusInput = Parameters<typeof CertificateAttemptStatusValue.rehydrate>[0];
 type CertificateIssueReasonInput = Parameters<typeof CertificateIssueReasonValue.rehydrate>[0];
 
@@ -410,6 +416,20 @@ export interface SerializedCertificateAttempt extends Record<string, unknown> {
   retriable?: boolean;
   retryAfter?: string;
   idempotencyKey?: string;
+  materialFingerprint?: string;
+}
+
+export interface SerializedImportedCertificateMetadata extends Record<string, unknown> {
+  subjectAlternativeNames: string[];
+  notBefore: string;
+  keyAlgorithm: string;
+  issuer?: string;
+}
+
+export interface SerializedImportedCertificateSecretRefs extends Record<string, unknown> {
+  certificateChain: string;
+  privateKey: string;
+  passphrase?: string;
 }
 
 export type RepositoryExecutor = Kysely<Database> | Transaction<Database>;
@@ -1169,17 +1189,23 @@ export function serializeCertificateAttempts(
     ...(attempt.retriable === undefined ? {} : { retriable: attempt.retriable }),
     ...(attempt.retryAfter ? { retryAfter: attempt.retryAfter.value } : {}),
     ...(attempt.idempotencyKey ? { idempotencyKey: attempt.idempotencyKey.value } : {}),
+    ...(attempt.materialFingerprint
+      ? { materialFingerprint: attempt.materialFingerprint.value }
+      : {}),
   }));
 }
 
 export function rehydrateCertificateRow(row: Selectable<Database["certificates"]>) {
   const attempts = (row.attempts ?? []) as unknown as SerializedCertificateAttempt[];
+  const safeMetadata = (row.safe_metadata ?? {}) as SerializedImportedCertificateMetadata;
+  const secretRefs = (row.secret_refs ?? {}) as SerializedImportedCertificateSecretRefs;
 
   return {
     id: CertificateId.rehydrate(row.id),
     domainBindingId: DomainBindingId.rehydrate(row.domain_binding_id),
     domainName: PublicDomainName.rehydrate(row.domain_name),
     status: CertificateStatusValue.rehydrate(row.status as CertificateStatusInput),
+    source: CertificateSourceValue.rehydrate(row.source as CertificateSourceInput),
     providerKey: ProviderKey.rehydrate(row.provider_key),
     challengeType: CertificateChallengeTypeValue.rehydrate(row.challenge_type),
     ...(row.issued_at
@@ -1200,6 +1226,33 @@ export function rehydrateCertificateRow(row: Selectable<Database["certificates"]
       ? { fingerprint: CertificateFingerprintValue.rehydrate(row.fingerprint) }
       : {}),
     ...(row.secret_ref ? { secretRef: CertificateSecretRefValue.rehydrate(row.secret_ref) } : {}),
+    ...(Array.isArray(safeMetadata.subjectAlternativeNames) &&
+    safeMetadata.notBefore &&
+    safeMetadata.keyAlgorithm
+      ? {
+          importedMetadata: {
+            subjectAlternativeNames: safeMetadata.subjectAlternativeNames.map((domainName) =>
+              PublicDomainName.rehydrate(domainName),
+            ),
+            notBefore: CertificateNotBeforeValue.rehydrate(safeMetadata.notBefore),
+            keyAlgorithm: CertificateKeyAlgorithmValue.rehydrate(safeMetadata.keyAlgorithm),
+            ...(safeMetadata.issuer
+              ? { issuer: CertificateIssuerValue.rehydrate(safeMetadata.issuer) }
+              : {}),
+          },
+        }
+      : {}),
+    ...(secretRefs.certificateChain && secretRefs.privateKey
+      ? {
+          importedSecretRefs: {
+            certificateChain: CertificateSecretRefValue.rehydrate(secretRefs.certificateChain),
+            privateKey: CertificateSecretRefValue.rehydrate(secretRefs.privateKey),
+            ...(secretRefs.passphrase
+              ? { passphrase: CertificateSecretRefValue.rehydrate(secretRefs.passphrase) }
+              : {}),
+          },
+        }
+      : {}),
     attempts: attempts.map((attempt) => ({
       id: CertificateAttemptId.rehydrate(attempt.id),
       reason: CertificateIssueReasonValue.rehydrate(attempt.reason),
@@ -1232,6 +1285,13 @@ export function rehydrateCertificateRow(row: Selectable<Database["certificates"]
       ...(attempt.idempotencyKey
         ? {
             idempotencyKey: CertificateAttemptIdempotencyKeyValue.rehydrate(attempt.idempotencyKey),
+          }
+        : {}),
+      ...(attempt.materialFingerprint
+        ? {
+            materialFingerprint: CertificateMaterialFingerprintValue.rehydrate(
+              attempt.materialFingerprint,
+            ),
           }
         : {}),
     })),
