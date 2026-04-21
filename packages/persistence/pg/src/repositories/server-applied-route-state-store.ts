@@ -565,6 +565,24 @@ export class PgServerAppliedRouteStateStore implements ServerAppliedRouteStateSt
     }
   }
 
+  async deleteDesiredBySourceFingerprint(sourceFingerprint: string): Promise<Result<number>> {
+    const fingerprintResult = validateSourceFingerprint(sourceFingerprint);
+    if (fingerprintResult.isErr()) {
+      return err(fingerprintResult.error);
+    }
+
+    try {
+      const deleted = await this.db
+        .deleteFrom("server_applied_route_states")
+        .where("source_fingerprint", "=", sourceFingerprint)
+        .executeTakeFirst();
+
+      return ok(Number(deleted.numDeletedRows));
+    } catch (error) {
+      return err(persistenceError("Server-applied route state sweep could not be removed", error));
+    }
+  }
+
   private async readRouteSet(
     routeSetId: string,
   ): Promise<ServerAppliedRouteDesiredStateRecord | null> {
