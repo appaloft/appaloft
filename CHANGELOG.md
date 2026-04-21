@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.5](https://github.com/appaloft/appaloft/compare/v0.2.4...v0.2.5) (2026-04-21)
+
+
+### Bug Fixes
+
+* **application:** allow local source locators ([#29](https://github.com/appaloft/appaloft/issues/29)) ([a37fd8f](https://github.com/appaloft/appaloft/commit/a37fd8fa8ca4b894f842d196cece8b2f2bc34cf1))
+
 ## [0.2.4](https://github.com/appaloft/appaloft/compare/v0.2.3...v0.2.4) (2026-04-21)
 
 
