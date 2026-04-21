@@ -621,6 +621,31 @@ export class FileSystemRemoteStateLifecycle {
 export class FileSystemSourceLinkStore {
   constructor(private readonly dataRoot: string) {}
 
+  async list(): Promise<Result<SourceLinkRecord[]>> {
+    try {
+      if (!(await pathExists(this.linksDirectory()))) {
+        return ok([]);
+      }
+
+      const records: SourceLinkRecord[] = [];
+      for (const entry of await readdir(this.linksDirectory())) {
+        const record = await readJsonFile<SourceLinkRecord>(join(this.linksDirectory(), entry));
+        if (record) {
+          records.push(record);
+        }
+      }
+
+      return ok(records);
+    } catch (error) {
+      return err(
+        domainError.infra("Source links could not be listed", {
+          phase: "source-link-resolution",
+          message: error instanceof Error ? error.message : String(error),
+        }),
+      );
+    }
+  }
+
   async read(sourceFingerprint: string): Promise<Result<SourceLinkRecord | null>> {
     const fingerprintResult = validateSourceFingerprint(sourceFingerprint);
     if (fingerprintResult.isErr()) {
@@ -849,6 +874,33 @@ export class FileSystemServerAppliedRouteDesiredStateStore
   implements ServerAppliedRouteDesiredStateStore
 {
   constructor(private readonly dataRoot: string) {}
+
+  async list(): Promise<Result<ServerAppliedRouteDesiredStateRecord[]>> {
+    try {
+      if (!(await pathExists(this.routesDirectory()))) {
+        return ok([]);
+      }
+
+      const records: ServerAppliedRouteDesiredStateRecord[] = [];
+      for (const entry of await readdir(this.routesDirectory())) {
+        const record = await readJsonFile<ServerAppliedRouteDesiredStateRecord>(
+          join(this.routesDirectory(), entry),
+        );
+        if (record) {
+          records.push(record);
+        }
+      }
+
+      return ok(records);
+    } catch (error) {
+      return err(
+        domainError.infra("Server-applied route desired states could not be listed", {
+          phase: "config-domain-resolution",
+          message: error instanceof Error ? error.message : String(error),
+        }),
+      );
+    }
+  }
 
   async upsertDesired(input: {
     target: ServerAppliedRouteTarget;

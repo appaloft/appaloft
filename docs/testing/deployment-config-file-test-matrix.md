@@ -152,6 +152,8 @@ This matrix inherits:
 | CONFIG-FILE-STATE-011 | integration | Interrupted download preserves local mirror | SSH archive download succeeds but local archive extraction fails before composition opens PGlite | Workflow returns sync download error and leaves the previous target-scoped local mirror intact | `infra_error`, phase `remote-state-sync-download` | Remote archive -> staged local extract fails -> keep previous mirror -> no command dispatch |
 | CONFIG-FILE-STATE-012 | integration | Interrupted upload restores remote backup | Local archive creation succeeds but remote extraction/upload fails after command shutdown | Workflow returns sync upload error, remote command restores the pre-upload `pglite`/`source-links` backup when possible, and writes recovery metadata | `infra_error`, phase `remote-state-sync-upload` | Local archive -> remote backup -> staged remote extract fails -> restore backup -> recovery marker -> release lock |
 | CONFIG-FILE-STATE-013 | e2e-preferred, opt-in SSH | Isolated GitHub Action runner process boundary | Two separate non-interactive CLI processes use different runner-local PGlite directories, the same GitHub repository identity, and the same trusted SSH target | First run creates remote state/source link; second run downloads the SSH-server state, reuses the linked project/environment/server/resource, and records a second deployment without duplicate resources | None | Runner A ensure/lock/migrate/download -> first deploy -> upload/release; Runner B ensure/lock/migrate/download -> source link reuse -> second deploy -> upload/release |
+| CONFIG-FILE-STATE-014 | integration | Shell adopts legacy file-backed state into PG/PGlite | Downloaded or local PGlite data root contains legacy `source-links/` and `server-applied-routes/` files next to an initialized PG/PGlite store | Before identity resolution, shell imports legacy source-link and server-applied route records into PG/PGlite state and removes the legacy files | None | Download/prepare mirror -> migrate PG/PGlite -> adopt legacy source-link and route files -> identity resolution -> explicit operations |
+| CONFIG-FILE-STATE-015 | integration | Existing PG/PGlite rows win over stale legacy files | PG/PGlite already owns the source fingerprint or target route set, while adjacent legacy files still point at an older resource or route target | Shell keeps the PG/PGlite rows authoritative, prunes the stale legacy files, and does not re-import the superseded target into durable state | None | Download/prepare mirror -> migrate PG/PGlite -> compare legacy files with current rows -> prune stale legacy files -> identity resolution |
 
 ## Server-Applied Domain Matrix
 
@@ -243,6 +245,10 @@ Current implemented coverage:
   download/upload the PGlite directory over SSH archive commands. The same file proves failed
   download extraction keeps the existing local mirror and failed remote upload uses remote
   backup/restore/recovery command sequencing.
+- `CONFIG-FILE-STATE-014` and `CONFIG-FILE-STATE-015` are covered in
+  `apps/shell/test/legacy-pglite-state-adoption.test.ts`, proving shell startup adopts adjacent
+  legacy `source-links/` and `server-applied-routes/` files into PG/PGlite state and prunes stale
+  legacy files when PG/PGlite already owns the source fingerprint or route target.
 - `SOURCE-LINK-STATE-004` and `SOURCE-LINK-STATE-005` have config workflow coverage in
   `packages/adapters/cli/test/deployment-config.test.ts`, proving first-run source link creation
   and repeated config deploy reuse through the CLI source link hook.
