@@ -501,6 +501,7 @@ Implemented operations:
 
 | Capability | Kind | Operation Key | Message | Schema | CLI | oRPC / HTTP |
 | --- | --- | --- | --- | --- | --- | --- |
+| Configure default access domain policy | Command | `default-access-domain-policies.configure` | `ConfigureDefaultAccessDomainPolicyCommand` | `ConfigureDefaultAccessDomainPolicyCommandInput` | `appaloft default-access configure --scope system\|deployment-target [--server <serverId>] --mode disabled\|provider\|custom-template [--provider <key>] [--template-ref <ref>]` | `POST /api/default-access-domain-policies` |
 | Create domain binding | Command | `domain-bindings.create` | `CreateDomainBindingCommand` | `CreateDomainBindingCommandInput` | `appaloft domain-binding create <domainName> [--redirect-to <domain>] [--redirect-status 301\|302\|307\|308]` | `POST /api/domain-bindings` |
 | Confirm domain binding ownership | Command | `domain-bindings.confirm-ownership` | `ConfirmDomainBindingOwnershipCommand` | `ConfirmDomainBindingOwnershipCommandInput` | `appaloft domain-binding confirm-ownership <domainBindingId> [--verification-mode dns\|manual]` | `POST /api/domain-bindings/{domainBindingId}/ownership-confirmations` |
 | List domain bindings | Query | `domain-bindings.list` | `ListDomainBindingsQuery` | `ListDomainBindingsQueryInput` | `appaloft domain-binding list` | `GET /api/domain-bindings` |
@@ -564,8 +565,12 @@ Current boundary:
 - server-applied route desired/applied state belongs to the selected Appaloft state backend. A
   PostgreSQL/PGlite backend must persist it through a dedicated persistence adapter and keep it
   separate from `Resource`, `DomainBinding`, `Certificate`, and deployment command schemas.
-- generated default access policy editing must become the public command
-  `default-access-domain-policies.configure` before Web/CLI/API expose it
+- generated default access policy editing is exposed through
+  `default-access-domain-policies.configure` for system default and deployment-target override
+- the command persists provider-neutral policy state only. It does not rewrite existing deployment
+  route snapshots or mutate durable domain bindings/certificates
+- Web exposes a system-scope form on the servers page and a deployment-target override form on the
+  server detail page over the same command; current durable policy readback remains follow-up
 - `domain-bindings.list` exposes the read model used by CLI, API, and Web to observe accepted
   binding records and their verification status
 - Web exposes domain binding from both the resource detail page and the standalone domain bindings
@@ -579,7 +584,6 @@ Current boundary:
   generated access state, not as rows in the custom domain binding list
 
 Core next operations expected here:
-- configure default access domain policy
 - preview/show resource proxy configuration
 - import certificate
 - retry failed domain verification or certificate issuance attempt

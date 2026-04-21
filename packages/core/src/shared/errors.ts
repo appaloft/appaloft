@@ -173,6 +173,16 @@ export const domainError = {
     retryable = true,
   ): DomainError =>
     createError("certificate_provider_unavailable", "provider", message, details, retryable),
+  defaultAccessProviderUnavailable: (
+    message: string,
+    details?: Record<string, string | number | boolean | null>,
+    retryable = true,
+  ): DomainError =>
+    createError("default_access_provider_unavailable", "provider", message, details, retryable),
+  defaultAccessPolicyConflict: (
+    message: string,
+    details?: Record<string, string | number | boolean | null>,
+  ): DomainError => createError("default_access_policy_conflict", "user", message, details),
   certificateStorageFailed: (
     message: string,
     details?: Record<string, string | number | boolean | null>,

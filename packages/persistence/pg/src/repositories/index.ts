@@ -1,6 +1,7 @@
 export * from "./certificate-read-model";
 export * from "./certificate-repository";
 export * from "./certificate-retry-candidate-reader";
+export * from "./default-access-domain-policy-store";
 export * from "./deployment-read-model";
 export * from "./deployment-repository";
 export * from "./destination-repository";
