@@ -200,6 +200,10 @@ The first implementation slice exists:
   helper for gateway-generated 404, 502, 503, and 504 paths;
 - Traefik route realization can attach that middleware to served routes when the provider receives
   an explicit safe diagnostic renderer service URL, while redirect-only routes remain redirect-only;
+- Traefik route realization can also add a low-priority catch-all fallback router for unmatched
+  host/path requests when a safe diagnostic renderer service URL is available; the fallback rewrites
+  to `/.appaloft/resource-access-failure`, injects a provider-neutral `route-not-found` signal, and
+  excludes `/.well-known/acme-challenge/` requests;
 - a long-running Appaloft backend service that is already listening can expose a provider-neutral
   renderer target to local and SSH deployment route realization; `host.docker.internal` is used
   only when the service is wildcard-bound and Traefik is bootstrapped by Appaloft;

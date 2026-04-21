@@ -158,6 +158,10 @@ The first Code Round slice is implemented:
 - Traefik route realization accepts an optional resource access failure renderer target, attaches
   the generated error middleware to served routers, defines the renderer service URL with
   `loadbalancer.server.url`, and leaves redirect-only routers on their redirect middleware;
+- Traefik route realization can also add a low-priority catch-all router for unmatched host/path
+  requests when a safe renderer target is available; the fallback rewrites to
+  `/.appaloft/resource-access-failure`, injects a provider-neutral `route-not-found` signal, and
+  excludes `/.well-known/acme-challenge/` requests;
 - while the Appaloft backend service is running, shell composition can expose a provider-neutral
   renderer target to local and SSH runtime backends; wildcard-bound services use
   `http://host.docker.internal:<port>` and the Traefik bootstrap plan adds the matching Docker host
