@@ -83,9 +83,9 @@ Product constraints:
 
 The 1.0.0 product is ready only when all of these are checked:
 
-- [ ] A new operator can install Appaloft, connect an SSH/Docker target, create/select a
-  project/environment/resource, deploy an app, and observe status, logs, health, access,
-  diagnostics, and failure reasons.
+- [ ] A new operator can install Appaloft, connect a single-server SSH/Docker target and a Docker
+  Swarm cluster target, create/select a project/environment/resource, deploy an app, and observe
+  status, logs, health, access, diagnostics, and failure reasons.
 - [ ] The minimum loop is executable end to end: project -> environment -> target/server ->
   credential -> resource profile -> deployment -> resource health/logs/access -> optional
   domain/TLS.
@@ -171,6 +171,8 @@ Still blocking 1.0.0:
 - [ ] Dependency resources and bindings exist in core but lack provisioning, binding, backup, and
   deletion commands.
 - [ ] Framework coverage is narrower than the target product catalog.
+- [ ] Docker Swarm support is not yet specified and implemented as a supported `1.0.0` runtime target
+  backend.
 - [ ] Durable outbox/inbox, job state, process attempts, dead-letter/retry state, remote-state
   recovery, and audit visibility are not a complete operator surface.
 
@@ -506,6 +508,9 @@ Required:
   retries.
 - [ ] Add scheduled task/cron resource shape with run history and logs after workload service
   semantics are specified.
+- [ ] Complete the Docker Swarm Spec Round and Code Round as the first cluster runtime target:
+  target registration/readiness, placement, registry/secret handling, rollout/health/log/cleanup
+  semantics, normalized read surfaces, and contract tests.
 
 Exit criteria:
 
@@ -513,6 +518,8 @@ Exit criteria:
   rollback candidates without editing files on the server.
 - [ ] Postgres has a closed provision -> bind -> deploy -> observe -> backup/restore or delete loop.
 - [ ] Redis has a closed provision -> bind -> deploy -> observe -> backup/restore or delete loop.
+- [ ] Operators can deploy through both the single-server Docker/Compose path and the Docker Swarm
+  cluster path without changing the public deployment admission surface.
 - [ ] Rollback/redeploy are no longer rebuild-required if they are exposed.
 
 ## Phase 8: Operator/Internal State Closure And Interface Parity

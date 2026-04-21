@@ -26,6 +26,10 @@ The accepted target model is:
 | Docker Swarm cluster | Future target backend | A Docker-compatible cluster backend consumes the same OCI artifact and resource network/access contracts, then renders Swarm stack/service intent. |
 | Kubernetes cluster | Future target backend | A Kubernetes backend consumes the same OCI artifact and resource network/access contracts, then renders and applies Kubernetes-owned workload, service, routing, health, log, and cleanup intent. |
 
+For product planning through `1.0.0`, Docker Swarm is the first cluster runtime target that must be
+specified and implemented. Kubernetes remains a later backend unless a future roadmap/ADR change
+reorders that priority.
+
 `deployments.create` must not grow transport fields such as `kubernetesNamespace`, `helmChart`,
 `dockerSwarmService`, `replicas`, or provider-specific manifest fragments. Cluster placement,
 namespace-like isolation, service naming, rollout strategy, registry pull secrets, ingress class,
@@ -192,13 +196,12 @@ Current `ExecutionBackend` includes `cancel` and `rollback` methods even though 
 public operations out of the v1 surface. Those backend capabilities may remain internal, but target
 backend contracts must not imply public cancel or rollback until their own specs are accepted.
 
-Kubernetes and Docker Swarm backends are not active implementation targets yet. This ADR only fixes
-the direction and boundary so future specs can add them without changing deployment admission.
+Kubernetes and Docker Swarm backends are not active implementation targets yet. This ADR fixes the
+direction and boundary so future specs can add them without changing deployment admission; the
+current roadmap priority is to land Docker Swarm before `1.0.0`.
 
 ## Open Questions
 
-- Which cluster target should be implemented first after the single-server v1 loop is stable:
-  Docker Swarm or Kubernetes?
 - Should cluster target registration stay under transport-compatible `servers.register`, or should
   a future public alias such as `deployment-targets.register` be added after the operation catalog
   vocabulary is widened?

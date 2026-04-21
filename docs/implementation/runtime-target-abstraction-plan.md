@@ -36,9 +36,9 @@ ResourceSourceBinding + ResourceRuntimeProfile + ResourceNetworkProfile
   -> normalized deployment/resource read models
 ```
 
-Single-server Docker/Compose remains the first active backend. Docker Swarm and Kubernetes are
-future backend implementations that should plug into the same target abstraction after their own
-Spec Rounds.
+Single-server Docker/Compose remains the first active backend. Docker Swarm is the first required
+cluster backend on the path to `1.0.0`, and Kubernetes remains a later backend implementation.
+Both must plug into the same target abstraction after their own Spec Rounds.
 
 ## Expected Code Shape
 
@@ -165,6 +165,9 @@ Before Code Round:
 - define service update, health, logs, diagnostics, cleanup, and rollback-candidate identity;
 - update deployment and resource health/log/proxy specs.
 
+This backend is required before `1.0.0`; the abstraction is not roadmap-complete until these Swarm
+contracts and the corresponding implementation/tests exist.
+
 ### Kubernetes Backend
 
 Before Code Round:
@@ -211,7 +214,8 @@ The smallest coherent Code Round for this plan is:
 5. Update migration notes in deployment specs after implementation.
 
 This minimal deliverable does not implement Docker Swarm or Kubernetes. It creates the boundary
-that makes those backends addable later without changing deployment admission.
+that makes those backends addable later without changing deployment admission, but it is not
+sufficient for `1.0.0` because Docker Swarm support is still required afterward.
 
 ## Current Implementation Notes And Migration Gaps
 
