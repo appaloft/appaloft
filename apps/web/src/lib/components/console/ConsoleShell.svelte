@@ -21,7 +21,7 @@
   import type { Snippet } from "svelte";
 
   import { API_BASE, readErrorMessage, request } from "$lib/api/client";
-  import appaloftLogoMark from "$lib/assets/appaloft-logo-mark.svg";
+  import appaloftIcon from "$lib/assets/appaloft-icon-dark.svg";
   import ResourceHealthDot from "$lib/components/console/ResourceHealthDot.svelte";
   import ResourceHealthLabel from "$lib/components/console/ResourceHealthLabel.svelte";
   import { Avatar, AvatarFallback } from "$lib/components/ui/avatar";
@@ -255,9 +255,9 @@
     <SidebarHeader class="gap-3">
       <a class="flex items-center gap-3 px-2 py-2" href="/">
         <img
-          src={appaloftLogoMark}
+          src={appaloftIcon}
           alt={$t(i18nKeys.common.app.productName)}
-          class="size-6 shrink-0 rounded-md object-contain"
+          class="size-7 shrink-0 object-contain"
         />
         <span class="min-w-0 group-data-[collapsible=icon]:hidden">
           <span class="block truncate text-sm font-medium">{$t(i18nKeys.common.app.productName)}</span>
