@@ -13,13 +13,15 @@ import { inject, injectable } from "tsyringe";
 import { type ExecutionContext, toRepositoryContext } from "../../execution-context";
 import {
   type Clock,
+  DefaultAccessDomainPolicyByScopeSpec,
   type DefaultAccessDomainPolicyConfiguration,
   type DefaultAccessDomainPolicyRecord,
+  type DefaultAccessDomainPolicyRepository,
   type DefaultAccessDomainPolicyScope,
-  type DefaultAccessDomainPolicyStore,
   type DefaultAccessDomainPolicySupport,
   type IdGenerator,
   type ServerRepository,
+  UpsertDefaultAccessDomainPolicySpec,
 } from "../../ports";
 import { tokens } from "../../tokens";
 import { type ConfigureDefaultAccessDomainPolicyCommandInput } from "./configure-default-access-domain-policy.command";
@@ -38,8 +40,8 @@ function samePolicy(
 @injectable()
 export class ConfigureDefaultAccessDomainPolicyUseCase {
   constructor(
-    @inject(tokens.defaultAccessDomainPolicyStore)
-    private readonly policyStore: DefaultAccessDomainPolicyStore,
+    @inject(tokens.defaultAccessDomainPolicyRepository)
+    private readonly policyRepository: DefaultAccessDomainPolicyRepository,
     @inject(tokens.defaultAccessDomainPolicySupport)
     private readonly policySupport: DefaultAccessDomainPolicySupport,
     @inject(tokens.serverRepository)
@@ -55,7 +57,7 @@ export class ConfigureDefaultAccessDomainPolicyUseCase {
     input: ConfigureDefaultAccessDomainPolicyCommandInput,
   ): Promise<Result<{ id: string }>> {
     const repositoryContext = toRepositoryContext(context);
-    const { clock, idGenerator, policyStore, policySupport, serverRepository } = this;
+    const { clock, idGenerator, policyRepository, policySupport, serverRepository } = this;
 
     return safeTry(async function* () {
       let scope: DefaultAccessDomainPolicyScope;
@@ -83,7 +85,9 @@ export class ConfigureDefaultAccessDomainPolicyUseCase {
         ...(input.providerKey ? { providerKey: input.providerKey } : {}),
         ...(input.templateRef ? { templateRef: input.templateRef } : {}),
       });
-      const existing = yield* await policyStore.read(scope);
+      const existing = yield* await policyRepository.findOne(
+        DefaultAccessDomainPolicyByScopeSpec.create(scope),
+      );
 
       if (input.idempotencyKey && existing?.idempotencyKey === input.idempotencyKey) {
         if (!samePolicy(existing, policy)) {
@@ -113,7 +117,10 @@ export class ConfigureDefaultAccessDomainPolicyUseCase {
         ...(policy.templateRef ? { templateRef: policy.templateRef } : {}),
         ...(input.idempotencyKey ? { idempotencyKey: input.idempotencyKey } : {}),
       };
-      const persisted = yield* await policyStore.upsert(record);
+      const persisted = yield* await policyRepository.upsert(
+        record,
+        UpsertDefaultAccessDomainPolicySpec.fromRecord(record),
+      );
 
       return ok({ id: persisted.id });
     });

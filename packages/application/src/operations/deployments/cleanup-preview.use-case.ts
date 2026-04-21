@@ -12,8 +12,10 @@ import { type ExecutionContext, toRepositoryContext } from "../../execution-cont
 import {
   type DeploymentRepository,
   type ExecutionBackend,
-  type ServerAppliedRouteStateStore,
-  type SourceLinkStore,
+  ServerAppliedRouteStateByTargetSpec,
+  type ServerAppliedRouteStateRepository,
+  SourceLinkBySourceFingerprintSpec,
+  type SourceLinkRepository,
 } from "../../ports";
 import { tokens } from "../../tokens";
 import { type CleanupPreviewCommandInput } from "./cleanup-preview.command";
@@ -53,10 +55,10 @@ function withPreviewCleanupDetails(
 @injectable()
 export class CleanupPreviewUseCase {
   constructor(
-    @inject(tokens.sourceLinkStore)
-    private readonly sourceLinkStore: SourceLinkStore,
-    @inject(tokens.serverAppliedRouteDesiredStateReader)
-    private readonly serverAppliedRouteStateStore: ServerAppliedRouteStateStore,
+    @inject(tokens.sourceLinkRepository)
+    private readonly sourceLinkRepository: SourceLinkRepository,
+    @inject(tokens.serverAppliedRouteStateRepository)
+    private readonly serverAppliedRouteStateRepository: ServerAppliedRouteStateRepository,
     @inject(tokens.deploymentRepository)
     private readonly deploymentRepository: DeploymentRepository,
     @inject(tokens.executionBackend)
@@ -70,20 +72,22 @@ export class CleanupPreviewUseCase {
     const {
       deploymentRepository,
       executionBackend,
-      serverAppliedRouteStateStore,
-      sourceLinkStore,
+      serverAppliedRouteStateRepository,
+      sourceLinkRepository,
     } = this;
     const repositoryContext = toRepositoryContext(context);
 
     return safeTry(async function* () {
-      const sourceLink = yield* await sourceLinkStore.read(input.sourceFingerprint).then((result) =>
-        result.mapErr((error) =>
-          withPreviewCleanupDetails(error, {
-            sourceFingerprint: input.sourceFingerprint,
-            cleanupStage: "source-link-read",
-          }),
-        ),
-      );
+      const sourceLink = yield* await sourceLinkRepository
+        .findOne(SourceLinkBySourceFingerprintSpec.create(input.sourceFingerprint))
+        .then((result) =>
+          result.mapErr((error) =>
+            withPreviewCleanupDetails(error, {
+              sourceFingerprint: input.sourceFingerprint,
+              cleanupStage: "source-link-read",
+            }),
+          ),
+        );
 
       if (!sourceLink) {
         return ok({
@@ -119,14 +123,16 @@ export class CleanupPreviewUseCase {
       }
 
       const removedServerAppliedRoute = sourceLink.serverId
-        ? yield* await serverAppliedRouteStateStore
-            .deleteDesired({
-              projectId: sourceLink.projectId,
-              environmentId: sourceLink.environmentId,
-              resourceId: sourceLink.resourceId,
-              serverId: sourceLink.serverId,
-              ...(sourceLink.destinationId ? { destinationId: sourceLink.destinationId } : {}),
-            })
+        ? yield* await serverAppliedRouteStateRepository
+            .deleteOne(
+              ServerAppliedRouteStateByTargetSpec.create({
+                projectId: sourceLink.projectId,
+                environmentId: sourceLink.environmentId,
+                resourceId: sourceLink.resourceId,
+                serverId: sourceLink.serverId,
+                ...(sourceLink.destinationId ? { destinationId: sourceLink.destinationId } : {}),
+              }),
+            )
             .then((result) =>
               result.mapErr((error) =>
                 withPreviewCleanupDetails(error, {
@@ -140,8 +146,8 @@ export class CleanupPreviewUseCase {
             )
         : false;
 
-      const removedSourceLink = yield* await sourceLinkStore
-        .unlink(input.sourceFingerprint)
+      const removedSourceLink = yield* await sourceLinkRepository
+        .deleteOne(SourceLinkBySourceFingerprintSpec.create(input.sourceFingerprint))
         .then((result) =>
           result.mapErr((error) =>
             withPreviewCleanupDetails(error, {

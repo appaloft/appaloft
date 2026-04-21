@@ -55,55 +55,83 @@ import {
 } from "../src/execution-context";
 import { MarkServerAppliedRouteStatusOnDeploymentFinishedHandler } from "../src/operations/deployments/mark-server-applied-route-status-on-deployment-finished.handler";
 import {
+  MarkServerAppliedRouteAppliedSpec,
+  type MarkServerAppliedRouteFailedSpec,
   type ServerAppliedRouteDesiredStateRecord,
-  type ServerAppliedRouteDesiredStateTarget,
-  type ServerAppliedRouteStateStore,
+  type ServerAppliedRouteStateByTargetSpec,
+  type ServerAppliedRouteStateRepository,
 } from "../src/ports";
 
-class CapturingServerAppliedRouteStateStore implements ServerAppliedRouteStateStore {
-  readonly applied: Array<Parameters<ServerAppliedRouteStateStore["markApplied"]>[0]> = [];
-  readonly failed: Array<Parameters<ServerAppliedRouteStateStore["markFailed"]>[0]> = [];
+class CapturingServerAppliedRouteStateRepository implements ServerAppliedRouteStateRepository {
+  readonly applied: Array<{
+    routeSetId: string;
+    deploymentId: string;
+    updatedAt: string;
+    providerKey?: string;
+    proxyKind?: string;
+  }> = [];
+  readonly failed: Array<{
+    routeSetId: string;
+    deploymentId: string;
+    updatedAt: string;
+    phase: string;
+    errorCode: string;
+    message?: string;
+    retryable: boolean;
+    providerKey?: string;
+    proxyKind?: string;
+  }> = [];
 
-  async upsertDesired(
-    input: Parameters<ServerAppliedRouteStateStore["upsertDesired"]>[0],
-  ): Promise<Result<ServerAppliedRouteDesiredStateRecord>> {
+  async findOne(
+    _spec: ServerAppliedRouteStateByTargetSpec,
+  ): Promise<Result<ServerAppliedRouteDesiredStateRecord | null>> {
     return ok({
-      routeSetId: [
-        input.target.projectId,
-        input.target.environmentId,
-        input.target.resourceId,
-        input.target.serverId,
-        input.target.destinationId ?? "default",
-      ].join(":"),
-      ...input.target,
-      ...(input.sourceFingerprint ? { sourceFingerprint: input.sourceFingerprint } : {}),
-      domains: input.domains,
+      routeSetId: "proj_1:env_1:res_1:srv_1:dst_1",
+      projectId: "proj_1",
+      environmentId: "env_1",
+      resourceId: "res_1",
+      serverId: "srv_1",
+      destinationId: "dst_1",
+      domains: [],
       status: "desired",
-      updatedAt: input.updatedAt,
+      updatedAt: "2026-04-19T00:00:00.000Z",
     });
   }
 
-  async read(
-    _target: ServerAppliedRouteDesiredStateTarget,
+  async upsert(): Promise<Result<ServerAppliedRouteDesiredStateRecord>> {
+    throw new Error("Unexpected upsert call");
+  }
+
+  async updateOne(
+    selectionSpec: { routeSetId: string },
+    updateSpec: MarkServerAppliedRouteAppliedSpec | MarkServerAppliedRouteFailedSpec,
   ): Promise<Result<ServerAppliedRouteDesiredStateRecord | null>> {
+    if (updateSpec instanceof MarkServerAppliedRouteAppliedSpec) {
+      this.applied.push({
+        routeSetId: selectionSpec.routeSetId,
+        deploymentId: updateSpec.deploymentId,
+        updatedAt: updateSpec.updatedAt,
+        ...(updateSpec.providerKey ? { providerKey: updateSpec.providerKey } : {}),
+        ...(updateSpec.proxyKind ? { proxyKind: updateSpec.proxyKind } : {}),
+      });
+      return ok(null);
+    }
+
+    this.failed.push({
+      routeSetId: selectionSpec.routeSetId,
+      deploymentId: updateSpec.deploymentId,
+      updatedAt: updateSpec.updatedAt,
+      phase: updateSpec.phase,
+      errorCode: updateSpec.errorCode,
+      retryable: updateSpec.retryable,
+      ...(updateSpec.message ? { message: updateSpec.message } : {}),
+      ...(updateSpec.providerKey ? { providerKey: updateSpec.providerKey } : {}),
+      ...(updateSpec.proxyKind ? { proxyKind: updateSpec.proxyKind } : {}),
+    });
     return ok(null);
   }
 
-  async markApplied(
-    input: Parameters<ServerAppliedRouteStateStore["markApplied"]>[0],
-  ): Promise<Result<ServerAppliedRouteDesiredStateRecord | null>> {
-    this.applied.push(input);
-    return ok(null);
-  }
-
-  async markFailed(
-    input: Parameters<ServerAppliedRouteStateStore["markFailed"]>[0],
-  ): Promise<Result<ServerAppliedRouteDesiredStateRecord | null>> {
-    this.failed.push(input);
-    return ok(null);
-  }
-
-  async deleteDesired(): Promise<Result<boolean>> {
+  async deleteOne(): Promise<Result<boolean>> {
     return ok(false);
   }
 }
@@ -228,10 +256,10 @@ describe("MarkServerAppliedRouteStatusOnDeploymentFinishedHandler", () => {
   test("[EDGE-PROXY-ROUTE-005] records applied state for successful server-applied routes", async () => {
     const context = createTestContext();
     const deployments = new MemoryDeploymentRepository();
-    const store = new CapturingServerAppliedRouteStateStore();
+    const repository = new CapturingServerAppliedRouteStateRepository();
     const handler = new MarkServerAppliedRouteStatusOnDeploymentFinishedHandler(
       deployments,
-      store,
+      repository,
       new NoopLogger(),
     );
     const { deployment, event } = createDeployment({ status: "succeeded" });
@@ -244,31 +272,24 @@ describe("MarkServerAppliedRouteStatusOnDeploymentFinishedHandler", () => {
     const result = await handler.handle(context, event);
 
     expect(result.isOk()).toBe(true);
-    expect(store.applied).toEqual([
+    expect(repository.applied).toEqual([
       {
-        target: {
-          projectId: "proj_1",
-          environmentId: "env_1",
-          resourceId: "res_1",
-          serverId: "srv_1",
-          destinationId: "dst_1",
-        },
+        routeSetId: "proj_1:env_1:res_1:srv_1:dst_1",
         deploymentId: "dep_1",
         updatedAt: "2026-04-19T00:03:00.000Z",
-        routeSetId: "proj_1:env_1:res_1:srv_1:dst_1",
         proxyKind: "traefik",
       },
     ]);
-    expect(store.failed).toEqual([]);
+    expect(repository.failed).toEqual([]);
   });
 
   test("[EDGE-PROXY-ROUTE-007] records failed state for server-applied route failures", async () => {
     const context = createTestContext();
     const deployments = new MemoryDeploymentRepository();
-    const store = new CapturingServerAppliedRouteStateStore();
+    const repository = new CapturingServerAppliedRouteStateRepository();
     const handler = new MarkServerAppliedRouteStatusOnDeploymentFinishedHandler(
       deployments,
-      store,
+      repository,
       new NoopLogger(),
     );
     const { deployment, event } = createDeployment({
@@ -287,19 +308,12 @@ describe("MarkServerAppliedRouteStatusOnDeploymentFinishedHandler", () => {
     const result = await handler.handle(context, event);
 
     expect(result.isOk()).toBe(true);
-    expect(store.applied).toEqual([]);
-    expect(store.failed).toEqual([
+    expect(repository.applied).toEqual([]);
+    expect(repository.failed).toEqual([
       {
-        target: {
-          projectId: "proj_1",
-          environmentId: "env_1",
-          resourceId: "res_1",
-          serverId: "srv_1",
-          destinationId: "dst_1",
-        },
+        routeSetId: "proj_1:env_1:res_1:srv_1:dst_1",
         deploymentId: "dep_1",
         updatedAt: "2026-04-19T00:03:00.000Z",
-        routeSetId: "proj_1:env_1:res_1:srv_1:dst_1",
         phase: "public-route-verification",
         errorCode: "ssh_public_route_health_check_failed",
         message: "Public route failed",

@@ -184,10 +184,10 @@ class StaticServerAppliedRouteDesiredStateReader implements ServerAppliedRouteDe
 
   constructor(private readonly record: ServerAppliedRouteDesiredStateRecord | null) {}
 
-  async read(
-    target: ServerAppliedRouteDesiredStateTarget,
-  ): Promise<Result<ServerAppliedRouteDesiredStateRecord | null>> {
-    this.targets.push(target);
+  async findOne(spec: {
+    target: ServerAppliedRouteDesiredStateTarget;
+  }): Promise<Result<ServerAppliedRouteDesiredStateRecord | null>> {
+    this.targets.push(spec.target);
     return ok(this.record);
   }
 }

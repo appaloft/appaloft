@@ -3,6 +3,8 @@ import "reflect-metadata";
 import { fileURLToPath } from "node:url";
 
 import {
+  type ServerAppliedRouteDesiredStateStore as CliServerAppliedRouteStateStore,
+  type CliSourceLinkStore,
   createCliProgram,
   SshRemoteStateLifecycle,
   sshRemoteStateTargetFromDecision,
@@ -16,13 +18,23 @@ import {
   type ExecutionContext,
   type IdGenerator,
   type IntegrationAuthPort,
+  MarkServerAppliedRouteAppliedSpec,
+  MarkServerAppliedRouteFailedSpec,
   type QueryBus,
+  ServerAppliedRouteStateByRouteSetIdSpec,
+  ServerAppliedRouteStateByTargetSpec,
+  type ServerAppliedRouteStateRepository,
+  SourceLinkBySourceFingerprintSpec,
+  type SourceLinkRecord,
+  type SourceLinkRepository,
   type TerminalSessionGateway,
   tokens,
+  UpsertServerAppliedRouteDesiredStateSpec,
+  UpsertSourceLinkSpec,
 } from "@appaloft/application";
 import { createBetterAuthRuntime } from "@appaloft/auth-better";
 import { type AppConfig, resolveConfig } from "@appaloft/config";
-import { err, ok } from "@appaloft/core";
+import { domainError, err, ok } from "@appaloft/core";
 import {
   bootstrapOpenTelemetry,
   createExecutionContextFactory,
@@ -32,8 +44,8 @@ import {
   createDatabase,
   createMigrator,
   type PgliteRuntimeAssets,
-  PgServerAppliedRouteStateStore,
-  PgSourceLinkStore,
+  PgServerAppliedRouteStateRepository,
+  PgSourceLinkRepository,
 } from "@appaloft/persistence-pg";
 import { type LocalPluginHost } from "@appaloft/plugin-host";
 import { container, type DependencyContainer } from "tsyringe";
@@ -70,6 +82,144 @@ interface RequestContextRunner extends IntegrationAuthPort {
 
 function resolveToken<T>(dependencyContainer: DependencyContainer, token: symbol): T {
   return dependencyContainer.resolve(token as never) as T;
+}
+
+function createCliSourceLinkStore(repository: SourceLinkRepository): CliSourceLinkStore {
+  return {
+    read(sourceFingerprint) {
+      return repository.findOne(SourceLinkBySourceFingerprintSpec.create(sourceFingerprint));
+    },
+    async requireSameTargetOrMissing(sourceFingerprint, target) {
+      const existing = await repository.findOne(
+        SourceLinkBySourceFingerprintSpec.create(sourceFingerprint),
+      );
+      if (existing.isErr() || !existing.value) {
+        return existing;
+      }
+      const record = existing.value;
+      if (
+        record.projectId === target.projectId &&
+        record.environmentId === target.environmentId &&
+        record.resourceId === target.resourceId &&
+        record.serverId === target.serverId &&
+        record.destinationId === target.destinationId
+      ) {
+        return existing;
+      }
+
+      return err(
+        domainError.validation("Source link points at another deployment context", {
+          phase: "source-link-resolution",
+          sourceFingerprint,
+          projectId: record.projectId,
+          environmentId: record.environmentId,
+          resourceId: record.resourceId,
+        }),
+      );
+    },
+    createIfMissing: async (input) => {
+      const existing = await repository.findOne(
+        SourceLinkBySourceFingerprintSpec.create(input.sourceFingerprint),
+      );
+      if (existing.isErr()) {
+        return existing;
+      }
+      if (existing.value) {
+        return existing;
+      }
+
+      const record: SourceLinkRecord = {
+        sourceFingerprint: input.sourceFingerprint,
+        projectId: input.target.projectId,
+        environmentId: input.target.environmentId,
+        resourceId: input.target.resourceId,
+        updatedAt: input.updatedAt,
+        ...(input.target.serverId ? { serverId: input.target.serverId } : {}),
+        ...(input.target.destinationId ? { destinationId: input.target.destinationId } : {}),
+      };
+      return repository.upsert(record, UpsertSourceLinkSpec.fromRecord(record));
+    },
+  };
+}
+
+function createCliServerAppliedRouteStore(
+  repository: ServerAppliedRouteStateRepository,
+): CliServerAppliedRouteStateStore {
+  return {
+    upsertDesired(input) {
+      const record = {
+        routeSetId: [
+          input.target.projectId,
+          input.target.environmentId,
+          input.target.resourceId,
+          input.target.serverId,
+          input.target.destinationId ?? "default",
+        ].join(":"),
+        projectId: input.target.projectId,
+        environmentId: input.target.environmentId,
+        resourceId: input.target.resourceId,
+        serverId: input.target.serverId,
+        ...(input.target.destinationId ? { destinationId: input.target.destinationId } : {}),
+        ...(input.sourceFingerprint ? { sourceFingerprint: input.sourceFingerprint } : {}),
+        domains: input.domains,
+        status: "desired" as const,
+        updatedAt: input.updatedAt,
+      };
+      return repository.upsert(record, UpsertServerAppliedRouteDesiredStateSpec.fromRecord(record));
+    },
+    read(target) {
+      return repository.findOne(ServerAppliedRouteStateByTargetSpec.create(target));
+    },
+    async markApplied(input) {
+      const routeSetId =
+        input.routeSetId ??
+        [
+          input.target.projectId,
+          input.target.environmentId,
+          input.target.resourceId,
+          input.target.serverId,
+          input.target.destinationId ?? "default",
+        ].join(":");
+
+      return repository.updateOne(
+        ServerAppliedRouteStateByRouteSetIdSpec.create(routeSetId),
+        MarkServerAppliedRouteAppliedSpec.create({
+          deploymentId: input.deploymentId,
+          updatedAt: input.updatedAt,
+          ...(input.providerKey ? { providerKey: input.providerKey } : {}),
+          ...(input.proxyKind ? { proxyKind: input.proxyKind } : {}),
+        }),
+      );
+    },
+    async markFailed(input) {
+      const routeSetId =
+        input.routeSetId ??
+        [
+          input.target.projectId,
+          input.target.environmentId,
+          input.target.resourceId,
+          input.target.serverId,
+          input.target.destinationId ?? "default",
+        ].join(":");
+
+      return repository.updateOne(
+        ServerAppliedRouteStateByRouteSetIdSpec.create(routeSetId),
+        MarkServerAppliedRouteFailedSpec.create({
+          deploymentId: input.deploymentId,
+          updatedAt: input.updatedAt,
+          phase: input.phase,
+          errorCode: input.errorCode,
+          retryable: input.retryable,
+          ...(input.message ? { message: input.message } : {}),
+          ...(input.providerKey ? { providerKey: input.providerKey } : {}),
+          ...(input.proxyKind ? { proxyKind: input.proxyKind } : {}),
+        }),
+      );
+    },
+    deleteDesired(target) {
+      return repository.deleteOne(ServerAppliedRouteStateByTargetSpec.create(target));
+    },
+  };
 }
 
 async function resolveWebStaticDir(
@@ -109,8 +259,10 @@ export async function createAppComposition(
   if (config.databaseDriver === "pglite") {
     await migrator.migrateToLatest();
   }
-  const sourceLinkStore = new PgSourceLinkStore(database.db);
-  const serverAppliedRouteStore = new PgServerAppliedRouteStateStore(database.db);
+  const sourceLinkRepository = new PgSourceLinkRepository(database.db);
+  const serverAppliedRouteRepository = new PgServerAppliedRouteStateRepository(database.db);
+  const sourceLinkStore = createCliSourceLinkStore(sourceLinkRepository);
+  const serverAppliedRouteStore = createCliServerAppliedRouteStore(serverAppliedRouteRepository);
   let resourceAccessFailureRendererTarget: ReturnType<
     typeof resourceAccessFailureRendererTargetForStartedServer
   >;
@@ -135,8 +287,8 @@ export async function createAppComposition(
     migrator,
     authRuntime,
     deploymentProgressReporter,
-    ...(sourceLinkStore ? { sourceLinkStore } : {}),
-    serverAppliedRouteDesiredStateReader: serverAppliedRouteStore,
+    sourceLinkRepository,
+    serverAppliedRouteStateRepository: serverAppliedRouteRepository,
     resourceAccessFailureRenderer: () => resourceAccessFailureRendererTarget,
   });
   registerApplicationServices(childContainer);

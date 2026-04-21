@@ -20,21 +20,22 @@ import { FixedClock, MemoryServerRepository, SequenceIdGenerator } from "@appalo
 import { createExecutionContext, toRepositoryContext } from "../src";
 import { ConfigureDefaultAccessDomainPolicyCommand } from "../src/messages";
 import {
+  type DefaultAccessDomainPolicyByScopeSpec,
   type DefaultAccessDomainPolicyConfiguration,
   type DefaultAccessDomainPolicyRecord,
+  type DefaultAccessDomainPolicyRepository,
   type DefaultAccessDomainPolicyScope,
-  type DefaultAccessDomainPolicyStore,
   type DefaultAccessDomainPolicySupport,
 } from "../src/ports";
 import { ConfigureDefaultAccessDomainPolicyUseCase } from "../src/use-cases";
 
-class MemoryDefaultAccessDomainPolicyStore implements DefaultAccessDomainPolicyStore {
+class MemoryDefaultAccessDomainPolicyRepository implements DefaultAccessDomainPolicyRepository {
   readonly items = new Map<string, DefaultAccessDomainPolicyRecord>();
 
-  async read(
-    scope: DefaultAccessDomainPolicyScope,
+  async findOne(
+    spec: DefaultAccessDomainPolicyByScopeSpec,
   ): Promise<Result<DefaultAccessDomainPolicyRecord | null>> {
-    return ok(this.items.get(this.scopeKey(scope)) ?? null);
+    return ok(this.items.get(this.scopeKey(spec.scope)) ?? null);
   }
 
   async upsert(
@@ -109,7 +110,7 @@ async function createHarness() {
   });
   const repositoryContext = toRepositoryContext(context);
   const serverRepository = new MemoryServerRepository();
-  const policyStore = new MemoryDefaultAccessDomainPolicyStore();
+  const policyRepository = new MemoryDefaultAccessDomainPolicyRepository();
 
   await serverRepository.upsert(
     repositoryContext,
@@ -119,9 +120,9 @@ async function createHarness() {
 
   return {
     context,
-    policyStore,
+    policyRepository,
     useCase: new ConfigureDefaultAccessDomainPolicyUseCase(
-      policyStore,
+      policyRepository,
       new StaticDefaultAccessDomainPolicySupport(),
       serverRepository,
       new FixedClock("2026-01-01T00:00:10.000Z"),
@@ -132,7 +133,7 @@ async function createHarness() {
 
 describe("default-access-domain-policies.configure command", () => {
   test("[DEF-ACCESS-POLICY-001] persists system-scoped provider policy", async () => {
-    const { context, policyStore, useCase } = await createHarness();
+    const { context, policyRepository, useCase } = await createHarness();
 
     const result = await useCase.execute(context, {
       scope: { kind: "system" },
@@ -142,7 +143,7 @@ describe("default-access-domain-policies.configure command", () => {
 
     expect(result.isOk()).toBe(true);
     expect(result._unsafeUnwrap().id).toBe("dap_0001");
-    expect(policyStore.items.get("system")).toEqual({
+    expect(policyRepository.items.get("system")).toEqual({
       id: "dap_0001",
       scope: { kind: "system" },
       mode: "provider",
@@ -152,7 +153,7 @@ describe("default-access-domain-policies.configure command", () => {
   });
 
   test("[DEF-ACCESS-POLICY-002] persists deployment-target override for an existing server", async () => {
-    const { context, policyStore, useCase } = await createHarness();
+    const { context, policyRepository, useCase } = await createHarness();
 
     const result = await useCase.execute(context, {
       scope: { kind: "deployment-target", serverId: "srv_demo" },
@@ -160,7 +161,7 @@ describe("default-access-domain-policies.configure command", () => {
     });
 
     expect(result.isOk()).toBe(true);
-    expect(policyStore.items.get("deployment-target:srv_demo")).toEqual({
+    expect(policyRepository.items.get("deployment-target:srv_demo")).toEqual({
       id: "dap_0001",
       scope: { kind: "deployment-target", serverId: "srv_demo" },
       mode: "disabled",
