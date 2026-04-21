@@ -54,7 +54,7 @@ import {
 import {
   dockerPublishedPortCommand,
   parseDockerPublishedHostPort,
-  appaloftDockerContainerLabels,
+  appaloftDockerContainerLabelsForDeployment,
 } from "./docker-container-commands";
 import {
   RuntimeCommandBuilder,
@@ -1720,15 +1720,9 @@ export class SshExecutionBackend implements ExecutionBackend {
             value,
             ...(snapshotVariable?.isSecret ? { redacted: true } : {}),
           };
-        });
+      });
       const labels = dockerLabelsFromAssignments([
-        ...appaloftDockerContainerLabels({
-          deploymentId: state.id.value,
-          projectId: state.projectId.value,
-          environmentId: state.environmentId.value,
-          resourceId: state.resourceId.value,
-          destinationId: state.destinationId.value,
-        }),
+        ...appaloftDockerContainerLabelsForDeployment(state),
         ...(proxyRoutePlanResult.value?.labels ?? []),
       ]);
       const usesDirectHostPort =
