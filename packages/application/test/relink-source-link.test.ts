@@ -10,13 +10,10 @@ import {
   DestinationId,
   DestinationKindValue,
   DestinationName,
-  type DomainError,
-  domainError,
   Environment,
   EnvironmentId,
   EnvironmentKindValue,
   EnvironmentName,
-  err,
   HostAddress,
   ok,
   PortNumber,
@@ -46,12 +43,10 @@ import {
 import { createExecutionContext, toRepositoryContext } from "../src";
 import { RelinkSourceLinkCommand } from "../src/messages";
 import {
-  SourceLinkBySourceFingerprintSpec,
   type SourceLinkRecord,
   type SourceLinkRepository,
   type SourceLinkSelectionSpec,
   type SourceLinkSelectionSpecVisitor,
-  UpsertSourceLinkSpec,
 } from "../src/ports";
 import { RelinkSourceLinkUseCase } from "../src/use-cases";
 
@@ -96,20 +91,6 @@ class MemorySourceLinkRepository implements SourceLinkRepository {
       },
     } satisfies SourceLinkSelectionSpecVisitor<Result<boolean>>);
   }
-}
-
-function sourceLinkConflict(kind: string, expected: string, actual: string): DomainError {
-  return {
-    code: "source_link_conflict",
-    category: "user",
-    message: `Source link ${kind} guard did not match`,
-    retryable: false,
-    details: {
-      phase: "source-link-resolution",
-      expected,
-      actual,
-    },
-  };
 }
 
 async function createRelinkFixture(input?: {
