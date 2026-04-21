@@ -20,6 +20,7 @@
   } from "@lucide/svelte";
   import type {
     ArchiveResourceInput,
+    CertificateSummary,
     ConfigureResourceHealthInput,
     ConfigureResourceNetworkInput,
     ConfigureResourceRuntimeInput,
@@ -28,6 +29,7 @@
     CreateDomainBindingInput,
     DeleteResourceInput,
     DomainBindingSummary,
+    ImportCertificateInput,
     ProxyConfigurationView,
     ResourceDetail,
     ResourceHealthOverall,
@@ -116,6 +118,7 @@
     serversQuery,
     deploymentsQuery,
     domainBindingsQuery,
+    certificatesQuery,
   } = createConsoleQueries(browser);
   const resourceId = $derived(page.params.resourceId ?? "");
   const resourceDetailQuery = createQuery(() =>
@@ -152,6 +155,7 @@
   const servers = $derived(serversQuery.data?.items ?? []);
   const deployments = $derived(deploymentsQuery.data?.items ?? []);
   const domainBindings = $derived(domainBindingsQuery.data?.items ?? []);
+  const certificates = $derived(certificatesQuery.data?.items ?? []);
   const pageLoading = $derived(
     projectsQuery.isPending ||
       environmentsQuery.isPending ||
@@ -159,6 +163,7 @@
       serversQuery.isPending ||
       deploymentsQuery.isPending ||
       domainBindingsQuery.isPending ||
+      certificatesQuery.isPending ||
       resourceDetailQuery.isPending,
   );
   const resourceDetail = $derived(resourceDetailQuery.data ?? null);
@@ -176,6 +181,13 @@
   );
   const resourceDomainBindings = $derived(
     resource ? domainBindings.filter((binding) => binding.resourceId === resource.id) : [],
+  );
+  const resourceCertificates = $derived(
+    resourceDomainBindings.length > 0
+      ? certificates.filter((certificate) =>
+          resourceDomainBindings.some((binding) => binding.id === certificate.domainBindingId),
+        )
+      : [],
   );
   const resourceHealth = $derived(resourceHealthQuery.data ?? null);
   const resourceHealthOverall = $derived.by((): ResourceHealthViewStatus => {
@@ -225,6 +237,16 @@
     title: string;
     detail: string;
   } | null>(null);
+  let importFeedback = $state<{
+    bindingId: string;
+    kind: "success" | "error";
+    title: string;
+    detail: string;
+  } | null>(null);
+  let importBindingId = $state("");
+  let importCertificateChain = $state("");
+  let importPrivateKey = $state("");
+  let importPassphrase = $state("");
   let healthFeedback = $state<{
     kind: "success" | "error";
     title: string;
@@ -363,6 +385,16 @@
         (routeMode === "serve" || redirectTo),
     ),
   );
+  const canImportCertificate = $derived(
+    Boolean(
+      importBindingId &&
+        importCertificateChain.trim() &&
+        importPrivateKey.trim() &&
+        resourceDomainBindings.some(
+          (binding) => binding.id === importBindingId && binding.certificatePolicy === "manual",
+        ),
+    ),
+  );
   const diagnosticSummaryButtonLabel = $derived(
     diagnosticSummaryLoading
       ? $t(i18nKeys.console.resources.diagnosticSummaryLoading)
@@ -485,6 +517,30 @@
       createFeedback = {
         kind: "error",
         title: $t(i18nKeys.console.domainBindings.confirmOwnershipErrorTitle),
+        detail: readErrorMessage(error),
+      };
+    },
+  }));
+  const importCertificateMutation = createMutation(() => ({
+    mutationFn: (input: ImportCertificateInput) => orpcClient.certificates.import(input),
+    onSuccess: (result, variables) => {
+      importFeedback = {
+        bindingId: variables.domainBindingId,
+        kind: "success",
+        title: $t(i18nKeys.console.resources.certificateImportSuccessTitle),
+        detail: result.certificateId,
+      };
+      resetImportCertificateForm();
+      void queryClient.invalidateQueries({ queryKey: ["resources"] });
+      void queryClient.invalidateQueries({ queryKey: ["domain-bindings"] });
+      void queryClient.invalidateQueries({ queryKey: ["certificates"] });
+      void queryClient.invalidateQueries({ queryKey: ["resources", "show", resourceId] });
+    },
+    onError: (error, variables) => {
+      importFeedback = {
+        bindingId: variables?.domainBindingId ?? importBindingId,
+        kind: "error",
+        title: $t(i18nKeys.console.resources.certificateImportErrorTitle),
         detail: readErrorMessage(error),
       };
     },
@@ -1379,6 +1435,51 @@
     });
   }
 
+  function resetImportCertificateForm(): void {
+    importBindingId = "";
+    importCertificateChain = "";
+    importPrivateKey = "";
+    importPassphrase = "";
+  }
+
+  function toggleCertificateImport(binding: DomainBindingSummary): void {
+    if (binding.certificatePolicy !== "manual") {
+      return;
+    }
+
+    if (importBindingId === binding.id) {
+      resetImportCertificateForm();
+      return;
+    }
+
+    importBindingId = binding.id;
+    importCertificateChain = "";
+    importPrivateKey = "";
+    importPassphrase = "";
+    importFeedback = null;
+  }
+
+  function importCertificateForBinding(binding: DomainBindingSummary, event: SubmitEvent): void {
+    event.preventDefault();
+
+    if (
+      binding.certificatePolicy !== "manual" ||
+      importBindingId !== binding.id ||
+      !canImportCertificate ||
+      importCertificateMutation.isPending
+    ) {
+      return;
+    }
+
+    importFeedback = null;
+    importCertificateMutation.mutate({
+      domainBindingId: binding.id,
+      certificateChain: importCertificateChain.trim(),
+      privateKey: importPrivateKey.trim(),
+      ...(importPassphrase.trim() ? { passphrase: importPassphrase } : {}),
+    });
+  }
+
   function domainBindingHref(binding: DomainBindingSummary): string {
     const normalizedPath = binding.pathPrefix.startsWith("/")
       ? binding.pathPrefix
@@ -1566,6 +1667,70 @@
       case "pending_verification":
       case "requested":
         return "secondary";
+    }
+  }
+
+  function latestCertificateForBinding(bindingId: string): CertificateSummary | null {
+    const bindingCertificates = resourceCertificates.filter(
+      (certificate) => certificate.domainBindingId === bindingId,
+    );
+
+    if (bindingCertificates.length === 0) {
+      return null;
+    }
+
+    return bindingCertificates.reduce((latest, candidate) =>
+      certificateSortTimestamp(candidate) > certificateSortTimestamp(latest) ? candidate : latest,
+    );
+  }
+
+  function certificateSortTimestamp(certificate: CertificateSummary): number {
+    return Date.parse(certificate.issuedAt ?? certificate.createdAt) || 0;
+  }
+
+  function certificateSourceLabel(source: CertificateSummary["source"]): string {
+    switch (source) {
+      case "imported":
+        return $t(i18nKeys.console.resources.certificateSourceImported);
+      case "managed":
+        return $t(i18nKeys.console.resources.certificateSourceManaged);
+    }
+  }
+
+  function certificateStatusLabel(status: CertificateSummary["status"]): string {
+    switch (status) {
+      case "active":
+        return $t(i18nKeys.console.resources.certificateStatusActive);
+      case "disabled":
+        return $t(i18nKeys.console.resources.certificateStatusDisabled);
+      case "expired":
+        return $t(i18nKeys.console.resources.certificateStatusExpired);
+      case "failed":
+        return $t(i18nKeys.console.resources.certificateStatusFailed);
+      case "issuing":
+        return $t(i18nKeys.console.resources.certificateStatusIssuing);
+      case "pending":
+        return $t(i18nKeys.console.resources.certificateStatusPending);
+      case "renewing":
+        return $t(i18nKeys.console.resources.certificateStatusRenewing);
+    }
+  }
+
+  function certificateStatusVariant(
+    status: CertificateSummary["status"],
+  ): "default" | "secondary" | "outline" | "destructive" {
+    switch (status) {
+      case "active":
+        return "default";
+      case "failed":
+      case "expired":
+        return "destructive";
+      case "issuing":
+      case "pending":
+      case "renewing":
+        return "secondary";
+      case "disabled":
+        return "outline";
     }
   }
 
@@ -2683,6 +2848,8 @@
                   {#if resourceDomainBindings.length > 0}
                     {#each resourceDomainBindings as binding (binding.id)}
                       {@const server = findServer(servers, binding.serverId)}
+                      {@const bindingCertificate = latestCertificateForBinding(binding.id)}
+                      {@const isImportOpen = importBindingId === binding.id}
                       <article class="rounded-md border bg-background p-4">
                         <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                           <div class="min-w-0 space-y-2">
@@ -2755,6 +2922,211 @@
                               {binding.certificatePolicy}
                             </p>
                           </div>
+                        </div>
+                        <div class="mt-4 rounded-md border bg-muted/15 p-3">
+                          <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                            <div>
+                              <p class="text-sm font-medium">
+                                {$t(i18nKeys.console.resources.certificateLatestTitle)}
+                              </p>
+                            </div>
+                            {#if bindingCertificate}
+                              <div class="flex flex-wrap items-center gap-2">
+                                <Badge variant={certificateStatusVariant(bindingCertificate.status)}>
+                                  {certificateStatusLabel(bindingCertificate.status)}
+                                </Badge>
+                                <Badge variant="outline">
+                                  {certificateSourceLabel(bindingCertificate.source)}
+                                </Badge>
+                              </div>
+                            {/if}
+                          </div>
+
+                          {#if bindingCertificate}
+                            <div class="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                              <div class="rounded-md bg-background px-3 py-2">
+                                <p class="text-xs text-muted-foreground">
+                                  {$t(i18nKeys.common.domain.source)}
+                                </p>
+                                <p class="mt-1 truncate text-sm font-medium">
+                                  {certificateSourceLabel(bindingCertificate.source)}
+                                </p>
+                              </div>
+                              <div class="rounded-md bg-background px-3 py-2">
+                                <p class="text-xs text-muted-foreground">
+                                  {$t(i18nKeys.common.domain.status)}
+                                </p>
+                                <p class="mt-1 truncate text-sm font-medium">
+                                  {certificateStatusLabel(bindingCertificate.status)}
+                                </p>
+                              </div>
+                              <div class="rounded-md bg-background px-3 py-2">
+                                <p class="text-xs text-muted-foreground">
+                                  {$t(i18nKeys.console.resources.certificateExpiresAt)}
+                                </p>
+                                <p class="mt-1 truncate text-sm font-medium">
+                                  {bindingCertificate.expiresAt
+                                    ? formatTime(bindingCertificate.expiresAt)
+                                    : "-"}
+                                </p>
+                              </div>
+                              <div class="rounded-md bg-background px-3 py-2">
+                                <p class="text-xs text-muted-foreground">
+                                  {$t(i18nKeys.console.resources.certificateNotBefore)}
+                                </p>
+                                <p class="mt-1 truncate text-sm font-medium">
+                                  {bindingCertificate.notBefore
+                                    ? formatTime(bindingCertificate.notBefore)
+                                    : "-"}
+                                </p>
+                              </div>
+                              <div class="rounded-md bg-background px-3 py-2">
+                                <p class="text-xs text-muted-foreground">
+                                  {$t(i18nKeys.console.resources.certificateIssuer)}
+                                </p>
+                                <p class="mt-1 truncate text-sm font-medium">
+                                  {bindingCertificate.issuer ?? "-"}
+                                </p>
+                              </div>
+                              <div class="rounded-md bg-background px-3 py-2">
+                                <p class="text-xs text-muted-foreground">
+                                  {$t(i18nKeys.console.resources.certificateKeyAlgorithm)}
+                                </p>
+                                <p class="mt-1 truncate text-sm font-medium">
+                                  {bindingCertificate.keyAlgorithm ?? "-"}
+                                </p>
+                              </div>
+                              <div class="rounded-md bg-background px-3 py-2 sm:col-span-2 lg:col-span-3">
+                                <p class="text-xs text-muted-foreground">
+                                  {$t(i18nKeys.console.resources.certificateSans)}
+                                </p>
+                                <p class="mt-1 break-all text-sm font-medium">
+                                  {bindingCertificate.subjectAlternativeNames?.length
+                                    ? bindingCertificate.subjectAlternativeNames.join(", ")
+                                    : "-"}
+                                </p>
+                              </div>
+                            </div>
+                          {:else}
+                            <div class="mt-3 rounded-md bg-background px-3 py-2 text-sm text-muted-foreground">
+                              {$t(i18nKeys.console.resources.certificateSummaryEmpty)}
+                            </div>
+                          {/if}
+                        </div>
+
+                        <div class="mt-4 rounded-md border border-dashed bg-muted/10 p-3">
+                          <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                            <div>
+                              <p class="text-sm font-medium">
+                                {$t(i18nKeys.console.resources.certificateImportTitle)}
+                              </p>
+                              <p class="mt-1 text-xs text-muted-foreground">
+                                {$t(i18nKeys.console.resources.certificateImportDescription)}
+                              </p>
+                            </div>
+                            {#if binding.certificatePolicy === "manual"}
+                              <Button
+                                id={`resource-domain-binding-import-toggle-${binding.id}`}
+                                type="button"
+                                size="sm"
+                                variant={isImportOpen ? "selected" : "outline"}
+                                aria-expanded={isImportOpen}
+                                onclick={() => toggleCertificateImport(binding)}
+                              >
+                                {isImportOpen
+                                  ? $t(i18nKeys.common.actions.close)
+                                  : $t(i18nKeys.console.resources.certificateImportOpen)}
+                              </Button>
+                            {/if}
+                          </div>
+
+                          {#if importFeedback?.bindingId === binding.id}
+                            <div
+                              class={`mt-3 rounded-md border px-3 py-2 text-sm ${
+                                importFeedback.kind === "success"
+                                  ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-700"
+                                  : "border-destructive/40 bg-destructive/10 text-destructive"
+                              }`}
+                            >
+                              <p class="font-medium">{importFeedback.title}</p>
+                              <p class="mt-1 break-all text-xs">{importFeedback.detail}</p>
+                            </div>
+                          {/if}
+
+                          {#if binding.certificatePolicy === "manual"}
+                            {#if isImportOpen}
+                              <form
+                                id={`resource-domain-binding-import-form-${binding.id}`}
+                                class="mt-4 grid gap-3 border-t pt-4"
+                                onsubmit={(event) => importCertificateForBinding(binding, event)}
+                              >
+                                <label class="space-y-1.5 text-sm font-medium">
+                                  <span>
+                                    {$t(i18nKeys.console.resources.certificateImportCertificateChain)}
+                                  </span>
+                                  <Textarea
+                                    id={`resource-domain-binding-import-certificate-chain-${binding.id}`}
+                                    bind:value={importCertificateChain}
+                                    rows={6}
+                                    spellcheck={false}
+                                    autocomplete="off"
+                                    placeholder={$t(
+                                      i18nKeys.console.resources
+                                        .certificateImportCertificateChainPlaceholder,
+                                    )}
+                                  />
+                                </label>
+
+                                <label class="space-y-1.5 text-sm font-medium">
+                                  <span>
+                                    {$t(i18nKeys.console.resources.certificateImportPrivateKey)}
+                                  </span>
+                                  <Textarea
+                                    id={`resource-domain-binding-import-private-key-${binding.id}`}
+                                    bind:value={importPrivateKey}
+                                    rows={6}
+                                    spellcheck={false}
+                                    autocomplete="off"
+                                    placeholder={$t(
+                                      i18nKeys.console.resources
+                                        .certificateImportPrivateKeyPlaceholder,
+                                    )}
+                                  />
+                                </label>
+
+                                <label class="space-y-1.5 text-sm font-medium">
+                                  <span>{$t(i18nKeys.console.resources.certificateImportPassphrase)}</span>
+                                  <Input
+                                    id={`resource-domain-binding-import-passphrase-${binding.id}`}
+                                    bind:value={importPassphrase}
+                                    type="password"
+                                    autocomplete="new-password"
+                                    placeholder={$t(
+                                      i18nKeys.console.resources
+                                        .certificateImportPassphrasePlaceholder,
+                                    )}
+                                  />
+                                </label>
+
+                                <div class="flex justify-end">
+                                  <Button
+                                    type="submit"
+                                    disabled={!canImportCertificate || importCertificateMutation.isPending}
+                                  >
+                                    {importCertificateMutation.isPending
+                                      ? $t(i18nKeys.console.resources.certificateImportSubmitting)
+                                      : $t(i18nKeys.console.resources.certificateImportSubmit)}
+                                  </Button>
+                                </div>
+                              </form>
+                            {/if}
+                          {:else}
+                            <div class="mt-3 rounded-md bg-background px-3 py-2 text-xs text-muted-foreground">
+                              {binding.certificatePolicy === "disabled"
+                                ? $t(i18nKeys.console.resources.certificateImportDisabledPolicy)
+                                : $t(i18nKeys.console.resources.certificateImportAutoPolicy)}
+                            </div>
+                          {/if}
                         </div>
                       </article>
                     {/each}

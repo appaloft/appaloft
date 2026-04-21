@@ -104,7 +104,15 @@ Admission errors reject the command and return `err(DomainError)`.
 | `certificate_not_allowed` | `certificate-admission` | No | Binding TLS policy does not allow issuance or renewal. |
 | `certificate_attempt_conflict` | `certificate-admission` | No | Duplicate in-flight certificate attempt conflicts with the command. |
 | `certificate_provider_unavailable` | `certificate-admission` | Yes | Required certificate provider is unavailable before acceptance. |
-| `infra_error` | persistence or event publication phase | Conditional | State or event could not be safely recorded. |
+| `certificate_import_not_allowed` | `certificate-admission` | No | Binding policy or binding state does not allow manual import. |
+| `certificate_import_domain_mismatch` | `certificate-import-validation` | No | Imported certificate does not cover the bound hostname. |
+| `certificate_import_key_mismatch` | `certificate-import-validation` | No | Imported private key does not match the leaf certificate. |
+| `certificate_import_expired` | `certificate-import-validation` | No | Imported certificate is already expired. |
+| `certificate_import_not_yet_valid` | `certificate-import-validation` | No | Imported certificate `notBefore` is in the future. |
+| `certificate_import_unsupported_algorithm` | `certificate-import-validation` | No | Imported certificate/key algorithm is not supported by policy. |
+| `certificate_import_malformed_chain` | `certificate-import-validation` | No | Imported chain is malformed or cannot be parsed into a valid leaf/intermediate sequence. |
+| `certificate_import_storage_failed` | `certificate-import-storage` | Yes | Secret storage or durable state recording failed before import success could be recorded. |
+| `infra_error` | persistence, import storage, or event publication phase | Conditional | State or event could not be safely recorded. |
 
 ## Async Error Profile
 
@@ -118,8 +126,11 @@ Admission errors reject the command and return `err(DomainError)`.
 | Certificate provider request fails | `certificate-issuance-failed` with `code = certificate_provider_unavailable`, `failurePhase = provider-request`. | Yes when transient. |
 | Domain validation fails | `certificate-issuance-failed` with `code = certificate_challenge_failed`, `failurePhase = domain-validation`. | No until DNS/binding config changes. |
 | Certificate storage fails | `certificate-issuance-failed` with `code = certificate_storage_failed`, `failurePhase = certificate-storage`. | Yes when storage can recover. |
-| Imported certificate is invalid, expired, or key mismatched | Import command returns `err` or the import attempt records `code = certificate_import_invalid`, `phase = certificate-import-validation`. | No until certificate material changes. |
-| Imported certificate secret storage fails | Import command returns `err` or the import attempt records `code = certificate_import_storage_failed`, `phase = certificate-import-storage`. | Yes when storage can recover. |
+| Imported certificate does not cover the bound hostname | Import command returns `err` with `code = certificate_import_domain_mismatch`, `phase = certificate-import-validation`. | No until certificate material changes. |
+| Imported certificate key does not match | Import command returns `err` with `code = certificate_import_key_mismatch`, `phase = certificate-import-validation`. | No until certificate material changes. |
+| Imported certificate is expired or not yet valid | Import command returns `err` with `code = certificate_import_expired` or `certificate_import_not_yet_valid`, `phase = certificate-import-validation`. | No until certificate material changes or time crosses the validity window. |
+| Imported certificate chain is malformed or algorithm is unsupported | Import command returns `err` with `code = certificate_import_malformed_chain` or `certificate_import_unsupported_algorithm`, `phase = certificate-import-validation`. | No until certificate material changes. |
+| Imported certificate secret storage fails | Import command returns `err` with `code = certificate_import_storage_failed`, `phase = certificate-import-storage`. | Yes when storage can recover. |
 | Renewal window invalid | `certificate-issuance-failed` with `code = certificate_renewal_window_invalid`, `failurePhase = renewal-window`. | No unless time/policy changes. |
 | Event handler crashes before terminal state | Persist event-processing failure or retryable attempt state; do not publish terminal success/failure until state is known. | Yes |
 | Duplicate event consumed | No new side effect; return `ok`. | Not applicable |
@@ -178,12 +189,15 @@ into durable failed or retry-scheduled certificate attempt state and publishes
 Current code consumes `certificate-issued` for certificate-backed domain readiness and publishes
 `domain-ready` after the referenced bound domain binding is marked ready.
 
+`certificates.import`, `certificate-imported`, and import-specific validation/storage error mapping
+are not implemented yet.
+
 Current code serves HTTP-01 challenge tokens through an injected challenge token store. Missing,
 expired, removed, or host-mismatched challenge requests return HTTP `404` and do not mutate
 certificate or domain binding state.
 
-Route realization failure state, DNS-provider verification failure state, real provider-specific
-failure mapping, retry scheduler execution, and proxy reload are not implemented yet.
+Route realization failure state, DNS-provider verification failure state, and import-specific
+business-code error mapping are not implemented yet.
 
 ## Open Questions
 

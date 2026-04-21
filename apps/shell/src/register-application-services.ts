@@ -42,6 +42,8 @@ import {
   DiffEnvironmentsQueryService,
   DoctorQueryService,
   type ExecutionContext,
+  ImportCertificateCommandHandler,
+  ImportCertificateUseCase,
   IssueCertificateOnCertificateRequestedHandler,
   IssueOrRenewCertificateCommandHandler,
   IssueOrRenewCertificateUseCase,
@@ -57,6 +59,7 @@ import {
   ListResourcesQueryService,
   ListServersQueryService,
   ListSshCredentialsQueryService,
+  MarkDomainReadyOnCertificateImportedHandler,
   MarkDomainReadyOnCertificateIssuedHandler,
   MarkDomainReadyOnDeploymentFinishedHandler,
   MarkDomainReadyOnDomainBoundHandler,
@@ -100,6 +103,7 @@ class ShellCertificateProviderSelectionPolicy implements CertificateProviderSele
 export function registerApplicationServices(container: DependencyContainer): void {
   container.registerSingleton(BootstrapServerEdgeProxyOnTargetRegisteredHandler);
   container.registerSingleton(MarkDomainReadyOnDomainBoundHandler);
+  container.registerSingleton(MarkDomainReadyOnCertificateImportedHandler);
   container.registerSingleton(MarkDomainReadyOnCertificateIssuedHandler);
   container.registerSingleton(MarkDomainReadyOnDeploymentFinishedHandler);
   container.registerSingleton(MarkDomainRouteFailedOnDeploymentFinishedHandler);
@@ -115,6 +119,7 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(ArchiveResourceCommandHandler);
   container.registerSingleton(DeleteResourceCommandHandler);
   container.registerSingleton(ShowResourceQueryHandler);
+  container.registerSingleton(ImportCertificateCommandHandler);
   container.registerSingleton(IssueOrRenewCertificateCommandHandler);
   container.registerSingleton(RelinkSourceLinkCommandHandler);
   container.registerSingleton(ListCertificatesQueryHandler);
@@ -200,6 +205,7 @@ export function registerApplicationServices(container: DependencyContainer): voi
     tokens.listDomainBindingsQueryService,
     ListDomainBindingsQueryService,
   );
+  container.registerSingleton(tokens.importCertificateUseCase, ImportCertificateUseCase);
   container.registerSingleton(
     tokens.issueOrRenewCertificateUseCase,
     IssueOrRenewCertificateUseCase,

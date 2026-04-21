@@ -1,4 +1,5 @@
 import { AsyncLocalStorage } from "node:async_hooks";
+import { createHash, createPrivateKey, createPublicKey, X509Certificate } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { isAbsolute, join } from "node:path";
 import {
@@ -22,10 +23,10 @@ import {
   type AppLogger,
   type CertificateHttpChallengeToken,
   type CertificateHttpChallengeTokenStore,
+  type CertificateMaterialValidator,
   type CertificateProviderIssueInput,
   type CertificateProviderIssueResult,
   type CertificateProviderPort,
-  type CertificateSecretStore,
   type Clock,
   CommandBus,
   type DefaultAccessDomainPolicyStore,
@@ -58,6 +59,7 @@ import {
   PgCertificateReadModel,
   PgCertificateRepository,
   PgCertificateRetryCandidateReader,
+  PgCertificateSecretStore,
   PgDefaultAccessDomainPolicyStore,
   PgDeploymentReadModel,
   PgDeploymentRepository,
@@ -136,15 +138,240 @@ class UnavailableCertificateProvider implements CertificateProviderPort {
   }
 }
 
-class InMemoryCertificateSecretStore implements CertificateSecretStore {
-  async store(
+const supportedImportedKeyAlgorithms = new Set(["rsa", "ec", "ed25519", "ed448"]);
+
+function certificatePemBlocks(pem: string): string[] {
+  return (
+    pem
+      .match(/-----BEGIN CERTIFICATE-----[\s\S]*?-----END CERTIFICATE-----/g)
+      ?.map((block) => block.trim()) ?? []
+  );
+}
+
+function normalizePemBlocks(blocks: string[]): string {
+  return blocks.map((block) => block.trim()).join("\n");
+}
+
+function normalizePrivateKeyPem(value: string): string {
+  return value.trim();
+}
+
+function normalizeSecretText(value: string): string {
+  return value.trim();
+}
+
+function parseDnsNames(certificate: X509Certificate): string[] {
+  const names = new Set<string>();
+  const subjectAltName = certificate.subjectAltName;
+  if (subjectAltName) {
+    for (const entry of subjectAltName.split(",")) {
+      const normalized = entry.trim();
+      if (normalized.startsWith("DNS:")) {
+        names.add(normalized.slice(4).trim().toLowerCase());
+      }
+    }
+  }
+
+  if (names.size > 0) {
+    return [...names];
+  }
+
+  const commonNameMatch = certificate.subject.match(/(?:^|\n|\s)CN\s*=\s*([^\n,]+)/);
+  if (commonNameMatch?.[1]) {
+    names.add(commonNameMatch[1].trim().toLowerCase());
+  }
+
+  return [...names];
+}
+
+function matchesDomain(pattern: string, domainName: string): boolean {
+  if (pattern === domainName) {
+    return true;
+  }
+
+  if (!pattern.startsWith("*.")) {
+    return false;
+  }
+
+  const suffix = pattern.slice(2);
+  if (!domainName.endsWith(`.${suffix}`)) {
+    return false;
+  }
+
+  const prefix = domainName.slice(0, domainName.length - suffix.length - 1);
+  return prefix.length > 0 && !prefix.includes(".");
+}
+
+class NodeCryptoCertificateMaterialValidator implements CertificateMaterialValidator {
+  async validateImported(
     context: ExecutionContext,
-    material: CertificateProviderIssueResult,
-  ): Promise<Result<{ secretRef: string }, DomainError>> {
+    input: Parameters<CertificateMaterialValidator["validateImported"]>[1],
+  ) {
     void context;
-    return ok({
-      secretRef: `memory://${material.certificateId}/${material.attemptId}`,
-    });
+
+    const certificateBlocks = certificatePemBlocks(input.certificateChain);
+    if (certificateBlocks.length === 0) {
+      return err(
+        domainError.certificateImportMalformedChain(
+          "Certificate chain is missing a leaf certificate",
+          {
+            phase: "certificate-import-validation",
+            domainName: input.domainName,
+          },
+        ),
+      );
+    }
+
+    try {
+      const normalizedCertificateChain = normalizePemBlocks(certificateBlocks);
+      const normalizedPrivateKey = normalizePrivateKeyPem(input.privateKey);
+      const normalizedPassphrase = input.passphrase
+        ? normalizeSecretText(input.passphrase)
+        : undefined;
+      const leafCertificate = certificateBlocks[0];
+      if (!leafCertificate) {
+        return err(
+          domainError.certificateImportMalformedChain(
+            "Certificate chain is missing a leaf certificate",
+            {
+              phase: "certificate-import-validation",
+              domainName: input.domainName,
+            },
+          ),
+        );
+      }
+
+      const leaf = new X509Certificate(leafCertificate);
+      for (const block of certificateBlocks.slice(1)) {
+        new X509Certificate(block);
+      }
+
+      const subjectAlternativeNames = parseDnsNames(leaf);
+      const normalizedDomainName = input.domainName.trim().toLowerCase();
+      if (
+        subjectAlternativeNames.length === 0 ||
+        !subjectAlternativeNames.some((pattern) => matchesDomain(pattern, normalizedDomainName))
+      ) {
+        return err(
+          domainError.certificateImportDomainMismatch(
+            "Imported certificate does not cover the bound hostname",
+            {
+              phase: "certificate-import-validation",
+              domainName: input.domainName,
+            },
+          ),
+        );
+      }
+
+      const importedAtMs = Date.parse(input.importedAt);
+      const notBefore = new Date(leaf.validFrom).toISOString();
+      const expiresAt = new Date(leaf.validTo).toISOString();
+      const notBeforeMs = Date.parse(notBefore);
+      const expiresAtMs = Date.parse(expiresAt);
+
+      if (!Number.isFinite(notBeforeMs) || !Number.isFinite(expiresAtMs)) {
+        return err(
+          domainError.certificateImportMalformedChain(
+            "Imported certificate validity timestamps could not be parsed",
+            {
+              phase: "certificate-import-validation",
+              domainName: input.domainName,
+            },
+          ),
+        );
+      }
+
+      if (Number.isFinite(importedAtMs) && notBeforeMs > importedAtMs) {
+        return err(
+          domainError.certificateImportNotYetValid("Imported certificate is not valid yet", {
+            phase: "certificate-import-validation",
+            domainName: input.domainName,
+            notBefore,
+          }),
+        );
+      }
+
+      if (Number.isFinite(importedAtMs) && expiresAtMs <= importedAtMs) {
+        return err(
+          domainError.certificateImportExpired("Imported certificate is already expired", {
+            phase: "certificate-import-validation",
+            domainName: input.domainName,
+            expiresAt,
+          }),
+        );
+      }
+
+      const privateKey = createPrivateKey({
+        key: normalizedPrivateKey,
+        format: "pem",
+        ...(normalizedPassphrase ? { passphrase: normalizedPassphrase } : {}),
+      });
+      const certificatePublicKey = leaf.publicKey.export({
+        type: "spki",
+        format: "der",
+      });
+      const privateKeyPublicKey = createPublicKey(privateKey).export({
+        type: "spki",
+        format: "der",
+      });
+
+      if (!Buffer.from(certificatePublicKey).equals(Buffer.from(privateKeyPublicKey))) {
+        return err(
+          domainError.certificateImportKeyMismatch(
+            "Imported private key does not match the leaf certificate",
+            {
+              phase: "certificate-import-validation",
+              domainName: input.domainName,
+            },
+          ),
+        );
+      }
+
+      const keyAlgorithm = leaf.publicKey.asymmetricKeyType;
+      if (!keyAlgorithm || !supportedImportedKeyAlgorithms.has(keyAlgorithm)) {
+        return err(
+          domainError.certificateImportUnsupportedAlgorithm(
+            "Imported certificate key algorithm is not supported",
+            {
+              phase: "certificate-import-validation",
+              domainName: input.domainName,
+              ...(keyAlgorithm ? { keyAlgorithm } : {}),
+            },
+          ),
+        );
+      }
+
+      const materialHash = createHash("sha256")
+        .update(normalizedCertificateChain)
+        .update("\n--\n")
+        .update(normalizedPrivateKey)
+        .update("\n--\n")
+        .update(normalizedPassphrase ?? "")
+        .digest("hex");
+
+      return ok({
+        normalizedCertificateChain,
+        normalizedPrivateKey,
+        ...(normalizedPassphrase ? { normalizedPassphrase } : {}),
+        normalizedMaterialFingerprint: `sha256:${materialHash}`,
+        notBefore,
+        expiresAt,
+        subjectAlternativeNames,
+        keyAlgorithm,
+        issuer: leaf.issuer.replace(/\n+/g, ", ").trim(),
+        fingerprint: leaf.fingerprint256,
+      });
+    } catch {
+      return err(
+        domainError.certificateImportMalformedChain(
+          "Certificate chain, private key, or passphrase could not be parsed",
+          {
+            phase: "certificate-import-validation",
+            domainName: input.domainName,
+          },
+        ),
+      );
+    }
   }
 }
 
@@ -492,8 +719,17 @@ export function registerRuntimeDependencies(
       () => new PgCertificateRetryCandidateReader(input.database.db),
     ),
   });
+  container.register(tokens.certificateMaterialValidator, {
+    useFactory: instanceCachingFactory(() => new NodeCryptoCertificateMaterialValidator()),
+  });
   container.register(tokens.certificateSecretStore, {
-    useFactory: instanceCachingFactory(() => new InMemoryCertificateSecretStore()),
+    useFactory: instanceCachingFactory(
+      (dependencyContainer) =>
+        new PgCertificateSecretStore(
+          input.database.db,
+          dependencyContainer.resolve<Clock>(tokens.clock),
+        ),
+    ),
   });
   container.register(tokens.certificateHttpChallengeTokenStore, {
     useFactory: instanceCachingFactory(() => new InMemoryCertificateHttpChallengeTokenStore()),
