@@ -168,6 +168,43 @@ describe("remote PGlite state sync", () => {
     }
   });
 
+  test("[CONFIG-FILE-STATE-010] preview cleanup plans the same remote PGlite mirror", async () => {
+    const dataDir = await mkdtemp(join(tmpdir(), "appaloft-remote-sync-"));
+    try {
+      const plan = resolveRemotePgliteStateSyncPlan(
+        [
+          "appaloft",
+          "preview",
+          "cleanup",
+          ".",
+          "--preview",
+          "pull-request",
+          "--preview-id",
+          "pr-5",
+          "--server-host",
+          "203.0.113.10",
+          "--server-ssh-username",
+          "deploy",
+        ],
+        {},
+        testConfig(dataDir),
+      );
+
+      expect(plan.isOk()).toBe(true);
+      if (plan.isErr() || !plan.value) {
+        throw new Error("Expected remote PGlite plan");
+      }
+      expect(plan.value.dataRoot).toBe("/var/lib/appaloft/runtime/state");
+      expect(plan.value.localPgliteDataDir).toContain("remote-pglite");
+      expect(plan.value.target).toEqual({
+        host: "203.0.113.10",
+        username: "deploy",
+      });
+    } finally {
+      await rm(dataDir, { recursive: true, force: true });
+    }
+  });
+
   test("[CONFIG-FILE-STATE-010] archive sync downloads and uploads PGlite over SSH", async () => {
     const dataDir = await mkdtemp(join(tmpdir(), "appaloft-remote-sync-"));
     const calls: RemotePgliteArchiveRunnerInput[] = [];
