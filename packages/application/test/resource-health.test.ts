@@ -38,6 +38,8 @@ import {
   type DeploymentReadModel,
   type DeploymentSummary,
   type DestinationRepository,
+  type DomainBindingReadModel,
+  type DomainBindingSummary,
   type ResourceHealthProbeRequest,
   type ResourceHealthProbeResult,
   type ResourceHealthProbeRunner,
@@ -98,6 +100,26 @@ class StaticDeploymentReadModel implements DeploymentReadModel {
 
   async findLogs(): Promise<DeploymentLogSummary[]> {
     return [];
+  }
+}
+
+class StaticDomainBindingReadModel implements DomainBindingReadModel {
+  constructor(private readonly bindings: DomainBindingSummary[]) {}
+
+  async list(
+    _context: ReturnType<typeof toRepositoryContext>,
+    input?: {
+      projectId?: string;
+      environmentId?: string;
+      resourceId?: string;
+    },
+  ): Promise<DomainBindingSummary[]> {
+    return this.bindings
+      .filter((binding) => (input?.projectId ? binding.projectId === input.projectId : true))
+      .filter((binding) =>
+        input?.environmentId ? binding.environmentId === input.environmentId : true,
+      )
+      .filter((binding) => (input?.resourceId ? binding.resourceId === input.resourceId : true));
   }
 }
 
@@ -298,12 +320,14 @@ function createService(input?: {
   resources?: ResourceSummary[];
   resourceAggregates?: Resource[];
   deployments?: DeploymentSummary[];
+  domainBindings?: DomainBindingSummary[];
   probeRunner?: StaticResourceHealthProbeRunner;
 }) {
   const resourceReadModel = new StaticResourceReadModel(input?.resources ?? [resourceSummary()]);
   const deploymentReadModel = new StaticDeploymentReadModel(
     input?.deployments ?? [deploymentSummary()],
   );
+  const domainBindingReadModel = new StaticDomainBindingReadModel(input?.domainBindings ?? []);
   const listResourcesQueryService = new ListResourcesQueryService(
     resourceReadModel,
     new EmptyDestinationRepository(),
@@ -313,6 +337,7 @@ function createService(input?: {
 
   return new ResourceHealthQueryService(
     listResourcesQueryService,
+    domainBindingReadModel,
     new StaticResourceRepository(input?.resourceAggregates ?? []),
     deploymentReadModel,
     input?.probeRunner ?? new StaticResourceHealthProbeRunner(),
@@ -374,7 +399,7 @@ describe("ResourceHealthQueryService", () => {
     );
   });
 
-  test("[EDGE-PROXY-ROUTE-005] reports server-applied domain as public access route", async () => {
+  test("[RES-HEALTH-QRY-020][EDGE-PROXY-ROUTE-005] reports server-applied domain before generated route", async () => {
     const service = createService({
       resources: [
         resourceSummary({
@@ -389,6 +414,18 @@ describe("ResourceHealthQueryService", () => {
               proxyKind: "traefik",
               targetPort: 3000,
               updatedAt: "2026-01-01T00:00:05.000Z",
+            },
+            latestGeneratedAccessRoute: {
+              url: "http://generated.example.test",
+              hostname: "generated.example.test",
+              scheme: "http",
+              providerKey: "sslip",
+              deploymentId: "dep_generated",
+              deploymentStatus: "succeeded",
+              pathPrefix: "/",
+              proxyKind: "traefik",
+              targetPort: 3000,
+              updatedAt: "2026-01-01T00:00:04.000Z",
             },
             proxyRouteStatus: "ready",
             lastRouteRealizationDeploymentId: "dep_web",
@@ -411,6 +448,106 @@ describe("ResourceHealthQueryService", () => {
       providerKey: "traefik",
       lastRouteRealizationDeploymentId: "dep_web",
     });
+  });
+
+  test("[RES-HEALTH-QRY-014] reports durable domain before server-applied and generated routes", async () => {
+    const service = createService({
+      resources: [
+        resourceSummary({
+          accessSummary: {
+            latestDurableDomainRoute: {
+              url: "https://durable.example.test",
+              hostname: "durable.example.test",
+              scheme: "https",
+              deploymentId: "dep_web",
+              deploymentStatus: "succeeded",
+              pathPrefix: "/",
+              proxyKind: "traefik",
+              targetPort: 3000,
+              updatedAt: "2026-01-01T00:00:07.000Z",
+            },
+            latestServerAppliedDomainRoute: {
+              url: "https://server-applied.example.test",
+              hostname: "server-applied.example.test",
+              scheme: "https",
+              deploymentId: "dep_web",
+              deploymentStatus: "succeeded",
+              pathPrefix: "/",
+              proxyKind: "traefik",
+              targetPort: 3000,
+              updatedAt: "2026-01-01T00:00:06.000Z",
+            },
+            latestGeneratedAccessRoute: {
+              url: "http://generated.example.test",
+              hostname: "generated.example.test",
+              scheme: "http",
+              providerKey: "sslip",
+              deploymentId: "dep_web",
+              deploymentStatus: "succeeded",
+              pathPrefix: "/",
+              proxyKind: "traefik",
+              targetPort: 3000,
+              updatedAt: "2026-01-01T00:00:05.000Z",
+            },
+            proxyRouteStatus: "ready",
+            lastRouteRealizationDeploymentId: "dep_web",
+          },
+        }),
+      ],
+    });
+
+    const result = await service.execute(createTestContext(), createQuery());
+
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap().publicAccess).toMatchObject({
+      status: "ready",
+      url: "https://durable.example.test",
+      kind: "durable-domain",
+    });
+  });
+
+  test("[RES-HEALTH-QRY-015] reports non-ready durable domain before generated fallback", async () => {
+    const service = createService({
+      domainBindings: [
+        {
+          id: "dmb_pending",
+          projectId: "prj_demo",
+          environmentId: "env_demo",
+          resourceId: "res_web",
+          serverId: "srv_demo",
+          destinationId: "dst_demo",
+          domainName: "pending.example.test",
+          pathPrefix: "/",
+          proxyKind: "traefik",
+          tlsMode: "auto",
+          certificatePolicy: "auto",
+          status: "pending_verification",
+          verificationAttemptCount: 1,
+          createdAt: "2026-01-01T00:00:06.000Z",
+        },
+      ],
+    });
+
+    const result = await service.execute(createTestContext(), createQuery());
+
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap()).toMatchObject({
+      overall: "degraded",
+      publicAccess: {
+        status: "not-ready",
+        url: "https://pending.example.test",
+        kind: "durable-domain",
+        reasonCode: "resource_domain_binding_not_ready",
+      },
+    });
+    expect(result._unsafeUnwrap().sourceErrors).toContainEqual(
+      expect.objectContaining({
+        source: "domain-binding",
+        code: "resource_domain_binding_not_ready",
+        relatedEntityId: "dmb_pending",
+        relatedState: "pending_verification",
+      }),
+    );
   });
 
   test("degrades current health when public access or proxy route state failed", async () => {

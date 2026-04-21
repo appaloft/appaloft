@@ -289,16 +289,30 @@ function requestedDeploymentWithDurableDomainBindings(
     return requestedDeployment;
   }
 
-  const servedBindings = bindings.filter((binding) => !binding.redirectTo);
-  const primaryBinding = servedBindings
-    .filter((binding) => binding.proxyKind !== "none")
-    .sort((left, right) => right.createdAt.localeCompare(left.createdAt))[0];
+  const servedBindings = bindings
+    .filter((binding) => !binding.redirectTo && binding.proxyKind !== "none")
+    .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
+  const readyPrimaryBinding = servedBindings.find((binding) => binding.status === "ready");
+  const primaryBinding =
+    readyPrimaryBinding ??
+    servedBindings.find(
+      (binding) =>
+        binding.status === "bound" ||
+        binding.status === "certificate_pending" ||
+        binding.status === "not_ready",
+    );
 
   if (!primaryBinding) {
     return requestedDeployment;
   }
 
-  const routeGroups = domainBindingRouteGroups(bindings, primaryBinding.proxyKind);
+  const allowedStatuses = new Set<DomainRouteBindingCandidate["status"]>(
+    primaryBinding.status === "ready" ? ["ready"] : ["bound", "certificate_pending", "not_ready"],
+  );
+  const routeGroups = domainBindingRouteGroups(
+    bindings.filter((binding) => allowedStatuses.has(binding.status)),
+    primaryBinding.proxyKind,
+  );
   const primaryRouteGroup = routeGroups.find(
     (group) =>
       !group.redirectTo &&
@@ -333,6 +347,7 @@ function requestedDeploymentWithDurableDomainBindings(
       ...(requestedDeployment.accessRouteMetadata ?? {}),
       "access.routeSource": "durable-domain-binding",
       "access.domainBindingId": primaryBinding.id,
+      "access.domainBindingStatus": primaryBinding.status,
       "access.hostname": primaryBinding.domainName,
       "access.scheme": primaryBinding.tlsMode === "auto" ? "https" : "http",
       "access.routeGroupCount": String(routeGroups.length),
@@ -671,16 +686,15 @@ export class CreateDeploymentUseCase {
             destinationId: targetContext.destinationId,
           })
         : [];
-      const requestedDeploymentWithServerAppliedRoute =
-        yield* requestedDeploymentWithServerAppliedRoutes({
-          requestedDeployment: requestedDeploymentBase,
-          desiredState: serverAppliedRouteDesiredState,
-          proxyKind: proxyKindFromServer(server),
-        });
-      const requestedDeployment = requestedDeploymentWithDurableDomainBindings(
-        requestedDeploymentWithServerAppliedRoute,
+      const requestedDeploymentWithDurableRoute = requestedDeploymentWithDurableDomainBindings(
+        requestedDeploymentBase,
         routeBindings,
       );
+      const requestedDeployment = yield* requestedDeploymentWithServerAppliedRoutes({
+        requestedDeployment: requestedDeploymentWithDurableRoute,
+        desiredState: serverAppliedRouteDesiredState,
+        proxyKind: proxyKindFromServer(server),
+      });
       const requestedDeploymentWithRuntimeMetadata = requestedDeploymentWithRuntimeContextMetadata(
         requestedDeployment,
         {
