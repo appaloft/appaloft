@@ -191,8 +191,9 @@ context exists. That mapping is the migration path from pure CLI to cloud.
   state on the SSH server.
 - Repository config can make a repeated GitHub Actions deployment stable without a hosted service.
 - Pure CLI mode has limited background behavior: no always-on Appaloft DNS observer, no Appaloft
-  certificate retry scheduler, and no automatic PR-environment cleanup unless a future server agent
-  or control plane is configured.
+  certificate retry scheduler, and no cleanup retry loop or scheduler after the process exits.
+  Action/CLI preview cleanup may still run through the explicit `deployments.cleanup-preview`
+  command from a user-authored close-event workflow.
 - Hosted/cloud mode remains valuable for GitHub App webhooks, preview environment orchestration,
   continuous DNS/certificate lifecycle, fleet visibility, team auth, audit, cleanup, and managed
   integrations.

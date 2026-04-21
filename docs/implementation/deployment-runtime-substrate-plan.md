@@ -185,7 +185,9 @@ Required coverage:
   [Workload Framework Detection And Planning](../workflows/workload-framework-detection-and-planning.md)
   or fail with structured unsupported-planner errors and explicit custom-command fallback guidance;
 - base image policy changes are covered per planner family;
-- local Docker adapter starts and verifies a container with resource-scoped labels/names;
+- local Docker adapter starts and verifies a container with resource-scoped labels/names plus
+  sanitized diagnostic labels for context names/kinds, runtime/source/artifact/route summaries, and
+  preview identity when available;
 - generic-SSH Docker adapter uses resolved server credentials and reports sanitized failures;
 - same internal port on two reverse-proxy resources does not trigger cross-resource cleanup;
 - direct host-port collision fails or rejects without stopping the existing resource;

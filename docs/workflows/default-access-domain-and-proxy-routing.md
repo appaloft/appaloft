@@ -130,7 +130,8 @@ packages/providers/default-access-domain-*
 
 ## Route Precedence
 
-Route resolution must apply this precedence:
+Route precedence is a normative contract for deployment route resolution and for every resource
+access observation surface. Route resolution must apply this precedence:
 
 1. Durable ready domain binding for the resource/destination/target/path.
 2. Durable accepted-but-not-ready domain binding only when the workflow explicitly allows pending-route realization.
@@ -140,6 +141,12 @@ Route resolution must apply this precedence:
 
 Generated routes must not overwrite or remove durable domain bindings or server-applied custom
 routes.
+
+`bound`, `certificate_pending`, or `not_ready` durable bindings may be included in route
+realization only for a workflow branch that has explicitly chosen pending realization or route
+retry. `requested`, `pending_verification`, and `failed` bindings must not become route input.
+Absent that explicit pending-realization branch, only `ready` durable domain bindings take
+precedence over server-applied and generated/default routes.
 
 ## Resource Network Requirements
 
@@ -210,8 +217,13 @@ Web, CLI, API, automation, and future MCP entrypoints must treat generated defau
 They may display:
 
 - whether generated access is enabled;
-- the planned generated public URL after the resource exists and before the first deployment;
+- the planned generated public URL after the resource exists and before the first deployment, while
+  keeping it visually separate from the current selected route when durable or server-applied route
+  state exists;
 - the realized generated public URL after route realization writes a deployment snapshot/read-model projection;
+- the current selected public route using the route precedence contract: durable ready domain,
+  server-applied config domain, latest generated route, planned generated route, then no public
+  route;
 - the read-only generated proxy configuration view when `resources.proxy-configuration.preview` is active;
 - route/proxy readiness and failure state;
 - instructions to add a custom domain through `domain-bindings.create`.
@@ -255,6 +267,20 @@ ResourceAccessSummary
 `plannedGeneratedAccessRoute` is suitable for resource detail and Quick Deploy review surfaces after a resource record exists. `latestGeneratedAccessRoute` is suitable for completed deployment/readiness surfaces after a deployment attempt resolves and realizes routes.
 
 Deployment detail may also show the immutable route snapshot used by that deployment attempt, but resource detail is the canonical owner-scoped user surface for the current generated access URL.
+
+Consumers that need one current public route, such as `resources.health`,
+`resources.diagnostic-summary`, and `resources.proxy-configuration.preview`, must select from
+`ResourceAccessSummary` using the same precedence as deployment route resolution:
+
+1. `latestDurableDomainRoute`;
+2. `latestServerAppliedDomainRoute`;
+3. `latestGeneratedAccessRoute`;
+4. `plannedGeneratedAccessRoute`;
+5. no public route.
+
+`ResourceAccessSummary` may still expose generated, durable, and server-applied route fields
+separately so Web, CLI, API, and future MCP clients can explain why a generated/default URL is
+present but not the current selected route.
 
 ## Error Semantics
 

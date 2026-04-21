@@ -243,6 +243,80 @@ describe("projectResourceAccessSummary", () => {
     });
   });
 
+  test("[DEF-ACCESS-QRY-002] keeps durable route realization ahead of newer server-applied route", () => {
+    const summary = projectResourceAccessSummary(
+      [
+        {
+          id: "dep_server_applied",
+          status: "succeeded",
+          createdAt: "2026-01-01T02:00:00.000Z",
+          runtimePlan: {
+            execution: {
+              accessRoutes: [
+                {
+                  proxyKind: "traefik",
+                  domains: ["server-applied.example.test"],
+                  pathPrefix: "/",
+                  tlsMode: "disabled",
+                  targetPort: 3000,
+                },
+              ],
+              metadata: {
+                "access.routeSource": "server-applied-config-domain",
+                "access.hostname": "server-applied.example.test",
+                "access.scheme": "http",
+              },
+            },
+          },
+        },
+        {
+          id: "dep_durable",
+          status: "succeeded",
+          createdAt: "2026-01-01T01:00:00.000Z",
+          runtimePlan: {
+            execution: {
+              accessRoutes: [
+                {
+                  proxyKind: "traefik",
+                  domains: ["durable.example.test"],
+                  pathPrefix: "/",
+                  tlsMode: "disabled",
+                  targetPort: 3000,
+                },
+              ],
+              metadata: {
+                "access.routeSource": "durable-domain-binding",
+                "access.hostname": "durable.example.test",
+                "access.scheme": "http",
+              },
+            },
+          },
+        },
+      ],
+      [
+        {
+          id: "dmb_ready",
+          status: "ready",
+          createdAt: "2026-01-01T01:05:00.000Z",
+          domainName: "durable.example.test",
+          pathPrefix: "/",
+          proxyKind: "traefik",
+          tlsMode: "disabled",
+        },
+      ],
+    );
+
+    expect(summary?.latestDurableDomainRoute).toMatchObject({
+      hostname: "durable.example.test",
+      deploymentId: "dep_durable",
+    });
+    expect(summary?.latestServerAppliedDomainRoute).toMatchObject({
+      hostname: "server-applied.example.test",
+      deploymentId: "dep_server_applied",
+    });
+    expect(summary?.lastRouteRealizationDeploymentId).toBe("dep_durable");
+  });
+
   test("[EDGE-PROXY-ROUTE-005] projects latest server-applied config domain route", () => {
     const summary = projectResourceAccessSummary([
       {

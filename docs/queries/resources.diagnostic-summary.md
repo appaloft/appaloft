@@ -126,10 +126,14 @@ Required top-level behavior:
   runtime strategy when available.
 - `deployment` includes attempt status, lifecycle phase, terminal timestamps, request/correlation id
   when available, and last structured error summary when available.
-- `access` includes generated and durable access route status, public URL when safe, route
-  realization status, server-applied canonical redirect status when present, the latest safe edge
-  access failure diagnostic when available, and the structured reason when no access URL is
-  available.
+- `access` includes generated, durable, and server-applied access route status, public URLs when
+  safe, route realization status, server-applied canonical redirect status when present, the latest
+  safe edge access failure diagnostic when available, and the structured reason when no access URL
+  is available. When a durable domain binding exists but is not ready, the access section reports
+  that blocking state instead of silently treating fallback routes as the current public route;
+  generated or server-applied URLs may still appear as context. When the summary needs one current
+  route for support/debug context, it otherwise uses durable ready domain, server-applied config
+  domain, latest generated route, planned generated route, then no public route.
 - `proxy` includes provider key, proxy readiness, configuration view availability, and safe warnings
   or last structured provider error.
 - `deploymentLogs` and `runtimeLogs` report whether logs are available, empty, unavailable, or not
@@ -208,7 +212,8 @@ The query must:
    resource network/access context.
 5. Read deployment status and last structured error from deployment read models or aggregate
    snapshots.
-6. Read generated/durable access summary and route realization status.
+6. Read generated/durable/server-applied access summary, non-ready durable binding state, and route
+   realization status.
 7. Read the latest safe edge access failure diagnostic for the resource when such a read source
    exists.
 8. Summarize proxy readiness and optionally call `resources.proxy-configuration.preview` semantics
@@ -260,13 +265,14 @@ The initial implementation returns canonical `copy.json` and omits optional `cop
 The Web resource detail action calls the typed query client. Quick Deploy completion and deployment
 detail do not yet expose the action directly.
 
-Safe backend/system context currently includes request id, entrypoint, locale, readiness status, and
-database driver/mode from diagnostics. It intentionally omits private database locations and local
-filesystem paths.
+Safe backend/system context currently includes request id, entrypoint, locale, readiness status,
+and database driver/mode from diagnostics. It intentionally omits private database locations and
+local filesystem paths.
 
-No edge request failure envelope is currently attached to the diagnostic summary. Until that read
-source exists, gateway request failures can still appear indirectly through access, proxy, health,
-deployment, and runtime log source errors.
+The current implementation resolves generated/durable/server-applied access context, non-ready
+durable domain binding state, proxy preview context, and the latest safe edge request failure
+envelope when available. It reports a non-ready durable binding as the blocking access fact instead
+of silently selecting fallback routes as the current public route.
 
 ## Open Questions
 

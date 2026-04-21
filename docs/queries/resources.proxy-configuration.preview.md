@@ -84,7 +84,7 @@ type ProxyConfigurationRouteView = {
   pathPrefix: string;
   tlsMode: "auto" | "disabled";
   targetPort?: number;
-  source: "generated-default" | "deployment-snapshot" | "server-applied" | "durable-domain";
+  source: "generated-default" | "deployment-snapshot" | "server-applied" | "domain-binding";
   routeBehavior?: "serve" | "redirect";
   redirectTo?: string;
   redirectStatus?: 301 | 302 | 307 | 308;
@@ -144,10 +144,15 @@ The query must not:
 | Scope | Meaning |
 | --- | --- |
 | `planned` | Render desired proxy configuration from persisted resource/server/policy state before the first deployment or before the latest deploy applies it. |
-| `latest` | Render the most relevant current view, preferring latest realized deployment route snapshot and falling back to planned route when no realized snapshot exists. |
+| `latest` | Render the most relevant current view, selecting durable ready domain route, server-applied config domain route, latest generated route, then planned generated route. When no current-route summary exists, fall back to the latest realized deployment route snapshot. |
 | `deployment-snapshot` | Render configuration from one immutable deployment runtime-plan snapshot. |
 
 If no proxy route is required, the query returns `ok` with `status = "not-configured"` and an empty `sections` array.
+
+The query must preserve provider-neutral route source labels. Provider-rendered sections may contain
+provider-specific syntax, but the wrapper route view must identify whether each route came from a
+durable managed domain, server-applied config domain, generated/default access, or an immutable
+deployment snapshot fallback.
 
 ## Web / API / CLI Use
 

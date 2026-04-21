@@ -228,8 +228,9 @@ ACME storage, reload commands, private keys, DNS provider credentials, target cr
 certificate material must stay outside the table.
 
 The table must not cascade-delete resources. Any desired, applied, failed, or stale route state
-referencing a resource is a `server-applied-route` deletion blocker until a future explicit cleanup
-or unlink behavior removes that route state.
+referencing a resource is a `server-applied-route` deletion blocker until an explicit cleanup
+behavior such as `deployments.cleanup-preview` for preview-scoped routes, or a future owner-scoped
+cleanup operation, removes that route state.
 
 ## Proxy Reload
 

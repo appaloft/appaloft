@@ -10,11 +10,11 @@ The minimal deliverable is:
 generic default access domain provider port
   -> provider implementation registered in composition root
   -> resource access summary can expose planned generated route before first deployment
-  -> route resolver uses resource network profile + server proxy readiness + policy
-  -> deployments.create resolves generated access route snapshot
+  -> route resolver uses resource network profile + server proxy readiness + durable-domain route state + server-applied route state + policy
+  -> deployments.create resolves the highest-precedence route snapshot
   -> edge proxy provider renders route plan against internalPort
   -> runtime adapter executes provider-produced proxy route plan
-  -> resource access summary read model exposes generated URL/status separately from DomainBinding
+  -> resource access summary read model exposes generated, durable, and server-applied URL/status separately while current-route consumers use one precedence contract
 ```
 
 ## Governed ADRs
@@ -97,7 +97,8 @@ The first implementation may read static installation/server configuration while
 
 Deployment admission/planning must capture:
 
-- route source: `generated-default`, `domain-binding`, or `none`;
+- route source: `durable-domain-binding`, `server-applied-config-domain`, `generated-default`, or
+  `none`;
 - hostname(s);
 - opaque provider key;
 - scheme hint;
@@ -115,6 +116,19 @@ Server edge proxy state must remain owned by the server/proxy bootstrap workflow
 `ResourceAccessSummary` must project planned and realized generated access URL/status from resource/server/policy state, deployment route snapshots, and related readiness state. This projection must not become `Resource` aggregate state.
 
 `plannedGeneratedAccessRoute` is computed for an already persisted resource before the first deployment attempt. `latestGeneratedAccessRoute` is derived from immutable deployment/runtime-plan snapshots after route resolution and realization.
+
+The route resolver and all current-route observers must use this precedence:
+
+1. ready durable domain binding;
+2. explicitly deployable pending durable domain binding when the workflow branch allows pending
+   route realization or route retry;
+3. server-applied config domain route from the selected SSH/server state backend;
+4. generated default access route;
+5. no public route.
+
+`ResourceAccessSummary` remains decomposed into separate generated, durable, and server-applied
+fields, but `resources.health`, `resources.diagnostic-summary`, and
+`resources.proxy-configuration.preview` must choose the current route in that order.
 
 ## Event Publishing Points
 
@@ -151,7 +165,9 @@ Minimum tests:
 
 - provider adapter contract: concrete provider produces expected hostname from provider-neutral input;
 - policy command contract: `default-access-domain-policies.configure` persists provider-neutral policy state and does not mutate deployments or domain bindings;
-- application route resolver: policy disabled, policy enabled, provider failure, missing public address, durable binding precedence;
+- application route resolver: policy disabled, policy enabled, provider failure, missing public
+  address, durable binding precedence over server-applied/generated, server-applied precedence over
+  generated;
 - deployment admission: ids-only command resolves generated route from resource/server/policy state;
 - runtime adapter: proxy route targets `networkProfile.internalPort` and does not require public host application port;
 - runtime adapter: two reverse-proxy resources can use the same `internalPort` without one deployment
@@ -162,7 +178,9 @@ Minimum tests:
   without stopping the existing resource runtime;
 - edge proxy provider contract: concrete provider renders ensure plan, route realization plan, and configuration view from provider-neutral input;
 - proxy configuration query: planned/latest/deployment-snapshot views are read-only and redacted;
-- read model: planned generated route is exposed for persisted resources before first deployment, and realized generated route is exposed from deployment snapshots after deployment;
+- read model: planned generated route is exposed for persisted resources before first deployment,
+  generated/durable/server-applied fields remain separately observable, and current-route consumers
+  select durable, server-applied, latest generated, then planned generated;
 - resource access summary: latest generated URL/status is projected from deployment snapshots and does not mutate Resource aggregate state;
 - Web/CLI: generated URL/status is displayed from read model, not from provider-specific local generation.
 
@@ -186,8 +204,9 @@ The minimal deliverable is complete when:
 
 Runtime adapter route hint fields such as `domains`, `proxyKind`, `pathPrefix`, and `tlsMode`
 remain an adapter-facing migration seam. They are populated by the default access route resolver
-instead of transport command input, but durable domain binding precedence and ADR-024
-server-applied config-domain precedence have not yet been wired into the same resolver.
+instead of transport command input. Durable ready domain bindings, explicitly deployable
+pending/retry durable bindings, ADR-024 server-applied config domains, generated default routes, and
+no-route outcomes must now be selected by one precedence path before runtime planning.
 
 Existing proxy label/config generation is reused behind the route snapshot boundary. Reverse-proxy deployments bind workload ports to loopback for local health and proxy access rather than requiring a stable public host application port.
 

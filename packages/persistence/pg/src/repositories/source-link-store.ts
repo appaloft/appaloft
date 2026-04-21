@@ -317,4 +317,23 @@ export class PgSourceLinkStore implements SourceLinkStore {
       return err(persistenceError("Source link could not be persisted", error));
     }
   }
+
+  async unlink(sourceFingerprint: string): Promise<Result<boolean>> {
+    const fingerprintResult = validateSourceFingerprint(sourceFingerprint);
+    if (fingerprintResult.isErr()) {
+      return err(fingerprintResult.error);
+    }
+
+    try {
+      const deleted = await this.db
+        .deleteFrom("source_links")
+        .where("source_fingerprint", "=", sourceFingerprint)
+        .returning("source_fingerprint")
+        .executeTakeFirst();
+
+      return ok(Boolean(deleted));
+    } catch (error) {
+      return err(persistenceError("Source link could not be removed", error));
+    }
+  }
 }

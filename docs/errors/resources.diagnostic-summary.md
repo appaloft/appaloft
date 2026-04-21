@@ -99,6 +99,7 @@ Typical source errors:
 | Source | Error code | Phase | Meaning |
 | --- | --- | --- | --- |
 | `access` | `default_access_route_unavailable` | `access-summary` | No generated or durable access URL is currently available. |
+| `access` | `resource_domain_binding_not_ready` | `access-summary` | A durable domain binding exists but is not ready, so fallback routes remain context rather than the selected access target. |
 | `edge-access` | `resource_access_route_not_found` | `edge-request-routing` | Recent edge request reached Appaloft but no active route matched the host/path. |
 | `edge-access` | `resource_access_proxy_unavailable` | `proxy-route-observation` | Recent edge request reached a route that required unavailable proxy infrastructure. |
 | `edge-access` | `resource_access_route_unavailable` | `proxy-route-observation` | Recent edge request reached a known route that was not applied, ready, or current. |
@@ -148,8 +149,10 @@ Resource diagnostic summary error mapping is implemented for the initial query s
 Whole-query failures include `not_found`, `resource_diagnostic_context_mismatch`,
 `resource_diagnostic_unavailable`, and `resource_diagnostic_redaction_failed`.
 
-Initial source errors include `default_access_route_unavailable`, `deployment_logs_unavailable`,
-runtime log errors propagated from `resources.runtime-logs`, proxy errors propagated from
+Initial source errors include `default_access_route_unavailable`,
+`resource_domain_binding_not_ready`, `resource_access_*` edge-access diagnostics when a safe
+envelope is available, `deployment_logs_unavailable`, runtime log errors propagated from
+`resources.runtime-logs`, proxy errors propagated from
 `resources.proxy-configuration.preview`, and `system_context_unavailable`.
 
 The implementation uses the current codebase `DomainError.category` values (`user`, `infra`,

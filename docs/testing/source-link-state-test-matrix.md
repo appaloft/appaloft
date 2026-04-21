@@ -76,6 +76,7 @@ This matrix inherits:
 | SOURCE-LINK-STATE-016 | integration | PG source link relink is idempotent and guarded | Existing `source_links` row points at a resource and `source-links.relink` is called with same or guarded target ids. | Same target returns ok without duplicate rows; mismatched optimistic guard rejects and leaves the row unchanged. | `source_link_conflict`, phase `source-link-resolution` for guard mismatch |
 | SOURCE-LINK-STATE-017 | integration | Resource delete sees PG source link blocker | `source_links.resource_id` points at an archived resource being deleted. | `ResourceDeletionBlockerReader` reports `source-link` with safe id/count details and `resources.delete` rejects before tombstoning. | `resource_delete_blocked`, phase `resource-deletion-guard` |
 | SOURCE-LINK-STATE-018 | integration | PG source link migration blocks unsafe cascades | Schema migration creates `source_links` with resource reverse lookup and non-cascading resource reference. | Deleting/tombstoning a resource cannot erase source-link identity as a storage side effect; source links remain explicit relink/unlink state. | None |
+| SOURCE-LINK-STATE-019 | integration | PG source link unlink removes preview identity explicitly | `deployments.cleanup-preview` or another explicit cleanup path unlinks one preview source fingerprint from PostgreSQL/PGlite state. | The matching `source_links` row is deleted and unrelated source links remain intact. | None |
 
 ## Diagnostics Matrix
 
@@ -102,7 +103,7 @@ in `packages/application/test/relink-source-link.test.ts` and
 `packages/adapters/cli/test/source-link-command.test.ts`. Shell startup plans the same SSH remote
 PGlite mirror for relink in `apps/shell/test/remote-pglite-state-sync.test.ts`.
 
-`SOURCE-LINK-STATE-015` through `SOURCE-LINK-STATE-018` are covered in
+`SOURCE-LINK-STATE-015` through `SOURCE-LINK-STATE-019` are covered in
 `packages/persistence/pg/test/pglite.integration.test.ts`. The implementation includes the PG
 `SourceLinkStore` adapter, `019_source_links` migration, delete-blocker integration, and PGlite
 persistence tests. `source-link` blockers are closed for `resources.delete` when the selected state
