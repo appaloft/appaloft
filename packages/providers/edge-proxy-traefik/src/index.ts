@@ -25,6 +25,9 @@ const traefikImage = "traefik:v3.6.2";
 const defaultAccessFailureMiddlewareName = "appaloft-resource-access-errors";
 const defaultAccessFailureRendererPath = "/.appaloft/resource-access-failure";
 const defaultAccessFailureStatuses = [404, 502, 503, 504] as const;
+const defaultRouteNotFoundSignalHeader = "X-Appaloft-Resource-Access-Signal";
+const defaultRouteNotFoundSignalValue = "route-not-found";
+const defaultCatchAllPriority = 1;
 
 const capabilities: EdgeProxyProviderCapabilities = {
   ensureProxy: true,
@@ -130,6 +133,45 @@ export function renderTraefikResourceAccessFailureMiddleware(
         : []),
     ],
   };
+}
+
+function routeNotFoundFallbackLabels(input: {
+  deploymentId: string;
+  renderer: ResourceAccessFailureRendererTarget;
+}): string[] {
+  const serviceUrl = safeRendererServiceUrl(input.renderer.url);
+  if (!serviceUrl) {
+    return [];
+  }
+
+  const routerBase = sanitizeRouteName({
+    deploymentId: input.deploymentId,
+    suffix: "route-not-found",
+  });
+  const serviceName = `${routerBase}-svc`;
+  const rewriteMiddleware = `${routerBase}-rewrite`;
+  const headerMiddleware = `${routerBase}-headers`;
+  const rule = "PathPrefix(`/`) && !PathPrefix(`/.well-known/acme-challenge/`)";
+
+  return [
+    "traefik.enable=true",
+    `traefik.docker.network=${traefikEdgeNetworkName}`,
+    `traefik.http.routers.${routerBase}.rule=${rule}`,
+    `traefik.http.routers.${routerBase}.entrypoints=web`,
+    `traefik.http.routers.${routerBase}.priority=${defaultCatchAllPriority}`,
+    `traefik.http.routers.${routerBase}.middlewares=${rewriteMiddleware},${headerMiddleware}`,
+    `traefik.http.routers.${routerBase}.service=${serviceName}`,
+    `traefik.http.routers.${routerBase}-tls.rule=${rule}`,
+    `traefik.http.routers.${routerBase}-tls.entrypoints=websecure`,
+    `traefik.http.routers.${routerBase}-tls.tls=true`,
+    `traefik.http.routers.${routerBase}-tls.priority=${defaultCatchAllPriority}`,
+    `traefik.http.routers.${routerBase}-tls.middlewares=${rewriteMiddleware},${headerMiddleware}`,
+    `traefik.http.routers.${routerBase}-tls.service=${serviceName}`,
+    `traefik.http.middlewares.${rewriteMiddleware}.replacepath.path=${defaultAccessFailureRendererPath}`,
+    `traefik.http.middlewares.${headerMiddleware}.headers.customrequestheaders.${defaultRouteNotFoundSignalHeader}=${defaultRouteNotFoundSignalValue}`,
+    `traefik.http.services.${serviceName}.loadbalancer.server.url=${serviceUrl}`,
+    `traefik.http.services.${serviceName}.loadbalancer.passhostheader=false`,
+  ];
 }
 
 function accessFailureMiddlewareConfig(
@@ -518,7 +560,17 @@ export class TraefikEdgeProxyProvider implements EdgeProxyProvider {
           : {}),
       }),
     );
-    const labels = [...routeLabels, ...(accessFailureConfig ? accessFailureConfig.labels : [])];
+    const routeNotFoundLabels = input.resourceAccessFailureRenderer
+      ? routeNotFoundFallbackLabels({
+          deploymentId: input.deploymentId,
+          renderer: input.resourceAccessFailureRenderer,
+        })
+      : [];
+    const labels = [
+      ...routeLabels,
+      ...(accessFailureConfig ? accessFailureConfig.labels : []),
+      ...routeNotFoundLabels,
+    ];
 
     return ok({
       providerKey: this.key,
@@ -529,6 +581,7 @@ export class TraefikEdgeProxyProvider implements EdgeProxyProvider {
         ...(accessFailureConfig
           ? { resourceAccessFailureMiddleware: accessFailureConfig.middlewareName }
           : {}),
+        ...(routeNotFoundLabels.length > 0 ? { routeNotFoundFallback: "enabled" } : {}),
       },
     });
   }

@@ -87,6 +87,7 @@ Then:
 | RES-ACCESS-DIAG-ROUTE-001 | contract | Traefik served route with diagnostic renderer target | Provider route realization receives a safe renderer service URL | Served router references the access failure middleware and the middleware points at `/.appaloft/resource-access-failure` | Error middleware covers gateway-generated 404, 502, 503, and 504 statuses and does not expose raw provider text. |
 | RES-ACCESS-DIAG-ROUTE-002 | contract | Redirect-only route with diagnostic renderer target | Provider route realization receives canonical serve route plus alias redirect route | Serve router can use access failure middleware; alias redirect router remains redirect-only | Redirect alias is not accidentally attached to the upstream error middleware or workload service. |
 | RES-ACCESS-DIAG-ROUTE-003 | contract | Running service renderer target | Appaloft backend service is listening and provider-backed route realization runs | Runtime passes a safe renderer target into provider route realization | A wildcard-bound service derives `host.docker.internal:<port>` automatically; loopback-only one-shot CLI style runtime does not inject a target unless an explicit reachable override is configured. |
+| RES-ACCESS-DIAG-ROUTE-004 | contract | Unmatched route fallback | Provider route realization receives a safe renderer service URL and no router matches a later request host/path | Provider renders a low-priority catch-all router that rewrites to `/.appaloft/resource-access-failure` and injects a provider-neutral `route-not-found` signal | The fallback excludes `/.well-known/acme-challenge/`, does not leak raw provider details, and preserves more-specific served or redirect routers as the primary match. |
 
 ## Resource Observation Matrix
 
@@ -118,6 +119,7 @@ Executable tests now cover:
 - `RES-ACCESS-DIAG-ROUTE-001`;
 - `RES-ACCESS-DIAG-ROUTE-002` through the same provider route-label assertion;
 - `RES-ACCESS-DIAG-ROUTE-003`;
+- `RES-ACCESS-DIAG-ROUTE-004`;
 - `EDGE-PROXY-PROVIDER-010` as the Traefik provider contract row.
 
 Remaining gaps include broader classification rows, a companion/static renderer path for one-shot

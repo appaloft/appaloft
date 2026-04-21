@@ -377,4 +377,53 @@ describe("TraefikEdgeProxyProvider", () => {
     );
     expect(content).not.toContain("token=secret");
   });
+
+  test("[RES-ACCESS-DIAG-ROUTE-004] renders a low-priority route-not-found fallback when a renderer target is available", async () => {
+    const provider = new TraefikEdgeProxyProvider();
+
+    const realized = await provider.realizeRoutes(
+      { correlationId: "req_traefik_route_not_found_fallback_test" },
+      {
+        deploymentId: "dep_route_not_found",
+        port: 3000,
+        accessRoutes: [
+          {
+            proxyKind: "traefik" as const,
+            domains: ["app.example.test"],
+            pathPrefix: "/",
+            tlsMode: "auto" as const,
+            targetPort: 3000,
+          },
+        ],
+        resourceAccessFailureRenderer: {
+          url: "http://appaloft.internal:3001/.appaloft/resource-access-failure?token=secret",
+        },
+      },
+    );
+
+    expect(realized.isOk()).toBe(true);
+    const labels = realized._unsafeUnwrap().labels;
+    expect(labels).toEqual(
+      expect.arrayContaining([
+        "traefik.http.routers.dep-route-not-found-route-not-found.rule=PathPrefix(`/`) && !PathPrefix(`/.well-known/acme-challenge/`)",
+        "traefik.http.routers.dep-route-not-found-route-not-found.entrypoints=web",
+        "traefik.http.routers.dep-route-not-found-route-not-found.priority=1",
+        "traefik.http.routers.dep-route-not-found-route-not-found.middlewares=dep-route-not-found-route-not-found-rewrite,dep-route-not-found-route-not-found-headers",
+        "traefik.http.routers.dep-route-not-found-route-not-found.service=dep-route-not-found-route-not-found-svc",
+        "traefik.http.routers.dep-route-not-found-route-not-found-tls.rule=PathPrefix(`/`) && !PathPrefix(`/.well-known/acme-challenge/`)",
+        "traefik.http.routers.dep-route-not-found-route-not-found-tls.entrypoints=websecure",
+        "traefik.http.routers.dep-route-not-found-route-not-found-tls.tls=true",
+        "traefik.http.routers.dep-route-not-found-route-not-found-tls.priority=1",
+        "traefik.http.middlewares.dep-route-not-found-route-not-found-rewrite.replacepath.path=/.appaloft/resource-access-failure",
+        "traefik.http.middlewares.dep-route-not-found-route-not-found-headers.headers.customrequestheaders.X-Appaloft-Resource-Access-Signal=route-not-found",
+        "traefik.http.services.dep-route-not-found-route-not-found-svc.loadbalancer.server.url=http://appaloft.internal:3001",
+        "traefik.http.services.dep-route-not-found-route-not-found-svc.loadbalancer.passhostheader=false",
+      ]),
+    );
+    expect(labels.join("\n")).not.toContain("token=secret");
+    expect(realized._unsafeUnwrap().metadata).toMatchObject({
+      routeCount: "1",
+      routeNotFoundFallback: "enabled",
+    });
+  });
 });

@@ -6,6 +6,8 @@ import {
   resourceAccessFailureCodeFromHttpStatus,
 } from "@appaloft/application";
 
+const routeFailureSignalHeader = "x-appaloft-resource-access-signal";
+
 function firstQueryValue(searchParams: URLSearchParams, key: string): string | null {
   const value = searchParams.get(key)?.trim();
   return value && value.length > 0 ? value : null;
@@ -57,7 +59,9 @@ function resolveRequestId(request: Request, searchParams: URLSearchParams): stri
 function buildDiagnostic(request: Request, now: () => string): ResourceAccessFailureDiagnostic {
   const url = new URL(request.url);
   const code = parseResourceAccessFailureCode(firstQueryValue(url.searchParams, "code"));
-  const signal = parseResourceAccessFailureSignal(firstQueryValue(url.searchParams, "signal"));
+  const signal =
+    parseResourceAccessFailureSignal(firstQueryValue(url.searchParams, "signal")) ??
+    parseResourceAccessFailureSignal(request.headers.get(routeFailureSignalHeader));
   const status = parseStatus(firstQueryValue(url.searchParams, "status"));
   const statusCode = status === null ? null : resourceAccessFailureCodeFromHttpStatus(status);
   const selectedCode = code ?? (signal ? null : statusCode);
