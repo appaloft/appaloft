@@ -330,15 +330,20 @@ Implemented operations:
 | Capability | Kind | Operation Key | Message | Schema | CLI | oRPC / HTTP |
 | --- | --- | --- | --- | --- | --- | --- |
 | Create deployment | Command | `deployments.create` | `CreateDeploymentCommand` | `CreateDeploymentCommandInput` | `appaloft deploy [path-or-source]` or ids-only flags | `POST /api/deployments` |
+| Cleanup preview deployment | Command | `deployments.cleanup-preview` | `CleanupPreviewCommand` | `CleanupPreviewCommandInput` | `appaloft preview cleanup [path-or-source] --preview pull-request --preview-id pr-123` | - |
 | List deployments | Query | `deployments.list` | `ListDeploymentsQuery` | `ListDeploymentsQueryInput` | `appaloft deployments list` | `GET /api/deployments` |
 | Read deployment logs | Query | `deployments.logs` | `DeploymentLogsQuery` | `DeploymentLogsQueryInput` | `appaloft logs <deploymentId>` | `GET /api/deployments/{deploymentId}/logs` |
 
 Current boundary:
-- `deployments.create` is the only public deployment write command for the v1 operation surface.
-  This reset is governed by
+- `deployments.create` is the only general deployment-attempt admission command for the v1
+  operation surface, and `deployments.cleanup-preview` is the only accepted narrow preview cleanup
+  command. This reset is governed by
   [ADR-016: Deployment Command Surface Reset](./decisions/ADR-016-deployment-command-surface-reset.md).
 - `deployments.create` accepts deployment context references only: `projectId`, `environmentId`,
   `resourceId`, `serverId`, and optional `destinationId`
+- `deployments.cleanup-preview` accepts only a trusted preview-scoped source fingerprint and must
+  not expand into generic cancel, redeploy, rollback, or resource delete behavior. It removes
+  preview runtime state, preview route desired state, and preview source-link identity only.
 - deployment source and runtime strategy are resolved from the resource's persisted
   `ResourceSourceBinding`, `ResourceRuntimeProfile`, and `ResourceNetworkProfile`
 - v1 deployment runtime execution is Docker/OCI-backed. Every accepted runtime plan must build,
@@ -438,11 +443,13 @@ Current boundary:
   the user wants a stable hostname such as `pr-123.preview.example.com`, they must configure
   wildcard DNS to the selected server and provide the preview host template as trusted action or
   installation policy. Appaloft does not mutate public DNS in `controlPlane.mode: none`.
-- Action-only PR close cleanup is future behavior until a preview cleanup/delete operation exists.
+- Action-only PR close cleanup is supported only when a repository adds a user-authored
+  `pull_request.closed` workflow that dispatches `deployments.cleanup-preview`, typically through
+  `appaloft preview cleanup ...`. The command is idempotent when preview state is already absent.
   Product-grade preview environments with GitHub App webhooks, comments/checks, policy, cleanup
-  retries, audit, and managed domain lifecycle require Appaloft Cloud or a self-hosted control
-  plane. That future product line must still reuse repository config and explicit operations rather
-  than adding preview fields to `deployments.create`.
+  retries, audit, and managed domain lifecycle still require Appaloft Cloud or a self-hosted
+  control plane. That future product line must still reuse repository config and explicit
+  operations rather than adding preview fields to `deployments.create`.
 - `APPALOFT_PROJECT_ID`, `APPALOFT_RESOURCE_ID`, `APPALOFT_SERVER_ID`, and similar ids are optional
   trusted selection overrides for CLI/Action mode. They are required only when the operator wants to
   select existing control-plane identity explicitly; pure SSH CLI mode may reuse or create identity

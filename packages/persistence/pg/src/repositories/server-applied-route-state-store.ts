@@ -546,6 +546,25 @@ export class PgServerAppliedRouteStateStore implements ServerAppliedRouteStateSt
     }
   }
 
+  async deleteDesired(target: ServerAppliedRouteDesiredStateTarget): Promise<Result<boolean>> {
+    const targetResult = validateTarget(target);
+    if (targetResult.isErr()) {
+      return err(targetResult.error);
+    }
+
+    try {
+      const deleted = await this.db
+        .deleteFrom("server_applied_route_states")
+        .where("route_set_id", "=", routeSetKey(target))
+        .returning("route_set_id")
+        .executeTakeFirst();
+
+      return ok(Boolean(deleted));
+    } catch (error) {
+      return err(persistenceError("Server-applied route state could not be removed", error));
+    }
+  }
+
   private async readRouteSet(
     routeSetId: string,
   ): Promise<ServerAppliedRouteDesiredStateRecord | null> {

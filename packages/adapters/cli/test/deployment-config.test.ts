@@ -180,6 +180,7 @@ async function createPreviewDeployCliHarness(
                 updatedAt: routeInput.updatedAt,
               });
             },
+            deleteDesired: async () => ok(false),
           },
         }
       : {}),
@@ -621,6 +622,7 @@ describe("CLI deployment config entry workflow", () => {
             updatedAt: input.updatedAt,
           });
         },
+        deleteDesired: async () => ok(false),
       },
     });
     const workspace = mkdtempSync(join(tmpdir(), "appaloft-domain-config-"));

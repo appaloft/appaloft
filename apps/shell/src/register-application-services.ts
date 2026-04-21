@@ -8,6 +8,8 @@ import {
   type CertificateProviderSelectionInput,
   type CertificateProviderSelectionPolicy,
   CertificateRetryScheduler,
+  CleanupPreviewCommandHandler,
+  CleanupPreviewUseCase,
   ConfigureResourceHealthCommandHandler,
   ConfigureResourceHealthUseCase,
   ConfigureResourceNetworkCommandHandler,
@@ -102,6 +104,7 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(MarkServerAppliedRouteStatusOnDeploymentFinishedHandler);
   container.registerSingleton(IssueCertificateOnCertificateRequestedHandler);
   container.registerSingleton(BootstrapServerProxyCommandHandler);
+  container.registerSingleton(CleanupPreviewCommandHandler);
   container.registerSingleton(ConfigureResourceHealthCommandHandler);
   container.registerSingleton(ConfigureResourceNetworkCommandHandler);
   container.registerSingleton(ConfigureResourceRuntimeCommandHandler);
@@ -180,6 +183,7 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(tokens.deploymentFactory, DeploymentFactory);
   container.registerSingleton(tokens.deploymentLifecycleService, DeploymentLifecycleService);
   container.registerSingleton(tokens.createDeploymentUseCase, CreateDeploymentUseCase);
+  container.registerSingleton(tokens.cleanupPreviewUseCase, CleanupPreviewUseCase);
   container.registerSingleton(tokens.createDomainBindingUseCase, CreateDomainBindingUseCase);
   container.registerSingleton(
     tokens.confirmDomainBindingOwnershipUseCase,

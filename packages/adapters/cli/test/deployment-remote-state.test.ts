@@ -515,6 +515,46 @@ describe("CLI server-applied route desired state", () => {
       await rm(root, { recursive: true, force: true });
     }
   });
+
+  test("[SERVER-APPLIED-ROUTE-STATE-006] preview cleanup can delete server-applied route state", async () => {
+    const root = await tempStateRoot();
+    try {
+      const store = new FileSystemServerAppliedRouteDesiredStateStore(root);
+      const target = {
+        projectId: "proj_1",
+        environmentId: "env_1",
+        resourceId: "res_1",
+        serverId: "srv_1",
+      };
+      await store.upsertDesired({
+        target,
+        updatedAt: "2026-04-19T00:00:00.000Z",
+        domains: [
+          {
+            host: "www.example.com",
+            pathPrefix: "/",
+            tlsMode: "auto",
+          },
+        ],
+      });
+
+      const deleted = await store.deleteDesired(target);
+      const readBack = await store.read(target);
+      const deletedAgain = await store.deleteDesired(target);
+
+      expect(deleted.isOk()).toBe(true);
+      expect(readBack.isOk()).toBe(true);
+      expect(deletedAgain.isOk()).toBe(true);
+      if (deleted.isErr() || readBack.isErr() || deletedAgain.isErr()) {
+        throw new Error("Expected server-applied route state deletion to succeed");
+      }
+      expect(deleted.value).toBe(true);
+      expect(readBack.value).toBeNull();
+      expect(deletedAgain.value).toBe(false);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
 });
 
 describe("CLI source link state", () => {
@@ -923,6 +963,40 @@ describe("CLI source link state", () => {
         exists: true,
         phase: "remote-state-recovery",
       });
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  test("[SOURCE-LINK-STATE-019] preview cleanup can unlink source link state", async () => {
+    const root = await tempStateRoot();
+    try {
+      const store = new FileSystemSourceLinkStore(root);
+      const sourceFingerprint = "source-fingerprint:v1:preview%3Apr%3A14";
+      await store.createIfMissing({
+        sourceFingerprint,
+        updatedAt: "2026-04-19T00:00:00.000Z",
+        target: {
+          projectId: "proj_1",
+          environmentId: "env_1",
+          resourceId: "res_1",
+          serverId: "srv_1",
+        },
+      });
+
+      const deleted = await store.unlink(sourceFingerprint);
+      const readBack = await store.read(sourceFingerprint);
+      const deletedAgain = await store.unlink(sourceFingerprint);
+
+      expect(deleted.isOk()).toBe(true);
+      expect(readBack.isOk()).toBe(true);
+      expect(deletedAgain.isOk()).toBe(true);
+      if (deleted.isErr() || readBack.isErr() || deletedAgain.isErr()) {
+        throw new Error("Expected source link deletion to succeed");
+      }
+      expect(deleted.value).toBe(true);
+      expect(readBack.value).toBeNull();
+      expect(deletedAgain.value).toBe(false);
     } finally {
       await rm(root, { recursive: true, force: true });
     }
