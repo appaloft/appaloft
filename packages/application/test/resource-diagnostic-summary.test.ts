@@ -563,6 +563,73 @@ describe("ResourceDiagnosticSummaryQueryService", () => {
     expect(summary.copy.json).toContain('"serverAppliedUrl": "https://www.example.test/admin"');
   });
 
+  test("[RES-DIAG-QRY-015] keeps durable route first for diagnostic proxy context", async () => {
+    const context = createTestContext();
+    const { service } = createService({
+      resources: [
+        resourceSummary({
+          accessSummary: {
+            latestDurableDomainRoute: {
+              url: "https://durable.example.test",
+              hostname: "durable.example.test",
+              scheme: "https",
+              deploymentId: "dep_web",
+              deploymentStatus: "succeeded",
+              pathPrefix: "/",
+              proxyKind: "caddy",
+              targetPort: 3000,
+              updatedAt: "2026-01-01T00:00:07.000Z",
+            },
+            latestServerAppliedDomainRoute: {
+              url: "https://server-applied.example.test",
+              hostname: "server-applied.example.test",
+              scheme: "https",
+              deploymentId: "dep_web",
+              deploymentStatus: "succeeded",
+              pathPrefix: "/",
+              proxyKind: "traefik",
+              targetPort: 3000,
+              updatedAt: "2026-01-01T00:00:06.000Z",
+            },
+            latestGeneratedAccessRoute: {
+              url: "http://generated.example.test",
+              hostname: "generated.example.test",
+              scheme: "http",
+              providerKey: "sslip",
+              deploymentId: "dep_web",
+              deploymentStatus: "succeeded",
+              pathPrefix: "/",
+              proxyKind: "traefik",
+              targetPort: 3000,
+              updatedAt: "2026-01-01T00:00:05.000Z",
+            },
+            proxyRouteStatus: "ready",
+            lastRouteRealizationDeploymentId: "dep_web",
+          },
+        }),
+      ],
+    });
+    const query = ResourceDiagnosticSummaryQuery.create({
+      resourceId: "res_web",
+      includeDeploymentLogTail: false,
+      includeRuntimeLogTail: false,
+      includeProxyConfiguration: false,
+      tailLines: 10,
+    })._unsafeUnwrap();
+
+    const result = await service.execute(context, query);
+
+    expect(result.isOk()).toBe(true);
+    const summary = result._unsafeUnwrap();
+    expect(summary.access).toMatchObject({
+      durableUrl: "https://durable.example.test",
+      serverAppliedUrl: "https://server-applied.example.test",
+      generatedUrl: "http://generated.example.test",
+    });
+    expect(summary.proxy.providerKey).toBe("caddy");
+    expect(summary.copy.json).toContain('"durableUrl": "https://durable.example.test"');
+  });
+
   test("[EDGE-PROXY-ROUTE-006] includes provider-local TLS diagnostics in resource diagnostics", async () => {
     const context = createTestContext();
     const { service } = createService({

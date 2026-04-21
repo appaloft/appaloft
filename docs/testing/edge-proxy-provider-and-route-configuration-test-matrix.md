@@ -114,7 +114,7 @@ Then:
 | Test ID | Preferred automation | Case | Input | Expected result | Expected error | Expected sections |
 | --- | --- | --- | --- | --- | --- | --- |
 | EDGE-PROXY-QRY-001 | integration | Planned route before first deploy | `resourceId`, `routeScope = planned` | `ok`, status `planned` | None | Provider-rendered desired sections. |
-| EDGE-PROXY-QRY-002 | integration | Latest realized route | `resourceId`, `routeScope = latest` | `ok`, status `applied` or `stale` | None | Snapshot/provider sections. |
+| EDGE-PROXY-QRY-002 | integration | Latest current route | `resourceId`, `routeScope = latest`, with durable/server-applied/generated route state available | `ok`, status `applied`, `stale`, or `planned` | None | Provider sections render the selected current route using durable, server-applied, latest generated, then planned generated precedence; immutable deployment snapshot remains available through `deployment-snapshot`. |
 | EDGE-PROXY-QRY-003 | integration | Deployment snapshot | `resourceId`, `deploymentId`, `routeScope = deployment-snapshot` | `ok` | None | Immutable snapshot-based sections. |
 | EDGE-PROXY-QRY-004 | integration | No proxy route | Resource has no inbound route | `ok`, status `not-configured` | None | Empty sections. |
 | EDGE-PROXY-QRY-005 | integration | Missing provider | Provider key unavailable | `err` | `proxy_provider_unavailable` | None. |

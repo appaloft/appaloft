@@ -673,6 +673,7 @@ export interface EdgeProxyRouteInput {
   tlsMode: TlsMode;
   targetPort?: number;
   providerKey?: string;
+  source?: "generated-default" | "domain-binding" | "deployment-snapshot" | "server-applied";
   routeBehavior?: "serve" | "redirect";
   redirectTo?: string;
   redirectStatus?: 301 | 302 | 307 | 308;

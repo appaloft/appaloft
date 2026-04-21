@@ -81,6 +81,12 @@ The workflow composes read state from:
 Each source is allowed to be unavailable. The summary must preserve source-specific status and
 structured source errors.
 
+When access state includes multiple public routes, diagnostic access and proxy sections must use
+the default-access route precedence contract for the current selected route: durable ready domain,
+server-applied config domain, latest generated route, planned generated route, then no public
+route. The summary may still include the separate generated, durable, and server-applied URLs so an
+operator can see why a generated/default URL exists but is not the selected public route.
+
 The query service may depend on existing query services or read-model ports, but Web components,
 CLI commands, and HTTP handlers must not manually reconstruct the diagnostic payload by calling many
 separate endpoints and merging ad hoc shapes.

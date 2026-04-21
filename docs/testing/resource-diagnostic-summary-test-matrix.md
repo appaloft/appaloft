@@ -81,6 +81,7 @@ Then:
 | RES-DIAG-QRY-012 | integration | Core read model failure | Resource context cannot be safely loaded | `err(resource_diagnostic_unavailable)` | None | No partial unsafe summary is returned. |
 | RES-DIAG-QRY-013 | integration | Redaction failure | Redactor cannot prove safety | `err(resource_diagnostic_redaction_failed)` | None | No copy payload is returned. |
 | RES-DIAG-QRY-014 | integration | Copy markdown failure | Optional markdown render fails but JSON succeeds | `ok` | `resource_diagnostic_copy_render_failed` | `copy.json` remains present. |
+| RES-DIAG-QRY-015 | integration | Access precedence summary | Durable ready, server-applied, and generated routes are all present | `ok` with access and proxy sections available | None | Copy payload preserves separate route URLs and proxy/provider context uses durable, server-applied, latest generated, then planned generated precedence for the selected route. |
 
 ## Entrypoint Matrix
 

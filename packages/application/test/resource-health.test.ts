@@ -374,7 +374,7 @@ describe("ResourceHealthQueryService", () => {
     );
   });
 
-  test("[EDGE-PROXY-ROUTE-005] reports server-applied domain as public access route", async () => {
+  test("[RES-HEALTH-QRY-018][EDGE-PROXY-ROUTE-005] reports server-applied domain before generated route", async () => {
     const service = createService({
       resources: [
         resourceSummary({
@@ -389,6 +389,18 @@ describe("ResourceHealthQueryService", () => {
               proxyKind: "traefik",
               targetPort: 3000,
               updatedAt: "2026-01-01T00:00:05.000Z",
+            },
+            latestGeneratedAccessRoute: {
+              url: "http://generated.example.test",
+              hostname: "generated.example.test",
+              scheme: "http",
+              providerKey: "sslip",
+              deploymentId: "dep_generated",
+              deploymentStatus: "succeeded",
+              pathPrefix: "/",
+              proxyKind: "traefik",
+              targetPort: 3000,
+              updatedAt: "2026-01-01T00:00:04.000Z",
             },
             proxyRouteStatus: "ready",
             lastRouteRealizationDeploymentId: "dep_web",
@@ -410,6 +422,62 @@ describe("ResourceHealthQueryService", () => {
       status: "ready",
       providerKey: "traefik",
       lastRouteRealizationDeploymentId: "dep_web",
+    });
+  });
+
+  test("[RES-HEALTH-QRY-014] reports durable domain before server-applied and generated routes", async () => {
+    const service = createService({
+      resources: [
+        resourceSummary({
+          accessSummary: {
+            latestDurableDomainRoute: {
+              url: "https://durable.example.test",
+              hostname: "durable.example.test",
+              scheme: "https",
+              deploymentId: "dep_web",
+              deploymentStatus: "succeeded",
+              pathPrefix: "/",
+              proxyKind: "traefik",
+              targetPort: 3000,
+              updatedAt: "2026-01-01T00:00:07.000Z",
+            },
+            latestServerAppliedDomainRoute: {
+              url: "https://server-applied.example.test",
+              hostname: "server-applied.example.test",
+              scheme: "https",
+              deploymentId: "dep_web",
+              deploymentStatus: "succeeded",
+              pathPrefix: "/",
+              proxyKind: "traefik",
+              targetPort: 3000,
+              updatedAt: "2026-01-01T00:00:06.000Z",
+            },
+            latestGeneratedAccessRoute: {
+              url: "http://generated.example.test",
+              hostname: "generated.example.test",
+              scheme: "http",
+              providerKey: "sslip",
+              deploymentId: "dep_web",
+              deploymentStatus: "succeeded",
+              pathPrefix: "/",
+              proxyKind: "traefik",
+              targetPort: 3000,
+              updatedAt: "2026-01-01T00:00:05.000Z",
+            },
+            proxyRouteStatus: "ready",
+            lastRouteRealizationDeploymentId: "dep_web",
+          },
+        }),
+      ],
+    });
+
+    const result = await service.execute(createTestContext(), createQuery());
+
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap().publicAccess).toMatchObject({
+      status: "ready",
+      url: "https://durable.example.test",
+      kind: "durable-domain",
     });
   });
 

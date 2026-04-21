@@ -88,15 +88,19 @@ function routeUrl(input: {
   return `${input.scheme}://${input.hostname}${path}`;
 }
 
-function routeSource(input: ProxyConfigurationViewInput): ProxyConfigurationRouteView["source"] {
-  return input.routeScope === "planned" ? "generated-default" : "deployment-snapshot";
+function routeSource(
+  input: ProxyConfigurationViewInput,
+  route: EdgeProxyRouteInput,
+): ProxyConfigurationRouteView["source"] {
+  return (
+    route.source ?? (input.routeScope === "planned" ? "generated-default" : "deployment-snapshot")
+  );
 }
 
 function routeViews(input: ProxyConfigurationViewInput): ProxyConfigurationRouteView[] {
-  const source = routeSource(input);
-
   return input.accessRoutes.flatMap((route) =>
     route.domains.map((hostname) => {
+      const source = routeSource(input, route);
       const scheme = routeScheme(route);
       const redirect = route.routeBehavior === "redirect" || Boolean(route.redirectTo);
       return {
