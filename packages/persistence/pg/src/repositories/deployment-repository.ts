@@ -160,16 +160,20 @@ export class PgDeploymentRepository implements DeploymentRepository {
         );
       }
 
-      return err(
-        domainError.infra("Deployment could not be created", {
-          commandName: "deployments.create",
-          phase: "deployment-creation",
-          resourceId: state.resourceId.value,
-          operation: "deployment.admit",
-          causeCode: "deployment_insert_failed",
-          ...(safeErrorMessage(error) ? { message: safeErrorMessage(error) } : {}),
-        }),
-      );
+      const errorMetadata: Record<string, string | number | boolean | null> = {
+        commandName: "deployments.create",
+        phase: "deployment-creation",
+        resourceId: state.resourceId.value,
+        operation: "deployment.admit",
+        causeCode: "deployment_insert_failed",
+      };
+      const errorMessage = safeErrorMessage(error);
+
+      if (errorMessage) {
+        errorMetadata.message = errorMessage;
+      }
+
+      return err(domainError.infra("Deployment could not be created", errorMetadata));
     }
   }
 
