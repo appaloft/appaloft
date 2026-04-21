@@ -82,10 +82,11 @@ Then:
 | RES-HEALTH-QRY-011 | integration | Command policy pass | Adapter supports command check and command exits 0 | `ok` with command check passed | Command runs inside workload boundary. |
 | RES-HEALTH-QRY-012 | integration | Command policy unsupported | Adapter cannot run command policy | `ok(overall = "unknown")` or `degraded` by policy strictness | Source error is `resource_health_policy_unsupported`. |
 | RES-HEALTH-QRY-013 | integration | Proxy route missing | Reverse-proxy exposure but route not applied | `ok(overall = "degraded")` | Proxy section identifies unavailable route. |
-| RES-HEALTH-QRY-014 | integration | Durable domain ready | Ready domain binding and generated route both exist | `ok` uses durable domain as public access target | Durable domain precedes generated default route. |
+| RES-HEALTH-QRY-014 | integration | Durable domain ready | Ready domain binding, server-applied route, and generated route all exist | `ok` uses durable domain as public access target | Durable domain precedes server-applied and generated default routes. |
 | RES-HEALTH-QRY-015 | integration | Durable domain pending | Domain binding exists but is not ready | `ok(overall = "degraded")` when public access is required | Domain state is not hidden by generated route unless policy allows fallback. |
 | RES-HEALTH-QRY-016 | integration | Runtime inspection fails | Runtime provider inspect fails | `ok(overall = "unknown")` | Source error records runtime inspection failure. |
 | RES-HEALTH-QRY-017 | integration | Read model failure | Required resource context cannot be safely loaded | `err(resource_health_unavailable)` | No partial unsafe summary is returned. |
+| RES-HEALTH-QRY-018 | integration | Server-applied route ready | Server-applied config domain and generated route both exist, with no ready durable binding | `ok` uses server-applied domain as public access target | Server-applied route precedes generated default route and reports `kind = server-applied-domain`. |
 
 ## Status Aggregation Matrix
 

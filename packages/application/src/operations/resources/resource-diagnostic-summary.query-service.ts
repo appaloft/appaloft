@@ -213,9 +213,9 @@ function proxyProviderKey(
   deployment: DeploymentSummary | undefined,
 ): string | undefined {
   const proxyKind =
-    resource.accessSummary?.latestGeneratedAccessRoute?.proxyKind ??
     resource.accessSummary?.latestDurableDomainRoute?.proxyKind ??
     resource.accessSummary?.latestServerAppliedDomainRoute?.proxyKind ??
+    resource.accessSummary?.latestGeneratedAccessRoute?.proxyKind ??
     resource.accessSummary?.plannedGeneratedAccessRoute?.proxyKind ??
     deployment?.runtimePlan.execution.accessRoutes?.find((route) => route.proxyKind !== "none")
       ?.proxyKind;
@@ -470,7 +470,7 @@ export class ResourceDiagnosticSummaryQueryService {
           retryable: false,
           redactions,
           relatedEntityId: resource.id,
-          message: "No generated or durable access URL is currently available",
+          message: "No durable, server-applied, or generated access URL is currently available",
         }),
       );
     }

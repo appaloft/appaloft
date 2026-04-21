@@ -146,7 +146,8 @@ Required top-level behavior:
   available.
 - `healthPolicy` reports whether a health check is enabled, missing, or unsupported.
 - `publicAccess` reports the current resource URL being checked. Durable resource domain bindings
-  take precedence over generated default access.
+  take precedence over server-applied config domains, and server-applied config domains take
+  precedence over generated default access.
 - `proxy` reports route readiness and provider key when the resource uses reverse-proxy exposure.
 - `sourceErrors` records per-source observation failures without failing the whole query when the
   resource can still be identified.
@@ -197,8 +198,9 @@ Public access checks target the resource's current route:
 
 1. ready durable domain binding for the resource/destination/target/path;
 2. latest durable domain route in `ResourceAccessSummary`;
-3. latest generated default route;
-4. planned generated route only when no deployment has realized a route yet.
+3. latest server-applied config domain route in `ResourceAccessSummary`;
+4. latest generated default route;
+5. planned generated route only when no deployment has realized a route yet.
 
 The query must not treat deployment-scoped route snapshots as domain ownership. A deployment
 snapshot records which route was used by that attempt; the current route belongs to resource access

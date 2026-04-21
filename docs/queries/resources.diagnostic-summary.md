@@ -124,9 +124,11 @@ Required top-level behavior:
   runtime strategy when available.
 - `deployment` includes attempt status, lifecycle phase, terminal timestamps, request/correlation id
   when available, and last structured error summary when available.
-- `access` includes generated and durable access route status, public URL when safe, route
-  realization status, server-applied canonical redirect status when present, and the structured
-  reason when no access URL is available.
+- `access` includes generated, durable, and server-applied access route status, public URLs when
+  safe, route realization status, server-applied canonical redirect status when present, and the
+  structured reason when no access URL is available. When the summary needs one current route for
+  support/debug context, it uses durable ready domain, server-applied config domain, latest
+  generated route, planned generated route, then no public route.
 - `proxy` includes provider key, proxy readiness, configuration view availability, and safe warnings
   or last structured provider error.
 - `deploymentLogs` and `runtimeLogs` report whether logs are available, empty, unavailable, or not
@@ -179,7 +181,7 @@ The query must:
    resource network/access context.
 5. Read deployment status and last structured error from deployment read models or aggregate
    snapshots.
-6. Read generated/durable access summary and route realization status.
+6. Read generated/durable/server-applied access summary and route realization status.
 7. Summarize proxy readiness and optionally call `resources.proxy-configuration.preview` semantics
    or the same provider-backed read service for redacted configuration sections.
 8. Read a bounded deployment log tail when requested.
