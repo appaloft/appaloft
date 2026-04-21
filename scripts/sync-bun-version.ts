@@ -2,6 +2,7 @@ import { resolve } from "node:path";
 
 const root = resolve(import.meta.dir, "..");
 const bunVersionPath = resolve(root, ".bun-version");
+const packageJsonPath = resolve(root, "package.json");
 const runtimeHelperPath = resolve(
   root,
   "packages",
@@ -14,6 +15,7 @@ const runtimeHelperPath = resolve(
 
 const checkOnly = Bun.argv.includes("--check");
 const bunVersion = (await Bun.file(bunVersionPath).text()).trim();
+const packageJson = (await Bun.file(packageJsonPath).json()) as Record<string, unknown>;
 
 if (!/^\d+\.\d+\.\d+$/u.test(bunVersion)) {
   throw new Error(`Expected .bun-version to contain an exact semantic version, got: ${bunVersion}`);
@@ -25,8 +27,14 @@ export const pinnedBunAlpineImage = \`oven/bun:\${pinnedBunVersion}-alpine\`;
 `;
 
 const currentRuntimeHelper = await Bun.file(runtimeHelperPath).text();
+const nextPackageManager = `bun@${bunVersion}`;
+const currentPackageManager =
+  typeof packageJson.packageManager === "string" ? packageJson.packageManager : undefined;
 
-if (currentRuntimeHelper === nextRuntimeHelper) {
+const packageManagerNeedsUpdate = currentPackageManager !== nextPackageManager;
+const runtimeHelperNeedsUpdate = currentRuntimeHelper !== nextRuntimeHelper;
+
+if (!packageManagerNeedsUpdate && !runtimeHelperNeedsUpdate) {
   console.log(`Bun version sync is up to date at ${bunVersion}.`);
   process.exit(0);
 }
@@ -37,5 +45,16 @@ if (checkOnly) {
   );
 }
 
-await Bun.write(runtimeHelperPath, nextRuntimeHelper);
+if (packageManagerNeedsUpdate) {
+  const nextPackageJson = {
+    ...packageJson,
+    packageManager: nextPackageManager,
+  };
+  await Bun.write(packageJsonPath, `${JSON.stringify(nextPackageJson, null, 2)}\n`);
+}
+
+if (runtimeHelperNeedsUpdate) {
+  await Bun.write(runtimeHelperPath, nextRuntimeHelper);
+}
+
 console.log(`Synchronized Bun runtime image helpers to ${bunVersion}.`);
