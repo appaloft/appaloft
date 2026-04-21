@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.2.8](https://github.com/appaloft/appaloft/compare/v0.2.7...v0.2.8) (2026-04-21)
+
+
+### Features
+
+* **branding:** refresh app icons and favicons ([6980cf2](https://github.com/appaloft/appaloft/commit/6980cf2494894f5cb1e53854763e05ca6e70b30d))
+
+
+### Bug Fixes
+
+* **branding:** use light icon assets by default ([13bb2cb](https://github.com/appaloft/appaloft/commit/13bb2cb72d83a274fdc22ef198d5c61e50ec2372))
+* sweep stale preview cleanup state ([2b17699](https://github.com/appaloft/appaloft/commit/2b1769990151ff3513b3fa331fb11808a74d4a18))
+* sweep stale preview cleanup state ([3081327](https://github.com/appaloft/appaloft/commit/30813277eb8b1c5ec99f2a602eded4c753d107b2))
+* sync shell noop route state store ([86984b4](https://github.com/appaloft/appaloft/commit/86984b47097aa12a21c2f4287b36a175838fb96e))
+
+
+### Documentation
+
+* align roadmap for 0.2.8 gate ([#40](https://github.com/appaloft/appaloft/issues/40)) ([1e72550](https://github.com/appaloft/appaloft/commit/1e725505b12568dfe9280a08b3b30ad55c82c374))
+
 ## [0.2.7](https://github.com/appaloft/appaloft/compare/v0.2.6...v0.2.7) (2026-04-21)
 
 
