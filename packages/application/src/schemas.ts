@@ -1,3 +1,4 @@
+export * from "./operations/certificates/import-certificate.schema";
 export * from "./operations/certificates/issue-or-renew-certificate.schema";
 export * from "./operations/certificates/list-certificates.schema";
 export * from "./operations/default-access-domain-policies/configure-default-access-domain-policy.schema";

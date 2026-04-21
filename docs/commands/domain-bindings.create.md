@@ -114,7 +114,8 @@ domain-bindings.create
   -> DNS observation pending | matched | mismatch | unresolved | lookup_failed
   -> domain-bound
   -> certificate-requested, when certificatePolicy is auto
-  -> certificate-issued | certificate-issuance-failed
+  -> certificate-issued | certificate-issuance-failed, when certificatePolicy is auto
+  -> certificates.import -> certificate-imported, when certificatePolicy is manual
   -> domain-ready, when route and TLS gates are satisfied
 ```
 
@@ -130,6 +131,7 @@ Canonical event specs:
 - `domain-bound`: domain binding ownership/route requirements are satisfied.
 - `certificate-requested`: certificate issuance or renewal requested.
 - `certificate-issued`: certificate is issued and durable certificate state exists.
+- `certificate-imported`: imported certificate state is durably recorded for manual certificate policy.
 - `certificate-issuance-failed`: certificate issuance attempt failed.
 - `domain-ready`: domain binding is ready for traffic according to routing and TLS policy.
 

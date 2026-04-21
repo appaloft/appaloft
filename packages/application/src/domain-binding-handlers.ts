@@ -4,6 +4,7 @@ export * from "./operations/domain-bindings/create-domain-binding.handler";
 export * from "./operations/domain-bindings/create-domain-binding.use-case";
 export * from "./operations/domain-bindings/list-domain-bindings.handler";
 export * from "./operations/domain-bindings/list-domain-bindings.query-service";
+export * from "./operations/domain-bindings/mark-domain-ready-on-certificate-imported.handler";
 export * from "./operations/domain-bindings/mark-domain-ready-on-certificate-issued.handler";
 export * from "./operations/domain-bindings/mark-domain-ready-on-deployment-finished.handler";
 export * from "./operations/domain-bindings/mark-domain-ready-on-domain-bound.handler";

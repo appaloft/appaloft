@@ -53,7 +53,12 @@ export interface CertificateSummary {
   challengeType: string;
   domainBindingId: string;
   domainName: string;
+  expiresAt?: string;
+  fingerprint?: string;
+  source: "managed" | "imported";
   id: string;
+  issuer?: string;
+  keyAlgorithm?: string;
   latestAttempt?: {
     errorCode?: string;
     failurePhase?: string;
@@ -62,8 +67,10 @@ export interface CertificateSummary {
     retriable?: boolean;
     status: string;
   };
+  notBefore?: string;
   providerKey: string;
   status: string;
+  subjectAlternativeNames?: string[];
 }
 
 export interface ResourceSummary {

@@ -1,4 +1,5 @@
 export * from "./operations/certificates/certificate-retry-scheduler";
+export * from "./operations/certificates/import-certificate.use-case";
 export * from "./operations/certificates/issue-certificate-on-certificate-requested.handler";
 export * from "./operations/certificates/issue-or-renew-certificate.use-case";
 export * from "./operations/certificates/list-certificates.query-service";
@@ -19,6 +20,7 @@ export * from "./operations/deployments/runtime-plan-resolution-input.builder";
 export * from "./operations/domain-bindings/confirm-domain-binding-ownership.use-case";
 export * from "./operations/domain-bindings/create-domain-binding.use-case";
 export * from "./operations/domain-bindings/list-domain-bindings.query-service";
+export * from "./operations/domain-bindings/mark-domain-ready-on-certificate-imported.handler";
 export * from "./operations/domain-bindings/mark-domain-ready-on-certificate-issued.handler";
 export * from "./operations/domain-bindings/mark-domain-ready-on-deployment-finished.handler";
 export * from "./operations/domain-bindings/mark-domain-ready-on-domain-bound.handler";

@@ -43,7 +43,9 @@ import {
   diffEnvironmentsQueryInputSchema,
   type ExecutionContext,
   type ExecutionContextFactory,
+  ImportCertificateCommand,
   IssueOrRenewCertificateCommand,
+  importCertificateCommandInputSchema,
   issueOrRenewCertificateCommandInputSchema,
   ListCertificatesQuery,
   ListDeploymentsQuery,
@@ -113,6 +115,7 @@ import {
   deploymentProgressEventSchema,
   diffEnvironmentResponseSchema,
   environmentSummarySchema,
+  importCertificateResponseSchema,
   issueOrRenewCertificateResponseSchema,
   listCertificatesResponseSchema,
   listDeploymentsResponseSchema,
@@ -906,6 +909,18 @@ export const issueOrRenewCertificateProcedure = base
     executeCommand(context, IssueOrRenewCertificateCommand.create(input)),
   );
 
+export const importCertificateProcedure = base
+  .route({
+    method: "POST",
+    path: "/certificates/import",
+    successStatus: 200,
+  })
+  .input(importCertificateCommandInputSchema)
+  .output(importCertificateResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, ImportCertificateCommand.create(input)),
+  );
+
 export const listCertificatesProcedure = base
   .route({
     method: "GET",
@@ -1191,6 +1206,7 @@ export const appaloftOrpcRouter = {
     confirmOwnership: confirmDomainBindingOwnershipProcedure,
   },
   certificates: {
+    import: importCertificateProcedure,
     list: listCertificatesProcedure,
     issueOrRenew: issueOrRenewCertificateProcedure,
   },
@@ -1350,6 +1366,7 @@ export function mountAppaloftOrpcRoutes(
     "/api/domain-bindings",
     "/api/domain-bindings/:domainBindingId/ownership-confirmations",
     "/api/certificates",
+    "/api/certificates/import",
     "/api/certificates/issue-or-renew",
     "/api/deployments",
     "/api/deployments/stream",

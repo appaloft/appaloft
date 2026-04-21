@@ -986,6 +986,155 @@ describe("pglite persistence integration", () => {
     }
   }, 15000);
 
+  test("[CERT-SECRET-STORE-001] pg certificate secret store persists managed certificate bundles durably", async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), "appaloft-pglite-certificate-secret-managed-"));
+    const pgliteDataDir = join(workspaceDir, ".appaloft", "data", "pglite");
+    let closeDatabase: (() => Promise<void>) | undefined;
+
+    try {
+      const { createDatabase, createMigrator, PgCertificateSecretStore } = await import(
+        "../src/index"
+      );
+      const database = await createDatabase({
+        driver: "pglite",
+        pgliteDataDir,
+      });
+      closeDatabase = () => database.close();
+      const migrator = createMigrator(database.db);
+      const migrationResult = await migrator.migrateToLatest();
+      expect(migrationResult.error).toBeUndefined();
+
+      const target = await seedSourceLinkContext(database.db, "cert-secret-managed");
+      await insertDomainBinding(database.db, target, {
+        id: "dmb_cert_secret_managed",
+        domainName: "managed.example.test",
+        status: "bound",
+        tlsMode: "auto",
+        createdAt: "2026-01-01T00:00:00.000Z",
+      });
+
+      const store = new PgCertificateSecretStore(database.db, new FixedClock());
+      const result = await store.store(createTestExecutionContext(), {
+        certificateId: "crt_managed",
+        domainBindingId: "dmb_cert_secret_managed",
+        domainName: "managed.example.test",
+        attemptId: "cat_managed",
+        providerKey: "acme",
+        issuedAt: "2026-01-01T00:00:01.000Z",
+        expiresAt: "2026-02-01T00:00:01.000Z",
+        certificatePem: "  leaf-cert  ",
+        privateKeyPem: "  private-key  ",
+        certificateChainPem: "  issuer-chain  ",
+      });
+
+      expect(result.isOk()).toBe(true);
+      expect(result._unsafeUnwrap()).toEqual({
+        secretRef: "appaloft+pg://certificate/crt_managed/cat_managed/managed-bundle",
+      });
+
+      const row = await database.db
+        .selectFrom("certificate_secrets")
+        .selectAll()
+        .where("ref", "=", "appaloft+pg://certificate/crt_managed/cat_managed/managed-bundle")
+        .executeTakeFirstOrThrow();
+
+      expect(row.source).toBe("managed");
+      expect(row.kind).toBe("managed-bundle");
+      expect(row.payload).toEqual({
+        certificatePem: "leaf-cert",
+        privateKeyPem: "private-key",
+        certificateChainPem: "issuer-chain",
+      });
+      expect(row.metadata).toEqual({
+        providerKey: "acme",
+        domainName: "managed.example.test",
+        issuedAt: "2026-01-01T00:00:01.000Z",
+        expiresAt: "2026-02-01T00:00:01.000Z",
+      });
+    } finally {
+      await closeDatabase?.();
+      rmSync(workspaceDir, { recursive: true, force: true });
+    }
+  }, 15000);
+
+  test("[CERT-SECRET-STORE-002] pg certificate secret store persists imported material with stable refs", async () => {
+    const workspaceDir = mkdtempSync(
+      join(tmpdir(), "appaloft-pglite-certificate-secret-imported-"),
+    );
+    const pgliteDataDir = join(workspaceDir, ".appaloft", "data", "pglite");
+    let closeDatabase: (() => Promise<void>) | undefined;
+
+    try {
+      const { createDatabase, createMigrator, PgCertificateSecretStore } = await import(
+        "../src/index"
+      );
+      const database = await createDatabase({
+        driver: "pglite",
+        pgliteDataDir,
+      });
+      closeDatabase = () => database.close();
+      const migrator = createMigrator(database.db);
+      const migrationResult = await migrator.migrateToLatest();
+      expect(migrationResult.error).toBeUndefined();
+
+      const target = await seedSourceLinkContext(database.db, "cert-secret-imported");
+      await insertDomainBinding(database.db, target, {
+        id: "dmb_cert_secret_imported",
+        domainName: "manual.example.test",
+        status: "bound",
+        tlsMode: "auto",
+        createdAt: "2026-01-01T00:00:00.000Z",
+      });
+
+      const store = new PgCertificateSecretStore(database.db, new FixedClock());
+      const importedInput = {
+        certificateId: "crt_imported",
+        domainBindingId: "dmb_cert_secret_imported",
+        domainName: "manual.example.test",
+        attemptId: "cat_imported",
+        certificateChain: "  chain-pem  ",
+        privateKey: "  private-key  ",
+        passphrase: "  passphrase  ",
+      };
+
+      const first = await store.storeImported(createTestExecutionContext(), importedInput);
+      const second = await store.storeImported(createTestExecutionContext(), importedInput);
+
+      expect(first.isOk()).toBe(true);
+      expect(second.isOk()).toBe(true);
+      expect(first._unsafeUnwrap()).toEqual({
+        certificateChainRef:
+          "appaloft+pg://certificate/crt_imported/cat_imported/certificate-chain",
+        privateKeyRef: "appaloft+pg://certificate/crt_imported/cat_imported/private-key",
+        passphraseRef: "appaloft+pg://certificate/crt_imported/cat_imported/passphrase",
+      });
+      expect(second._unsafeUnwrap()).toEqual(first._unsafeUnwrap());
+
+      const rows = await database.db
+        .selectFrom("certificate_secrets")
+        .selectAll()
+        .where("certificate_id", "=", "crt_imported")
+        .orderBy("kind")
+        .execute();
+
+      expect(rows).toHaveLength(3);
+      expect(rows.map((row) => row.ref)).toEqual([
+        "appaloft+pg://certificate/crt_imported/cat_imported/certificate-chain",
+        "appaloft+pg://certificate/crt_imported/cat_imported/passphrase",
+        "appaloft+pg://certificate/crt_imported/cat_imported/private-key",
+      ]);
+      expect(rows.map((row) => row.payload)).toEqual([
+        { value: "chain-pem" },
+        { value: "passphrase" },
+        { value: "private-key" },
+      ]);
+      expect(rows.every((row) => row.source === "imported")).toBe(true);
+    } finally {
+      await closeDatabase?.();
+      rmSync(workspaceDir, { recursive: true, force: true });
+    }
+  }, 15000);
+
   test("[SOURCE-LINK-STATE-018] pg source link migration blocks unsafe cascades", async () => {
     const workspaceDir = mkdtempSync(join(tmpdir(), "appaloft-pglite-source-link-migration-"));
     const pgliteDataDir = join(workspaceDir, ".appaloft", "data", "pglite");

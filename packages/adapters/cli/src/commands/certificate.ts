@@ -1,6 +1,11 @@
-import { IssueOrRenewCertificateCommand, ListCertificatesQuery } from "@appaloft/application";
+import {
+  ImportCertificateCommand,
+  IssueOrRenewCertificateCommand,
+  ListCertificatesQuery,
+} from "@appaloft/application";
 import { certificateIssueReasons } from "@appaloft/core";
 import { Args, Command as EffectCommand, Options } from "@effect/cli";
+import { Effect } from "effect";
 
 import { optionalValue, runCommand, runQuery } from "../runtime.js";
 
@@ -13,6 +18,9 @@ const providerKeyOption = Options.text("provider").pipe(Options.optional);
 const challengeTypeOption = Options.text("challenge").pipe(Options.optional);
 const idempotencyKeyOption = Options.text("idempotency-key").pipe(Options.optional);
 const domainBindingFilterOption = Options.text("domain-binding").pipe(Options.optional);
+const certificateChainFileOption = Options.text("chain-file");
+const privateKeyFileOption = Options.text("key-file");
+const passphraseFileOption = Options.text("passphrase-file").pipe(Options.optional);
 
 const issueOrRenewCommand = EffectCommand.make(
   "issue-or-renew",
@@ -37,6 +45,38 @@ const issueOrRenewCommand = EffectCommand.make(
     ),
 ).pipe(EffectCommand.withDescription("Request certificate issuance or renewal"));
 
+const importCommand = EffectCommand.make(
+  "import",
+  {
+    domainBindingId: domainBindingIdArg,
+    certificateChainFile: certificateChainFileOption,
+    privateKeyFile: privateKeyFileOption,
+    passphraseFile: passphraseFileOption,
+    idempotencyKey: idempotencyKeyOption,
+  },
+  ({ certificateChainFile, domainBindingId, idempotencyKey, passphraseFile, privateKeyFile }) =>
+    Effect.gen(function* () {
+      const certificateChain = yield* Effect.promise(() => Bun.file(certificateChainFile).text());
+      const privateKey = yield* Effect.promise(() => Bun.file(privateKeyFile).text());
+      const passphrasePath = optionalValue(passphraseFile);
+      const passphrase = passphrasePath
+        ? yield* Effect.promise(() => Bun.file(passphrasePath).text())
+        : undefined;
+
+      yield* runCommand(
+        ImportCertificateCommand.create({
+          domainBindingId,
+          certificateChain,
+          privateKey,
+          ...(passphrase ? { passphrase } : {}),
+          ...(optionalValue(idempotencyKey)
+            ? { idempotencyKey: optionalValue(idempotencyKey) }
+            : {}),
+        }),
+      );
+    }),
+).pipe(EffectCommand.withDescription("Import a manual certificate for a bound domain"));
+
 const listCommand = EffectCommand.make(
   "list",
   {
@@ -52,5 +92,5 @@ const listCommand = EffectCommand.make(
 
 export const certificateCommand = EffectCommand.make("certificate").pipe(
   EffectCommand.withDescription("Certificate operations"),
-  EffectCommand.withSubcommands([issueOrRenewCommand, listCommand]),
+  EffectCommand.withSubcommands([importCommand, issueOrRenewCommand, listCommand]),
 );

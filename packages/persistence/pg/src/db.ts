@@ -26,6 +26,8 @@ import { auditLogAggregateIndexMigration } from "./migrations/018_audit_log_aggr
 import { sourceLinksMigration } from "./migrations/019_source_links";
 import { serverAppliedRouteStatesMigration } from "./migrations/020_server_applied_route_states";
 import { defaultAccessDomainPoliciesMigration } from "./migrations/021_default_access_domain_policies";
+import { certificateImportsMigration } from "./migrations/022_certificate_imports";
+import { certificateSecretsMigration } from "./migrations/023_certificate_secrets";
 import { PgliteDialect } from "./pglite-dialect";
 import { type Database } from "./schema";
 import { TracingDialect } from "./tracing-dialect";
@@ -141,6 +143,8 @@ class StaticMigrationProvider implements MigrationProvider {
       "019_source_links": sourceLinksMigration,
       "020_server_applied_route_states": serverAppliedRouteStatesMigration,
       "021_default_access_domain_policies": defaultAccessDomainPoliciesMigration,
+      "022_certificate_imports": certificateImportsMigration,
+      "023_certificate_secrets": certificateSecretsMigration,
     };
   }
 }
