@@ -2,6 +2,7 @@ export * from "./operations/certificates/certificate-retry-scheduler";
 export * from "./operations/certificates/issue-certificate-on-certificate-requested.handler";
 export * from "./operations/certificates/issue-or-renew-certificate.use-case";
 export * from "./operations/certificates/list-certificates.query-service";
+export * from "./operations/default-access-domain-policies/configure-default-access-domain-policy.use-case";
 export * from "./operations/deployments/cleanup-preview.use-case";
 export * from "./operations/deployments/create-deployment.use-case";
 export * from "./operations/deployments/default-access-domain-runtime-plan.resolver";

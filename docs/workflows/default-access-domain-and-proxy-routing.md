@@ -321,7 +321,9 @@ Durable domain binding precedence is not yet merged into the default access rout
 
 Server-applied config domain precedence from ADR-024 is not yet merged into the route resolver.
 
-The future public `default-access-domain-policies.configure` command is not yet implemented; shell/static configuration selects the current provider.
+`default-access-domain-policies.configure` is now the active public command for system and
+deployment-target policy state. Shell/static configuration remains only as the fallback seam when
+no durable policy record exists.
 
 ## Open Questions
 

@@ -6,6 +6,7 @@ import {
   bootstrapServerProxyCommandInputSchema,
   type Command,
   type CommandBus,
+  ConfigureDefaultAccessDomainPolicyCommand,
   ConfigureResourceHealthCommand,
   ConfigureResourceNetworkCommand,
   ConfigureResourceRuntimeCommand,
@@ -19,6 +20,7 @@ import {
   CreateProjectCommand,
   CreateResourceCommand,
   CreateSshCredentialCommand,
+  configureDefaultAccessDomainPolicyCommandInputSchema,
   configureResourceHealthCommandInputSchema,
   configureResourceNetworkCommandInputSchema,
   configureResourceRuntimeCommandInputSchema,
@@ -94,6 +96,7 @@ import {
 import {
   archiveResourceResponseSchema,
   bootstrapServerProxyResponseSchema,
+  configureDefaultAccessDomainPolicyResponseSchema,
   configureResourceHealthResponseSchema,
   configureResourceNetworkResponseSchema,
   configureResourceRuntimeResponseSchema,
@@ -739,6 +742,18 @@ export const createEnvironmentProcedure = base
     executeCommand(context, CreateEnvironmentCommand.create(input)),
   );
 
+export const configureDefaultAccessDomainPolicyProcedure = base
+  .route({
+    method: "POST",
+    path: "/default-access-domain-policies",
+    successStatus: 200,
+  })
+  .input(configureDefaultAccessDomainPolicyCommandInputSchema)
+  .output(configureDefaultAccessDomainPolicyResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, ConfigureDefaultAccessDomainPolicyCommand.create(input)),
+  );
+
 export const listResourcesProcedure = base
   .route({
     method: "GET",
@@ -1148,6 +1163,9 @@ export const appaloftOrpcRouter = {
     promote: promoteEnvironmentProcedure,
     diff: diffEnvironmentsProcedure,
   },
+  defaultAccessDomainPolicies: {
+    configure: configureDefaultAccessDomainPolicyProcedure,
+  },
   resources: {
     list: listResourcesProcedure,
     show: showResourceProcedure,
@@ -1310,6 +1328,7 @@ export function mountAppaloftOrpcRoutes(
     "/api/servers/:serverId/connectivity-tests",
     "/api/servers/:serverId/edge-proxy/bootstrap",
     "/api/environments",
+    "/api/default-access-domain-policies",
     "/api/environments/:environmentId",
     "/api/environments/:environmentId/variables",
     "/api/environments/:environmentId/variables/:key",

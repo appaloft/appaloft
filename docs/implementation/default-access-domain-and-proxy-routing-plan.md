@@ -220,7 +220,9 @@ Existing proxy label/config generation is still runtime-adapter owned. ADR-019 r
 
 Current deployment progress streaming remains the route-realization observation channel. More granular route-realization progress may be added when route realization becomes an independently retryable workflow.
 
-`default-access-domain-policies.configure` is still a future public command. Static shell configuration is the temporary configuration seam.
+`default-access-domain-policies.configure` is now active through CLI, API/oRPC, and minimal Web
+forms. Static shell configuration remains the temporary fallback seam only when no durable policy
+record exists.
 
 ## Open Questions
 

@@ -25,6 +25,7 @@ import { resourceDeleteTombstoneMigration } from "./migrations/017_resource_dele
 import { auditLogAggregateIndexMigration } from "./migrations/018_audit_log_aggregate_index";
 import { sourceLinksMigration } from "./migrations/019_source_links";
 import { serverAppliedRouteStatesMigration } from "./migrations/020_server_applied_route_states";
+import { defaultAccessDomainPoliciesMigration } from "./migrations/021_default_access_domain_policies";
 import { PgliteDialect } from "./pglite-dialect";
 import { type Database } from "./schema";
 import { TracingDialect } from "./tracing-dialect";
@@ -139,6 +140,7 @@ class StaticMigrationProvider implements MigrationProvider {
       "018_audit_log_aggregate_index": auditLogAggregateIndexMigration,
       "019_source_links": sourceLinksMigration,
       "020_server_applied_route_states": serverAppliedRouteStatesMigration,
+      "021_default_access_domain_policies": defaultAccessDomainPoliciesMigration,
     };
   }
 }

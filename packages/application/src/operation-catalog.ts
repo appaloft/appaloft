@@ -1,6 +1,7 @@
 import { type ZodTypeAny } from "zod";
 import { issueOrRenewCertificateCommandInputSchema } from "./operations/certificates/issue-or-renew-certificate.command";
 import { listCertificatesQueryInputSchema } from "./operations/certificates/list-certificates.query";
+import { configureDefaultAccessDomainPolicyCommandInputSchema } from "./operations/default-access-domain-policies/configure-default-access-domain-policy.command";
 import { cleanupPreviewCommandInputSchema } from "./operations/deployments/cleanup-preview.command";
 import { createDeploymentCommandInputSchema } from "./operations/deployments/create-deployment.command";
 import { deploymentLogsQueryInputSchema } from "./operations/deployments/deployment-logs.query";
@@ -50,6 +51,7 @@ type OperationDomain =
   | "environments"
   | "resources"
   | "deployments"
+  | "default-access-domain-policies"
   | "domain-bindings"
   | "certificates"
   | "source-links"
@@ -585,6 +587,20 @@ export const operationCatalog = [
     serviceToken: tokens.relinkSourceLinkUseCase,
     transports: {
       cli: "appaloft source-links relink",
+    },
+  },
+  {
+    key: "default-access-domain-policies.configure",
+    kind: "command",
+    domain: "default-access-domain-policies",
+    messageName: "ConfigureDefaultAccessDomainPolicyCommand",
+    handlerName: "ConfigureDefaultAccessDomainPolicyCommandHandler",
+    serviceName: "ConfigureDefaultAccessDomainPolicyUseCase",
+    inputSchema: configureDefaultAccessDomainPolicyCommandInputSchema,
+    serviceToken: tokens.configureDefaultAccessDomainPolicyUseCase,
+    transports: {
+      cli: "appaloft default-access configure",
+      orpc: { method: "POST", path: "/api/default-access-domain-policies" },
     },
   },
   {
