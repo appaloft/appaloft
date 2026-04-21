@@ -265,9 +265,15 @@ describe("postgres persistence integration", () => {
       }),
     );
 
-    (await deploymentRepository.admit(context, deployment))._unsafeUnwrap();
     (
-      await deploymentRepository.upsert(
+      await deploymentRepository.insertOne(
+        context,
+        deployment,
+        UpsertDeploymentSpec.fromDeployment(deployment),
+      )
+    )._unsafeUnwrap();
+    (
+      await deploymentRepository.updateOne(
         context,
         deployment,
         UpsertDeploymentSpec.fromDeployment(deployment),

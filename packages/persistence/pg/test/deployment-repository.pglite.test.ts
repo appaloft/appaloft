@@ -59,6 +59,7 @@ import {
   SourceLocator,
   StartedAt,
   TargetKindValue,
+  UpsertDeploymentSpec,
   UpsertDeploymentTargetSpec,
   UpsertDestinationSpec,
   UpsertEnvironmentSpec,
@@ -260,7 +261,11 @@ describe("pglite deployment repository", () => {
       createdAt: "2026-01-01T00:00:01.000Z",
       status: "succeeded",
     });
-    const previousAdmit = await deploymentRepository.admit(context, previousDeployment);
+    const previousAdmit = await deploymentRepository.insertOne(
+      context,
+      previousDeployment,
+      UpsertDeploymentSpec.fromDeployment(previousDeployment),
+    );
     expect(previousAdmit.isOk()).toBe(true);
 
     const activeDeployment = createDeploymentRecord({
@@ -269,7 +274,11 @@ describe("pglite deployment repository", () => {
       status: "planned",
       supersedesDeploymentId: "dep_prev",
     });
-    const firstAdmit = await deploymentRepository.admit(context, activeDeployment);
+    const firstAdmit = await deploymentRepository.insertOne(
+      context,
+      activeDeployment,
+      UpsertDeploymentSpec.fromDeployment(activeDeployment),
+    );
     expect(firstAdmit.isOk()).toBe(true);
 
     const competingDeployment = createDeploymentRecord({
@@ -278,12 +287,17 @@ describe("pglite deployment repository", () => {
       status: "planned",
       supersedesDeploymentId: "dep_prev",
     });
-    const secondAdmit = await deploymentRepository.admit(context, competingDeployment);
+    const secondAdmit = await deploymentRepository.insertOne(
+      context,
+      competingDeployment,
+      UpsertDeploymentSpec.fromDeployment(competingDeployment),
+    );
     expect(secondAdmit.isErr()).toBe(true);
     if (secondAdmit.isErr()) {
-      expect(secondAdmit.error.code).toBe("deployment_not_redeployable");
+      expect(secondAdmit.error.code).toBe("conflict");
       expect(secondAdmit.error.details).toMatchObject({
-        phase: "redeploy-guard",
+        aggregateRoot: "deployment",
+        constraint: "deployments_active_resource_unique",
         resourceId: "res_repo",
         deploymentId: "dep_active",
         status: "planned",

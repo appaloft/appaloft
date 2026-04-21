@@ -281,9 +281,31 @@ function requestedDeploymentWithRuntimeContextMetadata(
 }
 
 function isDeploymentWriteFenceError(error: { details?: Record<string, unknown> }): boolean {
+  return error.details?.aggregateRoot === "deployment" && error.details?.reason === "stale_write";
+}
+
+function isDeploymentInsertConflict(error: { details?: Record<string, unknown> }): boolean {
   return (
-    error.details?.phase === "deployment-write-fence" &&
-    error.details?.causeCode === "deployment_superseded"
+    error.details?.aggregateRoot === "deployment" &&
+    error.details?.constraint === "deployments_active_resource_unique"
+  );
+}
+
+function redeployGuardErrorFromInsertConflict(input: {
+  deploymentId?: string;
+  resourceId: string;
+  status?: string;
+}): ReturnType<typeof domainError.deploymentNotRedeployable> {
+  return domainError.deploymentNotRedeployable(
+    "Latest deployment for this resource must be succeeded or failed before redeploying",
+    {
+      commandName: "deployments.create",
+      phase: "redeploy-guard",
+      resourceId: input.resourceId,
+      ...(input.deploymentId ? { deploymentId: input.deploymentId } : {}),
+      ...(input.status ? { status: input.status } : {}),
+      causeCode: "concurrent_active_deployment",
+    },
   );
 }
 
@@ -599,7 +621,7 @@ export class CreateDeploymentUseCase {
     context: ExecutionContext,
     deployment: Deployment,
   ): Promise<Result<"persisted" | "fenced">> {
-    const result = await this.deploymentRepository.upsert(
+    const result = await this.deploymentRepository.updateOne(
       toRepositoryContext(context),
       deployment,
       UpsertDeploymentSpec.fromDeployment(deployment),
@@ -899,8 +921,37 @@ export class CreateDeploymentUseCase {
       const prepareResult = deploymentLifecycleService.prepareForExecution(deployment);
       yield* prepareResult;
 
-      const admitResult = await deploymentRepository.admit(repositoryContext, deployment);
-      yield* admitResult;
+      const insertResult = await deploymentRepository.insertOne(
+        repositoryContext,
+        deployment,
+        UpsertDeploymentSpec.fromDeployment(deployment),
+      );
+      if (insertResult.isErr()) {
+        if (isDeploymentInsertConflict(insertResult.error)) {
+          const conflictingDeploymentId =
+            typeof insertResult.error.details?.deploymentId === "string"
+              ? insertResult.error.details.deploymentId
+              : undefined;
+          const conflictingStatus =
+            typeof insertResult.error.details?.status === "string"
+              ? insertResult.error.details.status
+              : undefined;
+          const conflictingResourceId =
+            typeof insertResult.error.details?.resourceId === "string"
+              ? insertResult.error.details.resourceId
+              : deployment.toState().resourceId.value;
+
+          return err(
+            redeployGuardErrorFromInsertConflict({
+              resourceId: conflictingResourceId,
+              ...(conflictingDeploymentId ? { deploymentId: conflictingDeploymentId } : {}),
+              ...(conflictingStatus ? { status: conflictingStatus } : {}),
+            }),
+          );
+        }
+
+        yield* insertResult;
+      }
       await publishDomainEventsAndReturn(context, eventBus, logger, deployment, undefined);
 
       const startResult = deploymentLifecycleService.startExecution(deployment);

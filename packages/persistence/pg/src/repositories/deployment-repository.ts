@@ -17,7 +17,7 @@ import {
   type LatestRuntimeOwningDeploymentSpec,
   ok,
   type Result,
-  UpsertDeploymentSpec,
+  type UpsertDeploymentSpec,
 } from "@appaloft/core";
 import { type Insertable, type Kysely, type Selectable, type SelectQueryBuilder } from "kysely";
 
@@ -105,20 +105,22 @@ class KyselyDeploymentMutationVisitor
 export class PgDeploymentRepository implements DeploymentRepository {
   constructor(private readonly db: Kysely<Database>) {}
 
-  async admit(context: RepositoryContext, deployment: Deployment): Promise<Result<void>> {
+  async insertOne(
+    context: RepositoryContext,
+    deployment: Deployment,
+    spec: DeploymentMutationSpec,
+  ): Promise<Result<void>> {
     const executor = resolveRepositoryExecutor(this.db, context);
     const state = deployment.toState();
-    const mutation = UpsertDeploymentSpec.fromDeployment(deployment).accept(
-      new KyselyDeploymentMutationVisitor(),
-    );
+    const mutation = spec.accept(new KyselyDeploymentMutationVisitor());
 
     try {
       await context.tracer.startActiveSpan(
-        createRepositorySpanName("deployment", "admit"),
+        createRepositorySpanName("deployment", "insert_one"),
         {
           attributes: {
             [appaloftTraceAttributes.repositoryName]: "deployment",
-            [appaloftTraceAttributes.mutationSpecName]: "AdmitDeployment",
+            [appaloftTraceAttributes.mutationSpecName]: spec.constructor.name,
           },
         },
         async () => {
@@ -147,25 +149,20 @@ export class PgDeploymentRepository implements DeploymentRepository {
           .executeTakeFirst();
 
         return err(
-          domainError.deploymentNotRedeployable(
-            "Latest deployment for this resource must be succeeded or failed before redeploying",
-            {
-              commandName: "deployments.create",
-              phase: "redeploy-guard",
-              resourceId: state.resourceId.value,
-              ...(activeRow ? { deploymentId: activeRow.id, status: activeRow.status } : {}),
-              causeCode: "concurrent_active_deployment",
-            },
-          ),
+          domainError.conflict("Deployment insert conflicts with current persistence state", {
+            aggregateRoot: "deployment",
+            constraint: "deployments_active_resource_unique",
+            resourceId: state.resourceId.value,
+            ...(activeRow ? { deploymentId: activeRow.id, status: activeRow.status } : {}),
+          }),
         );
       }
 
       const errorMetadata: Record<string, string | number | boolean | null> = {
-        commandName: "deployments.create",
-        phase: "deployment-creation",
+        aggregateRoot: "deployment",
+        operation: "insertOne",
+        deploymentId: state.id.value,
         resourceId: state.resourceId.value,
-        operation: "deployment.admit",
-        causeCode: "deployment_insert_failed",
       };
       const errorMessage = safeErrorMessage(error);
 
@@ -173,11 +170,11 @@ export class PgDeploymentRepository implements DeploymentRepository {
         errorMetadata.message = errorMessage;
       }
 
-      return err(domainError.infra("Deployment could not be created", errorMetadata));
+      return err(domainError.infra("Deployment could not be inserted", errorMetadata));
     }
   }
 
-  async upsert(
+  async updateOne(
     context: RepositoryContext,
     deployment: Deployment,
     spec: DeploymentMutationSpec,
@@ -186,7 +183,7 @@ export class PgDeploymentRepository implements DeploymentRepository {
     const state = deployment.toState();
     const mutation = spec.accept(new KyselyDeploymentMutationVisitor());
     const updateResult = await context.tracer.startActiveSpan(
-      createRepositorySpanName("deployment", "upsert"),
+      createRepositorySpanName("deployment", "update_one"),
       {
         attributes: {
           [appaloftTraceAttributes.repositoryName]: "deployment",
@@ -242,24 +239,23 @@ export class PgDeploymentRepository implements DeploymentRepository {
 
     if (currentRow?.superseded_by_deployment_id) {
       return err(
-        domainError.conflict("Deployment write is fenced by a superseding deployment", {
-          phase: "deployment-write-fence",
+        domainError.conflict("Deployment update conflicts with current persistence state", {
+          aggregateRoot: "deployment",
+          reason: "stale_write",
           deploymentId: state.id.value,
           resourceId: currentRow.resource_id,
           status: currentRow.status,
           supersededByDeploymentId: currentRow.superseded_by_deployment_id,
-          causeCode: "deployment_superseded",
         }),
       );
     }
 
     return err(
       domainError.infra("Deployment could not be updated", {
-        commandName: "deployments.create",
-        phase: "deployment-creation",
+        aggregateRoot: "deployment",
         deploymentId: state.id.value,
         resourceId: state.resourceId.value,
-        operation: "deployment.upsert",
+        operation: "updateOne",
       }),
     );
   }

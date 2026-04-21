@@ -74,6 +74,7 @@ import {
   StaticPublishDirectory,
   TargetKindValue,
   UpdatedAt,
+  UpsertDeploymentSpec,
   UpsertDeploymentTargetSpec,
   UpsertDestinationSpec,
   UpsertEnvironmentSpec,
@@ -717,22 +718,19 @@ class RaceLosingMemoryDeploymentRepository extends MemoryDeploymentRepository {
     return null;
   }
 
-  override async admit(
+  override async insertOne(
     _context: ReturnType<typeof toRepositoryContext>,
     _deployment: Deployment,
+    _spec: Parameters<MemoryDeploymentRepository["insertOne"]>[2],
   ): Promise<Result<void>> {
     return err(
-      domainError.deploymentNotRedeployable(
-        "Latest deployment for this resource must be succeeded or failed before redeploying",
-        {
-          commandName: "deployments.create",
-          phase: "redeploy-guard",
-          deploymentId: "dep_competing",
-          resourceId: "res_demo",
-          status: "running",
-          causeCode: "concurrent_active_deployment",
-        },
-      ),
+      domainError.conflict("Deployment insert conflicts with current persistence state", {
+        aggregateRoot: "deployment",
+        constraint: "deployments_active_resource_unique",
+        deploymentId: "dep_competing",
+        resourceId: "res_demo",
+        status: "running",
+      }),
     );
   }
 }
@@ -870,7 +868,11 @@ describe("CreateDeploymentUseCase", () => {
       createdAt: "2026-01-01T00:00:05.000Z",
       status: "running",
     });
-    const admitResult = await deployments.admit(repositoryContext, activeDeployment);
+    const admitResult = await deployments.insertOne(
+      repositoryContext,
+      activeDeployment,
+      UpsertDeploymentSpec.fromDeployment(activeDeployment),
+    );
     expect(admitResult.isOk()).toBe(true);
 
     const result = await createDeploymentUseCase.execute(context, createDeploymentInput);
@@ -1046,7 +1048,11 @@ describe("CreateDeploymentUseCase", () => {
       createdAt: "2026-01-01T00:00:05.000Z",
       status: "running",
     });
-    const admitResult = await deployments.admit(repositoryContext, activeDeployment);
+    const admitResult = await deployments.insertOne(
+      repositoryContext,
+      activeDeployment,
+      UpsertDeploymentSpec.fromDeployment(activeDeployment),
+    );
     expect(admitResult.isOk()).toBe(true);
 
     const result = await createDeploymentUseCase.execute(context, createDeploymentInput);
@@ -1556,8 +1562,24 @@ describe("CreateDeploymentUseCase", () => {
       status: "failed",
     });
 
-    expect((await deployments.admit(repositoryContext, successfulDeployment)).isOk()).toBe(true);
-    expect((await deployments.admit(repositoryContext, failedDeployment)).isOk()).toBe(true);
+    expect(
+      (
+        await deployments.insertOne(
+          repositoryContext,
+          successfulDeployment,
+          UpsertDeploymentSpec.fromDeployment(successfulDeployment),
+        )
+      ).isOk(),
+    ).toBe(true);
+    expect(
+      (
+        await deployments.insertOne(
+          repositoryContext,
+          failedDeployment,
+          UpsertDeploymentSpec.fromDeployment(failedDeployment),
+        )
+      ).isOk(),
+    ).toBe(true);
 
     const result = await createDeploymentUseCase.execute(context, createDeploymentInput);
 

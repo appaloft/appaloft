@@ -268,8 +268,12 @@ export interface ResourceDeletionBlockerReader {
 
 export interface DeploymentRepository {
   findOne(context: RepositoryContext, spec: DeploymentSelectionSpec): Promise<Deployment | null>;
-  admit(context: RepositoryContext, deployment: Deployment): Promise<Result<void>>;
-  upsert(
+  insertOne(
+    context: RepositoryContext,
+    deployment: Deployment,
+    spec: DeploymentMutationSpec,
+  ): Promise<Result<void>>;
+  updateOne(
     context: RepositoryContext,
     deployment: Deployment,
     spec: DeploymentMutationSpec,
