@@ -13,6 +13,7 @@ import {
   resolveNodePackageManager,
   type NodePackageManager,
 } from "./node";
+import { pinnedBunAlpineImage } from "./bun";
 
 function runCommandFor(packageManager: NodePackageManager, script: string): string {
   switch (packageManager) {
@@ -42,7 +43,7 @@ function installCommandFor(packageManager: NodePackageManager): string {
 
 function nextBaseImage(inspection?: SourceInspectionSnapshot): string {
   if (inspection?.packageManager === "bun") {
-    return "oven/bun:1-alpine";
+    return pinnedBunAlpineImage;
   }
 
   const version = inspection?.runtimeVersion ?? "22";

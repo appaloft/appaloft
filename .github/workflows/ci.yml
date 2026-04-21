@@ -16,7 +16,6 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  BUN_VERSION: 1.3.12
   APPALOFT_APP_VERSION: 0.1.0-ci
   APPALOFT_DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/appaloft
   APPALOFT_HTTP_HOST: 127.0.0.1
@@ -104,8 +103,6 @@ jobs:
       - name: Set up Bun and caches
         if: ${{ needs.changes.outputs.docs_only != 'true' }}
         uses: ./.github/actions/setup-bun-turbo
-        with:
-          bun-version: ${{ env.BUN_VERSION }}
 
       - name: Biome
         if: ${{ needs.changes.outputs.docs_only != 'true' }}
@@ -128,8 +125,6 @@ jobs:
       - name: Set up Bun and caches
         if: ${{ needs.changes.outputs.docs_only != 'true' }}
         uses: ./.github/actions/setup-bun-turbo
-        with:
-          bun-version: ${{ env.BUN_VERSION }}
 
       - name: Typecheck
         if: ${{ needs.changes.outputs.docs_only != 'true' }}
@@ -152,8 +147,6 @@ jobs:
       - name: Set up Bun and caches
         if: ${{ needs.changes.outputs.docs_only != 'true' }}
         uses: ./.github/actions/setup-bun-turbo
-        with:
-          bun-version: ${{ env.BUN_VERSION }}
 
       - name: Unit Tests
         if: ${{ needs.changes.outputs.docs_only != 'true' }}
@@ -176,8 +169,6 @@ jobs:
       - name: Set up Bun and caches
         if: ${{ needs.changes.outputs.docs_only != 'true' }}
         uses: ./.github/actions/setup-bun-turbo
-        with:
-          bun-version: ${{ env.BUN_VERSION }}
 
       - name: Start Postgres
         if: ${{ needs.changes.outputs.docs_only != 'true' }}
@@ -226,8 +217,6 @@ jobs:
       - name: Set up Bun and caches
         if: ${{ needs.changes.outputs.docs_only != 'true' }}
         uses: ./.github/actions/setup-bun-turbo
-        with:
-          bun-version: ${{ env.BUN_VERSION }}
 
       - name: Build
         if: ${{ needs.changes.outputs.docs_only != 'true' }}

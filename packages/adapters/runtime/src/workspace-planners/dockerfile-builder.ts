@@ -1,4 +1,5 @@
 import { type RuntimeExecutionPlan, type SourceInspectionSnapshot } from "@appaloft/core";
+import { pinnedBunAlpineImage } from "./bun";
 
 export interface DockerfileBuildContext {
   baseImage: string;
@@ -200,7 +201,7 @@ function staticBuildImage(input: {
     .toLowerCase();
 
   if (input.sourceInspection?.packageManager === "bun" || /\bbun\b/u.test(commands)) {
-    return "oven/bun:1-alpine";
+    return pinnedBunAlpineImage;
   }
 
   const runtimeVersion = input.sourceInspection?.runtimeVersion ?? "22";

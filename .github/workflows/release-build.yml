@@ -19,7 +19,6 @@ permissions:
   artifact-metadata: write
 
 env:
-  BUN_VERSION: 1.3.12
   APPALOFT_OTEL_ENABLED: "false"
 
 jobs:
@@ -56,10 +55,13 @@ jobs:
 
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: ${{ env.BUN_VERSION }}
+          bun-version-file: .bun-version
 
       - name: Install
         run: bun install --frozen-lockfile
+
+      - name: Verify Bun version sync
+        run: bun run bun:version:check
 
       - name: Build Backend And Web Archives
         run: bun run package:artifacts -- --version "${APPALOFT_APP_VERSION}" --archives --skip-binary
@@ -74,6 +76,7 @@ jobs:
             dist/release/appaloft-web-static-v*.tar.gz
             dist/release/docker-compose.selfhost.yml
             dist/release/Dockerfile
+            dist/release/.bun-version
             dist/release/install.sh
 
   binary-artifacts:
@@ -100,10 +103,13 @@ jobs:
 
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: ${{ env.BUN_VERSION }}
+          bun-version-file: .bun-version
 
       - name: Install
         run: bun install --frozen-lockfile
+
+      - name: Verify Bun version sync
+        run: bun run bun:version:check
 
       - name: Build Binary Bundle
         run: >
@@ -149,7 +155,7 @@ jobs:
 
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: ${{ env.BUN_VERSION }}
+          bun-version-file: .bun-version
 
       - uses: dtolnay/rust-toolchain@stable
 
@@ -171,6 +177,9 @@ jobs:
 
       - name: Install
         run: bun install --frozen-lockfile
+
+      - name: Verify Bun version sync
+        run: bun run bun:version:check
 
       - name: Download Desktop Sidecar Archive
         uses: actions/download-artifact@v4
@@ -313,7 +322,7 @@ jobs:
 
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: ${{ env.BUN_VERSION }}
+          bun-version-file: .bun-version
 
       - uses: actions/setup-node@v4
         with:
@@ -322,6 +331,9 @@ jobs:
 
       - name: Install
         run: bun install --frozen-lockfile
+
+      - name: Verify Bun version sync
+        run: bun run bun:version:check
 
       - name: Download Binary Archives
         uses: actions/download-artifact@v4
@@ -371,10 +383,13 @@ jobs:
 
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: ${{ env.BUN_VERSION }}
+          bun-version-file: .bun-version
 
       - name: Install
         run: bun install --frozen-lockfile
+
+      - name: Verify Bun version sync
+        run: bun run bun:version:check
 
       - name: Download Release Artifacts
         uses: actions/download-artifact@v4
@@ -437,7 +452,10 @@ jobs:
 
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: ${{ env.BUN_VERSION }}
+          bun-version-file: .bun-version
+
+      - name: Verify Bun version sync
+        run: bun run bun:version:check
 
       - name: Download Final Release Metadata
         if: ${{ env.HAS_HOMEBREW_TAP_TOKEN == 'true' }}

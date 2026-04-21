@@ -10,6 +10,7 @@ import {
   type WorkspaceRuntimePlan,
   type WorkspaceRuntimePlanner,
 } from "./types";
+import { pinnedBunAlpineImage } from "./bun";
 
 export type NodePackageManager = "bun" | "npm" | "pnpm" | "yarn";
 
@@ -55,7 +56,7 @@ function runCommandFor(packageManager: NodePackageManager, script: string): stri
 
 function nodeBaseImage(inspection?: SourceInspectionSnapshot): string {
   if (inspection?.packageManager === "bun") {
-    return "oven/bun:1-alpine";
+    return pinnedBunAlpineImage;
   }
 
   const version = inspection?.runtimeVersion ?? "22";

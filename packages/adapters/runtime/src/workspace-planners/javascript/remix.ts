@@ -9,6 +9,7 @@ import {
   type WorkspaceRuntimePlan,
   type WorkspaceRuntimePlanner,
 } from "../types";
+import { pinnedBunAlpineImage } from "../bun";
 import { resolveNodePackageManager, type NodePackageManager } from "../node";
 
 function installCommandFor(packageManager: NodePackageManager): string {
@@ -39,7 +40,7 @@ function runCommandFor(packageManager: NodePackageManager, script: string): stri
 
 function remixBaseImage(inspection?: SourceInspectionSnapshot): string {
   if (inspection?.packageManager === "bun") {
-    return "oven/bun:1-alpine";
+    return pinnedBunAlpineImage;
   }
 
   return `node:${inspection?.runtimeVersion ?? "22"}-alpine`;

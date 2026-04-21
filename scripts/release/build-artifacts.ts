@@ -45,6 +45,7 @@ await copyFileIfExists(
   join(releaseRoot, "docker-compose.selfhost.yml"),
 );
 await copyFileIfExists(join(root, "Dockerfile"), join(releaseRoot, "Dockerfile"));
+await copyFileIfExists(join(root, ".bun-version"), join(releaseRoot, ".bun-version"));
 await copyFileIfExists(join(root, "install.sh"), join(releaseRoot, "install.sh"));
 
 await Bun.write(

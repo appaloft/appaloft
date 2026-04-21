@@ -1,26 +1,20 @@
 name: Setup Bun And Turbo Cache
 description: Set up Bun, restore Bun and Turborepo caches, and install dependencies.
 
-inputs:
-  bun-version:
-    description: Bun version to install.
-    required: true
-
 runs:
   using: composite
   steps:
     - name: Set up Bun
       uses: oven-sh/setup-bun@v2
       with:
-        bun-version: ${{ inputs.bun-version }}
+        bun-version-file: .bun-version
 
     - name: Cache Bun install cache
       uses: actions/cache@v4
       with:
         path: ~/.bun/install/cache
-        key: ${{ runner.os }}-bun-${{ inputs.bun-version }}-${{ hashFiles('bun.lock') }}
+        key: ${{ runner.os }}-bun-${{ hashFiles('.bun-version', 'bun.lock') }}
         restore-keys: |
-          ${{ runner.os }}-bun-${{ inputs.bun-version }}-
           ${{ runner.os }}-bun-
 
     - name: Cache Turbo task cache
@@ -35,3 +29,7 @@ runs:
     - name: Install
       shell: bash
       run: bun install --frozen-lockfile
+
+    - name: Verify Bun version sync
+      shell: bash
+      run: bun run bun:version:check
