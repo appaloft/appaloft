@@ -595,7 +595,9 @@ export class PgServerAppliedRouteStateRepository implements ServerAppliedRouteSt
     }
 
     try {
-      const mutation = updateSpec.accept(new KyselyServerAppliedRouteStateUpdateVisitor());
+      const mutation = updateSpec.accept<{
+        values: Updateable<Database["server_applied_route_states"]>;
+      }>(new KyselyServerAppliedRouteStateUpdateVisitor());
       const updated = await spec
         .accept(
           this.db.updateTable("server_applied_route_states"),

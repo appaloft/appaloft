@@ -21,6 +21,7 @@ export {
   type SshRemoteStateTarget,
   sshRemoteStateTargetFromDecision,
 } from "./commands/deployment-ssh-remote-state.js";
+export type { CliSourceLinkStore } from "./runtime.js";
 
 export function createCliProgram(input: CliProgramInput): CliProgram {
   const live = Layer.mergeAll(NodeContext.layer, CliRuntimeLive(input));

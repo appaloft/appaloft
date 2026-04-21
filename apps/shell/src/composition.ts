@@ -123,10 +123,10 @@ function createCliSourceLinkStore(repository: SourceLinkRepository): CliSourceLi
         SourceLinkBySourceFingerprintSpec.create(input.sourceFingerprint),
       );
       if (existing.isErr()) {
-        return existing;
+        return err(existing.error);
       }
       if (existing.value) {
-        return existing;
+        return ok(existing.value);
       }
 
       const record: SourceLinkRecord = {

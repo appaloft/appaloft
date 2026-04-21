@@ -14,6 +14,7 @@ import {
   DetectSummary,
   DisplayNameText,
   type DomainEvent,
+  domainError,
   EdgeProxyKindValue,
   EnvironmentConfigSnapshot,
   EnvironmentId,
@@ -23,6 +24,7 @@ import {
   ExecutionStatusValue,
   ExecutionStrategyKindValue,
   ExitCode,
+  err,
   FinishedAt,
   GeneratedAt,
   ImageReference,
@@ -55,11 +57,14 @@ import {
 } from "../src/execution-context";
 import { MarkServerAppliedRouteStatusOnDeploymentFinishedHandler } from "../src/operations/deployments/mark-server-applied-route-status-on-deployment-finished.handler";
 import {
-  MarkServerAppliedRouteAppliedSpec,
+  type MarkServerAppliedRouteAppliedSpec,
   type MarkServerAppliedRouteFailedSpec,
   type ServerAppliedRouteDesiredStateRecord,
-  type ServerAppliedRouteStateByTargetSpec,
   type ServerAppliedRouteStateRepository,
+  type ServerAppliedRouteStateSelectionSpec,
+  type ServerAppliedRouteStateSelectionSpecVisitor,
+  type ServerAppliedRouteStateUpdateSpec,
+  type ServerAppliedRouteStateUpdateSpecVisitor,
 } from "../src/ports";
 
 class CapturingServerAppliedRouteStateRepository implements ServerAppliedRouteStateRepository {
@@ -83,19 +88,32 @@ class CapturingServerAppliedRouteStateRepository implements ServerAppliedRouteSt
   }> = [];
 
   async findOne(
-    _spec: ServerAppliedRouteStateByTargetSpec,
+    spec: ServerAppliedRouteStateSelectionSpec,
   ): Promise<Result<ServerAppliedRouteDesiredStateRecord | null>> {
-    return ok({
-      routeSetId: "proj_1:env_1:res_1:srv_1:dst_1",
-      projectId: "proj_1",
-      environmentId: "env_1",
-      resourceId: "res_1",
-      serverId: "srv_1",
-      destinationId: "dst_1",
-      domains: [],
-      status: "desired",
-      updatedAt: "2026-04-19T00:00:00.000Z",
-    });
+    const unsupported: Result<ServerAppliedRouteDesiredStateRecord | null> = err(
+      domainError.validation("Unsupported route-state selection spec for test repository", {
+        phase: "test-double",
+      }),
+    );
+
+    return spec.accept<Result<ServerAppliedRouteDesiredStateRecord | null>>(unsupported, {
+      visitServerAppliedRouteStateByTarget: () =>
+        ok({
+          routeSetId: "proj_1:env_1:res_1:srv_1:dst_1",
+          projectId: "proj_1",
+          environmentId: "env_1",
+          resourceId: "res_1",
+          serverId: "srv_1",
+          destinationId: "dst_1",
+          domains: [],
+          status: "desired",
+          updatedAt: "2026-04-19T00:00:00.000Z",
+        }),
+      visitServerAppliedRouteStateByRouteSetId: () => unsupported,
+      visitServerAppliedRouteStateBySourceFingerprint: () => unsupported,
+    } satisfies ServerAppliedRouteStateSelectionSpecVisitor<
+      Result<ServerAppliedRouteDesiredStateRecord | null>
+    >);
   }
 
   async upsert(): Promise<Result<ServerAppliedRouteDesiredStateRecord>> {
@@ -103,30 +121,56 @@ class CapturingServerAppliedRouteStateRepository implements ServerAppliedRouteSt
   }
 
   async updateOne(
-    selectionSpec: { routeSetId: string },
-    updateSpec: MarkServerAppliedRouteAppliedSpec | MarkServerAppliedRouteFailedSpec,
+    selectionSpec: ServerAppliedRouteStateSelectionSpec,
+    updateSpec: ServerAppliedRouteStateUpdateSpec,
   ): Promise<Result<ServerAppliedRouteDesiredStateRecord | null>> {
-    if (updateSpec instanceof MarkServerAppliedRouteAppliedSpec) {
+    const unsupportedRouteSetId: Result<string> = err(
+      domainError.validation("Unsupported route-state selection spec for test repository", {
+        phase: "test-double",
+      }),
+    );
+
+    const routeSetIdResult = selectionSpec.accept(unsupportedRouteSetId, {
+      visitServerAppliedRouteStateByTarget: () => unsupportedRouteSetId,
+      visitServerAppliedRouteStateByRouteSetId: (_query, spec) => ok(spec.routeSetId),
+      visitServerAppliedRouteStateBySourceFingerprint: () => unsupportedRouteSetId,
+    } satisfies ServerAppliedRouteStateSelectionSpecVisitor<Result<string>>);
+    if (routeSetIdResult.isErr()) {
+      return err(routeSetIdResult.error);
+    }
+
+    const updateAction = updateSpec.accept<
+      | { kind: "applied"; spec: MarkServerAppliedRouteAppliedSpec }
+      | { kind: "failed"; spec: MarkServerAppliedRouteFailedSpec }
+    >({
+      visitMarkServerAppliedRouteApplied: (spec) => ({ kind: "applied" as const, spec }),
+      visitMarkServerAppliedRouteFailed: (spec) => ({ kind: "failed" as const, spec }),
+    } satisfies ServerAppliedRouteStateUpdateSpecVisitor<
+      | { kind: "applied"; spec: MarkServerAppliedRouteAppliedSpec }
+      | { kind: "failed"; spec: MarkServerAppliedRouteFailedSpec }
+    >);
+
+    if (updateAction.kind === "applied") {
       this.applied.push({
-        routeSetId: selectionSpec.routeSetId,
-        deploymentId: updateSpec.deploymentId,
-        updatedAt: updateSpec.updatedAt,
-        ...(updateSpec.providerKey ? { providerKey: updateSpec.providerKey } : {}),
-        ...(updateSpec.proxyKind ? { proxyKind: updateSpec.proxyKind } : {}),
+        routeSetId: routeSetIdResult.value,
+        deploymentId: updateAction.spec.deploymentId,
+        updatedAt: updateAction.spec.updatedAt,
+        ...(updateAction.spec.providerKey ? { providerKey: updateAction.spec.providerKey } : {}),
+        ...(updateAction.spec.proxyKind ? { proxyKind: updateAction.spec.proxyKind } : {}),
       });
       return ok(null);
     }
 
     this.failed.push({
-      routeSetId: selectionSpec.routeSetId,
-      deploymentId: updateSpec.deploymentId,
-      updatedAt: updateSpec.updatedAt,
-      phase: updateSpec.phase,
-      errorCode: updateSpec.errorCode,
-      retryable: updateSpec.retryable,
-      ...(updateSpec.message ? { message: updateSpec.message } : {}),
-      ...(updateSpec.providerKey ? { providerKey: updateSpec.providerKey } : {}),
-      ...(updateSpec.proxyKind ? { proxyKind: updateSpec.proxyKind } : {}),
+      routeSetId: routeSetIdResult.value,
+      deploymentId: updateAction.spec.deploymentId,
+      updatedAt: updateAction.spec.updatedAt,
+      phase: updateAction.spec.phase,
+      errorCode: updateAction.spec.errorCode,
+      retryable: updateAction.spec.retryable,
+      ...(updateAction.spec.message ? { message: updateAction.spec.message } : {}),
+      ...(updateAction.spec.providerKey ? { providerKey: updateAction.spec.providerKey } : {}),
+      ...(updateAction.spec.proxyKind ? { proxyKind: updateAction.spec.proxyKind } : {}),
     });
     return ok(null);
   }

@@ -290,21 +290,37 @@ class CapturingServerAppliedRouteStateRepository implements ServerAppliedRouteSt
   }
 
   async deleteOne(spec: ServerAppliedRouteStateSelectionSpec): Promise<Result<boolean>> {
-    if ("target" in spec) {
-      this.deletedTargets.push(spec.target);
-      return this.deleteResult;
-    }
+    const unsupported: Result<boolean> = err(
+      domainError.validation("Unsupported route-state selection spec for test repository", {
+        phase: "test-double",
+      }),
+    );
 
-    throw new Error("Unexpected deleteOne spec");
+    return spec.accept<Result<boolean>>(unsupported, {
+      visitServerAppliedRouteStateByTarget: (_query, targetSpec) => {
+        this.deletedTargets.push(targetSpec.target);
+        return this.deleteResult;
+      },
+      visitServerAppliedRouteStateByRouteSetId: () => unsupported,
+      visitServerAppliedRouteStateBySourceFingerprint: () => unsupported,
+    });
   }
 
   async deleteMany(spec: ServerAppliedRouteStateSelectionSpec): Promise<Result<number>> {
-    if (spec instanceof ServerAppliedRouteStateBySourceFingerprintSpec) {
-      this.deletedSourceFingerprints.push(spec.sourceFingerprint);
-      return this.deleteManyResult;
-    }
+    const unsupported: Result<number> = err(
+      domainError.validation("Unsupported route-state selection spec for test repository", {
+        phase: "test-double",
+      }),
+    );
 
-    throw new Error("Unexpected deleteMany spec");
+    return spec.accept<Result<number>>(unsupported, {
+      visitServerAppliedRouteStateByTarget: () => unsupported,
+      visitServerAppliedRouteStateByRouteSetId: () => unsupported,
+      visitServerAppliedRouteStateBySourceFingerprint: (_query, sourceFingerprintSpec) => {
+        this.deletedSourceFingerprints.push(sourceFingerprintSpec.sourceFingerprint);
+        return this.deleteManyResult;
+      },
+    });
   }
 }
 

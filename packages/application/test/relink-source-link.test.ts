@@ -50,6 +50,7 @@ import {
   type SourceLinkRecord,
   type SourceLinkRepository,
   type SourceLinkSelectionSpec,
+  type SourceLinkSelectionSpecVisitor,
   UpsertSourceLinkSpec,
 } from "../src/ports";
 import { RelinkSourceLinkUseCase } from "../src/use-cases";
@@ -60,15 +61,18 @@ class MemorySourceLinkRepository implements SourceLinkRepository {
   constructor(private record: SourceLinkRecord | null) {}
 
   async findOne(spec: SourceLinkSelectionSpec): Promise<Result<SourceLinkRecord | null>> {
-    if (!(spec instanceof SourceLinkBySourceFingerprintSpec)) {
-      return ok(null);
-    }
+    return spec.accept(ok(null), {
+      visitSourceLinkBySourceFingerprint: (_query, sourceFingerprintSpec) => {
+        if (
+          !this.record ||
+          this.record.sourceFingerprint !== sourceFingerprintSpec.sourceFingerprint
+        ) {
+          return ok(null);
+        }
 
-    if (!this.record || this.record.sourceFingerprint !== spec.sourceFingerprint) {
-      return ok(null);
-    }
-
-    return ok(this.record);
+        return ok(this.record);
+      },
+    } satisfies SourceLinkSelectionSpecVisitor<Result<SourceLinkRecord | null>>);
   }
 
   async upsert(record: SourceLinkRecord): Promise<Result<SourceLinkRecord>> {
@@ -78,16 +82,19 @@ class MemorySourceLinkRepository implements SourceLinkRepository {
   }
 
   async deleteOne(spec: SourceLinkSelectionSpec): Promise<Result<boolean>> {
-    if (
-      !(spec instanceof SourceLinkBySourceFingerprintSpec) ||
-      !this.record ||
-      this.record.sourceFingerprint !== spec.sourceFingerprint
-    ) {
-      return ok(false);
-    }
+    return spec.accept(ok(false), {
+      visitSourceLinkBySourceFingerprint: (_query, sourceFingerprintSpec) => {
+        if (
+          !this.record ||
+          this.record.sourceFingerprint !== sourceFingerprintSpec.sourceFingerprint
+        ) {
+          return ok(false);
+        }
 
-    this.record = null;
-    return ok(true);
+        this.record = null;
+        return ok(true);
+      },
+    } satisfies SourceLinkSelectionSpecVisitor<Result<boolean>>);
   }
 }
 
