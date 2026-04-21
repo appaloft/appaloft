@@ -1055,6 +1055,48 @@ describe("pglite persistence integration", () => {
     }
   }, 15000);
 
+  test("[SOURCE-LINK-STATE-019] pg source link store can unlink preview state", async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), "appaloft-pglite-source-link-unlink-"));
+    const pgliteDataDir = join(workspaceDir, ".appaloft", "data", "pglite");
+    let closeDatabase: (() => Promise<void>) | undefined;
+
+    try {
+      const { createDatabase, createMigrator, PgSourceLinkStore } = await import("../src/index");
+      const database = await createDatabase({
+        driver: "pglite",
+        pgliteDataDir,
+      });
+      closeDatabase = () => database.close();
+      const migrator = createMigrator(database.db);
+      const migrationResult = await migrator.migrateToLatest();
+      expect(migrationResult.error).toBeUndefined();
+
+      const target = await seedSourceLinkContext(database.db, "unlink");
+      const store = new PgSourceLinkStore(database.db);
+      const sourceFingerprint = "source-fingerprint:v1:preview%3Apr%3A14";
+      const created = await store.createIfMissing({
+        sourceFingerprint,
+        target,
+        updatedAt: "2026-01-01T00:01:00.000Z",
+      });
+      expect(created.isOk()).toBe(true);
+
+      const deleted = await store.unlink(sourceFingerprint);
+      const readBack = await store.read(sourceFingerprint);
+      const deletedAgain = await store.unlink(sourceFingerprint);
+
+      expect(deleted.isOk()).toBe(true);
+      expect(readBack.isOk()).toBe(true);
+      expect(deletedAgain.isOk()).toBe(true);
+      expect(deleted._unsafeUnwrap()).toBe(true);
+      expect(readBack._unsafeUnwrap()).toBeNull();
+      expect(deletedAgain._unsafeUnwrap()).toBe(false);
+    } finally {
+      await closeDatabase?.();
+      rmSync(workspaceDir, { recursive: true, force: true });
+    }
+  }, 15000);
+
   test("[SERVER-APPLIED-ROUTE-STATE-001] pg route store upserts and reads desired state", async () => {
     const workspaceDir = mkdtempSync(join(tmpdir(), "appaloft-pglite-route-state-"));
     const pgliteDataDir = join(workspaceDir, ".appaloft", "data", "pglite");
@@ -1446,6 +1488,55 @@ describe("pglite persistence integration", () => {
         .where("route_set_id", "=", desired._unsafeUnwrap().routeSetId)
         .executeTakeFirst();
       expect(retainedAfterDeleteAttempt?.route_set_id).toBe(desired._unsafeUnwrap().routeSetId);
+    } finally {
+      await closeDatabase?.();
+      rmSync(workspaceDir, { recursive: true, force: true });
+    }
+  }, 15000);
+
+  test("[SERVER-APPLIED-ROUTE-STATE-006] pg route store can delete preview route state", async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), "appaloft-pglite-route-delete-"));
+    const pgliteDataDir = join(workspaceDir, ".appaloft", "data", "pglite");
+    let closeDatabase: (() => Promise<void>) | undefined;
+
+    try {
+      const { createDatabase, createMigrator, PgServerAppliedRouteStateStore } = await import(
+        "../src/index"
+      );
+      const database = await createDatabase({
+        driver: "pglite",
+        pgliteDataDir,
+      });
+      closeDatabase = () => database.close();
+      const migrator = createMigrator(database.db);
+      const migrationResult = await migrator.migrateToLatest();
+      expect(migrationResult.error).toBeUndefined();
+
+      const target = await seedSourceLinkContext(database.db, "route_delete");
+      const store = new PgServerAppliedRouteStateStore(database.db);
+      const desired = await store.upsertDesired({
+        target,
+        updatedAt: "2026-01-01T00:04:00.000Z",
+        domains: [
+          {
+            host: "delete.example.test",
+            pathPrefix: "/",
+            tlsMode: "auto",
+          },
+        ],
+      });
+      expect(desired.isOk()).toBe(true);
+
+      const deleted = await store.deleteDesired(target);
+      const readBack = await store.read(target);
+      const deletedAgain = await store.deleteDesired(target);
+
+      expect(deleted.isOk()).toBe(true);
+      expect(readBack.isOk()).toBe(true);
+      expect(deletedAgain.isOk()).toBe(true);
+      expect(deleted._unsafeUnwrap()).toBe(true);
+      expect(readBack._unsafeUnwrap()).toBeNull();
+      expect(deletedAgain._unsafeUnwrap()).toBe(false);
     } finally {
       await closeDatabase?.();
       rmSync(workspaceDir, { recursive: true, force: true });

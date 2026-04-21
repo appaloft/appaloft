@@ -337,9 +337,12 @@ Access behavior:
   still succeed and the action output omits `preview-url` while diagnostics explain why access is
   unavailable.
 
-PR close cleanup is not part of the first Action-only contract. A future cleanup mode must be
-specified as an explicit operation or workflow before docs promise automatic deletion on
-`pull_request.closed`.
+PR close cleanup is a separate explicit workflow over `deployments.cleanup-preview`. A repository
+that wants cleanup on `pull_request.closed` must add a close-event workflow that runs
+`appaloft preview cleanup [path-or-source] --preview pull-request --preview-id pr-123` with the
+same trusted SSH/state inputs used for preview deploy. Pure Action mode still has no scheduler or
+retry loop after the process exits, so docs must not imply guaranteed cleanup if the close-event
+workflow never runs or fails before completion.
 
 Publishing a new Appaloft CLI release must not normally require a new action wrapper release. A
 pinned `version: vX.Y.Z` downloads that exact CLI release, and `version: latest` resolves the

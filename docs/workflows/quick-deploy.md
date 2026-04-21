@@ -511,7 +511,8 @@ Examples:
 - an environment variable set before deployment admission fails remains available;
 - a deployment accepted before runtime execution fails remains available with terminal failed deployment state.
 
-Rollback or cleanup requires explicit future operations. It must not be implied by Quick Deploy failure.
+Rollback or cleanup requires explicit operations such as `deployments.cleanup-preview`. It must not
+be implied by Quick Deploy failure.
 
 ## Idempotency And Deduplication
 

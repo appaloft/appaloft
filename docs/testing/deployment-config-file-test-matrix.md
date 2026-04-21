@@ -199,7 +199,7 @@ This matrix inherits:
 | CONFIG-FILE-ENTRY-016 | integration | Deploy action PR preview generated access | With no custom preview domain, default access provider enabled, public IPv4 server address, and ready proxy ingress, preview deploy emits `preview-url` from generated/default access, requires no user DNS, and creates no `DomainBinding`. |
 | CONFIG-FILE-ENTRY-017 | integration | Deploy action PR preview wildcard domain template | With trusted `preview-domain-template` and user-configured wildcard DNS, the rendered host is stored as server-applied route desired state in SSH mode, realized through the edge proxy, emitted as `preview-url`, and kept out of `deployments.create`. |
 | CONFIG-FILE-ENTRY-018 | contract | Deploy action PR preview fork safety | Default example workflow skips fork PR preview deployment before secrets or SSH credentials are exposed, and docs explain that fork previews require explicit reduced-credential policy. |
-| CONFIG-FILE-ENTRY-019 | integration | Deploy action PR preview cleanup unsupported | A future cleanup mode invoked before an accepted cleanup/delete operation exists fails before mutation with `preview_cleanup_unsupported`, phase `preview-cleanup`; server resources and route state are not silently deleted. |
+| CONFIG-FILE-ENTRY-019 | integration | Deploy action PR preview cleanup | A user-authored `pull_request.closed` workflow invokes CLI/action preview cleanup with trusted PR context; Appaloft derives the preview-scoped source fingerprint, stops preview runtime when present, deletes preview server-applied route desired state, unlinks the preview source link, and returns success when cleanup is done or already clean. |
 | CONFIG-FILE-ENTRY-020 | integration | Deploy action PR preview explicit config path | With `preview=pull-request` and `config: appaloft.preview.yml`, the action/CLI uses the preview config origin, does not read production-only root config fields, creates/reuses preview environment/resource identity from trusted PR context, and dispatches ids-only `deployments.create`. |
 | CONFIG-FILE-ENTRY-021 | integration | Deploy action PR preview avoids production root domains | With preview mode selected and an implicitly discovered root config that contains production `access.domains[]`, the action/CLI must not render those hosts as PR preview URLs; preview access comes from generated/default access, trusted `preview-domain-template`, explicitly selected preview config, or future selected preview overlay. |
 | CONFIG-FILE-ENTRY-022 | integration | Deploy action PR preview overlay boundary | Future preview config overlays apply only after trusted PR entrypoint context selects the preview environment; a committed overlay cannot select environment/project/resource/server/destination identity or credentials and cannot retarget an existing preview source link. |
@@ -313,13 +313,18 @@ fields, and does not reinterpret implicitly discovered root `access.domains[]` a
 `CONFIG-FILE-ENTRY-023` and `CONFIG-FILE-ENTRY-024` add flag-only preview profile parity and
 required-preview-URL gating coverage in the same file.
 
+`CONFIG-FILE-ENTRY-019` has application and CLI command coverage in
+`packages/application/test/cleanup-preview.test.ts` and
+`packages/adapters/cli/test/preview-command.test.ts`, proving cleanup idempotency, runtime-first
+failure staging, and remote-state prepare/release around the preview cleanup command path.
+
 Public `appaloft/deploy-action` wrapper coverage is not implemented yet. The main repository
 release workflow already produces CLI archives, the static Docker self-host installer,
 `checksums.txt`, `release-manifest.json`, and release notes, but `CONFIG-FILE-ENTRY-009` through
 `CONFIG-FILE-ENTRY-014`, `CONFIG-FILE-ENTRY-016`, `CONFIG-FILE-ENTRY-018`,
 `CONFIG-FILE-ENTRY-019`, and `CONFIG-FILE-ENTRY-022` still need wrapper repository coverage,
-action metadata, SSH secret temp-key handling, generated access output handling, cleanup
-unsupported behavior, future overlay behavior, and tests.
+action metadata, SSH secret temp-key handling, generated access output handling, wrapper-level
+cleanup input/examples, future overlay behavior, and tests.
 
 Profile drift detection, existing-resource profile operation sequencing through
 `resources.configure-source`, `resources.configure-runtime`, and `resources.configure-network`,

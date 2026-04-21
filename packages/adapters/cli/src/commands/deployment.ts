@@ -1,6 +1,7 @@
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import {
+  CleanupPreviewCommand,
   CreateDeploymentCommand,
   type CreateDeploymentCommandInput,
   DeploymentLogsQuery,
@@ -33,6 +34,7 @@ import {
   optionalNumber,
   optionalValue,
   resultToEffect,
+  runCommand,
   runDeploymentCommandResult,
   runQuery,
 } from "../runtime.js";
@@ -527,6 +529,26 @@ function resolvePreviewDeployContext(input: {
   });
 }
 
+function resolveRequiredPreviewContext(input: {
+  mode?: (typeof previewModes)[number];
+  previewId?: string;
+  env: Record<string, string | undefined>;
+}): Result<PreviewDeployContext> {
+  return resolvePreviewDeployContext({
+    ...(input.mode ? { mode: input.mode } : {}),
+    ...(input.previewId ? { previewId: input.previewId } : {}),
+    env: input.env,
+  }).andThen((previewContext) =>
+    previewContext
+      ? ok(previewContext)
+      : err(
+          previewContextValidationError("Preview cleanup requires preview mode", {
+            reason: "preview_mode_missing",
+          }),
+        ),
+  );
+}
+
 function resolvePreviewDomainTemplateRoutes(
   previewDomainTemplate: string | undefined,
   previewTlsMode: (typeof previewTlsModes)[number] | undefined,
@@ -749,6 +771,116 @@ function runCreateDeploymentCommand(
     }
   });
 }
+
+function runCleanupPreviewCommand(sourceFingerprint: string) {
+  return runCommand(CleanupPreviewCommand.create({ sourceFingerprint }));
+}
+
+const previewCleanupCommand = EffectCommand.make(
+  "cleanup",
+  {
+    pathOrSource: pathOrSourceArg,
+    config: configOption,
+    preview: previewOption,
+    previewId: previewIdOption,
+    serverHost: serverHostOption,
+    serverPort: serverPortOption,
+    serverProvider: serverProviderOption,
+    serverSshUsername: serverSshUsernameOption,
+    serverSshPrivateKeyFile: serverSshPrivateKeyFileOption,
+    stateBackend: stateBackendOption,
+  },
+  ({
+    config,
+    pathOrSource,
+    preview,
+    previewId,
+    serverHost,
+    serverPort,
+    serverProvider,
+    serverSshPrivateKeyFile,
+    serverSshUsername,
+    stateBackend,
+  }) =>
+    Effect.gen(function* () {
+      const requestedPreviewMode = optionalValue(preview);
+      const requestedPreviewId = optionalValue(previewId);
+      const previewContext = yield* resultToEffect(
+        resolveRequiredPreviewContext({
+          ...(requestedPreviewMode ? { mode: requestedPreviewMode } : {}),
+          ...(requestedPreviewId ? { previewId: requestedPreviewId } : {}),
+          env: Bun.env,
+        }),
+      );
+
+      const sourceLocator = optionalValue(pathOrSource) ?? ".";
+      const configFilePath = optionalValue(config);
+      const requestedStateBackend = optionalValue(stateBackend);
+      const serverHostValue = optionalValue(serverHost);
+      const serverPortValue = optionalNumber(serverPort);
+      const serverProviderValue = optionalValue(serverProvider);
+      const serverSshUsernameValue = optionalValue(serverSshUsername);
+      const serverSshPrivateKeyFileValue = optionalValue(serverSshPrivateKeyFile);
+      const normalizedSourceLocator = normalizeCliPathOrSource(sourceLocator, "auto");
+      const configResolution = yield* resultToEffect(
+        readDeploymentConfigForCli({
+          sourceLocator: normalizedSourceLocator,
+          ...(configFilePath ? { configFilePath } : {}),
+        }),
+      );
+      const configuredSourceLocator = applyConfigSourceBase(
+        normalizedSourceLocator,
+        configResolution?.config,
+      );
+
+      const stateBackendDecision =
+        configResolution || previewContext || requestedStateBackend || serverHostValue
+          ? resolveDeploymentStateBackend({
+              ...(requestedStateBackend ? { explicitBackend: requestedStateBackend } : {}),
+              ...(Bun.env.APPALOFT_DATABASE_URL
+                ? { databaseUrl: Bun.env.APPALOFT_DATABASE_URL }
+                : {}),
+              ...(Bun.env.APPALOFT_CONTROL_PLANE_URL
+                ? { controlPlaneUrl: Bun.env.APPALOFT_CONTROL_PLANE_URL }
+                : {}),
+              ...(serverHostValue
+                ? {
+                    trustedSshTarget: {
+                      host: serverHostValue,
+                      ...(serverPortValue === undefined ? {} : { port: serverPortValue }),
+                      ...(serverProviderValue ? { providerKey: serverProviderValue } : {}),
+                      ...(serverSshUsernameValue ? { username: serverSshUsernameValue } : {}),
+                      ...(serverSshPrivateKeyFileValue
+                        ? { identityFile: serverSshPrivateKeyFileValue }
+                        : {}),
+                    },
+                  }
+                : {}),
+            })
+          : undefined;
+
+      const sourceFingerprint = sourceFingerprintForConfigDeploy({
+        sourceLocator: configuredSourceLocator,
+        ...(configResolution ? { configResolution } : {}),
+        previewContext,
+      });
+
+      const stateSession = yield* prepareDeploymentStateSessionIfNeeded(stateBackendDecision);
+      const runCleanup = runCleanupPreviewCommand(sourceFingerprint);
+
+      if (!stateSession) {
+        return yield* runCleanup;
+      }
+
+      const result = yield* Effect.either(runCleanup);
+      yield* releaseDeploymentStateSession(stateSession);
+      if (Either.isLeft(result)) {
+        return yield* Effect.fail(result.left);
+      }
+
+      return result.right;
+    }),
+).pipe(EffectCommand.withDescription("Clean up a preview deployment context"));
 
 export const deployCommand = EffectCommand.make(
   "deploy",
@@ -1124,4 +1256,9 @@ const listDeploymentsCommand = EffectCommand.make(
 export const deploymentsCommand = EffectCommand.make("deployments").pipe(
   EffectCommand.withDescription("Deployment queries"),
   EffectCommand.withSubcommands([listDeploymentsCommand]),
+);
+
+export const previewCommand = EffectCommand.make("preview").pipe(
+  EffectCommand.withDescription("Preview deployment commands"),
+  EffectCommand.withSubcommands([previewCleanupCommand]),
 );
