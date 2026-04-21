@@ -79,6 +79,7 @@ export function projectResourceAccessSummary(
       }
     | undefined;
   let latestGeneratedRoute: typeof latestRoute;
+  let latestDurableRoute: typeof latestRoute;
   let latestServerAppliedRoute: typeof latestRoute;
 
   for (const deployment of sortedDeployments) {
@@ -95,6 +96,10 @@ export function projectResourceAccessSummary(
 
     if (metadata["access.routeSource"] === "generated-default") {
       latestGeneratedRoute ??= { deployment, route, metadata };
+    }
+
+    if (metadata["access.routeSource"] === "durable-domain-binding") {
+      latestDurableRoute ??= { deployment, route, metadata };
     }
 
     if (metadata["access.routeSource"] === "server-applied-config-domain") {
@@ -139,8 +144,10 @@ export function projectResourceAccessSummary(
     }
   }
 
-  if (readyDurableBinding && latestRoute) {
-    const { deployment, metadata, route } = latestRoute;
+  const durableRoute = latestDurableRoute ?? latestRoute;
+
+  if (readyDurableBinding && durableRoute) {
+    const { deployment, metadata, route } = durableRoute;
     const scheme = readyDurableBinding.tlsMode === "auto" ? "https" : "http";
 
     summary.latestDurableDomainRoute = {
@@ -185,8 +192,8 @@ export function projectResourceAccessSummary(
   }
 
   const routeStatusDeployment =
-    summary.latestDurableDomainRoute && latestRoute
-      ? latestRoute.deployment
+    summary.latestDurableDomainRoute && durableRoute
+      ? durableRoute.deployment
       : (latestServerAppliedRoute?.deployment ?? latestGeneratedRoute?.deployment);
 
   if (routeStatusDeployment) {
