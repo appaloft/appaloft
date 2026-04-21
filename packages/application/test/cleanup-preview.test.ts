@@ -55,7 +55,6 @@ import {
   type DeploymentReadModel,
   type ExecutionBackend,
   type ServerAppliedRouteDesiredStateRecord,
-  ServerAppliedRouteStateBySourceFingerprintSpec,
   type ServerAppliedRouteStateByTargetSpec,
   type ServerAppliedRouteStateRepository,
   type ServerAppliedRouteStateSelectionSpec,
@@ -411,7 +410,7 @@ describe("CleanupPreviewUseCase", () => {
       requestId: "req_preview_cleanup_success",
     });
     const deployment = createSucceededDeployment();
-    await deployments.upsert(
+    await deployments.insertOne(
       toRepositoryContext(context),
       deployment,
       UpsertDeploymentSpec.fromDeployment(deployment),
@@ -481,7 +480,7 @@ describe("CleanupPreviewUseCase", () => {
       requestId: "req_preview_cleanup_runtime_failure",
     });
     const deployment = createSucceededDeployment();
-    await deployments.upsert(
+    await deployments.insertOne(
       toRepositoryContext(context),
       deployment,
       UpsertDeploymentSpec.fromDeployment(deployment),
@@ -581,12 +580,12 @@ describe("CleanupPreviewUseCase", () => {
         "preview.mode": "pull-request",
       },
     });
-    await deployments.upsert(
+    await deployments.insertOne(
       toRepositoryContext(context),
       currentDeployment,
       UpsertDeploymentSpec.fromDeployment(currentDeployment),
     );
-    await deployments.upsert(
+    await deployments.insertOne(
       toRepositoryContext(context),
       oldDeployment,
       UpsertDeploymentSpec.fromDeployment(oldDeployment),

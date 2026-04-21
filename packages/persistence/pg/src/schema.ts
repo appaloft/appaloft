@@ -129,6 +129,8 @@ export interface DeploymentsTable {
   started_at: string | null;
   finished_at: string | null;
   rollback_of_deployment_id: string | null;
+  supersedes_deployment_id: string | null;
+  superseded_by_deployment_id: string | null;
 }
 
 export interface DomainBindingsTable {

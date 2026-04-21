@@ -4,6 +4,10 @@ import { type Deployment, type DeploymentState } from "./deployment";
 export interface DeploymentSelectionSpecVisitor<TResult> {
   visitDeploymentById(query: TResult, spec: DeploymentByIdSpec): TResult;
   visitLatestDeployment(query: TResult, spec: LatestDeploymentSpec): TResult;
+  visitLatestRuntimeOwningDeployment(
+    query: TResult,
+    spec: LatestRuntimeOwningDeploymentSpec,
+  ): TResult;
 }
 
 export interface DeploymentMutationSpecVisitor<TResult> {
@@ -39,6 +43,18 @@ export class LatestDeploymentSpec implements DeploymentSelectionSpec {
 
   accept<TResult>(query: TResult, visitor: DeploymentSelectionSpecVisitor<TResult>): TResult {
     return visitor.visitLatestDeployment(query, this);
+  }
+}
+
+export class LatestRuntimeOwningDeploymentSpec implements DeploymentSelectionSpec {
+  private constructor(public readonly resourceId: ResourceId) {}
+
+  static forResource(resourceId: ResourceId): LatestRuntimeOwningDeploymentSpec {
+    return new LatestRuntimeOwningDeploymentSpec(resourceId);
+  }
+
+  accept<TResult>(query: TResult, visitor: DeploymentSelectionSpecVisitor<TResult>): TResult {
+    return visitor.visitLatestRuntimeOwningDeployment(query, this);
   }
 }
 

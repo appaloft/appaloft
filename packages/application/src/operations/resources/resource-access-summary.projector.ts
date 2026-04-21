@@ -57,6 +57,7 @@ function proxyRouteStatusFor(
     case "planning":
     case "planned":
     case "running":
+    case "cancel-requested":
       return "not-ready";
   }
 }

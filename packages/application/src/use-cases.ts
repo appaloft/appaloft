@@ -11,6 +11,7 @@ export * from "./operations/deployments/deployment.factory";
 export * from "./operations/deployments/deployment-config-bootstrap.service";
 export * from "./operations/deployments/deployment-context.resolver";
 export * from "./operations/deployments/deployment-context-defaults.factory";
+export * from "./operations/deployments/deployment-execution.guard";
 export * from "./operations/deployments/deployment-lifecycle.service";
 export * from "./operations/deployments/deployment-logs.query-service";
 export * from "./operations/deployments/deployment-snapshot.factory";

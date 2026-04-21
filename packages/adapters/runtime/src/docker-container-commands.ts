@@ -216,21 +216,25 @@ export function dockerContainerLabelFlags(input: {
 
 export function dockerRemoveResourceContainersCommand(input: {
   resourceId: string;
-  currentContainerName: string;
+  deploymentIds: readonly string[];
   quote: (value: string) => string;
 }): string {
-  const resourceLabelFilter = input.quote(`label=appaloft.resource-id=${input.resourceId}`);
-  const currentContainerName = input.quote(input.currentContainerName);
+  if (input.deploymentIds.length === 0) {
+    return "";
+  }
 
-  return [
-    `docker ps -aq --filter ${resourceLabelFilter}`,
-    "| while read -r container_id; do",
-    `container_name="$(docker inspect -f '{{.Name}}' "$container_id" 2>/dev/null | sed 's#^/##')";`,
-    `if [ "$container_name" != ${currentContainerName} ]; then`,
-    'docker rm -f "$container_id";',
-    "fi;",
-    "done",
-  ].join(" ");
+  const resourceLabelFilter = input.quote(`label=appaloft.resource-id=${input.resourceId}`);
+  return input.deploymentIds
+    .map((deploymentId) => {
+      const deploymentLabelFilter = input.quote(`label=appaloft.deployment-id=${deploymentId}`);
+      return [
+        `docker ps -aq --filter ${resourceLabelFilter} --filter ${deploymentLabelFilter}`,
+        "| while read -r container_id; do",
+        'docker rm -f "$container_id";',
+        "done",
+      ].join(" ");
+    })
+    .join(" && ");
 }
 
 export function dockerPublishedPortFlag(input: {

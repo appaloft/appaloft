@@ -513,6 +513,13 @@ export class DeploymentStatusValue extends StateMachineValueObject<
     ).map(() => new DeploymentStatusValue("running"));
   }
 
+  requestCancel(): Result<DeploymentStatusValue> {
+    return this.ensureCurrent(
+      ["created", "planning", "planned", "running"],
+      "Deployment must be active before cancellation is requested",
+    ).map(() => new DeploymentStatusValue("cancel-requested"));
+  }
+
   canStartNewDeployment(): boolean {
     return (
       this.value === "succeeded" ||
@@ -524,7 +531,7 @@ export class DeploymentStatusValue extends StateMachineValueObject<
 
   cancel(): Result<DeploymentStatusValue> {
     return this.ensureCurrent(
-      ["created", "planning", "planned", "running"],
+      ["created", "planning", "planned", "running", "cancel-requested"],
       "Deployment must be active before cancellation",
     ).map(() => new DeploymentStatusValue("canceled"));
   }

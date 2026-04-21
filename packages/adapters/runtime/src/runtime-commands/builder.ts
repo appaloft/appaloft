@@ -122,12 +122,14 @@ export class DockerCommandBuilder {
 
   removeResourceContainers(input: {
     resourceId: string;
-    currentContainerName: string;
+    deploymentIds: readonly string[];
   }): DockerRemoveResourceContainersCommandSpec {
     return {
       kind: "docker-remove-resource-containers",
       resourceId: DisplayNameText.rehydrate(input.resourceId),
-      currentContainerName: DisplayNameText.rehydrate(input.currentContainerName),
+      deploymentIds: input.deploymentIds.map((deploymentId) =>
+        DisplayNameText.rehydrate(deploymentId),
+      ),
     };
   }
 

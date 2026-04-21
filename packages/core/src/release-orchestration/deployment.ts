@@ -41,6 +41,8 @@ export interface DeploymentState {
   startedAt?: StartedAt;
   finishedAt?: FinishedAt;
   rollbackOfDeploymentId?: DeploymentId;
+  supersedesDeploymentId?: DeploymentId;
+  supersededByDeploymentId?: DeploymentId;
 }
 
 export interface DeploymentVisitor<TContext, TResult> {
@@ -63,6 +65,8 @@ export class Deployment extends AggregateRoot<DeploymentState> {
     environmentSnapshot: EnvironmentSnapshot;
     createdAt: CreatedAt;
     rollbackOfDeploymentId?: DeploymentId;
+    supersedesDeploymentId?: DeploymentId;
+    supersededByDeploymentId?: DeploymentId;
   }): Result<Deployment> {
     if (input.runtimePlan.toState().steps.length === 0) {
       return err(domainError.validation("Runtime plan must contain at least one step"));
@@ -83,6 +87,12 @@ export class Deployment extends AggregateRoot<DeploymentState> {
         createdAt: input.createdAt,
         ...(input.rollbackOfDeploymentId
           ? { rollbackOfDeploymentId: input.rollbackOfDeploymentId }
+          : {}),
+        ...(input.supersedesDeploymentId
+          ? { supersedesDeploymentId: input.supersedesDeploymentId }
+          : {}),
+        ...(input.supersededByDeploymentId
+          ? { supersededByDeploymentId: input.supersededByDeploymentId }
           : {}),
       }),
     );
@@ -127,12 +137,47 @@ export class Deployment extends AggregateRoot<DeploymentState> {
     });
   }
 
-  cancel(at: FinishedAt, logs: DeploymentLogEntry[] = []): Result<void> {
+  requestCancellation(
+    at: StartedAt,
+    input?: { supersededByDeploymentId?: DeploymentId },
+  ): Result<void> {
+    return this.state.status.requestCancel().map((nextStatus) => {
+      this.state.status = nextStatus;
+      if (input?.supersededByDeploymentId) {
+        this.state.supersededByDeploymentId = input.supersededByDeploymentId;
+      }
+      this.recordDomainEvent("deployment.cancel_requested", at, {
+        ...(input?.supersededByDeploymentId
+          ? { supersededByDeploymentId: input.supersededByDeploymentId.value }
+          : {}),
+      });
+      return undefined;
+    });
+  }
+
+  cancel(
+    at: FinishedAt,
+    logs: DeploymentLogEntry[] = [],
+    input?: { supersededByDeploymentId?: DeploymentId },
+  ): Result<void> {
     return this.state.status.cancel().map((nextStatus) => {
       this.state.status = nextStatus;
       this.appendLogs(logs);
       this.state.finishedAt = at;
-      this.recordDomainEvent("deployment.canceled", at, {});
+      if (input?.supersededByDeploymentId) {
+        this.state.supersededByDeploymentId = input.supersededByDeploymentId;
+      }
+      this.recordDomainEvent("deployment.canceled", at, {
+        ...(input?.supersededByDeploymentId
+          ? { supersededByDeploymentId: input.supersededByDeploymentId.value }
+          : {}),
+      });
+      this.recordDomainEvent("deployment.finished", at, {
+        status: this.state.status.value,
+        ...(input?.supersededByDeploymentId
+          ? { supersededByDeploymentId: input.supersededByDeploymentId.value }
+          : {}),
+      });
       return undefined;
     });
   }
