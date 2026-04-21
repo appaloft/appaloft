@@ -87,6 +87,10 @@ server-applied config domain, latest generated route, planned generated route, t
 route. The summary may still include the separate generated, durable, and server-applied URLs so an
 operator can see why a generated/default URL exists but is not the selected public route.
 
+When a durable domain binding exists but is not ready, diagnostic access must surface that binding
+as the blocking fact with a stable source error instead of quietly treating fallback generated or
+server-applied URLs as the selected public route.
+
 The query service may depend on existing query services or read-model ports, but Web components,
 CLI commands, and HTTP handlers must not manually reconstruct the diagnostic payload by calling many
 separate endpoints and merging ad hoc shapes.

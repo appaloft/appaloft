@@ -14,6 +14,8 @@ import {
   type Clock,
   type DeploymentReadModel,
   type DeploymentSummary,
+  type DomainBindingReadModel,
+  type DomainBindingSummary,
   type ResourceAccessSummary,
   type ResourceHealthCheck,
   type ResourceHealthDeploymentContext,
@@ -33,6 +35,12 @@ import {
   type ResourceSummary,
 } from "../../ports";
 import { tokens } from "../../tokens";
+import {
+  currentNonReadyDurableDomainBinding,
+  durableDomainBindingNotReadyCategory,
+  durableDomainBindingNotReadyMessage,
+  durableDomainBindingUrl,
+} from "./durable-domain-observation";
 import { type ListResourcesQueryService } from "./list-resources.query-service";
 import { type ResourceHealthQuery } from "./resource-health.query";
 
@@ -360,9 +368,35 @@ function healthPolicySection(
 
 function publicAccessSection(
   resource: ResourceSummary,
+  domainBindings: DomainBindingSummary[],
   sourceErrors: ResourceHealthSourceError[],
 ): ResourcePublicAccessHealthSection {
   const access = resource.accessSummary;
+  const nonReadyDurableBinding = currentNonReadyDurableDomainBinding(domainBindings, access);
+
+  if (nonReadyDurableBinding) {
+    sourceErrors.push(
+      sourceError({
+        source: "domain-binding",
+        code: "resource_domain_binding_not_ready",
+        category: durableDomainBindingNotReadyCategory(nonReadyDurableBinding),
+        phase: "public-access-observation",
+        retriable: true,
+        relatedEntityId: nonReadyDurableBinding.id,
+        relatedState: nonReadyDurableBinding.status,
+        message: durableDomainBindingNotReadyMessage(nonReadyDurableBinding),
+      }),
+    );
+
+    return {
+      status: "not-ready",
+      url: durableDomainBindingUrl(nonReadyDurableBinding),
+      kind: "durable-domain",
+      reasonCode: "resource_domain_binding_not_ready",
+      phase: "public-access-observation",
+    };
+  }
+
   const route =
     access?.latestDurableDomainRoute ??
     access?.latestServerAppliedDomainRoute ??
@@ -713,6 +747,8 @@ export class ResourceHealthQueryService {
   constructor(
     @inject(tokens.listResourcesQueryService)
     private readonly listResourcesQueryService: ListResourcesQueryService,
+    @inject(tokens.domainBindingReadModel)
+    private readonly domainBindingReadModel: DomainBindingReadModel,
     @inject(tokens.resourceRepository)
     private readonly resourceRepository: ResourceRepository,
     @inject(tokens.deploymentReadModel)
@@ -738,6 +774,11 @@ export class ResourceHealthQueryService {
       return err(resourceStateResult.error);
     }
     const resourceState = resourceStateResult.value;
+    const domainBindingsResult = await this.resolveDomainBindings(context, resource.id);
+    if (domainBindingsResult.isErr()) {
+      return err(domainBindingsResult.error);
+    }
+    const domainBindings = domainBindingsResult.value;
     const deploymentsResult = await this.resolveDeployments(context, resource.id);
     if (deploymentsResult.isErr()) {
       return err(deploymentsResult.error);
@@ -786,7 +827,7 @@ export class ResourceHealthQueryService {
       latestDeployment,
       healthPolicy.status === "configured",
     );
-    let publicAccess = publicAccessSection(resource, sourceErrors);
+    let publicAccess = publicAccessSection(resource, domainBindings, sourceErrors);
     const proxy = proxySection(resource, sourceErrors);
     const liveChecks: ResourceHealthCheck[] = [];
 
@@ -1027,6 +1068,30 @@ export class ResourceHealthQueryService {
           {
             resourceId,
             phase: "latest-deployment-read",
+          },
+        ),
+      );
+    }
+  }
+
+  private async resolveDomainBindings(
+    context: ExecutionContext,
+    resourceId: string,
+  ): Promise<Result<DomainBindingSummary[]>> {
+    try {
+      return ok(
+        await this.domainBindingReadModel.list(toRepositoryContext(context), {
+          resourceId,
+        }),
+      );
+    } catch (error) {
+      return err(
+        domainError.resourceHealthUnavailable(
+          error instanceof Error ? error.message : "Resource health is unavailable",
+          {
+            resourceId,
+            phase: "read-model-load",
+            source: "domain-binding",
           },
         ),
       );

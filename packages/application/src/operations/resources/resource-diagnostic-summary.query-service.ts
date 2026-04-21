@@ -8,6 +8,8 @@ import {
   type DeploymentReadModel,
   type DeploymentSummary,
   type DiagnosticsPort,
+  type DomainBindingReadModel,
+  type DomainBindingSummary,
   type ProxyConfigurationStatus,
   type ProxyConfigurationView,
   type ResourceDiagnosticAccess,
@@ -26,6 +28,11 @@ import {
   type ResourceSummary,
 } from "../../ports";
 import { tokens } from "../../tokens";
+import {
+  currentNonReadyDurableDomainBinding,
+  durableDomainBindingNotReadyCategory,
+  durableDomainBindingNotReadyMessage,
+} from "./durable-domain-observation";
 import { type ListResourcesQueryService } from "./list-resources.query-service";
 import { type ResourceDiagnosticSummaryQuery } from "./resource-diagnostic-summary.query";
 import { ResourceProxyConfigurationPreviewQuery } from "./resource-proxy-configuration-preview.query";
@@ -155,8 +162,14 @@ function sourceErrorFromUnknown(input: {
   });
 }
 
-function accessStatus(resource: ResourceSummary): ResourceDiagnosticSectionStatus {
+function accessStatus(
+  resource: ResourceSummary,
+  domainBindings: DomainBindingSummary[],
+): ResourceDiagnosticSectionStatus {
   const access = resource.accessSummary;
+  if (currentNonReadyDurableDomainBinding(domainBindings, access)) {
+    return "unavailable";
+  }
 
   if (
     access?.latestGeneratedAccessRoute ||
@@ -228,6 +241,8 @@ export class ResourceDiagnosticSummaryQueryService {
   constructor(
     @inject(tokens.listResourcesQueryService)
     private readonly listResourcesQueryService: ListResourcesQueryService,
+    @inject(tokens.domainBindingReadModel)
+    private readonly domainBindingReadModel: DomainBindingReadModel,
     @inject(tokens.deploymentReadModel)
     private readonly deploymentReadModel: DeploymentReadModel,
     @inject(tokens.resourceRuntimeLogsQueryService)
@@ -250,6 +265,11 @@ export class ResourceDiagnosticSummaryQueryService {
     }
 
     const resource = resourceResult.value;
+    const domainBindingsResult = await this.resolveDomainBindings(context, resource.id);
+    if (domainBindingsResult.isErr()) {
+      return err(domainBindingsResult.error);
+    }
+    const domainBindings = domainBindingsResult.value;
     const deploymentResult = await this.resolveDeployment(context, query, resource);
     if (deploymentResult.isErr()) {
       return err(deploymentResult.error);
@@ -272,7 +292,7 @@ export class ResourceDiagnosticSummaryQueryService {
       redactions,
       sourceErrors,
     );
-    const access = this.buildAccessSection(resource, redactions, sourceErrors);
+    const access = this.buildAccessSection(resource, domainBindings, redactions, sourceErrors);
     const proxy = await this.buildProxySection(
       context,
       query,
@@ -389,6 +409,26 @@ export class ResourceDiagnosticSummaryQueryService {
     }
   }
 
+  private async resolveDomainBindings(
+    context: ExecutionContext,
+    resourceId: string,
+  ): Promise<Result<DomainBindingSummary[]>> {
+    try {
+      return ok(
+        await this.domainBindingReadModel.list(toRepositoryContext(context), {
+          resourceId,
+        }),
+      );
+    } catch {
+      return err(
+        domainError.resourceDiagnosticUnavailable("Resource diagnostic summary is unavailable", {
+          phase: "read-model-load",
+          resourceId,
+        }),
+      );
+    }
+  }
+
   private buildContext(
     resource: ResourceSummary,
     deployment: DeploymentSummary | undefined,
@@ -454,13 +494,29 @@ export class ResourceDiagnosticSummaryQueryService {
 
   private buildAccessSection(
     resource: ResourceSummary,
+    domainBindings: DomainBindingSummary[],
     redactions: readonly string[],
     sourceErrors: ResourceDiagnosticSourceError[],
   ): ResourceDiagnosticAccess {
     const access = resource.accessSummary;
-    const status = accessStatus(resource);
+    const blockingDurableBinding = currentNonReadyDurableDomainBinding(domainBindings, access);
+    const status = accessStatus(resource, domainBindings);
 
-    if (status === "unavailable") {
+    if (blockingDurableBinding) {
+      sourceErrors.push(
+        sourceError({
+          source: "access",
+          code: "resource_domain_binding_not_ready",
+          category: durableDomainBindingNotReadyCategory(blockingDurableBinding),
+          phase: "access-summary",
+          retryable: true,
+          redactions,
+          relatedEntityId: blockingDurableBinding.id,
+          relatedState: blockingDurableBinding.status,
+          message: durableDomainBindingNotReadyMessage(blockingDurableBinding),
+        }),
+      );
+    } else if (status === "unavailable") {
       sourceErrors.push(
         sourceError({
           source: "access",
@@ -493,9 +549,11 @@ export class ResourceDiagnosticSummaryQueryService {
       ...(access?.lastRouteRealizationDeploymentId
         ? { lastRouteRealizationDeploymentId: access.lastRouteRealizationDeploymentId }
         : {}),
-      ...(status === "unavailable"
-        ? { reasonCode: "default_access_route_unavailable", phase: "access-summary" }
-        : {}),
+      ...(blockingDurableBinding
+        ? { reasonCode: "resource_domain_binding_not_ready", phase: "access-summary" }
+        : status === "unavailable"
+          ? { reasonCode: "default_access_route_unavailable", phase: "access-summary" }
+          : {}),
     };
   }
 
