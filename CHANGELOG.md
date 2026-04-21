@@ -1,5 +1,29 @@
 # Changelog
 
+## [0.2.4](https://github.com/appaloft/appaloft/compare/v0.2.3...v0.2.4) (2026-04-21)
+
+
+### Features
+
+* add resource access failure diagnostics ([b087cda](https://github.com/appaloft/appaloft/commit/b087cda48b10c66533d38325d669151795ec76db))
+* add resource access failure diagnostics ([#23](https://github.com/appaloft/appaloft/issues/23)) ([b56639e](https://github.com/appaloft/appaloft/commit/b56639e0c52897f905346bdf4a6f48c1ce7135d8))
+* enrich deployment runtime labels ([671fac1](https://github.com/appaloft/appaloft/commit/671fac11461acb35e5a35a7d2ce1b8cf49cf527d))
+* **preview:** add explicit preview cleanup ([#27](https://github.com/appaloft/appaloft/issues/27)) ([f523642](https://github.com/appaloft/appaloft/commit/f523642fc096820ecc2133986894df65b45dfe49))
+* **server-applied-routes:** persist route state in pg ([3107bf1](https://github.com/appaloft/appaloft/commit/3107bf1dc090c91af1914330dbe695c8da4a34dd))
+
+
+### Bug Fixes
+
+* harden default access route precedence ([2067768](https://github.com/appaloft/appaloft/commit/20677683186beb3cf58e42d244cd4e6bb5571dda))
+* harden default access route precedence ([db764dc](https://github.com/appaloft/appaloft/commit/db764dcb2662ca09e19a765cc49f53586bb32606))
+* surface pending durable domain observation ([b666aa9](https://github.com/appaloft/appaloft/commit/b666aa9ec661e13df58dd168030646f33112ef1e))
+
+
+### Miscellaneous
+
+* merge main into resource profile lifecycle ([81b8b29](https://github.com/appaloft/appaloft/commit/81b8b2967328c93ff61a9435d0ab549d04775ddc))
+* merge origin/main into route precedence hardening ([c20a205](https://github.com/appaloft/appaloft/commit/c20a205086bfdd69c55f63100587cf3e42033e72))
+
 ## [0.2.3](https://github.com/appaloft/appaloft/compare/v0.2.2...v0.2.3) (2026-04-20)
 
 
