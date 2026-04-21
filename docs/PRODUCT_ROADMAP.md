@@ -25,7 +25,7 @@ This roadmap is the release gate for Appaloft versions before `1.0.0`.
 - [ ] Use this roadmap to choose the release version.
 - [ ] Before the next release, verify package manifests, Release Please state, and the latest
   published release agree on the current version line. The roadmap starts from the current public
-  line `0.2.x` because the current release is `0.2.7`.
+  line `0.2.x` because the current release is `0.2.8`.
 
 Version selection rules:
 
@@ -42,12 +42,14 @@ Version selection rules:
 
 Current release alignment:
 
-- [x] On 2026-04-21, latest public release is still `0.2.7`, while `origin/main` package manifests
-  have already advanced to `0.2.8` through the merged Release Please commit, so the current
-  stable-release action is publish rather than create another release PR.
-- [x] On 2026-04-21, `origin/main` contains post-`v0.2.7` merges for branding asset refresh, stale
-  preview cleanup sweep support, and legacy PGlite state adoption, and there is no open Release
-  Please PR, so the next stable publish target remains `0.2.8` on the `0.2.x` line.
+- [x] On 2026-04-21, latest public release and `origin/main` package manifests agree on `0.2.8`,
+  while open Release Please PR [#46](https://github.com/appaloft/appaloft/pull/46) proposes
+  `0.2.9`, so the current stable-release action is to update or merge that release PR instead of
+  creating another one.
+- [x] On 2026-04-21, the `v0.2.8` release partially published successfully but failed the macOS
+  desktop bundling jobs because the Tauri app icon was encoded as 16-bit RGBA; `origin/main` now
+  includes the 8-bit icon normalization fix, so the next stable publish target remains `0.2.9` on
+  the `0.2.x` line.
 - [x] On 2026-04-21, Action/CLI PR preview deploy profile flag support and explicit preview cleanup
   command support were completed early in the CLI/config bootstrap path, but the public
   deploy-action wrapper and product-grade GitHub App preview lifecycle remain incomplete.
