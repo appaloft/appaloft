@@ -70,12 +70,15 @@ import {
   type DomainBindingMutationSpec,
   type DomainBindingSelectionSpec,
   type DomainError,
+  domainError,
   Environment,
   EnvironmentByIdSpec,
   EnvironmentByProjectAndNameSpec,
   type EnvironmentMutationSpec,
   type EnvironmentSelectionSpec,
+  err,
   LatestDeploymentSpec,
+  LatestRuntimeOwningDeploymentSpec,
   ok,
   Project,
   ProjectByIdSpec,
@@ -565,14 +568,66 @@ export class MemoryResourceReadModel implements ResourceReadModel {
 export class MemoryDeploymentRepository implements DeploymentRepository {
   readonly items = new Map<string, Deployment>();
 
+  async admit(context: RepositoryContext, deployment: Deployment): Promise<Result<void>> {
+    void context;
+    const state = deployment.toState();
+    const activeDeployment = [...this.items.values()]
+      .map((candidate) => candidate.toState())
+      .find(
+        (candidate) =>
+          candidate.resourceId.equals(state.resourceId) &&
+          candidate.id.value !== state.id.value &&
+          !Deployment.rehydrate(candidate).canStartNewDeployment(),
+      );
+
+    if (activeDeployment) {
+      return err(
+        domainError.deploymentNotRedeployable(
+          "Latest deployment for this resource must be succeeded or failed before redeploying",
+          {
+            commandName: "deployments.create",
+            phase: "redeploy-guard",
+            deploymentId: activeDeployment.id.value,
+            resourceId: activeDeployment.resourceId.value,
+            status: activeDeployment.status.value,
+          },
+        ),
+      );
+    }
+
+    this.items.set(state.id.value, Deployment.rehydrate(state));
+    return ok(undefined);
+  }
+
   async upsert(
     context: RepositoryContext,
     deployment: Deployment,
     spec: DeploymentMutationSpec,
-  ): Promise<void> {
+  ): Promise<Result<void>> {
     void context;
     void spec;
-    this.items.set(deployment.toState().id.value, Deployment.rehydrate(deployment.toState()));
+    const incomingState = deployment.toState();
+    const currentState = this.items.get(incomingState.id.value)?.toState();
+
+    if (
+      currentState?.supersededByDeploymentId &&
+      (!incomingState.supersededByDeploymentId ||
+        !currentState.supersededByDeploymentId.equals(incomingState.supersededByDeploymentId))
+    ) {
+      return err(
+        domainError.conflict("Deployment write is fenced by a superseding deployment", {
+          phase: "deployment-write-fence",
+          deploymentId: incomingState.id.value,
+          resourceId: incomingState.resourceId.value,
+          status: currentState.status.value,
+          supersededByDeploymentId: currentState.supersededByDeploymentId.value,
+          causeCode: "deployment_superseded",
+        }),
+      );
+    }
+
+    this.items.set(incomingState.id.value, Deployment.rehydrate(incomingState));
+    return ok(undefined);
   }
 
   async findOne(
@@ -588,6 +643,20 @@ export class MemoryDeploymentRepository implements DeploymentRepository {
       return (
         [...this.items.values()]
           .filter((deployment) => deployment.toState().resourceId.equals(spec.resourceId))
+          .sort((left, right) =>
+            right.toState().createdAt.value.localeCompare(left.toState().createdAt.value),
+          )[0] ?? null
+      );
+    }
+
+    if (spec instanceof LatestRuntimeOwningDeploymentSpec) {
+      return (
+        [...this.items.values()]
+          .filter((deployment) => deployment.toState().resourceId.equals(spec.resourceId))
+          .filter((deployment) => {
+            const status = deployment.toState().status.value;
+            return status === "succeeded" || status === "rolled-back";
+          })
           .sort((left, right) =>
             right.toState().createdAt.value.localeCompare(left.toState().createdAt.value),
           )[0] ?? null
@@ -1222,6 +1291,12 @@ export class MemoryDeploymentReadModel implements DeploymentReadModel {
           ...(deployment.finishedAt ? { finishedAt: deployment.finishedAt.value } : {}),
           ...(deployment.rollbackOfDeploymentId
             ? { rollbackOfDeploymentId: deployment.rollbackOfDeploymentId.value }
+            : {}),
+          ...(deployment.supersedesDeploymentId
+            ? { supersedesDeploymentId: deployment.supersedesDeploymentId.value }
+            : {}),
+          ...(deployment.supersededByDeploymentId
+            ? { supersededByDeploymentId: deployment.supersededByDeploymentId.value }
             : {}),
           logs: deployment.logs.map((log) => ({
             timestamp: log.timestamp,

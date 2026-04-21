@@ -59,6 +59,8 @@ type DeploymentCreateErrorDetails = {
     | "source-detection"
     | "runtime-plan-resolution"
     | "runtime-artifact-resolution"
+    | "supersede-previous-deployment"
+    | "deployment-write-fence"
     | "runtime-target-resolution"
     | "runtime-target-render"
     | "runtime-target-apply"
@@ -76,6 +78,7 @@ type DeploymentCreateErrorDetails = {
     | "event-publication";
   step?: string;
   deploymentId?: string;
+  supersedesDeploymentId?: string;
   projectId?: string;
   environmentId?: string;
   resourceId?: string;
@@ -130,7 +133,8 @@ Admission errors reject the command and return `err(DomainError)`.
 | `validation_error` | `config-discovery`, `config-parse`, `config-schema`, `config-identity`, `config-secret-validation`, `config-profile-resolution` | No | Repository config file could not be safely used by the entry workflow. Details may include config path, format, safe schema issue paths, or rejected field names, but must not include secret values. |
 | `unsupported_config_field` | `config-capability-resolution` | No | Repository config requested a known future capability that Appaloft cannot enforce yet, such as CPU, memory, replicas, restart policy, rollout overlap, or rollout drain. |
 | `not_found` | `context-resolution` | No | Entity type, entity id, `commandName`, `phase`. |
-| `deployment_not_redeployable` | `redeploy-guard` | No | Existing deployment id, resource id, current deployment status. |
+| `deployment_not_redeployable` | `redeploy-guard` | No | Existing or concurrently-admitted deployment id when available, resource id, current deployment status, and safe cause metadata when a concurrent submit lost the atomic active-attempt race or another request won the supersede race first. |
+| `conflict` | `supersede-previous-deployment` | No | The later request could not safely cancel the previous active deployment before taking ownership. |
 | `conflict` | `admission-conflict` | No | Conflict subject and related state. |
 | `invariant_violation` | `planning-transition`, `execution-start-transition`, `finalization` | No | Current deployment state and attempted transition. |
 | `infra_error` | `deployment-creation`, `event-publication` | Conditional | Adapter/operation and sanitized cause. |
@@ -150,6 +154,16 @@ available.
 
 For reverse-proxy resources, another resource using the same `internalPort` is not an admission
 conflict and must not be reported as a host-port conflict.
+
+`deployment_not_redeployable` also covers the concurrent-submit branch where a pre-read found no
+active deployment, but durable state creation lost the race to another accepted non-terminal
+deployment for the same resource. In that branch the command still returns `err`, phase
+`redeploy-guard`, and should include the concurrently active deployment id/status when they can be
+read safely.
+
+If a superseded execution path later tries to persist state, the repository may raise an internal
+`deployment-write-fence` conflict with `causeCode = deployment_superseded`. That branch is part of
+execution fencing, not a separate public command.
 
 For static strategy resources, missing or unsafe `runtimeProfile.publishDirectory` is an admission
 failure when it can be detected before acceptance. Static package/build failures discovered after
@@ -222,6 +236,9 @@ Current implementation already uses neverthrow `Result` for command construction
 Migration gaps:
 
 - phase/step details are not yet uniformly included;
+- concurrent-submit races are now governed by the atomic active-attempt invariant, but adapters and
+  tests still need full coverage for the write-side branch that loses the race after a successful
+  pre-read;
 - runtime execution is currently awaited inside `deployments.create`;
 - backend failures can currently appear either as returned `err(DomainError)` or as failed deployment execution result depending on adapter behavior;
 - Web QuickDeploy still has hardcoded local validation text;

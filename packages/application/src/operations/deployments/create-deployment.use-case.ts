@@ -1,9 +1,11 @@
 import {
+  type Deployment,
   type Destination,
   domainError,
   type Environment,
   err,
   LatestDeploymentSpec,
+  LatestRuntimeOwningDeploymentSpec,
   ok,
   type Project,
   type Resource,
@@ -276,6 +278,17 @@ function requestedDeploymentWithRuntimeContextMetadata(
       ...previewMetadataForEnvironment({ environmentName, environmentKind }),
     },
   };
+}
+
+function isDeploymentWriteFenceError(error: { details?: Record<string, unknown> }): boolean {
+  return (
+    error.details?.phase === "deployment-write-fence" &&
+    error.details?.causeCode === "deployment_superseded"
+  );
+}
+
+function isExecutionSupersededError(error: { details?: Record<string, unknown> }): boolean {
+  return error.details?.causeCode === "deployment_execution_superseded";
 }
 
 function requestedDeploymentWithDurableDomainBindings(
@@ -582,6 +595,128 @@ export class CreateDeploymentUseCase {
     private readonly serverAppliedRouteStateRepository?: ServerAppliedRouteDesiredStateReader,
   ) {}
 
+  private async persistDeployment(
+    context: ExecutionContext,
+    deployment: Deployment,
+  ): Promise<Result<"persisted" | "fenced">> {
+    const result = await this.deploymentRepository.upsert(
+      toRepositoryContext(context),
+      deployment,
+      UpsertDeploymentSpec.fromDeployment(deployment),
+    );
+
+    if (result.isErr()) {
+      if (isDeploymentWriteFenceError(result.error)) {
+        return ok("fenced");
+      }
+
+      return err(result.error);
+    }
+
+    return ok("persisted");
+  }
+
+  private async supersedeActiveDeployment(input: {
+    context: ExecutionContext;
+    activeDeployment: Deployment;
+    supersedingDeployment: Deployment;
+  }): Promise<Result<void>> {
+    const { activeDeployment, context, supersedingDeployment } = input;
+    const activeState = activeDeployment.toState();
+    const supersedingDeploymentId = supersedingDeployment.toState().id;
+
+    if (activeState.status.value === "running") {
+      const requestResult = this.deploymentLifecycleService.requestCancellationForSupersede(
+        activeDeployment,
+        supersedingDeploymentId,
+      );
+      if (requestResult.isErr()) {
+        return err(requestResult.error);
+      }
+
+      const fencePersistResult = await this.persistDeployment(context, activeDeployment);
+      if (fencePersistResult.isErr()) {
+        return err(fencePersistResult.error);
+      }
+      if (fencePersistResult.value === "fenced") {
+        return err(
+          domainError.deploymentNotRedeployable(
+            "Another deployment replaced the active attempt before this request could supersede it",
+            {
+              commandName: "deployments.create",
+              phase: "redeploy-guard",
+              deploymentId: activeState.id.value,
+              resourceId: activeState.resourceId.value,
+              status: activeState.status.value,
+              causeCode: "supersede_race_lost",
+            },
+          ),
+        );
+      }
+
+      const cancelResult = await this.executionBackend.cancel(context, activeDeployment);
+      if (cancelResult.isErr()) {
+        return err(
+          domainError.conflict("Previous deployment could not be canceled before superseding it", {
+            commandName: "deployments.create",
+            phase: "supersede-previous-deployment",
+            deploymentId: activeState.id.value,
+            resourceId: activeState.resourceId.value,
+            status: activeState.status.value,
+            supersededByDeploymentId: supersedingDeploymentId.value,
+            causeCode: cancelResult.error.code,
+          }),
+        );
+      }
+
+      const cancelTransitionResult = this.deploymentLifecycleService.cancelForSupersede(
+        activeDeployment,
+        supersedingDeploymentId,
+        cancelResult.value.logs,
+      );
+      if (cancelTransitionResult.isErr()) {
+        return err(cancelTransitionResult.error);
+      }
+    } else {
+      const cancelTransitionResult = this.deploymentLifecycleService.cancelForSupersede(
+        activeDeployment,
+        supersedingDeploymentId,
+      );
+      if (cancelTransitionResult.isErr()) {
+        return err(cancelTransitionResult.error);
+      }
+    }
+
+    const persistResult = await this.persistDeployment(context, activeDeployment);
+    if (persistResult.isErr()) {
+      return err(persistResult.error);
+    }
+    if (persistResult.value === "fenced") {
+      return err(
+        domainError.deploymentNotRedeployable(
+          "Another deployment replaced the active attempt before this request could supersede it",
+          {
+            commandName: "deployments.create",
+            phase: "redeploy-guard",
+            deploymentId: activeState.id.value,
+            resourceId: activeState.resourceId.value,
+            status: activeState.status.value,
+            causeCode: "supersede_race_lost",
+          },
+        ),
+      );
+    }
+
+    await publishDomainEventsAndReturn(
+      context,
+      this.eventBus,
+      this.logger,
+      activeDeployment,
+      undefined,
+    );
+    return ok(undefined);
+  }
+
   async execute(
     context: ExecutionContext,
     input: CreateDeploymentCommandInput,
@@ -603,6 +738,8 @@ export class CreateDeploymentUseCase {
       serverAppliedRouteStateRepository,
       sourceDetector,
     } = this;
+    const persistDeployment = this.persistDeployment.bind(this);
+    const supersedeActiveDeployment = this.supersedeActiveDeployment.bind(this);
     const repositoryContext = toRepositoryContext(context);
 
     return safeTry(async function* () {
@@ -627,20 +764,12 @@ export class CreateDeploymentUseCase {
         repositoryContext,
         LatestDeploymentSpec.forResource(resource.toState().id),
       );
-
-      if (latestDeployment && !latestDeployment.canStartNewDeployment()) {
-        const latestDeploymentState = latestDeployment.toState();
-        return err(
-          domainError.deploymentNotRedeployable(
-            "Latest deployment for this resource must be succeeded or failed before redeploying",
-            {
-              deploymentId: latestDeploymentState.id.value,
-              resourceId: latestDeploymentState.resourceId.value,
-              status: latestDeploymentState.status.value,
-            },
-          ),
-        );
-      }
+      const activeDeployment =
+        latestDeployment && !latestDeployment.canStartNewDeployment() ? latestDeployment : null;
+      const latestRuntimeOwningDeployment = await deploymentRepository.findOne(
+        repositoryContext,
+        LatestRuntimeOwningDeploymentSpec.forResource(resource.toState().id),
+      );
 
       const resourceSourceResult = createResourceSourceDescriptor(resource);
       const resourceSource = yield* resourceSourceResult;
@@ -740,9 +869,22 @@ export class CreateDeploymentUseCase {
         resource,
         runtimePlan,
         environmentSnapshot: snapshot,
+        ...(latestRuntimeOwningDeployment
+          ? { supersedesDeploymentId: latestRuntimeOwningDeployment.toState().id }
+          : {}),
       });
       const deployment = yield* deploymentResult;
       const deploymentId = deployment.toState().id.value;
+
+      if (activeDeployment) {
+        const supersedeResult = await supersedeActiveDeployment({
+          context,
+          activeDeployment,
+          supersedingDeployment: deployment,
+        });
+        yield* supersedeResult;
+      }
+
       reportDeploymentProgress(deploymentProgressReporter, context, {
         deploymentId,
         phase: "plan",
@@ -757,36 +899,35 @@ export class CreateDeploymentUseCase {
       const prepareResult = deploymentLifecycleService.prepareForExecution(deployment);
       yield* prepareResult;
 
-      await deploymentRepository.upsert(
-        repositoryContext,
-        deployment,
-        UpsertDeploymentSpec.fromDeployment(deployment),
-      );
+      const admitResult = await deploymentRepository.admit(repositoryContext, deployment);
+      yield* admitResult;
       await publishDomainEventsAndReturn(context, eventBus, logger, deployment, undefined);
 
       const startResult = deploymentLifecycleService.startExecution(deployment);
       yield* startResult;
 
-      await deploymentRepository.upsert(
-        repositoryContext,
-        deployment,
-        UpsertDeploymentSpec.fromDeployment(deployment),
-      );
+      const startPersistResult = yield* await persistDeployment(context, deployment);
+      if (startPersistResult === "fenced") {
+        return ok({ id: deployment.toState().id.value });
+      }
       await publishDomainEventsAndReturn(context, eventBus, logger, deployment, undefined);
 
       const executionResult = await executionBackend.execute(context, deployment);
       if (executionResult.isErr()) {
+        if (isExecutionSupersededError(executionResult.error)) {
+          return ok({ id: deployment.toState().id.value });
+        }
+
         const failureResult = deploymentLifecycleService.failExecution(
           deployment,
           executionResult.error,
         );
         yield* failureResult;
 
-        await deploymentRepository.upsert(
-          repositoryContext,
-          deployment,
-          UpsertDeploymentSpec.fromDeployment(deployment),
-        );
+        const failurePersistResult = yield* await persistDeployment(context, deployment);
+        if (failurePersistResult === "fenced") {
+          return ok({ id: deployment.toState().id.value });
+        }
         await publishDomainEventsAndReturn(context, eventBus, logger, deployment, undefined);
 
         return ok({ id: deployment.toState().id.value });
@@ -794,11 +935,10 @@ export class CreateDeploymentUseCase {
 
       const execution = executionResult.value;
 
-      await deploymentRepository.upsert(
-        repositoryContext,
-        execution.deployment,
-        UpsertDeploymentSpec.fromDeployment(execution.deployment),
-      );
+      const terminalPersistResult = yield* await persistDeployment(context, execution.deployment);
+      if (terminalPersistResult === "fenced") {
+        return ok({ id: execution.deployment.toState().id.value });
+      }
       await publishDomainEventsAndReturn(
         context,
         eventBus,

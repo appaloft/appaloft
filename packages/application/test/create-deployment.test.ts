@@ -9,11 +9,12 @@ import {
   ConfigScopeValue,
   ConfigValueText,
   CreatedAt,
-  type Deployment,
+  Deployment,
   DeploymentByIdSpec,
   DeploymentId,
   DeploymentLogEntry,
   DeploymentPhaseValue,
+  type DeploymentSelectionSpec,
   DeploymentTarget,
   DeploymentTargetDescriptor,
   DeploymentTargetId,
@@ -30,6 +31,7 @@ import {
   EnvironmentId,
   EnvironmentKindValue,
   EnvironmentName,
+  EnvironmentSnapshotId,
   ExecutionResult,
   ExecutionStatusValue,
   ExecutionStrategyKindValue,
@@ -68,6 +70,7 @@ import {
   SourceDescriptor,
   SourceKindValue,
   SourceLocator,
+  StartedAt,
   StaticPublishDirectory,
   TargetKindValue,
   UpdatedAt,
@@ -299,6 +302,17 @@ class FailingStaticPackageExecutionBackend extends HermeticExecutionBackend {
         },
         true,
       ),
+    );
+  }
+}
+
+class CancelFailingExecutionBackend extends HermeticExecutionBackend {
+  override async cancel(): Promise<Result<{ logs: DeploymentLogEntry[] }>> {
+    return err(
+      domainError.conflict("Hermetic cancellation failed", {
+        phase: "runtime-execution",
+        causeCode: "hermetic_cancel_failed",
+      }),
     );
   }
 }
@@ -592,6 +606,137 @@ function createStaticSiteResource(input: { publishDirectory?: string } = {}): Re
   });
 }
 
+function createHistoricalDeployment(input: {
+  id: string;
+  resourceId?: string;
+  createdAt: string;
+  status: "created" | "planning" | "planned" | "running" | "succeeded" | "failed" | "rolled-back";
+  supersedesDeploymentId?: string;
+}): Deployment {
+  const environment = Environment.create({
+    id: EnvironmentId.rehydrate("env_demo"),
+    projectId: ProjectId.rehydrate("prj_demo"),
+    name: EnvironmentName.rehydrate("production"),
+    kind: EnvironmentKindValue.rehydrate("production"),
+    createdAt: CreatedAt.rehydrate(input.createdAt),
+  })._unsafeUnwrap();
+  const deployment = Deployment.create({
+    id: DeploymentId.rehydrate(input.id),
+    projectId: ProjectId.rehydrate("prj_demo"),
+    serverId: DeploymentTargetId.rehydrate("srv_demo"),
+    destinationId: DestinationId.rehydrate("dst_demo"),
+    environmentId: EnvironmentId.rehydrate("env_demo"),
+    resourceId: ResourceId.rehydrate(input.resourceId ?? "res_demo"),
+    runtimePlan: RuntimePlan.rehydrate({
+      id: RuntimePlanId.rehydrate(`plan_${input.id}`),
+      source: SourceDescriptor.rehydrate({
+        kind: SourceKindValue.rehydrate("local-folder"),
+        locator: SourceLocator.rehydrate("."),
+        displayName: DisplayNameText.rehydrate("workspace"),
+      }),
+      buildStrategy: BuildStrategyKindValue.rehydrate("dockerfile"),
+      packagingMode: PackagingModeValue.rehydrate("all-in-one-docker"),
+      execution: RuntimeExecutionPlan.rehydrate({
+        kind: ExecutionStrategyKindValue.rehydrate("docker-container"),
+        image: ImageReference.rehydrate("demo:test"),
+        port: PortNumber.rehydrate(3000),
+      }),
+      target: DeploymentTargetDescriptor.rehydrate({
+        kind: TargetKindValue.rehydrate("single-server"),
+        providerKey: ProviderKey.rehydrate("generic-ssh"),
+        serverIds: [DeploymentTargetId.rehydrate("srv_demo")],
+      }),
+      detectSummary: DetectSummary.rehydrate("historical deployment"),
+      steps: [
+        PlanStepText.rehydrate("package"),
+        PlanStepText.rehydrate("deploy"),
+        PlanStepText.rehydrate("verify"),
+      ],
+      generatedAt: GeneratedAt.rehydrate(input.createdAt),
+    }),
+    environmentSnapshot: environment.materializeSnapshot({
+      snapshotId: EnvironmentSnapshotId.rehydrate(`snap_${input.id}`),
+      createdAt: GeneratedAt.rehydrate(input.createdAt),
+    }),
+    createdAt: CreatedAt.rehydrate(input.createdAt),
+    ...(input.supersedesDeploymentId
+      ? { supersedesDeploymentId: DeploymentId.rehydrate(input.supersedesDeploymentId) }
+      : {}),
+  })._unsafeUnwrap();
+
+  if (input.status === "planning") {
+    deployment.markPlanning(StartedAt.rehydrate(input.createdAt))._unsafeUnwrap();
+    return deployment;
+  }
+
+  if (input.status === "planned") {
+    deployment.markPlanning(StartedAt.rehydrate(input.createdAt))._unsafeUnwrap();
+    deployment.markPlanned(StartedAt.rehydrate(input.createdAt))._unsafeUnwrap();
+    return deployment;
+  }
+
+  if (input.status === "running") {
+    deployment.markPlanning(StartedAt.rehydrate(input.createdAt))._unsafeUnwrap();
+    deployment.markPlanned(StartedAt.rehydrate(input.createdAt))._unsafeUnwrap();
+    deployment.start(StartedAt.rehydrate(input.createdAt))._unsafeUnwrap();
+    return deployment;
+  }
+
+  if (input.status === "succeeded" || input.status === "failed" || input.status === "rolled-back") {
+    deployment.markPlanning(StartedAt.rehydrate(input.createdAt))._unsafeUnwrap();
+    deployment.markPlanned(StartedAt.rehydrate(input.createdAt))._unsafeUnwrap();
+    deployment.start(StartedAt.rehydrate(input.createdAt))._unsafeUnwrap();
+    deployment
+      .applyExecutionResult(
+        FinishedAt.rehydrate("2026-01-01T00:10:00.000Z"),
+        ExecutionResult.rehydrate({
+          exitCode: ExitCode.rehydrate(input.status === "failed" ? 1 : 0),
+          status: ExecutionStatusValue.rehydrate(input.status),
+          retryable: input.status === "failed",
+          logs: [
+            DeploymentLogEntry.rehydrate({
+              timestamp: OccurredAt.rehydrate("2026-01-01T00:10:00.000Z"),
+              phase: DeploymentPhaseValue.rehydrate("deploy"),
+              level: LogLevelValue.rehydrate("info"),
+              message: MessageText.rehydrate(`Historical deployment ${input.status}`),
+            }),
+          ],
+        }),
+      )
+      ._unsafeUnwrap();
+  }
+
+  return deployment;
+}
+
+class RaceLosingMemoryDeploymentRepository extends MemoryDeploymentRepository {
+  override async findOne(
+    _context: ReturnType<typeof toRepositoryContext>,
+    _spec: DeploymentSelectionSpec,
+  ): Promise<Deployment | null> {
+    return null;
+  }
+
+  override async admit(
+    _context: ReturnType<typeof toRepositoryContext>,
+    _deployment: Deployment,
+  ): Promise<Result<void>> {
+    return err(
+      domainError.deploymentNotRedeployable(
+        "Latest deployment for this resource must be succeeded or failed before redeploying",
+        {
+          commandName: "deployments.create",
+          phase: "redeploy-guard",
+          deploymentId: "dep_competing",
+          resourceId: "res_demo",
+          status: "running",
+          causeCode: "concurrent_active_deployment",
+        },
+      ),
+    );
+  }
+}
+
 describe("CreateDeploymentUseCase", () => {
   test("rejects legacy deployment source and runtime fields at command schema boundary", () => {
     const command = CreateDeploymentCommand.create({
@@ -709,6 +854,225 @@ describe("CreateDeploymentUseCase", () => {
       },
     });
     expect(eventBus.events).toHaveLength(0);
+  });
+
+  test("[DEP-CREATE-ADM-023] supersedes the previous active deployment before admitting a new one", async () => {
+    const {
+      context,
+      createDeploymentInput,
+      createDeploymentUseCase,
+      deployments,
+      repositoryContext,
+    } = await createDeploymentFixture(new ExplicitContextRequiredPolicy());
+
+    const activeDeployment = createHistoricalDeployment({
+      id: "dep_active",
+      createdAt: "2026-01-01T00:00:05.000Z",
+      status: "running",
+    });
+    const admitResult = await deployments.admit(repositoryContext, activeDeployment);
+    expect(admitResult.isOk()).toBe(true);
+
+    const result = await createDeploymentUseCase.execute(context, createDeploymentInput);
+
+    expect(result.isOk()).toBe(true);
+    const nextDeploymentId = result._unsafeUnwrap().id;
+    expect(nextDeploymentId).not.toBe("dep_active");
+
+    const supersededDeployment = await deployments.findOne(
+      repositoryContext,
+      DeploymentByIdSpec.create(DeploymentId.rehydrate("dep_active")),
+    );
+    expect(supersededDeployment?.toState()).toMatchObject({
+      status: { value: "canceled" },
+      supersededByDeploymentId: { value: nextDeploymentId },
+    });
+
+    const acceptedDeployment = await deployments.findOne(
+      repositoryContext,
+      DeploymentByIdSpec.create(DeploymentId.rehydrate(nextDeploymentId)),
+    );
+    expect(acceptedDeployment?.toState().status.value).toBe("succeeded");
+  });
+
+  test("[DEP-CREATE-ADM-023A] rejects deployment admission when the atomic admit step loses a concurrent race", async () => {
+    const projects = new MemoryProjectRepository();
+    const servers = new MemoryServerRepository();
+    const destinations = new MemoryDestinationRepository();
+    const environments = new MemoryEnvironmentRepository();
+    const resources = new MemoryResourceRepository();
+    const deployments = new RaceLosingMemoryDeploymentRepository();
+    const clock = new FixedClock("2026-01-01T00:00:00.000Z");
+    const idGenerator = new SequenceIdGenerator();
+    const eventBus = new CapturedEventBus();
+    const logger = new NoopLogger();
+    const defaultsFactory = new DeploymentContextDefaultsFactory(clock, idGenerator);
+    const context = createTestContext();
+    const repositoryContext = toRepositoryContext(context);
+
+    const project = Project.create({
+      id: ProjectId.rehydrate("prj_demo"),
+      name: ProjectName.rehydrate("Demo"),
+      createdAt: CreatedAt.rehydrate(clock.now()),
+    })._unsafeUnwrap();
+    const server = DeploymentTarget.register({
+      id: DeploymentTargetId.rehydrate("srv_demo"),
+      name: DeploymentTargetName.rehydrate("demo-server"),
+      host: HostAddress.rehydrate("127.0.0.1"),
+      port: PortNumber.rehydrate(22),
+      providerKey: ProviderKey.rehydrate("generic-ssh"),
+      createdAt: CreatedAt.rehydrate(clock.now()),
+    })._unsafeUnwrap();
+    const destination = Destination.register({
+      id: DestinationId.rehydrate("dst_demo"),
+      serverId: DeploymentTargetId.rehydrate("srv_demo"),
+      name: DestinationName.rehydrate("default"),
+      kind: DestinationKindValue.rehydrate("generic"),
+      createdAt: CreatedAt.rehydrate(clock.now()),
+    })._unsafeUnwrap();
+    const environment = Environment.create({
+      id: EnvironmentId.rehydrate("env_demo"),
+      projectId: ProjectId.rehydrate("prj_demo"),
+      name: EnvironmentName.rehydrate("production"),
+      kind: EnvironmentKindValue.rehydrate("production"),
+      createdAt: CreatedAt.rehydrate(clock.now()),
+    })._unsafeUnwrap();
+    const resource = Resource.create({
+      id: ResourceId.rehydrate("res_demo"),
+      projectId: ProjectId.rehydrate("prj_demo"),
+      environmentId: EnvironmentId.rehydrate("env_demo"),
+      destinationId: DestinationId.rehydrate("dst_demo"),
+      name: ResourceName.rehydrate("web"),
+      kind: ResourceKindValue.rehydrate("application"),
+      sourceBinding: {
+        kind: SourceKindValue.rehydrate("local-folder"),
+        locator: SourceLocator.rehydrate("."),
+        displayName: DisplayNameText.rehydrate("workspace"),
+      },
+      runtimeProfile: {
+        strategy: RuntimePlanStrategyValue.rehydrate("auto"),
+      },
+      networkProfile: {
+        internalPort: PortNumber.rehydrate(3000),
+        upstreamProtocol: ResourceNetworkProtocolValue.rehydrate("http"),
+        exposureMode: ResourceExposureModeValue.rehydrate("reverse-proxy"),
+      },
+      createdAt: CreatedAt.rehydrate(clock.now()),
+    })._unsafeUnwrap();
+
+    await projects.upsert(repositoryContext, project, UpsertProjectSpec.fromProject(project));
+    await servers.upsert(
+      repositoryContext,
+      server,
+      UpsertDeploymentTargetSpec.fromDeploymentTarget(server),
+    );
+    await destinations.upsert(
+      repositoryContext,
+      destination,
+      UpsertDestinationSpec.fromDestination(destination),
+    );
+    await environments.upsert(
+      repositoryContext,
+      environment,
+      UpsertEnvironmentSpec.fromEnvironment(environment),
+    );
+    await resources.upsert(repositoryContext, resource, UpsertResourceSpec.fromResource(resource));
+
+    const useCase = new CreateDeploymentUseCase(
+      deployments,
+      new DeploymentContextResolver(projects, servers, destinations, environments, resources),
+      new DeploymentContextBootstrapService(
+        new NullDeploymentConfigReader(),
+        projects,
+        servers,
+        destinations,
+        environments,
+        resources,
+        new StaticProviderRegistry(),
+        new ExplicitContextRequiredPolicy(),
+        defaultsFactory,
+        clock,
+        idGenerator,
+        eventBus,
+        logger,
+      ),
+      new StaticSourceDetector(),
+      new StaticRuntimePlanResolver(),
+      new HermeticExecutionBackend(),
+      eventBus,
+      new NoopDeploymentProgressReporter(),
+      logger,
+      new DeploymentSnapshotFactory(clock, idGenerator),
+      new RuntimePlanResolutionInputBuilder(clock, idGenerator),
+      new DeploymentFactory(clock, idGenerator),
+      new DeploymentLifecycleService(clock),
+    );
+
+    const result = await useCase.execute(context, {
+      projectId: "prj_demo",
+      serverId: "srv_demo",
+      destinationId: "dst_demo",
+      environmentId: "env_demo",
+      resourceId: "res_demo",
+    });
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "deployment_not_redeployable",
+      details: {
+        commandName: "deployments.create",
+        phase: "redeploy-guard",
+        deploymentId: "dep_competing",
+        resourceId: "res_demo",
+        status: "running",
+        causeCode: "concurrent_active_deployment",
+      },
+    });
+  });
+
+  test("[DEP-CREATE-ADM-023B] rejects supersede when the previous running deployment cannot be canceled", async () => {
+    const {
+      context,
+      createDeploymentInput,
+      createDeploymentUseCase,
+      deployments,
+      repositoryContext,
+    } = await createDeploymentFixture(new ExplicitContextRequiredPolicy(), {
+      executionBackend: new CancelFailingExecutionBackend(),
+    });
+
+    const activeDeployment = createHistoricalDeployment({
+      id: "dep_active",
+      createdAt: "2026-01-01T00:00:05.000Z",
+      status: "running",
+    });
+    const admitResult = await deployments.admit(repositoryContext, activeDeployment);
+    expect(admitResult.isOk()).toBe(true);
+
+    const result = await createDeploymentUseCase.execute(context, createDeploymentInput);
+
+    expect(result.isErr()).toBe(true);
+    const error = result._unsafeUnwrapErr();
+    expect(error).toMatchObject({
+      code: "conflict",
+      details: {
+        commandName: "deployments.create",
+        phase: "supersede-previous-deployment",
+        deploymentId: "dep_active",
+        resourceId: "res_demo",
+      },
+    });
+    const supersedingDeploymentId = String(error.details?.supersededByDeploymentId ?? "");
+    expect(supersedingDeploymentId.length).toBeGreaterThan(0);
+
+    const storedDeployment = await deployments.findOne(
+      repositoryContext,
+      DeploymentByIdSpec.create(DeploymentId.rehydrate("dep_active")),
+    );
+    expect(storedDeployment?.toState()).toMatchObject({
+      status: { value: "cancel-requested" },
+      supersededByDeploymentId: { value: supersedingDeploymentId },
+    });
   });
 
   test("creates a deployment with an immutable environment snapshot", async () => {
@@ -1170,6 +1534,39 @@ describe("CreateDeploymentUseCase", () => {
         "access.scheme": "http",
       },
     });
+  });
+
+  test("[DEP-CREATE-ASYNC-012A] records the previous runtime-owning deployment as the explicit supersede target", async () => {
+    const {
+      context,
+      createDeploymentInput,
+      createDeploymentUseCase,
+      deployments,
+      repositoryContext,
+    } = await createDeploymentFixture(new ExplicitContextRequiredPolicy());
+
+    const successfulDeployment = createHistoricalDeployment({
+      id: "dep_success",
+      createdAt: "2026-01-01T00:00:01.000Z",
+      status: "succeeded",
+    });
+    const failedDeployment = createHistoricalDeployment({
+      id: "dep_failed",
+      createdAt: "2026-01-01T00:00:02.000Z",
+      status: "failed",
+    });
+
+    expect((await deployments.admit(repositoryContext, successfulDeployment)).isOk()).toBe(true);
+    expect((await deployments.admit(repositoryContext, failedDeployment)).isOk()).toBe(true);
+
+    const result = await createDeploymentUseCase.execute(context, createDeploymentInput);
+
+    expect(result.isOk()).toBe(true);
+    const deployment = await deployments.findOne(
+      repositoryContext,
+      DeploymentByIdSpec.create(DeploymentId.rehydrate(result._unsafeUnwrap().id)),
+    );
+    expect(deployment?.toState().supersedesDeploymentId?.value).toBe("dep_success");
   });
 
   test("[DEF-ACCESS-ROUTE-013] non-deployable durable binding does not block server-applied route", async () => {

@@ -268,11 +268,12 @@ export interface ResourceDeletionBlockerReader {
 
 export interface DeploymentRepository {
   findOne(context: RepositoryContext, spec: DeploymentSelectionSpec): Promise<Deployment | null>;
+  admit(context: RepositoryContext, deployment: Deployment): Promise<Result<void>>;
   upsert(
     context: RepositoryContext,
     deployment: Deployment,
     spec: DeploymentMutationSpec,
-  ): Promise<void>;
+  ): Promise<Result<void>>;
 }
 
 export interface DomainBindingRepository {
@@ -2481,6 +2482,18 @@ export interface RuntimePlanResolver {
       generatedAt: string;
     },
   ): Promise<Result<RuntimePlan>>;
+}
+
+export interface DeploymentExecutionGuardDecision {
+  allowed: boolean;
+  supersededByDeploymentId?: string;
+}
+
+export interface DeploymentExecutionGuard {
+  shouldContinue(
+    context: ExecutionContext,
+    deployment: Deployment,
+  ): Promise<Result<DeploymentExecutionGuardDecision>>;
 }
 
 export interface ExecutionBackend {
