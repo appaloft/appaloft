@@ -806,6 +806,22 @@ export const enUS = {
       createValidationError: "Enter a name, host, and valid SSH port before creating this server.",
       description: "Deployment targets, providers, and runtime health checks",
       detailDescription: "Server details, related deployments, and connectivity test",
+      defaultAccessCustomTemplateOption: "custom-template",
+      defaultAccessDisabledOption: "disabled",
+      defaultAccessModeLabel: "Default access mode",
+      defaultAccessOverrideDescription:
+        "Writes a server-scoped policy for future generated access routes on this deployment target. Existing route snapshots remain unchanged.",
+      defaultAccessOverrideTitle: "Server default access override",
+      defaultAccessProviderKeyLabel: "Provider key",
+      defaultAccessProviderKeyPlaceholder: "sslip",
+      defaultAccessProviderOption: "provider",
+      defaultAccessSaveErrorTitle: "Unable to save default access policy",
+      defaultAccessSaveSuccessTitle: "Default access policy saved",
+      defaultAccessSystemDescription:
+        "Writes the system default for future generated access routes. Existing deployment snapshots remain unchanged.",
+      defaultAccessSystemTitle: "System default access policy",
+      defaultAccessTemplateRefLabel: "Template ref",
+      defaultAccessTemplateRefPlaceholder: "templates/shared/web",
       emptyBody:
         "The deployment flow can create a local server automatically, or you can register a remote SSH target from the CLI first.",
       emptyTitle: "No server targets yet.",

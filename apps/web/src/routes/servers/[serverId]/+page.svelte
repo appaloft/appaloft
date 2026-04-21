@@ -12,7 +12,10 @@
     TriangleAlert,
     XCircle,
   } from "@lucide/svelte";
-  import type { TestServerConnectivityResponse } from "@appaloft/contracts";
+  import type {
+    ConfigureDefaultAccessDomainPolicyInput,
+    TestServerConnectivityResponse,
+  } from "@appaloft/contracts";
 
   import { readErrorMessage } from "$lib/api/client";
   import ConsoleShell from "$lib/components/console/ConsoleShell.svelte";
@@ -20,9 +23,12 @@
   import TerminalSessionPanel from "$lib/components/console/TerminalSessionPanel.svelte";
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
+  import { Input } from "$lib/components/ui/input";
+  import * as Select from "$lib/components/ui/select";
   import { Skeleton } from "$lib/components/ui/skeleton";
   import { createConsoleQueries } from "$lib/console/queries";
   import { orpcClient } from "$lib/orpc";
+  import { queryClient } from "$lib/query-client";
   import {
     findServer,
     formatTime,
@@ -42,9 +48,18 @@
   const serverDeployments = $derived(
     server ? deployments.filter((deployment) => deployment.serverId === server.id) : [],
   );
+  const defaultAccessModes = ["disabled", "provider", "custom-template"] as const;
 
   let connectivityResult = $state<TestServerConnectivityResponse | null>(null);
   let connectivityError = $state("");
+  let overrideMode = $state<ConfigureDefaultAccessDomainPolicyInput["mode"]>("provider");
+  let overrideProviderKey = $state("sslip");
+  let overrideTemplateRef = $state("");
+  let overrideFeedback = $state<{
+    kind: "success" | "error";
+    title: string;
+    detail: string;
+  } | null>(null);
 
   const connectivityMutation = createMutation(() => ({
     mutationFn: (inputServerId: string) =>
@@ -59,6 +74,25 @@
       connectivityError = readErrorMessage(error);
     },
   }));
+  const configureDefaultAccessOverrideMutation = createMutation(() => ({
+    mutationFn: (input: ConfigureDefaultAccessDomainPolicyInput) =>
+      orpcClient.defaultAccessDomainPolicies.configure(input),
+    onSuccess: (result) => {
+      overrideFeedback = {
+        kind: "success",
+        title: $t(i18nKeys.console.servers.defaultAccessSaveSuccessTitle),
+        detail: result.id,
+      };
+      void queryClient.invalidateQueries({ queryKey: ["resources"] });
+    },
+    onError: (error) => {
+      overrideFeedback = {
+        kind: "error",
+        title: $t(i18nKeys.console.servers.defaultAccessSaveErrorTitle),
+        detail: readErrorMessage(error),
+      };
+    },
+  }));
 
   function testConnectivity(): void {
     if (!server) {
@@ -67,6 +101,28 @@
 
     connectivityError = "";
     connectivityMutation.mutate(server.id);
+  }
+
+  function saveDefaultAccessOverride(event: SubmitEvent): void {
+    event.preventDefault();
+
+    if (!server) {
+      return;
+    }
+
+    configureDefaultAccessOverrideMutation.mutate({
+      scope: {
+        kind: "deployment-target",
+        serverId: server.id,
+      },
+      mode: overrideMode,
+      ...(overrideMode !== "disabled" && overrideProviderKey.trim()
+        ? { providerKey: overrideProviderKey.trim() }
+        : {}),
+      ...(overrideMode === "custom-template" && overrideTemplateRef.trim()
+        ? { templateRef: overrideTemplateRef.trim() }
+        : {}),
+    });
   }
 
   function connectivityLabel(status: TestServerConnectivityResponse["status"]): string {
@@ -207,6 +263,87 @@
             <p class="mt-2 font-semibold">{server.port}</p>
           </div>
         </div>
+      </section>
+
+      <section class="space-y-4 border-y py-6">
+        <div class="max-w-3xl space-y-1">
+          <h2 class="text-lg font-semibold">
+            {$t(i18nKeys.console.servers.defaultAccessOverrideTitle)}
+          </h2>
+          <p class="text-sm text-muted-foreground">
+            {$t(i18nKeys.console.servers.defaultAccessOverrideDescription)}
+          </p>
+        </div>
+
+        <form
+          class="grid gap-4 lg:grid-cols-[minmax(0,14rem)_minmax(0,1fr)_auto]"
+          onsubmit={saveDefaultAccessOverride}
+        >
+          <label class="space-y-1.5 text-sm font-medium">
+            <span>{$t(i18nKeys.console.servers.defaultAccessModeLabel)}</span>
+            <Select.Root bind:value={overrideMode} type="single">
+              <Select.Trigger class="w-full">
+                {overrideMode === "disabled"
+                  ? $t(i18nKeys.console.servers.defaultAccessDisabledOption)
+                  : overrideMode === "custom-template"
+                    ? $t(i18nKeys.console.servers.defaultAccessCustomTemplateOption)
+                    : $t(i18nKeys.console.servers.defaultAccessProviderOption)}
+              </Select.Trigger>
+              <Select.Content>
+                {#each defaultAccessModes as mode (mode)}
+                  <Select.Item value={mode}>
+                    {mode === "disabled"
+                      ? $t(i18nKeys.console.servers.defaultAccessDisabledOption)
+                      : mode === "custom-template"
+                        ? $t(i18nKeys.console.servers.defaultAccessCustomTemplateOption)
+                        : $t(i18nKeys.console.servers.defaultAccessProviderOption)}
+                  </Select.Item>
+                {/each}
+              </Select.Content>
+            </Select.Root>
+          </label>
+
+          <div class="grid gap-4 md:grid-cols-2">
+            {#if overrideMode !== "disabled"}
+              <label class="space-y-1.5 text-sm font-medium">
+                <span>{$t(i18nKeys.console.servers.defaultAccessProviderKeyLabel)}</span>
+                <Input
+                  bind:value={overrideProviderKey}
+                  autocomplete="off"
+                  placeholder={$t(i18nKeys.console.servers.defaultAccessProviderKeyPlaceholder)}
+                />
+              </label>
+            {/if}
+
+            {#if overrideMode === "custom-template"}
+              <label class="space-y-1.5 text-sm font-medium">
+                <span>{$t(i18nKeys.console.servers.defaultAccessTemplateRefLabel)}</span>
+                <Input
+                  bind:value={overrideTemplateRef}
+                  autocomplete="off"
+                  placeholder={$t(i18nKeys.console.servers.defaultAccessTemplateRefPlaceholder)}
+                />
+              </label>
+            {/if}
+          </div>
+
+          <div class="flex items-end">
+            <Button class="w-full sm:w-auto" disabled={configureDefaultAccessOverrideMutation.isPending}>
+              {configureDefaultAccessOverrideMutation.isPending
+                ? $t(i18nKeys.common.actions.saving)
+                : $t(i18nKeys.common.actions.save)}
+            </Button>
+          </div>
+        </form>
+
+        {#if overrideFeedback}
+          <div
+            class={`rounded-md border p-3 text-sm ${overrideFeedback.kind === "error" ? "border-destructive/30 text-destructive" : "border-border text-foreground"}`}
+          >
+            <p class="font-medium">{overrideFeedback.title}</p>
+            <p class="mt-1 text-muted-foreground">{overrideFeedback.detail}</p>
+          </div>
+        {/if}
       </section>
 
       <section class="grid gap-5 xl:grid-cols-[0.9fr_1.1fr]">

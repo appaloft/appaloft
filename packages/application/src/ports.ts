@@ -1993,6 +1993,39 @@ export interface DefaultAccessDomainProvider {
   ): Promise<Result<DefaultAccessDomainGeneration, DomainError>>;
 }
 
+export type DefaultAccessDomainPolicyScope =
+  | { kind: "system" }
+  | { kind: "deployment-target"; serverId: string };
+
+export type DefaultAccessDomainPolicyMode = "disabled" | "provider" | "custom-template";
+
+export interface DefaultAccessDomainPolicyConfiguration {
+  mode: DefaultAccessDomainPolicyMode;
+  providerKey?: string;
+  templateRef?: string;
+}
+
+export interface DefaultAccessDomainPolicyRecord extends DefaultAccessDomainPolicyConfiguration {
+  id: string;
+  scope: DefaultAccessDomainPolicyScope;
+  updatedAt: string;
+  idempotencyKey?: string;
+}
+
+export interface DefaultAccessDomainPolicyStore {
+  read(
+    scope: DefaultAccessDomainPolicyScope,
+  ): Promise<Result<DefaultAccessDomainPolicyRecord | null>>;
+  upsert(record: DefaultAccessDomainPolicyRecord): Promise<Result<DefaultAccessDomainPolicyRecord>>;
+}
+
+export interface DefaultAccessDomainPolicySupport {
+  validate(
+    context: ExecutionContext,
+    input: DefaultAccessDomainPolicyConfiguration,
+  ): Promise<Result<DefaultAccessDomainPolicyConfiguration, DomainError>>;
+}
+
 export interface DeploymentConfiguredProject {
   name: string;
   description?: string;

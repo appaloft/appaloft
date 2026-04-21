@@ -10,6 +10,8 @@ import {
   CertificateRetryScheduler,
   CleanupPreviewCommandHandler,
   CleanupPreviewUseCase,
+  ConfigureDefaultAccessDomainPolicyCommandHandler,
+  ConfigureDefaultAccessDomainPolicyUseCase,
   ConfigureResourceHealthCommandHandler,
   ConfigureResourceHealthUseCase,
   ConfigureResourceNetworkCommandHandler,
@@ -105,6 +107,7 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(IssueCertificateOnCertificateRequestedHandler);
   container.registerSingleton(BootstrapServerProxyCommandHandler);
   container.registerSingleton(CleanupPreviewCommandHandler);
+  container.registerSingleton(ConfigureDefaultAccessDomainPolicyCommandHandler);
   container.registerSingleton(ConfigureResourceHealthCommandHandler);
   container.registerSingleton(ConfigureResourceNetworkCommandHandler);
   container.registerSingleton(ConfigureResourceRuntimeCommandHandler);
@@ -122,6 +125,10 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(tokens.domainOwnershipVerifier, PublicDnsDomainOwnershipVerifier);
   container.registerSingleton(tokens.createProjectUseCase, CreateProjectUseCase);
   container.registerSingleton(tokens.listProjectsQueryService, ListProjectsQueryService);
+  container.registerSingleton(
+    tokens.configureDefaultAccessDomainPolicyUseCase,
+    ConfigureDefaultAccessDomainPolicyUseCase,
+  );
   container.registerSingleton(tokens.createResourceUseCase, CreateResourceUseCase);
   container.registerSingleton(tokens.archiveResourceUseCase, ArchiveResourceUseCase);
   container.registerSingleton(tokens.deleteResourceUseCase, DeleteResourceUseCase);

@@ -1,17 +1,27 @@
 <script lang="ts">
   import { browser } from "$app/environment";
+  import { createMutation } from "@tanstack/svelte-query";
   import { ArrowRight, Network, Server, ShieldCheck } from "@lucide/svelte";
+  import type {
+    ConfigureDefaultAccessDomainPolicyInput,
+    ServerSummary,
+  } from "@appaloft/contracts";
 
+  import { readErrorMessage } from "$lib/api/client";
   import ConsoleShell from "$lib/components/console/ConsoleShell.svelte";
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
+  import { Input } from "$lib/components/ui/input";
+  import * as Select from "$lib/components/ui/select";
   import { Skeleton } from "$lib/components/ui/skeleton";
   import { createConsoleQueries } from "$lib/console/queries";
   import { formatTime } from "$lib/console/utils";
   import { i18nKeys, t } from "$lib/i18n";
-  import type { ServerSummary } from "@appaloft/contracts";
+  import { orpcClient } from "$lib/orpc";
+  import { queryClient } from "$lib/query-client";
 
   const { serversQuery, deploymentsQuery } = createConsoleQueries(browser);
+  const defaultAccessModes = ["disabled", "provider", "custom-template"] as const;
 
   const servers = $derived(serversQuery.data?.items ?? []);
   const deployments = $derived(deploymentsQuery.data?.items ?? []);
@@ -19,9 +29,54 @@
   const activeServers = $derived(
     servers.filter((server) => countServerDeployments(server) > 0).length,
   );
+  let systemMode = $state<ConfigureDefaultAccessDomainPolicyInput["mode"]>("provider");
+  let systemProviderKey = $state("sslip");
+  let systemTemplateRef = $state("");
+  let systemFeedback = $state<{
+    kind: "success" | "error";
+    title: string;
+    detail: string;
+  } | null>(null);
+
+  const configureSystemDefaultAccessMutation = createMutation(() => ({
+    mutationFn: (input: ConfigureDefaultAccessDomainPolicyInput) =>
+      orpcClient.defaultAccessDomainPolicies.configure(input),
+    onSuccess: (result) => {
+      systemFeedback = {
+        kind: "success",
+        title: $t(i18nKeys.console.servers.defaultAccessSaveSuccessTitle),
+        detail: result.id,
+      };
+      void queryClient.invalidateQueries({ queryKey: ["resources"] });
+    },
+    onError: (error) => {
+      systemFeedback = {
+        kind: "error",
+        title: $t(i18nKeys.console.servers.defaultAccessSaveErrorTitle),
+        detail: readErrorMessage(error),
+      };
+    },
+  }));
 
   function countServerDeployments(server: ServerSummary): number {
     return deployments.filter((deployment) => deployment.serverId === server.id).length;
+  }
+
+  function submitSystemPolicy(event: SubmitEvent): void {
+    event.preventDefault();
+
+    configureSystemDefaultAccessMutation.mutate({
+      scope: {
+        kind: "system",
+      },
+      mode: systemMode,
+      ...(systemMode !== "disabled" && systemProviderKey.trim()
+        ? { providerKey: systemProviderKey.trim() }
+        : {}),
+      ...(systemMode === "custom-template" && systemTemplateRef.trim()
+        ? { templateRef: systemTemplateRef.trim() }
+        : {}),
+    });
   }
 </script>
 
@@ -99,6 +154,87 @@
             </div>
           </div>
         </div>
+      </section>
+
+      <section class="space-y-4 border-y py-6">
+        <div class="max-w-3xl space-y-1">
+          <h2 class="text-lg font-semibold">
+            {$t(i18nKeys.console.servers.defaultAccessSystemTitle)}
+          </h2>
+          <p class="text-sm text-muted-foreground">
+            {$t(i18nKeys.console.servers.defaultAccessSystemDescription)}
+          </p>
+        </div>
+
+        <form
+          class="grid gap-4 lg:grid-cols-[minmax(0,14rem)_minmax(0,1fr)_auto]"
+          onsubmit={submitSystemPolicy}
+        >
+          <label class="space-y-1.5 text-sm font-medium">
+            <span>{$t(i18nKeys.console.servers.defaultAccessModeLabel)}</span>
+            <Select.Root bind:value={systemMode} type="single">
+              <Select.Trigger class="w-full">
+                {systemMode === "disabled"
+                  ? $t(i18nKeys.console.servers.defaultAccessDisabledOption)
+                  : systemMode === "custom-template"
+                    ? $t(i18nKeys.console.servers.defaultAccessCustomTemplateOption)
+                    : $t(i18nKeys.console.servers.defaultAccessProviderOption)}
+              </Select.Trigger>
+              <Select.Content>
+                {#each defaultAccessModes as mode (mode)}
+                  <Select.Item value={mode}>
+                    {mode === "disabled"
+                      ? $t(i18nKeys.console.servers.defaultAccessDisabledOption)
+                      : mode === "custom-template"
+                        ? $t(i18nKeys.console.servers.defaultAccessCustomTemplateOption)
+                        : $t(i18nKeys.console.servers.defaultAccessProviderOption)}
+                  </Select.Item>
+                {/each}
+              </Select.Content>
+            </Select.Root>
+          </label>
+
+          <div class="grid gap-4 md:grid-cols-2">
+            {#if systemMode !== "disabled"}
+              <label class="space-y-1.5 text-sm font-medium">
+                <span>{$t(i18nKeys.console.servers.defaultAccessProviderKeyLabel)}</span>
+                <Input
+                  bind:value={systemProviderKey}
+                  autocomplete="off"
+                  placeholder={$t(i18nKeys.console.servers.defaultAccessProviderKeyPlaceholder)}
+                />
+              </label>
+            {/if}
+
+            {#if systemMode === "custom-template"}
+              <label class="space-y-1.5 text-sm font-medium">
+                <span>{$t(i18nKeys.console.servers.defaultAccessTemplateRefLabel)}</span>
+                <Input
+                  bind:value={systemTemplateRef}
+                  autocomplete="off"
+                  placeholder={$t(i18nKeys.console.servers.defaultAccessTemplateRefPlaceholder)}
+                />
+              </label>
+            {/if}
+          </div>
+
+          <div class="flex items-end">
+            <Button class="w-full sm:w-auto" disabled={configureSystemDefaultAccessMutation.isPending}>
+              {configureSystemDefaultAccessMutation.isPending
+                ? $t(i18nKeys.common.actions.saving)
+                : $t(i18nKeys.common.actions.save)}
+            </Button>
+          </div>
+        </form>
+
+        {#if systemFeedback}
+          <div
+            class={`rounded-md border p-3 text-sm ${systemFeedback.kind === "error" ? "border-destructive/30 text-destructive" : "border-border text-foreground"}`}
+          >
+            <p class="font-medium">{systemFeedback.title}</p>
+            <p class="mt-1 text-muted-foreground">{systemFeedback.detail}</p>
+          </div>
+        {/if}
       </section>
 
       <section class="space-y-3">
