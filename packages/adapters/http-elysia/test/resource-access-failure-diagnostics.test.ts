@@ -38,6 +38,32 @@ function createTestApp() {
 }
 
 describe("resource access failure diagnostics HTTP renderer", () => {
+  test("[RES-ACCESS-DIAG-CLASS-001] maps provider-injected route-not-found signals to the stable diagnostic code", async () => {
+    const app = createTestApp();
+    const response = await app.handle(
+      new Request(
+        "http://localhost/.appaloft/resource-access-failure?requestId=req_route_missing",
+        {
+          headers: {
+            accept: "application/json",
+            "x-appaloft-resource-access-signal": "route-not-found",
+          },
+        },
+      ),
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body).toMatchObject({
+      code: "resource_access_route_not_found",
+      category: "not-found",
+      phase: "edge-request-routing",
+      requestId: "req_route_missing",
+      retriable: false,
+      ownerHint: "platform",
+    });
+  });
+
   test("[RES-ACCESS-DIAG-RENDER-001] renders an HTML diagnostic page for browser requests", async () => {
     const app = createTestApp();
     const response = await app.handle(
