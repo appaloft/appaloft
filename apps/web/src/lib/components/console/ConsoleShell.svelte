@@ -21,7 +21,7 @@
   import type { Snippet } from "svelte";
 
   import { API_BASE, readErrorMessage, request } from "$lib/api/client";
-  import appaloftIcon from "$lib/assets/appaloft-icon-dark.svg";
+  import appaloftIcon from "$lib/assets/appaloft-icon-light.svg";
   import ResourceHealthDot from "$lib/components/console/ResourceHealthDot.svelte";
   import ResourceHealthLabel from "$lib/components/console/ResourceHealthLabel.svelte";
   import { Avatar, AvatarFallback } from "$lib/components/ui/avatar";
