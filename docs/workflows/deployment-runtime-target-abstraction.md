@@ -131,6 +131,8 @@ It must:
 
 Docker Swarm is a future runtime target backend, not a separate deployment command.
 
+It is the first cluster runtime target that must be completed on the path to `1.0.0`.
+
 A Swarm backend must consume the same workload artifact, environment snapshot, resource network
 profile, and access-route snapshot, then render Swarm stack/service intent inside the adapter
 boundary.
@@ -216,6 +218,5 @@ types and admission-time backend support checks.
 
 ## Open Questions
 
-- Which cluster target should be added first after the single-server v1 loop is stable?
 - What is the first normalized manifest/stack preview query, if operators need to inspect rendered
   Kubernetes or Swarm output before apply?
