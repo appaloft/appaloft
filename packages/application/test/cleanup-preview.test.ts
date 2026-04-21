@@ -52,6 +52,7 @@ import { MemoryDeploymentRepository } from "@appaloft/testkit";
 
 import { createExecutionContext, toRepositoryContext } from "../src/execution-context";
 import {
+  type DeploymentReadModel,
   type ExecutionBackend,
   type ServerAppliedRouteDesiredStateRecord,
   type ServerAppliedRouteStateStore,
@@ -60,17 +61,25 @@ import {
 } from "../src/ports";
 import { CleanupPreviewUseCase } from "../src/use-cases";
 
-function createRuntimePlan(): RuntimePlan {
+const previewSourceFingerprint =
+  "source-fingerprint:v1:preview%3Apr%3A14:github:repo:.:appaloft.preview.yml";
+
+function createRuntimePlan(input?: {
+  planId?: string;
+  domain?: string;
+  generatedAt?: string;
+  metadata?: Record<string, string>;
+}): RuntimePlan {
   const accessRoute = AccessRoute.create({
     proxyKind: EdgeProxyKindValue.rehydrate("traefik"),
-    domains: [PublicDomainName.create("14.preview.appaloft.com")._unsafeUnwrap()],
+    domains: [PublicDomainName.create(input?.domain ?? "14.preview.appaloft.com")._unsafeUnwrap()],
     pathPrefix: RoutePathPrefix.create("/")._unsafeUnwrap(),
     tlsMode: TlsModeValue.rehydrate("auto"),
     targetPort: PortNumber.rehydrate(4321),
   })._unsafeUnwrap();
 
   return RuntimePlan.create({
-    id: RuntimePlanId.rehydrate("plan_preview_1"),
+    id: RuntimePlanId.rehydrate(input?.planId ?? "plan_preview_1"),
     source: SourceDescriptor.rehydrate({
       kind: SourceKindValue.rehydrate("local-folder"),
       locator: SourceLocator.rehydrate("."),
@@ -85,6 +94,7 @@ function createRuntimePlan(): RuntimePlan {
       accessRoutes: [accessRoute],
       metadata: {
         "access.routeSource": "server-applied-config-domain",
+        ...(input?.metadata ?? {}),
       },
     }),
     target: DeploymentTargetDescriptor.rehydrate({
@@ -94,27 +104,44 @@ function createRuntimePlan(): RuntimePlan {
     }),
     detectSummary: DetectSummary.rehydrate("preview workspace"),
     steps: [PlanStepText.rehydrate("Deploy preview container")],
-    generatedAt: GeneratedAt.rehydrate("2026-04-21T00:00:00.000Z"),
+    generatedAt: GeneratedAt.rehydrate(input?.generatedAt ?? "2026-04-21T00:00:00.000Z"),
   })._unsafeUnwrap();
 }
 
-function createSucceededDeployment(): Deployment {
+function createSucceededDeployment(input?: {
+  deploymentId?: string;
+  projectId?: string;
+  environmentId?: string;
+  resourceId?: string;
+  serverId?: string;
+  destinationId?: string;
+  createdAt?: string;
+  planId?: string;
+  domain?: string;
+  generatedAt?: string;
+  metadata?: Record<string, string>;
+}): Deployment {
   const deployment = Deployment.create({
-    id: DeploymentId.rehydrate("dep_preview_1"),
-    projectId: ProjectId.rehydrate("prj_preview_1"),
-    environmentId: EnvironmentId.rehydrate("env_preview_1"),
-    resourceId: ResourceId.rehydrate("res_preview_1"),
-    serverId: DeploymentTargetId.rehydrate("srv_preview_1"),
-    destinationId: DestinationId.rehydrate("dst_preview_1"),
-    runtimePlan: createRuntimePlan(),
+    id: DeploymentId.rehydrate(input?.deploymentId ?? "dep_preview_1"),
+    projectId: ProjectId.rehydrate(input?.projectId ?? "prj_preview_1"),
+    environmentId: EnvironmentId.rehydrate(input?.environmentId ?? "env_preview_1"),
+    resourceId: ResourceId.rehydrate(input?.resourceId ?? "res_preview_1"),
+    serverId: DeploymentTargetId.rehydrate(input?.serverId ?? "srv_preview_1"),
+    destinationId: DestinationId.rehydrate(input?.destinationId ?? "dst_preview_1"),
+    runtimePlan: createRuntimePlan({
+      ...(input?.planId ? { planId: input.planId } : {}),
+      ...(input?.domain ? { domain: input.domain } : {}),
+      ...(input?.generatedAt ? { generatedAt: input.generatedAt } : {}),
+      ...(input?.metadata ? { metadata: input.metadata } : {}),
+    }),
     environmentSnapshot: EnvironmentConfigSnapshot.rehydrate({
       id: EnvironmentSnapshotId.rehydrate("snap_preview_1"),
-      environmentId: EnvironmentId.rehydrate("env_preview_1"),
+      environmentId: EnvironmentId.rehydrate(input?.environmentId ?? "env_preview_1"),
       createdAt: GeneratedAt.rehydrate("2026-04-21T00:00:00.000Z"),
       precedence: [ConfigScopeValue.rehydrate("environment")],
       variables: [],
     }),
-    createdAt: CreatedAt.rehydrate("2026-04-21T00:00:00.000Z"),
+    createdAt: CreatedAt.rehydrate(input?.createdAt ?? "2026-04-21T00:00:00.000Z"),
   })._unsafeUnwrap();
 
   deployment.markPlanning(StartedAt.rehydrate("2026-04-21T00:01:00.000Z"));
@@ -134,12 +161,86 @@ function createSucceededDeployment(): Deployment {
   return deployment;
 }
 
+function createDeploymentSummary(input?: {
+  deploymentId?: string;
+  projectId?: string;
+  environmentId?: string;
+  resourceId?: string;
+  serverId?: string;
+  destinationId?: string;
+  createdAt?: string;
+  startedAt?: string;
+  finishedAt?: string;
+  planId?: string;
+  generatedAt?: string;
+  domain?: string;
+  metadata?: Record<string, string>;
+}): Awaited<ReturnType<DeploymentReadModel["list"]>>[number] {
+  return {
+    id: input?.deploymentId ?? "dep_preview_1",
+    projectId: input?.projectId ?? "prj_preview_1",
+    environmentId: input?.environmentId ?? "env_preview_1",
+    resourceId: input?.resourceId ?? "res_preview_1",
+    serverId: input?.serverId ?? "srv_preview_1",
+    destinationId: input?.destinationId ?? "dst_preview_1",
+    status: "succeeded",
+    runtimePlan: {
+      id: input?.planId ?? "plan_preview_1",
+      source: {
+        kind: "local-folder",
+        locator: ".",
+        displayName: "workspace",
+      },
+      buildStrategy: "dockerfile",
+      packagingMode: "all-in-one-docker",
+      execution: {
+        kind: "docker-container",
+        image: "appaloft:test",
+        port: 4321,
+        accessRoutes: [
+          {
+            proxyKind: "traefik",
+            domains: [input?.domain ?? "14.preview.appaloft.com"],
+            pathPrefix: "/",
+            tlsMode: "auto",
+            targetPort: 4321,
+          },
+        ],
+        metadata: {
+          "access.routeSource": "server-applied-config-domain",
+          ...(input?.metadata ?? {}),
+        },
+      },
+      target: {
+        kind: "single-server",
+        providerKey: "generic-ssh",
+        serverIds: [input?.serverId ?? "srv_preview_1"],
+      },
+      detectSummary: "preview workspace",
+      generatedAt: input?.generatedAt ?? "2026-04-21T00:00:00.000Z",
+      steps: ["Deploy preview container"],
+    },
+    environmentSnapshot: {
+      id: "snap_preview_1",
+      environmentId: input?.environmentId ?? "env_preview_1",
+      createdAt: "2026-04-21T00:00:00.000Z",
+      precedence: ["environment"],
+      variables: [],
+    },
+    logs: [],
+    logCount: 0,
+    createdAt: input?.createdAt ?? "2026-04-21T00:00:00.000Z",
+    startedAt: input?.startedAt ?? "2026-04-21T00:02:00.000Z",
+    finishedAt: input?.finishedAt ?? "2026-04-21T00:03:00.000Z",
+  };
+}
+
 class MemorySourceLinkStore implements SourceLinkStore {
   readonly unlinked: string[] = [];
 
   constructor(private record: SourceLinkRecord | null) {}
 
-  async read(): Promise<Result<SourceLinkRecord | null>> {
+  async read(_sourceFingerprint: string): Promise<Result<SourceLinkRecord | null>> {
     return ok(this.record);
   }
 
@@ -174,8 +275,12 @@ class MemorySourceLinkStore implements SourceLinkStore {
 
 class CapturingServerAppliedRouteStateStore implements ServerAppliedRouteStateStore {
   readonly deletedTargets: Array<Parameters<ServerAppliedRouteStateStore["deleteDesired"]>[0]> = [];
+  readonly deletedSourceFingerprints: string[] = [];
 
-  constructor(private readonly deleteResult: Result<boolean> = ok(true)) {}
+  constructor(
+    private readonly deleteResult: Result<boolean> = ok(true),
+    private readonly deleteBySourceFingerprintResult: Result<number> = ok(0),
+  ) {}
 
   async upsertDesired(): Promise<Result<ServerAppliedRouteDesiredStateRecord>> {
     throw new Error("Unexpected upsertDesired call");
@@ -199,6 +304,11 @@ class CapturingServerAppliedRouteStateStore implements ServerAppliedRouteStateSt
     this.deletedTargets.push(target);
     return this.deleteResult;
   }
+
+  async deleteDesiredBySourceFingerprint(sourceFingerprint: string): Promise<Result<number>> {
+    this.deletedSourceFingerprints.push(sourceFingerprint);
+    return this.deleteBySourceFingerprintResult;
+  }
 }
 
 class CapturingExecutionBackend implements ExecutionBackend {
@@ -220,16 +330,30 @@ class CapturingExecutionBackend implements ExecutionBackend {
   }
 }
 
+class MemoryDeploymentReadModel implements DeploymentReadModel {
+  constructor(private readonly items: Awaited<ReturnType<DeploymentReadModel["list"]>> = []) {}
+
+  async list(): Promise<Awaited<ReturnType<DeploymentReadModel["list"]>>> {
+    return this.items;
+  }
+
+  async findLogs(): Promise<Awaited<ReturnType<DeploymentReadModel["findLogs"]>>> {
+    return [];
+  }
+}
+
 describe("CleanupPreviewUseCase", () => {
   test("[DEPLOYMENTS-CLEANUP-PREVIEW-001][CONFIG-FILE-ENTRY-019] returns already-clean when no preview source link exists", async () => {
     const sourceLinkStore = new MemorySourceLinkStore(null);
     const routeStore = new CapturingServerAppliedRouteStateStore();
     const executionBackend = new CapturingExecutionBackend();
     const deployments = new MemoryDeploymentRepository();
+    const deploymentReadModel = new MemoryDeploymentReadModel();
     const useCase = new CleanupPreviewUseCase(
       sourceLinkStore,
       routeStore,
       deployments,
+      deploymentReadModel,
       executionBackend,
     );
     const context = createExecutionContext({
@@ -238,14 +362,12 @@ describe("CleanupPreviewUseCase", () => {
     });
 
     const result = await useCase.execute(context, {
-      sourceFingerprint:
-        "source-fingerprint:v1:preview%3Apr%3A14:github:repo:.:appaloft.preview.yml",
+      sourceFingerprint: previewSourceFingerprint,
     });
 
     expect(result.isOk()).toBe(true);
     expect(result._unsafeUnwrap()).toEqual({
-      sourceFingerprint:
-        "source-fingerprint:v1:preview%3Apr%3A14:github:repo:.:appaloft.preview.yml",
+      sourceFingerprint: previewSourceFingerprint,
       status: "already-clean",
       cleanedRuntime: false,
       removedServerAppliedRoute: false,
@@ -253,13 +375,13 @@ describe("CleanupPreviewUseCase", () => {
     });
     expect(executionBackend.canceledDeploymentIds).toEqual([]);
     expect(routeStore.deletedTargets).toEqual([]);
+    expect(routeStore.deletedSourceFingerprints).toEqual([]);
     expect(sourceLinkStore.unlinked).toEqual([]);
   });
 
   test("[DEPLOYMENTS-CLEANUP-PREVIEW-002][CONFIG-FILE-ENTRY-019] cleans runtime, route state, and source link for a preview", async () => {
     const sourceLinkStore = new MemorySourceLinkStore({
-      sourceFingerprint:
-        "source-fingerprint:v1:preview%3Apr%3A14:github:repo:.:appaloft.preview.yml",
+      sourceFingerprint: previewSourceFingerprint,
       projectId: "prj_preview_1",
       environmentId: "env_preview_1",
       resourceId: "res_preview_1",
@@ -270,6 +392,7 @@ describe("CleanupPreviewUseCase", () => {
     const routeStore = new CapturingServerAppliedRouteStateStore();
     const executionBackend = new CapturingExecutionBackend();
     const deployments = new MemoryDeploymentRepository();
+    const deploymentReadModel = new MemoryDeploymentReadModel();
     const context = createExecutionContext({
       entrypoint: "cli",
       requestId: "req_preview_cleanup_success",
@@ -285,17 +408,16 @@ describe("CleanupPreviewUseCase", () => {
       sourceLinkStore,
       routeStore,
       deployments,
+      deploymentReadModel,
       executionBackend,
     );
     const result = await useCase.execute(context, {
-      sourceFingerprint:
-        "source-fingerprint:v1:preview%3Apr%3A14:github:repo:.:appaloft.preview.yml",
+      sourceFingerprint: previewSourceFingerprint,
     });
 
     expect(result.isOk()).toBe(true);
     expect(result._unsafeUnwrap()).toMatchObject({
-      sourceFingerprint:
-        "source-fingerprint:v1:preview%3Apr%3A14:github:repo:.:appaloft.preview.yml",
+      sourceFingerprint: previewSourceFingerprint,
       status: "cleaned",
       cleanedRuntime: true,
       removedServerAppliedRoute: true,
@@ -317,15 +439,13 @@ describe("CleanupPreviewUseCase", () => {
         destinationId: "dst_preview_1",
       },
     ]);
-    expect(sourceLinkStore.unlinked).toEqual([
-      "source-fingerprint:v1:preview%3Apr%3A14:github:repo:.:appaloft.preview.yml",
-    ]);
+    expect(routeStore.deletedSourceFingerprints).toEqual([previewSourceFingerprint]);
+    expect(sourceLinkStore.unlinked).toEqual([previewSourceFingerprint]);
   });
 
   test("[DEPLOYMENTS-CLEANUP-PREVIEW-003][CONFIG-FILE-ENTRY-019] stops cleanup when runtime cancellation fails", async () => {
     const sourceLinkStore = new MemorySourceLinkStore({
-      sourceFingerprint:
-        "source-fingerprint:v1:preview%3Apr%3A14:github:repo:.:appaloft.preview.yml",
+      sourceFingerprint: previewSourceFingerprint,
       projectId: "prj_preview_1",
       environmentId: "env_preview_1",
       resourceId: "res_preview_1",
@@ -342,6 +462,7 @@ describe("CleanupPreviewUseCase", () => {
       ),
     );
     const deployments = new MemoryDeploymentRepository();
+    const deploymentReadModel = new MemoryDeploymentReadModel();
     const context = createExecutionContext({
       entrypoint: "cli",
       requestId: "req_preview_cleanup_runtime_failure",
@@ -357,11 +478,11 @@ describe("CleanupPreviewUseCase", () => {
       sourceLinkStore,
       routeStore,
       deployments,
+      deploymentReadModel,
       executionBackend,
     );
     const result = await useCase.execute(context, {
-      sourceFingerprint:
-        "source-fingerprint:v1:preview%3Apr%3A14:github:repo:.:appaloft.preview.yml",
+      sourceFingerprint: previewSourceFingerprint,
     });
 
     expect(result.isErr()).toBe(true);
@@ -374,6 +495,125 @@ describe("CleanupPreviewUseCase", () => {
       },
     });
     expect(routeStore.deletedTargets).toEqual([]);
+    expect(routeStore.deletedSourceFingerprints).toEqual([]);
     expect(sourceLinkStore.unlinked).toEqual([]);
+  });
+
+  test("[DEPLOYMENTS-CLEANUP-PREVIEW-004][CONFIG-FILE-ENTRY-019] sweeps stale preview runtime and route state for the same preview fingerprint", async () => {
+    const sourceLinkStore = new MemorySourceLinkStore({
+      sourceFingerprint: previewSourceFingerprint,
+      projectId: "prj_preview_1",
+      environmentId: "env_preview_1",
+      resourceId: "res_preview_current",
+      serverId: "srv_preview_1",
+      destinationId: "dst_preview_1",
+      updatedAt: "2026-04-21T00:00:00.000Z",
+    });
+    const routeStore = new CapturingServerAppliedRouteStateStore(ok(true), ok(1));
+    const executionBackend = new CapturingExecutionBackend();
+    const deployments = new MemoryDeploymentRepository();
+    const deploymentReadModel = new MemoryDeploymentReadModel([
+      createDeploymentSummary({
+        deploymentId: "dep_preview_old",
+        planId: "plan_preview_old",
+        resourceId: "res_preview_old",
+        createdAt: "2026-04-20T23:00:00.000Z",
+        generatedAt: "2026-04-20T23:00:00.000Z",
+        domain: "old.14.preview.appaloft.com",
+        metadata: {
+          "access.sourceFingerprint": previewSourceFingerprint,
+          "preview.id": "pr-14",
+          "preview.mode": "pull-request",
+        },
+      }),
+      createDeploymentSummary({
+        deploymentId: "dep_preview_current",
+        planId: "plan_preview_current",
+        resourceId: "res_preview_current",
+        createdAt: "2026-04-21T00:00:00.000Z",
+        generatedAt: "2026-04-21T00:00:00.000Z",
+        metadata: {
+          "access.sourceFingerprint": previewSourceFingerprint,
+          "preview.id": "pr-14",
+          "preview.mode": "pull-request",
+        },
+      }),
+    ]);
+    const context = createExecutionContext({
+      entrypoint: "cli",
+      requestId: "req_preview_cleanup_sweep",
+    });
+    const currentDeployment = createSucceededDeployment({
+      deploymentId: "dep_preview_current",
+      planId: "plan_preview_current",
+      resourceId: "res_preview_current",
+      createdAt: "2026-04-21T00:00:00.000Z",
+      generatedAt: "2026-04-21T00:00:00.000Z",
+      metadata: {
+        "access.sourceFingerprint": previewSourceFingerprint,
+        "preview.id": "pr-14",
+        "preview.mode": "pull-request",
+      },
+    });
+    const oldDeployment = createSucceededDeployment({
+      deploymentId: "dep_preview_old",
+      planId: "plan_preview_old",
+      resourceId: "res_preview_old",
+      createdAt: "2026-04-20T23:00:00.000Z",
+      generatedAt: "2026-04-20T23:00:00.000Z",
+      domain: "old.14.preview.appaloft.com",
+      metadata: {
+        "access.sourceFingerprint": previewSourceFingerprint,
+        "preview.id": "pr-14",
+        "preview.mode": "pull-request",
+      },
+    });
+    await deployments.upsert(
+      toRepositoryContext(context),
+      currentDeployment,
+      UpsertDeploymentSpec.fromDeployment(currentDeployment),
+    );
+    await deployments.upsert(
+      toRepositoryContext(context),
+      oldDeployment,
+      UpsertDeploymentSpec.fromDeployment(oldDeployment),
+    );
+
+    const useCase = new CleanupPreviewUseCase(
+      sourceLinkStore,
+      routeStore,
+      deployments,
+      deploymentReadModel,
+      executionBackend,
+    );
+    const result = await useCase.execute(context, {
+      sourceFingerprint: previewSourceFingerprint,
+    });
+
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap()).toMatchObject({
+      sourceFingerprint: previewSourceFingerprint,
+      status: "cleaned",
+      cleanedRuntime: true,
+      removedServerAppliedRoute: true,
+      removedSourceLink: true,
+      resourceId: "res_preview_current",
+      deploymentId: "dep_preview_current",
+    });
+    expect(executionBackend.canceledDeploymentIds).toEqual([
+      "dep_preview_current",
+      "dep_preview_old",
+    ]);
+    expect(routeStore.deletedTargets).toEqual([
+      {
+        projectId: "prj_preview_1",
+        environmentId: "env_preview_1",
+        resourceId: "res_preview_current",
+        serverId: "srv_preview_1",
+        destinationId: "dst_preview_1",
+      },
+    ]);
+    expect(routeStore.deletedSourceFingerprints).toEqual([previewSourceFingerprint]);
+    expect(sourceLinkStore.unlinked).toEqual([previewSourceFingerprint]);
   });
 });

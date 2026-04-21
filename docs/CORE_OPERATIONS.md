@@ -343,7 +343,8 @@ Current boundary:
   `resourceId`, `serverId`, and optional `destinationId`
 - `deployments.cleanup-preview` accepts only a trusted preview-scoped source fingerprint and must
   not expand into generic cancel, redeploy, rollback, or resource delete behavior. It removes
-  preview runtime state, preview route desired state, and preview source-link identity only.
+  current and stale preview runtime state for the same preview fingerprint, preview route desired
+  state, and preview source-link identity only.
 - deployment source and runtime strategy are resolved from the resource's persisted
   `ResourceSourceBinding`, `ResourceRuntimeProfile`, and `ResourceNetworkProfile`
 - v1 deployment runtime execution is Docker/OCI-backed. Every accepted runtime plan must build,
