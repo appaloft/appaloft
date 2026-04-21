@@ -77,6 +77,7 @@ This matrix inherits:
 | SOURCE-LINK-STATE-017 | integration | Resource delete sees PG source link blocker | `source_links.resource_id` points at an archived resource being deleted. | `ResourceDeletionBlockerReader` reports `source-link` with safe id/count details and `resources.delete` rejects before tombstoning. | `resource_delete_blocked`, phase `resource-deletion-guard` |
 | SOURCE-LINK-STATE-018 | integration | PG source link migration blocks unsafe cascades | Schema migration creates `source_links` with resource reverse lookup and non-cascading resource reference. | Deleting/tombstoning a resource cannot erase source-link identity as a storage side effect; source links remain explicit relink/unlink state. | None |
 | SOURCE-LINK-STATE-019 | integration | PG source link unlink removes preview identity explicitly | `deployments.cleanup-preview` or another explicit cleanup path unlinks one preview source fingerprint from PostgreSQL/PGlite state. | The matching `source_links` row is deleted and unrelated source links remain intact. | None |
+| SOURCE-LINK-STATE-020 | integration | Shell adopts and prunes legacy file-backed source links | Shell opens a PG/PGlite state backend that still has adjacent legacy `source-links/` files from the pre-table implementation. | Missing source-link rows are imported into PG/PGlite before identity resolution, and stale legacy files are pruned when PG/PGlite already owns the fingerprint. | None |
 
 ## Diagnostics Matrix
 
@@ -108,6 +109,11 @@ PGlite mirror for relink in `apps/shell/test/remote-pglite-state-sync.test.ts`.
 `SourceLinkStore` adapter, `019_source_links` migration, delete-blocker integration, and PGlite
 persistence tests. `source-link` blockers are closed for `resources.delete` when the selected state
 backend is PostgreSQL/PGlite.
+
+`SOURCE-LINK-STATE-020` is covered in
+`apps/shell/test/legacy-pglite-state-adoption.test.ts`, proving shell startup adopts legacy
+file-backed source links into PG/PGlite state and prunes stale file records once PG/PGlite already
+owns the fingerprint.
 
 An opt-in external SSH e2e harness in
 `apps/shell/test/e2e/github-action-ssh-state.workflow.e2e.ts` proves source link state across a
