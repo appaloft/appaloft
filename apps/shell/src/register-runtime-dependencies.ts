@@ -29,7 +29,6 @@ import {
   type CertificateProviderPort,
   type Clock,
   CommandBus,
-  DefaultAccessDomainPolicyByScopeSpec,
   type DefaultAccessDomainPolicyRepository,
   DefaultAccessDomainRuntimePlanResolver,
   type DeploymentProgressReporter,
@@ -44,17 +43,12 @@ import {
   RepositoryBackedDeploymentExecutionGuard,
   type ResourceAccessFailureRendererTarget,
   type ServerAppliedRouteDesiredStateRecord,
-  ServerAppliedRouteStateByTargetSpec,
   type ServerAppliedRouteStateRepository,
   type ServerAppliedRouteStateSelectionSpec,
-  SourceLinkBySourceFingerprintSpec,
   type SourceLinkRecord,
   type SourceLinkRepository,
   type SourceLinkSelectionSpec,
   tokens,
-  UpsertDefaultAccessDomainPolicySpec,
-  UpsertServerAppliedRouteDesiredStateSpec,
-  UpsertSourceLinkSpec,
 } from "@appaloft/application";
 import { type AuthRuntime } from "@appaloft/auth-better";
 import { type AppConfig } from "@appaloft/config";
@@ -84,10 +78,8 @@ import {
   PgResourceDeletionBlockerReader,
   PgResourceReadModel,
   PgResourceRepository,
-  PgServerAppliedRouteStateRepository,
   PgServerReadModel,
   PgServerRepository,
-  PgSourceLinkRepository,
   PgSshCredentialReadModel,
   PgSshCredentialRepository,
 } from "@appaloft/persistence-pg";
