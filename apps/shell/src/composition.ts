@@ -52,6 +52,7 @@ import { type LocalPluginHost } from "@appaloft/plugin-host";
 import { container, type DependencyContainer } from "tsyringe";
 import { createCertificateRetrySchedulerRunner } from "./certificate-retry-scheduler-runner";
 import { ShellDeploymentProgressReporter } from "./deployment-progress-reporter";
+import { adoptLegacyPgliteState } from "./legacy-pglite-state-adoption";
 import { registerApplicationServices } from "./register-application-services";
 import { registerRuntimeDependencies } from "./register-runtime-dependencies";
 import { type RemotePgliteStateSyncSession } from "./remote-pglite-state-sync";
@@ -269,6 +270,15 @@ export async function createAppComposition(
   const serverAppliedRouteRepository = new PgServerAppliedRouteStateRepository(database.db);
   const sourceLinkStore = createCliSourceLinkStore(sourceLinkRepository);
   const serverAppliedRouteStore = createCliServerAppliedRouteStore(serverAppliedRouteRepository);
+
+  if (config.databaseDriver === "pglite") {
+    await adoptLegacyPgliteState({
+      pgliteDataDir: config.pgliteDataDir,
+      sourceLinkStore,
+      serverAppliedRouteStore,
+      logger,
+    });
+  }
   let resourceAccessFailureRendererTarget: ReturnType<
     typeof resourceAccessFailureRendererTargetForStartedServer
   >;

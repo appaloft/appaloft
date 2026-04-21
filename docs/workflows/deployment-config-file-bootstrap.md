@@ -177,6 +177,12 @@ then dispatch the final ids-only deployment command. `projectId`, `environmentId
 `serverId`, and `destinationId` are optional trusted selection overrides for hosted/self-hosted
 control planes or explicit operator selection. They are not required for the pure SSH CLI flow.
 
+When shell execution opens a PGlite backend from the SSH mirror, the shell must treat PG/PGlite
+tables as the authoritative state store and adopt any adjacent legacy file-backed `source-links/`
+and `server-applied-routes/` records into durable PG/PGlite rows before identity resolution. Once a
+legacy record is adopted or superseded by an existing PG/PGlite row, the shell must prune the
+legacy file so later uploads do not reintroduce conflicting source-link or route-state truth.
+
 Remote state lifecycle is mandatory for production pure CLI mode:
 
 ```text
@@ -647,9 +653,11 @@ now resolves `ssh-pglite` as the default state backend, carries a trusted SSH ta
 decision, and shell-built CLI programs run an SSH transport-backed remote-state lifecycle adapter
 before identity queries or mutations. The shell CLI also mirrors the selected SSH server's PGlite
 state into a target-scoped local data directory before composition opens the database, and uploads
-that PGlite directory back to the SSH server after the command shuts down. A custom CLI runtime
-without that adapter fails with `validation_error`, phase `remote-state-resolution`, rather than
-falling back to runner-local PGlite.
+that PGlite directory back to the SSH server after the command shuts down. Shell startup now adopts
+legacy file-backed `source-links/` and `server-applied-routes/` slices into durable PG/PGlite rows
+before command dispatch and prunes superseded legacy files so later uploads cannot resurrect stale
+resource ownership. A custom CLI runtime without that adapter fails with `validation_error`, phase
+`remote-state-resolution`, rather than falling back to runner-local PGlite.
 
 Current `DeploymentContextBootstrapService` contains legacy config/default bootstrap helpers, but
 the active `deployments.create` input schema is ids-only and the service currently only fills the
