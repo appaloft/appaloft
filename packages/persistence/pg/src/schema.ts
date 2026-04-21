@@ -170,18 +170,42 @@ export interface CertificatesTable {
   domain_binding_id: string;
   domain_name: string;
   status: string;
+  source: string;
   provider_key: string;
   challenge_type: string;
   issued_at: string | null;
   expires_at: string | null;
   fingerprint: string | null;
   secret_ref: string | null;
+  safe_metadata: ColumnType<
+    Record<string, unknown>,
+    Record<string, unknown>,
+    Record<string, unknown>
+  >;
+  secret_refs: ColumnType<
+    Record<string, unknown>,
+    Record<string, unknown>,
+    Record<string, unknown>
+  >;
   attempts: ColumnType<
     Record<string, unknown>[],
     Record<string, unknown>[],
     Record<string, unknown>[]
   >;
   created_at: TimestampColumn;
+}
+
+export interface CertificateSecretsTable {
+  ref: string;
+  certificate_id: string;
+  domain_binding_id: string;
+  attempt_id: string;
+  source: string;
+  kind: string;
+  payload: ColumnType<Record<string, unknown>, Record<string, unknown>, Record<string, unknown>>;
+  metadata: ColumnType<Record<string, unknown>, Record<string, unknown>, Record<string, unknown>>;
+  created_at: TimestampColumn;
+  updated_at: UpdatableTimestampColumn;
 }
 
 export interface AuditLogsTable {
@@ -253,6 +277,7 @@ export interface Database {
   deployments: DeploymentsTable;
   domain_bindings: DomainBindingsTable;
   certificates: CertificatesTable;
+  certificate_secrets: CertificateSecretsTable;
   audit_logs: AuditLogsTable;
   provider_job_logs: ProviderJobLogsTable;
   source_links: SourceLinksTable;

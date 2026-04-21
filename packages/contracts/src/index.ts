@@ -1018,6 +1018,20 @@ export const issueOrRenewCertificateResponseSchema = z.object({
   attemptId: z.string(),
 });
 
+export const importCertificateInputSchema = z.object({
+  domainBindingId: z.string().min(1),
+  certificateChain: z.string().min(1),
+  privateKey: z.string().min(1),
+  passphrase: z.string().min(1).optional(),
+  idempotencyKey: z.string().min(1).optional(),
+  causationId: z.string().min(1).optional(),
+});
+
+export const importCertificateResponseSchema = z.object({
+  certificateId: z.string(),
+  attemptId: z.string(),
+});
+
 export const certificateAttemptSummarySchema = z.object({
   id: z.string(),
   status: z.enum(["requested", "issuing", "issued", "failed", "retry_scheduled"]),
@@ -1040,11 +1054,16 @@ export const certificateSummarySchema = z.object({
   domainBindingId: z.string(),
   domainName: z.string(),
   status: z.enum(["pending", "issuing", "active", "renewing", "failed", "expired", "disabled"]),
+  source: z.enum(["managed", "imported"]),
   providerKey: z.string(),
   challengeType: z.string(),
   issuedAt: z.string().optional(),
   expiresAt: z.string().optional(),
   fingerprint: z.string().optional(),
+  notBefore: z.string().optional(),
+  issuer: z.string().optional(),
+  keyAlgorithm: z.string().optional(),
+  subjectAlternativeNames: z.array(z.string()).optional(),
   latestAttempt: certificateAttemptSummarySchema.optional(),
   createdAt: z.string(),
 });
@@ -1857,6 +1876,8 @@ export type ConfirmDomainBindingOwnershipResponse = z.infer<
 export type ListDomainBindingsResponse = z.infer<typeof listDomainBindingsResponseSchema>;
 export type IssueOrRenewCertificateInput = z.infer<typeof issueOrRenewCertificateInputSchema>;
 export type IssueOrRenewCertificateResponse = z.infer<typeof issueOrRenewCertificateResponseSchema>;
+export type ImportCertificateInput = z.infer<typeof importCertificateInputSchema>;
+export type ImportCertificateResponse = z.infer<typeof importCertificateResponseSchema>;
 export type CertificateAttemptSummary = z.infer<typeof certificateAttemptSummarySchema>;
 export type CertificateSummary = z.infer<typeof certificateSummarySchema>;
 export type ListCertificatesResponse = z.infer<typeof listCertificatesResponseSchema>;

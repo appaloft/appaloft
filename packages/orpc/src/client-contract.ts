@@ -17,6 +17,7 @@ import {
   type DeleteResourceCommandInput,
   type DeploymentLogsQueryInput,
   type DiffEnvironmentsQueryInput,
+  type ImportCertificateCommandInput,
   type IssueOrRenewCertificateCommandInput,
   type ListCertificatesQueryInput,
   type ListDeploymentsQueryInput,
@@ -58,6 +59,7 @@ import {
   type DeploymentProgressEvent,
   type DiffEnvironmentResponse,
   type EnvironmentSummary,
+  type ImportCertificateResponse,
   type IssueOrRenewCertificateResponse,
   type ListCertificatesResponse,
   type ListDeploymentsResponse,
@@ -317,6 +319,12 @@ export type AppaloftOrpcClientContract = {
       AppaloftClientContext,
       ListCertificatesQueryInput,
       ListCertificatesResponse,
+      AppaloftClientError
+    >;
+    import: Client<
+      AppaloftClientContext,
+      ImportCertificateCommandInput,
+      ImportCertificateResponse,
       AppaloftClientError
     >;
     issueOrRenew: Client<

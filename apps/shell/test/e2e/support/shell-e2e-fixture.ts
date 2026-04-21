@@ -86,8 +86,8 @@ export function runShellCli(args: string[], options: ShellCliOptions): CliResult
 
   return {
     exitCode: result.exitCode,
-    stderr: result.stderr.toString(),
-    stdout: result.stdout.toString(),
+    stderr: (result.stderr ?? new Uint8Array()).toString(),
+    stdout: (result.stdout ?? new Uint8Array()).toString(),
   };
 }
 
@@ -205,15 +205,27 @@ export async function startShellHttpServer(options: ShellCliOptions): Promise<{
 }
 
 export function runDocker(args: string[]): CliResult {
-  const result = Bun.spawnSync(["docker", ...args], {
-    stderr: "pipe",
-    stdout: "pipe",
-  });
+  let result: ReturnType<typeof Bun.spawnSync>;
+  try {
+    result = Bun.spawnSync(["docker", ...args], {
+      stderr: "pipe",
+      stdout: "pipe",
+    });
+  } catch (error) {
+    return {
+      exitCode: 127,
+      stderr: error instanceof Error ? error.message : String(error),
+      stdout: "",
+    };
+  }
+
+  const stderr = result.stderr ?? new Uint8Array();
+  const stdout = result.stdout ?? new Uint8Array();
 
   return {
     exitCode: result.exitCode,
-    stderr: result.stderr.toString(),
-    stdout: result.stdout.toString(),
+    stderr: stderr.toString(),
+    stdout: stdout.toString(),
   };
 }
 

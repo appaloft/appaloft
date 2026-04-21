@@ -12,6 +12,7 @@ import {
   normalizeTimestamp,
   resolveRepositoryExecutor,
   type SerializedCertificateAttempt,
+  type SerializedImportedCertificateMetadata,
 } from "./shared";
 
 export class PgCertificateReadModel implements CertificateReadModel {
@@ -41,6 +42,7 @@ export class PgCertificateReadModel implements CertificateReadModel {
         const rows = await query.execute();
         return rows.map((row): CertificateSummary => {
           const attempts = (row.attempts ?? []) as unknown as SerializedCertificateAttempt[];
+          const safeMetadata = (row.safe_metadata ?? {}) as SerializedImportedCertificateMetadata;
           const latestAttempt = attempts[attempts.length - 1];
 
           return {
@@ -48,6 +50,7 @@ export class PgCertificateReadModel implements CertificateReadModel {
             domainBindingId: row.domain_binding_id,
             domainName: row.domain_name,
             status: row.status as CertificateSummary["status"],
+            source: row.source as CertificateSummary["source"],
             providerKey: row.provider_key,
             challengeType: row.challenge_type,
             ...(row.issued_at
@@ -57,6 +60,14 @@ export class PgCertificateReadModel implements CertificateReadModel {
               ? { expiresAt: normalizeTimestamp(row.expires_at) ?? row.expires_at }
               : {}),
             ...(row.fingerprint ? { fingerprint: row.fingerprint } : {}),
+            ...(safeMetadata.notBefore
+              ? { notBefore: normalizeTimestamp(safeMetadata.notBefore) ?? safeMetadata.notBefore }
+              : {}),
+            ...(safeMetadata.issuer ? { issuer: safeMetadata.issuer } : {}),
+            ...(safeMetadata.keyAlgorithm ? { keyAlgorithm: safeMetadata.keyAlgorithm } : {}),
+            ...(Array.isArray(safeMetadata.subjectAlternativeNames)
+              ? { subjectAlternativeNames: safeMetadata.subjectAlternativeNames }
+              : {}),
             ...(latestAttempt
               ? {
                   latestAttempt: {

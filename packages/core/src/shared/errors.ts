@@ -163,10 +163,39 @@ export const domainError = {
     message: string,
     details?: Record<string, string | number | boolean | null>,
   ): DomainError => createError("certificate_not_allowed", "user", message, details),
+  certificateImportNotAllowed: (
+    message: string,
+    details?: Record<string, string | number | boolean | null>,
+  ): DomainError => createError("certificate_import_not_allowed", "user", message, details),
   certificateAttemptConflict: (
     message: string,
     details?: Record<string, string | number | boolean | null>,
   ): DomainError => createError("certificate_attempt_conflict", "user", message, details),
+  certificateImportDomainMismatch: (
+    message: string,
+    details?: Record<string, string | number | boolean | null>,
+  ): DomainError => createError("certificate_import_domain_mismatch", "user", message, details),
+  certificateImportKeyMismatch: (
+    message: string,
+    details?: Record<string, string | number | boolean | null>,
+  ): DomainError => createError("certificate_import_key_mismatch", "user", message, details),
+  certificateImportExpired: (
+    message: string,
+    details?: Record<string, string | number | boolean | null>,
+  ): DomainError => createError("certificate_import_expired", "user", message, details),
+  certificateImportNotYetValid: (
+    message: string,
+    details?: Record<string, string | number | boolean | null>,
+  ): DomainError => createError("certificate_import_not_yet_valid", "user", message, details),
+  certificateImportUnsupportedAlgorithm: (
+    message: string,
+    details?: Record<string, string | number | boolean | null>,
+  ): DomainError =>
+    createError("certificate_import_unsupported_algorithm", "user", message, details),
+  certificateImportMalformedChain: (
+    message: string,
+    details?: Record<string, string | number | boolean | null>,
+  ): DomainError => createError("certificate_import_malformed_chain", "user", message, details),
   certificateProviderUnavailable: (
     message: string,
     details?: Record<string, string | number | boolean | null>,
@@ -188,6 +217,12 @@ export const domainError = {
     details?: Record<string, string | number | boolean | null>,
     retryable = true,
   ): DomainError => createError("certificate_storage_failed", "infra", message, details, retryable),
+  certificateImportStorageFailed: (
+    message: string,
+    details?: Record<string, string | number | boolean | null>,
+    retryable = true,
+  ): DomainError =>
+    createError("certificate_import_storage_failed", "infra", message, details, retryable),
   proxyProviderUnavailable: (
     message: string,
     details?: Record<string, string | number | boolean | null>,

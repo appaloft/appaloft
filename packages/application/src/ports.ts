@@ -5,6 +5,7 @@ import {
   type CertificateMutationSpec,
   type CertificatePolicy,
   type CertificateSelectionSpec,
+  type CertificateSource,
   type CertificateStatus,
   type ConfigScope,
   type Deployment,
@@ -490,11 +491,59 @@ export interface CertificateProviderPort {
   ): Promise<Result<CertificateProviderIssueResult, DomainError>>;
 }
 
+export interface ImportedCertificateMaterialValidationInput {
+  domainName: string;
+  certificateChain: string;
+  privateKey: string;
+  passphrase?: string;
+  importedAt: string;
+}
+
+export interface ImportedCertificateMaterialValidationResult {
+  normalizedCertificateChain: string;
+  normalizedPrivateKey: string;
+  normalizedPassphrase?: string;
+  normalizedMaterialFingerprint: string;
+  notBefore: string;
+  expiresAt: string;
+  subjectAlternativeNames: string[];
+  keyAlgorithm: string;
+  issuer?: string;
+  fingerprint?: string;
+}
+
+export interface CertificateMaterialValidator {
+  validateImported(
+    context: ExecutionContext,
+    input: ImportedCertificateMaterialValidationInput,
+  ): Promise<Result<ImportedCertificateMaterialValidationResult, DomainError>>;
+}
+
+export interface ImportedCertificateSecretStoreInput {
+  certificateId: string;
+  domainBindingId: string;
+  domainName: string;
+  attemptId: string;
+  certificateChain: string;
+  privateKey: string;
+  passphrase?: string;
+}
+
+export interface ImportedCertificateSecretStoreResult {
+  certificateChainRef: string;
+  privateKeyRef: string;
+  passphraseRef?: string;
+}
+
 export interface CertificateSecretStore {
   store(
     context: ExecutionContext,
     material: CertificateProviderIssueResult,
   ): Promise<Result<{ secretRef: string }, DomainError>>;
+  storeImported(
+    context: ExecutionContext,
+    input: ImportedCertificateSecretStoreInput,
+  ): Promise<Result<ImportedCertificateSecretStoreResult, DomainError>>;
 }
 
 export interface CertificateHttpChallengeToken {
@@ -704,6 +753,7 @@ export interface ProxyRouteRealizationPlan {
 export type ProxyReloadReason =
   | "route-realization"
   | "certificate-issued"
+  | "certificate-imported"
   | "certificate-renewal"
   | "manual-repair";
 
@@ -1805,11 +1855,16 @@ export interface CertificateSummary {
   domainBindingId: string;
   domainName: string;
   status: CertificateStatus;
+  source: CertificateSource;
   providerKey: string;
   challengeType: string;
   issuedAt?: string;
   expiresAt?: string;
   fingerprint?: string;
+  notBefore?: string;
+  issuer?: string;
+  keyAlgorithm?: string;
+  subjectAlternativeNames?: string[];
   latestAttempt?: CertificateAttemptSummary;
   createdAt: string;
 }

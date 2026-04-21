@@ -48,6 +48,7 @@ This test matrix inherits:
 - [ADR-009: Certificates Import Command](../decisions/ADR-009-certificates-import-command.md)
 - [ADR-017: Default Access Domain And Proxy Routing](../decisions/ADR-017-default-access-domain-and-proxy-routing.md)
 - [ADR-024: Pure CLI SSH State And Server-Applied Domains](../decisions/ADR-024-pure-cli-ssh-state-and-server-applied-domains.md)
+- [certificates.import Test Matrix](./certificates.import-test-matrix.md)
 - [Error Model](../errors/model.md)
 - [neverthrow Conventions](../errors/neverthrow-conventions.md)
 - [Async Lifecycle And Acceptance](../architecture/async-lifecycle-and-acceptance.md)
@@ -59,7 +60,7 @@ This test matrix inherits:
 
 | Layer | Routing/domain/TLS focus |
 | --- | --- |
-| Command schema | `domain-bindings.create`, `domain-bindings.confirm-ownership`, and `certificates.issue-or-renew` input validation. |
+| Command schema | `domain-bindings.create`, `domain-bindings.confirm-ownership`, `certificates.issue-or-renew`, and `certificates.import` input validation. |
 | Aggregate/state-machine | Domain binding, certificate, and attempt status transitions. |
 | Use case/handler | Handler delegates; use case persists state and returns typed `Result`. |
 | Event/process manager | Event ordering, idempotency, retry, and async failure state. |
@@ -114,6 +115,8 @@ Then:
 | ROUTE-TLS-CMD-013 | integration | Issue certificate for missing binding | Unknown `domainBindingId` | `err` | `not_found`, phase `certificate-context-resolution` | None | No certificate attempt | No |
 | ROUTE-TLS-CMD-014 | integration | Issue certificate when TLS disabled | Binding TLS disabled | `err` | `certificate_not_allowed`, phase `certificate-admission` | None | No certificate attempt | No |
 | ROUTE-TLS-CMD-015 | integration | Duplicate in-flight certificate attempt | Same binding/certificate/reason already issuing | `err` or idempotent `ok` per idempotency key | `certificate_attempt_conflict` when rejected | No duplicate event | No duplicate attempt | No |
+| ROUTE-TLS-CMD-019 | integration | Import manual certificate | Bound or ready binding with `certificatePolicy = manual`; valid chain/key/passphrase | `ok({ certificateId, attemptId })` | None | `certificate-imported` | Certificate active with `source = imported`; no `certificate-issued` | No |
+| ROUTE-TLS-CMD-020 | integration | Import certificate not allowed | Binding is not manual-policy eligible or not durably owned | `err` | `certificate_import_not_allowed`, phase `certificate-admission` | None | No imported certificate attached | No |
 
 ## Event Matrix
 
@@ -147,6 +150,7 @@ Then:
 | ROUTE-TLS-READMODEL-007 | integration | Route failure binding list projection | Active binding consumed route realization failure and published `domain-route-realization-failed` | `domain-bindings.list` returns `status = not_ready` and safe route failure metadata without exposing provider secrets |
 | ROUTE-TLS-READMODEL-008 | integration | DNS pending binding list projection | `domain-bindings.create` accepted a binding before public DNS has converged | `domain-bindings.list` returns `dnsObservation.status = pending`, expected target metadata, and no `domain-bound` implication |
 | ROUTE-TLS-READMODEL-009 | integration | DNS matched binding list projection | DNS observer records the expected public target for a pending binding | `domain-bindings.list` returns `dnsObservation.status = matched` with observed targets and keeps ownership confirmation as a separate gate |
+| ROUTE-TLS-READMODEL-010 | integration | Imported certificate projection | `certificates.import` succeeded for a manual-policy binding | `certificates.list` returns `source = imported`, safe metadata, latest import attempt id, and no raw certificate/key/passphrase material |
 
 ## Workflow Matrix
 
@@ -156,6 +160,7 @@ Then:
 | ROUTE-TLS-WORKFLOW-002 | e2e-preferred, opt-in Docker | Durable domain reaches service through proxy | Docker/proxy e2e creates and confirms a TLS-disabled durable binding, redeploys the resource, then calls the proxy on `127.0.0.1` with `Host: <domain>` | The proxy returns the deployed service health/body for the durable domain without requiring public DNS registration |
 | ROUTE-TLS-WORKFLOW-003 | e2e-preferred | DNS propagation pending is waitable | CLI/API creates a domain binding for a domain whose public DNS has not converged | Binding remains accepted and observable as `pending_verification` with `dnsObservation.status = pending`; deployment replacement and previously serving runtime are not failed only because public DNS is pending |
 | ROUTE-TLS-WORKFLOW-004 | integration, opt-in public route | Confirmation-file route proof | Binding has generated route-proof token and edge/proxy can serve the requested host/path | A public request or direct edge-address plus `Host` header request returns the exact token body; proof success is route reachability evidence, not a replacement for DNS observation |
+| ROUTE-TLS-WORKFLOW-005 | e2e-preferred | Manual certificate policy reaches ready state through import | CLI/API creates a manual-policy binding, confirms ownership, imports a valid certificate, and then lists certificates/resources | `certificate-imported` is recorded, `domain-ready` follows when route gates are satisfied, and read models show HTTPS readiness without any `certificate-issued` event |
 
 ## HTTP Challenge Serving Matrix
 
@@ -197,7 +202,7 @@ Then:
 | ROUTE-TLS-ASYNC-005 | integration | Certificate challenge failed | `domain-validation` | `certificate_challenge_failed` | Attempt failed; domain not ready | `certificate-issuance-failed` | No until DNS/config changes |
 | ROUTE-TLS-ASYNC-006 | integration | Certificate rate limited | `provider-request` | `certificate_rate_limited` | Attempt retry scheduled | `certificate-issuance-failed` | Yes with `retryAfter` |
 | ROUTE-TLS-ASYNC-007 | integration | Certificate storage failed | `certificate-storage` | `certificate_storage_failed` | Attempt retryable/unknown | No `certificate-issued` | Yes when storage can recover |
-| ROUTE-TLS-ASYNC-008 | integration | Certificate import invalid | `certificate-import-validation` | `certificate_import_invalid` | Manual certificate not attached | No `certificate-imported` | No until certificate material changes |
+| ROUTE-TLS-ASYNC-008 | integration | Certificate import validation failed | `certificate-import-validation` | `certificate_import_domain_mismatch` or `certificate_import_key_mismatch` or `certificate_import_expired` or `certificate_import_not_yet_valid` or `certificate_import_unsupported_algorithm` or `certificate_import_malformed_chain` | Manual certificate not attached | No `certificate-imported` | No until certificate material changes |
 | ROUTE-TLS-ASYNC-009 | integration | Certificate import storage failed | `certificate-import-storage` | `certificate_import_storage_failed` | Import attempt retryable/unknown | No `certificate-imported` | Yes when storage can recover |
 | ROUTE-TLS-ASYNC-010 | integration | Invalid state transition | lifecycle transition | `invariant_violation` | Unchanged | No success event | No |
 | ROUTE-TLS-ASYNC-011 | integration | Worker crash before final persistence | `event-consumption` | `retryable_error` | Attempt retryable/unknown | No terminal event | Yes |
@@ -236,6 +241,9 @@ Then:
 | ROUTE-TLS-ENTRY-015 | e2e-preferred | Quick Deploy or config managed handoff | Quick Deploy, a config-aware local agent, or a headless executor runs in hosted/self-hosted control-plane mode with trusted resource/server/destination context and accepted managed domain/TLS intent | Executor dispatches `domain-bindings.create` as a separate command with explicit input; no domain/TLS fields are sent to `deployments.create` | Per command error contract | `domain-binding-requested` on success | Binding appears in the same read models as CLI/API/Web-created bindings |
 | ROUTE-TLS-ENTRY-016 | e2e-preferred | Managed canonical redirect binding | Web/API/CLI creates a served binding, then creates another binding with `redirectTo` and optional `redirectStatus` for the same owner/path scope | `domain-bindings.create` accepts the redirect alias, list/read models expose redirect metadata, and redeploy planning realizes a redirect route beside the served route | None | `domain-binding-requested` includes redirect metadata | Redirect binding remains a managed `DomainBinding` with normal ownership/DNS/TLS lifecycle |
 | ROUTE-TLS-ENTRY-017 | integration | Managed canonical redirect target missing | Web/API/CLI submits `redirectTo` without an existing served target binding in the same owner/path scope | Command rejects before persistence | `validation_error`, phase `domain-binding-admission` | None | No redirect binding is created |
+| ROUTE-TLS-ENTRY-018 | e2e-preferred | CLI imports manual certificate | CLI targets a bound manual-policy binding and supplies chain/key/passphrase through secret-safe input | `ok({ certificateId, attemptId })` is printed without secret echo | Per command error contract | `certificate-imported` | `certificate list` shows imported safe metadata only |
+| ROUTE-TLS-ENTRY-019 | e2e-preferred | API imports manual certificate | HTTP/oRPC posts the same command schema through secure transport handling | `ok({ certificateId, attemptId })` response | Per command error contract | `certificate-imported` | `GET /api/certificates` shows imported safe metadata only |
+| ROUTE-TLS-ENTRY-020 | e2e-preferred | Resource-scoped Web imports manual certificate | User opens a manual-policy bound binding from the resource-scoped surface and pastes or uploads chain/key/passphrase | Accepted success is shown without secret echo | Per command error contract | `certificate-imported` | Resource/domain status surfaces show imported state and later ready state when gates pass |
 
 ## Idempotency Assertions
 
@@ -329,10 +337,14 @@ Current certificate retry scheduler tests cover `ROUTE-TLS-SCHED-001..004` for d
 dispatch, future retry skip, in-flight skip, and repeated-tick idempotency. Shell wiring keeps
 long-running timer execution out of CLI one-shot commands.
 
+Current tests now cover `certificates.import` command/event/read-model coverage plus CLI, HTTP/API,
+resource-scoped Web entry behavior, and durable certificate secret persistence through application
+tests, shell e2e, Bun.WebView resource detail tests, and PG/PGlite persistence integration tests.
+
 Current tests do not yet cover live DNS lookup/recheck, DNS-provider verification workflow,
-confirmation-file route proof serving, certificate validation failure branches, event replay
-handling beyond the create/confirm/domain-ready/certificate-issued baseline, resource-scoped
-browser/e2e behavior, renewal-window scheduling, or live CA behavior.
+confirmation-file route proof serving, exhaustive certificate validation failure branches for manual
+import, event replay handling beyond the create/confirm/domain-ready/certificate-issued baseline,
+renewal-window scheduling, or live CA behavior.
 
 Generated default access routing tests are governed by [Default Access Domain And Proxy Routing Test Matrix](./default-access-domain-and-proxy-routing-test-matrix.md) and must remain separate from durable domain binding readiness tests.
 
