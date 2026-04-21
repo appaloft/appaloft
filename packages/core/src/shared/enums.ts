@@ -143,6 +143,7 @@ export const deploymentStatuses = [
   "planning",
   "planned",
   "running",
+  "cancel-requested",
   "succeeded",
   "failed",
   "canceled",

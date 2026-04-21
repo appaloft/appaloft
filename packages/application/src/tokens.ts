@@ -107,6 +107,7 @@ export const tokens = {
   dbMigrateUseCase: Symbol.for("appaloft.db_migrate_use_case"),
   sourceDetector: Symbol.for("appaloft.source_detector"),
   runtimePlanResolver: Symbol.for("appaloft.runtime_plan_resolver"),
+  deploymentExecutionGuard: Symbol.for("appaloft.deployment_execution_guard"),
   defaultAccessDomainProvider: Symbol.for("appaloft.default_access_domain_provider"),
   edgeProxyProviderRegistry: Symbol.for("appaloft.edge_proxy_provider_registry"),
   runtimeTargetBackendRegistry: Symbol.for("appaloft.runtime_target_backend_registry"),

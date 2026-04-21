@@ -4,6 +4,7 @@ import { dirname, resolve } from "node:path";
 import {
   deploymentProgressSteps,
   type AppLogger,
+  type DeploymentExecutionGuard,
   type DeploymentProgressReporter,
   type EdgeProxyProviderRegistry,
   type ExecutionBackend,
@@ -401,6 +402,12 @@ function deploymentEnv(deployment: Deployment, port?: number): NodeJS.ProcessEnv
   return env;
 }
 
+function supersededDeploymentIdsForCleanup(input: {
+  supersedesDeploymentId?: { value: string };
+}): string[] {
+  return input.supersedesDeploymentId ? [input.supersedesDeploymentId.value] : [];
+}
+
 interface SshTarget {
   host: string;
   publicHost: string;
@@ -425,6 +432,7 @@ export class SshExecutionBackend implements ExecutionBackend {
     private readonly edgeProxyProviderRegistry?: EdgeProxyProviderRegistry,
     private readonly remoteRuntimeRoot = "/var/lib/appaloft/runtime",
     private readonly resourceAccessFailureRenderer?: () => ResourceAccessFailureRendererTarget | undefined,
+    private readonly deploymentExecutionGuard?: DeploymentExecutionGuard,
   ) {}
 
   private report(
@@ -515,6 +523,37 @@ export class SshExecutionBackend implements ExecutionBackend {
     });
     logs.push(phaseLog(input.phase, input.line, input.level, "application"));
     return input.persistedCount + 1;
+  }
+
+  private async ensureExecutionStillOwned(
+    context: ExecutionContext,
+    deployment: Deployment,
+    input: { step: string },
+  ): Promise<Result<void>> {
+    if (!this.deploymentExecutionGuard) {
+      return ok(undefined);
+    }
+
+    const decision = await this.deploymentExecutionGuard.shouldContinue(context, deployment);
+    if (decision.isErr()) {
+      return decision.map(() => undefined);
+    }
+
+    if (decision.value.allowed) {
+      return ok(undefined);
+    }
+
+    return err(
+      domainError.conflict("Deployment execution was superseded by a newer deployment", {
+        phase: "runtime-execution",
+        step: input.step,
+        deploymentId: deployment.toState().id.value,
+        ...(decision.value.supersededByDeploymentId
+          ? { supersededByDeploymentId: decision.value.supersededByDeploymentId }
+          : {}),
+        causeCode: "deployment_execution_superseded",
+      }),
+    );
   }
 
   private createStreamingOutputSink(
@@ -1572,6 +1611,13 @@ export class SshExecutionBackend implements ExecutionBackend {
         return err(domainError.validation("Docker image is required for SSH docker execution"));
       }
 
+      const deployOwnershipResult = await this.ensureExecutionStillOwned(context, deployment, {
+        step: "before-deploy",
+      });
+      if (deployOwnershipResult.isErr()) {
+        return deployOwnershipResult.map(() => ({ deployment }));
+      }
+
       const accessRoutes = state.runtimePlan.execution.accessRoutes ?? [];
       const proxyBootstrapResult = this.edgeProxyProviderRegistry
         ? await createEdgeProxyEnsurePlan({
@@ -1727,17 +1773,20 @@ export class SshExecutionBackend implements ExecutionBackend {
       ]);
       const usesDirectHostPort =
         state.runtimePlan.execution.metadata?.["resource.exposureMode"] === "direct-port";
+      const supersededDeploymentIds = supersededDeploymentIdsForCleanup(state);
       const removeSupersededResourceContainersSpec =
         dockerCommandBuilder.removeResourceContainers({
           resourceId: state.resourceId.value,
-          currentContainerName: containerName,
+          deploymentIds: supersededDeploymentIds,
         });
       const runCommandSpec = RuntimeCommandBuilder.sequence([
         dockerCommandBuilder.removeContainer({
           containerName,
           ignoreMissing: true,
         }),
-        ...(usesDirectHostPort ? [removeSupersededResourceContainersSpec] : []),
+        ...(usesDirectHostPort && supersededDeploymentIds.length > 0
+          ? [removeSupersededResourceContainersSpec]
+          : []),
         dockerCommandBuilder.runContainer({
           image,
           containerName,
@@ -1755,7 +1804,7 @@ export class SshExecutionBackend implements ExecutionBackend {
         }),
       ]);
       const runCommand = renderRuntimeCommandString(runCommandSpec, { quote: shellQuote });
-      if (usesDirectHostPort) {
+      if (usesDirectHostPort && supersededDeploymentIds.length > 0) {
         logs.push(
           phaseLog(
             "deploy",
@@ -2136,7 +2185,7 @@ export class SshExecutionBackend implements ExecutionBackend {
         }
       }
 
-      if (!usesDirectHostPort) {
+      if (!usesDirectHostPort && supersededDeploymentIds.length > 0) {
         const cleanupCommand = renderRuntimeCommandString(removeSupersededResourceContainersSpec, {
           quote: shellQuote,
         });
@@ -2272,6 +2321,12 @@ export class SshExecutionBackend implements ExecutionBackend {
       const remoteComposeFile = composeFile.startsWith("/")
         ? composeFile
         : `${remoteWorkdir}/${composeFile}`;
+      const deployOwnershipResult = await this.ensureExecutionStillOwned(context, deployment, {
+        step: "before-compose-up",
+      });
+      if (deployOwnershipResult.isErr()) {
+        return deployOwnershipResult.map(() => ({ deployment }));
+      }
       const upCommand = renderRuntimeCommandString(
         RuntimeCommandBuilder.docker().composeUp({
           composeFile: remoteComposeFile,
