@@ -81,8 +81,19 @@ function hasSourceLinkRelinkCommand(argv: readonly string[]): boolean {
   return argv[sourceLinksIndex + 1] === "relink";
 }
 
+function hasPreviewCleanupCommand(argv: readonly string[]): boolean {
+  const previewIndex = argv.indexOf("preview");
+  if (previewIndex === -1) {
+    return false;
+  }
+
+  return argv[previewIndex + 1] === "cleanup";
+}
+
 function requiresRemotePgliteStateCommand(argv: readonly string[]): boolean {
-  return hasDeployCommand(argv) || hasSourceLinkRelinkCommand(argv);
+  return (
+    hasDeployCommand(argv) || hasSourceLinkRelinkCommand(argv) || hasPreviewCleanupCommand(argv)
+  );
 }
 
 function normalizePort(value: string | undefined): number | undefined {
