@@ -363,6 +363,7 @@ function executionMetadataFor(
     ...(requestedDeployment.accessContext?.resourceSlug
       ? { "resource.slug": requestedDeployment.accessContext.resourceSlug }
       : {}),
+    ...(requestedDeployment.runtimeMetadata ?? {}),
     ...(requestedDeployment.accessRouteMetadata ?? {}),
   };
 }
