@@ -5,8 +5,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   createExecutionContext,
+  DefaultAccessDomainPolicyByScopeSpec,
   type RepositoryContext,
   toRepositoryContext,
+  UpsertDefaultAccessDomainPolicySpec,
 } from "@appaloft/application";
 import {
   CreatedAt,
@@ -61,7 +63,7 @@ describe("default access domain policy store pglite integration", () => {
       const {
         createDatabase,
         createMigrator,
-        PgDefaultAccessDomainPolicyStore,
+        PgDefaultAccessDomainPolicyRepository,
         PgServerRepository,
       } = await import("../src");
       const database = await createDatabase({
@@ -74,34 +76,46 @@ describe("default access domain policy store pglite integration", () => {
         await migrator.migrateToLatest();
 
         const serverRepository = new PgServerRepository(database.db);
-        const store = new PgDefaultAccessDomainPolicyStore(database.db);
+        const repository = new PgDefaultAccessDomainPolicyRepository(database.db);
         const server = serverFixture();
 
         await serverRepository.upsert(context, server, UpsertServerSpec.fromServer(server));
 
-        const systemPolicy = await store.upsert({
+        const systemPolicyRecord = {
           id: "dap_system",
           scope: { kind: "system" },
           mode: "provider",
           providerKey: "sslip",
           updatedAt: "2026-01-01T00:00:10.000Z",
           idempotencyKey: "policy-1",
-        });
-        const targetPolicy = await store.upsert({
+        } as const;
+        const targetPolicyRecord = {
           id: "dap_server",
           scope: { kind: "deployment-target", serverId: "srv_demo" },
           mode: "disabled",
           updatedAt: "2026-01-01T00:00:11.000Z",
-        });
+        } as const;
+        const systemPolicy = await repository.upsert(
+          systemPolicyRecord,
+          UpsertDefaultAccessDomainPolicySpec.fromRecord(systemPolicyRecord),
+        );
+        const targetPolicy = await repository.upsert(
+          targetPolicyRecord,
+          UpsertDefaultAccessDomainPolicySpec.fromRecord(targetPolicyRecord),
+        );
 
         expect(systemPolicy.isOk()).toBe(true);
         expect(targetPolicy.isOk()).toBe(true);
 
-        const persistedSystem = await store.read({ kind: "system" });
-        const persistedTarget = await store.read({
-          kind: "deployment-target",
-          serverId: "srv_demo",
-        });
+        const persistedSystem = await repository.findOne(
+          DefaultAccessDomainPolicyByScopeSpec.create({ kind: "system" }),
+        );
+        const persistedTarget = await repository.findOne(
+          DefaultAccessDomainPolicyByScopeSpec.create({
+            kind: "deployment-target",
+            serverId: "srv_demo",
+          }),
+        );
 
         expect(persistedSystem.isOk()).toBe(true);
         expect(persistedTarget.isOk()).toBe(true);

@@ -45,97 +45,56 @@ import {
 } from "@appaloft/testkit";
 import { createExecutionContext, toRepositoryContext } from "../src";
 import { RelinkSourceLinkCommand } from "../src/messages";
-import { type SourceLinkRecord, type SourceLinkStore, type SourceLinkTarget } from "../src/ports";
+import {
+  SourceLinkBySourceFingerprintSpec,
+  type SourceLinkRecord,
+  type SourceLinkRepository,
+  type SourceLinkSelectionSpec,
+  type SourceLinkSelectionSpecVisitor,
+  UpsertSourceLinkSpec,
+} from "../src/ports";
 import { RelinkSourceLinkUseCase } from "../src/use-cases";
 
-class MemorySourceLinkStore implements SourceLinkStore {
-  readonly relinkCalls: Parameters<SourceLinkStore["relink"]>[0][] = [];
+class MemorySourceLinkRepository implements SourceLinkRepository {
+  readonly upsertCalls: SourceLinkRecord[] = [];
 
   constructor(private record: SourceLinkRecord | null) {}
 
-  async read(): Promise<Result<SourceLinkRecord | null>> {
-    return ok(this.record);
+  async findOne(spec: SourceLinkSelectionSpec): Promise<Result<SourceLinkRecord | null>> {
+    return spec.accept(ok(null), {
+      visitSourceLinkBySourceFingerprint: (_query, sourceFingerprintSpec) => {
+        if (
+          !this.record ||
+          this.record.sourceFingerprint !== sourceFingerprintSpec.sourceFingerprint
+        ) {
+          return ok(null);
+        }
+
+        return ok(this.record);
+      },
+    } satisfies SourceLinkSelectionSpecVisitor<Result<SourceLinkRecord | null>>);
   }
 
-  async requireSameTargetOrMissing(): Promise<Result<SourceLinkRecord | null>> {
-    return ok(this.record);
+  async upsert(record: SourceLinkRecord): Promise<Result<SourceLinkRecord>> {
+    this.upsertCalls.push(record);
+    this.record = record;
+    return ok(record);
   }
 
-  async createIfMissing(input: {
-    sourceFingerprint: string;
-    target: SourceLinkTarget;
-    updatedAt: string;
-  }): Promise<Result<SourceLinkRecord>> {
-    if (!this.record) {
-      this.record = {
-        sourceFingerprint: input.sourceFingerprint,
-        updatedAt: input.updatedAt,
-        ...input.target,
-      };
-    }
+  async deleteOne(spec: SourceLinkSelectionSpec): Promise<Result<boolean>> {
+    return spec.accept(ok(false), {
+      visitSourceLinkBySourceFingerprint: (_query, sourceFingerprintSpec) => {
+        if (
+          !this.record ||
+          this.record.sourceFingerprint !== sourceFingerprintSpec.sourceFingerprint
+        ) {
+          return ok(false);
+        }
 
-    return ok(this.record);
-  }
-
-  async relink(input: Parameters<SourceLinkStore["relink"]>[0]): Promise<Result<SourceLinkRecord>> {
-    this.relinkCalls.push(input);
-
-    if (!this.record) {
-      return err(
-        domainError.validation("Source link was not found", {
-          phase: "source-link-resolution",
-        }),
-      );
-    }
-
-    if (
-      input.expectedCurrentProjectId &&
-      this.record.projectId !== input.expectedCurrentProjectId
-    ) {
-      return err(
-        sourceLinkConflict("project", input.expectedCurrentProjectId, this.record.projectId),
-      );
-    }
-
-    if (
-      input.expectedCurrentEnvironmentId &&
-      this.record.environmentId !== input.expectedCurrentEnvironmentId
-    ) {
-      return err(
-        sourceLinkConflict(
-          "environment",
-          input.expectedCurrentEnvironmentId,
-          this.record.environmentId,
-        ),
-      );
-    }
-
-    if (
-      input.expectedCurrentResourceId &&
-      this.record.resourceId !== input.expectedCurrentResourceId
-    ) {
-      return err(
-        sourceLinkConflict("resource", input.expectedCurrentResourceId, this.record.resourceId),
-      );
-    }
-
-    this.record = {
-      sourceFingerprint: input.sourceFingerprint,
-      updatedAt: input.updatedAt,
-      ...(input.reason ? { reason: input.reason } : {}),
-      ...input.target,
-    };
-
-    return ok(this.record);
-  }
-
-  async unlink(sourceFingerprint: string): Promise<Result<boolean>> {
-    if (!this.record || this.record.sourceFingerprint !== sourceFingerprint) {
-      return ok(false);
-    }
-
-    this.record = null;
-    return ok(true);
+        this.record = null;
+        return ok(true);
+      },
+    } satisfies SourceLinkSelectionSpecVisitor<Result<boolean>>);
   }
 }
 
@@ -225,7 +184,7 @@ async function createRelinkFixture(input?: {
   );
   await resources.upsert(repositoryContext, resource, UpsertResourceSpec.fromResource(resource));
 
-  const sourceLinkStore = new MemorySourceLinkStore(
+  const sourceLinkRepository = new MemorySourceLinkRepository(
     input?.sourceLink === undefined
       ? {
           sourceFingerprint: "source-fingerprint:v1:branch%3Amain",
@@ -239,9 +198,9 @@ async function createRelinkFixture(input?: {
 
   return {
     context,
-    sourceLinkStore,
+    sourceLinkRepository,
     useCase: new RelinkSourceLinkUseCase(
-      sourceLinkStore,
+      sourceLinkRepository,
       projects,
       environments,
       resources,
@@ -288,7 +247,7 @@ describe("RelinkSourceLinkCommand", () => {
 
 describe("RelinkSourceLinkUseCase", () => {
   test("[SOURCE-LINK-STATE-008] relinks a source fingerprint after target context validation", async () => {
-    const { context, sourceLinkStore, useCase } = await createRelinkFixture();
+    const { context, sourceLinkRepository, useCase } = await createRelinkFixture();
 
     const result = await useCase.execute(context, {
       sourceFingerprint: "source-fingerprint:v1:branch%3Amain",
@@ -313,15 +272,15 @@ describe("RelinkSourceLinkUseCase", () => {
       serverId: "srv_demo",
       destinationId: "dst_demo",
     });
-    expect(sourceLinkStore.relinkCalls[0]).toMatchObject({
+    expect(sourceLinkRepository.upsertCalls[0]).toMatchObject({
       updatedAt: "2026-04-19T00:02:00.000Z",
-      expectedCurrentResourceId: "res_old",
       reason: "move to canonical resource",
+      resourceId: "res_demo",
     });
   });
 
   test("[SOURCE-LINK-STATE-010] optimistic guard conflicts reject without changing the mapping", async () => {
-    const { context, sourceLinkStore, useCase } = await createRelinkFixture();
+    const { context, sourceLinkRepository, useCase } = await createRelinkFixture();
 
     const result = await useCase.execute(context, {
       sourceFingerprint: "source-fingerprint:v1:branch%3Amain",
@@ -336,17 +295,17 @@ describe("RelinkSourceLinkUseCase", () => {
       throw new Error("Expected source link conflict");
     }
     expect(result.error).toMatchObject({
-      code: "source_link_conflict",
+      code: "source_link_context_mismatch",
       details: {
-        phase: "source-link-resolution",
-        actual: "res_old",
+        phase: "source-link-admission",
+        actualResourceId: "res_old",
       },
     });
-    expect(sourceLinkStore.relinkCalls).toHaveLength(1);
+    expect(sourceLinkRepository.upsertCalls).toHaveLength(0);
   });
 
   test("[SOURCE-LINK-STATE-011] rejects mismatched destination/server context before persistence", async () => {
-    const { context, sourceLinkStore, useCase } = await createRelinkFixture({
+    const { context, sourceLinkRepository, useCase } = await createRelinkFixture({
       destinationServerId: "srv_other",
     });
 
@@ -371,6 +330,6 @@ describe("RelinkSourceLinkUseCase", () => {
         destinationId: "dst_demo",
       },
     });
-    expect(sourceLinkStore.relinkCalls).toHaveLength(0);
+    expect(sourceLinkRepository.upsertCalls).toHaveLength(0);
   });
 });

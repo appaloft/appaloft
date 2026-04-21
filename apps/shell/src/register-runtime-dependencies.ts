@@ -29,7 +29,8 @@ import {
   type CertificateProviderPort,
   type Clock,
   CommandBus,
-  type DefaultAccessDomainPolicyStore,
+  DefaultAccessDomainPolicyByScopeSpec,
+  type DefaultAccessDomainPolicyRepository,
   DefaultAccessDomainRuntimePlanResolver,
   type DeploymentProgressReporter,
   type EventBus,
@@ -42,11 +43,17 @@ import {
   QueryBus,
   type ResourceAccessFailureRendererTarget,
   type ServerAppliedRouteDesiredStateRecord,
-  type ServerAppliedRouteDesiredStateTarget,
-  type ServerAppliedRouteStateStore,
+  ServerAppliedRouteStateByTargetSpec,
+  type ServerAppliedRouteStateRepository,
+  type ServerAppliedRouteStateSelectionSpec,
+  SourceLinkBySourceFingerprintSpec,
   type SourceLinkRecord,
-  type SourceLinkStore,
+  type SourceLinkRepository,
+  type SourceLinkSelectionSpec,
   tokens,
+  UpsertDefaultAccessDomainPolicySpec,
+  UpsertServerAppliedRouteDesiredStateSpec,
+  UpsertSourceLinkSpec,
 } from "@appaloft/application";
 import { type AuthRuntime } from "@appaloft/auth-better";
 import { type AppConfig } from "@appaloft/config";
@@ -60,7 +67,7 @@ import {
   PgCertificateRepository,
   PgCertificateRetryCandidateReader,
   PgCertificateSecretStore,
-  PgDefaultAccessDomainPolicyStore,
+  PgDefaultAccessDomainPolicyRepository,
   PgDeploymentReadModel,
   PgDeploymentRepository,
   PgDestinationRepository,
@@ -76,8 +83,10 @@ import {
   PgResourceDeletionBlockerReader,
   PgResourceReadModel,
   PgResourceRepository,
+  PgServerAppliedRouteStateRepository,
   PgServerReadModel,
   PgServerRepository,
+  PgSourceLinkRepository,
   PgSshCredentialReadModel,
   PgSshCredentialRepository,
 } from "@appaloft/persistence-pg";
@@ -508,66 +517,56 @@ class InMemoryEventBus implements EventBus {
   }
 }
 
-class UnavailableSourceLinkStore implements SourceLinkStore {
+class UnavailableSourceLinkRepository implements SourceLinkRepository {
   private unavailable() {
     return err(
       domainError.validation("Source link state is not configured for this runtime", {
         phase: "source-link-resolution",
-        reason: "source_link_store_unavailable",
+        reason: "source_link_repository_unavailable",
       }),
     );
   }
 
-  async read(): Promise<Result<SourceLinkRecord | null, DomainError>> {
+  async findOne(
+    _spec: SourceLinkSelectionSpec,
+  ): Promise<Result<SourceLinkRecord | null, DomainError>> {
     return this.unavailable();
   }
 
-  async requireSameTargetOrMissing(): Promise<Result<SourceLinkRecord | null, DomainError>> {
+  async upsert(): Promise<Result<SourceLinkRecord, DomainError>> {
     return this.unavailable();
   }
 
-  async createIfMissing(): Promise<Result<SourceLinkRecord, DomainError>> {
-    return this.unavailable();
-  }
-
-  async relink(): Promise<Result<SourceLinkRecord, DomainError>> {
-    return this.unavailable();
-  }
-
-  async unlink(): Promise<Result<boolean, DomainError>> {
+  async deleteOne(): Promise<Result<boolean, DomainError>> {
     return this.unavailable();
   }
 }
 
-class NoopServerAppliedRouteStateStore implements ServerAppliedRouteStateStore {
-  async upsertDesired(): Promise<Result<ServerAppliedRouteDesiredStateRecord>> {
+class NoopServerAppliedRouteStateRepository implements ServerAppliedRouteStateRepository {
+  async upsert(): Promise<Result<ServerAppliedRouteDesiredStateRecord>> {
     return err(
       domainError.validation("Server-applied route state is not configured for this runtime", {
         phase: "config-domain-resolution",
-        reason: "server_applied_route_store_missing",
+        reason: "server_applied_route_repository_missing",
       }),
     );
   }
 
-  async read(
-    _target: ServerAppliedRouteDesiredStateTarget,
+  async findOne(
+    _spec: ServerAppliedRouteStateSelectionSpec,
   ): Promise<Result<ServerAppliedRouteDesiredStateRecord | null>> {
     return ok(null);
   }
 
-  async markApplied(): Promise<Result<ServerAppliedRouteDesiredStateRecord | null>> {
+  async updateOne(): Promise<Result<ServerAppliedRouteDesiredStateRecord | null>> {
     return ok(null);
   }
 
-  async markFailed(): Promise<Result<ServerAppliedRouteDesiredStateRecord | null>> {
-    return ok(null);
-  }
-
-  async deleteDesired(): Promise<Result<boolean>> {
+  async deleteOne(): Promise<Result<boolean>> {
     return ok(false);
   }
 
-  async deleteDesiredBySourceFingerprint(): Promise<Result<number>> {
+  async deleteMany(): Promise<Result<number>> {
     return ok(0);
   }
 }
@@ -621,9 +620,9 @@ export interface RegisterRuntimeDependenciesInput {
   migrator: ConstructorParameters<typeof PgDiagnostics>[1];
   authRuntime: AuthRuntime;
   deploymentProgressReporter: DeploymentProgressReporter;
-  sourceLinkStore?: SourceLinkStore;
-  defaultAccessDomainPolicyStore?: DefaultAccessDomainPolicyStore;
-  serverAppliedRouteDesiredStateReader?: ServerAppliedRouteStateStore;
+  sourceLinkRepository?: SourceLinkRepository;
+  defaultAccessDomainPolicyRepository?: DefaultAccessDomainPolicyRepository;
+  serverAppliedRouteStateRepository?: ServerAppliedRouteStateRepository;
   resourceAccessFailureRenderer?: () => ResourceAccessFailureRendererTarget | undefined;
 }
 
@@ -646,16 +645,17 @@ export function registerRuntimeDependencies(
   });
   container.registerInstance(tokens.deploymentProgressReporter, input.deploymentProgressReporter);
   container.registerInstance(
-    tokens.sourceLinkStore,
-    input.sourceLinkStore ?? new UnavailableSourceLinkStore(),
+    tokens.sourceLinkRepository,
+    input.sourceLinkRepository ?? new UnavailableSourceLinkRepository(),
   );
   container.registerInstance(
-    tokens.defaultAccessDomainPolicyStore,
-    input.defaultAccessDomainPolicyStore ?? new PgDefaultAccessDomainPolicyStore(input.database.db),
+    tokens.defaultAccessDomainPolicyRepository,
+    input.defaultAccessDomainPolicyRepository ??
+      new PgDefaultAccessDomainPolicyRepository(input.database.db),
   );
   container.registerInstance(
-    tokens.serverAppliedRouteDesiredStateReader,
-    input.serverAppliedRouteDesiredStateReader ?? new NoopServerAppliedRouteStateStore(),
+    tokens.serverAppliedRouteStateRepository,
+    input.serverAppliedRouteStateRepository ?? new NoopServerAppliedRouteStateRepository(),
   );
   container.register(tokens.defaultAccessDomainPolicySupport, {
     useFactory: instanceCachingFactory(
@@ -807,7 +807,7 @@ export function registerRuntimeDependencies(
     useFactory: instanceCachingFactory(
       (dependencyContainer) =>
         new PolicyAwareDefaultAccessDomainProvider(
-          dependencyContainer.resolve(tokens.defaultAccessDomainPolicyStore),
+          dependencyContainer.resolve(tokens.defaultAccessDomainPolicyRepository),
           input.config.defaultAccessDomain,
           input.logger,
         ),

@@ -2,8 +2,10 @@ import {
   DeploymentByIdSpec,
   DeploymentId,
   type DomainEvent,
+  domainError,
   type EdgeProxyKind,
   edgeProxyKinds,
+  err,
   ok,
   type Result,
   safeTry,
@@ -15,7 +17,11 @@ import { type ExecutionContext, toRepositoryContext } from "../../execution-cont
 import {
   type AppLogger,
   type DeploymentRepository,
-  type ServerAppliedRouteStateStore,
+  MarkServerAppliedRouteAppliedSpec,
+  MarkServerAppliedRouteFailedSpec,
+  ServerAppliedRouteStateByRouteSetIdSpec,
+  ServerAppliedRouteStateByTargetSpec,
+  type ServerAppliedRouteStateRepository,
 } from "../../ports";
 import { tokens } from "../../tokens";
 
@@ -52,14 +58,14 @@ export class MarkServerAppliedRouteStatusOnDeploymentFinishedHandler
   constructor(
     @inject(tokens.deploymentRepository)
     private readonly deploymentRepository: DeploymentRepository,
-    @inject(tokens.serverAppliedRouteDesiredStateReader)
-    private readonly routeStateStore: ServerAppliedRouteStateStore,
+    @inject(tokens.serverAppliedRouteStateRepository)
+    private readonly routeStateRepository: ServerAppliedRouteStateRepository,
     @inject(tokens.logger)
     private readonly logger: AppLogger,
   ) {}
 
   async handle(context: ExecutionContext, event: DomainEvent): Promise<Result<void>> {
-    const { deploymentRepository, logger, routeStateStore } = this;
+    const { deploymentRepository, logger, routeStateRepository } = this;
     const repositoryContext = toRepositoryContext(context);
 
     return safeTry(async function* () {
@@ -105,16 +111,34 @@ export class MarkServerAppliedRouteStatusOnDeploymentFinishedHandler
       const proxyKind = isEdgeProxyKind(route?.proxyKind) ? route.proxyKind : undefined;
       const providerKey = metadata["access.providerKey"];
       const status = optionalPayloadText(event, "status");
+      const existing = yield* await routeStateRepository.findOne(
+        ServerAppliedRouteStateByTargetSpec.create(target),
+      );
+      if (!existing) {
+        return ok(undefined);
+      }
+      if (existing.routeSetId !== routeSetId) {
+        return err(
+          domainError.conflict("Server-applied route state did not match expected route set", {
+            phase: "proxy-route-realization",
+            expectedRouteSetId: routeSetId,
+            actualRouteSetId: existing.routeSetId,
+          }),
+        );
+      }
+
+      const selectionSpec = ServerAppliedRouteStateByRouteSetIdSpec.create(existing.routeSetId);
 
       if (status === "succeeded") {
-        yield* await routeStateStore.markApplied({
-          target,
-          deploymentId: deploymentId.value,
-          updatedAt: event.occurredAt,
-          routeSetId,
-          ...(providerKey ? { providerKey } : {}),
-          ...(proxyKind ? { proxyKind } : {}),
-        });
+        yield* await routeStateRepository.updateOne(
+          selectionSpec,
+          MarkServerAppliedRouteAppliedSpec.create({
+            deploymentId: deploymentId.value,
+            updatedAt: event.occurredAt,
+            ...(providerKey ? { providerKey } : {}),
+            ...(proxyKind ? { proxyKind } : {}),
+          }),
+        );
         return ok(undefined);
       }
 
@@ -129,18 +153,19 @@ export class MarkServerAppliedRouteStatusOnDeploymentFinishedHandler
 
       const errorCode = optionalPayloadText(event, "errorCode") ?? "deployment_failed";
       const errorMessage = optionalPayloadText(event, "errorMessage");
-      yield* await routeStateStore.markFailed({
-        target,
-        deploymentId: deploymentId.value,
-        updatedAt: event.occurredAt,
-        routeSetId,
-        phase: failurePhase,
-        errorCode,
-        retryable: optionalPayloadBoolean(event, "retryable") ?? false,
-        ...(errorMessage ? { message: errorMessage } : {}),
-        ...(providerKey ? { providerKey } : {}),
-        ...(proxyKind ? { proxyKind } : {}),
-      });
+      yield* await routeStateRepository.updateOne(
+        selectionSpec,
+        MarkServerAppliedRouteFailedSpec.create({
+          deploymentId: deploymentId.value,
+          updatedAt: event.occurredAt,
+          phase: failurePhase,
+          errorCode,
+          retryable: optionalPayloadBoolean(event, "retryable") ?? false,
+          ...(errorMessage ? { message: errorMessage } : {}),
+          ...(providerKey ? { providerKey } : {}),
+          ...(proxyKind ? { proxyKind } : {}),
+        }),
+      );
 
       return ok(undefined);
     });
