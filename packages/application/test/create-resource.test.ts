@@ -472,6 +472,55 @@ describe("CreateResourceUseCase", () => {
     });
   });
 
+  test("accepts absolute local-folder source locators", async () => {
+    const { context, repositoryContext, resources, useCase } = await seedResourceContext();
+
+    const result = await useCase.execute(context, {
+      projectId: "prj_demo",
+      environmentId: "env_demo",
+      name: "Workspace App",
+      kind: "application",
+      source: {
+        kind: "local-folder",
+        locator: "/tmp/appaloft/workspace-http-app",
+      },
+    });
+
+    expect(result.isOk()).toBe(true);
+    const persisted = await resources.findOne(
+      repositoryContext,
+      ResourceByIdSpec.create(ResourceId.rehydrate(result._unsafeUnwrap().id)),
+    );
+    expect(persisted?.toState().sourceBinding?.kind.value).toBe("local-folder");
+    expect(persisted?.toState().sourceBinding?.locator.value).toBe(
+      "/tmp/appaloft/workspace-http-app",
+    );
+  });
+
+  test("rejects absolute host paths for non-local source locators", async () => {
+    const { context, eventBus, useCase } = await seedResourceContext();
+
+    const result = await useCase.execute(context, {
+      projectId: "prj_demo",
+      environmentId: "env_demo",
+      name: "web",
+      kind: "application",
+      source: {
+        kind: "git-public",
+        locator: "/tmp/appaloft/workspace-http-app",
+      },
+    });
+
+    expect(result.isErr()).toBe(true);
+    const error = result._unsafeUnwrapErr();
+    expect(error.code).toBe("validation_error");
+    expect(error.details).toMatchObject({
+      phase: "resource-source-resolution",
+      field: "source.locator",
+    });
+    expect(eventBus.events).toHaveLength(0);
+  });
+
   test("rejects invalid source base directory", async () => {
     const { context, eventBus, useCase } = await seedResourceContext();
 

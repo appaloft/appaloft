@@ -32,6 +32,8 @@ const gitSourceInputKinds = [
   "local-git",
 ] as const;
 
+const localPathSourceInputKinds = ["local-folder", "local-git", "compose"] as const;
+
 type GitHubTreeNormalizationMode = "infer" | "require-explicit";
 
 function sourceResolutionError(
@@ -148,14 +150,20 @@ function validateSafeTextField(
   return ok(undefined);
 }
 
+function sourceKindAllowsAbsoluteHostPath(kind: string): boolean {
+  return localPathSourceInputKinds.some((candidate) => candidate === kind);
+}
+
 function validateSafeSourceInput(input: ResourceSourceBindingMapperInput): Result<void> {
+  const rejectAbsoluteLocatorHostPath = !sourceKindAllowsAbsoluteHostPath(input.kind);
+
   for (const [field, value, rejectAbsoluteHostPath] of [
-    ["source.locator", input.locator, true],
+    ["source.locator", input.locator, rejectAbsoluteLocatorHostPath],
     ["source.displayName", input.displayName, false],
     ["source.gitRef", input.gitRef, false],
     ["source.commitSha", input.commitSha, false],
     ["source.baseDirectory", input.baseDirectory, false],
-    ["source.originalLocator", input.originalLocator, true],
+    ["source.originalLocator", input.originalLocator, rejectAbsoluteLocatorHostPath],
     ["source.repositoryId", input.repositoryId, false],
     ["source.repositoryFullName", input.repositoryFullName, false],
     ["source.defaultBranch", input.defaultBranch, false],
@@ -175,7 +183,8 @@ function validateSafeSourceInput(input: ResourceSourceBindingMapperInput): Resul
     }
 
     const validation = validateSafeTextField(`source.metadata.${key}`, value, {
-      rejectAbsoluteHostPath: key === "locator" || key === "originalLocator",
+      rejectAbsoluteHostPath:
+        rejectAbsoluteLocatorHostPath && (key === "locator" || key === "originalLocator"),
     });
     if (validation.isErr()) {
       return err(validation.error);
