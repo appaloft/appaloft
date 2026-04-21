@@ -18,6 +18,11 @@ import {
 } from "../src";
 
 describe("EnvironmentProfile", () => {
+  test("accepts empty config values", () => {
+    const value = ConfigValueText.create("")._unsafeUnwrap();
+    expect(value.value).toBe("");
+  });
+
   test("materializes snapshots with scope precedence and masks no secrets at domain level", () => {
     const environment = EnvironmentProfile.create({
       id: EnvironmentId.rehydrate("env_prod"),

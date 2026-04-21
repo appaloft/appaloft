@@ -25,7 +25,7 @@ This roadmap is the release gate for Appaloft versions before `1.0.0`.
 - [ ] Use this roadmap to choose the release version.
 - [ ] Before the next release, verify package manifests, Release Please state, and the latest
   published release agree on the current version line. The roadmap starts from the current public
-  line `0.2.x` because the current release is `0.2.4`.
+  line `0.2.x` because the current release is `0.2.5`.
 
 Version selection rules:
 
@@ -43,7 +43,7 @@ Version selection rules:
 Current release alignment:
 
 - [x] On 2026-04-21, latest public release and package manifests agree on the `0.2.x` line at
-  `0.2.4`.
+  `0.2.5`.
 - [x] On 2026-04-21, Action/CLI PR preview deploy profile flag support and explicit preview cleanup
   command support were completed early in the CLI/config bootstrap path, but the public
   deploy-action wrapper and product-grade GitHub App preview lifecycle remain incomplete.
