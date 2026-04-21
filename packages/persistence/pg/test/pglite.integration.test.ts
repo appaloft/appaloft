@@ -1066,11 +1066,14 @@ describe("pglite persistence integration", () => {
         }),
       );
 
-      await deploymentRepository.upsert(
-        context,
-        deployment,
-        UpsertDeploymentSpec.fromDeployment(deployment),
-      );
+      (await deploymentRepository.admit(context, deployment))._unsafeUnwrap();
+      (
+        await deploymentRepository.upsert(
+          context,
+          deployment,
+          UpsertDeploymentSpec.fromDeployment(deployment),
+        )
+      )._unsafeUnwrap();
       await database.close();
 
       const reopened = await createDatabase({
