@@ -148,7 +148,7 @@ interface RemoteStateLockMetadata {
 const defaultSchemaVersion = 1;
 const defaultLockHeartbeatIntervalMs = 30_000;
 const defaultLockStaleAfterMs = 20 * 60_000;
-const defaultLockAcquireTimeoutMs = 15_000;
+const defaultLockAcquireTimeoutMs = 3 * 60_000;
 const defaultLockRetryIntervalMs = 1_000;
 const stateDirectories = [
   "pglite",

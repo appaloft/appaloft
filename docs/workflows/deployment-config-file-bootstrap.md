@@ -202,7 +202,7 @@ trusted SSH target and credential
 Recovery requirements:
 
 - active locks must keep heartbeat/last-seen metadata fresh while the workflow owns the state;
-- entrypoint adapters may wait for a short bounded retry window before returning a retriable
+- entrypoint adapters may wait for a bounded retry window before returning a retriable
   `remote-state-lock` error for an active lock;
 - abandoned locks must be visible through diagnostics and recoverable by a deliberate operator
   action or a safe stale-lock policy that records the recovered lock metadata before continuing;
