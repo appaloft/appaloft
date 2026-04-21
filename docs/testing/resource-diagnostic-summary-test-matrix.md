@@ -82,6 +82,7 @@ Then:
 | RES-DIAG-QRY-013 | integration | Redaction failure | Redactor cannot prove safety | `err(resource_diagnostic_redaction_failed)` | None | No copy payload is returned. |
 | RES-DIAG-QRY-014 | integration | Copy markdown failure | Optional markdown render fails but JSON succeeds | `ok` | `resource_diagnostic_copy_render_failed` | `copy.json` remains present. |
 | RES-DIAG-QRY-015 | integration | Access precedence summary | Durable ready, server-applied, and generated routes are all present | `ok` with access and proxy sections available | None | Copy payload preserves separate route URLs and proxy/provider context uses durable, server-applied, latest generated, then planned generated precedence for the selected route. |
+| RES-DIAG-QRY-016 | integration | Non-ready durable access | Durable domain binding exists but is not ready while generated or server-applied fallback route data exists | `ok` with access unavailable | `resource_domain_binding_not_ready` | Access section keeps fallback URLs as context but reports the non-ready durable binding as the blocking selected route. |
 
 ## Entrypoint Matrix
 

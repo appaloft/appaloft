@@ -144,6 +144,11 @@ Public access health is resource-scoped.
 Durable domain bindings belong to the resource. Each deployment for the same resource should reuse
 the same ready domain binding unless the binding, destination, target, or path policy changes.
 
+When a durable domain binding exists but is not ready, resource health must keep that durable domain
+visible as the public-access target with a not-ready/degraded reason. Generated or server-applied
+fallback routes may still be listed as context, but they must not hide the fact that the current
+durable domain is pending verification, certificate issuance, or route recovery.
+
 Deployment snapshots may record route metadata used by that attempt. They are immutable history and
 must not become the domain ownership boundary.
 
@@ -198,9 +203,10 @@ Current runtime deployment execution still performs attempt-time health checks a
 deployment attempt when local loopback/container checks fail. Those checks remain attempt-scoped
 until provider-native runtime/container inspection feeds resource-owned health observation.
 
-Bounded live HTTP policy and public access probes are implemented for safe HTTP targets. Docker
-health-state inspection, command policy execution, durable-domain readiness composition, and
-scheduled summary persistence are still future work.
+Bounded live HTTP policy and public access probes are implemented for safe HTTP targets. Durable
+domain readiness composition now uses domain binding records so pending/non-ready durable domains
+degrade public access instead of being hidden by fallback routes. Docker health-state inspection,
+command policy execution, and scheduled summary persistence are still future work.
 
 ## Open Questions
 

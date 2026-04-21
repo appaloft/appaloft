@@ -162,6 +162,7 @@ Implemented source errors include:
 - `resource_health_check_timeout`;
 - `resource_health_check_response_mismatch`;
 - `resource_health_check_failed`;
+- `resource_domain_binding_not_ready`;
 - `resource_public_access_unavailable`;
 - `resource_public_access_probe_failed`;
 - `resource_proxy_route_unavailable`;

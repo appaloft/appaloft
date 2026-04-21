@@ -145,6 +145,7 @@ Required coverage follows [Resource Diagnostic Summary Test Matrix](../testing/r
 - latest deployment selection;
 - complete summary composition;
 - access missing after successful deployment;
+- non-ready durable domain binding remains the blocking access fact even when fallback route URLs exist;
 - proxy source failure as partial summary;
 - runtime logs unavailable as partial summary;
 - deployment logs empty versus unavailable;
@@ -175,9 +176,9 @@ Per-source failures remain inside `sourceErrors` when a safe resource-scoped pay
 returned.
 
 Application query-service tests cover canonical copy JSON, secret redaction, missing access as a
-section/source error, proxy provider failure as a source error, runtime log reader failure as a
-source error, runtime logs not requested without reader calls, and deployment/resource context
-mismatch.
+section/source error, non-ready durable domain bindings as access source errors, proxy provider
+failure as a source error, runtime log reader failure as a source error, runtime logs not requested
+without reader calls, and deployment/resource context mismatch.
 
 Web resource detail prefers the native Desktop clipboard bridge when available, then browser
 clipboard APIs, and only exposes the generated diagnostic JSON textarea when every automatic copy
