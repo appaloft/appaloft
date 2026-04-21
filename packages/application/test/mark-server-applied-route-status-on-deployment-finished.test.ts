@@ -311,7 +311,7 @@ describe("MarkServerAppliedRouteStatusOnDeploymentFinishedHandler", () => {
       new NoopLogger(),
     );
     const { deployment, event } = createDeployment({ status: "succeeded" });
-    await deployments.upsert(
+    await deployments.insertOne(
       toRepositoryContext(context),
       deployment,
       UpsertDeploymentSpec.fromDeployment(deployment),
@@ -347,7 +347,7 @@ describe("MarkServerAppliedRouteStatusOnDeploymentFinishedHandler", () => {
       errorMessage: "Public route failed",
       retryable: true,
     });
-    await deployments.upsert(
+    await deployments.insertOne(
       toRepositoryContext(context),
       deployment,
       UpsertDeploymentSpec.fromDeployment(deployment),

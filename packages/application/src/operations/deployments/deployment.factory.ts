@@ -35,6 +35,7 @@ export class DeploymentFactory {
     resource: Resource;
     runtimePlan: RuntimePlan;
     environmentSnapshot: EnvironmentSnapshot;
+    supersedesDeploymentId?: DeploymentId;
   }): Result<DeploymentAggregate> {
     const { clock, idGenerator } = this;
 
@@ -52,6 +53,9 @@ export class DeploymentFactory {
         runtimePlan: input.runtimePlan,
         environmentSnapshot: input.environmentSnapshot,
         createdAt,
+        ...(input.supersedesDeploymentId
+          ? { supersedesDeploymentId: input.supersedesDeploymentId }
+          : {}),
       });
     });
   }

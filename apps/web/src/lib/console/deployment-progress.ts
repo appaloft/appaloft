@@ -31,6 +31,7 @@ const deploymentStatusPhase = {
   planning: "plan",
   planned: "plan",
   running: "deploy",
+  "cancel-requested": "deploy",
   succeeded: "verify",
   failed: "verify",
   canceled: "deploy",
@@ -42,6 +43,7 @@ const deploymentStatusProgressStatus = {
   planning: "running",
   planned: "succeeded",
   running: "running",
+  "cancel-requested": "running",
   succeeded: "succeeded",
   failed: "failed",
   canceled: "failed",
@@ -247,7 +249,7 @@ export function progressEventsFromDeployment(
       level:
         deployment.status === "failed"
           ? "error"
-          : deployment.status === "canceled"
+          : deployment.status === "canceled" || deployment.status === "cancel-requested"
             ? "warn"
             : "info",
       message: deployment.status,

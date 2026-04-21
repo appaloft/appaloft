@@ -51,6 +51,7 @@ const nonTerminalDeploymentStatuses = new Set<DeploymentSummary["status"]>([
   "planning",
   "planned",
   "running",
+  "cancel-requested",
 ]);
 
 function compareCreatedAtDesc(left: DeploymentSummary, right: DeploymentSummary): number {

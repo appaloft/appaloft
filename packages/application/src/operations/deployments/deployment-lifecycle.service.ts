@@ -1,5 +1,6 @@
 import {
   type Deployment,
+  type DeploymentId,
   DeploymentLogEntry,
   DeploymentPhaseValue,
   type DomainError,
@@ -51,6 +52,39 @@ export class DeploymentLifecycleService {
       const startedAt = yield* StartedAt.create(clock.now());
       const startResult = deployment.start(startedAt);
       yield* startResult;
+      return ok(undefined);
+    });
+  }
+
+  requestCancellationForSupersede(
+    deployment: Deployment,
+    supersededByDeploymentId: DeploymentId,
+  ): Result<void> {
+    const { clock } = this;
+
+    return safeTry(function* () {
+      const requestedAt = yield* StartedAt.create(clock.now());
+      const requestResult = deployment.requestCancellation(requestedAt, {
+        supersededByDeploymentId,
+      });
+      yield* requestResult;
+      return ok(undefined);
+    });
+  }
+
+  cancelForSupersede(
+    deployment: Deployment,
+    supersededByDeploymentId: DeploymentId,
+    logs: DeploymentLogEntry[] = [],
+  ): Result<void> {
+    const { clock } = this;
+
+    return safeTry(function* () {
+      const finishedAt = yield* FinishedAt.create(clock.now());
+      const cancelResult = deployment.cancel(finishedAt, logs, {
+        supersededByDeploymentId,
+      });
+      yield* cancelResult;
       return ok(undefined);
     });
   }

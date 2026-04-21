@@ -41,6 +41,7 @@ import {
   InMemoryEdgeProxyProviderRegistry,
   type IntegrationAuthPort,
   QueryBus,
+  RepositoryBackedDeploymentExecutionGuard,
   type ResourceAccessFailureRendererTarget,
   type ServerAppliedRouteDesiredStateRecord,
   ServerAppliedRouteStateByTargetSpec,
@@ -822,6 +823,9 @@ export function registerRuntimeDependencies(
         ),
     ),
   });
+  container.register(tokens.deploymentExecutionGuard, {
+    useClass: RepositoryBackedDeploymentExecutionGuard,
+  });
   container.register(tokens.runtimeTargetBackendRegistry, {
     useFactory: instanceCachingFactory((dependencyContainer) =>
       createDefaultRuntimeTargetBackendRegistry({
@@ -832,6 +836,7 @@ export function registerRuntimeDependencies(
           dependencyContainer.resolve(tokens.integrationAuthPort),
           dependencyContainer.resolve(tokens.edgeProxyProviderRegistry),
           input.resourceAccessFailureRenderer,
+          dependencyContainer.resolve(tokens.deploymentExecutionGuard),
         ),
         sshBackend: new SshExecutionBackend(
           join(input.config.dataDir, "runtime"),
@@ -842,6 +847,7 @@ export function registerRuntimeDependencies(
           dependencyContainer.resolve(tokens.edgeProxyProviderRegistry),
           input.config.remoteRuntimeRoot,
           input.resourceAccessFailureRenderer,
+          dependencyContainer.resolve(tokens.deploymentExecutionGuard),
         ),
       }),
     ),

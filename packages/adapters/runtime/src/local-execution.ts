@@ -5,6 +5,7 @@ import { dirname, resolve } from "node:path";
 import {
   deploymentProgressSteps,
   type AppLogger,
+  type DeploymentExecutionGuard,
   type DeploymentProgressReporter,
   type EdgeProxyProviderRegistry,
   type ExecutionBackend,
@@ -153,6 +154,12 @@ function deploymentEnv(
   }
 
   return env;
+}
+
+function supersededDeploymentIdsForCleanup(input: {
+  supersedesDeploymentId?: { value: string };
+}): string[] {
+  return input.supersedesDeploymentId ? [input.supersedesDeploymentId.value] : [];
 }
 
 async function reservePort(preferred?: number): Promise<number> {
@@ -524,6 +531,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
     private readonly integrationAuthPort?: IntegrationAuthPort,
     private readonly edgeProxyProviderRegistry?: EdgeProxyProviderRegistry,
     private readonly resourceAccessFailureRenderer?: () => ResourceAccessFailureRendererTarget | undefined,
+    private readonly deploymentExecutionGuard?: DeploymentExecutionGuard,
   ) {}
 
   private report(
@@ -577,6 +585,37 @@ export class LocalExecutionBackend implements ExecutionBackend {
 
     logs.push(phaseLog(input.phase, input.line, input.level, "application"));
     return input.persistedCount + 1;
+  }
+
+  private async ensureExecutionStillOwned(
+    context: ExecutionContext,
+    deployment: Deployment,
+    input: { phase: LogPhase; step: string },
+  ): Promise<Result<void>> {
+    if (!this.deploymentExecutionGuard) {
+      return ok(undefined);
+    }
+
+    const decision = await this.deploymentExecutionGuard.shouldContinue(context, deployment);
+    if (decision.isErr()) {
+      return decision.map(() => undefined);
+    }
+
+    if (decision.value.allowed) {
+      return ok(undefined);
+    }
+
+    return err(
+      domainError.conflict("Deployment execution was superseded by a newer deployment", {
+        phase: "runtime-execution",
+        step: input.step,
+        deploymentId: deployment.toState().id.value,
+        ...(decision.value.supersededByDeploymentId
+          ? { supersededByDeploymentId: decision.value.supersededByDeploymentId }
+          : {}),
+        causeCode: "deployment_execution_superseded",
+      }),
+    );
   }
 
   private pushCommandOutput(
@@ -1478,6 +1517,14 @@ export class LocalExecutionBackend implements ExecutionBackend {
       message: "Docker package is ready",
     });
 
+    const deployOwnershipResult = await this.ensureExecutionStillOwned(context, deployment, {
+      phase: "deploy",
+      step: "before-deploy",
+    });
+    if (deployOwnershipResult.isErr()) {
+      return deployOwnershipResult.map(() => ({ deployment }));
+    }
+
     const accessRoutes = state.runtimePlan.execution.accessRoutes ?? [];
     const proxyBootstrapResult = this.edgeProxyProviderRegistry
       ? await createEdgeProxyEnsurePlan({
@@ -1604,10 +1651,11 @@ export class LocalExecutionBackend implements ExecutionBackend {
     }
 
     const dockerCommandBuilder = RuntimeCommandBuilder.docker();
+    const supersededDeploymentIds = supersededDeploymentIdsForCleanup(state);
     const removeSupersededResourceContainersSpec =
       dockerCommandBuilder.removeResourceContainers({
         resourceId: state.resourceId.value,
-        currentContainerName: containerName,
+        deploymentIds: supersededDeploymentIds,
       });
     runSyncCommand({
       command: renderRuntimeCommandString(
@@ -1620,7 +1668,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
       cwd: workdir,
       env,
     });
-    if (usesDirectHostPort) {
+    if (usesDirectHostPort && supersededDeploymentIds.length > 0) {
       runSyncCommand({
         command: renderRuntimeCommandString(removeSupersededResourceContainersSpec, {
           quote: shellQuote,
@@ -2003,7 +2051,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
       status: "succeeded",
       message,
     });
-    if (!usesDirectHostPort) {
+    if (!usesDirectHostPort && supersededDeploymentIds.length > 0) {
       const cleanup = runSyncCommand({
         command: renderRuntimeCommandString(removeSupersededResourceContainersSpec, {
           quote: shellQuote,
@@ -2067,6 +2115,13 @@ export class LocalExecutionBackend implements ExecutionBackend {
         ? resolve(workdir, "docker-compose.yml")
         : (state.runtimePlan.execution.composeFile ?? state.runtimePlan.source.locator);
     logs.push(phaseLog("plan", `Compose working directory: ${workdir}`));
+    const deployOwnershipResult = await this.ensureExecutionStillOwned(context, deployment, {
+      phase: "deploy",
+      step: "before-compose-up",
+    });
+    if (deployOwnershipResult.isErr()) {
+      return deployOwnershipResult.map(() => ({ deployment }));
+    }
     const upCommand = renderRuntimeCommandString(
       RuntimeCommandBuilder.docker().composeUp({
         composeFile,

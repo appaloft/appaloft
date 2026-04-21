@@ -74,7 +74,7 @@ describe("runtime command builder", () => {
       }),
       docker.removeResourceContainers({
         resourceId: "res_1",
-        currentContainerName: "appaloft-dep_1",
+        deploymentIds: ["dep_old_1"],
       }),
       docker.runContainer({
         image: "app:latest",
@@ -87,6 +87,7 @@ describe("runtime command builder", () => {
 
     expect(command).toContain("docker rm -f 'appaloft-dep_1' >/dev/null 2>&1 || true");
     expect(command).toContain("docker ps -aq --filter 'label=appaloft.resource-id=res_1'");
+    expect(command).toContain("--filter 'label=appaloft.deployment-id=dep_old_1'");
     expect(command).toContain("docker run -d --name 'appaloft-dep_1' -p 8080:8080 'app:latest'");
   });
 

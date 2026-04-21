@@ -28,12 +28,12 @@ describe("docker container command helpers", () => {
   test("scopes cleanup to containers for the same resource", () => {
     const command = dockerRemoveResourceContainersCommand({
       resourceId: "res_first",
-      currentContainerName: "appaloft-dep_current",
+      deploymentIds: ["dep_previous"],
       quote,
     });
 
     expect(command).toContain("--filter 'label=appaloft.resource-id=res_first'");
-    expect(command).toContain("!= 'appaloft-dep_current'");
+    expect(command).toContain("--filter 'label=appaloft.deployment-id=dep_previous'");
     expect(command).not.toContain("publish=3000");
   });
 

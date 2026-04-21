@@ -156,8 +156,15 @@ application port.
 
 Cleanup and replacement are resource-scoped:
 
+- write-side deployment admission must enforce the invariant that at most one non-terminal
+  deployment attempt exists for a resource at a time; this guard must be atomic at durable-state
+  creation time, not only a best-effort pre-read in application code;
 - a new deployment may replace older runtime instance(s) for the same resource after the adapter's
   chosen rollout strategy says it is safe;
+- when a new deployment is accepted as a replacement candidate, durable deployment state should
+  record the explicit same-resource runtime-owning deployment attempt it supersedes when one
+  exists; cleanup must target that explicit superseded attempt identity rather than every other
+  runtime instance with the same resource label;
 - reverse-proxy and route-mediated rollout strategies must keep the previous successful
   same-resource runtime serving until the replacement candidate passes required health, route, and
   public verification gates;

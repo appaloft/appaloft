@@ -151,18 +151,24 @@ function renderDockerRemoveResourceContainersCommand(
   spec: DockerRemoveResourceContainersCommandSpec,
   options: RuntimeCommandRenderOptions,
 ): string {
-  const resourceLabelFilter = options.quote(`label=appaloft.resource-id=${spec.resourceId.value}`);
-  const currentContainerName = options.quote(spec.currentContainerName.value);
+  if (spec.deploymentIds.length === 0) {
+    return "";
+  }
 
-  return [
-    `docker ps -aq --filter ${resourceLabelFilter}`,
-    "| while read -r container_id; do",
-    `container_name="$(docker inspect -f '{{.Name}}' "$container_id" 2>/dev/null | sed 's#^/##')";`,
-    `if [ "$container_name" != ${currentContainerName} ]; then`,
-    'docker rm -f "$container_id";',
-    "fi;",
-    "done",
-  ].join(" ");
+  const resourceLabelFilter = options.quote(`label=appaloft.resource-id=${spec.resourceId.value}`);
+  return spec.deploymentIds
+    .map((deploymentId) => {
+      const deploymentLabelFilter = options.quote(
+        `label=appaloft.deployment-id=${deploymentId.value}`,
+      );
+      return [
+        `docker ps -aq --filter ${resourceLabelFilter} --filter ${deploymentLabelFilter}`,
+        "| while read -r container_id; do",
+        'docker rm -f "$container_id";',
+        "done",
+      ].join(" ");
+    })
+    .join(" && ");
 }
 
 function renderDockerInspectCommand(

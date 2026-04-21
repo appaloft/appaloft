@@ -113,16 +113,27 @@ The command must perform or delegate these admission steps before returning acce
 3. Resolve project, environment, resource, server, and destination.
 4. Reject inconsistent context, including cross-project/environment/resource/destination mismatches.
 5. Reject archived resources with `resource_archived`.
-6. Reject deployment when the latest deployment for the same resource is non-terminal.
-7. Resolve the source descriptor from `ResourceSourceBinding`.
-8. Resolve runtime plan configuration from `ResourceRuntimeProfile`.
-9. Resolve network endpoint configuration from `ResourceNetworkProfile`.
-10. Create an immutable environment snapshot.
-11. Resolve default generated and durable access route snapshots from resource/domain/server/policy state when the resource requires public reverse-proxy access.
-12. Resolve the runtime plan, Docker/OCI artifact requirements, and network/access snapshots.
-13. Resolve that the selected deployment target/destination has a runtime target backend with the
+6. If the latest same-resource deployment is active, resolve the supersede branch:
+   - `created`, `planning`, and `planned` attempts are canceled immediately and record
+     `supersededByDeploymentId`;
+   - `running` attempts enter `cancel-requested`, must be canceled through the runtime backend, and
+     then are marked `canceled` with `supersededByDeploymentId`;
+   - if supersede cannot complete safely, reject the later request with a deployment-specific
+     conflict branch.
+7. The write side must still enforce the single active same-resource invariant atomically when
+   durable deployment state is created so a concurrent submit cannot bypass the guard through a
+   read/write race.
+8. Resolve the source descriptor from `ResourceSourceBinding`.
+9. Resolve runtime plan configuration from `ResourceRuntimeProfile`.
+10. Resolve network endpoint configuration from `ResourceNetworkProfile`.
+11. Create an immutable environment snapshot.
+12. Resolve default generated and durable access route snapshots from resource/domain/server/policy state when the resource requires public reverse-proxy access.
+13. Resolve the runtime plan, Docker/OCI artifact requirements, and network/access snapshots.
+14. Resolve that the selected deployment target/destination has a runtime target backend with the
     required capabilities.
-14. Create durable deployment state.
+15. Create durable deployment state.
+    When a previous same-resource runtime-owning deployment exists, the new deployment state must
+    record the explicit superseded deployment id that cleanup and replacement logic may touch.
 15. Publish or record `deployment-requested`.
 16. Return `ok({ id })`.
 
@@ -256,6 +267,12 @@ Runtime replacement and cleanup must be resource-scoped. A new deployment may re
 runtime instances belonging to the same resource after the adapter strategy allows it. It must not
 stop another resource because the other resource shares an internal port, image name, Compose
 service name, or proxy label shape.
+
+Replacement targeting must also be attempt-scoped. When deployment admission identifies a previous
+same-resource runtime-owning deployment as the replacement target, the new deployment snapshot or
+durable state must preserve that superseded deployment identity. Runtime cleanup must remove only
+that explicitly superseded attempt's runtime identity, not an arbitrary "other container for the
+same resource" scan.
 
 For reverse-proxy or otherwise route-mediated deployments, the adapter strategy must preserve the
 last-known-good runtime for the same resource until the replacement attempt passes the required

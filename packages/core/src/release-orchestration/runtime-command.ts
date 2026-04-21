@@ -96,7 +96,7 @@ export interface DockerRemoveContainerCommandSpec {
 export interface DockerRemoveResourceContainersCommandSpec {
   kind: "docker-remove-resource-containers";
   resourceId: DisplayNameText;
-  currentContainerName: DisplayNameText;
+  deploymentIds: readonly DisplayNameText[];
 }
 
 export interface DockerInspectCommandSpec {

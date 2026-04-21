@@ -341,6 +341,10 @@ Current boundary:
   [ADR-016: Deployment Command Surface Reset](./decisions/ADR-016-deployment-command-surface-reset.md).
 - `deployments.create` accepts deployment context references only: `projectId`, `environmentId`,
   `resourceId`, `serverId`, and optional `destinationId`
+- when a same-resource active deployment already exists, `deployments.create` may supersede that
+  prior attempt through internal cancellation plus durable execution fencing; this does not
+  reintroduce a public `deployments.cancel` command and is governed by
+  [ADR-027: Deployment Supersede And Execution Fencing](./decisions/ADR-027-deployment-supersede-and-execution-fencing.md)
 - `deployments.cleanup-preview` accepts only a trusted preview-scoped source fingerprint and must
   not expand into generic cancel, redeploy, rollback, or resource delete behavior. It removes
   current and stale preview runtime state for the same preview fingerprint, preview route desired

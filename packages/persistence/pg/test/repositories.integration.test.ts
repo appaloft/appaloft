@@ -265,11 +265,20 @@ describe("postgres persistence integration", () => {
       }),
     );
 
-    await deploymentRepository.upsert(
-      context,
-      deployment,
-      UpsertDeploymentSpec.fromDeployment(deployment),
-    );
+    (
+      await deploymentRepository.insertOne(
+        context,
+        deployment,
+        UpsertDeploymentSpec.fromDeployment(deployment),
+      )
+    )._unsafeUnwrap();
+    (
+      await deploymentRepository.updateOne(
+        context,
+        deployment,
+        UpsertDeploymentSpec.fromDeployment(deployment),
+      )
+    )._unsafeUnwrap();
 
     const environments = await environmentReadModel.list(context, `prj_${suffix}`);
     const deployments = await deploymentReadModel.list(context, { projectId: `prj_${suffix}` });

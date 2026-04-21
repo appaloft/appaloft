@@ -1504,5 +1504,11 @@ export function rehydrateDeploymentRow(row: Selectable<Database["deployments"]>)
     ...(row.rollback_of_deployment_id
       ? { rollbackOfDeploymentId: DeploymentId.rehydrate(row.rollback_of_deployment_id) }
       : {}),
+    ...(row.supersedes_deployment_id
+      ? { supersedesDeploymentId: DeploymentId.rehydrate(row.supersedes_deployment_id) }
+      : {}),
+    ...(row.superseded_by_deployment_id
+      ? { supersededByDeploymentId: DeploymentId.rehydrate(row.superseded_by_deployment_id) }
+      : {}),
   };
 }

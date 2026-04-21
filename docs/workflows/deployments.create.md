@@ -58,6 +58,23 @@ commit so a redeploy of a moving branch can be distinguished from the previous a
 
 Retry is an explicit retry command or job that creates a new deployment attempt.
 
+Write-side admission must preserve one active deployment attempt per resource as an atomic durable
+invariant. Entry workflows may pre-read latest deployment state to give fast feedback, but durable
+state creation must still reject a concurrent submit that loses the race to another accepted
+non-terminal attempt.
+
+When a previous same-resource attempt is still active, `deployments.create` owns the supersede
+branch:
+
+- non-running attempts are canceled before the new attempt is admitted;
+- running attempts are marked `cancel-requested`, canceled through the runtime backend, then marked
+  `canceled` before the new attempt is admitted;
+- the superseded attempt records `supersededByDeploymentId`;
+- runtime execution must stop at phase boundaries when durable supersede/cancel state says the
+  attempt no longer owns execution;
+- a supersede cancellation failure rejects the later request instead of silently allowing both
+  attempts to continue.
+
 ## Web Workflow
 
 Web may:
@@ -200,6 +217,11 @@ Runtime adapters must not implement reverse-proxy rollout by globally removing w
 publish the same application port. A new deployment attempt may replace an older runtime instance
 only for the same resource after the redeploy guard allows a new terminal attempt.
 
+Replacement must be explicit about which prior attempt is being superseded. Deployment admission
+should record the previous same-resource runtime-owning deployment attempt that remains eligible
+for cleanup after the new candidate succeeds. Cleanup must target that superseded attempt identity,
+not every runtime instance that shares the same resource label.
+
 For reverse-proxy resources, replacement is candidate-first. The runtime adapter must keep the
 previous successful runtime instance for the same resource serving until the replacement candidate
 has passed the required apply, internal health, proxy route realization, and public route
@@ -230,6 +252,13 @@ direct-port rollout strategy and must never expand into cross-resource cleanup.
 | Proxy route realized | Runtime adapter configures generated or durable access route for this attempt; progress/read models expose route state. |
 | Terminal success | `deployment-succeeded`; deployment status is succeeded. |
 | Terminal failure | `deployment-failed`; deployment status is failed. |
+
+The accepted deployment state should include:
+
+- the immutable environment snapshot and runtime plan snapshot for this attempt;
+- the current attempt status;
+- when applicable, the explicit `supersedesDeploymentId` for the previous same-resource
+  runtime-owning deployment that may be cleaned up after terminal success.
 
 ## Current Implementation Notes And Migration Gaps
 

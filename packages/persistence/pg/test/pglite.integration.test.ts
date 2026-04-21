@@ -27,7 +27,6 @@ import {
   ResourceProxyConfigurationPreviewQuery,
   ResourceProxyConfigurationPreviewQueryService,
   ResourceRuntimeLogsQueryService,
-  type ServerAppliedRouteDesiredStateRecord,
   ServerAppliedRouteStateByRouteSetIdSpec,
   ServerAppliedRouteStateBySourceFingerprintSpec,
   ServerAppliedRouteStateByTargetSpec,
@@ -1066,11 +1065,20 @@ describe("pglite persistence integration", () => {
         }),
       );
 
-      await deploymentRepository.upsert(
-        context,
-        deployment,
-        UpsertDeploymentSpec.fromDeployment(deployment),
-      );
+      (
+        await deploymentRepository.insertOne(
+          context,
+          deployment,
+          UpsertDeploymentSpec.fromDeployment(deployment),
+        )
+      )._unsafeUnwrap();
+      (
+        await deploymentRepository.updateOne(
+          context,
+          deployment,
+          UpsertDeploymentSpec.fromDeployment(deployment),
+        )
+      )._unsafeUnwrap();
       await database.close();
 
       const reopened = await createDatabase({
