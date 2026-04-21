@@ -147,8 +147,11 @@ Required top-level behavior:
   available.
 - `healthPolicy` reports whether a health check is enabled, missing, or unsupported.
 - `publicAccess` reports the current resource URL being checked. Durable resource domain bindings
-  take precedence over generated default access, and recent safe edge access failure diagnostics may
-  explain why a current route failed at the gateway.
+  take precedence over server-applied config domains, and server-applied config domains take
+  precedence over generated default access. When a durable domain binding exists but is not yet
+  ready, `publicAccess` stays bound to that durable domain as `status = "not-ready"` instead of
+  silently falling back to a generated or server-applied route. Recent safe edge access failure
+  diagnostics may explain why the selected current route failed at the gateway.
 - `proxy` reports route readiness and provider key when the resource uses reverse-proxy exposure.
 - `sourceErrors` records per-source observation failures without failing the whole query when the
   resource can still be identified.
@@ -198,9 +201,13 @@ Missing policy:
 Public access checks target the resource's current route:
 
 1. ready durable domain binding for the resource/destination/target/path;
-2. latest durable domain route in `ResourceAccessSummary`;
-3. latest generated default route;
-4. planned generated route only when no deployment has realized a route yet.
+2. non-ready durable domain binding for the resource/destination/target/path when no ready durable
+   route exists; the section reports `status = "not-ready"` and
+   `reasonCode = "resource_domain_binding_not_ready"`;
+3. latest durable domain route in `ResourceAccessSummary`;
+4. latest server-applied config domain route in `ResourceAccessSummary`;
+5. latest generated default route;
+6. planned generated route only when no deployment has realized a route yet.
 
 The query must not treat deployment-scoped route snapshots as domain ownership. A deployment
 snapshot records which route was used by that attempt; the current route belongs to resource access
@@ -239,10 +246,9 @@ deployment context, runtime lifecycle from latest deployment state, resource acc
 route status, and bounded live HTTP/public probes when `mode = "live"` can resolve a safe URL. It
 does not mark a successful deployment as healthy without a configured/current health observation.
 
-Provider-native runtime inspection, Docker health-state inspection, command health checks,
-durable-domain readiness composition from domain binding records, and scheduled health summary
-persistence are still future work. Unsupported live inspection sources are reported as source
-errors inside `ok(ResourceHealthSummary)`.
+Provider-native runtime inspection, Docker health-state inspection, command health checks, and
+scheduled health summary persistence are still future work. Unsupported live inspection sources
+are reported as source errors inside `ok(ResourceHealthSummary)`.
 
 Runtime deployment verification still checks local loopback or Docker container reachability during
 `deployments.create` execution and records deployment success/failure. That remains

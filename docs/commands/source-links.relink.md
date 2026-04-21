@@ -119,8 +119,9 @@ Indexes must support:
 - reverse lookup by `resource_id` for `resources.delete` deletion guards.
 
 The table must not cascade-delete resources. A link pointing at a resource is a retained identity
-record and must be reported as a `source-link` deletion blocker until a future explicit unlink or
-relink behavior changes that record.
+record and must be reported as a `source-link` deletion blocker until an explicit unlink/relink
+behavior, such as `deployments.cleanup-preview` for preview-scoped links or `source-links.relink`,
+changes that record.
 
 PG/PGlite source-link persistence must be implemented inside `packages/persistence/pg`; no Kysely
 or Postgres driver types may leak into `application`, CLI, shell business logic, or core.

@@ -162,6 +162,7 @@ Required coverage follows [Resource Health Test Matrix](../testing/resource-heal
 - running with missing health policy is `unknown`;
 - HTTP policy default resolution from `ResourceNetworkProfile.internalPort`;
 - durable domain binding precedes generated route;
+- non-ready durable domain binding degrades public access before generated or server-applied fallback;
 - proxy route missing or not ready;
 - runtime inspection source failure as partial summary;
 - API/oRPC uses the shared query schema;
@@ -202,14 +203,14 @@ Implemented scope:
 
 Current implementation reads latest deployment context, resource-owned health policy, runtime
 lifecycle inferred from deployment state, configured deployment snapshot health path as fallback,
-resource access summary, and proxy route status. It deliberately keeps `overall = "unknown"` for a
-succeeded deployment when no configured/current health observation proves health.
+resource access summary, domain binding state, and proxy route status. It deliberately keeps
+`overall = "unknown"` for a succeeded deployment when no configured/current health observation
+proves health.
 
 Still deferred:
 
 - provider-native runtime/container inspection and Docker health state;
 - command health checks;
-- durable-domain readiness composition from domain binding records inside the health query;
 - background/scheduled health observation projection.
 - edge request failure diagnostic source composition using `resource_access_*` codes.
 

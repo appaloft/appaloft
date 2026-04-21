@@ -157,6 +157,7 @@ export interface SourceLinkStore {
     expectedCurrentResourceId?: string;
     reason?: string;
   }): Promise<Result<SourceLinkRecord>>;
+  unlink(sourceFingerprint: string): Promise<Result<boolean>>;
 }
 
 export interface ProjectRepository {
@@ -400,6 +401,7 @@ export interface ServerAppliedRouteStateStore extends ServerAppliedRouteDesiredS
     providerKey?: string;
     proxyKind?: EdgeProxyKind;
   }): Promise<Result<ServerAppliedRouteDesiredStateRecord | null>>;
+  deleteDesired(target: ServerAppliedRouteDesiredStateTarget): Promise<Result<boolean>>;
 }
 
 export interface CertificateRepository {
@@ -673,6 +675,7 @@ export interface EdgeProxyRouteInput {
   tlsMode: TlsMode;
   targetPort?: number;
   providerKey?: string;
+  source?: "generated-default" | "domain-binding" | "deployment-snapshot" | "server-applied";
   routeBehavior?: "serve" | "redirect";
   redirectTo?: string;
   redirectStatus?: 301 | 302 | 307 | 308;
@@ -1907,6 +1910,7 @@ export interface RequestedDeploymentConfig {
   exposureMode?: ResourceExposureMode;
   upstreamProtocol?: ResourceNetworkProtocol;
   accessContext?: RequestedDeploymentAccessContext;
+  runtimeMetadata?: Record<string, string>;
   accessRouteMetadata?: Record<string, string>;
   proxyKind?: EdgeProxyKind;
   domains?: string[];

@@ -629,6 +629,35 @@ describe("CreateDeploymentUseCase", () => {
     expect(command._unsafeUnwrapErr().code).toBe("validation_error");
   });
 
+  test("adds runtime context metadata for workload diagnostics", async () => {
+    const runtimePlanResolver = new CapturingRuntimePlanResolver();
+    const { context, createDeploymentInput, createDeploymentUseCase } =
+      await createDeploymentFixture(new ExplicitContextRequiredPolicy(), {
+        runtimePlanResolver,
+      });
+
+    const result = await createDeploymentUseCase.execute(context, createDeploymentInput);
+
+    expect(result.isOk()).toBe(true);
+    expect(runtimePlanResolver.input?.requestedDeployment.runtimeMetadata).toMatchObject({
+      "context.projectName": "Demo",
+      "context.projectSlug": "demo",
+      "context.environmentName": "production",
+      "context.environmentKind": "production",
+      "context.resourceName": "web",
+      "context.resourceSlug": "web",
+      "context.resourceKind": "application",
+      "context.destinationName": "default",
+      "context.destinationKind": "generic",
+      "context.serverName": "demo-server",
+      "context.serverProviderKey": "generic-ssh",
+      "context.serverTargetKind": "single-server",
+    });
+    expect(runtimePlanResolver.input?.requestedDeployment.runtimeMetadata?.["preview.id"]).toBe(
+      undefined,
+    );
+  });
+
   test("[RES-PROFILE-ARCHIVE-004] rejects deployment creation for archived resources", async () => {
     const {
       context,
@@ -994,7 +1023,7 @@ describe("CreateDeploymentUseCase", () => {
     });
   });
 
-  test("[EDGE-PROXY-ROUTE-005] resolves server-applied config domains into deployment planning input", async () => {
+  test("[DEF-ACCESS-ROUTE-013][EDGE-PROXY-ROUTE-005] resolves server-applied config domains into deployment planning input", async () => {
     const runtimePlanResolver = new CapturingRuntimePlanResolver();
     const desiredRoutes = new StaticServerAppliedRouteDesiredStateReader({
       routeSetId: "prj_demo:env_demo:res_demo:srv_demo:dst_demo",
@@ -1059,6 +1088,121 @@ describe("CreateDeploymentUseCase", () => {
         "access.routeCount": "2",
         "access.routeGroupCount": "1",
         "access.sourceFingerprint": "local-folder:demo",
+      },
+    });
+  });
+
+  test("[DEF-ACCESS-ROUTE-004] durable domain binding takes precedence over server-applied config domain", async () => {
+    const runtimePlanResolver = new CapturingRuntimePlanResolver();
+    const desiredRoutes = new StaticServerAppliedRouteDesiredStateReader({
+      routeSetId: "prj_demo:env_demo:res_demo:srv_demo:dst_demo",
+      projectId: "prj_demo",
+      environmentId: "env_demo",
+      resourceId: "res_demo",
+      serverId: "srv_demo",
+      destinationId: "dst_demo",
+      domains: [
+        {
+          host: "server-applied.example.test",
+          pathPrefix: "/",
+          tlsMode: "auto",
+        },
+      ],
+      status: "desired",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    });
+    const routeBindingReader = new StaticDomainRouteBindingReader([
+      {
+        id: "dmb_ready",
+        domainName: "durable.example.test",
+        pathPrefix: "/",
+        proxyKind: "traefik",
+        tlsMode: "disabled",
+        status: "ready",
+        createdAt: "2026-01-01T00:02:00.000Z",
+      },
+    ]);
+    const { context, createDeploymentInput, createDeploymentUseCase } =
+      await createDeploymentFixture(new ExplicitContextRequiredPolicy(), {
+        runtimePlanResolver,
+        edgeProxyKind: "traefik",
+        domainRouteBindingReader: routeBindingReader,
+        serverAppliedRouteDesiredStateReader: desiredRoutes,
+      });
+
+    const result = await createDeploymentUseCase.execute(context, createDeploymentInput);
+
+    expect(result.isOk()).toBe(true);
+    expect(runtimePlanResolver.input?.requestedDeployment).toMatchObject({
+      proxyKind: "traefik",
+      domains: ["durable.example.test"],
+      pathPrefix: "/",
+      tlsMode: "disabled",
+      accessRoutes: [
+        {
+          proxyKind: "traefik",
+          domains: ["durable.example.test"],
+          pathPrefix: "/",
+          tlsMode: "disabled",
+        },
+      ],
+      accessRouteMetadata: {
+        "access.routeSource": "durable-domain-binding",
+        "access.domainBindingId": "dmb_ready",
+        "access.domainBindingStatus": "ready",
+        "access.hostname": "durable.example.test",
+        "access.scheme": "http",
+      },
+    });
+  });
+
+  test("[DEF-ACCESS-ROUTE-013] non-deployable durable binding does not block server-applied route", async () => {
+    const runtimePlanResolver = new CapturingRuntimePlanResolver();
+    const desiredRoutes = new StaticServerAppliedRouteDesiredStateReader({
+      routeSetId: "prj_demo:env_demo:res_demo:srv_demo:dst_demo",
+      projectId: "prj_demo",
+      environmentId: "env_demo",
+      resourceId: "res_demo",
+      serverId: "srv_demo",
+      destinationId: "dst_demo",
+      domains: [
+        {
+          host: "server-applied.example.test",
+          pathPrefix: "/",
+          tlsMode: "disabled",
+        },
+      ],
+      status: "desired",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    });
+    const routeBindingReader = new StaticDomainRouteBindingReader([
+      {
+        id: "dmb_pending",
+        domainName: "pending.example.test",
+        pathPrefix: "/",
+        proxyKind: "traefik",
+        tlsMode: "disabled",
+        status: "pending_verification",
+        createdAt: "2026-01-01T00:02:00.000Z",
+      },
+    ]);
+    const { context, createDeploymentInput, createDeploymentUseCase } =
+      await createDeploymentFixture(new ExplicitContextRequiredPolicy(), {
+        runtimePlanResolver,
+        edgeProxyKind: "traefik",
+        domainRouteBindingReader: routeBindingReader,
+        serverAppliedRouteDesiredStateReader: desiredRoutes,
+      });
+
+    const result = await createDeploymentUseCase.execute(context, createDeploymentInput);
+
+    expect(result.isOk()).toBe(true);
+    expect(runtimePlanResolver.input?.requestedDeployment).toMatchObject({
+      proxyKind: "traefik",
+      domains: ["server-applied.example.test"],
+      accessRouteMetadata: {
+        "access.routeSource": "server-applied-config-domain",
+        "access.hostname": "server-applied.example.test",
       },
     });
   });

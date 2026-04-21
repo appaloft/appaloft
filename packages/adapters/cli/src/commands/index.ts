@@ -2,7 +2,7 @@ import { Command as EffectCommand } from "@effect/cli";
 
 import { certificateCommand } from "./certificate.js";
 import { dbCommand } from "./db.js";
-import { deployCommand, deploymentsCommand, logsCommand } from "./deployment.js";
+import { deployCommand, deploymentsCommand, logsCommand, previewCommand } from "./deployment.js";
 import { domainBindingCommand } from "./domain-binding.js";
 import { envCommand } from "./environment.js";
 import { pluginsCommand, providersCommand } from "./integrations.js";
@@ -26,6 +26,7 @@ export const mainCommand = EffectCommand.make("appaloft").pipe(
     domainBindingCommand,
     certificateCommand,
     deploymentsCommand,
+    previewCommand,
     deployCommand,
     logsCommand,
     envCommand,

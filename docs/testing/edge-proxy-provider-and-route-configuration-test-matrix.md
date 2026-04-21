@@ -117,7 +117,7 @@ Then:
 | Test ID | Preferred automation | Case | Input | Expected result | Expected error | Expected sections |
 | --- | --- | --- | --- | --- | --- | --- |
 | EDGE-PROXY-QRY-001 | integration | Planned route before first deploy | `resourceId`, `routeScope = planned` | `ok`, status `planned` | None | Provider-rendered desired sections. |
-| EDGE-PROXY-QRY-002 | integration | Latest realized route | `resourceId`, `routeScope = latest` | `ok`, status `applied` or `stale` | None | Snapshot/provider sections. |
+| EDGE-PROXY-QRY-002 | integration | Latest current route | `resourceId`, `routeScope = latest`, with durable/server-applied/generated route state available | `ok`, status `applied`, `stale`, or `planned` | None | Provider sections render the selected current route using durable, server-applied, latest generated, then planned generated precedence; immutable deployment snapshot remains available through `deployment-snapshot`. |
 | EDGE-PROXY-QRY-003 | integration | Deployment snapshot | `resourceId`, `deploymentId`, `routeScope = deployment-snapshot` | `ok` | None | Immutable snapshot-based sections. |
 | EDGE-PROXY-QRY-004 | integration | No proxy route | Resource has no inbound route | `ok`, status `not-configured` | None | Empty sections. |
 | EDGE-PROXY-QRY-005 | integration | Missing provider | Provider key unavailable | `err` | `proxy_provider_unavailable` | None. |
@@ -143,6 +143,7 @@ Then:
 | SERVER-APPLIED-ROUTE-STATE-003 | integration | Applied/failed status writeback | Desired row exists and route realization succeeds or fails; one write uses a mismatched target/route-set id | Applied/failed safe metadata is persisted; mismatched write is rejected | `server_applied_route_state_conflict`, phase `proxy-route-realization` | `markApplied` and `markFailed` are separate writes and do not overwrite another route set. |
 | SERVER-APPLIED-ROUTE-STATE-004 | integration | Delete blocker from route state | Archived resource has a row in `server_applied_route_states` | `resources.delete` rejects before tombstone and reports `server-applied-route` | `resource_delete_blocked`, phase `resource-deletion-guard` | Blocker comes from PG route-state reverse lookup by `resource_id`; no route state is cascaded away. |
 | SERVER-APPLIED-ROUTE-STATE-005 | integration | Migration shape supports durable lookups | PG/PGlite migrations are applied | Table and indexes support exact lookup, fallback lookup, resource reverse lookup, and server diagnostics | None | Schema has no unsafe cascade from resource deletion to route state. |
+| SERVER-APPLIED-ROUTE-STATE-006 | integration | Explicit desired-state delete for preview cleanup | `deployments.cleanup-preview` or another explicit cleanup path targets a preview route row | Matching desired route state is deleted and unrelated route rows remain intact | None | Route cleanup is an explicit store operation; route state is not removed by unsafe cascade or implicit deploy mutation. |
 
 ## Current Implementation Notes And Migration Gaps
 
@@ -172,7 +173,7 @@ diagnostics. Real HTTPS public validation and provider-owned ACME history remain
 renderer, runtime planning, and proxy configuration query coverage for canonical redirect aliases.
 External runtime reload and public redirect probing remain e2e follow-up coverage.
 
-`SERVER-APPLIED-ROUTE-STATE-001` through `SERVER-APPLIED-ROUTE-STATE-005` have PG/PGlite
+`SERVER-APPLIED-ROUTE-STATE-001` through `SERVER-APPLIED-ROUTE-STATE-006` have PG/PGlite
 integration coverage in `packages/persistence/pg/test/pglite.integration.test.ts`.
 
 `EDGE-PROXY-PROVIDER-010` now has Traefik provider coverage for rendering the resource access

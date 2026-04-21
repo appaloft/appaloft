@@ -6,9 +6,17 @@ Accepted
 
 ## Decision
 
-Appaloft v1 keeps `deployments.create` as the only public deployment write command.
+Appaloft v1 keeps `deployments.create` as the only general deployment-attempt admission command and
+allows one additional narrow preview lifecycle maintenance command:
+`deployments.cleanup-preview`.
 
-Deployment read/query and observation surfaces remain available so users and agents can inspect the result of a deployment attempt. The deployment progress stream remains a transport for observing `deployments.create`; it is not a separate business command.
+Deployment read/query and observation surfaces remain available so users and agents can inspect the
+result of a deployment attempt. The deployment progress stream remains a transport for observing
+`deployments.create`; it is not a separate business command.
+
+`deployments.cleanup-preview` is not a generic cancel, rollback, redeploy, or resource-delete path.
+It is the explicit cleanup boundary for preview-scoped runtime, route desired state, and source
+link identity.
 
 The following deployment write commands are removed from the public operation surface until they are rebuilt through source-of-truth specs and implementation plans:
 
@@ -39,11 +47,15 @@ Several deployment operations were implemented before the current spec-driven wo
 | --- | --- | --- |
 | Keep all existing deployment commands | Preserve cancel, health check, redeploy, reattach, rollback while continuing resource-first work. | Rejected because these commands were not rebuilt under the current command/event/workflow/error/test contracts. |
 | Hide only Web and CLI actions | Keep API/application commands but remove visible affordances. | Rejected because hidden public operations still appear in operation catalog, oRPC contract, and tests. |
-| Reset deployment write surface to create-only | Keep `deployments.create` plus read/progress/log observation; remove the rest until rebuilt from specs. | Accepted. |
+| Reset deployment write surface to create plus explicit preview cleanup | Keep `deployments.create`, add narrow `deployments.cleanup-preview`, and remove the rest until rebuilt from specs. | Accepted. |
 
 ## Chosen Rule
 
-The operation catalog, API/oRPC router, CLI commands, Web console, application exports, application registrations, and tests must expose only `deployments.create` as a deployment write command.
+The operation catalog, CLI commands, application exports, application registrations, and tests must
+expose only these deployment write commands in the v1 surface:
+
+- `deployments.create`
+- `deployments.cleanup-preview`
 
 The following are still allowed:
 
@@ -53,7 +65,8 @@ The following are still allowed:
 - deployment detail/read-model pages
 - resource/project/server/environment/credential/variable commands required by the first deployment workflow
 
-Future reintroduction of cancel, health check, redeploy, reattach, rollback, or equivalent operations requires a new Spec Round covering:
+Future reintroduction of cancel, health check, redeploy, reattach, rollback, or equivalent
+operations requires a new Spec Round covering:
 
 - command spec;
 - workflow spec;
@@ -63,9 +76,16 @@ Future reintroduction of cancel, health check, redeploy, reattach, rollback, or 
 - implementation plan;
 - Web/API/CLI entrypoint contract.
 
+`deployments.cleanup-preview` is allowed only as a preview-scoped explicit cleanup operation keyed
+by trusted preview source identity. It must not expand into a generic deployment cancel/delete
+surface without its own ADR/spec work.
+
 ## Consequences
 
-- Users can create and observe deployments, but cannot cancel, redeploy, rollback, reattach, or manually run deployment health checks through public commands.
+- Users can create and observe deployments, and they can explicitly clean preview-scoped runtime
+  state through `deployments.cleanup-preview`.
+- Users still cannot cancel, redeploy, rollback, reattach, or manually run deployment health
+  checks through public commands.
 - Web UI must remove buttons and panels that dispatch removed commands.
 - CLI must remove top-level commands that dispatch removed deployment write commands.
 - oRPC/OpenAPI must remove removed command routes and client contract members.
@@ -75,6 +95,8 @@ Future reintroduction of cancel, health check, redeploy, reattach, rollback, or 
 ## Governed Specs
 
 - [Core Operations](../CORE_OPERATIONS.md)
+- [deployments.cleanup-preview command spec](../commands/deployments.cleanup-preview.md)
+- [deployments.cleanup-preview test matrix](../testing/deployments.cleanup-preview-test-matrix.md)
 - [deployments.create command spec](../commands/deployments.create.md)
 - [deployments.create workflow spec](../workflows/deployments.create.md)
 - [deployments.create test matrix](../testing/deployments.create-test-matrix.md)
@@ -88,7 +110,11 @@ Future reintroduction of cancel, health check, redeploy, reattach, rollback, or 
 
 ## Current Implementation Notes And Migration Gaps
 
-Public operation registrations and entrypoints for removed deployment write commands are pruned from the v1 Web/API/CLI/MCP-facing surface. Existing low-level runtime backend methods, core state-machine helpers, and persisted read-model fields may remain as internal or historical capabilities until future specs reintroduce public operations.
+Public operation registrations and entrypoints for removed deployment write commands are pruned from
+the v1 Web/API/CLI/MCP-facing surface except for the accepted preview-scoped
+`deployments.cleanup-preview` command. Existing low-level runtime backend methods, core
+state-machine helpers, and persisted read-model fields may remain as internal or historical
+capabilities until future specs reintroduce public operations.
 
 ## Open Questions
 

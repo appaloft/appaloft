@@ -114,8 +114,11 @@ Limitations are explicit:
 - no always-on Appaloft DNS observer;
 - no Appaloft-owned certificate retry scheduler after the process exits;
 - no team auth, central audit, or fleet visibility;
-- no automatic preview cleanup unless another runner or control plane is configured;
+- no preview cleanup retry/scheduler unless another runner or control plane is configured;
 - route and TLS repair happens on deploy, verify, doctor, or another explicit CLI/Action run.
+
+Pure Action/CLI may still run explicit preview cleanup from a user-authored close-event workflow
+through `deployments.cleanup-preview`.
 
 ### `cloud`
 

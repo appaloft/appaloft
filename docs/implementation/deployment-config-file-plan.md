@@ -153,9 +153,10 @@ Implement in ordered slices:
 - Managed `DomainBinding` lifecycle from pure CLI mode. Server-applied config domains are
   target-local proxy routes; cloud/self-hosted control-plane adoption is a later slice.
 - Product-grade preview environment lifecycle. Action PR preview deploy may use the config workflow
-  to deploy or update a preview-scoped resource, but policy, automatic cleanup, comments/checks,
-  scheduler retries, scoped preview secret management, and no-workflow GitHub App execution require
-  separate preview/control-plane specs.
+  to deploy or update a preview-scoped resource and explicit close-event cleanup may use
+  `deployments.cleanup-preview`, but policy, cleanup retries/scheduling, comments/checks, scoped
+  preview secret management, and no-workflow GitHub App execution require separate
+  preview/control-plane specs.
 - Cloud-assisted Action, self-hosted API mode, SSH PGlite adoption, and control-plane-owned
   execution are governed by
   [Control-Plane Modes Roadmap](./control-plane-modes-roadmap.md).
@@ -224,8 +225,8 @@ Remaining gaps:
   [GitHub Action PR Preview Deploy](../workflows/github-action-pr-preview-deploy.md). The CLI now
   supports preview-scoped source fingerprints, non-interactive preview environment selection,
   explicit preview config paths, `preview-domain-template` route intent, and implicit root-domain
-  skipping, but the public wrapper inputs, stable `preview-url` output, and cleanup/delete behavior
-  are not implemented yet.
+  skipping. The CLI preview cleanup command is also active, but the public wrapper inputs/examples
+  and stable `preview-url` output are not implemented yet.
 - CLI config deploy now resolves state backend selection, defaults trusted SSH-targeted config
   deploys to `ssh-pglite`, invokes a remote-state lifecycle hook before identity queries/mutations,
   and uses SSH remote-state lifecycle and mirror sync in shell-built CLI programs.

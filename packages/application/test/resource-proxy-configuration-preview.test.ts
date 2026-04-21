@@ -164,7 +164,9 @@ class FakeEdgeProxyProvider implements EdgeProxyProvider {
           pathPrefix: route.pathPrefix,
           tlsMode: route.tlsMode,
           ...(route.targetPort === undefined ? {} : { targetPort: route.targetPort }),
-          source: input.routeScope === "planned" ? "generated-default" : "deployment-snapshot",
+          source:
+            route.source ??
+            (input.routeScope === "planned" ? "generated-default" : "deployment-snapshot"),
           ...(redirect.routeBehavior ? { routeBehavior: redirect.routeBehavior } : {}),
           ...(redirect.redirectTo ? { redirectTo: redirect.redirectTo } : {}),
           ...(redirect.redirectStatus ? { redirectStatus: redirect.redirectStatus } : {}),
@@ -222,7 +224,7 @@ function createTestContext(): ExecutionContext {
   });
 }
 
-function resourceSummary(): ResourceSummary {
+function resourceSummary(overrides?: Partial<ResourceSummary>): ResourceSummary {
   return {
     id: "res_web",
     projectId: "prj_demo",
@@ -245,6 +247,7 @@ function resourceSummary(): ResourceSummary {
     lastDeploymentId: "dep_web",
     lastDeploymentStatus: "succeeded",
     createdAt: "2026-01-01T00:00:00.000Z",
+    ...overrides,
   };
 }
 
@@ -352,6 +355,195 @@ describe("ResourceProxyConfigurationPreviewQueryService", () => {
       port: 3000,
       includeDiagnostics: true,
     });
+  });
+
+  test("[DEF-ACCESS-QRY-002][EDGE-PROXY-QRY-002] renders durable route before server-applied and generated routes", async () => {
+    const context = createTestContext();
+    const provider = new FakeEdgeProxyProvider();
+    const deployment = deploymentSummary();
+    const durableDeployment: DeploymentSummary = {
+      ...deployment,
+      id: "dep_durable",
+      runtimePlan: {
+        ...deployment.runtimePlan,
+        execution: {
+          ...deployment.runtimePlan.execution,
+          accessRoutes: [
+            {
+              proxyKind: "traefik",
+              domains: ["durable.example.test"],
+              pathPrefix: "/",
+              tlsMode: "disabled",
+              targetPort: 3000,
+            },
+          ],
+          metadata: {
+            "access.routeSource": "durable-domain-binding",
+          },
+        },
+      },
+    };
+    const service = new ResourceProxyConfigurationPreviewQueryService(
+      new ListResourcesQueryService(
+        new StaticResourceReadModel([
+          resourceSummary({
+            accessSummary: {
+              latestDurableDomainRoute: {
+                url: "http://durable.example.test",
+                hostname: "durable.example.test",
+                scheme: "http",
+                deploymentId: "dep_durable",
+                deploymentStatus: "succeeded",
+                pathPrefix: "/",
+                proxyKind: "traefik",
+                targetPort: 3000,
+                updatedAt: "2026-01-01T00:00:03.000Z",
+              },
+              latestServerAppliedDomainRoute: {
+                url: "http://server-applied.example.test",
+                hostname: "server-applied.example.test",
+                scheme: "http",
+                deploymentId: "dep_server_applied",
+                deploymentStatus: "succeeded",
+                pathPrefix: "/",
+                proxyKind: "traefik",
+                targetPort: 3000,
+                updatedAt: "2026-01-01T00:00:02.000Z",
+              },
+              latestGeneratedAccessRoute: {
+                url: "http://generated.example.test",
+                hostname: "generated.example.test",
+                scheme: "http",
+                providerKey: "sslip",
+                deploymentId: "dep_generated",
+                deploymentStatus: "succeeded",
+                pathPrefix: "/",
+                proxyKind: "traefik",
+                targetPort: 3000,
+                updatedAt: "2026-01-01T00:00:01.000Z",
+              },
+              proxyRouteStatus: "ready",
+              lastRouteRealizationDeploymentId: "dep_durable",
+            },
+          }),
+        ]),
+        new EmptyDestinationRepository(),
+        new EmptyServerRepository(),
+        new DisabledDefaultAccessDomainProvider(),
+      ),
+      new StaticDeploymentReadModel([durableDeployment]),
+      new StaticEdgeProxyProviderRegistry(provider),
+      new FixedClock(),
+    );
+    const query = ResourceProxyConfigurationPreviewQuery.create({
+      resourceId: "res_web",
+      routeScope: "latest",
+    })._unsafeUnwrap();
+
+    const result = await service.execute(context, query);
+
+    expect(result.isOk()).toBe(true);
+    expect(provider.lastConfigurationInput?.accessRoutes).toEqual([
+      expect.objectContaining({
+        domains: ["durable.example.test"],
+        source: "domain-binding",
+      }),
+    ]);
+    expect(result._unsafeUnwrap().routes).toEqual([
+      expect.objectContaining({
+        hostname: "durable.example.test",
+        source: "domain-binding",
+      }),
+    ]);
+  });
+
+  test("[DEF-ACCESS-ROUTE-013][EDGE-PROXY-QRY-002] renders server-applied route before generated route", async () => {
+    const context = createTestContext();
+    const provider = new FakeEdgeProxyProvider();
+    const deployment = deploymentSummary();
+    const serverAppliedDeployment: DeploymentSummary = {
+      ...deployment,
+      id: "dep_server_applied",
+      runtimePlan: {
+        ...deployment.runtimePlan,
+        execution: {
+          ...deployment.runtimePlan.execution,
+          accessRoutes: [
+            {
+              proxyKind: "traefik",
+              domains: ["server-applied.example.test"],
+              pathPrefix: "/",
+              tlsMode: "disabled",
+              targetPort: 3000,
+            },
+          ],
+          metadata: {
+            "access.routeSource": "server-applied-config-domain",
+          },
+        },
+      },
+    };
+    const service = new ResourceProxyConfigurationPreviewQueryService(
+      new ListResourcesQueryService(
+        new StaticResourceReadModel([
+          resourceSummary({
+            accessSummary: {
+              latestServerAppliedDomainRoute: {
+                url: "http://server-applied.example.test",
+                hostname: "server-applied.example.test",
+                scheme: "http",
+                deploymentId: "dep_server_applied",
+                deploymentStatus: "succeeded",
+                pathPrefix: "/",
+                proxyKind: "traefik",
+                targetPort: 3000,
+                updatedAt: "2026-01-01T00:00:02.000Z",
+              },
+              latestGeneratedAccessRoute: {
+                url: "http://generated.example.test",
+                hostname: "generated.example.test",
+                scheme: "http",
+                providerKey: "sslip",
+                deploymentId: "dep_generated",
+                deploymentStatus: "succeeded",
+                pathPrefix: "/",
+                proxyKind: "traefik",
+                targetPort: 3000,
+                updatedAt: "2026-01-01T00:00:01.000Z",
+              },
+              proxyRouteStatus: "ready",
+              lastRouteRealizationDeploymentId: "dep_server_applied",
+            },
+          }),
+        ]),
+        new EmptyDestinationRepository(),
+        new EmptyServerRepository(),
+        new DisabledDefaultAccessDomainProvider(),
+      ),
+      new StaticDeploymentReadModel([serverAppliedDeployment]),
+      new StaticEdgeProxyProviderRegistry(provider),
+      new FixedClock(),
+    );
+    const query = ResourceProxyConfigurationPreviewQuery.create({
+      resourceId: "res_web",
+      routeScope: "latest",
+    })._unsafeUnwrap();
+
+    const result = await service.execute(context, query);
+
+    expect(result.isOk()).toBe(true);
+    expect(provider.lastConfigurationInput?.accessRoutes).toEqual([
+      expect.objectContaining({
+        domains: ["server-applied.example.test"],
+        source: "server-applied",
+      }),
+    ]);
+    expect(result._unsafeUnwrap().routes).toEqual([
+      expect.objectContaining({
+        hostname: "server-applied.example.test",
+        source: "server-applied",
+      }),
+    ]);
   });
 
   test("does not treat generated access domain provider as edge proxy provider", async () => {

@@ -25,8 +25,9 @@ The workflow must keep these boundaries:
 - A workflow file is required. Installing the action package does not make GitHub run anything.
 - The action deploys only when the user workflow subscribes to `pull_request` events.
 - The action can deploy or update a preview on `opened`, `reopened`, and `synchronize`.
-- PR close cleanup is not automatic in the first Action-only scope because no public preview
-  cleanup/delete command exists yet.
+- PR close cleanup is a separate explicit close-event workflow over `deployments.cleanup-preview`;
+  it is not implied by preview deploy success and it is not retried automatically in pure Action
+  mode.
 - Product-grade preview creation, policy, cleanup, comments, audit, scheduler behavior, and
   no-workflow GitHub App execution remain future control-plane behavior.
 
@@ -334,26 +335,24 @@ close cleanup belong to the future GitHub App/control-plane track.
 
 ## Cleanup And Expiration
 
-Action-only PR preview deploy does not imply automatic cleanup unless a repository explicitly runs
-a cleanup workflow and Appaloft exposes an accepted cleanup operation.
+Action-only PR preview cleanup is supported only when a repository explicitly runs a close-event
+workflow.
 
-The target future close flow is:
+The close flow is:
 
 ```text
 pull_request closed
-  -> user workflow runs appaloft/deploy-action with preview cleanup mode
+  -> user workflow runs Appaloft CLI preview cleanup or a thin wrapper over the same CLI command
   -> Appaloft resolves preview-scoped source link
-  -> explicit cleanup/delete operation removes or stops preview runtime state
-  -> route desired/applied state is marked removed or inactive
-  -> GitHub deployment/status may be marked inactive when the workflow has permission
+  -> deployments.cleanup-preview stops preview runtime state when present
+  -> preview server-applied route desired state is deleted
+  -> preview source link is unlinked
+  -> command returns cleaned or already-clean
 ```
 
-That cleanup mode must not be documented as supported until the governing command/workflow specs,
-test matrix rows, and implementation exist.
-
-Until then, Action preview docs must describe cleanup as manual or future work. Product-grade
-GitHub App previews must own cleanup through a control plane, scheduler, or server agent rather
-than relying on one GitHub Actions close event always succeeding.
+The command is idempotent when the preview source link is already absent. Product-grade GitHub App
+previews still own cleanup through a control plane, scheduler, or server agent rather than relying
+on one GitHub Actions close event always succeeding.
 
 ## Product-Grade Preview Path
 
@@ -402,7 +401,7 @@ Expected errors:
 | `validation_error` | `validation` | `preview-context-resolution` | No | Required PR event context is missing or malformed. |
 | `validation_error` | `validation` | `preview-domain-template-resolution` | No | A preview domain template renders an invalid host or uses untrusted variables. |
 | `default_access_route_unavailable` | `application` or `integration` | `preview-access-resolution` | Conditional | No generated/custom preview route can be resolved when the workflow requires a URL. |
-| `preview_cleanup_unsupported` | `application` | `preview-cleanup` | No | Cleanup mode was requested before an accepted cleanup/delete operation exists. |
+| `infra_error` or `provider_error` | `application` or `integration` | `preview-cleanup` | Conditional | Preview runtime cleanup, route-state deletion, or source-link unlink failed after preview context resolution. |
 
 Errors must include sanitized preview id, repository identity, pull request number, selected access
 mode, and route phase when useful. They must not include SSH keys, tokens, raw secret values,
@@ -432,6 +431,6 @@ Missing pieces for product-grade previews:
 
 - GitHub App/webhook ingestion;
 - preview environment policy commands and read models;
-- cleanup/delete operation and close-event handling;
+- scheduler-owned close-event handling, retries, and audit around preview cleanup;
 - scheduler/agent cleanup retries;
 - Cloud/self-hosted source links, locks, audit, and managed domain mapping.

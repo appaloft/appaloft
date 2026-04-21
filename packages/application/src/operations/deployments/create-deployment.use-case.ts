@@ -1,12 +1,16 @@
 import {
+  type Destination,
   domainError,
+  type Environment,
   err,
   LatestDeploymentSpec,
   ok,
+  type Project,
   type Resource,
   type ResourceHealthCheckPolicyState,
   ResourceSourceBinding,
   type Result,
+  type Server,
   SourceDescriptor,
   safeTry,
   UpsertDeploymentSpec,
@@ -195,6 +199,84 @@ function requestedDeploymentFromResource(resource: Resource): Result<RequestedDe
   });
 }
 
+function compactMetadata(input: Record<string, string | undefined>): Record<string, string> {
+  const metadata: Record<string, string> = {};
+  for (const [key, value] of Object.entries(input)) {
+    const normalized = value?.trim();
+    if (normalized) {
+      metadata[key] = normalized;
+    }
+  }
+
+  return metadata;
+}
+
+function previewMetadataForEnvironment(input: {
+  environmentName: string;
+  environmentKind: string;
+}): Record<string, string> {
+  if (input.environmentKind !== "preview") {
+    return {};
+  }
+
+  const previewId = input.environmentName.startsWith("preview-")
+    ? input.environmentName.slice("preview-".length)
+    : input.environmentName;
+  const pullRequestMatch = /^pr-(\d+)$/.exec(previewId);
+  const previewNumber = pullRequestMatch?.[1];
+
+  return compactMetadata({
+    "preview.id": previewId,
+    ...(previewNumber
+      ? {
+          "preview.number": previewNumber,
+          "preview.mode": "pull-request",
+        }
+      : {}),
+  });
+}
+
+function requestedDeploymentWithRuntimeContextMetadata(
+  requestedDeployment: RequestedDeploymentConfig,
+  input: {
+    project: Project;
+    environment: Environment;
+    resource: Resource;
+    server: Server;
+    destination: Destination;
+  },
+): RequestedDeploymentConfig {
+  const projectState = input.project.toState();
+  const environmentState = input.environment.toState();
+  const resourceState = input.resource.toState();
+  const serverState = input.server.toState();
+  const destinationState = input.destination.toState();
+  const environmentName = environmentState.name.value;
+  const environmentKind = environmentState.kind.value;
+
+  return {
+    ...requestedDeployment,
+    runtimeMetadata: {
+      ...(requestedDeployment.runtimeMetadata ?? {}),
+      ...compactMetadata({
+        "context.projectName": projectState.name.value,
+        "context.projectSlug": projectState.slug.value,
+        "context.environmentName": environmentName,
+        "context.environmentKind": environmentKind,
+        "context.resourceName": resourceState.name.value,
+        "context.resourceSlug": resourceState.slug.value,
+        "context.resourceKind": resourceState.kind.value,
+        "context.destinationName": destinationState.name.value,
+        "context.destinationKind": destinationState.kind.value,
+        "context.serverName": serverState.name.value,
+        "context.serverProviderKey": serverState.providerKey.value,
+        "context.serverTargetKind": serverState.targetKind.value,
+      }),
+      ...previewMetadataForEnvironment({ environmentName, environmentKind }),
+    },
+  };
+}
+
 function requestedDeploymentWithDurableDomainBindings(
   requestedDeployment: RequestedDeploymentConfig,
   bindings: DomainRouteBindingCandidate[],
@@ -207,16 +289,30 @@ function requestedDeploymentWithDurableDomainBindings(
     return requestedDeployment;
   }
 
-  const servedBindings = bindings.filter((binding) => !binding.redirectTo);
-  const primaryBinding = servedBindings
-    .filter((binding) => binding.proxyKind !== "none")
-    .sort((left, right) => right.createdAt.localeCompare(left.createdAt))[0];
+  const servedBindings = bindings
+    .filter((binding) => !binding.redirectTo && binding.proxyKind !== "none")
+    .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
+  const readyPrimaryBinding = servedBindings.find((binding) => binding.status === "ready");
+  const primaryBinding =
+    readyPrimaryBinding ??
+    servedBindings.find(
+      (binding) =>
+        binding.status === "bound" ||
+        binding.status === "certificate_pending" ||
+        binding.status === "not_ready",
+    );
 
   if (!primaryBinding) {
     return requestedDeployment;
   }
 
-  const routeGroups = domainBindingRouteGroups(bindings, primaryBinding.proxyKind);
+  const allowedStatuses = new Set<DomainRouteBindingCandidate["status"]>(
+    primaryBinding.status === "ready" ? ["ready"] : ["bound", "certificate_pending", "not_ready"],
+  );
+  const routeGroups = domainBindingRouteGroups(
+    bindings.filter((binding) => allowedStatuses.has(binding.status)),
+    primaryBinding.proxyKind,
+  );
   const primaryRouteGroup = routeGroups.find(
     (group) =>
       !group.redirectTo &&
@@ -251,6 +347,7 @@ function requestedDeploymentWithDurableDomainBindings(
       ...(requestedDeployment.accessRouteMetadata ?? {}),
       "access.routeSource": "durable-domain-binding",
       "access.domainBindingId": primaryBinding.id,
+      "access.domainBindingStatus": primaryBinding.status,
       "access.hostname": primaryBinding.domainName,
       "access.scheme": primaryBinding.tlsMode === "auto" ? "https" : "http",
       "access.routeGroupCount": String(routeGroups.length),
@@ -589,22 +686,31 @@ export class CreateDeploymentUseCase {
             destinationId: targetContext.destinationId,
           })
         : [];
-      const requestedDeploymentWithServerAppliedRoute =
-        yield* requestedDeploymentWithServerAppliedRoutes({
-          requestedDeployment: requestedDeploymentBase,
-          desiredState: serverAppliedRouteDesiredState,
-          proxyKind: proxyKindFromServer(server),
-        });
-      const requestedDeployment = requestedDeploymentWithDurableDomainBindings(
-        requestedDeploymentWithServerAppliedRoute,
+      const requestedDeploymentWithDurableRoute = requestedDeploymentWithDurableDomainBindings(
+        requestedDeploymentBase,
         routeBindings,
+      );
+      const requestedDeployment = yield* requestedDeploymentWithServerAppliedRoutes({
+        requestedDeployment: requestedDeploymentWithDurableRoute,
+        desiredState: serverAppliedRouteDesiredState,
+        proxyKind: proxyKindFromServer(server),
+      });
+      const requestedDeploymentWithRuntimeMetadata = requestedDeploymentWithRuntimeContextMetadata(
+        requestedDeployment,
+        {
+          project,
+          environment,
+          resource,
+          server,
+          destination,
+        },
       );
       const runtimePlanInputResult = runtimePlanResolutionInputBuilder.build({
         source: detected.source,
         server,
         environmentSnapshot: snapshot,
         detectedReasoning: detected.reasoning,
-        requestedDeployment,
+        requestedDeployment: requestedDeploymentWithRuntimeMetadata,
       });
       const runtimePlanInput = yield* runtimePlanInputResult;
       const runtimePlanResult = await runtimePlanResolver.resolve(context, runtimePlanInput);

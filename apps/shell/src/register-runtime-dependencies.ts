@@ -304,6 +304,10 @@ class UnavailableSourceLinkStore implements SourceLinkStore {
   async relink(): Promise<Result<SourceLinkRecord, DomainError>> {
     return this.unavailable();
   }
+
+  async unlink(): Promise<Result<boolean, DomainError>> {
+    return this.unavailable();
+  }
 }
 
 class NoopServerAppliedRouteStateStore implements ServerAppliedRouteStateStore {
@@ -328,6 +332,10 @@ class NoopServerAppliedRouteStateStore implements ServerAppliedRouteStateStore {
 
   async markFailed(): Promise<Result<ServerAppliedRouteDesiredStateRecord | null>> {
     return ok(null);
+  }
+
+  async deleteDesired(): Promise<Result<boolean>> {
+    return ok(false);
   }
 }
 

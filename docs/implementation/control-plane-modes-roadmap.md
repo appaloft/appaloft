@@ -80,9 +80,9 @@ Remaining gaps:
 
 - host fingerprint pinning and recovery UX need hardening;
 - public docs must clearly explain DNS, SSH key, and route/TLS responsibilities;
-- Action-only PR preview cleanup remains future until a cleanup/delete operation exists; product
-  docs must not imply PR close events are reliably cleaned up by Appaloft without that operation or
-  a control plane;
+- Action-only PR preview cleanup uses explicit `deployments.cleanup-preview` from a user-authored
+  close workflow; product docs must still not imply PR close events are reliably cleaned up without
+  that workflow succeeding or a control-plane retry loop;
 - direct `ssh-pglite` is single-writer through Appaloft locks, not multi-process shared DB.
 
 ### Phase 1: Control-Plane Selection Parser And Diagnostics

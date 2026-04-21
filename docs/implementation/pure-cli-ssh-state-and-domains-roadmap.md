@@ -121,10 +121,10 @@ selection overrides, not required setup.
 | Server-applied route desired/applied state | No for first remote-state slice; yes for domain support | Yes | Useful | File-backed SSH route state exists for adapter-level mechanics. PG/PGlite durable persistence for selected hosted/self-hosted, embedded, and SSH-mirrored state backends is implemented through the server-applied route persistence plan. |
 | Edge proxy route realization for config domains | No for first remote-state slice; yes for domain support | Yes | No | Desired routes now enter provider-neutral route input, deployment-finished status writeback, mixed path/TLS route groups, and provider-local TLS diagnostics. |
 | GitHub Action wrapper docs | Yes before public release | Yes before public release | No | Binary can be used manually first, but public UX needs `appaloft/deploy-action`, version selection, checksum verification, SSH secret mapping, and examples. |
-| Action PR preview deploy/update | No for first remote-state slice; useful for public Action UX | Useful | No | Uses a user-authored `pull_request` workflow, preview-scoped source links, generated/default access or user-owned wildcard DNS, and no automatic cleanup until a cleanup operation exists. |
+| Action PR preview deploy/update | No for first remote-state slice; useful for public Action UX | Useful | No | Uses a user-authored `pull_request` workflow, preview-scoped source links, generated/default access or user-owned wildcard DNS, and may pair with explicit `deployments.cleanup-preview` on PR close. |
 | Appaloft always-on DNS observer | No | No | Yes for managed domains | Pure CLI delegates observation to deploy/doctor and resident proxy/provider. |
 | Appaloft certificate retry scheduler | No | No | Yes for managed certificates | Pure CLI may delegate renewal to Caddy/Traefik or equivalent provider-owned storage. |
-| PR preview cleanup | No | No | Yes for GitHub App previews | Requires webhook listener/control plane or future server agent. |
+| PR preview cleanup | No for first remote-state slice; useful for public Action UX | No | No | Supported through explicit `deployments.cleanup-preview` from a user-authored close-event workflow. Retry/scheduler behavior remains control-plane or future server-agent value. |
 | Team auth, audit, fleet visibility | No | No | Yes | Hosted/control-plane product line. |
 
 ## Current Implementation Gaps
@@ -182,6 +182,10 @@ selection overrides, not required setup.
 - Deployment-finished handling now records server-applied route `applied` status for successful
   deployments and `failed` status for route realization, proxy reload, and public route
   verification failures.
+- The public CLI `preview cleanup` command now dispatches `deployments.cleanup-preview`, reuses the
+  same preview-scoped source fingerprint derivation as preview deploy, cleans preview runtime and
+  route desired state, and unlinks preview source state through the selected SSH-server or
+  PostgreSQL/PGlite backend.
 - Resource access, health, and diagnostic summaries now expose the latest server-applied route URL
   and route status separately from generated access routes and managed durable domain bindings.
 - Provider-local TLS diagnostics for pure CLI `tlsMode = auto` routes are exposed through proxy
@@ -191,7 +195,7 @@ selection overrides, not required setup.
   `release-manifest.json`, and release notes; a separate `appaloft/deploy-action` repository still
   needs action metadata, install/checksum scripts, SSH secret to temp-key handling, wrapper tests,
   and public README examples.
-- Pure CLI mode has no always-on DNS observer, Appaloft certificate scheduler, or automatic cleanup
+- Pure CLI mode has no always-on DNS observer, Appaloft certificate scheduler, or cleanup retry
   loop after the process exits.
 - Hosted/cloud adoption, GitHub App webhook previews, team auth, audit, and fleet visibility are
   future control-plane work, not blockers for the pure CLI remote-state foundation.
@@ -203,11 +207,16 @@ The next Test-First Round should start from:
 - `CONFIG-FILE-STATE-001` through `CONFIG-FILE-STATE-013`
 - `CONFIG-FILE-DOMAIN-001` through `CONFIG-FILE-DOMAIN-009`
 - `SOURCE-LINK-STATE-001` through `SOURCE-LINK-STATE-014`
+- `SOURCE-LINK-STATE-019`
 - `CONFIG-FILE-ENTRY-008`
 - `QUICK-DEPLOY-WF-052` through `QUICK-DEPLOY-WF-055`
 - `ROUTE-TLS-BOUNDARY-005` through `ROUTE-TLS-BOUNDARY-006`
 - `EDGE-PROXY-ROUTE-005` through `EDGE-PROXY-ROUTE-008`
 - `EDGE-PROXY-QRY-007`
 - `SERVER-APPLIED-ROUTE-STATE-001` through `SERVER-APPLIED-ROUTE-STATE-005`
+- `SERVER-APPLIED-ROUTE-STATE-006`
 - `CONFIG-FILE-ENTRY-009` through `CONFIG-FILE-ENTRY-013`
+- `CONFIG-FILE-ENTRY-019`
+- `DEPLOYMENTS-CLEANUP-PREVIEW-001` through `DEPLOYMENTS-CLEANUP-PREVIEW-003`
+- `DEPLOYMENTS-CLEANUP-PREVIEW-CLI-001`
 - `QUICK-DEPLOY-ENTRY-011`

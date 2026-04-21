@@ -83,12 +83,13 @@ Then:
 | RES-HEALTH-QRY-011 | integration | Command policy pass | Adapter supports command check and command exits 0 | `ok` with command check passed | Command runs inside workload boundary. |
 | RES-HEALTH-QRY-012 | integration | Command policy unsupported | Adapter cannot run command policy | `ok(overall = "unknown")` or `degraded` by policy strictness | Source error is `resource_health_policy_unsupported`. |
 | RES-HEALTH-QRY-013 | integration | Proxy route missing | Reverse-proxy exposure but route not applied | `ok(overall = "degraded")` | Proxy section identifies unavailable route. |
-| RES-HEALTH-QRY-014 | integration | Durable domain ready | Ready domain binding and generated route both exist | `ok` uses durable domain as public access target | Durable domain precedes generated default route. |
-| RES-HEALTH-QRY-015 | integration | Durable domain pending | Domain binding exists but is not ready | `ok(overall = "degraded")` when public access is required | Domain state is not hidden by generated route unless policy allows fallback. |
+| RES-HEALTH-QRY-014 | integration | Durable domain ready | Ready domain binding, server-applied route, and generated route all exist | `ok` uses durable domain as public access target | Durable domain precedes server-applied and generated default routes. |
+| RES-HEALTH-QRY-015 | integration | Durable domain pending | Domain binding exists but is not ready while generated or server-applied fallback route state may also exist | `ok(overall = "degraded")` when public access is required | `publicAccess` reports the durable domain as `not-ready` with `reasonCode = resource_domain_binding_not_ready`, and `sourceErrors` include the domain-binding code instead of hiding the state behind fallback routes. |
 | RES-HEALTH-QRY-016 | integration | Runtime inspection fails | Runtime provider inspect fails | `ok(overall = "unknown")` | Source error records runtime inspection failure. |
 | RES-HEALTH-QRY-017 | integration | Read model failure | Required resource context cannot be safely loaded | `err(resource_health_unavailable)` | No partial unsafe summary is returned. |
 | RES-HEALTH-QRY-018 | integration | Edge upstream timeout observed | Latest deployment succeeded, internal health is unknown or healthy, latest edge failure is `resource_access_upstream_timeout` | `ok(overall = "degraded")` | Source error/check record includes request id, code, phase, retriable flag, and does not mark deployment success as reachable. |
 | RES-HEALTH-QRY-019 | integration | Edge proxy route unavailable observed | Latest deployment exists, edge failure is `resource_access_route_unavailable` or `resource_access_proxy_unavailable` | `ok(overall = "degraded")` | Proxy/public access sections use `resource_access_*` code and keep category out of `domain`. |
+| RES-HEALTH-QRY-020 | integration | Server-applied route ready | Server-applied config domain and generated route both exist, with no ready durable binding | `ok` uses server-applied domain as public access target | Server-applied route precedes generated default route and reports `kind = server-applied-domain`. |
 
 ## Status Aggregation Matrix
 
@@ -146,9 +147,9 @@ Current runtime adapter tests cover some deployment-time health checks. Those te
 attempt-scoped and new tests should cover the resource-owned observation contract separately.
 
 Remaining test gaps include provider-native runtime inspection, Docker health state, command policy
-support/unsupported cases, durable-domain precedence inside the health query, and Web e2e mocking
-of mixed resource health states. Edge access failure diagnostic source rows `RES-HEALTH-QRY-018`
-and `RES-HEALTH-QRY-019` are also future coverage.
+support/unsupported cases, and Web e2e mocking of mixed resource health states. Edge access
+failure diagnostic source rows `RES-HEALTH-QRY-018` and `RES-HEALTH-QRY-019` are also future
+coverage.
 
 ## Open Questions
 

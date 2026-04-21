@@ -129,6 +129,7 @@ export interface ServerAppliedRouteDesiredStateStore {
     providerKey?: string;
     proxyKind?: EdgeProxyKind;
   }): Promise<Result<ServerAppliedRouteDesiredStateRecord | null>>;
+  deleteDesired(target: ServerAppliedRouteTarget): Promise<Result<boolean>>;
 }
 
 const defaultSchemaVersion = 1;
@@ -777,6 +778,31 @@ export class FileSystemSourceLinkStore {
     });
   }
 
+  async unlink(sourceFingerprint: string): Promise<Result<boolean>> {
+    const fingerprintResult = validateSourceFingerprint(sourceFingerprint);
+    if (fingerprintResult.isErr()) {
+      return err(fingerprintResult.error);
+    }
+
+    try {
+      const path = join(this.linksDirectory(), encodeSourceLinkFileName(sourceFingerprint));
+      const exists = await pathExists(path);
+      if (!exists) {
+        return ok(false);
+      }
+
+      await rm(path);
+      return ok(true);
+    } catch (error) {
+      return err(
+        domainError.infra("Source link could not be removed", {
+          phase: "source-link-persistence",
+          message: error instanceof Error ? error.message : String(error),
+        }),
+      );
+    }
+  }
+
   async diagnostics(sourceFingerprint: string): Promise<Result<SourceLinkDiagnostics | null>> {
     const record = await this.read(sourceFingerprint);
     if (record.isErr() || !record.value) {
@@ -969,6 +995,31 @@ export class FileSystemServerAppliedRouteDesiredStateStore
         ...(input.proxyKind ? { proxyKind: input.proxyKind } : {}),
       },
     });
+  }
+
+  async deleteDesired(target: ServerAppliedRouteTarget): Promise<Result<boolean>> {
+    const targetResult = validateServerAppliedRouteTarget(target);
+    if (targetResult.isErr()) {
+      return err(targetResult.error);
+    }
+
+    try {
+      const path = join(this.routesDirectory(), encodeServerAppliedRouteFileName(target));
+      const exists = await pathExists(path);
+      if (!exists) {
+        return ok(false);
+      }
+
+      await rm(path);
+      return ok(true);
+    } catch (error) {
+      return err(
+        domainError.infra("Server-applied route desired state could not be removed", {
+          phase: "config-domain-resolution",
+          message: error instanceof Error ? error.message : String(error),
+        }),
+      );
+    }
   }
 
   private async readForStatusUpdate(

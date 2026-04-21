@@ -5,7 +5,26 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   createExecutionContext,
+  type DiagnosticsPort,
+  type EdgeProxyDiagnosticsInput,
+  type EdgeProxyEnsureInput,
+  type EdgeProxyExecutionContext,
+  type EdgeProxyProvider,
+  type EdgeProxyProviderCapabilities,
+  type EdgeProxyProviderRegistry,
+  type EdgeProxyProviderSelectionInput,
+  ListResourcesQueryService,
+  type ProxyConfigurationViewInput,
+  type ProxyReloadInput,
+  type ProxyRouteRealizationInput,
   type RepositoryContext,
+  ResourceDiagnosticSummaryQuery,
+  ResourceDiagnosticSummaryQueryService,
+  ResourceHealthQuery,
+  ResourceHealthQueryService,
+  ResourceProxyConfigurationPreviewQuery,
+  ResourceProxyConfigurationPreviewQueryService,
+  ResourceRuntimeLogsQueryService,
   toRepositoryContext,
 } from "@appaloft/application";
 import {
@@ -27,6 +46,7 @@ import {
   DestinationName,
   DetectSummary,
   DisplayNameText,
+  domainError,
   EnvironmentId,
   EnvironmentKindValue,
   EnvironmentName,
@@ -36,6 +56,7 @@ import {
   ExecutionStatusValue,
   ExecutionStrategyKindValue,
   ExitCode,
+  err,
   FinishedAt,
   GeneratedAt,
   HostAddress,
@@ -43,6 +64,7 @@ import {
   LogLevelValue,
   MessageText,
   OccurredAt,
+  ok,
   PackagingModeValue,
   PlanStepText,
   PortNumber,
@@ -78,26 +100,219 @@ import {
 import { type Kysely, sql } from "kysely";
 import { type Database } from "../src/schema";
 
-function createRepositoryContext(): RepositoryContext {
-  return toRepositoryContext(
-    createExecutionContext({
-      entrypoint: "system",
-      requestId: "req_pglite_test",
-      tracer: {
-        startActiveSpan(_name, _options, callback) {
-          return Promise.resolve(
-            callback({
-              addEvent() {},
-              recordError() {},
-              setAttribute() {},
-              setAttributes() {},
-              setStatus() {},
-            }),
-          );
-        },
+function createTestExecutionContext() {
+  return createExecutionContext({
+    entrypoint: "system",
+    requestId: "req_pglite_test",
+    tracer: {
+      startActiveSpan(_name, _options, callback) {
+        return Promise.resolve(
+          callback({
+            addEvent() {},
+            recordError() {},
+            setAttribute() {},
+            setAttributes() {},
+            setStatus() {},
+          }),
+        );
       },
-    }),
-  );
+    },
+  });
+}
+
+function createRepositoryContext(): RepositoryContext {
+  return toRepositoryContext(createTestExecutionContext());
+}
+
+class FixedClock {
+  now(): string {
+    return "2026-01-01T00:10:00.000Z";
+  }
+}
+
+class EmptyDestinationRepository {
+  async findOne(): Promise<null> {
+    return null;
+  }
+
+  async upsert(): Promise<void> {}
+}
+
+class EmptyServerRepository {
+  async findOne(): Promise<null> {
+    return null;
+  }
+
+  async upsert(): Promise<void> {}
+}
+
+class DisabledDefaultAccessDomainProvider {
+  async generate() {
+    return ok({
+      kind: "disabled" as const,
+      reason: "test-disabled",
+    });
+  }
+}
+
+class EmptyResourceRepository {
+  async findOne(): Promise<null> {
+    return null;
+  }
+
+  async upsert(): Promise<void> {}
+}
+
+class StaticResourceHealthProbeRunner {
+  async probe(
+    _context: unknown,
+    request: { name: string; target: "runtime" | "public-access"; expectedStatusCode: number },
+  ) {
+    return ok({
+      name: request.name,
+      target: request.target,
+      status: "passed" as const,
+      observedAt: "2026-01-01T00:10:01.000Z",
+      durationMs: 12,
+      statusCode: request.expectedStatusCode,
+    });
+  }
+}
+
+class EmptyRuntimeLogStream {
+  async close(): Promise<void> {}
+
+  async *[Symbol.asyncIterator](): AsyncIterator<never> {}
+}
+
+class EmptyRuntimeLogReader {
+  async open() {
+    return ok(new EmptyRuntimeLogStream());
+  }
+}
+
+class StaticDiagnosticsPort implements DiagnosticsPort {
+  async readiness() {
+    return {
+      status: "ready" as const,
+      checks: {
+        database: true,
+        migrations: true,
+      },
+      details: {
+        databaseDriver: "pglite",
+        databaseMode: "embedded",
+        databaseLocation: "/Users/example/private/db",
+      },
+    };
+  }
+
+  async migrationStatus() {
+    return {
+      pending: [],
+      executed: [],
+    };
+  }
+
+  async migrate() {
+    return {
+      executed: [],
+    };
+  }
+}
+
+class FakeEdgeProxyProvider implements EdgeProxyProvider {
+  readonly key = "traefik";
+  readonly displayName = "Traefik";
+  readonly capabilities: EdgeProxyProviderCapabilities = {
+    ensureProxy: true,
+    dockerLabels: true,
+    reloadProxy: true,
+    configurationView: true,
+    runtimeLogs: false,
+    diagnostics: false,
+  };
+
+  async ensureProxy(_context: EdgeProxyExecutionContext, _input: EdgeProxyEnsureInput) {
+    return err(domainError.provider("not used"));
+  }
+
+  async diagnoseProxy(_context: EdgeProxyExecutionContext, _input: EdgeProxyDiagnosticsInput) {
+    return err(domainError.provider("not used"));
+  }
+
+  async realizeRoutes(_context: EdgeProxyExecutionContext, input: ProxyRouteRealizationInput) {
+    return ok({
+      providerKey: this.key,
+      networkName: "appaloft-edge",
+      labels: [
+        `traefik.http.services.${input.deploymentId}.loadbalancer.server.port=${input.port}`,
+      ],
+    });
+  }
+
+  async reloadProxy(_context: EdgeProxyExecutionContext, input: ProxyReloadInput) {
+    return ok({
+      providerKey: this.key,
+      proxyKind: input.proxyKind,
+      displayName: this.displayName,
+      required: false,
+      steps: [],
+    });
+  }
+
+  async renderConfigurationView(
+    _context: EdgeProxyExecutionContext,
+    input: ProxyConfigurationViewInput,
+  ) {
+    const routes = input.accessRoutes.flatMap((route) =>
+      route.domains.map((hostname) => ({
+        hostname,
+        scheme: route.tlsMode === "auto" ? ("https" as const) : ("http" as const),
+        url: `${route.tlsMode === "auto" ? "https" : "http"}://${hostname}`,
+        pathPrefix: route.pathPrefix,
+        tlsMode: route.tlsMode,
+        ...(route.targetPort === undefined ? {} : { targetPort: route.targetPort }),
+        source:
+          route.source ??
+          (input.routeScope === "planned" ? "generated-default" : "deployment-snapshot"),
+        ...(route.routeBehavior ? { routeBehavior: route.routeBehavior } : {}),
+        ...(route.redirectTo ? { redirectTo: route.redirectTo } : {}),
+        ...(route.redirectStatus ? { redirectStatus: route.redirectStatus } : {}),
+      })),
+    );
+
+    return ok({
+      resourceId: input.resourceId,
+      ...(input.deploymentId ? { deploymentId: input.deploymentId } : {}),
+      providerKey: this.key,
+      routeScope: input.routeScope,
+      status: input.status,
+      generatedAt: input.generatedAt,
+      stale: input.stale,
+      routes,
+      sections: [],
+      warnings: [],
+    });
+  }
+}
+
+class StaticEdgeProxyProviderRegistry implements EdgeProxyProviderRegistry {
+  constructor(private readonly provider: EdgeProxyProvider | null) {}
+
+  resolve(_key: string) {
+    return this.provider
+      ? ok(this.provider)
+      : err(domainError.proxyProviderUnavailable("missing provider"));
+  }
+
+  defaultFor(input: EdgeProxyProviderSelectionInput) {
+    if (!input.proxyKind || input.proxyKind === "none") {
+      return ok(null);
+    }
+
+    return this.resolve(this.provider?.key ?? "missing");
+  }
 }
 
 async function seedSourceLinkContext(
@@ -208,6 +423,152 @@ async function seedSourceLinkContext(
     serverId,
     destinationId,
   };
+}
+
+async function enableReverseProxyResource(
+  db: Kysely<Database>,
+  resourceId: string,
+  input?: {
+    internalPort?: number;
+    targetServiceName?: string;
+  },
+): Promise<void> {
+  await db
+    .updateTable("resources")
+    .set({
+      services: [
+        {
+          name: "web",
+          kind: "web",
+        },
+      ],
+      network_profile: {
+        internalPort: input?.internalPort ?? 3000,
+        upstreamProtocol: "http",
+        exposureMode: "reverse-proxy",
+        ...(input?.targetServiceName ? { targetServiceName: input.targetServiceName } : {}),
+      },
+    })
+    .where("id", "=", resourceId)
+    .execute();
+}
+
+async function insertDeploymentSnapshot(
+  db: Kysely<Database>,
+  target: Awaited<ReturnType<typeof seedSourceLinkContext>>,
+  input: {
+    id: string;
+    status?: string;
+    createdAt: string;
+    routeSource: "generated-default" | "server-applied-config-domain" | "durable-domain-binding";
+    hostname: string;
+    pathPrefix?: string;
+    tlsMode?: "auto" | "disabled";
+    proxyKind?: "traefik" | "caddy";
+    targetPort?: number;
+  },
+): Promise<void> {
+  await db
+    .insertInto("deployments")
+    .values({
+      id: input.id,
+      project_id: target.projectId,
+      environment_id: target.environmentId,
+      resource_id: target.resourceId,
+      server_id: target.serverId,
+      destination_id: target.destinationId,
+      status: input.status ?? "succeeded",
+      runtime_plan: {
+        id: `plan_${input.id}`,
+        source: {
+          kind: "local-folder",
+          locator: ".",
+          displayName: "workspace",
+        },
+        buildStrategy: "workspace-commands",
+        packagingMode: "host-process-runtime",
+        execution: {
+          kind: "host-process",
+          port: input.targetPort ?? 3000,
+          accessRoutes: [
+            {
+              proxyKind: input.proxyKind ?? "traefik",
+              domains: [input.hostname],
+              pathPrefix: input.pathPrefix ?? "/",
+              tlsMode: input.tlsMode ?? "disabled",
+              targetPort: input.targetPort ?? 3000,
+            },
+          ],
+          metadata: {
+            "access.routeSource": input.routeSource,
+            "access.hostname": input.hostname,
+            "access.scheme": (input.tlsMode ?? "disabled") === "auto" ? "https" : "http",
+          },
+        },
+        target: {
+          kind: "single-server",
+          providerKey: "generic-ssh",
+          serverIds: [target.serverId],
+        },
+        detectSummary: "pglite access summary test",
+        generatedAt: input.createdAt,
+        steps: ["deploy", "verify"],
+      },
+      environment_snapshot: {
+        id: `snap_${input.id}`,
+        environmentId: target.environmentId,
+        createdAt: input.createdAt,
+        precedence: ["defaults", "environment", "deployment"],
+        variables: [],
+      },
+      logs: [],
+      created_at: input.createdAt,
+      started_at: input.createdAt,
+      finished_at: input.createdAt,
+      rollback_of_deployment_id: null,
+    })
+    .execute();
+}
+
+async function insertDomainBinding(
+  db: Kysely<Database>,
+  target: Awaited<ReturnType<typeof seedSourceLinkContext>>,
+  input: {
+    id: string;
+    domainName: string;
+    status: string;
+    createdAt: string;
+    tlsMode?: "auto" | "disabled";
+    proxyKind?: "traefik" | "caddy";
+    pathPrefix?: string;
+    redirectTo?: string;
+    redirectStatus?: 301 | 302 | 307 | 308;
+  },
+): Promise<void> {
+  await db
+    .insertInto("domain_bindings")
+    .values({
+      id: input.id,
+      project_id: target.projectId,
+      environment_id: target.environmentId,
+      resource_id: target.resourceId,
+      server_id: target.serverId,
+      destination_id: target.destinationId,
+      domain_name: input.domainName,
+      path_prefix: input.pathPrefix ?? "/",
+      proxy_kind: input.proxyKind ?? "traefik",
+      tls_mode: input.tlsMode ?? "disabled",
+      redirect_to: input.redirectTo ?? null,
+      redirect_status: input.redirectStatus ?? null,
+      certificate_policy: "auto",
+      status: input.status,
+      verification_attempts: [],
+      dns_observation: null,
+      route_failure: null,
+      idempotency_key: null,
+      created_at: input.createdAt,
+    })
+    .execute();
 }
 
 describe("pglite persistence integration", () => {
@@ -694,6 +1055,48 @@ describe("pglite persistence integration", () => {
     }
   }, 15000);
 
+  test("[SOURCE-LINK-STATE-019] pg source link store can unlink preview state", async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), "appaloft-pglite-source-link-unlink-"));
+    const pgliteDataDir = join(workspaceDir, ".appaloft", "data", "pglite");
+    let closeDatabase: (() => Promise<void>) | undefined;
+
+    try {
+      const { createDatabase, createMigrator, PgSourceLinkStore } = await import("../src/index");
+      const database = await createDatabase({
+        driver: "pglite",
+        pgliteDataDir,
+      });
+      closeDatabase = () => database.close();
+      const migrator = createMigrator(database.db);
+      const migrationResult = await migrator.migrateToLatest();
+      expect(migrationResult.error).toBeUndefined();
+
+      const target = await seedSourceLinkContext(database.db, "unlink");
+      const store = new PgSourceLinkStore(database.db);
+      const sourceFingerprint = "source-fingerprint:v1:preview%3Apr%3A14";
+      const created = await store.createIfMissing({
+        sourceFingerprint,
+        target,
+        updatedAt: "2026-01-01T00:01:00.000Z",
+      });
+      expect(created.isOk()).toBe(true);
+
+      const deleted = await store.unlink(sourceFingerprint);
+      const readBack = await store.read(sourceFingerprint);
+      const deletedAgain = await store.unlink(sourceFingerprint);
+
+      expect(deleted.isOk()).toBe(true);
+      expect(readBack.isOk()).toBe(true);
+      expect(deletedAgain.isOk()).toBe(true);
+      expect(deleted._unsafeUnwrap()).toBe(true);
+      expect(readBack._unsafeUnwrap()).toBeNull();
+      expect(deletedAgain._unsafeUnwrap()).toBe(false);
+    } finally {
+      await closeDatabase?.();
+      rmSync(workspaceDir, { recursive: true, force: true });
+    }
+  }, 15000);
+
   test("[SERVER-APPLIED-ROUTE-STATE-001] pg route store upserts and reads desired state", async () => {
     const workspaceDir = mkdtempSync(join(tmpdir(), "appaloft-pglite-route-state-"));
     const pgliteDataDir = join(workspaceDir, ".appaloft", "data", "pglite");
@@ -1085,6 +1488,367 @@ describe("pglite persistence integration", () => {
         .where("route_set_id", "=", desired._unsafeUnwrap().routeSetId)
         .executeTakeFirst();
       expect(retainedAfterDeleteAttempt?.route_set_id).toBe(desired._unsafeUnwrap().routeSetId);
+    } finally {
+      await closeDatabase?.();
+      rmSync(workspaceDir, { recursive: true, force: true });
+    }
+  }, 15000);
+
+  test("[SERVER-APPLIED-ROUTE-STATE-006] pg route store can delete preview route state", async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), "appaloft-pglite-route-delete-"));
+    const pgliteDataDir = join(workspaceDir, ".appaloft", "data", "pglite");
+    let closeDatabase: (() => Promise<void>) | undefined;
+
+    try {
+      const { createDatabase, createMigrator, PgServerAppliedRouteStateStore } = await import(
+        "../src/index"
+      );
+      const database = await createDatabase({
+        driver: "pglite",
+        pgliteDataDir,
+      });
+      closeDatabase = () => database.close();
+      const migrator = createMigrator(database.db);
+      const migrationResult = await migrator.migrateToLatest();
+      expect(migrationResult.error).toBeUndefined();
+
+      const target = await seedSourceLinkContext(database.db, "route_delete");
+      const store = new PgServerAppliedRouteStateStore(database.db);
+      const desired = await store.upsertDesired({
+        target,
+        updatedAt: "2026-01-01T00:04:00.000Z",
+        domains: [
+          {
+            host: "delete.example.test",
+            pathPrefix: "/",
+            tlsMode: "auto",
+          },
+        ],
+      });
+      expect(desired.isOk()).toBe(true);
+
+      const deleted = await store.deleteDesired(target);
+      const readBack = await store.read(target);
+      const deletedAgain = await store.deleteDesired(target);
+
+      expect(deleted.isOk()).toBe(true);
+      expect(readBack.isOk()).toBe(true);
+      expect(deletedAgain.isOk()).toBe(true);
+      expect(deleted._unsafeUnwrap()).toBe(true);
+      expect(readBack._unsafeUnwrap()).toBeNull();
+      expect(deletedAgain._unsafeUnwrap()).toBe(false);
+    } finally {
+      await closeDatabase?.();
+      rmSync(workspaceDir, { recursive: true, force: true });
+    }
+  }, 15000);
+
+  test("[DEF-ACCESS-QRY-002][RES-HEALTH-QRY-014][RES-DIAG-QRY-017][EDGE-PROXY-QRY-002] pglite keeps durable precedence over newer server-applied and generated routes", async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), "appaloft-pglite-route-precedence-"));
+    const pgliteDataDir = join(workspaceDir, ".appaloft", "data", "pglite");
+    let closeDatabase: (() => Promise<void>) | undefined;
+
+    try {
+      const {
+        createDatabase,
+        createMigrator,
+        PgDeploymentReadModel,
+        PgDomainBindingReadModel,
+        PgResourceReadModel,
+        PgServerAppliedRouteStateStore,
+      } = await import("../src/index");
+      const database = await createDatabase({
+        driver: "pglite",
+        pgliteDataDir,
+      });
+      closeDatabase = () => database.close();
+      const migrator = createMigrator(database.db);
+      const migrationResult = await migrator.migrateToLatest();
+      expect(migrationResult.error).toBeUndefined();
+
+      const target = await seedSourceLinkContext(database.db, "route_precedence");
+      await enableReverseProxyResource(database.db, target.resourceId);
+      await insertDeploymentSnapshot(database.db, target, {
+        id: "dep_generated",
+        createdAt: "2026-01-01T00:03:00.000Z",
+        routeSource: "generated-default",
+        hostname: "generated.example.test",
+      });
+      await insertDeploymentSnapshot(database.db, target, {
+        id: "dep_durable",
+        createdAt: "2026-01-01T00:04:00.000Z",
+        routeSource: "durable-domain-binding",
+        hostname: "durable.example.test",
+      });
+      await insertDeploymentSnapshot(database.db, target, {
+        id: "dep_server_applied",
+        createdAt: "2026-01-01T00:05:00.000Z",
+        routeSource: "server-applied-config-domain",
+        hostname: "server-applied.example.test",
+      });
+      await insertDomainBinding(database.db, target, {
+        id: "dmb_ready",
+        domainName: "durable.example.test",
+        status: "ready",
+        createdAt: "2026-01-01T00:04:30.000Z",
+      });
+
+      const routeStore = new PgServerAppliedRouteStateStore(database.db);
+      const desired = await routeStore.upsertDesired({
+        target,
+        updatedAt: "2026-01-01T00:04:45.000Z",
+        domains: [
+          {
+            host: "server-applied.example.test",
+            pathPrefix: "/",
+            tlsMode: "disabled",
+          },
+        ],
+      });
+      expect(desired.isOk()).toBe(true);
+      const applied = await routeStore.markApplied({
+        target,
+        deploymentId: "dep_server_applied",
+        updatedAt: "2026-01-01T00:05:00.000Z",
+        routeSetId: desired._unsafeUnwrap().routeSetId,
+        providerKey: "traefik",
+        proxyKind: "traefik",
+      });
+      expect(applied.isOk()).toBe(true);
+
+      const context = createTestExecutionContext();
+      const resourceReadModel = new PgResourceReadModel(database.db);
+      const deploymentReadModel = new PgDeploymentReadModel(database.db);
+      const domainBindingReadModel = new PgDomainBindingReadModel(database.db);
+      const listResourcesQueryService = new ListResourcesQueryService(
+        resourceReadModel,
+        new EmptyDestinationRepository(),
+        new EmptyServerRepository(),
+        new DisabledDefaultAccessDomainProvider(),
+      );
+      const proxyConfigurationQueryService = new ResourceProxyConfigurationPreviewQueryService(
+        listResourcesQueryService,
+        deploymentReadModel,
+        new StaticEdgeProxyProviderRegistry(new FakeEdgeProxyProvider()),
+        new FixedClock(),
+      );
+      const healthQueryService = new ResourceHealthQueryService(
+        listResourcesQueryService,
+        domainBindingReadModel,
+        new EmptyResourceRepository(),
+        deploymentReadModel,
+        new StaticResourceHealthProbeRunner(),
+        new FixedClock(),
+      );
+      const runtimeLogsQueryService = new ResourceRuntimeLogsQueryService(
+        resourceReadModel,
+        deploymentReadModel,
+        new EmptyRuntimeLogReader(),
+      );
+      const diagnosticQueryService = new ResourceDiagnosticSummaryQueryService(
+        listResourcesQueryService,
+        domainBindingReadModel,
+        deploymentReadModel,
+        runtimeLogsQueryService,
+        proxyConfigurationQueryService,
+        new StaticDiagnosticsPort(),
+        new FixedClock(),
+      );
+
+      const listed = await listResourcesQueryService.execute(context, {
+        projectId: target.projectId,
+      });
+      const resource = listed.items.find((item) => item.id === target.resourceId);
+      expect(resource?.accessSummary).toMatchObject({
+        latestGeneratedAccessRoute: {
+          hostname: "generated.example.test",
+          deploymentId: "dep_generated",
+        },
+        latestDurableDomainRoute: {
+          hostname: "durable.example.test",
+          deploymentId: "dep_durable",
+        },
+        latestServerAppliedDomainRoute: {
+          hostname: "server-applied.example.test",
+          deploymentId: "dep_server_applied",
+        },
+        lastRouteRealizationDeploymentId: "dep_durable",
+      });
+
+      const proxyQuery = ResourceProxyConfigurationPreviewQuery.create({
+        resourceId: target.resourceId,
+        routeScope: "latest",
+      })._unsafeUnwrap();
+      const proxyResult = await proxyConfigurationQueryService.execute(context, proxyQuery);
+      expect(proxyResult.isOk()).toBe(true);
+      expect(proxyResult._unsafeUnwrap().routes).toEqual([
+        expect.objectContaining({
+          hostname: "durable.example.test",
+          source: "domain-binding",
+        }),
+      ]);
+
+      const healthQuery = ResourceHealthQuery.create({
+        resourceId: target.resourceId,
+      })._unsafeUnwrap();
+      const healthResult = await healthQueryService.execute(context, healthQuery);
+      expect(healthResult.isOk()).toBe(true);
+      expect(healthResult._unsafeUnwrap().publicAccess).toMatchObject({
+        status: "ready",
+        url: "http://durable.example.test",
+        kind: "durable-domain",
+      });
+
+      const diagnosticQuery = ResourceDiagnosticSummaryQuery.create({
+        resourceId: target.resourceId,
+        includeDeploymentLogTail: false,
+        includeRuntimeLogTail: false,
+        includeProxyConfiguration: false,
+        tailLines: 10,
+      })._unsafeUnwrap();
+      const diagnosticResult = await diagnosticQueryService.execute(context, diagnosticQuery);
+      expect(diagnosticResult.isOk()).toBe(true);
+      expect(diagnosticResult._unsafeUnwrap()).toMatchObject({
+        access: {
+          status: "available",
+          generatedUrl: "http://generated.example.test",
+          durableUrl: "http://durable.example.test",
+          serverAppliedUrl: "http://server-applied.example.test",
+        },
+        proxy: {
+          providerKey: "traefik",
+        },
+      });
+    } finally {
+      await closeDatabase?.();
+      rmSync(workspaceDir, { recursive: true, force: true });
+    }
+  }, 15000);
+
+  test("[RES-HEALTH-QRY-015][RES-DIAG-QRY-018] pglite exposes non-ready durable domain state before generated fallback", async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), "appaloft-pglite-pending-domain-"));
+    const pgliteDataDir = join(workspaceDir, ".appaloft", "data", "pglite");
+    let closeDatabase: (() => Promise<void>) | undefined;
+
+    try {
+      const {
+        createDatabase,
+        createMigrator,
+        PgDeploymentReadModel,
+        PgDomainBindingReadModel,
+        PgResourceReadModel,
+      } = await import("../src/index");
+      const database = await createDatabase({
+        driver: "pglite",
+        pgliteDataDir,
+      });
+      closeDatabase = () => database.close();
+      const migrator = createMigrator(database.db);
+      const migrationResult = await migrator.migrateToLatest();
+      expect(migrationResult.error).toBeUndefined();
+
+      const target = await seedSourceLinkContext(database.db, "pending_domain");
+      await enableReverseProxyResource(database.db, target.resourceId);
+      await insertDeploymentSnapshot(database.db, target, {
+        id: "dep_generated_pending",
+        createdAt: "2026-01-01T00:03:00.000Z",
+        routeSource: "generated-default",
+        hostname: "generated.example.test",
+      });
+      await insertDomainBinding(database.db, target, {
+        id: "dmb_pending",
+        domainName: "pending.example.test",
+        status: "pending_verification",
+        createdAt: "2026-01-01T00:04:00.000Z",
+        tlsMode: "auto",
+      });
+
+      const context = createTestExecutionContext();
+      const resourceReadModel = new PgResourceReadModel(database.db);
+      const deploymentReadModel = new PgDeploymentReadModel(database.db);
+      const domainBindingReadModel = new PgDomainBindingReadModel(database.db);
+      const listResourcesQueryService = new ListResourcesQueryService(
+        resourceReadModel,
+        new EmptyDestinationRepository(),
+        new EmptyServerRepository(),
+        new DisabledDefaultAccessDomainProvider(),
+      );
+      const proxyConfigurationQueryService = new ResourceProxyConfigurationPreviewQueryService(
+        listResourcesQueryService,
+        deploymentReadModel,
+        new StaticEdgeProxyProviderRegistry(new FakeEdgeProxyProvider()),
+        new FixedClock(),
+      );
+      const healthQueryService = new ResourceHealthQueryService(
+        listResourcesQueryService,
+        domainBindingReadModel,
+        new EmptyResourceRepository(),
+        deploymentReadModel,
+        new StaticResourceHealthProbeRunner(),
+        new FixedClock(),
+      );
+      const runtimeLogsQueryService = new ResourceRuntimeLogsQueryService(
+        resourceReadModel,
+        deploymentReadModel,
+        new EmptyRuntimeLogReader(),
+      );
+      const diagnosticQueryService = new ResourceDiagnosticSummaryQueryService(
+        listResourcesQueryService,
+        domainBindingReadModel,
+        deploymentReadModel,
+        runtimeLogsQueryService,
+        proxyConfigurationQueryService,
+        new StaticDiagnosticsPort(),
+        new FixedClock(),
+      );
+
+      const healthQuery = ResourceHealthQuery.create({
+        resourceId: target.resourceId,
+      })._unsafeUnwrap();
+      const healthResult = await healthQueryService.execute(context, healthQuery);
+      expect(healthResult.isOk()).toBe(true);
+      expect(healthResult._unsafeUnwrap()).toMatchObject({
+        overall: "degraded",
+        publicAccess: {
+          status: "not-ready",
+          url: "https://pending.example.test",
+          kind: "durable-domain",
+          reasonCode: "resource_domain_binding_not_ready",
+        },
+      });
+      expect(healthResult._unsafeUnwrap().sourceErrors).toContainEqual(
+        expect.objectContaining({
+          source: "domain-binding",
+          code: "resource_domain_binding_not_ready",
+          relatedEntityId: "dmb_pending",
+          relatedState: "pending_verification",
+        }),
+      );
+
+      const diagnosticQuery = ResourceDiagnosticSummaryQuery.create({
+        resourceId: target.resourceId,
+        includeDeploymentLogTail: false,
+        includeRuntimeLogTail: false,
+        includeProxyConfiguration: false,
+        tailLines: 10,
+      })._unsafeUnwrap();
+      const diagnosticResult = await diagnosticQueryService.execute(context, diagnosticQuery);
+      expect(diagnosticResult.isOk()).toBe(true);
+      expect(diagnosticResult._unsafeUnwrap()).toMatchObject({
+        access: {
+          status: "unavailable",
+          generatedUrl: "http://generated.example.test",
+          reasonCode: "resource_domain_binding_not_ready",
+        },
+      });
+      expect(diagnosticResult._unsafeUnwrap().sourceErrors).toContainEqual(
+        expect.objectContaining({
+          source: "access",
+          code: "resource_domain_binding_not_ready",
+          relatedEntityId: "dmb_pending",
+          relatedState: "pending_verification",
+        }),
+      );
     } finally {
       await closeDatabase?.();
       rmSync(workspaceDir, { recursive: true, force: true });

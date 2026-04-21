@@ -11,6 +11,7 @@ import {
   type PlannedResourceAccessRouteSummary,
   type ProxyConfigurationStatus,
   type ProxyConfigurationView,
+  type ResourceAccessRouteSummary,
   type ResourceSummary,
 } from "../../ports";
 import { tokens } from "../../tokens";
@@ -45,26 +46,50 @@ function proxyConfigurationStatusFromDeployment(
   }
 }
 
-function routesFromDeployment(deployment: DeploymentSummary): EdgeProxyRouteInput[] {
+type ProxyRouteSource = NonNullable<EdgeProxyRouteInput["source"]>;
+type ResourceProxyRouteStatus = NonNullable<ResourceSummary["accessSummary"]>["proxyRouteStatus"];
+
+function routeSourceFromDeployment(deployment: DeploymentSummary): ProxyRouteSource {
+  switch (deployment.runtimePlan.execution.metadata?.["access.routeSource"]) {
+    case "generated-default":
+      return "generated-default";
+    case "durable-domain-binding":
+      return "domain-binding";
+    case "server-applied-config-domain":
+      return "server-applied";
+    default:
+      return "deployment-snapshot";
+  }
+}
+
+function routesFromDeployment(
+  deployment: DeploymentSummary,
+  source: ProxyRouteSource = "deployment-snapshot",
+): EdgeProxyRouteInput[] {
   return (deployment.runtimePlan.execution.accessRoutes ?? []).map((route) => ({
     proxyKind: route.proxyKind,
     domains: route.domains,
     pathPrefix: route.pathPrefix,
     tlsMode: route.tlsMode,
     ...(route.targetPort === undefined ? {} : { targetPort: route.targetPort }),
+    source,
     ...(route.routeBehavior ? { routeBehavior: route.routeBehavior } : {}),
     ...(route.redirectTo ? { redirectTo: route.redirectTo } : {}),
     ...(route.redirectStatus ? { redirectStatus: route.redirectStatus } : {}),
   }));
 }
 
-function routeFromPlannedSummary(route: PlannedResourceAccessRouteSummary): EdgeProxyRouteInput {
+function routeFromSummary(
+  route: PlannedResourceAccessRouteSummary | ResourceAccessRouteSummary,
+  source: Exclude<ProxyRouteSource, "deployment-snapshot">,
+): EdgeProxyRouteInput {
   return {
     proxyKind: route.proxyKind,
     domains: [route.hostname],
     pathPrefix: route.pathPrefix,
     tlsMode: route.scheme === "https" ? "auto" : "disabled",
-    targetPort: route.targetPort,
+    ...(route.targetPort === undefined ? {} : { targetPort: route.targetPort }),
+    source,
   };
 }
 
@@ -98,6 +123,21 @@ function portFromRoutes(
       resourceId: resource.id,
     }),
   );
+}
+
+function proxyConfigurationStatusFromAccessSummary(
+  status: ResourceProxyRouteStatus,
+): ProxyConfigurationStatus {
+  switch (status) {
+    case "ready":
+      return "applied";
+    case "failed":
+      return "failed";
+    case "not-ready":
+    case "unknown":
+    case undefined:
+      return "planned";
+  }
 }
 
 @injectable()
@@ -134,7 +174,12 @@ export class ResourceProxyConfigurationPreviewQueryService {
     }
 
     const selectedDeployment = selectedDeploymentResult.value;
-    const routeStateResult = this.resolveRouteState(resource, query, selectedDeployment);
+    const routeStateResult = this.resolveRouteState(
+      resource,
+      query,
+      selectedDeployment,
+      deployments,
+    );
     if (routeStateResult.isErr()) {
       return err(routeStateResult.error);
     }
@@ -224,6 +269,7 @@ export class ResourceProxyConfigurationPreviewQueryService {
     resource: ResourceSummary,
     query: ResourceProxyConfigurationPreviewQuery,
     selectedDeployment: DeploymentSummary | undefined,
+    deployments: DeploymentSummary[],
   ): Result<
     {
       routes: EdgeProxyRouteInput[];
@@ -252,8 +298,18 @@ export class ResourceProxyConfigurationPreviewQueryService {
       });
     }
 
+    if (query.routeScope === "latest") {
+      const currentRoute = this.currentRouteFromAccessSummary(resource, deployments);
+      if (currentRoute) {
+        return ok(currentRoute);
+      }
+    }
+
     if (query.routeScope === "latest" && selectedDeployment) {
-      const deploymentRoutes = routesFromDeployment(selectedDeployment);
+      const deploymentRoutes = routesFromDeployment(
+        selectedDeployment,
+        routeSourceFromDeployment(selectedDeployment),
+      );
       if (deploymentRoutes.some(routeRequiresProvider)) {
         return ok({
           deployment: selectedDeployment,
@@ -269,7 +325,7 @@ export class ResourceProxyConfigurationPreviewQueryService {
     const planned = resource.accessSummary?.plannedGeneratedAccessRoute;
     if (planned) {
       return ok({
-        routes: [routeFromPlannedSummary(planned)],
+        routes: [routeFromSummary(planned, "generated-default")],
         status: "planned",
         stale: false,
       });
@@ -280,5 +336,61 @@ export class ResourceProxyConfigurationPreviewQueryService {
       status: "not-configured",
       stale: false,
     });
+  }
+
+  private currentRouteFromAccessSummary(
+    resource: ResourceSummary,
+    deployments: DeploymentSummary[],
+  ):
+    | {
+        routes: EdgeProxyRouteInput[];
+        status: ProxyConfigurationStatus;
+        stale: boolean;
+        deployment?: DeploymentSummary;
+      }
+    | undefined {
+    const access = resource.accessSummary;
+    if (!access) {
+      return undefined;
+    }
+
+    const selected = access.latestDurableDomainRoute
+      ? { route: access.latestDurableDomainRoute, source: "domain-binding" as const }
+      : access.latestServerAppliedDomainRoute
+        ? { route: access.latestServerAppliedDomainRoute, source: "server-applied" as const }
+        : access.latestGeneratedAccessRoute
+          ? { route: access.latestGeneratedAccessRoute, source: "generated-default" as const }
+          : access.plannedGeneratedAccessRoute
+            ? { route: access.plannedGeneratedAccessRoute, source: "generated-default" as const }
+            : undefined;
+
+    if (!selected) {
+      return undefined;
+    }
+
+    const selectedRoute = selected.route;
+    const deploymentId = "deploymentId" in selectedRoute ? selectedRoute.deploymentId : undefined;
+    const deployment = deploymentId
+      ? deployments.find((candidate) => candidate.id === deploymentId)
+      : undefined;
+    const deploymentRoutes =
+      deployment && routeSourceFromDeployment(deployment) === selected.source
+        ? routesFromDeployment(deployment, selected.source)
+        : undefined;
+
+    return {
+      ...(deployment ? { deployment } : {}),
+      routes: deploymentRoutes?.length
+        ? deploymentRoutes
+        : [routeFromSummary(selected.route, selected.source)],
+      status:
+        selected.route === access.plannedGeneratedAccessRoute
+          ? "planned"
+          : proxyConfigurationStatusFromAccessSummary(access.proxyRouteStatus),
+      stale:
+        deployment && access.lastRouteRealizationDeploymentId
+          ? access.lastRouteRealizationDeploymentId !== deployment.id
+          : false,
+    };
   }
 }
