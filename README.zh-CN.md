@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="./apps/web/src/lib/assets/appaloft-logo.svg" alt="Appaloft" width="360" />
+  <img src="./apps/web/src/lib/assets/appaloft-mark.svg" alt="Appaloft mark" width="96" />
 
   <h1>Appaloft</h1>
 
