@@ -403,6 +403,7 @@ export interface ServerAppliedRouteStateStore extends ServerAppliedRouteDesiredS
     proxyKind?: EdgeProxyKind;
   }): Promise<Result<ServerAppliedRouteDesiredStateRecord | null>>;
   deleteDesired(target: ServerAppliedRouteDesiredStateTarget): Promise<Result<boolean>>;
+  deleteDesiredBySourceFingerprint(sourceFingerprint: string): Promise<Result<number>>;
 }
 
 export interface CertificateRepository {

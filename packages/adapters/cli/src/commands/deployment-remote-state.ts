@@ -1,4 +1,4 @@
-import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import {
   type DomainError,
@@ -130,6 +130,7 @@ export interface ServerAppliedRouteDesiredStateStore {
     proxyKind?: EdgeProxyKind;
   }): Promise<Result<ServerAppliedRouteDesiredStateRecord | null>>;
   deleteDesired(target: ServerAppliedRouteTarget): Promise<Result<boolean>>;
+  deleteDesiredBySourceFingerprint(sourceFingerprint: string): Promise<Result<number>>;
 }
 
 const defaultSchemaVersion = 1;
@@ -1015,6 +1016,40 @@ export class FileSystemServerAppliedRouteDesiredStateStore
     } catch (error) {
       return err(
         domainError.infra("Server-applied route desired state could not be removed", {
+          phase: "config-domain-resolution",
+          message: error instanceof Error ? error.message : String(error),
+        }),
+      );
+    }
+  }
+
+  async deleteDesiredBySourceFingerprint(sourceFingerprint: string): Promise<Result<number>> {
+    const fingerprintResult = validateSourceFingerprint(sourceFingerprint);
+    if (fingerprintResult.isErr()) {
+      return err(fingerprintResult.error);
+    }
+
+    try {
+      if (!(await pathExists(this.routesDirectory()))) {
+        return ok(0);
+      }
+
+      let deleted = 0;
+      for (const entry of await readdir(this.routesDirectory())) {
+        const path = join(this.routesDirectory(), entry);
+        const record = await readJsonFile<ServerAppliedRouteDesiredStateRecord>(path);
+        if (!record || record.sourceFingerprint !== sourceFingerprint) {
+          continue;
+        }
+
+        await rm(path);
+        deleted += 1;
+      }
+
+      return ok(deleted);
+    } catch (error) {
+      return err(
+        domainError.infra("Server-applied route desired state sweep could not be removed", {
           phase: "config-domain-resolution",
           message: error instanceof Error ? error.message : String(error),
         }),

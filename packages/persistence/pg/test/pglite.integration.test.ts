@@ -1692,6 +1692,80 @@ describe("pglite persistence integration", () => {
     }
   }, 15000);
 
+  test("[SERVER-APPLIED-ROUTE-STATE-007] pg route store can sweep preview route state by source fingerprint", async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), "appaloft-pglite-route-sweep-"));
+    const pgliteDataDir = join(workspaceDir, ".appaloft", "data", "pglite");
+    let closeDatabase: (() => Promise<void>) | undefined;
+
+    try {
+      const { createDatabase, createMigrator, PgServerAppliedRouteStateStore } = await import(
+        "../src/index"
+      );
+      const database = await createDatabase({
+        driver: "pglite",
+        pgliteDataDir,
+      });
+      closeDatabase = () => database.close();
+      const migrator = createMigrator(database.db);
+      const migrationResult = await migrator.migrateToLatest();
+      expect(migrationResult.error).toBeUndefined();
+
+      const sourceFingerprint = "source-fingerprint:v1:preview%3Apr%3A14";
+      const store = new PgServerAppliedRouteStateStore(database.db);
+      const firstTarget = await seedSourceLinkContext(database.db, "route_sweep_one");
+      const secondTarget = await seedSourceLinkContext(database.db, "route_sweep_two");
+      const retainedTarget = await seedSourceLinkContext(database.db, "route_sweep_retained");
+
+      await store.upsertDesired({
+        target: firstTarget,
+        sourceFingerprint,
+        updatedAt: "2026-01-01T00:04:00.000Z",
+        domains: [
+          {
+            host: "one.preview.example.test",
+            pathPrefix: "/",
+            tlsMode: "auto",
+          },
+        ],
+      });
+      await store.upsertDesired({
+        target: secondTarget,
+        sourceFingerprint,
+        updatedAt: "2026-01-01T00:04:00.000Z",
+        domains: [
+          {
+            host: "two.preview.example.test",
+            pathPrefix: "/",
+            tlsMode: "auto",
+          },
+        ],
+      });
+      await store.upsertDesired({
+        target: retainedTarget,
+        sourceFingerprint: "source-fingerprint:v1:preview%3Apr%3A15",
+        updatedAt: "2026-01-01T00:04:00.000Z",
+        domains: [
+          {
+            host: "retained.preview.example.test",
+            pathPrefix: "/",
+            tlsMode: "auto",
+          },
+        ],
+      });
+
+      const deleted = await store.deleteDesiredBySourceFingerprint(sourceFingerprint);
+      const retained = await store.read(retainedTarget);
+
+      expect(deleted.isOk()).toBe(true);
+      expect(retained.isOk()).toBe(true);
+      expect(deleted._unsafeUnwrap()).toBe(2);
+      expect(retained._unsafeUnwrap()?.resourceId).toBe(retainedTarget.resourceId);
+    } finally {
+      await closeDatabase?.();
+      rmSync(workspaceDir, { recursive: true, force: true });
+    }
+  }, 15000);
+
   test("[DEF-ACCESS-QRY-002][RES-HEALTH-QRY-014][RES-DIAG-QRY-017][EDGE-PROXY-QRY-002] pglite keeps durable precedence over newer server-applied and generated routes", async () => {
     const workspaceDir = mkdtempSync(join(tmpdir(), "appaloft-pglite-route-precedence-"));
     const pgliteDataDir = join(workspaceDir, ".appaloft", "data", "pglite");
