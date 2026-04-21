@@ -25,6 +25,7 @@ import {
   type SourcePackageManager,
   type SourceRuntimeFamily,
 } from "@appaloft/core";
+import { pinnedBunAlpineImage } from "../src/workspace-planners/bun";
 
 function createTestExecutionContext(): ExecutionContext {
   return {
@@ -699,7 +700,7 @@ describe("DefaultRuntimePlanResolver", () => {
         runtimeKind: "static",
         framework: "sveltekit",
         packageManager: "bun",
-        baseImage: "oven/bun:1-alpine",
+        baseImage: pinnedBunAlpineImage,
         publishDirectory: "/build",
       }),
     );

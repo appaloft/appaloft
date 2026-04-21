@@ -84,7 +84,6 @@ const frameworkFixtures: FrameworkFixtureExpectation[] = [
     packageManager: "bun",
     applicationShape: "static",
     fixedVersions: {
-      packageManager: "bun@1.3.12",
       dependencies: {
         "@vitejs/plugin-react": "4.3.4",
         react: "18.3.1",

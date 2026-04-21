@@ -8,6 +8,7 @@ import {
   type SourceInspectionSnapshot,
 } from "@appaloft/core";
 import { type RequestedDeploymentConfig } from "@appaloft/application";
+import { pinnedBunAlpineImage } from "../bun";
 import { resolveNodePackageManager, type NodePackageManager } from "../node";
 
 export interface StaticFrameworkPlan {
@@ -99,7 +100,7 @@ function runCommandFor(packageManager: NodePackageManager, script: string): stri
 
 function baseImageFor(inspection?: SourceInspectionSnapshot): string {
   if (inspection?.packageManager === "bun") {
-    return "oven/bun:1-alpine";
+    return pinnedBunAlpineImage;
   }
 
   return `node:${inspection?.runtimeVersion ?? "22"}-alpine`;
