@@ -5,6 +5,8 @@ export const tokens = {
   eventBus: Symbol.for("appaloft.event_bus"),
   deploymentProgressReporter: Symbol.for("appaloft.deployment_progress_reporter"),
   sourceLinkStore: Symbol.for("appaloft.source_link_store"),
+  defaultAccessDomainPolicyStore: Symbol.for("appaloft.default_access_domain_policy_store"),
+  defaultAccessDomainPolicySupport: Symbol.for("appaloft.default_access_domain_policy_support"),
   serverConnectivityChecker: Symbol.for("appaloft.server_connectivity_checker"),
   serverEdgeProxyBootstrapper: Symbol.for("appaloft.server_edge_proxy_bootstrapper"),
   deploymentConfigReader: Symbol.for("appaloft.deployment_config_reader"),
@@ -40,6 +42,9 @@ export const tokens = {
   sshCredentialReadModel: Symbol.for("appaloft.ssh_credential_read_model"),
   createProjectUseCase: Symbol.for("appaloft.create_project_use_case"),
   listProjectsQueryService: Symbol.for("appaloft.list_projects_query_service"),
+  configureDefaultAccessDomainPolicyUseCase: Symbol.for(
+    "appaloft.configure_default_access_domain_policy_use_case",
+  ),
   registerServerUseCase: Symbol.for("appaloft.register_server_use_case"),
   configureServerCredentialUseCase: Symbol.for("appaloft.configure_server_credential_use_case"),
   createSshCredentialUseCase: Symbol.for("appaloft.create_ssh_credential_use_case"),

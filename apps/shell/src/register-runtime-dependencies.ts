@@ -28,8 +28,7 @@ import {
   type CertificateSecretStore,
   type Clock,
   CommandBus,
-  type DefaultAccessDomainGeneration,
-  type DefaultAccessDomainProvider,
+  type DefaultAccessDomainPolicyStore,
   DefaultAccessDomainRuntimePlanResolver,
   type DeploymentProgressReporter,
   type EventBus,
@@ -59,6 +58,7 @@ import {
   PgCertificateReadModel,
   PgCertificateRepository,
   PgCertificateRetryCandidateReader,
+  PgDefaultAccessDomainPolicyStore,
   PgDeploymentReadModel,
   PgDeploymentRepository,
   PgDestinationRepository,
@@ -87,7 +87,6 @@ import {
   acmeCertificateProvider,
 } from "@appaloft/provider-certificate-acme";
 import { InMemoryProviderRegistry } from "@appaloft/provider-core";
-import { SslipDefaultAccessDomainProvider } from "@appaloft/provider-default-access-domain-sslip";
 import { caddyEdgeProxyProvider } from "@appaloft/provider-edge-proxy-caddy";
 import { traefikEdgeProxyProvider } from "@appaloft/provider-edge-proxy-traefik";
 import { genericSshProvider } from "@appaloft/provider-generic-ssh";
@@ -95,7 +94,10 @@ import { localShellProvider } from "@appaloft/provider-local-shell";
 import { tencentProvider } from "@appaloft/provider-tencent";
 import { customAlphabet } from "nanoid";
 import { type DependencyContainer, instanceCachingFactory } from "tsyringe";
-
+import {
+  PolicyAwareDefaultAccessDomainProvider,
+  ShellDefaultAccessDomainPolicySupport,
+} from "./default-access-domain-policy-runtime";
 import { ShellDeploymentContextDefaultsPolicy } from "./deployment-context-defaults-policy";
 
 class SystemClock implements Clock {
@@ -381,21 +383,6 @@ class RequestScopedIntegrationAuthPort implements IntegrationAuthPort {
   }
 }
 
-class DisabledDefaultAccessDomainProvider implements DefaultAccessDomainProvider {
-  constructor(
-    private readonly reason: string,
-    private readonly providerKey?: string,
-  ) {}
-
-  async generate(): Promise<Result<DefaultAccessDomainGeneration, DomainError>> {
-    return ok({
-      kind: "disabled",
-      reason: this.reason,
-      ...(this.providerKey ? { providerKey: this.providerKey } : {}),
-    });
-  }
-}
-
 export interface RegisterRuntimeDependenciesInput {
   config: AppConfig;
   logger: AppLogger;
@@ -404,6 +391,7 @@ export interface RegisterRuntimeDependenciesInput {
   authRuntime: AuthRuntime;
   deploymentProgressReporter: DeploymentProgressReporter;
   sourceLinkStore?: SourceLinkStore;
+  defaultAccessDomainPolicyStore?: DefaultAccessDomainPolicyStore;
   serverAppliedRouteDesiredStateReader?: ServerAppliedRouteStateStore;
   resourceAccessFailureRenderer?: () => ResourceAccessFailureRendererTarget | undefined;
 }
@@ -431,9 +419,18 @@ export function registerRuntimeDependencies(
     input.sourceLinkStore ?? new UnavailableSourceLinkStore(),
   );
   container.registerInstance(
+    tokens.defaultAccessDomainPolicyStore,
+    input.defaultAccessDomainPolicyStore ?? new PgDefaultAccessDomainPolicyStore(input.database.db),
+  );
+  container.registerInstance(
     tokens.serverAppliedRouteDesiredStateReader,
     input.serverAppliedRouteDesiredStateReader ?? new NoopServerAppliedRouteStateStore(),
   );
+  container.register(tokens.defaultAccessDomainPolicySupport, {
+    useFactory: instanceCachingFactory(
+      () => new ShellDefaultAccessDomainPolicySupport(input.config.defaultAccessDomain),
+    ),
+  });
   container.register(tokens.serverConnectivityChecker, {
     useFactory: instanceCachingFactory(
       (dependencyContainer) =>
@@ -567,25 +564,14 @@ export function registerRuntimeDependencies(
     useFactory: instanceCachingFactory(() => new FileSystemDeploymentConfigReader()),
   });
   container.register(tokens.defaultAccessDomainProvider, {
-    useFactory: instanceCachingFactory(() => {
-      const config = input.config.defaultAccessDomain;
-      if (config.mode === "disabled") {
-        return new DisabledDefaultAccessDomainProvider("policy-disabled", config.providerKey);
-      }
-
-      if (config.providerKey === "sslip") {
-        return new SslipDefaultAccessDomainProvider({
-          providerKey: config.providerKey,
-          zone: config.zone,
-          scheme: config.scheme,
-        });
-      }
-
-      input.logger.warn("default_access_domain_provider_unknown", {
-        providerKey: config.providerKey,
-      });
-      return new DisabledDefaultAccessDomainProvider("unknown-provider", config.providerKey);
-    }),
+    useFactory: instanceCachingFactory(
+      (dependencyContainer) =>
+        new PolicyAwareDefaultAccessDomainProvider(
+          dependencyContainer.resolve(tokens.defaultAccessDomainPolicyStore),
+          input.config.defaultAccessDomain,
+          input.logger,
+        ),
+    ),
   });
   container.register(tokens.runtimePlanResolver, {
     useFactory: instanceCachingFactory(
