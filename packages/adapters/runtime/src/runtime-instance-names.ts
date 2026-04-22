@@ -56,7 +56,7 @@ export interface RuntimeInstanceNames {
 
 export function deriveRuntimeInstanceNames(input: {
   deploymentId: string;
-  metadata?: Record<string, string>;
+  metadata?: Record<string, string> | undefined;
 }): RuntimeInstanceNames {
   const requestedRuntimeName = input.metadata?.["resource.runtimeName"]?.trim().toLowerCase();
 
