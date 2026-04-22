@@ -25,7 +25,7 @@ This roadmap is the release gate for Appaloft versions before `1.0.0`.
 - [x] Use this roadmap to choose the release version.
 - [x] Before the next release, verify package manifests, Release Please state, and the latest
   published release agree on the current version line. The roadmap starts from the current public
-  line `0.2.x` because the current release is `0.2.10`.
+  line `0.2.x` because the current release is `0.2.11`.
 
 Version selection rules:
 
@@ -42,15 +42,15 @@ Version selection rules:
 
 Current release alignment:
 
-- [x] On 2026-04-22, latest public release and `origin/main` package manifests agree on `0.2.10`,
+- [x] On 2026-04-22, latest public release and `origin/main` package manifests agree on `0.2.11`,
   and there is no open Release Please PR, so the next stable-release action is to create or update
-  the next patch-line Release Please PR for `0.2.11`.
-- [x] On 2026-04-22, the `v0.2.10` release is the current stable public line. Since Phase 1 is
-  still incomplete, the next allowed stable target remains `0.2.11` on the `0.2.x` line rather
+  the next patch-line Release Please PR for `0.2.12`.
+- [x] On 2026-04-22, the `v0.2.11` release is the current stable public line. Since Phase 1 is
+  still incomplete, the next allowed stable target remains `0.2.12` on the `0.2.x` line rather
   than `0.3.0`.
 - [x] On 2026-04-22, custom resource runtime/container naming for Quick Deploy, CLI config-driven
-  deploys, and Web runtime profile editing is merged on `origin/main`, while the current preview
-  runtime-name template variables on `main` remain `{previewId}` and `{prNumber}`.
+  deploys, and Web runtime profile editing is merged on `origin/main`, and the current preview
+  runtime-name template variables on `main` are `{preview_id}` and `{pr_number}`.
 - [x] On 2026-04-22, Action/CLI PR preview deploy profile flag support and explicit preview cleanup
   command support are implemented in the CLI/config bootstrap path, but the public
   deploy-action wrapper and product-grade GitHub App preview lifecycle remain incomplete.
@@ -234,7 +234,7 @@ Required:
 - [x] Add or update the release checklist so `docs/PRODUCT_ROADMAP.md` is part of every release
   preflight.
 - [x] Ensure `docs/PRODUCT_ROADMAP.md` is referenced by the release flow used by maintainers.
-- [ ] Confirm no release workflow can be intentionally triggered without explicit user confirmation.
+- [x] Confirm no release workflow can be intentionally triggered without explicit user confirmation.
 
 Exit criteria:
 
