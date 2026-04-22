@@ -125,10 +125,11 @@ environment values, or custom domain intent.
 Config files are not required for Action preview deploys. Trusted action inputs, workflow
 environment, CLI flags, and future MCP/tool parameters may provide the same canonical profile
 fields that repository config supports: runtime strategy and commands, publish directory, network
-profile, health path, non-secret env values, `ci-env:` secret references, and preview custom-route
-policy. These inputs feed the same config bootstrap/Quick Deploy profile path and must not be
-translated into `deployments.create` fields. A workflow must not generate a temporary config file as
-the normal way to pass values that the CLI/action input surface already models.
+profile, health path, optional runtime name, non-secret env values, `ci-env:` secret references,
+and preview custom-route policy. These inputs feed the same config bootstrap/Quick Deploy profile
+path and must not be translated into `deployments.create` fields. A workflow must not generate a
+temporary config file as the normal way to pass values that the CLI/action input surface already
+models.
 
 Field precedence after a config file is selected follows the repository config bootstrap contract:
 
@@ -194,6 +195,12 @@ The default environment key should be derived from the PR id, for example `previ
 an entry-workflow selection rule over `environments.create` / `environments.list`, not a committed
 config selector.
 
+The default preview runtime name seed should be derived from the PR id as `preview-{prNumber}`, for
+example `preview-123`. This is also trusted entry-workflow context, not committed repository
+identity. If preview-specific config or trusted action/CLI profile input supplies an explicit
+runtime name, that explicit value wins; otherwise preview resource creation/configuration must use
+the derived seed so effective runtime/container names remain human-recognizable.
+
 ## Operation Sequence
 
 For Action-only preview deploy, the workflow uses existing operations:
@@ -207,6 +214,7 @@ resolve preview context
   -> create or select project from trusted source state/defaults
   -> create or select preview environment
   -> create or select preview resource from preview-scoped link
+  -> derive preview runtime name seed `preview-{prNumber}` when profile input does not override it
   -> apply config env and secret references through environment operations
   -> deployments.create(projectId, environmentId, resourceId, serverId, destinationId?)
   -> realize proxy route when the resolved resource/network/access state has a route
@@ -227,6 +235,11 @@ Appaloft must not publish random host ports as a fallback.
 
 Multiple PR previews may use the same internal application port because route and workload
 replacement are scoped by resource/deployment identity, not by the port number alone.
+
+The same rule applies to runtime naming. Preview deployments should preserve the requested runtime
+name seed `preview-{prNumber}` in effective runtime/container names when possible, but adapters
+must still keep effective names unique for overlapping same-resource replacement and for distinct
+preview resources that happen to request the same name.
 
 If the selected server has no proxy intent, proxy bootstrap failed, or the resource is not inbound
 HTTP, the deployment may still succeed without a public preview URL when route policy says access is

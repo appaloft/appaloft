@@ -80,9 +80,9 @@ link/source state, explicit operator input, trusted CI/action inputs, or the int
 from a mutable `project` or resource selector in the repo file.
 
 Config file values follow the same resource-boundary rules as manually entered Quick Deploy drafts:
-runtime fields map to `ResourceRuntimeProfile`, listener and exposure fields map to
-`ResourceNetworkProfile`, health fields map to resource health/runtime profile, and final deployment
-admission remains ids-only.
+runtime fields, including optional runtime naming intent, map to `ResourceRuntimeProfile`, listener
+and exposure fields map to `ResourceNetworkProfile`, health fields map to resource
+health/runtime profile, and final deployment admission remains ids-only.
 
 When Quick Deploy collects custom domain/TLS intent, the handling depends on the selected state
 backend. In pure CLI/SSH mode, provider-neutral `access.domains[]` intent from `appaloft.yml` is a
@@ -118,6 +118,9 @@ Quick Deploy must use the ADR-012 domain language while collecting draft values:
 - source selection is variant-specific: Git, local folder, Docker image, Compose, Dockerfile,
   static, zip, and inline source drafts may expose different fields, but they must normalize into
   resource source/runtime/network profile input before any write command is dispatched;
+- runtime planning may include an optional runtime name field. The durable owner is
+  `ResourceRuntimeProfile.runtimeName`, even when Web/CLI labels present it as "container name"
+  for the current Docker/OCI substrate;
 - runtime selection produces a runtime plan strategy hint, not a deployment-owned method;
 - runtime selection must resolve to a Docker/OCI-backed deployment substrate for v1. Dockerfile,
   Docker Compose, prebuilt image, static, auto/buildpack-style, and workspace-command choices are

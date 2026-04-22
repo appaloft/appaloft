@@ -63,6 +63,7 @@ const runtimeStrategyOption = Options.choice("strategy", runtimePlanStrategies).
 const runtimeInstallCommandOption = Options.text("install-command").pipe(Options.optional);
 const runtimeBuildCommandOption = Options.text("build-command").pipe(Options.optional);
 const runtimeStartCommandOption = Options.text("start-command").pipe(Options.optional);
+const runtimeNameOption = Options.text("runtime-name").pipe(Options.optional);
 const runtimePublishDirectoryOption = Options.text("publish-directory").pipe(Options.optional);
 const runtimeDockerfilePathOption = Options.text("dockerfile-path").pipe(Options.optional);
 const runtimeDockerComposeFilePathOption = Options.text("docker-compose-file-path").pipe(
@@ -448,6 +449,7 @@ const configureRuntimeCommand = EffectCommand.make(
     installCommand: runtimeInstallCommandOption,
     buildCommand: runtimeBuildCommandOption,
     startCommand: runtimeStartCommandOption,
+    runtimeName: runtimeNameOption,
     publishDirectory: runtimePublishDirectoryOption,
     dockerfilePath: runtimeDockerfilePathOption,
     dockerComposeFilePath: runtimeDockerComposeFilePathOption,
@@ -463,6 +465,7 @@ const configureRuntimeCommand = EffectCommand.make(
     json,
     publishDirectory,
     resourceId,
+    runtimeName,
     startCommand,
     strategy,
   }) => {
@@ -470,6 +473,7 @@ const configureRuntimeCommand = EffectCommand.make(
     const installCommandValue = optionalValue(installCommand);
     const buildCommandValue = optionalValue(buildCommand);
     const startCommandValue = optionalValue(startCommand);
+    const runtimeNameValue = optionalValue(runtimeName);
     const publishDirectoryValue = optionalValue(publishDirectory);
     const dockerfilePathValue = optionalValue(dockerfilePath);
     const dockerComposeFilePathValue = optionalValue(dockerComposeFilePath);
@@ -483,6 +487,7 @@ const configureRuntimeCommand = EffectCommand.make(
           ...(installCommandValue ? { installCommand: installCommandValue } : {}),
           ...(buildCommandValue ? { buildCommand: buildCommandValue } : {}),
           ...(startCommandValue ? { startCommand: startCommandValue } : {}),
+          ...(runtimeNameValue ? { runtimeName: runtimeNameValue } : {}),
           ...(publishDirectoryValue ? { publishDirectory: publishDirectoryValue } : {}),
           ...(dockerfilePathValue ? { dockerfilePath: dockerfilePathValue } : {}),
           ...(dockerComposeFilePathValue

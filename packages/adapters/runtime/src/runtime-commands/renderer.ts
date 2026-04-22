@@ -122,6 +122,7 @@ function renderDockerComposeUpCommand(
 ): string {
   return [
     "docker compose",
+    spec.projectName ? `-p ${options.quote(spec.projectName.value)}` : "",
     "-f",
     options.quote(spec.composeFile.value),
     "up",

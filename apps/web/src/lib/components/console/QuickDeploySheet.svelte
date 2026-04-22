@@ -306,6 +306,7 @@
   let generatedResourceNameBase = $state("");
   let resourceKind = $state<ResourceKind>(parseResourceKind(browser ? page.url.searchParams.get("resourceKind") : null));
   let resourceDescription = $state(browser ? (page.url.searchParams.get("resourceDescription") ?? "") : "");
+  let resourceRuntimeName = $state(browser ? (page.url.searchParams.get("resourceRuntimeName") ?? "") : "");
   let resourceInternalPort = $state(
     browser
       ? (page.url.searchParams.get("resourceInternalPort") ??
@@ -573,6 +574,10 @@
         segments.push(`--resource-kind ${editedResourceInput.kind}`);
       }
       segments.push(`--port ${resourceInternalPort.trim() || resourceInternalPortDefault}`);
+    }
+
+    if (createsResource && resourceRuntimeName.trim()) {
+      segments.push(`--runtime-name ${resourceRuntimeName.trim()}`);
     }
 
     if (createsResource && resourceHealthCheckEnabled && healthCheckPath) {
@@ -1204,9 +1209,11 @@
         setSearchParam(params, "generatedResourceName", generatedResourceName);
         setSearchParam(params, "resourceKind", resourceKind, "application");
         setSearchParam(params, "resourceDescription", resourceDescription);
+        setSearchParam(params, "resourceRuntimeName", resourceRuntimeName);
       }
     } else {
       setSearchParam(params, "generatedResourceName", generatedResourceName);
+      setSearchParam(params, "resourceRuntimeName", resourceRuntimeName);
     }
     setSearchParam(params, "resourceInternalPort", resourceInternalPort, "3000");
     setSearchParam(params, "staticPublishDirectory", staticPublishDirectory, "/dist");
@@ -1269,6 +1276,7 @@
     generatedResourceNameBase = "";
     resourceKind = parseResourceKind(params.get("resourceKind"));
     resourceDescription = params.get("resourceDescription") ?? "";
+    resourceRuntimeName = params.get("resourceRuntimeName") ?? "";
     resourceInternalPort = params.get("resourceInternalPort") ?? (nextSourceKind === "static-site" ? "80" : "3000");
     staticPublishDirectory = params.get("staticPublishDirectory") ?? "/dist";
     staticInstallCommand = params.get("staticInstallCommand") ?? "";
@@ -1496,14 +1504,20 @@
 
   function runtimeProfileForSource(): ResourceRuntimeProfileInput {
     const healthCheck = healthCheckPolicyForResource();
+    const requestedRuntimeName = resourceRuntimeName.trim();
     const withHealthCheckPath = (
       input: ResourceRuntimeProfileInput,
     ): ResourceRuntimeProfileInput =>
-      healthCheck
+      healthCheck || requestedRuntimeName
         ? {
             ...input,
-            healthCheckPath: healthCheck.http?.path,
-            healthCheck,
+            ...(requestedRuntimeName ? { runtimeName: requestedRuntimeName } : {}),
+            ...(healthCheck
+              ? {
+                  healthCheckPath: healthCheck.http?.path,
+                  healthCheck,
+                }
+              : {}),
           }
         : input;
 
@@ -2795,6 +2809,12 @@
                         <div class="space-y-3">
                           <div class="grid gap-3 sm:grid-cols-2">
                             <Input bind:value={resourceName} placeholder={generatedResourceName || inferredSourceName} />
+                            <Input
+                              bind:value={resourceRuntimeName}
+                              placeholder={$t(i18nKeys.console.resources.runtimeNamePlaceholder)}
+                            />
+                          </div>
+                          <div class="grid gap-3 sm:grid-cols-2">
                             <Input bind:value={resourceDescription} placeholder={$t(i18nKeys.common.domain.description)} />
                           </div>
                           <div class="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">

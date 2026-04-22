@@ -63,6 +63,7 @@ import {
   type Result,
   type RollbackPlan,
   RuntimeExecutionPlan,
+  RuntimeNameText,
   RuntimePlan,
   RuntimePlanId,
   RuntimePlanStrategyValue,
@@ -498,6 +499,7 @@ async function createDeploymentFixture(
     },
     runtimeProfile: {
       strategy: RuntimePlanStrategyValue.rehydrate("auto"),
+      runtimeName: RuntimeNameText.rehydrate("www"),
     },
     networkProfile: {
       internalPort: PortNumber.rehydrate(3000),
@@ -811,6 +813,7 @@ describe("CreateDeploymentUseCase", () => {
       "context.serverName": "demo-server",
       "context.serverProviderKey": "generic-ssh",
       "context.serverTargetKind": "single-server",
+      "resource.runtimeName": "www",
     });
     expect(runtimePlanResolver.input?.requestedDeployment.runtimeMetadata?.["preview.id"]).toBe(
       undefined,

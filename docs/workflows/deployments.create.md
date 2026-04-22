@@ -154,6 +154,12 @@ Docker logs, process invocation, and shell-script leaves for user-authored works
 Adapter code renders those specs to local shell, SSH shell, or another executor-specific form only
 at the execution boundary. Workflow logic must not branch on ad-hoc rendered command strings.
 
+When `ResourceRuntimeProfile.runtimeName` is present, deployment planning/runtime adapters may use
+it as the requested runtime name while still deriving a unique effective Docker container or
+Compose project name from deployment/resource/preview context. The requested value must not be
+treated as an exact global reservation because safe replacement may require two same-resource
+runtime instances to overlap briefly.
+
 For `auto` and `workspace-commands` plans, framework detection must follow
 [Workload Framework Detection And Planning](./workload-framework-detection-and-planning.md).
 The workflow may inspect normalized source evidence such as package manifests, package/project
@@ -198,6 +204,7 @@ provider-neutral.
 | Resource source binding | Entry workflow must create or select a resource with source binding before deployment admission, or command validation rejects in phase `resource-source-resolution`. |
 | Resource source variant metadata | Entry workflow must normalize deep Git URLs, Git refs, source base directories, local-folder subdirectories, Docker image tag/digest identity, and artifact extraction roots into `ResourceSourceBinding` before deployment admission. Deployment admission must not guess source variants from raw UI URLs. |
 | Resource runtime profile | Entry workflow may create a resource with runtime profile; if omitted, deployment planning uses the resource/default runtime strategy contract. |
+| Resource runtime naming intent | Entry workflow may create or configure `runtimeProfile.runtimeName`; deployment planning derives an effective runtime instance/container/project name from it when present. |
 | Strategy-specific build file paths | Entry workflow must persist Dockerfile path, Docker Compose file path, static publish directory, and command defaults as resource runtime profile fields. Deployment admission combines these fields with the source binding base directory during runtime plan resolution. |
 | Static publish directory | Static-site entry workflows must persist `runtimeProfile.publishDirectory` before deployment admission. If a historical or selected static resource lacks it, deployment admission rejects in phase `runtime-plan-resolution` or `runtime-artifact-resolution`. |
 | Resource network profile | Entry workflow must create or select an inbound resource with `networkProfile.internalPort`, or deployment admission rejects in phase `resource-network-resolution`. |

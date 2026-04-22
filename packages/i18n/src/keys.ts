@@ -550,6 +550,8 @@ export const i18nKeys = {
       runtimeDockerfilePath: "console:resources.runtimeDockerfilePath",
       runtimeDockerfilePathPlaceholder: "console:resources.runtimeDockerfilePathPlaceholder",
       runtimeInstallCommand: "console:resources.runtimeInstallCommand",
+      runtimeName: "console:resources.runtimeName",
+      runtimeNamePlaceholder: "console:resources.runtimeNamePlaceholder",
       runtimeLogsConnecting: "console:resources.runtimeLogsConnecting",
       runtimeLogsDescription: "console:resources.runtimeLogsDescription",
       runtimeLogsEmpty: "console:resources.runtimeLogsEmpty",

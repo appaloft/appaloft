@@ -164,6 +164,9 @@ function requestedDeploymentFromResource(resource: Resource): Result<RequestedDe
       : {}),
     ...(runtimeProfile?.buildCommand ? { buildCommand: runtimeProfile.buildCommand.value } : {}),
     ...(runtimeProfile?.startCommand ? { startCommand: runtimeProfile.startCommand.value } : {}),
+    ...(runtimeProfile?.runtimeName
+      ? { runtimeMetadata: { "resource.runtimeName": runtimeProfile.runtimeName.value } }
+      : {}),
     ...(runtimeProfile?.publishDirectory
       ? { publishDirectory: runtimeProfile.publishDirectory.value }
       : {}),

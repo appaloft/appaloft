@@ -96,7 +96,7 @@ The command must preserve these terms:
 | --- | --- | --- |
 | Resource profile | `Resource` lifecycle commands | Durable deployable unit identity and ownership. |
 | Resource source binding | `Resource` lifecycle commands | Durable reusable source configuration. |
-| Resource runtime profile | `Resource` lifecycle commands | Durable reusable build, start, and health defaults. |
+| Resource runtime profile | `Resource` lifecycle commands | Durable reusable build, start, health, and runtime naming defaults. |
 | Resource network profile | `Resource` lifecycle commands | Durable reusable internal listener port, upstream protocol, exposure mode, and target service. |
 | Generated access route | Default access domain provider and route resolver | Provider-neutral convenience route resolved from policy, server public address, proxy readiness, and resource network profile. |
 | Resource access profile / domain binding | Future resource access operation or `domain-bindings.create` | Durable reusable access-route/domain/TLS intent. |
@@ -124,7 +124,8 @@ The command must perform or delegate these admission steps before returning acce
    durable deployment state is created so a concurrent submit cannot bypass the guard through a
    read/write race.
 8. Resolve the source descriptor from `ResourceSourceBinding`.
-9. Resolve runtime plan configuration from `ResourceRuntimeProfile`.
+9. Resolve runtime plan configuration from `ResourceRuntimeProfile`, including reusable runtime
+   naming intent when present.
 10. Resolve network endpoint configuration from `ResourceNetworkProfile`.
 11. Create an immutable environment snapshot.
 12. Resolve default generated and durable access route snapshots from resource/domain/server/policy state when the resource requires public reverse-proxy access.
@@ -210,7 +211,7 @@ the Docker/OCI artifact class needed by runtime execution:
 | --- | --- |
 | Buildable source | Build context, strategy, Dockerfile/buildpack/static/workspace command plan, and expected image tag or digest. |
 | Prebuilt image | Image name plus tag or digest; digest is preferred for immutable snapshots. |
-| Compose stack | Compose project identity, service image/build declarations, target service for inbound traffic, and resource/deployment-scoped project naming. |
+| Compose stack | Compose project identity, service image/build declarations, target service for inbound traffic, and resource/deployment-scoped project naming derived from resource runtime profile plus deployment context. |
 | Static site | Source root, `publishDirectory`, optional install/build command leaves, static-server artifact intent, and HTTP runtime endpoint metadata. |
 
 Framework and package detection is part of runtime plan resolution, not deployment admission input.
@@ -247,9 +248,16 @@ resolved under the source base directory after optional build commands, deployme
 with `validation_error` in phase `runtime-plan-resolution` or `runtime-artifact-resolution`
 according to where the invalid profile is detected.
 
-The runtime adapter may store sanitized Docker image ids, container ids, Compose project names, and
-container/health diagnostics in deployment logs, diagnostics, or read models. Those fields are not
-public command input and must not be required by Web/CLI/API callers.
+`ResourceRuntimeProfile.runtimeName` is a provider-neutral requested runtime name, not a Docker-only
+command field. Deployment planning/runtime adapters may use it to derive effective Docker
+container names or Compose project names, but they must preserve uniqueness for candidate-first
+replacement and must not treat the requested name as permission to stop or replace another
+resource.
+
+The runtime adapter may store sanitized Docker image ids, container ids, Compose project names,
+requested runtime names, effective runtime names, and container/health diagnostics in deployment
+logs, diagnostics, or read models. Those fields are not public command input and must not be
+required by Web/CLI/API callers.
 
 Runtime execution steps derived from the accepted plan must be represented as typed runtime command
 specifications before they reach an executor. Docker build, Docker container run, Docker Compose,

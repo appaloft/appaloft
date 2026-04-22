@@ -125,6 +125,7 @@ describe("ConfigureResourceRuntimeUseCase", () => {
       resourceId: "res_web",
       runtimeProfile: {
         strategy: "static",
+        runtimeName: "preview-123",
         publishDirectory: "dist",
       },
     });
@@ -136,6 +137,7 @@ describe("ConfigureResourceRuntimeUseCase", () => {
     );
     const runtimeProfile = persisted?.toState().runtimeProfile;
     expect(runtimeProfile?.strategy.value).toBe("static");
+    expect(runtimeProfile?.runtimeName?.value).toBe("preview-123");
     expect(runtimeProfile?.publishDirectory?.value).toBe("/dist");
     expect(runtimeProfile?.healthCheckPath?.value).toBe("/health");
     expect(runtimeProfile?.healthCheck?.http?.path.value).toBe("/health");
@@ -147,6 +149,7 @@ describe("ConfigureResourceRuntimeUseCase", () => {
       projectId: "prj_demo",
       environmentId: "env_demo",
       runtimePlanStrategy: "static",
+      runtimeName: "preview-123",
       configuredAt: "2026-01-01T00:00:10.000Z",
     });
   });

@@ -95,8 +95,9 @@ workflow must normalize that draft before dispatching `resources.create`:
 - Docker image drafts produce image identity fields such as `imageName`, `imageTag`, or
   `imageDigest`, and use a prebuilt-image runtime strategy.
 - Dockerfile, Docker Compose, static, and workspace-command choices produce runtime profile fields
-  such as `dockerfilePath`, `dockerComposeFilePath`, `publishDirectory`, or command defaults. Those
-  fields are combined with the source binding's `baseDirectory` during plan resolution.
+  such as `dockerfilePath`, `dockerComposeFilePath`, `publishDirectory`, optional `runtimeName`, or
+  command defaults. Those fields are combined with the source binding's `baseDirectory` during plan
+  resolution.
 
 Framework/runtime detection is a separate planning capability over the normalized source. Entry
 workflows may inspect source files to suggest a mainstream web framework profile, but the durable
@@ -120,6 +121,11 @@ install/build commands belong to the same runtime profile. The default network p
 accepted resource network configuration supplies another endpoint. The deployment step packages the
 publish directory into a Docker/OCI static-server artifact; it must not run static files as a raw
 host-process runtime.
+
+If the operator supplies a runtime name during first deploy, it is persisted on the resource
+profile before `deployments.create`. Deployment planning then derives an effective runtime
+container/project name from that reusable value plus deployment/resource context when required for
+uniqueness.
 
 The workflow must distinguish the resource internal listener port from host exposure. A collected application "port" is `ResourceNetworkProfile.internalPort`. It is not `deployments.create.port`, and it is not a server host-published port unless an explicit `direct-port` exposure mode is accepted.
 

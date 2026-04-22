@@ -200,6 +200,7 @@ describe("CreateResourceUseCase", () => {
         installCommand: "bun install",
         buildCommand: "bun run build",
         startCommand: "bun run start",
+        runtimeName: "www",
         healthCheckPath: "/health",
         healthCheck: {
           enabled: true,
@@ -242,6 +243,7 @@ describe("CreateResourceUseCase", () => {
     );
     expect(persistedState?.runtimeProfile?.strategy.value).toBe("workspace-commands");
     expect(persistedState?.runtimeProfile?.startCommand?.value).toBe("bun run start");
+    expect(persistedState?.runtimeProfile?.runtimeName?.value).toBe("www");
     expect(persistedState?.runtimeProfile?.healthCheck?.http?.path.value).toBe("/health");
     expect(persistedState?.runtimeProfile?.healthCheck?.intervalSeconds.value).toBe(5);
     expect(persistedState?.networkProfile?.internalPort.value).toBe(3000);
@@ -268,6 +270,7 @@ describe("CreateResourceUseCase", () => {
         installCommand: "bun install",
         buildCommand: "bun run build",
         startCommand: "bun run start",
+        runtimeName: "www",
         healthCheckPath: "/health",
         healthCheck: {
           enabled: true,

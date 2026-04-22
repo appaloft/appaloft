@@ -449,6 +449,7 @@ deployment admission.
 | Source root/base directory | `ResourceSourceBinding` | Normalize as source-root-relative path; reject `..`, URLs, shell metacharacters, and host absolute paths. |
 | Git ref or commit pin | `ResourceSourceBinding` | May refine selected source identity; branch/tag ambiguity must be resolved before persistence. |
 | Runtime strategy | `ResourceRuntimeProfile` | Use `RuntimePlanStrategy`, not `deploymentMethod`, after entry normalization. |
+| `runtime.name` | `ResourceRuntimeProfile.runtimeName` | Optional provider-neutral runtime naming intent. It is validated as a safe normalized identifier and later rendered to effective Docker container or Compose project names with deployment/preview uniqueness. |
 | Dockerfile, Compose file, build target, static publish directory | `ResourceRuntimeProfile` | Strategy-specific paths are relative to source base directory and must be safe. |
 | Install/build/start commands | `ResourceRuntimeProfile` | User-authored shell leaves; adapters render typed runtime commands at execution. |
 | `internalPort`, upstream protocol, exposure mode, target service | `ResourceNetworkProfile` | Must become resource network state; never a deployment command field. |

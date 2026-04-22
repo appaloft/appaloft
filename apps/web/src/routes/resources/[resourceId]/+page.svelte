@@ -282,6 +282,7 @@
   let runtimeInstallCommand = $state("");
   let runtimeBuildCommand = $state("");
   let runtimeStartCommand = $state("");
+  let runtimeName = $state("");
   let runtimePublishDirectory = $state("");
   let runtimeDockerfilePath = $state("");
   let runtimeDockerComposeFilePath = $state("");
@@ -1093,6 +1094,7 @@
     runtimeInstallCommand = profile?.installCommand ?? "";
     runtimeBuildCommand = profile?.buildCommand ?? "";
     runtimeStartCommand = profile?.startCommand ?? "";
+    runtimeName = profile?.runtimeName ?? "";
     runtimePublishDirectory = profile?.publishDirectory ?? "";
     runtimeDockerfilePath = profile?.dockerfilePath ?? "";
     runtimeDockerComposeFilePath = profile?.dockerComposeFilePath ?? "";
@@ -1344,6 +1346,7 @@
     const installCommand = runtimeInstallCommand.trim();
     const buildCommand = runtimeBuildCommand.trim();
     const startCommand = runtimeStartCommand.trim();
+    const requestedRuntimeName = runtimeName.trim();
     const publishDirectory = runtimePublishDirectory.trim();
     const dockerfilePath = runtimeDockerfilePath.trim();
     const dockerComposeFilePath = runtimeDockerComposeFilePath.trim();
@@ -1353,6 +1356,7 @@
       ...(installCommand ? { installCommand } : {}),
       ...(buildCommand ? { buildCommand } : {}),
       ...(startCommand ? { startCommand } : {}),
+      ...(requestedRuntimeName ? { runtimeName: requestedRuntimeName } : {}),
       ...(publishDirectory ? { publishDirectory } : {}),
       ...(dockerfilePath ? { dockerfilePath } : {}),
       ...(dockerComposeFilePath ? { dockerComposeFilePath } : {}),
@@ -2421,6 +2425,16 @@
                         id="resource-runtime-start-command"
                         bind:value={runtimeStartCommand}
                         autocomplete="off"
+                      />
+                    </label>
+
+                    <label class="space-y-1.5 text-sm font-medium" for="resource-runtime-name">
+                      <span>{$t(i18nKeys.console.resources.runtimeName)}</span>
+                      <Input
+                        id="resource-runtime-name"
+                        bind:value={runtimeName}
+                        autocomplete="off"
+                        placeholder={$t(i18nKeys.console.resources.runtimeNamePlaceholder)}
                       />
                     </label>
 
