@@ -11,7 +11,7 @@
   },
   "scripts": {
     "lint": "biome check .",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "typecheck": "tsgo -p tsconfig.json --noEmit --checkers 4",
     "test": "bun test",
     "test:unit": "bun test"
   }

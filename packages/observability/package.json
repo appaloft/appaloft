@@ -24,6 +24,6 @@
     "lint": "biome check .",
     "test": "bun test",
     "trace:analyze": "bun scripts/analyze-jaeger-trace.ts",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsgo -p tsconfig.json --noEmit --checkers 4"
   }
 }

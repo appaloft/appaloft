@@ -15,6 +15,7 @@
     "lint:ci": "biome ci .",
     "lint:staged": "lint-staged",
     "typecheck": "turbo run typecheck",
+    "typecheck:root": "tsgo -p tsconfig.json --noEmit --checkers 4",
     "test": "turbo run test",
     "test:unit": "turbo run test:unit",
     "test:integration": "turbo run test:integration",
@@ -44,10 +45,11 @@
     ]
   },
   "devDependencies": {
+    "@appaloft/adapter-packaging": "workspace:*",
     "@biomejs/biome": "^2.4.11",
     "@types/node": "^22.18.9",
     "@types/semver": "^7.7.1",
-    "@appaloft/adapter-packaging": "workspace:*",
+    "@typescript/native-preview": "^7.0.0-dev.20260421.2",
     "bun-types": "^1.3.13",
     "husky": "^9.1.7",
     "lint-staged": "^16.4.0",
