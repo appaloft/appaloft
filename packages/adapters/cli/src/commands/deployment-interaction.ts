@@ -1,4 +1,5 @@
 import {
+  ConfigureResourceRuntimeCommand,
   ConfigureServerCredentialCommand,
   type ConfigureServerCredentialCommandInput,
   type CreateDeploymentCommandInput,
@@ -629,6 +630,23 @@ function createResource(input: {
   });
 }
 
+function configureResourceRuntime(input: {
+  resourceId: string;
+  runtimeProfile: ResourceRuntimeProfileInput;
+}) {
+  return Effect.gen(function* () {
+    const cli = yield* CliRuntime;
+    const message = yield* resultToEffect(
+      ConfigureResourceRuntimeCommand.create({
+        resourceId: input.resourceId,
+        runtimeProfile: input.runtimeProfile,
+      }),
+    );
+    const result = yield* Effect.promise(() => cli.executeCommand(message));
+    return yield* resultToEffect(result);
+  });
+}
+
 function setEnvironmentVariable(input: SetEnvironmentVariableCommandInput) {
   return Effect.gen(function* () {
     const cli = yield* CliRuntime;
@@ -877,11 +895,20 @@ function resolveResource(input: {
   networkProfile: ResourceNetworkProfileInput;
 }) {
   return Effect.gen(function* () {
+    const reuseResolvedResource = (resource: { id: string; label: string }) =>
+      Effect.gen(function* () {
+        yield* configureResourceRuntime({
+          resourceId: resource.id,
+          runtimeProfile: input.runtimeProfile,
+        });
+        return resource;
+      });
+
     if (input.seed.resourceId) {
-      return {
+      return yield* reuseResolvedResource({
         id: input.seed.resourceId,
         label: input.seed.resourceId,
-      };
+      });
     }
 
     const sourceResource =
@@ -898,10 +925,10 @@ function resolveResource(input: {
         });
 
         if (existing) {
-          return {
+          return yield* reuseResolvedResource({
             id: existing.id,
             label: `${existing.name} (${existing.kind})`,
-          };
+          });
         }
 
         const created = yield* createResource({
@@ -961,10 +988,10 @@ function resolveResource(input: {
       return yield* createOrReuseSourceResource(sourceResource);
     }
 
-    return {
+    return yield* reuseResolvedResource({
       id: resourceId,
       label: selectedResource ? `${selectedResource.name} (${selectedResource.kind})` : resourceId,
-    };
+    });
   });
 }
 

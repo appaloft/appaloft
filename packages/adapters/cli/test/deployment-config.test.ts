@@ -74,7 +74,11 @@ async function withBunEnv<T>(
 }
 
 async function createPreviewDeployCliHarness(
-  input: { withRouteStore?: boolean; deploymentSummaries?: unknown[] } = {},
+  input: {
+    withRouteStore?: boolean;
+    deploymentSummaries?: unknown[];
+    sourceLinkRecord?: Record<string, unknown> | null;
+  } = {},
 ) {
   const { createExecutionContext } = await import("@appaloft/application");
   const { createCliProgram } = await import("../src");
@@ -96,6 +100,7 @@ async function createPreviewDeployCliHarness(
         case "CreateEnvironmentCommand":
           return ok({ id: "env_1" } as T);
         case "CreateResourceCommand":
+        case "ConfigureResourceRuntimeCommand":
           return ok({ id: "res_1" } as T);
         case "CreateDeploymentCommand":
           return ok({ id: "dep_1" } as T);
@@ -141,7 +146,7 @@ async function createPreviewDeployCliHarness(
     sourceLinkStore: {
       read: async (sourceFingerprint) => {
         sourceLinkCalls.push(`read:${sourceFingerprint}`);
-        return ok(null);
+        return ok((input.sourceLinkRecord ?? null) as null);
       },
       requireSameTargetOrMissing: async (sourceFingerprint) => {
         sourceLinkCalls.push(`requireSameTargetOrMissing:${sourceFingerprint}`);
@@ -977,6 +982,86 @@ describe("CLI deployment config entry workflow", () => {
     });
   });
 
+  test("[CONFIG-FILE-ENTRY-015B] deploy action PR preview reconfigures an existing preview resource runtime name", async () => {
+    ensureReflectMetadata();
+    const workspace = mkdtempSync(join(tmpdir(), "appaloft-preview-runtime-name-existing-"));
+    const configPath = join(workspace, "appaloft.preview.yml");
+    writeFileSync(
+      configPath,
+      ["runtime:", "  strategy: workspace-commands", "network:", "  internalPort: 4310", ""].join(
+        "\n",
+      ),
+    );
+    const harness = await createPreviewDeployCliHarness({
+      sourceLinkRecord: {
+        projectId: "proj_existing",
+        environmentId: "env_existing",
+        resourceId: "res_existing",
+        serverId: "srv_existing",
+      },
+    });
+
+    try {
+      await withBunEnv(
+        {
+          GITHUB_REPOSITORY: "acme/app",
+          GITHUB_REPOSITORY_ID: "R_preview_repo",
+          GITHUB_REF: "refs/pull/125/merge",
+          GITHUB_HEAD_REF: "feature/preview-runtime-name-existing",
+          GITHUB_SHA: "abc123",
+          GITHUB_WORKSPACE: workspace,
+        },
+        () =>
+          withMutedProcessOutput(async () => {
+            await harness.program.parseAsync([
+              "node",
+              "appaloft",
+              "deploy",
+              workspace,
+              "--config",
+              configPath,
+              "--preview",
+              "pull-request",
+              "--preview-id",
+              "pr-125",
+              "--runtime-name",
+              "appaloft-preview-125",
+              "--server-host",
+              "203.0.113.10",
+              "--server-provider",
+              "generic-ssh",
+            ]);
+          }),
+      );
+    } finally {
+      rmSync(workspace, { recursive: true, force: true });
+    }
+
+    expect(
+      harness.commands.find(
+        (command) => command.constructor.name === "ConfigureResourceRuntimeCommand",
+      ),
+    ).toMatchObject({
+      resourceId: "res_existing",
+      runtimeProfile: {
+        runtimeName: "appaloft-preview-125",
+      },
+    });
+
+    expect(
+      harness.commands.find((command) => command.constructor.name === "CreateResourceCommand"),
+    ).toBeUndefined();
+
+    expect(
+      harness.commands.find((command) => command.constructor.name === "CreateDeploymentCommand"),
+    ).toMatchObject({
+      projectId: "proj_existing",
+      serverId: "srv_existing",
+      environmentId: "env_existing",
+      resourceId: "res_existing",
+    });
+  });
+
   test("[CONFIG-FILE-ENTRY-017] deploy action PR preview domain template persists server-applied route intent", async () => {
     ensureReflectMetadata();
     const workspace = mkdtempSync(join(tmpdir(), "appaloft-preview-domain-"));
@@ -1730,7 +1815,11 @@ describe("CLI deployment config entry workflow", () => {
     );
 
     expect(queries).toEqual(["ListProjectsQuery", "ListServersQuery"]);
-    expect(commands).toEqual(["SetEnvironmentVariableCommand", "SetEnvironmentVariableCommand"]);
+    expect(commands).toEqual([
+      "ConfigureResourceRuntimeCommand",
+      "SetEnvironmentVariableCommand",
+      "SetEnvironmentVariableCommand",
+    ]);
     expect(input).toEqual({
       projectId: "proj_existing",
       serverId: "srv_existing",
@@ -2031,7 +2120,11 @@ describe("CLI deployment config entry workflow", () => {
       environmentId: "env_linked",
       resourceId: "res_linked",
     });
-    expect(operations).toEqual(["ListProjectsQuery", "ListServersQuery"]);
+    expect(operations).toEqual([
+      "ListProjectsQuery",
+      "ListServersQuery",
+      "ConfigureResourceRuntimeCommand",
+    ]);
     expect(sourceLinkCalls).toEqual([
       "read:source-fingerprint:v1:branch%3Amain",
       "requireSameTargetOrMissing",
