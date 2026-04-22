@@ -1,6 +1,6 @@
 {
   "name": "appaloft",
-  "version": "0.2.9",
+  "version": "0.2.10",
   "private": true,
   "license": "Apache-2.0",
   "type": "module",
@@ -8,6 +8,8 @@
     "build": "turbo run build",
     "dev": "bun --env-file=.env turbo run dev --filter=@appaloft/web --filter=@appaloft/shell",
     "dev:all": "turbo run dev --parallel",
+    "bun:version:sync": "bun run scripts/sync-bun-version.ts",
+    "bun:version:check": "bun run scripts/sync-bun-version.ts --check",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
     "lint:ci": "biome ci .",
@@ -46,16 +48,16 @@
     "@types/node": "^22.18.9",
     "@types/semver": "^7.7.1",
     "@appaloft/adapter-packaging": "workspace:*",
-    "bun-types": "^1.3.12",
+    "bun-types": "^1.3.13",
     "husky": "^9.1.7",
     "lint-staged": "^16.4.0",
     "turbo": "^2.9.5",
     "typescript": "6.0.2"
   },
   "engines": {
-    "bun": ">=1.3.12"
+    "bun": ">=1.3.13"
   },
-  "packageManager": "bun@1.3.12",
+  "packageManager": "bun@1.3.13",
   "workspaces": [
     "apps/*",
     "packages/*",

@@ -35,7 +35,6 @@ permissions:
   contents: read
 
 env:
-  BUN_VERSION: 1.3.12
   APPALOFT_OTEL_ENABLED: "false"
 
 jobs:
@@ -62,11 +61,15 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         if: ${{ env.HAS_SSH_REMOTE_STATE_SECRETS == 'true' }}
         with:
-          bun-version: ${{ env.BUN_VERSION }}
+          bun-version-file: .bun-version
 
       - name: Install
         if: ${{ env.HAS_SSH_REMOTE_STATE_SECRETS == 'true' }}
         run: bun install --frozen-lockfile
+
+      - name: Verify Bun version sync
+        if: ${{ env.HAS_SSH_REMOTE_STATE_SECRETS == 'true' }}
+        run: bun run bun:version:check
 
       - name: Prepare SSH Key
         if: ${{ env.HAS_SSH_REMOTE_STATE_SECRETS == 'true' }}

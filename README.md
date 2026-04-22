@@ -1,161 +1,73 @@
-# Appaloft
+<div align="center">
+  <img src="./apps/web/src/lib/assets/appaloft-mark.svg" alt="Appaloft mark" width="96" />
 
-Appaloft is an AI-native local-to-cloud deployment platform for developers who want to deploy local workspaces, local Git repositories, GitHub repositories, zip archives, Docker images, or Compose bundles onto their own servers.
+  <h1>Appaloft</h1>
 
-The system is backend-first and interface-agnostic:
+  <p><strong>From localhost to cloud.</strong></p>
 
-- `CLI`, `HTTP API`, and future `MCP tools` are first-class entry points
-- the web console is a static interface, not the product core
-- the deployment runtime, environment model, and planning pipeline live in the backend
+  <p>
+    AI-native deployment control plane for shipping local folders, Git repos, Docker images,
+    and Compose apps to your own servers.
+  </p>
 
-## Current Milestone
-
-Milestone 1 is implemented:
-
-- Bun + TypeScript strict monorepo with Turborepo
-- `apps/shell` bootstraps the backend runtime and CLI
-- `apps/web` builds as a static SvelteKit app
-- `apps/web` consumes the backend through `@appaloft/orpc/client` and `@tanstack/svelte-query`
-- Elysia serves `/api/health`, `/api/readiness`, `/api/version`, project/server/environment/deployment APIs
-- CLI supports `serve`, `doctor`, `db migrate`, `project`, `server`, `deploy`, `rollback`, `env`, `plugins`, `providers`
-- Kysely persistence is wired with migrations for external PostgreSQL and embedded PGlite modes
-- default self-hosted mode stays anonymous with no required login
-- hosted control-plane mode adds first-party Better Auth runtime support and can still load operator-installed system plugins
-- environment snapshots, masking, promote, and diff exist in the domain/application model
-- a hermetic fake execution backend drives deployment state, logs, and rollback flows
-- GitHub integration and Generic SSH provider skeletons exist
-- release artifacts, Dockerfile, Compose files, tests, and GitHub Actions are included
+  <p>
+    <a href="https://www.appaloft.com/en-US/">Website</a> ·
+    <a href="./README.zh-CN.md">中文</a> ·
+    <a href="./docs/BOOTSTRAP.md">Docs</a> ·
+    <a href="https://github.com/appaloft/appaloft/releases/latest">Download</a>
+  </p>
+</div>
 
 ## Quick Start
 
-Run Appaloft as a self-hosted Docker stack:
+> Fastest path: install the self-hosted stack on a Linux server or VM.
 
 ```bash
 curl -fsSL https://appaloft.com/install.sh | sudo sh
 ```
 
-Pin a release image:
+Pin a release version:
 
 ```bash
 curl -fsSL https://appaloft.com/install.sh | sudo sh -s -- --version 0.2.1
 ```
 
-The public installer installs or verifies Docker Engine plus the compose plugin on Linux, writes a
-self-hosted Compose stack under `/opt/appaloft`, and starts the Appaloft backend, static console, and
-PostgreSQL. For hardened production hosts, preinstall Docker Engine through Docker's official
-package repository and run the installer with `--skip-docker-install`.
+This installer verifies or installs Docker Engine and the Compose plugin, writes the self-hosted
+stack to `/opt/appaloft`, and starts the Appaloft backend, static console, and PostgreSQL.
+
+## Why Appaloft
+
+- Deploy local folders, local Git repos, GitHub repos, zip archives, Docker images, or Compose bundles.
+- Keep `CLI`, `HTTP API`, and future `MCP tools` as first-class interfaces.
+- Run deployments as a backend workflow: `detect -> plan -> execute -> verify -> rollback`.
+- Use the web app as a static console, not as the business core.
 
 ## Local Development
 
-1. Install dependencies.
-
 ```bash
 bun install
-```
-
-2. Choose a database mode.
-
-```bash
-# embedded PGlite is now the default local dev mode
 export APPALOFT_DATABASE_DRIVER=pglite
-
-# or external PostgreSQL
-# docker compose -f docker-compose.dev.yml up -d
-# export APPALOFT_DATABASE_DRIVER=postgres
-# export APPALOFT_DATABASE_URL=postgres://postgres:postgres@localhost:5432/appaloft
-```
-
-3. Apply migrations.
-
-```bash
 bun run db:migrate
-```
-
-4. Start the backend.
-
-```bash
 bun run serve
 ```
 
-5. Start the web interface in another terminal.
+In another terminal:
 
 ```bash
 bun --cwd apps/web run dev
 ```
 
-## Build And Package
-
-```bash
-bun run build
-bun run package:binary-bundle
-bun run package:binary-bundle -- --target linux-x64-gnu --version 0.1.0 --archive
-bun run package:artifacts -- --version 0.1.0 --archives
-bun run release:manifest -- --version 0.1.0
-bun run checksums
-docker build --build-arg APPALOFT_APP_VERSION=0.1.0 -t appaloft-all-in-one:local .
-```
-
-Release outputs target:
-
-- `appaloft-backend-vX.Y.Z.tar.gz`
-- `appaloft-web-static-vX.Y.Z.tar.gz`
-- `appaloft-vX.Y.Z-<platform>.tar.gz` or `.zip`
-- desktop installers built by Tauri
-- `docker-compose.selfhost.yml`
-- `install.sh` Docker self-host installer
-- `release-manifest.json`
-- `checksums.txt`
-
-Release Please maintains `CHANGELOG.md`, creates `vX.Y.Z` GitHub releases, and then GitHub Actions publishes GitHub Release assets, GHCR images, npm CLI packages, and Homebrew tap updates. The release workflow is manually triggered: run `Release` once to create or update the release PR, then run it again after merging that PR to publish the release.
-
-## Runtime Shapes
-
-Appaloft is intentionally not single-shape:
-
-- split deployment: static frontend + standalone backend
-- all-in-one Docker image
-- self-hosted Docker Compose bundle
-- future optional binary mode
-
-Important:
-
-- optional binary distribution is only a packaging form
-- PostgreSQL remains the primary hosted/production backend
-- PGlite is supported for embedded single-instance installs and defaults to the platform user data
-  directory; set `APPALOFT_DATA_DIR=.appaloft/data` only when you want portable workspace-local state
-- hosted auth and tenant features are additive, not mandatory for local/self-hosted use
-- `appaloft-binary-bundle` now packages a single Bun-compiled executable with embedded web console assets and embedded PGlite runtime assets
-
-## Repository Layout
-
-```text
-apps/
-  shell/   backend composition root, runtime entry, CLI
-  web/     static SvelteKit console
-packages/
-  core/ application/ contracts/ config/ observability/
-  persistence/pg/
-  adapters/{http-elysia,cli,filesystem,runtime,packaging}/
-  providers/{core,generic-ssh,aliyun,tencent}/
-  integrations/{core,github,gitlab}/
-  plugins/{sdk,host,builtins}/
-  ai/mcp/
-  testkit/
-  ui/
-docs/
-  architecture, environments, testing, operations, release, security, ADRs
-```
+For PostgreSQL local development, start `docker-compose.dev.yml` and set
+`APPALOFT_DATABASE_DRIVER=postgres` plus `APPALOFT_DATABASE_URL`.
 
 ## Documentation
 
-- [Chinese README](./README.zh-CN.md)
 - [Bootstrap](./docs/BOOTSTRAP.md)
 - [Architecture](./docs/ARCHITECTURE.md)
-- [Environments](./docs/ENVIRONMENTS.md)
-- [Plugins](./docs/PLUGINS.md)
+- [Core operations](./docs/CORE_OPERATIONS.md)
 - [Providers](./docs/PROVIDERS.md)
+- [Plugins](./docs/PLUGINS.md)
 - [Testing](./docs/TESTING.md)
-- [Operations](./docs/OPERATIONS.md)
 - [Release](./docs/RELEASE.md)
 - [Security](./docs/SECURITY.md)
 - [AGENTS rules](./AGENTS.md)

@@ -15,7 +15,6 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  BUN_VERSION: 1.3.12
   APPALOFT_APP_VERSION: 0.1.0-e2e
   APPALOFT_DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/appaloft
   APPALOFT_HTTP_HOST: 127.0.0.1
@@ -46,10 +45,13 @@ jobs:
 
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: ${{ env.BUN_VERSION }}
+          bun-version-file: .bun-version
 
       - name: Install
         run: bun install --frozen-lockfile
+
+      - name: Verify Bun version sync
+        run: bun run bun:version:check
 
       - name: Install Chromium For WebView
         working-directory: apps/web
