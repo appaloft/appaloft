@@ -159,7 +159,7 @@ them, but overlays must apply only after the action has selected the PR preview 
 trusted GitHub event context.
 
 When preview-specific profile input does not supply a runtime name, the action/CLI should derive a
-preview runtime name seed `preview-{prNumber}` from trusted GitHub event context before resource
+preview runtime name seed `preview-{pr_number}` from trusted GitHub event context before resource
 create/configure commands run. That seed is resource profile intent, not a deployment command
 field, and runtime adapters may still append deterministic uniqueness scope to the effective
 container/project name.
@@ -222,7 +222,7 @@ CLI/control-plane handshake implementation exists, the wrapper or CLI must fail 
 structured control-plane errors rather than falling back silently.
 
 When `preview = pull-request` and neither the wrapper inputs nor the selected preview profile set
-`runtime-name`, the wrapper/CLI should derive `runtime-name = preview-{prNumber}` from trusted PR
+`runtime-name`, the wrapper/CLI should derive `runtime-name = preview-{pr_number}` from trusted PR
 context before resource profile mutation.
 
 ## Secret And Environment Handling
