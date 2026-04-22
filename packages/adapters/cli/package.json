@@ -17,6 +17,6 @@
   "scripts": {
     "lint": "biome check .",
     "test": "bun test",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsgo -p tsconfig.json --noEmit --checkers 4"
   }
 }
