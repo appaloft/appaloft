@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.2.12](https://github.com/appaloft/appaloft/compare/v0.2.11...v0.2.12) (2026-04-22)
+
+
+### Features
+
+* **config:** use snake case runtime templates ([#63](https://github.com/appaloft/appaloft/issues/63)) ([39cb1a5](https://github.com/appaloft/appaloft/commit/39cb1a580391721578dcc79127a6e43dd0401db8))
+
+
+### Documentation
+
+* **roadmap:** align release prep for 0.2.12 ([#64](https://github.com/appaloft/appaloft/issues/64)) ([1fe741b](https://github.com/appaloft/appaloft/commit/1fe741bde21624efc63b17c2b28cd819ed10f83f))
+
+
+### Miscellaneous
+
+* switch typecheck to tsgo ([#62](https://github.com/appaloft/appaloft/issues/62)) ([a98bf79](https://github.com/appaloft/appaloft/commit/a98bf794c3ac71369cd5453139ec4cdcb1c799ec))
+
 ## [0.2.11](https://github.com/appaloft/appaloft/compare/v0.2.10...v0.2.11) (2026-04-22)
 
 
