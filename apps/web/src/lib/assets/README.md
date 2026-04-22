@@ -8,7 +8,7 @@ Flat icon system based on the approved cloud-upload mark.
 - Dark text: `#14213D`
 
 ## Included files
-- `appaloft-mark.svg` — transparent mark
+- `appaloft-mark.svg` — primary mark with wordmark
 - `appaloft-mark-mono.svg` — one-color mark using `currentColor`
 - `appaloft-icon-dark.svg` — dark rounded-square app icon
 - `appaloft-icon-light.svg` — light rounded-square app icon
@@ -20,6 +20,7 @@ Flat icon system based on the approved cloud-upload mark.
 - PNG exports: 16, 32, 180, 192, 512, 1024
 
 ## Suggested usage
+- README and primary header: `appaloft-mark.svg`
 - Website header: `appaloft-logo-horizontal.svg`
 - Favicon: `favicon.svg` or `favicon.ico`
 - App icon: `appaloft-icon-dark.svg`

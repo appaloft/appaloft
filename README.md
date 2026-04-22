@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="./apps/web/src/lib/assets/appaloft-logo-horizontal.svg" alt="Appaloft logo" width="360" />
+  <img src="./apps/web/src/lib/assets/appaloft-mark.svg" alt="Appaloft logo" width="360" />
   <p><code>/ˌæp əˈlɔːft/</code></p>
   <p><strong>From localhost to cloud.</strong></p>
   <p>
