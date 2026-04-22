@@ -78,6 +78,7 @@ async function createPreviewDeployCliHarness(
     withRouteStore?: boolean;
     deploymentSummaries?: unknown[];
     sourceLinkRecord?: Record<string, unknown> | null;
+    resourceDetail?: Record<string, unknown> | null;
   } = {},
 ) {
   const { createExecutionContext } = await import("@appaloft/application");
@@ -115,6 +116,13 @@ async function createPreviewDeployCliHarness(
       queries.push(query as AppQuery<unknown>);
       if (query.constructor.name === "ListDeploymentsQuery") {
         return ok({ items: input.deploymentSummaries ?? [] } as T);
+      }
+      if (query.constructor.name === "ShowResourceQuery") {
+        return ok(
+          (input.resourceDetail ?? {
+            runtimeProfile: undefined,
+          }) as Record<string, unknown> as T,
+        );
       }
       return ok({ items: [] } as T);
     },
@@ -999,6 +1007,14 @@ describe("CLI deployment config entry workflow", () => {
         resourceId: "res_existing",
         serverId: "srv_existing",
       },
+      resourceDetail: {
+        runtimeProfile: {
+          strategy: "workspace-commands",
+          buildCommand: "bun run build",
+          startCommand: "bun run start",
+          healthCheckPath: "/ready",
+        },
+      },
     });
 
     try {
@@ -1037,16 +1053,23 @@ describe("CLI deployment config entry workflow", () => {
       rmSync(workspace, { recursive: true, force: true });
     }
 
-    expect(
-      harness.commands.find(
-        (command) => command.constructor.name === "ConfigureResourceRuntimeCommand",
-      ),
-    ).toMatchObject({
+    const configureRuntime = harness.commands.find(
+      (command) => command.constructor.name === "ConfigureResourceRuntimeCommand",
+    );
+
+    expect(configureRuntime).toMatchObject({
       resourceId: "res_existing",
       runtimeProfile: {
+        strategy: "workspace-commands",
+        buildCommand: "bun run build",
+        startCommand: "bun run start",
         runtimeName: "appaloft-preview-125",
       },
     });
+    expect(
+      (configureRuntime as { runtimeProfile: Record<string, unknown> }).runtimeProfile,
+    ).not.toHaveProperty("healthCheckPath");
+    expect(harness.queries.map((query) => query.constructor.name)).toContain("ShowResourceQuery");
 
     expect(
       harness.commands.find((command) => command.constructor.name === "CreateResourceCommand"),
@@ -1815,11 +1838,7 @@ describe("CLI deployment config entry workflow", () => {
     );
 
     expect(queries).toEqual(["ListProjectsQuery", "ListServersQuery"]);
-    expect(commands).toEqual([
-      "ConfigureResourceRuntimeCommand",
-      "SetEnvironmentVariableCommand",
-      "SetEnvironmentVariableCommand",
-    ]);
+    expect(commands).toEqual(["SetEnvironmentVariableCommand", "SetEnvironmentVariableCommand"]);
     expect(input).toEqual({
       projectId: "proj_existing",
       serverId: "srv_existing",
@@ -2120,11 +2139,7 @@ describe("CLI deployment config entry workflow", () => {
       environmentId: "env_linked",
       resourceId: "res_linked",
     });
-    expect(operations).toEqual([
-      "ListProjectsQuery",
-      "ListServersQuery",
-      "ConfigureResourceRuntimeCommand",
-    ]);
+    expect(operations).toEqual(["ListProjectsQuery", "ListServersQuery"]);
     expect(sourceLinkCalls).toEqual([
       "read:source-fingerprint:v1:branch%3Amain",
       "requireSameTargetOrMissing",

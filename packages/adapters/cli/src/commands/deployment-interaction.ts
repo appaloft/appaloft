@@ -17,10 +17,12 @@ import {
   type ProjectSummary,
   RegisterServerCommand,
   type RegisterServerCommandInput,
+  type ResourceDetail,
   type ResourceSummary,
   type ServerSummary,
   SetEnvironmentVariableCommand,
   type SetEnvironmentVariableCommandInput,
+  ShowResourceQuery,
 } from "@appaloft/application";
 import {
   createQuickDeployGeneratedResourceName,
@@ -88,6 +90,10 @@ type ResourceSourceInput = NonNullable<CreateResourceCommandInput["source"]>;
 type ResourceRuntimeProfileInput = NonNullable<CreateResourceCommandInput["runtimeProfile"]>;
 type ResourceNetworkProfileInput = NonNullable<CreateResourceCommandInput["networkProfile"]>;
 type ResourceRuntimeProfileDraftInput = Partial<ResourceRuntimeProfileInput>;
+type ConfigurableResourceRuntimeProfileInput = Omit<
+  ResourceRuntimeProfileInput,
+  "healthCheck" | "healthCheckPath"
+>;
 export type DeploymentEnvironmentVariableSeed = Omit<
   SetEnvironmentVariableCommandInput,
   "environmentId"
@@ -647,6 +653,97 @@ function configureResourceRuntime(input: {
   });
 }
 
+function showResource(resourceId: string) {
+  return Effect.gen(function* () {
+    const cli = yield* CliRuntime;
+    const message = yield* resultToEffect(
+      ShowResourceQuery.create({
+        resourceId,
+        includeLatestDeployment: false,
+        includeAccessSummary: false,
+        includeProfileDiagnostics: false,
+      }),
+    );
+    const result = yield* Effect.promise(() => cli.executeQuery(message));
+    return yield* resultToEffect(result);
+  });
+}
+
+function configurableRuntimeProfileFromDetail(
+  runtimeProfile: ResourceDetail["runtimeProfile"] | undefined,
+): ConfigurableResourceRuntimeProfileInput | undefined {
+  if (!runtimeProfile) {
+    return undefined;
+  }
+
+  return {
+    strategy: runtimeProfile.strategy,
+    ...(runtimeProfile.installCommand ? { installCommand: runtimeProfile.installCommand } : {}),
+    ...(runtimeProfile.buildCommand ? { buildCommand: runtimeProfile.buildCommand } : {}),
+    ...(runtimeProfile.startCommand ? { startCommand: runtimeProfile.startCommand } : {}),
+    ...(runtimeProfile.runtimeName ? { runtimeName: runtimeProfile.runtimeName } : {}),
+    ...(runtimeProfile.publishDirectory
+      ? { publishDirectory: runtimeProfile.publishDirectory }
+      : {}),
+    ...(runtimeProfile.dockerfilePath ? { dockerfilePath: runtimeProfile.dockerfilePath } : {}),
+    ...(runtimeProfile.dockerComposeFilePath
+      ? { dockerComposeFilePath: runtimeProfile.dockerComposeFilePath }
+      : {}),
+    ...(runtimeProfile.buildTarget ? { buildTarget: runtimeProfile.buildTarget } : {}),
+  };
+}
+
+function configurableRuntimeProfileFromDeploymentInput(
+  runtimeProfile: ResourceRuntimeProfileInput,
+): ConfigurableResourceRuntimeProfileInput {
+  const {
+    healthCheck: _healthCheck,
+    healthCheckPath: _healthCheckPath,
+    ...configurableRuntimeProfile
+  } = runtimeProfile;
+
+  return configurableRuntimeProfile;
+}
+
+function runtimeProfileUpdateForReusedResource(input: {
+  currentRuntimeProfile: ResourceDetail["runtimeProfile"] | undefined;
+  desiredRuntimeProfile: ResourceRuntimeProfileInput;
+}): ResourceRuntimeProfileInput | undefined {
+  const desiredRuntimeName = trimToUndefined(input.desiredRuntimeProfile.runtimeName ?? "");
+  if (!desiredRuntimeName) {
+    return undefined;
+  }
+
+  const currentRuntimeName = trimToUndefined(input.currentRuntimeProfile?.runtimeName ?? "");
+  if (currentRuntimeName === desiredRuntimeName) {
+    return undefined;
+  }
+
+  return {
+    ...(configurableRuntimeProfileFromDetail(input.currentRuntimeProfile) ??
+      configurableRuntimeProfileFromDeploymentInput(input.desiredRuntimeProfile)),
+    runtimeName: desiredRuntimeName,
+  };
+}
+
+function resolveReusableResourceRuntimeProfile(input: {
+  resourceId: string;
+  runtimeProfile: ResourceRuntimeProfileInput;
+}) {
+  return Effect.gen(function* () {
+    const desiredRuntimeName = trimToUndefined(input.runtimeProfile.runtimeName ?? "");
+    if (!desiredRuntimeName) {
+      return undefined;
+    }
+
+    const resource = yield* showResource(input.resourceId);
+    return runtimeProfileUpdateForReusedResource({
+      currentRuntimeProfile: resource.runtimeProfile,
+      desiredRuntimeProfile: input.runtimeProfile,
+    });
+  });
+}
+
 function setEnvironmentVariable(input: SetEnvironmentVariableCommandInput) {
   return Effect.gen(function* () {
     const cli = yield* CliRuntime;
@@ -897,10 +994,16 @@ function resolveResource(input: {
   return Effect.gen(function* () {
     const reuseResolvedResource = (resource: { id: string; label: string }) =>
       Effect.gen(function* () {
-        yield* configureResourceRuntime({
+        const runtimeProfile = yield* resolveReusableResourceRuntimeProfile({
           resourceId: resource.id,
           runtimeProfile: input.runtimeProfile,
         });
+        if (runtimeProfile) {
+          yield* configureResourceRuntime({
+            resourceId: resource.id,
+            runtimeProfile,
+          });
+        }
         return resource;
       });
 
