@@ -18,10 +18,12 @@ import {
 } from "@appaloft/core";
 import { inject, injectable } from "tsyringe";
 import { type ExecutionContext, toRepositoryContext } from "../../execution-context";
+import { createCoordinationOwner, mutationCoordinationPolicies } from "../../mutation-coordination";
 import {
   type Clock,
   type DestinationRepository,
   type EnvironmentRepository,
+  type MutationCoordinator,
   type ProjectRepository,
   type ResourceRepository,
   type ServerRepository,
@@ -31,6 +33,7 @@ import {
   UpsertSourceLinkSpec,
 } from "../../ports";
 import { tokens } from "../../tokens";
+import { sourceLinkScope } from "../deployments/deployment-mutation-scopes";
 import { type RelinkSourceLinkCommandInput } from "./relink-source-link.command";
 
 export interface RelinkSourceLinkResult {
@@ -72,6 +75,8 @@ export class RelinkSourceLinkUseCase {
     private readonly destinationRepository: DestinationRepository,
     @inject(tokens.clock)
     private readonly clock: Clock,
+    @inject(tokens.mutationCoordinator)
+    private readonly mutationCoordinator: MutationCoordinator,
   ) {}
 
   async execute(
@@ -86,6 +91,7 @@ export class RelinkSourceLinkUseCase {
       resourceRepository,
       serverRepository,
       sourceLinkRepository,
+      mutationCoordinator,
     } = this;
     const repositoryContext = toRepositoryContext(context);
 
@@ -206,57 +212,72 @@ export class RelinkSourceLinkUseCase {
         }
       }
 
-      const existing = yield* await sourceLinkRepository.findOne(
-        SourceLinkBySourceFingerprintSpec.create(input.sourceFingerprint),
-      );
-      if (!existing) {
-        return err(domainError.notFound("Source link", input.sourceFingerprint));
-      }
-      if (input.expectedCurrentProjectId && existing.projectId !== input.expectedCurrentProjectId) {
-        return err(
-          sourceLinkContextMismatch("Source link project did not match expectation", {
-            expectedCurrentProjectId: input.expectedCurrentProjectId,
-            actualProjectId: existing.projectId,
-          }),
-        );
-      }
-      if (
-        input.expectedCurrentEnvironmentId &&
-        existing.environmentId !== input.expectedCurrentEnvironmentId
-      ) {
-        return err(
-          sourceLinkContextMismatch("Source link environment did not match expectation", {
-            expectedCurrentEnvironmentId: input.expectedCurrentEnvironmentId,
-            actualEnvironmentId: existing.environmentId,
-          }),
-        );
-      }
-      if (
-        input.expectedCurrentResourceId &&
-        existing.resourceId !== input.expectedCurrentResourceId
-      ) {
-        return err(
-          sourceLinkContextMismatch("Source link resource did not match expectation", {
-            expectedCurrentResourceId: input.expectedCurrentResourceId,
-            actualResourceId: existing.resourceId,
-          }),
-        );
-      }
+      const record = yield* await mutationCoordinator.runExclusive({
+        context,
+        policy: mutationCoordinationPolicies.relinkSourceLink,
+        scope: sourceLinkScope(input.sourceFingerprint),
+        owner: createCoordinationOwner(context, "source-links.relink"),
+        work: async () => {
+          const existing = await sourceLinkRepository.findOne(
+            SourceLinkBySourceFingerprintSpec.create(input.sourceFingerprint),
+          );
+          if (existing.isErr()) {
+            return err(existing.error);
+          }
+          if (!existing.value) {
+            return err(domainError.notFound("Source link", input.sourceFingerprint));
+          }
+          if (
+            input.expectedCurrentProjectId &&
+            existing.value.projectId !== input.expectedCurrentProjectId
+          ) {
+            return err(
+              sourceLinkContextMismatch("Source link project did not match expectation", {
+                expectedCurrentProjectId: input.expectedCurrentProjectId,
+                actualProjectId: existing.value.projectId,
+              }),
+            );
+          }
+          if (
+            input.expectedCurrentEnvironmentId &&
+            existing.value.environmentId !== input.expectedCurrentEnvironmentId
+          ) {
+            return err(
+              sourceLinkContextMismatch("Source link environment did not match expectation", {
+                expectedCurrentEnvironmentId: input.expectedCurrentEnvironmentId,
+                actualEnvironmentId: existing.value.environmentId,
+              }),
+            );
+          }
+          if (
+            input.expectedCurrentResourceId &&
+            existing.value.resourceId !== input.expectedCurrentResourceId
+          ) {
+            return err(
+              sourceLinkContextMismatch("Source link resource did not match expectation", {
+                expectedCurrentResourceId: input.expectedCurrentResourceId,
+                actualResourceId: existing.value.resourceId,
+              }),
+            );
+          }
 
-      const recordInput = {
-        sourceFingerprint: input.sourceFingerprint,
-        projectId: input.projectId,
-        environmentId: input.environmentId,
-        resourceId: input.resourceId,
-        updatedAt: clock.now(),
-        ...(input.serverId ? { serverId: input.serverId } : {}),
-        ...(input.destinationId ? { destinationId: input.destinationId } : {}),
-        ...(input.reason ? { reason: input.reason } : {}),
-      } satisfies SourceLinkRecord;
-      const record = yield* await sourceLinkRepository.upsert(
-        recordInput,
-        UpsertSourceLinkSpec.fromRecord(recordInput),
-      );
+          const recordInput = {
+            sourceFingerprint: input.sourceFingerprint,
+            projectId: input.projectId,
+            environmentId: input.environmentId,
+            resourceId: input.resourceId,
+            updatedAt: clock.now(),
+            ...(input.serverId ? { serverId: input.serverId } : {}),
+            ...(input.destinationId ? { destinationId: input.destinationId } : {}),
+            ...(input.reason ? { reason: input.reason } : {}),
+          } satisfies SourceLinkRecord;
+
+          return await sourceLinkRepository.upsert(
+            recordInput,
+            UpsertSourceLinkSpec.fromRecord(recordInput),
+          );
+        },
+      });
 
       return ok({
         sourceFingerprint: record.sourceFingerprint,

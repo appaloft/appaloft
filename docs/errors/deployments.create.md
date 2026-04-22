@@ -23,6 +23,7 @@ This spec inherits:
 - [ADR-017: Default Access Domain And Proxy Routing](../decisions/ADR-017-default-access-domain-and-proxy-routing.md)
 - [ADR-021: Docker/OCI Workload Substrate](../decisions/ADR-021-docker-oci-workload-substrate.md)
 - [ADR-023: Runtime Orchestration Target Boundary](../decisions/ADR-023-runtime-orchestration-target-boundary.md)
+- [ADR-028: Command Coordination Scope And Mutation Admission](../decisions/ADR-028-command-coordination-scope-and-mutation-admission.md)
 - [Repository Deployment Config File Bootstrap](../workflows/deployment-config-file-bootstrap.md)
 - [Error Model](./model.md)
 - [neverthrow Conventions](./neverthrow-conventions.md)
@@ -48,6 +49,7 @@ type DeploymentCreateErrorDetails = {
     | "config-profile-resolution"
     | "config-capability-resolution"
     | "context-resolution"
+    | "operation-coordination"
     | "redeploy-guard"
     | "admission-conflict"
     | "resource-source-resolution"
@@ -109,6 +111,11 @@ type DeploymentCreateErrorDetails = {
   targetProviderKey?: string;
   targetBackendKey?: string;
   targetCapability?: string;
+  coordinationScopeKind?: string;
+  coordinationScope?: string;
+  coordinationMode?: string;
+  waitedSeconds?: number;
+  retryAfterSeconds?: number;
   imageName?: string;
   imageTag?: string;
   imageDigest?: string;
@@ -133,6 +140,7 @@ Admission errors reject the command and return `err(DomainError)`.
 | `validation_error` | `config-discovery`, `config-parse`, `config-schema`, `config-identity`, `config-secret-validation`, `config-profile-resolution` | No | Repository config file could not be safely used by the entry workflow. Details may include config path, format, safe schema issue paths, or rejected field names, but must not include secret values. |
 | `unsupported_config_field` | `config-capability-resolution` | No | Repository config requested a known future capability that Appaloft cannot enforce yet, such as CPU, memory, replicas, restart policy, rollout overlap, or rollout drain. |
 | `not_found` | `context-resolution` | No | Entity type, entity id, `commandName`, `phase`. |
+| `coordination_timeout` | `operation-coordination` | Yes | Bounded waiting for the logical `resource-runtime` coordination scope elapsed before admission could proceed. Details should include `coordinationScopeKind`, safe `coordinationScope`, `coordinationMode`, `waitedSeconds`, and retry hint fields when available. |
 | `deployment_not_redeployable` | `redeploy-guard` | No | Existing or concurrently-admitted deployment id when available, resource id, current deployment status, and safe cause metadata when a concurrent submit lost the atomic active-attempt race or another request won the supersede race first. |
 | `conflict` | `supersede-previous-deployment` | No | The later request could not safely cancel the previous active deployment before taking ownership. |
 | `conflict` | `admission-conflict` | No | Conflict subject and related state. |
@@ -236,6 +244,12 @@ Current implementation already uses neverthrow `Result` for command construction
 Migration gaps:
 
 - phase/step details are not yet uniformly included;
+- `coordination_timeout`, `coordinationScopeKind`, and related ADR-028 details are not yet
+  uniformly emitted by current implementations;
+- SSH `ssh-pglite` finalization may now surface `remote_state_revision_conflict` before a merge
+  retry and `remote_state_merge_conflict` when refreshed remote state changed the same
+  authoritative PG/PGlite row incompatibly; non-overlapping row changes are retried instead of
+  failing immediately;
 - concurrent-submit races are now governed by the atomic active-attempt invariant, but adapters and
   tests still need full coverage for the write-side branch that loses the race after a successful
   pre-read;

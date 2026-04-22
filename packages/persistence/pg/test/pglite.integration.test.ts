@@ -2488,4 +2488,145 @@ describe("pglite persistence integration", () => {
       rmSync(workspaceDir, { recursive: true, force: true });
     }
   }, 15000);
+
+  test("PgMutationCoordinator executes work and releases the coordination row", async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), "appaloft-pglite-mutation-coordination-"));
+    const pgliteDataDir = join(workspaceDir, ".appaloft", "data", "pglite");
+
+    try {
+      const { createDatabase, createMigrator, PgMutationCoordinator } = await import(
+        "../src/index"
+      );
+      const database = await createDatabase({
+        driver: "pglite",
+        pgliteDataDir,
+      });
+      const migrator = createMigrator(database.db);
+      const migrationResult = await migrator.migrateToLatest();
+      expect(migrationResult.error).toBeUndefined();
+
+      const coordinator = new PgMutationCoordinator(database.db, new FixedClock());
+      const context = createTestExecutionContext();
+      const result = await coordinator.runExclusive({
+        context,
+        policy: {
+          operationKey: "deployments.cleanup-preview",
+          scopeKind: "preview-lifecycle",
+          mode: "serialize-with-bounded-wait",
+          waitTimeoutMs: 20,
+          retryIntervalMs: 5,
+          leaseTtlMs: 50,
+          heartbeatIntervalMs: 1,
+        },
+        scope: {
+          kind: "preview-lifecycle",
+          key: "source-fingerprint:v1:branch%3Amain",
+        },
+        owner: {
+          ownerId: "req_pglite_test",
+          label: "test-owner",
+        },
+        work: async () => ok("released"),
+      });
+
+      expect(result).toEqual(ok("released"));
+
+      const rows = await database.db
+        .selectFrom("mutation_coordinations")
+        .select("coordination_scope_key")
+        .execute();
+      expect(rows).toHaveLength(0);
+
+      await database.close();
+    } finally {
+      rmSync(workspaceDir, { recursive: true, force: true });
+    }
+  }, 15000);
+
+  test("PgMutationCoordinator returns coordination_timeout when the scope stays occupied", async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), "appaloft-pglite-mutation-timeout-"));
+    const pgliteDataDir = join(workspaceDir, ".appaloft", "data", "pglite");
+
+    try {
+      const { createDatabase, createMigrator, PgMutationCoordinator } = await import(
+        "../src/index"
+      );
+      const database = await createDatabase({
+        driver: "pglite",
+        pgliteDataDir,
+      });
+      const migrator = createMigrator(database.db);
+      const migrationResult = await migrator.migrateToLatest();
+      expect(migrationResult.error).toBeUndefined();
+
+      await database.db
+        .insertInto("mutation_coordinations")
+        .values({
+          coordination_scope_kind: "preview-lifecycle",
+          coordination_scope_key: "source-fingerprint:v1:branch%3Amain",
+          operation_key: "deployments.cleanup-preview",
+          coordination_mode: "serialize-with-bounded-wait",
+          owner_id: "req_existing",
+          owner_label: "existing-owner",
+          acquired_at: "2026-01-01T00:10:00.000Z",
+          heartbeat_at: "2026-01-01T00:10:00.000Z",
+          lease_expires_at: "2026-01-01T00:20:00.000Z",
+          metadata: {},
+        })
+        .execute();
+
+      const coordinator = new PgMutationCoordinator(database.db, new FixedClock());
+      const context = createTestExecutionContext();
+      const result = await coordinator.runExclusive({
+        context,
+        policy: {
+          operationKey: "deployments.cleanup-preview",
+          scopeKind: "preview-lifecycle",
+          mode: "serialize-with-bounded-wait",
+          waitTimeoutMs: 20,
+          retryIntervalMs: 5,
+          leaseTtlMs: 50,
+          heartbeatIntervalMs: 1,
+        },
+        scope: {
+          kind: "preview-lifecycle",
+          key: "source-fingerprint:v1:branch%3Amain",
+        },
+        owner: {
+          ownerId: "req_timeout",
+          label: "timeout-owner",
+        },
+        work: async () => ok("unexpected"),
+      });
+
+      expect(result.isErr()).toBe(true);
+      if (result.isOk()) {
+        throw new Error("Expected coordination timeout");
+      }
+      expect(result.error).toMatchObject({
+        code: "coordination_timeout",
+        category: "timeout",
+        details: {
+          phase: "operation-coordination",
+          coordinationScopeKind: "preview-lifecycle",
+          coordinationScope: "source-fingerprint:v1:branch%3Amain",
+        },
+      });
+
+      const rows = await database.db
+        .selectFrom("mutation_coordinations")
+        .select(["owner_id", "coordination_scope_key"])
+        .execute();
+      expect(rows).toEqual([
+        {
+          owner_id: "req_existing",
+          coordination_scope_key: "source-fingerprint:v1:branch%3Amain",
+        },
+      ]);
+
+      await database.close();
+    } finally {
+      rmSync(workspaceDir, { recursive: true, force: true });
+    }
+  }, 15000);
 });

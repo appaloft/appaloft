@@ -268,6 +268,19 @@ export interface ServerAppliedRouteStatesTable {
   metadata: ColumnType<JsonRecord, JsonRecord, JsonRecord>;
 }
 
+export interface MutationCoordinationsTable {
+  coordination_scope_kind: string;
+  coordination_scope_key: string;
+  operation_key: string;
+  coordination_mode: string;
+  owner_id: string;
+  owner_label: string;
+  acquired_at: UpdatableTimestampColumn;
+  heartbeat_at: UpdatableTimestampColumn;
+  lease_expires_at: UpdatableTimestampColumn;
+  metadata: ColumnType<JsonRecord, JsonRecord, JsonRecord>;
+}
+
 export interface Database {
   projects: ProjectsTable;
   servers: ServersTable;
@@ -285,4 +298,5 @@ export interface Database {
   source_links: SourceLinksTable;
   default_access_domain_policies: DefaultAccessDomainPoliciesTable;
   server_applied_route_states: ServerAppliedRouteStatesTable;
+  mutation_coordinations: MutationCoordinationsTable;
 }

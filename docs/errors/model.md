@@ -35,6 +35,11 @@ type ErrorDetails = {
   correlationId?: string;
   causationId?: string;
   retryAfter?: string;
+  coordinationScopeKind?: string;
+  coordinationScope?: string;
+  coordinationMode?: string;
+  waitedSeconds?: number;
+  retryAfterSeconds?: number;
   [key: string]: string | number | boolean | null | undefined;
 };
 
@@ -85,6 +90,7 @@ Codes must be stable identifiers, not localized text. Examples:
 | `not_found` | `not-found` | entity type and id |
 | `conflict` | `conflict` | conflict subject and state |
 | `deployment_not_redeployable` | `domain` or `application` | deployment id, resource id, current status |
+| `coordination_timeout` | `timeout` | coordination scope kind/key, coordination mode, waited seconds, retry hint when available |
 | `provider_error` | `integration` | provider key and operation |
 | `runtime_target_unsupported` | `application` or `integration` | target kind, provider key, missing capability, selected target/destination context |
 | `unsupported_config_field` | `validation` or `application` | config path, field path, requested capability, selected entry/workflow context |

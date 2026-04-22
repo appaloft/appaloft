@@ -67,9 +67,11 @@ creates project/environment/server/resource identity. The backend must provide:
 
 - remote state ensure: create or verify the Appaloft data root, permissions, schema-version marker,
   lock location, backup location, and diagnostics metadata before any business command runs;
-- an exclusive remote mutation lock for one deploy/update/relink workflow at a time, with lock
-  owner metadata, correlation id, start time, heartbeat/last-seen metadata, stale-lock detection,
-  owner-aware release, and safe operator-visible recovery;
+- state-root coordination for remote ensure, schema migration, mirror/sync, and other backend
+  maintenance, with owner metadata, correlation id, start time, heartbeat/last-seen metadata,
+  stale-lock detection, owner-aware release, and safe operator-visible recovery;
+- command-level mutation coordination remains a separate concern governed by
+  [ADR-028: Command Coordination Scope And Mutation Admission](./ADR-028-command-coordination-scope-and-mutation-admission.md);
 - schema migration before command dispatch, including a pre-migration backup or journal and a
   post-migration integrity check;
 - crash-safe persistence and safe migration backups, journals, or equivalent recovery behavior;
@@ -80,9 +82,9 @@ creates project/environment/server/resource identity. The backend must provide:
 - safe export/import or sync points so a future control plane can adopt the server-local state.
 
 The implementation may satisfy the remote state contract by running a remote helper on the SSH
-server, by transactional pull/mutate/push under a remote lock, or by another adapter strategy that
-keeps the SSH server as the durable source of truth. The contract is the storage and concurrency
-semantics, not a specific file path or helper shape.
+server, by transactional pull/mutate/push under a remote maintenance lease, or by another adapter
+strategy that keeps the SSH server as the durable source of truth. The contract is the storage and
+state-root coordination semantics, not a specific file path or helper shape.
 
 ## Source Link Contract
 

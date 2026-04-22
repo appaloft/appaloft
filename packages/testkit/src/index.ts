@@ -32,6 +32,8 @@ import {
   type ImportedCertificateMaterialValidationResult,
   type ImportedCertificateSecretStoreInput,
   type ImportedCertificateSecretStoreResult,
+  type MutationCoordinator,
+  type MutationCoordinatorRunExclusiveInput,
   type ProjectReadModel,
   type ProjectRepository,
   projectResourceAccessSummary,
@@ -129,6 +131,12 @@ export class NoopLogger implements AppLogger {
   info(): void {}
   warn(): void {}
   error(): void {}
+}
+
+export class PassThroughMutationCoordinator implements MutationCoordinator {
+  async runExclusive<T>(input: MutationCoordinatorRunExclusiveInput<T>): Promise<Result<T>> {
+    return input.work();
+  }
 }
 
 export class FakeCertificateProvider implements CertificateProviderPort {

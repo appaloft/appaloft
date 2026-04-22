@@ -60,6 +60,7 @@ This command inherits:
 - [ADR-016: Deployment Command Surface Reset](../decisions/ADR-016-deployment-command-surface-reset.md)
 - [ADR-024: Pure CLI SSH State And Server-Applied Domains](../decisions/ADR-024-pure-cli-ssh-state-and-server-applied-domains.md)
 - [ADR-025: Control-Plane Modes And Action Execution](../decisions/ADR-025-control-plane-modes-and-action-execution.md)
+- [ADR-028: Command Coordination Scope And Mutation Admission](../decisions/ADR-028-command-coordination-scope-and-mutation-admission.md)
 - [GitHub Action PR Preview Deploy Workflow](../workflows/github-action-pr-preview-deploy.md)
 - [Repository Deployment Config File Bootstrap](../workflows/deployment-config-file-bootstrap.md)
 - [Source Link State Test Matrix](../testing/source-link-state-test-matrix.md)
@@ -109,16 +110,18 @@ The cleanup boundary is intentionally narrow:
 
 1. Resolve the preview source link from the selected Appaloft state backend.
 2. Return `already-clean` when no link exists.
-3. Load the latest deployment for the linked preview resource when one exists.
-4. Discover additional preview deployments in the same linked project/environment scope whose
+3. Resolve operation coordination for the command's `preview-lifecycle` scope.
+4. Wait bounded time for the logical preview scope or reject with a retriable coordination timeout.
+5. Load the latest deployment for the linked preview resource when one exists.
+6. Discover additional preview deployments in the same linked project/environment scope whose
    runtime metadata still carries the selected preview source fingerprint.
-5. Invoke runtime cleanup against the linked latest deployment first and then any additional stale
+7. Invoke runtime cleanup against the linked latest deployment first and then any additional stale
    preview deployments discovered for the same preview fingerprint.
-6. Delete server-applied preview route desired state for the linked project/environment/resource/
+8. Delete server-applied preview route desired state for the linked project/environment/resource/
    server/destination target when the preview link owns a server target, and also delete any
    additional server-applied route rows that still carry the selected preview source fingerprint.
-7. Unlink the preview source fingerprint.
-8. Return safe ids describing what was cleaned.
+9. Unlink the preview source fingerprint.
+10. Return safe ids describing what was cleaned.
 
 The command must not:
 
@@ -134,6 +137,8 @@ The command must not:
 
 - Cleanup is preview-scoped. Callers must derive a preview fingerprint that includes the preview
   scope so regular deploy identity is not accidentally cleaned.
+- Cleanup uses operation coordination at the logical preview-lifecycle scope. Different preview
+  fingerprints must not be serialized only because they share a server or state root.
 - Cleanup is idempotent when the preview source link no longer exists or the linked target no
   longer has route desired state.
 - Runtime cleanup happens before route/link deletion. If any runtime cleanup step fails during the
@@ -161,6 +166,7 @@ The command must not:
 | Error code | Phase | Retriable | Meaning |
 | --- | --- | --- | --- |
 | `validation_error` | `command-validation` | No | Source fingerprint is missing or malformed. |
+| `coordination_timeout` | `operation-coordination` | Yes | The command could not acquire its logical preview-lifecycle coordination scope within the bounded wait window. |
 | `infra_error` | `preview-cleanup` | Conditional | State backend read/write, route-state deletion, source-link unlink, or runtime cleanup failed. |
 | `provider_error` | `preview-cleanup` | Conditional | Runtime backend/provider rejected preview runtime cleanup. |
 
@@ -192,3 +198,9 @@ metadata still carries the selected preview source fingerprint, deletes PG/PGlit
 filesystem-backed server-applied preview route desired state both for the linked target and for
 additional matching preview-fingerprint route rows, and unlinks the preview source fingerprint from
 the selected state backend. HTTP/oRPC and Web preview cleanup entrypoints remain future work.
+
+Current implementation now applies logical preview-lifecycle scoped coordination in the shell/runtime
+path. In SSH `ssh-pglite` mode, shell still performs brief backend state-root maintenance for
+mirror prepare/upload, and final upload may retry after `remote_state_revision_conflict` by merging
+non-overlapping PG/PGlite row changes onto a fresher remote snapshot. Overlapping row edits still
+fail with a structured infrastructure merge conflict.

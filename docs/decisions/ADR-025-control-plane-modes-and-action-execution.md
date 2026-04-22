@@ -100,7 +100,7 @@ For SSH targets:
 ```text
 GitHub Action or CLI
   -> trusted SSH target and credential from action inputs/CLI/env
-  -> ensure, lock, migrate, and sync SSH-server `ssh-pglite`
+  -> ensure, state-root coordinate, migrate, and sync SSH-server `ssh-pglite`
   -> resolve source link and identity from SSH-server state
   -> dispatch explicit Appaloft operations locally
   -> execute deployment over SSH
@@ -240,7 +240,7 @@ effect.
 
 Adoption from SSH-server `ssh-pglite` must:
 
-- acquire the remote mutation lock;
+- acquire backend state-root coordination for export/import safety;
 - export or stream project/environment/resource/server/source-link/deployment/server-applied-route
   state;
 - import or map that state into the control plane under an authenticated owner;

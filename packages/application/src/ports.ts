@@ -85,6 +85,46 @@ export interface EventBus {
   publish(context: ExecutionContext, events: DomainEvent[]): Promise<void>;
 }
 
+export type CoordinationScopeKind =
+  | "resource-runtime"
+  | "preview-lifecycle"
+  | "source-link"
+  | "state-root-maintenance";
+
+export type CoordinationMode = "supersede-active" | "serialize-with-bounded-wait";
+
+export interface CoordinationScope {
+  kind: CoordinationScopeKind;
+  key: string;
+}
+
+export interface CoordinationOwner {
+  ownerId: string;
+  label: string;
+}
+
+export interface CoordinationPolicy {
+  operationKey: string;
+  scopeKind: CoordinationScopeKind;
+  mode: CoordinationMode;
+  waitTimeoutMs: number;
+  retryIntervalMs: number;
+  leaseTtlMs: number;
+  heartbeatIntervalMs: number;
+}
+
+export interface MutationCoordinatorRunExclusiveInput<T> {
+  context: ExecutionContext;
+  policy: CoordinationPolicy;
+  scope: CoordinationScope;
+  owner: CoordinationOwner;
+  work: () => Promise<Result<T>>;
+}
+
+export interface MutationCoordinator {
+  runExclusive<T>(input: MutationCoordinatorRunExclusiveInput<T>): Promise<Result<T>>;
+}
+
 export type DeploymentProgressPhase =
   | "detect"
   | "plan"

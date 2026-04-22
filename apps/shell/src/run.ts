@@ -32,6 +32,14 @@ export async function runShellCli(options?: ShellRuntimeOptions): Promise<void> 
   let exitCode = 0;
 
   try {
+    if (remotePgliteStateSyncSession) {
+      const released = await remotePgliteStateSyncSession.releaseForCliRuntime();
+      if (released.isErr()) {
+        process.stderr.write(`${released.error.message}\n`);
+        process.exit(1);
+      }
+    }
+
     await app.cliProgram.parseAsync(process.argv);
     process.exitCode = 0;
   } catch {

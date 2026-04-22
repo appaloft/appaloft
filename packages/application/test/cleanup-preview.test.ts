@@ -48,7 +48,7 @@ import {
   TlsModeValue,
   UpsertDeploymentSpec,
 } from "@appaloft/core";
-import { MemoryDeploymentRepository } from "@appaloft/testkit";
+import { MemoryDeploymentRepository, PassThroughMutationCoordinator } from "@appaloft/testkit";
 
 import { createExecutionContext, toRepositoryContext } from "../src/execution-context";
 import {
@@ -367,6 +367,7 @@ describe("CleanupPreviewUseCase", () => {
       deployments,
       deploymentReadModel,
       executionBackend,
+      new PassThroughMutationCoordinator(),
     );
     const context = createExecutionContext({
       entrypoint: "cli",
@@ -422,6 +423,7 @@ describe("CleanupPreviewUseCase", () => {
       deployments,
       deploymentReadModel,
       executionBackend,
+      new PassThroughMutationCoordinator(),
     );
     const result = await useCase.execute(context, {
       sourceFingerprint: previewSourceFingerprint,
@@ -492,6 +494,7 @@ describe("CleanupPreviewUseCase", () => {
       deployments,
       deploymentReadModel,
       executionBackend,
+      new PassThroughMutationCoordinator(),
     );
     const result = await useCase.execute(context, {
       sourceFingerprint: previewSourceFingerprint,
@@ -597,6 +600,7 @@ describe("CleanupPreviewUseCase", () => {
       deployments,
       deploymentReadModel,
       executionBackend,
+      new PassThroughMutationCoordinator(),
     );
     const result = await useCase.execute(context, {
       sourceFingerprint: previewSourceFingerprint,
