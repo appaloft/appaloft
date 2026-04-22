@@ -18,6 +18,7 @@ This workflow inherits:
 - [ADR-017: Default Access Domain And Proxy Routing](../decisions/ADR-017-default-access-domain-and-proxy-routing.md)
 - [ADR-021: Docker/OCI Workload Substrate](../decisions/ADR-021-docker-oci-workload-substrate.md)
 - [ADR-023: Runtime Orchestration Target Boundary](../decisions/ADR-023-runtime-orchestration-target-boundary.md)
+- [ADR-028: Command Coordination Scope And Mutation Admission](../decisions/ADR-028-command-coordination-scope-and-mutation-admission.md)
 - [Workload Framework Detection And Planning](./workload-framework-detection-and-planning.md)
 - [Repository Deployment Config File Bootstrap](./deployment-config-file-bootstrap.md)
 - [Error Model](../errors/model.md)
@@ -62,6 +63,15 @@ Write-side admission must preserve one active deployment attempt per resource as
 invariant. Entry workflows may pre-read latest deployment state to give fast feedback, but durable
 state creation must still reject a concurrent submit that loses the race to another accepted
 non-terminal attempt.
+
+Admission also has a command-level coordination step separate from low-level state-root
+coordination. For `deployments.create`, the logical scope is `resource-runtime`, derived from the
+resolved resource and target placement context. v1 behavior is bounded waiting before acceptance:
+
+- the command may wait for the logical scope to become available;
+- timing out returns a retriable coordination error before acceptance;
+- no queued deployment attempt record is created by this workflow before acceptance;
+- unrelated resources must not be serialized only because they share a server or state root.
 
 When a previous same-resource attempt is still active, `deployments.create` owns the supersede
 branch:
@@ -274,6 +284,12 @@ Current implementation already routes API and CLI through the shared command.
 Migration gaps:
 
 - current use case awaits runtime backend execution before returning;
+- logical resource-runtime scoped admission coordination from ADR-028 is implemented for the
+  shell/runtime path, while non-shell entry and cross-provider parity still need explicit coverage;
+- current SSH entry paths now keep coarse backend locking to brief state-root maintenance and may
+  retry final mirror upload after `remote_state_revision_conflict` by merging non-overlapping
+  PG/PGlite row changes onto a fresher remote snapshot; overlapping row edits still fail with a
+  structured infrastructure merge conflict;
 - current aggregate events are `deployment.planning_started`, `deployment.planned`, `deployment.started`, and `deployment.finished`;
 - `deployment-requested`, `build-requested`, `deployment-succeeded`, and `deployment-failed` are canonical workflow events;
 - Web QuickDeploy currently has local hardcoded validation and related-entity orchestration;

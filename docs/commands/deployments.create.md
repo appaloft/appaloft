@@ -31,6 +31,7 @@ This command inherits the shared platform contracts:
 - [ADR-017: Default Access Domain And Proxy Routing](../decisions/ADR-017-default-access-domain-and-proxy-routing.md)
 - [ADR-021: Docker/OCI Workload Substrate](../decisions/ADR-021-docker-oci-workload-substrate.md)
 - [ADR-023: Runtime Orchestration Target Boundary](../decisions/ADR-023-runtime-orchestration-target-boundary.md)
+- [ADR-028: Command Coordination Scope And Mutation Admission](../decisions/ADR-028-command-coordination-scope-and-mutation-admission.md)
 - [resources.archive Command Spec](./resources.archive.md)
 - [Workload Framework Detection And Planning](../workflows/workload-framework-detection-and-planning.md)
 - [Repository Deployment Config File Bootstrap](../workflows/deployment-config-file-bootstrap.md)
@@ -88,6 +89,27 @@ normalize the file into explicit project/environment/server/resource selections 
 profile commands before creating this command. HTTP/oRPC deployment admission remains strict and
 non-interactive.
 
+## Admission Coordination
+
+`deployments.create` uses **operation coordination** in addition to any entry-workflow or backend
+state-root coordination.
+
+The command's logical coordination scope is `resource-runtime`. The scope key is derived from the
+resolved deployment context for the selected deployable runtime owner and target placement context.
+
+Rules:
+
+- unrelated resources must not be serialized only because they share the same SSH server or state
+  root;
+- coordination happens before durable admission takes ownership of a new attempt;
+- v1 coordination is bounded waiting before acceptance, not durable queued acceptance;
+- timing out while waiting for the coordination scope rejects the command with a retriable
+  coordination error instead of creating a queued deployment attempt.
+- in SSH `ssh-pglite` mode, command completion may still perform brief state-root maintenance to
+  upload the local mirror back to the remote host; that finalization path may merge non-overlapping
+  row changes after `remote_state_revision_conflict`, but it must not weaken logical admission
+  scope semantics.
+
 ## Domain Language Boundary
 
 The command must preserve these terms:
@@ -113,30 +135,32 @@ The command must perform or delegate these admission steps before returning acce
 3. Resolve project, environment, resource, server, and destination.
 4. Reject inconsistent context, including cross-project/environment/resource/destination mismatches.
 5. Reject archived resources with `resource_archived`.
-6. If the latest same-resource deployment is active, resolve the supersede branch:
+6. Resolve operation coordination for the command's `resource-runtime` scope.
+7. Wait bounded time for the coordination scope or reject with a retriable coordination timeout.
+8. If the latest same-resource deployment is active, resolve the supersede branch:
    - `created`, `planning`, and `planned` attempts are canceled immediately and record
      `supersededByDeploymentId`;
    - `running` attempts enter `cancel-requested`, must be canceled through the runtime backend, and
      then are marked `canceled` with `supersededByDeploymentId`;
    - if supersede cannot complete safely, reject the later request with a deployment-specific
      conflict branch.
-7. The write side must still enforce the single active same-resource invariant atomically when
+9. The write side must still enforce the single active same-resource invariant atomically when
    durable deployment state is created so a concurrent submit cannot bypass the guard through a
    read/write race.
-8. Resolve the source descriptor from `ResourceSourceBinding`.
-9. Resolve runtime plan configuration from `ResourceRuntimeProfile`, including reusable runtime
-   naming intent when present.
-10. Resolve network endpoint configuration from `ResourceNetworkProfile`.
-11. Create an immutable environment snapshot.
-12. Resolve default generated and durable access route snapshots from resource/domain/server/policy state when the resource requires public reverse-proxy access.
-13. Resolve the runtime plan, Docker/OCI artifact requirements, and network/access snapshots.
-14. Resolve that the selected deployment target/destination has a runtime target backend with the
+10. Resolve the source descriptor from `ResourceSourceBinding`.
+11. Resolve runtime plan configuration from `ResourceRuntimeProfile`, including reusable runtime
+    naming intent when present.
+12. Resolve network endpoint configuration from `ResourceNetworkProfile`.
+13. Create an immutable environment snapshot.
+14. Resolve default generated and durable access route snapshots from resource/domain/server/policy state when the resource requires public reverse-proxy access.
+15. Resolve the runtime plan, Docker/OCI artifact requirements, and network/access snapshots.
+16. Resolve that the selected deployment target/destination has a runtime target backend with the
     required capabilities.
-15. Create durable deployment state.
+17. Create durable deployment state.
     When a previous same-resource runtime-owning deployment exists, the new deployment state must
     record the explicit superseded deployment id that cleanup and replacement logic may touch.
-15. Publish or record `deployment-requested`.
-16. Return `ok({ id })`.
+18. Publish or record `deployment-requested`.
+19. Return `ok({ id })`.
 
 Build, rollout, verify, failure recording, and retry progression belong to the async workflow owner, process manager, event handler, worker, or runtime adapter boundary. They must not be hidden inside Web/CLI/API entry logic.
 
@@ -185,6 +209,7 @@ All errors use the shared shape and category rules in [Error Model](../errors/mo
 | `validation_error` | `resource-network-resolution` | No | Resource network profile cannot produce a resolved deployment network snapshot. |
 | `not_found` | `context-resolution` | No | Referenced project, environment, server, destination, or resource is missing or inaccessible. |
 | `resource_archived` | `resource-lifecycle-guard` | No | Referenced resource is archived and cannot accept new deployment attempts. |
+| `coordination_timeout` | `operation-coordination` | Yes | The command could not acquire its logical resource-runtime coordination scope within the bounded wait window before admission. |
 | `deployment_not_redeployable` | `redeploy-guard` | No | Latest deployment for the same resource is non-terminal. |
 | `conflict` | `admission-conflict` | No | A deployment-specific admission conflict not covered by redeployability. |
 | `invariant_violation` | `planning-transition`, `execution-start-transition`, `finalization` | No | Deployment state transition was attempted out of order. |
@@ -406,6 +431,12 @@ Migration gaps:
 - `deployment-requested`, `build-requested`, `deployment-succeeded`, and `deployment-failed` are canonical specs and may need concrete implementation or projection from current events;
 - `deployment.finished` currently carries terminal status and should be split or projected into `deployment-succeeded` / `deployment-failed`;
 - no durable outbox/inbox/process-manager behavior was confirmed for this command;
+- logical resource-runtime scoped coordination from ADR-028 is implemented for the shell/runtime
+  path, while non-shell entry and cross-provider parity still need explicit coverage;
+- SSH `ssh-pglite` entry paths now keep coarse backend locking to brief state-root maintenance,
+  release it before command execution, and on final upload retry non-overlapping PG/PGlite row
+  changes after `remote_state_revision_conflict`; overlapping row edits still fail with a
+  structured infrastructure merge conflict;
 - current use-case return type is `Promise<Result<{ id: string }, DomainError>>`, not public `ResultAsync`;
 - Web QuickDeploy still performs some hardcoded local validation before dispatch.
   Quick Deploy is governed by [ADR-010](../decisions/ADR-010-quick-deploy-workflow-boundary.md).

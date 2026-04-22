@@ -171,7 +171,7 @@ explicitly selects PostgreSQL, or when the entrypoint is talking to a remote App
 that owns persistence.
 
 The default headless GitHub Actions flow is durable on the SSH server. It must ensure the remote
-state root, acquire an exclusive remote state lock, run state migrations, resolve or create
+state root, acquire backend state-root coordination, run state migrations, resolve or create
 project/environment/server/resource records from trusted CLI/action inputs and source fingerprints,
 then dispatch the final ids-only deployment command. `projectId`, `environmentId`, `resourceId`,
 `serverId`, and `destinationId` are optional trusted selection overrides for hosted/self-hosted
@@ -189,20 +189,21 @@ Remote state lifecycle is mandatory for production pure CLI mode:
 trusted SSH target and credential
   -> resolve remote Appaloft data root
   -> ensure data root, schema-version marker, lock area, backup/journal area, and permissions
-  -> acquire exclusive mutation lock with owner/correlation/heartbeat metadata
+  -> acquire brief state-root coordination with owner/correlation/heartbeat metadata
   -> create pre-migration backup or journal when schema version differs
   -> run migrations
   -> verify state integrity and migration marker
+  -> release state-root coordination
   -> resolve source link and workflow identity
-  -> run explicit Appaloft operations
+  -> run explicit Appaloft operations with command-level coordination by logical mutation scope
   -> persist source link, route desired/applied state, and safe diagnostics
-  -> release lock
 ```
 
 Recovery requirements:
 
-- active locks must keep heartbeat/last-seen metadata fresh while the workflow owns the state;
-- entrypoint adapters may wait for a short bounded retry window before returning a retriable
+- active state-root coordination leases must keep heartbeat/last-seen metadata fresh while backend
+  maintenance owns the state root;
+- entrypoint adapters may wait for a bounded retry window before returning a retriable
   `remote-state-lock` error for an active lock;
 - abandoned locks must be visible through diagnostics and recoverable by a deliberate operator
   action or a safe stale-lock policy that records the recovered lock metadata before continuing;
@@ -211,6 +212,9 @@ Recovery requirements:
 - failed migrations must leave either the previous state readable or an explicit recovery marker
   with the backup/journal location;
 - deploy commands must not continue after a failed ensure, lock, migration, or integrity check;
+- command-level mutation waiting belongs to the explicit operation scope, for example
+  `resource-runtime`, `preview-lifecycle`, or `source-link`, and must not be modeled only as a
+  whole-server lock;
 - `system.doctor` or equivalent CLI diagnostics must expose state backend origin, schema version,
   lock status, migration status, and last safe backup marker without leaking credentials.
 
@@ -218,6 +222,13 @@ CI-provided secrets are resolver inputs, not committed config values. For GitHub
 workflow maps GitHub secrets into runner environment variables, and the Appaloft config references
 them with `ci-env:<NAME>`. Other CI systems may provide equivalent environment variables without
 changing the repository config contract.
+
+## Current Implementation Notes And Migration Gaps
+
+Current SSH `ssh-pglite` execution still relies on coarse backend locking for more than brief
+state-root maintenance. The normative target after ADR-028 is shorter backend maintenance
+coordination plus scope-based command coordination for explicit operations such as
+`deployments.create`, `deployments.cleanup-preview`, and `source-links.relink`.
 
 ## GitHub Action Wrapper Install UX
 
@@ -630,6 +641,7 @@ Config-file errors use stable codes and phases:
 | `validation_error` | `remote-state-resolution` | Conditional | SSH-targeted entrypoint could not resolve or initialize the remote Appaloft state backend. |
 | `infra_error` | `remote-state-lock` | Yes | Remote state mutation lock could not be acquired or was interrupted. |
 | `infra_error` | `remote-state-migration` | Conditional | Remote state migration failed before workflow commands were dispatched. |
+| `coordination_timeout` | `operation-coordination` | Yes | A dispatched command could not acquire its logical mutation scope within the bounded wait window. |
 | `validation_error` | `source-link-resolution` | No | Source fingerprint is ambiguous, missing required stable identity, or points at another context without explicit relink. |
 | `validation_error` | `config-domain-resolution` | No | Config domain intent cannot map safely to server-applied or managed domain workflow state, including invalid host/path/TLS shape, missing redirect target, self-redirect, redirect loop, redirect-to-redirect, or unsupported redirect policy. |
 | `unsupported_config_field` | `config-capability-resolution` | No | Known future field such as CPU/memory/replicas or rollout policy is not enforceable by current workflow/resource/runtime target specs. |

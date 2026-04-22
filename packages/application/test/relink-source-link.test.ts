@@ -14,6 +14,7 @@ import {
   EnvironmentId,
   EnvironmentKindValue,
   EnvironmentName,
+  err,
   HostAddress,
   ok,
   PortNumber,
@@ -39,8 +40,15 @@ import {
   MemoryProjectRepository,
   MemoryResourceRepository,
   MemoryServerRepository,
+  PassThroughMutationCoordinator,
 } from "@appaloft/testkit";
-import { createExecutionContext, toRepositoryContext } from "../src";
+import {
+  coordinationTimeoutError,
+  createExecutionContext,
+  type MutationCoordinator,
+  type MutationCoordinatorRunExclusiveInput,
+  toRepositoryContext,
+} from "../src";
 import { RelinkSourceLinkCommand } from "../src/messages";
 import {
   type SourceLinkRecord,
@@ -93,10 +101,25 @@ class MemorySourceLinkRepository implements SourceLinkRepository {
   }
 }
 
+class TimeoutMutationCoordinator implements MutationCoordinator {
+  async runExclusive<T>(input: MutationCoordinatorRunExclusiveInput<T>): Promise<Result<T>> {
+    return err(
+      coordinationTimeoutError({
+        message: "Timed out waiting for source-link coordination",
+        policy: input.policy,
+        scope: input.scope,
+        waitedSeconds: Math.ceil(input.policy.waitTimeoutMs / 1000),
+        retryAfterSeconds: Math.ceil(input.policy.retryIntervalMs / 1000),
+      }),
+    );
+  }
+}
+
 async function createRelinkFixture(input?: {
   destinationServerId?: string;
   resourceDestinationId?: string;
   sourceLink?: SourceLinkRecord | null;
+  mutationCoordinator?: MutationCoordinator;
 }) {
   const context = createExecutionContext({
     requestId: "req_source_link_test",
@@ -188,6 +211,7 @@ async function createRelinkFixture(input?: {
       servers,
       destinations,
       clock,
+      input?.mutationCoordinator ?? new PassThroughMutationCoordinator(),
     ),
   };
 }
@@ -309,6 +333,37 @@ describe("RelinkSourceLinkUseCase", () => {
         phase: "source-link-admission",
         serverId: "srv_demo",
         destinationId: "dst_demo",
+      },
+    });
+    expect(sourceLinkRepository.upsertCalls).toHaveLength(0);
+  });
+
+  test("[SOURCE-LINK-STATE-012] surfaces coordination timeout without mutating the mapping", async () => {
+    const { context, sourceLinkRepository, useCase } = await createRelinkFixture({
+      mutationCoordinator: new TimeoutMutationCoordinator(),
+    });
+
+    const result = await useCase.execute(context, {
+      sourceFingerprint: "source-fingerprint:v1:branch%3Amain",
+      projectId: "prj_demo",
+      environmentId: "env_demo",
+      resourceId: "res_demo",
+      serverId: "srv_demo",
+      destinationId: "dst_demo",
+    });
+
+    expect(result.isErr()).toBe(true);
+    if (result.isOk()) {
+      throw new Error("Expected coordination timeout");
+    }
+    expect(result.error).toMatchObject({
+      code: "coordination_timeout",
+      category: "timeout",
+      details: {
+        phase: "operation-coordination",
+        coordinationScopeKind: "source-link",
+        coordinationScope: "source-fingerprint:v1:branch%3Amain",
+        coordinationMode: "serialize-with-bounded-wait",
       },
     });
     expect(sourceLinkRepository.upsertCalls).toHaveLength(0);

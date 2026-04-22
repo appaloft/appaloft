@@ -315,8 +315,11 @@ Current boundary:
 - `source-links.relink` updates source link mapping only. It does not mutate resource profiles,
   environment variables, credentials, deployment history, domain bindings, or server-applied route
   state.
-- CLI SSH mode uses the same remote PGlite state lock/download/upload path as config deploy when
-  the relink command is invoked with trusted SSH target options such as `--server-host`.
+- CLI SSH mode may still use brief state-root coordination for remote PGlite maintenance when the
+  relink command is invoked with trusted SSH target options such as `--server-host`, but the
+  command's user-visible admission semantics are governed by source-fingerprint scoped mutation
+  coordination rather than by a whole-server lock. This boundary is governed by
+  [ADR-028: Command Coordination Scope And Mutation Admission](./decisions/ADR-028-command-coordination-scope-and-mutation-admission.md).
 - PostgreSQL/PGlite source-link storage is implemented for hosted/self-hosted and embedded state
   backends through the dedicated `packages/persistence/pg` adapter. That same durable state feeds
   `resources.delete` source-link blocker checks. API/oRPC and Web relink surfaces remain future
@@ -353,6 +356,12 @@ Current boundary:
   not expand into generic cancel, redeploy, rollback, or resource delete behavior. It removes
   current and stale preview runtime state for the same preview fingerprint, preview route desired
   state, and preview source-link identity only.
+- mutation coordination is scope-based, not whole-server based:
+  `deployments.create` coordinates by logical resource-runtime scope and
+  `deployments.cleanup-preview` coordinates by logical preview-lifecycle scope. Low-level SSH
+  state-root maintenance may still require brief backend coordination, but that does not define the
+  public command model. This boundary is governed by
+  [ADR-028: Command Coordination Scope And Mutation Admission](./decisions/ADR-028-command-coordination-scope-and-mutation-admission.md).
 - deployment source and runtime strategy are resolved from the resource's persisted
   `ResourceSourceBinding`, `ResourceRuntimeProfile`, and `ResourceNetworkProfile`
 - v1 deployment runtime execution is Docker/OCI-backed. Every accepted runtime plan must build,

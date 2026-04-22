@@ -51,6 +51,8 @@ This matrix inherits:
 | DEPLOYMENTS-CLEANUP-PREVIEW-002 | integration | Cleanup runtime, route state, and source link | Preview link exists and latest deployment exists for the linked preview resource | `ok` with `status = cleaned`; runtime cleanup runs first, route desired state is deleted, and the preview source link is unlinked | None |
 | DEPLOYMENTS-CLEANUP-PREVIEW-003 | integration | Runtime cleanup failure stops later cleanup | Preview link exists and runtime backend cleanup fails | Command returns error with `phase = preview-cleanup` and `cleanupStage = runtime-cleanup`; route state and source link remain unchanged | `infra_error` or provider-mapped preview-cleanup failure |
 | DEPLOYMENTS-CLEANUP-PREVIEW-004 | integration | Cleanup sweeps stale preview state after retarget | Preview link points at the current preview resource while older preview deployments and route rows still carry the same preview source fingerprint | `ok` with `status = cleaned`; latest and stale preview runtimes are cleaned before linked-target and preview-fingerprint route rows are removed, then the preview source link is unlinked | None |
+| DEPLOYMENTS-CLEANUP-PREVIEW-005 | integration | Preview cleanup waits only on same preview scope | Another command currently owns mutation for the same preview fingerprint while a different preview fingerprint exists on the same server/state backend | Cleanup waits only for the same logical preview-lifecycle scope; unrelated preview scopes must not be blocked by whole-server coordination | `coordination_timeout`, phase `operation-coordination` only when the bounded wait for the same preview scope expires |
+| DEPLOYMENTS-CLEANUP-PREVIEW-006 | integration | SSH final upload merges disjoint preview cleanup state changes | `ssh-pglite` preview cleanup runs against a local mirror and another command advances the remote revision for a different logical scope with disjoint authoritative rows | Cleanup still completes after final upload retries against the fresher remote snapshot | None |
 
 ## CLI Matrix
 
@@ -65,6 +67,10 @@ coverage in `packages/application/test/cleanup-preview.test.ts`.
 
 `DEPLOYMENTS-CLEANUP-PREVIEW-CLI-001` has CLI integration coverage in
 `packages/adapters/cli/test/preview-command.test.ts`.
+
+`DEPLOYMENTS-CLEANUP-PREVIEW-006` currently relies on the shared shell-level SSH mirror coverage in
+`apps/shell/test/remote-pglite-state-sync.test.ts`; a cleanup-specific overlapping fixture is still
+follow-up work.
 
 Source-link unlink and server-applied route desired-state delete-by-target and
 delete-by-source-fingerprint coverage also live in

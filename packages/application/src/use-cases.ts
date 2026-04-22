@@ -1,3 +1,4 @@
+export * from "./mutation-coordination";
 export * from "./operations/certificates/certificate-retry-scheduler";
 export * from "./operations/certificates/import-certificate.use-case";
 export * from "./operations/certificates/issue-certificate-on-certificate-requested.handler";
@@ -14,6 +15,7 @@ export * from "./operations/deployments/deployment-context-defaults.factory";
 export * from "./operations/deployments/deployment-execution.guard";
 export * from "./operations/deployments/deployment-lifecycle.service";
 export * from "./operations/deployments/deployment-logs.query-service";
+export * from "./operations/deployments/deployment-mutation-scopes";
 export * from "./operations/deployments/deployment-snapshot.factory";
 export * from "./operations/deployments/list-deployments.query-service";
 export * from "./operations/deployments/mark-server-applied-route-status-on-deployment-finished.handler";

@@ -94,6 +94,7 @@ import {
   MemoryResourceRepository,
   MemoryServerRepository,
   NoopLogger,
+  PassThroughMutationCoordinator,
   SequenceIdGenerator,
 } from "@appaloft/testkit";
 import {
@@ -555,6 +556,7 @@ async function createDeploymentFixture(
     new RuntimePlanResolutionInputBuilder(clock, idGenerator),
     new DeploymentFactory(clock, idGenerator),
     new DeploymentLifecycleService(clock),
+    new PassThroughMutationCoordinator(),
     options.domainRouteBindingReader,
     options.serverAppliedRouteDesiredStateReader,
   );
@@ -1011,6 +1013,7 @@ describe("CreateDeploymentUseCase", () => {
       new RuntimePlanResolutionInputBuilder(clock, idGenerator),
       new DeploymentFactory(clock, idGenerator),
       new DeploymentLifecycleService(clock),
+      new PassThroughMutationCoordinator(),
     );
 
     const result = await useCase.execute(context, {
@@ -1212,6 +1215,7 @@ describe("CreateDeploymentUseCase", () => {
       new RuntimePlanResolutionInputBuilder(clock, idGenerator),
       new DeploymentFactory(clock, idGenerator),
       new DeploymentLifecycleService(clock),
+      new PassThroughMutationCoordinator(),
     );
 
     const result = await useCase.execute(context, {
@@ -1978,6 +1982,7 @@ describe("CreateDeploymentUseCase", () => {
       new RuntimePlanResolutionInputBuilder(clock, idGenerator),
       new DeploymentFactory(clock, idGenerator),
       new DeploymentLifecycleService(clock),
+      new PassThroughMutationCoordinator(),
     );
 
     const result = await useCase.execute(context, {
@@ -2053,6 +2058,7 @@ describe("CreateDeploymentUseCase", () => {
       new RuntimePlanResolutionInputBuilder(clock, idGenerator),
       new DeploymentFactory(clock, idGenerator),
       new DeploymentLifecycleService(clock),
+      new PassThroughMutationCoordinator(),
     );
 
     const result = await useCase.execute(context, {
@@ -2148,6 +2154,7 @@ describe("CreateDeploymentUseCase", () => {
       new RuntimePlanResolutionInputBuilder(clock, idGenerator),
       new DeploymentFactory(clock, idGenerator),
       new DeploymentLifecycleService(clock),
+      new PassThroughMutationCoordinator(),
     );
 
     const result = await useCase.execute(context, {

@@ -1,15 +1,11 @@
 <div align="center">
-  <img src="./apps/web/src/lib/assets/appaloft-mark.svg" alt="Appaloft mark" width="96" />
-
-  <h1>Appaloft</h1>
-
+  <img src="./apps/web/src/lib/assets/appaloft-mark.svg" alt="Appaloft logo" width="360" />
+  <p><code>/ˌæp əˈlɔːft/</code></p>
   <p><strong>From localhost to cloud.</strong></p>
-
   <p>
     AI-native deployment control plane for shipping local folders, Git repos, Docker images,
     and Compose apps to your own servers.
   </p>
-
   <p>
     <a href="https://www.appaloft.com/en-US/">Website</a> ·
     <a href="./README.zh-CN.md">中文</a> ·
