@@ -1265,6 +1265,7 @@ export interface ResourceDetailRuntimeProfile {
   installCommand?: string;
   buildCommand?: string;
   startCommand?: string;
+  runtimeName?: string;
   publishDirectory?: string;
   dockerfilePath?: string;
   dockerComposeFilePath?: string;

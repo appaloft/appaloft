@@ -1,4 +1,8 @@
 import {
+  domainError,
+  err,
+  ok,
+  type Result,
   resourceExposureModes,
   resourceNetworkProtocols,
   runtimePlanStrategies,
@@ -23,6 +27,14 @@ export const deploymentMethods = runtimePlanStrategies;
 const nonEmptyStringSchema = z.string().trim().min(1);
 const safeRelativePathPattern =
   /^(?!\/)(?![a-zA-Z][a-zA-Z0-9+.-]*:)(?!.*(?:^|[\\/])\.\.(?:[\\/]|$))(?!.*[;&|`$<>]).+$/;
+const runtimeNameIdentifierPattern = /^[a-z0-9](?:[a-z0-9_.-]{0,61}[a-z0-9])?$/;
+const runtimeNameTemplateTokenPattern = /\{([a-zA-Z][a-zA-Z0-9]*)\}/g;
+export const appaloftDeploymentRuntimeNameTemplateVariables = ["previewId", "prNumber"] as const;
+type AppaloftDeploymentRuntimeNameTemplateVariable =
+  (typeof appaloftDeploymentRuntimeNameTemplateVariables)[number];
+const runtimeNameTemplateVariableLookup = new Map(
+  appaloftDeploymentRuntimeNameTemplateVariables.map((value) => [value.toLowerCase(), value]),
+);
 const safeRelativePathSchema = nonEmptyStringSchema.regex(
   safeRelativePathPattern,
   "Path must be relative to the selected source root and must not escape it",
@@ -110,6 +122,109 @@ export interface AppaloftDeploymentConfigViolation {
   message: string;
 }
 
+function normalizeRuntimeNameTemplateVariable(
+  value: string,
+): AppaloftDeploymentRuntimeNameTemplateVariable | null {
+  return runtimeNameTemplateVariableLookup.get(value.toLowerCase()) ?? null;
+}
+
+function hasValidRuntimeNameTemplateSyntax(value: string): boolean {
+  const normalized = value.trim();
+  if (!normalized) {
+    return false;
+  }
+
+  let valid = true;
+  const substituted = normalized.replace(runtimeNameTemplateTokenPattern, (_, token: string) => {
+    if (!normalizeRuntimeNameTemplateVariable(token)) {
+      valid = false;
+    }
+
+    return "a";
+  });
+
+  return valid && !/[{}]/.test(substituted) && runtimeNameIdentifierPattern.test(substituted);
+}
+
+const runtimeNameConfigSchema = nonEmptyStringSchema.refine(
+  (value) => hasValidRuntimeNameTemplateSyntax(value.toLowerCase()),
+  "runtime.name must be a safe normalized identifier or a template using {previewId} and {prNumber}",
+);
+
+export interface AppaloftDeploymentRuntimeNameTemplateContext {
+  previewId?: string;
+  prNumber?: string | number;
+}
+
+export function renderAppaloftDeploymentRuntimeNameTemplate(input: {
+  template: string;
+  context?: AppaloftDeploymentRuntimeNameTemplateContext;
+}): Result<string> {
+  const normalizedTemplate = input.template.trim().toLowerCase();
+  let missingVariable: AppaloftDeploymentRuntimeNameTemplateVariable | undefined;
+
+  const rendered = normalizedTemplate.replace(
+    runtimeNameTemplateTokenPattern,
+    (_, rawToken: string) => {
+      const token = normalizeRuntimeNameTemplateVariable(rawToken);
+      if (!token) {
+        missingVariable = undefined;
+        return "";
+      }
+
+      if (token === "previewId") {
+        const previewId = input.context?.previewId?.trim().toLowerCase();
+        if (!previewId) {
+          missingVariable = token;
+          return "";
+        }
+
+        return previewId;
+      }
+
+      const prNumber = input.context?.prNumber;
+      const normalizedPrNumber =
+        prNumber === undefined || prNumber === null ? "" : String(prNumber).trim().toLowerCase();
+      if (!normalizedPrNumber) {
+        missingVariable = token;
+        return "";
+      }
+
+      return normalizedPrNumber;
+    },
+  );
+
+  if (/[{}]/.test(rendered)) {
+    return err(
+      domainError.validation("runtime.name template includes unsupported variables", {
+        phase: "config-template-resolution",
+        field: "runtime.name",
+      }),
+    );
+  }
+
+  if (missingVariable) {
+    return err(
+      domainError.validation("runtime.name template requires preview context", {
+        phase: "config-template-resolution",
+        field: "runtime.name",
+        variable: missingVariable,
+      }),
+    );
+  }
+
+  if (!runtimeNameIdentifierPattern.test(rendered)) {
+    return err(
+      domainError.validation("Rendered runtime.name is not a safe normalized identifier", {
+        phase: "config-template-resolution",
+        field: "runtime.name",
+      }),
+    );
+  }
+
+  return ok(rendered);
+}
+
 export const appaloftDeploymentSourceConfigSchema = z
   .object({
     baseDirectory: safeRelativePathSchema
@@ -140,6 +255,7 @@ export const appaloftDeploymentRuntimeConfigSchema = z
     installCommand: nonEmptyStringSchema.optional(),
     buildCommand: nonEmptyStringSchema.optional(),
     startCommand: nonEmptyStringSchema.optional(),
+    name: runtimeNameConfigSchema.optional(),
     publishDirectory: safeRelativePathSchema.optional(),
     healthCheckPath: nonEmptyStringSchema.optional(),
     healthCheck: appaloftDeploymentHealthCheckConfigSchema.optional(),
@@ -213,17 +329,17 @@ function hasUnsafePathPrefixCharacter(value: string): boolean {
 
 const appaloftDeploymentAccessDomainConfigSchema = z
   .object({
-    host: nonEmptyStringSchema
-      .transform((value) => value.toLowerCase())
-      .pipe(z.string().refine(isDomainName, domainHostError)),
+    host: nonEmptyStringSchema.refine(
+      (value) => isDomainName(value.toLowerCase()),
+      domainHostError,
+    ),
     pathPrefix: nonEmptyStringSchema
       .optional()
       .default("/")
       .pipe(z.string().refine(isSafeDomainPathPrefix, domainPathPrefixError)),
     tlsMode: z.enum(["auto", "disabled"]).optional().default("auto"),
     redirectTo: nonEmptyStringSchema
-      .transform((value) => value.toLowerCase())
-      .pipe(z.string().refine(isDomainName, domainRedirectToError))
+      .refine((value) => isDomainName(value.toLowerCase()), domainRedirectToError)
       .optional(),
     redirectStatus: z
       .union([z.literal(301), z.literal(302), z.literal(307), z.literal(308)])
@@ -329,22 +445,36 @@ export type AppaloftDeploymentConfigInput = z.input<typeof appaloftDeploymentCon
 export type AppaloftDeploymentConfig = z.output<typeof appaloftDeploymentConfigSchema>;
 
 function normalizeDeploymentConfig(config: AppaloftDeploymentConfig): AppaloftDeploymentConfig {
-  if (!config.access) {
-    return config;
-  }
-
   return {
     ...config,
-    access: {
-      domains: config.access.domains.map((domain) =>
-        domain.redirectTo && !domain.redirectStatus
-          ? {
-              ...domain,
-              redirectStatus: 308,
-            }
-          : domain,
-      ),
-    },
+    ...(config.runtime?.name
+      ? {
+          runtime: {
+            ...config.runtime,
+            name: config.runtime.name.toLowerCase(),
+          },
+        }
+      : {}),
+    ...(config.access
+      ? {
+          access: {
+            domains: config.access.domains.map((domain) => {
+              const normalizedDomain = {
+                ...domain,
+                host: domain.host.toLowerCase(),
+                ...(domain.redirectTo ? { redirectTo: domain.redirectTo.toLowerCase() } : {}),
+              };
+
+              return normalizedDomain.redirectTo && !normalizedDomain.redirectStatus
+                ? {
+                    ...normalizedDomain,
+                    redirectStatus: 308,
+                  }
+                : normalizedDomain;
+            }),
+          },
+        }
+      : {}),
   };
 }
 

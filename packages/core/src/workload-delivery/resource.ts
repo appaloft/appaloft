@@ -42,6 +42,7 @@ import {
   type ResourceName,
   type ResourceServiceName,
   ResourceSlug,
+  type RuntimeNameText,
 } from "../shared/text-values";
 import { ScalarValueObject } from "../shared/value-object";
 import {
@@ -85,6 +86,7 @@ export interface ResourceRuntimeProfileState {
   installCommand?: CommandText;
   buildCommand?: CommandText;
   startCommand?: CommandText;
+  runtimeName?: RuntimeNameText;
   publishDirectory?: StaticPublishDirectory;
   dockerfilePath?: DockerfilePath;
   dockerComposeFilePath?: DockerComposeFilePath;
@@ -508,6 +510,7 @@ function serializedRuntimeProfile(profile: ResourceRuntimeProfileState): Record<
     ...(profile.installCommand ? { installCommand: profile.installCommand.value } : {}),
     ...(profile.buildCommand ? { buildCommand: profile.buildCommand.value } : {}),
     ...(profile.startCommand ? { startCommand: profile.startCommand.value } : {}),
+    ...(profile.runtimeName ? { runtimeName: profile.runtimeName.value } : {}),
     ...(profile.publishDirectory ? { publishDirectory: profile.publishDirectory.value } : {}),
     ...(profile.dockerfilePath ? { dockerfilePath: profile.dockerfilePath.value } : {}),
     ...(profile.dockerComposeFilePath
@@ -860,6 +863,9 @@ export class Resource extends AggregateRoot<ResourceState> {
       projectId: this.state.projectId.value,
       environmentId: this.state.environmentId.value,
       runtimePlanStrategy: input.runtimeProfile.strategy.value,
+      ...(input.runtimeProfile.runtimeName
+        ? { runtimeName: input.runtimeProfile.runtimeName.value }
+        : {}),
       configuredAt: input.configuredAt.value,
     });
 

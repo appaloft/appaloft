@@ -57,6 +57,7 @@ import {
   parseDockerPublishedHostPort,
   appaloftDockerContainerLabelsForDeployment,
 } from "./docker-container-commands";
+import { deriveRuntimeInstanceNames } from "./runtime-instance-names";
 import {
   RuntimeCommandBuilder,
   dockerLabelsFromAssignments,
@@ -1411,8 +1412,12 @@ export class SshExecutionBackend implements ExecutionBackend {
         });
       }
 
+      const runtimeInstanceNames = deriveRuntimeInstanceNames({
+        deploymentId: state.id.value,
+        metadata: state.runtimePlan.execution.metadata,
+      });
       let image = prepared.source.image ?? state.runtimePlan.execution.image;
-      const containerName = sanitizeName(`appaloft-${state.id.value}`);
+      const containerName = runtimeInstanceNames.containerName;
 
       const shouldBuildImage =
         state.runtimePlan.buildStrategy === "dockerfile" ||
@@ -1420,7 +1425,7 @@ export class SshExecutionBackend implements ExecutionBackend {
         state.runtimePlan.buildStrategy === "static-artifact";
 
       if (shouldBuildImage) {
-        image = sanitizeName(`appaloft-image-${state.id.value}`);
+        image = runtimeInstanceNames.imageName;
         const remoteWorkdir = prepared.source.remoteWorkdir;
         if (!remoteWorkdir) {
           return err(domainError.validation("Dockerfile SSH deployment requires a remote workdir"));
@@ -2317,6 +2322,10 @@ export class SshExecutionBackend implements ExecutionBackend {
         });
       }
 
+      const runtimeInstanceNames = deriveRuntimeInstanceNames({
+        deploymentId: state.id.value,
+        metadata: state.runtimePlan.execution.metadata,
+      });
       const composeFile = state.runtimePlan.execution.composeFile ?? "docker-compose.yml";
       const remoteComposeFile = composeFile.startsWith("/")
         ? composeFile
@@ -2330,6 +2339,7 @@ export class SshExecutionBackend implements ExecutionBackend {
       const upCommand = renderRuntimeCommandString(
         RuntimeCommandBuilder.docker().composeUp({
           composeFile: remoteComposeFile,
+          projectName: runtimeInstanceNames.composeProjectName,
           workingDirectory: remoteWorkdir,
         }),
         { quote: shellQuote },
@@ -2366,6 +2376,7 @@ export class SshExecutionBackend implements ExecutionBackend {
               host: target.host,
               remoteWorkdir,
               composeFile: remoteComposeFile,
+              composeProjectName: runtimeInstanceNames.composeProjectName,
               ...prepared.source.metadata,
             },
           }),
@@ -2384,6 +2395,7 @@ export class SshExecutionBackend implements ExecutionBackend {
             host: target.host,
             remoteWorkdir,
             composeFile: remoteComposeFile,
+            composeProjectName: runtimeInstanceNames.composeProjectName,
             ...prepared.source.metadata,
           },
         }),
@@ -2431,7 +2443,11 @@ export class SshExecutionBackend implements ExecutionBackend {
 
     const target = targetResult._unsafeUnwrap();
     const env = deploymentEnv(deployment);
-    const containerName = metadata.containerName ?? sanitizeName(`appaloft-${state.id.value}`);
+    const runtimeInstanceNames = deriveRuntimeInstanceNames({
+      deploymentId: state.id.value,
+      metadata: state.runtimePlan.execution.metadata,
+    });
+    const containerName = metadata.containerName ?? runtimeInstanceNames.containerName;
 
     try {
       if (state.runtimePlan.execution.kind === "docker-container") {
@@ -2483,12 +2499,16 @@ export class SshExecutionBackend implements ExecutionBackend {
     const target = targetResult._unsafeUnwrap();
     const logs: DeploymentLogEntry[] = [];
     const env = deploymentEnv(deployment);
+    const runtimeInstanceNames = deriveRuntimeInstanceNames({
+      deploymentId: state.id.value,
+      metadata: state.runtimePlan.execution.metadata,
+    });
 
     try {
-      if (metadata.containerName) {
+      if (state.runtimePlan.execution.kind === "docker-container") {
         this.runRemoteCommand({
           target,
-          command: `docker rm -f ${shellQuote(metadata.containerName)}`,
+          command: `docker rm -f ${shellQuote(metadata.containerName ?? runtimeInstanceNames.containerName)}`,
           cwd: runtimeDir,
           env,
         });
@@ -2502,7 +2522,9 @@ export class SshExecutionBackend implements ExecutionBackend {
         "rollback",
         metadata.containerName
           ? `Removed SSH container ${metadata.containerName}`
-          : "No SSH container metadata recorded",
+          : state.runtimePlan.execution.kind === "docker-container"
+            ? `Removed SSH container ${runtimeInstanceNames.containerName}`
+            : "No SSH container metadata recorded",
       ),
     );
     deployment.applyExecutionResult(

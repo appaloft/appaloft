@@ -93,9 +93,10 @@ Required behavior:
   services, default destination, created timestamp, and updated timestamp when available.
 - `source` is the persisted `ResourceSourceBinding` in display-safe form. Secrets and credentials
   must be masked or omitted.
-- `runtimeProfile` shows planning defaults such as `RuntimePlanStrategy`, Dockerfile path, Docker
-  Compose path, static publish directory, build target, and command defaults. Health policy may be
-  summarized, but `resources.configure-health` remains the mutation command.
+- `runtimeProfile` shows planning defaults such as `RuntimePlanStrategy`, optional `runtimeName`,
+  Dockerfile path, Docker Compose path, static publish directory, build target, and command
+  defaults. Health policy may be summarized, but `resources.configure-health` remains the mutation
+  command.
 - `networkProfile` shows `internalPort`, `upstreamProtocol`, `exposureMode`, optional
   `targetServiceName`, and explicit `hostPort` only when a direct-port profile is accepted.
 - `accessSummary` reports resource-owned access state from read models. It must not infer domain

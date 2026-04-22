@@ -247,6 +247,7 @@ describe("CLI deployment config entry workflow", () => {
         installCommand: "bun install",
         buildCommand: "bun run build",
         startCommand: "bun run start",
+        name: "www",
         healthCheck: {
           path: "/ready",
           intervalSeconds: 10,
@@ -277,6 +278,7 @@ describe("CLI deployment config entry workflow", () => {
       installCommand: "bun install",
       buildCommand: "bun run build",
       startCommand: "bun run start",
+      runtimeNameTemplate: "www",
       port: 4310,
       upstreamProtocol: "http",
       exposureMode: "reverse-proxy",
@@ -893,6 +895,14 @@ describe("CLI deployment config entry workflow", () => {
     expect(harness.sourceLinkCalls.some((call) => call.includes("appaloft.preview.yml"))).toBe(
       true,
     );
+    const resource = harness.commands.find(
+      (command) => command.constructor.name === "CreateResourceCommand",
+    );
+    expect(resource).toMatchObject({
+      runtimeProfile: {
+        runtimeName: "preview-123",
+      },
+    });
     const deployment = harness.commands.find(
       (command) => command.constructor.name === "CreateDeploymentCommand",
     );
@@ -904,6 +914,67 @@ describe("CLI deployment config entry workflow", () => {
     });
     expect("preview" in (deployment as Record<string, unknown>)).toBe(false);
     expect("pullRequestNumber" in (deployment as Record<string, unknown>)).toBe(false);
+  });
+
+  test("[CONFIG-FILE-ENTRY-015A] deploy action PR preview renders runtime.name templates before resource creation", async () => {
+    ensureReflectMetadata();
+    const workspace = mkdtempSync(join(tmpdir(), "appaloft-preview-runtime-name-template-"));
+    const configPath = join(workspace, "appaloft.preview.yml");
+    writeFileSync(
+      configPath,
+      [
+        "runtime:",
+        "  strategy: workspace-commands",
+        "  name: preview-{prNumber}",
+        "network:",
+        "  internalPort: 4310",
+        "",
+      ].join("\n"),
+    );
+    const harness = await createPreviewDeployCliHarness();
+
+    try {
+      await withBunEnv(
+        {
+          GITHUB_REPOSITORY: "acme/app",
+          GITHUB_REPOSITORY_ID: "R_preview_repo",
+          GITHUB_REF: "refs/pull/124/merge",
+          GITHUB_HEAD_REF: "feature/preview-runtime-name",
+          GITHUB_SHA: "abc123",
+          GITHUB_WORKSPACE: workspace,
+        },
+        () =>
+          withMutedProcessOutput(async () => {
+            await harness.program.parseAsync([
+              "node",
+              "appaloft",
+              "deploy",
+              workspace,
+              "--config",
+              configPath,
+              "--preview",
+              "pull-request",
+              "--preview-id",
+              "pr-124",
+              "--server-host",
+              "203.0.113.10",
+              "--server-provider",
+              "generic-ssh",
+            ]);
+          }),
+      );
+    } finally {
+      rmSync(workspace, { recursive: true, force: true });
+    }
+
+    const resource = harness.commands.find(
+      (command) => command.constructor.name === "CreateResourceCommand",
+    );
+    expect(resource).toMatchObject({
+      runtimeProfile: {
+        runtimeName: "preview-124",
+      },
+    });
   });
 
   test("[CONFIG-FILE-ENTRY-017] deploy action PR preview domain template persists server-applied route intent", async () => {
@@ -1079,6 +1150,7 @@ describe("CLI deployment config entry workflow", () => {
     expect(resource).toMatchObject({
       runtimeProfile: {
         strategy: "workspace-commands",
+        runtimeName: "preview-123",
         installCommand: "bun install --frozen-lockfile",
         buildCommand: "bun run build",
         startCommand: "bun ./dist/server/entry.mjs",
@@ -1327,6 +1399,8 @@ describe("CLI deployment config entry workflow", () => {
               "bun ./dist/server/entry.mjs",
               "--port",
               "4321",
+              "--runtime-name",
+              "preview-5",
               "--health-path",
               "/",
               "--upstream-protocol",
@@ -1365,6 +1439,14 @@ describe("CLI deployment config entry workflow", () => {
       rmSync(workspace, { recursive: true, force: true });
     }
 
+    const resource = harness.commands.find(
+      (command) => command.constructor.name === "CreateResourceCommand",
+    );
+    expect(resource).toMatchObject({
+      runtimeProfile: {
+        runtimeName: "preview-5",
+      },
+    });
     const variables = harness.commands.filter(
       (command) => command.constructor.name === "SetEnvironmentVariableCommand",
     );

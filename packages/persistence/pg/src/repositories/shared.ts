@@ -124,6 +124,7 @@ import {
   RuntimeArtifactKindValue,
   RuntimeArtifactSnapshot,
   RuntimeExecutionPlan,
+  RuntimeNameText,
   RuntimePlan,
   RuntimePlanId,
   RuntimePlanStrategyValue,
@@ -359,6 +360,7 @@ export interface SerializedResourceRuntimeProfile extends Record<string, unknown
   installCommand?: string;
   buildCommand?: string;
   startCommand?: string;
+  runtimeName?: string;
   publishDirectory?: string;
   dockerfilePath?: string;
   dockerComposeFilePath?: string;
@@ -1417,6 +1419,9 @@ export function rehydrateResourceRow(row: Selectable<Database["resources"]>) {
               : {}),
             ...(runtimeProfile.startCommand
               ? { startCommand: CommandText.rehydrate(runtimeProfile.startCommand) }
+              : {}),
+            ...(runtimeProfile.runtimeName
+              ? { runtimeName: RuntimeNameText.rehydrate(runtimeProfile.runtimeName) }
               : {}),
             ...(runtimeProfile.publishDirectory
               ? {

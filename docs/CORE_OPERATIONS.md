@@ -222,8 +222,12 @@ Current boundary:
 - source configuration is variant-specific resource profile state. Git repository/ref/base
   directory, local-folder base directory, Docker image tag/digest, artifact extraction root, and
   provider repository identity belong to `ResourceSourceBinding`; Dockerfile path, Docker Compose
-  path, static publish directory, build target, command defaults, and health-check defaults belong
-  to `ResourceRuntimeProfile`; listener ports and exposure belong to `ResourceNetworkProfile`.
+  path, static publish directory, build target, command defaults, runtime naming intent, and
+  health-check defaults belong to `ResourceRuntimeProfile`; listener ports and exposure belong to
+  `ResourceNetworkProfile`.
+- resource runtime naming intent is reusable resource-owned profile state. Docker/Compose adapters
+  must derive unique effective runtime instance names from that profile plus deployment/resource or
+  preview context instead of adding Docker-native naming fields to `deployments.create`.
 - workload framework detection is an internal planning capability over the resource profile. It
   records typed source inspection evidence such as runtime family, framework, package manager or
   build tool, package/project name, lockfiles, scripts, runtime version, Dockerfile/Compose paths,
@@ -444,7 +448,11 @@ Current boundary:
   operation. A repository must add a workflow with `on.pull_request` before GitHub will attempt a
   preview deploy. The action may use trusted GitHub event context, such as PR number and head SHA,
   to create a preview-scoped source fingerprint and environment/resource selection outside
-  committed config, then dispatch ids-only `deployments.create`.
+  committed config, derive preview runtime naming intent, then dispatch ids-only
+  `deployments.create`.
+- When preview-specific profile input does not override runtime naming, the default preview runtime
+  name seed is `preview-{prNumber}` so effective runtime/container names remain human-recognizable
+  while adapters still preserve uniqueness during safe replacement.
 - Action/CLI profile flags are a first-class profile source alongside repository config files.
   Runtime commands, network profile, health path, non-secret env values, `ci-env:` secret
   references, and preview route policy passed as trusted inputs feed the same Quick Deploy/config

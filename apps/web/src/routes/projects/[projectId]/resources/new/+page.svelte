@@ -110,6 +110,7 @@
   let composeLocator = $state("");
   let localFolderSelectionNotice = $state<string | null>(null);
   let resourceInternalPort = $state("3000");
+  let resourceRuntimeName = $state("");
   let resourceHealthCheckEnabled = $state(false);
   let resourceHealthCheckMethod = $state<"GET" | "HEAD" | "POST" | "OPTIONS">("GET");
   let resourceHealthCheckScheme = $state<"http" | "https">("http");
@@ -536,12 +537,18 @@
 
   function runtimeProfileForSource(): ResourceRuntimeProfileInput {
     const healthCheck = healthCheckPolicyForForm();
+    const requestedRuntimeName = resourceRuntimeName.trim();
     const withHealthCheck = (input: ResourceRuntimeProfileInput): ResourceRuntimeProfileInput =>
-      healthCheck
+      healthCheck || requestedRuntimeName
         ? {
             ...input,
-            healthCheckPath: healthCheck.http?.path,
-            healthCheck,
+            ...(requestedRuntimeName ? { runtimeName: requestedRuntimeName } : {}),
+            ...(healthCheck
+              ? {
+                  healthCheckPath: healthCheck.http?.path,
+                  healthCheck,
+                }
+              : {}),
           }
         : input;
 
@@ -876,6 +883,18 @@
                 />
                 <span class="block text-xs font-normal text-muted-foreground">
                   {$t(i18nKeys.console.quickDeploy.applicationPortHint)}
+                </span>
+              </label>
+
+              <label class="space-y-1.5 text-sm font-medium">
+                <span>{$t(i18nKeys.console.resources.runtimeName)}</span>
+                <Input
+                  bind:value={resourceRuntimeName}
+                  autocomplete="off"
+                  placeholder={$t(i18nKeys.console.resources.runtimeNamePlaceholder)}
+                />
+                <span class="block text-xs font-normal text-muted-foreground">
+                  {$t(i18nKeys.console.resources.runtimeProfileFormDescription)}
                 </span>
               </label>
 

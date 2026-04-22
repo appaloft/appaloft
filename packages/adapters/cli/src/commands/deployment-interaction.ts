@@ -64,6 +64,8 @@ export interface DeploymentPromptSeed {
   installCommand?: string;
   buildCommand?: string;
   startCommand?: string;
+  runtimeName?: string;
+  runtimeNameTemplate?: string;
   publishDirectory?: string;
   port?: number;
   upstreamProtocol?: ResourceNetworkProfileInput["upstreamProtocol"];
@@ -224,6 +226,7 @@ export function runtimeProfileFromDeploymentInput(
       strategy: "static",
       ...(input.installCommand ? { installCommand: input.installCommand } : {}),
       ...(input.buildCommand ? { buildCommand: input.buildCommand } : {}),
+      ...(input.runtimeName ? { runtimeName: input.runtimeName } : {}),
       ...(input.publishDirectory ? { publishDirectory: input.publishDirectory } : {}),
       ...(input.healthCheckPath ? { healthCheckPath: input.healthCheckPath } : {}),
       ...(input.healthCheck ? { healthCheck: input.healthCheck } : {}),
@@ -235,6 +238,7 @@ export function runtimeProfileFromDeploymentInput(
     ...(input.installCommand ? { installCommand: input.installCommand } : {}),
     ...(input.buildCommand ? { buildCommand: input.buildCommand } : {}),
     ...(input.startCommand ? { startCommand: input.startCommand } : {}),
+    ...(input.runtimeName ? { runtimeName: input.runtimeName } : {}),
     ...(input.healthCheckPath ? { healthCheckPath: input.healthCheckPath } : {}),
     ...(input.healthCheck ? { healthCheck: input.healthCheck } : {}),
   };
@@ -311,6 +315,7 @@ export function deploymentPromptSeedFromConfig(
     ...(config.runtime?.installCommand ? { installCommand: config.runtime.installCommand } : {}),
     ...(config.runtime?.buildCommand ? { buildCommand: config.runtime.buildCommand } : {}),
     ...(config.runtime?.startCommand ? { startCommand: config.runtime.startCommand } : {}),
+    ...(config.runtime?.name ? { runtimeNameTemplate: config.runtime.name } : {}),
     ...(config.runtime?.publishDirectory
       ? { publishDirectory: config.runtime.publishDirectory }
       : {}),
@@ -975,6 +980,7 @@ function resolveAdvancedDeploymentConfig(input: {
       input.seed.installCommand ||
         input.seed.buildCommand ||
         input.seed.startCommand ||
+        input.seed.runtimeName ||
         input.seed.publishDirectory ||
         input.seed.port ||
         input.seed.upstreamProtocol ||
@@ -998,6 +1004,7 @@ function resolveAdvancedDeploymentConfig(input: {
         port:
           input.seed.port ??
           (isStatic ? defaultStaticInternalPort : defaultApplicationInternalPort),
+        ...(input.seed.runtimeName ? { runtimeName: input.seed.runtimeName } : {}),
         ...(input.seed.upstreamProtocol ? { upstreamProtocol: input.seed.upstreamProtocol } : {}),
         ...(input.seed.exposureMode ? { exposureMode: input.seed.exposureMode } : {}),
         ...(input.seed.targetServiceName
@@ -1096,6 +1103,7 @@ function resolveAdvancedDeploymentConfig(input: {
       ...(installCommand ? { installCommand } : {}),
       ...(buildCommand ? { buildCommand } : {}),
       ...(startCommand ? { startCommand } : {}),
+      ...(input.seed.runtimeName ? { runtimeName: input.seed.runtimeName } : {}),
       ...(publishDirectory ? { publishDirectory } : {}),
       ...(Number.isInteger(port) && port > 0 ? { port } : {}),
       ...(input.seed.upstreamProtocol ? { upstreamProtocol: input.seed.upstreamProtocol } : {}),

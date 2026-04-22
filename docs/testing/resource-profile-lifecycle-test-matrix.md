@@ -32,7 +32,7 @@ command and that no entrypoint exposes a generic `resources.update`.
 
 | ID | Operation | Type | Scenario | Expected |
 | --- | --- | --- | --- | --- |
-| RES-PROFILE-SHOW-001 | `resources.show` | Query service | Existing active resource with source/runtime/network profile. | Returns `ok` with `schemaVersion = "resources.show/v1"` and durable profile fields. |
+| RES-PROFILE-SHOW-001 | `resources.show` | Query service | Existing active resource with source/runtime/network profile. | Returns `ok` with `schemaVersion = "resources.show/v1"` and durable profile fields, including `runtimeProfile.runtimeName` when configured. |
 | RES-PROFILE-SHOW-002 | `resources.show` | Query service | Missing resource id. | Returns `not_found` with `phase = resource-read`. |
 | RES-PROFILE-SHOW-003 | `resources.show` | Query service | Archived resource. | Returns detail with `lifecycle.status = "archived"` and no mutation side effects. |
 | RES-PROFILE-SHOW-004 | `resources.show` | Read model | Latest deployment included. | Latest deployment is contextual and does not override lifecycle or health. |
@@ -47,6 +47,9 @@ command and that no entrypoint exposes a generic `resources.update`.
 | RES-PROFILE-RUNTIME-002 | `resources.configure-runtime` | Command use case | Runtime profile includes health policy mutation. | Rejects with `validation_error`; caller must use `resources.configure-health`. |
 | RES-PROFILE-RUNTIME-003 | `resources.configure-runtime` | Command use case | Dockerfile path contains `..` or host absolute path. | Rejects with `phase = resource-runtime-resolution`. |
 | RES-PROFILE-RUNTIME-004 | `resources.configure-runtime` | Command use case | Kubernetes/Helm/Swarm/provider-native target field supplied. | Rejects as unsupported runtime target configuration. |
+| RES-PROFILE-RUNTIME-004A | `resources.configure-runtime` | Command use case | Valid reusable runtime name supplied. | Persists `runtimeProfile.runtimeName`, publishes `resource-runtime-configured`, and does not mutate the current running workload in place. |
+| RES-PROFILE-RUNTIME-004B | `resources.configure-runtime` | Command use case | Duplicate requested runtime name matches another resource's requested name. | Command still succeeds because uniqueness is derived later during deployment execution. |
+| RES-PROFILE-RUNTIME-004C | `resources.configure-runtime` | Command use case | Runtime name is malformed or unsafe. | Rejects with `validation_error`, `phase = resource-runtime-resolution`. |
 | RES-PROFILE-RUNTIME-005 | `resources.configure-runtime` | Command use case | Archived resource. | Returns `resource_archived`, no event. |
 | RES-PROFILE-NETWORK-001 | `resources.configure-network` | Command use case | Valid reverse-proxy HTTP profile with `internalPort`. | Persists network profile, publishes `resource-network-configured`. |
 | RES-PROFILE-NETWORK-002 | `resources.configure-network` | Command use case | HTTP inbound resource without internal port. | Rejects with `validation_error`, `phase = resource-network-resolution`. |

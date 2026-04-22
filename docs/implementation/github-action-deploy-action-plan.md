@@ -158,6 +158,12 @@ config-profile or environment-overlay input may select overlay fields after the 
 them, but overlays must apply only after the action has selected the PR preview environment from
 trusted GitHub event context.
 
+When preview-specific profile input does not supply a runtime name, the action/CLI should derive a
+preview runtime name seed `preview-{prNumber}` from trusted GitHub event context before resource
+create/configure commands run. That seed is resource profile intent, not a deployment command
+field, and runtime adapters may still append deterministic uniqueness scope to the effective
+container/project name.
+
 The first preview mode creates or reuses preview-scoped source link state and dispatches the same
 ids-only `deployments.create` command. Explicit PR close cleanup now runs through
 `deployments.cleanup-preview` from a user-authored close-event workflow, but pure Action mode still
@@ -186,6 +192,7 @@ Initial inputs:
 | `version` | No | CLI release tag such as `v0.1.0`; `latest` resolves the latest non-prerelease Appaloft release. |
 | `config` | No | Path passed to `appaloft deploy --config`; defaults to `appaloft.yml` when present. PR preview examples should pass `appaloft.preview.yml` when the root config is production-oriented. |
 | `source` | No | Source path or locator passed as the deploy positional argument; defaults to `.`. |
+| `runtime-name` | No | Trusted override for `ResourceRuntimeProfile.runtimeName`; UI/docs may present this as "container name" for the current Docker/OCI substrate. |
 | `ssh-host` | Yes for SSH mode | Trusted target host, mapped to `--server-host`. |
 | `ssh-user` | No | Trusted SSH username, mapped to `--server-ssh-username`. |
 | `ssh-port` | No | Trusted SSH port, mapped to `--server-port`. |
@@ -213,6 +220,10 @@ Control-plane inputs are also trusted entrypoint inputs, not repository config i
 When absent, the wrapper must keep the current pure SSH behavior. When present before the matching
 CLI/control-plane handshake implementation exists, the wrapper or CLI must fail before mutation with
 structured control-plane errors rather than falling back silently.
+
+When `preview = pull-request` and neither the wrapper inputs nor the selected preview profile set
+`runtime-name`, the wrapper/CLI should derive `runtime-name = preview-{prNumber}` from trusted PR
+context before resource profile mutation.
 
 ## Secret And Environment Handling
 

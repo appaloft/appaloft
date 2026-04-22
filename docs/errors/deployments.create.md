@@ -98,6 +98,8 @@ type DeploymentCreateErrorDetails = {
   detectedFiles?: string;
   detectedScripts?: string;
   publishDirectory?: string;
+  requestedRuntimeName?: string;
+  effectiveRuntimeName?: string;
   internalPort?: number;
   hostPort?: number;
   publishedHostPort?: number;
@@ -198,9 +200,10 @@ They must:
 5. require a new deployment attempt for retry.
 
 Docker/OCI-specific failure details must be sanitized. It is valid to include image name, tag,
-digest, container id, Compose project name, container state, exit code, and bounded log excerpts
-when they do not contain secrets. It is not valid to include registry credentials, private key
-material, raw secret environment values, or full unbounded command output.
+digest, requested/effective runtime name, container id, Compose project name, container state, exit
+code, and bounded log excerpts when they do not contain secrets. It is not valid to include
+registry credentials, private key material, raw secret environment values, or full unbounded
+command output.
 
 Git source materialization failures may record `remote_git_clone_failed` or
 `remote_git_commit_resolution_failed` on the failed deployment attempt. Safe failure metadata may

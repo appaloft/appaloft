@@ -120,6 +120,43 @@ function createSlugTextValue<TText>(
   return validateSlug(value, label).map(create);
 }
 
+function validateRuntimeName(value: string): Result<string> {
+  const normalized = value.trim().toLowerCase();
+
+  if (!normalized) {
+    return err(
+      domainError.validation("Runtime name is required", {
+        phase: "resource-runtime-resolution",
+        field: "runtimeProfile.runtimeName",
+      }),
+    );
+  }
+
+  if (normalized.length > 63) {
+    return err(
+      domainError.validation("Runtime name must be at most 63 characters", {
+        phase: "resource-runtime-resolution",
+        field: "runtimeProfile.runtimeName",
+        maxLength: 63,
+      }),
+    );
+  }
+
+  if (!/^[a-z0-9](?:[a-z0-9_.-]{0,61}[a-z0-9])?$/.test(normalized)) {
+    return err(
+      domainError.validation(
+        "Runtime name must start and end with a lowercase letter or digit and may contain dots, underscores, or hyphens",
+        {
+          phase: "resource-runtime-resolution",
+          field: "runtimeProfile.runtimeName",
+        },
+      ),
+    );
+  }
+
+  return ok(normalized);
+}
+
 abstract class NonEmptyTextValue extends ScalarValueObject<string> {
   protected constructor(value: string) {
     super(value);
@@ -997,6 +1034,23 @@ export class DisplayNameText extends NonEmptyTextValue {
 
   static rehydrate(value: string): DisplayNameText {
     return new DisplayNameText(rehydrateRequiredText(value));
+  }
+}
+
+const runtimeNameBrand: unique symbol = Symbol("RuntimeNameText");
+export class RuntimeNameText extends ScalarValueObject<string> {
+  private [runtimeNameBrand]!: void;
+
+  private constructor(value: string) {
+    super(value);
+  }
+
+  static create(value: string): Result<RuntimeNameText> {
+    return validateRuntimeName(value).map((normalized) => new RuntimeNameText(normalized));
+  }
+
+  static rehydrate(value: string): RuntimeNameText {
+    return new RuntimeNameText(value.trim().toLowerCase());
   }
 }
 

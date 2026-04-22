@@ -9,6 +9,7 @@ import {
   ok,
   type ResourceRuntimeProfileState,
   type Result,
+  RuntimeNameText,
   RuntimePlanStrategyValue,
   StaticPublishDirectory,
 } from "@appaloft/core";
@@ -107,6 +108,12 @@ export function resourceRuntimeProfileFromInput(
     const startCommand = CommandText.create(input.startCommand);
     if (startCommand.isErr()) return err(startCommand.error);
     profile.startCommand = startCommand.value;
+  }
+
+  if (input.runtimeName) {
+    const runtimeName = RuntimeNameText.create(input.runtimeName);
+    if (runtimeName.isErr()) return err(runtimeName.error);
+    profile.runtimeName = runtimeName.value;
   }
 
   if (input.publishDirectory) {

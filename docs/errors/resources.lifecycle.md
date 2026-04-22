@@ -93,6 +93,7 @@ type ResourceLifecycleErrorDetails = {
   dockerfilePath?: string;
   dockerComposeFilePath?: string;
   publishDirectory?: string;
+  runtimeName?: string;
   imageName?: string;
   imageTag?: string;
   imageDigest?: string;
@@ -209,8 +210,8 @@ Tests must assert:
 - related entity ids and resource slug when relevant;
 - source variant fields such as `sourceKind`, `gitRef`, `baseDirectory`, `imageTag`, or
   `imageDigest` when a source profile error is relevant;
-- runtime variant fields such as `runtimePlanStrategy`, `dockerfilePath`, `dockerComposeFilePath`,
-  or `publishDirectory` when a runtime profile error is relevant;
+- runtime variant fields such as `runtimePlanStrategy`, `runtimeName`, `dockerfilePath`,
+  `dockerComposeFilePath`, or `publishDirectory` when a runtime profile error is relevant;
 - `internalPort`, `exposureMode`, and `targetServiceName` when a network profile error is relevant;
 - `lifecycleStatus` when archived-resource or deletion guard behavior is relevant;
 - safe `deletionBlockers` when `resource_delete_blocked` is relevant;

@@ -67,7 +67,7 @@ It is not:
 | `destinationId` | Optional | Default destination placement hint for future deployments. |
 | `services` | Optional | Declared resource services. Multiple services are allowed only for `compose-stack`. |
 | `source` | Optional | Durable source binding for first-deploy workflows. |
-| `runtimeProfile` | Optional | Durable runtime plan strategy, strategy-specific planning fields, command defaults, and health-check defaults for future deployments. |
+| `runtimeProfile` | Optional | Durable runtime plan strategy, strategy-specific planning fields, command defaults, optional runtime naming intent, and health-check defaults for future deployments. |
 | `networkProfile` | Optional | Durable workload endpoint profile for first-deploy workflows and future deployments. |
 
 Allowed `kind` values are the platform `ResourceKind` values:
@@ -182,7 +182,21 @@ and the split is ambiguous, the entrypoint must ask for or require explicit `git
 workspace root. It must not contain `..`, shell metacharacters, a URL, or a host absolute filesystem
 path. Runtime adapters may strip the leading `/` when materializing filesystem commands.
 
-`runtimeProfile` is a `ResourceRuntimeProfile`. It must use the domain term `RuntimePlanStrategy` and may include reusable install/build/start commands and health-check defaults.
+`runtimeProfile` is a `ResourceRuntimeProfile`. It must use the domain term
+`RuntimePlanStrategy` and may include reusable install/build/start commands, optional runtime
+naming intent, and health-check defaults.
+
+`runtimeProfile.runtimeName` is an optional reusable runtime naming intent for future deployments.
+It is a provider-neutral resource profile field, not a Docker-only deployment input. Entry surfaces
+may label it as "container name" while the v1 runtime substrate is Docker/OCI-backed, but the
+canonical command field belongs to the resource runtime profile.
+
+The field is a requested base name, not a target-global uniqueness reservation. Command validation
+must enforce a safe normalized identifier shape, and deployment planning/runtime adapters must
+derive an effective Docker container or Compose project name from this value plus deployment,
+resource, and preview context as needed to preserve uniqueness and candidate-first replacement.
+Two resources may therefore store the same `runtimeName` without causing `resources.create` to
+retarget or reject by itself.
 
 For v1, `RuntimePlanStrategy` is governed by
 [ADR-021: Docker/OCI Workload Substrate](../decisions/ADR-021-docker-oci-workload-substrate.md).
@@ -196,12 +210,14 @@ manifest, Helm, Swarm stack, replica, ingress-class, pull-secret, node selector,
 orchestrator-specific settings require future target/profile specs and must not be stored as loose
 runtime profile fields.
 
-`runtimeProfile` owns strategy-specific planning fields, not source identity. Dockerfile path,
-Docker Compose file path, static publish directory, Docker build target, install/build/start
-commands, and health-check defaults belong to runtime profile language. HTTP health check policy may include method, scheme, host, port, path, expected status, expected response text, interval, timeout, retries, and start period. These fields are combined with
-`source.metadata.baseDirectory` during runtime plan resolution. A prebuilt `docker-image` source
-must use `RuntimePlanStrategy = "prebuilt-image"` and must not require Dockerfile or Compose path
-fields.
+`runtimeProfile` owns strategy-specific planning fields and reusable runtime naming intent, not
+source identity. Dockerfile path, Docker Compose file path, static publish directory, Docker build
+target, install/build/start commands, `runtimeName`, and health-check defaults belong to runtime
+profile language. HTTP health check policy may include method, scheme, host, port, path, expected
+status, expected response text, interval, timeout, retries, and start period. These fields are
+combined with `source.metadata.baseDirectory` during runtime plan resolution. A prebuilt
+`docker-image` source must use `RuntimePlanStrategy = "prebuilt-image"` and must not require
+Dockerfile or Compose path fields.
 
 When entry workflows or source detectors infer a framework/runtime profile, the inferred facts are
 typed planning evidence, not a new deployment command shape. Detection may produce runtime family,

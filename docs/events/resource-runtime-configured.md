@@ -16,6 +16,7 @@ type ResourceRuntimeConfiguredEventPayload = {
   projectId: string;
   environmentId: string;
   runtimePlanStrategy: string;
+  runtimeName?: string;
   configuredAt: string;
   correlationId?: string;
   causationId?: string;

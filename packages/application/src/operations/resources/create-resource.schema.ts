@@ -72,6 +72,7 @@ export const createResourceRuntimeProfileInputSchema = z
     installCommand: z.string().trim().min(1).optional(),
     buildCommand: z.string().trim().min(1).optional(),
     startCommand: z.string().trim().min(1).optional(),
+    runtimeName: z.string().trim().min(1).optional(),
     publishDirectory: z.string().trim().min(1).optional(),
     dockerfilePath: z.string().trim().min(1).optional(),
     dockerComposeFilePath: z.string().trim().min(1).optional(),

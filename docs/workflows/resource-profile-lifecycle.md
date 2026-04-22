@@ -63,7 +63,7 @@ cleanup.
 | --- | --- | --- | --- |
 | View resource details | `resources.show` | Nothing | Any aggregate, runtime, route, deployment, domain, certificate, or source link |
 | Change repository/image/source root | `resources.configure-source` | `ResourceSourceBinding` | Runtime profile, network profile, health policy, deployment snapshots, source links |
-| Change build/start/static/Compose planning | `resources.configure-runtime` | Runtime planning profile | Source binding, network profile, health policy, runtime target state |
+| Change build/start/static/Compose planning and reusable runtime naming | `resources.configure-runtime` | Runtime planning profile | Source binding, network profile, health policy, runtime target state |
 | Change internal listener/exposure profile | `resources.configure-network` | `ResourceNetworkProfile` | Domains, generated access policy, proxy routes, current runtime |
 | Change health probe policy | `resources.configure-health` | Resource health policy | Source/runtime/network profile outside health policy fields |
 | Retire resource | `resources.archive` | Resource lifecycle status | Runtime stop, route/domain/certificate/source-link cleanup |
@@ -160,6 +160,11 @@ Deleted resources:
 
 Profile changes affect future `deployments.create` admission only. They do not mutate historical
 deployment snapshots or current runtime.
+
+Runtime naming intent is part of that same future-only rule. Changing a resource's
+`runtimeProfile.runtimeName` changes how future deployments derive effective Docker container or
+Compose project names. It must not rename a currently running workload in place, and it must not
+be treated as permission to clean up another resource that happens to use the same requested name.
 
 When the operator wants changed profile state to become runtime state, they must create a new
 deployment through the explicit deployment workflow once that is appropriate. Redeploy remains

@@ -3,6 +3,7 @@ import {
   appaloftDeploymentConfigFileNames,
   parseAppaloftDeploymentConfig,
   parseAppaloftDeploymentConfigText,
+  renderAppaloftDeploymentRuntimeNameTemplate,
 } from "../src";
 
 describe("Appaloft deployment config schema", () => {
@@ -13,6 +14,7 @@ describe("Appaloft deployment config schema", () => {
         installCommand: "bun install",
         buildCommand: "bun run build",
         startCommand: "bun run start",
+        name: "preview-{prNumber}",
         healthCheckPath: "/ready",
       },
       network: {
@@ -38,6 +40,7 @@ describe("Appaloft deployment config schema", () => {
       expect("project" in parsed.data).toBe(false);
       expect("targets" in parsed.data).toBe(false);
       expect(parsed.data.runtime?.strategy).toBe("workspace-commands");
+      expect(parsed.data.runtime?.name).toBe("preview-{prnumber}");
       expect(parsed.data.network?.internalPort).toBe(4310);
     }
 
@@ -66,6 +69,42 @@ describe("Appaloft deployment config schema", () => {
     expect(appaloftDeploymentConfigFileNames).toContain("appaloft.json");
     expect(appaloftDeploymentConfigFileNames).toContain("appaloft.yml");
     expect(appaloftDeploymentConfigFileNames).toContain("appaloft.yaml");
+  });
+
+  test("[CONFIG-FILE-PROFILE-001A] accepts runtime.name templates and renders preview values", () => {
+    const parsed = parseAppaloftDeploymentConfig({
+      runtime: {
+        name: "preview-{prNumber}",
+      },
+    });
+
+    expect(parsed.success).toBe(true);
+    if (!parsed.success) {
+      throw new Error("Expected runtime name template to parse");
+    }
+
+    const rendered = renderAppaloftDeploymentRuntimeNameTemplate({
+      template: parsed.data.runtime?.name ?? "",
+      context: {
+        prNumber: 123,
+      },
+    });
+
+    expect(rendered.isOk()).toBe(true);
+    if (rendered.isErr()) {
+      throw new Error(rendered.error.message);
+    }
+    expect(rendered.value).toBe("preview-123");
+  });
+
+  test("[CONFIG-FILE-PROFILE-001B] rejects unknown runtime.name template variables", () => {
+    const parsed = parseAppaloftDeploymentConfig({
+      runtime: {
+        name: "preview-{branch}",
+      },
+    });
+
+    expect(parsed.success).toBe(false);
   });
 
   test("[CONFIG-FILE-ID-001] rejects identity and destination fields from config files", () => {

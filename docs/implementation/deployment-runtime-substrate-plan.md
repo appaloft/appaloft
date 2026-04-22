@@ -44,6 +44,9 @@ The Code Round should introduce or normalize provider-neutral application DTOs f
 - image identity: image name, optional tag, optional digest, and optional local image id;
 - compose identity: resource/deployment-scoped project name, compose file snapshot identity, and
   target service name;
+- requested runtime naming intent and effective runtime identity: optional requested runtime name
+  from `ResourceRuntimeProfile.runtimeName` plus the derived effective Docker container or Compose
+  project name used for one deployment attempt;
 - runtime instance identity: sanitized container ids, service names, and runtime network aliases
   when needed for logs, health, diagnostics, and cleanup;
 - rollback candidate identity: previous successful runtime artifact and instance references when
@@ -76,7 +79,8 @@ Expected implementation scope:
   runtime profile strategies and source inspection value objects validate to containerizable
   artifact plans without framework or provider dependencies in core.
 - `packages/application/src/operations/deployments`: resolve source/runtime/network profile into
-  Docker/OCI artifact intent; preserve command input as ids-only.
+  Docker/OCI artifact intent; preserve command input as ids-only; derive effective runtime naming
+  from the resource profile plus deployment/preview context.
 - `packages/application/src/ports.ts` and `packages/application/src/tokens.ts`: keep runtime
   execution behind injected ports; add artifact builder/executor ports only when required; add
   target backend registry/backend ports before adding cluster runtime targets.
@@ -186,8 +190,11 @@ Required coverage:
   or fail with structured unsupported-planner errors and explicit custom-command fallback guidance;
 - base image policy changes are covered per planner family;
 - local Docker adapter starts and verifies a container with resource-scoped labels/names plus
-  sanitized diagnostic labels for context names/kinds, runtime/source/artifact/route summaries, and
-  preview identity when available;
+  sanitized diagnostic labels for context names/kinds, runtime/source/artifact/route summaries,
+  requested/effective runtime name, and preview identity when available;
+- requested runtime names are validated and derived into unique effective runtime/container/project
+  names so two resources or overlapping same-resource replacement attempts do not collide on exact
+  Docker names;
 - generic-SSH Docker adapter uses resolved server credentials and reports sanitized failures;
 - same internal port on two reverse-proxy resources does not trigger cross-resource cleanup;
 - direct host-port collision fails or rejects without stopping the existing resource;
@@ -244,6 +251,11 @@ detect, base image, command, and Dockerfile template behavior. Planner selection
 
 Current `deployments.create` still awaits runtime execution inside the use case. The source-of-truth
 contract remains acceptance-first and event/process-manager oriented.
+
+Current local and SSH Docker runtime code still defaults effective workload/container names to
+`appaloft-<deploymentId>` style values and image names to `appaloft-image-<deploymentId>` style
+values. User-supplied resource runtime naming intent and preview-derived `preview-{prNumber}` seeds
+remain a follow-up Code Round gap after this Spec Round.
 
 This Code Round introduced core runtime command spec types under
 `packages/core/src/release-orchestration/runtime-command.ts` and adapter-side helpers under

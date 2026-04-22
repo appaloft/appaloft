@@ -23,6 +23,9 @@ Implement in ordered slices:
    - Keep profile fields that can map to `ResourceSourceBinding`, `ResourceRuntimeProfile`,
      `ResourceNetworkProfile`, health policy, non-secret environment variables, and required secret
      references.
+   - Add `runtime.name` as an optional provider-neutral runtime naming field that maps to
+     `ResourceRuntimeProfile.runtimeName` and is validated independently from target-global
+     uniqueness.
    - Add provider-neutral `access.domains[]` for host/path/TLS route intent while rejecting raw
      certificate material, provider account ids, DNS credentials, server ids, destination ids, and
      credential selectors.
@@ -60,6 +63,7 @@ Implement in ordered slices:
 4. Profile mapper
    - Map config source/runtime/network/health profile fields into `resources.create` for first
      deploy.
+   - Map config `runtime.name` into `ResourceRuntimeProfile.runtimeName`.
    - When `resources.configure-source`, `resources.configure-runtime`, and
      `resources.configure-network` are active, sequence the relevant commands before deployment for
      existing resources.
@@ -101,8 +105,9 @@ Implement in ordered slices:
      to `PATH` only for the job.
    - Map trusted inputs to CLI flags: `config`, `source`, `ssh-host`, `ssh-user`, `ssh-port`,
      `ssh-private-key` or `ssh-private-key-file`, `server-proxy-kind`, `state-backend`, and the
-     same profile fields accepted by repository config: runtime commands, publish directory,
-     network profile, health path, non-secret env values, and `ci-env:` secret references.
+     same profile fields accepted by repository config: runtime commands, runtime name, publish
+     directory, network profile, health path, non-secret env values, and `ci-env:` secret
+     references.
    - Write `ssh-private-key` to a temporary `0600` file and pass only the file path to
      `--server-ssh-private-key-file`.
    - Treat `version: latest` as quickstart convenience and exact release tags as the recommended
@@ -113,6 +118,9 @@ Implement in ordered slices:
      `preview-domain-template`, `preview-tls-mode`, and `require-preview-url`. These inputs must
      affect preview-scoped source link/environment/resource selection and route desired state, not
      `deployments.create`.
+   - When preview mode is selected and no preview-specific profile input overrides runtime naming,
+     derive `runtime.name = preview-{prNumber}` as trusted entrypoint context before resource
+     create/configure commands run.
    - Document preview config selection as optional profile reuse, not as a requirement. When root
      `appaloft.yml` is production-oriented, Action preview examples should either pass
      `config: appaloft.preview.yml` deliberately or provide the preview profile entirely through
@@ -197,6 +205,8 @@ Remaining gaps:
 
 - Existing-resource profile drift detection and explicit `resources.configure-source`,
   `resources.configure-runtime`, and `resources.configure-network` command sequencing are not
+  implemented yet.
+- Config-file support for `runtime.name` and preview-derived default runtime naming is not
   implemented yet.
 - Config-file `access.domains[]` parser support is implemented for provider-neutral `host`,
   `pathPrefix`, `tlsMode`, optional `redirectTo`, and optional `redirectStatus` intent. SSH CLI
