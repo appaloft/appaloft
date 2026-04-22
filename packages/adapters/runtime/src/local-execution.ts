@@ -52,6 +52,7 @@ import {
   parseDockerPublishedHostPort,
   appaloftDockerContainerLabelsForDeployment,
 } from "./docker-container-commands";
+import { deriveRuntimeInstanceNames } from "./runtime-instance-names";
 import {
   RuntimeCommandBuilder,
   dockerLabelsFromAssignments,
@@ -1346,8 +1347,12 @@ export class LocalExecutionBackend implements ExecutionBackend {
       });
     }
 
+    const runtimeInstanceNames = deriveRuntimeInstanceNames({
+      deploymentId: state.id.value,
+      metadata: state.runtimePlan.execution.metadata,
+    });
     let image = state.runtimePlan.execution.image;
-    const containerName = sanitizeName(`appaloft-${state.id.value}`);
+    const containerName = runtimeInstanceNames.containerName;
 
     const shouldBuildImage =
       state.runtimePlan.buildStrategy === "dockerfile" ||
@@ -1355,7 +1360,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
       state.runtimePlan.buildStrategy === "static-artifact";
 
     if (shouldBuildImage) {
-      image = sanitizeName(`appaloft-image-${state.id.value}`);
+      image = runtimeInstanceNames.imageName;
       const dockerfilePath =
         state.runtimePlan.buildStrategy === "dockerfile"
           ? (state.runtimePlan.execution.dockerfilePath ?? "Dockerfile")
@@ -2108,6 +2113,10 @@ export class LocalExecutionBackend implements ExecutionBackend {
     }
 
     const workdir = preparedSource.workdir;
+    const runtimeInstanceNames = deriveRuntimeInstanceNames({
+      deploymentId: state.id.value,
+      metadata: state.runtimePlan.execution.metadata,
+    });
     const composeFile =
       isRemoteGitSourceKind(state.runtimePlan.source.kind) &&
       (!state.runtimePlan.execution.composeFile ||
@@ -2125,6 +2134,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
     const upCommand = renderRuntimeCommandString(
       RuntimeCommandBuilder.docker().composeUp({
         composeFile,
+        projectName: runtimeInstanceNames.composeProjectName,
       }),
       { quote: shellQuote },
     );
@@ -2177,6 +2187,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
           retryable: true,
           metadata: {
             composeFile,
+            composeProjectName: runtimeInstanceNames.composeProjectName,
             workdir,
             ...preparedSource.metadata,
           },
@@ -2205,6 +2216,7 @@ export class LocalExecutionBackend implements ExecutionBackend {
       logs,
       metadata: {
         composeFile,
+        composeProjectName: runtimeInstanceNames.composeProjectName,
         workdir,
         ...preparedSource.metadata,
       },
@@ -2285,7 +2297,11 @@ export class LocalExecutionBackend implements ExecutionBackend {
         );
         break;
       case "docker-container": {
-        const containerName = metadata.containerName ?? sanitizeName(`appaloft-${state.id.value}`);
+        const runtimeInstanceNames = deriveRuntimeInstanceNames({
+          deploymentId: state.id.value,
+          metadata: state.runtimePlan.execution.metadata,
+        });
+        const containerName = metadata.containerName ?? runtimeInstanceNames.containerName;
         runSyncCommand({
           command: `docker rm -f ${shellQuote(containerName)} >/dev/null 2>&1 || true`,
           cwd: workdir,
@@ -2296,8 +2312,11 @@ export class LocalExecutionBackend implements ExecutionBackend {
       }
       case "docker-compose-stack":
         if (metadata.composeFile) {
+          const composeProjectFlag = metadata.composeProjectName
+            ? `-p ${shellQuote(metadata.composeProjectName)} `
+            : "";
           runSyncCommand({
-            command: `docker compose -f ${shellQuote(metadata.composeFile)} down`,
+            command: `docker compose ${composeProjectFlag}-f ${shellQuote(metadata.composeFile)} down`,
             cwd: workdir,
             env,
           });
@@ -2335,6 +2354,10 @@ export class LocalExecutionBackend implements ExecutionBackend {
     const workdir =
       state.runtimePlan.execution.workingDirectory ?? normalizeWorkingDirectory(state.runtimePlan.source.locator);
     const logs: DeploymentLogEntry[] = [];
+    const runtimeInstanceNames = deriveRuntimeInstanceNames({
+      deploymentId: state.id.value,
+      metadata: state.runtimePlan.execution.metadata,
+    });
 
     try {
       this.report(context, {
@@ -2354,26 +2377,27 @@ export class LocalExecutionBackend implements ExecutionBackend {
           );
           break;
         case "docker-container":
-          if (metadata.containerName) {
-            runSyncCommand({
-              command: `docker rm -f ${metadata.containerName}`,
-              cwd: workdir,
-              env,
-            });
-          }
+          runSyncCommand({
+            command: `docker rm -f ${metadata.containerName ?? runtimeInstanceNames.containerName}`,
+            cwd: workdir,
+            env,
+          });
           logs.push(
             phaseLog(
               "rollback",
               metadata.containerName
                 ? `Removed container ${metadata.containerName}`
-                : "No container metadata recorded",
+                : `Removed container ${runtimeInstanceNames.containerName}`,
             ),
           );
           break;
         case "docker-compose-stack":
           if (metadata.composeFile) {
+            const composeProjectFlag = metadata.composeProjectName
+              ? `-p ${shellQuote(metadata.composeProjectName)} `
+              : "";
             runSyncCommand({
-              command: `docker compose -f ${metadata.composeFile} down`,
+              command: `docker compose ${composeProjectFlag}-f ${metadata.composeFile} down`,
               cwd: workdir,
               env,
             });

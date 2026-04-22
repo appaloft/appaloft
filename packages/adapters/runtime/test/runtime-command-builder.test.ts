@@ -94,11 +94,12 @@ describe("runtime command builder", () => {
   test("renders Compose up with an executor working directory", () => {
     const spec = RuntimeCommandBuilder.docker().composeUp({
       composeFile: "/srv/app/docker-compose.yml",
+      projectName: "preview-123-dep-1",
       workingDirectory: "/srv/app",
     });
 
     expect(renderRuntimeCommandString(spec, { quote: shellQuote })).toBe(
-      "cd '/srv/app' && docker compose -f '/srv/app/docker-compose.yml' up -d --build",
+      "cd '/srv/app' && docker compose -p 'preview-123-dep-1' -f '/srv/app/docker-compose.yml' up -d --build",
     );
   });
 });

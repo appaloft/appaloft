@@ -152,6 +152,7 @@ function runtimeProfileFromState(
     ...(profile.installCommand ? { installCommand: profile.installCommand.value } : {}),
     ...(profile.buildCommand ? { buildCommand: profile.buildCommand.value } : {}),
     ...(profile.startCommand ? { startCommand: profile.startCommand.value } : {}),
+    ...(profile.runtimeName ? { runtimeName: profile.runtimeName.value } : {}),
     ...(profile.publishDirectory ? { publishDirectory: profile.publishDirectory.value } : {}),
     ...(profile.dockerfilePath ? { dockerfilePath: profile.dockerfilePath.value } : {}),
     ...(profile.dockerComposeFilePath

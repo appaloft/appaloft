@@ -568,6 +568,8 @@ export const zhCN = {
       runtimeDockerfilePath: "Dockerfile 路径",
       runtimeDockerfilePathPlaceholder: "Dockerfile",
       runtimeInstallCommand: "安装命令",
+      runtimeName: "运行时名称",
+      runtimeNamePlaceholder: "www",
       runtimeLogsConnecting: "正在连接运行时日志...",
       runtimeLogsDescription: "通过已配置的运行时日志读取器查看最新应用输出。",
       runtimeLogsEmpty: "暂无运行时日志。",

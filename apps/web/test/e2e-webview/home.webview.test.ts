@@ -1082,6 +1082,7 @@ describe("console e2e with Bun.WebView", () => {
 
     await expectAnyText(view, ["Runtime profile", "运行时配置"]);
     await setInputValue(view, "#resource-runtime-start-command", "bun run preview");
+    await setInputValue(view, "#resource-runtime-name", "preview-123");
     await clickFormSubmit(view, "#resource-runtime-profile-form");
 
     const configureRuntimeRequest = await waitForRecordedRequest(
@@ -1094,6 +1095,7 @@ describe("console e2e with Bun.WebView", () => {
       runtimeProfile: {
         strategy: "workspace-commands",
         startCommand: "bun run preview",
+        runtimeName: "preview-123",
       },
     });
   }, 15_000);
@@ -1380,6 +1382,7 @@ describe("console e2e with Bun.WebView", () => {
     deployState.searchParams.set("staticPublishDirectory", "/dist");
     deployState.searchParams.set("staticInstallCommand", "pnpm install");
     deployState.searchParams.set("staticBuildCommand", "pnpm build");
+    deployState.searchParams.set("resourceRuntimeName", "preview-456");
     deployState.searchParams.set("projectId", "prj_static");
     deployState.searchParams.set("serverId", "srv_static");
 
@@ -1388,6 +1391,7 @@ describe("console e2e with Bun.WebView", () => {
 
     await expectAnyText(view, ["Static site", "静态站点"]);
     await expectText(view, "--method static");
+    await expectText(view, "--runtime-name preview-456");
     await clickButtonByAnyText(view, ["Create and deploy", "创建并部署"]);
 
     const resourcesCreateRequest = await waitForRecordedRequest("/api/rpc/resources/create");
@@ -1407,6 +1411,7 @@ describe("console e2e with Bun.WebView", () => {
           installCommand: "pnpm install",
           buildCommand: "pnpm build",
           publishDirectory: "/dist",
+          runtimeName: "preview-456",
         }),
         networkProfile: expect.objectContaining({
           internalPort: 80,

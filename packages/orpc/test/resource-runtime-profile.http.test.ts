@@ -65,6 +65,7 @@ describe("resource runtime profile HTTP route", () => {
           resourceId: "res_web",
           runtimeProfile: {
             strategy: "static",
+            runtimeName: "preview-123",
             publishDirectory: "dist",
           },
         }),
@@ -74,5 +75,10 @@ describe("resource runtime profile HTTP route", () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ id: "res_web" });
     expect(capturedCommand).toBeInstanceOf(ConfigureResourceRuntimeCommand);
+    expect(capturedCommand).toMatchObject({
+      runtimeProfile: {
+        runtimeName: "preview-123",
+      },
+    });
   });
 });

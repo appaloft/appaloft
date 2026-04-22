@@ -25,6 +25,7 @@ import {
   appaloftDeploymentConfigFileNames,
   parseAppaloftDeploymentConfig,
   parseAppaloftDeploymentConfigText,
+  renderAppaloftDeploymentRuntimeNameTemplate,
 } from "@appaloft/deployment-config";
 import { Args, Command as EffectCommand, Options } from "@effect/cli";
 import { Effect, Either } from "effect";
@@ -94,6 +95,7 @@ const requirePreviewUrlOption = Options.boolean("require-preview-url").pipe(
 const installOption = Options.text("install").pipe(Options.optional);
 const buildOption = Options.text("build").pipe(Options.optional);
 const startOption = Options.text("start").pipe(Options.optional);
+const runtimeNameOption = Options.text("runtime-name").pipe(Options.optional);
 const publishDirOption = Options.text("publish-dir").pipe(Options.optional);
 const portOption = Options.text("port").pipe(Options.optional);
 const upstreamProtocolOption = Options.choice("upstream-protocol", resourceNetworkProtocols).pipe(
@@ -620,6 +622,37 @@ function applyPreviewRoutePrecedence(input: {
   };
 }
 
+function resolveRuntimeNameSeed(input: {
+  explicitRuntimeName?: string;
+  configSeed: DeploymentPromptSeed;
+  previewContext?: PreviewDeployContext;
+}): Result<string | undefined> {
+  const explicitRuntimeName = input.explicitRuntimeName?.trim().toLowerCase();
+  if (explicitRuntimeName) {
+    return ok(explicitRuntimeName);
+  }
+
+  if (input.configSeed.runtimeNameTemplate) {
+    return renderAppaloftDeploymentRuntimeNameTemplate({
+      template: input.configSeed.runtimeNameTemplate,
+      ...(input.previewContext
+        ? {
+            context: {
+              previewId: input.previewContext.previewId,
+              prNumber: input.previewContext.pullRequestNumber,
+            },
+          }
+        : {}),
+    });
+  }
+
+  if (input.previewContext) {
+    return ok(`preview-${input.previewContext.pullRequestNumber}`);
+  }
+
+  return ok(undefined);
+}
+
 function sourceFingerprintForConfigDeploy(input: {
   sourceLocator: string;
   configResolution?: { config: AppaloftDeploymentConfig; configFilePath: string };
@@ -912,6 +945,7 @@ export const deployCommand = EffectCommand.make(
     install: installOption,
     build: buildOption,
     start: startOption,
+    runtimeName: runtimeNameOption,
     publishDir: publishDirOption,
     port: portOption,
     upstreamProtocol: upstreamProtocolOption,
@@ -951,6 +985,7 @@ export const deployCommand = EffectCommand.make(
     resourceDescription,
     resourceKind,
     resourceName,
+    runtimeName,
     secret,
     server,
     serverHost,
@@ -990,6 +1025,7 @@ export const deployCommand = EffectCommand.make(
       const installCommand = optionalValue(install);
       const buildCommand = optionalValue(build);
       const startCommand = optionalValue(start);
+      const runtimeNameValue = optionalValue(runtimeName);
       const publishDirectory = optionalValue(publishDir);
       const upstreamProtocolValue = optionalValue(upstreamProtocol);
       const exposureModeValue = optionalValue(exposureMode);
@@ -1029,6 +1065,7 @@ export const deployCommand = EffectCommand.make(
           installCommand ||
           buildCommand ||
           startCommand ||
+          runtimeNameValue ||
           publishDirectory ||
           portValue !== undefined ||
           upstreamProtocolValue ||
@@ -1077,6 +1114,13 @@ export const deployCommand = EffectCommand.make(
         ...(previewContext ? { previewContext } : {}),
         ...(previewDomainRoutes ? { previewDomainRoutes } : {}),
       });
+      const resolvedRuntimeName = yield* resultToEffect(
+        resolveRuntimeNameSeed({
+          ...(runtimeNameValue ? { explicitRuntimeName: runtimeNameValue } : {}),
+          configSeed,
+          ...(previewContext ? { previewContext } : {}),
+        }),
+      );
       const configEnvironmentVariables = configResolution
         ? yield* resultToEffect(deploymentEnvironmentVariablesFromConfig(configResolution.config))
         : [];
@@ -1190,6 +1234,7 @@ export const deployCommand = EffectCommand.make(
         ...(installCommand ? { installCommand } : {}),
         ...(buildCommand ? { buildCommand } : {}),
         ...(startCommand ? { startCommand } : {}),
+        ...(resolvedRuntimeName ? { runtimeName: resolvedRuntimeName } : {}),
         ...(publishDirectory ? { publishDirectory } : {}),
         ...(portValue === undefined ? {} : { port: portValue }),
         ...(upstreamProtocolValue ? { upstreamProtocol: upstreamProtocolValue } : {}),

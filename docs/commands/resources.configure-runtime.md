@@ -74,6 +74,7 @@ type ConfigureResourceRuntimeCommandInput = {
 | `runtimeProfile.installCommand` | Optional | Install command default for strategy families that accept commands. |
 | `runtimeProfile.buildCommand` | Optional | Build command default for strategy families that accept commands. |
 | `runtimeProfile.startCommand` | Optional | Start command default for image/container runtime planning. |
+| `runtimeProfile.runtimeName` | Optional | Provider-neutral runtime naming intent used to derive effective Docker container or Compose project names for future deployments. |
 | `runtimeProfile.dockerfilePath` | Conditional | Source-root-relative Dockerfile path for Dockerfile strategy. |
 | `runtimeProfile.dockerComposeFilePath` | Conditional | Source-root-relative Compose file path for Compose strategy. |
 | `runtimeProfile.publishDirectory` | Conditional | Source-root-relative static publish directory for static strategy. |
@@ -108,6 +109,17 @@ Docker/OCI images.
 
 Runtime profile paths are relative to the source binding's selected root. They must not contain
 `..`, shell metacharacters, URLs, or host absolute paths.
+
+`runtimeProfile.runtimeName` is a reusable runtime naming intent, not an exact deployment-instance
+reservation. The command must validate a safe normalized identifier shape, but it must not require
+target-global uniqueness because collision handling depends on the selected runtime substrate and
+deployment context. Deployment planning/runtime adapters derive an effective Docker container or
+Compose project name from `runtimeName` plus deployment/resource/preview context when uniqueness is
+required for safe replacement.
+
+Preview entry workflows may derive a default runtime name such as `preview-123` from trusted PR
+context before dispatching this command or `resources.create`. That derived preview default remains
+resource-owned runtime profile state once persisted.
 
 Changing runtime profile affects only future deployment admission. It does not mutate any current
 runtime instance or deployment snapshot.

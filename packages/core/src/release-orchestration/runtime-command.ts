@@ -81,6 +81,7 @@ export interface DockerRunContainerCommandSpec {
 export interface DockerComposeUpCommandSpec {
   kind: "docker-compose-up";
   composeFile: FilePathText;
+  projectName?: DisplayNameText;
   workingDirectory?: FilePathText;
   detach: boolean;
   build: boolean;

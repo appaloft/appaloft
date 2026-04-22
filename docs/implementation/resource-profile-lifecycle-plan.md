@@ -76,8 +76,9 @@ profile mutation.
 
 `resources.configure-source` updates only source binding fields.
 
-`resources.configure-runtime` updates only runtime planning fields and must preserve existing health
-policy storage even if the current persistence model stores health under runtime profile.
+`resources.configure-runtime` updates only runtime planning fields, including reusable runtime
+naming intent, and must preserve existing health policy storage even if the current persistence
+model stores health under runtime profile.
 
 `resources.configure-network` updates only network profile fields.
 
@@ -176,6 +177,7 @@ The read model must expose:
 - resource identity and lifecycle;
 - source profile in display-safe form;
 - runtime profile in display-safe form;
+- reusable runtime naming intent in display-safe form;
 - network profile;
 - health policy summary;
 - optional latest deployment context;

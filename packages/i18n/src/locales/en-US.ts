@@ -607,6 +607,8 @@ export const enUS = {
       runtimeDockerfilePath: "Dockerfile path",
       runtimeDockerfilePathPlaceholder: "Dockerfile",
       runtimeInstallCommand: "Install command",
+      runtimeName: "Runtime name",
+      runtimeNamePlaceholder: "www",
       runtimeLogsConnecting: "Connecting to runtime logs...",
       runtimeLogsDescription:
         "Read the latest application output through the configured runtime log reader.",
