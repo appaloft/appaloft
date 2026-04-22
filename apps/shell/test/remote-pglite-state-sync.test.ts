@@ -4,13 +4,20 @@ import { describe, expect, test } from "bun:test";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { createDatabase, createMigrator } from "@appaloft/persistence-pg";
 import {
+  prepareRemotePgliteStateSync,
   type RemotePgliteArchiveRunnerInput,
   RemotePgliteArchiveSync,
   resolveRemotePgliteStateSyncPlan,
 } from "../src/remote-pglite-state-sync";
 
-function testConfig(dataDir: string) {
+function testConfig(
+  dataDir: string,
+  overrides?: {
+    remoteRuntimeRoot?: string;
+  },
+) {
   return {
     appName: "Appaloft",
     appVersion: "0.1.0",
@@ -24,7 +31,7 @@ function testConfig(dataDir: string) {
     databaseDriver: "pglite" as const,
     dataDir,
     pgliteDataDir: join(dataDir, "pglite"),
-    remoteRuntimeRoot: "/var/lib/appaloft/runtime",
+    remoteRuntimeRoot: overrides?.remoteRuntimeRoot ?? "/var/lib/appaloft/runtime",
     logLevel: "info" as const,
     environment: "test",
     otelEnabled: false,
@@ -53,6 +60,47 @@ function testConfig(dataDir: string) {
       batchSize: 25,
     },
     enabledSystemPlugins: [],
+  };
+}
+
+async function initializePgliteRoot(root: string) {
+  await mkdir(root, { recursive: true });
+  await mkdir(join(root, "source-links"), { recursive: true });
+  await mkdir(join(root, "server-applied-routes"), { recursive: true });
+
+  const connection = await createDatabase({
+    driver: "pglite",
+    pgliteDataDir: join(root, "pglite"),
+  });
+  const migrations = await createMigrator(connection.db).migrateToLatest();
+  if (migrations.error) {
+    await connection.close();
+    throw migrations.error;
+  }
+
+  return connection;
+}
+
+function createLocalSshArchiveRunner() {
+  return {
+    run(input: RemotePgliteArchiveRunnerInput) {
+      const command =
+        input.command === "ssh"
+          ? ["sh", "-lc", input.args[input.args.length - 1] ?? ""]
+          : [input.command, ...input.args];
+      const result = Bun.spawnSync(command, {
+        ...(input.stdin ? { stdin: input.stdin } : {}),
+        stdout: "pipe",
+        stderr: "pipe",
+      });
+
+      return {
+        exitCode: result.exitCode,
+        stdout: result.stdout,
+        stderr: result.stderr.toString(),
+        failed: !result.success,
+      };
+    },
   };
 }
 
@@ -386,4 +434,500 @@ describe("remote PGlite state sync", () => {
       await rm(dataDir, { recursive: true, force: true });
     }
   });
+
+  test("[CONFIG-FILE-STATE-010] releaseForCliRuntime releases the coarse SSH lock before final upload and reacquires it later", async () => {
+    const dataDir = await mkdtemp(join(tmpdir(), "appaloft-remote-sync-"));
+    const calls: RemotePgliteArchiveRunnerInput[] = [];
+    try {
+      const session = await prepareRemotePgliteStateSync({
+        argv: ["appaloft", "deploy", ".", "--server-host", "203.0.113.10"],
+        config: testConfig(dataDir),
+        runner: {
+          run(input) {
+            calls.push(input);
+
+            if (input.command === "tar") {
+              return {
+                exitCode: 0,
+                stdout: new Uint8Array(),
+                stderr: "",
+                failed: false,
+              };
+            }
+
+            const joinedArgs = input.args.join(" ");
+            if (joinedArgs.includes("sync-revision.txt")) {
+              return {
+                exitCode: 0,
+                stdout: new TextEncoder().encode("0\n"),
+                stderr: "",
+                failed: false,
+              };
+            }
+
+            return {
+              exitCode: 0,
+              stdout: new TextEncoder().encode("archive"),
+              stderr: "",
+              failed: false,
+            };
+          },
+        },
+      });
+
+      expect(session.isOk()).toBe(true);
+      if (session.isErr() || !session.value) {
+        throw new Error("Expected remote sync session");
+      }
+
+      const released = await session.value.releaseForCliRuntime();
+      const releasedAgain = await session.value.releaseForCliRuntime();
+      const synced = await session.value.syncBackAndRelease();
+
+      expect(released.isOk()).toBe(true);
+      expect(releasedAgain.isOk()).toBe(true);
+      expect(synced.isOk()).toBe(true);
+
+      const sshCommands = calls
+        .filter((call) => call.command === "ssh")
+        .map((call) => call.args.join(" "));
+      expect(sshCommands).toHaveLength(7);
+      expect(sshCommands[0]).toContain("mutation.lock");
+      expect(sshCommands[1]).toContain("tar -czf - pglite source-links server-applied-routes");
+      expect(sshCommands[2]).toContain("sync-revision.txt");
+      expect(sshCommands[3]).toContain('rm -rf "$data_root/locks/mutation.lock"');
+      expect(sshCommands[4]).toContain("mutation.lock");
+      expect(sshCommands[5]).toContain("expected_revision");
+      expect(sshCommands[5]).toContain("next_revision");
+      expect(sshCommands[6]).toContain('rm -rf "$data_root/locks/mutation.lock"');
+      expect(
+        calls.filter(
+          (call) =>
+            call.command === "ssh" &&
+            call.args.join(" ").includes('rm -rf "$data_root/locks/mutation.lock"'),
+        ),
+      ).toHaveLength(2);
+    } finally {
+      await rm(dataDir, { recursive: true, force: true });
+    }
+  });
+
+  test("[CONFIG-FILE-STATE-012] final upload refuses to overwrite a newer remote revision", async () => {
+    const dataDir = await mkdtemp(join(tmpdir(), "appaloft-remote-sync-"));
+    const calls: RemotePgliteArchiveRunnerInput[] = [];
+    try {
+      const session = await prepareRemotePgliteStateSync({
+        argv: ["appaloft", "deploy", ".", "--server-host", "203.0.113.10"],
+        config: testConfig(dataDir),
+        runner: {
+          run(input) {
+            calls.push(input);
+
+            if (input.command === "tar") {
+              return {
+                exitCode: 0,
+                stdout: new Uint8Array(),
+                stderr: "",
+                failed: false,
+              };
+            }
+
+            const joinedArgs = input.args.join(" ");
+            if (
+              joinedArgs.includes("sync-revision.txt") &&
+              !joinedArgs.includes("expected_revision")
+            ) {
+              return {
+                exitCode: 0,
+                stdout: new TextEncoder().encode("0\n"),
+                stderr: "",
+                failed: false,
+              };
+            }
+
+            if (joinedArgs.includes("expected_revision")) {
+              return {
+                exitCode: 76,
+                stdout: new Uint8Array(),
+                stderr:
+                  '{"phase":"remote-state-sync-upload","reason":"remote_state_revision_conflict","expectedRevision":0,"actualRevision":1}',
+                failed: true,
+              };
+            }
+
+            return {
+              exitCode: 0,
+              stdout: new TextEncoder().encode("archive"),
+              stderr: "",
+              failed: false,
+            };
+          },
+        },
+      });
+
+      expect(session.isOk()).toBe(true);
+      if (session.isErr() || !session.value) {
+        throw new Error("Expected remote sync session");
+      }
+
+      const released = await session.value.releaseForCliRuntime();
+      const synced = await session.value.syncBackAndRelease();
+
+      expect(released.isOk()).toBe(true);
+      expect(synced.isErr()).toBe(true);
+      if (synced.isOk()) {
+        throw new Error("Expected sync conflict");
+      }
+      expect(synced.error).toMatchObject({
+        code: "infra_error",
+        details: {
+          phase: "remote-state-sync-upload",
+          reason: "remote_state_merge_failed",
+        },
+      });
+      expect(
+        calls.filter(
+          (call) =>
+            call.command === "ssh" &&
+            call.args.join(" ").includes('rm -rf "$data_root/locks/mutation.lock"'),
+        ),
+      ).toHaveLength(2);
+    } finally {
+      await rm(dataDir, { recursive: true, force: true });
+    }
+  });
+
+  test("[CONFIG-FILE-STATE-010] refreshLocalMirror reacquires the coarse lock, downloads a fresh mirror, and releases again", async () => {
+    const dataDir = await mkdtemp(join(tmpdir(), "appaloft-remote-sync-"));
+    const calls: RemotePgliteArchiveRunnerInput[] = [];
+    try {
+      const session = await prepareRemotePgliteStateSync({
+        argv: ["appaloft", "deploy", ".", "--server-host", "203.0.113.10"],
+        config: testConfig(dataDir),
+        runner: {
+          run(input) {
+            calls.push(input);
+
+            if (input.command === "tar") {
+              return {
+                exitCode: 0,
+                stdout: new Uint8Array(),
+                stderr: "",
+                failed: false,
+              };
+            }
+
+            const joinedArgs = input.args.join(" ");
+            if (joinedArgs.includes("sync-revision.txt")) {
+              const revisionReads = calls.filter(
+                (call) =>
+                  call.command === "ssh" && call.args.join(" ").includes("sync-revision.txt"),
+              ).length;
+              return {
+                exitCode: 0,
+                stdout: new TextEncoder().encode(`${revisionReads - 1}\n`),
+                stderr: "",
+                failed: false,
+              };
+            }
+
+            return {
+              exitCode: 0,
+              stdout: new TextEncoder().encode("archive"),
+              stderr: "",
+              failed: false,
+            };
+          },
+        },
+      });
+
+      expect(session.isOk()).toBe(true);
+      if (session.isErr() || !session.value) {
+        throw new Error("Expected remote sync session");
+      }
+
+      const released = await session.value.releaseForCliRuntime();
+      const refreshed = await session.value.refreshLocalMirror();
+
+      expect(released.isOk()).toBe(true);
+      expect(refreshed.isOk()).toBe(true);
+
+      const sshCommands = calls
+        .filter((call) => call.command === "ssh")
+        .map((call) => call.args.join(" "));
+      expect(
+        sshCommands.filter((command) =>
+          command.includes('rm -rf "$data_root/locks/mutation.lock"'),
+        ),
+      ).toHaveLength(2);
+      expect(
+        sshCommands.filter((command) =>
+          command.includes("tar -czf - pglite source-links server-applied-routes"),
+        ),
+      ).toHaveLength(2);
+      expect(sshCommands.filter((command) => command.includes("sync-revision.txt"))).toHaveLength(
+        2,
+      );
+    } finally {
+      await rm(dataDir, { recursive: true, force: true });
+    }
+  });
+
+  test("[CONFIG-FILE-STATE-012] final upload merges disjoint PGlite row changes onto a newer remote revision", async () => {
+    const localDataDir = await mkdtemp(join(tmpdir(), "appaloft-remote-sync-local-"));
+    const remoteRuntimeRoot = await mkdtemp(join(tmpdir(), "appaloft-remote-sync-remote-"));
+    const remoteStateRoot = join(remoteRuntimeRoot, "state");
+    const runner = createLocalSshArchiveRunner();
+    const now = "2026-04-22T00:00:00.000Z";
+
+    try {
+      const remoteBase = await initializePgliteRoot(remoteStateRoot);
+      try {
+        await remoteBase.db
+          .insertInto("projects")
+          .values({
+            id: "prj_demo",
+            name: "Demo",
+            slug: "demo",
+            description: null,
+            created_at: now,
+          })
+          .execute();
+        await remoteBase.db
+          .insertInto("servers")
+          .values({
+            id: "srv_main",
+            name: "Main",
+            host: "203.0.113.10",
+            port: 22,
+            provider_key: "ssh",
+            edge_proxy_kind: null,
+            edge_proxy_status: null,
+            edge_proxy_last_attempt_at: null,
+            edge_proxy_last_succeeded_at: null,
+            edge_proxy_last_error_code: null,
+            edge_proxy_last_error_message: null,
+            credential_id: null,
+            credential_kind: null,
+            credential_username: null,
+            credential_public_key: null,
+            credential_private_key: null,
+            created_at: now,
+          })
+          .execute();
+        await remoteBase.db
+          .insertInto("destinations")
+          .values({
+            id: "dst_main",
+            server_id: "srv_main",
+            name: "Main",
+            kind: "docker",
+            created_at: now,
+          })
+          .execute();
+      } finally {
+        await remoteBase.close();
+      }
+
+      const session = await prepareRemotePgliteStateSync({
+        argv: ["appaloft", "deploy", ".", "--server-host", "203.0.113.10"],
+        config: testConfig(localDataDir, { remoteRuntimeRoot }),
+        runner,
+      });
+
+      expect(session.isOk()).toBe(true);
+      if (session.isErr() || !session.value) {
+        throw new Error("Expected remote sync session");
+      }
+
+      const released = await session.value.releaseForCliRuntime();
+      expect(released.isOk()).toBe(true);
+
+      const localConnection = await initializePgliteRoot(session.value.localDataRoot);
+      try {
+        await localConnection.db
+          .insertInto("environments")
+          .values({
+            id: "env_pr13",
+            project_id: "prj_demo",
+            name: "preview-pr13",
+            kind: "preview",
+            parent_environment_id: null,
+            created_at: now,
+          })
+          .execute();
+        await localConnection.db
+          .insertInto("resources")
+          .values({
+            id: "res_pr13",
+            project_id: "prj_demo",
+            environment_id: "env_pr13",
+            destination_id: "dst_main",
+            name: "PR 13",
+            slug: "pr-13",
+            kind: "application",
+            description: null,
+            services: [],
+            source_binding: null,
+            runtime_profile: null,
+            network_profile: null,
+            lifecycle_status: "active",
+            archived_at: null,
+            archive_reason: null,
+            deleted_at: null,
+            created_at: now,
+          })
+          .execute();
+        await localConnection.db
+          .insertInto("deployments")
+          .values({
+            id: "dep_pr13",
+            project_id: "prj_demo",
+            environment_id: "env_pr13",
+            resource_id: "res_pr13",
+            server_id: "srv_main",
+            destination_id: "dst_main",
+            status: "succeeded",
+            runtime_plan: {},
+            environment_snapshot: {},
+            logs: [],
+            created_at: now,
+            started_at: now,
+            finished_at: now,
+            rollback_of_deployment_id: null,
+            supersedes_deployment_id: null,
+            superseded_by_deployment_id: null,
+          })
+          .execute();
+        await localConnection.db
+          .insertInto("source_links")
+          .values({
+            source_fingerprint: "source://preview/pr-13",
+            project_id: "prj_demo",
+            environment_id: "env_pr13",
+            resource_id: "res_pr13",
+            server_id: "srv_main",
+            destination_id: "dst_main",
+            updated_at: now,
+            reason: "local-preview",
+            metadata: {},
+          })
+          .execute();
+      } finally {
+        await localConnection.close();
+      }
+
+      const remoteConcurrent = await initializePgliteRoot(remoteStateRoot);
+      try {
+        await remoteConcurrent.db
+          .insertInto("environments")
+          .values({
+            id: "env_pr14",
+            project_id: "prj_demo",
+            name: "preview-pr14",
+            kind: "preview",
+            parent_environment_id: null,
+            created_at: now,
+          })
+          .execute();
+        await remoteConcurrent.db
+          .insertInto("resources")
+          .values({
+            id: "res_pr14",
+            project_id: "prj_demo",
+            environment_id: "env_pr14",
+            destination_id: "dst_main",
+            name: "PR 14",
+            slug: "pr-14",
+            kind: "application",
+            description: null,
+            services: [],
+            source_binding: null,
+            runtime_profile: null,
+            network_profile: null,
+            lifecycle_status: "active",
+            archived_at: null,
+            archive_reason: null,
+            deleted_at: null,
+            created_at: now,
+          })
+          .execute();
+        await remoteConcurrent.db
+          .insertInto("deployments")
+          .values({
+            id: "dep_pr14",
+            project_id: "prj_demo",
+            environment_id: "env_pr14",
+            resource_id: "res_pr14",
+            server_id: "srv_main",
+            destination_id: "dst_main",
+            status: "succeeded",
+            runtime_plan: {},
+            environment_snapshot: {},
+            logs: [],
+            created_at: now,
+            started_at: now,
+            finished_at: now,
+            rollback_of_deployment_id: null,
+            supersedes_deployment_id: null,
+            superseded_by_deployment_id: null,
+          })
+          .execute();
+        await remoteConcurrent.db
+          .insertInto("source_links")
+          .values({
+            source_fingerprint: "source://preview/pr-14",
+            project_id: "prj_demo",
+            environment_id: "env_pr14",
+            resource_id: "res_pr14",
+            server_id: "srv_main",
+            destination_id: "dst_main",
+            updated_at: now,
+            reason: "remote-preview",
+            metadata: {},
+          })
+          .execute();
+      } finally {
+        await remoteConcurrent.close();
+      }
+
+      await writeFile(join(remoteStateRoot, "sync-revision.txt"), "1\n");
+
+      const synced = await session.value.syncBackAndRelease();
+      expect(synced.isOk()).toBe(true);
+
+      const mergedRemote = await initializePgliteRoot(remoteStateRoot);
+      try {
+        const environments = await mergedRemote.db
+          .selectFrom("environments")
+          .select("id")
+          .orderBy("id")
+          .execute();
+        const deployments = await mergedRemote.db
+          .selectFrom("deployments")
+          .select("id")
+          .orderBy("id")
+          .execute();
+        const sourceLinks = await mergedRemote.db
+          .selectFrom("source_links")
+          .select("source_fingerprint")
+          .orderBy("source_fingerprint")
+          .execute();
+        const revision = await readFile(join(remoteStateRoot, "sync-revision.txt"), "utf8");
+
+        expect(environments.map((row) => row.id)).toEqual(["env_pr13", "env_pr14"]);
+        expect(deployments.map((row) => row.id)).toEqual(["dep_pr13", "dep_pr14"]);
+        expect(sourceLinks.map((row) => row.source_fingerprint)).toEqual([
+          "source://preview/pr-13",
+          "source://preview/pr-14",
+        ]);
+        expect(revision.trim()).toBe("2");
+      } finally {
+        await mergedRemote.close();
+      }
+    } finally {
+      await rm(localDataDir, { recursive: true, force: true });
+      await rm(remoteRuntimeRoot, { recursive: true, force: true });
+    }
+  }, 20_000);
 });

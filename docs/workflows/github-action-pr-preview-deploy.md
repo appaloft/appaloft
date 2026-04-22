@@ -202,18 +202,31 @@ For Action-only preview deploy, the workflow uses existing operations:
 resolve preview context
   -> resolve control-plane mode, defaulting to none
   -> resolve SSH target and credential from action inputs/secrets
-  -> ensure, lock, migrate, and sync SSH-server PGlite when mode is none
+  -> ensure, state-root coordinate, migrate, and sync SSH-server PGlite when mode is none
   -> resolve or create preview-scoped source link
   -> create or select project from trusted source state/defaults
   -> create or select preview environment
   -> create or select preview resource from preview-scoped link
   -> apply config env and secret references through environment operations
+  -> coordinate preview deploy admission at the logical resource-runtime scope
   -> deployments.create(projectId, environmentId, resourceId, serverId, destinationId?)
   -> realize proxy route when the resolved resource/network/access state has a route
 ```
 
 `deployments.create` remains ids-only. PR number, branch name, GitHub repository, preview domain
 template, route host, proxy kind, and TLS mode must not become deployment command fields.
+
+Preview deploy and preview cleanup must use logical mutation coordination, not only whole-server
+serialization. The workflow may still encounter brief backend state-root coordination during
+SSH-state maintenance, but user-visible waiting semantics should align to the selected preview or
+resource scope.
+
+When SSH `ssh-pglite` final upload observes that the remote state root advanced while the command
+was running, the workflow should not fail immediately for disjoint preview mutations. Shell may
+download a fresh remote snapshot, replay the command's non-overlapping PG/PGlite row changes, and
+retry the upload. If both sides changed the same authoritative row incompatibly, the workflow must
+still fail with a structured infrastructure merge conflict instead of silently overwriting the newer
+remote row.
 
 ## Access, Proxy, And Domain Policy
 

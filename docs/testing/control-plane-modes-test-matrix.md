@@ -51,18 +51,18 @@ This matrix inherits:
 | CONTROL-PLANE-HANDSHAKE-003 | contract | Unsupported mode fails before mutation | Cloud/self-hosted is selected before API handshake implementation exists | Workflow returns unsupported control-plane error before identity or deployment mutation | `control_plane_unsupported`, phase `control-plane-capability` | No write commands |
 | CONTROL-PLANE-HANDSHAKE-004 | integration | Version mismatch fails fast | Control plane responds with minimum client version greater than installed CLI/action version | Workflow stops before mutation with structured version details | `control_plane_handshake_failed`, phase `control-plane-handshake` | Handshake only |
 | CONTROL-PLANE-HANDSHAKE-005 | integration | Feature mismatch fails fast | Control plane lacks required feature such as source links or managed config domain mapping | Workflow stops before the unsupported branch mutates state | `control_plane_handshake_failed` or `control_plane_unsupported`, phase `control-plane-handshake` or `control-plane-capability` | Handshake -> no downstream mutation |
-| CONTROL-PLANE-HANDSHAKE-006 | integration | Cloud-assisted Action keeps Action execution | Cloud mode is selected and handshake succeeds with Action execution feature | GitHub Action remains execution owner while Cloud owns state/locks/source links and receives final report | None | Handshake -> Cloud identity/lock -> Action execution -> Cloud report |
+| CONTROL-PLANE-HANDSHAKE-006 | integration | Cloud-assisted Action keeps Action execution | Cloud mode is selected and handshake succeeds with Action execution feature | GitHub Action remains execution owner while Cloud owns state/coordination/source links and receives final report | None | Handshake -> Cloud identity/coordination -> Action execution -> Cloud report |
 | CONTROL-PLANE-HANDSHAKE-007 | integration | Action-custodied SSH credentials stay outside Cloud | Cloud-assisted Action uses SSH key from GitHub Secrets | Cloud receives no raw SSH key; Action writes key to temp file and only reports sanitized execution metadata | None | Action secret mapping -> Cloud handshake -> SSH execution |
 
 ## Adoption Matrix
 
 | Test ID | Preferred automation | Case | Given | Expected result | Expected error | Expected operation sequence |
 | --- | --- | --- | --- | --- | --- | --- |
-| CONTROL-PLANE-ADOPT-001 | integration | Adoption exports SSH state under lock | Existing SSH-server PGlite state is adopted into a control plane | Workflow acquires remote lock, exports state/source links/routes, imports to control plane, and writes adoption marker | None | Lock SSH state -> export -> import -> marker -> release |
-| CONTROL-PLANE-ADOPT-002 | integration | Interrupted adoption is recoverable | Import succeeds but marker write fails, or marker write succeeds but verification fails | Workflow records recovery metadata and does not report adoption complete | `infra_error`, phase `control-plane-adoption` | Lock -> partial import/marker -> recovery marker |
+| CONTROL-PLANE-ADOPT-001 | integration | Adoption exports SSH state under state-root coordination | Existing SSH-server PGlite state is adopted into a control plane | Workflow acquires SSH backend coordination, exports state/source links/routes, imports to control plane, and writes adoption marker | None | Acquire SSH state-root coordination -> export -> import -> marker -> release |
+| CONTROL-PLANE-ADOPT-002 | integration | Interrupted adoption is recoverable | Import succeeds but marker write fails, or marker write succeeds but verification fails | Workflow records recovery metadata and does not report adoption complete | `infra_error`, phase `control-plane-adoption` | Acquire coordination -> partial import/marker -> recovery marker |
 | CONTROL-PLANE-ADOPT-003 | integration | Auto mode detects adoption marker | SSH server has compatible adoption marker and entrypoint selects `auto` | Resolver selects the marked control plane and API mode instead of direct SSH PGlite mutation | None or handshake error | Marker read -> handshake -> API mode |
 | CONTROL-PLANE-ADOPT-004 | integration | Direct PGlite mutation blocked after adoption | SSH server has compatible adoption marker, but entrypoint attempts default direct SSH state mutation | Workflow stops before mutating remote PGlite | `control_plane_adoption_required`, phase `control-plane-resolution` | Marker read -> no direct mutation |
-| CONTROL-PLANE-ADOPT-005 | integration | Break-glass direct mutation is explicit | Operator supplies accepted break-glass flag and control plane is not concurrently using the PGlite state | Workflow records break-glass diagnostics and proceeds under remote state lock | None or lock/conflict error | Marker read -> break-glass confirmation -> lock -> mutation |
+| CONTROL-PLANE-ADOPT-005 | integration | Break-glass direct mutation is explicit | Operator supplies accepted break-glass flag and control plane is not concurrently using the PGlite state | Workflow records break-glass diagnostics and proceeds under backend state-root coordination | None or coordination/conflict error | Marker read -> break-glass confirmation -> acquire coordination -> mutation |
 
 ## Entrypoint Matrix
 
@@ -81,6 +81,10 @@ Current implementation has no automated rows in this matrix yet.
 Existing tests in `deployment-state.test.ts` and `remote-pglite-state-sync.test.ts` partially cover
 the older `postgres-control-plane` backend selection branch. Those tests should be renamed or
 extended with the IDs above during Phase 1 Code Round.
+
+`remote-pglite-state-sync.test.ts` now also covers SSH `ssh-pglite` final upload refresh/merge
+behavior after remote revision conflict. That coverage belongs to the SSH state-backend path under
+mode `none`; it is not evidence of Cloud/self-hosted control-plane handshake or adoption behavior.
 
 Cloud/self-hosted rows remain target coverage until the handshake, adoption, and API mode contracts
 exist.

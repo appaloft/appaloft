@@ -3,6 +3,7 @@ export const tokens = {
   idGenerator: Symbol.for("appaloft.id_generator"),
   logger: Symbol.for("appaloft.logger"),
   eventBus: Symbol.for("appaloft.event_bus"),
+  mutationCoordinator: Symbol.for("appaloft.mutation_coordinator"),
   deploymentProgressReporter: Symbol.for("appaloft.deployment_progress_reporter"),
   sourceLinkRepository: Symbol.for("appaloft.source_link_repository"),
   defaultAccessDomainPolicyRepository: Symbol.for(
