@@ -3,6 +3,7 @@
   import { goto } from "$app/navigation";
   import { page } from "$app/state";
   import { onDestroy } from "svelte";
+  import { createQuery, queryOptions } from "@tanstack/svelte-query";
   import {
     ArrowLeft,
     Boxes,
@@ -17,10 +18,11 @@
     ShieldCheck,
   } from "@lucide/svelte";
   import {
+    type DeploymentDetailSummary,
+    type DeploymentLogsResponse,
     shortDeploymentSourceCommitSha,
     sourceCommitShaForDeployment,
     type DeploymentProgressEvent,
-    type DeploymentSummary,
   } from "@appaloft/contracts";
 
   import ConsoleShell from "$lib/components/console/ConsoleShell.svelte";
@@ -34,32 +36,26 @@
     progressEventsFromDeployment,
     type DeploymentProgressDialogStatus,
   } from "$lib/console/deployment-progress";
-  import { createConsoleQueries } from "$lib/console/queries";
   import {
     deploymentDetailHref,
-    findDeployment,
-    findEnvironment,
-    findProject,
-    findResource,
-    findServer,
     formatTime,
     projectDetailHref,
     resourceDetailHref,
   } from "$lib/console/utils";
   import { i18nKeys, t } from "$lib/i18n";
+  import { orpcClient } from "$lib/orpc";
 
-  type AccessRoute = NonNullable<DeploymentSummary["runtimePlan"]["execution"]["accessRoutes"]>[number];
+  type AccessRoute =
+    NonNullable<DeploymentDetailSummary["runtimePlan"]["execution"]["accessRoutes"]>[number];
   type AccessUrlKind = "deployment" | "domain" | "direct";
   type AccessUrl = {
     url: string;
     kind: AccessUrlKind;
   };
   type DeploymentDetailTab = "overview" | "logs" | "timeline" | "snapshot";
+  type DeploymentLogEntry = DeploymentLogsResponse["logs"][number];
 
   const deploymentDetailTabs = ["overview", "logs", "timeline", "snapshot"] as const;
-
-  const { projectsQuery, serversQuery, environmentsQuery, resourcesQuery, deploymentsQuery } =
-    createConsoleQueries(browser);
 
   let deploymentProgressDialogOpen = $state(false);
   let deploymentProgressDialogStatus = $state<DeploymentProgressDialogStatus>("idle");
@@ -73,25 +69,43 @@
   let accessUrlCopyResetTimeout: ReturnType<typeof setTimeout> | undefined;
 
   const deploymentId = $derived(page.params.deploymentId ?? "");
-  const projects = $derived(projectsQuery.data?.items ?? []);
-  const servers = $derived(serversQuery.data?.items ?? []);
-  const environments = $derived(environmentsQuery.data?.items ?? []);
-  const resources = $derived(resourcesQuery.data?.items ?? []);
-  const deployments = $derived(deploymentsQuery.data?.items ?? []);
+  const deploymentDetailQuery = createQuery(() =>
+    queryOptions({
+      queryKey: ["deployments", "show", deploymentId],
+      queryFn: () =>
+        orpcClient.deployments.show({
+          deploymentId,
+          includeTimeline: true,
+          includeSnapshot: true,
+          includeRelatedContext: true,
+          includeLatestFailure: true,
+        }),
+      enabled: browser && deploymentId.length > 0,
+      staleTime: 5_000,
+    }),
+  );
+  const deploymentLogsQuery = createQuery(() =>
+    queryOptions({
+      queryKey: ["deployments", "logs", deploymentId],
+      queryFn: () =>
+        orpcClient.deployments.logs({
+          deploymentId,
+        }),
+      enabled: browser && deploymentId.length > 0,
+      staleTime: 5_000,
+    }),
+  );
   const pageLoading = $derived(
-    projectsQuery.isPending ||
-      serversQuery.isPending ||
-      environmentsQuery.isPending ||
-      resourcesQuery.isPending ||
-      deploymentsQuery.isPending,
+    deploymentDetailQuery.isPending || deploymentLogsQuery.isPending,
   );
-  const deployment = $derived(findDeployment(deployments, deploymentId));
-  const project = $derived(deployment ? findProject(projects, deployment.projectId) : null);
-  const environment = $derived(
-    deployment ? findEnvironment(environments, deployment.environmentId) : null,
-  );
-  const resource = $derived(deployment ? findResource(resources, deployment.resourceId) : null);
-  const server = $derived(deployment ? findServer(servers, deployment.serverId) : null);
+  const deploymentDetail = $derived(deploymentDetailQuery.data ?? null);
+  const deployment = $derived(deploymentDetail?.deployment ?? null);
+  const deploymentLogs = $derived(deploymentLogsQuery.data?.logs ?? []);
+  const sectionErrors = $derived(deploymentDetail?.sectionErrors ?? []);
+  const project = $derived(deploymentDetail?.relatedContext?.project ?? null);
+  const environment = $derived(deploymentDetail?.relatedContext?.environment ?? null);
+  const resource = $derived(deploymentDetail?.relatedContext?.resource ?? null);
+  const server = $derived(deploymentDetail?.relatedContext?.server ?? null);
   const accessUrls = $derived(deployment ? deploymentAccessUrls(deployment, server?.host) : []);
   const primaryAccessUrl = $derived(accessUrls[0] ?? null);
   const activeTab = $derived(parseDeploymentDetailTab(page.url.searchParams.get("tab")));
@@ -119,7 +133,7 @@
 
     deploymentProgressRequestId = "";
     deploymentProgressDeploymentId = progressDeployment.id;
-    deploymentProgressEvents = progressEventsFromDeployment(progressDeployment);
+    deploymentProgressEvents = progressEventsFromDeployment(progressDeployment, deploymentLogs);
     deploymentProgressStreamError = "";
     deploymentProgressDialogStatus =
       progressDeployment.status === "failed"
@@ -131,16 +145,14 @@
   }
 
   function deploymentProgressHref(): string {
-    const progressDeployment = deployments.find(
-      (candidate) => candidate.id === deploymentProgressDeploymentId,
-    );
+    if (deployment && deployment.id === deploymentProgressDeploymentId) {
+      return deploymentDetailHref(deployment);
+    }
 
-    return progressDeployment
-      ? deploymentDetailHref(progressDeployment)
-      : `/deployments/${encodeURIComponent(deploymentProgressDeploymentId)}`;
+    return `/deployments/${encodeURIComponent(deploymentProgressDeploymentId)}`;
   }
 
-  function logLevelClass(level: DeploymentSummary["logs"][number]["level"]): string {
+  function logLevelClass(level: DeploymentLogEntry["level"]): string {
     switch (level) {
       case "error":
         return "text-red-300";
@@ -153,7 +165,7 @@
     }
   }
 
-  function logSourceLabel(log: DeploymentSummary["logs"][number]): string {
+  function logSourceLabel(log: DeploymentLogEntry): string {
     return log.source === "application" ? "app" : "appaloft";
   }
 
@@ -201,7 +213,10 @@
     return [...urls, url];
   }
 
-  function deploymentAccessUrls(deployment: DeploymentSummary, serverHost: string | undefined): AccessUrl[] {
+  function deploymentAccessUrls(
+    deployment: DeploymentDetailSummary,
+    serverHost: string | undefined,
+  ): AccessUrl[] {
     const metadata = deployment.runtimePlan.execution.metadata ?? {};
     const metadataUrl = metadata.publicUrl ?? metadata.url;
     let urls: AccessUrl[] = [];
@@ -230,11 +245,20 @@
     }
   }
 
-  function formatDeploymentLogCopyLine(log: DeploymentSummary["logs"][number]): string {
+  function deploymentSectionErrorMessage(code: string): string {
+    switch (code) {
+      case "deployment_related_context_unavailable":
+        return $t(i18nKeys.console.deployments.relatedContextUnavailable);
+      default:
+        return $t(i18nKeys.console.deployments.sectionFallbackUnavailable);
+    }
+  }
+
+  function formatDeploymentLogCopyLine(log: DeploymentLogEntry): string {
     return [log.timestamp, log.source, log.level, log.phase, log.message].join(" ");
   }
 
-  function formatDeploymentLogsCopyText(logs: DeploymentSummary["logs"]): string {
+  function formatDeploymentLogsCopyText(logs: DeploymentLogsResponse["logs"]): string {
     return logs.map(formatDeploymentLogCopyLine).join("\n");
   }
 
@@ -290,12 +314,12 @@
   }
 
   async function handleCopyDeploymentLogs(): Promise<void> {
-    if (!browser || !deployment || deployment.logs.length === 0) {
+    if (!browser || !deployment || deploymentLogs.length === 0) {
       return;
     }
 
     try {
-      await copyTextToClipboard(formatDeploymentLogsCopyText(deployment.logs));
+      await copyTextToClipboard(formatDeploymentLogsCopyText(deploymentLogs));
       markLogsCopyState("copied");
     } catch {
       markLogsCopyState("failed");
@@ -379,7 +403,13 @@
     { label: environment?.name ?? $t(i18nKeys.common.domain.environment) },
     {
       label: resource?.name ?? $t(i18nKeys.common.domain.resource),
-      href: resource ? resourceDetailHref(resource) : undefined,
+      href: deployment
+        ? resourceDetailHref({
+            id: deployment.resourceId,
+            projectId: deployment.projectId,
+            environmentId: deployment.environmentId,
+          })
+        : undefined,
     },
     { label: deployment?.runtimePlan.source.displayName ?? $t(i18nKeys.common.domain.deployment) },
   ]}
@@ -448,7 +478,14 @@
               </Button>
             {/if}
             {#if resource}
-              <Button href={resourceDetailHref(resource)} variant="outline">
+              <Button
+                href={resourceDetailHref({
+                  id: deployment.resourceId,
+                  projectId: deployment.projectId,
+                  environmentId: deployment.environmentId,
+                })}
+                variant="outline"
+              >
                 <Boxes class="size-4" />
                 {$t(i18nKeys.common.actions.openResource)}
               </Button>
@@ -461,6 +498,38 @@
         </div>
 
       </section>
+
+      {#if sectionErrors.length > 0}
+        <section
+          class="rounded-md border border-amber-500/30 bg-amber-500/5 p-4"
+          data-testid="deployment-detail-section-errors"
+        >
+          <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+            <div class="space-y-2">
+              <div class="flex flex-wrap items-center gap-2">
+                <Badge variant="outline">{$t(i18nKeys.console.deployments.needsAttention)}</Badge>
+                <Badge variant="secondary">{$t(i18nKeys.common.status.degraded)}</Badge>
+              </div>
+              <div class="space-y-1">
+                <h2 class="text-base font-semibold">
+                  {$t(i18nKeys.console.deployments.partialDataTitle)}
+                </h2>
+                <p class="text-sm leading-6 text-muted-foreground">
+                  {$t(i18nKeys.console.deployments.partialDataDescription)}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div class="mt-4 space-y-2">
+            {#each sectionErrors as sectionError, index (`${sectionError.code}-${index}`)}
+              <div class="rounded-md border border-amber-500/20 bg-background/70 px-3 py-2 text-sm">
+                {deploymentSectionErrorMessage(sectionError.code)}
+              </div>
+            {/each}
+          </div>
+        </section>
+      {/if}
 
       <Tabs.Root value={activeTab} class="space-y-5">
         <Tabs.List
@@ -605,7 +674,7 @@
                 type="button"
                 size="sm"
                 variant="outline"
-                disabled={deployment.logs.length === 0}
+                disabled={deploymentLogs.length === 0}
                 aria-label={logsCopyLabel}
                 title={logsCopyLabel}
                 onclick={handleCopyDeploymentLogs}
@@ -619,10 +688,10 @@
               </Button>
             </div>
 
-            {#if deployment.logs.length > 0}
+            {#if deploymentLogs.length > 0}
               <div class="max-h-[42rem] overflow-auto rounded-md border border-zinc-800 bg-zinc-950 px-4 py-3 font-mono text-xs text-zinc-200 shadow-inner">
                 <div class="space-y-1">
-                  {#each deployment.logs as log, index (`${log.timestamp}-${index}`)}
+                  {#each deploymentLogs as log, index (`${log.timestamp}-${index}`)}
                     <div class="grid grid-cols-[4.75rem_5rem_3.5rem_5rem_minmax(0,1fr)] gap-2 leading-5">
                       <span class="text-zinc-600">{logTimeLabel(log.timestamp)}</span>
                       <span class={log.source === "application" ? "text-sky-300" : "text-emerald-300"}>

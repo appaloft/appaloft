@@ -76,6 +76,8 @@ import {
   ResourceRuntimeLogsQueryService,
   RuntimePlanResolutionInputBuilder,
   SetEnvironmentVariableUseCase,
+  ShowDeploymentQueryHandler,
+  ShowDeploymentQueryService,
   ShowEnvironmentQueryService,
   ShowResourceQueryHandler,
   ShowResourceQueryService,
@@ -119,6 +121,7 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(ArchiveResourceCommandHandler);
   container.registerSingleton(DeleteResourceCommandHandler);
   container.registerSingleton(ShowResourceQueryHandler);
+  container.registerSingleton(ShowDeploymentQueryHandler);
   container.registerSingleton(ImportCertificateCommandHandler);
   container.registerSingleton(IssueOrRenewCertificateCommandHandler);
   container.registerSingleton(RelinkSourceLinkCommandHandler);
@@ -213,6 +216,7 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(tokens.certificateRetryScheduler, CertificateRetryScheduler);
   container.registerSingleton(tokens.listCertificatesQueryService, ListCertificatesQueryService);
   container.registerSingleton(tokens.listDeploymentsQueryService, ListDeploymentsQueryService);
+  container.registerSingleton(tokens.showDeploymentQueryService, ShowDeploymentQueryService);
   container.registerSingleton(tokens.logsQueryService, DeploymentLogsQueryService);
   container.registerSingleton(
     tokens.resourceDiagnosticSummaryQueryService,

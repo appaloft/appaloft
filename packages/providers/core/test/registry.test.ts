@@ -29,4 +29,18 @@ describe("provider registry contract", () => {
       ]),
     );
   });
+
+  test("finds a provider descriptor by normalized key without scanning callers", () => {
+    const registry = new InMemoryProviderRegistry([
+      genericSshProvider,
+      aliyunProvider,
+      tencentProvider,
+    ]);
+
+    expect(registry.findByKey("generic-ssh")).toMatchObject({
+      key: "generic-ssh",
+      category: "deploy-target",
+    });
+    expect(registry.findByKey("missing-provider")).toBeNull();
+  });
 });

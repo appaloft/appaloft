@@ -34,6 +34,7 @@ import {
   type ResourceProxyConfigurationPreviewQueryInput,
   type ResourceRuntimeLogsQueryInput,
   type SetEnvironmentVariableCommandInput,
+  type ShowDeploymentQueryInput,
   type ShowEnvironmentQueryInput,
   type ShowResourceQueryInput,
   type TestServerConnectivityCommandInput,
@@ -81,6 +82,7 @@ import {
   type ResourceRuntimeLogEvent,
   type ResourceRuntimeLogsResponse,
   type ResourceRuntimeLogsStreamResponse,
+  type ShowDeploymentResponse,
   type TerminalSessionDescriptor,
   type TestServerConnectivityResponse,
 } from "@appaloft/contracts";
@@ -339,6 +341,12 @@ export type AppaloftOrpcClientContract = {
       AppaloftClientContext,
       ListDeploymentsQueryInput,
       ListDeploymentsResponse,
+      AppaloftClientError
+    >;
+    show: Client<
+      AppaloftClientContext,
+      ShowDeploymentQueryInput,
+      ShowDeploymentResponse,
       AppaloftClientError
     >;
     create: Client<

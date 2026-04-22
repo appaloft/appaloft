@@ -7,6 +7,7 @@ import {
   DeploymentLogsQuery,
   type DeploymentSummary,
   ListDeploymentsQuery,
+  ShowDeploymentQuery,
 } from "@appaloft/application";
 import { createQuickDeployGeneratedResourceName } from "@appaloft/contracts";
 import {
@@ -1298,9 +1299,17 @@ const listDeploymentsCommand = EffectCommand.make(
     ),
 ).pipe(EffectCommand.withDescription("List deployments"));
 
+const showDeploymentCommand = EffectCommand.make(
+  "show",
+  {
+    deploymentId: deploymentIdArg,
+  },
+  ({ deploymentId }) => runQuery(ShowDeploymentQuery.create({ deploymentId })),
+).pipe(EffectCommand.withDescription("Show deployment detail"));
+
 export const deploymentsCommand = EffectCommand.make("deployments").pipe(
   EffectCommand.withDescription("Deployment queries"),
-  EffectCommand.withSubcommands([listDeploymentsCommand]),
+  EffectCommand.withSubcommands([listDeploymentsCommand, showDeploymentCommand]),
 );
 
 export const previewCommand = EffectCommand.make("preview").pipe(

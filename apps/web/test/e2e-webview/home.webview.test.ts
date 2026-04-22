@@ -16,6 +16,182 @@ type RecordedApiRequest = {
   body: unknown;
 };
 
+function deploymentDetailFixture(input: {
+  deploymentId: string;
+  projectId: string;
+  environmentId: string;
+  resourceId: string;
+  serverId: string;
+  destinationId: string;
+  sourceDisplayName: string;
+  sourceLocator: string;
+  status?: "created" | "planning" | "planned" | "running" | "succeeded" | "failed";
+  sectionErrors?: Array<{
+    section: "related-context" | "timeline" | "snapshot" | "latest-failure";
+    code: string;
+    category: string;
+    phase: string;
+    retriable: boolean;
+    relatedEntityId?: string;
+  }>;
+}) {
+  const status = input.status ?? "succeeded";
+
+  return {
+    schemaVersion: "deployments.show/v1",
+    deployment: {
+      id: input.deploymentId,
+      projectId: input.projectId,
+      environmentId: input.environmentId,
+      resourceId: input.resourceId,
+      serverId: input.serverId,
+      destinationId: input.destinationId,
+      status,
+      runtimePlan: {
+        id: `plan_${input.deploymentId}`,
+        source: {
+          kind: "git-public",
+          locator: input.sourceLocator,
+          displayName: input.sourceDisplayName,
+        },
+        buildStrategy: "workspace-commands",
+        packagingMode: "host-process-runtime",
+        execution: {
+          kind: "host-process",
+          port: 3000,
+          accessRoutes: [
+            {
+              proxyKind: "traefik",
+              domains: ["workspace-demo.example.test"],
+              pathPrefix: "/",
+              tlsMode: "auto",
+              targetPort: 3000,
+            },
+          ],
+          metadata: {
+            publicUrl: "https://workspace-demo.example.test",
+          },
+        },
+        target: {
+          kind: "single-server",
+          providerKey: "generic-ssh",
+          serverIds: [input.serverId],
+        },
+        detectSummary: "mocked in bun webview",
+        steps: ["detect", "plan", "deploy", "verify"],
+        generatedAt: "2026-01-01T00:00:00.000Z",
+      },
+      environmentSnapshot: {
+        id: `snap_${input.deploymentId}`,
+        environmentId: input.environmentId,
+        createdAt: "2026-01-01T00:00:00.000Z",
+        precedence: ["defaults", "project", "environment", "deployment"],
+        variables: [],
+      },
+      createdAt: "2026-01-01T00:00:00.000Z",
+      startedAt: "2026-01-01T00:00:01.000Z",
+      finishedAt: "2026-01-01T00:00:03.000Z",
+      logCount: 2,
+    },
+    status: {
+      current: status,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      startedAt: "2026-01-01T00:00:01.000Z",
+      finishedAt: "2026-01-01T00:00:03.000Z",
+    },
+    relatedContext: {
+      project: {
+        id: input.projectId,
+        name: input.projectId === "prj_static" ? "Static Project" : "Demo",
+        slug: input.projectId === "prj_static" ? "static-project" : "demo",
+      },
+      environment: {
+        id: input.environmentId,
+        name: input.environmentId === "env_static" ? "preview" : "production",
+        kind: input.environmentId === "env_static" ? "preview" : "production",
+      },
+      resource: {
+        id: input.resourceId,
+        name: input.resourceId === "res_static" ? "docs-site" : "workspace",
+        slug: input.resourceId === "res_static" ? "docs-site" : "workspace",
+        kind: input.resourceId === "res_static" ? "static-site" : "application",
+      },
+      server: {
+        id: input.serverId,
+        name: input.serverId === "srv_static" ? "static-edge" : "edge",
+        host: "127.0.0.1",
+        port: 22,
+        providerKey: "generic-ssh",
+      },
+      destination: {
+        id: input.destinationId,
+      },
+    },
+    snapshot: {
+      runtimePlan: {
+        id: `plan_${input.deploymentId}`,
+        source: {
+          kind: "git-public",
+          locator: input.sourceLocator,
+          displayName: input.sourceDisplayName,
+        },
+        buildStrategy: "workspace-commands",
+        packagingMode: "host-process-runtime",
+        execution: {
+          kind: "host-process",
+          port: 3000,
+        },
+        target: {
+          kind: "single-server",
+          providerKey: "generic-ssh",
+          serverIds: [input.serverId],
+        },
+        detectSummary: "mocked in bun webview",
+        steps: ["detect", "plan", "deploy", "verify"],
+        generatedAt: "2026-01-01T00:00:00.000Z",
+      },
+      environmentSnapshot: {
+        id: `snap_${input.deploymentId}`,
+        environmentId: input.environmentId,
+        createdAt: "2026-01-01T00:00:00.000Z",
+        precedence: ["defaults", "project", "environment", "deployment"],
+        variables: [],
+      },
+    },
+    timeline: {
+      createdAt: "2026-01-01T00:00:00.000Z",
+      startedAt: "2026-01-01T00:00:01.000Z",
+      finishedAt: "2026-01-01T00:00:03.000Z",
+      logCount: 2,
+    },
+    nextActions: ["logs", "resource-detail", "resource-health", "diagnostic-summary"],
+    sectionErrors: input.sectionErrors ?? [],
+    generatedAt: "2026-01-01T00:00:04.000Z",
+  };
+}
+
+function deploymentLogsFixture(deploymentId: string) {
+  return {
+    deploymentId,
+    logs: [
+      {
+        timestamp: "2026-01-01T00:00:01.000Z",
+        source: "appaloft",
+        level: "info",
+        phase: "plan",
+        message: `Planning deployment ${deploymentId}`,
+      },
+      {
+        timestamp: "2026-01-01T00:00:03.000Z",
+        source: "application",
+        level: "info",
+        phase: "verify",
+        message: `Application is ready for ${deploymentId}`,
+      },
+    ],
+  };
+}
+
 const apiResponses: Record<ApiScenario, Record<string, ApiRoute>> = {
   dashboard: {
     "/api/health": {
@@ -349,6 +525,44 @@ const apiResponses: Record<ApiScenario, Record<string, ApiRoute>> = {
         ],
       },
     },
+    "/api/rpc/deployments/show": (_request: Request, body: unknown) => {
+      const input = readOrpcJsonPayload(body) as { deploymentId?: string } | null;
+      const deploymentId = input?.deploymentId ?? "dep_demo";
+
+      return {
+        json:
+          deploymentId === "dep_new"
+            ? deploymentDetailFixture({
+                deploymentId: "dep_new",
+                projectId: "prj_demo",
+                environmentId: "env_demo",
+                resourceId: "res_demo",
+                serverId: "srv_demo",
+                destinationId: "dst_demo",
+                sourceDisplayName: "workspace",
+                sourceLocator: "https://github.com/acme/platform.git",
+              })
+            : deploymentDetailFixture({
+                deploymentId: "dep_demo",
+                projectId: "prj_demo",
+                environmentId: "env_demo",
+                resourceId: "res_demo",
+                serverId: "srv_demo",
+                destinationId: "dst_demo",
+                sourceDisplayName: "workspace",
+                sourceLocator: "https://github.com/acme/platform.git",
+              }),
+      };
+    },
+    "/api/rpc/deployments/logs": (_request: Request, body: unknown) => {
+      const input = readOrpcJsonPayload(body) as { deploymentId?: string } | null;
+      return {
+        json: deploymentLogsFixture(input?.deploymentId ?? "dep_demo"),
+      };
+    },
+    "/api/deployments": {
+      id: "dep_new",
+    },
     "/api/rpc/providers/list": {
       json: {
         items: [
@@ -606,6 +820,27 @@ const apiResponses: Record<ApiScenario, Record<string, ApiRoute>> = {
     "/api/deployments": {
       id: "dep_static",
     },
+    "/api/rpc/deployments/show": (_request: Request, body: unknown) => {
+      const input = readOrpcJsonPayload(body) as { deploymentId?: string } | null;
+      return {
+        json: deploymentDetailFixture({
+          deploymentId: input?.deploymentId ?? "dep_static",
+          projectId: "prj_static",
+          environmentId: "env_static",
+          resourceId: "res_static",
+          serverId: "srv_static",
+          destinationId: "dst_static",
+          sourceDisplayName: "docs-site",
+          sourceLocator: "https://github.com/acme/docs-site.git",
+        }),
+      };
+    },
+    "/api/rpc/deployments/logs": (_request: Request, body: unknown) => {
+      const input = readOrpcJsonPayload(body) as { deploymentId?: string } | null;
+      return {
+        json: deploymentLogsFixture(input?.deploymentId ?? "dep_static"),
+      };
+    },
   },
 };
 
@@ -833,6 +1068,10 @@ async function pageText(view: Bun.WebView): Promise<string> {
   return view.evaluate<string>("document.body.innerText");
 }
 
+async function locationPath(view: Bun.WebView): Promise<string> {
+  return view.evaluate<string>("window.location.pathname + window.location.search");
+}
+
 async function expectText(view: Bun.WebView, text: string): Promise<void> {
   await waitFor(
     () => pageText(view),
@@ -846,6 +1085,14 @@ async function expectAnyText(view: Bun.WebView, texts: [string, ...string[]]): P
     () => pageText(view),
     (content) => texts.some((text) => content.includes(text)),
     `Expected page to contain one of: ${texts.join(" | ")}`,
+  );
+}
+
+async function expectLocation(view: Bun.WebView, expected: string): Promise<void> {
+  await waitFor(
+    () => locationPath(view),
+    (path) => path === expected,
+    `Expected location to be ${expected}`,
   );
 }
 
@@ -913,6 +1160,28 @@ async function clickButtonByAnyText(
   expect(found).toBe(true);
 }
 
+async function clickLinkByHref(view: Bun.WebView, hrefFragment: string): Promise<void> {
+  const found = await waitFor(
+    () =>
+      view.evaluate<boolean>(
+        `(() => {
+          const anchor = Array.from(document.querySelectorAll("a")).find((candidate) =>
+            candidate.getAttribute("href")?.includes(${JSON.stringify(hrefFragment)})
+          );
+          if (!(anchor instanceof HTMLAnchorElement)) {
+            return false;
+          }
+          anchor.click();
+          return true;
+        })()`,
+      ),
+    Boolean,
+    `Expected a link containing href fragment: ${hrefFragment}`,
+  );
+
+  expect(found).toBe(true);
+}
+
 async function setInputValue(view: Bun.WebView, selector: string, value: string): Promise<void> {
   const found = await waitFor(
     () =>
@@ -958,11 +1227,11 @@ async function clickFormSubmit(view: Bun.WebView, selector: string): Promise<voi
 
 beforeAll(async () => {
   await setupWebApp();
-});
+}, 20_000);
 
 afterAll(async () => {
   await teardownWebApp();
-});
+}, 20_000);
 
 describe("console e2e with Bun.WebView", () => {
   test("renders the console dashboard with mocked control-plane data", async () => {
@@ -1097,6 +1366,107 @@ describe("console e2e with Bun.WebView", () => {
         startCommand: "bun run preview",
         runtimeName: "preview-123",
       },
+    });
+  }, 15_000);
+
+  test("[DEP-SHOW-ENTRY-001] loads deployment detail through deployments.show and deployments.logs", async () => {
+    activeScenario = "dashboard";
+    resetRecordedApiRequests();
+
+    await using view = createWebView();
+    await view.navigate(`${previewUrl}/deployments/dep_demo`);
+
+    await expectText(view, "workspace");
+    await expectAnyText(view, ["Overview", "基本信息"]);
+
+    const showRequest = await waitForRecordedRequest("/api/rpc/deployments/show");
+    const showInput = readOrpcJsonPayload(showRequest.body);
+    expect(showInput).toEqual({
+      deploymentId: "dep_demo",
+      includeTimeline: true,
+      includeSnapshot: true,
+      includeRelatedContext: true,
+      includeLatestFailure: true,
+    });
+
+    const logsRequest = await waitForRecordedRequest("/api/rpc/deployments/logs");
+    const logsInput = readOrpcJsonPayload(logsRequest.body);
+    expect(logsInput).toEqual({
+      deploymentId: "dep_demo",
+    });
+
+    await view.navigate(`${previewUrl}/deployments/dep_demo?tab=logs`);
+    await expectText(view, "Application is ready for dep_demo");
+  }, 15_000);
+
+  test("[DEP-SHOW-QRY-004] surfaces section errors as degraded deployment detail UI", async () => {
+    activeScenario = "dashboard";
+    resetRecordedApiRequests();
+
+    const previousShowRoute = apiResponses.dashboard["/api/rpc/deployments/show"];
+    apiResponses.dashboard["/api/rpc/deployments/show"] = () => ({
+      json: deploymentDetailFixture({
+        deploymentId: "dep_demo",
+        projectId: "prj_demo",
+        environmentId: "env_demo",
+        resourceId: "res_demo",
+        serverId: "srv_demo",
+        destinationId: "dst_demo",
+        sourceDisplayName: "workspace",
+        sourceLocator: "https://github.com/acme/platform.git",
+        sectionErrors: [
+          {
+            section: "related-context",
+            code: "deployment_related_context_unavailable",
+            category: "application",
+            phase: "related-context-resolution",
+            retriable: false,
+            relatedEntityId: "res_demo",
+          },
+        ],
+      }),
+    });
+
+    try {
+      await using view = createWebView();
+      await view.navigate(`${previewUrl}/deployments/dep_demo`);
+
+      await expectAnyText(view, [
+        "This deployment detail is partially available.",
+        "当前部署详情为部分可用状态。",
+      ]);
+      await expectAnyText(view, [
+        "Related project, environment, resource, or server context could not be fully resolved.",
+        "关联的项目、环境、资源或服务器上下文未能完整解析。",
+      ]);
+    } finally {
+      apiResponses.dashboard["/api/rpc/deployments/show"] = previousShowRoute;
+    }
+  }, 15_000);
+
+  test("[DEP-SHOW-ENTRY-002] opens deployment detail from resource history", async () => {
+    activeScenario = "dashboard";
+    resetRecordedApiRequests();
+
+    await using view = createWebView();
+    await view.navigate(`${previewUrl}/resources/res_demo?tab=deployments`);
+
+    await expectText(view, "workspace");
+    await clickLinkByHref(view, "/deployments/dep_demo");
+    await expectLocation(
+      view,
+      "/projects/prj_demo/environments/env_demo/resources/res_demo/deployments/dep_demo",
+    );
+    await expectText(view, "workspace");
+
+    const showRequest = await waitForRecordedRequest("/api/rpc/deployments/show");
+    const showInput = readOrpcJsonPayload(showRequest.body);
+    expect(showInput).toEqual({
+      deploymentId: "dep_demo",
+      includeTimeline: true,
+      includeSnapshot: true,
+      includeRelatedContext: true,
+      includeLatestFailure: true,
     });
   }, 15_000);
 
@@ -1433,6 +1803,23 @@ describe("console e2e with Bun.WebView", () => {
       serverId: "srv_static",
       environmentId: "env_static",
       resourceId: "res_static",
+    });
+
+    await clickButtonByAnyText(view, ["View deployment", "查看部署"]);
+    await expectLocation(
+      view,
+      "/projects/prj_static/environments/env_static/resources/res_static/deployments/dep_static",
+    );
+    await expectText(view, "docs-site");
+
+    const deploymentShowRequest = await waitForRecordedRequest("/api/rpc/deployments/show");
+    const deploymentShowInput = readOrpcJsonPayload(deploymentShowRequest.body);
+    expect(deploymentShowInput).toEqual({
+      deploymentId: "dep_static",
+      includeTimeline: true,
+      includeSnapshot: true,
+      includeRelatedContext: true,
+      includeLatestFailure: true,
     });
   }, 15_000);
 });

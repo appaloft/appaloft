@@ -436,7 +436,7 @@ export class DeploymentContextBootstrapService {
 
     return safeTry(async function* () {
       const providerKeyValue = normalizeProviderKey(targetConfig.providerKey);
-      const provider = providerRegistry.list().find((item) => item.key === providerKeyValue);
+      const provider = providerRegistry.findByKey(providerKeyValue);
 
       if (!provider) {
         return err(

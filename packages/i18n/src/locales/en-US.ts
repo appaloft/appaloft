@@ -247,6 +247,9 @@ export const enUS = {
       pageDescription: "Deployment records and project relationships",
       pageDescriptionForProject: "Deployments for {{projectName}}",
       pageTitle: "Deployments",
+      partialDataDescription:
+        "Some deployment detail sections are unavailable. Stable deployment identity, snapshot, and logs remain available where present.",
+      partialDataTitle: "This deployment detail is partially available.",
       planSteps: "Plan steps",
       precedence: "Precedence",
       progressDeploymentLabel: "deployment",
@@ -274,6 +277,9 @@ export const enUS = {
       snapshotDescription:
         "The immutable environment snapshot captured for this deployment. Secret values stay masked.",
       snapshotTitle: "Environment snapshot",
+      relatedContextUnavailable:
+        "Related project, environment, resource, or server context could not be fully resolved.",
+      sectionFallbackUnavailable: "A deployment detail section could not be loaded.",
       sourceCommitSha: "Commit",
       startCommand: "Start command",
       timelineTitle: "Timeline",

@@ -224,10 +224,18 @@ function deploymentIsNewer(candidate: DeploymentSummary, current: DeploymentSumm
   return candidate.id > current.id;
 }
 
+type DeploymentProgressSource = Pick<
+  DeploymentSummary,
+  "id" | "status" | "createdAt" | "startedAt" | "finishedAt"
+> & {
+  logs?: DeploymentSummary["logs"];
+};
+
 export function progressEventsFromDeployment(
-  deployment: DeploymentSummary,
+  deployment: DeploymentProgressSource,
+  logs: DeploymentSummary["logs"] = deployment.logs ?? [],
 ): DeploymentProgressEvent[] {
-  const logEvents = deployment.logs.map((log) => {
+  const logEvents = logs.map((log) => {
     return {
       timestamp: log.timestamp,
       source: log.source,

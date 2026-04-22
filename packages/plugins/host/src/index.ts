@@ -21,6 +21,7 @@ interface RegisteredPlugin {
 
 export class LocalPluginHost implements PluginRegistry {
   private readonly plugins: RegisteredPlugin[];
+  private readonly byName: Map<string, PluginSummary>;
 
   constructor(definitions: SystemPluginDefinition[], appVersion: string) {
     this.plugins = definitions.map((definition) => {
@@ -59,10 +60,18 @@ export class LocalPluginHost implements PluginRegistry {
         },
       };
     });
+    this.byName = new Map(
+      this.plugins.map((plugin) => [plugin.summary.name, { ...plugin.summary }]),
+    );
   }
 
   list(): PluginSummary[] {
     return this.plugins.map((plugin) => ({ ...plugin.summary }));
+  }
+
+  findByName(name: string): PluginSummary | null {
+    const plugin = this.byName.get(name);
+    return plugin ? { ...plugin } : null;
   }
 
   listWebExtensions(): SystemPluginWebExtensionSummary[] {

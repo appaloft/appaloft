@@ -93,6 +93,7 @@ export const tokens = {
   certificateRetryScheduler: Symbol.for("appaloft.certificate_retry_scheduler"),
   listCertificatesQueryService: Symbol.for("appaloft.list_certificates_query_service"),
   listDeploymentsQueryService: Symbol.for("appaloft.list_deployments_query_service"),
+  showDeploymentQueryService: Symbol.for("appaloft.show_deployment_query_service"),
   logsQueryService: Symbol.for("appaloft.logs_query_service"),
   deploymentContextDefaultsFactory: Symbol.for("appaloft.deployment_context_defaults_factory"),
   deploymentContextResolver: Symbol.for("appaloft.deployment_context_resolver"),

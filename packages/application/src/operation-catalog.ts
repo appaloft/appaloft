@@ -7,6 +7,7 @@ import { cleanupPreviewCommandInputSchema } from "./operations/deployments/clean
 import { createDeploymentCommandInputSchema } from "./operations/deployments/create-deployment.command";
 import { deploymentLogsQueryInputSchema } from "./operations/deployments/deployment-logs.query";
 import { listDeploymentsQueryInputSchema } from "./operations/deployments/list-deployments.query";
+import { showDeploymentQueryInputSchema } from "./operations/deployments/show-deployment.query";
 import { confirmDomainBindingOwnershipCommandInputSchema } from "./operations/domain-bindings/confirm-domain-binding-ownership.command";
 import { createDomainBindingCommandInputSchema } from "./operations/domain-bindings/create-domain-binding.command";
 import { listDomainBindingsQueryInputSchema } from "./operations/domain-bindings/list-domain-bindings.query";
@@ -561,6 +562,20 @@ export const operationCatalog = [
     transports: {
       cli: "appaloft deployments list",
       orpc: { method: "GET", path: "/api/deployments" },
+    },
+  },
+  {
+    key: "deployments.show",
+    kind: "query",
+    domain: "deployments",
+    messageName: "ShowDeploymentQuery",
+    handlerName: "ShowDeploymentQueryHandler",
+    serviceName: "ShowDeploymentQueryService",
+    inputSchema: showDeploymentQueryInputSchema,
+    serviceToken: tokens.showDeploymentQueryService,
+    transports: {
+      cli: "appaloft deployments show <deploymentId>",
+      orpc: { method: "GET", path: "/api/deployments/{deploymentId}" },
     },
   },
   {

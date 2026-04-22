@@ -97,6 +97,10 @@ class StaticResourceReadModel implements ResourceReadModel {
         input?.environmentId ? resource.environmentId === input.environmentId : true,
       );
   }
+
+  async findOne(): Promise<ResourceSummary | null> {
+    return null;
+  }
 }
 
 class StaticDeploymentReadModel implements DeploymentReadModel {
@@ -118,6 +122,10 @@ class StaticDeploymentReadModel implements DeploymentReadModel {
 
   async findLogs(): Promise<DeploymentLogSummary[]> {
     return [];
+  }
+
+  async findOne(): Promise<DeploymentSummary | null> {
+    return null;
   }
 }
 

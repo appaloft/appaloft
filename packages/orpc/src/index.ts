@@ -85,9 +85,11 @@ import {
   resourceProxyConfigurationPreviewQueryInputSchema,
   resourceRuntimeLogsQueryInputSchema,
   SetEnvironmentVariableCommand,
+  ShowDeploymentQuery,
   ShowEnvironmentQuery,
   ShowResourceQuery,
   setEnvironmentVariableCommandInputSchema,
+  showDeploymentQueryInputSchema,
   showEnvironmentQueryInputSchema,
   showResourceQueryInputSchema,
   TestServerConnectivityCommand,
@@ -137,6 +139,7 @@ import {
   resourceRuntimeLogEventSchema,
   resourceRuntimeLogsResponseSchema,
   resourceRuntimeLogsStreamResponseSchema,
+  showDeploymentResponseSchema,
   terminalSessionDescriptorSchema,
   testServerConnectivityResponseSchema,
 } from "@appaloft/contracts";
@@ -1013,6 +1016,16 @@ export const createDeploymentProcedure = base
     executeCommand(context, CreateDeploymentCommand.create(input)),
   );
 
+export const showDeploymentProcedure = base
+  .route({
+    method: "GET",
+    path: "/deployments/{deploymentId}",
+    successStatus: 200,
+  })
+  .input(showDeploymentQueryInputSchema)
+  .output(showDeploymentResponseSchema)
+  .handler(async ({ input, context }) => executeQuery(context, ShowDeploymentQuery.create(input)));
+
 export const createDeploymentStreamProcedure = base
   .route({
     method: "POST",
@@ -1213,6 +1226,7 @@ export const appaloftOrpcRouter = {
   deployments: {
     list: listDeploymentsProcedure,
     create: createDeploymentProcedure,
+    show: showDeploymentProcedure,
     createStream: createDeploymentStreamProcedure,
     logs: deploymentLogsProcedure,
   },
@@ -1369,6 +1383,7 @@ export function mountAppaloftOrpcRoutes(
     "/api/certificates/import",
     "/api/certificates/issue-or-renew",
     "/api/deployments",
+    "/api/deployments/:deploymentId",
     "/api/deployments/stream",
     "/api/deployments/:deploymentId/logs",
     "/api/providers",

@@ -339,33 +339,45 @@ class StaticDeploymentConfigReader implements DeploymentConfigReader {
 }
 
 class StaticProviderRegistry implements ProviderRegistry {
+  private readonly providers: ProviderDescriptor[] = [
+    {
+      key: "local-shell",
+      title: "Local Shell",
+      category: "deploy-target",
+      capabilities: ["single-server"],
+    },
+    {
+      key: "generic-ssh",
+      title: "Generic SSH",
+      category: "deploy-target",
+      capabilities: ["single-server"],
+    },
+    {
+      key: "aliyun",
+      title: "Alibaba Cloud",
+      category: "cloud-provider",
+      capabilities: ["ecs"],
+    },
+    {
+      key: "tencent-cloud",
+      title: "Tencent Cloud",
+      category: "cloud-provider",
+      capabilities: ["cvm"],
+    },
+  ];
+
   list(): ProviderDescriptor[] {
-    return [
-      {
-        key: "local-shell",
-        title: "Local Shell",
-        category: "deploy-target",
-        capabilities: ["single-server"],
-      },
-      {
-        key: "generic-ssh",
-        title: "Generic SSH",
-        category: "deploy-target",
-        capabilities: ["single-server"],
-      },
-      {
-        key: "aliyun",
-        title: "Alibaba Cloud",
-        category: "cloud-provider",
-        capabilities: ["ecs"],
-      },
-      {
-        key: "tencent-cloud",
-        title: "Tencent Cloud",
-        category: "cloud-provider",
-        capabilities: ["cvm"],
-      },
-    ];
+    return [...this.providers];
+  }
+
+  findByKey(key: string): ProviderDescriptor | null {
+    for (const provider of this.providers) {
+      if (provider.key === key) {
+        return provider;
+      }
+    }
+
+    return null;
   }
 }
 

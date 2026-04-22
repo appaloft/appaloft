@@ -259,6 +259,42 @@ export class MemoryProjectReadModel implements ProjectReadModel {
       };
     });
   }
+
+  async findOne(context: RepositoryContext, spec: Parameters<ProjectReadModel["findOne"]>[1]) {
+    void context;
+    if (spec instanceof ProjectByIdSpec) {
+      const project = this.repository.items.get(spec.id.value);
+      if (!project) {
+        return null;
+      }
+
+      const state = project.toState();
+      return {
+        id: state.id.value,
+        name: state.name.value,
+        slug: state.slug.value,
+        ...(state.description ? { description: state.description.value } : {}),
+        createdAt: state.createdAt.value,
+      };
+    }
+
+    if (spec instanceof ProjectBySlugSpec) {
+      for (const project of this.repository.items.values()) {
+        const state = project.toState();
+        if (state.slug.equals(spec.slug)) {
+          return {
+            id: state.id.value,
+            name: state.name.value,
+            slug: state.slug.value,
+            ...(state.description ? { description: state.description.value } : {}),
+            createdAt: state.createdAt.value,
+          };
+        }
+      }
+    }
+
+    return null;
+  }
 }
 
 export class MemoryServerRepository implements ServerRepository {
@@ -312,6 +348,44 @@ export class MemoryServerReadModel implements ServerReadModel {
         createdAt: state.createdAt.value,
       };
     });
+  }
+
+  async findOne(context: RepositoryContext, spec: Parameters<ServerReadModel["findOne"]>[1]) {
+    void context;
+    if (spec instanceof DeploymentTargetByIdSpec) {
+      const server = this.repository.items.get(spec.id.value);
+      if (!server) {
+        return null;
+      }
+
+      const state = server.toState();
+      return {
+        id: state.id.value,
+        name: state.name.value,
+        host: state.host.value,
+        port: state.port.value,
+        providerKey: state.providerKey.value,
+        createdAt: state.createdAt.value,
+      };
+    }
+
+    if (spec instanceof DeploymentTargetByProviderAndHostSpec) {
+      for (const server of this.repository.items.values()) {
+        const state = server.toState();
+        if (state.providerKey.equals(spec.providerKey) && state.host.equals(spec.host)) {
+          return {
+            id: state.id.value,
+            name: state.name.value,
+            host: state.host.value,
+            port: state.port.value,
+            providerKey: state.providerKey.value,
+            createdAt: state.createdAt.value,
+          };
+        }
+      }
+    }
+
+    return null;
   }
 }
 
@@ -419,9 +493,63 @@ export class MemoryEnvironmentReadModel implements EnvironmentReadModel {
       );
   }
 
-  async findById(context: RepositoryContext, id: string) {
-    const environments = await this.list(context);
-    return environments.find((environment) => environment.id === id) ?? null;
+  async findOne(context: RepositoryContext, spec: Parameters<EnvironmentReadModel["findOne"]>[1]) {
+    void context;
+    if (spec instanceof EnvironmentByIdSpec) {
+      const environment = this.repository.items.get(spec.id.value);
+      if (!environment) {
+        return null;
+      }
+
+      const state = environment.toState();
+      return {
+        id: state.id.value,
+        projectId: state.projectId.value,
+        name: state.name.value,
+        kind: state.kind.value,
+        createdAt: state.createdAt.value,
+        ...(state.parentEnvironmentId
+          ? { parentEnvironmentId: state.parentEnvironmentId.value }
+          : {}),
+        maskedVariables: state.variables.map((variable) => ({
+          key: variable.key,
+          value: variable.isSecret ? this.secretMask : variable.value,
+          scope: variable.scope as EnvironmentSummary["maskedVariables"][number]["scope"],
+          exposure: variable.exposure as EnvironmentSummary["maskedVariables"][number]["exposure"],
+          isSecret: variable.isSecret,
+          kind: variable.kind as EnvironmentSummary["maskedVariables"][number]["kind"],
+        })),
+      };
+    }
+
+    if (spec instanceof EnvironmentByProjectAndNameSpec) {
+      for (const environment of this.repository.items.values()) {
+        const state = environment.toState();
+        if (state.projectId.equals(spec.projectId) && state.name.equals(spec.name)) {
+          return {
+            id: state.id.value,
+            projectId: state.projectId.value,
+            name: state.name.value,
+            kind: state.kind.value,
+            createdAt: state.createdAt.value,
+            ...(state.parentEnvironmentId
+              ? { parentEnvironmentId: state.parentEnvironmentId.value }
+              : {}),
+            maskedVariables: state.variables.map((variable) => ({
+              key: variable.key,
+              value: variable.isSecret ? this.secretMask : variable.value,
+              scope: variable.scope as EnvironmentSummary["maskedVariables"][number]["scope"],
+              exposure:
+                variable.exposure as EnvironmentSummary["maskedVariables"][number]["exposure"],
+              isSecret: variable.isSecret,
+              kind: variable.kind as EnvironmentSummary["maskedVariables"][number]["kind"],
+            })),
+          };
+        }
+      }
+    }
+
+    return null;
   }
 }
 
@@ -468,6 +596,93 @@ export class MemoryResourceReadModel implements ResourceReadModel {
     private readonly domainBindings?: { items: Map<string, DomainBinding> },
   ) {}
 
+  private toSummary(resource: ReturnType<Resource["toState"]>): ResourceSummary {
+    const deployments = [...(this.deployments?.items.values() ?? [])]
+      .map((deployment) => deployment.toState())
+      .filter((deployment) => deployment.resourceId.equals(resource.id))
+      .sort((left, right) => right.createdAt.value.localeCompare(left.createdAt.value));
+    const domainBindings = [...(this.domainBindings?.items.values() ?? [])]
+      .map((domainBinding) => domainBinding.toState())
+      .filter((domainBinding) => domainBinding.resourceId.equals(resource.id))
+      .sort((left, right) => right.createdAt.value.localeCompare(left.createdAt.value));
+    const lastDeployment = deployments[0];
+    const accessSummary = projectResourceAccessSummary(
+      deployments.map((deployment) => ({
+        id: deployment.id.value,
+        status: deployment.status.value,
+        createdAt: deployment.createdAt.value,
+        runtimePlan: {
+          execution: {
+            ...(deployment.runtimePlan.execution.accessRoutes.length > 0
+              ? {
+                  accessRoutes: deployment.runtimePlan.execution.accessRoutes.map((route) => ({
+                    proxyKind: route.proxyKind,
+                    domains: route.domains,
+                    pathPrefix: route.pathPrefix,
+                    tlsMode: route.tlsMode,
+                    ...(typeof route.targetPort === "number"
+                      ? { targetPort: route.targetPort }
+                      : {}),
+                  })),
+                }
+              : {}),
+            ...(deployment.runtimePlan.execution.metadata
+              ? { metadata: deployment.runtimePlan.execution.metadata }
+              : {}),
+          },
+        },
+      })),
+      domainBindings.map((domainBinding) => ({
+        id: domainBinding.id.value,
+        status: domainBinding.status.value,
+        createdAt: domainBinding.createdAt.value,
+        domainName: domainBinding.domainName.value,
+        pathPrefix: domainBinding.pathPrefix.value,
+        proxyKind: domainBinding.proxyKind.value,
+        tlsMode: domainBinding.tlsMode.value,
+      })),
+    );
+
+    return {
+      id: resource.id.value,
+      projectId: resource.projectId.value,
+      environmentId: resource.environmentId.value,
+      ...(resource.destinationId ? { destinationId: resource.destinationId.value } : {}),
+      name: resource.name.value,
+      slug: resource.slug.value,
+      kind: resource.kind.value,
+      ...(resource.description ? { description: resource.description.value } : {}),
+      services: resource.services.map((service) => ({
+        name: service.name.value,
+        kind: service.kind.value,
+      })),
+      ...(resource.networkProfile
+        ? {
+            networkProfile: {
+              internalPort: resource.networkProfile.internalPort.value,
+              upstreamProtocol: resource.networkProfile.upstreamProtocol.value,
+              exposureMode: resource.networkProfile.exposureMode.value,
+              ...(resource.networkProfile.targetServiceName
+                ? { targetServiceName: resource.networkProfile.targetServiceName.value }
+                : {}),
+              ...(resource.networkProfile.hostPort
+                ? { hostPort: resource.networkProfile.hostPort.value }
+                : {}),
+            },
+          }
+        : {}),
+      deploymentCount: deployments.length,
+      ...(lastDeployment
+        ? {
+            lastDeploymentId: lastDeployment.id.value,
+            lastDeploymentStatus: lastDeployment.status.value,
+          }
+        : {}),
+      ...(accessSummary ? { accessSummary } : {}),
+      createdAt: resource.createdAt.value,
+    };
+  }
+
   async list(
     context: RepositoryContext,
     input?: {
@@ -485,92 +700,25 @@ export class MemoryResourceReadModel implements ResourceReadModel {
       .filter((resource) =>
         input?.environmentId ? resource.environmentId.value === input.environmentId : true,
       )
-      .map((resource): ResourceSummary => {
-        const deployments = [...(this.deployments?.items.values() ?? [])]
-          .map((deployment) => deployment.toState())
-          .filter((deployment) => deployment.resourceId.equals(resource.id))
-          .sort((left, right) => right.createdAt.value.localeCompare(left.createdAt.value));
-        const domainBindings = [...(this.domainBindings?.items.values() ?? [])]
-          .map((domainBinding) => domainBinding.toState())
-          .filter((domainBinding) => domainBinding.resourceId.equals(resource.id))
-          .sort((left, right) => right.createdAt.value.localeCompare(left.createdAt.value));
-        const lastDeployment = deployments[0];
-        const accessSummary = projectResourceAccessSummary(
-          deployments.map((deployment) => ({
-            id: deployment.id.value,
-            status: deployment.status.value,
-            createdAt: deployment.createdAt.value,
-            runtimePlan: {
-              execution: {
-                ...(deployment.runtimePlan.execution.accessRoutes.length > 0
-                  ? {
-                      accessRoutes: deployment.runtimePlan.execution.accessRoutes.map((route) => ({
-                        proxyKind: route.proxyKind,
-                        domains: route.domains,
-                        pathPrefix: route.pathPrefix,
-                        tlsMode: route.tlsMode,
-                        ...(typeof route.targetPort === "number"
-                          ? { targetPort: route.targetPort }
-                          : {}),
-                      })),
-                    }
-                  : {}),
-                ...(deployment.runtimePlan.execution.metadata
-                  ? { metadata: deployment.runtimePlan.execution.metadata }
-                  : {}),
-              },
-            },
-          })),
-          domainBindings.map((domainBinding) => ({
-            id: domainBinding.id.value,
-            status: domainBinding.status.value,
-            createdAt: domainBinding.createdAt.value,
-            domainName: domainBinding.domainName.value,
-            pathPrefix: domainBinding.pathPrefix.value,
-            proxyKind: domainBinding.proxyKind.value,
-            tlsMode: domainBinding.tlsMode.value,
-          })),
-        );
+      .map((resource): ResourceSummary => this.toSummary(resource));
+  }
 
-        return {
-          id: resource.id.value,
-          projectId: resource.projectId.value,
-          environmentId: resource.environmentId.value,
-          ...(resource.destinationId ? { destinationId: resource.destinationId.value } : {}),
-          name: resource.name.value,
-          slug: resource.slug.value,
-          kind: resource.kind.value,
-          ...(resource.description ? { description: resource.description.value } : {}),
-          services: resource.services.map((service) => ({
-            name: service.name.value,
-            kind: service.kind.value,
-          })),
-          ...(resource.networkProfile
-            ? {
-                networkProfile: {
-                  internalPort: resource.networkProfile.internalPort.value,
-                  upstreamProtocol: resource.networkProfile.upstreamProtocol.value,
-                  exposureMode: resource.networkProfile.exposureMode.value,
-                  ...(resource.networkProfile.targetServiceName
-                    ? { targetServiceName: resource.networkProfile.targetServiceName.value }
-                    : {}),
-                  ...(resource.networkProfile.hostPort
-                    ? { hostPort: resource.networkProfile.hostPort.value }
-                    : {}),
-                },
-              }
-            : {}),
-          deploymentCount: deployments.length,
-          ...(lastDeployment
-            ? {
-                lastDeploymentId: lastDeployment.id.value,
-                lastDeploymentStatus: lastDeployment.status.value,
-              }
-            : {}),
-          ...(accessSummary ? { accessSummary } : {}),
-          createdAt: resource.createdAt.value,
-        };
-      });
+  async findOne(context: RepositoryContext, spec: Parameters<ResourceReadModel["findOne"]>[1]) {
+    void context;
+    for (const resource of this.repository.items.values()) {
+      const state = resource.toState();
+      if (
+        (spec instanceof ResourceByIdSpec && state.id.equals(spec.id)) ||
+        (spec instanceof ResourceByEnvironmentAndSlugSpec &&
+          state.projectId.equals(spec.projectId) &&
+          state.environmentId.equals(spec.environmentId) &&
+          state.slug.equals(spec.slug))
+      ) {
+        return state.lifecycleStatus.isDeleted() ? null : this.toSummary(state);
+      }
+    }
+
+    return null;
   }
 }
 
@@ -1352,6 +1500,33 @@ export class MemoryDeploymentReadModel implements DeploymentReadModel {
           logCount: deployment.logs.length,
         };
       });
+  }
+
+  async findOne(context: RepositoryContext, spec: Parameters<DeploymentReadModel["findOne"]>[1]) {
+    const result = spec.accept(
+      {
+        items: [...this.repository.items.values()],
+        result: null,
+      },
+      new MemoryDeploymentSelectionVisitor(),
+    );
+
+    if (!result.result) {
+      return null;
+    }
+
+    const state = result.result.toState();
+    const summaries = await this.list(context, {
+      resourceId: state.resourceId.value,
+    });
+
+    for (const summary of summaries) {
+      if (summary.id === state.id.value) {
+        return summary;
+      }
+    }
+
+    return null;
   }
 
   async findLogs(context: RepositoryContext, id: string): Promise<DeploymentLogSummary[]> {
