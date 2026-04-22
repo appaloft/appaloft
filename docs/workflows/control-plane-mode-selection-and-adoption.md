@@ -58,7 +58,7 @@ default unless the operator explicitly selected local-only state.
 config/flags/env
   -> control-plane mode resolves to none
   -> SSH target present
-  -> ensure, lock, migrate, and sync SSH-server state
+  -> ensure, state-root coordinate, migrate, and sync SSH-server state
   -> source link and identity resolution
   -> explicit operations
   -> deploy and persist back to SSH state
@@ -174,7 +174,7 @@ resolve control-plane endpoint and credential
   -> verify client version, API version, feature flags, state schema, auth scope, and source policy
   -> resolve or create source link through the control plane
   -> resolve project/environment/resource/server/destination context through trusted state
-  -> acquire control-plane lock or workflow lease
+  -> acquire control-plane coordination lease or workflow lease
   -> dispatch explicit operations or a future accepted workflow API
 ```
 
@@ -186,7 +186,7 @@ Adoption moves a target from `none` to `cloud` or `self-hosted`.
 
 ```text
 operator selects control plane and target SSH state
-  -> acquire SSH remote state lock
+  -> acquire SSH state-root coordination
   -> export SSH-server state and source links
   -> authenticate to control plane
   -> import or map state into control plane

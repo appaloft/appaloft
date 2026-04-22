@@ -42,7 +42,6 @@ import {
   createLogger,
 } from "@appaloft/observability";
 import {
-  createDatabase,
   createMigrator,
   type PgliteRuntimeAssets,
   PgServerAppliedRouteStateRepository,
@@ -55,6 +54,7 @@ import { ShellDeploymentProgressReporter } from "./deployment-progress-reporter"
 import { adoptLegacyPgliteState } from "./legacy-pglite-state-adoption";
 import { registerApplicationServices } from "./register-application-services";
 import { registerRuntimeDependencies } from "./register-runtime-dependencies";
+import { createReloadableDatabase } from "./reloadable-database";
 import { type RemotePgliteStateSyncSession } from "./remote-pglite-state-sync";
 import { resourceAccessFailureRendererTargetForStartedServer } from "./resource-access-failure-renderer-target";
 
@@ -254,7 +254,7 @@ export async function createAppComposition(
   const config = resolveConfig(flags ? { flags } : {});
   const logger = createLogger(config);
   const telemetry = await bootstrapOpenTelemetry(config);
-  const database = await createDatabase({
+  const database = await createReloadableDatabase({
     driver: config.databaseDriver,
     pgliteDataDir: config.pgliteDataDir,
     ...(options?.pgliteRuntimeAssets ? { pgliteRuntimeAssets: options.pgliteRuntimeAssets } : {}),
@@ -270,6 +270,7 @@ export async function createAppComposition(
   const serverAppliedRouteRepository = new PgServerAppliedRouteStateRepository(database.db);
   const sourceLinkStore = createCliSourceLinkStore(sourceLinkRepository);
   const serverAppliedRouteStore = createCliServerAppliedRouteStore(serverAppliedRouteRepository);
+  const remotePgliteStateSyncSession = options?.remotePgliteStateSyncSession;
 
   if (config.databaseDriver === "pglite") {
     await adoptLegacyPgliteState({
@@ -303,6 +304,20 @@ export async function createAppComposition(
     migrator,
     authRuntime,
     deploymentProgressReporter,
+    ...(remotePgliteStateSyncSession ? { remotePgliteStateSyncSession } : {}),
+    ...(remotePgliteStateSyncSession
+      ? {
+          refreshRemotePgliteState: async () => {
+            const refreshed = await remotePgliteStateSyncSession.refreshLocalMirror();
+            if (refreshed.isErr()) {
+              return refreshed;
+            }
+
+            await database.reload();
+            return ok(undefined);
+          },
+        }
+      : {}),
     sourceLinkRepository,
     serverAppliedRouteStateRepository: serverAppliedRouteRepository,
     resourceAccessFailureRenderer: () => resourceAccessFailureRendererTarget,

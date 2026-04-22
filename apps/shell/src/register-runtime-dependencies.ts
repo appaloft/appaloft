@@ -39,6 +39,7 @@ import {
   type IdGenerator,
   InMemoryEdgeProxyProviderRegistry,
   type IntegrationAuthPort,
+  type MutationCoordinator,
   QueryBus,
   RepositoryBackedDeploymentExecutionGuard,
   type ResourceAccessFailureRendererTarget,
@@ -73,6 +74,7 @@ import {
   PgDomainRouteFailureCandidateReader,
   PgEnvironmentReadModel,
   PgEnvironmentRepository,
+  PgMutationCoordinator,
   PgProjectReadModel,
   PgProjectRepository,
   PgResourceDeletionBlockerReader,
@@ -103,6 +105,8 @@ import {
   ShellDefaultAccessDomainPolicySupport,
 } from "./default-access-domain-policy-runtime";
 import { ShellDeploymentContextDefaultsPolicy } from "./deployment-context-defaults-policy";
+import { type RemotePgliteStateSyncSession } from "./remote-pglite-state-sync";
+import { SshMutationCoordinator } from "./ssh-mutation-coordinator";
 
 class SystemClock implements Clock {
   now(): string {
@@ -613,6 +617,8 @@ export interface RegisterRuntimeDependenciesInput {
   migrator: ConstructorParameters<typeof PgDiagnostics>[1];
   authRuntime: AuthRuntime;
   deploymentProgressReporter: DeploymentProgressReporter;
+  remotePgliteStateSyncSession?: RemotePgliteStateSyncSession;
+  refreshRemotePgliteState?: () => Promise<Result<void>>;
   sourceLinkRepository?: SourceLinkRepository;
   defaultAccessDomainPolicyRepository?: DefaultAccessDomainPolicyRepository;
   serverAppliedRouteStateRepository?: ServerAppliedRouteStateRepository;
@@ -920,6 +926,24 @@ export function registerRuntimeDependencies(
     useFactory: instanceCachingFactory(
       () => new PgDiagnostics(input.database.db, input.migrator, input.database.descriptor),
     ),
+  });
+  container.register(tokens.mutationCoordinator, {
+    useFactory: instanceCachingFactory((dependencyContainer) => {
+      const clock = dependencyContainer.resolve<Clock>(tokens.clock);
+
+      if (input.remotePgliteStateSyncSession) {
+        return new SshMutationCoordinator({
+          target: input.remotePgliteStateSyncSession.target,
+          dataRoot: input.remotePgliteStateSyncSession.dataRoot,
+          clock,
+          ...(input.refreshRemotePgliteState
+            ? { refreshLocalState: input.refreshRemotePgliteState }
+            : {}),
+        }) satisfies MutationCoordinator;
+      }
+
+      return new PgMutationCoordinator(input.database.db, clock) satisfies MutationCoordinator;
+    }),
   });
 
   container.register(tokens.commandBus, {

@@ -14,7 +14,8 @@ Tests must prove:
 - repeated deploy reuses the link;
 - committed config cannot retarget an existing link;
 - relink requires explicit `source-links.relink`;
-- relink uses the same remote state lock and recovery contract as config deploy;
+- relink uses the same SSH backend maintenance recovery contract as config deploy when remote
+  `ssh-pglite` is selected, while user-visible waiting follows source-link scoped coordination;
 - diagnostics explain the chosen link without leaking secrets.
 
 ## Global References
@@ -53,8 +54,8 @@ This matrix inherits:
 
 | Test ID | Preferred automation | Case | Given | Expected result | Expected error | Expected operation sequence |
 | --- | --- | --- | --- | --- | --- | --- |
-| SOURCE-LINK-STATE-004 | e2e-preferred | First-run config deploy creates link | SSH-targeted config deploy has no existing link and no Appaloft ids | Workflow creates project/environment/server/resource through explicit operations, then persists source link state in remote PGlite | None | Ensure/lock/migrate remote state -> explicit operations -> persist source link -> `deployments.create` |
-| SOURCE-LINK-STATE-005 | e2e-preferred | Repeated config deploy reuses link | Existing source link points at project/environment/resource/server context | Workflow reuses linked ids and does not create duplicate context records | None | Ensure/lock/migrate remote state -> resolve source link -> profile/env operations as needed -> `deployments.create` |
+| SOURCE-LINK-STATE-004 | e2e-preferred | First-run config deploy creates link | SSH-targeted config deploy has no existing link and no Appaloft ids | Workflow creates project/environment/server/resource through explicit operations, then persists source link state in remote PGlite | None | Ensure/state-root-coordinate/migrate remote state -> explicit operations -> persist source link -> `deployments.create` |
+| SOURCE-LINK-STATE-005 | e2e-preferred | Repeated config deploy reuses link | Existing source link points at project/environment/resource/server context | Workflow reuses linked ids and does not create duplicate context records | None | Ensure/state-root-coordinate/migrate remote state -> resolve source link -> profile/env operations as needed -> `deployments.create` |
 | SOURCE-LINK-STATE-006 | integration | Config cannot retarget link | Existing source link points at one resource; committed config changes name, target, or identity-like fields | Workflow refuses retargeting and requires explicit relink | `validation_error`, phase `source-link-resolution` or `config-identity` | No accidental project/resource/server mutation |
 | SOURCE-LINK-STATE-007 | integration | Ambiguous fingerprint requires explicit selection | Source selector cannot produce one stable fingerprint or matches multiple links | Workflow stops before mutation | `validation_error`, phase `source-link-resolution` | No write commands |
 
@@ -66,7 +67,8 @@ This matrix inherits:
 | SOURCE-LINK-STATE-009 | integration | Relink idempotent same target | Existing link already matches requested target ids | Command returns ok with existing mapping | None | No duplicate link or audit event beyond idempotent record policy |
 | SOURCE-LINK-STATE-010 | integration | Relink optimistic guard conflict | Command includes `expectedCurrentResourceId`, but current link points elsewhere | Command rejects without mutation | `source_link_conflict`, phase `source-link-resolution` | Existing link unchanged |
 | SOURCE-LINK-STATE-011 | integration | Relink validates context | Target resource does not belong to target project/environment or destination does not belong to target server | Command rejects without mutation | `source_link_context_mismatch`, phase `source-link-admission` | Existing link unchanged |
-| SOURCE-LINK-STATE-012 | integration | Relink uses remote state lock | Another deploy/relink owns remote mutation lock or left behind a stale lock | Command may wait for a bounded retry window while the lock is active, then fails with retriable lock error if it still cannot acquire it; stale locks are recovered under the shared stale-lock policy before relink proceeds | `infra_error`, phase `remote-state-lock` when the active lock cannot be acquired within the retry window or recovery is unsafe | Existing link unchanged unless stale-lock recovery succeeds and relink completes |
+| SOURCE-LINK-STATE-012 | integration | Relink uses source-link coordination | Another relink or source-link mutation currently owns the same source fingerprint while a different source fingerprint exists on the same state backend | Command may wait for a bounded retry window on the same logical source-link scope, then fails with retriable coordination timeout if it still cannot acquire it; unrelated source fingerprints must not be blocked only because they share a server or state root | `coordination_timeout`, phase `operation-coordination` when the same source-link scope cannot be acquired within the retry window |
+| SOURCE-LINK-STATE-012A | integration | SSH final upload merges disjoint source-link state changes | `ssh-pglite` relink runs against a local mirror and another command advances the remote revision with disjoint authoritative rows | Relink still completes after final upload retries against the fresher remote snapshot | None | Updated source link and unrelated remote rows both remain present |
 
 ## PostgreSQL / PGlite Persistence Matrix
 
@@ -103,6 +105,10 @@ Current implementation has application command and CLI dispatch coverage for `so
 in `packages/application/test/relink-source-link.test.ts` and
 `packages/adapters/cli/test/source-link-command.test.ts`. Shell startup plans the same SSH remote
 PGlite mirror for relink in `apps/shell/test/remote-pglite-state-sync.test.ts`.
+
+`SOURCE-LINK-STATE-012A` currently relies on the shared shell-level SSH mirror coverage in
+`apps/shell/test/remote-pglite-state-sync.test.ts`; a relink-specific overlapping fixture remains
+follow-up work.
 
 `SOURCE-LINK-STATE-015` through `SOURCE-LINK-STATE-019` are covered in
 `packages/persistence/pg/test/pglite.integration.test.ts`. The implementation includes the PG

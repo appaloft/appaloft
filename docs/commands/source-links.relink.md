@@ -32,6 +32,7 @@ type RelinkSourceResult = Result<
 This command inherits:
 
 - [ADR-024: Pure CLI SSH State And Server-Applied Domains](../decisions/ADR-024-pure-cli-ssh-state-and-server-applied-domains.md)
+- [ADR-028: Command Coordination Scope And Mutation Admission](../decisions/ADR-028-command-coordination-scope-and-mutation-admission.md)
 - [Repository Deployment Config File Bootstrap](../workflows/deployment-config-file-bootstrap.md)
 - [Quick Deploy Workflow](../workflows/quick-deploy.md)
 - [Source Link Durable Persistence Implementation Plan](../implementation/source-link-durable-persistence-plan.md)
@@ -69,15 +70,20 @@ auditable.
 The command must:
 
 1. Validate input and derive a canonical source fingerprint when `sourceSelector` is supplied.
-2. Resolve and lock the selected state backend. For SSH mode this is the remote `ssh-pglite`
-   mutation lock.
-3. Load the current link for the fingerprint and scope.
-4. Enforce optimistic guards when provided.
-5. Resolve target project, environment, resource, and optional server/destination.
-6. Reject mismatched project/environment/resource ownership.
-7. Update the source link mapping.
-8. Persist safe audit metadata and config/source origin metadata.
-9. Return the new mapping.
+2. Resolve the selected state backend and complete any required backend maintenance coordination.
+   For SSH mode this may include brief remote `ssh-pglite` state-root coordination before command
+   execution.
+3. Resolve operation coordination for the command's `source-link` scope using the normalized source
+   fingerprint.
+4. Wait bounded time for the logical source-link scope or reject with a retriable coordination
+   timeout.
+5. Load the current link for the fingerprint and scope.
+6. Enforce optimistic guards when provided.
+7. Resolve target project, environment, resource, and optional server/destination.
+8. Reject mismatched project/environment/resource ownership.
+9. Update the source link mapping.
+10. Persist safe audit metadata and config/source origin metadata.
+11. Return the new mapping.
 
 ## Rules
 
@@ -87,7 +93,8 @@ The command must:
 - Relink must not mutate `ResourceSourceBinding`, `ResourceRuntimeProfile`, `ResourceNetworkProfile`,
   environment variables, credentials, deployment attempts, domain bindings, or server-applied route
   state.
-- Relink must be protected by the same remote state lock as config deploys.
+- Relink uses source-fingerprint scoped operation coordination in addition to any low-level
+  state-root coordination needed by the selected backend.
 - Relink must not accept raw credentials, raw config files, or committed config identity selectors
   as proof of target ownership.
 - Relink should record safe audit metadata so `system.doctor` or future source-link queries can
@@ -149,6 +156,7 @@ authoritative state.
 | `source_link_conflict` | `source-link-resolution` | No | Optimistic guard did not match the current link. |
 | `source_link_context_mismatch` | `source-link-admission` | No | Target project/environment/resource/server/destination relationship is invalid. |
 | `infra_error` | `remote-state-lock` | Yes | State backend lock could not be acquired. |
+| `coordination_timeout` | `operation-coordination` | Yes | The command could not acquire its logical source-link coordination scope within the bounded wait window. |
 | `infra_error` | `source-link-persistence` | Conditional | Link update could not be persisted. |
 
 ## Tests
@@ -161,7 +169,7 @@ At minimum, Test-First Round must cover:
 - deploy refusing to retarget without relink;
 - relink success and idempotency;
 - optimistic guard conflict;
-- remote lock use during relink;
+- backend maintenance coordination plus source-link scoped coordination during relink;
 - diagnostics with no secret leakage.
 
 ## Current Implementation Notes And Migration Gaps
@@ -175,6 +183,12 @@ against the active Appaloft state backend before updating the source link. Shell
 PG/PGlite `SourceLinkStore` adapter for command execution, including SSH remote PGlite mirrors.
 The file-backed source-link store remains available for adapter-level remote-state transfer and
 legacy explicit wiring, but it is not the shell runtime's authoritative source-link store.
+
+Current implementation now applies logical source-link scoped coordination in the shell/runtime
+path. In SSH `ssh-pglite` mode, shell still performs brief backend state-root maintenance for
+mirror prepare/upload, and final upload may retry after `remote_state_revision_conflict` by merging
+non-overlapping PG/PGlite row changes onto a fresher remote snapshot. Overlapping row edits still
+fail with a structured infrastructure merge conflict.
 
 PostgreSQL/PGlite source-link persistence is implemented through the `source_links` migration and
 PG adapter in `packages/persistence/pg`. `resources.delete` reports `source-link` blockers from

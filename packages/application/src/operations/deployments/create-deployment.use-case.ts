@@ -21,6 +21,7 @@ import { i18nKeys } from "@appaloft/i18n";
 import { inject, injectable } from "tsyringe";
 import { deploymentProgressSteps, reportDeploymentProgress } from "../../deployment-progress";
 import { type ExecutionContext, toRepositoryContext } from "../../execution-context";
+import { createCoordinationOwner, mutationCoordinationPolicies } from "../../mutation-coordination";
 import {
   type AppLogger,
   type DeploymentProgressReporter,
@@ -29,6 +30,7 @@ import {
   type DomainRouteBindingReader,
   type EventBus,
   type ExecutionBackend,
+  type MutationCoordinator,
   type RequestedDeploymentConfig,
   type RequestedDeploymentHealthCheck,
   type RuntimePlanResolver,
@@ -45,6 +47,7 @@ import { type DeploymentFactory } from "./deployment.factory";
 import { type DeploymentContextBootstrapService } from "./deployment-config-bootstrap.service";
 import { type DeploymentContextResolver } from "./deployment-context.resolver";
 import { type DeploymentLifecycleService } from "./deployment-lifecycle.service";
+import { deploymentResourceRuntimeScope } from "./deployment-mutation-scopes";
 import { type DeploymentSnapshotFactory } from "./deployment-snapshot.factory";
 import { type RuntimePlanResolutionInputBuilder } from "./runtime-plan-resolution-input.builder";
 
@@ -611,6 +614,8 @@ export class CreateDeploymentUseCase {
     private readonly deploymentFactory: DeploymentFactory,
     @inject(tokens.deploymentLifecycleService)
     private readonly deploymentLifecycleService: DeploymentLifecycleService,
+    @inject(tokens.mutationCoordinator)
+    private readonly mutationCoordinator: MutationCoordinator,
     @inject(tokens.domainRouteBindingReader)
     private readonly domainRouteBindingReader?: DomainRouteBindingReader,
     @inject(tokens.serverAppliedRouteStateRepository)
@@ -754,6 +759,7 @@ export class CreateDeploymentUseCase {
       eventBus,
       executionBackend,
       logger,
+      mutationCoordinator,
       deploymentProgressReporter,
       runtimePlanResolutionInputBuilder,
       runtimePlanResolver,
@@ -782,16 +788,6 @@ export class CreateDeploymentUseCase {
         effectiveInput,
       );
       const { project, server, destination, environment, resource } = yield* resolvedContextResult;
-      const latestDeployment = await deploymentRepository.findOne(
-        repositoryContext,
-        LatestDeploymentSpec.forResource(resource.toState().id),
-      );
-      const activeDeployment =
-        latestDeployment && !latestDeployment.canStartNewDeployment() ? latestDeployment : null;
-      const latestRuntimeOwningDeployment = await deploymentRepository.findOne(
-        repositoryContext,
-        LatestRuntimeOwningDeploymentSpec.forResource(resource.toState().id),
-      );
 
       const resourceSourceResult = createResourceSourceDescriptor(resource);
       const resourceSource = yield* resourceSourceResult;
@@ -883,29 +879,99 @@ export class CreateDeploymentUseCase {
       const runtimePlanInput = yield* runtimePlanInputResult;
       const runtimePlanResult = await runtimePlanResolver.resolve(context, runtimePlanInput);
       const runtimePlan = yield* runtimePlanResult;
-      const deploymentResult = deploymentFactory.create({
-        project,
-        server,
-        destination,
-        environment,
-        resource,
-        runtimePlan,
-        environmentSnapshot: snapshot,
-        ...(latestRuntimeOwningDeployment
-          ? { supersedesDeploymentId: latestRuntimeOwningDeployment.toState().id }
-          : {}),
-      });
-      const deployment = yield* deploymentResult;
-      const deploymentId = deployment.toState().id.value;
+      const admittedDeploymentResult = await mutationCoordinator.runExclusive({
+        context,
+        policy: mutationCoordinationPolicies.createDeployment,
+        scope: deploymentResourceRuntimeScope({ resource, server, destination }),
+        owner: createCoordinationOwner(context, "deployments.create"),
+        work: async () =>
+          safeTry(async function* () {
+            const latestDeployment = await deploymentRepository.findOne(
+              repositoryContext,
+              LatestDeploymentSpec.forResource(resource.toState().id),
+            );
+            const activeDeployment =
+              latestDeployment && !latestDeployment.canStartNewDeployment()
+                ? latestDeployment
+                : null;
+            const latestRuntimeOwningDeployment = await deploymentRepository.findOne(
+              repositoryContext,
+              LatestRuntimeOwningDeploymentSpec.forResource(resource.toState().id),
+            );
 
-      if (activeDeployment) {
-        const supersedeResult = await supersedeActiveDeployment({
-          context,
-          activeDeployment,
-          supersedingDeployment: deployment,
-        });
-        yield* supersedeResult;
-      }
+            const deploymentResult = deploymentFactory.create({
+              project,
+              server,
+              destination,
+              environment,
+              resource,
+              runtimePlan,
+              environmentSnapshot: snapshot,
+              ...(latestRuntimeOwningDeployment
+                ? { supersedesDeploymentId: latestRuntimeOwningDeployment.toState().id }
+                : {}),
+            });
+            const deployment = yield* deploymentResult;
+
+            if (activeDeployment) {
+              const supersedeResult = await supersedeActiveDeployment({
+                context,
+                activeDeployment,
+                supersedingDeployment: deployment,
+              });
+              yield* supersedeResult;
+            }
+
+            const prepareResult = deploymentLifecycleService.prepareForExecution(deployment);
+            yield* prepareResult;
+
+            const insertResult = await deploymentRepository.insertOne(
+              repositoryContext,
+              deployment,
+              UpsertDeploymentSpec.fromDeployment(deployment),
+            );
+            if (insertResult.isErr()) {
+              if (isDeploymentInsertConflict(insertResult.error)) {
+                const conflictingDeploymentId =
+                  typeof insertResult.error.details?.deploymentId === "string"
+                    ? insertResult.error.details.deploymentId
+                    : undefined;
+                const conflictingStatus =
+                  typeof insertResult.error.details?.status === "string"
+                    ? insertResult.error.details.status
+                    : undefined;
+                const conflictingResourceId =
+                  typeof insertResult.error.details?.resourceId === "string"
+                    ? insertResult.error.details.resourceId
+                    : deployment.toState().resourceId.value;
+
+                return err(
+                  redeployGuardErrorFromInsertConflict({
+                    resourceId: conflictingResourceId,
+                    ...(conflictingDeploymentId ? { deploymentId: conflictingDeploymentId } : {}),
+                    ...(conflictingStatus ? { status: conflictingStatus } : {}),
+                  }),
+                );
+              }
+
+              yield* insertResult;
+            }
+            await publishDomainEventsAndReturn(context, eventBus, logger, deployment, undefined);
+
+            const startResult = deploymentLifecycleService.startExecution(deployment);
+            yield* startResult;
+
+            const startPersistResult = yield* await persistDeployment(context, deployment);
+            if (startPersistResult === "fenced") {
+              return ok(deployment);
+            }
+            await publishDomainEventsAndReturn(context, eventBus, logger, deployment, undefined);
+
+            return ok(deployment);
+          }),
+      });
+      const deployment = yield* admittedDeploymentResult;
+      const deploymentId = deployment.toState().id.value;
 
       reportDeploymentProgress(deploymentProgressReporter, context, {
         deploymentId,
@@ -917,51 +983,6 @@ export class CreateDeploymentUseCase {
           executionKind: runtimePlan.execution.kind,
         }),
       });
-
-      const prepareResult = deploymentLifecycleService.prepareForExecution(deployment);
-      yield* prepareResult;
-
-      const insertResult = await deploymentRepository.insertOne(
-        repositoryContext,
-        deployment,
-        UpsertDeploymentSpec.fromDeployment(deployment),
-      );
-      if (insertResult.isErr()) {
-        if (isDeploymentInsertConflict(insertResult.error)) {
-          const conflictingDeploymentId =
-            typeof insertResult.error.details?.deploymentId === "string"
-              ? insertResult.error.details.deploymentId
-              : undefined;
-          const conflictingStatus =
-            typeof insertResult.error.details?.status === "string"
-              ? insertResult.error.details.status
-              : undefined;
-          const conflictingResourceId =
-            typeof insertResult.error.details?.resourceId === "string"
-              ? insertResult.error.details.resourceId
-              : deployment.toState().resourceId.value;
-
-          return err(
-            redeployGuardErrorFromInsertConflict({
-              resourceId: conflictingResourceId,
-              ...(conflictingDeploymentId ? { deploymentId: conflictingDeploymentId } : {}),
-              ...(conflictingStatus ? { status: conflictingStatus } : {}),
-            }),
-          );
-        }
-
-        yield* insertResult;
-      }
-      await publishDomainEventsAndReturn(context, eventBus, logger, deployment, undefined);
-
-      const startResult = deploymentLifecycleService.startExecution(deployment);
-      yield* startResult;
-
-      const startPersistResult = yield* await persistDeployment(context, deployment);
-      if (startPersistResult === "fenced") {
-        return ok({ id: deployment.toState().id.value });
-      }
-      await publishDomainEventsAndReturn(context, eventBus, logger, deployment, undefined);
 
       const executionResult = await executionBackend.execute(context, deployment);
       if (executionResult.isErr()) {

@@ -18,11 +18,13 @@ import {
   type RepositoryContext,
   toRepositoryContext,
 } from "../../execution-context";
+import { createCoordinationOwner, mutationCoordinationPolicies } from "../../mutation-coordination";
 import {
   type DeploymentReadModel,
   type DeploymentRepository,
   type DeploymentSummary,
   type ExecutionBackend,
+  type MutationCoordinator,
   ServerAppliedRouteStateBySourceFingerprintSpec,
   ServerAppliedRouteStateByTargetSpec,
   type ServerAppliedRouteStateRepository,
@@ -31,6 +33,7 @@ import {
 } from "../../ports";
 import { tokens } from "../../tokens";
 import { type CleanupPreviewCommandInput } from "./cleanup-preview.command";
+import { previewLifecycleScope } from "./deployment-mutation-scopes";
 
 export interface CleanupPreviewResult {
   sourceFingerprint: string;
@@ -95,6 +98,8 @@ export class CleanupPreviewUseCase {
     private readonly deploymentReadModel: DeploymentReadModel,
     @inject(tokens.executionBackend)
     private readonly executionBackend: ExecutionBackend,
+    @inject(tokens.mutationCoordinator)
+    private readonly mutationCoordinator: MutationCoordinator,
   ) {}
 
   private async findLatestDeploymentForResource(
@@ -173,153 +178,172 @@ export class CleanupPreviewUseCase {
     context: ExecutionContext,
     input: CleanupPreviewCommandInput,
   ): Promise<Result<CleanupPreviewResult>> {
-    const { executionBackend, serverAppliedRouteStateRepository, sourceLinkRepository } = this;
+    const {
+      executionBackend,
+      mutationCoordinator,
+      serverAppliedRouteStateRepository,
+      sourceLinkRepository,
+    } = this;
     const findDeploymentById = this.findDeploymentById.bind(this);
     const findLatestDeploymentForResource = this.findLatestDeploymentForResource.bind(this);
     const listProjectDeployments = this.listProjectDeployments.bind(this);
     const repositoryContext = toRepositoryContext(context);
 
-    return safeTry(async function* () {
-      const sourceLink = yield* await sourceLinkRepository
-        .findOne(SourceLinkBySourceFingerprintSpec.create(input.sourceFingerprint))
-        .then((result) =>
-          result.mapErr((error) =>
-            withPreviewCleanupDetails(error, {
-              sourceFingerprint: input.sourceFingerprint,
-              cleanupStage: "source-link-read",
-            }),
-          ),
-        );
-
-      if (!sourceLink) {
-        return ok({
-          sourceFingerprint: input.sourceFingerprint,
-          status: "already-clean" as const,
-          cleanedRuntime: false,
-          removedServerAppliedRoute: false,
-          removedSourceLink: false,
-        });
-      }
-
-      const resourceId = yield* ResourceId.create(sourceLink.resourceId);
-      const latestDeployment = yield* await findLatestDeploymentForResource(repositoryContext, {
-        resourceId,
-        sourceFingerprint: input.sourceFingerprint,
-      });
-      const runtimeCleanupCandidates = new Map<string, Deployment>();
-
-      if (latestDeployment) {
-        runtimeCleanupCandidates.set(latestDeployment.toState().id.value, latestDeployment);
-      }
-
-      const previewDeployments = yield* await listProjectDeployments(repositoryContext, {
-        projectId: sourceLink.projectId,
-        sourceFingerprint: input.sourceFingerprint,
-      });
-
-      for (const previewDeployment of previewDeployments) {
-        if (
-          previewDeployment.projectId !== sourceLink.projectId ||
-          previewDeployment.environmentId !== sourceLink.environmentId ||
-          deploymentSourceFingerprint(previewDeployment) !== input.sourceFingerprint ||
-          runtimeCleanupCandidates.has(previewDeployment.id)
-        ) {
-          continue;
-        }
-
-        const candidate = yield* await findDeploymentById(repositoryContext, {
-          deploymentId: previewDeployment.id,
-          sourceFingerprint: input.sourceFingerprint,
-        });
-
-        if (candidate) {
-          runtimeCleanupCandidates.set(previewDeployment.id, candidate);
-        }
-      }
-
-      let deploymentId: string | undefined;
-      let cleanedRuntime = false;
-      for (const runtimeCleanupCandidate of runtimeCleanupCandidates.values()) {
-        const candidateState = runtimeCleanupCandidate.toState();
-        deploymentId ??= candidateState.id.value;
-        yield* await executionBackend.cancel(context, runtimeCleanupCandidate).then((result) =>
-          result.mapErr((error) =>
-            withPreviewCleanupDetails(error, {
-              sourceFingerprint: input.sourceFingerprint,
-              cleanupStage: "runtime-cleanup",
-              resourceId: candidateState.resourceId.value,
-              deploymentId: candidateState.id.value,
-            }),
-          ),
-        );
-        cleanedRuntime = true;
-      }
-
-      const removedLinkedServerAppliedRoute = sourceLink.serverId
-        ? yield* await serverAppliedRouteStateRepository
-            .deleteOne(
-              ServerAppliedRouteStateByTargetSpec.create({
-                projectId: sourceLink.projectId,
-                environmentId: sourceLink.environmentId,
-                resourceId: sourceLink.resourceId,
-                serverId: sourceLink.serverId,
-                ...(sourceLink.destinationId ? { destinationId: sourceLink.destinationId } : {}),
-              }),
-            )
+    return mutationCoordinator.runExclusive({
+      context,
+      policy: mutationCoordinationPolicies.cleanupPreview,
+      scope: previewLifecycleScope(input.sourceFingerprint),
+      owner: createCoordinationOwner(context, "deployments.cleanup-preview"),
+      work: async () =>
+        safeTry(async function* () {
+          const sourceLink = yield* await sourceLinkRepository
+            .findOne(SourceLinkBySourceFingerprintSpec.create(input.sourceFingerprint))
             .then((result) =>
               result.mapErr((error) =>
                 withPreviewCleanupDetails(error, {
                   sourceFingerprint: input.sourceFingerprint,
-                  cleanupStage: "server-applied-route-delete",
-                  resourceId: sourceLink.resourceId,
-                  serverId: sourceLink.serverId,
-                  ...(sourceLink.destinationId ? { destinationId: sourceLink.destinationId } : {}),
+                  cleanupStage: "source-link-read",
                 }),
               ),
-            )
-        : false;
+            );
 
-      const removedScopedServerAppliedRouteCount = yield* await serverAppliedRouteStateRepository
-        .deleteMany(ServerAppliedRouteStateBySourceFingerprintSpec.create(input.sourceFingerprint))
-        .then((result) =>
-          result.mapErr((error) =>
-            withPreviewCleanupDetails(error, {
+          if (!sourceLink) {
+            return ok({
               sourceFingerprint: input.sourceFingerprint,
-              cleanupStage: "server-applied-route-delete",
-            }),
-          ),
-        );
+              status: "already-clean" as const,
+              cleanedRuntime: false,
+              removedServerAppliedRoute: false,
+              removedSourceLink: false,
+            });
+          }
 
-      const removedServerAppliedRoute =
-        removedLinkedServerAppliedRoute || removedScopedServerAppliedRouteCount > 0;
+          const resourceId = yield* ResourceId.create(sourceLink.resourceId);
+          const latestDeployment = yield* await findLatestDeploymentForResource(repositoryContext, {
+            resourceId,
+            sourceFingerprint: input.sourceFingerprint,
+          });
+          const runtimeCleanupCandidates = new Map<string, Deployment>();
 
-      const removedSourceLink = yield* await sourceLinkRepository
-        .deleteOne(SourceLinkBySourceFingerprintSpec.create(input.sourceFingerprint))
-        .then((result) =>
-          result.mapErr((error) =>
-            withPreviewCleanupDetails(error, {
+          if (latestDeployment) {
+            runtimeCleanupCandidates.set(latestDeployment.toState().id.value, latestDeployment);
+          }
+
+          const previewDeployments = yield* await listProjectDeployments(repositoryContext, {
+            projectId: sourceLink.projectId,
+            sourceFingerprint: input.sourceFingerprint,
+          });
+
+          for (const previewDeployment of previewDeployments) {
+            if (
+              previewDeployment.projectId !== sourceLink.projectId ||
+              previewDeployment.environmentId !== sourceLink.environmentId ||
+              deploymentSourceFingerprint(previewDeployment) !== input.sourceFingerprint ||
+              runtimeCleanupCandidates.has(previewDeployment.id)
+            ) {
+              continue;
+            }
+
+            const candidate = yield* await findDeploymentById(repositoryContext, {
+              deploymentId: previewDeployment.id,
               sourceFingerprint: input.sourceFingerprint,
-              cleanupStage: "source-link-delete",
-            }),
-          ),
-        );
+            });
 
-      return ok({
-        sourceFingerprint: input.sourceFingerprint,
-        status:
-          cleanedRuntime || removedServerAppliedRoute || removedSourceLink
-            ? ("cleaned" as const)
-            : ("already-clean" as const),
-        cleanedRuntime,
-        removedServerAppliedRoute,
-        removedSourceLink,
-        projectId: sourceLink.projectId,
-        environmentId: sourceLink.environmentId,
-        resourceId: sourceLink.resourceId,
-        ...(sourceLink.serverId ? { serverId: sourceLink.serverId } : {}),
-        ...(sourceLink.destinationId ? { destinationId: sourceLink.destinationId } : {}),
-        ...(deploymentId ? { deploymentId } : {}),
-      });
+            if (candidate) {
+              runtimeCleanupCandidates.set(previewDeployment.id, candidate);
+            }
+          }
+
+          let deploymentId: string | undefined;
+          let cleanedRuntime = false;
+          for (const runtimeCleanupCandidate of runtimeCleanupCandidates.values()) {
+            const candidateState = runtimeCleanupCandidate.toState();
+            deploymentId ??= candidateState.id.value;
+            yield* await executionBackend.cancel(context, runtimeCleanupCandidate).then((result) =>
+              result.mapErr((error) =>
+                withPreviewCleanupDetails(error, {
+                  sourceFingerprint: input.sourceFingerprint,
+                  cleanupStage: "runtime-cleanup",
+                  resourceId: candidateState.resourceId.value,
+                  deploymentId: candidateState.id.value,
+                }),
+              ),
+            );
+            cleanedRuntime = true;
+          }
+
+          const removedLinkedServerAppliedRoute = sourceLink.serverId
+            ? yield* await serverAppliedRouteStateRepository
+                .deleteOne(
+                  ServerAppliedRouteStateByTargetSpec.create({
+                    projectId: sourceLink.projectId,
+                    environmentId: sourceLink.environmentId,
+                    resourceId: sourceLink.resourceId,
+                    serverId: sourceLink.serverId,
+                    ...(sourceLink.destinationId
+                      ? { destinationId: sourceLink.destinationId }
+                      : {}),
+                  }),
+                )
+                .then((result) =>
+                  result.mapErr((error) =>
+                    withPreviewCleanupDetails(error, {
+                      sourceFingerprint: input.sourceFingerprint,
+                      cleanupStage: "server-applied-route-delete",
+                      resourceId: sourceLink.resourceId,
+                      serverId: sourceLink.serverId,
+                      ...(sourceLink.destinationId
+                        ? { destinationId: sourceLink.destinationId }
+                        : {}),
+                    }),
+                  ),
+                )
+            : false;
+
+          const removedScopedServerAppliedRouteCount =
+            yield* await serverAppliedRouteStateRepository
+              .deleteMany(
+                ServerAppliedRouteStateBySourceFingerprintSpec.create(input.sourceFingerprint),
+              )
+              .then((result) =>
+                result.mapErr((error) =>
+                  withPreviewCleanupDetails(error, {
+                    sourceFingerprint: input.sourceFingerprint,
+                    cleanupStage: "server-applied-route-delete",
+                  }),
+                ),
+              );
+
+          const removedServerAppliedRoute =
+            removedLinkedServerAppliedRoute || removedScopedServerAppliedRouteCount > 0;
+
+          const removedSourceLink = yield* await sourceLinkRepository
+            .deleteOne(SourceLinkBySourceFingerprintSpec.create(input.sourceFingerprint))
+            .then((result) =>
+              result.mapErr((error) =>
+                withPreviewCleanupDetails(error, {
+                  sourceFingerprint: input.sourceFingerprint,
+                  cleanupStage: "source-link-delete",
+                }),
+              ),
+            );
+
+          return ok({
+            sourceFingerprint: input.sourceFingerprint,
+            status:
+              cleanedRuntime || removedServerAppliedRoute || removedSourceLink
+                ? ("cleaned" as const)
+                : ("already-clean" as const),
+            cleanedRuntime,
+            removedServerAppliedRoute,
+            removedSourceLink,
+            projectId: sourceLink.projectId,
+            environmentId: sourceLink.environmentId,
+            resourceId: sourceLink.resourceId,
+            ...(sourceLink.serverId ? { serverId: sourceLink.serverId } : {}),
+            ...(sourceLink.destinationId ? { destinationId: sourceLink.destinationId } : {}),
+            ...(deploymentId ? { deploymentId } : {}),
+          });
+        }),
     });
   }
 }
