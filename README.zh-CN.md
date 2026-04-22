@@ -1,14 +1,10 @@
 <div align="center">
-  <img src="./apps/web/src/lib/assets/appaloft-mark.svg" alt="Appaloft mark" width="96" />
-
-  <h1>Appaloft</h1>
-
+  <img src="./apps/web/src/lib/assets/appaloft-logo-horizontal.svg" alt="Appaloft logo" width="360" />
+  <p><code>/ˌæp əˈlɔːft/</code></p>
   <p><strong>From localhost to cloud.</strong></p>
-
   <p>
     一个 AI-native 的部署控制面，把本地目录、Git 仓库、Docker 镜像和 Compose 应用发布到你自己的服务器。
   </p>
-
   <p>
     <a href="https://www.appaloft.com/zh-CN/">网站</a> ·
     <a href="./README.md">English</a> ·
