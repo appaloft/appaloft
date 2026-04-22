@@ -1,7 +1,16 @@
 import "reflect-metadata";
 
 import { describe, expect, test } from "bun:test";
-import { domainError, err, ok, type Result } from "@appaloft/core";
+import {
+  DeploymentByIdSpec,
+  DeploymentTargetByIdSpec,
+  domainError,
+  err,
+  LatestDeploymentSpec,
+  ok,
+  ResourceByIdSpec,
+  type Result,
+} from "@appaloft/core";
 
 import { createExecutionContext, type ExecutionContext, type RepositoryContext } from "../src";
 import { OpenTerminalSessionCommand } from "../src/messages";
@@ -33,6 +42,16 @@ class StaticServerReadModel implements ServerReadModel {
   async list(): Promise<ServerSummary[]> {
     return this.servers;
   }
+
+  async findOne(
+    _context: RepositoryContext,
+    spec: Parameters<ServerReadModel["findOne"]>[1],
+  ): Promise<ServerSummary | null> {
+    if (spec instanceof DeploymentTargetByIdSpec) {
+      return this.servers.find((server) => server.id === spec.id.value) ?? null;
+    }
+    return null;
+  }
 }
 
 class StaticResourceReadModel implements ResourceReadModel {
@@ -40,6 +59,16 @@ class StaticResourceReadModel implements ResourceReadModel {
 
   async list(): Promise<ResourceSummary[]> {
     return this.resources;
+  }
+
+  async findOne(
+    _context: RepositoryContext,
+    spec: Parameters<ResourceReadModel["findOne"]>[1],
+  ): Promise<ResourceSummary | null> {
+    if (spec instanceof ResourceByIdSpec) {
+      return this.resources.find((resource) => resource.id === spec.id.value) ?? null;
+    }
+    return null;
   }
 }
 
@@ -58,6 +87,23 @@ class StaticDeploymentReadModel implements DeploymentReadModel {
       .filter((deployment) =>
         input?.resourceId ? deployment.resourceId === input.resourceId : true,
       );
+  }
+
+  async findOne(
+    _context: RepositoryContext,
+    spec: Parameters<DeploymentReadModel["findOne"]>[1],
+  ): Promise<DeploymentSummary | null> {
+    if (spec instanceof DeploymentByIdSpec) {
+      return this.deployments.find((deployment) => deployment.id === spec.id.value) ?? null;
+    }
+    if (spec instanceof LatestDeploymentSpec) {
+      return (
+        [...this.deployments]
+          .filter((deployment) => deployment.resourceId === spec.resourceId.value)
+          .sort((left, right) => right.createdAt.localeCompare(left.createdAt))[0] ?? null
+      );
+    }
+    return null;
   }
 
   async findLogs(): Promise<DeploymentLogSummary[]> {

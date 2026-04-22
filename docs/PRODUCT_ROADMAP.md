@@ -498,7 +498,7 @@ Required:
 - [ ] Add Redis provisioning/import/list/show/update/delete.
 - [ ] Add dependency bind/unbind and binding secret rotation.
 - [ ] Add backup/restore for the minimum useful dependency-resource loop.
-- [ ] Rebuild deployment show as a first-class query.
+- [x] Rebuild deployment show as a first-class query.
 - [ ] Rebuild deployment stream-events as a first-class query.
 - [ ] Rebuild deployment retry/redeploy under ADR-016.
 - [ ] Rebuild rollback under ADR-016 with retained artifacts, rollback candidates, lifecycle
@@ -619,7 +619,7 @@ work below before GA.
 - [x] Source link: relink through CLI.
 - [ ] Source link: list/show/delete or archive, PostgreSQL/control-plane persistence before API/Web.
 - [x] Deployment attempt: create/list/logs.
-- [ ] Deployment attempt: show, stream events, retry/redeploy, cancel, rollback candidate/readiness,
+- [ ] Deployment attempt: stream events, retry/redeploy, cancel, rollback candidate/readiness,
   archive/prune.
 - [x] Runtime artifact/instance: internal snapshot and resource/deployment diagnostic context.
 - [ ] Runtime artifact/instance: cleanup/prune and rollback-candidate retention.
@@ -732,7 +732,7 @@ Recommended next Spec Rounds before broad Code Rounds:
   Next.js, Vite, Angular, SvelteKit, Nuxt, Astro, Remix, Express, FastAPI, Django, and Flask slice.
 - [ ] Framework support tier matrix: promote Web/CLI draft-field parity and real deploy smoke rows
   for the JavaScript/TypeScript/Python catalog.
-- [ ] Deployment observation and recovery: `deployments.show`, `deployments.stream-events`,
+- [ ] Deployment observation and recovery: `deployments.stream-events`,
   retry/redeploy, rollback candidate, and ADR-016 rebuild decisions.
 - [ ] Access/domain/TLS closure: default access policy editing, route precedence hardening, domain
   binding show/update/delete/retry, and certificate import/revoke/retry.
