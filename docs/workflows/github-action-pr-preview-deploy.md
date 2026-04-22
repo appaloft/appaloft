@@ -195,7 +195,7 @@ The default environment key should be derived from the PR id, for example `previ
 an entry-workflow selection rule over `environments.create` / `environments.list`, not a committed
 config selector.
 
-The default preview runtime name seed should be derived from the PR id as `preview-{prNumber}`, for
+The default preview runtime name seed should be derived from the PR id as `preview-{pr_number}`, for
 example `preview-123`. This is also trusted entry-workflow context, not committed repository
 identity. If preview-specific config or trusted action/CLI profile input supplies an explicit
 runtime name, that explicit value wins; otherwise preview resource creation/configuration must use
@@ -214,7 +214,7 @@ resolve preview context
   -> create or select project from trusted source state/defaults
   -> create or select preview environment
   -> create or select preview resource from preview-scoped link
-  -> derive preview runtime name seed `preview-{prNumber}` when profile input does not override it
+  -> derive preview runtime name seed `preview-{pr_number}` when profile input does not override it
   -> apply config env and secret references through environment operations
   -> coordinate preview deploy admission at the logical resource-runtime scope
   -> deployments.create(projectId, environmentId, resourceId, serverId, destinationId?)
@@ -250,7 +250,7 @@ Multiple PR previews may use the same internal application port because route an
 replacement are scoped by resource/deployment identity, not by the port number alone.
 
 The same rule applies to runtime naming. Preview deployments should preserve the requested runtime
-name seed `preview-{prNumber}` in effective runtime/container names when possible, but adapters
+name seed `preview-{pr_number}` in effective runtime/container names when possible, but adapters
 must still keep effective names unique for overlapping same-resource replacement and for distinct
 preview resources that happen to request the same name.
 

@@ -28,8 +28,8 @@ const nonEmptyStringSchema = z.string().trim().min(1);
 const safeRelativePathPattern =
   /^(?!\/)(?![a-zA-Z][a-zA-Z0-9+.-]*:)(?!.*(?:^|[\\/])\.\.(?:[\\/]|$))(?!.*[;&|`$<>]).+$/;
 const runtimeNameIdentifierPattern = /^[a-z0-9](?:[a-z0-9_.-]{0,61}[a-z0-9])?$/;
-const runtimeNameTemplateTokenPattern = /\{([a-zA-Z][a-zA-Z0-9]*)\}/g;
-export const appaloftDeploymentRuntimeNameTemplateVariables = ["previewId", "prNumber"] as const;
+const runtimeNameTemplateTokenPattern = /\{([a-zA-Z][a-zA-Z0-9_]*)\}/g;
+export const appaloftDeploymentRuntimeNameTemplateVariables = ["preview_id", "pr_number"] as const;
 type AppaloftDeploymentRuntimeNameTemplateVariable =
   (typeof appaloftDeploymentRuntimeNameTemplateVariables)[number];
 const runtimeNameTemplateVariableLookup = new Map(
@@ -148,12 +148,12 @@ function hasValidRuntimeNameTemplateSyntax(value: string): boolean {
 
 const runtimeNameConfigSchema = nonEmptyStringSchema.refine(
   (value) => hasValidRuntimeNameTemplateSyntax(value.toLowerCase()),
-  "runtime.name must be a safe normalized identifier or a template using {previewId} and {prNumber}",
+  "runtime.name must be a safe normalized identifier or a template using {preview_id} and {pr_number}",
 );
 
 export interface AppaloftDeploymentRuntimeNameTemplateContext {
-  previewId?: string;
-  prNumber?: string | number;
+  preview_id?: string;
+  pr_number?: string | number;
 }
 
 export function renderAppaloftDeploymentRuntimeNameTemplate(input: {
@@ -172,8 +172,8 @@ export function renderAppaloftDeploymentRuntimeNameTemplate(input: {
         return "";
       }
 
-      if (token === "previewId") {
-        const previewId = input.context?.previewId?.trim().toLowerCase();
+      if (token === "preview_id") {
+        const previewId = input.context?.preview_id?.trim().toLowerCase();
         if (!previewId) {
           missingVariable = token;
           return "";
@@ -182,7 +182,7 @@ export function renderAppaloftDeploymentRuntimeNameTemplate(input: {
         return previewId;
       }
 
-      const prNumber = input.context?.prNumber;
+      const prNumber = input.context?.pr_number;
       const normalizedPrNumber =
         prNumber === undefined || prNumber === null ? "" : String(prNumber).trim().toLowerCase();
       if (!normalizedPrNumber) {

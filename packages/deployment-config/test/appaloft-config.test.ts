@@ -14,7 +14,7 @@ describe("Appaloft deployment config schema", () => {
         installCommand: "bun install",
         buildCommand: "bun run build",
         startCommand: "bun run start",
-        name: "preview-{prNumber}",
+        name: "preview-{pr_number}",
         healthCheckPath: "/ready",
       },
       network: {
@@ -40,7 +40,7 @@ describe("Appaloft deployment config schema", () => {
       expect("project" in parsed.data).toBe(false);
       expect("targets" in parsed.data).toBe(false);
       expect(parsed.data.runtime?.strategy).toBe("workspace-commands");
-      expect(parsed.data.runtime?.name).toBe("preview-{prnumber}");
+      expect(parsed.data.runtime?.name).toBe("preview-{pr_number}");
       expect(parsed.data.network?.internalPort).toBe(4310);
     }
 
@@ -74,7 +74,7 @@ describe("Appaloft deployment config schema", () => {
   test("[CONFIG-FILE-PROFILE-001A] accepts runtime.name templates and renders preview values", () => {
     const parsed = parseAppaloftDeploymentConfig({
       runtime: {
-        name: "preview-{prNumber}",
+        name: "preview-{pr_number}",
       },
     });
 
@@ -86,7 +86,7 @@ describe("Appaloft deployment config schema", () => {
     const rendered = renderAppaloftDeploymentRuntimeNameTemplate({
       template: parsed.data.runtime?.name ?? "",
       context: {
-        prNumber: 123,
+        pr_number: 123,
       },
     });
 
@@ -97,10 +97,46 @@ describe("Appaloft deployment config schema", () => {
     expect(rendered.value).toBe("preview-123");
   });
 
+  test("[CONFIG-FILE-PROFILE-001AA] renders preview_id runtime.name templates", () => {
+    const parsed = parseAppaloftDeploymentConfig({
+      runtime: {
+        name: "container-{preview_id}",
+      },
+    });
+
+    expect(parsed.success).toBe(true);
+    if (!parsed.success) {
+      throw new Error("Expected runtime name template to parse");
+    }
+
+    const rendered = renderAppaloftDeploymentRuntimeNameTemplate({
+      template: parsed.data.runtime?.name ?? "",
+      context: {
+        preview_id: "pr-123",
+      },
+    });
+
+    expect(rendered.isOk()).toBe(true);
+    if (rendered.isErr()) {
+      throw new Error(rendered.error.message);
+    }
+    expect(rendered.value).toBe("container-pr-123");
+  });
+
   test("[CONFIG-FILE-PROFILE-001B] rejects unknown runtime.name template variables", () => {
     const parsed = parseAppaloftDeploymentConfig({
       runtime: {
         name: "preview-{branch}",
+      },
+    });
+
+    expect(parsed.success).toBe(false);
+  });
+
+  test("[CONFIG-FILE-PROFILE-001C] rejects legacy camelCase runtime.name template variables", () => {
+    const parsed = parseAppaloftDeploymentConfig({
+      runtime: {
+        name: "preview-{prNumber}",
       },
     });
 

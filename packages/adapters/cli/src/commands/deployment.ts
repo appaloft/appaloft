@@ -638,8 +638,8 @@ function resolveRuntimeNameSeed(input: {
       ...(input.previewContext
         ? {
             context: {
-              previewId: input.previewContext.previewId,
-              prNumber: input.previewContext.pullRequestNumber,
+              preview_id: input.previewContext.previewId,
+              pr_number: input.previewContext.pullRequestNumber,
             },
           }
         : {}),
