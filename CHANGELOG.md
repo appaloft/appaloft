@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.2.11](https://github.com/appaloft/appaloft/compare/v0.2.10...v0.2.11) (2026-04-22)
+
+
+### Bug Fixes
+
+* **proxy:** render diagnostics for unmatched traefik routes ([#54](https://github.com/appaloft/appaloft/issues/54)) ([f257c8a](https://github.com/appaloft/appaloft/commit/f257c8a7036bd91618583fecf1e0447119834c12))
+
+
+### Documentation
+
+* refresh readme landing content ([#52](https://github.com/appaloft/appaloft/issues/52)) ([c6ce0f7](https://github.com/appaloft/appaloft/commit/c6ce0f7d46de5b8162dc1ef1af85608124c9a946))
+* **roadmap:** align release prep for 0.2.11 ([#60](https://github.com/appaloft/appaloft/issues/60)) ([dfa4036](https://github.com/appaloft/appaloft/commit/dfa40360099139aa0296c4937545302e0bb9d596))
+* tighten readme branding header ([#57](https://github.com/appaloft/appaloft/issues/57)) ([54a97d0](https://github.com/appaloft/appaloft/commit/54a97d02b6c22321410d054b380b274afef02f29))
+* tighten readme hero mark ([#53](https://github.com/appaloft/appaloft/issues/53)) ([847e7dc](https://github.com/appaloft/appaloft/commit/847e7dcf66cda4ee0f82002646cacb9127bddc97))
+* use wordmark asset for readme banner ([#58](https://github.com/appaloft/appaloft/issues/58)) ([7a244c7](https://github.com/appaloft/appaloft/commit/7a244c79208ee8086a073011ef62bc6e997add69))
+
+
+### Miscellaneous
+
+* unify Bun version at 1.3.13 ([#55](https://github.com/appaloft/appaloft/issues/55)) ([84a91bd](https://github.com/appaloft/appaloft/commit/84a91bd3ff183e0c68e4bc05b63cfe15a6b38ff4))
+
 ## [0.2.10](https://github.com/appaloft/appaloft/compare/v0.2.9...v0.2.10) (2026-04-21)
 
 
