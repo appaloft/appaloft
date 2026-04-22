@@ -119,7 +119,7 @@ Implement in ordered slices:
      affect preview-scoped source link/environment/resource selection and route desired state, not
      `deployments.create`.
    - When preview mode is selected and no preview-specific profile input overrides runtime naming,
-     derive `runtime.name = preview-{prNumber}` as trusted entrypoint context before resource
+     derive `runtime.name = preview-{pr_number}` as trusted entrypoint context before resource
      create/configure commands run.
    - Document preview config selection as optional profile reuse, not as a requirement. When root
      `appaloft.yml` is production-oriented, Action preview examples should either pass

@@ -925,7 +925,7 @@ describe("CLI deployment config entry workflow", () => {
       [
         "runtime:",
         "  strategy: workspace-commands",
-        "  name: preview-{prNumber}",
+        "  name: preview-{pr_number}",
         "network:",
         "  internalPort: 4310",
         "",

@@ -254,7 +254,7 @@ contract remains acceptance-first and event/process-manager oriented.
 
 Current local and SSH Docker runtime code still defaults effective workload/container names to
 `appaloft-<deploymentId>` style values and image names to `appaloft-image-<deploymentId>` style
-values. User-supplied resource runtime naming intent and preview-derived `preview-{prNumber}` seeds
+values. User-supplied resource runtime naming intent and preview-derived `preview-{pr_number}` seeds
 remain a follow-up Code Round gap after this Spec Round.
 
 This Code Round introduced core runtime command spec types under

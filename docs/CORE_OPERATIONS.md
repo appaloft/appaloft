@@ -451,7 +451,7 @@ Current boundary:
   committed config, derive preview runtime naming intent, then dispatch ids-only
   `deployments.create`.
 - When preview-specific profile input does not override runtime naming, the default preview runtime
-  name seed is `preview-{prNumber}` so effective runtime/container names remain human-recognizable
+  name seed is `preview-{pr_number}` so effective runtime/container names remain human-recognizable
   while adapters still preserve uniqueness during safe replacement.
 - Action/CLI profile flags are a first-class profile source alongside repository config files.
   Runtime commands, network profile, health path, non-secret env values, `ci-env:` secret
