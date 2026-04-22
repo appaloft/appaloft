@@ -1,6 +1,6 @@
 # Product Roadmap To 1.0.0
 
-> Analysis date: 2026-04-21.
+> Analysis date: 2026-04-22.
 >
 > Scope: Appaloft product, operation, workflow, framework-planner, day-two
 > operations, and release gates through `1.0.0`.
@@ -17,15 +17,15 @@ This roadmap is the release gate for Appaloft versions before `1.0.0`.
 
 - [x] Keep roadmap entries in Markdown todo format so completed and incomplete work is visible.
 - [x] Keep external baseline research summarized without naming other products in this document.
-- [ ] Before every release, compare implementation, operation catalog, specs, tests, and migration
+- [x] Before every release, compare implementation, operation catalog, specs, tests, and migration
   notes against this roadmap.
-- [ ] Before every release, update this roadmap for work that was finished early, deferred, removed,
+- [x] Before every release, update this roadmap for work that was finished early, deferred, removed,
   or discovered as incomplete.
-- [ ] Commit the roadmap alignment change before triggering or publishing a release.
-- [ ] Use this roadmap to choose the release version.
-- [ ] Before the next release, verify package manifests, Release Please state, and the latest
+- [x] Commit the roadmap alignment change before triggering or publishing a release.
+- [x] Use this roadmap to choose the release version.
+- [x] Before the next release, verify package manifests, Release Please state, and the latest
   published release agree on the current version line. The roadmap starts from the current public
-  line `0.2.x` because the current release is `0.2.8`.
+  line `0.2.x` because the current release is `0.2.10`.
 
 Version selection rules:
 
@@ -42,18 +42,19 @@ Version selection rules:
 
 Current release alignment:
 
-- [x] On 2026-04-21, latest public release and `origin/main` package manifests agree on `0.2.8`,
-  while open Release Please PR [#46](https://github.com/appaloft/appaloft/pull/46) proposes
-  `0.2.9`, so the current stable-release action is to update or merge that release PR instead of
-  creating another one.
-- [x] On 2026-04-21, the `v0.2.8` release partially published successfully but failed the macOS
-  desktop bundling jobs because the Tauri app icon was encoded as 16-bit RGBA; `origin/main` now
-  includes the 8-bit icon normalization fix, so the next stable publish target remains `0.2.9` on
-  the `0.2.x` line.
-- [x] On 2026-04-21, Action/CLI PR preview deploy profile flag support and explicit preview cleanup
-  command support were completed early in the CLI/config bootstrap path, but the public
+- [x] On 2026-04-22, latest public release and `origin/main` package manifests agree on `0.2.10`,
+  and there is no open Release Please PR, so the next stable-release action is to create or update
+  the next patch-line Release Please PR for `0.2.11`.
+- [x] On 2026-04-22, the `v0.2.10` release is the current stable public line. Since Phase 1 is
+  still incomplete, the next allowed stable target remains `0.2.11` on the `0.2.x` line rather
+  than `0.3.0`.
+- [x] On 2026-04-22, custom resource runtime/container naming for Quick Deploy, CLI config-driven
+  deploys, and Web runtime profile editing is merged on `origin/main`, while the current preview
+  runtime-name template variables on `main` remain `{previewId}` and `{prNumber}`.
+- [x] On 2026-04-22, Action/CLI PR preview deploy profile flag support and explicit preview cleanup
+  command support are implemented in the CLI/config bootstrap path, but the public
   deploy-action wrapper and product-grade GitHub App preview lifecycle remain incomplete.
-- [x] On 2026-04-21, Phase 1 remains incomplete, so the next stable release is limited to the next
+- [x] On 2026-04-22, Phase 1 remains incomplete, so the next stable release is limited to the next
   `0.2.x` patch.
 - [x] Release Please keeps pre-`1.0.0` feature and minor bumps on the current patch line by
   default; an explicit `Release-As` is required only when the roadmap gate allows a target minor or
