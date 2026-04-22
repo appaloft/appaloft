@@ -9,7 +9,7 @@
     "dev": "bun run --watch src/index.ts serve",
     "build": "bun build src/index.ts --outfile dist/appaloft --target bun",
     "lint": "biome check .",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "typecheck": "tsgo -p tsconfig.json --noEmit --checkers 4",
     "test": "bun test",
     "test:e2e": "bun test ./test/e2e/*.e2e.ts",
     "db:migrate": "bun run src/index.ts db migrate",
