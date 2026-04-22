@@ -30,6 +30,10 @@ class StaticResourceReadModel implements ResourceReadModel {
   async list(): Promise<ResourceSummary[]> {
     return this.resources;
   }
+
+  async findOne(): Promise<ResourceSummary | null> {
+    return null;
+  }
 }
 
 class StaticDeploymentReadModel implements DeploymentReadModel {
@@ -51,6 +55,10 @@ class StaticDeploymentReadModel implements DeploymentReadModel {
 
   async findLogs(): Promise<DeploymentLogSummary[]> {
     return [];
+  }
+
+  async findOne(): Promise<DeploymentSummary | null> {
+    return null;
   }
 }
 

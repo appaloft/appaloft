@@ -339,6 +339,7 @@ Implemented operations:
 | Create deployment | Command | `deployments.create` | `CreateDeploymentCommand` | `CreateDeploymentCommandInput` | `appaloft deploy [path-or-source]` or ids-only flags | `POST /api/deployments` |
 | Cleanup preview deployment | Command | `deployments.cleanup-preview` | `CleanupPreviewCommand` | `CleanupPreviewCommandInput` | `appaloft preview cleanup [path-or-source] --preview pull-request --preview-id pr-123` | - |
 | List deployments | Query | `deployments.list` | `ListDeploymentsQuery` | `ListDeploymentsQueryInput` | `appaloft deployments list` | `GET /api/deployments` |
+| Show deployment detail | Query | `deployments.show` | `ShowDeploymentQuery` | `ShowDeploymentQueryInput` | `appaloft deployments show <deploymentId>` | `GET /api/deployments/{deploymentId}` |
 | Read deployment logs | Query | `deployments.logs` | `DeploymentLogsQuery` | `DeploymentLogsQueryInput` | `appaloft logs <deploymentId>` | `GET /api/deployments/{deploymentId}/logs` |
 
 Current boundary:
@@ -356,6 +357,9 @@ Current boundary:
   not expand into generic cancel, redeploy, rollback, or resource delete behavior. It removes
   current and stale preview runtime state for the same preview fingerprint, preview route desired
   state, and preview source-link identity only.
+- `deployments.show` is the active immutable-attempt deployment detail surface. It returns
+  deployment context, historical snapshot, timeline, and safe related context while keeping
+  deployment logs on `deployments.logs` and current health on `resources.health`.
 - mutation coordination is scope-based, not whole-server based:
   `deployments.create` coordinates by logical resource-runtime scope and
   `deployments.cleanup-preview` coordinates by logical preview-lifecycle scope. Low-level SSH
@@ -507,7 +511,6 @@ Current boundary:
 
 Core next operations expected here:
 - explicit plan deployment without execution
-- show deployment details
 - stream deployment events
 
 ## Routing / Domain Bindings

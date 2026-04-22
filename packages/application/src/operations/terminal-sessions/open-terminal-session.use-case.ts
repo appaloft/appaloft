@@ -1,4 +1,15 @@
-import { domainError, err, type Result } from "@appaloft/core";
+import {
+  DeploymentByIdSpec,
+  DeploymentId,
+  DeploymentTargetId,
+  domainError,
+  err,
+  LatestDeploymentSpec,
+  ResourceByIdSpec,
+  ResourceId,
+  type Result,
+  ServerByIdSpec,
+} from "@appaloft/core";
 import { inject, injectable } from "tsyringe";
 
 import { type ExecutionContext, toRepositoryContext } from "../../execution-context";
@@ -40,17 +51,6 @@ function meaningfulWorkingDirectory(workingDirectory?: string): string | undefin
   }
 
   return trimmed;
-}
-
-function deploymentCreatedAtMillis(deployment: DeploymentSummary): number {
-  const parsed = Date.parse(deployment.createdAt);
-  return Number.isFinite(parsed) ? parsed : 0;
-}
-
-function latestDeployment(deployments: DeploymentSummary[]): DeploymentSummary | undefined {
-  return [...deployments].sort(
-    (left, right) => deploymentCreatedAtMillis(right) - deploymentCreatedAtMillis(left),
-  )[0];
 }
 
 function resolveDeploymentWorkspace(deployment: DeploymentSummary): string | undefined {
@@ -96,8 +96,9 @@ export class OpenTerminalSessionUseCase {
         );
       }
 
-      const server = (await this.serverReadModel.list(repositoryContext)).find(
-        (candidate) => candidate.id === scope.serverId,
+      const server = await this.serverReadModel.findOne(
+        repositoryContext,
+        ServerByIdSpec.create(DeploymentTargetId.rehydrate(scope.serverId)),
       );
 
       if (!server) {
@@ -115,40 +116,26 @@ export class OpenTerminalSessionUseCase {
       });
     }
 
-    const resource = (await this.resourceReadModel.list(repositoryContext)).find(
-      (candidate) => candidate.id === scope.resourceId,
+    const resource = await this.resourceReadModel.findOne(
+      repositoryContext,
+      ResourceByIdSpec.create(ResourceId.rehydrate(scope.resourceId)),
     );
 
     if (!resource) {
       return err(domainError.notFound("resource", scope.resourceId));
     }
 
-    const resourceDeployments = await this.deploymentReadModel.list(repositoryContext, {
-      resourceId: resource.id,
-    });
     const deployment = scope.deploymentId
-      ? resourceDeployments.find((candidate) => candidate.id === scope.deploymentId)
-      : latestDeployment(resourceDeployments);
-
-    if (!deployment) {
-      if (scope.deploymentId) {
-        const selectedDeployment = (await this.deploymentReadModel.list(repositoryContext)).find(
-          (candidate) => candidate.id === scope.deploymentId,
+      ? await this.deploymentReadModel.findOne(
+          repositoryContext,
+          DeploymentByIdSpec.create(DeploymentId.rehydrate(scope.deploymentId)),
+        )
+      : await this.deploymentReadModel.findOne(
+          repositoryContext,
+          LatestDeploymentSpec.forResource(ResourceId.rehydrate(resource.id)),
         );
 
-        if (selectedDeployment) {
-          return err(
-            domainError.terminalSessionContextMismatch(
-              "Selected deployment does not belong to the requested resource",
-              {
-                resourceId: resource.id,
-                deploymentId: selectedDeployment.id,
-              },
-            ),
-          );
-        }
-      }
-
+    if (!deployment) {
       return err(
         scope.deploymentId
           ? domainError.notFound("deployment", scope.deploymentId)
@@ -161,8 +148,21 @@ export class OpenTerminalSessionUseCase {
       );
     }
 
-    const server = (await this.serverReadModel.list(repositoryContext)).find(
-      (candidate) => candidate.id === deployment.serverId,
+    if (deployment.resourceId !== resource.id) {
+      return err(
+        domainError.terminalSessionContextMismatch(
+          "Selected deployment does not belong to the requested resource",
+          {
+            resourceId: resource.id,
+            deploymentId: deployment.id,
+          },
+        ),
+      );
+    }
+
+    const server = await this.serverReadModel.findOne(
+      repositoryContext,
+      ServerByIdSpec.create(DeploymentTargetId.rehydrate(deployment.serverId)),
     );
 
     if (!server) {

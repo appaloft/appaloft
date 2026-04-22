@@ -2024,6 +2024,110 @@ export interface DeploymentSummary {
   logCount: number;
 }
 
+export type DeploymentDetailSummary = Omit<DeploymentSummary, "logs">;
+
+export type DeploymentDetailSection =
+  | "related-context"
+  | "timeline"
+  | "snapshot"
+  | "latest-failure";
+
+export interface DeploymentDetailSectionError {
+  section: DeploymentDetailSection;
+  code: string;
+  category: string;
+  phase: string;
+  retriable: boolean;
+  relatedEntityId?: string;
+  relatedState?: string;
+}
+
+export interface DeploymentAttemptStatusSummary {
+  current: DeploymentStatus;
+  createdAt: string;
+  startedAt?: string;
+  finishedAt?: string;
+  rollbackOfDeploymentId?: string;
+}
+
+export interface DeploymentAttemptTimeline {
+  createdAt: string;
+  startedAt?: string;
+  finishedAt?: string;
+  logCount: number;
+}
+
+export interface DeploymentAttemptSnapshot {
+  runtimePlan: DeploymentDetailSummary["runtimePlan"];
+  environmentSnapshot: DeploymentDetailSummary["environmentSnapshot"];
+}
+
+export interface DeploymentAttemptFailureSummary {
+  timestamp: string;
+  source: DeploymentLogSource;
+  phase: DeploymentLogSummary["phase"];
+  level: LogLevel;
+  message: string;
+}
+
+export interface DeploymentRelatedProjectContext {
+  id: string;
+  name?: string;
+  slug?: string;
+}
+
+export interface DeploymentRelatedEnvironmentContext {
+  id: string;
+  name?: string;
+  kind?: EnvironmentKind;
+}
+
+export interface DeploymentRelatedResourceContext {
+  id: string;
+  name?: string;
+  slug?: string;
+  kind?: ResourceKind;
+}
+
+export interface DeploymentRelatedServerContext {
+  id: string;
+  name?: string;
+  host?: string;
+  port?: number;
+  providerKey?: string;
+}
+
+export interface DeploymentRelatedDestinationContext {
+  id: string;
+}
+
+export interface DeploymentRelatedContext {
+  project: DeploymentRelatedProjectContext;
+  environment: DeploymentRelatedEnvironmentContext;
+  resource: DeploymentRelatedResourceContext;
+  server: DeploymentRelatedServerContext;
+  destination: DeploymentRelatedDestinationContext;
+}
+
+export type DeploymentAttemptNextAction =
+  | "logs"
+  | "resource-detail"
+  | "resource-health"
+  | "diagnostic-summary";
+
+export interface DeploymentDetail {
+  schemaVersion: "deployments.show/v1";
+  deployment: DeploymentDetailSummary;
+  status: DeploymentAttemptStatusSummary;
+  relatedContext?: DeploymentRelatedContext;
+  snapshot?: DeploymentAttemptSnapshot;
+  timeline?: DeploymentAttemptTimeline;
+  latestFailure?: DeploymentAttemptFailureSummary;
+  nextActions: DeploymentAttemptNextAction[];
+  sectionErrors: DeploymentDetailSectionError[];
+  generatedAt: string;
+}
+
 export interface DomainBindingSummary {
   id: string;
   projectId: string;
@@ -2096,10 +2200,12 @@ export interface CertificateSummary {
 
 export interface ProjectReadModel {
   list(context: RepositoryContext): Promise<ProjectSummary[]>;
+  findOne(context: RepositoryContext, spec: ProjectSelectionSpec): Promise<ProjectSummary | null>;
 }
 
 export interface ServerReadModel {
   list(context: RepositoryContext): Promise<ServerSummary[]>;
+  findOne(context: RepositoryContext, spec: ServerSelectionSpec): Promise<ServerSummary | null>;
 }
 
 export interface SshCredentialReadModel {
@@ -2108,7 +2214,10 @@ export interface SshCredentialReadModel {
 
 export interface EnvironmentReadModel {
   list(context: RepositoryContext, projectId?: string): Promise<EnvironmentSummary[]>;
-  findById(context: RepositoryContext, id: string): Promise<EnvironmentSummary | null>;
+  findOne(
+    context: RepositoryContext,
+    spec: EnvironmentSelectionSpec,
+  ): Promise<EnvironmentSummary | null>;
 }
 
 export interface ResourceReadModel {
@@ -2119,6 +2228,7 @@ export interface ResourceReadModel {
       environmentId?: string;
     },
   ): Promise<ResourceSummary[]>;
+  findOne(context: RepositoryContext, spec: ResourceSelectionSpec): Promise<ResourceSummary | null>;
 }
 
 export interface DeploymentReadModel {
@@ -2129,6 +2239,10 @@ export interface DeploymentReadModel {
       resourceId?: string;
     },
   ): Promise<DeploymentSummary[]>;
+  findOne(
+    context: RepositoryContext,
+    spec: DeploymentSelectionSpec,
+  ): Promise<DeploymentSummary | null>;
   findLogs(context: RepositoryContext, id: string): Promise<DeploymentLogSummary[]>;
 }
 
@@ -2602,10 +2716,12 @@ export interface IntegrationDescriptor {
 
 export interface ProviderRegistry {
   list(): ProviderDescriptor[];
+  findByKey(key: string): ProviderDescriptor | null;
 }
 
 export interface IntegrationRegistry {
   list(): IntegrationDescriptor[];
+  findByKey(key: string): IntegrationDescriptor | null;
 }
 
 export interface IntegrationAuthPort {
@@ -2647,6 +2763,7 @@ export interface PluginSummary {
 
 export interface PluginRegistry {
   list(): PluginSummary[];
+  findByName(name: string): PluginSummary | null;
 }
 
 export interface DiagnosticsStatus {

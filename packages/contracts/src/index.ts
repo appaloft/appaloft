@@ -1434,6 +1434,123 @@ export const listDeploymentsResponseSchema = z.object({
   items: z.array(deploymentSummarySchema),
 });
 
+export const deploymentDetailSummarySchema = deploymentSummarySchema.omit({
+  logs: true,
+});
+
+export const deploymentRelatedContextSchema = z.object({
+  project: projectSummarySchema
+    .pick({
+      id: true,
+      name: true,
+      slug: true,
+    })
+    .partial({
+      name: true,
+      slug: true,
+    }),
+  environment: environmentSummarySchema
+    .pick({
+      id: true,
+      name: true,
+      kind: true,
+    })
+    .partial({
+      name: true,
+      kind: true,
+    }),
+  resource: resourceSummarySchema
+    .pick({
+      id: true,
+      name: true,
+      slug: true,
+      kind: true,
+    })
+    .partial({
+      name: true,
+      slug: true,
+      kind: true,
+    }),
+  server: serverSummarySchema
+    .pick({
+      id: true,
+      name: true,
+      host: true,
+      port: true,
+      providerKey: true,
+    })
+    .partial({
+      name: true,
+      host: true,
+      port: true,
+      providerKey: true,
+    }),
+  destination: z.object({
+    id: z.string(),
+  }),
+});
+
+export const deploymentDetailSectionErrorSchema = z.object({
+  section: z.enum(["related-context", "timeline", "snapshot", "latest-failure"]),
+  code: z.string(),
+  category: z.string(),
+  phase: z.string(),
+  retriable: z.boolean(),
+  relatedEntityId: z.string().optional(),
+  relatedState: z.string().optional(),
+});
+
+export const deploymentAttemptStatusSummarySchema = z.object({
+  current: deploymentSummarySchema.shape.status,
+  createdAt: z.string(),
+  startedAt: z.string().optional(),
+  finishedAt: z.string().optional(),
+  rollbackOfDeploymentId: z.string().optional(),
+});
+
+export const deploymentAttemptTimelineSchema = z.object({
+  createdAt: z.string(),
+  startedAt: z.string().optional(),
+  finishedAt: z.string().optional(),
+  logCount: z.number().int().nonnegative(),
+});
+
+export const deploymentAttemptSnapshotSchema = z.object({
+  runtimePlan: runtimePlanSchema,
+  environmentSnapshot: deploymentSummarySchema.shape.environmentSnapshot,
+});
+
+export const deploymentAttemptFailureSummarySchema = z.object({
+  timestamp: z.string(),
+  source: deploymentLogEntrySchema.shape.source,
+  phase: deploymentLogEntrySchema.shape.phase,
+  level: deploymentLogEntrySchema.shape.level,
+  message: z.string(),
+});
+
+export const showDeploymentInputSchema = z.object({
+  deploymentId: z.string().min(1),
+  includeTimeline: z.boolean().optional(),
+  includeSnapshot: z.boolean().optional(),
+  includeRelatedContext: z.boolean().optional(),
+  includeLatestFailure: z.boolean().optional(),
+});
+
+export const showDeploymentResponseSchema = z.object({
+  schemaVersion: z.literal("deployments.show/v1"),
+  deployment: deploymentDetailSummarySchema,
+  status: deploymentAttemptStatusSummarySchema,
+  relatedContext: deploymentRelatedContextSchema.optional(),
+  snapshot: deploymentAttemptSnapshotSchema.optional(),
+  timeline: deploymentAttemptTimelineSchema.optional(),
+  latestFailure: deploymentAttemptFailureSummarySchema.optional(),
+  nextActions: z.array(
+    z.enum(["logs", "resource-detail", "resource-health", "diagnostic-summary"]),
+  ),
+  sectionErrors: z.array(deploymentDetailSectionErrorSchema),
+  generatedAt: z.string(),
+});
+
 export const deploymentLogsResponseSchema = z.object({
   deploymentId: z.string(),
   logs: z.array(deploymentLogEntrySchema),
@@ -1900,6 +2017,15 @@ export type DeploymentResourceInput = z.infer<typeof deploymentResourceInputSche
 export type CreateDeploymentInput = z.infer<typeof createDeploymentInputSchema>;
 export type CreateDeploymentResponse = z.infer<typeof createDeploymentResponseSchema>;
 export type ListDeploymentsResponse = z.infer<typeof listDeploymentsResponseSchema>;
+export type DeploymentDetailSummary = z.infer<typeof deploymentDetailSummarySchema>;
+export type DeploymentRelatedContext = z.infer<typeof deploymentRelatedContextSchema>;
+export type DeploymentDetailSectionError = z.infer<typeof deploymentDetailSectionErrorSchema>;
+export type DeploymentAttemptStatusSummary = z.infer<typeof deploymentAttemptStatusSummarySchema>;
+export type DeploymentAttemptTimeline = z.infer<typeof deploymentAttemptTimelineSchema>;
+export type DeploymentAttemptSnapshot = z.infer<typeof deploymentAttemptSnapshotSchema>;
+export type DeploymentAttemptFailureSummary = z.infer<typeof deploymentAttemptFailureSummarySchema>;
+export type ShowDeploymentInput = z.infer<typeof showDeploymentInputSchema>;
+export type ShowDeploymentResponse = z.infer<typeof showDeploymentResponseSchema>;
 export type DeploymentLogsResponse = z.infer<typeof deploymentLogsResponseSchema>;
 export type ResourceRuntimeLogLine = z.infer<typeof resourceRuntimeLogLineSchema>;
 export type ResourceRuntimeLogEvent = z.infer<typeof resourceRuntimeLogEventSchema>;

@@ -20,6 +20,7 @@ export * from "./operations/deployments/deployment-snapshot.factory";
 export * from "./operations/deployments/list-deployments.query-service";
 export * from "./operations/deployments/mark-server-applied-route-status-on-deployment-finished.handler";
 export * from "./operations/deployments/runtime-plan-resolution-input.builder";
+export * from "./operations/deployments/show-deployment.query-service";
 export * from "./operations/domain-bindings/confirm-domain-binding-ownership.use-case";
 export * from "./operations/domain-bindings/create-domain-binding.use-case";
 export * from "./operations/domain-bindings/list-domain-bindings.query-service";

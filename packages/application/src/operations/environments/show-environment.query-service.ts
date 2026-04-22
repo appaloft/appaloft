@@ -1,7 +1,14 @@
-import { domainError, err, ok, type Result } from "@appaloft/core";
+import {
+  domainError,
+  EnvironmentByIdSpec,
+  EnvironmentId,
+  err,
+  ok,
+  type Result,
+} from "@appaloft/core";
 import { inject, injectable } from "tsyringe";
 import { type ExecutionContext, toRepositoryContext } from "../../execution-context";
-import { type EnvironmentReadModel } from "../../ports";
+import { type EnvironmentReadModel, type EnvironmentSummary } from "../../ports";
 import { tokens } from "../../tokens";
 
 @injectable()
@@ -13,8 +20,11 @@ export class ShowEnvironmentQueryService {
   async execute(
     context: ExecutionContext,
     environmentId: string,
-  ): Promise<Result<NonNullable<Awaited<ReturnType<EnvironmentReadModel["findById"]>>>>> {
-    const environment = await this.readModel.findById(toRepositoryContext(context), environmentId);
+  ): Promise<Result<EnvironmentSummary>> {
+    const environment = await this.readModel.findOne(
+      toRepositoryContext(context),
+      EnvironmentByIdSpec.create(EnvironmentId.rehydrate(environmentId)),
+    );
     return environment ? ok(environment) : err(domainError.notFound("environment", environmentId));
   }
 }

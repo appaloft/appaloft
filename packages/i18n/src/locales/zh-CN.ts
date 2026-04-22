@@ -249,6 +249,9 @@ export const zhCN = {
       pageDescription: "部署记录和项目关系",
       pageDescriptionForProject: "{{projectName}} 的部署记录",
       pageTitle: "部署",
+      partialDataDescription:
+        "部分部署详情分区当前不可用；稳定的部署身份、快照和可读取的日志仍会继续展示。",
+      partialDataTitle: "当前部署详情为部分可用状态。",
       planSteps: "计划步骤",
       precedence: "优先级",
       progressDeploymentLabel: "deployment",
@@ -273,6 +276,8 @@ export const zhCN = {
       runtimePlanTitle: "Runtime plan",
       snapshotDescription: "部署时持久化的不可变环境快照，Secret 只显示元信息。",
       snapshotTitle: "环境快照",
+      relatedContextUnavailable: "关联的项目、环境、资源或服务器上下文未能完整解析。",
+      sectionFallbackUnavailable: "有一个部署详情分区暂时无法加载。",
       sourceCommitSha: "提交",
       startCommand: "启动命令",
       timelineTitle: "时间线",

@@ -349,6 +349,10 @@ class MemoryDeploymentReadModel implements DeploymentReadModel {
     return this.items;
   }
 
+  async findOne(): Promise<Awaited<ReturnType<DeploymentReadModel["findOne"]>>> {
+    return null;
+  }
+
   async findLogs(): Promise<Awaited<ReturnType<DeploymentReadModel["findLogs"]>>> {
     return [];
   }
