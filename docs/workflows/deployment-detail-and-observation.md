@@ -12,7 +12,7 @@ deployment history or deep link
   -> deployments.show
   -> deployments.stream-events for replay/follow timeline observation
   -> deployments.logs for full attempt logs
-  -> optional create-time progress reconnect while migration to standalone event stream is incomplete
+  -> optional create-time progress display for the original deployment command request
   -> optional resource health / diagnostic summary follow-up
 ```
 
@@ -113,9 +113,9 @@ The page must label these separately.
 
 The create-time progress stream remains tied to `deployments.create`.
 
-`deployments.stream-events` is the accepted standalone observation boundary for replay/follow
-timeline behavior. Until it is implemented, deployment detail may reconnect to a transport-specific
-progress source only as a migration seam for an already accepted deployment attempt.
+`deployments.stream-events` is the active standalone observation boundary for replay/follow timeline
+behavior. Deployment detail and watch-style entrypoints use this query after acceptance instead of
+depending on the original command transport staying open.
 
 `deployments.show` should therefore keep immutable detail and recent summary, while
 `deployments.stream-events` owns replay/follow semantics and cursor-based reconnect.
@@ -151,12 +151,12 @@ Forbidden until later specs reintroduce them:
 
 ## Current Implementation Notes And Migration Gaps
 
-Current Web deployment detail now reads `deployments.show` for the primary detail contract.
+Current Web deployment detail reads `deployments.show` for the primary detail contract, reads
+timeline replay/follow through `deployments.stream-events`, and keeps attempt logs on
+`deployments.logs`.
 
-Current logs and create-time progress affordances already exist, but standalone
-`deployments.stream-events` is not implemented yet.
-
-Create-time progress reconnect remains a migration seam until `deployments.stream-events` is active.
+Create-time progress remains a request-local affordance for `deployments.create`; it is no longer
+the standalone observation boundary after command acceptance.
 
 ## Open Questions
 
