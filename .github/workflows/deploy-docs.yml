@@ -7,12 +7,22 @@ on:
         description: Appaloft release tag to install and deploy with, for example v0.2.13.
         required: true
         type: string
+      source_ref:
+        description: Optional git ref for the docs source to deploy. Defaults to the resolved release tag.
+        required: false
+        default: ""
+        type: string
   workflow_dispatch:
     inputs:
       appaloft_version:
         description: Appaloft release tag to install and deploy with. Use latest for manual redeploys.
         required: false
         default: latest
+        type: string
+      source_ref:
+        description: Git ref for the docs source to deploy when redeploying without a new release.
+        required: false
+        default: main
         type: string
 
 concurrency:
@@ -57,10 +67,24 @@ jobs:
           esac
           echo "tag=$version" >> "$GITHUB_OUTPUT"
 
-      - name: Checkout Release Source
+      - name: Resolve Docs Source Ref
+        id: source
+        shell: bash
+        env:
+          REQUESTED_SOURCE_REF: ${{ inputs.source_ref }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+        run: |
+          set -euo pipefail
+          source_ref="${REQUESTED_SOURCE_REF:-}"
+          if [ -z "$source_ref" ]; then
+            source_ref="$RELEASE_TAG"
+          fi
+          echo "ref=$source_ref" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout Docs Source
         uses: actions/checkout@v4
         with:
-          ref: ${{ steps.release.outputs.tag }}
+          ref: ${{ steps.source.outputs.ref }}
 
       - name: Set Up Node
         uses: actions/setup-node@v4
