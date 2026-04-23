@@ -32,6 +32,7 @@
     "@tanstack/svelte-query": "^6.1.14",
     "@types/node": "^22",
     "@appaloft/contracts": "workspace:*",
+    "@appaloft/docs-registry": "workspace:*",
     "@appaloft/i18n": "workspace:*",
     "@appaloft/orpc": "workspace:*",
     "bits-ui": "^2.16.3",

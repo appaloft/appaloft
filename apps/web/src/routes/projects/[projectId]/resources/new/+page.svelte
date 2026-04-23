@@ -26,6 +26,7 @@
   import ConsoleShell from "$lib/components/console/ConsoleShell.svelte";
   import DeploymentProgressDialog from "$lib/components/console/DeploymentProgressDialog.svelte";
   import DockerIcon from "$lib/components/console/DockerIcon.svelte";
+  import DocsHelpLink from "$lib/components/console/DocsHelpLink.svelte";
   import GitHubIcon from "$lib/components/console/GitHubIcon.svelte";
   import ResourceSourceOption from "$lib/components/console/ResourceSourceOption.svelte";
   import { Badge } from "$lib/components/ui/badge";
@@ -38,6 +39,7 @@
     createDeploymentWithProgress,
     type DeploymentProgressDialogStatus,
   } from "$lib/console/deployment-progress";
+  import { webDocsHrefs } from "$lib/console/docs-help";
   import { createConsoleQueries } from "$lib/console/queries";
   import {
     deploymentDetailHref,
@@ -746,9 +748,15 @@
                 <FolderOpen class="size-4" />
               </div>
               <div>
-                <h2 class="text-lg font-semibold">
-                  {$t(i18nKeys.console.projects.createResourceSourceTitle)}
-                </h2>
+                <div class="flex items-center gap-2">
+                  <h2 class="text-lg font-semibold">
+                    {$t(i18nKeys.console.projects.createResourceSourceTitle)}
+                  </h2>
+                  <DocsHelpLink
+                    href={webDocsHrefs.resourceSourceProfile}
+                    ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+                  />
+                </div>
                 <p class="mt-1 text-sm text-muted-foreground">
                   {$t(i18nKeys.console.projects.createResourceSourceDescription)}
                 </p>
@@ -822,9 +830,15 @@
                 <Server class="size-4" />
               </div>
               <div>
-                <h2 class="text-lg font-semibold">
-                  {$t(i18nKeys.console.resources.newDeploymentTargetTitle)}
-                </h2>
+                <div class="flex items-center gap-2">
+                  <h2 class="text-lg font-semibold">
+                    {$t(i18nKeys.console.resources.newDeploymentTargetTitle)}
+                  </h2>
+                  <DocsHelpLink
+                    href={webDocsHrefs.serverDeploymentTarget}
+                    ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+                  />
+                </div>
                 <p class="mt-1 text-sm text-muted-foreground">
                   {$t(i18nKeys.console.resources.newDeploymentTargetDescription)}
                 </p>
@@ -863,9 +877,15 @@
                 <Waypoints class="size-4" />
               </div>
               <div>
-                <h2 class="text-lg font-semibold">
-                  {$t(i18nKeys.console.projects.createResourceRuntimeTitle)}
-                </h2>
+                <div class="flex items-center gap-2">
+                  <h2 class="text-lg font-semibold">
+                    {$t(i18nKeys.console.projects.createResourceRuntimeTitle)}
+                  </h2>
+                  <DocsHelpLink
+                    href={webDocsHrefs.resourceRuntimeProfile}
+                    ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+                  />
+                </div>
                 <p class="mt-1 text-sm text-muted-foreground">
                   {$t(i18nKeys.console.projects.createResourceRuntimeDescription)}
                 </p>
@@ -873,9 +893,19 @@
             </div>
 
             <div class="mt-5 grid gap-4 sm:grid-cols-2">
-              <label class="space-y-1.5 text-sm font-medium">
-                <span>{$t(i18nKeys.console.quickDeploy.applicationPort)}</span>
+              <div class="space-y-1.5 text-sm font-medium">
+                <div class="flex items-center gap-1.5">
+                  <label for="resource-create-internal-port">
+                    {$t(i18nKeys.console.quickDeploy.applicationPort)}
+                  </label>
+                  <DocsHelpLink
+                    href={webDocsHrefs.resourceNetworkProfile}
+                    ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+                    className="size-5"
+                  />
+                </div>
                 <Input
+                  id="resource-create-internal-port"
                   bind:value={resourceInternalPort}
                   autocomplete="off"
                   inputmode="numeric"
@@ -884,7 +914,7 @@
                 <span class="block text-xs font-normal text-muted-foreground">
                   {$t(i18nKeys.console.quickDeploy.applicationPortHint)}
                 </span>
-              </label>
+              </div>
 
               <label class="space-y-1.5 text-sm font-medium">
                 <span>{$t(i18nKeys.console.resources.runtimeName)}</span>
@@ -909,9 +939,15 @@
             <div class="mt-5 rounded-md border bg-background px-3 py-3">
               <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div class="space-y-1">
-                  <p class="text-sm font-medium">
-                    {$t(i18nKeys.console.quickDeploy.healthCheckPolicy)}
-                  </p>
+                  <div class="flex items-center gap-2">
+                    <p class="text-sm font-medium">
+                      {$t(i18nKeys.console.quickDeploy.healthCheckPolicy)}
+                    </p>
+                    <DocsHelpLink
+                      href={webDocsHrefs.resourceHealthProfile}
+                      ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+                    />
+                  </div>
                   <p class="text-xs text-muted-foreground">
                     {$t(i18nKeys.console.quickDeploy.healthCheckPathHint)}
                   </p>
@@ -1120,9 +1156,16 @@
                 <Package class="size-4" />
               </div>
               <div>
-                <h2 class="text-sm font-semibold">
-                  {$t(i18nKeys.console.resources.networkProfileTitle)}
-                </h2>
+                <div class="flex items-center gap-2">
+                  <h2 class="text-sm font-semibold">
+                    {$t(i18nKeys.console.resources.networkProfileTitle)}
+                  </h2>
+                  <DocsHelpLink
+                    href={webDocsHrefs.resourceNetworkProfile}
+                    ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+                    className="size-5"
+                  />
+                </div>
                 <p class="mt-1 text-sm text-muted-foreground">
                   {$t(i18nKeys.console.resources.networkProfileDescription)}
                 </p>

@@ -47,6 +47,7 @@ export interface AppConfig {
   webOrigin: string;
   resourceAccessFailureRendererUrl?: string;
   webStaticDir?: string;
+  docsStaticDir?: string;
   databaseDriver: "postgres" | "pglite";
   databaseUrl?: string;
   dataDir: string;
@@ -385,6 +386,12 @@ export function resolveConfig(source: ConfigSource<AppConfig> = {}): AppConfig {
       ? {
           webStaticDir:
             source.flags?.webStaticDir ?? env.APPALOFT_WEB_STATIC_DIR ?? fileConfig.webStaticDir,
+        }
+      : {}),
+    ...(source.flags?.docsStaticDir || env.APPALOFT_DOCS_STATIC_DIR || fileConfig.docsStaticDir
+      ? {
+          docsStaticDir:
+            source.flags?.docsStaticDir ?? env.APPALOFT_DOCS_STATIC_DIR ?? fileConfig.docsStaticDir,
         }
       : {}),
     databaseDriver,

@@ -62,8 +62,10 @@ bun run package:binary-bundle
 The binary bundle is self-contained:
 
 - the web console static assets are embedded into the executable
+- the public documentation static assets are embedded into the executable
 - the PGlite fs bundle and wasm modules are embedded into the executable
 - `APPALOFT_WEB_STATIC_DIR` remains available only as an override for an external web build
+- `APPALOFT_DOCS_STATIC_DIR` remains available only as an override for an external docs build
 
 Run the Tauri desktop shell:
 
@@ -151,6 +153,7 @@ docker build -t appaloft-all-in-one:local .
 docker run --rm -p 3001:3001 \
   -e APPALOFT_DATABASE_URL=postgres://... \
   -e APPALOFT_WEB_STATIC_DIR=/app/web \
+  -e APPALOFT_DOCS_STATIC_DIR=/app/docs \
   appaloft-all-in-one:local
 ```
 

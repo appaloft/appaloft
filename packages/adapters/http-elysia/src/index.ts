@@ -1,5 +1,5 @@
 import { existsSync, statSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { join, resolve, sep } from "node:path";
 import {
   type AppLogger,
   type CertificateHttpChallengeTokenStore,
@@ -106,6 +106,12 @@ interface TerminalWebSocket {
 type EmbeddedStaticAssets = Readonly<Record<string, Blob>>;
 
 type MutableHeaders = Record<string, string>;
+
+interface StaticAssetSource {
+  embeddedAssets: EmbeddedStaticAssets;
+  fallbackToRootIndex: boolean;
+  staticDir: string | null;
+}
 
 function readErrorMessage(error: unknown): string {
   if (
@@ -429,25 +435,29 @@ export function createHttpApp(input: {
   authRuntime?: AuthRuntime;
   requestContextRunner?: RequestContextRunner;
   embeddedStaticAssets?: EmbeddedStaticAssets;
+  embeddedWebAssets?: EmbeddedStaticAssets;
+  embeddedDocsAssets?: EmbeddedStaticAssets;
   certificateHttpChallengeTokenStore?: CertificateHttpChallengeTokenStore;
 }) {
   const pluginMiddlewares = input.pluginRuntime?.listHttpMiddlewares() ?? [];
   const pluginRoutes = input.pluginRuntime?.listHttpRoutes() ?? [];
-  const staticDir = input.config.webStaticDir ? resolve(input.config.webStaticDir) : null;
-  const embeddedStaticAssets = input.embeddedStaticAssets ?? {};
+  const webStaticDir = input.config.webStaticDir ? resolve(input.config.webStaticDir) : null;
+  const docsStaticDir = input.config.docsStaticDir ? resolve(input.config.docsStaticDir) : null;
+  const embeddedWebAssets = input.embeddedWebAssets ?? input.embeddedStaticAssets ?? {};
+  const embeddedDocsAssets = input.embeddedDocsAssets ?? {};
   const allowedOrigins = createAllowedOrigins(input.config.webOrigin);
   const terminalSessionsBySocket = new WeakMap<object, TerminalSession>();
   const terminalSessionsBySessionId = new Map<string, TerminalSession>();
   const requestStartTimes = new WeakMap<Request, number>();
 
-  function staticResponse(pathname: string): Response | null {
+  function staticAssetResponse(pathname: string, source: StaticAssetSource): Response | null {
     const relativePath = pathname === "/" ? "index.html" : pathname.replace(/^\/+/, "");
     const embeddedPath = `/${relativePath}`;
 
-    if (staticDir) {
-      const candidate = resolve(staticDir, relativePath);
+    if (source.staticDir) {
+      const candidate = resolve(source.staticDir, relativePath);
 
-      if (!candidate.startsWith(staticDir)) {
+      if (candidate !== source.staticDir && !candidate.startsWith(`${source.staticDir}${sep}`)) {
         return null;
       }
 
@@ -455,17 +465,61 @@ export function createHttpApp(input: {
         return new Response(Bun.file(candidate));
       }
 
-      const indexFile = join(staticDir, "index.html");
-      return existsSync(indexFile) ? new Response(Bun.file(indexFile)) : null;
+      const routeIndexFile = join(candidate, "index.html");
+      if (existsSync(routeIndexFile) && statSync(routeIndexFile).isFile()) {
+        return new Response(Bun.file(routeIndexFile));
+      }
+
+      if (source.fallbackToRootIndex) {
+        const indexFile = join(source.staticDir, "index.html");
+        return existsSync(indexFile) ? new Response(Bun.file(indexFile)) : null;
+      }
+
+      return null;
     }
 
-    const embeddedAsset = embeddedStaticAssets[embeddedPath];
+    const embeddedAsset = source.embeddedAssets[embeddedPath];
     if (embeddedAsset) {
       return new Response(embeddedAsset);
     }
 
-    const embeddedIndex = embeddedStaticAssets["/index.html"];
+    const embeddedRouteIndex =
+      source.embeddedAssets[
+        relativePath.endsWith("/") ? `/${relativePath}index.html` : `/${relativePath}/index.html`
+      ];
+    if (embeddedRouteIndex) {
+      return new Response(embeddedRouteIndex);
+    }
+
+    if (!source.fallbackToRootIndex) {
+      return null;
+    }
+
+    const embeddedIndex = source.embeddedAssets["/index.html"];
     return embeddedIndex ? new Response(embeddedIndex) : null;
+  }
+
+  function webStaticResponse(pathname: string): Response | null {
+    return staticAssetResponse(pathname, {
+      staticDir: webStaticDir,
+      embeddedAssets: embeddedWebAssets,
+      fallbackToRootIndex: true,
+    });
+  }
+
+  function docsStaticResponse(pathname: string): Response | null {
+    if (pathname !== "/docs" && !pathname.startsWith("/docs/")) {
+      return null;
+    }
+
+    const docsPathname =
+      pathname === "/docs" || pathname === "/docs/" ? "/" : pathname.slice("/docs".length);
+
+    return staticAssetResponse(docsPathname, {
+      staticDir: docsStaticDir,
+      embeddedAssets: embeddedDocsAssets,
+      fallbackToRootIndex: false,
+    });
   }
 
   function deploymentProgressStream(request: Request, requestId: string): Response {
@@ -916,15 +970,29 @@ export function createHttpApp(input: {
   });
 
   return app
-    .get("/", () => staticResponse("/") ?? new Response("Appaloft backend is running"))
+    .get("/", () => webStaticResponse("/") ?? new Response("Appaloft backend is running"))
+    .get(
+      "/docs",
+      ({ request }) =>
+        docsStaticResponse(new URL(request.url).pathname) ??
+        new Response("Not found", { status: 404 }),
+    )
+    .get(
+      "/docs/*",
+      ({ request }) =>
+        docsStaticResponse(new URL(request.url).pathname) ??
+        new Response("Not found", { status: 404 }),
+    )
     .get(
       "/_app/*",
       ({ request }) =>
-        staticResponse(new URL(request.url).pathname) ?? new Response("Not found", { status: 404 }),
+        webStaticResponse(new URL(request.url).pathname) ??
+        new Response("Not found", { status: 404 }),
     )
     .get(
       "/*",
       ({ request }) =>
-        staticResponse(new URL(request.url).pathname) ?? new Response("Not found", { status: 404 }),
+        webStaticResponse(new URL(request.url).pathname) ??
+        new Response("Not found", { status: 404 }),
     );
 }

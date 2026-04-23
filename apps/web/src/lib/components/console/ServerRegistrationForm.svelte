@@ -3,6 +3,7 @@
   import type { TestServerConnectivityResponse } from "@appaloft/contracts";
 
   import { readErrorMessage } from "$lib/api/client";
+  import DocsHelpLink from "$lib/components/console/DocsHelpLink.svelte";
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
   import { Input } from "$lib/components/ui/input";
@@ -18,6 +19,7 @@
     type DraftServerConnectivityInput,
     type ServerRegistrationDraft,
   } from "$lib/console/server-registration";
+  import { webDocsHrefs } from "$lib/console/docs-help";
   import { i18nKeys, t } from "$lib/i18n";
   import type { SshCredentialSummary } from "@appaloft/contracts";
 
@@ -236,7 +238,13 @@
   {#if draft.providerKey === "generic-ssh"}
     <div class="space-y-3 bg-muted/20 px-3 py-3">
       <div class="space-y-1">
-        <p class="text-sm font-medium">{$t(i18nKeys.console.serverForm.sshCredentialTitle)}</p>
+        <div class="flex items-center gap-2">
+          <p class="text-sm font-medium">{$t(i18nKeys.console.serverForm.sshCredentialTitle)}</p>
+          <DocsHelpLink
+            href={webDocsHrefs.serverSshCredential}
+            ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+          />
+        </div>
         <p class="text-xs leading-5 text-muted-foreground">
           {$t(i18nKeys.console.serverForm.sshCredentialDescription)}
         </p>
@@ -474,9 +482,16 @@
       <div class="space-y-2 border-t pt-3">
         <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div class="space-y-1">
-            <p class="text-xs font-medium text-muted-foreground">
-              {$t(i18nKeys.console.serverForm.connectivityDraftTitle)}
-            </p>
+            <div class="flex items-center gap-2">
+              <p class="text-xs font-medium text-muted-foreground">
+                {$t(i18nKeys.console.serverForm.connectivityDraftTitle)}
+              </p>
+              <DocsHelpLink
+                href={webDocsHrefs.serverConnectivityTest}
+                ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+                className="size-5"
+              />
+            </div>
             <p class="text-xs leading-5 text-muted-foreground">
               {$t(i18nKeys.console.serverForm.connectivityDraftDescription)}
             </p>
