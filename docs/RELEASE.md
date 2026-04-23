@@ -41,7 +41,9 @@ docker build --build-arg APPALOFT_APP_VERSION=0.1.0 -t appaloft-all-in-one:local
 - `e2e.yml`: real Postgres, started backend, CLI/API/deployment E2E, web smoke.
 - `nightly.yml`: scheduled Compose/self-host smoke.
 - `release.yml`: manually runs Release Please on `main`; if a release is created, calls
-  `release-build.yml`.
+  `release-build.yml` and then deploys the public docs site.
+- `deploy-docs.yml`: deploys `apps/docs` as a standalone static site to `https://docs.appaloft.com`
+  with the released Appaloft CLI and `appaloft.docs.yml`.
 - `release-retry.yml`: rebuilds and reuploads assets for an existing tag without changing the version.
 - `release-build.yml`: reusable release build for source archives, CLI binaries, desktop bundles, GHCR, npm, GitHub Release assets, checksums, attestations, and Homebrew tap updates.
 
@@ -87,6 +89,19 @@ The CLI binary bundle embeds:
 - `NPM_TOKEN`: optional fallback for npm publish. Prefer npm trusted publishing/OIDC. Because the
   source repository is private, npm provenance is not requested.
 - `HOMEBREW_TAP_TOKEN`: token with write access to `appaloft/homebrew-tap`.
+- `APPALOFT_SSH_PRIVATE_KEY`: SSH private key used by `deploy-docs.yml` to deploy to the same
+  server as `appaloft/www`.
+
+## Required Variables
+
+- `APPALOFT_SSH_HOST`: SSH host used by `deploy-docs.yml`; keep it aligned with `appaloft/www`.
+- `APPALOFT_SSH_USER`: optional SSH username used by `deploy-docs.yml`; defaults to `root`.
+
+## Required DNS
+
+- `docs.appaloft.com` must resolve through Cloudflare to the same public origin path used by
+  `www.appaloft.com`. The docs deployment creates the Appaloft static-site resource and server-side
+  reverse-proxy route, but DNS still has to send traffic to that server.
 
 For npm trusted publishing, configure each npm package to trust GitHub Actions from
 `appaloft/appaloft` with workflow filename `release.yml`. The publish command lives in the reusable
