@@ -28,8 +28,13 @@ already govern the behavior:
 - [ADR-023: Runtime Orchestration Target Boundary](../decisions/ADR-023-runtime-orchestration-target-boundary.md) keeps runtime backend selection internal to the deployment target boundary.
 
 A new ADR is required before adding non-container static hosting, CDN/object-storage publication,
-custom static server image selection as public input, route/domain/TLS ownership changes, SPA
-fallback policy, cache-header policy, or any new public operation.
+custom static server image selection as public input, route/domain/TLS ownership changes,
+cache-header policy, or any new public operation.
+
+[ADR-031: Static Server Routing Policy](../decisions/ADR-031-static-server-routing-policy.md)
+governs the built-in static-server routing policy for directory indexes, missing asset `404`
+responses, and extensionless app-route fallback. This policy is adapter-owned runtime behavior, not
+a public resource or deployment input.
 
 ## Governed Specs
 
@@ -93,6 +98,9 @@ Runtime adapters should:
 - run optional install/build command leaves before packaging when present;
 - package the resolved publish directory into a Docker/OCI image using an adapter-owned static
   server implementation;
+- generate adapter-owned static-server configuration that serves exact files first, then directory
+  indexes, rejects missing extension-bearing assets with `404`, and falls back extensionless app
+  routes to the root `index.html`;
 - start the static server on the resource network profile endpoint, normally internal port 80;
 - preserve resource-scoped cleanup and replacement semantics.
 
@@ -144,8 +152,8 @@ The minimal Code Round deliverable is:
   failures;
 - read/progress/log behavior consistent with existing deployment observation surfaces.
 
-SPA fallback, cache headers, custom static server images, custom generated route policy, CDN
-publication, object storage hosting, and domain/TLS convenience flows are follow-up behaviors.
+Cache headers, custom static server images, custom generated route policy, CDN publication, object
+storage hosting, and domain/TLS convenience flows are follow-up behaviors.
 
 ## Current Implementation Notes And Migration Gaps
 
@@ -167,6 +175,10 @@ Current runtime execution backends generate adapter-owned static-server Dockerfi
 generic-SSH Docker image builds. Local Docker static smoke coverage now verifies the generated
 nginx image path against a real container, and generic-SSH Docker static smoke coverage exists as an
 opt-in e2e harness gated by `APPALOFT_E2E_SSH_QUICK_DEPLOY=true`.
+
+Generated static-server Dockerfiles now also write an Appaloft-owned Nginx routing configuration:
+exact files and directory indexes win, missing extension-bearing assets return `404`, and
+extensionless app routes fall back to `/index.html`.
 
 Existing Docker/OCI substrate work provides the boundary this behavior should extend. It must not
 introduce raw host-process static serving or provider-specific deployment command input.

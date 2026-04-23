@@ -6,6 +6,60 @@ const rootPackage = JSON.parse(
   readFileSync(new URL("../../package.json", import.meta.url), "utf8"),
 );
 const appaloftVersion = process.env.APPALOFT_APP_VERSION || rootPackage.version;
+const docsBase = normalizeDocsBase(process.env.APPALOFT_DOCS_BASE);
+const docsSite = normalizeDocsSite(process.env.APPALOFT_DOCS_SITE);
+const docsBasePrefix = docsBase === "/" ? "" : docsBase;
+
+function normalizeDocsBase(value) {
+  const trimmed = value?.trim() || "/docs";
+  if (trimmed === "/") return "/";
+
+  return `/${trimmed.replace(/^\/+/, "").replace(/\/+$/, "")}`;
+}
+
+function normalizeDocsSite(value) {
+  return (value?.trim() || "https://appaloft.dev").replace(/\/+$/, "");
+}
+
+function rewriteDocsPathForBase(value) {
+  if (value === "/docs") {
+    return docsBase;
+  }
+
+  if (!value.startsWith("/docs/")) {
+    return value;
+  }
+
+  return `${docsBasePrefix}${value.slice("/docs".length)}` || "/";
+}
+
+function rewriteElementProperty(properties, key) {
+  const value = properties[key];
+  if (typeof value === "string") {
+    properties[key] = rewriteDocsPathForBase(value);
+  }
+}
+
+function rewriteDocsBaseLinks(node) {
+  if (!node || typeof node !== "object") {
+    return;
+  }
+
+  if (node.type === "element" && node.properties && typeof node.properties === "object") {
+    rewriteElementProperty(node.properties, "href");
+    rewriteElementProperty(node.properties, "src");
+  }
+
+  if (Array.isArray(node.children)) {
+    for (const child of node.children) {
+      rewriteDocsBaseLinks(child);
+    }
+  }
+}
+
+function rehypeAppaloftDocsBaseLinks() {
+  return (tree) => rewriteDocsBaseLinks(tree);
+}
 
 const sidebar = [
   {
@@ -182,8 +236,11 @@ const sidebar = [
 ];
 
 export default defineConfig({
-  base: "/docs",
-  site: "https://appaloft.dev",
+  base: docsBase,
+  site: docsSite,
+  markdown: {
+    rehypePlugins: [rehypeAppaloftDocsBaseLinks],
+  },
   vite: {
     define: {
       "import.meta.env.PUBLIC_APPALOFT_VERSION": JSON.stringify(appaloftVersion),

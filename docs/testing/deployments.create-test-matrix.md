@@ -259,7 +259,9 @@ the static artifact planning assertion in `packages/adapters/runtime/test/runtim
 Current code accepts the static runtime plan strategy, resolves static artifact intent, and covers
 adapter-owned static-server Dockerfile generation in
 `packages/adapters/runtime/test/runtime-plan-resolver.test.ts`. Executable static smoke coverage
-now includes the local Docker generated-nginx path and an opt-in generic-SSH Docker path.
+now includes the local Docker generated-nginx path and an opt-in generic-SSH Docker path. The local
+Docker static smoke also verifies ADR-031 routing behavior for directory indexes, extensionless
+app-route fallback, exact assets, and missing asset `404` responses.
 
 Framework planner rows `DEP-CREATE-ADM-028` through `DEP-CREATE-ADM-034` define the deployment
 admission side of the mainstream web framework expansion. Detailed package-manager precedence,

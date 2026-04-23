@@ -235,6 +235,10 @@ Current boundary:
   install/build/start/package steps. This capability is governed by
   [Workload Framework Detection And Planning](./workflows/workload-framework-detection-and-planning.md);
   it must not add framework, base-image, or package-name fields to `deployments.create`.
+- static-server routing is adapter-owned runtime behavior governed by
+  [ADR-031](./decisions/ADR-031-static-server-routing-policy.md): exact files and directory indexes
+  are served first, missing extension-bearing assets return `404`, and extensionless app routes
+  fall back to the packaged root `index.html`.
 - application listener port belongs to resource network profile language as `internalPort`; UI/CLI
   may display it as "port", but deployment admission must consume it from resource state
 - reverse-proxy resources can be eligible for generated default access routes when the configured

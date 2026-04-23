@@ -140,6 +140,24 @@ function createSource(input: {
   });
 }
 
+const staticServerConfigInstruction = [
+  'RUN ["sh","-lc","printf \'%s\\\\n\' ',
+  "'server {' ",
+  "'  listen 80;' ",
+  "'  server_name _;' ",
+  "'  root /usr/share/nginx/html;' ",
+  "'  index index.html;' ",
+  "'' ",
+  "'  location ~* \\\\.[A-Za-z0-9][A-Za-z0-9._-]*$ {' ",
+  "'    try_files $uri =404;' ",
+  "'  }' ",
+  "'' ",
+  "'  location / {' ",
+  "'    try_files $uri $uri/ /index.html;' ",
+  "'  }' ",
+  "'}' > '/etc/nginx/conf.d/default.conf'\"]",
+].join("");
+
 describe("DefaultRuntimePlanResolver", () => {
   test("renders workspace Dockerfiles through the Dockerfile builder", async () => {
     const { renderWorkspaceDockerfile } = await import("../src/workspace-planners");
@@ -185,6 +203,7 @@ describe("DefaultRuntimePlanResolver", () => {
       [
         "FROM nginx:1.27-alpine",
         'COPY ["dist/","/usr/share/nginx/html/"]',
+        staticServerConfigInstruction,
         "EXPOSE 80",
         'CMD ["nginx","-g","daemon off;"]',
         "",
@@ -211,6 +230,7 @@ describe("DefaultRuntimePlanResolver", () => {
         'RUN ["sh","-lc","pnpm build"]',
         "FROM nginx:1.27-alpine",
         'COPY --from=build ["/app/dist/","/usr/share/nginx/html/"]',
+        staticServerConfigInstruction,
         "EXPOSE 80",
         'CMD ["nginx","-g","daemon off;"]',
         "",
