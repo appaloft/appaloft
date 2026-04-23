@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.2.13](https://github.com/appaloft/appaloft/compare/v0.2.12...v0.2.13) (2026-04-23)
+
+
+### Features
+
+* add deployment event stream observation ([#68](https://github.com/appaloft/appaloft/issues/68)) ([7c41ca5](https://github.com/appaloft/appaloft/commit/7c41ca5243dfc4ce76cd69266561d36bfd195887))
+* **deployment:** close deployment show workflow ([#67](https://github.com/appaloft/appaloft/issues/67)) ([6c0b5ae](https://github.com/appaloft/appaloft/commit/6c0b5ae0d1018a10dc1acf7fefb619b217e94595))
+
+
+### Documentation
+
+* align roadmap for 0.2.13 release ([#71](https://github.com/appaloft/appaloft/issues/71)) ([086c9ab](https://github.com/appaloft/appaloft/commit/086c9ab0cebb430c60319a653ada470f367e11a4))
+
 ## [0.2.12](https://github.com/appaloft/appaloft/compare/v0.2.11...v0.2.12) (2026-04-22)
 
 
