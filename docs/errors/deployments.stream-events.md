@@ -114,13 +114,21 @@ Tests must assert:
 
 ## Current Implementation Notes And Migration Gaps
 
-There is no standalone `deployments.stream-events` error surface in current code.
+`deployments.stream-events` now has a standalone error surface:
 
-Current progress streaming failures are transport-specific to `deployments.create` and do not yet
-provide the durable replay/gap semantics required by this spec.
+- query validation uses the shared schema and `validation_error`;
+- missing deployments return `not_found` with `queryName = "deployments.stream-events"` and
+  `phase = "deployment-resolution"`;
+- malformed or unsafe cursors return `deployment_event_cursor_invalid`;
+- event-source load failures return `deployment_event_stream_unavailable`;
+- bounded replay failures return `deployment_event_replay_failed`;
+- Web consumers render `gap` and `error` stream envelopes without treating them as deployment
+  mutations.
+
+Remaining gaps are test-depth gaps, not operation-boundary gaps: CLI cancellation, post-open follow
+failure, and explicit gap-envelope scenarios need broader executable coverage before GA.
 
 ## Open Questions
 
-- Should a gap after a previously valid cursor always be represented as a `gap` envelope, or are
-  there cases where the product should fail the stream immediately with `err(...)` before any
-  replay begins?
+- None for the active error boundary. Exact gap-vs-startup-error policy for future pruned or rebuilt
+  event projections remains observability hardening.
