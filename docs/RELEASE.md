@@ -45,7 +45,8 @@ docker build --build-arg APPALOFT_APP_VERSION=0.1.0 -t appaloft-all-in-one:local
 - `deploy-docs.yml`: deploys `apps/docs` as a standalone static site to `https://docs.appaloft.com`
   with the released Appaloft CLI and `appaloft.docs.yml`. Release-triggered runs deploy the tagged
   source; manual runs can redeploy docs from `main` or another ref without waiting for a new
-  release tag.
+  release tag, and manual runs execute Appaloft from the checked-out source so docs-recovery fixes
+  in unreleased CLI code can take effect immediately.
 - `release-retry.yml`: rebuilds and reuploads assets for an existing tag without changing the version.
 - `release-build.yml`: reusable release build for source archives, CLI binaries, desktop bundles, GHCR, npm, GitHub Release assets, checksums, attestations, and Homebrew tap updates.
 
@@ -133,8 +134,9 @@ a new Appaloft release.
 3. Set `source_ref=main` to redeploy the latest merged docs source, or choose another branch, tag,
    or SHA for a targeted redeploy.
 
-This keeps docs recovery independent from the product release flow while still using a released
-Appaloft deploy binary.
+Release-triggered docs deploys still run with the tagged released CLI. Manual docs-only redeploys
+run Appaloft from the checked-out source ref so unreleased deployment fixes can be used for public
+docs recovery without publishing a new product release first.
 
 ## Checksums And Provenance
 

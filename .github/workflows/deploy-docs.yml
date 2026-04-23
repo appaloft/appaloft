@@ -91,6 +91,12 @@ jobs:
         with:
           node-version: 24
 
+      - name: Set Up Bun
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.3.13"
+
       - name: Validate Deployment Settings
         id: settings
         shell: bash
@@ -114,7 +120,40 @@ jobs:
           fi
           echo "ssh_user=${APPALOFT_SSH_USER:-root}" >> "$GITHUB_OUTPUT"
 
-      - name: Deploy Docs With Appaloft
+      - name: Install Source Dependencies
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          bun install --frozen-lockfile
+
+      - name: Deploy Docs With Source Appaloft
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        shell: bash
+        env:
+          APPALOFT_SSH_HOST: ${{ vars.APPALOFT_SSH_HOST }}
+          APPALOFT_SSH_PRIVATE_KEY: ${{ secrets.APPALOFT_SSH_PRIVATE_KEY }}
+          APPALOFT_SSH_USER: ${{ steps.settings.outputs.ssh_user }}
+        run: |
+          set -euo pipefail
+          key_file="$RUNNER_TEMP/appaloft-docs-deploy.key"
+          printf '%s\n' "$APPALOFT_SSH_PRIVATE_KEY" > "$key_file"
+          chmod 600 "$key_file"
+          bun run --cwd apps/shell src/index.ts deploy . \
+            --config appaloft.docs.yml \
+            --method static \
+            --resource-name appaloft-docs \
+            --resource-kind static-site \
+            --app-log-lines 8 \
+            --server-host "$APPALOFT_SSH_HOST" \
+            --server-provider generic-ssh \
+            --server-proxy-kind traefik \
+            --server-ssh-username "$APPALOFT_SSH_USER" \
+            --server-ssh-private-key-file "$key_file" \
+            --state-backend ssh-pglite
+
+      - name: Deploy Docs With Released Appaloft
+        if: ${{ github.event_name != 'workflow_dispatch' }}
         uses: appaloft/deploy-action@v1
         with:
           version: ${{ steps.release.outputs.tag }}
