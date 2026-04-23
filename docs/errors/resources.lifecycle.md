@@ -5,8 +5,9 @@
 Resource lifecycle commands and queries use the shared platform error model and neverthrow
 conventions. This file defines the resource-specific error profile for `resources.create`,
 `resources.show`, `resources.configure-source`, `resources.configure-runtime`,
-`resources.configure-network`, `resources.configure-health`, `resources.archive`,
-`resources.delete`, and the minimum resource lifecycle.
+`resources.configure-network`, `resources.configure-health`, `resources.set-variable`,
+`resources.unset-variable`, `resources.effective-config`, `resources.archive`, `resources.delete`,
+and the minimum resource lifecycle.
 
 Resource errors must use stable `code`, `category`, `phase`, `retriable`, and related entity details. They must not rely on message text as the contract.
 
@@ -48,15 +49,19 @@ type ResourceLifecycleErrorDetails = {
     | "resources.configure-runtime"
     | "resources.configure-network"
     | "resources.configure-health"
+    | "resources.set-variable"
+    | "resources.unset-variable"
     | "resources.archive"
     | "resources.delete";
-  queryName?: "resources.show";
+  queryName?: "resources.show" | "resources.effective-config";
   eventName?:
     | "resource-created"
     | "resource-source-configured"
     | "resource-runtime-configured"
     | "resource-network-configured"
     | "resource-health-policy-configured"
+    | "resource-variable-set"
+    | "resource-variable-unset"
     | "resource-archived"
     | "resource-deleted";
   phase:
@@ -71,6 +76,7 @@ type ResourceLifecycleErrorDetails = {
     | "health-policy-resolution"
     | "resource-lifecycle-guard"
     | "resource-deletion-guard"
+    | "config-read"
     | "config-identity"
     | "config-secret-validation"
     | "config-profile-resolution"
@@ -104,6 +110,17 @@ type ResourceLifecycleErrorDetails = {
   exposureMode?: "none" | "reverse-proxy" | "direct-port";
   upstreamProtocol?: "http" | "tcp";
   targetServiceName?: string;
+  variableKey?: string;
+  variableExposure?: "build-time" | "runtime";
+  variableScope?:
+    | "defaults"
+    | "system"
+    | "organization"
+    | "project"
+    | "environment"
+    | "resource"
+    | "deployment";
+  variableKind?: "plain-config" | "secret" | "provider-specific" | "deployment-strategy";
   lifecycleStatus?: "active" | "archived" | "deleted";
   deletedAt?: string;
   deletionBlockers?: ResourceDeletionBlockerKind[];
@@ -149,9 +166,9 @@ Admission errors reject `resources.create` and return `err(DomainError)`.
 ## Profile Lifecycle Errors
 
 These errors apply to `resources.show`, `resources.configure-source`, `resources.configure-runtime`,
-`resources.configure-network`, `resources.configure-health`, `resources.archive`,
-`resources.delete`, and `deployments.create` where deployment admission reads resource lifecycle
-state.
+`resources.configure-network`, `resources.configure-health`, `resources.set-variable`,
+`resources.unset-variable`, `resources.effective-config`, `resources.archive`, `resources.delete`,
+and `deployments.create` where deployment admission reads resource lifecycle or configuration state.
 
 | Error code | Category | Phase | Retriable | Meaning |
 | --- | --- | --- | --- | --- |
@@ -164,6 +181,10 @@ state.
 | `validation_error` | `validation` | `resource-source-resolution` | No | Source profile update is invalid, ambiguous, unsafe, or contains forbidden secret/credential material. |
 | `validation_error` | `validation` | `resource-runtime-resolution` | No | Runtime profile update is invalid, unsafe, includes health-policy mutation, or includes unsupported runtime target fields. |
 | `validation_error` | `validation` | `resource-network-resolution` | No | Network profile update is invalid, unsafe, missing required endpoint data, or requests unsupported direct-port exposure. |
+| `validation_error` | `validation` | `config-identity` | No | Variable key, exposure, or scope identity is invalid. |
+| `validation_error` | `validation` | `config-secret-validation` | No | A resource variable requested secret storage for a build-time value or another forbidden secret combination. |
+| `validation_error` | `validation` | `config-profile-resolution` | No | Resource variable shape, exposure, or prefix policy is invalid for the requested override. |
+| `not_found` | `not-found` | `config-read` | No | Requested resource-scoped variable identity cannot be found for removal. |
 | `resource_delete_blocked` | `conflict` | `resource-deletion-guard` | No | Delete was requested for an active resource or an archived resource with retained blockers such as deployments, runtime instances, source links, domain bindings, certificates, terminal sessions, dependency bindings, routes, logs, or audit requirements. |
 | `validation_error` | `validation` | `resource-deletion-guard` | No | Delete confirmation did not match the resource slug. |
 | `infra_error` | `infra` | `resource-persistence` | Conditional | Profile/lifecycle state could not be safely persisted. |
@@ -193,6 +214,7 @@ Resource consumers additionally must:
 - distinguish missing project/environment/destination from context mismatch;
 - distinguish invalid source variant configuration from runtime-plan failure;
 - distinguish invalid resource listener port from deployment runtime failure;
+- distinguish resource variable validation/read failures from environment or deployment failures;
 - distinguish archived-resource guards from missing resources;
 - distinguish delete blockers from validation failures;
 - avoid retry affordances for validation, not-found, conflict, and invariant errors;
@@ -213,6 +235,7 @@ Tests must assert:
 - runtime variant fields such as `runtimePlanStrategy`, `runtimeName`, `dockerfilePath`,
   `dockerComposeFilePath`, or `publishDirectory` when a runtime profile error is relevant;
 - `internalPort`, `exposureMode`, and `targetServiceName` when a network profile error is relevant;
+- `variableKey`, `variableExposure`, `variableScope`, and `variableKind` when a resource config error is relevant;
 - `lifecycleStatus` when archived-resource or deletion guard behavior is relevant;
 - safe `deletionBlockers` when `resource_delete_blocked` is relevant;
 - no resource persisted on admission failure;

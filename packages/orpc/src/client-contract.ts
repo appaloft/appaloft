@@ -32,10 +32,12 @@ import {
   type RegisterServerCommandInput,
   type RenameProjectCommandInput,
   type ResourceDiagnosticSummaryQueryInput,
+  type ResourceEffectiveConfigQueryInput,
   type ResourceHealthQueryInput,
   type ResourceProxyConfigurationPreviewQueryInput,
   type ResourceRuntimeLogsQueryInput,
   type SetEnvironmentVariableCommandInput,
+  type SetResourceVariableCommandInput,
   type ShowDeploymentQueryInput,
   type ShowEnvironmentQueryInput,
   type ShowProjectQueryInput,
@@ -43,6 +45,7 @@ import {
   type StreamDeploymentEventsQueryInput,
   type TestServerConnectivityCommandInput,
   type UnsetEnvironmentVariableCommandInput,
+  type UnsetResourceVariableCommandInput,
 } from "@appaloft/application/schemas";
 import {
   type ArchiveProjectResponse,
@@ -87,14 +90,17 @@ import {
   type RenameProjectResponse,
   type ResourceDetail,
   type ResourceDiagnosticSummary,
+  type ResourceEffectiveConfigResponse,
   type ResourceHealthSummary,
   type ResourceRuntimeLogEvent,
   type ResourceRuntimeLogsResponse,
   type ResourceRuntimeLogsStreamResponse,
+  type SetResourceVariableResponse,
   type ShowDeploymentResponse,
   type ShowProjectResponse,
   type TerminalSessionDescriptor,
   type TestServerConnectivityResponse,
+  type UnsetResourceVariableResponse,
 } from "@appaloft/contracts";
 import { type AsyncIteratorClass, type Client, type ORPCError } from "@orpc/client";
 
@@ -283,6 +289,24 @@ export type AppaloftOrpcClientContract = {
       AppaloftClientContext,
       ConfigureResourceSourceCommandInput,
       ConfigureResourceSourceResponse,
+      AppaloftClientError
+    >;
+    setVariable: Client<
+      AppaloftClientContext,
+      SetResourceVariableCommandInput,
+      SetResourceVariableResponse,
+      AppaloftClientError
+    >;
+    unsetVariable: Client<
+      AppaloftClientContext,
+      UnsetResourceVariableCommandInput,
+      UnsetResourceVariableResponse,
+      AppaloftClientError
+    >;
+    effectiveConfig: Client<
+      AppaloftClientContext,
+      ResourceEffectiveConfigQueryInput,
+      ResourceEffectiveConfigResponse,
       AppaloftClientError
     >;
     diagnosticSummary: Client<

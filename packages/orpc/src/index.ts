@@ -77,6 +77,7 @@ import {
   RegisterServerCommand,
   RenameProjectCommand,
   ResourceDiagnosticSummaryQuery,
+  ResourceEffectiveConfigQuery,
   ResourceHealthQuery,
   ResourceProxyConfigurationPreviewQuery,
   type ResourceRuntimeLogEvent,
@@ -86,10 +87,12 @@ import {
   registerServerCommandInputSchema,
   renameProjectCommandInputSchema,
   resourceDiagnosticSummaryQueryInputSchema,
+  resourceEffectiveConfigQueryInputSchema,
   resourceHealthQueryInputSchema,
   resourceProxyConfigurationPreviewQueryInputSchema,
   resourceRuntimeLogsQueryInputSchema,
   SetEnvironmentVariableCommand,
+  SetResourceVariableCommand,
   ShowDeploymentQuery,
   ShowEnvironmentQuery,
   ShowProjectQuery,
@@ -98,6 +101,7 @@ import {
   type StreamDeploymentEventsQueryInput,
   type StreamDeploymentEventsResult,
   setEnvironmentVariableCommandInputSchema,
+  setResourceVariableCommandInputSchema,
   showDeploymentQueryInputSchema,
   showEnvironmentQueryInputSchema,
   showProjectQueryInputSchema,
@@ -106,7 +110,9 @@ import {
   TestServerConnectivityCommand,
   testServerConnectivityCommandInputSchema,
   UnsetEnvironmentVariableCommand,
+  UnsetResourceVariableCommand,
   unsetEnvironmentVariableCommandInputSchema,
+  unsetResourceVariableCommandInputSchema,
 } from "@appaloft/application";
 import {
   archiveProjectResponseSchema,
@@ -151,14 +157,17 @@ import {
   renameProjectResponseSchema,
   resourceDetailSchema,
   resourceDiagnosticSummarySchema,
+  resourceEffectiveConfigResponseSchema,
   resourceHealthSummarySchema,
   resourceRuntimeLogEventSchema,
   resourceRuntimeLogsResponseSchema,
   resourceRuntimeLogsStreamResponseSchema,
+  setResourceVariableResponseSchema,
   showDeploymentResponseSchema,
   showProjectResponseSchema,
   terminalSessionDescriptorSchema,
   testServerConnectivityResponseSchema,
+  unsetResourceVariableResponseSchema,
 } from "@appaloft/contracts";
 import { type DomainError, type Result } from "@appaloft/core";
 import { resolvePublicDocsHelpHref } from "@appaloft/docs-registry";
@@ -267,6 +276,18 @@ export const apiRouteDescriptions = {
   configureResourceNetwork: routeDescription(
     "Configures ports, protocols, and exposure behavior for resource access.",
     "resource.network-profile",
+  ),
+  setResourceVariable: routeDescription(
+    "Sets one resource-scoped variable or secret override.",
+    "environment.variable-precedence",
+  ),
+  unsetResourceVariable: routeDescription(
+    "Removes one resource-scoped variable override.",
+    "environment.variable-precedence",
+  ),
+  resourceEffectiveConfig: routeDescription(
+    "Reads the masked effective configuration for one resource.",
+    "environment.variable-precedence",
   ),
   createDomainBinding: routeDescription(
     "Creates a custom domain binding for a resource.",
@@ -1098,6 +1119,45 @@ export const configureResourceSourceProcedure = base
     executeCommand(context, ConfigureResourceSourceCommand.create(input)),
   );
 
+export const setResourceVariableProcedure = base
+  .route({
+    method: "POST",
+    path: "/resources/{resourceId}/variables",
+    description: apiRouteDescriptions.setResourceVariable,
+    successStatus: 200,
+  })
+  .input(setResourceVariableCommandInputSchema)
+  .output(setResourceVariableResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, SetResourceVariableCommand.create(input)),
+  );
+
+export const unsetResourceVariableProcedure = base
+  .route({
+    method: "DELETE",
+    path: "/resources/{resourceId}/variables/{key}",
+    description: apiRouteDescriptions.unsetResourceVariable,
+    successStatus: 200,
+  })
+  .input(unsetResourceVariableCommandInputSchema)
+  .output(unsetResourceVariableResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, UnsetResourceVariableCommand.create(input)),
+  );
+
+export const resourceEffectiveConfigProcedure = base
+  .route({
+    method: "GET",
+    path: "/resources/{resourceId}/effective-config",
+    description: apiRouteDescriptions.resourceEffectiveConfig,
+    successStatus: 200,
+  })
+  .input(resourceEffectiveConfigQueryInputSchema)
+  .output(resourceEffectiveConfigResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ResourceEffectiveConfigQuery.create(input)),
+  );
+
 export const createDomainBindingProcedure = base
   .route({
     method: "POST",
@@ -1500,6 +1560,9 @@ export const appaloftOrpcRouter = {
     configureNetwork: configureResourceNetworkProcedure,
     configureRuntime: configureResourceRuntimeProcedure,
     configureSource: configureResourceSourceProcedure,
+    setVariable: setResourceVariableProcedure,
+    unsetVariable: unsetResourceVariableProcedure,
+    effectiveConfig: resourceEffectiveConfigProcedure,
     diagnosticSummary: resourceDiagnosticSummaryProcedure,
     health: resourceHealthProcedure,
     proxyConfiguration: resourceProxyConfigurationPreviewProcedure,

@@ -816,7 +816,7 @@ export class CreateDeploymentUseCase {
         step: deploymentProgressSteps.plan,
         message: context.t(i18nKeys.backend.deployment.createSnapshotAndPlan),
       });
-      const snapshotResult = deploymentSnapshotFactory.create(environment);
+      const snapshotResult = deploymentSnapshotFactory.create(environment, resource);
       const snapshot = yield* snapshotResult;
       const requestedDeploymentBase = yield* requestedDeploymentFromResource(resource);
       const targetContext = {

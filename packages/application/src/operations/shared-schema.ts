@@ -28,6 +28,7 @@ export const environmentVariableScopeSchema = z.enum([
   "organization",
   "project",
   "environment",
+  "resource",
   "deployment",
 ]);
 

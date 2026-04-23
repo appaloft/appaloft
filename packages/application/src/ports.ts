@@ -1416,6 +1416,26 @@ export interface ResourceDetail {
   generatedAt: string;
 }
 
+export interface ResourceConfigEntryView {
+  key: string;
+  value: string;
+  scope: ConfigScope;
+  exposure: VariableExposure;
+  isSecret: boolean;
+  kind: VariableKind;
+  updatedAt?: string;
+}
+
+export interface ResourceEffectiveConfigView {
+  schemaVersion: "resources.effective-config/v1";
+  resourceId: string;
+  environmentId: string;
+  ownedEntries: ResourceConfigEntryView[];
+  effectiveEntries: ResourceConfigEntryView[];
+  precedence: ConfigScope[];
+  generatedAt: string;
+}
+
 export type ResourceHealthOverall =
   | "healthy"
   | "degraded"
