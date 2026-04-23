@@ -164,8 +164,8 @@ Still blocking 1.0.0:
   webhooks, and internal process state.
 - [ ] Resource source/runtime/network profile update is still the major missing horizontal
   operation.
-- [ ] Deployment show, event stream, retry/redeploy, cancel, and rollback are not public
-  operations.
+- [ ] Standalone deployment event stream, retry/redeploy, cancel, and rollback are not public
+  operations. `deployments.show` is already active.
 - [ ] `deployments.create` progress stream is still create-time observation, not standalone durable
   deployment observation.
 - [ ] Default access policy editing is not public.
@@ -732,8 +732,9 @@ Recommended next Spec Rounds before broad Code Rounds:
   Next.js, Vite, Angular, SvelteKit, Nuxt, Astro, Remix, Express, FastAPI, Django, and Flask slice.
 - [ ] Framework support tier matrix: promote Web/CLI draft-field parity and real deploy smoke rows
   for the JavaScript/TypeScript/Python catalog.
-- [ ] Deployment observation and recovery: `deployments.stream-events`,
-  retry/redeploy, rollback candidate, and ADR-016 rebuild decisions.
+- [ ] Deployment observation and recovery: standalone `deployments.stream-events`, reconnect
+  boundary replacing `deployments.reattach`, retry/redeploy, rollback candidate/readiness, and
+  ADR-016 rebuild decisions.
 - [ ] Access/domain/TLS closure: default access policy editing, route precedence hardening, domain
   binding show/update/delete/retry, and certificate import/revoke/retry.
 - [ ] Dependency resource lifecycle: Postgres/Redis provision/import, bind/unbind, secret rotation,

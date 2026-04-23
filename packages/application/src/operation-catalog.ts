@@ -8,6 +8,7 @@ import { createDeploymentCommandInputSchema } from "./operations/deployments/cre
 import { deploymentLogsQueryInputSchema } from "./operations/deployments/deployment-logs.query";
 import { listDeploymentsQueryInputSchema } from "./operations/deployments/list-deployments.query";
 import { showDeploymentQueryInputSchema } from "./operations/deployments/show-deployment.query";
+import { streamDeploymentEventsQueryInputSchema } from "./operations/deployments/stream-deployment-events.query";
 import { confirmDomainBindingOwnershipCommandInputSchema } from "./operations/domain-bindings/confirm-domain-binding-ownership.command";
 import { createDomainBindingCommandInputSchema } from "./operations/domain-bindings/create-domain-binding.command";
 import { listDomainBindingsQueryInputSchema } from "./operations/domain-bindings/list-domain-bindings.query";
@@ -590,6 +591,21 @@ export const operationCatalog = [
     transports: {
       cli: "appaloft logs <deploymentId>",
       orpc: { method: "GET", path: "/api/deployments/{deploymentId}/logs" },
+    },
+  },
+  {
+    key: "deployments.stream-events",
+    kind: "query",
+    domain: "deployments",
+    messageName: "StreamDeploymentEventsQuery",
+    handlerName: "StreamDeploymentEventsQueryHandler",
+    serviceName: "StreamDeploymentEventsQueryService",
+    inputSchema: streamDeploymentEventsQueryInputSchema,
+    serviceToken: tokens.streamDeploymentEventsQueryService,
+    transports: {
+      cli: "appaloft deployments events <deploymentId>",
+      orpc: { method: "GET", path: "/api/deployments/{deploymentId}/events" },
+      orpcStream: { method: "GET", path: "/api/deployments/{deploymentId}/events/stream" },
     },
   },
   {

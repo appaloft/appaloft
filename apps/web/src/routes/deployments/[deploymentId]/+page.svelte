@@ -18,6 +18,7 @@
     ShieldCheck,
   } from "@lucide/svelte";
   import {
+    type DeploymentEventStreamEnvelope,
     type DeploymentDetailSummary,
     type DeploymentLogsResponse,
     shortDeploymentSourceCommitSha,
@@ -25,6 +26,7 @@
     type DeploymentProgressEvent,
   } from "@appaloft/contracts";
 
+  import { readErrorMessage } from "$lib/api/client";
   import ConsoleShell from "$lib/components/console/ConsoleShell.svelte";
   import DeploymentStatusBadge from "$lib/components/console/DeploymentStatusBadge.svelte";
   import DeploymentProgressDialog from "$lib/components/console/DeploymentProgressDialog.svelte";
@@ -33,6 +35,13 @@
   import { Skeleton } from "$lib/components/ui/skeleton";
   import * as Tabs from "$lib/components/ui/tabs";
   import {
+    deploymentEventProgressEvents,
+    deploymentEventProgressStatus,
+    groupDeploymentProgressEvents,
+    latestDeploymentEventCursor,
+    mergeDeploymentEventEnvelopes,
+    progressSourceLabel,
+    progressStatusVariant,
     progressEventsFromDeployment,
     type DeploymentProgressDialogStatus,
   } from "$lib/console/deployment-progress";
@@ -58,11 +67,15 @@
   const deploymentDetailTabs = ["overview", "logs", "timeline", "snapshot"] as const;
 
   let deploymentProgressDialogOpen = $state(false);
-  let deploymentProgressDialogStatus = $state<DeploymentProgressDialogStatus>("idle");
-  let deploymentProgressEvents = $state<DeploymentProgressEvent[]>([]);
-  let deploymentProgressStreamError = $state("");
   let deploymentProgressRequestId = $state("");
   let deploymentProgressDeploymentId = $state("");
+  let liveDeploymentEventEnvelopes = $state<DeploymentEventStreamEnvelope[]>([]);
+  let deploymentEventFollowError = $state("");
+  let deploymentEventsFollowing = $state(false);
+  let deploymentEventFollowGeneration = 0;
+  let deploymentEventStream: Awaited<
+    ReturnType<typeof orpcClient.deployments.eventsStream>
+  > | null = null;
   let logsCopyState = $state<"idle" | "copied" | "failed">("idle");
   let accessUrlCopyState = $state<"idle" | "copied" | "failed">("idle");
   let logsCopyResetTimeout: ReturnType<typeof setTimeout> | undefined;
@@ -95,12 +108,55 @@
       staleTime: 5_000,
     }),
   );
+  const deploymentEventsQuery = createQuery(() =>
+    queryOptions({
+      queryKey: ["deployments", "events", deploymentId],
+      queryFn: () =>
+        orpcClient.deployments.events({
+          deploymentId,
+          historyLimit: 100,
+          includeHistory: true,
+          follow: false,
+          untilTerminal: true,
+        }),
+      enabled: browser && deploymentId.length > 0,
+      staleTime: 5_000,
+    }),
+  );
   const pageLoading = $derived(
-    deploymentDetailQuery.isPending || deploymentLogsQuery.isPending,
+    deploymentDetailQuery.isPending || deploymentLogsQuery.isPending || deploymentEventsQuery.isPending,
   );
   const deploymentDetail = $derived(deploymentDetailQuery.data ?? null);
   const deployment = $derived(deploymentDetail?.deployment ?? null);
   const deploymentLogs = $derived(deploymentLogsQuery.data?.logs ?? []);
+  const replayDeploymentEventEnvelopes = $derived(deploymentEventsQuery.data?.envelopes ?? []);
+  const deploymentEventEnvelopes = $derived(
+    mergeDeploymentEventEnvelopes(replayDeploymentEventEnvelopes, liveDeploymentEventEnvelopes),
+  );
+  const deploymentObservedProgressEvents = $derived(
+    deploymentEventProgressEvents(deploymentEventEnvelopes),
+  );
+  const replayDeploymentEventError = $derived(
+    deploymentEventsQuery.error ? readErrorMessage(deploymentEventsQuery.error) : "",
+  );
+  const deploymentProgressEvents = $derived(
+    deploymentObservedProgressEvents.length > 0
+      ? deploymentObservedProgressEvents
+      : deployment
+        ? progressEventsFromDeployment(deployment, deploymentLogs)
+        : [],
+  );
+  const deploymentProgressDialogStatus = $derived<DeploymentProgressDialogStatus>(
+    deployment
+      ? deploymentEventProgressStatus(deploymentEventEnvelopes, deployment.status)
+      : "idle",
+  );
+  const deploymentProgressStreamError = $derived(
+    deploymentEventFollowError || replayDeploymentEventError,
+  );
+  const deploymentTimelineSections = $derived(
+    groupDeploymentProgressEvents(deploymentProgressEvents),
+  );
   const sectionErrors = $derived(deploymentDetail?.sectionErrors ?? []);
   const project = $derived(deploymentDetail?.relatedContext?.project ?? null);
   const environment = $derived(deploymentDetail?.relatedContext?.environment ?? null);
@@ -109,6 +165,12 @@
   const accessUrls = $derived(deployment ? deploymentAccessUrls(deployment, server?.host) : []);
   const primaryAccessUrl = $derived(accessUrls[0] ?? null);
   const activeTab = $derived(parseDeploymentDetailTab(page.url.searchParams.get("tab")));
+  const shouldFollowDeploymentEvents = $derived(
+    browser &&
+      Boolean(deployment) &&
+      deploymentProgressDialogStatus === "running" &&
+      (activeTab === "timeline" || deploymentProgressDialogOpen),
+  );
   const logsCopyLabel = $derived(
     logsCopyState === "copied"
       ? $t(i18nKeys.console.deployments.copyLogsCopied)
@@ -133,14 +195,6 @@
 
     deploymentProgressRequestId = "";
     deploymentProgressDeploymentId = progressDeployment.id;
-    deploymentProgressEvents = progressEventsFromDeployment(progressDeployment, deploymentLogs);
-    deploymentProgressStreamError = "";
-    deploymentProgressDialogStatus =
-      progressDeployment.status === "failed"
-        ? "failed"
-        : progressDeployment.status === "succeeded" || progressDeployment.status === "rolled-back"
-          ? "succeeded"
-          : "running";
     deploymentProgressDialogOpen = true;
   }
 
@@ -339,7 +393,125 @@
     }
   }
 
+  function isActiveDeploymentEventFollow(
+    currentDeploymentId: string,
+    generation: number,
+  ): boolean {
+    return (
+      deployment?.id === currentDeploymentId &&
+      deploymentEventFollowGeneration === generation &&
+      shouldFollowDeploymentEvents
+    );
+  }
+
+  function stopDeploymentEventFollow(): void {
+    deploymentEventFollowGeneration += 1;
+    const stream = deploymentEventStream;
+    deploymentEventStream = null;
+    deploymentEventsFollowing = false;
+    void stream?.return?.().catch(() => undefined);
+  }
+
+  async function consumeDeploymentEventStream(
+    currentDeploymentId: string,
+    generation: number,
+    cursor: string | undefined,
+  ): Promise<void> {
+    try {
+      const stream = await orpcClient.deployments.eventsStream({
+        deploymentId: currentDeploymentId,
+        historyLimit: 0,
+        includeHistory: false,
+        follow: true,
+        untilTerminal: true,
+        ...(cursor ? { cursor } : {}),
+      });
+
+      if (!isActiveDeploymentEventFollow(currentDeploymentId, generation)) {
+        await stream.return?.();
+        return;
+      }
+
+      deploymentEventStream = stream;
+      let result = await stream.next();
+
+      while (isActiveDeploymentEventFollow(currentDeploymentId, generation) && !result.done) {
+        const envelope = result.value;
+
+        liveDeploymentEventEnvelopes = mergeDeploymentEventEnvelopes(
+          liveDeploymentEventEnvelopes,
+          [envelope],
+        );
+
+        if (envelope.kind === "gap") {
+          deploymentEventFollowError = $t(
+            i18nKeys.console.deployments.progressStreamDisconnected,
+          );
+          break;
+        }
+
+        if (envelope.kind === "error") {
+          deploymentEventFollowError = envelope.error.message;
+          break;
+        }
+
+        if (envelope.kind === "closed") {
+          break;
+        }
+
+        result = await stream.next();
+      }
+    } catch (error) {
+      if (isActiveDeploymentEventFollow(currentDeploymentId, generation)) {
+        deploymentEventFollowError = readErrorMessage(error);
+      }
+    } finally {
+      if (
+        deployment?.id === currentDeploymentId &&
+        deploymentEventFollowGeneration === generation
+      ) {
+        deploymentEventStream = null;
+        deploymentEventsFollowing = false;
+      }
+    }
+  }
+
+  $effect(() => {
+    const currentDeploymentId = deploymentId;
+
+    liveDeploymentEventEnvelopes = [];
+    deploymentEventFollowError = "";
+    deploymentProgressRequestId = "";
+    deploymentProgressDeploymentId = currentDeploymentId;
+    stopDeploymentEventFollow();
+  });
+
+  $effect(() => {
+    if (
+      !shouldFollowDeploymentEvents ||
+      !deployment ||
+      deploymentEventsFollowing ||
+      deploymentEventsQuery.isPending
+    ) {
+      if (!shouldFollowDeploymentEvents) {
+        stopDeploymentEventFollow();
+      }
+      return;
+    }
+
+    const generation = deploymentEventFollowGeneration + 1;
+    deploymentEventFollowGeneration = generation;
+    deploymentEventFollowError = "";
+    deploymentEventsFollowing = true;
+    void consumeDeploymentEventStream(
+      deployment.id,
+      generation,
+      latestDeploymentEventCursor(deploymentEventEnvelopes),
+    );
+  });
+
   onDestroy(() => {
+    stopDeploymentEventFollow();
     if (logsCopyResetTimeout) {
       clearTimeout(logsCopyResetTimeout);
     }
@@ -347,6 +519,36 @@
       clearTimeout(accessUrlCopyResetTimeout);
     }
   });
+
+  function progressStatusLabel(status?: DeploymentProgressEvent["status"]): string {
+    switch (status) {
+      case "running":
+        return $t(i18nKeys.console.deployments.progressStatusRunning);
+      case "succeeded":
+        return $t(i18nKeys.console.deployments.progressStatusSucceeded);
+      case "failed":
+        return $t(i18nKeys.common.status.failed);
+      default:
+        return $t(i18nKeys.console.deployments.progressStatusLog);
+    }
+  }
+
+  function progressPhaseLabel(phase: DeploymentProgressEvent["phase"]): string {
+    switch (phase) {
+      case "detect":
+        return $t(i18nKeys.console.deployments.progressPhaseDetect);
+      case "plan":
+        return $t(i18nKeys.console.deployments.progressPhasePlan);
+      case "package":
+        return $t(i18nKeys.console.deployments.progressPhasePackage);
+      case "deploy":
+        return $t(i18nKeys.console.deployments.progressPhaseDeploy);
+      case "verify":
+        return $t(i18nKeys.console.deployments.progressPhaseVerify);
+      case "rollback":
+        return $t(i18nKeys.console.deployments.progressPhaseRollback);
+    }
+  }
 
   function parseDeploymentDetailTab(value: string | null): DeploymentDetailTab {
     return deploymentDetailTabs.includes(value as DeploymentDetailTab)
@@ -719,10 +921,44 @@
 
         <Tabs.Content value="timeline" class="mt-0 space-y-4">
           <section class="rounded-md border bg-background p-4">
-            <h2 class="flex items-center gap-2 text-lg font-semibold">
-              <Clock3 class="size-5 text-muted-foreground" />
-              {$t(i18nKeys.console.deployments.timelineTitle)}
-            </h2>
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <h2 class="flex items-center gap-2 text-lg font-semibold">
+                  <Clock3 class="size-5 text-muted-foreground" />
+                  {$t(i18nKeys.console.deployments.timelineTitle)}
+                </h2>
+                <p class="mt-1 text-sm text-muted-foreground">
+                  {$t(i18nKeys.console.deployments.progressDescription)}
+                </p>
+              </div>
+              <div class="flex flex-wrap items-center gap-2">
+                <Badge
+                  variant={progressStatusVariant(
+                    deploymentProgressDialogStatus === "idle"
+                      ? undefined
+                      : deploymentProgressDialogStatus,
+                  )}
+                >
+                  {progressStatusLabel(
+                    deploymentProgressDialogStatus === "idle"
+                      ? undefined
+                      : deploymentProgressDialogStatus,
+                  )}
+                </Badge>
+                {#if deploymentEventsFollowing}
+                  <Badge variant="secondary">
+                    {$t(i18nKeys.console.deployments.progressStatusRunning)}
+                  </Badge>
+                {/if}
+              </div>
+            </div>
+
+            {#if deploymentProgressStreamError}
+              <div class="mt-4 rounded-md border border-destructive/30 px-3 py-2 text-sm text-destructive">
+                {deploymentProgressStreamError}
+              </div>
+            {/if}
+
             <div class="mt-4 grid gap-3 md:grid-cols-3">
               <div class="rounded-md bg-muted/30 px-4 py-3">
                 <p class="text-xs text-muted-foreground">{$t(i18nKeys.common.domain.createdAt)}</p>
@@ -740,6 +976,50 @@
                   {deployment.finishedAt ? formatTime(deployment.finishedAt) : "-"}
                 </p>
               </div>
+            </div>
+
+            <div class="mt-4 max-h-[42rem] overflow-auto rounded-md border border-zinc-800 bg-zinc-950 px-4 py-3 font-mono text-xs text-zinc-200 shadow-inner">
+              {#if deploymentTimelineSections.length === 0}
+                <p class="text-zinc-500">{$t(i18nKeys.console.deployments.progressWaiting)}</p>
+              {:else}
+                {#each deploymentTimelineSections as section (section.phase)}
+                  <div class="border-t border-zinc-800/80 py-2 first:border-t-0 first:pt-0">
+                    <div class="flex flex-wrap items-center gap-2 text-zinc-400">
+                      <span class="text-emerald-300">
+                        [{section.step?.current ?? "-"} / {section.step?.total ?? "-"}]
+                      </span>
+                      <span>{progressPhaseLabel(section.phase)}</span>
+                      <span class="text-zinc-600">·</span>
+                      <span>
+                        {section.step?.label ??
+                          $t(i18nKeys.console.deployments.progressStepFallback)}
+                      </span>
+                      {#if section.status}
+                        <span class="text-zinc-600">·</span>
+                        <span>{progressStatusLabel(section.status)}</span>
+                      {/if}
+                    </div>
+
+                    <div class="mt-2 space-y-1">
+                      {#each section.events as event, index (`${event.timestamp}-${section.phase}-${index}`)}
+                        <div class="grid grid-cols-[4.75rem_6rem_3.5rem_minmax(0,1fr)] gap-2 leading-5">
+                          <span class="text-zinc-600">{logTimeLabel(event.timestamp)}</span>
+                          <span class={event.source === "application" ? "text-sky-300" : "text-emerald-300"}>
+                            {progressSourceLabel(event)}
+                          </span>
+                          <span class={logLevelClass(event.level)}>{event.level}</span>
+                          <span
+                            class={`min-w-0 break-words ${logLevelClass(event.level)} ${event.source === "application" ? "pl-3" : ""}`}
+                          >
+                            {event.source === "application" ? "└ " : ""}
+                            {event.message}
+                          </span>
+                        </div>
+                      {/each}
+                    </div>
+                  </div>
+                {/each}
+              {/if}
             </div>
           </section>
         </Tabs.Content>

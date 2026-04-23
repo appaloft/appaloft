@@ -164,6 +164,97 @@ export interface DeploymentProgressObserver {
   subscribe(listener: DeploymentProgressListener): () => void;
 }
 
+export type DeploymentObservedEventSource =
+  | "domain-event"
+  | "process-observation"
+  | "progress-projection";
+
+export type DeploymentObservedEventType =
+  | "deployment-requested"
+  | "build-requested"
+  | "deployment-started"
+  | "deployment-succeeded"
+  | "deployment-failed"
+  | "deployment-progress";
+
+export type DeploymentEventStreamPhase = "event-replay" | "live-follow";
+
+export interface DeploymentObservedEvent {
+  deploymentId: string;
+  sequence: number;
+  cursor: string;
+  emittedAt: string;
+  source: DeploymentObservedEventSource;
+  eventType: DeploymentObservedEventType;
+  phase?: DeploymentProgressPhase;
+  status?: string;
+  retriable?: boolean;
+  summary?: string;
+}
+
+export interface DeploymentEventStreamGap {
+  code: string;
+  phase: DeploymentEventStreamPhase;
+  retriable: boolean;
+  cursor?: string;
+  lastSequence?: number;
+  recommendedAction?: "restart-stream" | "open-deployment-detail";
+}
+
+export type DeploymentEventStreamEnvelope =
+  | {
+      schemaVersion: "deployments.stream-events/v1";
+      kind: "event";
+      event: DeploymentObservedEvent;
+    }
+  | {
+      schemaVersion: "deployments.stream-events/v1";
+      kind: "heartbeat";
+      at: string;
+      cursor?: string;
+    }
+  | {
+      schemaVersion: "deployments.stream-events/v1";
+      kind: "gap";
+      gap: DeploymentEventStreamGap;
+    }
+  | {
+      schemaVersion: "deployments.stream-events/v1";
+      kind: "closed";
+      reason: "completed" | "cancelled" | "source-ended" | "idle-timeout";
+      cursor?: string;
+    }
+  | {
+      schemaVersion: "deployments.stream-events/v1";
+      kind: "error";
+      error: DomainError;
+    };
+
+export interface DeploymentEventObservationRequest {
+  cursor?: string;
+  historyLimit: number;
+  includeHistory: boolean;
+  follow: boolean;
+  untilTerminal: boolean;
+}
+
+export interface DeploymentEventObservationContext {
+  deployment: DeploymentSummary;
+}
+
+export interface DeploymentEventStream extends AsyncIterable<DeploymentEventStreamEnvelope> {
+  close(): Promise<void>;
+}
+
+export interface DeploymentEventObserver {
+  open(
+    context: ExecutionContext,
+    observationContext: DeploymentEventObservationContext,
+    request: DeploymentEventObservationRequest,
+    signal: AbortSignal,
+  ): Promise<Result<DeploymentEventStream>>;
+}
+
 export interface SourceLinkTarget {
   projectId: string;
   environmentId: string;
@@ -2127,6 +2218,18 @@ export interface DeploymentDetail {
   sectionErrors: DeploymentDetailSectionError[];
   generatedAt: string;
 }
+
+export type StreamDeploymentEventsResult =
+  | {
+      mode: "bounded";
+      deploymentId: string;
+      envelopes: DeploymentEventStreamEnvelope[];
+    }
+  | {
+      mode: "stream";
+      deploymentId: string;
+      stream: DeploymentEventStream;
+    };
 
 export interface DomainBindingSummary {
   id: string;
