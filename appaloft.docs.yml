@@ -1,0 +1,18 @@
+runtime:
+  strategy: static
+  name: appaloft-docs
+  installCommand: bun install --frozen-lockfile
+  buildCommand: bun run --cwd apps/docs build
+  publishDirectory: apps/docs/dist
+  healthCheckPath: /
+
+network:
+  internalPort: 80
+  upstreamProtocol: http
+  exposureMode: reverse-proxy
+
+access:
+  domains:
+    - host: docs.appaloft.com
+      pathPrefix: /
+      tlsMode: auto

@@ -80,3 +80,13 @@ jobs:
       tag_name: ${{ needs.release-please.outputs.tag_name }}
       prerelease: ${{ inputs.prerelease }}
     secrets: inherit
+
+  deploy-docs:
+    needs:
+      - release-please
+      - build-release
+    if: ${{ needs.release-please.outputs.release_created == 'true' }}
+    uses: ./.github/workflows/deploy-docs.yml
+    with:
+      appaloft_version: ${{ needs.release-please.outputs.tag_name }}
+    secrets: inherit
