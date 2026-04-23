@@ -18,7 +18,7 @@ export const deploymentMethods = [
   "workspace-commands",
 ] as const satisfies readonly DeploymentMethod[];
 
-function isRemoteOrImageSource(locator: string): boolean {
+export function isRemoteOrImageSource(locator: string): boolean {
   return (
     /^(https?|ssh|git):\/\//.test(locator) ||
     /^[^/\\]+@[^/\\]+:/.test(locator) ||
