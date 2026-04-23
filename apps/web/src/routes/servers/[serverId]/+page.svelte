@@ -20,12 +20,14 @@
   import { readErrorMessage } from "$lib/api/client";
   import ConsoleShell from "$lib/components/console/ConsoleShell.svelte";
   import DeploymentTable from "$lib/components/console/DeploymentTable.svelte";
+  import DocsHelpLink from "$lib/components/console/DocsHelpLink.svelte";
   import TerminalSessionPanel from "$lib/components/console/TerminalSessionPanel.svelte";
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
   import { Input } from "$lib/components/ui/input";
   import * as Select from "$lib/components/ui/select";
   import { Skeleton } from "$lib/components/ui/skeleton";
+  import { webDocsHrefs } from "$lib/console/docs-help";
   import { createConsoleQueries } from "$lib/console/queries";
   import { orpcClient } from "$lib/orpc";
   import { queryClient } from "$lib/query-client";
@@ -267,9 +269,15 @@
 
       <section class="space-y-4 border-y py-6">
         <div class="max-w-3xl space-y-1">
-          <h2 class="text-lg font-semibold">
-            {$t(i18nKeys.console.servers.defaultAccessOverrideTitle)}
-          </h2>
+          <div class="flex items-center gap-2">
+            <h2 class="text-lg font-semibold">
+              {$t(i18nKeys.console.servers.defaultAccessOverrideTitle)}
+            </h2>
+            <DocsHelpLink
+              href={webDocsHrefs.defaultAccessPolicy}
+              ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+            />
+          </div>
           <p class="text-sm text-muted-foreground">
             {$t(i18nKeys.console.servers.defaultAccessOverrideDescription)}
           </p>
@@ -280,7 +288,14 @@
           onsubmit={saveDefaultAccessOverride}
         >
           <label class="space-y-1.5 text-sm font-medium">
-            <span>{$t(i18nKeys.console.servers.defaultAccessModeLabel)}</span>
+            <span class="inline-flex items-center gap-1.5">
+              {$t(i18nKeys.console.servers.defaultAccessModeLabel)}
+              <DocsHelpLink
+                href={webDocsHrefs.defaultAccessPolicy}
+                ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+                className="size-5"
+              />
+            </span>
             <Select.Root bind:value={overrideMode} type="single">
               <Select.Trigger class="w-full">
                 {overrideMode === "disabled"
@@ -306,7 +321,14 @@
           <div class="grid gap-4 md:grid-cols-2">
             {#if overrideMode !== "disabled"}
               <label class="space-y-1.5 text-sm font-medium">
-                <span>{$t(i18nKeys.console.servers.defaultAccessProviderKeyLabel)}</span>
+                <span class="inline-flex items-center gap-1.5">
+                  {$t(i18nKeys.console.servers.defaultAccessProviderKeyLabel)}
+                  <DocsHelpLink
+                    href={webDocsHrefs.defaultAccessPolicy}
+                    ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+                    className="size-5"
+                  />
+                </span>
                 <Input
                   bind:value={overrideProviderKey}
                   autocomplete="off"
@@ -317,7 +339,14 @@
 
             {#if overrideMode === "custom-template"}
               <label class="space-y-1.5 text-sm font-medium">
-                <span>{$t(i18nKeys.console.servers.defaultAccessTemplateRefLabel)}</span>
+                <span class="inline-flex items-center gap-1.5">
+                  {$t(i18nKeys.console.servers.defaultAccessTemplateRefLabel)}
+                  <DocsHelpLink
+                    href={webDocsHrefs.defaultAccessPolicy}
+                    ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+                    className="size-5"
+                  />
+                </span>
                 <Input
                   bind:value={overrideTemplateRef}
                   autocomplete="off"
@@ -350,7 +379,15 @@
         <section class="space-y-4">
           <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h2 class="text-lg font-semibold">{$t(i18nKeys.console.servers.connectivityTitle)}</h2>
+              <div class="flex items-center gap-2">
+                <h2 class="text-lg font-semibold">
+                  {$t(i18nKeys.console.servers.connectivityTitle)}
+                </h2>
+                <DocsHelpLink
+                  href={webDocsHrefs.serverConnectivityTest}
+                  ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+                />
+              </div>
               <p class="mt-1 text-sm text-muted-foreground">
                 {$t(i18nKeys.console.servers.connectivityDescription)}
               </p>
@@ -452,14 +489,22 @@
         </section>
       </section>
 
-      <TerminalSessionPanel
-        title={$t(i18nKeys.console.terminal.serverTitle)}
-        description={$t(i18nKeys.console.terminal.serverDescription)}
-        scope={{
-          kind: "server",
-          serverId: server.id,
-        }}
-      />
+      <section class="space-y-3">
+        <div class="flex justify-end">
+          <DocsHelpLink
+            href={webDocsHrefs.serverTerminalSession}
+            ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+          />
+        </div>
+        <TerminalSessionPanel
+          title={$t(i18nKeys.console.terminal.serverTitle)}
+          description={$t(i18nKeys.console.terminal.serverDescription)}
+          scope={{
+            kind: "server",
+            serverId: server.id,
+          }}
+        />
+      </section>
     </div>
   {/if}
 </ConsoleShell>

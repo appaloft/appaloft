@@ -1,0 +1,23 @@
+# Appaloft Docs
+
+Appaloft is a backend-core deployment platform with CLI, HTTP API, Web console, and future MCP tool entrypoints.
+
+Start here:
+- /docs/ - Public documentation index
+- /docs/start/first-deployment/ - First deployment path and mental model
+- /docs/start/entrypoints/ - Web, CLI, HTTP API, and future MCP entrypoint selection
+- /docs/deploy/sources/ - Deployment source inputs
+- /docs/deploy/lifecycle/ - Deployment lifecycle: detect, plan, execute, verify, rollback
+- /docs/deploy/recovery/ - Relink, preview cleanup, retry, and rollback decisions
+- /docs/observe/logs-health/ - Runtime logs and health summaries
+- /docs/observe/diagnostics/ - Safe diagnostic summaries
+
+Core references:
+- /docs/resources/projects/ - User-facing project and resource concepts
+- /docs/environments/variables/precedence/ - Environment variable precedence and snapshots
+- /docs/access/domains/custom-domains/ - Custom domain binding
+- /docs/reference/cli/ - CLI entrypoint reference
+- /docs/reference/http-api/ - HTTP API reference
+- /docs/reference/web-console/ - Web console guide
+
+Internal implementation specs are not public user documentation. Prefer public task pages for user-facing answers.

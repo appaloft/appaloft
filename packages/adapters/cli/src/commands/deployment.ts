@@ -58,6 +58,7 @@ import {
   resolveDeploymentStateBackend,
   type SourceFingerprintScope,
 } from "./deployment-state.js";
+import { cliCommandDescriptions, cliDocsHrefs } from "./docs-help.js";
 
 const pathOrSourceArg = Args.text({ name: "pathOrSource" }).pipe(Args.optional);
 const deploymentIdArg = Args.text({ name: "deploymentId" });
@@ -127,6 +128,9 @@ const deploymentStateBackendKinds = [
 const stateBackendOption = Options.choice("state-backend", deploymentStateBackendKinds).pipe(
   Options.optional,
 );
+export const deployCommandDocsHref = cliDocsHrefs.deploymentSource;
+export const deployCommandDescription = cliCommandDescriptions.deploy;
+
 function parseAppLogLines(value: string): number {
   const parsed = Number(value);
   return Number.isInteger(parsed) && parsed >= 0 ? parsed : 3;
@@ -921,7 +925,7 @@ const previewCleanupCommand = EffectCommand.make(
 
       return result.right;
     }),
-).pipe(EffectCommand.withDescription("Clean up a preview deployment context"));
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.previewCleanup));
 
 export const deployCommand = EffectCommand.make(
   "deploy",
@@ -1281,7 +1285,7 @@ export const deployCommand = EffectCommand.make(
 
       return result.right;
     }),
-).pipe(EffectCommand.withDescription("Create a deployment"));
+).pipe(EffectCommand.withDescription(deployCommandDescription));
 
 export const logsCommand = EffectCommand.make(
   "logs",
@@ -1289,7 +1293,7 @@ export const logsCommand = EffectCommand.make(
     deploymentId: deploymentIdArg,
   },
   ({ deploymentId }) => runQuery(DeploymentLogsQuery.create({ deploymentId })),
-).pipe(EffectCommand.withDescription("Show deployment logs"));
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.deploymentLogs));
 
 const listDeploymentsCommand = EffectCommand.make(
   "list",
@@ -1304,7 +1308,7 @@ const listDeploymentsCommand = EffectCommand.make(
         resourceId: optionalValue(resource),
       }),
     ),
-).pipe(EffectCommand.withDescription("List deployments"));
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.deploymentList));
 
 const showDeploymentCommand = EffectCommand.make(
   "show",
@@ -1312,7 +1316,7 @@ const showDeploymentCommand = EffectCommand.make(
     deploymentId: deploymentIdArg,
   },
   ({ deploymentId }) => runQuery(ShowDeploymentQuery.create({ deploymentId })),
-).pipe(EffectCommand.withDescription("Show deployment detail"));
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.deploymentShow));
 
 const streamDeploymentEventsCommand = EffectCommand.make(
   "events",
@@ -1335,10 +1339,10 @@ const streamDeploymentEventsCommand = EffectCommand.make(
         ...(optionalValue(cursor) ? { cursor: optionalValue(cursor) } : {}),
       }),
     ),
-).pipe(EffectCommand.withDescription("Replay or follow deployment lifecycle events"));
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.deploymentEvents));
 
 export const deploymentsCommand = EffectCommand.make("deployments").pipe(
-  EffectCommand.withDescription("Deployment queries"),
+  EffectCommand.withDescription(cliCommandDescriptions.deployments),
   EffectCommand.withSubcommands([
     listDeploymentsCommand,
     showDeploymentCommand,
@@ -1347,6 +1351,6 @@ export const deploymentsCommand = EffectCommand.make("deployments").pipe(
 );
 
 export const previewCommand = EffectCommand.make("preview").pipe(
-  EffectCommand.withDescription("Preview deployment commands"),
+  EffectCommand.withDescription(cliCommandDescriptions.preview),
   EffectCommand.withSubcommands([previewCleanupCommand]),
 );

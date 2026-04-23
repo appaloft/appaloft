@@ -152,6 +152,7 @@ import {
   testServerConnectivityResponseSchema,
 } from "@appaloft/contracts";
 import { type DomainError, type Result } from "@appaloft/core";
+import { resolvePublicDocsHelpHref } from "@appaloft/docs-registry";
 import { resolveAppaloftLocaleFromHeaders, translateDomainError } from "@appaloft/i18n";
 import { OpenAPIHandler } from "@orpc/openapi/fetch";
 import { eventIterator, ORPCError, os } from "@orpc/server";
@@ -185,6 +186,132 @@ export interface RequestContextRunner {
 
 const base = os.$context<AppaloftOrpcRequestContext>();
 const emptyResponseSchema = z.null();
+export const createDeploymentDocsHref = resolvePublicDocsHelpHref("deployment.source");
+
+function routeDescription(
+  summary: string,
+  topicId: Parameters<typeof resolvePublicDocsHelpHref>[0],
+): string {
+  return `${summary} Public docs: ${resolvePublicDocsHelpHref(topicId)}`;
+}
+
+export const apiDocsHrefs = {
+  createDeployment: createDeploymentDocsHref,
+  serverCredential: resolvePublicDocsHelpHref("server.ssh-credential"),
+  serverConnectivity: resolvePublicDocsHelpHref("server.connectivity-test"),
+  serverProxyReadiness: resolvePublicDocsHelpHref("server.proxy-readiness"),
+  environmentVariablePrecedence: resolvePublicDocsHelpHref("environment.variable-precedence"),
+  environmentDiffPromote: resolvePublicDocsHelpHref("environment.diff-promote"),
+  defaultAccessRoute: resolvePublicDocsHelpHref("domain.generated-access-route"),
+  resourceSourceProfile: resolvePublicDocsHelpHref("resource.source-profile"),
+  resourceRuntimeProfile: resolvePublicDocsHelpHref("resource.runtime-profile"),
+  resourceHealthProfile: resolvePublicDocsHelpHref("resource.health-profile"),
+  resourceNetworkProfile: resolvePublicDocsHelpHref("resource.network-profile"),
+  domainCustomBinding: resolvePublicDocsHelpHref("domain.custom-domain-binding"),
+  domainOwnershipCheck: resolvePublicDocsHelpHref("domain.ownership-check"),
+  certificateReadiness: resolvePublicDocsHelpHref("certificate.readiness"),
+  runtimeLogs: resolvePublicDocsHelpHref("observability.runtime-logs"),
+  healthSummary: resolvePublicDocsHelpHref("observability.health-summary"),
+  diagnosticSummary: resolvePublicDocsHelpHref("diagnostics.safe-support-payload"),
+  terminalSession: resolvePublicDocsHelpHref("server.terminal-session"),
+} as const;
+
+export const apiRouteDescriptions = {
+  createDeployment: routeDescription(
+    "Creates a deployment from an explicit project, server, environment, and resource context.",
+    "deployment.source",
+  ),
+  configureServerCredential: routeDescription(
+    "Configures the SSH credential Appaloft uses for server connectivity and deployment.",
+    "server.ssh-credential",
+  ),
+  createSshCredential: routeDescription(
+    "Creates a reusable SSH credential from a private key input.",
+    "server.ssh-credential",
+  ),
+  testServerConnectivity: routeDescription(
+    "Tests whether Appaloft can reach and inspect a server.",
+    "server.connectivity-test",
+  ),
+  bootstrapServerProxy: routeDescription(
+    "Repairs or bootstraps provider-owned edge proxy infrastructure.",
+    "server.proxy-readiness",
+  ),
+  configureDefaultAccessDomainPolicy: routeDescription(
+    "Configures generated access routes for deployed resources.",
+    "domain.generated-access-route",
+  ),
+  configureResourceSource: routeDescription(
+    "Configures the source profile used by later deployment detect and plan stages.",
+    "resource.source-profile",
+  ),
+  configureResourceRuntime: routeDescription(
+    "Configures runtime settings such as strategy, commands, and publish directory.",
+    "resource.runtime-profile",
+  ),
+  configureResourceHealth: routeDescription(
+    "Configures readiness and health checks used during verification.",
+    "resource.health-profile",
+  ),
+  configureResourceNetwork: routeDescription(
+    "Configures ports, protocols, and exposure behavior for resource access.",
+    "resource.network-profile",
+  ),
+  createDomainBinding: routeDescription(
+    "Creates a custom domain binding for a resource.",
+    "domain.custom-domain-binding",
+  ),
+  confirmDomainBindingOwnership: routeDescription(
+    "Confirms that a user controls the custom domain.",
+    "domain.ownership-check",
+  ),
+  issueOrRenewCertificate: routeDescription(
+    "Requests certificate issuance or renewal for a domain binding.",
+    "certificate.readiness",
+  ),
+  importCertificate: routeDescription(
+    "Imports a manual certificate for a domain binding.",
+    "certificate.readiness",
+  ),
+  setEnvironmentVariable: routeDescription(
+    "Sets an environment variable with explicit kind, exposure, scope, and secret handling.",
+    "environment.variable-precedence",
+  ),
+  unsetEnvironmentVariable: routeDescription(
+    "Removes an environment variable in a specific exposure and optional scope.",
+    "environment.variable-precedence",
+  ),
+  promoteEnvironment: routeDescription(
+    "Promotes one environment configuration set into another.",
+    "environment.diff-promote",
+  ),
+  diffEnvironments: routeDescription(
+    "Compares two environment configuration sets.",
+    "environment.diff-promote",
+  ),
+  deploymentLogs: routeDescription("Reads deployment logs.", "observability.runtime-logs"),
+  resourceRuntimeLogs: routeDescription(
+    "Reads resource runtime logs.",
+    "observability.runtime-logs",
+  ),
+  resourceDiagnosticSummary: routeDescription(
+    "Returns a support-safe diagnostic summary.",
+    "diagnostics.safe-support-payload",
+  ),
+  resourceHealth: routeDescription(
+    "Reads current resource health.",
+    "observability.health-summary",
+  ),
+  resourceProxyConfigurationPreview: routeDescription(
+    "Previews generated proxy configuration for a resource.",
+    "resource.network-profile",
+  ),
+  openTerminalSession: routeDescription(
+    "Opens a controlled terminal session for server or resource troubleshooting.",
+    "server.terminal-session",
+  ),
+} as const;
+export const createDeploymentRouteDescription = apiRouteDescriptions.createDeployment;
 
 function readObjectProperty(input: unknown, key: string): unknown {
   return input && typeof input === "object" ? (input as Record<string, unknown>)[key] : undefined;
@@ -707,6 +834,7 @@ export const configureServerCredentialProcedure = base
   .route({
     method: "POST",
     path: "/servers/{serverId}/credentials",
+    description: apiRouteDescriptions.configureServerCredential,
     successStatus: 200,
   })
   .input(configureServerCredentialCommandInputSchema)
@@ -729,6 +857,7 @@ export const createSshCredentialProcedure = base
   .route({
     method: "POST",
     path: "/credentials/ssh",
+    description: apiRouteDescriptions.createSshCredential,
     successStatus: 201,
   })
   .input(createSshCredentialCommandInputSchema)
@@ -741,6 +870,7 @@ export const testServerConnectivityProcedure = base
   .route({
     method: "POST",
     path: "/servers/{serverId}/connectivity-tests",
+    description: apiRouteDescriptions.testServerConnectivity,
     successStatus: 200,
   })
   .input(testServerConnectivityCommandInputSchema)
@@ -753,6 +883,7 @@ export const testDraftServerConnectivityProcedure = base
   .route({
     method: "POST",
     path: "/servers/connectivity-tests",
+    description: apiRouteDescriptions.testServerConnectivity,
     successStatus: 200,
   })
   .input(testServerConnectivityCommandInputSchema)
@@ -765,6 +896,7 @@ export const bootstrapServerProxyProcedure = base
   .route({
     method: "POST",
     path: "/servers/{serverId}/edge-proxy/bootstrap",
+    description: apiRouteDescriptions.bootstrapServerProxy,
     successStatus: 200,
   })
   .input(bootstrapServerProxyCommandInputSchema)
@@ -801,6 +933,7 @@ export const configureDefaultAccessDomainPolicyProcedure = base
   .route({
     method: "POST",
     path: "/default-access-domain-policies",
+    description: apiRouteDescriptions.configureDefaultAccessDomainPolicy,
     successStatus: 200,
   })
   .input(configureDefaultAccessDomainPolicyCommandInputSchema)
@@ -869,6 +1002,7 @@ export const configureResourceHealthProcedure = base
   .route({
     method: "POST",
     path: "/resources/{resourceId}/health-policy",
+    description: apiRouteDescriptions.configureResourceHealth,
     successStatus: 200,
   })
   .input(configureResourceHealthCommandInputSchema)
@@ -881,6 +1015,7 @@ export const configureResourceNetworkProcedure = base
   .route({
     method: "POST",
     path: "/resources/{resourceId}/network-profile",
+    description: apiRouteDescriptions.configureResourceNetwork,
     successStatus: 200,
   })
   .input(configureResourceNetworkCommandInputSchema)
@@ -893,6 +1028,7 @@ export const configureResourceRuntimeProcedure = base
   .route({
     method: "POST",
     path: "/resources/{resourceId}/runtime-profile",
+    description: apiRouteDescriptions.configureResourceRuntime,
     successStatus: 200,
   })
   .input(configureResourceRuntimeCommandInputSchema)
@@ -905,6 +1041,7 @@ export const configureResourceSourceProcedure = base
   .route({
     method: "POST",
     path: "/resources/{resourceId}/source",
+    description: apiRouteDescriptions.configureResourceSource,
     successStatus: 200,
   })
   .input(configureResourceSourceCommandInputSchema)
@@ -917,6 +1054,7 @@ export const createDomainBindingProcedure = base
   .route({
     method: "POST",
     path: "/domain-bindings",
+    description: apiRouteDescriptions.createDomainBinding,
     successStatus: 201,
   })
   .input(createDomainBindingCommandInputSchema)
@@ -929,6 +1067,7 @@ export const confirmDomainBindingOwnershipProcedure = base
   .route({
     method: "POST",
     path: "/domain-bindings/{domainBindingId}/ownership-confirmations",
+    description: apiRouteDescriptions.confirmDomainBindingOwnership,
     successStatus: 200,
   })
   .input(confirmDomainBindingOwnershipCommandInputSchema)
@@ -953,6 +1092,7 @@ export const issueOrRenewCertificateProcedure = base
   .route({
     method: "POST",
     path: "/certificates/issue-or-renew",
+    description: apiRouteDescriptions.issueOrRenewCertificate,
     successStatus: 202,
   })
   .input(issueOrRenewCertificateCommandInputSchema)
@@ -965,6 +1105,7 @@ export const importCertificateProcedure = base
   .route({
     method: "POST",
     path: "/certificates/import",
+    description: apiRouteDescriptions.importCertificate,
     successStatus: 200,
   })
   .input(importCertificateCommandInputSchema)
@@ -999,6 +1140,7 @@ export const setEnvironmentVariableProcedure = base
   .route({
     method: "POST",
     path: "/environments/{environmentId}/variables",
+    description: apiRouteDescriptions.setEnvironmentVariable,
     successStatus: 204,
   })
   .input(setEnvironmentVariableCommandInputSchema)
@@ -1011,6 +1153,7 @@ export const unsetEnvironmentVariableProcedure = base
   .route({
     method: "DELETE",
     path: "/environments/{environmentId}/variables/{key}",
+    description: apiRouteDescriptions.unsetEnvironmentVariable,
     successStatus: 204,
   })
   .input(unsetEnvironmentVariableCommandInputSchema)
@@ -1023,6 +1166,7 @@ export const promoteEnvironmentProcedure = base
   .route({
     method: "POST",
     path: "/environments/{environmentId}/promote",
+    description: apiRouteDescriptions.promoteEnvironment,
     successStatus: 200,
   })
   .input(promoteEnvironmentCommandInputSchema)
@@ -1035,6 +1179,7 @@ export const diffEnvironmentsProcedure = base
   .route({
     method: "GET",
     path: "/environments/{environmentId}/diff/{otherEnvironmentId}",
+    description: apiRouteDescriptions.diffEnvironments,
     successStatus: 200,
   })
   .input(diffEnvironmentsQueryInputSchema)
@@ -1057,6 +1202,8 @@ export const createDeploymentProcedure = base
   .route({
     method: "POST",
     path: "/deployments",
+    summary: "Create deployment",
+    description: createDeploymentRouteDescription,
     successStatus: 201,
   })
   .input(createDeploymentCommandInputSchema)
@@ -1089,6 +1236,7 @@ export const deploymentLogsProcedure = base
   .route({
     method: "GET",
     path: "/deployments/{deploymentId}/logs",
+    description: apiRouteDescriptions.deploymentLogs,
     successStatus: 200,
   })
   .input(deploymentLogsQueryInputSchema)
@@ -1141,6 +1289,7 @@ export const resourceRuntimeLogsProcedure = base
   .route({
     method: "GET",
     path: "/resources/{resourceId}/runtime-logs",
+    description: apiRouteDescriptions.resourceRuntimeLogs,
     successStatus: 200,
   })
   .input(resourceRuntimeLogsQueryInputSchema)
@@ -1172,6 +1321,7 @@ export const resourceRuntimeLogsStreamProcedure = base
   .route({
     method: "GET",
     path: "/resources/{resourceId}/runtime-logs/stream",
+    description: apiRouteDescriptions.resourceRuntimeLogs,
     successStatus: 200,
   })
   .input(resourceRuntimeLogsQueryInputSchema)
@@ -1182,6 +1332,7 @@ export const resourceDiagnosticSummaryProcedure = base
   .route({
     method: "GET",
     path: "/resources/{resourceId}/diagnostic-summary",
+    description: apiRouteDescriptions.resourceDiagnosticSummary,
     successStatus: 200,
   })
   .input(resourceDiagnosticSummaryQueryInputSchema)
@@ -1194,6 +1345,7 @@ export const resourceHealthProcedure = base
   .route({
     method: "GET",
     path: "/resources/{resourceId}/health",
+    description: apiRouteDescriptions.resourceHealth,
     successStatus: 200,
   })
   .input(resourceHealthQueryInputSchema)
@@ -1204,6 +1356,7 @@ export const resourceProxyConfigurationPreviewProcedure = base
   .route({
     method: "GET",
     path: "/resources/{resourceId}/proxy-configuration",
+    description: apiRouteDescriptions.resourceProxyConfigurationPreview,
     successStatus: 200,
   })
   .input(resourceProxyConfigurationPreviewQueryInputSchema)
@@ -1216,6 +1369,7 @@ export const openTerminalSessionProcedure = base
   .route({
     method: "POST",
     path: "/terminal-sessions",
+    description: apiRouteDescriptions.openTerminalSession,
     successStatus: 201,
   })
   .input(openTerminalSessionCommandInputSchema)

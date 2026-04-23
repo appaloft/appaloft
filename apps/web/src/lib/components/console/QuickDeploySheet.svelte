@@ -44,6 +44,7 @@
 
   import { API_BASE, readErrorMessage, request } from "$lib/api/client";
   import DockerIcon from "$lib/components/console/DockerIcon.svelte";
+  import DocsHelpLink from "$lib/components/console/DocsHelpLink.svelte";
   import GitHubIcon from "$lib/components/console/GitHubIcon.svelte";
   import QuickDeployProgressDialog from "$lib/components/console/QuickDeployProgressDialog.svelte";
   import ResourceSourceOption from "$lib/components/console/ResourceSourceOption.svelte";
@@ -55,6 +56,7 @@
   import { Textarea } from "$lib/components/ui/textarea";
   import { Badge } from "$lib/components/ui/badge";
   import { createDeploymentWithProgress } from "$lib/console/deployment-progress";
+  import { quickDeploySourceHelpHref, webDocsHrefs } from "$lib/console/docs-help";
   import { defaultAuthSession, type ProviderSummary } from "$lib/console/queries";
   import {
     createQuickDeployServerCredential,
@@ -2104,6 +2106,10 @@
             <div class="flex items-center gap-2 text-sm font-medium">
               <Waypoints class="size-4 text-muted-foreground" />
               <span>{$t(i18nKeys.common.domain.source)}</span>
+              <DocsHelpLink
+                href={quickDeploySourceHelpHref}
+                ariaLabel={$t(i18nKeys.console.quickDeploy.sourceHelpLink)}
+              />
             </div>
             <div
               class="grid gap-3 sm:grid-cols-2 xl:grid-cols-5"
@@ -2385,6 +2391,10 @@
             <div class="flex items-center gap-2 text-sm font-medium">
               <Server class="size-4 text-muted-foreground" />
               <span>{$t(i18nKeys.common.domain.server)}</span>
+              <DocsHelpLink
+                href={webDocsHrefs.serverDeploymentTarget}
+                ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+              />
             </div>
             <div class="grid gap-2 sm:grid-cols-2">
               <Button
@@ -2445,6 +2455,10 @@
             <div class="flex items-center gap-2 text-sm font-medium">
               <Settings2 class="size-4 text-muted-foreground" />
               <span>{$t(i18nKeys.common.domain.environment)}</span>
+              <DocsHelpLink
+                href={webDocsHrefs.environmentConcept}
+                ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+              />
             </div>
             <div class="grid gap-2 sm:grid-cols-2">
               <Button
@@ -2517,6 +2531,10 @@
             <div class="flex items-center gap-2 text-sm font-medium">
               <TerminalSquare class="size-4 text-muted-foreground" />
               <span>{$t(i18nKeys.console.quickDeploy.firstVariable)}</span>
+              <DocsHelpLink
+                href={webDocsHrefs.environmentVariablePrecedence}
+                ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+              />
             </div>
             <div class="space-y-3">
               <div class="grid gap-3 sm:grid-cols-2">
@@ -2665,7 +2683,13 @@
                 <div class="min-w-0 rounded-md border bg-background px-3 py-3">
                   <div class="flex items-center justify-between gap-3">
                     <div class="min-w-0">
-                      <p class="text-sm font-medium">{$t(i18nKeys.common.domain.environment)}</p>
+                      <div class="flex items-center gap-2">
+                        <p class="text-sm font-medium">{$t(i18nKeys.common.domain.environment)}</p>
+                        <DocsHelpLink
+                          href={webDocsHrefs.environmentConcept}
+                          ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+                        />
+                      </div>
                       <p class="break-words text-xs text-muted-foreground">{environmentSummary}</p>
                     </div>
                     <Button
@@ -2744,7 +2768,13 @@
                 <div class="min-w-0 rounded-md border bg-background px-3 py-3">
                   <div class="flex items-center justify-between gap-3">
                     <div class="min-w-0">
-                      <p class="text-sm font-medium">{$t(i18nKeys.common.domain.resource)}</p>
+                      <div class="flex items-center gap-2">
+                        <p class="text-sm font-medium">{$t(i18nKeys.common.domain.resource)}</p>
+                        <DocsHelpLink
+                          href={webDocsHrefs.resourceConcept}
+                          ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+                        />
+                      </div>
                       <p class="break-words text-xs text-muted-foreground">{resourceSummary}</p>
                     </div>
                     <Button
@@ -2882,9 +2912,16 @@
                         {/if}
                         <div class="grid gap-3 sm:grid-cols-2">
                           <div class="space-y-2">
-                            <label class="text-xs font-medium text-muted-foreground" for="resource-internal-port">
-                              {$t(i18nKeys.console.quickDeploy.applicationPort)}
-                            </label>
+                            <div class="flex items-center gap-1.5">
+                              <label class="text-xs font-medium text-muted-foreground" for="resource-internal-port">
+                                {$t(i18nKeys.console.quickDeploy.applicationPort)}
+                              </label>
+                              <DocsHelpLink
+                                href={webDocsHrefs.resourceNetworkProfile}
+                                ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+                                className="size-5"
+                              />
+                            </div>
                             <Input
                               id="resource-internal-port"
                               bind:value={resourceInternalPort}
@@ -2894,15 +2931,22 @@
                               {$t(i18nKeys.console.quickDeploy.applicationPortHint)}
                             </p>
                           </div>
-                          <Button
-                            type="button"
-                            variant={resourceHealthCheckEnabled ? "selected" : "outline"}
-                            onclick={() => {
-                              resourceHealthCheckEnabled = !resourceHealthCheckEnabled;
-                            }}
-                          >
-                            {$t(i18nKeys.console.quickDeploy.healthCheckToggle)}
-                          </Button>
+                          <div class="flex items-center gap-2">
+                            <Button
+                              type="button"
+                              class="flex-1"
+                              variant={resourceHealthCheckEnabled ? "selected" : "outline"}
+                              onclick={() => {
+                                resourceHealthCheckEnabled = !resourceHealthCheckEnabled;
+                              }}
+                            >
+                              {$t(i18nKeys.console.quickDeploy.healthCheckToggle)}
+                            </Button>
+                            <DocsHelpLink
+                              href={webDocsHrefs.resourceHealthProfile}
+                              ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+                            />
+                          </div>
                         </div>
                         {#if resourceHealthCheckEnabled}
                           <div class="grid gap-3 rounded-md border bg-muted/10 p-3 sm:grid-cols-3">
@@ -3018,9 +3062,16 @@
                     {/if}
                     <div class="mt-3 grid gap-3 sm:grid-cols-2">
                       <div class="space-y-2">
-                        <label class="text-xs font-medium text-muted-foreground" for="resource-default-internal-port">
-                          {$t(i18nKeys.console.quickDeploy.applicationPort)}
-                        </label>
+                        <div class="flex items-center gap-1.5">
+                          <label class="text-xs font-medium text-muted-foreground" for="resource-default-internal-port">
+                            {$t(i18nKeys.console.quickDeploy.applicationPort)}
+                          </label>
+                          <DocsHelpLink
+                            href={webDocsHrefs.resourceNetworkProfile}
+                            ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+                            className="size-5"
+                          />
+                        </div>
                         <Input
                           id="resource-default-internal-port"
                           bind:value={resourceInternalPort}
@@ -3030,15 +3081,22 @@
                           {$t(i18nKeys.console.quickDeploy.applicationPortHint)}
                         </p>
                       </div>
-                      <Button
-                        type="button"
-                        variant={resourceHealthCheckEnabled ? "selected" : "outline"}
-                        onclick={() => {
-                          resourceHealthCheckEnabled = !resourceHealthCheckEnabled;
-                        }}
-                      >
-                        {$t(i18nKeys.console.quickDeploy.healthCheckToggle)}
-                      </Button>
+                      <div class="flex items-center gap-2">
+                        <Button
+                          type="button"
+                          class="flex-1"
+                          variant={resourceHealthCheckEnabled ? "selected" : "outline"}
+                          onclick={() => {
+                            resourceHealthCheckEnabled = !resourceHealthCheckEnabled;
+                          }}
+                        >
+                          {$t(i18nKeys.console.quickDeploy.healthCheckToggle)}
+                        </Button>
+                        <DocsHelpLink
+                          href={webDocsHrefs.resourceHealthProfile}
+                          ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+                        />
+                      </div>
                     </div>
                     {#if resourceHealthCheckEnabled}
                       <div class="mt-3 grid gap-3 rounded-md border bg-muted/10 p-3 sm:grid-cols-3">
@@ -3121,7 +3179,13 @@
                 <div class="min-w-0 rounded-md border bg-background px-3 py-3">
                   <div class="flex items-center justify-between gap-3">
                     <div class="min-w-0">
-                      <p class="text-sm font-medium">{$t(i18nKeys.common.domain.variables)}</p>
+                      <div class="flex items-center gap-2">
+                        <p class="text-sm font-medium">{$t(i18nKeys.common.domain.variables)}</p>
+                        <DocsHelpLink
+                          href={webDocsHrefs.environmentVariablePrecedence}
+                          ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+                        />
+                      </div>
                       <p class="break-words text-xs text-muted-foreground">{variableSummary}</p>
                     </div>
                     <Button

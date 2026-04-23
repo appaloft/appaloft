@@ -10,11 +10,13 @@
 
   import { readErrorMessage } from "$lib/api/client";
   import ConsoleShell from "$lib/components/console/ConsoleShell.svelte";
+  import DocsHelpLink from "$lib/components/console/DocsHelpLink.svelte";
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
   import { Input } from "$lib/components/ui/input";
   import * as Select from "$lib/components/ui/select";
   import { Skeleton } from "$lib/components/ui/skeleton";
+  import { webDocsHrefs } from "$lib/console/docs-help";
   import { createConsoleQueries } from "$lib/console/queries";
   import {
     findEnvironment,
@@ -376,9 +378,15 @@
               <Plus class="size-4" />
             </div>
             <div>
-              <h2 class="text-lg font-semibold">
-                {$t(i18nKeys.console.domainBindings.createTitle)}
-              </h2>
+              <div class="flex items-center gap-2">
+                <h2 class="text-lg font-semibold">
+                  {$t(i18nKeys.console.domainBindings.createTitle)}
+                </h2>
+                <DocsHelpLink
+                  href={webDocsHrefs.domainCustomDomainBinding}
+                  ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+                />
+              </div>
               <p class="mt-1 text-sm text-muted-foreground">
                 {$t(i18nKeys.console.domainBindings.createDescription)}
               </p>
@@ -439,7 +447,14 @@
               </label>
 
               <label class="space-y-1.5 text-sm font-medium">
-                <span>{$t(i18nKeys.common.domain.server)}</span>
+                <span class="inline-flex items-center gap-1.5">
+                  {$t(i18nKeys.common.domain.server)}
+                  <DocsHelpLink
+                    href={webDocsHrefs.serverDeploymentTarget}
+                    ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+                    className="size-5"
+                  />
+                </span>
                 <Select.Root bind:value={serverId} type="single" disabled={servers.length === 0}>
                   <Select.Trigger class="w-full">
                     {selectedServer?.name ?? $t(i18nKeys.console.domainBindings.noServerOptions)}
@@ -453,7 +468,14 @@
               </label>
 
               <label class="space-y-1.5 text-sm font-medium">
-                <span>{$t(i18nKeys.common.domain.domainName)}</span>
+                <span class="inline-flex items-center gap-1.5">
+                  {$t(i18nKeys.common.domain.domainName)}
+                  <DocsHelpLink
+                    href={webDocsHrefs.domainCustomDomainBinding}
+                    ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+                    className="size-5"
+                  />
+                </span>
                 <Input
                   bind:value={domainName}
                   autocomplete="off"
@@ -462,12 +484,26 @@
               </label>
 
               <label class="space-y-1.5 text-sm font-medium">
-                <span>{$t(i18nKeys.common.domain.pathPrefix)}</span>
+                <span class="inline-flex items-center gap-1.5">
+                  {$t(i18nKeys.common.domain.pathPrefix)}
+                  <DocsHelpLink
+                    href={webDocsHrefs.domainGeneratedAccessRoute}
+                    ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+                    className="size-5"
+                  />
+                </span>
                 <Input bind:value={pathPrefix} autocomplete="off" placeholder="/" />
               </label>
 
               <label class="space-y-1.5 text-sm font-medium">
-                <span>{$t(i18nKeys.common.domain.proxy)}</span>
+                <span class="inline-flex items-center gap-1.5">
+                  {$t(i18nKeys.common.domain.proxy)}
+                  <DocsHelpLink
+                    href={webDocsHrefs.serverProxyReadiness}
+                    ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+                    className="size-5"
+                  />
+                </span>
                 <Select.Root bind:value={proxyKind} type="single">
                   <Select.Trigger class="w-full">{proxyKind}</Select.Trigger>
                   <Select.Content>
@@ -478,7 +514,14 @@
               </label>
 
               <label class="space-y-1.5 text-sm font-medium">
-                <span>{$t(i18nKeys.common.domain.tls)}</span>
+                <span class="inline-flex items-center gap-1.5">
+                  {$t(i18nKeys.common.domain.tls)}
+                  <DocsHelpLink
+                    href={webDocsHrefs.certificateReadiness}
+                    ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+                    className="size-5"
+                  />
+                </span>
                 <Select.Root bind:value={tlsMode} type="single">
                   <Select.Trigger class="w-full">{tlsMode}</Select.Trigger>
                   <Select.Content>
@@ -489,7 +532,14 @@
               </label>
 
               <label class="space-y-1.5 text-sm font-medium">
-                <span>{$t(i18nKeys.common.domain.routeBehavior)}</span>
+                <span class="inline-flex items-center gap-1.5">
+                  {$t(i18nKeys.common.domain.routeBehavior)}
+                  <DocsHelpLink
+                    href={webDocsHrefs.domainGeneratedAccessRoute}
+                    ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+                    className="size-5"
+                  />
+                </span>
                 <Select.Root bind:value={routeMode} type="single">
                   <Select.Trigger class="w-full">
                     {routeMode === "redirect"
@@ -509,7 +559,14 @@
 
               {#if routeMode === "redirect"}
                 <label class="space-y-1.5 text-sm font-medium">
-                  <span>{$t(i18nKeys.common.domain.redirectTo)}</span>
+                  <span class="inline-flex items-center gap-1.5">
+                    {$t(i18nKeys.common.domain.redirectTo)}
+                    <DocsHelpLink
+                      href={webDocsHrefs.domainCustomDomainBinding}
+                      ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+                      className="size-5"
+                    />
+                  </span>
                   <Select.Root
                     bind:value={redirectTo}
                     type="single"
@@ -528,7 +585,14 @@
                 </label>
 
                 <label class="space-y-1.5 text-sm font-medium">
-                  <span>{$t(i18nKeys.common.domain.redirectStatus)}</span>
+                  <span class="inline-flex items-center gap-1.5">
+                    {$t(i18nKeys.common.domain.redirectStatus)}
+                    <DocsHelpLink
+                      href={webDocsHrefs.domainCustomDomainBinding}
+                      ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+                      className="size-5"
+                    />
+                  </span>
                   <Select.Root bind:value={redirectStatus} type="single">
                     <Select.Trigger class="w-full">{redirectStatus}</Select.Trigger>
                     <Select.Content>
@@ -542,7 +606,14 @@
               {/if}
 
               <label class="space-y-1.5 text-sm font-medium sm:col-span-2">
-                <span>{$t(i18nKeys.common.domain.destination)}</span>
+                <span class="inline-flex items-center gap-1.5">
+                  {$t(i18nKeys.common.domain.destination)}
+                  <DocsHelpLink
+                    href={webDocsHrefs.domainGeneratedAccessRoute}
+                    ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+                    className="size-5"
+                  />
+                </span>
                 <Input bind:value={destinationId} autocomplete="off" placeholder="dst_..." />
                 <span class="block text-xs font-normal leading-5 text-muted-foreground">
                   {#if selectedResource?.destinationId}

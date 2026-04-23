@@ -3,6 +3,7 @@
   import { goto } from "$app/navigation";
   import { page } from "$app/state";
   import {
+    BookOpen,
     ChevronUp,
     FolderOpen,
     Gauge,
@@ -18,16 +19,17 @@
     UserRound,
   } from "@lucide/svelte";
   import type { ResourceSummary } from "@appaloft/contracts";
+  import appaloftIcon from "@appaloft/design/assets/appaloft-icon-light.svg";
   import type { Snippet } from "svelte";
 
   import { API_BASE, readErrorMessage, request } from "$lib/api/client";
-  import appaloftIcon from "$lib/assets/appaloft-icon-light.svg";
   import ResourceHealthDot from "$lib/components/console/ResourceHealthDot.svelte";
   import ResourceHealthLabel from "$lib/components/console/ResourceHealthLabel.svelte";
   import { Avatar, AvatarFallback } from "$lib/components/ui/avatar";
   import { Badge } from "$lib/components/ui/badge";
   import * as Breadcrumb from "$lib/components/ui/breadcrumb";
   import { Button } from "$lib/components/ui/button";
+  import { webDocsHrefs } from "$lib/console/docs-help";
   import {
     DropdownMenu,
     DropdownMenuContent,
@@ -138,6 +140,11 @@
   const authIdentity = $derived(readSessionIdentity(authSession.session));
   const connectionError = $derived(healthQuery.error ? readErrorMessage(healthQuery.error) : "");
   const deploymentModeLabel = $derived(version?.mode ?? "self-hosted");
+  const appVersion = $derived(version?.version ?? healthQuery.data?.version ?? "");
+  const appVersionLabel = $derived(appVersion ? `v${appVersion}` : "");
+  const appVersionTitle = $derived(
+    appVersion ? `${$t(i18nKeys.common.domain.version)} ${appVersion}` : "",
+  );
   const colorModeLabel = $derived(
     colorMode === "dark"
       ? $t(i18nKeys.common.actions.switchToLightMode)
@@ -231,6 +238,12 @@
     }
   }
 
+  function openDocumentation(): void {
+    if (browser) {
+      window.open(webDocsHrefs.docsHome, "_blank", "noreferrer");
+    }
+  }
+
   function navigateTo(path: string): void {
     if (browser) {
       void goto(path);
@@ -261,7 +274,9 @@
         />
         <span class="min-w-0 group-data-[collapsible=icon]:hidden">
           <span class="block truncate text-sm font-medium">{$t(i18nKeys.common.app.productName)}</span>
-          <span class="block truncate text-xs text-muted-foreground">{$t(i18nKeys.common.app.consoleSubtitle)}</span>
+          <span class="block truncate text-xs text-muted-foreground">
+            {$t(i18nKeys.common.app.consoleSubtitle)}{appVersionLabel ? ` · ${appVersionLabel}` : ""}
+          </span>
         </span>
       </a>
       <SidebarInput
@@ -398,6 +413,10 @@
             <Rocket class="size-4" />
             {$t(i18nKeys.console.deployments.records)}
           </DropdownMenuItem>
+          <DropdownMenuItem onclick={openDocumentation}>
+            <BookOpen class="size-4" />
+            {$t(i18nKeys.common.actions.openDocumentation)}
+          </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuLabel>{$t(i18nKeys.common.language.label)}</DropdownMenuLabel>
           <DropdownMenuRadioGroup value={$locale}>
@@ -447,6 +466,11 @@
         </div>
       </div>
       <div class="flex shrink-0 items-center gap-2">
+        {#if appVersionLabel}
+          <Badge variant="outline" class="hidden sm:inline-flex" title={appVersionTitle}>
+            {appVersionLabel}
+          </Badge>
+        {/if}
         <Badge variant="outline" class="hidden md:inline-flex">{deploymentModeLabel}</Badge>
         <Button
           aria-label={colorModeLabel}

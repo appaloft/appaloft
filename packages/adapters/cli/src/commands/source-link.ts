@@ -3,6 +3,7 @@ import { Args, Command as EffectCommand, Options } from "@effect/cli";
 
 import { optionalValue, runCommand } from "../runtime.js";
 import { type DeploymentStateBackendKind } from "./deployment-state.js";
+import { cliCommandDescriptions } from "./docs-help.js";
 
 const sourceFingerprintArg = Args.text({ name: "sourceFingerprint" });
 const projectOption = Options.text("project");
@@ -92,9 +93,9 @@ const relinkCommand = EffectCommand.make(
       }),
     );
   },
-).pipe(EffectCommand.withDescription("Relink a source fingerprint to an explicit resource"));
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.sourceLinkRelink));
 
 export const sourceLinksCommand = EffectCommand.make("source-links").pipe(
-  EffectCommand.withDescription("Source fingerprint link operations"),
+  EffectCommand.withDescription(cliCommandDescriptions.sourceLinks),
   EffectCommand.withSubcommands([relinkCommand]),
 );

@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc" viewBox="0 0 1120 420">
+  <title id="title">Access readiness</title>
+  <desc id="desc">Access readiness depends on runtime, health, proxy, generated URL, domain, and TLS states.</desc>
+  <rect width="1120" height="420" rx="32" fill="#fffaf0"/>
+  <g font-family="IBM Plex Sans, Arial, sans-serif">
+    <text x="56" y="72" fill="#123d2a" font-size="30" font-weight="700">Access is a chain, not one status</text>
+    <g fill="#0f7a4a">
+      <circle cx="120" cy="210" r="54"/>
+      <circle cx="300" cy="210" r="54"/>
+      <circle cx="480" cy="210" r="54"/>
+      <circle cx="660" cy="210" r="54"/>
+      <circle cx="840" cy="210" r="54"/>
+      <circle cx="1018" cy="210" r="54"/>
+    </g>
+    <g stroke="#123d2a" stroke-width="5" stroke-linecap="round">
+      <line x1="174" y1="210" x2="246" y2="210"/>
+      <line x1="354" y1="210" x2="426" y2="210"/>
+      <line x1="534" y1="210" x2="606" y2="210"/>
+      <line x1="714" y1="210" x2="786" y2="210"/>
+      <line x1="894" y1="210" x2="964" y2="210"/>
+    </g>
+    <g text-anchor="middle" fill="#fffaf0" font-size="18" font-weight="700">
+      <text x="120" y="204">Runtime</text><text x="120" y="228">up</text>
+      <text x="300" y="204">Health</text><text x="300" y="228">passes</text>
+      <text x="480" y="204">Proxy</text><text x="480" y="228">ready</text>
+      <text x="660" y="204">Generated</text><text x="660" y="228">URL</text>
+      <text x="840" y="204">Domain</text><text x="840" y="228">owned</text>
+      <text x="1018" y="204">TLS</text><text x="1018" y="228">ready</text>
+    </g>
+    <text x="56" y="330" fill="#476657" font-size="18">Troubleshoot left to right: application first, DNS and certificate last.</text>
+  </g>
+</svg>
