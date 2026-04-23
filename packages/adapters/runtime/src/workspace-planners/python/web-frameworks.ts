@@ -11,7 +11,7 @@ import {
 } from "../types";
 import {
   pythonBaseImage,
-  pythonDockerfile,
+  pythonDockerBuild,
   pythonInstallCommand,
   pythonRunCommandFor,
   resolvePythonPackageManager,
@@ -110,8 +110,8 @@ function createPythonWebFrameworkPlanner(
       });
     },
 
-    dockerfile(input: WorkspaceDockerfileInput): string | null {
-      return pythonDockerfile(input);
+    dockerBuild(input: WorkspaceDockerfileInput) {
+      return pythonDockerBuild(input);
     },
   };
 }

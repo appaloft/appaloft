@@ -1,7 +1,7 @@
 import { err, ok, type Result, type SourceInspectionSnapshot } from "@appaloft/core";
 import {
   commandMentions,
-  dockerfileFromExecution,
+  dockerBuildFromExecution,
   generatedWorkspaceDockerfileName,
   requiredStartCommand,
   workspaceMetadata,
@@ -87,8 +87,8 @@ export const javaWorkspacePlanner: WorkspaceRuntimePlanner = {
     });
   },
 
-  dockerfile(input: WorkspaceDockerfileInput): string | null {
-    return dockerfileFromExecution({
+  dockerBuild(input: WorkspaceDockerfileInput) {
+    return dockerBuildFromExecution({
       baseImage: input.execution.metadata?.["workspace.baseImage"] ?? javaBaseImage(input.sourceInspection),
       execution: input.execution,
     });

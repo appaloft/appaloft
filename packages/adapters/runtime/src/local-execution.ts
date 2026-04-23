@@ -58,7 +58,11 @@ import {
   dockerLabelsFromAssignments,
   renderRuntimeCommandString,
 } from "./runtime-commands";
-import { generateStaticSiteDockerfile, generateWorkspaceDockerfile } from "./workspace-planners";
+import {
+  cleanupGeneratedDockerBuildAssets,
+  writeGeneratedDockerBuildAssets,
+} from "./generated-docker-build-assets";
+import { generateStaticSiteDockerBuild, generateWorkspaceDockerBuild } from "./workspace-planners";
 
 type LogPhase = "detect" | "plan" | "package" | "deploy" | "verify" | "rollback";
 type LogLevel = "debug" | "info" | "warn" | "error";
@@ -1372,126 +1376,185 @@ export class LocalExecutionBackend implements ExecutionBackend {
                   : "Dockerfile.appaloft"),
             );
 
-      if (state.runtimePlan.buildStrategy === "workspace-commands") {
-        const dockerfile = generateWorkspaceDockerfile({
-          execution: state.runtimePlan.execution,
-          ...(state.runtimePlan.source.inspection
-            ? { sourceInspection: state.runtimePlan.source.inspection }
-            : {}),
-        });
-        if (!dockerfile) {
-          const message = "Start command is required for workspace image generation";
-          this.report(context, {
-            deploymentId: state.id.value,
-            phase: "package",
-            status: "failed",
-            level: "error",
-            message,
+      let generatedContextAssetPaths: string[] = [];
+      try {
+        if (state.runtimePlan.buildStrategy === "workspace-commands") {
+          const dockerBuild = generateWorkspaceDockerBuild({
+            execution: state.runtimePlan.execution,
+            ...(state.runtimePlan.source.inspection
+              ? { sourceInspection: state.runtimePlan.source.inspection }
+              : {}),
           });
-          return ok({
-            deployment: this.applyFailure(deployment, {
-              logs: [
-                ...logs,
-                phaseLog("package", message, "error"),
-              ],
-              errorCode: "workspace_start_command_missing",
-              retryable: false,
-            }).deployment,
-          });
+          if (!dockerBuild) {
+            const message = "Start command is required for workspace image generation";
+            this.report(context, {
+              deploymentId: state.id.value,
+              phase: "package",
+              status: "failed",
+              level: "error",
+              message,
+            });
+            return ok({
+              deployment: this.applyFailure(deployment, {
+                logs: [
+                  ...logs,
+                  phaseLog("package", message, "error"),
+                ],
+                errorCode: "workspace_start_command_missing",
+                retryable: false,
+              }).deployment,
+            });
+          }
+
+          try {
+            mkdirSync(runtimeDir, { recursive: true });
+            await Bun.write(dockerfilePath, dockerBuild.dockerfile);
+            generatedContextAssetPaths = await writeGeneratedDockerBuildAssets(
+              workdir,
+              dockerBuild.contextAssets,
+            );
+          } catch {
+            const message = "Workspace Docker build asset preparation failed";
+            this.report(context, {
+              deploymentId: state.id.value,
+              phase: "package",
+              status: "failed",
+              level: "error",
+              message,
+            });
+            return ok({
+              deployment: this.applyFailure(deployment, {
+                logs: [
+                  ...logs,
+                  phaseLog("package", message, "error"),
+                ],
+                errorCode: "workspace_docker_asset_write_failed",
+                retryable: true,
+              }).deployment,
+            });
+          }
+
+          logs.push(phaseLog("package", `Generated workspace Dockerfile at ${dockerfilePath}`));
         }
-        mkdirSync(runtimeDir, { recursive: true });
-        await Bun.write(dockerfilePath, dockerfile);
-        logs.push(phaseLog("package", `Generated workspace Dockerfile at ${dockerfilePath}`));
-      }
 
-      if (state.runtimePlan.buildStrategy === "static-artifact") {
-        const dockerfile = generateStaticSiteDockerfile({
-          execution: state.runtimePlan.execution,
-          ...(state.runtimePlan.source.inspection
-            ? { sourceInspection: state.runtimePlan.source.inspection }
-            : {}),
-        });
-        if (!dockerfile) {
-          const message = "Static publish directory is required for static image generation";
-          this.report(context, {
-            deploymentId: state.id.value,
-            phase: "package",
-            status: "failed",
-            level: "error",
-            message,
+        if (state.runtimePlan.buildStrategy === "static-artifact") {
+          const dockerBuild = generateStaticSiteDockerBuild({
+            execution: state.runtimePlan.execution,
+            ...(state.runtimePlan.source.inspection
+              ? { sourceInspection: state.runtimePlan.source.inspection }
+              : {}),
           });
-          return ok({
-            deployment: this.applyFailure(deployment, {
-              logs: [
-                ...logs,
-                phaseLog("package", message, "error"),
-              ],
-              errorCode: "static_dockerfile_generation_failed",
-              retryable: false,
-            }).deployment,
-          });
+          if (!dockerBuild) {
+            const message = "Static publish directory is required for static image generation";
+            this.report(context, {
+              deploymentId: state.id.value,
+              phase: "package",
+              status: "failed",
+              level: "error",
+              message,
+            });
+            return ok({
+              deployment: this.applyFailure(deployment, {
+                logs: [
+                  ...logs,
+                  phaseLog("package", message, "error"),
+                ],
+                errorCode: "static_dockerfile_generation_failed",
+                retryable: false,
+              }).deployment,
+            });
+          }
+
+          try {
+            mkdirSync(runtimeDir, { recursive: true });
+            await Bun.write(dockerfilePath, dockerBuild.dockerfile);
+            generatedContextAssetPaths = await writeGeneratedDockerBuildAssets(
+              workdir,
+              dockerBuild.contextAssets,
+            );
+          } catch {
+            const message = "Static Docker build asset preparation failed";
+            this.report(context, {
+              deploymentId: state.id.value,
+              phase: "package",
+              status: "failed",
+              level: "error",
+              message,
+            });
+            return ok({
+              deployment: this.applyFailure(deployment, {
+                logs: [
+                  ...logs,
+                  phaseLog("package", message, "error"),
+                ],
+                errorCode: "static_docker_asset_write_failed",
+                retryable: true,
+              }).deployment,
+            });
+          }
+
+          logs.push(phaseLog("package", `Generated static site Dockerfile at ${dockerfilePath}`));
         }
-        mkdirSync(runtimeDir, { recursive: true });
-        await Bun.write(dockerfilePath, dockerfile);
-        logs.push(phaseLog("package", `Generated static site Dockerfile at ${dockerfilePath}`));
-      }
 
-      const buildCommand = renderRuntimeCommandString(
-        RuntimeCommandBuilder.docker().buildImage({
-          image,
-          dockerfilePath,
-          contextPath: workdir,
-        }),
-        { quote: shellQuote },
-      );
-      logs.push(phaseLog("package", buildCommand));
-      this.report(context, {
-        deploymentId: state.id.value,
-        phase: "package",
-        status: "running",
-        message: `Build image ${image}`,
-      });
-      const build = runSyncCommand({
-        command: buildCommand,
-        cwd: workdir,
-        env,
-      });
-      this.pushCommandOutput(logs, {
-        context,
-        deploymentId: state.id.value,
-        phase: "package",
-        output: build.stdout,
-        level: "info",
-        stream: "stdout",
-      });
-      this.pushCommandOutput(logs, {
-        context,
-        deploymentId: state.id.value,
-        phase: "package",
-        output: build.stderr,
-        level: "warn",
-        stream: "stderr",
-      });
-
-      if (build.failed || !image) {
-        const message = "Docker image build failed";
+        const buildCommand = renderRuntimeCommandString(
+          RuntimeCommandBuilder.docker().buildImage({
+            image,
+            dockerfilePath,
+            contextPath: workdir,
+          }),
+          { quote: shellQuote },
+        );
+        logs.push(phaseLog("package", buildCommand));
         this.report(context, {
           deploymentId: state.id.value,
           phase: "package",
-          status: "failed",
-          level: "error",
-          message,
+          status: "running",
+          message: `Build image ${image}`,
         });
-        return ok({
-          deployment: this.applyFailure(deployment, {
-            logs: [
-              ...logs,
-              phaseLog("package", message, "error"),
-            ],
-            errorCode: "docker_build_failed",
-            retryable: true,
-          }).deployment,
+        const build = runSyncCommand({
+          command: buildCommand,
+          cwd: workdir,
+          env,
         });
+        this.pushCommandOutput(logs, {
+          context,
+          deploymentId: state.id.value,
+          phase: "package",
+          output: build.stdout,
+          level: "info",
+          stream: "stdout",
+        });
+        this.pushCommandOutput(logs, {
+          context,
+          deploymentId: state.id.value,
+          phase: "package",
+          output: build.stderr,
+          level: "warn",
+          stream: "stderr",
+        });
+
+        if (build.failed || !image) {
+          const message = "Docker image build failed";
+          this.report(context, {
+            deploymentId: state.id.value,
+            phase: "package",
+            status: "failed",
+            level: "error",
+            message,
+          });
+          return ok({
+            deployment: this.applyFailure(deployment, {
+              logs: [
+                ...logs,
+                phaseLog("package", message, "error"),
+              ],
+              errorCode: "docker_build_failed",
+              retryable: true,
+            }).deployment,
+          });
+        }
+      } finally {
+        cleanupGeneratedDockerBuildAssets(generatedContextAssetPaths);
       }
     }
 

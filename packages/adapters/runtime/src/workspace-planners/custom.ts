@@ -1,7 +1,7 @@
 import { err, ok, type Result } from "@appaloft/core";
 import {
   commandMentions,
-  dockerfileFromExecution,
+  dockerBuildFromExecution,
   generatedWorkspaceDockerfileName,
   requiredStartCommand,
   workspaceMetadata,
@@ -55,8 +55,8 @@ export const customWorkspacePlanner: WorkspaceRuntimePlanner = {
     });
   },
 
-  dockerfile(input: WorkspaceDockerfileInput): string | null {
-    return dockerfileFromExecution({
+  dockerBuild(input: WorkspaceDockerfileInput) {
+    return dockerBuildFromExecution({
       baseImage: input.execution.metadata?.["workspace.baseImage"] ?? customBaseImage(),
       execution: input.execution,
     });
