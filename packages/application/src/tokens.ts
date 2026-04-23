@@ -5,6 +5,7 @@ export const tokens = {
   eventBus: Symbol.for("appaloft.event_bus"),
   mutationCoordinator: Symbol.for("appaloft.mutation_coordinator"),
   deploymentProgressReporter: Symbol.for("appaloft.deployment_progress_reporter"),
+  deploymentEventObserver: Symbol.for("appaloft.deployment_event_observer"),
   sourceLinkRepository: Symbol.for("appaloft.source_link_repository"),
   defaultAccessDomainPolicyRepository: Symbol.for(
     "appaloft.default_access_domain_policy_repository",
@@ -94,6 +95,7 @@ export const tokens = {
   listCertificatesQueryService: Symbol.for("appaloft.list_certificates_query_service"),
   listDeploymentsQueryService: Symbol.for("appaloft.list_deployments_query_service"),
   showDeploymentQueryService: Symbol.for("appaloft.show_deployment_query_service"),
+  streamDeploymentEventsQueryService: Symbol.for("appaloft.stream_deployment_events_query_service"),
   logsQueryService: Symbol.for("appaloft.logs_query_service"),
   deploymentContextDefaultsFactory: Symbol.for("appaloft.deployment_context_defaults_factory"),
   deploymentContextResolver: Symbol.for("appaloft.deployment_context_resolver"),
