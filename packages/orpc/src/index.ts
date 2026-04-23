@@ -34,6 +34,7 @@ import {
   createResourceCommandInputSchema,
   createSshCredentialCommandInputSchema,
   DeleteResourceCommand,
+  type DeploymentEventStreamEnvelope,
   DeploymentLogsQuery,
   type DeploymentProgressEvent,
   type DeploymentProgressObserver,
@@ -88,10 +89,14 @@ import {
   ShowDeploymentQuery,
   ShowEnvironmentQuery,
   ShowResourceQuery,
+  StreamDeploymentEventsQuery,
+  type StreamDeploymentEventsQueryInput,
+  type StreamDeploymentEventsResult,
   setEnvironmentVariableCommandInputSchema,
   showDeploymentQueryInputSchema,
   showEnvironmentQueryInputSchema,
   showResourceQueryInputSchema,
+  streamDeploymentEventsQueryInputSchema,
   TestServerConnectivityCommand,
   testServerConnectivityCommandInputSchema,
   UnsetEnvironmentVariableCommand,
@@ -113,6 +118,9 @@ import {
   createResourceResponseSchema,
   createSshCredentialResponseSchema,
   deleteResourceResponseSchema,
+  deploymentEventStreamEnvelopeSchema,
+  deploymentEventStreamResponseSchema,
+  deploymentEventStreamStreamResponseSchema,
   deploymentLogsResponseSchema,
   deploymentProgressEventSchema,
   diffEnvironmentResponseSchema,
@@ -712,6 +720,47 @@ function createResourceRuntimeLogStream(
   })();
 }
 
+function createDeploymentEventStream(
+  context: AppaloftOrpcRequestContext,
+  input: StreamDeploymentEventsQueryInput,
+): AsyncGenerator<DeploymentEventStreamEnvelope, { deploymentId: string }, void> {
+  return (async function* streamDeploymentEvents() {
+    const result: StreamDeploymentEventsResult = await executeQuery(
+      context,
+      StreamDeploymentEventsQuery.create({
+        ...input,
+        follow: true,
+      }),
+    );
+
+    if (result.mode === "bounded") {
+      for (const envelope of result.envelopes) {
+        yield envelope;
+      }
+
+      return {
+        deploymentId: result.deploymentId,
+      };
+    }
+
+    try {
+      for await (const envelope of result.stream) {
+        yield envelope;
+
+        if (envelope.kind === "closed" || envelope.kind === "error") {
+          break;
+        }
+      }
+
+      return {
+        deploymentId: result.deploymentId,
+      };
+    } finally {
+      await result.stream.close();
+    }
+  })();
+}
+
 function toDeploymentProgressStreamEvent(
   event: DeploymentProgressEvent,
 ): DeploymentProgressStreamEvent {
@@ -1194,6 +1243,48 @@ export const deploymentLogsProcedure = base
   .output(deploymentLogsResponseSchema)
   .handler(async ({ input, context }) => executeQuery(context, DeploymentLogsQuery.create(input)));
 
+export const deploymentEventReplayProcedure = base
+  .route({
+    method: "GET",
+    path: "/deployments/{deploymentId}/events",
+    successStatus: 200,
+  })
+  .input(streamDeploymentEventsQueryInputSchema)
+  .output(deploymentEventStreamResponseSchema)
+  .handler(async ({ input, context }) => {
+    const result: StreamDeploymentEventsResult = await executeQuery(
+      context,
+      StreamDeploymentEventsQuery.create({
+        ...input,
+        follow: false,
+      }),
+    );
+
+    if (result.mode !== "bounded") {
+      throw new ORPCError("INTERNAL_SERVER_ERROR", {
+        message: "Deployment event query returned a stream for a bounded request",
+        status: 500,
+      });
+    }
+
+    return {
+      deploymentId: result.deploymentId,
+      envelopes: result.envelopes,
+    };
+  });
+
+export const deploymentEventStreamProcedure = base
+  .route({
+    method: "GET",
+    path: "/deployments/{deploymentId}/events/stream",
+    successStatus: 200,
+  })
+  .input(streamDeploymentEventsQueryInputSchema)
+  .output(
+    eventIterator(deploymentEventStreamEnvelopeSchema, deploymentEventStreamStreamResponseSchema),
+  )
+  .handler(({ input, context }) => createDeploymentEventStream(context, input));
+
 export const resourceRuntimeLogsProcedure = base
   .route({
     method: "GET",
@@ -1383,6 +1474,8 @@ export const appaloftOrpcRouter = {
     show: showDeploymentProcedure,
     createStream: createDeploymentStreamProcedure,
     logs: deploymentLogsProcedure,
+    events: deploymentEventReplayProcedure,
+    eventsStream: deploymentEventStreamProcedure,
   },
   providers: {
     list: listProvidersProcedure,
@@ -1540,6 +1633,8 @@ export function mountAppaloftOrpcRoutes(
     "/api/deployments/:deploymentId",
     "/api/deployments/stream",
     "/api/deployments/:deploymentId/logs",
+    "/api/deployments/:deploymentId/events",
+    "/api/deployments/:deploymentId/events/stream",
     "/api/providers",
     "/api/plugins",
     "/api/integrations/github/repositories",

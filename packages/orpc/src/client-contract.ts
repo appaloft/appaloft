@@ -37,6 +37,7 @@ import {
   type ShowDeploymentQueryInput,
   type ShowEnvironmentQueryInput,
   type ShowResourceQueryInput,
+  type StreamDeploymentEventsQueryInput,
   type TestServerConnectivityCommandInput,
   type UnsetEnvironmentVariableCommandInput,
 } from "@appaloft/application/schemas";
@@ -56,6 +57,9 @@ import {
   type CreateResourceResponse,
   type CreateSshCredentialResponse,
   type DeleteResourceResponse,
+  type DeploymentEventStreamEnvelope,
+  type DeploymentEventStreamResponse,
+  type DeploymentEventStreamStreamResponse,
   type DeploymentLogsResponse,
   type DeploymentProgressEvent,
   type DiffEnvironmentResponse,
@@ -365,6 +369,18 @@ export type AppaloftOrpcClientContract = {
       AppaloftClientContext,
       DeploymentLogsQueryInput,
       DeploymentLogsResponse,
+      AppaloftClientError
+    >;
+    events: Client<
+      AppaloftClientContext,
+      StreamDeploymentEventsQueryInput,
+      DeploymentEventStreamResponse,
+      AppaloftClientError
+    >;
+    eventsStream: Client<
+      AppaloftClientContext,
+      StreamDeploymentEventsQueryInput,
+      AsyncIteratorClass<DeploymentEventStreamEnvelope, DeploymentEventStreamStreamResponse, void>,
       AppaloftClientError
     >;
   };

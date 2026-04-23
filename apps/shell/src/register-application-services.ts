@@ -81,12 +81,15 @@ import {
   ShowEnvironmentQueryService,
   ShowResourceQueryHandler,
   ShowResourceQueryService,
+  StreamDeploymentEventsQueryHandler,
+  StreamDeploymentEventsQueryService,
   TestServerConnectivityUseCase,
   tokens,
   UnsetEnvironmentVariableUseCase,
 } from "@appaloft/application";
 import { type DomainError, ok, type Result } from "@appaloft/core";
 import { type DependencyContainer } from "tsyringe";
+import { ShellDeploymentEventObserver } from "./deployment-event-observer";
 import { PublicDnsDomainOwnershipVerifier } from "./domain-ownership-verifier";
 
 class ShellCertificateProviderSelectionPolicy implements CertificateProviderSelectionPolicy {
@@ -122,6 +125,7 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(DeleteResourceCommandHandler);
   container.registerSingleton(ShowResourceQueryHandler);
   container.registerSingleton(ShowDeploymentQueryHandler);
+  container.registerSingleton(StreamDeploymentEventsQueryHandler);
   container.registerSingleton(ImportCertificateCommandHandler);
   container.registerSingleton(IssueOrRenewCertificateCommandHandler);
   container.registerSingleton(RelinkSourceLinkCommandHandler);
@@ -217,7 +221,12 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(tokens.listCertificatesQueryService, ListCertificatesQueryService);
   container.registerSingleton(tokens.listDeploymentsQueryService, ListDeploymentsQueryService);
   container.registerSingleton(tokens.showDeploymentQueryService, ShowDeploymentQueryService);
+  container.registerSingleton(
+    tokens.streamDeploymentEventsQueryService,
+    StreamDeploymentEventsQueryService,
+  );
   container.registerSingleton(tokens.logsQueryService, DeploymentLogsQueryService);
+  container.registerSingleton(tokens.deploymentEventObserver, ShellDeploymentEventObserver);
   container.registerSingleton(
     tokens.resourceDiagnosticSummaryQueryService,
     ResourceDiagnosticSummaryQueryService,

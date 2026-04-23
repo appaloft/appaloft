@@ -192,6 +192,115 @@ function deploymentLogsFixture(deploymentId: string) {
   };
 }
 
+function deploymentEventReplayFixture(
+  deploymentId: string,
+  status: "running" | "succeeded" = "succeeded",
+) {
+  const envelopes = [
+    {
+      schemaVersion: "deployments.stream-events/v1",
+      kind: "event" as const,
+      event: {
+        deploymentId,
+        sequence: 1,
+        cursor: `${deploymentId}:1`,
+        emittedAt: "2026-01-01T00:00:01.000Z",
+        source: "progress-projection" as const,
+        eventType: "deployment-requested",
+        phase: "detect" as const,
+        summary: "Deployment requested",
+      },
+    },
+    {
+      schemaVersion: "deployments.stream-events/v1",
+      kind: "event" as const,
+      event: {
+        deploymentId,
+        sequence: 2,
+        cursor: `${deploymentId}:2`,
+        emittedAt: "2026-01-01T00:00:02.000Z",
+        source: "progress-projection" as const,
+        eventType: "build-requested",
+        phase: "plan" as const,
+        summary: "Build requested",
+      },
+    },
+  ];
+
+  if (status === "running") {
+    return {
+      deploymentId,
+      envelopes,
+    };
+  }
+
+  return {
+    deploymentId,
+    envelopes: [
+      ...envelopes,
+      {
+        schemaVersion: "deployments.stream-events/v1",
+        kind: "event" as const,
+        event: {
+          deploymentId,
+          sequence: 3,
+          cursor: `${deploymentId}:3`,
+          emittedAt: "2026-01-01T00:00:03.000Z",
+          source: "domain-event" as const,
+          eventType: "deployment-succeeded",
+          phase: "verify" as const,
+          summary: "Deployment succeeded",
+        },
+      },
+      {
+        schemaVersion: "deployments.stream-events/v1",
+        kind: "closed" as const,
+        reason: "completed" as const,
+        cursor: `${deploymentId}:3`,
+      },
+    ],
+  };
+}
+
+function deploymentEventStreamFixture(deploymentId: string): Response {
+  const envelopes = [
+    {
+      schemaVersion: "deployments.stream-events/v1",
+      kind: "event",
+      event: {
+        deploymentId,
+        sequence: 3,
+        cursor: `${deploymentId}:3`,
+        emittedAt: "2026-01-01T00:00:03.000Z",
+        source: "domain-event",
+        eventType: "deployment-succeeded",
+        phase: "verify",
+        summary: "Deployment succeeded",
+      },
+    },
+    {
+      schemaVersion: "deployments.stream-events/v1",
+      kind: "closed",
+      reason: "completed",
+      cursor: `${deploymentId}:3`,
+    },
+  ];
+
+  const body = [
+    ": ",
+    "",
+    ...envelopes.flatMap((envelope) => ["event: message", `data: ${JSON.stringify(envelope)}`, ""]),
+  ].join("\n");
+
+  return new Response(body, {
+    headers: {
+      "access-control-allow-origin": "*",
+      "cache-control": "no-cache",
+      "content-type": "text/event-stream",
+    },
+  });
+}
+
 const apiResponses: Record<ApiScenario, Record<string, ApiRoute>> = {
   dashboard: {
     "/api/health": {
@@ -560,6 +669,16 @@ const apiResponses: Record<ApiScenario, Record<string, ApiRoute>> = {
         json: deploymentLogsFixture(input?.deploymentId ?? "dep_demo"),
       };
     },
+    "/api/rpc/deployments/events": (_request: Request, body: unknown) => {
+      const input = readOrpcJsonPayload(body) as { deploymentId?: string } | null;
+      return {
+        json: deploymentEventReplayFixture(input?.deploymentId ?? "dep_demo"),
+      };
+    },
+    "/api/rpc/deployments/eventsStream": (_request: Request, body: unknown) => {
+      const input = readOrpcJsonPayload(body) as { deploymentId?: string } | null;
+      return deploymentEventStreamFixture(input?.deploymentId ?? "dep_demo");
+    },
     "/api/deployments": {
       id: "dep_new",
     },
@@ -840,6 +959,16 @@ const apiResponses: Record<ApiScenario, Record<string, ApiRoute>> = {
       return {
         json: deploymentLogsFixture(input?.deploymentId ?? "dep_static"),
       };
+    },
+    "/api/rpc/deployments/events": (_request: Request, body: unknown) => {
+      const input = readOrpcJsonPayload(body) as { deploymentId?: string } | null;
+      return {
+        json: deploymentEventReplayFixture(input?.deploymentId ?? "dep_static"),
+      };
+    },
+    "/api/rpc/deployments/eventsStream": (_request: Request, body: unknown) => {
+      const input = readOrpcJsonPayload(body) as { deploymentId?: string } | null;
+      return deploymentEventStreamFixture(input?.deploymentId ?? "dep_static");
     },
   },
 };
@@ -1469,6 +1598,71 @@ describe("console e2e with Bun.WebView", () => {
       includeRelatedContext: true,
       includeLatestFailure: true,
     });
+  }, 15_000);
+
+  test("[DEP-EVENTS-ENTRY-005] replays and follows deployment events on the detail timeline", async () => {
+    activeScenario = "dashboard";
+    resetRecordedApiRequests();
+
+    const previousShowRoute = apiResponses.dashboard["/api/rpc/deployments/show"];
+    const previousReplayRoute = apiResponses.dashboard["/api/rpc/deployments/events"];
+    const previousStreamRoute = apiResponses.dashboard["/api/rpc/deployments/eventsStream"];
+
+    apiResponses.dashboard["/api/rpc/deployments/show"] = () => ({
+      json: deploymentDetailFixture({
+        deploymentId: "dep_demo",
+        projectId: "prj_demo",
+        environmentId: "env_demo",
+        resourceId: "res_demo",
+        serverId: "srv_demo",
+        destinationId: "dst_demo",
+        sourceDisplayName: "workspace",
+        sourceLocator: "https://github.com/acme/platform.git",
+        status: "running",
+      }),
+    });
+    apiResponses.dashboard["/api/rpc/deployments/events"] = () => ({
+      json: deploymentEventReplayFixture("dep_demo", "running"),
+    });
+    apiResponses.dashboard["/api/rpc/deployments/eventsStream"] = () =>
+      deploymentEventStreamFixture("dep_demo");
+
+    try {
+      await using view = createWebView();
+      await view.navigate(`${previewUrl}/deployments/dep_demo?tab=timeline`);
+
+      await expectAnyText(view, ["Timeline", "时间线"]);
+      await expectText(view, "Deployment requested");
+      await expectText(view, "Build requested");
+
+      const replayRequest = await waitForRecordedRequest("/api/rpc/deployments/events");
+      expect(replayRequest.method).toBe("POST");
+      expect(readOrpcJsonPayload(replayRequest.body)).toEqual({
+        deploymentId: "dep_demo",
+        historyLimit: 100,
+        includeHistory: true,
+        follow: false,
+        untilTerminal: true,
+      });
+
+      const streamRequest = await waitForRecordedRequest("/api/rpc/deployments/eventsStream");
+      expect(streamRequest.method).toBe("POST");
+      expect(readOrpcJsonPayload(streamRequest.body)).toEqual({
+        deploymentId: "dep_demo",
+        historyLimit: 0,
+        includeHistory: false,
+        follow: true,
+        untilTerminal: true,
+        cursor: "dep_demo:2",
+      });
+
+      const timelineText = await pageText(view);
+      expect(timelineText).not.toContain("Not Found");
+    } finally {
+      apiResponses.dashboard["/api/rpc/deployments/show"] = previousShowRoute;
+      apiResponses.dashboard["/api/rpc/deployments/events"] = previousReplayRoute;
+      apiResponses.dashboard["/api/rpc/deployments/eventsStream"] = previousStreamRoute;
+    }
   }, 15_000);
 
   test("[RES-PROFILE-ENTRY-002] submits resource archive through Web", async () => {

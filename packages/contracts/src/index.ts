@@ -1556,6 +1556,26 @@ export const deploymentLogsResponseSchema = z.object({
   logs: z.array(deploymentLogEntrySchema),
 });
 
+export const deploymentObservedEventSchema = z.object({
+  deploymentId: z.string(),
+  sequence: z.number().int().positive(),
+  cursor: z.string(),
+  emittedAt: z.string(),
+  source: z.enum(["domain-event", "process-observation", "progress-projection"]),
+  eventType: z.enum([
+    "deployment-requested",
+    "build-requested",
+    "deployment-started",
+    "deployment-succeeded",
+    "deployment-failed",
+    "deployment-progress",
+  ]),
+  phase: z.enum(["detect", "plan", "package", "deploy", "verify", "rollback"]).optional(),
+  status: z.string().optional(),
+  retriable: z.boolean().optional(),
+  summary: z.string().optional(),
+});
+
 export const resourceRuntimeLogLineSchema = z.object({
   resourceId: z.string(),
   deploymentId: z.string().optional(),
@@ -1586,6 +1606,45 @@ export const domainErrorResponseSchema = z.object({
   details: z.record(z.string(), domainErrorDetailValueSchema).optional(),
 });
 
+export const deploymentEventStreamGapSchema = z.object({
+  code: z.string(),
+  phase: z.enum(["event-replay", "live-follow"]),
+  retriable: z.boolean(),
+  cursor: z.string().optional(),
+  lastSequence: z.number().int().positive().optional(),
+  recommendedAction: z.enum(["restart-stream", "open-deployment-detail"]).optional(),
+});
+
+export const deploymentEventStreamEnvelopeSchema = z.discriminatedUnion("kind", [
+  z.object({
+    schemaVersion: z.literal("deployments.stream-events/v1"),
+    kind: z.literal("event"),
+    event: deploymentObservedEventSchema,
+  }),
+  z.object({
+    schemaVersion: z.literal("deployments.stream-events/v1"),
+    kind: z.literal("heartbeat"),
+    at: z.string(),
+    cursor: z.string().optional(),
+  }),
+  z.object({
+    schemaVersion: z.literal("deployments.stream-events/v1"),
+    kind: z.literal("gap"),
+    gap: deploymentEventStreamGapSchema,
+  }),
+  z.object({
+    schemaVersion: z.literal("deployments.stream-events/v1"),
+    kind: z.literal("closed"),
+    reason: z.enum(["completed", "cancelled", "source-ended", "idle-timeout"]),
+    cursor: z.string().optional(),
+  }),
+  z.object({
+    schemaVersion: z.literal("deployments.stream-events/v1"),
+    kind: z.literal("error"),
+    error: domainErrorResponseSchema,
+  }),
+]);
+
 export const resourceRuntimeLogEventSchema = z.discriminatedUnion("kind", [
   z.object({
     kind: z.literal("line"),
@@ -1609,6 +1668,15 @@ export const resourceRuntimeLogsResponseSchema = z.object({
   resourceId: z.string(),
   deploymentId: z.string().optional(),
   logs: z.array(resourceRuntimeLogLineSchema),
+});
+
+export const deploymentEventStreamResponseSchema = z.object({
+  deploymentId: z.string(),
+  envelopes: z.array(deploymentEventStreamEnvelopeSchema),
+});
+
+export const deploymentEventStreamStreamResponseSchema = z.object({
+  deploymentId: z.string(),
 });
 
 export const resourceRuntimeLogsStreamResponseSchema = z.object({
@@ -2027,6 +2095,13 @@ export type DeploymentAttemptFailureSummary = z.infer<typeof deploymentAttemptFa
 export type ShowDeploymentInput = z.infer<typeof showDeploymentInputSchema>;
 export type ShowDeploymentResponse = z.infer<typeof showDeploymentResponseSchema>;
 export type DeploymentLogsResponse = z.infer<typeof deploymentLogsResponseSchema>;
+export type DeploymentObservedEvent = z.infer<typeof deploymentObservedEventSchema>;
+export type DeploymentEventStreamGap = z.infer<typeof deploymentEventStreamGapSchema>;
+export type DeploymentEventStreamEnvelope = z.infer<typeof deploymentEventStreamEnvelopeSchema>;
+export type DeploymentEventStreamResponse = z.infer<typeof deploymentEventStreamResponseSchema>;
+export type DeploymentEventStreamStreamResponse = z.infer<
+  typeof deploymentEventStreamStreamResponseSchema
+>;
 export type ResourceRuntimeLogLine = z.infer<typeof resourceRuntimeLogLineSchema>;
 export type ResourceRuntimeLogEvent = z.infer<typeof resourceRuntimeLogEventSchema>;
 export type ResourceRuntimeLogsResponse = z.infer<typeof resourceRuntimeLogsResponseSchema>;

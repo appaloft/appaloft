@@ -35,6 +35,10 @@ export const cliCommandDescriptions = {
   deploymentLogs: withDocs("Show deployment logs", "observability.runtime-logs"),
   deploymentList: withDocs("List deployments", "deployment.lifecycle"),
   deploymentShow: withDocs("Show deployment detail", "deployment.lifecycle"),
+  deploymentEvents: withDocs(
+    "Replay or follow deployment lifecycle events",
+    "deployment.lifecycle",
+  ),
   deployments: withDocs("Deployment queries", "deployment.lifecycle"),
   preview: withDocs("Preview deployment commands", "deployment.preview-cleanup"),
   previewCleanup: withDocs("Clean up a preview deployment context", "deployment.preview-cleanup"),

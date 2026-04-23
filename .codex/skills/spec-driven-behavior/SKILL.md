@@ -44,7 +44,7 @@ Before adding or changing a behavior, locate it in `docs/BUSINESS_OPERATION_MAP.
 
 Local specs use Normative Contract style. Read the main body as the target contract. Read `Current Implementation Notes And Migration Gaps` only as migration context. Read `Open Questions` only to identify decisions that still need ADR/user confirmation.
 
-Public documentation is governed by `docs/decisions/ADR-029-public-documentation-round-and-platform.md`, `docs/documentation/public-docs-structure.md`, and `docs/testing/public-documentation-test-matrix.md`. Public docs are downstream of internal specs and must explain behavior from the user's task perspective instead of mirroring internal DDD/CQRS/spec folders.
+Public documentation is governed by `docs/decisions/ADR-030-public-documentation-round-and-platform.md`, `docs/documentation/public-docs-structure.md`, and `docs/testing/public-documentation-test-matrix.md`. Public docs are downstream of internal specs and must explain behavior from the user's task perspective instead of mirroring internal DDD/CQRS/spec folders.
 
 ## v1 Closure Target
 
@@ -157,7 +157,7 @@ entrypoint affordances.
 
 Do this:
 
-- read `docs/decisions/ADR-029-public-documentation-round-and-platform.md`,
+- read `docs/decisions/ADR-030-public-documentation-round-and-platform.md`,
   `docs/documentation/public-docs-structure.md`, and
   `docs/testing/public-documentation-test-matrix.md`;
 - decide whether the behavior needs a public task page, concept page, reference page,
@@ -393,7 +393,7 @@ If Spec Round:
 If Docs Round:
 
 - create or refresh the Docs Round todo before editing public docs or docs governance;
-- read ADR-029, public docs structure, and public documentation test matrix;
+- read ADR-030, public docs structure, and public documentation test matrix;
 - update public documentation pages, help anchor mappings, public docs migration gaps, or docs
   governance only;
 - keep public docs user-task oriented and do not mirror internal spec folders one-to-one;

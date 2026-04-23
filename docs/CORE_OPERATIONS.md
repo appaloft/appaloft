@@ -341,6 +341,7 @@ Implemented operations:
 | List deployments | Query | `deployments.list` | `ListDeploymentsQuery` | `ListDeploymentsQueryInput` | `appaloft deployments list` | `GET /api/deployments` |
 | Show deployment detail | Query | `deployments.show` | `ShowDeploymentQuery` | `ShowDeploymentQueryInput` | `appaloft deployments show <deploymentId>` | `GET /api/deployments/{deploymentId}` |
 | Read deployment logs | Query | `deployments.logs` | `DeploymentLogsQuery` | `DeploymentLogsQueryInput` | `appaloft logs <deploymentId>` | `GET /api/deployments/{deploymentId}/logs` |
+| Stream deployment events | Query | `deployments.stream-events` | `StreamDeploymentEventsQuery` | `StreamDeploymentEventsQueryInput` | `appaloft deployments events <deploymentId>` | `GET /api/deployments/{deploymentId}/events` and `GET /api/deployments/{deploymentId}/events/stream` |
 
 Current boundary:
 - `deployments.create` is the only general deployment-attempt admission command for the v1
@@ -360,6 +361,9 @@ Current boundary:
 - `deployments.show` is the active immutable-attempt deployment detail surface. It returns
   deployment context, historical snapshot, timeline, and safe related context while keeping
   deployment logs on `deployments.logs` and current health on `resources.health`.
+- `deployments.stream-events` is the read-only replay/follow observation surface for one accepted
+  deployment attempt. It does not replace immutable detail on `deployments.show`, full attempt
+  logs on `deployments.logs`, or reintroduce `deployments.reattach` as a write command.
 - mutation coordination is scope-based, not whole-server based:
   `deployments.create` coordinates by logical resource-runtime scope and
   `deployments.cleanup-preview` coordinates by logical preview-lifecycle scope. Low-level SSH
