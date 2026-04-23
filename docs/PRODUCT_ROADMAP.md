@@ -1,6 +1,6 @@
 # Product Roadmap To 1.0.0
 
-> Analysis date: 2026-04-22.
+> Analysis date: 2026-04-23.
 >
 > Scope: Appaloft product, operation, workflow, framework-planner, day-two
 > operations, and release gates through `1.0.0`.
@@ -25,7 +25,7 @@ This roadmap is the release gate for Appaloft versions before `1.0.0`.
 - [x] Use this roadmap to choose the release version.
 - [x] Before the next release, verify package manifests, Release Please state, and the latest
   published release agree on the current version line. The roadmap starts from the current public
-  line `0.2.x` because the current release is `0.2.11`.
+  line `0.2.x` because the current release is `0.2.12`.
 
 Version selection rules:
 
@@ -42,12 +42,15 @@ Version selection rules:
 
 Current release alignment:
 
-- [x] On 2026-04-22, latest public release and `origin/main` package manifests agree on `0.2.11`,
+- [x] On 2026-04-23, latest public release and `origin/main` package manifests agree on `0.2.12`,
   and there is no open Release Please PR, so the next stable-release action is to create or update
-  the next patch-line Release Please PR for `0.2.12`.
-- [x] On 2026-04-22, the `v0.2.11` release is the current stable public line. Since Phase 1 is
-  still incomplete, the next allowed stable target remains `0.2.12` on the `0.2.x` line rather
+  the next patch-line Release Please PR for `0.2.13`.
+- [x] On 2026-04-23, the `v0.2.12` release is the current stable public line. Since Phase 1 is
+  still incomplete, the next allowed stable target remains `0.2.13` on the `0.2.x` line rather
   than `0.3.0`.
+- [x] On 2026-04-23, the public docs app and standalone docs deployment workflow are merged on
+  `origin/main`; `docs.appaloft.com` DNS and release deployment secrets/variables are configured,
+  so the docs site should deploy after the next release publish run creates a GitHub Release.
 - [x] On 2026-04-22, custom resource runtime/container naming for Quick Deploy, CLI config-driven
   deploys, and Web runtime profile editing is merged on `origin/main`, and the current preview
   runtime-name template variables on `main` are `{preview_id}` and `{pr_number}`.
