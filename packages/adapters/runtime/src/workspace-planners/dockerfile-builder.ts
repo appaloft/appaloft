@@ -23,6 +23,23 @@ const envKeyPattern = /^[A-Za-z_][A-Za-z0-9_]*$/u;
 const defaultStaticBuildImage = "node:22-alpine";
 const defaultStaticServerImage = "nginx:1.27-alpine";
 const staticServerRoot = "/usr/share/nginx/html/";
+const staticServerConfigPath = "/etc/nginx/conf.d/default.conf";
+const staticServerConfigLines = [
+  "server {",
+  "  listen 80;",
+  "  server_name _;",
+  `  root ${staticServerRoot.replace(/\/+$/, "")};`,
+  "  index index.html;",
+  "",
+  "  location ~* \\.[A-Za-z0-9][A-Za-z0-9._-]*$ {",
+  "    try_files $uri =404;",
+  "  }",
+  "",
+  "  location / {",
+  "    try_files $uri $uri/ /index.html;",
+  "  }",
+  "}",
+];
 
 function dockerfileToken(value: string, label: string): string {
   const token = value.trim();
@@ -35,6 +52,16 @@ function dockerfileToken(value: string, label: string): string {
 
 function jsonArray(values: readonly string[]): string {
   return JSON.stringify(values);
+}
+
+function shellSingleQuote(value: string): string {
+  return `'${value.replace(/'/g, "'\\''")}'`;
+}
+
+function renderStaticServerConfigCommand(): string {
+  return `printf '%s\\n' ${staticServerConfigLines
+    .map((line) => shellSingleQuote(line))
+    .join(" ")} > ${shellSingleQuote(staticServerConfigPath)}`;
 }
 
 export class DockerfileBuilder {
@@ -225,6 +252,7 @@ export function renderStaticSiteDockerfile(context: StaticSiteDockerfileContext)
     return new DockerfileBuilder()
       .from(serverImage)
       .copyJson(publishDirectorySource, staticServerRoot)
+      .runShell(renderStaticServerConfigCommand())
       .expose(80)
       .cmdExec(["nginx", "-g", "daemon off;"])
       .build();
@@ -240,6 +268,7 @@ export function renderStaticSiteDockerfile(context: StaticSiteDockerfileContext)
     .runShell(context.buildCommand)
     .from(serverImage)
     .copyJson(`/app/${publishDirectorySource}`, staticServerRoot, { from: "build" })
+    .runShell(renderStaticServerConfigCommand())
     .expose(80)
     .cmdExec(["nginx", "-g", "daemon off;"])
     .build();

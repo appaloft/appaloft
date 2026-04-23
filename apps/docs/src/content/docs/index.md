@@ -20,10 +20,10 @@ hero:
   tagline: "从第一次部署到服务器、域名、环境变量和故障排查，这里按你想完成的事情组织。"
   actions:
     - text: "完成第一次部署"
-      link: /docs/start/first-deployment/
+      link: start/first-deployment/
       icon: right-arrow
     - text: "查看常见问题"
-      link: /docs/observe/diagnostics/
+      link: observe/diagnostics/
       variant: minimal
       icon: external
 ---

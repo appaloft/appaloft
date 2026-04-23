@@ -19,10 +19,10 @@ hero:
   tagline: "From your first deployment to servers, domains, environment variables, and troubleshooting, these docs are organized around what you want to get done."
   actions:
     - text: "Complete your first deployment"
-      link: /docs/en/start/first-deployment/
+      link: start/first-deployment/
       icon: right-arrow
     - text: "View troubleshooting"
-      link: /docs/en/observe/diagnostics/
+      link: observe/diagnostics/
       variant: minimal
       icon: external
 ---

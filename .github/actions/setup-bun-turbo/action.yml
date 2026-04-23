@@ -14,16 +14,16 @@ runs:
       with:
         bun-version-file: .bun-version
 
-    - name: Cache Bun install cache
-      uses: actions/cache@v4
+    - name: Restore Bun install cache
+      uses: actions/cache/restore@v4
       with:
         path: ~/.bun/install/cache
         key: ${{ runner.os }}-bun-${{ hashFiles('.bun-version', 'bun.lock') }}
         restore-keys: |
           ${{ runner.os }}-bun-
 
-    - name: Cache Turbo task cache
-      uses: actions/cache@v4
+    - name: Restore Turbo task cache
+      uses: actions/cache/restore@v4
       with:
         path: .turbo
         key: ${{ runner.os }}-turbo-${{ github.job }}-${{ github.sha }}

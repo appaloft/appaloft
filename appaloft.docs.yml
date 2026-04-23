@@ -2,7 +2,7 @@ runtime:
   strategy: static
   name: appaloft-docs
   installCommand: bun install --frozen-lockfile
-  buildCommand: bun run --cwd apps/docs build
+  buildCommand: APPALOFT_DOCS_BASE=/ APPALOFT_DOCS_SITE=https://docs.appaloft.com bun run --cwd apps/docs build
   publishDirectory: apps/docs/dist
   healthCheckPath: /
 
