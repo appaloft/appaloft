@@ -18,6 +18,7 @@ Consumers:
 - `@appaloft/design/styles/www.css`: future website entrypoint using the same fonts, tokens, and Tailwind theme.
 - `@appaloft/design/styles/tokens.css`: raw CSS custom properties.
 - `@appaloft/design/styles/tailwind.css`: Tailwind v4 `@theme inline` mapping.
+- `@appaloft/design/assets/*`: canonical Appaloft logo and icon SVG assets.
 
 ## Product Model
 
@@ -52,6 +53,15 @@ attempt pages.
 - Product wordmark and rare editorial headings: Fraunces.
 - Avoid Inter/Roboto/system-only stacks for Appaloft-owned surfaces.
 - Technical labels, ids, ports, and command text must use monospace.
+
+## Brand Assets
+
+- Header, sidebar, documentation, website, favicon, and app-icon usage must pull Appaloft SVG
+  assets from `@appaloft/design/assets/*` when bundler support is available.
+- App icon usage should use `appaloft-icon-light.svg` on light or neutral surfaces and
+  `appaloft-icon-dark.svg` on dark surfaces.
+- Product wordmarks and horizontal logos are brand assets, not text recreated with local font
+  choices.
 
 ## Component Rules
 

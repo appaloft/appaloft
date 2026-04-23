@@ -184,6 +184,11 @@ export default defineConfig({
         "zh-CN": "Appaloft 文档",
         en: "Appaloft Docs",
       },
+      logo: {
+        dark: "@appaloft/design/assets/appaloft-icon-dark.svg",
+        light: "@appaloft/design/assets/appaloft-icon-light.svg",
+        alt: "",
+      },
       description: "Task-oriented Appaloft documentation for CLI, HTTP API, and Web console users.",
       defaultLocale: "root",
       locales: {

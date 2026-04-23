@@ -9,6 +9,7 @@ describe("design package", () => {
     expect(designPackage.cssEntrypoints.web).toBe("@appaloft/design/styles/web.css");
     expect(designPackage.cssEntrypoints.docs).toBe("@appaloft/design/styles/docs.css");
     expect(designPackage.cssEntrypoints.www).toBe("@appaloft/design/styles/www.css");
+    expect(designPackage.assets.iconLight).toBe("@appaloft/design/assets/appaloft-icon-light.svg");
   });
 
   test("keeps Web semantic tokens available for Tailwind consumers", async () => {
@@ -19,5 +20,15 @@ describe("design package", () => {
       expect(tokensCss).toContain(token);
       expect(tailwindCss).toContain(token);
     }
+  });
+
+  test("keeps brand assets available to product surfaces", async () => {
+    const icon = await readFile(
+      new URL("../assets/appaloft-icon-light.svg", import.meta.url),
+      "utf8",
+    );
+
+    expect(icon).toContain("<title>Appaloft icon light</title>");
+    expect(icon).toContain("#4E84FF");
   });
 });

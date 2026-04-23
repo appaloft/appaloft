@@ -35,8 +35,21 @@ body {
 }
 
 .site-title {
-  font-family: var(--appaloft-font-serif);
-  letter-spacing: -0.03em;
+  color: var(--foreground);
+  font-family: var(--appaloft-font-sans);
+  letter-spacing: -0.015em;
+}
+
+.site-title img {
+  border-radius: calc(var(--radius) + 0.25rem);
+  box-shadow: var(--shadow-sm);
+  height: 2rem;
+  width: 2rem;
+}
+
+.site-title span {
+  font-size: 0.95rem;
+  font-weight: 600;
 }
 
 .sl-markdown-content h1,

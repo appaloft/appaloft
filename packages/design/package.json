@@ -10,7 +10,8 @@
     "./styles/tailwind.css": "./styles/tailwind.css",
     "./styles/web.css": "./styles/web.css",
     "./styles/docs.css": "./styles/docs.css",
-    "./styles/www.css": "./styles/www.css"
+    "./styles/www.css": "./styles/www.css",
+    "./assets/*": "./assets/*"
   },
   "scripts": {
     "lint": "biome check .",

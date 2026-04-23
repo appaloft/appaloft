@@ -17,5 +17,11 @@ export const designPackage = {
     tokens: "@appaloft/design/styles/tokens.css",
     tailwind: "@appaloft/design/styles/tailwind.css",
   },
+  assets: {
+    iconLight: "@appaloft/design/assets/appaloft-icon-light.svg",
+    iconDark: "@appaloft/design/assets/appaloft-icon-dark.svg",
+    logoHorizontal: "@appaloft/design/assets/appaloft-logo-horizontal.svg",
+    logoHorizontalInverse: "@appaloft/design/assets/appaloft-logo-horizontal-inverse.svg",
+  },
   documentation: "@appaloft/design/design.md",
 } as const;

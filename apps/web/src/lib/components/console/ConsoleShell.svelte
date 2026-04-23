@@ -18,10 +18,10 @@
     UserRound,
   } from "@lucide/svelte";
   import type { ResourceSummary } from "@appaloft/contracts";
+  import appaloftIcon from "@appaloft/design/assets/appaloft-icon-light.svg";
   import type { Snippet } from "svelte";
 
   import { API_BASE, readErrorMessage, request } from "$lib/api/client";
-  import appaloftIcon from "$lib/assets/appaloft-icon-light.svg";
   import ResourceHealthDot from "$lib/components/console/ResourceHealthDot.svelte";
   import ResourceHealthLabel from "$lib/components/console/ResourceHealthLabel.svelte";
   import { Avatar, AvatarFallback } from "$lib/components/ui/avatar";
