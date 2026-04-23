@@ -142,22 +142,42 @@ The first implementation may adapt the existing progress/timeline projection as 
 new query, but it must not keep the long-term public observation contract dependent on the original
 command transport remaining open.
 
+## Completed Code Round: `deployments.stream-events`
+
+`deployments.stream-events` is implemented with:
+
+1. Application query slice:
+   - `stream-deployment-events.schema.ts`;
+   - `stream-deployment-events.query.ts`;
+   - `stream-deployment-events.handler.ts`;
+   - `stream-deployment-events.query-service.ts`.
+2. Application ports and tokens for `DeploymentEventObserver` and
+   `StreamDeploymentEventsQueryService`.
+3. Operation catalog and `CORE_OPERATIONS.md` active operation entries.
+4. HTTP/oRPC bounded replay endpoint at `/api/deployments/{deploymentId}/events`.
+5. HTTP/oRPC streaming endpoint at `/api/deployments/{deploymentId}/events/stream`.
+6. CLI subcommand `appaloft deployments events <deploymentId>` with follow, cursor, history, and
+   terminal-close flags.
+7. Shell deployment event observer that adapts persisted deployment logs and live progress
+   observations into normalized stream envelopes.
+8. Web deployment detail timeline replay/follow behavior over `deployments.stream-events`, with
+   detail and logs kept on their separate queries.
+9. Focused automated coverage for bounded replay, missing deployment, invalid cursor, normalized
+   progress replay, follow-mode service behavior, HTTP dispatch, and Web timeline replay/follow.
+
 ## Current Implementation Notes And Migration Gaps
 
-Standalone `deployments.stream-events` is not implemented yet.
+The first active implementation uses deployment log/progress projection data and live progress
+observation as its event source. Cursor tokens currently use deployment-local sequence positions.
 
-Existing product seams that can seed the first slice:
+Remaining hardening gaps:
 
-- `deployments.show` already exposes recent timeline/summary data;
-- create-time progress transport already emits deployment-phase updates while the initial request is
-  alive;
-- canonical deployment lifecycle event specs already exist for
-  `deployment-requested`, `build-requested`, `deployment-started`,
-  `deployment-succeeded`, and `deployment-failed`.
-
-What is still missing is the formal query, cursor/follow contract, and public transport mapping.
+- cursor durability across projection rebuilds or pruning;
+- explicit gap-envelope and post-open follow-failure tests;
+- CLI follow/cancellation executable coverage;
+- future richer durable lifecycle sourcing when outbox/process state becomes first-class.
 
 ## Open Questions
 
-- Should the first cursor token be derived from projection sequence, outbox/event id, or a separate
-  deployment-observation checkpoint table?
+- None for the active first implementation. Future durable process/outbox work may replace the
+  deployment-local sequence cursor with a rebuild-stable checkpoint token.

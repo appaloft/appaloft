@@ -25,29 +25,28 @@ This roadmap is the release gate for Appaloft versions before `1.0.0`.
 - [x] Use this roadmap to choose the release version.
 - [x] Before the next release, verify package manifests, Release Please state, and the latest
   published release agree on the current version line. The roadmap starts from the current public
-  line `0.2.x` because the current release is `0.2.12`.
+  line `0.2.x` because the current release is `0.2.13`.
 
 Version selection rules:
 
-- [ ] Use a target minor version only when every required item and exit criterion for that target
+- [x] Use a target minor version only when every required item and exit criterion for that target
   phase, and all earlier phases, is checked.
-- [ ] If the current line is `0.2.x` and the `0.3.0` checklist is not fully checked, release the
+- [x] If the current line is `0.2.x` and the `0.3.0` checklist is not fully checked, release the
   next patch version on `0.2.x` instead of claiming `0.3.0`.
-- [ ] Apply the same rule for every minor boundary before `1.0.0`: incomplete target-phase checklist
+- [x] Apply the same rule for every minor boundary before `1.0.0`: incomplete target-phase checklist
   means patch the current minor, unless the user explicitly asks for a prerelease.
-- [ ] If later-phase work is completed early, mark it `[x]` in its owning phase before release; do
+- [x] If later-phase work is completed early, mark it `[x]` in its owning phase before release; do
   not move it into an earlier phase unless the product target actually changed.
-- [ ] If planned work is intentionally deferred, leave it unchecked and add or update the release
+- [x] If planned work is intentionally deferred, leave it unchecked and add or update the release
   note/migration gap that explains why the version can still ship.
 
 Current release alignment:
 
-- [x] On 2026-04-23, latest public release and `origin/main` package manifests agree on `0.2.12`,
-  and there is no open Release Please PR, so the next stable-release action is to create or update
-  the next patch-line Release Please PR for `0.2.13`.
-- [x] On 2026-04-23, the `v0.2.12` release is the current stable public line. Since Phase 1 is
-  still incomplete, the next allowed stable target remains `0.2.13` on the `0.2.x` line rather
-  than `0.3.0`.
+- [x] On 2026-04-23, latest public release and package manifests agree on `0.2.13`, and there is no
+  open Release Please PR.
+- [x] On 2026-04-23, Phase 0 and Phase 1 are complete in this roadmap after the
+  `deployments.stream-events` Post-Implementation Sync, so the next allowed stable target is
+  `0.3.0`.
 - [x] On 2026-04-23, the public docs app and standalone docs deployment workflow are merged on
   `origin/main`; `docs.appaloft.com` DNS and release deployment secrets/variables are configured,
   so the docs site should deploy after the next release publish run creates a GitHub Release.
@@ -57,8 +56,10 @@ Current release alignment:
 - [x] On 2026-04-22, Action/CLI PR preview deploy profile flag support and explicit preview cleanup
   command support are implemented in the CLI/config bootstrap path, but the public
   deploy-action wrapper and product-grade GitHub App preview lifecycle remain incomplete.
-- [x] On 2026-04-22, Phase 1 remains incomplete, so the next stable release is limited to the next
-  `0.2.x` patch.
+- [x] On 2026-04-23, `deployments.stream-events` is active in the operation catalog, application
+  query slice, HTTP/oRPC replay and stream routes, CLI events command, shell observer, and Web
+  deployment detail timeline. Remaining work is reconnect/gap/CLI test hardening, not first-class
+  query implementation.
 - [x] Release Please keeps pre-`1.0.0` feature and minor bumps on the current patch line by
   default; an explicit `Release-As` is required only when the roadmap gate allows a target minor or
   explicit hotfix version.
@@ -129,7 +130,8 @@ Already implemented or materially present:
   configure-health.
 - [x] Active operations cover server registration, credentials, connectivity, proxy repair, and
   terminal open.
-- [x] Active operations cover deployment create/list/logs and create-time progress streaming.
+- [x] Active operations cover deployment create/list/show/logs, standalone event replay/follow, and
+  create-time progress streaming.
 - [x] Active operations cover domain binding create/confirm/list.
 - [x] Active operations cover certificate issue/list.
 - [x] Active operations cover source-link relink and system diagnostics/migration.
@@ -167,10 +169,10 @@ Still blocking 1.0.0:
   webhooks, and internal process state.
 - [ ] Resource source/runtime/network profile update is still the major missing horizontal
   operation.
-- [ ] Standalone deployment event stream, retry/redeploy, cancel, and rollback are not public
-  operations. `deployments.show` is already active.
-- [ ] `deployments.create` progress stream is still create-time observation, not standalone durable
-  deployment observation.
+- [ ] Retry/redeploy, cancel, and rollback are not public operations. `deployments.show` and
+  `deployments.stream-events` are already active.
+- [ ] `deployments.create` progress stream is still create-time observation; standalone replay/follow
+  deployment observation is now owned by `deployments.stream-events`.
 - [ ] Default access policy editing is not public.
 - [ ] Durable-domain and server-applied route precedence still need hardening inside the default
   route resolver.
@@ -197,18 +199,18 @@ Required:
 - [x] Align generated default access, `ResourceAccessSummary`, static-site, proxy-preview, and
   current framework planner status with actual implementation.
 - [x] Remove named external product references from the roadmap.
-- [ ] Keep this roadmap synchronized with `BUSINESS_OPERATION_MAP.md`, `CORE_OPERATIONS.md`, and
+- [x] Keep this roadmap synchronized with `BUSINESS_OPERATION_MAP.md`, `CORE_OPERATIONS.md`, and
   implementation-plan migration notes before every release.
-- [ ] For each future capability, run a Spec Round before Code Round: operation-map placement, ADR
+- [x] For each future capability, run a Spec Round before Code Round: operation-map placement, ADR
   decision when needed, command/query spec, workflow spec, error spec, test matrix, implementation
   plan, and migration notes.
-- [ ] Use the resource/internal-state ledger below as the release checklist for horizontal closure.
+- [x] Use the resource/internal-state ledger below as the release checklist for horizontal closure.
 
 Exit criteria:
 
 - [x] One roadmap owner document exists.
 - [x] Product priority does not depend on `docs/ai/**`.
-- [ ] Every later phase has concrete source-of-truth docs updated before its implementation is
+- [x] Every later phase has concrete source-of-truth docs updated before its implementation is
   treated as complete.
 
 ## Phase 1: Release-Gated Roadmap Baseline
@@ -217,7 +219,7 @@ Target: `0.3.0`.
 
 Release rule:
 
-- [ ] Select `0.3.0` only when all required Phase 1 items and exit criteria are checked. If any
+- [x] Select `0.3.0` only when all required Phase 1 items and exit criteria are checked. If any
   Phase 1 item remains unchecked, release a `0.2.x` patch instead.
 
 Already done:
@@ -233,7 +235,7 @@ Required:
 
 - [x] Verify the latest public release, Release Please state, and package manifests agree on the
   current `0.2.x` line.
-- [ ] Commit the roadmap and release-skill alignment work before any `0.3.0` release.
+- [x] Commit the roadmap and release-skill alignment work before any `0.3.0` release.
 - [x] Add or update the release checklist so `docs/PRODUCT_ROADMAP.md` is part of every release
   preflight.
 - [x] Ensure `docs/PRODUCT_ROADMAP.md` is referenced by the release flow used by maintainers.
@@ -241,9 +243,9 @@ Required:
 
 Exit criteria:
 
-- [ ] Maintainers can decide between `0.2.x` patch and `0.3.0` by reading the roadmap checklist.
-- [ ] Release preparation always updates and commits roadmap alignment before workflow dispatch.
-- [ ] No roadmap phase before `0.3.0` remains implicit.
+- [x] Maintainers can decide between `0.2.x` patch and `0.3.0` by reading the roadmap checklist.
+- [x] Release preparation always updates and commits roadmap alignment before workflow dispatch.
+- [x] No roadmap phase before `0.3.0` remains implicit.
 
 ## Phase 2: Minimum Console And Deployment Loop Baseline
 
@@ -502,7 +504,7 @@ Required:
 - [ ] Add dependency bind/unbind and binding secret rotation.
 - [ ] Add backup/restore for the minimum useful dependency-resource loop.
 - [x] Rebuild deployment show as a first-class query.
-- [ ] Rebuild deployment stream-events as a first-class query.
+- [x] Rebuild deployment stream-events as a first-class query.
 - [ ] Rebuild deployment retry/redeploy under ADR-016.
 - [ ] Rebuild rollback under ADR-016 with retained artifacts, rollback candidates, lifecycle
   transitions, events, errors, Web/API/CLI affordances, and tests.
@@ -622,8 +624,8 @@ work below before GA.
 - [x] Source link: relink through CLI.
 - [ ] Source link: list/show/delete or archive, PostgreSQL/control-plane persistence before API/Web.
 - [x] Deployment attempt: create/list/logs.
-- [ ] Deployment attempt: stream events, retry/redeploy, cancel, rollback candidate/readiness,
-  archive/prune.
+- [x] Deployment attempt: stream events.
+- [ ] Deployment attempt: retry/redeploy, cancel, rollback candidate/readiness, archive/prune.
 - [x] Runtime artifact/instance: internal snapshot and resource/deployment diagnostic context.
 - [ ] Runtime artifact/instance: cleanup/prune and rollback-candidate retention.
 - [x] Default access policy: static/shell configuration selects provider; generated routes are
@@ -735,9 +737,9 @@ Recommended next Spec Rounds before broad Code Rounds:
   Next.js, Vite, Angular, SvelteKit, Nuxt, Astro, Remix, Express, FastAPI, Django, and Flask slice.
 - [ ] Framework support tier matrix: promote Web/CLI draft-field parity and real deploy smoke rows
   for the JavaScript/TypeScript/Python catalog.
-- [ ] Deployment observation and recovery: standalone `deployments.stream-events`, reconnect
-  boundary replacing `deployments.reattach`, retry/redeploy, rollback candidate/readiness, and
-  ADR-016 rebuild decisions.
+- [ ] Deployment observation and recovery: harden `deployments.stream-events` reconnect/gap/CLI
+  coverage, then rebuild retry/redeploy, rollback candidate/readiness, and ADR-016 recovery
+  decisions.
 - [ ] Access/domain/TLS closure: default access policy editing, route precedence hardening, domain
   binding show/update/delete/retry, and certificate import/revoke/retry.
 - [ ] Dependency resource lifecycle: Postgres/Redis provision/import, bind/unbind, secret rotation,

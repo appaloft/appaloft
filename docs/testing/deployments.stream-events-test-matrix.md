@@ -103,17 +103,37 @@ Then:
 
 ## Current Implementation Notes And Migration Gaps
 
-There is no standalone executable coverage yet for `deployments.stream-events`.
+Automated coverage now exists for:
 
-Current product coverage around deployment observation is split across:
+- `DEP-EVENTS-QRY-001` in `packages/application/test/stream-deployment-events.test.ts`;
+- `DEP-EVENTS-QRY-002` in `packages/application/test/stream-deployment-events.test.ts`;
+- `DEP-EVENTS-QRY-003` in `apps/shell/test/deployment-event-observer.test.ts`;
+- `DEP-EVENTS-QRY-006` in `apps/shell/test/deployment-event-observer.test.ts`;
+- `DEP-EVENTS-STREAM-001` service-mode coverage in
+  `packages/application/test/stream-deployment-events.test.ts`;
+- envelope merge, cursor extraction, heartbeat/gap/error rendering, and summary mapping in
+  `apps/web/src/lib/console/deployment-progress.test.ts`;
+- `DEP-EVENTS-ENTRY-004` bounded HTTP/oRPC dispatch in
+  `packages/orpc/test/deployment-event-stream.http.test.ts`;
+- `DEP-EVENTS-ENTRY-005` Web deployment detail replay/follow behavior in
+  `apps/web/test/e2e-webview/home.webview.test.ts`.
 
-- `deployments.show` detail tests;
-- `deployments.logs` transport/read tests;
-- create-time deployment progress transport coverage during `deployments.create`.
+Remaining executable coverage gaps:
 
-Those tests do not yet prove cursor-based reconnect or standalone event replay.
+- `DEP-EVENTS-QRY-004` cursor continuation after a known envelope;
+- `DEP-EVENTS-QRY-005` source-unavailable startup error;
+- `DEP-EVENTS-QRY-007` finite historical-only close behavior at the query-service boundary;
+- `DEP-EVENTS-QRY-008` detail/log separation at the query-service boundary;
+- `DEP-EVENTS-STREAM-002` heartbeat behavior;
+- `DEP-EVENTS-STREAM-003` terminal close behavior beyond service-mode smoke coverage;
+- `DEP-EVENTS-STREAM-004` caller cancellation and cleanup;
+- `DEP-EVENTS-STREAM-005` explicit gap-envelope scenario;
+- `DEP-EVENTS-STREAM-006` post-open follow-source failure;
+- `DEP-EVENTS-OWN-001` through `DEP-EVENTS-OWN-004` as explicit boundary assertions;
+- `DEP-EVENTS-ENTRY-001` and `DEP-EVENTS-ENTRY-002` as standalone Web timeline/reconnect rows
+  separate from the Quick Deploy handoff row;
+- `DEP-EVENTS-ENTRY-003` CLI follow/cancellation coverage.
 
 ## Open Questions
 
-- Should the first browser/e2e assertion cover only historical replay, or should it also prove
-  cursor-based reconnect in the same first Code Round?
+- None for the active first implementation. Cursor reconnect remains a named executable coverage gap.
