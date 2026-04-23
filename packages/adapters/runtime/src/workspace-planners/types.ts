@@ -13,12 +13,20 @@ import {
 export {
   type DockerfileBuildContext,
   DockerfileBuilder,
+  dockerBuildFromExecution,
   dockerfileFromExecution,
+  renderStaticSiteDockerBuild,
   renderStaticSiteDockerfile,
+  renderWorkspaceDockerBuild,
   renderWorkspaceDockerfile,
   type StaticSiteDockerfileContext,
+  staticSiteDockerBuildFromExecution,
   staticSiteDockerfileFromExecution,
 } from "./dockerfile-builder";
+export type {
+  GeneratedDockerBuildAsset,
+  GeneratedDockerBuildResult,
+} from "../generated-docker-build-assets";
 
 export const generatedWorkspaceDockerfileName = "Dockerfile.appaloft";
 
@@ -60,7 +68,9 @@ export interface WorkspaceRuntimePlanner {
   readonly runtimeKind: WorkspaceRuntimeKind;
   detect(input: WorkspacePlannerInput): boolean;
   plan(input: WorkspacePlannerInput): Result<WorkspaceRuntimePlan>;
-  dockerfile(input: WorkspaceDockerfileInput): string | null;
+  dockerBuild(
+    input: WorkspaceDockerfileInput,
+  ): import("../generated-docker-build-assets").GeneratedDockerBuildResult | null;
 }
 
 export function commandMentions(input: WorkspacePlannerInput, terms: readonly string[]): boolean {

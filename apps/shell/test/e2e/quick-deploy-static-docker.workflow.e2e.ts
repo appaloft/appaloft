@@ -137,13 +137,21 @@ describe("quick deploy static Docker workflow e2e", () => {
         deploymentId,
         "Dockerfile.appaloft-static",
       );
+      const generatedStaticConfigAsset = join(
+        fixtureDir,
+        ".appaloft",
+        "docker-build",
+        "static-server",
+        "default.conf",
+      );
       expect(existsSync(generatedDockerfile)).toBe(true);
+      expect(existsSync(generatedStaticConfigAsset)).toBe(false);
       const dockerfileText = await Bun.file(generatedDockerfile).text();
       expect(dockerfileText).toContain("FROM nginx:1.27-alpine");
       expect(dockerfileText).toContain('COPY ["dist/","/usr/share/nginx/html/"]');
-      expect(dockerfileText).toContain("/etc/nginx/conf.d/default.conf");
-      expect(dockerfileText).toContain("try_files $uri $uri/ /index.html");
-      expect(dockerfileText).toContain("try_files $uri =404");
+      expect(dockerfileText).toContain(
+        'COPY [".appaloft/docker-build/static-server/default.conf","/etc/nginx/conf.d/default.conf"]',
+      );
       expect(dockerfileText).toContain("EXPOSE 80");
 
       const deployments = runShellCli(["deployments", "list"], workspace.cliOptions);
