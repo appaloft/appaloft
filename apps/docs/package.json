@@ -11,11 +11,9 @@
     "lint": "biome check ."
   },
   "devDependencies": {
+    "@appaloft/design": "workspace:*",
     "@astrojs/check": "^0.9.8",
     "@astrojs/starlight": "^0.38.3",
-    "@fontsource/fraunces": "^5.2.9",
-    "@fontsource/ibm-plex-mono": "^5.2.7",
-    "@fontsource/ibm-plex-sans": "^5.2.8",
     "astro": "^6.1.9",
     "typescript": "^6.0.2"
   }

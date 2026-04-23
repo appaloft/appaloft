@@ -1,92 +1,12 @@
-@import "@fontsource/ibm-plex-sans/400.css";
-@import "@fontsource/ibm-plex-sans/500.css";
-@import "@fontsource/ibm-plex-sans/600.css";
-@import "@fontsource/ibm-plex-mono/400.css";
-@import "@fontsource/ibm-plex-mono/500.css";
-@import "@fontsource/fraunces/600.css";
-
-:root {
-  --sl-font: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
-  --sl-font-mono: "IBM Plex Mono", ui-monospace, monospace;
-  --sl-color-accent-low: #d9fbe7;
-  --sl-color-accent: #0f8f4f;
-  --sl-color-accent-high: #053d26;
-  --sl-color-white: #fbfaf6;
-  --sl-color-gray-1: #efeee7;
-  --sl-color-gray-2: #d7d4c9;
-  --sl-color-gray-3: #aaa69a;
-  --sl-color-gray-4: #767268;
-  --sl-color-gray-5: #4b473f;
-  --sl-color-gray-6: #302d28;
-  --sl-color-black: #171512;
-  --appaloft-grid: color-mix(in oklab, var(--sl-color-gray-5) 22%, transparent);
-}
-
-:root[data-theme="light"] {
-  --sl-color-accent-low: #e1f8e9;
-  --sl-color-accent: #126c42;
-  --sl-color-accent-high: #07351f;
-  --sl-color-white: #161611;
-  --sl-color-gray-1: #27251f;
-  --sl-color-gray-2: #464237;
-  --sl-color-gray-3: #706a5b;
-  --sl-color-gray-4: #9d9788;
-  --sl-color-gray-5: #cbc5b7;
-  --sl-color-gray-6: #e8e2d3;
-  --sl-color-gray-7: #f7f1df;
-  --sl-color-black: #fffaf0;
-}
-
-body {
-  background:
-    radial-gradient(
-      circle at 12% 8%,
-      color-mix(in oklab, var(--sl-color-accent) 16%, transparent),
-      transparent 26rem
-    ),
-    linear-gradient(90deg, var(--appaloft-grid) 1px, transparent 1px),
-    linear-gradient(0deg, var(--appaloft-grid) 1px, transparent 1px), var(--sl-color-black);
-  background-size:
-    auto,
-    3.5rem 3.5rem,
-    3.5rem 3.5rem,
-    auto;
-}
-
-.site-title {
-  font-family: "Fraunces", Georgia, serif;
-  letter-spacing: -0.03em;
-}
-
-.sl-markdown-content h1,
-.sl-markdown-content h2,
-.sl-markdown-content h3 {
-  letter-spacing: -0.03em;
-}
-
-.sl-markdown-content h1 {
-  font-family: "Fraunces", Georgia, serif;
-}
-
-.sl-markdown-content code {
-  border: 1px solid color-mix(in oklab, var(--sl-color-gray-4) 36%, transparent);
-}
-
-.sl-markdown-content a {
-  text-underline-offset: 0.2em;
-}
-
-.hero img {
-  filter: drop-shadow(0 24px 80px color-mix(in oklab, var(--sl-color-accent) 26%, transparent));
-}
+@import "@appaloft/design/styles/docs.css";
 
 .sl-markdown-content img[src*="/diagrams/"] {
-  border: 1px solid color-mix(in oklab, var(--sl-color-accent) 26%, transparent);
-  border-radius: 1.25rem;
-  box-shadow: 0 24px 70px color-mix(in oklab, var(--sl-color-black) 18%, transparent);
+  border: 1px solid color-mix(in oklch, var(--border) 70%, transparent);
+  border-radius: var(--radius-xl);
+  box-shadow: 0 18px 48px color-mix(in oklch, var(--foreground) 10%, transparent);
   margin-block: 1.5rem;
 }
 
 .sl-markdown-content pre {
-  box-shadow: 0 18px 48px color-mix(in oklab, var(--sl-color-black) 16%, transparent);
+  box-shadow: 0 18px 48px color-mix(in oklch, var(--foreground) 10%, transparent);
 }

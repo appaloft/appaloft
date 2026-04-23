@@ -47,6 +47,11 @@ live under `apps/docs`, and the public documentation source should live with tha
 future ADR extracts a shared `packages/docs-content` package for generated indexes or reusable
 content processing.
 
+Public documentation must use the same product design language as the Web console. The canonical
+design package is `@appaloft/design`; Web remains the reference surface for product tokens, and
+Docs/www consume those tokens instead of redefining font, color, radius, shadow, or Tailwind theme
+variables locally.
+
 The public documentation site technology is **Astro Starlight** unless a later ADR supersedes this
 decision. Starlight is selected because it fits Appaloft's current requirements:
 
@@ -183,6 +188,8 @@ public documentation contract.
 - `apps/docs` is the expected documentation app location in the monorepo.
 - `apps/docs` may use Astro, Starlight, Tailwind, and documentation-only tooling, but must not
   depend on `packages/core` or `packages/application`.
+- `apps/docs` and future `www` must consume `@appaloft/design` so product surfaces share the same
+  typography, color semantics, radius, shadows, and Tailwind theme vocabulary.
 - Public documentation structure diverges intentionally from internal spec structure.
 - Web, CLI, API, and future MCP/tool help should converge on stable documentation anchors.
 - Binary and release packaging must plan for documentation assets separately from Web console
@@ -209,6 +216,17 @@ Current implementation has an `apps/docs` Starlight/Astro application with:
 - Pagefind search index generation through Starlight;
 - stable explicit anchors in specific nested pages rather than group-only overview pages;
 - a curated `llms.txt` file.
+
+Current implementation has a shared `@appaloft/design` package with:
+
+- Web-derived CSS tokens for color, radius, shadows, and typography;
+- Tailwind v4 `@theme inline` mappings for product color and radius utilities;
+- Web, Docs, and future www CSS entrypoints;
+- a canonical `packages/design/DESIGN.md` design-language contract.
+
+`apps/web` imports `@appaloft/design/styles/web.css`. `apps/docs` imports
+`@appaloft/design/styles/docs.css`, which maps the same tokens into Starlight variables so docs
+feel like the product manual for the console rather than a separate visual system.
 
 Current implementation also has documentation packaging support:
 
@@ -238,9 +256,10 @@ documented public topics.
 Current implementation still has no full automated public documentation coverage checker for all
 links, locale drift, search freshness, or full Web/CLI/API/MCP surface adoption.
 
-Tailwind Vite plugin integration is deferred because the current Tailwind v4 Vite plugin path fails
-against the repository's current Vite 8/Rolldown dependency set during static docs builds. The docs
-app uses Appaloft CSS variables and local font assets until that compatibility issue is resolved.
+Tailwind Vite plugin integration for Docs is deferred because the current Tailwind v4 Vite plugin
+path fails against the repository's current Vite 8/Rolldown dependency set during static docs
+builds. The docs app still consumes `@appaloft/design` tokens and fonts; it does not yet consume the
+Tailwind entrypoint directly.
 
 Until those are implemented, user-visible Code Rounds must still identify the intended public docs
 page and anchor in specs or migration gaps when the behavior changes user-facing input, output,

@@ -20,6 +20,10 @@ bounded context, command handler, value object, repository, port, adapter, and p
 not appear in primary user journeys unless the page is explicitly an advanced contributor or
 operator reference.
 
+Public docs must also share the Appaloft product design language. `apps/web` is the reference
+surface for tokens; `apps/docs` and future `www` must consume `@appaloft/design` rather than
+redefining product fonts, colors, radius, shadows, or Tailwind theme names locally.
+
 Every user-visible behavior that changes input, output, status, recovery, workflow sequencing, or
 entrypoint affordances must have one of these Docs Round outcomes:
 
@@ -252,6 +256,11 @@ IA v2 pages now exist in `zh-CN` and `en-US` under nested grouped paths such as 
 explicit anchors for first-pass help-link targets. Legacy top-level seed pages are intentionally
 removed, and product help surfaces now target specific nested pages instead of group overviews.
 
+`@appaloft/design` now owns product-facing design tokens and the design-language contract. Web
+imports `@appaloft/design/styles/web.css` and remains the reference implementation. Docs imports
+`@appaloft/design/styles/docs.css`, which maps the same tokens into Starlight variables. The future
+`www` surface should import `@appaloft/design/styles/www.css`.
+
 The shell, HTTP adapter, Docker image, install script, and binary bundle now treat docs static
 assets as a separate asset surface from Web console assets. Docs are served under `/docs/*` from
 embedded assets by default, or from `APPALOFT_DOCS_STATIC_DIR` when that override is configured.
@@ -278,8 +287,8 @@ There is still no full automated public docs link, locale, search, or product-he
 Registry anchor-source coverage, operation coverage, and packaging coverage exist for the initial
 slices.
 
-Tailwind Vite plugin integration is deferred; the initial docs app uses Appaloft CSS variables and
-local fonts for theme customization.
+Tailwind Vite plugin integration is deferred for Docs; the docs app consumes shared
+`@appaloft/design` variables and fonts but does not yet consume the Tailwind entrypoint directly.
 
 ## Open Questions
 

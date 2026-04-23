@@ -1,0 +1,62 @@
+@import "./fonts.css";
+@import "./tokens.css";
+
+:root {
+  --sl-font: var(--appaloft-font-sans);
+  --sl-font-mono: var(--appaloft-font-mono);
+  --sl-color-accent-low: color-mix(in oklch, var(--ring) 15%, var(--background));
+  --sl-color-accent: var(--ring);
+  --sl-color-accent-high: color-mix(in oklch, var(--ring) 72%, var(--foreground));
+  --sl-color-white: var(--foreground);
+  --sl-color-gray-1: color-mix(in oklch, var(--foreground) 88%, var(--background));
+  --sl-color-gray-2: color-mix(in oklch, var(--foreground) 72%, var(--background));
+  --sl-color-gray-3: color-mix(in oklch, var(--foreground) 54%, var(--background));
+  --sl-color-gray-4: color-mix(in oklch, var(--foreground) 36%, var(--background));
+  --sl-color-gray-5: color-mix(in oklch, var(--foreground) 20%, var(--background));
+  --sl-color-gray-6: color-mix(in oklch, var(--foreground) 10%, var(--background));
+  --sl-color-gray-7: color-mix(in oklch, var(--foreground) 5%, var(--background));
+  --sl-color-black: var(--background);
+  --appaloft-docs-grid: color-mix(in oklch, var(--border) 44%, transparent);
+}
+
+body {
+  background:
+    linear-gradient(90deg, var(--appaloft-docs-grid) 1px, transparent 1px),
+    linear-gradient(0deg, var(--appaloft-docs-grid) 1px, transparent 1px), var(--background);
+  background-size:
+    3.5rem 3.5rem,
+    3.5rem 3.5rem,
+    auto;
+  color: var(--foreground);
+  font-feature-settings:
+    "cv02" 1,
+    "cv03" 1,
+    "ss01" 1;
+}
+
+.site-title {
+  font-family: var(--appaloft-font-serif);
+  letter-spacing: -0.03em;
+}
+
+.sl-markdown-content h1,
+.sl-markdown-content h2,
+.sl-markdown-content h3 {
+  letter-spacing: -0.03em;
+}
+
+.sl-markdown-content h1 {
+  font-family: var(--appaloft-font-serif);
+}
+
+.sl-markdown-content code {
+  border: 1px solid color-mix(in oklch, var(--border) 70%, transparent);
+}
+
+.sl-markdown-content a {
+  text-underline-offset: 0.2em;
+}
+
+.hero img {
+  filter: drop-shadow(0 24px 80px color-mix(in oklch, var(--ring) 18%, transparent));
+}
