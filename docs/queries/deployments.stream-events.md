@@ -8,7 +8,7 @@
 - Handler: `StreamDeploymentEventsQueryHandler`
 - Query service: `StreamDeploymentEventsQueryService`
 - Domain / bounded context: Release orchestration / Deployment event observation
-- Current status: accepted candidate query
+- Current status: active query
 - Source classification: normative contract
 
 ## Normative Contract
@@ -202,25 +202,29 @@ It must not:
 
 | Entrypoint | Mapping | Status |
 | --- | --- | --- |
-| Web | Deployment detail timeline tab replays and optionally follows this query. | Future / Code Round |
-| CLI | `appaloft deployments events <deploymentId> [--follow] [--cursor <cursor>] [--json]` | Future / Code Round |
-| oRPC / HTTP | Bounded replay and streaming endpoint(s) over the same query schema. | Future / Code Round |
+| Web | Deployment detail timeline tab replays and optionally follows this query. | Active |
+| CLI | `appaloft deployments events <deploymentId> [--follow] [--cursor <cursor>] [--json]` | Active |
+| oRPC / HTTP | Bounded replay and streaming endpoint(s) over the same query schema. | Active |
 | Automation / MCP | Future read-only watch/query tool over the same operation key. | Future |
 
 ## Current Implementation Notes And Migration Gaps
 
-Standalone `deployments.stream-events` is not implemented yet.
+`deployments.stream-events` is active through the application query slice, operation catalog,
+HTTP/oRPC bounded replay endpoint, HTTP/oRPC streaming endpoint, CLI `deployments events` command,
+shell deployment event observer, and Web deployment detail timeline.
 
-Current product surfaces rely on:
+The first active implementation uses deployment log/progress projection data plus live progress
+observation to produce ordered envelopes with `deploymentId:sequence` cursor tokens. This satisfies
+the standalone replay/follow boundary without requiring the original `deployments.create` transport
+to stay open.
 
-- `deployments.show` for immutable deployment detail and recent timeline summary;
-- `deployments.logs` for full attempt logs;
-- create-time progress transport for in-flight deployment observation while the original command
-  request is still open.
+Remaining hardening gaps:
 
-Those are migration seams, not the accepted long-term deployment observation boundary.
+- projection-rebuild-stable cursors beyond the current deployment sequence token;
+- broader executable coverage for CLI follow/cancellation and stream gap/failure envelopes;
+- richer durable lifecycle fact sourcing when outbox/process state becomes first-class.
 
 ## Open Questions
 
-- Should the first cursor implementation use a projection sequence, event id, or transport-safe
-  opaque token that can survive projection rebuilds?
+- None for the active query boundary. Projection-rebuild-stable cursor durability remains future
+  observability hardening.
