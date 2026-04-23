@@ -43,8 +43,11 @@ export const tokens = {
   domainBindingReadModel: Symbol.for("appaloft.domain_binding_read_model"),
   certificateReadModel: Symbol.for("appaloft.certificate_read_model"),
   sshCredentialReadModel: Symbol.for("appaloft.ssh_credential_read_model"),
+  archiveProjectUseCase: Symbol.for("appaloft.archive_project_use_case"),
   createProjectUseCase: Symbol.for("appaloft.create_project_use_case"),
   listProjectsQueryService: Symbol.for("appaloft.list_projects_query_service"),
+  renameProjectUseCase: Symbol.for("appaloft.rename_project_use_case"),
+  showProjectQueryService: Symbol.for("appaloft.show_project_query_service"),
   configureDefaultAccessDomainPolicyUseCase: Symbol.for(
     "appaloft.configure_default_access_domain_policy_use_case",
   ),

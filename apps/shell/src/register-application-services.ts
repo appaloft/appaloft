@@ -1,4 +1,6 @@
 import {
+  ArchiveProjectCommandHandler,
+  ArchiveProjectUseCase,
   ArchiveResourceCommandHandler,
   ArchiveResourceUseCase,
   BootstrapServerEdgeProxyOnTargetRegisteredHandler,
@@ -70,6 +72,8 @@ import {
   RegisterServerUseCase,
   RelinkSourceLinkCommandHandler,
   RelinkSourceLinkUseCase,
+  RenameProjectCommandHandler,
+  RenameProjectUseCase,
   ResourceDiagnosticSummaryQueryService,
   ResourceHealthQueryService,
   ResourceProxyConfigurationPreviewQueryService,
@@ -79,6 +83,8 @@ import {
   ShowDeploymentQueryHandler,
   ShowDeploymentQueryService,
   ShowEnvironmentQueryService,
+  ShowProjectQueryHandler,
+  ShowProjectQueryService,
   ShowResourceQueryHandler,
   ShowResourceQueryService,
   StreamDeploymentEventsQueryHandler,
@@ -114,6 +120,7 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(MarkDomainRouteFailedOnDeploymentFinishedHandler);
   container.registerSingleton(MarkServerAppliedRouteStatusOnDeploymentFinishedHandler);
   container.registerSingleton(IssueCertificateOnCertificateRequestedHandler);
+  container.registerSingleton(ArchiveProjectCommandHandler);
   container.registerSingleton(BootstrapServerProxyCommandHandler);
   container.registerSingleton(CleanupPreviewCommandHandler);
   container.registerSingleton(ConfigureDefaultAccessDomainPolicyCommandHandler);
@@ -129,14 +136,19 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(ImportCertificateCommandHandler);
   container.registerSingleton(IssueOrRenewCertificateCommandHandler);
   container.registerSingleton(RelinkSourceLinkCommandHandler);
+  container.registerSingleton(RenameProjectCommandHandler);
   container.registerSingleton(ListCertificatesQueryHandler);
+  container.registerSingleton(ShowProjectQueryHandler);
   container.registerSingleton(
     tokens.certificateProviderSelectionPolicy,
     ShellCertificateProviderSelectionPolicy,
   );
   container.registerSingleton(tokens.domainOwnershipVerifier, PublicDnsDomainOwnershipVerifier);
+  container.registerSingleton(tokens.archiveProjectUseCase, ArchiveProjectUseCase);
   container.registerSingleton(tokens.createProjectUseCase, CreateProjectUseCase);
   container.registerSingleton(tokens.listProjectsQueryService, ListProjectsQueryService);
+  container.registerSingleton(tokens.renameProjectUseCase, RenameProjectUseCase);
+  container.registerSingleton(tokens.showProjectQueryService, ShowProjectQueryService);
   container.registerSingleton(
     tokens.configureDefaultAccessDomainPolicyUseCase,
     ConfigureDefaultAccessDomainPolicyUseCase,

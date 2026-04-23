@@ -19,8 +19,11 @@ import { promoteEnvironmentCommandInputSchema } from "./operations/environments/
 import { setEnvironmentVariableCommandInputSchema } from "./operations/environments/set-environment-variable.command";
 import { showEnvironmentQueryInputSchema } from "./operations/environments/show-environment.query";
 import { unsetEnvironmentVariableCommandInputSchema } from "./operations/environments/unset-environment-variable.command";
+import { archiveProjectCommandInputSchema } from "./operations/projects/archive-project.command";
 import { createProjectCommandInputSchema } from "./operations/projects/create-project.command";
 import { listProjectsQueryInputSchema } from "./operations/projects/list-projects.query";
+import { renameProjectCommandInputSchema } from "./operations/projects/rename-project.command";
+import { showProjectQueryInputSchema } from "./operations/projects/show-project.query";
 import { archiveResourceCommandInputSchema } from "./operations/resources/archive-resource.command";
 import { configureResourceHealthCommandInputSchema } from "./operations/resources/configure-resource-health.command";
 import { configureResourceNetworkCommandInputSchema } from "./operations/resources/configure-resource-network.command";
@@ -112,6 +115,48 @@ export const operationCatalog = [
     transports: {
       cli: "appaloft project list",
       orpc: { method: "GET", path: "/api/projects" },
+    },
+  },
+  {
+    key: "projects.show",
+    kind: "query",
+    domain: "projects",
+    messageName: "ShowProjectQuery",
+    handlerName: "ShowProjectQueryHandler",
+    serviceName: "ShowProjectQueryService",
+    inputSchema: showProjectQueryInputSchema,
+    serviceToken: tokens.showProjectQueryService,
+    transports: {
+      cli: "appaloft project show <projectId>",
+      orpc: { method: "GET", path: "/api/projects/{projectId}" },
+    },
+  },
+  {
+    key: "projects.rename",
+    kind: "command",
+    domain: "projects",
+    messageName: "RenameProjectCommand",
+    handlerName: "RenameProjectCommandHandler",
+    serviceName: "RenameProjectUseCase",
+    inputSchema: renameProjectCommandInputSchema,
+    serviceToken: tokens.renameProjectUseCase,
+    transports: {
+      cli: "appaloft project rename <projectId> --name <name>",
+      orpc: { method: "POST", path: "/api/projects/{projectId}/rename" },
+    },
+  },
+  {
+    key: "projects.archive",
+    kind: "command",
+    domain: "projects",
+    messageName: "ArchiveProjectCommand",
+    handlerName: "ArchiveProjectCommandHandler",
+    serviceName: "ArchiveProjectUseCase",
+    inputSchema: archiveProjectCommandInputSchema,
+    serviceToken: tokens.archiveProjectUseCase,
+    transports: {
+      cli: "appaloft project archive <projectId>",
+      orpc: { method: "POST", path: "/api/projects/{projectId}/archive" },
     },
   },
   {

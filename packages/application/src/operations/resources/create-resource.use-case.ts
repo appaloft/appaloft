@@ -98,6 +98,8 @@ export class CreateResourceUseCase {
         return err(domainError.notFound("project", input.projectId));
       }
 
+      yield* project.ensureCanAcceptMutation("resources.create");
+
       const environment = await environmentRepository.findOne(
         repositoryContext,
         EnvironmentByIdSpec.create(environmentId),

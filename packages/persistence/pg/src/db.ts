@@ -31,6 +31,7 @@ import { certificateSecretsMigration } from "./migrations/023_certificate_secret
 import { deploymentAdmissionAndSupersedeMigration } from "./migrations/024_deployment_admission_and_supersede";
 import { deploymentSupersedeFencingMigration } from "./migrations/025_deployment_supersede_fencing";
 import { mutationCoordinationsMigration } from "./migrations/026_mutation_coordinations";
+import { projectLifecycleMigration } from "./migrations/028_project_lifecycle";
 import { PgliteDialect } from "./pglite-dialect";
 import { type Database } from "./schema";
 import { TracingDialect } from "./tracing-dialect";
@@ -151,6 +152,7 @@ class StaticMigrationProvider implements MigrationProvider {
       "024_deployment_admission_and_supersede": deploymentAdmissionAndSupersedeMigration,
       "025_deployment_supersede_fencing": deploymentSupersedeFencingMigration,
       "026_mutation_coordinations": mutationCoordinationsMigration,
+      "028_project_lifecycle": projectLifecycleMigration,
     };
   }
 }
