@@ -64,7 +64,8 @@ import {
   renderRuntimeCommandString,
 } from "./runtime-commands";
 import { runStreamingProcess } from "./streaming-process";
-import { generateStaticSiteDockerfile, generateWorkspaceDockerfile } from "./workspace-planners";
+import { normalizeGeneratedDockerBuildAssetPath } from "./generated-docker-build-assets";
+import { generateStaticSiteDockerBuild, generateWorkspaceDockerBuild } from "./workspace-planners";
 
 type LogPhase = "detect" | "plan" | "package" | "deploy" | "verify" | "rollback";
 type LogLevel = "debug" | "info" | "warn" | "error";
@@ -104,6 +105,24 @@ function sanitizeName(input: string): string {
 
 function shellQuote(input: string): string {
   return `'${input.replaceAll("'", "'\\''")}'`;
+}
+
+function remoteGeneratedDockerBuildAssetPath(remoteWorkdir: string, relativePath: string): string {
+  return `${remoteWorkdir.replace(/\/+$/, "")}/${normalizeGeneratedDockerBuildAssetPath(
+    relativePath,
+  )}`;
+}
+
+function remoteWriteTextFileCommand(path: string, contents: string): string {
+  const encoded = Buffer.from(contents, "utf8").toString("base64");
+  return [
+    `mkdir -p ${shellQuote(dirname(path))}`,
+    `printf %s ${shellQuote(encoded)} | base64 -d > ${shellQuote(path)}`,
+  ].join(" && ");
+}
+
+function remoteWriteTextFilesCommand(files: readonly { path: string; contents: string }[]): string {
+  return files.map((file) => remoteWriteTextFileCommand(file.path, file.contents)).join(" && ");
 }
 
 function redactSecrets(input: string, secrets: readonly string[] = []): string {
@@ -1440,175 +1459,210 @@ export class SshExecutionBackend implements ExecutionBackend {
                   ? "Dockerfile.appaloft-static"
                   : "Dockerfile.appaloft")
               }`;
+        const generatedRemoteContextAssetPaths: string[] = [];
 
-        if (state.runtimePlan.buildStrategy === "workspace-commands") {
-          const dockerfile = generateWorkspaceDockerfile({
-            execution: state.runtimePlan.execution,
-            ...(state.runtimePlan.source.inspection
-              ? { sourceInspection: state.runtimePlan.source.inspection }
-              : {}),
-          });
-          if (!dockerfile) {
-            const message = "Start command is required for workspace image generation";
-            logs.push(phaseLog("package", message, "error"));
-            return ok({
-              deployment: this.applyFailure(deployment, {
-                logs,
-                errorCode: "workspace_start_command_missing",
-                retryable: false,
-                metadata: {
-                  host: target.host,
-                  remoteWorkdir,
-                },
-              }),
+        try {
+          if (state.runtimePlan.buildStrategy === "workspace-commands") {
+            const dockerBuild = generateWorkspaceDockerBuild({
+              execution: state.runtimePlan.execution,
+              ...(state.runtimePlan.source.inspection
+                ? { sourceInspection: state.runtimePlan.source.inspection }
+                : {}),
             });
+            if (!dockerBuild) {
+              const message = "Start command is required for workspace image generation";
+              logs.push(phaseLog("package", message, "error"));
+              return ok({
+                deployment: this.applyFailure(deployment, {
+                  logs,
+                  errorCode: "workspace_start_command_missing",
+                  retryable: false,
+                  metadata: {
+                    host: target.host,
+                    remoteWorkdir,
+                  },
+                }),
+              });
+            }
+
+            const generatedFiles = [
+              {
+                path: dockerfilePath,
+                contents: dockerBuild.dockerfile,
+              },
+              ...dockerBuild.contextAssets.map((asset) => ({
+                path: remoteGeneratedDockerBuildAssetPath(remoteWorkdir, asset.relativePath),
+                contents: asset.contents,
+              })),
+            ];
+            generatedRemoteContextAssetPaths.push(
+              ...generatedFiles.slice(1).map((file) => file.path),
+            );
+
+            const writeDockerBuildAssets = this.runRemoteCommand({
+              target,
+              command: remoteWriteTextFilesCommand(generatedFiles),
+              cwd: runtimeDir,
+              env,
+            });
+
+            if (writeDockerBuildAssets.failed) {
+              const message = "SSH workspace Docker build asset write failed";
+              logs.push(phaseLog("package", message, "error"));
+              return ok({
+                deployment: this.applyFailure(deployment, {
+                  logs,
+                  errorCode: "ssh_workspace_dockerfile_write_failed",
+                  retryable: true,
+                  metadata: {
+                    host: target.host,
+                    remoteWorkdir,
+                  },
+                }),
+              });
+            }
+
+            logs.push(phaseLog("package", `Generated workspace Dockerfile at ${dockerfilePath}`));
           }
 
-          const encodedDockerfile = Buffer.from(dockerfile, "utf8").toString("base64");
-          const writeDockerfile = this.runRemoteCommand({
-            target,
-            command: [
-              `mkdir -p ${shellQuote(remoteRoot)}`,
-              `printf %s ${shellQuote(encodedDockerfile)} | base64 -d > ${shellQuote(dockerfilePath)}`,
-            ].join(" && "),
-            cwd: runtimeDir,
-            env,
-          });
-
-          if (writeDockerfile.failed) {
-            const message = "SSH workspace Dockerfile write failed";
-            logs.push(phaseLog("package", message, "error"));
-            return ok({
-              deployment: this.applyFailure(deployment, {
-                logs,
-                errorCode: "ssh_workspace_dockerfile_write_failed",
-                retryable: true,
-                metadata: {
-                  host: target.host,
-                  remoteWorkdir,
-                },
-              }),
+          if (state.runtimePlan.buildStrategy === "static-artifact") {
+            const dockerBuild = generateStaticSiteDockerBuild({
+              execution: state.runtimePlan.execution,
+              ...(state.runtimePlan.source.inspection
+                ? { sourceInspection: state.runtimePlan.source.inspection }
+                : {}),
             });
-          }
-        }
+            if (!dockerBuild) {
+              const message = "Static publish directory is required for static image generation";
+              logs.push(phaseLog("package", message, "error"));
+              return ok({
+                deployment: this.applyFailure(deployment, {
+                  logs,
+                  errorCode: "static_dockerfile_generation_failed",
+                  retryable: false,
+                  metadata: {
+                    host: target.host,
+                    remoteWorkdir,
+                  },
+                }),
+              });
+            }
 
-        if (state.runtimePlan.buildStrategy === "static-artifact") {
-          const dockerfile = generateStaticSiteDockerfile({
-            execution: state.runtimePlan.execution,
-            ...(state.runtimePlan.source.inspection
-              ? { sourceInspection: state.runtimePlan.source.inspection }
-              : {}),
-          });
-          if (!dockerfile) {
-            const message = "Static publish directory is required for static image generation";
-            logs.push(phaseLog("package", message, "error"));
-            return ok({
-              deployment: this.applyFailure(deployment, {
-                logs,
-                errorCode: "static_dockerfile_generation_failed",
-                retryable: false,
-                metadata: {
-                  host: target.host,
-                  remoteWorkdir,
-                },
-              }),
+            const generatedFiles = [
+              {
+                path: dockerfilePath,
+                contents: dockerBuild.dockerfile,
+              },
+              ...dockerBuild.contextAssets.map((asset) => ({
+                path: remoteGeneratedDockerBuildAssetPath(remoteWorkdir, asset.relativePath),
+                contents: asset.contents,
+              })),
+            ];
+            generatedRemoteContextAssetPaths.push(
+              ...generatedFiles.slice(1).map((file) => file.path),
+            );
+
+            const writeDockerBuildAssets = this.runRemoteCommand({
+              target,
+              command: remoteWriteTextFilesCommand(generatedFiles),
+              cwd: runtimeDir,
+              env,
             });
+
+            if (writeDockerBuildAssets.failed) {
+              const message = "SSH static Docker build asset write failed";
+              logs.push(phaseLog("package", message, "error"));
+              return ok({
+                deployment: this.applyFailure(deployment, {
+                  logs,
+                  errorCode: "ssh_static_dockerfile_write_failed",
+                  retryable: true,
+                  metadata: {
+                    host: target.host,
+                    remoteWorkdir,
+                  },
+                }),
+              });
+            }
+
+            logs.push(
+              phaseLog("package", `Generated static site Dockerfile at ${dockerfilePath}`),
+            );
           }
 
-          const encodedDockerfile = Buffer.from(dockerfile, "utf8").toString("base64");
-          const writeDockerfile = this.runRemoteCommand({
-            target,
-            command: [
-              `mkdir -p ${shellQuote(remoteRoot)}`,
-              `printf %s ${shellQuote(encodedDockerfile)} | base64 -d > ${shellQuote(dockerfilePath)}`,
-            ].join(" && "),
-            cwd: runtimeDir,
-            env,
-          });
-
-          if (writeDockerfile.failed) {
-            const message = "SSH static site Dockerfile write failed";
-            logs.push(phaseLog("package", message, "error"));
-            return ok({
-              deployment: this.applyFailure(deployment, {
-                logs,
-                errorCode: "ssh_static_dockerfile_write_failed",
-                retryable: true,
-                metadata: {
-                  host: target.host,
-                  remoteWorkdir,
-                },
-              }),
-            });
-          }
-          logs.push(
-            phaseLog("package", `Generated static site Dockerfile at ${dockerfilePath}`),
+          const buildCommand = renderRuntimeCommandString(
+            RuntimeCommandBuilder.docker().buildImage({
+              image,
+              dockerfilePath,
+              contextPath: ".",
+              workingDirectory: remoteWorkdir,
+            }),
+            { quote: shellQuote },
           );
-        }
+          logs.push(phaseLog("package", `Build Docker image ${image} on SSH target`));
+          this.report(context, {
+            deploymentId: state.id.value,
+            phase: "package",
+            status: "running",
+            message: `Build image ${image}`,
+          });
+          let buildStdoutCount = 0;
+          let buildStderrCount = 0;
+          const build = await this.runRemoteCommandStreaming({
+            target,
+            command: buildCommand,
+            cwd: runtimeDir,
+            env,
+            onOutput: (line, level, stream) => {
+              if (stream === "stdout") {
+                buildStdoutCount = this.pushStreamingCommandOutput(logs, {
+                  context,
+                  deploymentId: state.id.value,
+                  phase: "package",
+                  line,
+                  level,
+                  stream,
+                  persistedCount: buildStdoutCount,
+                });
+                return;
+              }
 
-        const buildCommand = renderRuntimeCommandString(
-          RuntimeCommandBuilder.docker().buildImage({
-            image,
-            dockerfilePath,
-            contextPath: ".",
-            workingDirectory: remoteWorkdir,
-          }),
-          { quote: shellQuote },
-        );
-        logs.push(phaseLog("package", `Build Docker image ${image} on SSH target`));
-        this.report(context, {
-          deploymentId: state.id.value,
-          phase: "package",
-          status: "running",
-          message: `Build image ${image}`,
-        });
-        let buildStdoutCount = 0;
-        let buildStderrCount = 0;
-        const build = await this.runRemoteCommandStreaming({
-          target,
-          command: buildCommand,
-          cwd: runtimeDir,
-          env,
-          onOutput: (line, level, stream) => {
-            if (stream === "stdout") {
-              buildStdoutCount = this.pushStreamingCommandOutput(logs, {
+              buildStderrCount = this.pushStreamingCommandOutput(logs, {
                 context,
                 deploymentId: state.id.value,
                 phase: "package",
                 line,
                 level,
                 stream,
-                persistedCount: buildStdoutCount,
+                persistedCount: buildStderrCount,
               });
-              return;
-            }
-
-            buildStderrCount = this.pushStreamingCommandOutput(logs, {
-              context,
-              deploymentId: state.id.value,
-              phase: "package",
-              line,
-              level,
-              stream,
-              persistedCount: buildStderrCount,
-            });
-          },
-        });
-
-        if (build.failed) {
-          const message = "SSH Docker image build failed";
-          logs.push(phaseLog("package", message, "error"));
-          return ok({
-            deployment: this.applyFailure(deployment, {
-              logs,
-              errorCode: "ssh_docker_build_failed",
-              retryable: true,
-              metadata: {
-                host: target.host,
-                remoteWorkdir,
-              },
-            }),
+            },
           });
+
+          if (build.failed) {
+            const message = "SSH Docker image build failed";
+            logs.push(phaseLog("package", message, "error"));
+            return ok({
+              deployment: this.applyFailure(deployment, {
+                logs,
+                errorCode: "ssh_docker_build_failed",
+                retryable: true,
+                metadata: {
+                  host: target.host,
+                  remoteWorkdir,
+                },
+              }),
+            });
+          }
+        } finally {
+          if (generatedRemoteContextAssetPaths.length > 0) {
+            this.runRemoteCommand({
+              target,
+              command: `rm -f ${generatedRemoteContextAssetPaths.map(shellQuote).join(" ")}`,
+              cwd: runtimeDir,
+              env,
+            });
+          }
         }
       }
 

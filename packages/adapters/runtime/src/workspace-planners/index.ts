@@ -13,9 +13,13 @@ import {
 import {
   DockerfileBuilder,
   generatedWorkspaceDockerfileName,
+  renderStaticSiteDockerBuild,
   renderStaticSiteDockerfile,
+  renderWorkspaceDockerBuild,
   renderWorkspaceDockerfile,
+  staticSiteDockerBuildFromExecution,
   staticSiteDockerfileFromExecution,
+  type GeneratedDockerBuildResult,
   type WorkspaceDockerfileInput,
   type WorkspacePlannerInput,
   type WorkspaceRuntimePlan,
@@ -25,7 +29,9 @@ import {
 export {
   DockerfileBuilder,
   generatedWorkspaceDockerfileName,
+  renderStaticSiteDockerBuild,
   renderStaticSiteDockerfile,
+  renderWorkspaceDockerBuild,
   renderWorkspaceDockerfile,
 };
 
@@ -87,9 +93,21 @@ function plannerForExecution(execution: RuntimeExecutionPlan): WorkspaceRuntimeP
 }
 
 export function generateWorkspaceDockerfile(input: WorkspaceDockerfileInput): string | null {
-  return plannerForExecution(input.execution).dockerfile(input);
+  return generateWorkspaceDockerBuild(input)?.dockerfile ?? null;
+}
+
+export function generateWorkspaceDockerBuild(
+  input: WorkspaceDockerfileInput,
+): GeneratedDockerBuildResult | null {
+  return plannerForExecution(input.execution).dockerBuild(input);
 }
 
 export function generateStaticSiteDockerfile(input: WorkspaceDockerfileInput): string | null {
-  return staticSiteDockerfileFromExecution(input);
+  return generateStaticSiteDockerBuild(input)?.dockerfile ?? null;
+}
+
+export function generateStaticSiteDockerBuild(
+  input: WorkspaceDockerfileInput,
+): GeneratedDockerBuildResult | null {
+  return staticSiteDockerBuildFromExecution(input);
 }

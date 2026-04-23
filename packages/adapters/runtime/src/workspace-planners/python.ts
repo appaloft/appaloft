@@ -5,6 +5,7 @@ import {
   generatedWorkspaceDockerfileName,
   requiredStartCommand,
   workspaceMetadata,
+  type GeneratedDockerBuildResult,
   type WorkspaceDockerfileInput,
   type WorkspacePlannerInput,
   type WorkspaceRuntimePlan,
@@ -69,8 +70,10 @@ export function pythonRunCommandFor(
   }
 }
 
-export function pythonDockerfile(input: WorkspaceDockerfileInput): string | null {
-  return dockerfileFromExecution({
+export function pythonDockerBuild(
+  input: WorkspaceDockerfileInput,
+): GeneratedDockerBuildResult | null {
+  const dockerfile = dockerfileFromExecution({
     baseImage:
       input.execution.metadata?.["workspace.baseImage"] ?? pythonBaseImage(input.sourceInspection),
     execution: input.execution,
@@ -79,6 +82,19 @@ export function pythonDockerfile(input: WorkspaceDockerfileInput): string | null
       PYTHONUNBUFFERED: "1",
     },
   });
+
+  if (!dockerfile) {
+    return null;
+  }
+
+  return {
+    dockerfile,
+    contextAssets: [],
+  };
+}
+
+export function pythonDockerfile(input: WorkspaceDockerfileInput): string | null {
+  return pythonDockerBuild(input)?.dockerfile ?? null;
 }
 
 export const pythonWorkspacePlanner: WorkspaceRuntimePlanner = {
@@ -123,7 +139,7 @@ export const pythonWorkspacePlanner: WorkspaceRuntimePlanner = {
     });
   },
 
-  dockerfile(input: WorkspaceDockerfileInput): string | null {
-    return pythonDockerfile(input);
+  dockerBuild(input: WorkspaceDockerfileInput) {
+    return pythonDockerBuild(input);
   },
 };

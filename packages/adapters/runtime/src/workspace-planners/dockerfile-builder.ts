@@ -1,5 +1,16 @@
 import { type RuntimeExecutionPlan, type SourceInspectionSnapshot } from "@appaloft/core";
+import {
+  type GeneratedDockerBuildAsset,
+  type GeneratedDockerBuildResult,
+} from "../generated-docker-build-assets";
 import { pinnedBunAlpineImage } from "./bun";
+import {
+  defaultStaticServerImage,
+  renderStaticServerConfig,
+  staticServerConfigAssetPath,
+  staticServerConfigPath,
+  staticServerRoot,
+} from "./static-server-config";
 
 export interface DockerfileBuildContext {
   baseImage: string;
@@ -21,25 +32,6 @@ export interface StaticSiteDockerfileContext {
 
 const envKeyPattern = /^[A-Za-z_][A-Za-z0-9_]*$/u;
 const defaultStaticBuildImage = "node:22-alpine";
-const defaultStaticServerImage = "nginx:1.27-alpine";
-const staticServerRoot = "/usr/share/nginx/html/";
-const staticServerConfigPath = "/etc/nginx/conf.d/default.conf";
-const staticServerConfigLines = [
-  "server {",
-  "  listen 80;",
-  "  server_name _;",
-  `  root ${staticServerRoot.replace(/\/+$/, "")};`,
-  "  index index.html;",
-  "",
-  "  location ~* \\.[A-Za-z0-9][A-Za-z0-9._-]*$ {",
-  "    try_files $uri =404;",
-  "  }",
-  "",
-  "  location / {",
-  "    try_files $uri $uri/ /index.html;",
-  "  }",
-  "}",
-];
 
 function dockerfileToken(value: string, label: string): string {
   const token = value.trim();
@@ -54,14 +46,14 @@ function jsonArray(values: readonly string[]): string {
   return JSON.stringify(values);
 }
 
-function shellSingleQuote(value: string): string {
-  return `'${value.replace(/'/g, "'\\''")}'`;
-}
-
-function renderStaticServerConfigCommand(): string {
-  return `printf '%s\\n' ${staticServerConfigLines
-    .map((line) => shellSingleQuote(line))
-    .join(" ")} > ${shellSingleQuote(staticServerConfigPath)}`;
+function generatedDockerBuildResult(
+  dockerfile: string,
+  contextAssets: readonly GeneratedDockerBuildAsset[] = [],
+): GeneratedDockerBuildResult {
+  return {
+    dockerfile,
+    contextAssets,
+  };
 }
 
 export class DockerfileBuilder {
@@ -163,31 +155,39 @@ export class DockerfileBuilder {
 }
 
 export function renderWorkspaceDockerfile(context: DockerfileBuildContext): string {
-  return new DockerfileBuilder()
-    .from(context.baseImage)
-    .workdir("/app")
-    .envAll(context.env)
-    .runShellAll(context.beforeCopyRunCommands)
-    .copy(".", ".")
-    .runShell(context.installCommand)
-    .runShell(context.buildCommand)
-    .expose(context.port)
-    .cmdShell(context.startCommand)
-    .build();
+  return renderWorkspaceDockerBuild(context).dockerfile;
 }
 
-export function dockerfileFromExecution(input: {
+export function renderWorkspaceDockerBuild(
+  context: DockerfileBuildContext,
+): GeneratedDockerBuildResult {
+  return generatedDockerBuildResult(
+    new DockerfileBuilder()
+      .from(context.baseImage)
+      .workdir("/app")
+      .envAll(context.env)
+      .runShellAll(context.beforeCopyRunCommands)
+      .copy(".", ".")
+      .runShell(context.installCommand)
+      .runShell(context.buildCommand)
+      .expose(context.port)
+      .cmdShell(context.startCommand)
+      .build(),
+  );
+}
+
+export function dockerBuildFromExecution(input: {
   baseImage: string;
   execution: RuntimeExecutionPlan;
   env?: Record<string, string>;
   beforeCopyRunCommands?: readonly string[];
-}): string | null {
+}): GeneratedDockerBuildResult | null {
   const startCommand = input.execution.startCommand;
   if (!startCommand) {
     return null;
   }
 
-  return renderWorkspaceDockerfile({
+  return renderWorkspaceDockerBuild({
     baseImage: input.baseImage,
     ...(input.env ? { env: input.env } : {}),
     ...(input.beforeCopyRunCommands ? { beforeCopyRunCommands: input.beforeCopyRunCommands } : {}),
@@ -196,6 +196,15 @@ export function dockerfileFromExecution(input: {
     ...(input.execution.port ? { port: input.execution.port } : {}),
     startCommand,
   });
+}
+
+export function dockerfileFromExecution(input: {
+  baseImage: string;
+  execution: RuntimeExecutionPlan;
+  env?: Record<string, string>;
+  beforeCopyRunCommands?: readonly string[];
+}): string | null {
+  return dockerBuildFromExecution(input)?.dockerfile ?? null;
 }
 
 function normalizeStaticPublishDirectory(value: string): string | null {
@@ -240,6 +249,12 @@ function shouldEnableCorepack(buildImage: string): boolean {
 }
 
 export function renderStaticSiteDockerfile(context: StaticSiteDockerfileContext): string | null {
+  return renderStaticSiteDockerBuild(context)?.dockerfile ?? null;
+}
+
+export function renderStaticSiteDockerBuild(
+  context: StaticSiteDockerfileContext,
+): GeneratedDockerBuildResult | null {
   const publishDirectory = normalizeStaticPublishDirectory(context.publishDirectory);
   if (!publishDirectory) {
     return null;
@@ -247,46 +262,65 @@ export function renderStaticSiteDockerfile(context: StaticSiteDockerfileContext)
 
   const serverImage = context.serverImage ?? defaultStaticServerImage;
   const publishDirectorySource = `${publishDirectory}/`;
+  const contextAssets = [
+    {
+      relativePath: staticServerConfigAssetPath,
+      contents: renderStaticServerConfig(),
+    },
+  ] as const;
 
   if (!context.installCommand && !context.buildCommand) {
-    return new DockerfileBuilder()
-      .from(serverImage)
-      .copyJson(publishDirectorySource, staticServerRoot)
-      .runShell(renderStaticServerConfigCommand())
-      .expose(80)
-      .cmdExec(["nginx", "-g", "daemon off;"])
-      .build();
+    return generatedDockerBuildResult(
+      new DockerfileBuilder()
+        .from(serverImage)
+        .copyJson(publishDirectorySource, staticServerRoot)
+        .copyJson(staticServerConfigAssetPath, staticServerConfigPath)
+        .expose(80)
+        .cmdExec(["nginx", "-g", "daemon off;"])
+        .build(),
+      contextAssets,
+    );
   }
 
   const buildImage = context.buildImage ?? defaultStaticBuildImage;
-  return new DockerfileBuilder()
-    .fromAs(buildImage, "build")
-    .workdir("/app")
-    .runShell(shouldEnableCorepack(buildImage) ? "corepack enable || true" : undefined)
-    .copy(".", ".")
-    .runShell(context.installCommand)
-    .runShell(context.buildCommand)
-    .from(serverImage)
-    .copyJson(`/app/${publishDirectorySource}`, staticServerRoot, { from: "build" })
-    .runShell(renderStaticServerConfigCommand())
-    .expose(80)
-    .cmdExec(["nginx", "-g", "daemon off;"])
-    .build();
+  return generatedDockerBuildResult(
+    new DockerfileBuilder()
+      .fromAs(buildImage, "build")
+      .workdir("/app")
+      .runShell(shouldEnableCorepack(buildImage) ? "corepack enable || true" : undefined)
+      .copy(".", ".")
+      .runShell(context.installCommand)
+      .runShell(context.buildCommand)
+      .from(serverImage)
+      .copyJson(`/app/${publishDirectorySource}`, staticServerRoot, { from: "build" })
+      .copyJson(staticServerConfigAssetPath, staticServerConfigPath)
+      .expose(80)
+      .cmdExec(["nginx", "-g", "daemon off;"])
+      .build(),
+    contextAssets,
+  );
+}
+
+export function staticSiteDockerBuildFromExecution(input: {
+  execution: RuntimeExecutionPlan;
+  sourceInspection?: SourceInspectionSnapshot;
+}): GeneratedDockerBuildResult | null {
+  const publishDirectory = input.execution.metadata?.["static.publishDirectory"];
+  if (!publishDirectory) {
+    return null;
+  }
+
+  return renderStaticSiteDockerBuild({
+    publishDirectory,
+    ...(input.execution.installCommand ? { installCommand: input.execution.installCommand } : {}),
+    ...(input.execution.buildCommand ? { buildCommand: input.execution.buildCommand } : {}),
+    buildImage: staticBuildImage(input),
+  });
 }
 
 export function staticSiteDockerfileFromExecution(input: {
   execution: RuntimeExecutionPlan;
   sourceInspection?: SourceInspectionSnapshot;
 }): string | null {
-  const publishDirectory = input.execution.metadata?.["static.publishDirectory"];
-  if (!publishDirectory) {
-    return null;
-  }
-
-  return renderStaticSiteDockerfile({
-    publishDirectory,
-    ...(input.execution.installCommand ? { installCommand: input.execution.installCommand } : {}),
-    ...(input.execution.buildCommand ? { buildCommand: input.execution.buildCommand } : {}),
-    buildImage: staticBuildImage(input),
-  });
+  return staticSiteDockerBuildFromExecution(input)?.dockerfile ?? null;
 }

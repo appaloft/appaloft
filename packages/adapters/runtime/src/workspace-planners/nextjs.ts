@@ -1,6 +1,6 @@
 import { err, ok, type Result, type SourceInspectionSnapshot } from "@appaloft/core";
 import {
-  dockerfileFromExecution,
+  dockerBuildFromExecution,
   generatedWorkspaceDockerfileName,
   requiredStartCommand,
   workspaceMetadata,
@@ -92,11 +92,11 @@ export const nextjsWorkspacePlanner: WorkspaceRuntimePlanner = {
     });
   },
 
-  dockerfile(input: WorkspaceDockerfileInput): string | null {
+  dockerBuild(input: WorkspaceDockerfileInput) {
     const baseImage =
       input.execution.metadata?.["workspace.baseImage"] ?? nextBaseImage(input.sourceInspection);
 
-    return dockerfileFromExecution({
+    return dockerBuildFromExecution({
       baseImage,
       execution: input.execution,
       env: {
