@@ -10,6 +10,7 @@ searchAliases:
   - "default url"
   - "generated domain"
 relatedOperations:
+  - default-access-domain-policies.configure
   - domain-bindings.create
 sidebar:
   label: "Generated routes"
@@ -23,6 +24,18 @@ sidebar:
 The generated access URL is the URL Appaloft provides before a custom domain is ready. Use it to confirm that a deployment is reachable from a browser and to separate app/proxy problems from DNS or TLS problems.
 
 The generated URL is not deployment input. It is derived from the resource network profile, the target server public entrypoint, proxy readiness, and deployment state.
+
+<h2 id="default-access-policy">Default access policy</h2>
+
+The default access policy decides how Appaloft will generate default access URLs in the future. It is not input for one deployment and it is not a custom domain binding.
+
+The Web console shows this policy on server pages. The common fields mean:
+
+- **Default access mode**: whether generated access is enabled. `provider` uses a registered default-access-domain provider; `disabled` skips generation; `custom-template` uses a configured template.
+- **Provider key**: which default-access-domain provider to use. In local or self-hosted setups, `sslip` is the common provider key and generates hostnames from the server public address.
+- **Server default access override**: one server can override the system default; servers without an override use the system default policy.
+
+Policy changes affect future generated access resolution. They do not rewrite URLs already persisted in deployment snapshots. If you want to use your own hostname, configure a custom domain binding instead of changing the default access policy.
 
 Common uses:
 

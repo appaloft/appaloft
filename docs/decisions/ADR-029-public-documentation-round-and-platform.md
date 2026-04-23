@@ -253,6 +253,11 @@ The `PUB-DOCS-002` contract test checks that operation coverage stays complete a
 `packages/application/src/operation-catalog.ts` changes. The current operation catalog maps to
 documented public topics.
 
+Initial traceability metadata records governing spec references and Web surfaces for high-confusion
+access topics such as default access policy and generated access routes. The human-readable index
+lives in `docs/documentation/public-docs-traceability.md`, while `@appaloft/docs-registry` remains
+the machine-readable source.
+
 Current implementation still has no full automated public documentation coverage checker for all
 links, locale drift, search freshness, or full Web/CLI/API/MCP surface adoption.
 

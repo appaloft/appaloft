@@ -43,11 +43,33 @@ describe("public docs help registry", () => {
     expect(resolvePublicDocsHelpHref("deployment.source")).toBe(
       "/docs/deploy/sources/#deployment-source",
     );
+    expect(resolvePublicDocsHelpHref("default-access.policy")).toBe(
+      "/docs/access/generated-routes/#default-access-policy",
+    );
     expect(resolvePublicDocsHelpHref("deployment.source", { locale: "en-US" })).toBe(
       "/docs/en/deploy/sources/#deployment-source",
     );
     expect(resolvePublicDocsHelpHref("deployment.source", { basePath: "help" })).toBe(
       "/help/deploy/sources/#deployment-source",
     );
+  });
+
+  test("[PUB-DOCS-016] traceable topics point to spec files and product surfaces", () => {
+    const defaultAccessTopic = publicDocsHelpTopics["default-access.policy"];
+
+    expect(defaultAccessTopic.relatedOperation).toBe("default-access-domain-policies.configure");
+    expect(defaultAccessTopic.webSurfaces?.join("\n")).toContain(
+      "apps/web/src/routes/servers/+page.svelte",
+    );
+
+    for (const topic of Object.values(publicDocsHelpTopics)) {
+      for (const specReference of topic.specReferences ?? []) {
+        expect(existsSync(resolve(repositoryRoot, specReference)), specReference).toBe(true);
+      }
+
+      for (const webSurface of topic.webSurfaces ?? []) {
+        expect(webSurface.trim().length, topic.id).toBeGreaterThan(0);
+      }
+    }
   });
 });

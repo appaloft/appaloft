@@ -11,6 +11,7 @@ searchAliases:
   - "generated domain"
   - "访问地址"
 relatedOperations:
+  - default-access-domain-policies.configure
   - domain-bindings.create
 sidebar:
   label: "Generated routes"
@@ -24,6 +25,18 @@ sidebar:
 默认访问地址是 Appaloft 在没有自定义域名时给资源生成的可访问 URL。它用于第一次验证部署是否真的能从浏览器访问，也用于排查“应用已启动但外部打不开”的问题。
 
 默认访问地址不是部署输入。它来自资源的 network profile、目标服务器的公共入口、代理 readiness 和当前部署状态。
+
+<h2 id="default-access-policy">系统默认访问策略</h2>
+
+系统默认访问策略决定“未来生成默认访问地址时使用什么策略”。它不是某一次部署的输入，也不是自定义域名绑定。
+
+Web console 的服务器页会显示这个策略，常见字段含义如下：
+
+- **Default access mode**：是否生成默认访问地址。`provider` 表示使用已注册的默认访问域名 provider；`disabled` 表示不生成；`custom-template` 表示使用后续配置的模板。
+- **Provider key**：选择哪个默认访问域名 provider。当前本地/自托管常见值是 `sslip`，表示根据服务器公共地址生成可访问 hostname。
+- **Server default access override**：某台服务器可以覆盖系统默认值；未覆盖时使用系统默认策略。
+
+策略变更只影响之后解析出来的默认访问地址。已经持久化到 deployment snapshot 里的历史部署访问地址不会被回写修改。如果你只是想绑定自己的域名，应使用自定义域名绑定，而不是修改默认访问策略。
 
 常见使用场景：
 

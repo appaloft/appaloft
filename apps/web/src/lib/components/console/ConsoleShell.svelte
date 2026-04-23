@@ -3,6 +3,7 @@
   import { goto } from "$app/navigation";
   import { page } from "$app/state";
   import {
+    BookOpen,
     ChevronUp,
     FolderOpen,
     Gauge,
@@ -28,6 +29,7 @@
   import { Badge } from "$lib/components/ui/badge";
   import * as Breadcrumb from "$lib/components/ui/breadcrumb";
   import { Button } from "$lib/components/ui/button";
+  import { webDocsHrefs } from "$lib/console/docs-help";
   import {
     DropdownMenu,
     DropdownMenuContent,
@@ -231,6 +233,12 @@
     }
   }
 
+  function openDocumentation(): void {
+    if (browser) {
+      window.open(webDocsHrefs.docsHome, "_blank", "noreferrer");
+    }
+  }
+
   function navigateTo(path: string): void {
     if (browser) {
       void goto(path);
@@ -397,6 +405,10 @@
           <DropdownMenuItem onclick={() => navigateTo("/deployments")}>
             <Rocket class="size-4" />
             {$t(i18nKeys.console.deployments.records)}
+          </DropdownMenuItem>
+          <DropdownMenuItem onclick={openDocumentation}>
+            <BookOpen class="size-4" />
+            {$t(i18nKeys.common.actions.openDocumentation)}
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuLabel>{$t(i18nKeys.common.language.label)}</DropdownMenuLabel>

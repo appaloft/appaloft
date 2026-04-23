@@ -165,7 +165,7 @@
               {$t(i18nKeys.console.servers.defaultAccessSystemTitle)}
             </h2>
             <DocsHelpLink
-              href={webDocsHrefs.serverProxyReadiness}
+              href={webDocsHrefs.defaultAccessPolicy}
               ariaLabel={$t(i18nKeys.common.actions.openDocs)}
             />
           </div>
@@ -182,7 +182,7 @@
             <span class="inline-flex items-center gap-1.5">
               {$t(i18nKeys.console.servers.defaultAccessModeLabel)}
               <DocsHelpLink
-                href={webDocsHrefs.serverProxyReadiness}
+                href={webDocsHrefs.defaultAccessPolicy}
                 ariaLabel={$t(i18nKeys.common.actions.openDocs)}
                 className="size-5"
               />
@@ -215,7 +215,7 @@
                 <span class="inline-flex items-center gap-1.5">
                   {$t(i18nKeys.console.servers.defaultAccessProviderKeyLabel)}
                   <DocsHelpLink
-                    href={webDocsHrefs.serverProxyReadiness}
+                    href={webDocsHrefs.defaultAccessPolicy}
                     ariaLabel={$t(i18nKeys.common.actions.openDocs)}
                     className="size-5"
                   />
@@ -233,7 +233,7 @@
                 <span class="inline-flex items-center gap-1.5">
                   {$t(i18nKeys.console.servers.defaultAccessTemplateRefLabel)}
                   <DocsHelpLink
-                    href={webDocsHrefs.domainGeneratedAccessRoute}
+                    href={webDocsHrefs.defaultAccessPolicy}
                     ariaLabel={$t(i18nKeys.common.actions.openDocs)}
                     className="size-5"
                   />

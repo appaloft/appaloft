@@ -20,6 +20,7 @@ export const enUS = {
       newDeployment: "New deployment",
       next: "Next",
       openDocs: "Open related docs",
+      openDocumentation: "Documentation",
       openDeployments: "Open deployments",
       openProject: "Open project",
       openResource: "Open resource",

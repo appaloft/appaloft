@@ -26,6 +26,8 @@ export interface PublicDocsHelpTopic {
   readonly surfaces: readonly PublicDocsHelpSurface[];
   readonly relatedOperation?: string;
   readonly aliases: readonly string[];
+  readonly specReferences?: readonly string[];
+  readonly webSurfaces?: readonly string[];
 }
 
 export const publicDocsHelpTopics = {
@@ -268,6 +270,34 @@ export const publicDocsHelpTopics = {
     relatedOperation: "servers.bootstrap-proxy",
     aliases: ["proxy", "caddy", "default access", "代理"],
   },
+  "default-access.policy": {
+    id: "default-access.policy",
+    title: "Default access policy",
+    description:
+      "How the system default and server override select generated access route behavior.",
+    page: {
+      "zh-CN": "access/generated-routes",
+      "en-US": "en/access/generated-routes",
+    },
+    anchor: "default-access-policy",
+    localeCoverage: {
+      "zh-CN": "complete",
+      "en-US": "complete",
+    },
+    surfaces: ["web", "cli", "http-api", "mcp"],
+    relatedOperation: "default-access-domain-policies.configure",
+    aliases: ["default access policy", "provider key", "sslip", "系统默认访问策略"],
+    specReferences: [
+      "docs/decisions/ADR-017-default-access-domain-and-proxy-routing.md",
+      "docs/commands/default-access-domain-policies.configure.md",
+      "docs/workflows/default-access-domain-and-proxy-routing.md",
+      "docs/testing/default-access-domain-and-proxy-routing-test-matrix.md",
+    ],
+    webSurfaces: [
+      "apps/web/src/routes/servers/+page.svelte: system default access policy form",
+      "apps/web/src/routes/servers/[serverId]/+page.svelte: server default access override form",
+    ],
+  },
   "server.terminal-session": {
     id: "server.terminal-session",
     title: "Terminal session",
@@ -352,6 +382,15 @@ export const publicDocsHelpTopics = {
     surfaces: ["web", "cli", "http-api", "mcp"],
     relatedOperation: "domain-bindings.create",
     aliases: ["access route", "url", "domain", "proxy", "访问地址"],
+    specReferences: [
+      "docs/decisions/ADR-017-default-access-domain-and-proxy-routing.md",
+      "docs/workflows/default-access-domain-and-proxy-routing.md",
+      "docs/testing/default-access-domain-and-proxy-routing-test-matrix.md",
+    ],
+    webSurfaces: [
+      "apps/web/src/routes/resources/[resourceId]/+page.svelte: resource access area",
+      "apps/web/src/routes/deployments/[deploymentId]/+page.svelte: deployment access URL area",
+    ],
   },
   "domain.custom-domain-binding": {
     id: "domain.custom-domain-binding",
@@ -672,7 +711,7 @@ export const publicDocsOperationCoverage = [
   {
     operationKey: "default-access-domain-policies.configure",
     status: "documented",
-    topicId: "domain.generated-access-route",
+    topicId: "default-access.policy",
   },
   {
     operationKey: "domain-bindings.create",

@@ -26,6 +26,7 @@ export const zhCN = {
       newDeployment: "新部署",
       next: "下一步",
       openDocs: "打开相关文档",
+      openDocumentation: "文档中心",
       openDeployments: "打开部署页",
       openProject: "打开项目",
       openResource: "打开资源",

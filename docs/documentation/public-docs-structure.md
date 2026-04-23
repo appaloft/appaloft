@@ -183,6 +183,21 @@ For each user-visible operation, public docs must decide the state of each relev
 If the same behavior is available on multiple surfaces, docs must use the same public vocabulary
 for the same concept.
 
+## Spec And Surface Traceability
+
+Public docs are not a rendered copy of internal specs, but every product-help topic should remain
+traceable to the internal behavior contract that governs it.
+
+Traceability records should answer three questions:
+
+- which public page and stable anchor explains the behavior for users;
+- which ADR, command, workflow, error, or testing spec governs the behavior;
+- which Web, CLI, HTTP/API, repository config, or future MCP surface links to that public anchor.
+
+The canonical machine-readable source is `@appaloft/docs-registry`. Human-readable traceability
+notes live in [Public Docs Traceability](./public-docs-traceability.md). These records should use
+public topic ids and file paths, not internal DDD vocabulary in user-facing pages.
+
 ## Localization
 
 The initial public docs locales are:
@@ -282,6 +297,10 @@ The same registry also records public docs coverage decisions for every current
 topic, mark the operation not applicable to public docs with a reason, or record an explicit
 migration gap with the target page or topic. The current operation catalog maps to documented
 public topics.
+
+Traceability for high-confusion topics now records governing spec files and Web surfaces in
+`@appaloft/docs-registry`, with a human-readable index in
+`docs/documentation/public-docs-traceability.md`.
 
 There is still no full automated public docs link, locale, search, or product-help-surface checker.
 Registry anchor-source coverage, operation coverage, and packaging coverage exist for the initial

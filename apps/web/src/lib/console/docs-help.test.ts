@@ -9,6 +9,10 @@ describe("console docs help links", () => {
   });
 
   test("[PUB-DOCS-010] Web help hrefs cover high-confusion console surfaces", () => {
+    expect(webDocsHrefs.docsHome).toBe("/docs/");
+    expect(webDocsHrefs.defaultAccessPolicy).toBe(
+      "/docs/access/generated-routes/#default-access-policy",
+    );
     expect(webDocsHrefs.serverDeploymentTarget).toBe(
       "/docs/servers/register-connect/#server-deployment-target",
     );
@@ -107,10 +111,11 @@ describe("console docs help links", () => {
         "routes/projects/[projectId]/environments/[environmentId]/resources/[resourceId]/deployments/new/+page.svelte"
       ],
     ).toContain("deploymentLifecycle");
-    expect(sourceByPath["routes/servers/+page.svelte"]).toContain("serverProxyReadiness");
+    expect(sourceByPath["routes/servers/+page.svelte"]).toContain("defaultAccessPolicy");
     expect(sourceByPath["routes/servers/[serverId]/+page.svelte"]).toContain(
       "serverConnectivityTest",
     );
+    expect(sourceByPath["routes/servers/[serverId]/+page.svelte"]).toContain("defaultAccessPolicy");
     expect(sourceByPath["routes/servers/[serverId]/+page.svelte"]).toContain(
       "serverTerminalSession",
     );

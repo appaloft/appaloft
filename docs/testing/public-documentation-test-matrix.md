@@ -35,6 +35,7 @@ and final round summaries must identify the row as a documented manual or deferr
 | PUB-DOCS-013 | Binary bundle embeds docs separately from Web console assets. | e2e-preferred | A binary bundle serves Web console assets and docs assets independently, with docs available under `/docs/*`. |
 | PUB-DOCS-014 | Docs static directory override works. | e2e-preferred | Setting the docs static override environment variable serves replacement docs assets without overriding Web console assets. |
 | PUB-DOCS-015 | Secret and diagnostic guidance is safe. | contract | Troubleshooting and diagnostic docs explain masked secrets and safe support payload sharing without instructing users to expose secret values. |
+| PUB-DOCS-016 | Public docs topics are traceable to specs and product surfaces. | contract | Topics that explain governed behavior record the public page/anchor, internal spec references, and the Web/CLI/API surface that links users to the topic. |
 
 ## Current Implementation Notes And Migration Gaps
 
@@ -75,6 +76,8 @@ Current status:
   verification that `/docs/*` is served separately from Web console assets.
 - `PUB-DOCS-014` is covered by HTTP adapter tests for `docsStaticDir` override behavior and binary
   bundle documentation of `APPALOFT_DOCS_STATIC_DIR`.
+- `PUB-DOCS-016` is covered for initial high-confusion access topics by `@appaloft/docs-registry`
+  topic metadata and `docs/documentation/public-docs-traceability.md`.
 
 There is still no dedicated automated public documentation checker for every product help
 affordance, complete link resolution in built output, search alias freshness, or future MCP/tool

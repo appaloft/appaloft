@@ -1,6 +1,7 @@
-import { resolvePublicDocsHelpHref } from "@appaloft/docs-registry";
+import { publicDocsBasePath, resolvePublicDocsHelpHref } from "@appaloft/docs-registry";
 
 export const webDocsHrefs = {
+  docsHome: `${publicDocsBasePath}/`,
   deploymentLifecycle: resolvePublicDocsHelpHref("deployment.lifecycle"),
   deploymentSource: resolvePublicDocsHelpHref("deployment.source"),
   serverDeploymentTarget: resolvePublicDocsHelpHref("server.deployment-target"),
@@ -8,6 +9,7 @@ export const webDocsHrefs = {
   serverConnectivityTest: resolvePublicDocsHelpHref("server.connectivity-test"),
   serverProxyReadiness: resolvePublicDocsHelpHref("server.proxy-readiness"),
   serverTerminalSession: resolvePublicDocsHelpHref("server.terminal-session"),
+  defaultAccessPolicy: resolvePublicDocsHelpHref("default-access.policy"),
   resourceConcept: resolvePublicDocsHelpHref("resource.concept"),
   resourceSourceProfile: resolvePublicDocsHelpHref("resource.source-profile"),
   resourceRuntimeProfile: resolvePublicDocsHelpHref("resource.runtime-profile"),

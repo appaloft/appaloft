@@ -20,6 +20,7 @@ export const i18nKeys = {
       newDeployment: "common:actions.newDeployment",
       next: "common:actions.next",
       openDocs: "common:actions.openDocs",
+      openDocumentation: "common:actions.openDocumentation",
       openDeployments: "common:actions.openDeployments",
       openProject: "common:actions.openProject",
       openResource: "common:actions.openResource",
