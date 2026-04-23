@@ -62,6 +62,11 @@ jobs:
         with:
           ref: ${{ steps.release.outputs.tag }}
 
+      - name: Set Up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
       - name: Validate Deployment Settings
         id: settings
         shell: bash
