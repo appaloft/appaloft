@@ -35,3 +35,5 @@ Web console 只收集输入、显示状态并调用 HTTP/oRPC 合同。部署规
 <h2 id="web-local-docs-links">本地文档链接</h2>
 
 自托管时，Web `?` 链接应优先打开本地 `/docs/*`，保持离线可用。
+
+单独运行 Web Vite dev server 时，`/docs/*` 会重定向到本地 Docs dev server。根 `bun dev` 会同时启动 docs；如需调整本地 docs 地址，可设置 `APPALOFT_DEV_DOCS_HOST` / `APPALOFT_DEV_DOCS_PORT`，或用 `APPALOFT_WEB_DEV_DOCS_TARGET` 覆盖完整目标。

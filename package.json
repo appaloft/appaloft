@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "build": "turbo run build",
-    "dev": "bun --env-file=.env turbo run dev --filter=@appaloft/web --filter=@appaloft/shell",
+    "dev": "bun --env-file=.env turbo run dev --filter=@appaloft/web --filter=@appaloft/docs --filter=@appaloft/shell",
     "dev:all": "turbo run dev --parallel",
     "bun:version:sync": "bun run scripts/sync-bun-version.ts",
     "bun:version:check": "bun run scripts/sync-bun-version.ts --check",
