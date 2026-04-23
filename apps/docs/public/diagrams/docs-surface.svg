@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc" viewBox="0 0 1120 300">
+  <title id="title">Appaloft documentation surface</title>
+  <desc id="desc">Decorative console-like documentation surface with help anchors and snippets.</desc>
+  <rect width="1120" height="300" rx="32" fill="#123d2a"/>
+  <g font-family="IBM Plex Mono, monospace">
+    <rect x="56" y="46" width="1008" height="208" rx="24" fill="#fffaf0"/>
+    <circle cx="94" cy="82" r="8" fill="#e45b4f"/>
+    <circle cx="122" cy="82" r="8" fill="#e7b84a"/>
+    <circle cx="150" cy="82" r="8" fill="#0f8f4f"/>
+    <text x="84" y="130" fill="#123d2a" font-size="20">$ appaloft deploy . --method static --publish-dir dist</text>
+    <text x="84" y="170" fill="#476657" font-size="18">detect -> plan -> execute -> verify</text>
+    <text x="84" y="210" fill="#0f7a4a" font-size="18">docs: /docs/deploy/lifecycle/#deployment-lifecycle</text>
+    <rect x="740" y="106" width="260" height="88" rx="18" fill="#d9fbe7"/>
+    <text x="768" y="142" fill="#123d2a" font-size="18">?</text>
+    <text x="806" y="142" fill="#123d2a" font-size="18">stable help anchor</text>
+    <text x="806" y="174" fill="#476657" font-size="14">same in Web, CLI, API</text>
+  </g>
+</svg>

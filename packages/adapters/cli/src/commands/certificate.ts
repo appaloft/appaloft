@@ -8,6 +8,7 @@ import { Args, Command as EffectCommand, Options } from "@effect/cli";
 import { Effect } from "effect";
 
 import { optionalValue, runCommand, runQuery } from "../runtime.js";
+import { cliCommandDescriptions } from "./docs-help.js";
 
 const domainBindingIdArg = Args.text({ name: "domainBindingId" });
 const reasonOption = Options.choice("reason", certificateIssueReasons).pipe(
@@ -43,7 +44,7 @@ const issueOrRenewCommand = EffectCommand.make(
         idempotencyKey: optionalValue(idempotencyKey),
       }),
     ),
-).pipe(EffectCommand.withDescription("Request certificate issuance or renewal"));
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.certificateIssueOrRenew));
 
 const importCommand = EffectCommand.make(
   "import",
@@ -75,7 +76,7 @@ const importCommand = EffectCommand.make(
         }),
       );
     }),
-).pipe(EffectCommand.withDescription("Import a manual certificate for a bound domain"));
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.certificateImport));
 
 const listCommand = EffectCommand.make(
   "list",
@@ -88,9 +89,9 @@ const listCommand = EffectCommand.make(
         domainBindingId: optionalValue(domainBindingId),
       }),
     ),
-).pipe(EffectCommand.withDescription("List certificate lifecycle state"));
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.certificateList));
 
 export const certificateCommand = EffectCommand.make("certificate").pipe(
-  EffectCommand.withDescription("Certificate operations"),
+  EffectCommand.withDescription(cliCommandDescriptions.certificate),
   EffectCommand.withSubcommands([importCommand, issueOrRenewCommand, listCommand]),
 );

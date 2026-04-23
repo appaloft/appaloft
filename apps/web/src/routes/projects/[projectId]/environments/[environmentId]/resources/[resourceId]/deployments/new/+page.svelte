@@ -7,6 +7,7 @@
 
   import { readErrorMessage } from "$lib/api/client";
   import ConsoleShell from "$lib/components/console/ConsoleShell.svelte";
+  import DocsHelpLink from "$lib/components/console/DocsHelpLink.svelte";
   import DeploymentProgressDialog from "$lib/components/console/DeploymentProgressDialog.svelte";
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
@@ -17,6 +18,7 @@
     createDeploymentWithProgress,
     type DeploymentProgressDialogStatus,
   } from "$lib/console/deployment-progress";
+  import { webDocsHrefs } from "$lib/console/docs-help";
   import { createConsoleQueries } from "$lib/console/queries";
   import {
     deploymentDetailHref,
@@ -274,9 +276,16 @@
             <div class="flex items-start gap-2">
               <Server class="mt-1 size-4 text-muted-foreground" />
               <div class="space-y-1">
-                <h2 class="font-semibold">
-                  {$t(i18nKeys.console.resources.newDeploymentTargetTitle)}
-                </h2>
+                <div class="flex items-center gap-2">
+                  <h2 class="font-semibold">
+                    {$t(i18nKeys.console.resources.newDeploymentTargetTitle)}
+                  </h2>
+                  <DocsHelpLink
+                    href={webDocsHrefs.deploymentLifecycle}
+                    ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+                    className="size-5"
+                  />
+                </div>
                 <p class="text-sm leading-6 text-muted-foreground">
                   {$t(i18nKeys.console.resources.newDeploymentTargetDescription)}
                 </p>
@@ -286,7 +295,14 @@
             <div class="space-y-5">
               <div class="grid gap-4 sm:grid-cols-2">
                 <label class="space-y-1.5 text-sm font-medium">
-                  <span>{$t(i18nKeys.common.domain.server)}</span>
+                  <span class="inline-flex items-center gap-1.5">
+                    {$t(i18nKeys.common.domain.server)}
+                    <DocsHelpLink
+                      href={webDocsHrefs.serverDeploymentTarget}
+                      ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+                      className="size-5"
+                    />
+                  </span>
                   <Select.Root bind:value={serverId} type="single">
                     <Select.Trigger class="w-full">
                       {selectedServer?.name ?? $t(i18nKeys.console.domainBindings.noServerOptions)}
@@ -300,7 +316,14 @@
                 </label>
 
                 <label class="space-y-1.5 text-sm font-medium">
-                  <span>{$t(i18nKeys.common.domain.destination)}</span>
+                  <span class="inline-flex items-center gap-1.5">
+                    {$t(i18nKeys.common.domain.destination)}
+                    <DocsHelpLink
+                      href={webDocsHrefs.domainGeneratedAccessRoute}
+                      ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+                      className="size-5"
+                    />
+                  </span>
                   <Input
                     bind:value={destinationId}
                     autocomplete="off"

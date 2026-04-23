@@ -105,6 +105,18 @@ describe("resolveConfig", () => {
     expect(config.remoteRuntimeRoot).toBe("/srv/appaloft/runtime");
   });
 
+  test("allows overriding Web and docs static asset directories independently", () => {
+    const config = resolveConfig({
+      env: {
+        APPALOFT_WEB_STATIC_DIR: "/srv/appaloft/web",
+        APPALOFT_DOCS_STATIC_DIR: "/srv/appaloft/docs",
+      },
+    });
+
+    expect(config.webStaticDir).toBe("/srv/appaloft/web");
+    expect(config.docsStaticDir).toBe("/srv/appaloft/docs");
+  });
+
   test("uses an explicit resource access failure renderer URL only when it is HTTP based", () => {
     const configured = resolveConfig({
       env: {

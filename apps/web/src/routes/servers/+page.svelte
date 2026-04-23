@@ -9,11 +9,13 @@
 
   import { readErrorMessage } from "$lib/api/client";
   import ConsoleShell from "$lib/components/console/ConsoleShell.svelte";
+  import DocsHelpLink from "$lib/components/console/DocsHelpLink.svelte";
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
   import { Input } from "$lib/components/ui/input";
   import * as Select from "$lib/components/ui/select";
   import { Skeleton } from "$lib/components/ui/skeleton";
+  import { webDocsHrefs } from "$lib/console/docs-help";
   import { createConsoleQueries } from "$lib/console/queries";
   import { formatTime } from "$lib/console/utils";
   import { i18nKeys, t } from "$lib/i18n";
@@ -158,9 +160,15 @@
 
       <section class="space-y-4 border-y py-6">
         <div class="max-w-3xl space-y-1">
-          <h2 class="text-lg font-semibold">
-            {$t(i18nKeys.console.servers.defaultAccessSystemTitle)}
-          </h2>
+          <div class="flex items-center gap-2">
+            <h2 class="text-lg font-semibold">
+              {$t(i18nKeys.console.servers.defaultAccessSystemTitle)}
+            </h2>
+            <DocsHelpLink
+              href={webDocsHrefs.defaultAccessPolicy}
+              ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+            />
+          </div>
           <p class="text-sm text-muted-foreground">
             {$t(i18nKeys.console.servers.defaultAccessSystemDescription)}
           </p>
@@ -171,7 +179,14 @@
           onsubmit={submitSystemPolicy}
         >
           <label class="space-y-1.5 text-sm font-medium">
-            <span>{$t(i18nKeys.console.servers.defaultAccessModeLabel)}</span>
+            <span class="inline-flex items-center gap-1.5">
+              {$t(i18nKeys.console.servers.defaultAccessModeLabel)}
+              <DocsHelpLink
+                href={webDocsHrefs.defaultAccessPolicy}
+                ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+                className="size-5"
+              />
+            </span>
             <Select.Root bind:value={systemMode} type="single">
               <Select.Trigger class="w-full">
                 {systemMode === "disabled"
@@ -197,7 +212,14 @@
           <div class="grid gap-4 md:grid-cols-2">
             {#if systemMode !== "disabled"}
               <label class="space-y-1.5 text-sm font-medium">
-                <span>{$t(i18nKeys.console.servers.defaultAccessProviderKeyLabel)}</span>
+                <span class="inline-flex items-center gap-1.5">
+                  {$t(i18nKeys.console.servers.defaultAccessProviderKeyLabel)}
+                  <DocsHelpLink
+                    href={webDocsHrefs.defaultAccessPolicy}
+                    ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+                    className="size-5"
+                  />
+                </span>
                 <Input
                   bind:value={systemProviderKey}
                   autocomplete="off"
@@ -208,7 +230,14 @@
 
             {#if systemMode === "custom-template"}
               <label class="space-y-1.5 text-sm font-medium">
-                <span>{$t(i18nKeys.console.servers.defaultAccessTemplateRefLabel)}</span>
+                <span class="inline-flex items-center gap-1.5">
+                  {$t(i18nKeys.console.servers.defaultAccessTemplateRefLabel)}
+                  <DocsHelpLink
+                    href={webDocsHrefs.defaultAccessPolicy}
+                    ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+                    className="size-5"
+                  />
+                </span>
                 <Input
                   bind:value={systemTemplateRef}
                   autocomplete="off"

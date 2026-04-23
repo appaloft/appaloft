@@ -1,0 +1,12 @@
+@import "@appaloft/design/styles/docs.css";
+
+.sl-markdown-content img[src*="/diagrams/"] {
+  border: 1px solid color-mix(in oklch, var(--border) 70%, transparent);
+  border-radius: var(--radius-xl);
+  box-shadow: 0 18px 48px color-mix(in oklch, var(--foreground) 10%, transparent);
+  margin-block: 1.5rem;
+}
+
+.sl-markdown-content pre {
+  box-shadow: 0 18px 48px color-mix(in oklch, var(--foreground) 10%, transparent);
+}

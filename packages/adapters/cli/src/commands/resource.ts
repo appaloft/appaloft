@@ -30,6 +30,7 @@ import {
   runQuery,
   runResourceRuntimeLogsQuery,
 } from "../runtime.js";
+import { cliCommandDescriptions } from "./docs-help.js";
 
 const resourceIdArg = Args.text({ name: "resourceId" });
 const projectOption = Options.text("project").pipe(Options.optional);
@@ -135,7 +136,7 @@ const listCommand = EffectCommand.make(
         environmentId: optionalValue(environment),
       }),
     ),
-).pipe(EffectCommand.withDescription("List resources"));
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.resourceList));
 
 const showCommand = EffectCommand.make(
   "show",
@@ -154,7 +155,7 @@ const showCommand = EffectCommand.make(
       }),
     );
   },
-).pipe(EffectCommand.withDescription("Show resource profile"));
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.resourceShow));
 
 const createCommand = EffectCommand.make(
   "create",
@@ -190,7 +191,7 @@ const createCommand = EffectCommand.make(
       }),
     );
   },
-).pipe(EffectCommand.withDescription("Create a resource"));
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.resourceCreate));
 
 const logsCommand = EffectCommand.make(
   "logs",
@@ -211,7 +212,7 @@ const logsCommand = EffectCommand.make(
         follow,
       }),
     ),
-).pipe(EffectCommand.withDescription("Show resource runtime logs"));
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.resourceLogs));
 
 const archiveCommand = EffectCommand.make(
   "archive",
@@ -229,7 +230,7 @@ const archiveCommand = EffectCommand.make(
       }),
     );
   },
-).pipe(EffectCommand.withDescription("Archive a resource"));
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.resourceArchive));
 
 const deleteCommand = EffectCommand.make(
   "delete",
@@ -249,7 +250,7 @@ const deleteCommand = EffectCommand.make(
       }),
     );
   },
-).pipe(EffectCommand.withDescription("Delete an archived resource"));
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.resourceDelete));
 
 const terminalCommand = EffectCommand.make(
   "terminal",
@@ -273,7 +274,7 @@ const terminalCommand = EffectCommand.make(
         initialCols: Number(cols),
       }),
     ),
-).pipe(EffectCommand.withDescription("Open a resource terminal session"));
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.resourceTerminal));
 
 const proxyConfigCommand = EffectCommand.make(
   "proxy-config",
@@ -292,7 +293,7 @@ const proxyConfigCommand = EffectCommand.make(
         includeDiagnostics: diagnostics,
       }),
     ),
-).pipe(EffectCommand.withDescription("Show resource proxy configuration"));
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.resourceProxyConfig));
 
 const diagnoseCommand = EffectCommand.make(
   "diagnose",
@@ -318,7 +319,7 @@ const diagnoseCommand = EffectCommand.make(
       }),
     );
   },
-).pipe(EffectCommand.withDescription("Copy resource diagnostic summary context"));
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.resourceDiagnose));
 
 const healthCommand = EffectCommand.make(
   "health",
@@ -342,7 +343,7 @@ const healthCommand = EffectCommand.make(
       }),
     );
   },
-).pipe(EffectCommand.withDescription("Show current resource health"));
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.resourceHealth));
 
 const configureHealthCommand = EffectCommand.make(
   "configure-health",
@@ -408,7 +409,7 @@ const configureHealthCommand = EffectCommand.make(
       }),
     );
   },
-).pipe(EffectCommand.withDescription("Configure resource health policy"));
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.resourceConfigureHealth));
 
 const configureNetworkCommand = EffectCommand.make(
   "configure-network",
@@ -439,7 +440,7 @@ const configureNetworkCommand = EffectCommand.make(
       }),
     );
   },
-).pipe(EffectCommand.withDescription("Configure resource network profile"));
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.resourceConfigureNetwork));
 
 const configureRuntimeCommand = EffectCommand.make(
   "configure-runtime",
@@ -498,7 +499,7 @@ const configureRuntimeCommand = EffectCommand.make(
       }),
     );
   },
-).pipe(EffectCommand.withDescription("Configure resource runtime profile"));
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.resourceConfigureRuntime));
 
 const configureSourceCommand = EffectCommand.make(
   "configure-source",
@@ -570,10 +571,10 @@ const configureSourceCommand = EffectCommand.make(
       }),
     );
   },
-).pipe(EffectCommand.withDescription("Configure resource source profile"));
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.resourceConfigureSource));
 
 export const resourceCommand = EffectCommand.make("resource").pipe(
-  EffectCommand.withDescription("Resource operations"),
+  EffectCommand.withDescription(cliCommandDescriptions.resource),
   EffectCommand.withSubcommands([
     createCommand,
     listCommand,

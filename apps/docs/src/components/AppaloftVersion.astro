@@ -1,0 +1,27 @@
+---
+// biome-ignore-all lint/correctness/noUnusedVariables: Astro frontmatter values are consumed by the component template.
+const version = import.meta.env.PUBLIC_APPALOFT_VERSION;
+const label = Astro.url.pathname.includes("/en/") ? "Appaloft version" : "Appaloft 版本";
+---
+
+{
+  version && (
+    <span class="appaloft-version-badge" title={`${label} ${version}`} aria-label={`${label} ${version}`}>
+      v{version}
+    </span>
+  )
+}
+
+<style>
+  .appaloft-version-badge {
+    border: 1px solid var(--sl-color-gray-5);
+    border-radius: 999px;
+    color: var(--sl-color-gray-2);
+    display: inline-flex;
+    font-size: var(--sl-text-xs);
+    font-weight: 600;
+    line-height: 1;
+    padding: 0.35rem 0.55rem;
+    white-space: nowrap;
+  }
+</style>

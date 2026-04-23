@@ -14,6 +14,7 @@ This repository is a backend-core deployment platform, not a web-first CRUD app.
 - `packages/application` depends only on `core`
 - adapters, persistence, providers, integrations, plugins, and shell depend inward
 - `apps/web` may depend on `contracts`, `@appaloft/orpc/client`, `@tanstack/svelte-query`, and optional `ui`, never on `core` or `application`
+- `apps/docs` is the public documentation app; it may depend on documentation-site tooling such as Astro/Starlight/Tailwind and generated public docs metadata, never on `core` or `application`
 
 ## Package Boundaries
 
@@ -29,6 +30,7 @@ This repository is a backend-core deployment platform, not a web-first CRUD app.
 - `providers/*`: provider descriptors and provider-facing capability implementations
 - `integrations/*`: VCS and external-system integration descriptors/adapters
 - `plugins/*`: plugin manifest, compatibility checks, plugin host, built-ins
+- `apps/docs`: public user documentation only; owns rendered documentation IA, stable help anchors, search metadata, and localized public docs content
 - `apps/shell`: composition root only
 
 ## Forbidden
@@ -100,6 +102,19 @@ This repository is a backend-core deployment platform, not a web-first CRUD app.
 - if a change alters command boundaries, ownership scope, lifecycle stages, readiness rules, retry semantics, durable state shape, or other cross-cutting behavior, update an existing ADR or add a new ADR in the same change before expanding local specs
 - agents should treat `docs/testing/*-test-matrix.md` and equivalent testing specs as the authoritative behavioral coverage map for command/event/workflow testing
 - if a capability also changes a normative local spec, update the corresponding command/event/workflow/testing docs in the same change
+
+## Public Documentation Rules
+
+- public documentation is a first-class product surface governed by [ADR-029: Public Documentation Round And Platform](/Users/nichenqin/projects/appaloft/docs/decisions/ADR-029-public-documentation-round-and-platform.md)
+- public docs structure is governed by [docs/documentation/public-docs-structure.md](/Users/nichenqin/projects/appaloft/docs/documentation/public-docs-structure.md)
+- public docs coverage is governed by [docs/testing/public-documentation-test-matrix.md](/Users/nichenqin/projects/appaloft/docs/testing/public-documentation-test-matrix.md)
+- user-visible changes to input, output, status, recovery, workflow sequencing, or entrypoint affordances require a Docs Round outcome before the behavior is considered complete
+- Docs Round outcomes must identify the public page or stable anchor, reuse an existing anchor, mark the behavior not user-facing with a reason, or record an explicit migration gap
+- public docs must be task-oriented and must not mirror internal spec directories one-to-one
+- do not expose DDD, CQRS, aggregate, value object, repository, port, adapter, or handler terminology in primary user docs unless the page is explicitly advanced/contributor reference
+- Web `?` help, CLI docs/help text, HTTP/API descriptions, and future MCP/tool descriptions should target stable public documentation anchors
+- translated pages must keep product help anchor ids stable across locales
+- public docs static assets should be packaged separately from Web console assets and served under `/docs/*` when embedded in self-hosted or binary builds
 
 ## PostgreSQL And Kysely Rules
 

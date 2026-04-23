@@ -22,6 +22,8 @@
       "@appaloft/application": ["./packages/application/src/index.ts"],
       "@appaloft/cli-logging": ["./packages/cli-logging/src/index.ts"],
       "@appaloft/contracts": ["./packages/contracts/src/index.ts"],
+      "@appaloft/design": ["./packages/design/src/index.ts"],
+      "@appaloft/docs-registry": ["./packages/docs-registry/src/index.ts"],
       "@appaloft/i18n": ["./packages/i18n/src/index.ts"],
       "@appaloft/config": ["./packages/config/src/index.ts"],
       "@appaloft/observability": ["./packages/observability/src/index.ts"],

@@ -28,6 +28,7 @@ dist
 !apps/shell/test/fixtures/static-site/dist/index.html
 *.bun-build
 .svelte-kit
+**/.astro
 apps/web/.svelte-kit
 apps/web/playwright-report
 apps/web/test-results

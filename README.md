@@ -44,13 +44,7 @@ stack to `/opt/appaloft`, and starts the Appaloft backend, static console, and P
 bun install
 export APPALOFT_DATABASE_DRIVER=pglite
 bun run db:migrate
-bun run serve
-```
-
-In another terminal:
-
-```bash
-bun --cwd apps/web run dev
+bun run dev
 ```
 
 For PostgreSQL local development, start `docker-compose.dev.yml` and set

@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc" viewBox="0 0 1120 380">
+  <title id="title">Diagnostics loop</title>
+  <desc id="desc">A recovery loop from status to logs to diagnostics to safe action.</desc>
+  <rect width="1120" height="380" rx="32" fill="#171512"/>
+  <g font-family="IBM Plex Sans, Arial, sans-serif">
+    <text x="56" y="70" fill="#fffaf0" font-size="30" font-weight="700">Observe before changing state</text>
+    <g fill="none" stroke="#d9fbe7" stroke-width="7" stroke-linecap="round">
+      <path d="M300 112C206 126 144 198 166 260c24 70 142 90 254 45"/>
+      <path d="M816 268c94-14 156-86 134-148-24-70-142-90-254-45"/>
+    </g>
+    <g fill="#0f7a4a">
+      <rect x="216" y="124" width="186" height="84" rx="22"/>
+      <rect x="468" y="72" width="186" height="84" rx="22"/>
+      <rect x="718" y="124" width="186" height="84" rx="22"/>
+      <rect x="468" y="232" width="186" height="84" rx="22"/>
+    </g>
+    <g text-anchor="middle" fill="#fffaf0" font-size="20" font-weight="700">
+      <text x="309" y="174">Status</text>
+      <text x="561" y="122">Logs</text>
+      <text x="811" y="174">Diagnostics</text>
+      <text x="561" y="282">Safe action</text>
+    </g>
+    <text x="56" y="334" fill="#d9fbe7" font-size="18">Copy summaries, not secrets. Retry only after the failed phase is clear.</text>
+  </g>
+</svg>

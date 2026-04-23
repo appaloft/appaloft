@@ -7,6 +7,7 @@ import { certificatePolicies, edgeProxyKinds, tlsModes } from "@appaloft/core";
 import { Args, Command as EffectCommand, Options } from "@effect/cli";
 
 import { optionalValue, runCommand, runQuery } from "../runtime.js";
+import { cliCommandDescriptions } from "./docs-help.js";
 
 const projectIdOption = Options.text("project-id");
 const environmentIdOption = Options.text("environment-id");
@@ -96,7 +97,7 @@ const createCommand = EffectCommand.make(
       }),
     );
   },
-).pipe(EffectCommand.withDescription("Create a durable domain binding"));
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.domainBindingCreate));
 
 const confirmOwnershipCommand = EffectCommand.make(
   "confirm-ownership",
@@ -126,7 +127,7 @@ const confirmOwnershipCommand = EffectCommand.make(
         idempotencyKey: optionalValue(idempotencyKey),
       }),
     ),
-).pipe(EffectCommand.withDescription("Confirm domain binding ownership"));
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.domainBindingConfirmOwnership));
 
 const listCommand = EffectCommand.make(
   "list",
@@ -143,9 +144,9 @@ const listCommand = EffectCommand.make(
         resourceId: optionalValue(resource),
       }),
     ),
-).pipe(EffectCommand.withDescription("List domain bindings"));
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.domainBindingList));
 
 export const domainBindingCommand = EffectCommand.make("domain-binding").pipe(
-  EffectCommand.withDescription("Domain binding operations"),
+  EffectCommand.withDescription(cliCommandDescriptions.domainBinding),
   EffectCommand.withSubcommands([createCommand, confirmOwnershipCommand, listCommand]),
 );

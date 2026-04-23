@@ -5,6 +5,9 @@
   "exports": {
     ".": "./src/index.ts"
   },
+  "dependencies": {
+    "@appaloft/design": "workspace:*"
+  },
   "scripts": {
     "lint": "biome check .",
     "typecheck": "tsgo -p tsconfig.json --noEmit --checkers 4"

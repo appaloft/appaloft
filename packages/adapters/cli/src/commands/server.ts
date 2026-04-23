@@ -13,6 +13,7 @@ import { Args, Command as EffectCommand, Options } from "@effect/cli";
 import { Effect } from "effect";
 
 import { optionalValue, runCommand, runQuery } from "../runtime.js";
+import { cliCommandDescriptions } from "./docs-help.js";
 
 const nameOption = Options.text("name");
 const hostOption = Options.text("host");
@@ -52,10 +53,10 @@ const registerCommand = EffectCommand.make(
         proxyKind,
       }),
     ),
-).pipe(EffectCommand.withDescription("Register a server"));
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.serverRegister));
 
 const listCommand = EffectCommand.make("list", {}, () => runQuery(ListServersQuery.create())).pipe(
-  EffectCommand.withDescription("List servers"),
+  EffectCommand.withDescription(cliCommandDescriptions.serverList),
 );
 
 const credentialCommand = EffectCommand.make(
@@ -100,7 +101,7 @@ const credentialCommand = EffectCommand.make(
         }),
       );
     }),
-).pipe(EffectCommand.withDescription("Configure server SSH credential"));
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.serverCredential));
 
 const credentialCreateCommand = EffectCommand.make(
   "credential-create",
@@ -125,11 +126,11 @@ const credentialCreateCommand = EffectCommand.make(
         }),
       );
     }),
-).pipe(EffectCommand.withDescription("Create a reusable SSH credential from a private key file"));
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.serverCredentialCreate));
 
 const credentialListCommand = EffectCommand.make("credential-list", {}, () =>
   runQuery(ListSshCredentialsQuery.create()),
-).pipe(EffectCommand.withDescription("List reusable SSH credentials"));
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.serverCredentialList));
 
 const testCommand = EffectCommand.make(
   "test",
@@ -142,7 +143,7 @@ const testCommand = EffectCommand.make(
         serverId,
       }),
     ),
-).pipe(EffectCommand.withDescription("Test server connectivity"));
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.serverTest));
 
 const doctorCommand = EffectCommand.make(
   "doctor",
@@ -155,7 +156,7 @@ const doctorCommand = EffectCommand.make(
         serverId,
       }),
     ),
-).pipe(EffectCommand.withDescription("Diagnose server SSH and Docker readiness"));
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.serverDoctor));
 
 const proxyRepairCommand = EffectCommand.make(
   "repair",
@@ -169,10 +170,10 @@ const proxyRepairCommand = EffectCommand.make(
         reason: "repair",
       }),
     ),
-).pipe(EffectCommand.withDescription("Repair provider-owned edge proxy infrastructure"));
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.serverProxyRepair));
 
 const proxyCommand = EffectCommand.make("proxy").pipe(
-  EffectCommand.withDescription("Server edge proxy operations"),
+  EffectCommand.withDescription(cliCommandDescriptions.serverProxy),
   EffectCommand.withSubcommands([proxyRepairCommand]),
 );
 
@@ -194,10 +195,10 @@ const terminalCommand = EffectCommand.make(
         initialCols: Number(cols),
       }),
     ),
-).pipe(EffectCommand.withDescription("Open a server terminal session"));
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.serverTerminal));
 
 export const serverCommand = EffectCommand.make("server").pipe(
-  EffectCommand.withDescription("Server operations"),
+  EffectCommand.withDescription(cliCommandDescriptions.server),
   EffectCommand.withSubcommands([
     registerCommand,
     listCommand,

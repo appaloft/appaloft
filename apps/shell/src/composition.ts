@@ -70,6 +70,7 @@ export interface AppComposition {
 
 export interface ShellRuntimeOptions {
   embeddedWebAssets?: Readonly<Record<string, Blob>>;
+  embeddedDocsAssets?: Readonly<Record<string, Blob>>;
   pgliteRuntimeAssets?: PgliteRuntimeAssets;
   remotePgliteStateSyncSession?: RemotePgliteStateSyncSession;
 }
@@ -247,6 +248,24 @@ async function resolveWebStaticDir(
   return (await Bun.file(localWebIndex).exists()) ? fileURLToPath(localWebBuildDir) : undefined;
 }
 
+async function resolveDocsStaticDir(
+  config: AppConfig,
+  options?: ShellRuntimeOptions,
+): Promise<string | undefined> {
+  if (
+    config.docsStaticDir ||
+    options?.embeddedDocsAssets ||
+    Bun.env.APPALOFT_DEV_DISABLE_LOCAL_DOCS_STATIC_DIR === "true"
+  ) {
+    return config.docsStaticDir;
+  }
+
+  const localDocsBuildDir = new URL("../../docs/dist/", import.meta.url);
+  const localDocsIndex = new URL("index.html", localDocsBuildDir);
+
+  return (await Bun.file(localDocsIndex).exists()) ? fileURLToPath(localDocsBuildDir) : undefined;
+}
+
 export async function createAppComposition(
   flags?: Partial<AppConfig>,
   options?: ShellRuntimeOptions,
@@ -354,9 +373,14 @@ export async function createAppComposition(
     logger,
   });
   const webStaticDir = await resolveWebStaticDir(config, options);
+  const docsStaticDir = await resolveDocsStaticDir(config, options);
 
   const httpApp = createHttpApp({
-    config: webStaticDir ? { ...config, webStaticDir } : config,
+    config: {
+      ...config,
+      ...(webStaticDir ? { webStaticDir } : {}),
+      ...(docsStaticDir ? { docsStaticDir } : {}),
+    },
     commandBus,
     queryBus,
     logger,
@@ -367,7 +391,8 @@ export async function createAppComposition(
     pluginRuntime,
     authRuntime,
     requestContextRunner,
-    ...(options?.embeddedWebAssets ? { embeddedStaticAssets: options.embeddedWebAssets } : {}),
+    ...(options?.embeddedWebAssets ? { embeddedWebAssets: options.embeddedWebAssets } : {}),
+    ...(options?.embeddedDocsAssets ? { embeddedDocsAssets: options.embeddedDocsAssets } : {}),
   });
 
   let started = false;

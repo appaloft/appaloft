@@ -2,6 +2,7 @@ import { ConfigureDefaultAccessDomainPolicyCommand } from "@appaloft/application
 import { Command as EffectCommand, Options } from "@effect/cli";
 
 import { optionalValue, runCommand } from "../runtime.js";
+import { cliCommandDescriptions } from "./docs-help.js";
 
 const policyScopes = ["system", "deployment-target"] as const;
 const policyModes = ["disabled", "provider", "custom-template"] as const;
@@ -41,9 +42,9 @@ const configureCommand = EffectCommand.make(
         ...(optionalValue(idempotencyKey) ? { idempotencyKey: optionalValue(idempotencyKey) } : {}),
       }),
     ),
-).pipe(EffectCommand.withDescription("Configure default access domain policy"));
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.defaultAccessConfigure));
 
 export const defaultAccessCommand = EffectCommand.make("default-access").pipe(
-  EffectCommand.withDescription("Configure generated default access domain policy"),
+  EffectCommand.withDescription(cliCommandDescriptions.defaultAccess),
   EffectCommand.withSubcommands([configureCommand]),
 );

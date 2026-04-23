@@ -19,10 +19,6 @@
     "test:e2e:webview": "bun run build && bun test test/e2e-webview"
   },
   "devDependencies": {
-    "@fontsource-variable/inter": "^5.2.8",
-    "@fontsource/fraunces": "^5.2.9",
-    "@fontsource/ibm-plex-mono": "^5.2.7",
-    "@fontsource/ibm-plex-sans": "^5.2.8",
     "@internationalized/date": "^3.12.0",
     "@lucide/svelte": "^1.8.0",
     "@sveltejs/adapter-static": "^3.0.10",
@@ -32,6 +28,8 @@
     "@tanstack/svelte-query": "^6.1.14",
     "@types/node": "^22",
     "@appaloft/contracts": "workspace:*",
+    "@appaloft/design": "workspace:*",
+    "@appaloft/docs-registry": "workspace:*",
     "@appaloft/i18n": "workspace:*",
     "@appaloft/orpc": "workspace:*",
     "bits-ui": "^2.16.3",

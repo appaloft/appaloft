@@ -28,22 +28,21 @@ Apply migrations:
 bun run db:migrate
 ```
 
-Run the local web console and backend together:
+Run the local web console, public docs, and backend together:
 
 ```bash
 bun run dev
 ```
 
-This root command starts only `apps/shell` and `apps/web`, not the desktop app. Open:
+This root command starts `apps/shell`, `apps/web`, and `apps/docs`, not the desktop app. Open the Web
+URL printed by Vite. Web dev keeps `/docs/*` links working by redirecting them to the local Docs dev
+server.
 
-```text
-http://localhost:3001
-```
-
-By default the Vite dev server listens on port `3001`, the backend listens on port `3002`, and Vite
-proxies `/api` to the backend. Override the dev-only ports with `APPALOFT_DEV_WEB_PORT` and
-`APPALOFT_DEV_BACKEND_PORT` when needed. Override the public browser origin used for OAuth callbacks
-with `APPALOFT_DEV_WEB_ORIGIN`.
+By default Vite proxies `/api` to `APPALOFT_WEB_DEV_PROXY_TARGET`. Override `APPALOFT_HTTP_PORT` for
+the backend, `APPALOFT_WEB_DEV_PROXY_TARGET` for Web-to-backend development traffic, and
+`APPALOFT_WEB_ORIGIN` for the public browser origin used by OAuth callbacks. If the local Docs dev
+server uses a non-default address, set `APPALOFT_DEV_DOCS_HOST` / `APPALOFT_DEV_DOCS_PORT`, or set
+`APPALOFT_WEB_DEV_DOCS_TARGET` to override the full Web redirect target.
 
 Run backend only:
 
@@ -62,8 +61,10 @@ bun run package:binary-bundle
 The binary bundle is self-contained:
 
 - the web console static assets are embedded into the executable
+- the public documentation static assets are embedded into the executable
 - the PGlite fs bundle and wasm modules are embedded into the executable
 - `APPALOFT_WEB_STATIC_DIR` remains available only as an override for an external web build
+- `APPALOFT_DOCS_STATIC_DIR` remains available only as an override for an external docs build
 
 Run the Tauri desktop shell:
 
@@ -151,6 +152,7 @@ docker build -t appaloft-all-in-one:local .
 docker run --rm -p 3001:3001 \
   -e APPALOFT_DATABASE_URL=postgres://... \
   -e APPALOFT_WEB_STATIC_DIR=/app/web \
+  -e APPALOFT_DOCS_STATIC_DIR=/app/docs \
   appaloft-all-in-one:local
 ```
 

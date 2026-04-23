@@ -11,6 +11,7 @@ import { configScopes, environmentKinds, variableExposures, variableKinds } from
 import { Args, Command as EffectCommand, Options } from "@effect/cli";
 
 import { optionalValue, runCommand, runQuery } from "../runtime.js";
+import { cliCommandDescriptions } from "./docs-help.js";
 
 const environmentIdArg = Args.text({ name: "environmentId" });
 const otherEnvironmentIdArg = Args.text({ name: "otherEnvironmentId" });
@@ -38,7 +39,7 @@ const listCommand = EffectCommand.make(
         projectId: optionalValue(project),
       }),
     ),
-).pipe(EffectCommand.withDescription("List environments"));
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.environmentList));
 
 const createCommand = EffectCommand.make(
   "create",
@@ -57,7 +58,7 @@ const createCommand = EffectCommand.make(
         parentEnvironmentId: optionalValue(parent),
       }),
     ),
-).pipe(EffectCommand.withDescription("Create an environment"));
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.environmentCreate));
 
 const showCommand = EffectCommand.make(
   "show",
@@ -65,7 +66,7 @@ const showCommand = EffectCommand.make(
     environmentId: environmentIdArg,
   },
   ({ environmentId }) => runQuery(ShowEnvironmentQuery.create({ environmentId })),
-).pipe(EffectCommand.withDescription("Show an environment"));
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.environmentShow));
 
 const setCommand = EffectCommand.make(
   "set",
@@ -90,7 +91,7 @@ const setCommand = EffectCommand.make(
         isSecret: secret,
       }),
     ),
-).pipe(EffectCommand.withDescription("Set an environment variable"));
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.environmentSet));
 
 const unsetCommand = EffectCommand.make(
   "unset",
@@ -109,7 +110,7 @@ const unsetCommand = EffectCommand.make(
         scope: optionalValue(scope),
       }),
     ),
-).pipe(EffectCommand.withDescription("Unset an environment variable"));
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.environmentUnset));
 
 const diffCommand = EffectCommand.make(
   "diff",
@@ -124,7 +125,7 @@ const diffCommand = EffectCommand.make(
         otherEnvironmentId,
       }),
     ),
-).pipe(EffectCommand.withDescription("Diff two environments"));
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.environmentDiff));
 
 const promoteCommand = EffectCommand.make(
   "promote",
@@ -141,10 +142,10 @@ const promoteCommand = EffectCommand.make(
         targetKind: kind,
       }),
     ),
-).pipe(EffectCommand.withDescription("Promote an environment"));
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.environmentPromote));
 
 export const envCommand = EffectCommand.make("env").pipe(
-  EffectCommand.withDescription("Environment operations"),
+  EffectCommand.withDescription(cliCommandDescriptions.environment),
   EffectCommand.withSubcommands([
     listCommand,
     createCommand,

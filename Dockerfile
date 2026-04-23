@@ -23,6 +23,7 @@ COPY . .
 RUN bun install --frozen-lockfile
 RUN bun run --cwd apps/shell build
 RUN bun run --cwd apps/web build
+RUN bun run --cwd apps/docs build
 
 FROM debian:bookworm-slim AS runtime
 WORKDIR /app
@@ -36,11 +37,13 @@ COPY --from=bun /root/.bun /root/.bun
 
 COPY --from=builder /app/apps/shell/dist/appaloft /app/appaloft
 COPY --from=builder /app/apps/web/build /app/web
+COPY --from=builder /app/apps/docs/dist /app/docs
 
 ENV APPALOFT_APP_VERSION=${APPALOFT_APP_VERSION}
 ENV APPALOFT_HTTP_HOST=0.0.0.0
 ENV APPALOFT_HTTP_PORT=3001
 ENV APPALOFT_WEB_STATIC_DIR=/app/web
+ENV APPALOFT_DOCS_STATIC_DIR=/app/docs
 
 EXPOSE 3001
 

@@ -1,0 +1,30 @@
+{
+  "name": "@appaloft/design",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./design.md": "./DESIGN.md",
+    "./styles/fonts.css": "./styles/fonts.css",
+    "./styles/tokens.css": "./styles/tokens.css",
+    "./styles/tailwind.css": "./styles/tailwind.css",
+    "./styles/web.css": "./styles/web.css",
+    "./styles/docs.css": "./styles/docs.css",
+    "./styles/www.css": "./styles/www.css",
+    "./assets/*": "./assets/*"
+  },
+  "scripts": {
+    "lint": "biome check .",
+    "typecheck": "tsgo -p tsconfig.json --noEmit --checkers 4",
+    "test:unit": "vitest --run"
+  },
+  "dependencies": {
+    "@fontsource/fraunces": "^5.2.9",
+    "@fontsource/ibm-plex-mono": "^5.2.7",
+    "@fontsource/ibm-plex-sans": "^5.2.8"
+  },
+  "devDependencies": {
+    "@types/node": "^22",
+    "vitest": "^4.1.3"
+  }
+}

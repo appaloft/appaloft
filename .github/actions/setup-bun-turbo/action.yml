@@ -4,6 +4,11 @@ description: Set up Bun, restore Bun and Turborepo caches, and install dependenc
 runs:
   using: composite
   steps:
+    - name: Set up Node
+      uses: actions/setup-node@v4
+      with:
+        node-version: 24
+
     - name: Set up Bun
       uses: oven-sh/setup-bun@v2
       with:

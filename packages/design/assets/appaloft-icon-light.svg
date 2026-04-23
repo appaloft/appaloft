@@ -1,0 +1,9 @@
+<svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <title>Appaloft icon light</title>
+  <desc>Light app icon with flat cloud upload mark for Appaloft</desc>
+  <rect x="20" y="20" width="216" height="216" rx="54" fill="#FFFFFF" stroke="#D9E2F2" stroke-width="2"/>
+  <path d="M76 166 C58 166 48 153 48 139 C48 124 58 112 74 109 C77 91 92 79 111 79 C127 79 141 87 149 100" stroke="#4E84FF" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M96 166 C137 166 160 154 173 130 C185 108 186 89 177 77" stroke="#4E84FF" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M183 114 C203 120 216 135 216 153 C216 171 202 185 184 185 L149 185" stroke="#4E84FF" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M176 54 L208 89 L162 89 Z" fill="#4E84FF"/>
+</svg>
