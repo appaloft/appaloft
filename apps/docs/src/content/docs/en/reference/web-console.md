@@ -35,3 +35,7 @@ The Web console collects input, displays state, and calls HTTP/oRPC contracts. B
 Self-hosted Web `?` links should prefer local `/docs/*` targets.
 
 When running the Web Vite dev server by itself, `/docs/*` redirects to the local Docs dev server. The root `bun dev` command starts docs as well; set `APPALOFT_DEV_DOCS_HOST` / `APPALOFT_DEV_DOCS_PORT` to move local docs, or set `APPALOFT_WEB_DEV_DOCS_TARGET` to override the full target.
+
+<h2 id="web-product-version">Product version</h2>
+
+The Web console displays the Appaloft product version returned by backend `/api/version`. The docs site displays the same product version at build time; release and binary packaging inject it through `APPALOFT_APP_VERSION`, while development falls back to the repository root `package.json` version.

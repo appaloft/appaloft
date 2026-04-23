@@ -92,6 +92,7 @@ export const enUS = {
       time: "Time",
       tls: "TLS",
       value: "Value",
+      version: "Version",
       variables: "Variables",
     },
     language: {

@@ -92,6 +92,7 @@ export const i18nKeys = {
       time: "common:domain.time",
       tls: "common:domain.tls",
       value: "common:domain.value",
+      version: "common:domain.version",
       variables: "common:domain.variables",
     },
     language: {

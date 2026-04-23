@@ -37,3 +37,7 @@ Web console 只收集输入、显示状态并调用 HTTP/oRPC 合同。部署规
 自托管时，Web `?` 链接应优先打开本地 `/docs/*`，保持离线可用。
 
 单独运行 Web Vite dev server 时，`/docs/*` 会重定向到本地 Docs dev server。根 `bun dev` 会同时启动 docs；如需调整本地 docs 地址，可设置 `APPALOFT_DEV_DOCS_HOST` / `APPALOFT_DEV_DOCS_PORT`，或用 `APPALOFT_WEB_DEV_DOCS_TARGET` 覆盖完整目标。
+
+<h2 id="web-product-version">产品版本</h2>
+
+Web console 会显示后端 `/api/version` 返回的 Appaloft 产品版本。Docs 站点显示构建时的同一产品版本；release 和 binary 打包会通过 `APPALOFT_APP_VERSION` 注入，开发环境默认使用仓库根 `package.json` 的版本。

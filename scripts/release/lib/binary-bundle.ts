@@ -224,6 +224,7 @@ export async function createBinaryBundle(input: {
 
   await resetDir(input.outDir);
   await resetDir(tempBuildRoot);
+  process.env.APPALOFT_APP_VERSION = version;
 
   if (!input.skipWebBuild) {
     await removePath(webBuildDir);

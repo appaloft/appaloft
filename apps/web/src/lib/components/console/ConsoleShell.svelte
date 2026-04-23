@@ -140,6 +140,11 @@
   const authIdentity = $derived(readSessionIdentity(authSession.session));
   const connectionError = $derived(healthQuery.error ? readErrorMessage(healthQuery.error) : "");
   const deploymentModeLabel = $derived(version?.mode ?? "self-hosted");
+  const appVersion = $derived(version?.version ?? healthQuery.data?.version ?? "");
+  const appVersionLabel = $derived(appVersion ? `v${appVersion}` : "");
+  const appVersionTitle = $derived(
+    appVersion ? `${$t(i18nKeys.common.domain.version)} ${appVersion}` : "",
+  );
   const colorModeLabel = $derived(
     colorMode === "dark"
       ? $t(i18nKeys.common.actions.switchToLightMode)
@@ -269,7 +274,9 @@
         />
         <span class="min-w-0 group-data-[collapsible=icon]:hidden">
           <span class="block truncate text-sm font-medium">{$t(i18nKeys.common.app.productName)}</span>
-          <span class="block truncate text-xs text-muted-foreground">{$t(i18nKeys.common.app.consoleSubtitle)}</span>
+          <span class="block truncate text-xs text-muted-foreground">
+            {$t(i18nKeys.common.app.consoleSubtitle)}{appVersionLabel ? ` · ${appVersionLabel}` : ""}
+          </span>
         </span>
       </a>
       <SidebarInput
@@ -459,6 +466,11 @@
         </div>
       </div>
       <div class="flex shrink-0 items-center gap-2">
+        {#if appVersionLabel}
+          <Badge variant="outline" class="hidden sm:inline-flex" title={appVersionTitle}>
+            {appVersionLabel}
+          </Badge>
+        {/if}
         <Badge variant="outline" class="hidden md:inline-flex">{deploymentModeLabel}</Badge>
         <Button
           aria-label={colorModeLabel}

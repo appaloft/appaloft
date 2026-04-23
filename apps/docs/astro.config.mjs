@@ -1,5 +1,11 @@
+import { readFileSync } from "node:fs";
 import starlight from "@astrojs/starlight";
 import { defineConfig } from "astro/config";
+
+const rootPackage = JSON.parse(
+  readFileSync(new URL("../../package.json", import.meta.url), "utf8"),
+);
+const appaloftVersion = process.env.APPALOFT_APP_VERSION || rootPackage.version;
 
 const sidebar = [
   {
@@ -178,6 +184,11 @@ const sidebar = [
 export default defineConfig({
   base: "/docs",
   site: "https://appaloft.dev",
+  vite: {
+    define: {
+      "import.meta.env.PUBLIC_APPALOFT_VERSION": JSON.stringify(appaloftVersion),
+    },
+  },
   integrations: [
     starlight({
       title: {
@@ -202,6 +213,9 @@ export default defineConfig({
         },
       },
       customCss: ["./src/styles/appaloft-docs.css"],
+      components: {
+        Header: "./src/components/Header.astro",
+      },
       sidebar,
       tableOfContents: {
         minHeadingLevel: 2,

@@ -98,6 +98,7 @@ export const zhCN = {
       time: "时间",
       tls: "TLS",
       value: "Value",
+      version: "版本",
       variables: "变量",
     },
     language: {
