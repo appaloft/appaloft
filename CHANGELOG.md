@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.3.0](https://github.com/appaloft/appaloft/compare/v0.2.13...v0.3.0) (2026-04-23)
+
+
+### Bug Fixes
+
+* repair static docs routing ([#74](https://github.com/appaloft/appaloft/issues/74)) ([105083d](https://github.com/appaloft/appaloft/commit/105083d52fc9b461e2c04fb4825679fe6c1ee453))
+
+
+### Documentation
+
+* align roadmap for 0.3.0 release ([#75](https://github.com/appaloft/appaloft/issues/75)) ([fd0ffb6](https://github.com/appaloft/appaloft/commit/fd0ffb6ade71476a3d6082bef67694eaafd1ecd6))
+
 ## [0.2.13](https://github.com/appaloft/appaloft/compare/v0.2.12...v0.2.13) (2026-04-23)
 
 
