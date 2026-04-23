@@ -41,6 +41,7 @@
   import { readErrorMessage } from "$lib/api/client";
   import ConsoleShell from "$lib/components/console/ConsoleShell.svelte";
   import DeploymentTable from "$lib/components/console/DeploymentTable.svelte";
+  import DocsHelpLink from "$lib/components/console/DocsHelpLink.svelte";
   import ResourceProfileSummary from "$lib/components/console/ResourceProfileSummary.svelte";
   import ResourceStatusDot from "$lib/components/console/ResourceStatusDot.svelte";
   import TerminalSessionPanel from "$lib/components/console/TerminalSessionPanel.svelte";
@@ -52,6 +53,7 @@
   import { Skeleton } from "$lib/components/ui/skeleton";
   import * as Tabs from "$lib/components/ui/tabs";
   import { Textarea } from "$lib/components/ui/textarea";
+  import { webDocsHrefs } from "$lib/console/docs-help";
   import { createConsoleQueries } from "$lib/console/queries";
   import {
     findEnvironment,
@@ -2210,6 +2212,10 @@
                         <h2 class="text-lg font-semibold">
                           {$t(i18nKeys.console.resources.sourceProfileTitle)}
                         </h2>
+                        <DocsHelpLink
+                          href={webDocsHrefs.resourceSourceProfile}
+                          ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+                        />
                         <Badge variant={resourceDetail?.source ? "default" : "outline"}>
                           {sourceProfileStatusLabel}
                         </Badge>
@@ -2222,7 +2228,14 @@
 
                   <div class="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                     <label class="space-y-1.5 text-sm font-medium">
-                      <span>{$t(i18nKeys.console.resources.sourceKind)}</span>
+                      <span class="inline-flex items-center gap-1.5">
+                        {$t(i18nKeys.console.resources.sourceKind)}
+                        <DocsHelpLink
+                          href={webDocsHrefs.resourceSourceProfile}
+                          ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+                          className="size-5"
+                        />
+                      </span>
                       <Select.Root bind:value={sourceKind} type="single">
                         <Select.Trigger class="w-full">
                           {sourceKindLabel(sourceKind)}
@@ -2248,7 +2261,14 @@
                     </label>
 
                     <label class="space-y-1.5 text-sm font-medium" for="resource-source-locator">
-                      <span>{$t(i18nKeys.console.resources.sourceLocator)}</span>
+                      <span class="inline-flex items-center gap-1.5">
+                        {$t(i18nKeys.console.resources.sourceLocator)}
+                        <DocsHelpLink
+                          href={webDocsHrefs.deploymentSource}
+                          ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+                          className="size-5"
+                        />
+                      </span>
                       <Input
                         id="resource-source-locator"
                         bind:value={sourceLocator}
@@ -2361,6 +2381,10 @@
                         <h2 class="text-lg font-semibold">
                           {$t(i18nKeys.console.resources.runtimeProfileTitle)}
                         </h2>
+                        <DocsHelpLink
+                          href={webDocsHrefs.resourceRuntimeProfile}
+                          ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+                        />
                         <Badge variant={resourceDetail?.runtimeProfile ? "default" : "outline"}>
                           {runtimeProfileStatusLabel}
                         </Badge>
@@ -2373,7 +2397,14 @@
 
                   <div class="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                     <label class="space-y-1.5 text-sm font-medium">
-                      <span>{$t(i18nKeys.console.resources.runtimeStrategy)}</span>
+                      <span class="inline-flex items-center gap-1.5">
+                        {$t(i18nKeys.console.resources.runtimeStrategy)}
+                        <DocsHelpLink
+                          href={webDocsHrefs.resourceRuntimeProfile}
+                          ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+                          className="size-5"
+                        />
+                      </span>
                       <Select.Root bind:value={runtimeStrategy} type="single">
                         <Select.Trigger class="w-full">
                           {runtimeStrategyLabel(runtimeStrategy)}
@@ -2420,7 +2451,14 @@
                     </label>
 
                     <label class="space-y-1.5 text-sm font-medium" for="resource-runtime-start-command">
-                      <span>{$t(i18nKeys.console.resources.runtimeStartCommand)}</span>
+                      <span class="inline-flex items-center gap-1.5">
+                        {$t(i18nKeys.console.resources.runtimeStartCommand)}
+                        <DocsHelpLink
+                          href={webDocsHrefs.resourceRuntimeProfile}
+                          ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+                          className="size-5"
+                        />
+                      </span>
                       <Input
                         id="resource-runtime-start-command"
                         bind:value={runtimeStartCommand}
@@ -2523,6 +2561,10 @@
                         <h2 class="text-lg font-semibold">
                           {$t(i18nKeys.console.resources.networkProfileTitle)}
                         </h2>
+                        <DocsHelpLink
+                          href={webDocsHrefs.resourceNetworkProfile}
+                          ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+                        />
                         <Badge variant={resource.networkProfile ? "default" : "outline"}>
                           {networkProfileStatusLabel}
                         </Badge>
@@ -2535,7 +2577,14 @@
 
                   <div class="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                     <label class="space-y-1.5 text-sm font-medium" for="resource-network-internal-port">
-                      <span>{$t(i18nKeys.common.domain.port)}</span>
+                      <span class="inline-flex items-center gap-1.5">
+                        {$t(i18nKeys.common.domain.port)}
+                        <DocsHelpLink
+                          href={webDocsHrefs.resourceNetworkProfile}
+                          ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+                          className="size-5"
+                        />
+                      </span>
                       <Input
                         id="resource-network-internal-port"
                         bind:value={networkInternalPort}
@@ -2546,7 +2595,14 @@
                     </label>
 
                     <label class="space-y-1.5 text-sm font-medium">
-                      <span>{$t(i18nKeys.common.domain.protocol)}</span>
+                      <span class="inline-flex items-center gap-1.5">
+                        {$t(i18nKeys.common.domain.protocol)}
+                        <DocsHelpLink
+                          href={webDocsHrefs.resourceNetworkProfile}
+                          ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+                          className="size-5"
+                        />
+                      </span>
                       <Select.Root bind:value={networkUpstreamProtocol} type="single">
                         <Select.Trigger class="w-full">
                           {networkProtocolLabel(networkUpstreamProtocol)}
@@ -2563,7 +2619,14 @@
                     </label>
 
                     <label class="space-y-1.5 text-sm font-medium">
-                      <span>{$t(i18nKeys.common.domain.exposure)}</span>
+                      <span class="inline-flex items-center gap-1.5">
+                        {$t(i18nKeys.common.domain.exposure)}
+                        <DocsHelpLink
+                          href={webDocsHrefs.resourceNetworkProfile}
+                          ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+                          className="size-5"
+                        />
+                      </span>
                       <Select.Root bind:value={networkExposureMode} type="single">
                         <Select.Trigger class="w-full">
                           {networkExposureModeLabel(networkExposureMode)}
@@ -2699,9 +2762,15 @@
               {:else if activeSettingsSection === "domains"}
               <section id="resource-overview-domains" class="space-y-4">
                 <div>
-                  <h2 class="text-lg font-semibold">
-                    {$t(i18nKeys.console.resources.domainBindingsTitle)}
-                  </h2>
+                  <div class="flex items-center gap-2">
+                    <h2 class="text-lg font-semibold">
+                      {$t(i18nKeys.console.resources.domainBindingsTitle)}
+                    </h2>
+                    <DocsHelpLink
+                      href={webDocsHrefs.domainCustomDomainBinding}
+                      ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+                    />
+                  </div>
                   <p class="mt-1 text-sm text-muted-foreground">
                     {$t(i18nKeys.console.resources.domainBindingsDescription)}
                   </p>
@@ -2719,7 +2788,14 @@
 
                   <div class="mt-4 grid gap-4 md:grid-cols-[minmax(0,1fr)_10rem_10rem_12rem]">
                     <label class="space-y-1.5 text-sm font-medium">
-                      <span>{$t(i18nKeys.common.domain.domainName)}</span>
+                      <span class="inline-flex items-center gap-1.5">
+                        {$t(i18nKeys.common.domain.domainName)}
+                        <DocsHelpLink
+                          href={webDocsHrefs.domainCustomDomainBinding}
+                          ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+                          className="size-5"
+                        />
+                      </span>
                       <Input
                         bind:value={domainName}
                         autocomplete="off"
@@ -2728,12 +2804,26 @@
                     </label>
 
                     <label class="space-y-1.5 text-sm font-medium">
-                      <span>{$t(i18nKeys.common.domain.pathPrefix)}</span>
+                      <span class="inline-flex items-center gap-1.5">
+                        {$t(i18nKeys.common.domain.pathPrefix)}
+                        <DocsHelpLink
+                          href={webDocsHrefs.domainGeneratedAccessRoute}
+                          ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+                          className="size-5"
+                        />
+                      </span>
                       <Input bind:value={pathPrefix} autocomplete="off" placeholder="/" />
                     </label>
 
                     <label class="space-y-1.5 text-sm font-medium">
-                      <span>{$t(i18nKeys.common.domain.tls)}</span>
+                      <span class="inline-flex items-center gap-1.5">
+                        {$t(i18nKeys.common.domain.tls)}
+                        <DocsHelpLink
+                          href={webDocsHrefs.certificateReadiness}
+                          ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+                          className="size-5"
+                        />
+                      </span>
                       <Select.Root bind:value={tlsMode} type="single">
                         <Select.Trigger class="w-full">{tlsMode}</Select.Trigger>
                         <Select.Content>
@@ -2744,7 +2834,14 @@
                     </label>
 
                     <label class="space-y-1.5 text-sm font-medium">
-                      <span>{$t(i18nKeys.common.domain.routeBehavior)}</span>
+                      <span class="inline-flex items-center gap-1.5">
+                        {$t(i18nKeys.common.domain.routeBehavior)}
+                        <DocsHelpLink
+                          href={webDocsHrefs.domainGeneratedAccessRoute}
+                          ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+                          className="size-5"
+                        />
+                      </span>
                       <Select.Root bind:value={routeMode} type="single">
                         <Select.Trigger class="w-full">
                           {routeMode === "redirect"
@@ -2766,7 +2863,14 @@
                   {#if routeMode === "redirect"}
                     <div class="mt-4 grid gap-4 sm:grid-cols-[minmax(0,1fr)_10rem]">
                       <label class="space-y-1.5 text-sm font-medium">
-                        <span>{$t(i18nKeys.common.domain.redirectTo)}</span>
+                        <span class="inline-flex items-center gap-1.5">
+                          {$t(i18nKeys.common.domain.redirectTo)}
+                          <DocsHelpLink
+                            href={webDocsHrefs.domainCustomDomainBinding}
+                            ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+                            className="size-5"
+                          />
+                        </span>
                         <Select.Root
                           bind:value={redirectTo}
                           type="single"
@@ -2785,7 +2889,14 @@
                       </label>
 
                       <label class="space-y-1.5 text-sm font-medium">
-                        <span>{$t(i18nKeys.common.domain.redirectStatus)}</span>
+                        <span class="inline-flex items-center gap-1.5">
+                          {$t(i18nKeys.common.domain.redirectStatus)}
+                          <DocsHelpLink
+                            href={webDocsHrefs.domainCustomDomainBinding}
+                            ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+                            className="size-5"
+                          />
+                        </span>
                         <Select.Root bind:value={redirectStatus} type="single">
                           <Select.Trigger class="w-full">{redirectStatus}</Select.Trigger>
                           <Select.Content>
@@ -2803,7 +2914,14 @@
                     <div class="mt-4 grid gap-4 sm:grid-cols-2">
                       {#if shouldShowServerField}
                         <label class="space-y-1.5 text-sm font-medium">
-                          <span>{$t(i18nKeys.common.domain.server)}</span>
+                          <span class="inline-flex items-center gap-1.5">
+                            {$t(i18nKeys.common.domain.server)}
+                            <DocsHelpLink
+                              href={webDocsHrefs.serverDeploymentTarget}
+                              ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+                              className="size-5"
+                            />
+                          </span>
                           <Select.Root bind:value={serverId} type="single">
                             <Select.Trigger class="w-full">
                               {selectedServer?.name ??
@@ -2820,7 +2938,14 @@
 
                       {#if shouldShowDestinationField}
                         <label class="space-y-1.5 text-sm font-medium">
-                          <span>{$t(i18nKeys.common.domain.destination)}</span>
+                          <span class="inline-flex items-center gap-1.5">
+                            {$t(i18nKeys.common.domain.destination)}
+                            <DocsHelpLink
+                              href={webDocsHrefs.domainGeneratedAccessRoute}
+                              ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+                              className="size-5"
+                            />
+                          </span>
                           <Input
                             bind:value={destinationId}
                             autocomplete="off"
@@ -3075,8 +3200,13 @@
                                 onsubmit={(event) => importCertificateForBinding(binding, event)}
                               >
                                 <label class="space-y-1.5 text-sm font-medium">
-                                  <span>
+                                  <span class="inline-flex items-center gap-1.5">
                                     {$t(i18nKeys.console.resources.certificateImportCertificateChain)}
+                                    <DocsHelpLink
+                                      href={webDocsHrefs.certificateReadiness}
+                                      ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+                                      className="size-5"
+                                    />
                                   </span>
                                   <Textarea
                                     id={`resource-domain-binding-import-certificate-chain-${binding.id}`}
@@ -3092,8 +3222,13 @@
                                 </label>
 
                                 <label class="space-y-1.5 text-sm font-medium">
-                                  <span>
+                                  <span class="inline-flex items-center gap-1.5">
                                     {$t(i18nKeys.console.resources.certificateImportPrivateKey)}
+                                    <DocsHelpLink
+                                      href={webDocsHrefs.certificateReadiness}
+                                      ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+                                      className="size-5"
+                                    />
                                   </span>
                                   <Textarea
                                     id={`resource-domain-binding-import-private-key-${binding.id}`}
@@ -3109,7 +3244,14 @@
                                 </label>
 
                                 <label class="space-y-1.5 text-sm font-medium">
-                                  <span>{$t(i18nKeys.console.resources.certificateImportPassphrase)}</span>
+                                  <span class="inline-flex items-center gap-1.5">
+                                    {$t(i18nKeys.console.resources.certificateImportPassphrase)}
+                                    <DocsHelpLink
+                                      href={webDocsHrefs.certificateReadiness}
+                                      ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+                                      className="size-5"
+                                    />
+                                  </span>
                                   <Input
                                     id={`resource-domain-binding-import-passphrase-${binding.id}`}
                                     bind:value={importPassphrase}
@@ -3204,20 +3346,33 @@
                 </div>
 
                 <form class="mt-5 border-t pt-4" onsubmit={configureResourceHealth}>
-                  <Button
-                    type="button"
-                    variant={healthEnabled ? "selected" : "outline"}
-                    aria-pressed={healthEnabled}
-                    onclick={() => {
-                      healthEnabled = !healthEnabled;
-                    }}
-                  >
-                    {$t(i18nKeys.console.quickDeploy.healthCheckToggle)}
-                  </Button>
+                  <div class="flex flex-wrap items-center gap-2">
+                    <Button
+                      type="button"
+                      variant={healthEnabled ? "selected" : "outline"}
+                      aria-pressed={healthEnabled}
+                      onclick={() => {
+                        healthEnabled = !healthEnabled;
+                      }}
+                    >
+                      {$t(i18nKeys.console.quickDeploy.healthCheckToggle)}
+                    </Button>
+                    <DocsHelpLink
+                      href={webDocsHrefs.resourceHealthProfile}
+                      ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+                    />
+                  </div>
 
                   <div class="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                     <label class="space-y-1.5 text-sm font-medium">
-                      <span>{$t(i18nKeys.console.quickDeploy.healthCheckMethod)}</span>
+                      <span class="inline-flex items-center gap-1.5">
+                        {$t(i18nKeys.console.quickDeploy.healthCheckMethod)}
+                        <DocsHelpLink
+                          href={webDocsHrefs.resourceHealthProfile}
+                          ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+                          className="size-5"
+                        />
+                      </span>
                       <Select.Root bind:value={healthMethod} type="single">
                         <Select.Trigger class="w-full">{healthMethod}</Select.Trigger>
                         <Select.Content>
@@ -3246,7 +3401,14 @@
                     </label>
 
                     <label class="space-y-1.5 text-sm font-medium">
-                      <span>{$t(i18nKeys.console.quickDeploy.healthCheckPath)}</span>
+                      <span class="inline-flex items-center gap-1.5">
+                        {$t(i18nKeys.console.quickDeploy.healthCheckPath)}
+                        <DocsHelpLink
+                          href={webDocsHrefs.resourceHealthProfile}
+                          ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+                          className="size-5"
+                        />
+                      </span>
                       <Input bind:value={healthPath} autocomplete="off" disabled={!healthEnabled} />
                     </label>
 
@@ -3256,7 +3418,14 @@
                     </label>
 
                     <label class="space-y-1.5 text-sm font-medium">
-                      <span>{$t(i18nKeys.console.quickDeploy.healthCheckExpectedStatusCode)}</span>
+                      <span class="inline-flex items-center gap-1.5">
+                        {$t(i18nKeys.console.quickDeploy.healthCheckExpectedStatusCode)}
+                        <DocsHelpLink
+                          href={webDocsHrefs.resourceHealthProfile}
+                          ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+                          className="size-5"
+                        />
+                      </span>
                       <Input
                         bind:value={healthExpectedStatus}
                         autocomplete="off"
@@ -3265,7 +3434,14 @@
                     </label>
 
                     <label class="space-y-1.5 text-sm font-medium">
-                      <span>{$t(i18nKeys.console.quickDeploy.healthCheckIntervalSeconds)}</span>
+                      <span class="inline-flex items-center gap-1.5">
+                        {$t(i18nKeys.console.quickDeploy.healthCheckIntervalSeconds)}
+                        <DocsHelpLink
+                          href={webDocsHrefs.observabilityHealthSummary}
+                          ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+                          className="size-5"
+                        />
+                      </span>
                       <Input bind:value={healthIntervalSeconds} autocomplete="off" />
                     </label>
 
@@ -3408,9 +3584,15 @@
               <section id="resource-overview-diagnostics" class="rounded-md border bg-background p-4">
                 <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div>
-                    <h2 class="text-lg font-semibold">
-                      {$t(i18nKeys.console.resources.diagnosticsTitle)}
-                    </h2>
+                    <div class="flex items-center gap-2">
+                      <h2 class="text-lg font-semibold">
+                        {$t(i18nKeys.console.resources.diagnosticsTitle)}
+                      </h2>
+                      <DocsHelpLink
+                        href={webDocsHrefs.diagnosticsSafeSupportPayload}
+                        ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+                      />
+                    </div>
                     <p class="mt-1 text-sm text-muted-foreground">
                       {$t(i18nKeys.console.resources.diagnosticsDescription)}
                     </p>
@@ -3463,9 +3645,15 @@
                     <Terminal class="size-4" />
                   </div>
                   <div>
-                    <h2 class="text-lg font-semibold">
-                      {$t(i18nKeys.console.resources.runtimeLogsTitle)}
-                    </h2>
+                    <div class="flex items-center gap-2">
+                      <h2 class="text-lg font-semibold">
+                        {$t(i18nKeys.console.resources.runtimeLogsTitle)}
+                      </h2>
+                      <DocsHelpLink
+                        href={webDocsHrefs.observabilityRuntimeLogs}
+                        ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+                      />
+                    </div>
                     <p class="mt-1 text-sm text-muted-foreground">
                       {$t(i18nKeys.console.resources.runtimeLogsDescription)}
                     </p>
@@ -3532,15 +3720,23 @@
         </Tabs.Content>
 
         <Tabs.Content value="terminal" class="mt-0">
-          <TerminalSessionPanel
-            title={$t(i18nKeys.console.terminal.resourceTitle)}
-            description={$t(i18nKeys.console.terminal.resourceDescription)}
-            disabled={resourceDeployments.length === 0}
-            scope={{
-              kind: "resource",
-              resourceId: resource.id,
-            }}
-          />
+          <section class="space-y-3">
+            <div class="flex justify-end">
+              <DocsHelpLink
+                href={webDocsHrefs.serverTerminalSession}
+                ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+              />
+            </div>
+            <TerminalSessionPanel
+              title={$t(i18nKeys.console.terminal.resourceTitle)}
+              description={$t(i18nKeys.console.terminal.resourceDescription)}
+              disabled={resourceDeployments.length === 0}
+              scope={{
+                kind: "resource",
+                resourceId: resource.id,
+              }}
+            />
+          </section>
         </Tabs.Content>
       </Tabs.Root>
 

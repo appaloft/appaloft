@@ -258,12 +258,15 @@ embedded assets by default, or from `APPALOFT_DOCS_STATIC_DIR` when that overrid
 
 `@appaloft/docs-registry` now provides the initial source-controlled help anchor registry. It
 contains stable topic ids, locale docs paths, explicit anchors, owning surfaces, related operation
-keys, and search aliases. Web consuming surfaces now include quick deploy, server registration, and
-resource create help links for source, server target, SSH credentials, connectivity testing,
-environments, variables, resource identity, runtime, health, and network profiles. CLI and HTTP/API
-descriptions now consume registry anchors for high-confusion operations such as deployment source,
-preview cleanup, source relink, SSH credentials, server connectivity, resource profiles,
-environment variables, domains, certificates, logs, health, diagnostics, and terminal sessions.
+keys, and search aliases. Web consuming surfaces now include quick deploy, server registration,
+resource create, domain binding, resource detail, deployment target, server default-access,
+connectivity, runtime logs, diagnostics, and terminal help links for source, server target, SSH
+credentials, connectivity testing, environments, variables, resource identity, runtime, health,
+network profiles, custom domains, generated access routes, TLS certificates, proxy readiness, safe
+diagnostic payloads, runtime logs, and terminal sessions. CLI and HTTP/API descriptions now consume
+registry anchors for high-confusion operations such as deployment source, preview cleanup, source
+relink, SSH credentials, server connectivity, resource profiles, environment variables, domains,
+certificates, logs, health, diagnostics, and terminal sessions.
 
 The same registry also records public docs coverage decisions for every current
 `packages/application/src/operation-catalog.ts` key. Operation coverage may point to a documented

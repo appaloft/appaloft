@@ -220,12 +220,15 @@ Current implementation also has documentation packaging support:
 
 Current implementation has an initial `@appaloft/docs-registry` package that records stable help
 topic ids, locale-aware docs paths, explicit anchors, owning surfaces, related operation keys, and
-search aliases. Web consuming surfaces now include quick deploy, server registration, and resource
-create help links for source, server target, SSH credentials, connectivity testing, environments,
-variables, resource identity, runtime, health, and network profiles. CLI and HTTP/API descriptions
-consume registry anchors for high-confusion operations such as deployment source, preview cleanup,
-source relink, SSH credentials, server connectivity, resource profiles, environment variables,
-domains, certificates, logs, health, diagnostics, and terminal sessions.
+search aliases. Web consuming surfaces now include quick deploy, server registration, resource
+create, domain binding, resource detail, deployment target, server default-access, connectivity,
+runtime logs, diagnostics, and terminal help links for source, server target, SSH credentials,
+connectivity testing, environments, variables, resource identity, runtime, health, network
+profiles, custom domains, generated access routes, TLS certificates, proxy readiness, safe
+diagnostic payloads, runtime logs, and terminal sessions. CLI and HTTP/API descriptions consume
+registry anchors for high-confusion operations such as deployment source, preview cleanup, source
+relink, SSH credentials, server connectivity, resource profiles, environment variables, domains,
+certificates, logs, health, diagnostics, and terminal sessions.
 
 The registry also records a public docs coverage decision for every current operation catalog key.
 The `PUB-DOCS-002` contract test checks that operation coverage stays complete as

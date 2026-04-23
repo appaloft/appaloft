@@ -195,9 +195,16 @@
       />
     </div>
     <div class="space-y-2">
-      <label class="text-xs font-medium text-muted-foreground" for={`${idPrefix}-port`}>
-        {$t(i18nKeys.console.serverForm.sshPort)}
-      </label>
+      <div class="flex items-center gap-1.5">
+        <label class="text-xs font-medium text-muted-foreground" for={`${idPrefix}-port`}>
+          {$t(i18nKeys.console.serverForm.sshPort)}
+        </label>
+        <DocsHelpLink
+          href={webDocsHrefs.serverDeploymentTarget}
+          ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+          className="size-5"
+        />
+      </div>
       <Input
         id={`${idPrefix}-port`}
         bind:value={draft.port}
@@ -207,9 +214,16 @@
     </div>
   </div>
   <div class="space-y-2">
-    <label class="text-xs font-medium text-muted-foreground" for={`${idPrefix}-host`}>
-      {$t(i18nKeys.common.domain.host)}
-    </label>
+    <div class="flex items-center gap-1.5">
+      <label class="text-xs font-medium text-muted-foreground" for={`${idPrefix}-host`}>
+        {$t(i18nKeys.common.domain.host)}
+      </label>
+      <DocsHelpLink
+        href={webDocsHrefs.serverDeploymentTarget}
+        ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+        className="size-5"
+      />
+    </div>
     <Input
       id={`${idPrefix}-host`}
       bind:value={draft.host}
@@ -218,7 +232,14 @@
     />
   </div>
   <div class="space-y-2">
-    <p class="text-xs font-medium text-muted-foreground">{$t(i18nKeys.common.domain.provider)}</p>
+    <div class="flex items-center gap-1.5">
+      <p class="text-xs font-medium text-muted-foreground">{$t(i18nKeys.common.domain.provider)}</p>
+      <DocsHelpLink
+        href={webDocsHrefs.serverDeploymentTarget}
+        ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+        className="size-5"
+      />
+    </div>
     <div class="grid gap-2">
       {#each providerOptions as provider (provider.key)}
         <Button

@@ -1,10 +1,13 @@
 import { resolvePublicDocsHelpHref } from "@appaloft/docs-registry";
 
 export const webDocsHrefs = {
+  deploymentLifecycle: resolvePublicDocsHelpHref("deployment.lifecycle"),
   deploymentSource: resolvePublicDocsHelpHref("deployment.source"),
   serverDeploymentTarget: resolvePublicDocsHelpHref("server.deployment-target"),
   serverSshCredential: resolvePublicDocsHelpHref("server.ssh-credential"),
   serverConnectivityTest: resolvePublicDocsHelpHref("server.connectivity-test"),
+  serverProxyReadiness: resolvePublicDocsHelpHref("server.proxy-readiness"),
+  serverTerminalSession: resolvePublicDocsHelpHref("server.terminal-session"),
   resourceConcept: resolvePublicDocsHelpHref("resource.concept"),
   resourceSourceProfile: resolvePublicDocsHelpHref("resource.source-profile"),
   resourceRuntimeProfile: resolvePublicDocsHelpHref("resource.runtime-profile"),
@@ -12,6 +15,13 @@ export const webDocsHrefs = {
   resourceNetworkProfile: resolvePublicDocsHelpHref("resource.network-profile"),
   environmentConcept: resolvePublicDocsHelpHref("environment.concept"),
   environmentVariablePrecedence: resolvePublicDocsHelpHref("environment.variable-precedence"),
+  domainGeneratedAccessRoute: resolvePublicDocsHelpHref("domain.generated-access-route"),
+  domainCustomDomainBinding: resolvePublicDocsHelpHref("domain.custom-domain-binding"),
+  domainOwnershipCheck: resolvePublicDocsHelpHref("domain.ownership-check"),
+  certificateReadiness: resolvePublicDocsHelpHref("certificate.readiness"),
+  observabilityRuntimeLogs: resolvePublicDocsHelpHref("observability.runtime-logs"),
+  observabilityHealthSummary: resolvePublicDocsHelpHref("observability.health-summary"),
+  diagnosticsSafeSupportPayload: resolvePublicDocsHelpHref("diagnostics.safe-support-payload"),
 } as const;
 
 export const quickDeploySourceHelpHref = webDocsHrefs.deploymentSource;
