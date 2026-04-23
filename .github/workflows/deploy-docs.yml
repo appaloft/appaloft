@@ -139,7 +139,7 @@ jobs:
           key_file="$RUNNER_TEMP/appaloft-docs-deploy.key"
           printf '%s\n' "$APPALOFT_SSH_PRIVATE_KEY" > "$key_file"
           chmod 600 "$key_file"
-          bun run --cwd apps/shell src/index.ts deploy . \
+          bun run apps/shell/src/index.ts deploy . \
             --config appaloft.docs.yml \
             --method static \
             --resource-name appaloft-docs \
