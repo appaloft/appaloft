@@ -1085,6 +1085,102 @@ describe("CLI deployment config entry workflow", () => {
     });
   });
 
+  test("[CONFIG-FILE-ENTRY-015C] deploy action reconfigures an existing resource runtime profile from config", async () => {
+    ensureReflectMetadata();
+    const workspace = mkdtempSync(join(tmpdir(), "appaloft-existing-runtime-profile-"));
+    const configPath = join(workspace, "appaloft.yml");
+    writeFileSync(
+      configPath,
+      [
+        "runtime:",
+        "  strategy: static",
+        "  installCommand: bun install --frozen-lockfile",
+        "  buildCommand: APPALOFT_DOCS_BASE=/ APPALOFT_DOCS_SITE=https://docs.appaloft.com bun run --cwd apps/docs build",
+        "  publishDirectory: apps/docs/dist",
+        "network:",
+        "  internalPort: 80",
+        "  upstreamProtocol: http",
+        "  exposureMode: reverse-proxy",
+        "",
+      ].join("\n"),
+    );
+    const harness = await createPreviewDeployCliHarness({
+      sourceLinkRecord: {
+        projectId: "proj_existing",
+        environmentId: "env_existing",
+        resourceId: "res_existing",
+        serverId: "srv_existing",
+      },
+      resourceDetail: {
+        runtimeProfile: {
+          strategy: "static",
+          installCommand: "bun install --frozen-lockfile",
+          buildCommand: "bun run --cwd apps/docs build",
+          publishDirectory: "apps/docs/dist",
+        },
+      },
+    });
+
+    try {
+      await withBunEnv(
+        {
+          GITHUB_REPOSITORY: "appaloft/appaloft",
+          GITHUB_REPOSITORY_ID: "R_docs_repo",
+          GITHUB_REF: "refs/heads/main",
+          GITHUB_SHA: "550d1f8bf78b9cbb7081a03e7bdfc32e8570ddf8",
+          GITHUB_WORKSPACE: workspace,
+        },
+        () =>
+          withMutedProcessOutput(async () => {
+            await harness.program.parseAsync([
+              "node",
+              "appaloft",
+              "deploy",
+              workspace,
+              "--config",
+              configPath,
+              "--method",
+              "static",
+              "--server-host",
+              "203.0.113.10",
+              "--server-provider",
+              "generic-ssh",
+            ]);
+          }),
+      );
+    } finally {
+      rmSync(workspace, { recursive: true, force: true });
+    }
+
+    const configureRuntime = harness.commands.find(
+      (command) => command.constructor.name === "ConfigureResourceRuntimeCommand",
+    );
+
+    expect(configureRuntime).toMatchObject({
+      resourceId: "res_existing",
+      runtimeProfile: {
+        strategy: "static",
+        installCommand: "bun install --frozen-lockfile",
+        buildCommand:
+          "APPALOFT_DOCS_BASE=/ APPALOFT_DOCS_SITE=https://docs.appaloft.com bun run --cwd apps/docs build",
+        publishDirectory: "apps/docs/dist",
+      },
+    });
+
+    expect(
+      harness.commands.find((command) => command.constructor.name === "CreateResourceCommand"),
+    ).toBeUndefined();
+
+    expect(
+      harness.commands.find((command) => command.constructor.name === "CreateDeploymentCommand"),
+    ).toMatchObject({
+      projectId: "proj_existing",
+      serverId: "srv_existing",
+      environmentId: "env_existing",
+      resourceId: "res_existing",
+    });
+  });
+
   test("[CONFIG-FILE-ENTRY-017] deploy action PR preview domain template persists server-applied route intent", async () => {
     ensureReflectMetadata();
     const workspace = mkdtempSync(join(tmpdir(), "appaloft-preview-domain-"));
