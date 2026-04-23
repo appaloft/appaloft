@@ -137,14 +137,18 @@ Create-time progress streaming stays transport-specific unless a future Spec Rou
 
 ## Current Implementation Notes And Migration Gaps
 
-`deployments.show` is not implemented yet.
+`deployments.show` is active in the operation catalog, CLI, HTTP/oRPC, and Web deployment detail
+path.
 
-Existing product seams that can seed the first implementation:
+Existing product seams that seeded the implementation and still matter for follow-up work:
 
-- deployment list read model already exposes base attempt summary used by Web detail today;
+- deployment list and related read sources still inform some secondary summaries and migration
+  seams;
 - deployment logs query is active and should remain the log-specific companion query;
 - resource diagnostic summary already accepts `deploymentId` and can be linked from deployment
-  detail once the new query is active.
+  detail;
+- standalone `deployments.stream-events` is still the next observation slice beyond this detail
+  query.
 
 ## Open Questions
 

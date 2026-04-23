@@ -1,12 +1,14 @@
 import {
   type CreateDeploymentInput,
   type CreateDeploymentResponse,
+  type DeploymentEventStreamEnvelope,
   type DeploymentProgressEvent,
   type DeploymentSummary,
 } from "@appaloft/contracts";
 
-import { API_BASE, request } from "$lib/api/client";
+import { API_BASE, readErrorMessage, request } from "$lib/api/client";
 import { i18nKeys, translate } from "$lib/i18n";
+import { orpcClient } from "$lib/orpc";
 
 export type DeploymentProgressDialogStatus = "idle" | "running" | "succeeded" | "failed";
 
@@ -51,6 +53,18 @@ const deploymentStatusProgressStatus = {
 } as const satisfies Record<
   DeploymentSummary["status"],
   NonNullable<DeploymentProgressEvent["status"]>
+>;
+
+const deploymentEventPhaseFallback = {
+  "deployment-requested": "detect",
+  "build-requested": "plan",
+  "deployment-started": "deploy",
+  "deployment-succeeded": "verify",
+  "deployment-failed": "verify",
+  "deployment-progress": "deploy",
+} as const satisfies Record<
+  Extract<DeploymentEventStreamEnvelope, { kind: "event" }>["event"]["eventType"],
+  DeploymentProgressEvent["phase"]
 >;
 
 export function createDeploymentRequestId(): string {
@@ -115,12 +129,29 @@ export async function createDeploymentWithProgress(
   onEvent: (event: DeploymentProgressEvent) => void,
   options: CreateDeploymentProgressStreamOptions = {},
 ): Promise<CreateDeploymentResponse> {
+  const seenEventFingerprints = new Set<string>();
+  let deploymentTerminalObserved = false;
+  const emitEvent = (event: DeploymentProgressEvent) => {
+    const fingerprint = deploymentProgressEventFingerprint(event);
+    if (seenEventFingerprints.has(fingerprint)) {
+      return;
+    }
+
+    seenEventFingerprints.add(fingerprint);
+    const status = progressDialogStatusFromProgressEvent(event);
+    deploymentTerminalObserved = status === "succeeded" || status === "failed";
+    onEvent(event);
+  };
   const stream = createDeploymentProgressStream(input, options);
   let result = await stream.next();
 
   while (!result.done) {
-    onEvent(result.value);
+    emitEvent(result.value);
     result = await stream.next();
+  }
+
+  if (!deploymentTerminalObserved) {
+    await observeDeploymentProgressAfterAcceptance(result.value.id, emitEvent, options);
   }
 
   return result.value;
@@ -268,6 +299,149 @@ export function progressEventsFromDeployment(
   ];
 }
 
+export function deploymentEventEnvelopeCursor(
+  envelope: DeploymentEventStreamEnvelope,
+): string | undefined {
+  switch (envelope.kind) {
+    case "event":
+      return envelope.event.cursor;
+    case "heartbeat":
+      return envelope.cursor;
+    case "gap":
+      return envelope.gap.cursor;
+    case "closed":
+      return envelope.cursor;
+    case "error":
+      return undefined;
+  }
+}
+
+export function latestDeploymentEventCursor(
+  envelopes: DeploymentEventStreamEnvelope[],
+): string | undefined {
+  const cursors = envelopes
+    .map((envelope) => deploymentEventEnvelopeCursor(envelope))
+    .filter((cursor) => typeof cursor === "string");
+
+  return cursors.at(-1);
+}
+
+export function mergeDeploymentEventEnvelopes(
+  currentEnvelopes: DeploymentEventStreamEnvelope[],
+  incomingEnvelopes: DeploymentEventStreamEnvelope[],
+): DeploymentEventStreamEnvelope[] {
+  const merged = new Map<string, DeploymentEventStreamEnvelope>();
+
+  for (const envelope of [...currentEnvelopes, ...incomingEnvelopes]) {
+    const key =
+      envelope.kind === "event"
+        ? `event:${envelope.event.cursor}`
+        : envelope.kind === "heartbeat"
+          ? `heartbeat:${envelope.cursor ?? envelope.at}`
+          : envelope.kind === "gap"
+            ? `gap:${envelope.gap.cursor ?? envelope.gap.code}:${envelope.gap.phase}`
+            : envelope.kind === "closed"
+              ? `closed:${envelope.cursor ?? envelope.reason}`
+              : `error:${envelope.error.code}:${envelope.error.message}`;
+
+    merged.set(key, envelope);
+  }
+
+  return [...merged.values()].sort((left, right) => {
+    if (left.kind === "event" && right.kind === "event") {
+      if (left.event.sequence !== right.event.sequence) {
+        return left.event.sequence - right.event.sequence;
+      }
+
+      return left.event.cursor.localeCompare(right.event.cursor);
+    }
+
+    if (left.kind === "event") {
+      return -1;
+    }
+
+    if (right.kind === "event") {
+      return 1;
+    }
+
+    const leftCursor = deploymentEventEnvelopeCursor(left) ?? "";
+    const rightCursor = deploymentEventEnvelopeCursor(right) ?? "";
+    return leftCursor.localeCompare(rightCursor);
+  });
+}
+
+export function deploymentEventProgressEvents(
+  envelopes: DeploymentEventStreamEnvelope[],
+): DeploymentProgressEvent[] {
+  return envelopes.flatMap((envelope) => {
+    if (envelope.kind !== "event") {
+      return [];
+    }
+
+    const phase = envelope.event.phase ?? deploymentEventPhaseFallback[envelope.event.eventType];
+    const status = deploymentEventStatus(envelope.event);
+
+    return [
+      {
+        timestamp: envelope.event.emittedAt,
+        source: envelope.event.source === "process-observation" ? "application" : "appaloft",
+        phase,
+        level: deploymentEventLevel(envelope.event),
+        message: envelope.event.summary ?? envelope.event.eventType,
+        deploymentId: envelope.event.deploymentId,
+        ...(status ? { status } : {}),
+        step: {
+          ...progressStepForPhase(phase),
+          label: envelope.event.summary ?? envelope.event.eventType,
+        },
+      } satisfies DeploymentProgressEvent,
+    ];
+  });
+}
+
+export function deploymentEventProgressStatus(
+  envelopes: DeploymentEventStreamEnvelope[],
+  fallbackStatus: DeploymentSummary["status"] | null | undefined,
+): DeploymentProgressDialogStatus {
+  const lastEvent = [...envelopes].reverse().find((envelope) => envelope.kind === "event");
+  if (lastEvent?.kind === "event") {
+    const status = deploymentEventStatus(lastEvent.event);
+    if (status) {
+      return status;
+    }
+  }
+
+  if (!fallbackStatus) {
+    return "idle";
+  }
+
+  switch (fallbackStatus) {
+    case "succeeded":
+    case "rolled-back":
+      return "succeeded";
+    case "failed":
+    case "canceled":
+      return "failed";
+    case "created":
+    case "planning":
+    case "planned":
+    case "running":
+    case "cancel-requested":
+      return "running";
+  }
+}
+
+export function isTerminalDeploymentStatus(
+  status: DeploymentSummary["status"] | null | undefined,
+): boolean {
+  return (
+    status === "succeeded" ||
+    status === "failed" ||
+    status === "canceled" ||
+    status === "rolled-back"
+  );
+}
+
 function progressStepForPhase(
   phase: DeploymentProgressEvent["phase"],
 ): DeploymentProgressEvent["step"] {
@@ -338,6 +512,139 @@ export function progressStatusVariant(
 export function progressSourceLabel(event: DeploymentProgressEvent): string {
   const source = event.source === "application" ? "app" : "appaloft";
   return event.stream ? `${source}:${event.stream}` : source;
+}
+
+async function observeDeploymentProgressAfterAcceptance(
+  deploymentId: string,
+  onEvent: (event: DeploymentProgressEvent) => void,
+  options: CreateDeploymentProgressStreamOptions,
+): Promise<void> {
+  try {
+    const replay = await orpcClient.deployments.events({
+      deploymentId,
+      historyLimit: 100,
+      includeHistory: true,
+      follow: false,
+      untilTerminal: true,
+    });
+
+    for (const event of deploymentEventProgressEvents(replay.envelopes)) {
+      onEvent(event);
+    }
+
+    if (deploymentEventProgressStatus(replay.envelopes, "running") !== "running") {
+      return;
+    }
+
+    const cursor = latestDeploymentEventCursor(replay.envelopes);
+    const stream = await orpcClient.deployments.eventsStream({
+      deploymentId,
+      historyLimit: 0,
+      includeHistory: false,
+      follow: true,
+      untilTerminal: true,
+      ...(cursor ? { cursor } : {}),
+    });
+
+    try {
+      let result = await stream.next();
+
+      while (!result.done) {
+        const envelope = result.value;
+
+        switch (envelope.kind) {
+          case "event":
+            for (const event of deploymentEventProgressEvents([envelope])) {
+              onEvent(event);
+            }
+            break;
+          case "gap":
+            options.onStreamError?.(
+              translate(i18nKeys.console.deployments.progressStreamDisconnected),
+            );
+            return;
+          case "error":
+            options.onStreamError?.(envelope.error.message);
+            return;
+          case "closed":
+            return;
+          case "heartbeat":
+            break;
+        }
+
+        result = await stream.next();
+      }
+    } finally {
+      await stream.return?.();
+    }
+  } catch (error) {
+    options.onStreamError?.(readErrorMessage(error));
+  }
+}
+
+function deploymentProgressEventFingerprint(event: DeploymentProgressEvent): string {
+  return [
+    event.timestamp,
+    event.deploymentId ?? "",
+    event.source,
+    event.phase,
+    event.level,
+    event.message,
+    event.status ?? "",
+  ].join("|");
+}
+
+function progressDialogStatusFromProgressEvent(
+  event: DeploymentProgressEvent,
+): DeploymentProgressDialogStatus {
+  switch (event.status) {
+    case "failed":
+      return "failed";
+    case "succeeded":
+      return "succeeded";
+    case "running":
+      return "running";
+    default:
+      return "running";
+  }
+}
+
+function deploymentEventLevel(
+  event: Extract<DeploymentEventStreamEnvelope, { kind: "event" }>["event"],
+): DeploymentProgressEvent["level"] {
+  const status = deploymentEventStatus(event);
+  if (status === "failed") {
+    return "error";
+  }
+
+  if (event.source === "process-observation") {
+    return "info";
+  }
+
+  return "info";
+}
+
+function deploymentEventStatus(
+  event: Extract<DeploymentEventStreamEnvelope, { kind: "event" }>["event"],
+): DeploymentProgressEvent["status"] | undefined {
+  switch (event.status) {
+    case "running":
+    case "succeeded":
+    case "failed":
+      return event.status;
+  }
+
+  switch (event.eventType) {
+    case "deployment-succeeded":
+      return "succeeded";
+    case "deployment-failed":
+      return "failed";
+    case "deployment-requested":
+    case "build-requested":
+    case "deployment-started":
+    case "deployment-progress":
+      return "running";
+  }
 }
 
 export function redeployInputFromDeployment(deployment: DeploymentSummary): CreateDeploymentInput {

@@ -8,7 +8,7 @@
 - Handler: `ShowDeploymentQueryHandler`
 - Query service: `ShowDeploymentQueryService`
 - Domain / bounded context: Release orchestration / Deployment detail read model
-- Current status: accepted candidate query
+- Current status: active query, implemented
 - Source classification: normative contract
 
 ## Normative Contract
@@ -181,23 +181,21 @@ It must not:
 
 | Entrypoint | Mapping | Status |
 | --- | --- | --- |
-| Web | Deployment detail page reads this query for overview/timeline/snapshot sections. | Accepted candidate |
-| CLI | `appaloft deployments show <deploymentId> [--json]` over the same query schema. | Future / Code Round |
-| oRPC / HTTP | `GET /api/deployments/{deploymentId}` using the query schema. | Future / Code Round |
+| Web | Deployment detail page reads this query for overview/timeline/snapshot sections. | Implemented |
+| CLI | `appaloft deployments show <deploymentId> [--json]` over the same query schema. | Implemented |
+| oRPC / HTTP | `GET /api/deployments/{deploymentId}` using the query schema. | Implemented |
 | Automation / MCP | Future read-only tool/query over the same operation key. | Future |
 
 ## Current Implementation Notes And Migration Gaps
 
-Current Web deployment detail assembles its page from `deployments.list` plus `deployments.logs`
-and related resource/project/server queries. That implementation is a migration seam, not the
-accepted query contract.
+`deployments.show` is active in the operation catalog, CLI, HTTP/oRPC, and Web deployment detail
+path.
 
-Existing deployment list rows and log projections can seed the first `deployments.show`
-implementation, but the accepted query must become the one deployment-detail source before the
-operation is promoted to active.
+Timeline/watch behavior remains intentionally separate from this query and is governed by accepted
+candidate `deployments.stream-events`. `deployments.logs` remains the separate attempt-log
+operation.
 
 ## Open Questions
 
-- Should `timeline` normalize persisted deployment progress logs into phase buckets inside
-  `deployments.show`, or should the first slice expose only a structured recent-events summary and
-  keep richer phase history for a future `deployments.stream-events` query?
+- Should `deployments.show` keep only a recent summary once `deployments.stream-events` becomes
+  active, or should it continue exposing a bounded recent timeline section for overview screens?

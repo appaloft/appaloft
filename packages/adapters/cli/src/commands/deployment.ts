@@ -8,6 +8,7 @@ import {
   type DeploymentSummary,
   ListDeploymentsQuery,
   ShowDeploymentQuery,
+  StreamDeploymentEventsQuery,
 } from "@appaloft/application";
 import { createQuickDeployGeneratedResourceName } from "@appaloft/contracts";
 import {
@@ -38,6 +39,7 @@ import {
   resultToEffect,
   runCommand,
   runDeploymentCommandResult,
+  runDeploymentEventStreamQuery,
   runQuery,
 } from "../runtime.js";
 import {
@@ -112,6 +114,11 @@ const envOption = Options.text("env").pipe(Options.repeated);
 const secretOption = Options.text("secret").pipe(Options.repeated);
 const optionalSecretOption = Options.text("optional-secret").pipe(Options.repeated);
 const appLogLinesOption = Options.text("app-log-lines").pipe(Options.withDefault("3"));
+const followEventsOption = Options.boolean("follow").pipe(Options.withDefault(false));
+const deploymentCursorOption = Options.text("cursor").pipe(Options.optional);
+const deploymentHistoryLimitOption = Options.text("history-limit").pipe(Options.withDefault("100"));
+const includeHistoryOption = Options.boolean("include-history").pipe(Options.withDefault(true));
+const untilTerminalOption = Options.boolean("until-terminal").pipe(Options.withDefault(true));
 const deploymentStateBackendKinds = [
   "ssh-pglite",
   "local-pglite",
@@ -1307,9 +1314,36 @@ const showDeploymentCommand = EffectCommand.make(
   ({ deploymentId }) => runQuery(ShowDeploymentQuery.create({ deploymentId })),
 ).pipe(EffectCommand.withDescription("Show deployment detail"));
 
+const streamDeploymentEventsCommand = EffectCommand.make(
+  "events",
+  {
+    deploymentId: deploymentIdArg,
+    cursor: deploymentCursorOption,
+    follow: followEventsOption,
+    historyLimit: deploymentHistoryLimitOption,
+    includeHistory: includeHistoryOption,
+    untilTerminal: untilTerminalOption,
+  },
+  ({ cursor, deploymentId, follow, historyLimit, includeHistory, untilTerminal }) =>
+    runDeploymentEventStreamQuery(
+      StreamDeploymentEventsQuery.create({
+        deploymentId,
+        follow,
+        includeHistory,
+        historyLimit: Number(historyLimit),
+        untilTerminal,
+        ...(optionalValue(cursor) ? { cursor: optionalValue(cursor) } : {}),
+      }),
+    ),
+).pipe(EffectCommand.withDescription("Replay or follow deployment lifecycle events"));
+
 export const deploymentsCommand = EffectCommand.make("deployments").pipe(
   EffectCommand.withDescription("Deployment queries"),
-  EffectCommand.withSubcommands([listDeploymentsCommand, showDeploymentCommand]),
+  EffectCommand.withSubcommands([
+    listDeploymentsCommand,
+    showDeploymentCommand,
+    streamDeploymentEventsCommand,
+  ]),
 );
 
 export const previewCommand = EffectCommand.make("preview").pipe(

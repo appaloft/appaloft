@@ -53,6 +53,7 @@ rebuild-required there, update the operation map and required ADR before local s
 | [ADR-026: Aggregate Mutation Command Boundary](./ADR-026-aggregate-mutation-command-boundary.md) | Accepted | Forbids generic aggregate-root update operations and requires intention-revealing domain commands for every aggregate mutation. |
 | [ADR-027: Deployment Supersede And Execution Fencing](./ADR-027-deployment-supersede-and-execution-fencing.md) | Accepted | Later deployment requests may supersede one previous same-resource active attempt through internal cancellation plus durable write fencing without reintroducing a public cancel command. |
 | [ADR-028: Command Coordination Scope And Mutation Admission](./ADR-028-command-coordination-scope-and-mutation-admission.md) | Accepted | Separates low-level state-root coordination from command-level mutation coordination and defines scope-based admission waiting for CLI, Actions, and future control-plane providers. |
+| [ADR-029: Deployment Event Stream And Recovery Boundary](./ADR-029-deployment-event-stream-and-recovery-boundary.md) | Accepted | Splits deployment detail, event-stream observation, and logs into separate read boundaries; keeps reconnect as read behavior and leaves recovery write commands gated by ADR-016. |
 
 ## Authoring Rules
 

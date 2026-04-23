@@ -9,6 +9,7 @@ import {
   type QueryBus,
   type ResourceRuntimeLogLine,
   type ResourceRuntimeLogsResult,
+  type StreamDeploymentEventsResult,
 } from "@appaloft/application";
 import { createCliLogRenderer } from "@appaloft/cli-logging";
 import { type DomainError, domainError, type Result } from "@appaloft/core";
@@ -183,6 +184,17 @@ function runtimeLogErrorFromUnknown(error: unknown): DomainError {
   });
 }
 
+function deploymentEventStreamErrorFromUnknown(error: unknown): DomainError {
+  if (isDomainError(error)) {
+    return error;
+  }
+
+  return domainError.infra("Deployment event stream failed", {
+    phase: "cli-deployment-event-stream",
+    message: error instanceof Error ? error.message : String(error),
+  });
+}
+
 const runLoggedCommand = <T>(
   message: Result<AppCommand<T>>,
   options: {
@@ -288,6 +300,45 @@ export const runResourceRuntimeLogsQuery = (
         }
       },
       catch: runtimeLogErrorFromUnknown,
+    });
+  });
+
+export const runDeploymentEventStreamQuery = (
+  message: Result<AppQuery<StreamDeploymentEventsResult>>,
+): Effect.Effect<void, DomainError, CliRuntime> =>
+  Effect.gen(function* () {
+    const cli = yield* CliRuntime;
+    const query = yield* resultToEffect(message);
+    const result = yield* Effect.promise(() => cli.executeQuery(query));
+    const output = yield* resultToEffect(result);
+
+    if (output.mode === "bounded") {
+      yield* print({
+        deploymentId: output.deploymentId,
+        envelopes: output.envelopes,
+      });
+      return;
+    }
+
+    yield* Effect.tryPromise({
+      try: async () => {
+        try {
+          for await (const envelope of output.stream) {
+            await Effect.runPromise(print(envelope));
+
+            if (envelope.kind === "error") {
+              throw envelope.error;
+            }
+
+            if (envelope.kind === "closed") {
+              break;
+            }
+          }
+        } finally {
+          await output.stream.close();
+        }
+      },
+      catch: deploymentEventStreamErrorFromUnknown,
     });
   });
 

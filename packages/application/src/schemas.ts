@@ -6,6 +6,7 @@ export * from "./operations/deployments/create-deployment.schema";
 export * from "./operations/deployments/deployment-logs.schema";
 export * from "./operations/deployments/list-deployments.schema";
 export * from "./operations/deployments/show-deployment.schema";
+export * from "./operations/deployments/stream-deployment-events.schema";
 export * from "./operations/domain-bindings/confirm-domain-binding-ownership.schema";
 export * from "./operations/domain-bindings/create-domain-binding.schema";
 export * from "./operations/domain-bindings/list-domain-bindings.schema";
