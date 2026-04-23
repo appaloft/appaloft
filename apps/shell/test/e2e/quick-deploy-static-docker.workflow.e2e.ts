@@ -115,6 +115,21 @@ describe("quick deploy static Docker workflow e2e", () => {
       const html = await waitForStaticSite(runtimeUrl);
       expect(html).toContain('data-smoke-marker="static-site"');
 
+      const directoryIndex = await fetch(new URL("guide/", runtimeUrl));
+      expect(directoryIndex.status).toBe(200);
+      expect(await directoryIndex.text()).toContain('data-route-marker="directory-index"');
+
+      const appRouteFallback = await fetch(new URL("client-side/route", runtimeUrl));
+      expect(appRouteFallback.status).toBe(200);
+      expect(await appRouteFallback.text()).toContain('data-smoke-marker="static-site"');
+
+      const staticAsset = await fetch(new URL("assets/app.css", runtimeUrl));
+      expect(staticAsset.status).toBe(200);
+      expect(await staticAsset.text()).toContain("color: #17221b");
+
+      const missingAsset = await fetch(new URL("assets/missing.css", runtimeUrl));
+      expect(missingAsset.status).toBe(404);
+
       const generatedDockerfile = join(
         workspace.dataDir,
         "runtime",
@@ -126,6 +141,9 @@ describe("quick deploy static Docker workflow e2e", () => {
       const dockerfileText = await Bun.file(generatedDockerfile).text();
       expect(dockerfileText).toContain("FROM nginx:1.27-alpine");
       expect(dockerfileText).toContain('COPY ["dist/","/usr/share/nginx/html/"]');
+      expect(dockerfileText).toContain("/etc/nginx/conf.d/default.conf");
+      expect(dockerfileText).toContain("try_files $uri $uri/ /index.html");
+      expect(dockerfileText).toContain("try_files $uri =404");
       expect(dockerfileText).toContain("EXPOSE 80");
 
       const deployments = runShellCli(["deployments", "list"], workspace.cliOptions);
