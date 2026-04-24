@@ -40,13 +40,13 @@ docker build --build-arg APPALOFT_APP_VERSION=0.1.0 -t appaloft-all-in-one:local
 - `ci.yml`: lint, typecheck, unit, integration, build, binary smoke, Docker build smoke.
 - `e2e.yml`: real Postgres, started backend, CLI/API/deployment E2E, web smoke.
 - `nightly.yml`: scheduled Compose/self-host smoke.
-- `release.yml`: manually runs Release Please on `main`; if a release is created, calls
-  `release-build.yml` and then deploys the public docs site.
+- `release.yml`: manually runs Release Please on `main`; if a release is created, it calls
+  `release-build.yml` to publish distribution artifacts. Public docs deployment is no longer tied
+  to product releases.
 - `deploy-docs.yml`: deploys `apps/docs` as a standalone static site to `https://docs.appaloft.com`
-  with the released Appaloft CLI and `appaloft.docs.yml`. Release-triggered runs deploy the tagged
-  source; manual runs can redeploy docs from `main` or another ref without waiting for a new
-  release tag, and manual runs execute Appaloft from the checked-out source so docs-recovery fixes
-  in unreleased CLI code can take effect immediately.
+  with Appaloft from the checked-out source and `appaloft.docs.yml`. Pushes to `main` auto-deploy
+  when docs content, docs config, or the source-side deployment stack used by docs changes. Manual
+  runs can redeploy docs from `main` or another ref without waiting for a release.
 - `release-retry.yml`: rebuilds and reuploads assets for an existing tag without changing the version.
 - `release-build.yml`: reusable release build for source archives, CLI binaries, desktop bundles, GHCR, npm, GitHub Release assets, checksums, attestations, and Homebrew tap updates.
 
@@ -126,17 +126,16 @@ If you do not want to publish yet, do not run `Release`, or leave the Release Pl
 
 ## Docs-Only Redeploys
 
-Use `Deploy Docs` directly when the docs source needs to be rebuilt and deployed without publishing
-a new Appaloft release.
+`Deploy Docs` runs automatically on `main` when docs content, docs config, or the docs deploy
+dependency chain changes. Use it manually only when the docs source needs to be rebuilt from a
+specific ref.
 
 1. Open GitHub Actions and run `Deploy Docs`.
-2. Leave `appaloft_version=latest` unless docs deployment needs a specific released Appaloft CLI.
-3. Set `source_ref=main` to redeploy the latest merged docs source, or choose another branch, tag,
-   or SHA for a targeted redeploy.
+2. Leave `source_ref=main` to redeploy the latest merged docs source, or choose another branch,
+   tag, or SHA for a targeted redeploy.
 
-Release-triggered docs deploys still run with the tagged released CLI. Manual docs-only redeploys
-run Appaloft from the checked-out source ref so unreleased deployment fixes can be used for public
-docs recovery without publishing a new product release first.
+Docs deploys always run Appaloft from the checked-out source ref, so docs-recovery fixes in
+unreleased CLI code can be used immediately without publishing a new product release first.
 
 ## Checksums And Provenance
 
