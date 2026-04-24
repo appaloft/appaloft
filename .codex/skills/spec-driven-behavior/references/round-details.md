@@ -118,6 +118,7 @@ Enter Code Round only if:
 Do this:
 
 - Implement the smallest coherent behavior slice.
+- Load and apply the `ddd-domain-modeling` skill when the code change creates or modifies `packages/core` domain concepts, aggregate/entity/value-object state, domain events, repository or specification contracts, or behavior placement between core, application, and adapters.
 - Keep CLI as a frontend-like input collection flow, not an afterthought.
 - Keep Web/API/CLI differences at the entry boundary and converge on shared command/query semantics.
 - Include the read/query path and relevant user-facing entrypoint needed for a minimal closed loop unless explicitly scoped out.
@@ -127,6 +128,8 @@ Do this:
 - Run Post-Implementation Sync before final output.
 
 Do not treat a write-side command as complete if the only confirmation path is manual persistence inspection.
+
+The `ddd-domain-modeling` gate is a code-level modeling guardrail under `AGENTS.md`, accepted ADRs, and governing specs. It is not required for transport-only, public-docs-only, read-model-only, or test-harness-only changes unless they alter domain semantics.
 
 ## Sync Round
 

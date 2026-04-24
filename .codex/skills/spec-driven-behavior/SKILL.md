@@ -130,6 +130,8 @@ Use only when implementation is allowed and the artifact state shows required go
 
 Implement the smallest coherent behavior slice across core/application/adapters/transports. Keep command/query/event/workflow/error/read-model/tests/Web/API/CLI aligned with the governing specs. New business endpoints and CLI commands dispatch through `CommandBus` or `QueryBus`; transport inputs reuse command/query schemas; handlers delegate to use cases or query services. New business capabilities update both `docs/CORE_OPERATIONS.md` and `packages/application/src/operation-catalog.ts`.
 
+When Code Round creates or changes `packages/core` domain concepts, aggregate/entity/value-object state, domain events, repository or specification contracts, or behavior placement between core, application, and adapters, also load and apply the `ddd-domain-modeling` skill as a code-level modeling guardrail under `AGENTS.md`, accepted ADRs, and governing specs. It is not required for transport-only, public-docs-only, read-model-only, or test-harness-only changes unless they alter domain semantics.
+
 Default Code Round closure includes an executable user-facing chain and the read/query surface needed for a user to observe the result. Every new or changed command must have at least one real CLI or HTTP/oRPC e2e/acceptance test unless the test matrix explicitly documents an exception.
 
 ### Sync Round
