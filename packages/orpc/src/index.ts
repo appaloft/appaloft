@@ -1,6 +1,8 @@
 import {
   type AppLogger,
+  ArchiveProjectCommand,
   ArchiveResourceCommand,
+  archiveProjectCommandInputSchema,
   archiveResourceCommandInputSchema,
   BootstrapServerProxyCommand,
   bootstrapServerProxyCommandInputSchema,
@@ -73,6 +75,7 @@ import {
   type Query,
   type QueryBus,
   RegisterServerCommand,
+  RenameProjectCommand,
   ResourceDiagnosticSummaryQuery,
   ResourceHealthQuery,
   ResourceProxyConfigurationPreviewQuery,
@@ -81,6 +84,7 @@ import {
   type ResourceRuntimeLogsQueryInput,
   type ResourceRuntimeLogsResult,
   registerServerCommandInputSchema,
+  renameProjectCommandInputSchema,
   resourceDiagnosticSummaryQueryInputSchema,
   resourceHealthQueryInputSchema,
   resourceProxyConfigurationPreviewQueryInputSchema,
@@ -88,6 +92,7 @@ import {
   SetEnvironmentVariableCommand,
   ShowDeploymentQuery,
   ShowEnvironmentQuery,
+  ShowProjectQuery,
   ShowResourceQuery,
   StreamDeploymentEventsQuery,
   type StreamDeploymentEventsQueryInput,
@@ -95,6 +100,7 @@ import {
   setEnvironmentVariableCommandInputSchema,
   showDeploymentQueryInputSchema,
   showEnvironmentQueryInputSchema,
+  showProjectQueryInputSchema,
   showResourceQueryInputSchema,
   streamDeploymentEventsQueryInputSchema,
   TestServerConnectivityCommand,
@@ -103,6 +109,7 @@ import {
   unsetEnvironmentVariableCommandInputSchema,
 } from "@appaloft/application";
 import {
+  archiveProjectResponseSchema,
   archiveResourceResponseSchema,
   bootstrapServerProxyResponseSchema,
   configureDefaultAccessDomainPolicyResponseSchema,
@@ -141,6 +148,7 @@ import {
   promoteEnvironmentResponseSchema,
   proxyConfigurationViewSchema,
   registerServerResponseSchema,
+  renameProjectResponseSchema,
   resourceDetailSchema,
   resourceDiagnosticSummarySchema,
   resourceHealthSummarySchema,
@@ -148,6 +156,7 @@ import {
   resourceRuntimeLogsResponseSchema,
   resourceRuntimeLogsStreamResponseSchema,
   showDeploymentResponseSchema,
+  showProjectResponseSchema,
   terminalSessionDescriptorSchema,
   testServerConnectivityResponseSchema,
 } from "@appaloft/contracts";
@@ -214,6 +223,7 @@ export const apiDocsHrefs = {
   healthSummary: resolvePublicDocsHelpHref("observability.health-summary"),
   diagnosticSummary: resolvePublicDocsHelpHref("diagnostics.safe-support-payload"),
   terminalSession: resolvePublicDocsHelpHref("server.terminal-session"),
+  projectLifecycle: resolvePublicDocsHelpHref("project.lifecycle"),
 } as const;
 
 export const apiRouteDescriptions = {
@@ -221,6 +231,7 @@ export const apiRouteDescriptions = {
     "Creates a deployment from an explicit project, server, environment, and resource context.",
     "deployment.source",
   ),
+  projectLifecycle: routeDescription("Read, rename, and archive projects.", "project.lifecycle"),
   configureServerCredential: routeDescription(
     "Configures the SSH credential Appaloft uses for server connectivity and deployment.",
     "server.ssh-credential",
@@ -807,6 +818,43 @@ export const createProjectProcedure = base
   .output(createProjectResponseSchema)
   .handler(async ({ input, context }) =>
     executeCommand(context, CreateProjectCommand.create(input)),
+  );
+
+export const showProjectProcedure = base
+  .route({
+    method: "GET",
+    path: "/projects/{projectId}",
+    description: apiRouteDescriptions.projectLifecycle,
+    successStatus: 200,
+  })
+  .input(showProjectQueryInputSchema)
+  .output(showProjectResponseSchema)
+  .handler(async ({ input, context }) => executeQuery(context, ShowProjectQuery.create(input)));
+
+export const renameProjectProcedure = base
+  .route({
+    method: "POST",
+    path: "/projects/{projectId}/rename",
+    description: apiRouteDescriptions.projectLifecycle,
+    successStatus: 200,
+  })
+  .input(renameProjectCommandInputSchema)
+  .output(renameProjectResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, RenameProjectCommand.create(input)),
+  );
+
+export const archiveProjectProcedure = base
+  .route({
+    method: "POST",
+    path: "/projects/{projectId}/archive",
+    description: apiRouteDescriptions.projectLifecycle,
+    successStatus: 200,
+  })
+  .input(archiveProjectCommandInputSchema)
+  .output(archiveProjectResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, ArchiveProjectCommand.create(input)),
   );
 
 export const listServersProcedure = base
@@ -1412,6 +1460,9 @@ export const appaloftOrpcRouter = {
   projects: {
     list: listProjectsProcedure,
     create: createProjectProcedure,
+    show: showProjectProcedure,
+    rename: renameProjectProcedure,
+    archive: archiveProjectProcedure,
   },
   servers: {
     list: listServersProcedure,
@@ -1598,6 +1649,9 @@ export function mountAppaloftOrpcRoutes(
 
   const routes = [
     "/api/projects",
+    "/api/projects/:projectId",
+    "/api/projects/:projectId/rename",
+    "/api/projects/:projectId/archive",
     "/api/credentials/ssh",
     "/api/servers",
     "/api/servers/connectivity-tests",

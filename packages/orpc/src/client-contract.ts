@@ -1,4 +1,5 @@
 import {
+  type ArchiveProjectCommandInput,
   type ArchiveResourceCommandInput,
   type BootstrapServerProxyCommandInput,
   type ConfigureDefaultAccessDomainPolicyCommandInput,
@@ -29,6 +30,7 @@ import {
   type OpenTerminalSessionCommandInput,
   type PromoteEnvironmentCommandInput,
   type RegisterServerCommandInput,
+  type RenameProjectCommandInput,
   type ResourceDiagnosticSummaryQueryInput,
   type ResourceHealthQueryInput,
   type ResourceProxyConfigurationPreviewQueryInput,
@@ -36,12 +38,14 @@ import {
   type SetEnvironmentVariableCommandInput,
   type ShowDeploymentQueryInput,
   type ShowEnvironmentQueryInput,
+  type ShowProjectQueryInput,
   type ShowResourceQueryInput,
   type StreamDeploymentEventsQueryInput,
   type TestServerConnectivityCommandInput,
   type UnsetEnvironmentVariableCommandInput,
 } from "@appaloft/application/schemas";
 import {
+  type ArchiveProjectResponse,
   type ArchiveResourceResponse,
   type BootstrapServerProxyResponse,
   type ConfigureDefaultAccessDomainPolicyResponse,
@@ -80,6 +84,7 @@ import {
   type PromoteEnvironmentResponse,
   type ProxyConfigurationView,
   type RegisterServerResponse,
+  type RenameProjectResponse,
   type ResourceDetail,
   type ResourceDiagnosticSummary,
   type ResourceHealthSummary,
@@ -87,6 +92,7 @@ import {
   type ResourceRuntimeLogsResponse,
   type ResourceRuntimeLogsStreamResponse,
   type ShowDeploymentResponse,
+  type ShowProjectResponse,
   type TerminalSessionDescriptor,
   type TestServerConnectivityResponse,
 } from "@appaloft/contracts";
@@ -102,6 +108,24 @@ export type AppaloftOrpcClientContract = {
       AppaloftClientContext,
       CreateProjectCommandInput,
       CreateProjectResponse,
+      AppaloftClientError
+    >;
+    show: Client<
+      AppaloftClientContext,
+      ShowProjectQueryInput,
+      ShowProjectResponse,
+      AppaloftClientError
+    >;
+    rename: Client<
+      AppaloftClientContext,
+      RenameProjectCommandInput,
+      RenameProjectResponse,
+      AppaloftClientError
+    >;
+    archive: Client<
+      AppaloftClientContext,
+      ArchiveProjectCommandInput,
+      ArchiveProjectResponse,
       AppaloftClientError
     >;
   };

@@ -349,6 +349,16 @@ export const enUS = {
     },
     projects: {
       activeProjects: "With deployments",
+      active: "Active",
+      archiveAction: "Archive",
+      archiveConfirm:
+        "Archive this project? New resources, environments, deployments, and project renames will be blocked while existing history remains visible.",
+      archiveFailed: "Project was not archived",
+      archiveNotice:
+        "This project is archived. Existing resources, environments, deployments, and access routes remain visible, but new mutations are blocked.",
+      archiveSucceeded: "Project archived",
+      archived: "Archived",
+      archivedAt: "Archived at",
       detailDescription: "Environments, resources, and deployment records for this project",
       description: "Projects, environments, and deployment relationships",
       emptyBody:
@@ -379,6 +389,12 @@ export const enUS = {
       projectsWithResources: "With resources",
       publicAccessDescription: "Default access URLs created by resource deployments.",
       publicAccessTitle: "Public access",
+      renameFailed: "Project was not renamed",
+      renameLabel: "Project name",
+      renameSucceeded: "Project renamed",
+      settingsDescription:
+        "Project lifecycle changes use dedicated operations and keep history readable.",
+      settingsTitle: "Project settings",
       createResourceDescription:
         "Define the resource source and network, then start the first deployment in the current project, environment, and server.",
       createResourceDeploymentPartialError:

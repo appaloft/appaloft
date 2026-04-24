@@ -74,6 +74,9 @@ export const projectSummarySchema = z.object({
   name: z.string(),
   slug: z.string(),
   description: z.string().optional(),
+  lifecycleStatus: z.enum(["active", "archived"]),
+  archivedAt: z.string().optional(),
+  archiveReason: z.string().optional(),
   createdAt: z.string(),
 });
 
@@ -82,12 +85,36 @@ export const createProjectInputSchema = z.object({
   description: z.string().optional(),
 });
 
+export const showProjectInputSchema = z.object({
+  projectId: z.string().min(1),
+});
+
+export const renameProjectInputSchema = z.object({
+  projectId: z.string().min(1),
+  name: z.string().min(1),
+});
+
+export const archiveProjectInputSchema = z.object({
+  projectId: z.string().min(1),
+  reason: z.string().min(1).max(280).optional(),
+});
+
 export const createProjectResponseSchema = z.object({
   id: z.string(),
 });
 
 export const listProjectsResponseSchema = z.object({
   items: z.array(projectSummarySchema),
+});
+
+export const showProjectResponseSchema = projectSummarySchema;
+
+export const renameProjectResponseSchema = z.object({
+  id: z.string(),
+});
+
+export const archiveProjectResponseSchema = z.object({
+  id: z.string(),
 });
 
 export const serverSummarySchema = z.object({
@@ -2002,8 +2029,14 @@ export type PluginSummary = z.infer<typeof pluginSummarySchema>;
 export type SystemPluginWebExtension = z.infer<typeof systemPluginWebExtensionSchema>;
 export type ProjectSummary = z.infer<typeof projectSummarySchema>;
 export type CreateProjectInput = z.infer<typeof createProjectInputSchema>;
+export type ShowProjectInput = z.infer<typeof showProjectInputSchema>;
+export type RenameProjectInput = z.infer<typeof renameProjectInputSchema>;
+export type ArchiveProjectInput = z.infer<typeof archiveProjectInputSchema>;
 export type CreateProjectResponse = z.infer<typeof createProjectResponseSchema>;
 export type ListProjectsResponse = z.infer<typeof listProjectsResponseSchema>;
+export type ShowProjectResponse = z.infer<typeof showProjectResponseSchema>;
+export type RenameProjectResponse = z.infer<typeof renameProjectResponseSchema>;
+export type ArchiveProjectResponse = z.infer<typeof archiveProjectResponseSchema>;
 export type ServerSummary = z.infer<typeof serverSummarySchema>;
 export type SshCredentialSummary = z.infer<typeof sshCredentialSummarySchema>;
 export type RegisterServerInput = z.infer<typeof registerServerInputSchema>;

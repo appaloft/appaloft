@@ -76,9 +76,14 @@ Implemented operations:
 | --- | --- | --- | --- | --- | --- | --- |
 | Create project | Command | `projects.create` | `CreateProjectCommand` | `CreateProjectCommandInput` | `appaloft project create` | `POST /api/projects` |
 | List projects | Query | `projects.list` | `ListProjectsQuery` | `ListProjectsQueryInput` | `appaloft project list` | `GET /api/projects` |
+| Show project | Query | `projects.show` | `ShowProjectQuery` | `ShowProjectQueryInput` | `appaloft project show <projectId>` | `GET /api/projects/{projectId}` |
+| Rename project | Command | `projects.rename` | `RenameProjectCommand` | `RenameProjectCommandInput` | `appaloft project rename <projectId> --name <name>` | `POST /api/projects/{projectId}/rename` |
+| Archive project | Command | `projects.archive` | `ArchiveProjectCommand` | `ArchiveProjectCommandInput` | `appaloft project archive <projectId>` | `POST /api/projects/{projectId}/archive` |
 
 Current boundary:
 - a project is currently metadata plus deployment ownership
+- project lifecycle state is explicit; archived projects remain readable but reject new
+  project-scoped mutations and deployment admission
 - project detail surfaces should make resources the primary list and resource creation the primary
   write affordance
 - project-level "view deployments" is a secondary rollup over resources
@@ -91,10 +96,9 @@ Current boundary:
   [ADR-013: Project Resource Navigation And Deployment Ownership](./decisions/ADR-013-project-resource-navigation-and-deployment-ownership.md)
 
 Core next operations expected here:
-- `projects.show`
-- `projects.rename`
 - `projects.configure-source` if project source binding becomes a first-class aggregate concept
-- `projects.archive`
+- `projects.set-description` if description editing becomes a first-class mutation
+- project hard delete or restore only after safety rules are specified
 
 Those are expected domain operations, but they are not implemented yet and must not be assumed by
 transports until added here and to the operation catalog.
