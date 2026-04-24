@@ -33,7 +33,7 @@ async function waitForStaticSite(url: string): Promise<string> {
 }
 
 describe("quick deploy static Docker workflow e2e", () => {
-  test("[QUICK-DEPLOY-WF-040] quick deploys a static site through generated nginx Docker packaging", async () => {
+  test("[QUICK-DEPLOY-WF-040][MIN-CONSOLE-SMOKE-001] quick deploys a static site and observes resource/deployment state", async () => {
     expect(existsSync(join(fixtureDir, "Dockerfile"))).toBe(false);
     expect(existsSync(join(fixtureDir, "dist", "index.html"))).toBe(true);
 
@@ -101,6 +101,69 @@ describe("quick deploy static Docker workflow e2e", () => {
       expectCliSuccess(deployment, "quick deploy static site");
       deploymentId = parseJson<{ id: string }>(deployment.stdout).id;
 
+      const resources = runShellCli(
+        ["resource", "list", "--project", projectId, "--environment", environmentId],
+        workspace.cliOptions,
+      );
+      expectCliSuccess(resources, "list resources after quick deploy");
+      const resourceItems = parseJson<{
+        items: Array<{
+          id: string;
+          projectId: string;
+          environmentId: string;
+          kind: string;
+          lastDeploymentId?: string;
+          lastDeploymentStatus?: string;
+          networkProfile?: { internalPort?: number };
+        }>;
+      }>(resources.stdout).items;
+      const resource = resourceItems.find((item) => item.lastDeploymentId === deploymentId);
+
+      expect(resource).toMatchObject({
+        projectId,
+        environmentId,
+        kind: "static-site",
+        lastDeploymentId: deploymentId,
+        lastDeploymentStatus: "succeeded",
+        networkProfile: {
+          internalPort: 80,
+        },
+      });
+      const resourceId = resource?.id;
+      if (!resourceId) {
+        throw new Error(`Could not find resource for deployment ${deploymentId}`);
+      }
+
+      const resourceDetail = runShellCli(["resource", "show", resourceId], workspace.cliOptions);
+      expectCliSuccess(resourceDetail, "show resource after quick deploy");
+      expect(
+        parseJson<{
+          schemaVersion: string;
+          resource: { id: string; projectId: string; environmentId: string; kind: string };
+          latestDeployment?: { id: string; status: string };
+          networkProfile?: { internalPort?: number };
+          lifecycle: { status: string };
+        }>(resourceDetail.stdout),
+      ).toMatchObject({
+        schemaVersion: "resources.show/v1",
+        resource: {
+          id: resourceId,
+          projectId,
+          environmentId,
+          kind: "static-site",
+        },
+        latestDeployment: {
+          id: deploymentId,
+          status: "succeeded",
+        },
+        networkProfile: {
+          internalPort: 80,
+        },
+        lifecycle: {
+          status: "active",
+        },
+      });
+
       const logs = runShellCli(["logs", deploymentId], workspace.cliOptions);
       expect(logs.exitCode, logs.stderr).toBe(0);
       expect(logs.stdout).toContain("Generated static site Dockerfile");
@@ -166,6 +229,37 @@ describe("quick deploy static Docker workflow e2e", () => {
           }),
         ]),
       );
+
+      const deploymentDetail = runShellCli(
+        ["deployments", "show", deploymentId],
+        workspace.cliOptions,
+      );
+      expectCliSuccess(deploymentDetail, "show deployment after quick deploy");
+      expect(
+        parseJson<{
+          schemaVersion: string;
+          deployment: { id: string; projectId: string; environmentId: string; resourceId: string };
+          status: { current: string };
+          relatedContext?: { resource?: { id?: string; kind?: string } };
+        }>(deploymentDetail.stdout),
+      ).toMatchObject({
+        schemaVersion: "deployments.show/v1",
+        deployment: {
+          id: deploymentId,
+          projectId,
+          environmentId,
+          resourceId,
+        },
+        status: {
+          current: "succeeded",
+        },
+        relatedContext: {
+          resource: {
+            id: resourceId,
+            kind: "static-site",
+          },
+        },
+      });
     } finally {
       cleanupLocalDockerDeployment(deploymentId);
       cleanupWorkspace(workspace.workspaceDir);

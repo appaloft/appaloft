@@ -60,6 +60,10 @@ Current release alignment:
   query slice, HTTP/oRPC replay and stream routes, CLI events command, shell observer, and Web
   deployment detail timeline. Remaining work is reconnect/gap/CLI test hardening, not first-class
   query implementation.
+- [x] On 2026-04-24, the `0.4.0` minimum console and deployment loop has a dedicated release-gate
+  matrix, Quick Deploy new-resource sequencing remains `resources.create ->
+  deployments.create(resourceId)`, and the local CLI smoke covers resource/deployment observation
+  after deployment.
 - [x] Release Please keeps pre-`1.0.0` feature and minor bumps on the current patch line by
   default; an explicit `Release-As` is required only when the roadmap gate allows a target minor or
   explicit hotfix version.
@@ -76,6 +80,7 @@ Internal governing sources:
 - [x] [Async Lifecycle And Acceptance](./architecture/async-lifecycle-and-acceptance.md)
 - [x] [Workload Framework Detection And Planning](./workflows/workload-framework-detection-and-planning.md)
 - [x] [Quick Deploy](./workflows/quick-deploy.md)
+- [x] [Minimum Console And Deployment Loop Test Matrix](./testing/minimum-console-deployment-loop-test-matrix.md)
 - [x] [deployments.create Test Matrix](./testing/deployments.create-test-matrix.md)
 - [x] [Quick Deploy Test Matrix](./testing/quick-deploy-test-matrix.md)
 - [x] [Deployment Runtime Substrate Plan](./implementation/deployment-runtime-substrate-plan.md)
@@ -126,8 +131,9 @@ Already implemented or materially present:
   instances, bindings, releases, deployments, rollback plans, domain bindings, and runtime plans.
 - [x] Active operations cover project create/list.
 - [x] Active operations cover environment create/list/show/set/unset/diff/promote.
-- [x] Active operations cover resource create/list/health/logs/proxy-preview/diagnostics and
-  configure-health.
+- [x] Active operations cover resource create/list/show, source/runtime/network/health
+  configuration, resource variables/effective config, archive/delete, health, logs, proxy preview,
+  diagnostics, and Web detail observation.
 - [x] Active operations cover server registration, credentials, connectivity, proxy repair, and
   terminal open.
 - [x] Active operations cover deployment create/list/show/logs, standalone event replay/follow, and
@@ -167,8 +173,8 @@ Still blocking 1.0.0:
 - [ ] Top-level resource CRUD/lifecycle is uneven across projects, servers, credentials, resources,
   deployments, domain bindings, certificates, default access policy, dependency resources, storage,
   webhooks, and internal process state.
-- [ ] Resource source/runtime/network profile update is still the major missing horizontal
-  operation.
+- [ ] Resource profile editing affordances, profile-drift handling, and remaining non-resource
+  lifecycle gaps are still major horizontal work.
 - [ ] Retry/redeploy, cancel, and rollback are not public operations. `deployments.show` and
   `deployments.stream-events` are already active.
 - [ ] `deployments.create` progress stream is still create-time observation; standalone replay/follow
@@ -253,7 +259,7 @@ Target: `0.4.0`.
 
 Release rule:
 
-- [ ] Select `0.4.0` only when all required Phase 2 items, Phase 1 items, and exit criteria are
+- [x] Select `0.4.0` only when all required Phase 2 items, Phase 1 items, and exit criteria are
   checked. If any Phase 2 item remains unchecked, release a `0.3.x` patch instead.
 
 Already done:
@@ -271,21 +277,34 @@ Already done:
 
 Required:
 
-- [ ] Verify Web, CLI, and HTTP/oRPC all dispatch the active operation catalog entries for the
-  minimum loop.
-- [ ] Confirm Quick Deploy still dispatches `resources.create` before ids-only `deployments.create`
-  for new first-deploy resources.
-- [ ] Add or update smoke coverage for the minimum console path from project/environment/server to
-  resource/deployment observation.
-- [ ] Document any intentionally missing show/update/delete commands as post-`0.4.0` gaps in this
-  roadmap.
+- [x] Verify Web, CLI, and HTTP/oRPC all dispatch the active operation catalog entries for the
+  minimum loop. Covered by `MIN-CONSOLE-OPS-001`.
+- [x] Confirm Quick Deploy still dispatches `resources.create` before ids-only `deployments.create`
+  for new first-deploy resources. Covered by `MIN-CONSOLE-QUICK-001`.
+- [x] Add or update smoke coverage for the minimum console path from project/environment/server to
+  resource/deployment observation. Covered by `MIN-CONSOLE-SMOKE-001`.
+- [x] Document any intentionally missing show/update/delete commands as post-`0.4.0` gaps in this
+  roadmap. Covered by `MIN-CONSOLE-GAPS-001`.
 
 Exit criteria:
 
-- [ ] A user can complete a minimal first deployment loop from the console or CLI without relying on
+- [x] A user can complete a minimal first deployment loop from the console or CLI without relying on
   hidden Web-only behavior.
-- [ ] The current active operations are accurately checked in the resource/internal-state ledger.
-- [ ] Missing CRUD/lifecycle operations are explicitly assigned to later phases.
+- [x] The current active operations are accurately checked in the resource/internal-state ledger.
+- [x] Missing CRUD/lifecycle operations are explicitly assigned to later phases.
+
+Post-`0.4.0` gaps assigned to later phases:
+
+- Server show/rename/configure-edge-proxy/deactivate/delete safety and credential usage visibility
+  remain Phase 4 work.
+- Credential show/rotate/delete when unused remains Phase 4 work.
+- Remaining environment clone/lock/archive/effective-precedence/history work remains Phase 4 work.
+- Access policy editing, route precedence hardening, route intent repair, domain binding mutation
+  lifecycle, and certificate import/revoke/retry/delete remain Phase 6 work.
+- Deployment retry/redeploy, cancel, rollback, dependency resources, storage, secrets, webhooks,
+  auto-deploy, and product-grade preview deployments remain Phase 7 work.
+- Durable outbox/inbox/job state, recovery/prune commands, audit/event history, remote SSH state
+  diagnostics, and terminal session lifecycle closure remain Phase 8 work.
 
 ## Phase 3: Access, Static, SSH Config, And Planner Baseline
 
@@ -339,7 +358,8 @@ Release rule:
 Already done:
 
 - [x] `resources.create` exists.
-- [x] Resource read/list, health, runtime logs, proxy preview, diagnostics, configure-health, and Web
+- [x] Resource read/list/show, source/runtime/network/health configuration, resource variable
+  overrides/effective config, archive/delete, runtime logs, proxy preview, diagnostics, and Web
   resource detail observation exist.
 - [x] Environment create/list/show/set/unset/diff/promote exists.
 - [x] Project create/list/show/rename/archive exists.
@@ -350,10 +370,10 @@ Required:
 - [x] Add project show/rename/archive.
 - [ ] Add server show/update/deactivate/delete safety rules and credential usage visibility.
 - [ ] Add credential show/rotate/delete when unused.
-- [ ] Add resource show/update/archive/delete.
-- [ ] Add separate resource source update semantics where specs require a separate command.
-- [ ] Add separate resource runtime update semantics where specs require a separate command.
-- [ ] Add separate resource network update semantics where specs require a separate command.
+- [x] Add resource show/archive/delete.
+- [x] Add separate resource source update semantics where specs require a separate command.
+- [x] Add separate resource runtime update semantics where specs require a separate command.
+- [x] Add separate resource network update semantics where specs require a separate command.
 - [ ] Add reusable access-profile update semantics where specs require a separate command.
 - [ ] Add environment update/clone/lock/archive.
 - [ ] Add environment effective-precedence query.
@@ -618,13 +638,14 @@ work below before GA.
   rollups.
 - [x] SSH credential: create/list, attach to server.
 - [ ] SSH credential: show, rotate/update, delete when unused, usage visibility.
-- [x] Resource: create/list, health, logs, proxy preview, diagnostics, configure health, Web detail
+- [x] Resource: create/list/show, configure source/runtime/network/health, set/unset variables,
+  effective config, health, logs, proxy preview, diagnostics, archive/delete, and Web detail
   observation.
-- [ ] Resource: show, update source/runtime/network profile, archive/delete, profile drift
-  visibility.
+- [ ] Resource: profile drift visibility and reusable access-profile mutation semantics where specs
+  require separate commands.
 - [x] Source link: relink through CLI.
 - [ ] Source link: list/show/delete or archive, PostgreSQL/control-plane persistence before API/Web.
-- [x] Deployment attempt: create/list/logs.
+- [x] Deployment attempt: create/list/show/logs.
 - [x] Deployment attempt: stream events.
 - [ ] Deployment attempt: retry/redeploy, cancel, rollback candidate/readiness, archive/prune.
 - [x] Runtime artifact/instance: internal snapshot and resource/deployment diagnostic context.

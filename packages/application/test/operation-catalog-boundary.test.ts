@@ -29,6 +29,51 @@ describe("operation catalog aggregate mutation boundary", () => {
     expect(findGenericAggregateMutationOperations(operationCatalog)).toEqual([]);
   });
 
+  test("[MIN-CONSOLE-OPS-001] minimum console loop operations expose CLI and HTTP/oRPC transports", () => {
+    const minimumLoopOperationKeys = [
+      "projects.create",
+      "projects.list",
+      "environments.create",
+      "environments.list",
+      "environments.show",
+      "environments.set-variable",
+      "environments.unset-variable",
+      "environments.diff",
+      "environments.promote",
+      "servers.register",
+      "servers.configure-credential",
+      "credentials.create-ssh",
+      "credentials.list-ssh",
+      "servers.list",
+      "servers.test-connectivity",
+      "resources.create",
+      "resources.list",
+      "resources.show",
+      "resources.health",
+      "resources.runtime-logs",
+      "resources.proxy-configuration.preview",
+      "resources.diagnostic-summary",
+      "deployments.create",
+      "deployments.list",
+      "deployments.show",
+      "deployments.logs",
+      "deployments.stream-events",
+    ];
+    const catalogEntries: readonly OperationCatalogEntry[] = operationCatalog;
+    const entriesByKey = new Map<string, OperationCatalogEntry>(
+      catalogEntries.map((entry) => [entry.key, entry]),
+    );
+
+    for (const key of minimumLoopOperationKeys) {
+      const entry = entriesByKey.get(key);
+
+      expect(entry, key).toBeDefined();
+      expect(entry?.inputSchema, key).toBeDefined();
+      expect(entry?.transports.cli, key).toBeTruthy();
+      expect(entry?.transports.orpc, key).toBeDefined();
+    }
+  });
+
   test("[AGG-MUTATION-CATALOG-002] detects generic aggregate update operation keys and command names", () => {
     const violations = findGenericAggregateMutationOperations([
       catalogEntry({
