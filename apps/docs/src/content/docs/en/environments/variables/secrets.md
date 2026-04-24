@@ -11,6 +11,8 @@ searchAliases:
   - "runtime variable"
 relatedOperations:
   - environments.set-variable
+  - resources.set-variable
+  - resources.effective-config
 sidebar:
   label: "Secrets"
   order: 4
@@ -18,7 +20,8 @@ sidebar:
 
 <h2 id="environment-secret-values">Secret values</h2>
 
-Secret values are for runtime use and should not appear in read models, logs, diagnostics, or support payloads.
+Secret values are for runtime use and should not appear in read models, logs, diagnostics, support
+payloads, or effective-config responses as plaintext.
 
 Users should see the existence and state of a secret, such as masked value, last update time, source environment, and whether it participates in deployment snapshots. They should not see plaintext values.
 
@@ -34,7 +37,8 @@ After rotating a secret, redeploy resources so running instances read the new de
 
 Recommended flow:
 
-1. Set the new secret in the target environment.
+1. Set the new secret in the target environment or on the target resource when the override is
+   resource-specific.
 2. Create new deployments for affected resources.
 3. Confirm health and logs show the app reading the new value safely.
 4. Confirm the old secret is no longer used.

@@ -109,6 +109,18 @@ export interface EnvironmentVariablesTable {
   updated_at: TimestampColumn;
 }
 
+export interface ResourceVariablesTable {
+  id: string;
+  resource_id: string;
+  key: string;
+  value: string;
+  kind: string;
+  exposure: string;
+  scope: string;
+  is_secret: boolean;
+  updated_at: TimestampColumn;
+}
+
 export interface DeploymentsTable {
   id: string;
   project_id: string;
@@ -292,6 +304,7 @@ export interface Database {
   environments: EnvironmentsTable;
   resources: ResourcesTable;
   environment_variables: EnvironmentVariablesTable;
+  resource_variables: ResourceVariablesTable;
   deployments: DeploymentsTable;
   domain_bindings: DomainBindingsTable;
   certificates: CertificatesTable;

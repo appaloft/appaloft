@@ -162,6 +162,7 @@ export const configScopes = [
   "organization",
   "project",
   "environment",
+  "resource",
   "deployment",
 ] as const;
 

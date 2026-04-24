@@ -31,11 +31,14 @@
     DomainBindingSummary,
     ImportCertificateInput,
     ProxyConfigurationView,
+    ResourceConfigEntry,
     ResourceDetail,
+    ResourceEffectiveConfig,
     ResourceHealthOverall,
     ResourceRuntimeLogEvent,
     ResourceRuntimeLogLine,
     ResourceSummary,
+    SetResourceVariableInput,
   } from "@appaloft/contracts";
 
   import { readErrorMessage } from "$lib/api/client";
@@ -103,10 +106,19 @@
   type SourceKind = SourceProfileInput["kind"];
   type DomainRouteMode = "serve" | "redirect";
   type RedirectStatusText = "301" | "302" | "307" | "308";
-  type ResourceSettingsSection = "profile" | "domains" | "health" | "proxy" | "diagnostics";
+  type ResourceSettingsSection =
+    | "profile"
+    | "configuration"
+    | "domains"
+    | "health"
+    | "proxy"
+    | "diagnostics";
+  type ResourceVariableKind = SetResourceVariableInput["kind"];
+  type ResourceVariableExposure = SetResourceVariableInput["exposure"];
   const resourceDetailTabs = ["settings", "deployments", "logs", "terminal"] as const;
   const resourceSettingsSections = [
     "profile",
+    "configuration",
     "domains",
     "health",
     "proxy",
@@ -146,6 +158,17 @@
           mode: "live",
           includeChecks: true,
           includePublicAccessProbe: true,
+        }),
+      enabled: browser && resourceId.length > 0,
+      staleTime: 5_000,
+    }),
+  );
+  const resourceEffectiveConfigQuery = createQuery(() =>
+    queryOptions({
+      queryKey: ["resources", "effective-config", resourceId],
+      queryFn: () =>
+        orpcClient.resources.effectiveConfig({
+          resourceId,
         }),
       enabled: browser && resourceId.length > 0,
       staleTime: 5_000,
@@ -192,6 +215,9 @@
       : [],
   );
   const resourceHealth = $derived(resourceHealthQuery.data ?? null);
+  const resourceEffectiveConfig = $derived<ResourceEffectiveConfig | null>(
+    resourceEffectiveConfigQuery.data ?? null,
+  );
   const resourceHealthOverall = $derived.by((): ResourceHealthViewStatus => {
     if (
       resourceHealthQuery.isPending ||
@@ -314,6 +340,17 @@
   let runtimeLogsFollowing = $state(false);
   let runtimeLogStream = $state<RuntimeLogClientStream | null>(null);
   let runtimeLogRequestGeneration = $state(0);
+  let configFormResourceId = $state("");
+  let configKey = $state("");
+  let configValue = $state("");
+  let configKind = $state<ResourceVariableKind>("plain-config");
+  let configExposure = $state<ResourceVariableExposure>("runtime");
+  let configSecret = $state(false);
+  let configFeedback = $state<{
+    kind: "success" | "error";
+    title: string;
+    detail: string;
+  } | null>(null);
   let proxyConfigurationResourceId = $state("");
   let proxyConfiguration = $state<ProxyConfigurationView | null>(null);
   let proxyConfigurationLoading = $state(false);
@@ -480,9 +517,10 @@
             isPositiveIntegerText(healthTimeoutSeconds) &&
             isPositiveIntegerText(healthRetries) &&
             isNonNegativeIntegerText(healthStartPeriodSeconds) &&
-            (!healthPort.trim() || isPositiveIntegerText(healthPort)))),
+        (!healthPort.trim() || isPositiveIntegerText(healthPort)))),
     ),
   );
+  const canSetResourceVariable = $derived(Boolean(resource && !isResourceArchived && configKey.trim()));
   const createDomainBindingMutation = createMutation(() => ({
     mutationFn: (input: CreateDomainBindingInput) => orpcClient.domainBindings.create(input),
     onSuccess: (result) => {
@@ -632,6 +670,48 @@
       networkFeedback = {
         kind: "error",
         title: $t(i18nKeys.console.resources.networkProfileSaveFailed),
+        detail: readErrorMessage(error),
+      };
+    },
+  }));
+  const setResourceVariableMutation = createMutation(() => ({
+    mutationFn: (input: SetResourceVariableInput) => orpcClient.resources.setVariable(input),
+    onSuccess: () => {
+      configFeedback = {
+        kind: "success",
+        title: $t(i18nKeys.console.resources.configurationSaved),
+        detail: configKey.trim(),
+      };
+      configValue = "";
+      void queryClient.invalidateQueries({
+        queryKey: ["resources", "effective-config", resourceId],
+      });
+    },
+    onError: (error) => {
+      configFeedback = {
+        kind: "error",
+        title: $t(i18nKeys.console.resources.configurationSaveFailed),
+        detail: readErrorMessage(error),
+      };
+    },
+  }));
+  const unsetResourceVariableMutation = createMutation(() => ({
+    mutationFn: (input: { resourceId: string; key: string; exposure: ResourceVariableExposure }) =>
+      orpcClient.resources.unsetVariable(input),
+    onSuccess: (_result, variables) => {
+      configFeedback = {
+        kind: "success",
+        title: $t(i18nKeys.console.resources.configurationUnsetSucceeded),
+        detail: variables.key,
+      };
+      void queryClient.invalidateQueries({
+        queryKey: ["resources", "effective-config", resourceId],
+      });
+    },
+    onError: (error) => {
+      configFeedback = {
+        kind: "error",
+        title: $t(i18nKeys.console.resources.configurationUnsetFailed),
         detail: readErrorMessage(error),
       };
     },
@@ -1150,6 +1230,24 @@
   });
 
   $effect(() => {
+    if (!browser || !resource) {
+      return;
+    }
+
+    if (configFormResourceId === resource.id) {
+      return;
+    }
+
+    configFormResourceId = resource.id;
+    configKey = "";
+    configValue = "";
+    configKind = "plain-config";
+    configExposure = "runtime";
+    configSecret = false;
+    configFeedback = null;
+  });
+
+  $effect(() => {
     const currentResourceId = resource?.id ?? "";
 
     if (!browser) {
@@ -1430,6 +1528,37 @@
     });
   }
 
+  function setResourceVariable(event: SubmitEvent): void {
+    event.preventDefault();
+
+    if (!resource || !canSetResourceVariable || setResourceVariableMutation.isPending) {
+      return;
+    }
+
+    configFeedback = null;
+    setResourceVariableMutation.mutate({
+      resourceId: resource.id,
+      key: configKey.trim(),
+      value: configValue,
+      kind: configKind,
+      exposure: configExposure,
+      ...(configSecret ? { isSecret: true } : {}),
+    });
+  }
+
+  function unsetResourceVariable(entry: ResourceConfigEntry): void {
+    if (!resource || isResourceArchived || unsetResourceVariableMutation.isPending) {
+      return;
+    }
+
+    configFeedback = null;
+    unsetResourceVariableMutation.mutate({
+      resourceId: resource.id,
+      key: entry.key,
+      exposure: entry.exposure,
+    });
+  }
+
   function confirmDomainBindingOwnership(binding: DomainBindingSummary): void {
     if (binding.status !== "pending_verification" || confirmDomainBindingOwnershipMutation.isPending) {
       return;
@@ -1570,6 +1699,8 @@
     switch (section) {
       case "profile":
         return $t(i18nKeys.console.resources.profileTitle);
+      case "configuration":
+        return $t(i18nKeys.console.resources.configurationTitle);
       case "domains":
         return $t(i18nKeys.console.resources.domainBindingsTitle);
       case "health":
@@ -1600,6 +1731,29 @@
       case "dockerfile-inline":
       case "zip-artifact":
         return kind;
+    }
+  }
+
+  function configScopeBadgeVariant(scope: ResourceConfigEntry["scope"]): "default" | "outline" {
+    return scope === "resource" ? "default" : "outline";
+  }
+
+  function configExposureLabel(exposure: ResourceVariableExposure): string {
+    return exposure === "build-time"
+      ? $t(i18nKeys.console.resources.configurationExposureBuildTime)
+      : $t(i18nKeys.console.resources.configurationExposureRuntime);
+  }
+
+  function configKindLabel(kind: ResourceVariableKind): string {
+    switch (kind) {
+      case "plain-config":
+        return $t(i18nKeys.console.resources.configurationKindPlain);
+      case "secret":
+        return $t(i18nKeys.console.resources.configurationKindSecret);
+      case "provider-specific":
+        return $t(i18nKeys.console.resources.configurationKindProviderSpecific);
+      case "deployment-strategy":
+        return $t(i18nKeys.console.resources.configurationKindDeploymentStrategy);
     }
   }
 
@@ -2758,6 +2912,298 @@
                   </div>
                 </section>
               </div>
+
+              {:else if activeSettingsSection === "configuration"}
+              <section id="resource-overview-configuration" class="space-y-4">
+                <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <div class="flex items-center gap-2">
+                      <h2 class="text-lg font-semibold">
+                        {$t(i18nKeys.console.resources.configurationTitle)}
+                      </h2>
+                      <DocsHelpLink
+                        href={webDocsHrefs.environmentVariablePrecedence}
+                        ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+                      />
+                    </div>
+                    <p class="mt-1 text-sm text-muted-foreground">
+                      {$t(i18nKeys.console.resources.configurationDescription)}
+                    </p>
+                  </div>
+                  {#if resourceEffectiveConfig}
+                    <div class="rounded-md border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+                      <p class="font-medium text-foreground">
+                        {$t(i18nKeys.console.resources.configurationPrecedence)}
+                      </p>
+                      <p class="mt-1 break-all">{resourceEffectiveConfig.precedence.join(" -> ")}</p>
+                    </div>
+                  {/if}
+                </div>
+
+                <form
+                  id="resource-configuration-form"
+                  class="rounded-md border bg-background p-4"
+                  onsubmit={setResourceVariable}
+                >
+                  <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <h3 class="text-base font-semibold">
+                        {$t(i18nKeys.console.resources.configurationFormTitle)}
+                      </h3>
+                      <p class="mt-1 text-sm text-muted-foreground">
+                        {$t(i18nKeys.console.resources.configurationFormDescription)}
+                      </p>
+                    </div>
+                    <Badge variant="outline">{$t(i18nKeys.common.domain.resource)}</Badge>
+                  </div>
+
+                  <div class="mt-4 grid gap-4 xl:grid-cols-2">
+                    <label class="space-y-1.5 text-sm font-medium" for="resource-config-key">
+                      <span>{$t(i18nKeys.common.domain.key)}</span>
+                      <Input
+                        id="resource-config-key"
+                        bind:value={configKey}
+                        autocomplete="off"
+                        placeholder="PUBLIC_API_BASE_URL"
+                      />
+                    </label>
+
+                    <label class="space-y-1.5 text-sm font-medium">
+                      <span>{$t(i18nKeys.common.domain.exposure)}</span>
+                      <Select.Root bind:value={configExposure} type="single">
+                        <Select.Trigger class="w-full">
+                          {configExposureLabel(configExposure)}
+                        </Select.Trigger>
+                        <Select.Content>
+                          <Select.Item value="runtime">
+                            {$t(i18nKeys.console.resources.configurationExposureRuntime)}
+                          </Select.Item>
+                          <Select.Item value="build-time">
+                            {$t(i18nKeys.console.resources.configurationExposureBuildTime)}
+                          </Select.Item>
+                        </Select.Content>
+                      </Select.Root>
+                    </label>
+
+                    <label class="space-y-1.5 text-sm font-medium">
+                      <span>{$t(i18nKeys.common.domain.kind)}</span>
+                      <Select.Root bind:value={configKind} type="single">
+                        <Select.Trigger class="w-full">
+                          {configKindLabel(configKind)}
+                        </Select.Trigger>
+                        <Select.Content>
+                          <Select.Item value="plain-config">
+                            {$t(i18nKeys.console.resources.configurationKindPlain)}
+                          </Select.Item>
+                          <Select.Item value="secret">
+                            {$t(i18nKeys.console.resources.configurationKindSecret)}
+                          </Select.Item>
+                          <Select.Item value="provider-specific">
+                            {$t(i18nKeys.console.resources.configurationKindProviderSpecific)}
+                          </Select.Item>
+                          <Select.Item value="deployment-strategy">
+                            {$t(i18nKeys.console.resources.configurationKindDeploymentStrategy)}
+                          </Select.Item>
+                        </Select.Content>
+                      </Select.Root>
+                    </label>
+
+                    <label
+                      class="flex items-start gap-3 rounded-md border bg-muted/20 px-3 py-3 text-sm"
+                      for="resource-config-secret"
+                    >
+                      <input
+                        id="resource-config-secret"
+                        bind:checked={configSecret}
+                        type="checkbox"
+                        class="mt-0.5 size-4 rounded border-input"
+                      />
+                      <span class="space-y-1">
+                        <span class="block font-medium">
+                          {$t(i18nKeys.console.quickDeploy.secretStorage)}
+                        </span>
+                        <span class="block text-muted-foreground">
+                          {$t(i18nKeys.console.resources.configurationSecretDescription)}
+                        </span>
+                      </span>
+                    </label>
+
+                    <label
+                      class="space-y-1.5 text-sm font-medium xl:col-span-2"
+                      for="resource-config-value"
+                    >
+                      <span>{$t(i18nKeys.common.domain.value)}</span>
+                      <Textarea
+                        id="resource-config-value"
+                        bind:value={configValue}
+                        rows={4}
+                        spellcheck={false}
+                        autocomplete="off"
+                        placeholder="https://api.example.com"
+                      />
+                    </label>
+                  </div>
+
+                  {#if configFeedback}
+                    <div
+                      class={[
+                        "mt-4 rounded-md border px-3 py-2 text-sm",
+                        configFeedback.kind === "success"
+                          ? "border-primary/25 bg-primary/5"
+                          : "border-destructive/30 bg-destructive/5 text-destructive",
+                      ]}
+                    >
+                      <p class="font-medium">{configFeedback.title}</p>
+                      <p class="mt-1 break-all text-xs">{configFeedback.detail}</p>
+                    </div>
+                  {/if}
+
+                  <div class="mt-4 flex justify-end">
+                    <Button
+                      type="submit"
+                      disabled={!canSetResourceVariable || setResourceVariableMutation.isPending}
+                    >
+                      {setResourceVariableMutation.isPending
+                        ? $t(i18nKeys.common.actions.saving)
+                        : $t(i18nKeys.console.resources.configurationSetAction)}
+                    </Button>
+                  </div>
+                </form>
+
+                {#if resourceEffectiveConfigQuery.isPending}
+                  <div class="space-y-3">
+                    <Skeleton class="h-28 w-full" />
+                    <Skeleton class="h-28 w-full" />
+                  </div>
+                {:else if resourceEffectiveConfigQuery.error}
+                  <div class="rounded-md border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+                    {readErrorMessage(resourceEffectiveConfigQuery.error)}
+                  </div>
+                {:else if resourceEffectiveConfig}
+                  <div class="grid gap-4 xl:grid-cols-2">
+                    <section class="rounded-md border bg-background p-4">
+                      <div class="flex items-center justify-between gap-3">
+                        <div>
+                          <h3 class="text-base font-semibold">
+                            {$t(i18nKeys.console.resources.configurationOwnedTitle)}
+                          </h3>
+                          <p class="mt-1 text-sm text-muted-foreground">
+                            {$t(i18nKeys.console.resources.configurationOwnedDescription)}
+                          </p>
+                        </div>
+                        <Badge variant="default">{$t(i18nKeys.common.domain.resource)}</Badge>
+                      </div>
+
+                      <div class="mt-4 space-y-3">
+                        {#if resourceEffectiveConfig.ownedEntries.length > 0}
+                          {#each resourceEffectiveConfig.ownedEntries as entry (`${entry.key}:${entry.exposure}:${entry.scope}`)}
+                            <article class="rounded-md border bg-muted/15 p-3">
+                              <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                                <div class="min-w-0 flex-1 space-y-2">
+                                  <div class="flex flex-wrap items-center gap-2">
+                                    <p class="truncate font-medium">{entry.key}</p>
+                                    <Badge variant={configScopeBadgeVariant(entry.scope)}>
+                                      {entry.scope}
+                                    </Badge>
+                                    <Badge variant="outline">
+                                      {configExposureLabel(
+                                        entry.exposure as ResourceVariableExposure,
+                                      )}
+                                    </Badge>
+                                    <Badge variant="outline">
+                                      {configKindLabel(entry.kind as ResourceVariableKind)}
+                                    </Badge>
+                                    {#if entry.isSecret}
+                                      <Badge variant="secondary">
+                                        {$t(i18nKeys.console.resources.configurationSecretBadge)}
+                                      </Badge>
+                                    {/if}
+                                  </div>
+                                  <p class="break-all rounded-md bg-background px-3 py-2 font-mono text-xs">
+                                    {entry.value === "" ? '""' : entry.value}
+                                  </p>
+                                  {#if entry.updatedAt}
+                                    <p class="text-xs text-muted-foreground">
+                                      {$t(i18nKeys.console.resources.configurationUpdatedAt)}
+                                      {formatTime(entry.updatedAt)}
+                                    </p>
+                                  {/if}
+                                </div>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  disabled={isResourceArchived || unsetResourceVariableMutation.isPending}
+                                  onclick={() => unsetResourceVariable(entry)}
+                                >
+                                  {$t(i18nKeys.console.resources.configurationUnsetAction)}
+                                </Button>
+                              </div>
+                            </article>
+                          {/each}
+                        {:else}
+                          <div class="rounded-md border border-dashed bg-muted/15 px-4 py-6 text-sm text-muted-foreground">
+                            {$t(i18nKeys.console.resources.configurationOwnedEmpty)}
+                          </div>
+                        {/if}
+                      </div>
+                    </section>
+
+                    <section class="rounded-md border bg-background p-4">
+                      <div class="flex items-center justify-between gap-3">
+                        <div>
+                          <h3 class="text-base font-semibold">
+                            {$t(i18nKeys.console.resources.configurationEffectiveTitle)}
+                          </h3>
+                          <p class="mt-1 text-sm text-muted-foreground">
+                            {$t(i18nKeys.console.resources.configurationEffectiveDescription)}
+                          </p>
+                        </div>
+                        <Badge variant="outline">
+                          {resourceEffectiveConfig.effectiveEntries.length}
+                        </Badge>
+                      </div>
+
+                      <div class="mt-4 space-y-3">
+                        {#if resourceEffectiveConfig.effectiveEntries.length > 0}
+                          {#each resourceEffectiveConfig.effectiveEntries as entry (`${entry.key}:${entry.exposure}:${entry.scope}`)}
+                            <article class="rounded-md border bg-muted/15 p-3">
+                              <div class="space-y-2">
+                                <div class="flex flex-wrap items-center gap-2">
+                                  <p class="truncate font-medium">{entry.key}</p>
+                                  <Badge variant={configScopeBadgeVariant(entry.scope)}>
+                                    {entry.scope}
+                                  </Badge>
+                                  <Badge variant="outline">
+                                    {configExposureLabel(
+                                      entry.exposure as ResourceVariableExposure,
+                                    )}
+                                  </Badge>
+                                  <Badge variant="outline">
+                                    {configKindLabel(entry.kind as ResourceVariableKind)}
+                                  </Badge>
+                                  {#if entry.isSecret}
+                                    <Badge variant="secondary">
+                                      {$t(i18nKeys.console.resources.configurationSecretBadge)}
+                                    </Badge>
+                                  {/if}
+                                </div>
+                                <p class="break-all rounded-md bg-background px-3 py-2 font-mono text-xs">
+                                  {entry.value === "" ? '""' : entry.value}
+                                </p>
+                              </div>
+                            </article>
+                          {/each}
+                        {:else}
+                          <div class="rounded-md border border-dashed bg-muted/15 px-4 py-6 text-sm text-muted-foreground">
+                            {$t(i18nKeys.console.resources.configurationEffectiveEmpty)}
+                          </div>
+                        {/if}
+                      </div>
+                    </section>
+                  </div>
+                {/if}
+              </section>
 
               {:else if activeSettingsSection === "domains"}
               <section id="resource-overview-domains" class="space-y-4">

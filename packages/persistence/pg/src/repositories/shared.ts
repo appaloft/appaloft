@@ -164,6 +164,7 @@ import { type Kysely, type Selectable, type Transaction } from "kysely";
 import { type Database } from "../schema";
 
 export type EnvironmentVariableRow = Selectable<Database["environment_variables"]>;
+export type ResourceVariableRow = Selectable<Database["resource_variables"]>;
 type SourceKindInput = Parameters<typeof SourceKindValue.rehydrate>[0];
 type BuildStrategyInput = Parameters<typeof BuildStrategyKindValue.rehydrate>[0];
 type PackagingModeInput = Parameters<typeof PackagingModeValue.rehydrate>[0];
@@ -895,8 +896,8 @@ export interface InsertableEnvironmentVariable {
   index: number;
 }
 
-export function rehydrateEnvironmentConfigSet(
-  rows: EnvironmentVariableRow[],
+export function rehydrateConfigSet(
+  rows: Array<EnvironmentVariableRow | ResourceVariableRow>,
 ): EnvironmentConfigSet {
   return EnvironmentConfigSet.rehydrate(
     rows.map((variable) => ({
@@ -911,6 +912,12 @@ export function rehydrateEnvironmentConfigSet(
       ),
     })),
   );
+}
+
+export function rehydrateEnvironmentConfigSet(
+  rows: EnvironmentVariableRow[],
+): EnvironmentConfigSet {
+  return rehydrateConfigSet(rows);
 }
 
 export function rehydrateProject(row: Selectable<Database["projects"]>) {
@@ -1310,7 +1317,10 @@ export function rehydrateCertificateRow(row: Selectable<Database["certificates"]
   };
 }
 
-export function rehydrateResourceRow(row: Selectable<Database["resources"]>) {
+export function rehydrateResourceRow(
+  row: Selectable<Database["resources"]>,
+  variables: ResourceVariableRow[] = [],
+) {
   const services = (row.services ?? []) as unknown as SerializedResourceService[];
   const sourceBinding = row.source_binding
     ? (row.source_binding as unknown as SerializedResourceSourceBinding)
@@ -1482,6 +1492,7 @@ export function rehydrateResourceRow(row: Selectable<Database["resources"]>) {
           },
         }
       : {}),
+    variables: rehydrateConfigSet(variables),
     lifecycleStatus: ResourceLifecycleStatusValue.rehydrate(
       row.lifecycle_status as ResourceLifecycleStatusInput,
     ),

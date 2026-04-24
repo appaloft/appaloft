@@ -14,6 +14,9 @@ searchAliases:
 relatedOperations:
   - environments.set-variable
   - environments.unset-variable
+  - resources.set-variable
+  - resources.unset-variable
+  - resources.effective-config
 sidebar:
   label: "Precedence and snapshots"
   order: 3
@@ -21,12 +24,13 @@ sidebar:
 
 <h2 id="environment-variable-precedence">变量优先级</h2>
 
-Appaloft 的配置优先级是 defaults、system、organization、project、environment、deployment snapshot。用户不需要记住内部层级，但需要知道最终部署使用的是快照值。
+Appaloft 的配置优先级是 defaults、system、organization、project、environment、resource、deployment snapshot。用户不需要记住内部层级，但需要知道最终部署使用的是快照值。
 
 用户可见规则：
 
 - 越靠近具体部署的配置优先级越高。
 - 环境变量覆盖项目或系统默认值。
+- 同一个资源上的资源级变量会覆盖同 `key + exposure` 的环境级变量。
 - 部署创建时会保存不可变快照。
 - 部署完成后再修改变量，不会改变那次部署。
 
@@ -47,15 +51,15 @@ Appaloft 的配置优先级是 defaults、system、organization、project、envi
 
 <h2 id="environment-snapshot">部署快照</h2>
 
-每次部署都保存不可变环境快照。后续修改环境变量不会改变已经完成或正在运行的部署。
+每次部署都保存不可变环境快照。这个快照可能同时包含环境级变量和资源级覆盖值。后续修改变量不会改变已经完成或正在运行的部署。
 
 用户应该在部署详情中看到“这次部署使用的配置摘要”，而不是只能看到当前环境变量表。
 
 <h2 id="environment-variable-surfaces">入口说明</h2>
 
-Web console 应显示环境变量列表、secret 屏蔽状态、最近修改时间和部署快照提示。
+Web console 应显示环境变量和资源级变量列表、secret 屏蔽状态、最近修改时间、作用域和部署快照提示。
 
-CLI 适合 `set`、`unset`、`diff` 和自动化脚本。CLI 输出 secret 时只应显示 masked 状态，不显示值。
+CLI 适合 `set`、`unset`、`effective-config`、`diff` 和自动化脚本。CLI 输出 secret 时只应显示 masked 状态，不显示值。
 
 HTTP API 应返回变量 key、作用域、是否 secret、来源层级和 masked value。API 不应返回明文 secret。
 

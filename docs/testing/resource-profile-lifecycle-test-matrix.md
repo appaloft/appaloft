@@ -8,6 +8,9 @@ This matrix covers the active resource profile lifecycle operations:
 - `resources.configure-source`
 - `resources.configure-runtime`
 - `resources.configure-network`
+- `resources.set-variable`
+- `resources.unset-variable`
+- `resources.effective-config`
 - `resources.archive`
 - `resources.delete`
 
@@ -21,6 +24,9 @@ command and that no entrypoint exposes a generic `resources.update`.
 - [resources.configure-source Command Spec](../commands/resources.configure-source.md)
 - [resources.configure-runtime Command Spec](../commands/resources.configure-runtime.md)
 - [resources.configure-network Command Spec](../commands/resources.configure-network.md)
+- [resources.set-variable Command Spec](../commands/resources.set-variable.md)
+- [resources.unset-variable Command Spec](../commands/resources.unset-variable.md)
+- [resources.effective-config Query Spec](../queries/resources.effective-config.md)
 - [resources.archive Command Spec](../commands/resources.archive.md)
 - [resources.delete Command Spec](../commands/resources.delete.md)
 - [resources.configure-health Command Spec](../commands/resources.configure-health.md)
@@ -58,6 +64,18 @@ command and that no entrypoint exposes a generic `resources.update`.
 | RES-PROFILE-NETWORK-005 | `resources.configure-network` | Command use case | Two reverse-proxy resources share the same `internalPort`. | Command accepts; no port-collision failure for reverse proxy. |
 | RES-PROFILE-NETWORK-006 | `resources.configure-network` | Command use case | Archived resource. | Returns `resource_archived`, no event. |
 | RES-PROFILE-HEALTH-001 | `resources.configure-health` | Command use case | Archived resource. | Returns `resource_archived`, no event. |
+| RES-PROFILE-CONFIG-001 | `resources.set-variable` | Command use case | Valid runtime plain-config variable. | Persists resource-scoped override, publishes `resource-variable-set`, returns `ok({ id })`. |
+| RES-PROFILE-CONFIG-002 | `resources.set-variable` | Command use case | Valid runtime secret variable. | Persists secret override, publishes `resource-variable-set`, and future read models return only masked values. |
+| RES-PROFILE-CONFIG-003 | `resources.set-variable` | Command use case | Build-time variable marked secret. | Rejects with `validation_error`, `phase = config-secret-validation`, and no mutation. |
+| RES-PROFILE-CONFIG-004 | `resources.set-variable` | Command use case | Build-time variable without `PUBLIC_` or `VITE_` prefix. | Rejects with `validation_error`, `phase = config-profile-resolution`, and no mutation. |
+| RES-PROFILE-CONFIG-005 | `resources.set-variable` | Command use case | Archived resource. | Returns `resource_archived`, no event. |
+| RES-PROFILE-CONFIG-006 | `resources.unset-variable` | Command use case | Existing resource-scoped variable. | Removes the override, publishes `resource-variable-unset`, and returns `ok({ id })`. |
+| RES-PROFILE-CONFIG-007 | `resources.unset-variable` | Command use case | Missing resource-scoped variable identity. | Returns `not_found` with `phase = config-read`. |
+| RES-PROFILE-CONFIG-008 | `resources.unset-variable` | Command use case | Archived resource. | Returns `resource_archived`, no event. |
+| RES-PROFILE-CONFIG-009 | `resources.effective-config` | Query service | Environment and resource define the same key plus exposure. | Returns masked effective entry from `scope = "resource"` and includes resource-owned override in owned entries. |
+| RES-PROFILE-CONFIG-010 | `resources.effective-config` | Query service | Resource inherits environment-only variable. | Returns environment-owned effective entry and no resource-owned entry. |
+| RES-PROFILE-CONFIG-011 | `resources.effective-config` | Query service | Secret values are present. | Returns masked values only; no plaintext secret in owned or effective entries. |
+| RES-PROFILE-CONFIG-012 | `deployments.create` | Snapshot boundary | Resource-scoped variable exists at deployment admission. | Immutable deployment snapshot includes the resource-owned effective entry and retains `scope = "resource"` on the resolved snapshot variable. |
 | RES-PROFILE-ARCHIVE-001 | `resources.archive` | Command use case | Active resource archived. | Persists archived lifecycle, publishes `resource-archived`, returns `ok({ id })`. |
 | RES-PROFILE-ARCHIVE-002 | `resources.archive` | Command use case | Already archived resource. | Returns idempotent `ok({ id })` without duplicate state effect or duplicate event. |
 | RES-PROFILE-ARCHIVE-003 | `resources.archive` | Command use case | Resource has deployment history or runtime logs. | Archive succeeds and retains history; no cleanup side effects. |
@@ -73,9 +91,9 @@ command and that no entrypoint exposes a generic `resources.update`.
 | RES-PROFILE-DELETE-008 | `resources.show` / `resources.list` | Read model | Deleted resource queried by normal active read paths. | `resources.show` returns `not_found`; list omits the resource. |
 | RES-PROFILE-DELETE-009 | `resource-deleted` | Event payload | Delete succeeds. | Event includes resource ids, `resourceSlug`, deleted timestamp, and no secrets, logs, certificate material, or provider configs. |
 | RES-PROFILE-ENTRY-001 | Web | Entrypoint | Resource detail page loads durable profile. | Dispatches `resources.show`; does not synthesize full detail from list-only data. |
-| RES-PROFILE-ENTRY-002 | Web | Entrypoint | Source/runtime/network/archive/delete actions submitted independently. | Each form/action dispatches its matching command and refetches detail/health/list. |
+| RES-PROFILE-ENTRY-002 | Web | Entrypoint | Source/runtime/network/config/archive/delete actions submitted independently. | Each form/action dispatches its matching command and refetches detail/health/effective-config/list. |
 | RES-PROFILE-ENTRY-003 | CLI | Entrypoint | Resource profile commands are listed. | CLI exposes separate subcommands and no generic `resource update`. |
-| RES-PROFILE-ENTRY-004 | HTTP/oRPC | Entrypoint | Routes accept show/source/runtime/network/archive/delete requests. | Each route reuses the application schema; no transport-only schema. |
+| RES-PROFILE-ENTRY-004 | HTTP/oRPC | Entrypoint | Routes accept show/source/runtime/network/config/archive/delete requests. | Each route reuses the application schema; no transport-only schema. |
 | RES-PROFILE-ENTRY-005 | Operation catalog | Catalog | Public exposure in Code Round. | Each active operation appears in `CORE_OPERATIONS.md` and `operation-catalog.ts` in the same change. |
 | RES-PROFILE-ENTRY-006 | CLI | Entrypoint | Delete command submitted with `--confirm-slug`. | Dispatches `DeleteResourceCommand` through `CommandBus`; no generic delete/update helper bypass. |
 | RES-PROFILE-ENTRY-007 | HTTP/oRPC | Entrypoint | Delete route submitted with command schema. | Dispatches `DeleteResourceCommand`; a follow-up `resources.show` for the deleted resource returns `not_found`. |
@@ -96,6 +114,7 @@ Tests must assert that profile commands do not:
 - apply proxy routes;
 - retarget source links;
 - write secrets into events, read models, errors, logs, or diagnostics.
+- return plaintext secret values from resource configuration queries or effective deployment snapshot reads.
 
 ## Current Implementation Notes And Migration Gaps
 
@@ -114,6 +133,9 @@ Automated coverage now exists for:
 - `RES-PROFILE-NETWORK-006` in
   `packages/application/test/configure-resource-network.test.ts`;
 - `RES-PROFILE-HEALTH-001` in `packages/application/test/configure-resource-health.test.ts`;
+- `RES-PROFILE-CONFIG-001` through `RES-PROFILE-CONFIG-012` remain part of this Code Round;
+  application, HTTP/oRPC, CLI, Web, and persistence coverage must land in the same change before
+  the migration gap can be cleared;
 - `RES-PROFILE-ARCHIVE-001`, `RES-PROFILE-ARCHIVE-002`, `RES-PROFILE-ARCHIVE-003`, and
   `RES-PROFILE-ARCHIVE-005` in `packages/application/test/archive-resource.test.ts`;
 - `RES-PROFILE-ARCHIVE-004` in `packages/application/test/create-deployment.test.ts`;

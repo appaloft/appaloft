@@ -67,6 +67,7 @@ describe("EnvironmentProfile", () => {
       "organization",
       "project",
       "environment",
+      "resource",
       "deployment",
     ]);
     expect(snapshot.variables).toHaveLength(2);

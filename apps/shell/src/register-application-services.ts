@@ -75,11 +75,15 @@ import {
   RenameProjectCommandHandler,
   RenameProjectUseCase,
   ResourceDiagnosticSummaryQueryService,
+  ResourceEffectiveConfigQueryHandler,
+  ResourceEffectiveConfigQueryService,
   ResourceHealthQueryService,
   ResourceProxyConfigurationPreviewQueryService,
   ResourceRuntimeLogsQueryService,
   RuntimePlanResolutionInputBuilder,
   SetEnvironmentVariableUseCase,
+  SetResourceVariableCommandHandler,
+  SetResourceVariableUseCase,
   ShowDeploymentQueryHandler,
   ShowDeploymentQueryService,
   ShowEnvironmentQueryService,
@@ -92,6 +96,8 @@ import {
   TestServerConnectivityUseCase,
   tokens,
   UnsetEnvironmentVariableUseCase,
+  UnsetResourceVariableCommandHandler,
+  UnsetResourceVariableUseCase,
 } from "@appaloft/application";
 import { type DomainError, ok, type Result } from "@appaloft/core";
 import { type DependencyContainer } from "tsyringe";
@@ -128,9 +134,12 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(ConfigureResourceNetworkCommandHandler);
   container.registerSingleton(ConfigureResourceRuntimeCommandHandler);
   container.registerSingleton(ConfigureResourceSourceCommandHandler);
+  container.registerSingleton(SetResourceVariableCommandHandler);
+  container.registerSingleton(UnsetResourceVariableCommandHandler);
   container.registerSingleton(ArchiveResourceCommandHandler);
   container.registerSingleton(DeleteResourceCommandHandler);
   container.registerSingleton(ShowResourceQueryHandler);
+  container.registerSingleton(ResourceEffectiveConfigQueryHandler);
   container.registerSingleton(ShowDeploymentQueryHandler);
   container.registerSingleton(StreamDeploymentEventsQueryHandler);
   container.registerSingleton(ImportCertificateCommandHandler);
@@ -172,8 +181,14 @@ export function registerApplicationServices(container: DependencyContainer): voi
     tokens.configureResourceRuntimeUseCase,
     ConfigureResourceRuntimeUseCase,
   );
+  container.registerSingleton(tokens.setResourceVariableUseCase, SetResourceVariableUseCase);
+  container.registerSingleton(tokens.unsetResourceVariableUseCase, UnsetResourceVariableUseCase);
   container.registerSingleton(tokens.listResourcesQueryService, ListResourcesQueryService);
   container.registerSingleton(tokens.showResourceQueryService, ShowResourceQueryService);
+  container.registerSingleton(
+    tokens.resourceEffectiveConfigQueryService,
+    ResourceEffectiveConfigQueryService,
+  );
   container.registerSingleton(tokens.registerServerUseCase, RegisterServerUseCase);
   container.registerSingleton(
     tokens.configureServerCredentialUseCase,

@@ -1,8 +1,14 @@
+import {
+  EnvironmentConfigSet,
+  type EnvironmentConfigSnapshotEntryState,
+  type EnvironmentSnapshot,
+} from "../configuration/environment-config-set";
 import { AggregateRoot } from "../shared/entity";
 import { domainError } from "../shared/errors";
 import {
   type DestinationId,
   type EnvironmentId,
+  type EnvironmentSnapshotId,
   type ProjectId,
   type ResourceId,
 } from "../shared/identifiers";
@@ -16,6 +22,7 @@ import {
 } from "../shared/numeric-values";
 import { err, ok, type Result } from "../shared/result";
 import {
+  ConfigScopeValue,
   type HealthCheckHttpMethodValue,
   type HealthCheckSchemeValue,
   type HealthCheckTypeValue,
@@ -25,16 +32,21 @@ import {
   type ResourceNetworkProtocolValue,
   type ResourceServiceKindValue,
   type RuntimePlanStrategyValue,
+  type VariableExposureValue,
+  type VariableKindValue,
 } from "../shared/state-machine";
 import {
   type ArchivedAt,
   type CreatedAt,
   type DeletedAt,
+  type GeneratedAt,
   type UpdatedAt,
 } from "../shared/temporal";
 import {
   type ArchiveReason,
   type CommandText,
+  type ConfigKey,
+  type ConfigValueText,
   type DescriptionText,
   type HealthCheckHostText,
   type HealthCheckPathText,
@@ -341,6 +353,7 @@ export interface ResourceState {
   sourceBinding?: ResourceSourceBindingState;
   runtimeProfile?: ResourceRuntimeProfileState;
   networkProfile?: ResourceNetworkProfileState;
+  variables: EnvironmentConfigSet;
   lifecycleStatus: ResourceLifecycleStatusValue;
   archivedAt?: ArchivedAt;
   archiveReason?: ArchiveReason;
@@ -375,6 +388,8 @@ function cloneResourceNetworkProfileState(
 ): ResourceNetworkProfileState {
   return { ...profile };
 }
+
+export type ResourceVariableState = ReturnType<EnvironmentConfigSet["toState"]>[number];
 
 function serializedNetworkProfile(profile: ResourceNetworkProfileState): Record<string, unknown> {
   return {
@@ -582,9 +597,11 @@ export interface ResourceVisitor<TContext, TResult> {
 
 type ResourceRehydrateState = Omit<
   ResourceState,
-  "archiveReason" | "archivedAt" | "deletedAt" | "lifecycleStatus"
+  "archiveReason" | "archivedAt" | "deletedAt" | "lifecycleStatus" | "variables"
 > &
-  Partial<Pick<ResourceState, "archiveReason" | "archivedAt" | "deletedAt" | "lifecycleStatus">>;
+  Partial<Pick<ResourceState, "archiveReason" | "archivedAt" | "deletedAt" | "lifecycleStatus">> & {
+    variables?: EnvironmentConfigSet;
+  };
 
 export class Resource extends AggregateRoot<ResourceState> {
   private constructor(state: ResourceState) {
@@ -602,6 +619,7 @@ export class Resource extends AggregateRoot<ResourceState> {
     sourceBinding?: ResourceSourceBindingState;
     runtimeProfile?: ResourceRuntimeProfileState;
     networkProfile?: ResourceNetworkProfileState;
+    variables?: ResourceVariableState[];
     createdAt: CreatedAt;
     description?: DescriptionText;
   }): Result<Resource> {
@@ -662,6 +680,7 @@ export class Resource extends AggregateRoot<ResourceState> {
         ...(input.networkProfile
           ? { networkProfile: cloneResourceNetworkProfileState(input.networkProfile) }
           : {}),
+        variables: EnvironmentConfigSet.rehydrate(input.variables ?? []),
         lifecycleStatus: ResourceLifecycleStatusValue.active(),
         createdAt: input.createdAt,
         ...(input.description ? { description: input.description } : {}),
@@ -721,6 +740,7 @@ export class Resource extends AggregateRoot<ResourceState> {
       ...(state.networkProfile
         ? { networkProfile: cloneResourceNetworkProfileState(state.networkProfile) }
         : {}),
+      variables: EnvironmentConfigSet.rehydrate(state.variables?.toState() ?? []),
       lifecycleStatus: state.lifecycleStatus ?? ResourceLifecycleStatusValue.active(),
       ...(state.archivedAt ? { archivedAt: state.archivedAt } : {}),
       ...(state.archiveReason ? { archiveReason: state.archiveReason } : {}),
@@ -748,6 +768,86 @@ export class Resource extends AggregateRoot<ResourceState> {
 
   ensureCanCreateDeployment(): Result<void> {
     return this.rejectInactiveResource("deployments.create");
+  }
+
+  setVariable(input: {
+    key: ConfigKey;
+    value: ConfigValueText;
+    kind: VariableKindValue;
+    exposure: VariableExposureValue;
+    isSecret?: boolean;
+    updatedAt: UpdatedAt;
+  }): Result<void> {
+    const active = this.rejectInactiveResource("resources.set-variable");
+    if (active.isErr()) {
+      return active;
+    }
+
+    const configSet = EnvironmentConfigSet.rehydrate(this.state.variables.toState());
+    return configSet
+      .setEntry({
+        ...input,
+        scope: ConfigScopeValue.rehydrate("resource"),
+      })
+      .map((nextEntry) => {
+        this.state.variables = configSet;
+        this.recordDomainEvent("resource-variable-set", input.updatedAt, {
+          resourceId: this.state.id.value,
+          projectId: this.state.projectId.value,
+          environmentId: this.state.environmentId.value,
+          variableKey: nextEntry.toState().key.value,
+          variableExposure: nextEntry.toState().exposure.value,
+          variableKind: nextEntry.toState().kind.value,
+          isSecret: nextEntry.toState().isSecret,
+          configuredAt: input.updatedAt.value,
+        });
+        return undefined;
+      });
+  }
+
+  unsetVariable(input: {
+    key: ConfigKey;
+    exposure: VariableExposureValue;
+    updatedAt: UpdatedAt;
+  }): Result<void> {
+    const active = this.rejectInactiveResource("resources.unset-variable");
+    if (active.isErr()) {
+      return active;
+    }
+
+    const configSet = EnvironmentConfigSet.rehydrate(this.state.variables.toState());
+    return configSet
+      .unsetEntry({
+        key: input.key,
+        exposure: input.exposure,
+        scope: ConfigScopeValue.rehydrate("resource"),
+      })
+      .map(() => {
+        this.state.variables = configSet;
+        this.recordDomainEvent("resource-variable-unset", input.updatedAt, {
+          resourceId: this.state.id.value,
+          projectId: this.state.projectId.value,
+          environmentId: this.state.environmentId.value,
+          variableKey: input.key.value,
+          variableExposure: input.exposure.value,
+          removedAt: input.updatedAt.value,
+        });
+        return undefined;
+      });
+  }
+
+  materializeEffectiveEnvironmentSnapshot(input: {
+    environmentId: EnvironmentId;
+    snapshotId: EnvironmentSnapshotId;
+    createdAt: GeneratedAt;
+    inherited?: EnvironmentConfigSnapshotEntryState[];
+  }): EnvironmentSnapshot {
+    return this.state.variables.materializeSnapshot({
+      environmentId: input.environmentId,
+      snapshotId: input.snapshotId,
+      createdAt: input.createdAt,
+      ...(input.inherited ? { inherited: input.inherited } : {}),
+    });
   }
 
   archive(input: { archivedAt: ArchivedAt; reason?: ArchiveReason }): Result<{ changed: boolean }> {
@@ -1039,6 +1139,7 @@ export class Resource extends AggregateRoot<ResourceState> {
       ...(this.state.networkProfile
         ? { networkProfile: cloneResourceNetworkProfileState(this.state.networkProfile) }
         : {}),
+      variables: EnvironmentConfigSet.rehydrate(this.state.variables.toState()),
     };
   }
 }

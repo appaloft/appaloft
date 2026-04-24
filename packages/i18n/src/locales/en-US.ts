@@ -496,6 +496,37 @@ export const enUS = {
       composeServicesDescription:
         "Service boundaries from the compose file and the current traffic target.",
       composeServicesTitle: "Compose services",
+      configurationDescription:
+        "Manage resource-scoped variables and secrets for future deployments. Resource entries override inherited environment values at snapshot materialization time.",
+      configurationEffectiveDescription:
+        "This is the masked effective configuration that future deployments will inherit after environment and resource precedence are resolved.",
+      configurationEffectiveEmpty: "No effective configuration is visible for this resource yet.",
+      configurationEffectiveTitle: "Effective future deployment config",
+      configurationExposureBuildTime: "Build-time",
+      configurationExposureRuntime: "Runtime",
+      configurationFormDescription:
+        "Add or replace one resource-owned variable override. Secret values are masked on every read surface.",
+      configurationFormTitle: "Set variable override",
+      configurationKindDeploymentStrategy: "Deployment strategy",
+      configurationKindPlain: "Plain config",
+      configurationKindProviderSpecific: "Provider specific",
+      configurationKindSecret: "Secret",
+      configurationOwnedDescription:
+        "Entries persisted directly on the resource. Unset removes only the resource-owned override layer.",
+      configurationOwnedEmpty: "This resource does not own any variable overrides yet.",
+      configurationOwnedTitle: "Resource-owned entries",
+      configurationPrecedence: "Precedence",
+      configurationSaved: "Resource variable saved",
+      configurationSaveFailed: "Resource variable was not saved",
+      configurationSecretBadge: "Secret",
+      configurationSecretDescription:
+        "Secret values are stored on the write side and masked everywhere they are read back.",
+      configurationSetAction: "Set variable",
+      configurationTitle: "Configuration",
+      configurationUnsetAction: "Unset",
+      configurationUnsetFailed: "Resource variable was not removed",
+      configurationUnsetSucceeded: "Resource variable removed",
+      configurationUpdatedAt: "Updated",
       copyAccessUrl: "Copy URL",
       dataProfileDescription:
         "Data resources focus on placement context and internal access boundaries.",

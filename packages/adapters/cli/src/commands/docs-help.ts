@@ -90,6 +90,18 @@ export const cliCommandDescriptions = {
     "Configure resource network profile",
     "resource.network-profile",
   ),
+  resourceSetVariable: withDocs(
+    "Set a resource-scoped variable override",
+    "environment.variable-precedence",
+  ),
+  resourceUnsetVariable: withDocs(
+    "Unset a resource-scoped variable override",
+    "environment.variable-precedence",
+  ),
+  resourceEffectiveConfig: withDocs(
+    "Show masked effective resource configuration",
+    "environment.variable-precedence",
+  ),
   resourceProxyConfig: withDocs("Show resource proxy configuration", "resource.network-profile"),
   resourceDiagnose: withDocs(
     "Copy resource diagnostic summary context",

@@ -155,6 +155,132 @@ describe("CLI resource commands", () => {
     });
   });
 
+  test("[RES-PROFILE-ENTRY-003] resource set-variable dispatches the application command", async () => {
+    ensureReflectMetadata();
+    const { SetResourceVariableCommand, createExecutionContext } = await import(
+      "@appaloft/application"
+    );
+    const { createCliProgram } = await import("../src");
+    const commands: AppCommand<unknown>[] = [];
+    const commandBus = {
+      execute: async <T>(_context: unknown, command: AppCommand<T>) => {
+        commands.push(command as AppCommand<unknown>);
+        return ok({ id: "res_demo" } as T);
+      },
+    } as unknown as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: unknown, _query: AppQuery<T>) => ok({} as T),
+    } as unknown as QueryBus;
+    const executionContextFactory: ExecutionContextFactory = {
+      create: (input) =>
+        createExecutionContext({
+          ...input,
+          requestId: "req_cli_resource_set_variable_test",
+        }),
+    };
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus,
+      queryBus,
+      executionContextFactory,
+    });
+
+    const writeStdout = process.stdout.write;
+    try {
+      process.stdout.write = (() => true) as typeof process.stdout.write;
+      await program.parseAsync([
+        "node",
+        "appaloft",
+        "resource",
+        "set-variable",
+        "res_demo",
+        "DATABASE_URL",
+        "postgres://resource",
+        "--kind",
+        "secret",
+        "--exposure",
+        "runtime",
+        "--secret",
+      ]);
+    } finally {
+      process.stdout.write = writeStdout;
+    }
+
+    expect(commands).toHaveLength(1);
+    expect(commands[0]).toBeInstanceOf(SetResourceVariableCommand);
+    expect(commands[0]).toMatchObject({
+      resourceId: "res_demo",
+      key: "DATABASE_URL",
+      value: "postgres://resource",
+      kind: "secret",
+      exposure: "runtime",
+      isSecret: true,
+    });
+  });
+
+  test("[RES-PROFILE-ENTRY-003] resource effective-config dispatches the application query", async () => {
+    ensureReflectMetadata();
+    const { ResourceEffectiveConfigQuery, createExecutionContext } = await import(
+      "@appaloft/application"
+    );
+    const { createCliProgram } = await import("../src");
+    const queries: AppQuery<unknown>[] = [];
+    const commandBus = {
+      execute: async <T>(_context: unknown, _command: AppCommand<T>) => ok({} as T),
+    } as unknown as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: unknown, query: AppQuery<T>) => {
+        queries.push(query as AppQuery<unknown>);
+        return ok({
+          schemaVersion: "resources.effective-config/v1",
+          resourceId: "res_demo",
+          environmentId: "env_demo",
+          ownedEntries: [],
+          effectiveEntries: [],
+          precedence: [
+            "defaults",
+            "system",
+            "organization",
+            "project",
+            "environment",
+            "resource",
+            "deployment",
+          ],
+          generatedAt: "2026-01-01T00:00:00.000Z",
+        } as T);
+      },
+    } as unknown as QueryBus;
+    const executionContextFactory: ExecutionContextFactory = {
+      create: (input) =>
+        createExecutionContext({
+          ...input,
+          requestId: "req_cli_resource_effective_config_test",
+        }),
+    };
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus,
+      queryBus,
+      executionContextFactory,
+    });
+
+    const writeStdout = process.stdout.write;
+    try {
+      process.stdout.write = (() => true) as typeof process.stdout.write;
+      await program.parseAsync(["node", "appaloft", "resource", "effective-config", "res_demo"]);
+    } finally {
+      process.stdout.write = writeStdout;
+    }
+
+    expect(queries).toHaveLength(1);
+    expect(queries[0]).toBeInstanceOf(ResourceEffectiveConfigQuery);
+    expect(queries[0]).toMatchObject({
+      resourceId: "res_demo",
+    });
+  });
+
   test("[RES-PROFILE-ENTRY-006] resource delete dispatches the application command", async () => {
     ensureReflectMetadata();
     const { DeleteResourceCommand, createExecutionContext } = await import("@appaloft/application");

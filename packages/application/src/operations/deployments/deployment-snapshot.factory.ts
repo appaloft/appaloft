@@ -4,6 +4,7 @@ import {
   EnvironmentSnapshotId,
   GeneratedAt,
   ok,
+  type Resource,
   type Result,
   safeTry,
 } from "@appaloft/core";
@@ -21,18 +22,26 @@ export class DeploymentSnapshotFactory {
     private readonly idGenerator: IdGenerator,
   ) {}
 
-  create(environment: EnvironmentProfile): Result<EnvironmentSnapshot> {
+  create(environment: EnvironmentProfile, resource?: Resource): Result<EnvironmentSnapshot> {
     const { clock, idGenerator } = this;
 
     return safeTry(function* () {
       const snapshotId = yield* EnvironmentSnapshotId.create(idGenerator.next("snap"));
       const generatedAt = yield* GeneratedAt.create(clock.now());
+      const inherited = environment.materializeSnapshot({
+        snapshotId,
+        createdAt: generatedAt,
+      });
 
       return ok(
-        environment.materializeSnapshot({
-          snapshotId,
-          createdAt: generatedAt,
-        }),
+        resource
+          ? resource.materializeEffectiveEnvironmentSnapshot({
+              environmentId: environment.toState().id,
+              snapshotId,
+              createdAt: generatedAt,
+              inherited: inherited.toState().variables,
+            })
+          : inherited,
       );
     });
   }

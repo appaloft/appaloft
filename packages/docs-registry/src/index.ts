@@ -717,6 +717,21 @@ export const publicDocsOperationCoverage = [
     status: "documented",
     topicId: "environment.variable-precedence",
   },
+  {
+    operationKey: "resources.set-variable",
+    status: "documented",
+    topicId: "environment.variable-precedence",
+  },
+  {
+    operationKey: "resources.unset-variable",
+    status: "documented",
+    topicId: "environment.variable-precedence",
+  },
+  {
+    operationKey: "resources.effective-config",
+    status: "documented",
+    topicId: "environment.variable-precedence",
+  },
   { operationKey: "environments.diff", status: "documented", topicId: "environment.diff-promote" },
   {
     operationKey: "environments.promote",

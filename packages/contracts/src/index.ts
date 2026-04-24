@@ -242,6 +242,10 @@ export const environmentVariableSchema = z.object({
   kind: z.string(),
 });
 
+export const resourceConfigEntrySchema = environmentVariableSchema.extend({
+  updatedAt: z.string().optional(),
+});
+
 export const environmentSummarySchema = z.object({
   id: z.string(),
   projectId: z.string(),
@@ -738,6 +742,37 @@ export const resourceDetailSchema = z.object({
 });
 
 export const showResourceResponseSchema = resourceDetailSchema;
+
+export const setResourceVariableInputSchema = z.object({
+  resourceId: z.string().min(1),
+  key: z.string().min(1),
+  value: z.string(),
+  kind: z
+    .enum(["plain-config", "secret", "provider-specific", "deployment-strategy"])
+    .default("plain-config"),
+  exposure: z.enum(["build-time", "runtime"]),
+  isSecret: z.boolean().optional(),
+});
+
+export const unsetResourceVariableInputSchema = z.object({
+  resourceId: z.string().min(1),
+  key: z.string().min(1),
+  exposure: z.enum(["build-time", "runtime"]),
+});
+
+export const resourceEffectiveConfigSchema = z.object({
+  schemaVersion: z.literal("resources.effective-config/v1"),
+  resourceId: z.string(),
+  environmentId: z.string(),
+  ownedEntries: z.array(resourceConfigEntrySchema),
+  effectiveEntries: z.array(resourceConfigEntrySchema),
+  precedence: z.array(z.string()),
+  generatedAt: z.string(),
+});
+
+export const setResourceVariableResponseSchema = z.null();
+export const unsetResourceVariableResponseSchema = z.null();
+export const resourceEffectiveConfigResponseSchema = resourceEffectiveConfigSchema;
 
 export const createResourceInputSchema = z.object({
   projectId: z.string().min(1),
@@ -2059,6 +2094,8 @@ export type ResourceHealthOverall = z.infer<typeof resourceHealthOverallSchema>;
 export type ResourceHealthSummary = z.infer<typeof resourceHealthSummarySchema>;
 export type ResourceSummary = z.infer<typeof resourceSummarySchema>;
 export type ResourceDetail = z.infer<typeof resourceDetailSchema>;
+export type ResourceConfigEntry = z.infer<typeof resourceConfigEntrySchema>;
+export type ResourceEffectiveConfig = z.infer<typeof resourceEffectiveConfigSchema>;
 export type ShowResourceInput = z.infer<typeof showResourceInputSchema>;
 export type ShowResourceResponse = z.infer<typeof showResourceResponseSchema>;
 export type ResourceSourceBindingInput = z.infer<typeof resourceSourceBindingInputSchema>;
@@ -2081,6 +2118,11 @@ export type ConfigureResourceRuntimeResponse = z.infer<
 >;
 export type ConfigureResourceSourceInput = z.infer<typeof configureResourceSourceInputSchema>;
 export type ConfigureResourceSourceResponse = z.infer<typeof configureResourceSourceResponseSchema>;
+export type SetResourceVariableInput = z.infer<typeof setResourceVariableInputSchema>;
+export type SetResourceVariableResponse = z.infer<typeof setResourceVariableResponseSchema>;
+export type UnsetResourceVariableInput = z.infer<typeof unsetResourceVariableInputSchema>;
+export type UnsetResourceVariableResponse = z.infer<typeof unsetResourceVariableResponseSchema>;
+export type ResourceEffectiveConfigResponse = z.infer<typeof resourceEffectiveConfigResponseSchema>;
 export type ConfigureDefaultAccessDomainPolicyInput = z.infer<
   typeof configureDefaultAccessDomainPolicyInputSchema
 >;

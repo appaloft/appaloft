@@ -1258,6 +1258,189 @@ describe("CreateDeploymentUseCase", () => {
     expect(eventBus.events.length).toBeGreaterThan(0);
   });
 
+  test("[RES-PROFILE-CONFIG-012] applies resource-scoped variables over inherited environment snapshot entries", async () => {
+    const projects = new MemoryProjectRepository();
+    const servers = new MemoryServerRepository();
+    const destinations = new MemoryDestinationRepository();
+    const environments = new MemoryEnvironmentRepository();
+    const resources = new MemoryResourceRepository();
+    const deployments = new MemoryDeploymentRepository();
+    const clock = new FixedClock("2026-01-01T00:00:00.000Z");
+    const idGenerator = new SequenceIdGenerator();
+    const eventBus = new CapturedEventBus();
+    const logger = new NoopLogger();
+    const defaultsFactory = new DeploymentContextDefaultsFactory(clock, idGenerator);
+    const context = createTestContext();
+    const repositoryContext = toRepositoryContext(context);
+
+    const project = Project.create({
+      id: ProjectId.rehydrate("prj_demo"),
+      name: ProjectName.rehydrate("Demo"),
+      createdAt: CreatedAt.rehydrate(clock.now()),
+    })._unsafeUnwrap();
+    const server = DeploymentTarget.register({
+      id: DeploymentTargetId.rehydrate("srv_demo"),
+      name: DeploymentTargetName.rehydrate("demo-server"),
+      host: HostAddress.rehydrate("127.0.0.1"),
+      port: PortNumber.rehydrate(22),
+      providerKey: ProviderKey.rehydrate("generic-ssh"),
+      createdAt: CreatedAt.rehydrate(clock.now()),
+    })._unsafeUnwrap();
+    const destination = Destination.register({
+      id: DestinationId.rehydrate("dst_demo"),
+      serverId: DeploymentTargetId.rehydrate("srv_demo"),
+      name: DestinationName.rehydrate("default"),
+      kind: DestinationKindValue.rehydrate("generic"),
+      createdAt: CreatedAt.rehydrate(clock.now()),
+    })._unsafeUnwrap();
+    const environment = Environment.create({
+      id: EnvironmentId.rehydrate("env_demo"),
+      projectId: ProjectId.rehydrate("prj_demo"),
+      name: EnvironmentName.rehydrate("production"),
+      kind: EnvironmentKindValue.rehydrate("production"),
+      createdAt: CreatedAt.rehydrate(clock.now()),
+    })._unsafeUnwrap();
+    const resource = Resource.create({
+      id: ResourceId.rehydrate("res_demo"),
+      projectId: ProjectId.rehydrate("prj_demo"),
+      environmentId: EnvironmentId.rehydrate("env_demo"),
+      destinationId: DestinationId.rehydrate("dst_demo"),
+      name: ResourceName.rehydrate("web"),
+      kind: ResourceKindValue.rehydrate("application"),
+      sourceBinding: {
+        kind: SourceKindValue.rehydrate("local-folder"),
+        locator: SourceLocator.rehydrate("."),
+        displayName: DisplayNameText.rehydrate("workspace"),
+      },
+      runtimeProfile: {
+        strategy: RuntimePlanStrategyValue.rehydrate("auto"),
+      },
+      networkProfile: {
+        internalPort: PortNumber.rehydrate(3000),
+        upstreamProtocol: ResourceNetworkProtocolValue.rehydrate("http"),
+        exposureMode: ResourceExposureModeValue.rehydrate("reverse-proxy"),
+      },
+      createdAt: CreatedAt.rehydrate(clock.now()),
+    })._unsafeUnwrap();
+
+    environment.setVariable({
+      key: ConfigKey.rehydrate("DATABASE_URL"),
+      value: ConfigValueText.rehydrate("postgres://environment"),
+      kind: VariableKindValue.rehydrate("secret"),
+      exposure: VariableExposureValue.rehydrate("runtime"),
+      scope: ConfigScopeValue.rehydrate("environment"),
+      isSecret: true,
+      updatedAt: UpdatedAt.rehydrate(clock.now()),
+    });
+    environment.setVariable({
+      key: ConfigKey.rehydrate("PUBLIC_BASE_URL"),
+      value: ConfigValueText.rehydrate("https://env.example.test"),
+      kind: VariableKindValue.rehydrate("plain-config"),
+      exposure: VariableExposureValue.rehydrate("build-time"),
+      scope: ConfigScopeValue.rehydrate("environment"),
+      updatedAt: UpdatedAt.rehydrate(clock.now()),
+    });
+    resource.setVariable({
+      key: ConfigKey.rehydrate("DATABASE_URL"),
+      value: ConfigValueText.rehydrate("postgres://resource"),
+      kind: VariableKindValue.rehydrate("secret"),
+      exposure: VariableExposureValue.rehydrate("runtime"),
+      isSecret: true,
+      updatedAt: UpdatedAt.rehydrate(clock.now()),
+    });
+
+    await projects.upsert(repositoryContext, project, UpsertProjectSpec.fromProject(project));
+    await servers.upsert(
+      repositoryContext,
+      server,
+      UpsertDeploymentTargetSpec.fromDeploymentTarget(server),
+    );
+    await destinations.upsert(
+      repositoryContext,
+      destination,
+      UpsertDestinationSpec.fromDestination(destination),
+    );
+    await environments.upsert(
+      repositoryContext,
+      environment,
+      UpsertEnvironmentSpec.fromEnvironment(environment),
+    );
+    await resources.upsert(repositoryContext, resource, UpsertResourceSpec.fromResource(resource));
+
+    const useCase = new CreateDeploymentUseCase(
+      deployments,
+      new DeploymentContextResolver(projects, servers, destinations, environments, resources),
+      new DeploymentContextBootstrapService(
+        new NullDeploymentConfigReader(),
+        projects,
+        servers,
+        destinations,
+        environments,
+        resources,
+        new StaticProviderRegistry(),
+        new ExplicitContextRequiredPolicy(),
+        defaultsFactory,
+        clock,
+        idGenerator,
+        eventBus,
+        logger,
+      ),
+      new StaticSourceDetector(),
+      new StaticRuntimePlanResolver(),
+      new HermeticExecutionBackend(),
+      eventBus,
+      new NoopDeploymentProgressReporter(),
+      logger,
+      new DeploymentSnapshotFactory(clock, idGenerator),
+      new RuntimePlanResolutionInputBuilder(clock, idGenerator),
+      new DeploymentFactory(clock, idGenerator),
+      new DeploymentLifecycleService(clock),
+      new PassThroughMutationCoordinator(),
+    );
+
+    const result = await useCase.execute(context, {
+      projectId: "prj_demo",
+      serverId: "srv_demo",
+      destinationId: "dst_demo",
+      environmentId: "env_demo",
+      resourceId: "res_demo",
+    });
+
+    expect(result.isOk()).toBe(true);
+    const createdDeployment = result._unsafeUnwrap();
+    const deployment = await deployments.findOne(
+      repositoryContext,
+      DeploymentByIdSpec.create(DeploymentId.rehydrate(createdDeployment.id)),
+    );
+
+    expect(deployment?.toState().environmentSnapshot.precedence).toEqual([
+      "defaults",
+      "system",
+      "organization",
+      "project",
+      "environment",
+      "resource",
+      "deployment",
+    ]);
+    expect(deployment?.toState().environmentSnapshot.variables).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          key: "DATABASE_URL",
+          value: "postgres://resource",
+          scope: "resource",
+          isSecret: true,
+        }),
+        expect.objectContaining({
+          key: "PUBLIC_BASE_URL",
+          value: "https://env.example.test",
+          scope: "environment",
+          exposure: "build-time",
+          isSecret: false,
+        }),
+      ]),
+    );
+  });
+
   test("rejects deployment admission when resource has no source binding", async () => {
     const {
       context,

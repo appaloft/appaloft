@@ -33,10 +33,13 @@ import { createResourceCommandInputSchema } from "./operations/resources/create-
 import { deleteResourceCommandInputSchema } from "./operations/resources/delete-resource.command";
 import { listResourcesQueryInputSchema } from "./operations/resources/list-resources.query";
 import { resourceDiagnosticSummaryQueryInputSchema } from "./operations/resources/resource-diagnostic-summary.query";
+import { resourceEffectiveConfigQueryInputSchema } from "./operations/resources/resource-effective-config.query";
 import { resourceHealthQueryInputSchema } from "./operations/resources/resource-health.query";
 import { resourceProxyConfigurationPreviewQueryInputSchema } from "./operations/resources/resource-proxy-configuration-preview.query";
 import { resourceRuntimeLogsQueryInputSchema } from "./operations/resources/resource-runtime-logs.query";
+import { setResourceVariableCommandInputSchema } from "./operations/resources/set-resource-variable.command";
 import { showResourceQueryInputSchema } from "./operations/resources/show-resource.query";
+import { unsetResourceVariableCommandInputSchema } from "./operations/resources/unset-resource-variable.command";
 import { bootstrapServerProxyCommandInputSchema } from "./operations/servers/bootstrap-server-proxy.command";
 import { configureServerCredentialCommandInputSchema } from "./operations/servers/configure-server-credential.command";
 import { createSshCredentialCommandInputSchema } from "./operations/servers/create-ssh-credential.command";
@@ -394,6 +397,48 @@ export const operationCatalog = [
     transports: {
       cli: "appaloft resource configure-network <resourceId>",
       orpc: { method: "POST", path: "/api/resources/{resourceId}/network-profile" },
+    },
+  },
+  {
+    key: "resources.set-variable",
+    kind: "command",
+    domain: "resources",
+    messageName: "SetResourceVariableCommand",
+    handlerName: "SetResourceVariableCommandHandler",
+    serviceName: "SetResourceVariableUseCase",
+    inputSchema: setResourceVariableCommandInputSchema,
+    serviceToken: tokens.setResourceVariableUseCase,
+    transports: {
+      cli: "appaloft resource set-variable <resourceId> <key> <value>",
+      orpc: { method: "POST", path: "/api/resources/{resourceId}/variables" },
+    },
+  },
+  {
+    key: "resources.unset-variable",
+    kind: "command",
+    domain: "resources",
+    messageName: "UnsetResourceVariableCommand",
+    handlerName: "UnsetResourceVariableCommandHandler",
+    serviceName: "UnsetResourceVariableUseCase",
+    inputSchema: unsetResourceVariableCommandInputSchema,
+    serviceToken: tokens.unsetResourceVariableUseCase,
+    transports: {
+      cli: "appaloft resource unset-variable <resourceId> <key>",
+      orpc: { method: "DELETE", path: "/api/resources/{resourceId}/variables/{key}" },
+    },
+  },
+  {
+    key: "resources.effective-config",
+    kind: "query",
+    domain: "resources",
+    messageName: "ResourceEffectiveConfigQuery",
+    handlerName: "ResourceEffectiveConfigQueryHandler",
+    serviceName: "ResourceEffectiveConfigQueryService",
+    inputSchema: resourceEffectiveConfigQueryInputSchema,
+    serviceToken: tokens.resourceEffectiveConfigQueryService,
+    transports: {
+      cli: "appaloft resource effective-config <resourceId>",
+      orpc: { method: "GET", path: "/api/resources/{resourceId}/effective-config" },
     },
   },
   {

@@ -9,10 +9,13 @@ import {
   ListResourcesQuery,
   OpenTerminalSessionCommand,
   ResourceDiagnosticSummaryQuery,
+  ResourceEffectiveConfigQuery,
   ResourceHealthQuery,
   ResourceProxyConfigurationPreviewQuery,
   ResourceRuntimeLogsQuery,
+  SetResourceVariableCommand,
   ShowResourceQuery,
+  UnsetResourceVariableCommand,
 } from "@appaloft/application";
 import {
   resourceExposureModes,
@@ -20,6 +23,8 @@ import {
   resourceNetworkProtocols,
   runtimePlanStrategies,
   sourceKinds,
+  variableExposures,
+  variableKinds,
 } from "@appaloft/core";
 import { Args, Command as EffectCommand, Options } from "@effect/cli";
 
@@ -122,6 +127,11 @@ const includeProxyConfigurationOption = Options.boolean("proxy-configuration").p
 );
 const jsonOption = Options.boolean("json").pipe(Options.withDefault(true));
 const followOption = Options.boolean("follow").pipe(Options.withDefault(false));
+const variableExposureOption = Options.choice("exposure", variableExposures);
+const variableKindOption = Options.choice("kind", variableKinds).pipe(
+  Options.withDefault("plain-config"),
+);
+const variableSecretOption = Options.boolean("secret").pipe(Options.withDefault(false));
 
 const listCommand = EffectCommand.make(
   "list",
@@ -156,6 +166,14 @@ const showCommand = EffectCommand.make(
     );
   },
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.resourceShow));
+
+const effectiveConfigCommand = EffectCommand.make(
+  "effective-config",
+  {
+    resourceId: resourceIdArg,
+  },
+  ({ resourceId }) => runQuery(ResourceEffectiveConfigQuery.create({ resourceId })),
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.resourceEffectiveConfig));
 
 const createCommand = EffectCommand.make(
   "create",
@@ -251,6 +269,46 @@ const deleteCommand = EffectCommand.make(
     );
   },
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.resourceDelete));
+
+const setVariableCommand = EffectCommand.make(
+  "set-variable",
+  {
+    resourceId: resourceIdArg,
+    key: Args.text({ name: "key" }),
+    value: Args.text({ name: "value" }),
+    kind: variableKindOption,
+    exposure: variableExposureOption,
+    secret: variableSecretOption,
+  },
+  ({ exposure, key, kind, resourceId, secret, value }) =>
+    runCommand(
+      SetResourceVariableCommand.create({
+        resourceId,
+        key,
+        value,
+        kind,
+        exposure,
+        isSecret: secret,
+      }),
+    ),
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.resourceSetVariable));
+
+const unsetVariableCommand = EffectCommand.make(
+  "unset-variable",
+  {
+    resourceId: resourceIdArg,
+    key: Args.text({ name: "key" }),
+    exposure: variableExposureOption,
+  },
+  ({ exposure, key, resourceId }) =>
+    runCommand(
+      UnsetResourceVariableCommand.create({
+        resourceId,
+        key,
+        exposure,
+      }),
+    ),
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.resourceUnsetVariable));
 
 const terminalCommand = EffectCommand.make(
   "terminal",
@@ -579,8 +637,11 @@ export const resourceCommand = EffectCommand.make("resource").pipe(
     createCommand,
     listCommand,
     showCommand,
+    effectiveConfigCommand,
     archiveCommand,
     deleteCommand,
+    setVariableCommand,
+    unsetVariableCommand,
     terminalCommand,
     logsCommand,
     healthCommand,
