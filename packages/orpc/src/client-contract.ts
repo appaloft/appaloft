@@ -9,6 +9,7 @@ import {
   type ConfigureResourceRuntimeCommandInput,
   type ConfigureResourceSourceCommandInput,
   type ConfigureServerCredentialCommandInput,
+  type ConfigureServerEdgeProxyCommandInput,
   type ConfirmDomainBindingOwnershipCommandInput,
   type CreateDeploymentCommandInput,
   type CreateDomainBindingCommandInput,
@@ -63,6 +64,7 @@ import {
   type ConfigureResourceNetworkResponse,
   type ConfigureResourceRuntimeResponse,
   type ConfigureResourceSourceResponse,
+  type ConfigureServerEdgeProxyResponse,
   type ConfirmDomainBindingOwnershipResponse,
   type CreateDeploymentResponse,
   type CreateDomainBindingResponse,
@@ -158,6 +160,12 @@ export type AppaloftOrpcClientContract = {
       AppaloftClientContext,
       RenameServerCommandInput,
       RenameServerResponse,
+      AppaloftClientError
+    >;
+    configureEdgeProxy: Client<
+      AppaloftClientContext,
+      ConfigureServerEdgeProxyCommandInput,
+      ConfigureServerEdgeProxyResponse,
       AppaloftClientError
     >;
     deactivate: Client<

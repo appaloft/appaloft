@@ -43,6 +43,7 @@ import { unsetResourceVariableCommandInputSchema } from "./operations/resources/
 import { bootstrapServerProxyCommandInputSchema } from "./operations/servers/bootstrap-server-proxy.command";
 import { checkServerDeleteSafetyQueryInputSchema } from "./operations/servers/check-server-delete-safety.query";
 import { configureServerCredentialCommandInputSchema } from "./operations/servers/configure-server-credential.command";
+import { configureServerEdgeProxyCommandInputSchema } from "./operations/servers/configure-server-edge-proxy.command";
 import { createSshCredentialCommandInputSchema } from "./operations/servers/create-ssh-credential.command";
 import { deactivateServerCommandInputSchema } from "./operations/servers/deactivate-server.command";
 import { deleteServerCommandInputSchema } from "./operations/servers/delete-server.command";
@@ -263,6 +264,20 @@ export const operationCatalog = [
     transports: {
       cli: "appaloft server rename <serverId> --name <name>",
       orpc: { method: "POST", path: "/api/servers/{serverId}/rename" },
+    },
+  },
+  {
+    key: "servers.configure-edge-proxy",
+    kind: "command",
+    domain: "servers",
+    messageName: "ConfigureServerEdgeProxyCommand",
+    handlerName: "ConfigureServerEdgeProxyCommandHandler",
+    serviceName: "ConfigureServerEdgeProxyUseCase",
+    inputSchema: configureServerEdgeProxyCommandInputSchema,
+    serviceToken: tokens.configureServerEdgeProxyUseCase,
+    transports: {
+      cli: "appaloft server proxy configure <serverId> --kind none|traefik|caddy",
+      orpc: { method: "POST", path: "/api/servers/{serverId}/edge-proxy/configuration" },
     },
   },
   {

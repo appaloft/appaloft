@@ -302,7 +302,14 @@ function deploymentEventStreamFixture(deploymentId: string): Response {
   });
 }
 
-function serverDetailFixture(serverId = "srv_demo", input: { name?: string } = {}) {
+function serverDetailFixture(
+  serverId = "srv_demo",
+  input: {
+    edgeProxyKind?: "none" | "traefik" | "caddy";
+    edgeProxyStatus?: "pending" | "starting" | "ready" | "failed" | "disabled";
+    name?: string;
+  } = {},
+) {
   const isStaticServer = serverId === "srv_static";
 
   return {
@@ -315,8 +322,8 @@ function serverDetailFixture(serverId = "srv_demo", input: { name?: string } = {
       providerKey: "generic-ssh",
       lifecycleStatus: "active",
       edgeProxy: {
-        kind: "traefik",
-        status: "ready",
+        kind: input.edgeProxyKind ?? "traefik",
+        status: input.edgeProxyStatus ?? "ready",
         lastAttemptAt: "2026-01-01T00:00:00.000Z",
         lastSucceededAt: "2026-01-01T00:00:01.000Z",
       },
@@ -454,6 +461,21 @@ const apiResponses: Record<ApiScenario, Record<string, ApiRoute>> = {
       return {
         json: {
           id: input?.serverId ?? "srv_demo",
+        },
+      };
+    },
+    "/api/rpc/servers/configureEdgeProxy": (_request: Request, body: unknown) => {
+      const input = readOrpcJsonPayload(body) as {
+        proxyKind?: "none" | "traefik" | "caddy";
+        serverId?: string;
+      } | null;
+      return {
+        json: {
+          id: input?.serverId ?? "srv_demo",
+          edgeProxy: {
+            kind: input?.proxyKind ?? "traefik",
+            status: input?.proxyKind === "none" ? "disabled" : "pending",
+          },
         },
       };
     },
@@ -1790,6 +1812,67 @@ describe("console e2e with Bun.WebView", () => {
     } finally {
       apiResponses.dashboard["/api/rpc/servers/show"] = previousShowRoute;
       apiResponses.dashboard["/api/rpc/servers/rename"] = previousRenameRoute;
+    }
+  }, 15_000);
+
+  test("[SRV-LIFE-ENTRY-020] configures edge proxy intent from server detail", async () => {
+    activeScenario = "dashboard";
+    resetRecordedApiRequests();
+
+    const previousShowRoute = apiResponses.dashboard["/api/rpc/servers/show"];
+    const previousConfigureRoute = apiResponses.dashboard["/api/rpc/servers/configureEdgeProxy"];
+    let currentProxyKind: "none" | "traefik" | "caddy" = "traefik";
+    let currentProxyStatus: "pending" | "starting" | "ready" | "failed" | "disabled" = "ready";
+
+    apiResponses.dashboard["/api/rpc/servers/show"] = (_request: Request, body: unknown) => {
+      const input = readOrpcJsonPayload(body) as { serverId?: string } | null;
+      return {
+        json: serverDetailFixture(input?.serverId ?? "srv_demo", {
+          edgeProxyKind: currentProxyKind,
+          edgeProxyStatus: currentProxyStatus,
+        }),
+      };
+    };
+    apiResponses.dashboard["/api/rpc/servers/configureEdgeProxy"] = (
+      _request: Request,
+      body: unknown,
+    ) => {
+      const input = readOrpcJsonPayload(body) as {
+        proxyKind?: "none" | "traefik" | "caddy";
+        serverId?: string;
+      } | null;
+      currentProxyKind = input?.proxyKind ?? currentProxyKind;
+      currentProxyStatus = currentProxyKind === "none" ? "disabled" : "pending";
+
+      return {
+        json: {
+          id: input?.serverId ?? "srv_demo",
+          edgeProxy: {
+            kind: currentProxyKind,
+            status: currentProxyStatus,
+          },
+        },
+      };
+    };
+
+    try {
+      await using view = createWebView();
+      await view.navigate(`${previewUrl}/servers/srv_demo`);
+
+      await expectText(view, "traefik");
+      await clickButtonByText(view, "caddy");
+      await clickFormSubmit(view, "#server-edge-proxy-form");
+
+      const configureRequest = await waitForRecordedRequest("/api/rpc/servers/configureEdgeProxy");
+      expect(configureRequest.method).toBe("POST");
+      expect(readOrpcJsonPayload(configureRequest.body)).toEqual({
+        serverId: "srv_demo",
+        proxyKind: "caddy",
+      });
+      await expectText(view, "caddy");
+    } finally {
+      apiResponses.dashboard["/api/rpc/servers/show"] = previousShowRoute;
+      apiResponses.dashboard["/api/rpc/servers/configureEdgeProxy"] = previousConfigureRoute;
     }
   }, 15_000);
 

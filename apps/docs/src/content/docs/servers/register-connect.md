@@ -14,6 +14,7 @@ relatedOperations:
   - servers.register
   - servers.show
   - servers.rename
+  - servers.configure-edge-proxy
   - servers.deactivate
   - servers.delete-check
   - servers.delete
@@ -36,6 +37,8 @@ sidebar:
 读取服务器详情用于确认某个部署目标的 host、provider、已配置凭据摘要、代理状态，以及当前部署、资源和域名的汇总。这个读取不会运行连接测试、修复代理或修改服务器。
 
 重命名服务器只修改显示名称。它不会改变 server id、host、provider、credential、proxy、lifecycle 或历史部署/域名/审计引用。active 和 inactive 服务器都可以重命名；已经删除的服务器不会出现在普通重命名入口中。
+
+修改 edge proxy 类型只保存服务器未来路由使用的代理意图。`none` 会让后续生成访问地址或自定义域名路由不再把这个服务器当作代理承载目标；`traefik` 和 `caddy` 会把服务器标记为后续代理准备和路由实现的目标。这个操作不会改 server id、host、provider、credential、lifecycle，也不会删除历史 route snapshot、部署、域名或审计引用。只有 active 服务器可以修改；已停用服务器需要重新启用或走专门恢复流程后才能接收新的代理目标配置工作。
 
 停用服务器用于阻止它继续作为新的部署、调度或代理配置目标。停用不会停止已有运行任务，也不会删除部署历史、域名、证书、凭据、路由、日志或审计记录。
 
@@ -107,6 +110,10 @@ appaloft server show srv_primary
 
 ```bash title="重命名服务器"
 appaloft server rename srv_primary --name "Primary SSH server"
+```
+
+```bash title="修改 edge proxy 类型"
+appaloft server proxy configure srv_primary --kind caddy
 ```
 
 ```bash title="停用服务器"

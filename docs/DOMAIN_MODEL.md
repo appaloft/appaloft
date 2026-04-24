@@ -470,6 +470,10 @@ Current scope:
   layer; provider SDK specifics remain outside the aggregate
 - owns current edge proxy intent/status summary for server readiness and proxy-backed deployment
   admission/read-model display
+- changes to current edge proxy intent are deployment-target lifecycle mutations through
+  `servers.configure-edge-proxy`; they must not change server identity, host, provider,
+  credential, lifecycle state, historical deployment/domain/route/audit references, or
+  provider-owned runtime artifacts
 - may host the default `ssh-pglite` Appaloft state backend for CLI/GitHub Actions deployments,
   while PostgreSQL/PGlite selected backends persist source link state and server-applied proxy route
   desired/applied state through dedicated application persistence adapters

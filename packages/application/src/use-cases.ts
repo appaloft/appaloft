@@ -62,6 +62,7 @@ export * from "./operations/resources/unset-resource-variable.use-case";
 export * from "./operations/servers/bootstrap-server-proxy.use-case";
 export * from "./operations/servers/check-server-delete-safety.query-service";
 export * from "./operations/servers/configure-server-credential.use-case";
+export * from "./operations/servers/configure-server-edge-proxy.use-case";
 export * from "./operations/servers/create-ssh-credential.use-case";
 export * from "./operations/servers/deactivate-server.use-case";
 export * from "./operations/servers/delete-server.use-case";

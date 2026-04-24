@@ -190,6 +190,68 @@ describe("CLI server commands", () => {
     });
   });
 
+  test("[SRV-LIFE-ENTRY-017] server proxy configure dispatches the application command", async () => {
+    ensureReflectMetadata();
+    const { ConfigureServerEdgeProxyCommand, createExecutionContext } = await import(
+      "@appaloft/application"
+    );
+    const { createCliProgram } = await import("../src");
+    const commands: AppCommand<unknown>[] = [];
+    const commandBus = {
+      execute: async <T>(_context: unknown, command: AppCommand<T>) => {
+        commands.push(command as AppCommand<unknown>);
+        return ok({
+          id: "srv_primary",
+          edgeProxy: {
+            kind: "none",
+            status: "disabled",
+          },
+        } as T);
+      },
+    } as unknown as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: unknown, _query: AppQuery<T>) => ok({} as T),
+    } as unknown as QueryBus;
+    const executionContextFactory: ExecutionContextFactory = {
+      create: (input) =>
+        createExecutionContext({
+          ...input,
+          requestId: "req_cli_server_proxy_configure_test",
+        }),
+    };
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus,
+      queryBus,
+      executionContextFactory,
+    });
+
+    const writeStdout = process.stdout.write;
+    try {
+      process.stdout.write = (() => true) as typeof process.stdout.write;
+      await program.parseAsync([
+        "node",
+        "appaloft",
+        "server",
+        "proxy",
+        "configure",
+        "srv_primary",
+        "--kind",
+        "none",
+      ]);
+    } finally {
+      process.stdout.write = writeStdout;
+    }
+
+    expect(commands).toHaveLength(1);
+    expect(commands[0]).toBeInstanceOf(ConfigureServerEdgeProxyCommand);
+    expect(commands[0]).toMatchObject({
+      serverId: "srv_primary",
+      proxyKind: "none",
+    });
+  });
+
   test("[SRV-LIFE-ENTRY-007] server delete-check dispatches the application query", async () => {
     ensureReflectMetadata();
     const { CheckServerDeleteSafetyQuery, createExecutionContext } = await import(

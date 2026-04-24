@@ -19,11 +19,13 @@
   } from "@lucide/svelte";
   import type {
     ConfigureDefaultAccessDomainPolicyInput,
+    ConfigureServerEdgeProxyInput,
     RenameServerInput,
     ServerDeleteSafety,
     ServerSummary,
     TestServerConnectivityResponse,
   } from "@appaloft/contracts";
+  import { configureServerEdgeProxyInputSchema } from "@appaloft/contracts";
 
   import { readErrorMessage } from "$lib/api/client";
   import ConsoleShell from "$lib/components/console/ConsoleShell.svelte";
@@ -98,6 +100,7 @@
     serverRollups?.deployments.total ?? serverDeployments.length,
   );
   const defaultAccessModes = ["disabled", "provider", "custom-template"] as const;
+  const edgeProxyKindOptions = configureServerEdgeProxyInputSchema.shape.proxyKind.options;
 
   let connectivityResult = $state<TestServerConnectivityResponse | null>(null);
   let connectivityError = $state("");
@@ -106,6 +109,7 @@
   let overrideTemplateRef = $state("");
   let serverFormServerId = $state("");
   let serverName = $state("");
+  let edgeProxyKind = $state<ConfigureServerEdgeProxyInput["proxyKind"]>("none");
   let lifecycleFeedback = $state<{
     kind: "success" | "error";
     title: string;
@@ -118,6 +122,11 @@
   } | null>(null);
   const canRenameServer = $derived(
     Boolean(server) && serverName.trim().length > 0 && serverName.trim() !== server?.name,
+  );
+  const canConfigureEdgeProxy = $derived(
+    Boolean(server) &&
+      server?.lifecycleStatus === "active" &&
+      edgeProxyKind !== (server?.edgeProxy?.kind ?? "none"),
   );
 
   const connectivityMutation = createMutation(() => ({
@@ -172,6 +181,27 @@
       };
     },
   }));
+  const configureEdgeProxyMutation = createMutation(() => ({
+    mutationFn: (input: ConfigureServerEdgeProxyInput) =>
+      orpcClient.servers.configureEdgeProxy(input),
+    onSuccess: (result) => {
+      edgeProxyKind = result.edgeProxy.kind;
+      lifecycleFeedback = {
+        kind: "success",
+        title: $t(i18nKeys.console.servers.edgeProxyConfigured),
+        detail: `${result.edgeProxy.kind} · ${edgeProxyStatusLabel(result.edgeProxy.status)}`,
+      };
+      void queryClient.invalidateQueries({ queryKey: ["servers"] });
+      void queryClient.invalidateQueries({ queryKey: ["servers", "show", result.id] });
+    },
+    onError: (error) => {
+      lifecycleFeedback = {
+        kind: "error",
+        title: $t(i18nKeys.console.servers.edgeProxyConfigureFailed),
+        detail: readErrorMessage(error),
+      };
+    },
+  }));
 
   $effect(() => {
     if (!server || serverFormServerId === server.id) {
@@ -180,6 +210,7 @@
 
     serverFormServerId = server.id;
     serverName = server.name;
+    edgeProxyKind = server.edgeProxy?.kind ?? "none";
     lifecycleFeedback = null;
   });
 
@@ -203,6 +234,20 @@
     renameServerMutation.mutate({
       serverId: server.id,
       name: serverName.trim(),
+    });
+  }
+
+  function configureEdgeProxy(event: SubmitEvent): void {
+    event.preventDefault();
+
+    if (!server || !canConfigureEdgeProxy || configureEdgeProxyMutation.isPending) {
+      return;
+    }
+
+    lifecycleFeedback = null;
+    configureEdgeProxyMutation.mutate({
+      serverId: server.id,
+      proxyKind: edgeProxyKind,
     });
   }
 
@@ -523,6 +568,63 @@
               >
                 <Save class="size-4" />
                 {renameServerMutation.isPending
+                  ? $t(i18nKeys.common.actions.saving)
+                  : $t(i18nKeys.common.actions.save)}
+              </Button>
+            </div>
+          </form>
+
+          <form
+            id="server-edge-proxy-form"
+            class="mt-5 grid gap-4 border-t pt-4 lg:grid-cols-[minmax(0,1fr)_minmax(14rem,22rem)_auto]"
+            onsubmit={configureEdgeProxy}
+          >
+            <div class="min-w-0 space-y-1">
+              <div class="flex items-center gap-2">
+                <h2 class="text-sm font-semibold">
+                  {$t(i18nKeys.console.servers.edgeProxyKindLabel)}
+                </h2>
+                <DocsHelpLink
+                  href={webDocsHrefs.serverProxyReadiness}
+                  ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+                />
+              </div>
+              <p class="text-sm text-muted-foreground">
+                {$t(i18nKeys.console.servers.edgeProxyDescription)}
+              </p>
+            </div>
+
+            <fieldset class="space-y-1.5 text-sm font-medium">
+              <span>{$t(i18nKeys.console.servers.edgeProxyKindLabel)}</span>
+              <div
+                class="grid min-h-8 grid-cols-3 overflow-hidden rounded-lg border bg-background"
+                aria-label={$t(i18nKeys.console.servers.edgeProxyKindLabel)}
+              >
+                {#each edgeProxyKindOptions as kind (kind)}
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={edgeProxyKind === kind ? "selected" : "ghost"}
+                    class="h-8 rounded-none border-0"
+                    disabled={server.lifecycleStatus !== "active" || configureEdgeProxyMutation.isPending}
+                    onclick={() => {
+                      edgeProxyKind = kind;
+                    }}
+                  >
+                    {kind}
+                  </Button>
+                {/each}
+              </div>
+            </fieldset>
+
+            <div class="flex items-end">
+              <Button
+                type="submit"
+                class="w-full sm:w-auto"
+                disabled={!canConfigureEdgeProxy || configureEdgeProxyMutation.isPending}
+              >
+                <Save class="size-4" />
+                {configureEdgeProxyMutation.isPending
                   ? $t(i18nKeys.common.actions.saving)
                   : $t(i18nKeys.common.actions.save)}
               </Button>

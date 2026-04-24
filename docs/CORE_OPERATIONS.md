@@ -122,6 +122,7 @@ Implemented operations:
 | List deployment targets | Query | `servers.list` | `ListServersQuery` | `ListServersQueryInput` | `appaloft server list` | `GET /api/servers` |
 | Show deployment target | Query | `servers.show` | `ShowServerQuery` | `ShowServerQueryInput` | `appaloft server show <serverId>` | `GET /api/servers/{serverId}` |
 | Rename deployment target | Command | `servers.rename` | `RenameServerCommand` | `RenameServerCommandInput` | `appaloft server rename <serverId> --name <name>` | `POST /api/servers/{serverId}/rename` |
+| Configure deployment target edge proxy | Command | `servers.configure-edge-proxy` | `ConfigureServerEdgeProxyCommand` | `ConfigureServerEdgeProxyCommandInput` | `appaloft server proxy configure <serverId> --kind none\|traefik\|caddy` | `POST /api/servers/{serverId}/edge-proxy/configuration` |
 | Deactivate deployment target | Command | `servers.deactivate` | `DeactivateServerCommand` | `DeactivateServerCommandInput` | `appaloft server deactivate <serverId>` | `POST /api/servers/{serverId}/deactivate` |
 | Check deployment target delete safety | Query | `servers.delete-check` | `CheckServerDeleteSafetyQuery` | `CheckServerDeleteSafetyQueryInput` | `appaloft server delete-check <serverId>` | `GET /api/servers/{serverId}/delete-check` |
 | Delete deployment target | Command | `servers.delete` | `DeleteServerCommand` | `DeleteServerCommandInput` | `appaloft server delete <serverId> --confirm <serverId>` | `DELETE /api/servers/{serverId}` |
@@ -152,6 +153,14 @@ Implemented operations:
   id, host, provider, credential, proxy, lifecycle state, and historical references. Active and
   inactive servers may be renamed; deleted servers are not visible to the normal rename entrypoint.
   Server names are display labels, not unique identities.
+- `servers.configure-edge-proxy` changes only an active deployment target/server's desired edge
+  proxy kind. It preserves the server id, host, provider, credential, lifecycle state, destination
+  ids, and historical deployment/domain/route/audit references. `none` disables future generated
+  default access or custom-domain proxy-backed target selection for that server without deleting
+  historical route snapshots or provider-owned artifacts. `traefik` and `caddy` record
+  provider-owned proxy intent for later route realization. The command does not synchronously
+  bootstrap or repair proxy infrastructure; after changing from `none` to a provider-backed kind,
+  users should run `servers.bootstrap-proxy` or rely on a later deployment ensure path.
 - `servers.deactivate` moves a server to inactive lifecycle state. Inactive servers remain
   readable and keep history/dependency visibility, but deployment admission, scheduler target
   selection, and new proxy target configuration must not use them for future work.
@@ -169,7 +178,6 @@ Implemented operations:
   injection, not by core/application command input
 
 Core next operations expected here:
-- `servers.configure-edge-proxy`
 - rotate reusable SSH credential
 - delete reusable SSH credential when unused
 

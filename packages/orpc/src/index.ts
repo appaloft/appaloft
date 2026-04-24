@@ -15,6 +15,7 @@ import {
   ConfigureResourceRuntimeCommand,
   ConfigureResourceSourceCommand,
   ConfigureServerCredentialCommand,
+  ConfigureServerEdgeProxyCommand,
   ConfirmDomainBindingOwnershipCommand,
   CreateDeploymentCommand,
   type CreateDeploymentCommandInput,
@@ -30,6 +31,7 @@ import {
   configureResourceRuntimeCommandInputSchema,
   configureResourceSourceCommandInputSchema,
   configureServerCredentialCommandInputSchema,
+  configureServerEdgeProxyCommandInputSchema,
   confirmDomainBindingOwnershipCommandInputSchema,
   createDeploymentCommandInputSchema,
   createDomainBindingCommandInputSchema,
@@ -135,6 +137,7 @@ import {
   configureResourceNetworkResponseSchema,
   configureResourceRuntimeResponseSchema,
   configureResourceSourceResponseSchema,
+  configureServerEdgeProxyResponseSchema,
   confirmDomainBindingOwnershipResponseSchema,
   createDeploymentResponseSchema,
   createDomainBindingResponseSchema,
@@ -265,6 +268,10 @@ export const apiRouteDescriptions = {
   renameServer: routeDescription(
     "Renames the display label for one deployment target without changing its identity.",
     "server.deployment-target",
+  ),
+  configureServerEdgeProxy: routeDescription(
+    "Configures the desired edge proxy kind for future server access routing.",
+    "server.proxy-readiness",
   ),
   deactivateServer: routeDescription(
     "Marks one deployment target inactive so it cannot receive new work.",
@@ -950,6 +957,19 @@ export const renameServerProcedure = base
     executeCommand(context, RenameServerCommand.create(input)),
   );
 
+export const configureServerEdgeProxyProcedure = base
+  .route({
+    method: "POST",
+    path: "/servers/{serverId}/edge-proxy/configuration",
+    description: apiRouteDescriptions.configureServerEdgeProxy,
+    successStatus: 200,
+  })
+  .input(configureServerEdgeProxyCommandInputSchema)
+  .output(configureServerEdgeProxyResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, ConfigureServerEdgeProxyCommand.create(input)),
+  );
+
 export const deactivateServerProcedure = base
   .route({
     method: "POST",
@@ -1630,6 +1650,7 @@ export const appaloftOrpcRouter = {
     list: listServersProcedure,
     show: showServerProcedure,
     rename: renameServerProcedure,
+    configureEdgeProxy: configureServerEdgeProxyProcedure,
     deactivate: deactivateServerProcedure,
     deleteCheck: checkServerDeleteSafetyProcedure,
     delete: deleteServerProcedure,
@@ -1826,6 +1847,7 @@ export function mountAppaloftOrpcRoutes(
     "/api/servers",
     "/api/servers/:serverId",
     "/api/servers/:serverId/rename",
+    "/api/servers/:serverId/edge-proxy/configuration",
     "/api/servers/:serverId/deactivate",
     "/api/servers/:serverId/delete-check",
     "/api/servers/connectivity-tests",

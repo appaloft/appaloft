@@ -112,6 +112,25 @@ describe("operation catalog aggregate mutation boundary", () => {
     expect(entry?.inputSchema).toBeDefined();
   });
 
+  test("[SRV-LIFE-ENTRY-019] server edge proxy configure is exposed through the active operation catalog", () => {
+    const entry = operationCatalog.find(
+      (candidate) => candidate.key === "servers.configure-edge-proxy",
+    );
+
+    expect(entry).toMatchObject({
+      kind: "command",
+      domain: "servers",
+      messageName: "ConfigureServerEdgeProxyCommand",
+      handlerName: "ConfigureServerEdgeProxyCommandHandler",
+      serviceName: "ConfigureServerEdgeProxyUseCase",
+      transports: {
+        cli: "appaloft server proxy configure <serverId> --kind none|traefik|caddy",
+        orpc: { method: "POST", path: "/api/servers/{serverId}/edge-proxy/configuration" },
+      },
+    });
+    expect(entry?.inputSchema).toBeDefined();
+  });
+
   test("[AGG-MUTATION-CATALOG-002] detects generic aggregate update operation keys and command names", () => {
     const violations = findGenericAggregateMutationOperations([
       catalogEntry({
