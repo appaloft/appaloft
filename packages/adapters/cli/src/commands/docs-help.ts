@@ -8,6 +8,7 @@ export const cliDocsHrefs = {
   deploymentSource: resolvePublicDocsHelpHref("deployment.source"),
   deploymentPreviewCleanup: resolvePublicDocsHelpHref("deployment.preview-cleanup"),
   deploymentSourceRelink: resolvePublicDocsHelpHref("deployment.source-relink"),
+  projectLifecycle: resolvePublicDocsHelpHref("project.lifecycle"),
   serverDeploymentTarget: resolvePublicDocsHelpHref("server.deployment-target"),
   serverSshCredential: resolvePublicDocsHelpHref("server.ssh-credential"),
   serverConnectivityTest: resolvePublicDocsHelpHref("server.connectivity-test"),
@@ -47,6 +48,12 @@ export const cliCommandDescriptions = {
     "Relink a source fingerprint to an explicit resource",
     "deployment.source-relink",
   ),
+  project: withDocs("Project operations", "project.lifecycle"),
+  projectCreate: withDocs("Create a project", "project.concept"),
+  projectList: withDocs("List projects", "project.concept"),
+  projectShow: withDocs("Show project identity and lifecycle", "project.lifecycle"),
+  projectRename: withDocs("Rename a project", "project.lifecycle"),
+  projectArchive: withDocs("Archive a project", "project.lifecycle"),
   server: withDocs("Server operations", "server.deployment-target"),
   serverRegister: withDocs("Register a server", "server.deployment-target"),
   serverList: withDocs("List servers", "server.deployment-target"),
@@ -82,6 +89,18 @@ export const cliCommandDescriptions = {
   resourceConfigureNetwork: withDocs(
     "Configure resource network profile",
     "resource.network-profile",
+  ),
+  resourceSetVariable: withDocs(
+    "Set a resource-scoped variable override",
+    "environment.variable-precedence",
+  ),
+  resourceUnsetVariable: withDocs(
+    "Unset a resource-scoped variable override",
+    "environment.variable-precedence",
+  ),
+  resourceEffectiveConfig: withDocs(
+    "Show masked effective resource configuration",
+    "environment.variable-precedence",
   ),
   resourceProxyConfig: withDocs("Show resource proxy configuration", "resource.network-profile"),
   resourceDiagnose: withDocs(

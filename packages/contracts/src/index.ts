@@ -74,6 +74,9 @@ export const projectSummarySchema = z.object({
   name: z.string(),
   slug: z.string(),
   description: z.string().optional(),
+  lifecycleStatus: z.enum(["active", "archived"]),
+  archivedAt: z.string().optional(),
+  archiveReason: z.string().optional(),
   createdAt: z.string(),
 });
 
@@ -82,12 +85,36 @@ export const createProjectInputSchema = z.object({
   description: z.string().optional(),
 });
 
+export const showProjectInputSchema = z.object({
+  projectId: z.string().min(1),
+});
+
+export const renameProjectInputSchema = z.object({
+  projectId: z.string().min(1),
+  name: z.string().min(1),
+});
+
+export const archiveProjectInputSchema = z.object({
+  projectId: z.string().min(1),
+  reason: z.string().min(1).max(280).optional(),
+});
+
 export const createProjectResponseSchema = z.object({
   id: z.string(),
 });
 
 export const listProjectsResponseSchema = z.object({
   items: z.array(projectSummarySchema),
+});
+
+export const showProjectResponseSchema = projectSummarySchema;
+
+export const renameProjectResponseSchema = z.object({
+  id: z.string(),
+});
+
+export const archiveProjectResponseSchema = z.object({
+  id: z.string(),
 });
 
 export const serverSummarySchema = z.object({
@@ -213,6 +240,10 @@ export const environmentVariableSchema = z.object({
   exposure: z.enum(["build-time", "runtime"]),
   isSecret: z.boolean(),
   kind: z.string(),
+});
+
+export const resourceConfigEntrySchema = environmentVariableSchema.extend({
+  updatedAt: z.string().optional(),
 });
 
 export const environmentSummarySchema = z.object({
@@ -711,6 +742,37 @@ export const resourceDetailSchema = z.object({
 });
 
 export const showResourceResponseSchema = resourceDetailSchema;
+
+export const setResourceVariableInputSchema = z.object({
+  resourceId: z.string().min(1),
+  key: z.string().min(1),
+  value: z.string(),
+  kind: z
+    .enum(["plain-config", "secret", "provider-specific", "deployment-strategy"])
+    .default("plain-config"),
+  exposure: z.enum(["build-time", "runtime"]),
+  isSecret: z.boolean().optional(),
+});
+
+export const unsetResourceVariableInputSchema = z.object({
+  resourceId: z.string().min(1),
+  key: z.string().min(1),
+  exposure: z.enum(["build-time", "runtime"]),
+});
+
+export const resourceEffectiveConfigSchema = z.object({
+  schemaVersion: z.literal("resources.effective-config/v1"),
+  resourceId: z.string(),
+  environmentId: z.string(),
+  ownedEntries: z.array(resourceConfigEntrySchema),
+  effectiveEntries: z.array(resourceConfigEntrySchema),
+  precedence: z.array(z.string()),
+  generatedAt: z.string(),
+});
+
+export const setResourceVariableResponseSchema = z.null();
+export const unsetResourceVariableResponseSchema = z.null();
+export const resourceEffectiveConfigResponseSchema = resourceEffectiveConfigSchema;
 
 export const createResourceInputSchema = z.object({
   projectId: z.string().min(1),
@@ -2002,8 +2064,14 @@ export type PluginSummary = z.infer<typeof pluginSummarySchema>;
 export type SystemPluginWebExtension = z.infer<typeof systemPluginWebExtensionSchema>;
 export type ProjectSummary = z.infer<typeof projectSummarySchema>;
 export type CreateProjectInput = z.infer<typeof createProjectInputSchema>;
+export type ShowProjectInput = z.infer<typeof showProjectInputSchema>;
+export type RenameProjectInput = z.infer<typeof renameProjectInputSchema>;
+export type ArchiveProjectInput = z.infer<typeof archiveProjectInputSchema>;
 export type CreateProjectResponse = z.infer<typeof createProjectResponseSchema>;
 export type ListProjectsResponse = z.infer<typeof listProjectsResponseSchema>;
+export type ShowProjectResponse = z.infer<typeof showProjectResponseSchema>;
+export type RenameProjectResponse = z.infer<typeof renameProjectResponseSchema>;
+export type ArchiveProjectResponse = z.infer<typeof archiveProjectResponseSchema>;
 export type ServerSummary = z.infer<typeof serverSummarySchema>;
 export type SshCredentialSummary = z.infer<typeof sshCredentialSummarySchema>;
 export type RegisterServerInput = z.infer<typeof registerServerInputSchema>;
@@ -2026,6 +2094,8 @@ export type ResourceHealthOverall = z.infer<typeof resourceHealthOverallSchema>;
 export type ResourceHealthSummary = z.infer<typeof resourceHealthSummarySchema>;
 export type ResourceSummary = z.infer<typeof resourceSummarySchema>;
 export type ResourceDetail = z.infer<typeof resourceDetailSchema>;
+export type ResourceConfigEntry = z.infer<typeof resourceConfigEntrySchema>;
+export type ResourceEffectiveConfig = z.infer<typeof resourceEffectiveConfigSchema>;
 export type ShowResourceInput = z.infer<typeof showResourceInputSchema>;
 export type ShowResourceResponse = z.infer<typeof showResourceResponseSchema>;
 export type ResourceSourceBindingInput = z.infer<typeof resourceSourceBindingInputSchema>;
@@ -2048,6 +2118,11 @@ export type ConfigureResourceRuntimeResponse = z.infer<
 >;
 export type ConfigureResourceSourceInput = z.infer<typeof configureResourceSourceInputSchema>;
 export type ConfigureResourceSourceResponse = z.infer<typeof configureResourceSourceResponseSchema>;
+export type SetResourceVariableInput = z.infer<typeof setResourceVariableInputSchema>;
+export type SetResourceVariableResponse = z.infer<typeof setResourceVariableResponseSchema>;
+export type UnsetResourceVariableInput = z.infer<typeof unsetResourceVariableInputSchema>;
+export type UnsetResourceVariableResponse = z.infer<typeof unsetResourceVariableResponseSchema>;
+export type ResourceEffectiveConfigResponse = z.infer<typeof resourceEffectiveConfigResponseSchema>;
 export type ConfigureDefaultAccessDomainPolicyInput = z.infer<
   typeof configureDefaultAccessDomainPolicyInputSchema
 >;

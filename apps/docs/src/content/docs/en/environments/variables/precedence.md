@@ -13,6 +13,9 @@ searchAliases:
 relatedOperations:
   - environments.set-variable
   - environments.unset-variable
+  - resources.set-variable
+  - resources.unset-variable
+  - resources.effective-config
 sidebar:
   label: "Precedence and snapshots"
   order: 3
@@ -20,12 +23,15 @@ sidebar:
 
 <h2 id="environment-variable-precedence">Variable precedence</h2>
 
-Appaloft resolves configuration as defaults, system, organization, project, environment, and deployment snapshot. Users mainly need to know that deployments use snapshot values.
+Appaloft resolves configuration as defaults, system, organization, project, environment, resource,
+and deployment snapshot. Users mainly need to know that deployments use snapshot values.
 
 User-visible rules:
 
 - Configuration closer to the deployment wins.
 - Environment variables override project or system defaults.
+- Resource variables override environment variables for the same key plus exposure on that
+  resource only.
 - Creating a deployment stores an immutable snapshot.
 - Changing variables later does not change that deployment.
 
@@ -44,15 +50,19 @@ If a variable is visible to the browser, such as `PUBLIC_` or `VITE_`, do not tr
 
 <h2 id="environment-snapshot">Deployment snapshot</h2>
 
-Every deployment stores an immutable environment snapshot. Later variable changes do not change running or completed deployments.
+Every deployment stores an immutable environment snapshot. That snapshot may include inherited
+environment values and resource-specific overrides. Later variable changes do not change running or
+completed deployments.
 
 Deployment details should show the configuration summary used by that deployment, not only the current environment variable table.
 
 <h2 id="environment-variable-surfaces">Entrypoints</h2>
 
-The Web console should show variables, masked secret status, last update time, and deployment snapshot hints.
+The Web console should show environment and resource variables, masked secret status, last update
+time, ownership scope, and deployment snapshot hints.
 
-The CLI fits `set`, `unset`, `diff`, and automation scripts. CLI output should show masked status for secrets, not values.
+The CLI fits `set`, `unset`, `effective-config`, `diff`, and automation scripts. CLI output should
+show masked status for secrets, not values.
 
 The HTTP API should return variable key, scope, whether it is secret, source layer, and masked value. It should not return plaintext secrets.
 

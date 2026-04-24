@@ -19,8 +19,11 @@ import { promoteEnvironmentCommandInputSchema } from "./operations/environments/
 import { setEnvironmentVariableCommandInputSchema } from "./operations/environments/set-environment-variable.command";
 import { showEnvironmentQueryInputSchema } from "./operations/environments/show-environment.query";
 import { unsetEnvironmentVariableCommandInputSchema } from "./operations/environments/unset-environment-variable.command";
+import { archiveProjectCommandInputSchema } from "./operations/projects/archive-project.command";
 import { createProjectCommandInputSchema } from "./operations/projects/create-project.command";
 import { listProjectsQueryInputSchema } from "./operations/projects/list-projects.query";
+import { renameProjectCommandInputSchema } from "./operations/projects/rename-project.command";
+import { showProjectQueryInputSchema } from "./operations/projects/show-project.query";
 import { archiveResourceCommandInputSchema } from "./operations/resources/archive-resource.command";
 import { configureResourceHealthCommandInputSchema } from "./operations/resources/configure-resource-health.command";
 import { configureResourceNetworkCommandInputSchema } from "./operations/resources/configure-resource-network.command";
@@ -30,10 +33,13 @@ import { createResourceCommandInputSchema } from "./operations/resources/create-
 import { deleteResourceCommandInputSchema } from "./operations/resources/delete-resource.command";
 import { listResourcesQueryInputSchema } from "./operations/resources/list-resources.query";
 import { resourceDiagnosticSummaryQueryInputSchema } from "./operations/resources/resource-diagnostic-summary.query";
+import { resourceEffectiveConfigQueryInputSchema } from "./operations/resources/resource-effective-config.query";
 import { resourceHealthQueryInputSchema } from "./operations/resources/resource-health.query";
 import { resourceProxyConfigurationPreviewQueryInputSchema } from "./operations/resources/resource-proxy-configuration-preview.query";
 import { resourceRuntimeLogsQueryInputSchema } from "./operations/resources/resource-runtime-logs.query";
+import { setResourceVariableCommandInputSchema } from "./operations/resources/set-resource-variable.command";
 import { showResourceQueryInputSchema } from "./operations/resources/show-resource.query";
+import { unsetResourceVariableCommandInputSchema } from "./operations/resources/unset-resource-variable.command";
 import { bootstrapServerProxyCommandInputSchema } from "./operations/servers/bootstrap-server-proxy.command";
 import { configureServerCredentialCommandInputSchema } from "./operations/servers/configure-server-credential.command";
 import { createSshCredentialCommandInputSchema } from "./operations/servers/create-ssh-credential.command";
@@ -112,6 +118,48 @@ export const operationCatalog = [
     transports: {
       cli: "appaloft project list",
       orpc: { method: "GET", path: "/api/projects" },
+    },
+  },
+  {
+    key: "projects.show",
+    kind: "query",
+    domain: "projects",
+    messageName: "ShowProjectQuery",
+    handlerName: "ShowProjectQueryHandler",
+    serviceName: "ShowProjectQueryService",
+    inputSchema: showProjectQueryInputSchema,
+    serviceToken: tokens.showProjectQueryService,
+    transports: {
+      cli: "appaloft project show <projectId>",
+      orpc: { method: "GET", path: "/api/projects/{projectId}" },
+    },
+  },
+  {
+    key: "projects.rename",
+    kind: "command",
+    domain: "projects",
+    messageName: "RenameProjectCommand",
+    handlerName: "RenameProjectCommandHandler",
+    serviceName: "RenameProjectUseCase",
+    inputSchema: renameProjectCommandInputSchema,
+    serviceToken: tokens.renameProjectUseCase,
+    transports: {
+      cli: "appaloft project rename <projectId> --name <name>",
+      orpc: { method: "POST", path: "/api/projects/{projectId}/rename" },
+    },
+  },
+  {
+    key: "projects.archive",
+    kind: "command",
+    domain: "projects",
+    messageName: "ArchiveProjectCommand",
+    handlerName: "ArchiveProjectCommandHandler",
+    serviceName: "ArchiveProjectUseCase",
+    inputSchema: archiveProjectCommandInputSchema,
+    serviceToken: tokens.archiveProjectUseCase,
+    transports: {
+      cli: "appaloft project archive <projectId>",
+      orpc: { method: "POST", path: "/api/projects/{projectId}/archive" },
     },
   },
   {
@@ -349,6 +397,48 @@ export const operationCatalog = [
     transports: {
       cli: "appaloft resource configure-network <resourceId>",
       orpc: { method: "POST", path: "/api/resources/{resourceId}/network-profile" },
+    },
+  },
+  {
+    key: "resources.set-variable",
+    kind: "command",
+    domain: "resources",
+    messageName: "SetResourceVariableCommand",
+    handlerName: "SetResourceVariableCommandHandler",
+    serviceName: "SetResourceVariableUseCase",
+    inputSchema: setResourceVariableCommandInputSchema,
+    serviceToken: tokens.setResourceVariableUseCase,
+    transports: {
+      cli: "appaloft resource set-variable <resourceId> <key> <value>",
+      orpc: { method: "POST", path: "/api/resources/{resourceId}/variables" },
+    },
+  },
+  {
+    key: "resources.unset-variable",
+    kind: "command",
+    domain: "resources",
+    messageName: "UnsetResourceVariableCommand",
+    handlerName: "UnsetResourceVariableCommandHandler",
+    serviceName: "UnsetResourceVariableUseCase",
+    inputSchema: unsetResourceVariableCommandInputSchema,
+    serviceToken: tokens.unsetResourceVariableUseCase,
+    transports: {
+      cli: "appaloft resource unset-variable <resourceId> <key>",
+      orpc: { method: "DELETE", path: "/api/resources/{resourceId}/variables/{key}" },
+    },
+  },
+  {
+    key: "resources.effective-config",
+    kind: "query",
+    domain: "resources",
+    messageName: "ResourceEffectiveConfigQuery",
+    handlerName: "ResourceEffectiveConfigQueryHandler",
+    serviceName: "ResourceEffectiveConfigQueryService",
+    inputSchema: resourceEffectiveConfigQueryInputSchema,
+    serviceToken: tokens.resourceEffectiveConfigQueryService,
+    transports: {
+      cli: "appaloft resource effective-config <resourceId>",
+      orpc: { method: "GET", path: "/api/resources/{resourceId}/effective-config" },
     },
   },
   {

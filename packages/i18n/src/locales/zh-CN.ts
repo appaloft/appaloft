@@ -341,6 +341,16 @@ export const zhCN = {
     },
     projects: {
       activeProjects: "有部署",
+      active: "活跃",
+      archiveAction: "归档",
+      archiveConfirm:
+        "确定归档这个项目吗？归档后不能新建资源、环境、部署，也不能重命名项目；已有历史仍会保留可见。",
+      archiveFailed: "项目归档失败",
+      archiveNotice:
+        "这个项目已经归档；已有资源、环境、部署和访问路由仍可查看，但新的变更会被阻止。",
+      archiveSucceeded: "项目已归档",
+      archived: "已归档",
+      archivedAt: "归档时间",
       detailDescription: "项目下的环境、资源和部署记录",
       description: "项目、环境和部署关系",
       emptyBody:
@@ -368,6 +378,11 @@ export const zhCN = {
       projectsWithResources: "已有资源",
       publicAccessDescription: "由资源部署产生的默认访问地址。",
       publicAccessTitle: "公开访问",
+      renameFailed: "项目重命名失败",
+      renameLabel: "项目名称",
+      renameSucceeded: "项目已重命名",
+      settingsDescription: "项目生命周期通过专用操作变更，并保留历史可读性。",
+      settingsTitle: "项目设置",
       createResourceDescription:
         "先定义资源来源和网络，再在当前项目、环境、服务器上发起第一次部署。",
       createResourceDeploymentPartialError:
@@ -455,6 +470,36 @@ export const zhCN = {
       composeProfileTitle: "Compose 栈",
       composeServicesDescription: "Compose 文件里的服务边界和当前流量目标。",
       composeServicesTitle: "Compose 服务",
+      configurationDescription:
+        "管理资源级变量和 Secret，供后续部署使用。生成部署快照时，资源级配置会覆盖继承来的环境配置。",
+      configurationEffectiveDescription:
+        "这里展示的是未来部署会继承的生效配置视图，环境与资源优先级已经完成合并，Secret 只显示掩码值。",
+      configurationEffectiveEmpty: "这个资源暂时没有可见的生效配置。",
+      configurationEffectiveTitle: "未来部署生效配置",
+      configurationExposureBuildTime: "构建期",
+      configurationExposureRuntime: "运行期",
+      configurationFormDescription:
+        "新增或替换一条资源自有变量覆盖项。Secret 在所有读取面都会被掩码处理。",
+      configurationFormTitle: "设置变量覆盖",
+      configurationKindDeploymentStrategy: "部署策略",
+      configurationKindPlain: "普通配置",
+      configurationKindProviderSpecific: "Provider 专用",
+      configurationKindSecret: "Secret",
+      configurationOwnedDescription:
+        "直接持久化在资源上的条目。Unset 只会删除资源级覆盖，不会修改环境级变量。",
+      configurationOwnedEmpty: "这个资源还没有自己的变量覆盖项。",
+      configurationOwnedTitle: "资源自有条目",
+      configurationPrecedence: "优先级",
+      configurationSaved: "资源变量已保存",
+      configurationSaveFailed: "资源变量保存失败",
+      configurationSecretBadge: "Secret",
+      configurationSecretDescription: "Secret 值会保存在写侧，但任何读取结果里都只返回掩码值。",
+      configurationSetAction: "设置变量",
+      configurationTitle: "配置变量",
+      configurationUnsetAction: "移除",
+      configurationUnsetFailed: "资源变量移除失败",
+      configurationUnsetSucceeded: "资源变量已移除",
+      configurationUpdatedAt: "更新时间",
       copyAccessUrl: "复制地址",
       dataProfileDescription: "数据类资源关注放置上下文和内部访问边界。",
       dataProfileTitle: "数据服务",

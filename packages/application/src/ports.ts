@@ -892,6 +892,9 @@ export interface ProjectSummary {
   name: string;
   slug: string;
   description?: string;
+  lifecycleStatus: "active" | "archived";
+  archivedAt?: string;
+  archiveReason?: string;
   createdAt: string;
 }
 
@@ -1410,6 +1413,26 @@ export interface ResourceDetail {
   latestDeployment?: ResourceDetailDeploymentContext;
   lifecycle: ResourceDetailLifecycle;
   diagnostics: ResourceDetailProfileDiagnostic[];
+  generatedAt: string;
+}
+
+export interface ResourceConfigEntryView {
+  key: string;
+  value: string;
+  scope: ConfigScope;
+  exposure: VariableExposure;
+  isSecret: boolean;
+  kind: VariableKind;
+  updatedAt?: string;
+}
+
+export interface ResourceEffectiveConfigView {
+  schemaVersion: "resources.effective-config/v1";
+  resourceId: string;
+  environmentId: string;
+  ownedEntries: ResourceConfigEntryView[];
+  effectiveEntries: ResourceConfigEntryView[];
+  precedence: ConfigScope[];
   generatedAt: string;
 }
 

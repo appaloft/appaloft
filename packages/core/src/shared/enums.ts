@@ -126,6 +126,10 @@ export const resourceLifecycleStatuses = ["active", "archived", "deleted"] as co
 
 export type ResourceLifecycleStatus = (typeof resourceLifecycleStatuses)[number];
 
+export const projectLifecycleStatuses = ["active", "archived"] as const;
+
+export type ProjectLifecycleStatus = (typeof projectLifecycleStatuses)[number];
+
 export const healthCheckTypes = ["http", "command"] as const;
 
 export type HealthCheckType = (typeof healthCheckTypes)[number];
@@ -158,6 +162,7 @@ export const configScopes = [
   "organization",
   "project",
   "environment",
+  "resource",
   "deployment",
 ] as const;
 

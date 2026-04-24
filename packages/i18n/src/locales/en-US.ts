@@ -349,6 +349,16 @@ export const enUS = {
     },
     projects: {
       activeProjects: "With deployments",
+      active: "Active",
+      archiveAction: "Archive",
+      archiveConfirm:
+        "Archive this project? New resources, environments, deployments, and project renames will be blocked while existing history remains visible.",
+      archiveFailed: "Project was not archived",
+      archiveNotice:
+        "This project is archived. Existing resources, environments, deployments, and access routes remain visible, but new mutations are blocked.",
+      archiveSucceeded: "Project archived",
+      archived: "Archived",
+      archivedAt: "Archived at",
       detailDescription: "Environments, resources, and deployment records for this project",
       description: "Projects, environments, and deployment relationships",
       emptyBody:
@@ -379,6 +389,12 @@ export const enUS = {
       projectsWithResources: "With resources",
       publicAccessDescription: "Default access URLs created by resource deployments.",
       publicAccessTitle: "Public access",
+      renameFailed: "Project was not renamed",
+      renameLabel: "Project name",
+      renameSucceeded: "Project renamed",
+      settingsDescription:
+        "Project lifecycle changes use dedicated operations and keep history readable.",
+      settingsTitle: "Project settings",
       createResourceDescription:
         "Define the resource source and network, then start the first deployment in the current project, environment, and server.",
       createResourceDeploymentPartialError:
@@ -480,6 +496,37 @@ export const enUS = {
       composeServicesDescription:
         "Service boundaries from the compose file and the current traffic target.",
       composeServicesTitle: "Compose services",
+      configurationDescription:
+        "Manage resource-scoped variables and secrets for future deployments. Resource entries override inherited environment values at snapshot materialization time.",
+      configurationEffectiveDescription:
+        "This is the masked effective configuration that future deployments will inherit after environment and resource precedence are resolved.",
+      configurationEffectiveEmpty: "No effective configuration is visible for this resource yet.",
+      configurationEffectiveTitle: "Effective future deployment config",
+      configurationExposureBuildTime: "Build-time",
+      configurationExposureRuntime: "Runtime",
+      configurationFormDescription:
+        "Add or replace one resource-owned variable override. Secret values are masked on every read surface.",
+      configurationFormTitle: "Set variable override",
+      configurationKindDeploymentStrategy: "Deployment strategy",
+      configurationKindPlain: "Plain config",
+      configurationKindProviderSpecific: "Provider specific",
+      configurationKindSecret: "Secret",
+      configurationOwnedDescription:
+        "Entries persisted directly on the resource. Unset removes only the resource-owned override layer.",
+      configurationOwnedEmpty: "This resource does not own any variable overrides yet.",
+      configurationOwnedTitle: "Resource-owned entries",
+      configurationPrecedence: "Precedence",
+      configurationSaved: "Resource variable saved",
+      configurationSaveFailed: "Resource variable was not saved",
+      configurationSecretBadge: "Secret",
+      configurationSecretDescription:
+        "Secret values are stored on the write side and masked everywhere they are read back.",
+      configurationSetAction: "Set variable",
+      configurationTitle: "Configuration",
+      configurationUnsetAction: "Unset",
+      configurationUnsetFailed: "Resource variable was not removed",
+      configurationUnsetSucceeded: "Resource variable removed",
+      configurationUpdatedAt: "Updated",
       copyAccessUrl: "Copy URL",
       dataProfileDescription:
         "Data resources focus on placement context and internal access boundaries.",

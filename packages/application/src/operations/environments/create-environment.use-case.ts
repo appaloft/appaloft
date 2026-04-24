@@ -66,6 +66,8 @@ export class CreateEnvironmentUseCase {
         return err(domainError.notFound("project", input.projectId));
       }
 
+      yield* project.ensureCanAcceptMutation("environments.create");
+
       const existing = await environmentRepository.findOne(
         repositoryContext,
         EnvironmentByProjectAndNameSpec.create(projectId, environmentName),

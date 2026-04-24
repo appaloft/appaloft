@@ -1,6 +1,8 @@
 import {
   type AppLogger,
+  ArchiveProjectCommand,
   ArchiveResourceCommand,
+  archiveProjectCommandInputSchema,
   archiveResourceCommandInputSchema,
   BootstrapServerProxyCommand,
   bootstrapServerProxyCommandInputSchema,
@@ -73,7 +75,9 @@ import {
   type Query,
   type QueryBus,
   RegisterServerCommand,
+  RenameProjectCommand,
   ResourceDiagnosticSummaryQuery,
+  ResourceEffectiveConfigQuery,
   ResourceHealthQuery,
   ResourceProxyConfigurationPreviewQuery,
   type ResourceRuntimeLogEvent,
@@ -81,28 +85,37 @@ import {
   type ResourceRuntimeLogsQueryInput,
   type ResourceRuntimeLogsResult,
   registerServerCommandInputSchema,
+  renameProjectCommandInputSchema,
   resourceDiagnosticSummaryQueryInputSchema,
+  resourceEffectiveConfigQueryInputSchema,
   resourceHealthQueryInputSchema,
   resourceProxyConfigurationPreviewQueryInputSchema,
   resourceRuntimeLogsQueryInputSchema,
   SetEnvironmentVariableCommand,
+  SetResourceVariableCommand,
   ShowDeploymentQuery,
   ShowEnvironmentQuery,
+  ShowProjectQuery,
   ShowResourceQuery,
   StreamDeploymentEventsQuery,
   type StreamDeploymentEventsQueryInput,
   type StreamDeploymentEventsResult,
   setEnvironmentVariableCommandInputSchema,
+  setResourceVariableCommandInputSchema,
   showDeploymentQueryInputSchema,
   showEnvironmentQueryInputSchema,
+  showProjectQueryInputSchema,
   showResourceQueryInputSchema,
   streamDeploymentEventsQueryInputSchema,
   TestServerConnectivityCommand,
   testServerConnectivityCommandInputSchema,
   UnsetEnvironmentVariableCommand,
+  UnsetResourceVariableCommand,
   unsetEnvironmentVariableCommandInputSchema,
+  unsetResourceVariableCommandInputSchema,
 } from "@appaloft/application";
 import {
+  archiveProjectResponseSchema,
   archiveResourceResponseSchema,
   bootstrapServerProxyResponseSchema,
   configureDefaultAccessDomainPolicyResponseSchema,
@@ -141,15 +154,20 @@ import {
   promoteEnvironmentResponseSchema,
   proxyConfigurationViewSchema,
   registerServerResponseSchema,
+  renameProjectResponseSchema,
   resourceDetailSchema,
   resourceDiagnosticSummarySchema,
+  resourceEffectiveConfigResponseSchema,
   resourceHealthSummarySchema,
   resourceRuntimeLogEventSchema,
   resourceRuntimeLogsResponseSchema,
   resourceRuntimeLogsStreamResponseSchema,
+  setResourceVariableResponseSchema,
   showDeploymentResponseSchema,
+  showProjectResponseSchema,
   terminalSessionDescriptorSchema,
   testServerConnectivityResponseSchema,
+  unsetResourceVariableResponseSchema,
 } from "@appaloft/contracts";
 import { type DomainError, type Result } from "@appaloft/core";
 import { resolvePublicDocsHelpHref } from "@appaloft/docs-registry";
@@ -214,6 +232,7 @@ export const apiDocsHrefs = {
   healthSummary: resolvePublicDocsHelpHref("observability.health-summary"),
   diagnosticSummary: resolvePublicDocsHelpHref("diagnostics.safe-support-payload"),
   terminalSession: resolvePublicDocsHelpHref("server.terminal-session"),
+  projectLifecycle: resolvePublicDocsHelpHref("project.lifecycle"),
 } as const;
 
 export const apiRouteDescriptions = {
@@ -221,6 +240,7 @@ export const apiRouteDescriptions = {
     "Creates a deployment from an explicit project, server, environment, and resource context.",
     "deployment.source",
   ),
+  projectLifecycle: routeDescription("Read, rename, and archive projects.", "project.lifecycle"),
   configureServerCredential: routeDescription(
     "Configures the SSH credential Appaloft uses for server connectivity and deployment.",
     "server.ssh-credential",
@@ -256,6 +276,18 @@ export const apiRouteDescriptions = {
   configureResourceNetwork: routeDescription(
     "Configures ports, protocols, and exposure behavior for resource access.",
     "resource.network-profile",
+  ),
+  setResourceVariable: routeDescription(
+    "Sets one resource-scoped variable or secret override.",
+    "environment.variable-precedence",
+  ),
+  unsetResourceVariable: routeDescription(
+    "Removes one resource-scoped variable override.",
+    "environment.variable-precedence",
+  ),
+  resourceEffectiveConfig: routeDescription(
+    "Reads the masked effective configuration for one resource.",
+    "environment.variable-precedence",
   ),
   createDomainBinding: routeDescription(
     "Creates a custom domain binding for a resource.",
@@ -809,6 +841,43 @@ export const createProjectProcedure = base
     executeCommand(context, CreateProjectCommand.create(input)),
   );
 
+export const showProjectProcedure = base
+  .route({
+    method: "GET",
+    path: "/projects/{projectId}",
+    description: apiRouteDescriptions.projectLifecycle,
+    successStatus: 200,
+  })
+  .input(showProjectQueryInputSchema)
+  .output(showProjectResponseSchema)
+  .handler(async ({ input, context }) => executeQuery(context, ShowProjectQuery.create(input)));
+
+export const renameProjectProcedure = base
+  .route({
+    method: "POST",
+    path: "/projects/{projectId}/rename",
+    description: apiRouteDescriptions.projectLifecycle,
+    successStatus: 200,
+  })
+  .input(renameProjectCommandInputSchema)
+  .output(renameProjectResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, RenameProjectCommand.create(input)),
+  );
+
+export const archiveProjectProcedure = base
+  .route({
+    method: "POST",
+    path: "/projects/{projectId}/archive",
+    description: apiRouteDescriptions.projectLifecycle,
+    successStatus: 200,
+  })
+  .input(archiveProjectCommandInputSchema)
+  .output(archiveProjectResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, ArchiveProjectCommand.create(input)),
+  );
+
 export const listServersProcedure = base
   .route({
     method: "GET",
@@ -1048,6 +1117,45 @@ export const configureResourceSourceProcedure = base
   .output(configureResourceSourceResponseSchema)
   .handler(async ({ input, context }) =>
     executeCommand(context, ConfigureResourceSourceCommand.create(input)),
+  );
+
+export const setResourceVariableProcedure = base
+  .route({
+    method: "POST",
+    path: "/resources/{resourceId}/variables",
+    description: apiRouteDescriptions.setResourceVariable,
+    successStatus: 200,
+  })
+  .input(setResourceVariableCommandInputSchema)
+  .output(setResourceVariableResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, SetResourceVariableCommand.create(input)),
+  );
+
+export const unsetResourceVariableProcedure = base
+  .route({
+    method: "DELETE",
+    path: "/resources/{resourceId}/variables/{key}",
+    description: apiRouteDescriptions.unsetResourceVariable,
+    successStatus: 200,
+  })
+  .input(unsetResourceVariableCommandInputSchema)
+  .output(unsetResourceVariableResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, UnsetResourceVariableCommand.create(input)),
+  );
+
+export const resourceEffectiveConfigProcedure = base
+  .route({
+    method: "GET",
+    path: "/resources/{resourceId}/effective-config",
+    description: apiRouteDescriptions.resourceEffectiveConfig,
+    successStatus: 200,
+  })
+  .input(resourceEffectiveConfigQueryInputSchema)
+  .output(resourceEffectiveConfigResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ResourceEffectiveConfigQuery.create(input)),
   );
 
 export const createDomainBindingProcedure = base
@@ -1412,6 +1520,9 @@ export const appaloftOrpcRouter = {
   projects: {
     list: listProjectsProcedure,
     create: createProjectProcedure,
+    show: showProjectProcedure,
+    rename: renameProjectProcedure,
+    archive: archiveProjectProcedure,
   },
   servers: {
     list: listServersProcedure,
@@ -1449,6 +1560,9 @@ export const appaloftOrpcRouter = {
     configureNetwork: configureResourceNetworkProcedure,
     configureRuntime: configureResourceRuntimeProcedure,
     configureSource: configureResourceSourceProcedure,
+    setVariable: setResourceVariableProcedure,
+    unsetVariable: unsetResourceVariableProcedure,
+    effectiveConfig: resourceEffectiveConfigProcedure,
     diagnosticSummary: resourceDiagnosticSummaryProcedure,
     health: resourceHealthProcedure,
     proxyConfiguration: resourceProxyConfigurationPreviewProcedure,
@@ -1598,6 +1712,9 @@ export function mountAppaloftOrpcRoutes(
 
   const routes = [
     "/api/projects",
+    "/api/projects/:projectId",
+    "/api/projects/:projectId/rename",
+    "/api/projects/:projectId/archive",
     "/api/credentials/ssh",
     "/api/servers",
     "/api/servers/connectivity-tests",

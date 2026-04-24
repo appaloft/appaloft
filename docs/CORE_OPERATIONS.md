@@ -76,9 +76,14 @@ Implemented operations:
 | --- | --- | --- | --- | --- | --- | --- |
 | Create project | Command | `projects.create` | `CreateProjectCommand` | `CreateProjectCommandInput` | `appaloft project create` | `POST /api/projects` |
 | List projects | Query | `projects.list` | `ListProjectsQuery` | `ListProjectsQueryInput` | `appaloft project list` | `GET /api/projects` |
+| Show project | Query | `projects.show` | `ShowProjectQuery` | `ShowProjectQueryInput` | `appaloft project show <projectId>` | `GET /api/projects/{projectId}` |
+| Rename project | Command | `projects.rename` | `RenameProjectCommand` | `RenameProjectCommandInput` | `appaloft project rename <projectId> --name <name>` | `POST /api/projects/{projectId}/rename` |
+| Archive project | Command | `projects.archive` | `ArchiveProjectCommand` | `ArchiveProjectCommandInput` | `appaloft project archive <projectId>` | `POST /api/projects/{projectId}/archive` |
 
 Current boundary:
 - a project is currently metadata plus deployment ownership
+- project lifecycle state is explicit; archived projects remain readable but reject new
+  project-scoped mutations and deployment admission
 - project detail surfaces should make resources the primary list and resource creation the primary
   write affordance
 - project-level "view deployments" is a secondary rollup over resources
@@ -91,10 +96,9 @@ Current boundary:
   [ADR-013: Project Resource Navigation And Deployment Ownership](./decisions/ADR-013-project-resource-navigation-and-deployment-ownership.md)
 
 Core next operations expected here:
-- `projects.show`
-- `projects.rename`
 - `projects.configure-source` if project source binding becomes a first-class aggregate concept
-- `projects.archive`
+- `projects.set-description` if description editing becomes a first-class mutation
+- project hard delete or restore only after safety rules are specified
 
 Those are expected domain operations, but they are not implemented yet and must not be assumed by
 transports until added here and to the operation catalog.
@@ -195,10 +199,13 @@ Implemented operations:
 | Configure resource health policy | Command | `resources.configure-health` | `ConfigureResourceHealthCommand` | `ConfigureResourceHealthCommandInput` | `appaloft resource configure-health <resourceId>` | `POST /api/resources/{resourceId}/health-policy` |
 | Configure resource runtime profile | Command | `resources.configure-runtime` | `ConfigureResourceRuntimeCommand` | `ConfigureResourceRuntimeCommandInput` | `appaloft resource configure-runtime <resourceId>` | `POST /api/resources/{resourceId}/runtime-profile` |
 | Configure resource network profile | Command | `resources.configure-network` | `ConfigureResourceNetworkCommand` | `ConfigureResourceNetworkCommandInput` | `appaloft resource configure-network <resourceId>` | `POST /api/resources/{resourceId}/network-profile` |
+| Set resource variable | Command | `resources.set-variable` | `SetResourceVariableCommand` | `SetResourceVariableCommandInput` | `appaloft resource set-variable <resourceId> <key> <value>` | `POST /api/resources/{resourceId}/variables` |
+| Unset resource variable | Command | `resources.unset-variable` | `UnsetResourceVariableCommand` | `UnsetResourceVariableCommandInput` | `appaloft resource unset-variable <resourceId> <key>` | `DELETE /api/resources/{resourceId}/variables/{key}` |
 | Archive resource | Command | `resources.archive` | `ArchiveResourceCommand` | `ArchiveResourceCommandInput` | `appaloft resource archive <resourceId>` | `POST /api/resources/{resourceId}/archive` |
 | Delete resource | Command | `resources.delete` | `DeleteResourceCommand` | `DeleteResourceCommandInput` | `appaloft resource delete <resourceId> --confirm-slug <slug>` | `DELETE /api/resources/{resourceId}` |
 | List resources | Query | `resources.list` | `ListResourcesQuery` | `ListResourcesQueryInput` | `appaloft resource list` | `GET /api/resources` |
 | Show resource profile | Query | `resources.show` | `ShowResourceQuery` | `ShowResourceQueryInput` | `appaloft resource show <resourceId>` | `GET /api/resources/{resourceId}` |
+| Read resource effective configuration | Query | `resources.effective-config` | `ResourceEffectiveConfigQuery` | `ResourceEffectiveConfigQueryInput` | `appaloft resource effective-config <resourceId>` | `GET /api/resources/{resourceId}/effective-config` |
 | Read resource runtime logs | Query | `resources.runtime-logs` | `ResourceRuntimeLogsQuery` | `ResourceRuntimeLogsQueryInput` | `appaloft resource logs <resourceId>` | `GET /api/resources/{resourceId}/runtime-logs`; stream: `GET /api/resources/{resourceId}/runtime-logs/stream` |
 | Preview resource proxy configuration | Query | `resources.proxy-configuration.preview` | `ResourceProxyConfigurationPreviewQuery` | `ResourceProxyConfigurationPreviewQueryInput` | `appaloft resource proxy-config <resourceId>` | `GET /api/resources/{resourceId}/proxy-configuration` |
 | Read resource diagnostic summary | Query | `resources.diagnostic-summary` | `ResourceDiagnosticSummaryQuery` | `ResourceDiagnosticSummaryQueryInput` | `appaloft resource diagnose <resourceId>` | `GET /api/resources/{resourceId}/diagnostic-summary` |
@@ -282,6 +289,11 @@ Current boundary:
   command replaces the durable workload endpoint profile for future deployment admission and route
   planning without binding domains, applying proxy routes, restarting runtime, or mutating
   deployment snapshots.
+- resource-scoped variables and secrets are resource-owned through `resources.set-variable` and
+  `resources.unset-variable`; these commands replace only the resource override layer used during
+  future deployment snapshot materialization after environment precedence is resolved.
+- `resources.effective-config` is the active read surface for masked resource-owned variables and
+  the merged effective deployment snapshot view. It must not return plaintext secret values.
 - resource archive is resource-owned through `resources.archive`; the command moves lifecycle
   state to `archived`, publishes `resource-archived` on the first transition, and blocks future
   profile mutations and deployments without stopping runtime or deleting retained history,

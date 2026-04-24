@@ -19,13 +19,16 @@ import { type Insertable, type Kysely, type Selectable, type SelectQueryBuilder 
 
 import { type Database } from "../schema";
 import {
+  type RepositoryExecutor,
   rehydrateResourceRow,
   resolveRepositoryExecutor,
   type SerializedResourceNetworkProfile,
   type SerializedResourceRuntimeProfile,
   type SerializedResourceSourceBinding,
+  serializeEnvironmentVariables,
   serializeHealthCheckPolicy,
   serializeResourceServices,
+  withRepositoryTransaction,
 } from "./shared";
 
 type ResourceSelectionQuery = SelectQueryBuilder<
@@ -55,7 +58,8 @@ class KyselyResourceSelectionVisitor
 class KyselyResourceMutationVisitor
   implements
     ResourceMutationSpecVisitor<{
-      values: Insertable<Database["resources"]>;
+      resource: Insertable<Database["resources"]>;
+      variables: Insertable<Database["resource_variables"]>[];
     }>
 {
   visitUpsertResource(spec: UpsertResourceSpec) {
@@ -150,7 +154,7 @@ class KyselyResourceMutationVisitor
       : null;
 
     return {
-      values: {
+      resource: {
         id: spec.state.id.value,
         project_id: spec.state.projectId.value,
         environment_id: spec.state.environmentId.value,
@@ -169,6 +173,17 @@ class KyselyResourceMutationVisitor
         deleted_at: spec.state.deletedAt?.value ?? null,
         created_at: spec.state.createdAt.value,
       },
+      variables: serializeEnvironmentVariables(spec.state.variables).map((variable) => ({
+        id: `${spec.state.id.value}:${variable.key}:${variable.exposure}:${variable.scope}:${variable.index}`,
+        resource_id: spec.state.id.value,
+        key: variable.key,
+        value: variable.value,
+        kind: variable.kind,
+        exposure: variable.exposure,
+        scope: variable.scope,
+        is_secret: variable.is_secret,
+        updated_at: variable.updated_at,
+      })),
     };
   }
 }
@@ -193,29 +208,61 @@ export class PgResourceRepository implements ResourceRepository {
         },
       },
       async () => {
-        await executor
-          .insertInto("resources")
-          .values(mutation.values)
-          .onConflict((conflict) =>
-            conflict.column("id").doUpdateSet({
-              name: mutation.values.name,
-              slug: mutation.values.slug,
-              kind: mutation.values.kind,
-              destination_id: mutation.values.destination_id ?? null,
-              description: mutation.values.description ?? null,
-              services: mutation.values.services as unknown as Record<string, unknown>[],
-              source_binding: mutation.values.source_binding,
-              runtime_profile: mutation.values.runtime_profile,
-              network_profile: mutation.values.network_profile,
-              lifecycle_status: mutation.values.lifecycle_status,
-              archived_at: mutation.values.archived_at ?? null,
-              archive_reason: mutation.values.archive_reason ?? null,
-              deleted_at: mutation.values.deleted_at ?? null,
-            }),
-          )
-          .execute();
+        await withRepositoryTransaction(this.db, context, async (transaction) => {
+          await transaction
+            .insertInto("resources")
+            .values(mutation.resource)
+            .onConflict((conflict) =>
+              conflict.column("id").doUpdateSet({
+                name: mutation.resource.name,
+                slug: mutation.resource.slug,
+                kind: mutation.resource.kind,
+                destination_id: mutation.resource.destination_id ?? null,
+                description: mutation.resource.description ?? null,
+                services: mutation.resource.services as unknown as Record<string, unknown>[],
+                source_binding: mutation.resource.source_binding,
+                runtime_profile: mutation.resource.runtime_profile,
+                network_profile: mutation.resource.network_profile,
+                lifecycle_status: mutation.resource.lifecycle_status,
+                archived_at: mutation.resource.archived_at ?? null,
+                archive_reason: mutation.resource.archive_reason ?? null,
+                deleted_at: mutation.resource.deleted_at ?? null,
+              }),
+            )
+            .execute();
+
+          await transaction
+            .deleteFrom("resource_variables")
+            .where("resource_id", "=", mutation.resource.id)
+            .execute();
+
+          if (mutation.variables.length > 0) {
+            await transaction.insertInto("resource_variables").values(mutation.variables).execute();
+          }
+        });
       },
     );
+  }
+
+  private async loadState(executor: RepositoryExecutor, id: string): Promise<Resource | null> {
+    const resourceRow = await executor
+      .selectFrom("resources")
+      .selectAll()
+      .where("id", "=", id)
+      .executeTakeFirst();
+
+    if (!resourceRow) {
+      return null;
+    }
+
+    const variables = await executor
+      .selectFrom("resource_variables")
+      .selectAll()
+      .where("resource_id", "=", resourceRow.id)
+      .orderBy("updated_at", "asc")
+      .execute();
+
+    return Resource.rehydrate(rehydrateResourceRow(resourceRow, variables));
   }
 
   async findOne(context: RepositoryContext, spec: ResourceSelectionSpec): Promise<Resource | null> {
@@ -240,7 +287,7 @@ export class PgResourceRepository implements ResourceRepository {
           return null;
         }
 
-        return Resource.rehydrate(rehydrateResourceRow(row));
+        return this.loadState(executor, row.id);
       },
     );
   }

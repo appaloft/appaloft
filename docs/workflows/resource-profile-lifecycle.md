@@ -11,10 +11,13 @@ It is not a single command. Every user-visible mutation must dispatch one explic
 - `resources.configure-runtime`
 - `resources.configure-network`
 - `resources.configure-health`
+- `resources.set-variable`
+- `resources.unset-variable`
 - `resources.archive`
 - `resources.delete`
 
 Every user-visible full detail read must dispatch `resources.show`.
+Every user-visible effective configuration read must dispatch `resources.effective-config`.
 
 No Web, CLI, HTTP, automation, or future MCP entrypoint may expose a generic `resources.update`
 operation for these behaviors.
@@ -34,6 +37,9 @@ This workflow inherits:
 - [resources.configure-runtime Command Spec](../commands/resources.configure-runtime.md)
 - [resources.configure-network Command Spec](../commands/resources.configure-network.md)
 - [resources.configure-health Command Spec](../commands/resources.configure-health.md)
+- [resources.set-variable Command Spec](../commands/resources.set-variable.md)
+- [resources.unset-variable Command Spec](../commands/resources.unset-variable.md)
+- [resources.effective-config Query Spec](../queries/resources.effective-config.md)
 - [resources.archive Command Spec](../commands/resources.archive.md)
 - [resources.delete Command Spec](../commands/resources.delete.md)
 - [Resource Profile Lifecycle Test Matrix](../testing/resource-profile-lifecycle-test-matrix.md)
@@ -49,9 +55,10 @@ The workflow gives operators a stable way to:
 
 1. Open one resource detail/profile surface.
 2. Change source, runtime, network, or health configuration independently.
-3. Retire a resource through archive.
-4. Permanently delete only archived, unreferenced resources.
-5. See how the updated profile will affect future deployment admission.
+3. Change resource-scoped variables and secrets independently from environment scope.
+4. Inspect the masked effective configuration that future deployments will snapshot.
+5. Retire a resource through archive.
+6. Permanently delete only archived, unreferenced resources.
 
 Profile changes are reusable configuration for future deployments. They are not deployment
 execution, redeploy, restart, route apply, domain binding, certificate issuance, or runtime
@@ -66,6 +73,9 @@ cleanup.
 | Change build/start/static/Compose planning and reusable runtime naming | `resources.configure-runtime` | Runtime planning profile | Source binding, network profile, health policy, runtime target state |
 | Change internal listener/exposure profile | `resources.configure-network` | `ResourceNetworkProfile` | Domains, generated access policy, proxy routes, current runtime |
 | Change health probe policy | `resources.configure-health` | Resource health policy | Source/runtime/network profile outside health policy fields |
+| Set one resource-scoped variable override | `resources.set-variable` | Resource config override layer | Environment variables, deployment snapshots, current runtime, domains |
+| Remove one resource-scoped variable override | `resources.unset-variable` | Resource config override layer | Environment variables, deployment snapshots, current runtime, domains |
+| Inspect effective future deployment configuration | `resources.effective-config` | Nothing | Resource lifecycle, current runtime, historical deployment snapshots |
 | Retire resource | `resources.archive` | Resource lifecycle status | Runtime stop, route/domain/certificate/source-link cleanup |
 | Remove unused archived resource from active state | `resources.delete` | Archived unreferenced resource identity | Cascading cleanup of blockers |
 
@@ -112,6 +122,24 @@ resources.show(resourceId)
   -> resources.health(resourceId)
 ```
 
+Resource variables:
+
+```text
+resources.show(resourceId)
+  -> resources.effective-config(resourceId)
+  -> resources.set-variable(resourceId, variable)
+  -> resources.effective-config(resourceId)
+```
+
+Resource variable removal:
+
+```text
+resources.show(resourceId)
+  -> resources.effective-config(resourceId)
+  -> resources.unset-variable(resourceId, key, exposure)
+  -> resources.effective-config(resourceId)
+```
+
 Archive:
 
 ```text
@@ -141,6 +169,8 @@ Archived resources:
 - reject `resources.configure-runtime`;
 - reject `resources.configure-network`;
 - reject `resources.configure-health`;
+- reject `resources.set-variable`;
+- reject `resources.unset-variable`;
 - may be passed to `resources.delete` after deletion guards pass.
 
 `resources.archive` is synchronous lifecycle-state mutation. Command success means archived state
@@ -160,6 +190,11 @@ Deleted resources:
 
 Profile changes affect future `deployments.create` admission only. They do not mutate historical
 deployment snapshots or current runtime.
+
+Resource-scoped variables participate in that same future-only rule. Accepted resource variables and
+secrets override environment-scoped entries with the same `key` plus `exposure` identity when a
+future deployment snapshot is materialized. Changing or deleting a resource-scoped variable does
+not mutate historical deployment snapshots or update a currently running workload in place.
 
 Runtime naming intent is part of that same future-only rule. Changing a resource's
 `runtimeProfile.runtimeName` changes how future deployments derive effective Docker container or
@@ -182,7 +217,7 @@ network profile, but they keep their own commands and lifecycle events.
 
 | Entrypoint | Required behavior |
 | --- | --- |
-| Web | Resource detail is owner-scoped. Each profile section dispatches the matching operation and refetches `resources.show` or the relevant observation query. |
+| Web | Resource detail is owner-scoped. Each profile section dispatches the matching operation and refetches `resources.show`, `resources.effective-config`, or the relevant observation query. |
 | CLI | Each operation has its own `appaloft resource ...` subcommand. No `appaloft resource update` generic mutation. |
 | oRPC / HTTP | Each operation has its own route using the application command/query schema. No parallel transport-only input shape. |
 | Automation / MCP | Future tools map one-to-one to operation keys. Tools must not combine unrelated source/runtime/network/archive/delete behavior. |
@@ -191,9 +226,11 @@ network profile, but they keep their own commands and lifecycle events.
 
 Current implementation has active resource create/list, `resources.show`,
 `resources.configure-source`, `resources.configure-runtime`, `resources.configure-health`,
-`resources.configure-network`, `resources.archive`, and `resources.delete` surfaces. The Web resource detail page
-dispatches `resources.show` for durable profile data, dispatches source/runtime/network/health
-forms through separate commands, and dispatches archive/delete through dedicated lifecycle actions.
+`resources.configure-network`, `resources.set-variable`, `resources.unset-variable`,
+`resources.effective-config`, `resources.archive`, and `resources.delete` surfaces. The Web
+resource detail page dispatches `resources.show` for durable profile data, dispatches
+source/runtime/network/health/configuration forms through separate commands, and dispatches
+archive/delete through dedicated lifecycle actions.
 
 Archived-resource guards are active for source/runtime/network/health mutations and deployment
 admission. `resources.delete` may delete only archived resources with matching slug confirmation

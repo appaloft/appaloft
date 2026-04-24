@@ -106,6 +106,7 @@ import {
   PlanStepText,
   PortNumber,
   ProjectId,
+  ProjectLifecycleStatusValue,
   ProjectName,
   ProjectSlug,
   ProviderKey,
@@ -163,6 +164,7 @@ import { type Kysely, type Selectable, type Transaction } from "kysely";
 import { type Database } from "../schema";
 
 export type EnvironmentVariableRow = Selectable<Database["environment_variables"]>;
+export type ResourceVariableRow = Selectable<Database["resource_variables"]>;
 type SourceKindInput = Parameters<typeof SourceKindValue.rehydrate>[0];
 type BuildStrategyInput = Parameters<typeof BuildStrategyKindValue.rehydrate>[0];
 type PackagingModeInput = Parameters<typeof PackagingModeValue.rehydrate>[0];
@@ -181,6 +183,7 @@ type DeploymentPhaseInput = Parameters<typeof DeploymentPhaseValue.rehydrate>[0]
 type LogLevelInput = Parameters<typeof LogLevelValue.rehydrate>[0];
 type ResourceKindInput = Parameters<typeof ResourceKindValue.rehydrate>[0];
 type ResourceLifecycleStatusInput = Parameters<typeof ResourceLifecycleStatusValue.rehydrate>[0];
+type ProjectLifecycleStatusInput = Parameters<typeof ProjectLifecycleStatusValue.rehydrate>[0];
 type ResourceServiceKindInput = Parameters<typeof ResourceServiceKindValue.rehydrate>[0];
 type ResourceNetworkProtocolInput = Parameters<typeof ResourceNetworkProtocolValue.rehydrate>[0];
 type ResourceExposureModeInput = Parameters<typeof ResourceExposureModeValue.rehydrate>[0];
@@ -893,8 +896,8 @@ export interface InsertableEnvironmentVariable {
   index: number;
 }
 
-export function rehydrateEnvironmentConfigSet(
-  rows: EnvironmentVariableRow[],
+export function rehydrateConfigSet(
+  rows: Array<EnvironmentVariableRow | ResourceVariableRow>,
 ): EnvironmentConfigSet {
   return EnvironmentConfigSet.rehydrate(
     rows.map((variable) => ({
@@ -911,11 +914,24 @@ export function rehydrateEnvironmentConfigSet(
   );
 }
 
+export function rehydrateEnvironmentConfigSet(
+  rows: EnvironmentVariableRow[],
+): EnvironmentConfigSet {
+  return rehydrateConfigSet(rows);
+}
+
 export function rehydrateProject(row: Selectable<Database["projects"]>) {
   return {
     id: ProjectId.rehydrate(row.id),
     name: ProjectName.rehydrate(row.name),
     slug: ProjectSlug.rehydrate(row.slug),
+    lifecycleStatus: ProjectLifecycleStatusValue.rehydrate(
+      row.lifecycle_status as ProjectLifecycleStatusInput,
+    ),
+    ...(row.archived_at
+      ? { archivedAt: ArchivedAt.rehydrate(normalizeTimestamp(row.archived_at) ?? row.archived_at) }
+      : {}),
+    ...(row.archive_reason ? { archiveReason: ArchiveReason.rehydrate(row.archive_reason) } : {}),
     createdAt: CreatedAt.rehydrate(normalizeTimestamp(row.created_at) ?? row.created_at),
     ...(row.description ? { description: DescriptionText.rehydrate(row.description) } : {}),
   };
@@ -1301,7 +1317,10 @@ export function rehydrateCertificateRow(row: Selectable<Database["certificates"]
   };
 }
 
-export function rehydrateResourceRow(row: Selectable<Database["resources"]>) {
+export function rehydrateResourceRow(
+  row: Selectable<Database["resources"]>,
+  variables: ResourceVariableRow[] = [],
+) {
   const services = (row.services ?? []) as unknown as SerializedResourceService[];
   const sourceBinding = row.source_binding
     ? (row.source_binding as unknown as SerializedResourceSourceBinding)
@@ -1473,6 +1492,7 @@ export function rehydrateResourceRow(row: Selectable<Database["resources"]>) {
           },
         }
       : {}),
+    variables: rehydrateConfigSet(variables),
     lifecycleStatus: ResourceLifecycleStatusValue.rehydrate(
       row.lifecycle_status as ResourceLifecycleStatusInput,
     ),

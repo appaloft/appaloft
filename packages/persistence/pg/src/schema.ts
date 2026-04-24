@@ -8,6 +8,9 @@ export interface ProjectsTable {
   name: string;
   slug: string;
   description: string | null;
+  lifecycle_status: ColumnType<string, string | undefined, string>;
+  archived_at: ColumnType<string | null, string | null | undefined, string | null>;
+  archive_reason: ColumnType<string | null, string | null | undefined, string | null>;
   created_at: TimestampColumn;
 }
 
@@ -97,6 +100,18 @@ export interface ResourcesTable {
 export interface EnvironmentVariablesTable {
   id: string;
   environment_id: string;
+  key: string;
+  value: string;
+  kind: string;
+  exposure: string;
+  scope: string;
+  is_secret: boolean;
+  updated_at: TimestampColumn;
+}
+
+export interface ResourceVariablesTable {
+  id: string;
+  resource_id: string;
   key: string;
   value: string;
   kind: string;
@@ -289,6 +304,7 @@ export interface Database {
   environments: EnvironmentsTable;
   resources: ResourcesTable;
   environment_variables: EnvironmentVariablesTable;
+  resource_variables: ResourceVariablesTable;
   deployments: DeploymentsTable;
   domain_bindings: DomainBindingsTable;
   certificates: CertificatesTable;

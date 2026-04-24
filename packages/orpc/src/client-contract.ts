@@ -1,4 +1,5 @@
 import {
+  type ArchiveProjectCommandInput,
   type ArchiveResourceCommandInput,
   type BootstrapServerProxyCommandInput,
   type ConfigureDefaultAccessDomainPolicyCommandInput,
@@ -29,19 +30,25 @@ import {
   type OpenTerminalSessionCommandInput,
   type PromoteEnvironmentCommandInput,
   type RegisterServerCommandInput,
+  type RenameProjectCommandInput,
   type ResourceDiagnosticSummaryQueryInput,
+  type ResourceEffectiveConfigQueryInput,
   type ResourceHealthQueryInput,
   type ResourceProxyConfigurationPreviewQueryInput,
   type ResourceRuntimeLogsQueryInput,
   type SetEnvironmentVariableCommandInput,
+  type SetResourceVariableCommandInput,
   type ShowDeploymentQueryInput,
   type ShowEnvironmentQueryInput,
+  type ShowProjectQueryInput,
   type ShowResourceQueryInput,
   type StreamDeploymentEventsQueryInput,
   type TestServerConnectivityCommandInput,
   type UnsetEnvironmentVariableCommandInput,
+  type UnsetResourceVariableCommandInput,
 } from "@appaloft/application/schemas";
 import {
+  type ArchiveProjectResponse,
   type ArchiveResourceResponse,
   type BootstrapServerProxyResponse,
   type ConfigureDefaultAccessDomainPolicyResponse,
@@ -80,15 +87,20 @@ import {
   type PromoteEnvironmentResponse,
   type ProxyConfigurationView,
   type RegisterServerResponse,
+  type RenameProjectResponse,
   type ResourceDetail,
   type ResourceDiagnosticSummary,
+  type ResourceEffectiveConfigResponse,
   type ResourceHealthSummary,
   type ResourceRuntimeLogEvent,
   type ResourceRuntimeLogsResponse,
   type ResourceRuntimeLogsStreamResponse,
+  type SetResourceVariableResponse,
   type ShowDeploymentResponse,
+  type ShowProjectResponse,
   type TerminalSessionDescriptor,
   type TestServerConnectivityResponse,
+  type UnsetResourceVariableResponse,
 } from "@appaloft/contracts";
 import { type AsyncIteratorClass, type Client, type ORPCError } from "@orpc/client";
 
@@ -102,6 +114,24 @@ export type AppaloftOrpcClientContract = {
       AppaloftClientContext,
       CreateProjectCommandInput,
       CreateProjectResponse,
+      AppaloftClientError
+    >;
+    show: Client<
+      AppaloftClientContext,
+      ShowProjectQueryInput,
+      ShowProjectResponse,
+      AppaloftClientError
+    >;
+    rename: Client<
+      AppaloftClientContext,
+      RenameProjectCommandInput,
+      RenameProjectResponse,
+      AppaloftClientError
+    >;
+    archive: Client<
+      AppaloftClientContext,
+      ArchiveProjectCommandInput,
+      ArchiveProjectResponse,
       AppaloftClientError
     >;
   };
@@ -259,6 +289,24 @@ export type AppaloftOrpcClientContract = {
       AppaloftClientContext,
       ConfigureResourceSourceCommandInput,
       ConfigureResourceSourceResponse,
+      AppaloftClientError
+    >;
+    setVariable: Client<
+      AppaloftClientContext,
+      SetResourceVariableCommandInput,
+      SetResourceVariableResponse,
+      AppaloftClientError
+    >;
+    unsetVariable: Client<
+      AppaloftClientContext,
+      UnsetResourceVariableCommandInput,
+      UnsetResourceVariableResponse,
+      AppaloftClientError
+    >;
+    effectiveConfig: Client<
+      AppaloftClientContext,
+      ResourceEffectiveConfigQueryInput,
+      ResourceEffectiveConfigResponse,
       AppaloftClientError
     >;
     diagnosticSummary: Client<

@@ -14,6 +14,7 @@ import {
   healthCheckTypes,
   logLevels,
   packagingModes,
+  projectLifecycleStatuses,
   resourceExposureModes,
   resourceLifecycleStatuses,
   resourceNetworkProtocols,
@@ -44,6 +45,7 @@ export {
   healthCheckTypes,
   logLevels,
   packagingModes,
+  projectLifecycleStatuses,
   resourceExposureModes,
   resourceLifecycleStatuses,
   resourceNetworkProtocols,
@@ -1176,6 +1178,48 @@ export class ResourceLifecycleStatusValue extends StateMachineValueObject<
 
   isDeleted(): boolean {
     return this.value === "deleted";
+  }
+}
+
+const projectLifecycleStatusBrand: unique symbol = Symbol("ProjectLifecycleStatusValue");
+export class ProjectLifecycleStatusValue extends StateMachineValueObject<
+  (typeof projectLifecycleStatuses)[number]
+> {
+  private [projectLifecycleStatusBrand]!: void;
+
+  private constructor(value: (typeof projectLifecycleStatuses)[number]) {
+    super(value);
+  }
+
+  static create(value: string): Result<ProjectLifecycleStatusValue> {
+    return createEnumValue(
+      value,
+      projectLifecycleStatuses,
+      "Project lifecycle status",
+      (validated) => new ProjectLifecycleStatusValue(validated),
+    );
+  }
+
+  static rehydrate(value: (typeof projectLifecycleStatuses)[number]): ProjectLifecycleStatusValue {
+    return new ProjectLifecycleStatusValue(value);
+  }
+
+  static active(): ProjectLifecycleStatusValue {
+    return new ProjectLifecycleStatusValue("active");
+  }
+
+  archive(): Result<ProjectLifecycleStatusValue> {
+    return this.ensureCurrent(["active"], "Only active projects can be archived").map(
+      () => new ProjectLifecycleStatusValue("archived"),
+    );
+  }
+
+  isActive(): boolean {
+    return this.value === "active";
+  }
+
+  isArchived(): boolean {
+    return this.value === "archived";
   }
 }
 
