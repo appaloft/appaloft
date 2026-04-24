@@ -13,6 +13,8 @@ searchAliases:
 relatedOperations:
   - servers.configure-credential
   - credentials.create-ssh
+  - credentials.show
+  - credentials.delete-ssh
 sidebar:
   label: "SSH credentials"
   order: 3
@@ -59,5 +61,27 @@ CLI 可以读取本机密钥路径，例如用户明确传入的 key path。Web 
 5. 再移除旧凭据。
 
 不要在连接测试失败时删除旧凭据，否则可能同时失去部署和恢复入口。
+
+<h2 id="server-credential-delete-unused">删除未使用的已保存凭据</h2>
+
+只有没有任何活跃或已停用服务器引用的 saved credential 可以删除。先查看凭据详情和 usage：
+
+- `totalServers = 0`：可以通过 Web、CLI 或 HTTP API 删除。
+- `totalServers > 0`：删除会以 `credential_in_use` 拒绝；先切换或删除引用它的服务器。
+- usage 暂不可读：不能当作 0 使用量，删除会拒绝；请重试或先修复状态读取问题。
+
+CLI 删除需要 typed confirmation：
+
+```bash
+appaloft server credential-delete <credentialId> --confirm <credentialId>
+```
+
+HTTP API 使用同一个命令语义：
+
+```http
+DELETE /api/credentials/ssh/{credentialId}
+```
+
+Web 控制台的已保存 SSH 凭据区域会打开 destructive confirmation dialog。它会重新检查 usage；当 usage 暂不可读或不为 0 时禁用删除，并要求输入完整 credential id 后才会发起删除命令。
 
 相关页面：[Register and test a server](/docs/servers/register-connect/)。

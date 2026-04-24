@@ -64,6 +64,7 @@ export const tokens = {
   configureServerEdgeProxyUseCase: Symbol.for("appaloft.configure_server_edge_proxy_use_case"),
   deactivateServerUseCase: Symbol.for("appaloft.deactivate_server_use_case"),
   deleteServerUseCase: Symbol.for("appaloft.delete_server_use_case"),
+  deleteSshCredentialUseCase: Symbol.for("appaloft.delete_ssh_credential_use_case"),
   checkServerDeleteSafetyQueryService: Symbol.for(
     "appaloft.check_server_delete_safety_query_service",
   ),

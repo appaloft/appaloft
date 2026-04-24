@@ -148,6 +148,23 @@ describe("operation catalog aggregate mutation boundary", () => {
     expect(entry?.inputSchema).toBeDefined();
   });
 
+  test("[SSH-CRED-ENTRY-006] reusable SSH credential delete is exposed through the active operation catalog", () => {
+    const entry = operationCatalog.find((candidate) => candidate.key === "credentials.delete-ssh");
+
+    expect(entry).toMatchObject({
+      kind: "command",
+      domain: "credentials",
+      messageName: "DeleteSshCredentialCommand",
+      handlerName: "DeleteSshCredentialCommandHandler",
+      serviceName: "DeleteSshCredentialUseCase",
+      transports: {
+        cli: "appaloft server credential-delete <credentialId> --confirm <credentialId>",
+        orpc: { method: "DELETE", path: "/api/credentials/ssh/{credentialId}" },
+      },
+    });
+    expect(entry?.inputSchema).toBeDefined();
+  });
+
   test("[AGG-MUTATION-CATALOG-002] detects generic aggregate update operation keys and command names", () => {
     const violations = findGenericAggregateMutationOperations([
       catalogEntry({

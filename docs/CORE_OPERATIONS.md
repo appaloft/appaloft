@@ -132,6 +132,7 @@ Implemented operations:
 | Create reusable SSH credential | Command | `credentials.create-ssh` | `CreateSshCredentialCommand` | `CreateSshCredentialCommandInput` | `appaloft server credential-create` | `POST /api/credentials/ssh` |
 | List reusable SSH credentials | Query | `credentials.list-ssh` | `ListSshCredentialsQuery` | `ListSshCredentialsQueryInput` | `appaloft server credential-list` | `GET /api/credentials/ssh` |
 | Show reusable SSH credential usage | Query | `credentials.show` | `ShowSshCredentialQuery` | `ShowSshCredentialQueryInput` | `appaloft server credential-show <credentialId>` | `GET /api/credentials/ssh/{credentialId}` |
+| Delete reusable SSH credential when unused | Command | `credentials.delete-ssh` | `DeleteSshCredentialCommand` | `DeleteSshCredentialCommandInput` | `appaloft server credential-delete <credentialId> --confirm <credentialId>` | `DELETE /api/credentials/ssh/{credentialId}` |
 | Open deployment target terminal | Command | `terminal-sessions.open` | `OpenTerminalSessionCommand` | `OpenTerminalSessionCommandInput` | `appaloft server terminal <serverId>` | `POST /api/terminal-sessions`; attach: `WS /api/terminal-sessions/{sessionId}/attach` |
 
 - server registration may carry edge proxy intent/provider selection; when omitted, the deployment
@@ -174,13 +175,18 @@ Implemented operations:
   reports no blockers. It does not cascade cleanup, stop workloads, detach credentials, remove
   routes, revoke certificates, delete logs, or remove audit state. Normal server list/show target
   selection omits deleted servers while historical records retain the server id.
+- `credentials.delete-ssh` permanently deletes only a stored reusable SSH private-key credential.
+  The command reuses the durable active/inactive server usage surface from `credentials.show` and
+  accepts deletion only when `usage.totalServers = 0`. Active or inactive visible server references
+  reject with `credential_in_use`. A usage-read failure rejects the command and must not be treated
+  as zero usage. The command never returns private key material, public key bodies, local key paths,
+  or credential-bearing strings.
 - generated default access routes require proxy readiness and a usable target public address, but
   the generated-domain provider is selected by infrastructure configuration and dependency
   injection, not by core/application command input
 
 Core next operations expected here:
 - rotate reusable SSH credential
-- delete reusable SSH credential when unused
 
 ## Environments
 

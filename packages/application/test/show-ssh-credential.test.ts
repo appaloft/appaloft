@@ -144,6 +144,7 @@ function extractCredentialId(credentialIdOrSpec: unknown): string | null {
       query: TResult,
       visitor: {
         visitSshCredentialById(query: TResult, spec: { id: { value: string } }): TResult;
+        visitUnusedSshCredentialById(query: TResult, spec: { id: { value: string } }): TResult;
       },
     ) => TResult;
   };
@@ -154,6 +155,7 @@ function extractCredentialId(credentialIdOrSpec: unknown): string | null {
 
   return maybeSpec.accept<string | null>(null, {
     visitSshCredentialById: (_query, spec) => spec.id.value,
+    visitUnusedSshCredentialById: (_query, spec) => spec.id.value,
   });
 }
 

@@ -338,6 +338,7 @@ export interface SshCredentialRepository {
     credential: SshCredential,
     spec: SshCredentialMutationSpec,
   ): Promise<void>;
+  deleteOne(context: RepositoryContext, spec: SshCredentialSelectionSpec): Promise<boolean>;
 }
 
 export interface DestinationRepository {

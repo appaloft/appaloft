@@ -20,6 +20,7 @@ import {
   type DeactivateServerCommandInput,
   type DeleteResourceCommandInput,
   type DeleteServerCommandInput,
+  type DeleteSshCredentialCommandInput,
   type DeploymentLogsQueryInput,
   type DiffEnvironmentsQueryInput,
   type ImportCertificateCommandInput,
@@ -76,6 +77,7 @@ import {
   type DeactivateServerResponse,
   type DeleteResourceResponse,
   type DeleteServerResponse,
+  type DeleteSshCredentialResponse,
   type DeploymentEventStreamEnvelope,
   type DeploymentEventStreamResponse,
   type DeploymentEventStreamStreamResponse,
@@ -245,6 +247,12 @@ export type AppaloftOrpcClientContract = {
         AppaloftClientContext,
         CreateSshCredentialCommandInput,
         CreateSshCredentialResponse,
+        AppaloftClientError
+      >;
+      delete: Client<
+        AppaloftClientContext,
+        DeleteSshCredentialCommandInput,
+        DeleteSshCredentialResponse,
         AppaloftClientError
       >;
     };
