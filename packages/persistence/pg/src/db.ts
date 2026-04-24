@@ -34,6 +34,7 @@ import { mutationCoordinationsMigration } from "./migrations/026_mutation_coordi
 import { resourceVariablesMigration } from "./migrations/027_resource_variables";
 import { projectLifecycleMigration } from "./migrations/028_project_lifecycle";
 import { serverLifecycleMigration } from "./migrations/029_server_lifecycle";
+import { serverDeleteTombstoneMigration } from "./migrations/030_server_delete_tombstone";
 import { PgliteDialect } from "./pglite-dialect";
 import { type Database } from "./schema";
 import { TracingDialect } from "./tracing-dialect";
@@ -157,6 +158,7 @@ class StaticMigrationProvider implements MigrationProvider {
       "027_resource_variables": resourceVariablesMigration,
       "028_project_lifecycle": projectLifecycleMigration,
       "029_server_lifecycle": serverLifecycleMigration,
+      "030_server_delete_tombstone": serverDeleteTombstoneMigration,
     };
   }
 }

@@ -10,7 +10,12 @@ import {
   EdgeProxyStatusValue,
   TargetKindValue,
 } from "../shared/state-machine";
-import { type CreatedAt, type DeactivatedAt, type UpdatedAt } from "../shared/temporal";
+import {
+  type CreatedAt,
+  type DeactivatedAt,
+  type DeletedAt,
+  type UpdatedAt,
+} from "../shared/temporal";
 import {
   type DeactivationReason,
   type DeploymentTargetName,
@@ -49,6 +54,7 @@ export interface DeploymentTargetState {
   targetKind: TargetKindValue;
   lifecycleStatus: DeploymentTargetLifecycleStatusValue;
   deactivatedAt?: DeactivatedAt;
+  deletedAt?: DeletedAt;
   deactivationReason?: DeactivationReason;
   credential?: DeploymentTargetCredentialState;
   edgeProxy?: DeploymentTargetEdgeProxyState;
@@ -57,9 +63,14 @@ export interface DeploymentTargetState {
 
 export type DeploymentTargetRehydrateState = Omit<
   DeploymentTargetState,
-  "deactivatedAt" | "deactivationReason" | "lifecycleStatus"
+  "deactivatedAt" | "deletedAt" | "deactivationReason" | "lifecycleStatus"
 > &
-  Partial<Pick<DeploymentTargetState, "deactivatedAt" | "deactivationReason" | "lifecycleStatus">>;
+  Partial<
+    Pick<
+      DeploymentTargetState,
+      "deactivatedAt" | "deletedAt" | "deactivationReason" | "lifecycleStatus"
+    >
+  >;
 
 export interface DeploymentTargetVisitor<TContext, TResult> {
   visitDeploymentTarget(target: DeploymentTarget, context: TContext): TResult;
@@ -153,8 +164,42 @@ export class DeploymentTarget extends AggregateRoot<DeploymentTargetState> {
     return ok({ changed: true });
   }
 
+  delete(input: { deletedAt: DeletedAt }): Result<{ changed: boolean }> {
+    if (this.state.lifecycleStatus.isDeleted()) {
+      return ok({ changed: false });
+    }
+
+    if (this.state.lifecycleStatus.isActive()) {
+      return err(
+        domainError.serverDeleteBlocked("Active servers must be deactivated before deletion", {
+          phase: "server-lifecycle-guard",
+          serverId: this.state.id.value,
+          lifecycleStatus: "active",
+          deletionBlockers: ["active-server"],
+        }),
+      );
+    }
+
+    const lifecycleStatus = this.state.lifecycleStatus.delete();
+    if (lifecycleStatus.isErr()) {
+      return err(lifecycleStatus.error);
+    }
+
+    this.state.lifecycleStatus = lifecycleStatus.value;
+    this.state.deletedAt = input.deletedAt;
+
+    this.recordDomainEvent("server-deleted", input.deletedAt, {
+      serverId: this.state.id.value,
+      serverName: this.state.name.value,
+      providerKey: this.state.providerKey.value,
+      deletedAt: input.deletedAt.value,
+    });
+
+    return ok({ changed: true });
+  }
+
   ensureCanAcceptNewWork(commandName: string): Result<void> {
-    if (this.state.lifecycleStatus.isInactive()) {
+    if (!this.state.lifecycleStatus.isActive()) {
       return err(
         domainError.serverInactive("Inactive servers cannot accept new work", {
           commandName,

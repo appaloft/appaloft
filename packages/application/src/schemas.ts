@@ -42,6 +42,7 @@ export * from "./operations/servers/check-server-delete-safety.schema";
 export * from "./operations/servers/configure-server-credential.schema";
 export * from "./operations/servers/create-ssh-credential.schema";
 export * from "./operations/servers/deactivate-server.schema";
+export * from "./operations/servers/delete-server.schema";
 export * from "./operations/servers/list-ssh-credentials.schema";
 export * from "./operations/servers/register-server.schema";
 export * from "./operations/servers/show-server.schema";

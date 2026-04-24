@@ -949,7 +949,7 @@ export function rehydrateDeploymentTarget(row: Selectable<Database["servers"]>) 
     providerKey: ProviderKey.rehydrate(row.provider_key),
     targetKind: TargetKindValue.rehydrate("single-server"),
     lifecycleStatus: DeploymentTargetLifecycleStatusValue.rehydrate(
-      row.lifecycle_status as "active" | "inactive",
+      row.lifecycle_status as "active" | "inactive" | "deleted",
     ),
     ...(row.deactivated_at
       ? {
@@ -960,6 +960,9 @@ export function rehydrateDeploymentTarget(row: Selectable<Database["servers"]>) 
       : {}),
     ...(row.deactivation_reason
       ? { deactivationReason: DeactivationReason.rehydrate(row.deactivation_reason) }
+      : {}),
+    ...(row.deleted_at
+      ? { deletedAt: DeletedAt.rehydrate(normalizeTimestamp(row.deleted_at) ?? row.deleted_at) }
       : {}),
     ...(row.credential_kind
       ? {

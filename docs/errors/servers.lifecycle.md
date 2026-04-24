@@ -2,7 +2,7 @@
 
 ## Normative Contract
 
-Deployment target lifecycle queries and future lifecycle commands use the shared platform error
+Deployment target lifecycle queries and commands use the shared platform error
 model and neverthrow conventions. This file defines the server-lifecycle error profile for
 `servers.show`, `servers.delete-check`, and explicit server lifecycle mutations.
 
@@ -91,7 +91,14 @@ Server lifecycle commands use these branches:
 
 `servers.deactivate` does not block on retained dependencies. It is designed to preserve visibility
 while preventing future use. Active deployments and retained dependencies appear in
-`servers.delete-check` blockers and future `servers.delete` guards.
+`servers.delete-check` blockers and `servers.delete` guards.
+
+`servers.delete` must convert the same blocker semantics as `servers.delete-check` into
+`server_delete_blocked`. Active servers are blocked with `deletionBlockers = ["active-server"]`.
+Inactive servers with retained deployments, resources, domains, certificates, credentials, source
+links, server-applied routes, default-access policy overrides, terminal sessions, runtime tasks,
+runtime-log retention, or audit retention are blocked with the corresponding safe blocker kinds.
+Confirmation mismatch is a validation error at `phase = server-lifecycle-guard`.
 
 ## Async Error Profile
 
@@ -126,10 +133,11 @@ Tests must assert:
 
 ## Current Implementation Notes And Migration Gaps
 
-`servers.show`, `servers.deactivate`, and `servers.delete-check` are active in this lifecycle spec.
+`servers.show`, `servers.deactivate`, `servers.delete-check`, and guarded `servers.delete` are
+active in this lifecycle spec.
 
-Actual server deletion is still future work. The delete-check query defines blocker visibility for
-that future command without mutating server state.
+`servers.delete` uses soft-delete lifecycle state. Normal server reads omit deleted servers while
+historical records retain server ids.
 
 ## Open Questions
 

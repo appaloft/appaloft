@@ -39,6 +39,7 @@ import {
   createSshCredentialCommandInputSchema,
   DeactivateServerCommand,
   DeleteResourceCommand,
+  DeleteServerCommand,
   type DeploymentEventStreamEnvelope,
   DeploymentLogsQuery,
   type DeploymentProgressEvent,
@@ -46,6 +47,7 @@ import {
   DiffEnvironmentsQuery,
   deactivateServerCommandInputSchema,
   deleteResourceCommandInputSchema,
+  deleteServerCommandInputSchema,
   deploymentLogsQueryInputSchema,
   diffEnvironmentsQueryInputSchema,
   type ExecutionContext,
@@ -140,6 +142,7 @@ import {
   createSshCredentialResponseSchema,
   deactivateServerResponseSchema,
   deleteResourceResponseSchema,
+  deleteServerResponseSchema,
   deploymentEventStreamEnvelopeSchema,
   deploymentEventStreamResponseSchema,
   deploymentEventStreamStreamResponseSchema,
@@ -262,6 +265,10 @@ export const apiRouteDescriptions = {
   ),
   checkServerDeleteSafety: routeDescription(
     "Previews whether a deployment target can be safely deleted.",
+    "server.deployment-target",
+  ),
+  deleteServer: routeDescription(
+    "Deletes an inactive deployment target only after delete-safety blockers are clear.",
     "server.deployment-target",
   ),
   configureServerCredential: routeDescription(
@@ -949,6 +956,19 @@ export const checkServerDeleteSafetyProcedure = base
     executeQuery(context, CheckServerDeleteSafetyQuery.create(input)),
   );
 
+export const deleteServerProcedure = base
+  .route({
+    method: "DELETE",
+    path: "/servers/{serverId}",
+    description: apiRouteDescriptions.deleteServer,
+    successStatus: 200,
+  })
+  .input(deleteServerCommandInputSchema)
+  .output(deleteServerResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, DeleteServerCommand.create(input)),
+  );
+
 export const registerServerProcedure = base
   .route({
     method: "POST",
@@ -1591,6 +1611,7 @@ export const appaloftOrpcRouter = {
     show: showServerProcedure,
     deactivate: deactivateServerProcedure,
     deleteCheck: checkServerDeleteSafetyProcedure,
+    delete: deleteServerProcedure,
     create: registerServerProcedure,
     configureCredential: configureServerCredentialProcedure,
     testConnectivity: testServerConnectivityProcedure,
