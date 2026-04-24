@@ -1,26 +1,38 @@
 name: Deploy Docs
 
 on:
-  workflow_call:
-    inputs:
-      appaloft_version:
-        description: Appaloft release tag to install and deploy with, for example v0.2.13.
-        required: true
-        type: string
-      source_ref:
-        description: Optional git ref for the docs source to deploy. Defaults to the resolved release tag.
-        required: false
-        default: ""
-        type: string
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/deploy-docs.yml
+      - appaloft.docs.yml
+      - apps/docs/**
+      - apps/shell/**
+      - packages/adapters/**
+      - packages/application/**
+      - packages/auth/**
+      - packages/cli-logging/**
+      - packages/config/**
+      - packages/contracts/**
+      - packages/core/**
+      - packages/deployment-config/**
+      - packages/design/**
+      - packages/docs-registry/**
+      - packages/integrations/**
+      - packages/observability/**
+      - packages/persistence/**
+      - packages/plugins/**
+      - packages/providers/**
+      - bun.lock
+      - package.json
+      - tsconfig.base.json
+      - tsconfig.json
+      - turbo.json
   workflow_dispatch:
     inputs:
-      appaloft_version:
-        description: Appaloft release tag to install and deploy with. Use latest for manual redeploys.
-        required: false
-        default: latest
-        type: string
       source_ref:
-        description: Git ref for the docs source to deploy when redeploying without a new release.
+        description: Git ref for the docs source to deploy manually.
         required: false
         default: main
         type: string
@@ -44,40 +56,19 @@ jobs:
       name: docs-production
       url: https://docs.appaloft.com
     steps:
-      - name: Resolve Appaloft Release
-        id: release
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-          REQUESTED_VERSION: ${{ inputs.appaloft_version }}
-        run: |
-          set -euo pipefail
-          version="${REQUESTED_VERSION:-latest}"
-          if [ "$version" = "latest" ]; then
-            version="$(gh release view --repo "$GITHUB_REPOSITORY" --json tagName --jq .tagName)"
-          fi
-          version="${version#refs/tags/}"
-          case "$version" in
-            v[0-9]*.[0-9]*.[0-9]*)
-              ;;
-            *)
-              echo "::error::Appaloft version must be latest or a release tag like v0.2.13, got '$version'."
-              exit 1
-              ;;
-          esac
-          echo "tag=$version" >> "$GITHUB_OUTPUT"
-
       - name: Resolve Docs Source Ref
         id: source
         shell: bash
         env:
+          EVENT_NAME: ${{ github.event_name }}
+          PUSH_SHA: ${{ github.sha }}
           REQUESTED_SOURCE_REF: ${{ inputs.source_ref }}
-          RELEASE_TAG: ${{ steps.release.outputs.tag }}
         run: |
           set -euo pipefail
-          source_ref="${REQUESTED_SOURCE_REF:-}"
-          if [ -z "$source_ref" ]; then
-            source_ref="$RELEASE_TAG"
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            source_ref="${REQUESTED_SOURCE_REF:-main}"
+          else
+            source_ref="$PUSH_SHA"
           fi
           echo "ref=$source_ref" >> "$GITHUB_OUTPUT"
 
@@ -92,7 +83,6 @@ jobs:
           node-version: 24
 
       - name: Set Up Bun
-        if: ${{ github.event_name == 'workflow_dispatch' }}
         uses: oven-sh/setup-bun@v2
         with:
           bun-version: "1.3.13"
@@ -121,14 +111,12 @@ jobs:
           echo "ssh_user=${APPALOFT_SSH_USER:-root}" >> "$GITHUB_OUTPUT"
 
       - name: Install Source Dependencies
-        if: ${{ github.event_name == 'workflow_dispatch' }}
         shell: bash
         run: |
           set -euo pipefail
           bun install --frozen-lockfile
 
-      - name: Deploy Docs With Source Appaloft
-        if: ${{ github.event_name == 'workflow_dispatch' }}
+      - name: Deploy Docs
         shell: bash
         env:
           APPALOFT_SSH_HOST: ${{ vars.APPALOFT_SSH_HOST }}
@@ -151,19 +139,3 @@ jobs:
             --server-ssh-username "$APPALOFT_SSH_USER" \
             --server-ssh-private-key-file "$key_file" \
             --state-backend ssh-pglite
-
-      - name: Deploy Docs With Released Appaloft
-        if: ${{ github.event_name != 'workflow_dispatch' }}
-        uses: appaloft/deploy-action@v1
-        with:
-          version: ${{ steps.release.outputs.tag }}
-          config: appaloft.docs.yml
-          method: static
-          source: .
-          ssh-host: ${{ vars.APPALOFT_SSH_HOST }}
-          ssh-user: ${{ steps.settings.outputs.ssh_user }}
-          ssh-private-key: ${{ secrets.APPALOFT_SSH_PRIVATE_KEY }}
-          server-proxy-kind: traefik
-          resource-name: appaloft-docs
-          resource-kind: static-site
-          app-log-lines: "8"
