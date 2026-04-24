@@ -448,6 +448,15 @@ implicit-root-domain skip rule needed for Action-style execution. CLI/action pro
 remain in sync with config profile fields so Action previews can be expressed without generating a
 temporary config file. The public `appaloft/deploy-action` repository is not yet implemented.
 
+The main Appaloft repository now includes `.github/workflows/deploy-docs-preview.yml` as a
+repository-authored docs preview workflow over the same CLI path. It classifies PRs whose changed
+files affect docs content or docs build inputs, skips fork PR preview deploys, checks out the PR
+head for same-repository preview deploy, passes trusted PR context through `--preview pull-request`
+and `--preview-id pr-<number>`, renders `docs-pr-<number>.preview.appaloft.com` as a trusted custom
+preview host with TLS disabled, requires the preview URL to be observable, and runs `appaloft
+preview cleanup` on `pull_request.closed`. This workflow is an internal use of the CLI preview
+feature; it does not replace the public `appaloft/deploy-action` wrapper gap below.
+
 Missing pieces before Action PR preview can be documented as supported:
 
 - `appaloft/deploy-action` wrapper repository and Marketplace README;

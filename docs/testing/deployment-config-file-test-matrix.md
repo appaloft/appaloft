@@ -330,6 +330,13 @@ required-preview-URL gating coverage in the same file.
 `packages/adapters/cli/test/preview-command.test.ts`, proving cleanup idempotency, runtime-first
 failure staging, and remote-state prepare/release around the preview cleanup command path.
 
+The main repository also has `.github/workflows/deploy-docs-preview.yml` as a repository-authored
+workflow example that exercises the direct CLI shape for docs previews: it skips fork PR preview
+deploys, uses trusted PR preview context, supplies a custom preview domain template, requires a
+public preview URL, and runs explicit preview cleanup on PR close. This workflow is not a substitute
+for the public action wrapper tests because it runs the source checkout directly instead of
+installing a released `appaloft/deploy-action` wrapper.
+
 Public `appaloft/deploy-action` wrapper coverage is not implemented yet. The main repository
 release workflow already produces CLI archives, the static Docker self-host installer,
 `checksums.txt`, `release-manifest.json`, and release notes, but `CONFIG-FILE-ENTRY-009` through
