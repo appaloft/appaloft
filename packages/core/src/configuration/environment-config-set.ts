@@ -45,8 +45,22 @@ export interface EnvironmentConfigDiffEntry {
   change: "added" | "removed" | "changed" | "unchanged";
 }
 
+const configScopePrecedenceOrder = [
+  "defaults",
+  "system",
+  "organization",
+  "project",
+  "environment",
+  "resource",
+  "deployment",
+] as const;
+
+function precedenceIndex(scope: ConfigScopeValue): number {
+  return configScopePrecedenceOrder.indexOf(scope.value);
+}
+
 function compareByPrecedence(left: EnvironmentConfigEntry, right: EnvironmentConfigEntry): number {
-  return left.toState().scope.value.localeCompare(right.toState().scope.value);
+  return precedenceIndex(left.toState().scope) - precedenceIndex(right.toState().scope);
 }
 
 function variableIdentity(variable: Pick<EnvironmentConfigEntryState, "key" | "exposure">): string {
@@ -354,6 +368,7 @@ export class EnvironmentConfigSet {
         ConfigScopeValue.rehydrate("organization"),
         ConfigScopeValue.rehydrate("project"),
         ConfigScopeValue.rehydrate("environment"),
+        ConfigScopeValue.rehydrate("resource"),
         ConfigScopeValue.rehydrate("deployment"),
       ],
       variables: [...merged.values()]

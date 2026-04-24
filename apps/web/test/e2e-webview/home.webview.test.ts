@@ -559,6 +559,58 @@ const apiResponses: Record<ApiScenario, Record<string, ApiRoute>> = {
         id: "res_demo",
       },
     },
+    "/api/rpc/resources/effectiveConfig": {
+      json: {
+        schemaVersion: "resources.effective-config/v1",
+        resourceId: "res_demo",
+        environmentId: "env_demo",
+        ownedEntries: [
+          {
+            key: "DATABASE_URL",
+            value: "****",
+            scope: "resource",
+            exposure: "runtime",
+            isSecret: true,
+            kind: "secret",
+            updatedAt: "2026-01-01T00:00:00.000Z",
+          },
+        ],
+        effectiveEntries: [
+          {
+            key: "DATABASE_URL",
+            value: "****",
+            scope: "resource",
+            exposure: "runtime",
+            isSecret: true,
+            kind: "secret",
+          },
+          {
+            key: "PUBLIC_BASE_URL",
+            value: "https://env.example.test",
+            scope: "environment",
+            exposure: "build-time",
+            isSecret: false,
+            kind: "plain-config",
+          },
+        ],
+        precedence: [
+          "defaults",
+          "system",
+          "organization",
+          "project",
+          "environment",
+          "resource",
+          "deployment",
+        ],
+        generatedAt: "2026-01-01T00:00:00.000Z",
+      },
+    },
+    "/api/rpc/resources/setVariable": {
+      json: null,
+    },
+    "/api/rpc/resources/unsetVariable": {
+      json: null,
+    },
     "/api/rpc/resources/archive": {
       json: {
         id: "res_demo",
@@ -1496,6 +1548,39 @@ describe("console e2e with Bun.WebView", () => {
         startCommand: "bun run preview",
         runtimeName: "preview-123",
       },
+    });
+  }, 15_000);
+
+  test("[RES-PROFILE-ENTRY-002] submits resource variable overrides through Web", async () => {
+    activeScenario = "dashboard";
+    resetRecordedApiRequests();
+
+    await using view = createWebView();
+    await view.navigate(`${previewUrl}/resources/res_demo?section=configuration`);
+
+    await expectAnyText(view, ["Configuration", "配置变量"]);
+
+    const effectiveConfigRequest = await waitForRecordedRequest(
+      "/api/rpc/resources/effectiveConfig",
+    );
+    const effectiveConfigInput = readOrpcJsonPayload(effectiveConfigRequest.body);
+    expect(effectiveConfigInput).toEqual({
+      resourceId: "res_demo",
+    });
+
+    await setInputValue(view, "#resource-config-key", "DATABASE_URL");
+    await setInputValue(view, "#resource-config-value", "postgres://resource");
+    await clickFormSubmit(view, "#resource-configuration-form");
+
+    const setVariableRequest = await waitForRecordedRequest("/api/rpc/resources/setVariable");
+    const setVariableInput = readOrpcJsonPayload(setVariableRequest.body);
+
+    expect(setVariableInput).toEqual({
+      resourceId: "res_demo",
+      key: "DATABASE_URL",
+      value: "postgres://resource",
+      kind: "plain-config",
+      exposure: "runtime",
     });
   }, 15_000);
 

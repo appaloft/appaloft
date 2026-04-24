@@ -6,7 +6,8 @@ Date: 2026-04-14
 
 ## Decision
 
-Reusable source, build, runtime, health, and access-route defaults belong to the Resource side of the domain model, not to the Deployment aggregate.
+Reusable source, build, runtime, health, access-route defaults, and resource-scoped variable
+overrides belong to the Resource side of the domain model, not to the Deployment aggregate.
 
 `deployments.create` creates one deployment attempt. It consumes the source/runtime/network profile owned by `Resource` and persists only the resolved deployment attempt snapshot.
 
@@ -18,6 +19,8 @@ The target domain vocabulary is:
   resource lifecycle.
 - `ResourceRuntimeProfile`: durable reusable build, start, and health defaults owned by the resource lifecycle.
 - `ResourceNetworkProfile`: durable reusable workload endpoint configuration, including the internal application listener port, governed by [ADR-015](./ADR-015-resource-network-profile.md).
+- `ResourceConfigOverrideSet`: durable reusable resource-scoped variable and secret overrides
+  merged into future deployment environment snapshots after environment precedence is resolved.
 - `DefaultAccessDomainPolicy`: provider-neutral policy for generated default public access, governed by [ADR-017](./ADR-017-default-access-domain-and-proxy-routing.md).
 - `RuntimePlanStrategy`: the planning strategy used to resolve a runtime plan from a source and runtime profile.
 - `RuntimePlanSnapshot`: the immutable resolved runtime plan persisted by the deployment attempt.
@@ -33,6 +36,7 @@ Resource
   -> ResourceSourceBinding
   -> ResourceRuntimeProfile
   -> ResourceNetworkProfile
+  -> ResourceConfigOverrideSet
   -> ResourceAccessProfile or DomainBinding references
 
 Deployment
@@ -41,7 +45,14 @@ Deployment
   -> RuntimePlanSnapshot
 ```
 
-`Deployment` must persist the resolved runtime plan, resolved network snapshot, and environment snapshot used by the attempt. It must not become the long-term source of truth for reusable source binding, build commands, start commands, internal listener port, health-check policy, domain names, proxy policy, or TLS policy.
+`Deployment` must persist the resolved runtime plan, resolved network snapshot, and environment
+snapshot used by the attempt. It must not become the long-term source of truth for reusable source
+binding, build commands, start commands, internal listener port, health-check policy, domain
+names, proxy policy, TLS policy, or resource-scoped variable overrides.
+
+The environment snapshot boundary includes both environment-owned variables and resource-owned
+overrides. Resource-owned variables must be resolved before the deployment snapshot is persisted,
+and later variable changes must not mutate historical deployment snapshots.
 
 ## Context
 
@@ -175,6 +186,17 @@ Reusable build/runtime/health configuration must be modeled by a future explicit
 
 Reusable workload network endpoint configuration must follow [ADR-015](./ADR-015-resource-network-profile.md). The internal application listener port belongs to `ResourceNetworkProfile`, not to deployment admission.
 
+Reusable resource-scoped variable overrides must be modeled by explicit resource configuration
+operations such as `resources.set-variable`, `resources.unset-variable`, and
+`resources.effective-config`. The snapshot materialization rule is:
+
+- defaults < system < organization < project < environment < resource < deployment snapshot
+- variable identity is `key + exposure`
+- resource scope may override environment scope for the same identity
+- build-time variables must use the `PUBLIC_` or `VITE_` prefix
+- build-time variables cannot be marked secret
+- read models, logs, diagnostics, and API responses must mask secret values
+
 Reusable domain/routing/TLS lifecycle remains governed by ADR-002 and the routing/domain/TLS command set:
 
 - durable domains belong to `domain-bindings.create`;
@@ -220,6 +242,9 @@ Future implementation must not add more reusable configuration fields to `deploy
 - [resources.show Query Spec](../queries/resources.show.md)
 - [resources.configure-source Command Spec](../commands/resources.configure-source.md)
 - [resources.configure-runtime Command Spec](../commands/resources.configure-runtime.md)
+- [resources.set-variable Command Spec](../commands/resources.set-variable.md)
+- [resources.unset-variable Command Spec](../commands/resources.unset-variable.md)
+- [resources.effective-config Query Spec](../queries/resources.effective-config.md)
 - [Repository Deployment Config File Bootstrap Workflow Spec](../workflows/deployment-config-file-bootstrap.md)
 - [Workload Framework Detection And Planning Workflow Spec](../workflows/workload-framework-detection-and-planning.md)
 - [Resource Profile Lifecycle Test Matrix](../testing/resource-profile-lifecycle-test-matrix.md)
@@ -250,9 +275,10 @@ Current `DeploymentContextBootstrapService` can create or reuse resources during
 
 Public redeploy behavior is removed from the v1 deployment command surface by [ADR-016](./ADR-016-deployment-command-surface-reset.md). Any future redeploy behavior must rebuild its own command spec, workflow, test matrix, and resource-profile snapshot rules before re-entering the public Web/API/CLI surface.
 
-Resource-side source binding, runtime profile, and network profile persistence are active through
-`resources.create` and dedicated configuration commands named `resources.configure-source`,
-`resources.configure-runtime`, and `resources.configure-network`. Each command mutates exactly one
+Resource-side source binding, runtime profile, network profile, and resource-scoped config
+override persistence are active through `resources.create` and dedicated configuration commands
+named `resources.configure-source`, `resources.configure-runtime`, `resources.configure-network`,
+`resources.set-variable`, and `resources.unset-variable`. Each command mutates exactly one
 resource-owned concern and appears in the active public catalog.
 
 Current code stores the resource listener port as `ResourceNetworkProfile.internalPort`.
