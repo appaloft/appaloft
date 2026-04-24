@@ -56,6 +56,7 @@ export const tokens = {
   createSshCredentialUseCase: Symbol.for("appaloft.create_ssh_credential_use_case"),
   listSshCredentialsQueryService: Symbol.for("appaloft.list_ssh_credentials_query_service"),
   listServersQueryService: Symbol.for("appaloft.list_servers_query_service"),
+  showServerQueryService: Symbol.for("appaloft.show_server_query_service"),
   testServerConnectivityUseCase: Symbol.for("appaloft.test_server_connectivity_use_case"),
   bootstrapServerProxyUseCase: Symbol.for("appaloft.bootstrap_server_proxy_use_case"),
   createEnvironmentUseCase: Symbol.for("appaloft.create_environment_use_case"),

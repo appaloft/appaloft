@@ -301,6 +301,77 @@ function deploymentEventStreamFixture(deploymentId: string): Response {
   });
 }
 
+function serverDetailFixture(serverId = "srv_demo") {
+  const isStaticServer = serverId === "srv_static";
+
+  return {
+    schemaVersion: "servers.show/v1",
+    server: {
+      id: serverId,
+      name: isStaticServer ? "static-edge" : "edge",
+      host: "127.0.0.1",
+      port: 22,
+      providerKey: "generic-ssh",
+      edgeProxy: {
+        kind: "traefik",
+        status: "ready",
+        lastAttemptAt: "2026-01-01T00:00:00.000Z",
+        lastSucceededAt: "2026-01-01T00:00:01.000Z",
+      },
+      credential: {
+        kind: "local-ssh-agent",
+        username: "deployer",
+        publicKeyConfigured: false,
+        privateKeyConfigured: false,
+      },
+      createdAt: "2026-01-01T00:00:00.000Z",
+    },
+    rollups: {
+      resources: {
+        total: isStaticServer ? 1 : 2,
+        deployedResourceIds: isStaticServer ? ["res_static"] : ["res_demo", "res_api"],
+      },
+      deployments: {
+        total: isStaticServer ? 1 : 3,
+        statusCounts: [
+          {
+            status: "succeeded",
+            count: isStaticServer ? 1 : 2,
+          },
+          ...(isStaticServer
+            ? []
+            : [
+                {
+                  status: "running",
+                  count: 1,
+                },
+              ]),
+        ],
+        latestDeploymentId: isStaticServer ? "dep_static" : "dep_demo",
+        latestDeploymentStatus: "succeeded",
+      },
+      domains: {
+        total: isStaticServer ? 0 : 1,
+        statusCounts: isStaticServer
+          ? []
+          : [
+              {
+                status: "ready",
+                count: 1,
+              },
+            ],
+        ...(isStaticServer
+          ? {}
+          : {
+              latestDomainBindingId: "dbn_demo",
+              latestDomainBindingStatus: "ready",
+            }),
+      },
+    },
+    generatedAt: "2026-01-01T00:00:02.000Z",
+  };
+}
+
 const apiResponses: Record<ApiScenario, Record<string, ApiRoute>> = {
   dashboard: {
     "/api/health": {
@@ -368,6 +439,12 @@ const apiResponses: Record<ApiScenario, Record<string, ApiRoute>> = {
           },
         ],
       },
+    },
+    "/api/rpc/servers/show": (_request: Request, body: unknown) => {
+      const input = readOrpcJsonPayload(body) as { serverId?: string } | null;
+      return {
+        json: serverDetailFixture(input?.serverId ?? "srv_demo"),
+      };
     },
     "/api/rpc/environments/list": {
       json: {
@@ -1612,6 +1689,28 @@ describe("console e2e with Bun.WebView", () => {
 
     await view.navigate(`${previewUrl}/deployments/dep_demo?tab=logs`);
     await expectText(view, "Application is ready for dep_demo");
+  }, 15_000);
+
+  test("[SRV-LIFE-ENTRY-004] loads server detail through servers.show", async () => {
+    activeScenario = "dashboard";
+    resetRecordedApiRequests();
+
+    await using view = createWebView();
+    await view.navigate(`${previewUrl}/servers/srv_demo`);
+
+    await expectText(view, "edge");
+    await expectText(view, "traefik");
+    await expectAnyText(view, ["Related deployments", "关联部署"]);
+
+    const showRequest = await waitForRecordedRequest("/api/rpc/servers/show");
+    expect(showRequest.method).toBe("POST");
+    expect(readOrpcJsonPayload(showRequest.body)).toEqual({
+      serverId: "srv_demo",
+      includeRollups: true,
+    });
+    expect(
+      recordedApiRequests.some((request) => request.pathname === "/api/rpc/servers/list"),
+    ).toBe(false);
   }, 15_000);
 
   test("[DEP-SHOW-QRY-004] surfaces section errors as degraded deployment detail UI", async () => {

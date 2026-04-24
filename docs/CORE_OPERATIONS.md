@@ -120,6 +120,7 @@ Implemented operations:
 | Register deployment target | Command | `servers.register` | `RegisterServerCommand` | `RegisterServerCommandInput` | `appaloft server register` | `POST /api/servers` |
 | Configure deployment target credential | Command | `servers.configure-credential` | `ConfigureServerCredentialCommand` | `ConfigureServerCredentialCommandInput` | `appaloft server credential <serverId>` | `POST /api/servers/{serverId}/credentials` |
 | List deployment targets | Query | `servers.list` | `ListServersQuery` | `ListServersQueryInput` | `appaloft server list` | `GET /api/servers` |
+| Show deployment target | Query | `servers.show` | `ShowServerQuery` | `ShowServerQueryInput` | `appaloft server show <serverId>` | `GET /api/servers/{serverId}` |
 | Test deployment target connectivity | Command | `servers.test-connectivity` | `TestServerConnectivityCommand` | `TestServerConnectivityCommandInput` | `appaloft server test <serverId>`; `appaloft server doctor <serverId>` | `POST /api/servers/{serverId}/connectivity-tests` |
 | Test draft deployment target connectivity | Command | `servers.test-draft-connectivity` | `TestServerConnectivityCommand` | `TestServerConnectivityCommandInput` | - | `POST /api/servers/connectivity-tests` |
 | Repair deployment target edge proxy | Command | `servers.bootstrap-proxy` | `BootstrapServerProxyCommand` | `BootstrapServerProxyCommandInput` | `appaloft server proxy repair <serverId>` | `POST /api/servers/{serverId}/edge-proxy/bootstrap` |
@@ -139,12 +140,15 @@ Implemented operations:
 - `servers.bootstrap-proxy` is the explicit repair/retry operation for provider-owned proxy
   infrastructure; it creates a new proxy bootstrap attempt and may recreate provider-owned proxy
   containers, but it must not touch user workload containers
+- `servers.show` reads one deployment target/server, masked credential summary, edge proxy status,
+  and deployment/resource/domain rollups. It does not test connectivity, repair proxy state, or
+  mutate credentials, resources, deployments, domains, routes, terminal sessions, logs, or audit
+  state.
 - generated default access routes require proxy readiness and a usable target public address, but
   the generated-domain provider is selected by infrastructure configuration and dependency
   injection, not by core/application command input
 
 Core next operations expected here:
-- `servers.show`
 - `servers.rename`
 - `servers.configure-edge-proxy`
 - `servers.deactivate`

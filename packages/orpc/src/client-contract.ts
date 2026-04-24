@@ -42,6 +42,7 @@ import {
   type ShowEnvironmentQueryInput,
   type ShowProjectQueryInput,
   type ShowResourceQueryInput,
+  type ShowServerQueryInput,
   type StreamDeploymentEventsQueryInput,
   type TestServerConnectivityCommandInput,
   type UnsetEnvironmentVariableCommandInput,
@@ -98,6 +99,7 @@ import {
   type SetResourceVariableResponse,
   type ShowDeploymentResponse,
   type ShowProjectResponse,
+  type ShowServerResponse,
   type TerminalSessionDescriptor,
   type TestServerConnectivityResponse,
   type UnsetResourceVariableResponse,
@@ -137,6 +139,12 @@ export type AppaloftOrpcClientContract = {
   };
   servers: {
     list: Client<AppaloftClientContext, undefined, ListServersResponse, AppaloftClientError>;
+    show: Client<
+      AppaloftClientContext,
+      ShowServerQueryInput,
+      ShowServerResponse,
+      AppaloftClientError
+    >;
     create: Client<
       AppaloftClientContext,
       RegisterServerCommandInput,

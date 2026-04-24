@@ -6,6 +6,7 @@ import {
   ListSshCredentialsQuery,
   OpenTerminalSessionCommand,
   RegisterServerCommand,
+  ShowServerQuery,
   TestServerConnectivityCommand,
 } from "@appaloft/application";
 import { deploymentTargetCredentialKinds, edgeProxyKinds } from "@appaloft/core";
@@ -58,6 +59,19 @@ const registerCommand = EffectCommand.make(
 const listCommand = EffectCommand.make("list", {}, () => runQuery(ListServersQuery.create())).pipe(
   EffectCommand.withDescription(cliCommandDescriptions.serverList),
 );
+
+const showCommand = EffectCommand.make(
+  "show",
+  {
+    serverId: serverIdArg,
+  },
+  ({ serverId }) =>
+    runQuery(
+      ShowServerQuery.create({
+        serverId,
+      }),
+    ),
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.serverShow));
 
 const credentialCommand = EffectCommand.make(
   "credential",
@@ -202,6 +216,7 @@ export const serverCommand = EffectCommand.make("server").pipe(
   EffectCommand.withSubcommands([
     registerCommand,
     listCommand,
+    showCommand,
     credentialCommand,
     credentialCreateCommand,
     credentialListCommand,

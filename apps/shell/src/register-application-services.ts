@@ -91,6 +91,7 @@ import {
   ShowProjectQueryService,
   ShowResourceQueryHandler,
   ShowResourceQueryService,
+  ShowServerQueryService,
   StreamDeploymentEventsQueryHandler,
   StreamDeploymentEventsQueryService,
   TestServerConnectivityUseCase,
@@ -200,6 +201,7 @@ export function registerApplicationServices(container: DependencyContainer): voi
     ListSshCredentialsQueryService,
   );
   container.registerSingleton(tokens.listServersQueryService, ListServersQueryService);
+  container.registerSingleton(tokens.showServerQueryService, ShowServerQueryService);
   container.registerSingleton(tokens.testServerConnectivityUseCase, TestServerConnectivityUseCase);
   container.registerSingleton(tokens.bootstrapServerProxyUseCase, BootstrapServerProxyUseCase);
   container.registerSingleton(tokens.createEnvironmentUseCase, CreateEnvironmentUseCase);

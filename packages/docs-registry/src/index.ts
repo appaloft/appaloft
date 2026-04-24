@@ -107,6 +107,14 @@ export const publicDocsHelpTopics = {
     surfaces: ["web", "cli", "http-api", "mcp"],
     relatedOperation: "servers.register",
     aliases: ["server", "target", "ssh host", "服务器"],
+    specReferences: [
+      "docs/workflows/deployment-target-lifecycle.md",
+      "docs/queries/servers.show.md",
+      "docs/errors/servers.lifecycle.md",
+      "docs/testing/deployment-target-lifecycle-test-matrix.md",
+      "docs/workflows/server-bootstrap-and-proxy.md",
+    ],
+    webSurfaces: ["apps/web server list/detail and registration surfaces"],
   },
   "deployment.lifecycle": {
     id: "deployment.lifecycle",
@@ -639,6 +647,7 @@ export const publicDocsOperationCoverage = [
     topicId: "server.ssh-credential",
   },
   { operationKey: "servers.list", status: "documented", topicId: "server.deployment-target" },
+  { operationKey: "servers.show", status: "documented", topicId: "server.deployment-target" },
   {
     operationKey: "servers.test-connectivity",
     status: "documented",

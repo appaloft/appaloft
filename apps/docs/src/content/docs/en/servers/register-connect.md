@@ -11,6 +11,7 @@ searchAliases:
   - "ssh test"
 relatedOperations:
   - servers.register
+  - servers.show
   - servers.test-connectivity
 sidebar:
   label: "Register and test"
@@ -26,6 +27,8 @@ A server is a target Appaloft can connect to, inspect, and deploy applications o
 A server is not a project or a resource. One server can host multiple resources, and resource access still depends on network profile and proxy readiness.
 
 Registering a server makes Appaloft able to execute deployment plans. It does not deploy an app by itself.
+
+Reading server detail confirms a deployment target's host, provider, masked credential summary, proxy status, and current deployment, resource, and domain rollups. This read does not run connectivity checks, repair proxy state, or mutate the server.
 
 <h2 id="server-connectivity-test">Connectivity test</h2>
 
@@ -83,4 +86,8 @@ appaloft server register \
 
 ```bash title="Run connectivity test"
 appaloft server test srv_primary
+```
+
+```bash title="Read server detail"
+appaloft server show srv_primary
 ```
