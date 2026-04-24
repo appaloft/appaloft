@@ -1,0 +1,224 @@
+name: Deploy Docs Preview
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, closed]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: appaloft-docs-preview-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  changes:
+    name: Changes
+    if: ${{ github.event.action != 'closed' }}
+    runs-on: ubuntu-latest
+    outputs:
+      docs_preview_required: ${{ steps.classify.outputs.docs_preview_required }}
+    steps:
+      - name: Classify changed files
+        id: classify
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+
+          gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/files" --paginate --jq '.[].filename' > changed-files.txt
+
+          docs_preview_required=false
+          while IFS= read -r file; do
+            case "$file" in
+              .github/workflows/deploy-docs.yml|.github/workflows/deploy-docs-preview.yml|appaloft.docs.yml|apps/docs/*|docs/*|packages/design/*|packages/docs-registry/*|packages/openapi/*|*.md|*.mdx|bun.lock|package.json|tsconfig.base.json|tsconfig.json|turbo.json)
+                docs_preview_required=true
+                break
+                ;;
+            esac
+          done < changed-files.txt
+
+          echo "docs_preview_required=${docs_preview_required}" >> "$GITHUB_OUTPUT"
+          {
+            echo "### Docs preview classification"
+            sed 's/^/- `/' changed-files.txt | sed 's/$/`/'
+            echo
+            echo "docs_preview_required=${docs_preview_required}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  preview:
+    name: Preview
+    needs: changes
+    if: ${{ needs.changes.outputs.docs_preview_required == 'true' && github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # Preview deploys share the same remote-state root as production docs deploys.
+    concurrency:
+      group: appaloft-www-remote-state
+      cancel-in-progress: false
+    environment:
+      name: docs-preview-pr-${{ github.event.pull_request.number }}
+      url: ${{ steps.deploy.outputs.preview_url }}
+    steps:
+      - name: Checkout PR Source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Set up Bun and caches
+        uses: ./.github/actions/setup-bun-turbo
+
+      - name: Resolve Preview Settings
+        id: settings
+        shell: bash
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          APPALOFT_SSH_HOST: ${{ vars.APPALOFT_SSH_HOST }}
+          APPALOFT_SSH_USER: ${{ vars.APPALOFT_SSH_USER }}
+          APPALOFT_SSH_PRIVATE_KEY: ${{ secrets.APPALOFT_SSH_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+
+          missing=0
+          if [ -z "$APPALOFT_SSH_HOST" ]; then
+            echo "::error::Missing repository variable APPALOFT_SSH_HOST. Copy the value used by the docs production deploy."
+            missing=1
+          fi
+          if [ -z "$APPALOFT_SSH_PRIVATE_KEY" ]; then
+            echo "::error::Missing repository secret APPALOFT_SSH_PRIVATE_KEY. Use the same deployment key as the docs production deploy."
+            missing=1
+          fi
+          if [ "$missing" -ne 0 ]; then
+            exit 1
+          fi
+
+          preview_host="docs-pr-${PR_NUMBER}.preview.appaloft.com"
+          preview_url="http://${preview_host}"
+
+          {
+            echo "ssh_user=${APPALOFT_SSH_USER:-root}"
+            echo "preview_host=${preview_host}"
+            echo "preview_url=${preview_url}"
+            echo "preview_tls_mode=disabled"
+            echo "resource_name=appaloft-docs-preview-pr-${PR_NUMBER}"
+          } >> "$GITHUB_OUTPUT"
+
+          {
+            echo "### Docs preview"
+            echo "- Preview URL: ${preview_url}"
+            echo "- Preview host: ${preview_host}"
+            echo "- TLS mode: disabled"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Deploy Docs Preview
+        id: deploy
+        shell: bash
+        env:
+          APPALOFT_SSH_HOST: ${{ vars.APPALOFT_SSH_HOST }}
+          APPALOFT_SSH_PRIVATE_KEY: ${{ secrets.APPALOFT_SSH_PRIVATE_KEY }}
+          APPALOFT_SSH_USER: ${{ steps.settings.outputs.ssh_user }}
+          PREVIEW_HOST: ${{ steps.settings.outputs.preview_host }}
+          PREVIEW_TLS_MODE: ${{ steps.settings.outputs.preview_tls_mode }}
+          PREVIEW_URL: ${{ steps.settings.outputs.preview_url }}
+          RESOURCE_NAME: ${{ steps.settings.outputs.resource_name }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+
+          key_file="$RUNNER_TEMP/appaloft-docs-preview.key"
+          printf '%s\n' "$APPALOFT_SSH_PRIVATE_KEY" > "$key_file"
+          chmod 600 "$key_file"
+
+          build_command="APPALOFT_DOCS_BASE=/ APPALOFT_DOCS_SITE=$PREVIEW_URL bun run --cwd apps/docs build"
+
+          bun run apps/shell/src/index.ts deploy . \
+            --config appaloft.docs.yml \
+            --method static \
+            --resource-name "$RESOURCE_NAME" \
+            --resource-kind static-site \
+            --runtime-name "$RESOURCE_NAME" \
+            --build "$build_command" \
+            --preview pull-request \
+            --preview-id "pr-${PR_NUMBER}" \
+            --preview-domain-template "$PREVIEW_HOST" \
+            --preview-tls-mode "$PREVIEW_TLS_MODE" \
+            --require-preview-url \
+            --app-log-lines 8 \
+            --server-host "$APPALOFT_SSH_HOST" \
+            --server-provider generic-ssh \
+            --server-proxy-kind traefik \
+            --server-ssh-username "$APPALOFT_SSH_USER" \
+            --server-ssh-private-key-file "$key_file" \
+            --state-backend ssh-pglite
+
+          echo "preview_url=$PREVIEW_URL" >> "$GITHUB_OUTPUT"
+
+  cleanup:
+    name: Cleanup
+    if: ${{ github.event.action == 'closed' && github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # Cleanup mutates the same remote-state root as preview and production docs deploys.
+    concurrency:
+      group: appaloft-www-remote-state
+      cancel-in-progress: false
+    steps:
+      - name: Checkout Base Source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+
+      - name: Set up Bun and caches
+        uses: ./.github/actions/setup-bun-turbo
+
+      - name: Resolve Cleanup Settings
+        id: settings
+        shell: bash
+        env:
+          APPALOFT_SSH_HOST: ${{ vars.APPALOFT_SSH_HOST }}
+          APPALOFT_SSH_USER: ${{ vars.APPALOFT_SSH_USER }}
+          APPALOFT_SSH_PRIVATE_KEY: ${{ secrets.APPALOFT_SSH_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+
+          missing=0
+          if [ -z "$APPALOFT_SSH_HOST" ]; then
+            echo "::error::Missing repository variable APPALOFT_SSH_HOST. Cleanup needs the same SSH target as preview deploy."
+            missing=1
+          fi
+          if [ -z "$APPALOFT_SSH_PRIVATE_KEY" ]; then
+            echo "::error::Missing repository secret APPALOFT_SSH_PRIVATE_KEY. Cleanup needs the same SSH key as preview deploy."
+            missing=1
+          fi
+          if [ "$missing" -ne 0 ]; then
+            exit 1
+          fi
+
+          echo "ssh_user=${APPALOFT_SSH_USER:-root}" >> "$GITHUB_OUTPUT"
+
+      - name: Cleanup Docs Preview
+        shell: bash
+        env:
+          APPALOFT_SSH_HOST: ${{ vars.APPALOFT_SSH_HOST }}
+          APPALOFT_SSH_PRIVATE_KEY: ${{ secrets.APPALOFT_SSH_PRIVATE_KEY }}
+          APPALOFT_SSH_USER: ${{ steps.settings.outputs.ssh_user }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+
+          key_file="$RUNNER_TEMP/appaloft-docs-preview-cleanup.key"
+          printf '%s\n' "$APPALOFT_SSH_PRIVATE_KEY" > "$key_file"
+          chmod 600 "$key_file"
+
+          bun run apps/shell/src/index.ts preview cleanup . \
+            --config appaloft.docs.yml \
+            --preview pull-request \
+            --preview-id "pr-${PR_NUMBER}" \
+            --server-host "$APPALOFT_SSH_HOST" \
+            --server-provider generic-ssh \
+            --server-ssh-username "$APPALOFT_SSH_USER" \
+            --server-ssh-private-key-file "$key_file" \
+            --state-backend ssh-pglite

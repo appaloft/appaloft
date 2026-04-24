@@ -69,6 +69,9 @@ Historical alignment notes:
   matrix, Quick Deploy new-resource sequencing remains `resources.create ->
   deployments.create(resourceId)`, and the local CLI smoke covers resource/deployment observation
   after deployment.
+- [x] On 2026-04-24, the main repository has a docs PR preview workflow that uses the Appaloft CLI
+  preview path for same-repository docs changes and runs explicit preview cleanup when the PR is
+  closed; the public `appaloft/deploy-action` wrapper remains separate roadmap work.
 - [x] Release Please keeps pre-`1.0.0` feature and minor bumps on the current patch line by
   default; the `release_as` workflow input is required only when the roadmap gate allows a target
   minor or explicit hotfix version.
