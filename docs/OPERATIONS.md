@@ -85,9 +85,10 @@ appaloft deploy . \
   --require-preview-url
 ```
 
-The close job runs `appaloft preview cleanup` on `pull_request.closed`. Cleanup is idempotent, so it
-is allowed to run for same-repository PRs even if the final file list no longer contains docs
-changes.
+The close job runs `appaloft preview cleanup` on `pull_request.closed`, then deletes the matching
+GitHub deployments and `docs-preview-pr-<number>` GitHub environment. Appaloft cleanup is
+idempotent, so the close job is allowed to run for same-repository PRs even if the final file list
+no longer contains docs changes.
 
 Required GitHub repository settings:
 
