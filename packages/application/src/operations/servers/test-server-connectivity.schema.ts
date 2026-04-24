@@ -11,14 +11,26 @@ const draftServerConnectivityInputSchema = z.object({
   credential: configureServerCredentialCommandInputSchema.shape.credential.optional(),
 });
 
+export const testRegisteredServerConnectivityCommandInputSchema = z.object({
+  serverId: nonEmptyTrimmedString("Server ID"),
+});
+
+export const testDraftServerConnectivityCommandInputSchema = z.object({
+  server: draftServerConnectivityInputSchema,
+});
+
 export const testServerConnectivityCommandInputSchema = z.union([
-  z.object({
-    serverId: nonEmptyTrimmedString("Server ID"),
-  }),
-  z.object({
-    server: draftServerConnectivityInputSchema,
-  }),
+  testRegisteredServerConnectivityCommandInputSchema,
+  testDraftServerConnectivityCommandInputSchema,
 ]);
+
+export type TestRegisteredServerConnectivityCommandInput = z.input<
+  typeof testRegisteredServerConnectivityCommandInputSchema
+>;
+
+export type TestDraftServerConnectivityCommandInput = z.input<
+  typeof testDraftServerConnectivityCommandInputSchema
+>;
 
 export type TestServerConnectivityCommandInput = z.input<
   typeof testServerConnectivityCommandInputSchema

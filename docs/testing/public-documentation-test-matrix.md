@@ -74,7 +74,9 @@ Current status:
 - `PUB-DOCS-012` has expanded HTTP/API route-description coverage for high-confusion operations
   including deployment source, SSH credentials, server connectivity, resource profiles, environment
   variables, project lifecycle, domains, certificates, logs, health, diagnostics, and terminal
-  sessions.
+  sessions. The HTTP API reference page also names the runtime OpenAPI document path
+  `/api/openapi.json`, Scalar reference path `/api/reference`, and docs-generated OpenAPI
+  reference path `/docs/reference/openapi/`.
 - `PUB-DOCS-013` is covered by HTTP adapter tests for embedded docs routing and binary bundle smoke
   verification that `/docs/*` is served separately from Web console assets.
 - `PUB-DOCS-014` is covered by HTTP adapter tests for `docsStaticDir` override behavior and binary

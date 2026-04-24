@@ -10,11 +10,18 @@ export const collections = {
     loader: docsLoader(),
     schema: docsSchema({
       extend: z.object({
-        docType: z.enum(["task", "concept", "reference", "troubleshooting", "index"]),
-        localeState: z.object({
-          "zh-CN": localeState,
-          "en-US": localeState,
-        }),
+        docType: z
+          .enum(["task", "concept", "reference", "troubleshooting", "index"])
+          .default("reference"),
+        localeState: z
+          .object({
+            "zh-CN": localeState,
+            "en-US": localeState,
+          })
+          .default({
+            "zh-CN": "complete",
+            "en-US": "complete",
+          }),
         searchAliases: z.array(z.string()).default([]),
         relatedOperations: z.array(z.string()).default([]),
       }),

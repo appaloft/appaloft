@@ -9,6 +9,9 @@ Responsibilities:
 - mount oRPC RPC handlers at `/api/rpc` and OpenAPI/REST handlers at `/api` without hand-writing business routes in the HTTP adapter
 - expose a typed client plus TanStack Query helpers for `apps/web` and other first-party consumers
 
+OpenAPI document generation and Scalar reference rendering live in `@appaloft/openapi`, which imports
+this package's router without coupling the reference UI to Elysia.
+
 Depends on:
 
 - `@appaloft/application` for buses and message types

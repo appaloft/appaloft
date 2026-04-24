@@ -906,7 +906,13 @@ export function registerRuntimeDependencies(
   });
   container.register(tokens.pluginRegistry, {
     useFactory: instanceCachingFactory(
-      () => new LocalPluginHost(createBuiltinPlugins(), input.config.appVersion),
+      () =>
+        new LocalPluginHost(
+          createBuiltinPlugins({
+            appVersion: input.config.appVersion,
+          }),
+          input.config.appVersion,
+        ),
     ),
   });
 
