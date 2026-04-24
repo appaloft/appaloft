@@ -571,6 +571,23 @@ export const publicDocsHelpTopics = {
     relatedOperation: "system.plugins.list",
     aliases: ["plugin", "extension", "compatibility", "插件"],
   },
+  "http-api.openapi-reference": {
+    id: "http-api.openapi-reference",
+    title: "OpenAPI reference",
+    description:
+      "Where to find the OpenAPI document, Scalar API reference, and generated docs pages.",
+    page: {
+      "zh-CN": "reference/http-api",
+      "en-US": "en/reference/http-api",
+    },
+    anchor: "api-openapi-reference",
+    localeCoverage: {
+      "zh-CN": "complete",
+      "en-US": "complete",
+    },
+    surfaces: ["http-api"],
+    aliases: ["openapi", "scalar", "api reference", "接口文档"],
+  },
 } as const satisfies Record<string, Omit<PublicDocsHelpTopic, "id"> & { id: string }>;
 
 export type PublicDocsHelpTopicId = keyof typeof publicDocsHelpTopics;

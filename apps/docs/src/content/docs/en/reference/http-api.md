@@ -23,6 +23,14 @@ sidebar:
 
 HTTP/oRPC inputs must reuse business operation schemas instead of inventing transport-only business semantics.
 
+<h2 id="api-openapi-reference">OpenAPI and Scalar reference</h2>
+
+The backend serves the OpenAPI 3.1 document at `/api/openapi.json` and the Scalar interactive API reference at `/api/reference` by default.
+
+The public docs site also generates OpenAPI reference pages at `/docs/reference/openapi/`, with each operation expanded into its own page.
+
+Those entries are registered by the built-in OpenAPI Reference system plugin. Other Bun or Elysia servers can import `@appaloft/openapi` and mount the exported `Response` handlers on their own routes.
+
 <h2 id="api-lifecycle-status">Lifecycle status</h2>
 
 API callers should observe asynchronous state through public query/read surfaces.

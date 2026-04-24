@@ -30,6 +30,7 @@
       "@appaloft/observability/bootstrap": ["./packages/observability/src/bootstrap.ts"],
       "@appaloft/orpc": ["./packages/orpc/src/index.ts"],
       "@appaloft/orpc/client": ["./packages/orpc/src/client.ts"],
+      "@appaloft/openapi": ["./packages/openapi/src/index.ts"],
       "@appaloft/persistence-pg": ["./packages/persistence/pg/src/index.ts"],
       "@appaloft/adapter-http-elysia": ["./packages/adapters/http-elysia/src/index.ts"],
       "@appaloft/adapter-cli": ["./packages/adapters/cli/src/index.ts"],

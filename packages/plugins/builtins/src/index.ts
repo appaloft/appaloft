@@ -1,3 +1,4 @@
+import { createAppaloftOpenApiReferencePlugin } from "@appaloft/openapi";
 import { type SystemPluginDefinition } from "@appaloft/plugin-sdk";
 
 const builtinFakeRuntimePlugin: SystemPluginDefinition = {
@@ -13,6 +14,17 @@ const builtinFakeRuntimePlugin: SystemPluginDefinition = {
   },
 };
 
-export function createBuiltinPlugins(): SystemPluginDefinition[] {
-  return [builtinFakeRuntimePlugin];
+export interface CreateBuiltinPluginsOptions {
+  readonly appVersion?: string;
+}
+
+export function createBuiltinPlugins(
+  options: CreateBuiltinPluginsOptions = {},
+): SystemPluginDefinition[] {
+  return [
+    builtinFakeRuntimePlugin,
+    createAppaloftOpenApiReferencePlugin({
+      ...(options.appVersion ? { appVersion: options.appVersion } : {}),
+    }),
+  ];
 }

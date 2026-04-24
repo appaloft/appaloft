@@ -18,6 +18,13 @@ function createDocsRedirectTarget(mode: string): string {
   );
 }
 
+function createWebDevPort(mode: string): number {
+  const env = loadEnv(mode, process.cwd(), "");
+  const parsed = Number(env.APPALOFT_WEB_DEV_PORT || "4173");
+
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : 4173;
+}
+
 function createDocsRedirectPlugin(target: string): Plugin {
   const normalizedTarget = target.replace(/\/+$/g, "");
   const shouldRedirectDocsRequest = (requestUrl: string | undefined): requestUrl is string => {
@@ -61,10 +68,13 @@ function createDocsRedirectPlugin(target: string): Plugin {
 export default defineConfig(({ mode }) => {
   const proxyTarget = createApiProxyTarget(mode);
   const docsRedirectTarget = createDocsRedirectTarget(mode);
+  const webDevPort = createWebDevPort(mode);
 
   return {
     plugins: [createDocsRedirectPlugin(docsRedirectTarget), tailwindcss(), sveltekit()],
     server: {
+      port: webDevPort,
+      strictPort: true,
       watch: {
         ignored: ["**/build/**", "**/.svelte-kit/output/**"],
       },
