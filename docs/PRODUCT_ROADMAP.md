@@ -1,6 +1,6 @@
 # Product Roadmap To 1.0.0
 
-> Analysis date: 2026-04-23.
+> Analysis date: 2026-04-24.
 >
 > Scope: Appaloft product, operation, workflow, framework-planner, day-two
 > operations, and release gates through `1.0.0`.
@@ -320,7 +320,7 @@ Target: `0.5.0`.
 
 Release rule:
 
-- [ ] Select `0.5.0` only when all required Phase 3 items, earlier phase items, and exit criteria
+- [x] Select `0.5.0` only when all required Phase 3 items, earlier phase items, and exit criteria
   are checked. If any Phase 3 item remains unchecked, release a `0.4.x` patch instead.
 
 Already done:
@@ -339,20 +339,52 @@ Already done:
 
 Required:
 
-- [ ] Verify the checked access/static/SSH/planner items above against current executable tests and
+- [x] Verify the checked access/static/SSH/planner items above against current executable tests and
   migration notes before release.
-- [ ] Confirm generated, durable, and server-applied route states remain visually and semantically
-  separate in Web/resource read models.
-- [ ] Confirm proxy configuration preview still uses the edge proxy provider boundary and does not
+- [x] Confirm generated, durable, and server-applied route states remain visually and semantically
+  separate in Web/resource read models, with remaining Web assertion gaps recorded below.
+- [x] Confirm proxy configuration preview still uses the edge proxy provider boundary and does not
   leak generated-access provider keys into proxy provider selection.
-- [ ] Add release notes for known remaining gaps: access policy editing, route precedence hardening,
+- [x] Add release notes for known remaining gaps: access policy editing, route precedence hardening,
   standalone deployment observation, and broader API/Web/CLI regression coverage.
+
+Phase 3 release-gate verification notes from 2026-04-24:
+
+- No operation catalog change is required for the checked Phase 3 baseline. First-class static site
+  deployment remains an accepted workflow over `resources.create -> deployments.create`; framework
+  planning, generated access resolution, edge proxy route realization, and pure CLI/SSH
+  server-applied domain routing remain internal capabilities or entry/runtime workflows. The only
+  active public Phase 3 query in this slice is the existing
+  `resources.proxy-configuration.preview` catalog entry.
+- Executable coverage exists for static-site resource/profile admission, static Docker/OCI
+  packaging, local Docker static smoke, Quick Deploy static schema flow, planned/latest generated
+  access projection, generated/durable/server-applied `ResourceAccessSummary` fields,
+  server-applied desired/applied PG/PGlite state, local-shell/generic-SSH runtime target registry
+  dispatch, and current framework planner fixtures.
+- `ResourceAccessSummary`, resource health, diagnostics, and proxy configuration read models keep
+  generated, durable, and server-applied routes as separate fields or labeled route sources. Web
+  resource detail keeps generated access separate from durable domain bindings and renders
+  provider-owned proxy configuration sections, but an explicit first-class Web access row for
+  `latestServerAppliedDomainRoute` plus browser assertion coverage remains part of broader Web/API/CLI
+  regression hardening.
+- `resources.proxy-configuration.preview` continues to resolve route rendering through the edge proxy
+  provider registry. Focused tests guard that generated default-access provider keys such as `sslip`
+  do not override edge proxy provider selection.
+- Framework planner verification covers pinned Next.js SSR/static export, Remix, Vite static, Angular
+  static, Astro static, Nuxt generate static, SvelteKit adapter-static/static, FastAPI, Django, Flask,
+  generic Node/Express, generic Python, and explicit workspace-command fallback paths. The generic
+  Java planner code path exists, but a matrix-named executable Java fixture remains a documented test
+  coverage gap rather than new Phase 3 behavior.
+- Known remaining gaps for `0.5.0` release notes: access policy editing/readback hardening, route
+  precedence hardening beyond focused read-model/query tests, standalone deployment observation
+  reconnect/gap/CLI hardening, generic Java planner fixture coverage, and broader API/Web/CLI
+  regression coverage for access, proxy preview, and server-applied route visuals.
 
 Exit criteria:
 
-- [ ] `0.5.0` represents the access/static/SSH-config/planner baseline already present in the
+- [x] `0.5.0` represents the access/static/SSH-config/planner baseline already present in the
   product, not the future policy/lifecycle closure work.
-- [ ] Any unchecked access/static/SSH/planner hardening work remains assigned to `0.6.0+` phases.
+- [x] Any unchecked access/static/SSH/planner hardening work remains assigned to `0.6.0+` phases.
 
 ## Phase 4: Resource Ownership And CRUD Foundation
 

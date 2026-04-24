@@ -147,18 +147,19 @@ Current executable coverage is spread across deployment, resource, Quick Deploy,
 CLI, Web, and shell e2e tests. This matrix is the source of truth for the broader framework support
 catalog.
 
-Implemented planner coverage currently includes Next.js, Vite static, Astro static, Nuxt generate
+Implemented planner code paths currently include Next.js, Vite static, Astro static, Nuxt generate
 static, explicit SvelteKit static, Remix, FastAPI, Django, Flask, generic Node, generic Python,
-generic Java, and custom command fallback. Remaining catalog rows are target contract until their
-detectors, planners, Web/CLI parity, and Docker/SSH runtime paths have automated tests named with
-the corresponding matrix ids.
+generic Java, and custom command fallback. Executable matrix coverage exists for the named fixtures
+and focused planner tests listed below; generic Java still lacks a matrix-named fixture or focused
+planner test and remains a coverage gap until one is added.
 
 Executable coverage now includes first-slice `applicationShape` propagation for
 `WF-PLAN-DET-007`, Node manifest package-manager precedence coverage for `WF-PLAN-DET-001`, and
 container-native override coverage for `WF-PLAN-DET-009`/`WF-PLAN-CAT-016`. Catalog tests named
 with `WF-PLAN-CAT-001`, `WF-PLAN-CAT-002`, `WF-PLAN-CAT-003`, `WF-PLAN-CAT-005`,
-`WF-PLAN-CAT-007`, `WF-PLAN-CAT-008`, and `WF-PLAN-CAT-009` prove the selected planner records
-`static`, `serverful-http`, `hybrid-static-server`, or `ssr` classification metadata where covered.
+`WF-PLAN-CAT-007`, `WF-PLAN-CAT-008`, `WF-PLAN-CAT-009`, and `WF-PLAN-CAT-010` prove the selected
+planner records `static`, `serverful-http`, `hybrid-static-server`, or `ssr` classification metadata
+where covered.
 Fixed-version framework fixture tests now cover detector evidence for the table above, enforce exact
 manifest/requirements versions, and feed supported fixtures through runtime planning without
 installing dependencies or executing framework CLIs. Planner fixture coverage includes Next.js SSR,

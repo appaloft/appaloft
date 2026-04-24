@@ -152,9 +152,10 @@ Existing runtime tests assert concrete proxy bootstrap plans and route labels. T
 Provider package tests own concrete proxy label syntax. Runtime adapter tests should assert execution of provider-produced plans, not product-specific label generation.
 
 Application and provider tests cover the query service, provider-rendered sections, provider-owned
-reload plans, and the guard
-that generated default-access domain provider keys such as `sslip` do not override edge proxy
-provider selection. Broader API/Web/CLI regression coverage remains a follow-up.
+reload plans, and the guard that generated default-access domain provider keys such as `sslip` do
+not override edge proxy provider selection. Broader API/Web/CLI regression coverage remains a
+follow-up, including entry-surface assertions that latest route source labels remain distinct for
+generated, durable-domain, and server-applied routes.
 
 `EDGE-PROXY-ROUTE-005` now has application/runtime coverage for consuming SSH-server
 server-applied config domain desired state as provider-neutral route input and recording applied
