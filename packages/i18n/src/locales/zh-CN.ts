@@ -883,6 +883,12 @@ export const zhCN = {
       notFoundBody: "当前列表没有这个服务器。它可能已经被删除，或后端没有返回该记录。",
       notFoundTitle: "没有找到这个服务器。",
       pageTitle: "服务器",
+      renameFailed: "无法修改服务器名称",
+      renameLabel: "显示名称",
+      renameSucceeded: "服务器名称已保存",
+      settingsDescription:
+        "只修改显示名称，不改变 server id、Host、Provider、凭据、代理、生命周期或部署历史。",
+      settingsTitle: "服务器设置",
     },
     shell: {
       noProjects: "暂无项目",

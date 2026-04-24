@@ -46,6 +46,7 @@ describe("operation catalog aggregate mutation boundary", () => {
       "credentials.list-ssh",
       "servers.list",
       "servers.show",
+      "servers.rename",
       "servers.deactivate",
       "servers.delete-check",
       "servers.test-connectivity",
@@ -89,6 +90,23 @@ describe("operation catalog aggregate mutation boundary", () => {
       transports: {
         cli: "appaloft server delete <serverId> --confirm <serverId>",
         orpc: { method: "DELETE", path: "/api/servers/{serverId}" },
+      },
+    });
+    expect(entry?.inputSchema).toBeDefined();
+  });
+
+  test("[SRV-LIFE-ENTRY-015] server rename is exposed through the active operation catalog", () => {
+    const entry = operationCatalog.find((candidate) => candidate.key === "servers.rename");
+
+    expect(entry).toMatchObject({
+      kind: "command",
+      domain: "servers",
+      messageName: "RenameServerCommand",
+      handlerName: "RenameServerCommandHandler",
+      serviceName: "RenameServerUseCase",
+      transports: {
+        cli: "appaloft server rename <serverId> --name <name>",
+        orpc: { method: "POST", path: "/api/servers/{serverId}/rename" },
       },
     });
     expect(entry?.inputSchema).toBeDefined();

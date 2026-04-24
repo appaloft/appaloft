@@ -13,6 +13,7 @@ searchAliases:
 relatedOperations:
   - servers.register
   - servers.show
+  - servers.rename
   - servers.deactivate
   - servers.delete-check
   - servers.delete
@@ -33,6 +34,8 @@ sidebar:
 注册服务器的目标是让 Appaloft 能安全地执行部署计划，而不是立即部署应用。
 
 读取服务器详情用于确认某个部署目标的 host、provider、已配置凭据摘要、代理状态，以及当前部署、资源和域名的汇总。这个读取不会运行连接测试、修复代理或修改服务器。
+
+重命名服务器只修改显示名称。它不会改变 server id、host、provider、credential、proxy、lifecycle 或历史部署/域名/审计引用。active 和 inactive 服务器都可以重命名；已经删除的服务器不会出现在普通重命名入口中。
 
 停用服务器用于阻止它继续作为新的部署、调度或代理配置目标。停用不会停止已有运行任务，也不会删除部署历史、域名、证书、凭据、路由、日志或审计记录。
 
@@ -100,6 +103,10 @@ appaloft server test srv_primary
 
 ```bash title="读取服务器详情"
 appaloft server show srv_primary
+```
+
+```bash title="重命名服务器"
+appaloft server rename srv_primary --name "Primary SSH server"
 ```
 
 ```bash title="停用服务器"

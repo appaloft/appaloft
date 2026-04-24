@@ -58,6 +58,7 @@ export const tokens = {
   listSshCredentialsQueryService: Symbol.for("appaloft.list_ssh_credentials_query_service"),
   listServersQueryService: Symbol.for("appaloft.list_servers_query_service"),
   showServerQueryService: Symbol.for("appaloft.show_server_query_service"),
+  renameServerUseCase: Symbol.for("appaloft.rename_server_use_case"),
   deactivateServerUseCase: Symbol.for("appaloft.deactivate_server_use_case"),
   deleteServerUseCase: Symbol.for("appaloft.delete_server_use_case"),
   checkServerDeleteSafetyQueryService: Symbol.for(

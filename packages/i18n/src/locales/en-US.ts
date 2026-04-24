@@ -943,6 +943,12 @@ export const enUS = {
         "The current list does not include this server. It may have been removed or not returned by the backend.",
       notFoundTitle: "Server not found.",
       pageTitle: "Servers",
+      renameFailed: "Unable to rename server",
+      renameLabel: "Display name",
+      renameSucceeded: "Server name saved",
+      settingsDescription:
+        "Change the display name without changing the server id, host, provider, credential, proxy, lifecycle, or deployment history.",
+      settingsTitle: "Server settings",
     },
     shell: {
       noProjects: "No projects",

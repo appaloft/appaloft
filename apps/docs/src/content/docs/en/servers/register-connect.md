@@ -12,6 +12,7 @@ searchAliases:
 relatedOperations:
   - servers.register
   - servers.show
+  - servers.rename
   - servers.deactivate
   - servers.delete-check
   - servers.delete
@@ -32,6 +33,8 @@ A server is not a project or a resource. One server can host multiple resources,
 Registering a server makes Appaloft able to execute deployment plans. It does not deploy an app by itself.
 
 Reading server detail confirms a deployment target's host, provider, masked credential summary, proxy status, and current deployment, resource, and domain rollups. This read does not run connectivity checks, repair proxy state, or mutate the server.
+
+Renaming a server changes only the display name. It does not change server id, host, provider, credential, proxy, lifecycle, or historical deployment/domain/audit references. Active and inactive servers can both be renamed; deleted servers are not visible through the normal rename entrypoint.
 
 Deactivating a server prevents it from being used as a new deployment, scheduling, or proxy configuration target. Deactivation does not stop existing runtime work and does not delete deployment history, domains, certificates, credentials, routes, logs, or audit records.
 
@@ -99,6 +102,10 @@ appaloft server test srv_primary
 
 ```bash title="Read server detail"
 appaloft server show srv_primary
+```
+
+```bash title="Rename a server"
+appaloft server rename srv_primary --name "Primary SSH server"
 ```
 
 ```bash title="Deactivate a server"
