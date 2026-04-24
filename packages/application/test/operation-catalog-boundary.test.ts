@@ -45,6 +45,7 @@ describe("operation catalog aggregate mutation boundary", () => {
       "credentials.create-ssh",
       "credentials.list-ssh",
       "servers.list",
+      "servers.show",
       "servers.test-connectivity",
       "resources.create",
       "resources.list",

@@ -94,21 +94,28 @@
   let colorMode = $state<"light" | "dark">("light");
   let colorModeReady = $state(false);
 
-	const {
-		healthQuery,
-		versionQuery,
-		authSessionQuery,
-		projectsQuery,
+  const {
+    healthQuery,
+    versionQuery,
+    authSessionQuery,
+    projectsQuery,
     resourcesQuery,
     deploymentsQuery,
-	} = createConsoleQueries(browser);
+  } = createConsoleQueries(browser, {
+    readiness: false,
+    servers: false,
+    environments: false,
+    domainBindings: false,
+    certificates: false,
+    providers: false,
+  });
 
   const pathname = $derived(page.url.pathname);
   const version = $derived(versionQuery.data ?? null);
-	const authSession = $derived(authSessionQuery.data ?? defaultAuthSession);
-	const projects = $derived(projectsQuery.data?.items ?? []);
+  const authSession = $derived(authSessionQuery.data ?? defaultAuthSession);
+  const projects = $derived(projectsQuery.data?.items ?? []);
   const resources = $derived(resourcesQuery.data?.items ?? []);
-	const deployments = $derived(deploymentsQuery.data?.items ?? []);
+  const deployments = $derived(deploymentsQuery.data?.items ?? []);
   const filteredProjects = $derived.by(() => {
     const query = projectSearch.trim().toLowerCase();
     if (!query) {

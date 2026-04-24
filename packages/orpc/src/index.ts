@@ -97,6 +97,7 @@ import {
   ShowEnvironmentQuery,
   ShowProjectQuery,
   ShowResourceQuery,
+  ShowServerQuery,
   StreamDeploymentEventsQuery,
   type StreamDeploymentEventsQueryInput,
   type StreamDeploymentEventsResult,
@@ -106,6 +107,7 @@ import {
   showEnvironmentQueryInputSchema,
   showProjectQueryInputSchema,
   showResourceQueryInputSchema,
+  showServerQueryInputSchema,
   streamDeploymentEventsQueryInputSchema,
   TestServerConnectivityCommand,
   testServerConnectivityCommandInputSchema,
@@ -165,6 +167,7 @@ import {
   setResourceVariableResponseSchema,
   showDeploymentResponseSchema,
   showProjectResponseSchema,
+  showServerResponseSchema,
   terminalSessionDescriptorSchema,
   testServerConnectivityResponseSchema,
   unsetResourceVariableResponseSchema,
@@ -217,6 +220,7 @@ export const apiDocsHrefs = {
   createDeployment: createDeploymentDocsHref,
   serverCredential: resolvePublicDocsHelpHref("server.ssh-credential"),
   serverConnectivity: resolvePublicDocsHelpHref("server.connectivity-test"),
+  serverDeploymentTarget: resolvePublicDocsHelpHref("server.deployment-target"),
   serverProxyReadiness: resolvePublicDocsHelpHref("server.proxy-readiness"),
   environmentVariablePrecedence: resolvePublicDocsHelpHref("environment.variable-precedence"),
   environmentDiffPromote: resolvePublicDocsHelpHref("environment.diff-promote"),
@@ -241,6 +245,10 @@ export const apiRouteDescriptions = {
     "deployment.source",
   ),
   projectLifecycle: routeDescription("Read, rename, and archive projects.", "project.lifecycle"),
+  showServer: routeDescription(
+    "Reads one deployment target with proxy status and usage rollups.",
+    "server.deployment-target",
+  ),
   configureServerCredential: routeDescription(
     "Configures the SSH credential Appaloft uses for server connectivity and deployment.",
     "server.ssh-credential",
@@ -887,6 +895,17 @@ export const listServersProcedure = base
   .output(listServersResponseSchema)
   .handler(async ({ context }) => executeQuery(context, ListServersQuery.create()));
 
+export const showServerProcedure = base
+  .route({
+    method: "GET",
+    path: "/servers/{serverId}",
+    description: apiRouteDescriptions.showServer,
+    successStatus: 200,
+  })
+  .input(showServerQueryInputSchema)
+  .output(showServerResponseSchema)
+  .handler(async ({ input, context }) => executeQuery(context, ShowServerQuery.create(input)));
+
 export const registerServerProcedure = base
   .route({
     method: "POST",
@@ -1526,6 +1545,7 @@ export const appaloftOrpcRouter = {
   },
   servers: {
     list: listServersProcedure,
+    show: showServerProcedure,
     create: registerServerProcedure,
     configureCredential: configureServerCredentialProcedure,
     testConnectivity: testServerConnectivityProcedure,
@@ -1717,6 +1737,7 @@ export function mountAppaloftOrpcRoutes(
     "/api/projects/:projectId/archive",
     "/api/credentials/ssh",
     "/api/servers",
+    "/api/servers/:serverId",
     "/api/servers/connectivity-tests",
     "/api/servers/:serverId/credentials",
     "/api/servers/:serverId/connectivity-tests",

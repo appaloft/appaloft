@@ -154,6 +154,17 @@ export const registerServerInputSchema = z.object({
   proxyKind: z.enum(["none", "traefik", "caddy"]).default("traefik"),
 });
 
+export const showServerInputSchema = z.object({
+  serverId: z.string().min(1),
+  includeRollups: z
+    .union([
+      z.boolean(),
+      z.literal("true").transform(() => true),
+      z.literal("false").transform(() => false),
+    ])
+    .default(true),
+});
+
 export const configureServerCredentialInputSchema = z.object({
   serverId: z.string().min(1),
   credential: z.discriminatedUnion("kind", [
@@ -208,6 +219,66 @@ export const registerServerResponseSchema = z.object({
 export const listServersResponseSchema = z.object({
   items: z.array(serverSummarySchema),
 });
+
+const serverDeploymentStatusSchema = z.enum([
+  "created",
+  "planning",
+  "planned",
+  "running",
+  "cancel-requested",
+  "succeeded",
+  "failed",
+  "canceled",
+  "rolled-back",
+]);
+
+const serverDomainBindingStatusSchema = z.enum([
+  "requested",
+  "pending_verification",
+  "bound",
+  "certificate_pending",
+  "ready",
+  "not_ready",
+  "failed",
+]);
+
+const serverDeploymentStatusCountSchema = z.object({
+  status: serverDeploymentStatusSchema,
+  count: z.number(),
+});
+
+const serverDomainStatusCountSchema = z.object({
+  status: serverDomainBindingStatusSchema,
+  count: z.number(),
+});
+
+export const serverDetailSchema = z.object({
+  schemaVersion: z.literal("servers.show/v1"),
+  server: serverSummarySchema,
+  rollups: z
+    .object({
+      resources: z.object({
+        total: z.number(),
+        deployedResourceIds: z.array(z.string()),
+      }),
+      deployments: z.object({
+        total: z.number(),
+        statusCounts: z.array(serverDeploymentStatusCountSchema),
+        latestDeploymentId: z.string().optional(),
+        latestDeploymentStatus: serverDeploymentStatusSchema.optional(),
+      }),
+      domains: z.object({
+        total: z.number(),
+        statusCounts: z.array(serverDomainStatusCountSchema),
+        latestDomainBindingId: z.string().optional(),
+        latestDomainBindingStatus: serverDomainBindingStatusSchema.optional(),
+      }),
+    })
+    .optional(),
+  generatedAt: z.string(),
+});
+
+export const showServerResponseSchema = serverDetailSchema;
 
 export const serverConnectivityCheckSchema = z.object({
   name: z.string(),
@@ -2075,10 +2146,13 @@ export type ArchiveProjectResponse = z.infer<typeof archiveProjectResponseSchema
 export type ServerSummary = z.infer<typeof serverSummarySchema>;
 export type SshCredentialSummary = z.infer<typeof sshCredentialSummarySchema>;
 export type RegisterServerInput = z.infer<typeof registerServerInputSchema>;
+export type ShowServerInput = z.infer<typeof showServerInputSchema>;
 export type ConfigureServerCredentialInput = z.infer<typeof configureServerCredentialInputSchema>;
 export type CreateSshCredentialInput = z.infer<typeof createSshCredentialInputSchema>;
 export type RegisterServerResponse = z.infer<typeof registerServerResponseSchema>;
 export type ListServersResponse = z.infer<typeof listServersResponseSchema>;
+export type ServerDetail = z.infer<typeof serverDetailSchema>;
+export type ShowServerResponse = z.infer<typeof showServerResponseSchema>;
 export type CreateSshCredentialResponse = z.infer<typeof createSshCredentialResponseSchema>;
 export type ListSshCredentialsResponse = z.infer<typeof listSshCredentialsResponseSchema>;
 export type ServerConnectivityCheck = z.infer<typeof serverConnectivityCheckSchema>;
