@@ -3,7 +3,7 @@ version = 1
 name = "appaloft"
 
 [setup]
-script = ""
+script = "bun install"
 
 [[actions]]
 name = "开发 desktop"
