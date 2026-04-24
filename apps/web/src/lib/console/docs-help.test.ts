@@ -112,6 +112,11 @@ describe("console docs help links", () => {
       ],
     ).toContain("deploymentLifecycle");
     expect(sourceByPath["routes/servers/+page.svelte"]).toContain("defaultAccessPolicy");
+    expect(sourceByPath["routes/servers/+page.svelte"]).toContain("serverSshCredential");
+    expect(sourceByPath["routes/servers/+page.svelte"]).toContain(
+      "orpcClient.credentials.ssh.delete",
+    );
+    expect(sourceByPath["routes/servers/+page.svelte"]).toContain("deleteCredentialDialogTitle");
     expect(sourceByPath["routes/servers/[serverId]/+page.svelte"]).toContain(
       "serverConnectivityTest",
     );

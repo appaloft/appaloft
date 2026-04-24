@@ -5,6 +5,7 @@ export * from "./operations/servers/configure-server-edge-proxy.command";
 export * from "./operations/servers/create-ssh-credential.command";
 export * from "./operations/servers/deactivate-server.command";
 export * from "./operations/servers/delete-server.command";
+export * from "./operations/servers/delete-ssh-credential.command";
 export * from "./operations/servers/list-servers.query";
 export * from "./operations/servers/list-ssh-credentials.query";
 export * from "./operations/servers/register-server.command";

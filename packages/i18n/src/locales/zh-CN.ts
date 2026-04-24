@@ -889,6 +889,21 @@ export const zhCN = {
         "在删除能力开放前，先预览这个服务器是否仍被部署、域名、凭据、路由、日志或审计记录引用。",
       deleteSafetyEligible: "可删除",
       deleteSafetyTitle: "删除安全检查",
+      deleteCredentialAction: "删除",
+      deleteCredentialActionAria: "删除 SSH 凭据 {{name}}",
+      deleteCredentialConfirmMismatch: "输入的凭据 ID 必须完全匹配。",
+      deleteCredentialConfirmationLabel: "输入凭据 ID 以确认",
+      deleteCredentialDeleting: "正在删除",
+      deleteCredentialDialogDescription:
+        "只有当 {{id}} 的活跃和已停用服务器使用情况读取为 0 时，才会永久删除。",
+      deleteCredentialDialogTitle: "删除已保存 SSH 凭据",
+      deleteCredentialFailed: "无法删除 SSH 凭据",
+      deleteCredentialSucceeded: "SSH 凭据已删除",
+      deleteCredentialUsageChecking: "正在删除前检查凭据使用情况。",
+      deleteCredentialUsageInUse:
+        "这个凭据仍被 {{total}} 个服务器使用：{{active}} 个活跃，{{inactive}} 个已停用。",
+      deleteCredentialUsageReady: "使用情况为 0；仍需要输入确认。",
+      deleteCredentialUsageUnavailable: "使用情况无法安全读取。请重试后再删除这个凭据。",
       emptyBody: "新部署流程可以自动创建本地服务器，也可以先在 CLI 中注册远端 SSH 目标。",
       emptyTitle: "还没有服务器目标。",
       focusDescription:
@@ -909,6 +924,12 @@ export const zhCN = {
       settingsDescription:
         "只修改显示名称，不改变 server id、Host、Provider、凭据、代理、生命周期或部署历史。",
       settingsTitle: "服务器设置",
+      savedCredentialLibraryCount: "{{count}} 个已保存",
+      savedCredentialLibraryDescription:
+        "可复用的已保存 SSH 私钥凭据；只有在使用情况确认为空后，才允许删除。",
+      savedCredentialLibraryEmptyBody: "创建使用可复用私钥的服务器，或通过 CLI 保存凭据。",
+      savedCredentialLibraryEmptyTitle: "暂无已保存 SSH 凭据",
+      savedCredentialLibraryTitle: "已保存 SSH 凭据",
     },
     shell: {
       noProjects: "暂无项目",

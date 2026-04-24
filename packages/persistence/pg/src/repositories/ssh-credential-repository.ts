@@ -11,9 +11,17 @@ import {
   type SshCredentialMutationSpecVisitor,
   type SshCredentialSelectionSpec,
   type SshCredentialSelectionSpecVisitor,
+  type UnusedSshCredentialByIdSpec,
   type UpsertSshCredentialSpec,
 } from "@appaloft/core";
-import { type Insertable, type Kysely, type Selectable, type SelectQueryBuilder } from "kysely";
+import {
+  type DeleteQueryBuilder,
+  type DeleteResult,
+  type Insertable,
+  type Kysely,
+  type Selectable,
+  type SelectQueryBuilder,
+} from "kysely";
 
 import { type Database } from "../schema";
 import { rehydrateSshCredential, resolveRepositoryExecutor } from "./shared";
@@ -23,6 +31,7 @@ type SshCredentialSelectionQuery = SelectQueryBuilder<
   "ssh_credentials",
   Selectable<Database["ssh_credentials"]>
 >;
+type SshCredentialDeleteQuery = DeleteQueryBuilder<Database, "ssh_credentials", DeleteResult>;
 
 class KyselySshCredentialSelectionVisitor
   implements SshCredentialSelectionSpecVisitor<SshCredentialSelectionQuery>
@@ -32,6 +41,53 @@ class KyselySshCredentialSelectionVisitor
     spec: SshCredentialByIdSpec,
   ): SshCredentialSelectionQuery {
     return query.where("id", "=", spec.id.value);
+  }
+
+  visitUnusedSshCredentialById(
+    query: SshCredentialSelectionQuery,
+    spec: UnusedSshCredentialByIdSpec,
+  ): SshCredentialSelectionQuery {
+    return query
+      .where("id", "=", spec.id.value)
+      .where(({ exists, not, selectFrom }) =>
+        not(
+          exists(
+            selectFrom("servers")
+              .select("servers.id")
+              .whereRef("servers.credential_id", "=", "ssh_credentials.id")
+              .where("servers.lifecycle_status", "in", ["active", "inactive"]),
+          ),
+        ),
+      );
+  }
+}
+
+class KyselySshCredentialDeleteVisitor
+  implements SshCredentialSelectionSpecVisitor<SshCredentialDeleteQuery>
+{
+  visitSshCredentialById(
+    query: SshCredentialDeleteQuery,
+    spec: SshCredentialByIdSpec,
+  ): SshCredentialDeleteQuery {
+    return query.where("id", "=", spec.id.value);
+  }
+
+  visitUnusedSshCredentialById(
+    query: SshCredentialDeleteQuery,
+    spec: UnusedSshCredentialByIdSpec,
+  ): SshCredentialDeleteQuery {
+    return query
+      .where("id", "=", spec.id.value)
+      .where(({ exists, not, selectFrom }) =>
+        not(
+          exists(
+            selectFrom("servers")
+              .select("servers.id")
+              .whereRef("servers.credential_id", "=", "ssh_credentials.id")
+              .where("servers.lifecycle_status", "in", ["active", "inactive"]),
+          ),
+        ),
+      );
   }
 }
 
@@ -112,6 +168,26 @@ export class PgSshCredentialRepository implements SshCredentialRepository {
           .executeTakeFirst();
 
         return row ? SshCredential.rehydrate(rehydrateSshCredential(row)) : null;
+      },
+    );
+  }
+
+  async deleteOne(context: RepositoryContext, spec: SshCredentialSelectionSpec): Promise<boolean> {
+    const executor = resolveRepositoryExecutor(this.db, context);
+    return context.tracer.startActiveSpan(
+      createRepositorySpanName("ssh_credential", "delete_one"),
+      {
+        attributes: {
+          [appaloftTraceAttributes.repositoryName]: "ssh_credential",
+          [appaloftTraceAttributes.selectionSpecName]: spec.constructor.name,
+        },
+      },
+      async () => {
+        const deleted = await spec
+          .accept(executor.deleteFrom("ssh_credentials"), new KyselySshCredentialDeleteVisitor())
+          .returning("id")
+          .executeTakeFirst();
+        return Boolean(deleted);
       },
     );
   }
