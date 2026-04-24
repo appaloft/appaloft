@@ -57,13 +57,30 @@ describe("public docs operation coverage", () => {
       expect.arrayContaining([
         "docs/workflows/ssh-credential-lifecycle.md",
         "docs/queries/credentials.show.md",
+        "docs/commands/credentials.delete-ssh.md",
         "docs/errors/credentials.lifecycle.md",
         "docs/testing/ssh-credential-lifecycle-test-matrix.md",
       ]),
     );
     expect(topic.webSurfaces).toEqual(
       expect.arrayContaining([
-        "apps/web server registration, Quick Deploy credential step, and credential detail surfaces",
+        "apps/web server registration, Quick Deploy credential step, credential detail surfaces, and saved credential destructive delete dialog",
+      ]),
+    );
+  });
+
+  test("[SSH-CRED-ENTRY-009] [SSH-CRED-ENTRY-010] reusable SSH credential delete records docs coverage and Web surface", () => {
+    const coverage = getPublicDocsOperationCoverage("credentials.delete-ssh");
+    const topic = publicDocsHelpTopics["server.ssh-credential"];
+
+    expect(coverage).toMatchObject({
+      operationKey: "credentials.delete-ssh",
+      status: "documented",
+      topicId: "server.ssh-credential",
+    });
+    expect(topic.webSurfaces).toEqual(
+      expect.arrayContaining([
+        "apps/web server registration, Quick Deploy credential step, credential detail surfaces, and saved credential destructive delete dialog",
       ]),
     );
   });

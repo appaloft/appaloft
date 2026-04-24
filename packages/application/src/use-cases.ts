@@ -66,6 +66,7 @@ export * from "./operations/servers/configure-server-edge-proxy.use-case";
 export * from "./operations/servers/create-ssh-credential.use-case";
 export * from "./operations/servers/deactivate-server.use-case";
 export * from "./operations/servers/delete-server.use-case";
+export * from "./operations/servers/delete-ssh-credential.use-case";
 export * from "./operations/servers/list-servers.query-service";
 export * from "./operations/servers/list-ssh-credentials.query-service";
 export * from "./operations/servers/register-server.use-case";

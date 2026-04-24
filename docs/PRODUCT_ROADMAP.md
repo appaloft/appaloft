@@ -303,9 +303,8 @@ Exit criteria:
 
 Post-`0.4.0` gaps assigned to later phases:
 
-- Broad credential usage visibility remains Phase 4 work; server configure-edge-proxy, show,
-  rename, deactivate, delete safety, and guarded soft delete are active lifecycle slices.
-- Credential show/rotate/delete when unused remains Phase 4 work.
+- Credential rotation remains Phase 4 work; broad credential usage visibility and
+  delete-when-unused are active lifecycle slices.
 - Remaining environment clone/lock/archive/effective-precedence/history work remains Phase 4 work.
 - Access policy editing, route precedence hardening, route intent repair, domain binding mutation
   lifecycle, and certificate import/revoke/retry/delete remain Phase 6 work.
@@ -412,8 +411,9 @@ Required:
 - [x] Add server show with proxy status and initial deployment/resource/domain rollups.
 - [x] Add server rename.
 - [x] Add server configure-edge-proxy.
-- [ ] Add broad credential usage visibility.
-- [ ] Add credential show/rotate/delete when unused.
+- [x] Add broad credential usage visibility.
+- [x] Add credential show/delete when unused.
+- [ ] Add credential rotate/update.
 - [x] Add resource show/archive/delete.
 - [x] Add separate resource source update semantics where specs require a separate command.
 - [x] Add separate resource runtime update semantics where specs require a separate command.
@@ -680,9 +680,10 @@ work below before GA.
   safety, guarded soft delete, connectivity, proxy repair, terminal open.
 - [x] Deployment target/server: rename.
 - [x] Deployment target/server: configure-edge-proxy.
-- [ ] Deployment target/server: broad credential usage visibility.
+- [x] Deployment target/server: broad credential usage visibility.
 - [x] SSH credential: create/list, attach to server.
-- [ ] SSH credential: show, rotate/update, delete when unused, usage visibility.
+- [x] SSH credential: show, delete when unused, usage visibility.
+- [ ] SSH credential: rotate/update.
 - [x] Resource: create/list/show, configure source/runtime/network/health, set/unset variables,
   effective config, health, logs, proxy preview, diagnostics, archive/delete, and Web detail
   observation.
@@ -800,8 +801,8 @@ Recommended next Spec Rounds before broad Code Rounds:
 
 - [ ] Resource profile lifecycle: `resources.show`, source/runtime/network update, archive/delete,
   resource detail workflow, and test matrix.
-- [x] SSH credential lifecycle: `credentials.show` masked detail and usage visibility before
-  rotate/delete safety.
+- [x] SSH credential lifecycle: `credentials.show` masked detail and usage visibility plus
+  `credentials.delete-ssh` delete-when-unused safety across CLI, API, and Web typed confirmation.
 - [x] Framework support tier matrix: fixed-version detector/planner fixtures cover the current
   Next.js, Vite, Angular, SvelteKit, Nuxt, Astro, Remix, Express, FastAPI, Django, and Flask slice.
 - [ ] Framework support tier matrix: promote Web/CLI draft-field parity and real deploy smoke rows

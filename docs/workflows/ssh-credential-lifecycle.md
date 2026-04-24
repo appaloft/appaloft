@@ -10,11 +10,12 @@ The current active operations are:
 - `credentials.create-ssh`;
 - `credentials.list-ssh`;
 - `credentials.show`;
+- `credentials.delete-ssh`;
 - `servers.configure-credential`.
 
-Rotate/update and delete-when-unused are future mutations. They must not be exposed through Web,
-CLI, HTTP/oRPC, automation, or future MCP tools until their command boundaries, safety rules, error
-contracts, and tests are accepted.
+Rotate/update remains a future mutation. It must not be exposed through Web, CLI, HTTP/oRPC,
+automation, or future MCP tools until its command boundary, safety rules, error contract, and tests
+are accepted.
 
 ## Global References
 
@@ -54,6 +55,7 @@ server and does not replace `servers.test-connectivity`.
 | Create reusable SSH key credential | `credentials.create-ssh` | Credential library state | Server credential attachment, connectivity, deployment, runtime, or proxy state |
 | List reusable SSH key credentials | `credentials.list-ssh` | Nothing | Credential material, server state, connectivity, runtime, or proxy state |
 | Show reusable SSH credential detail and usage | `credentials.show` | Nothing | Credential material, server state, connectivity, runtime, proxy, terminal, or deployment state |
+| Delete unused reusable SSH credential | `credentials.delete-ssh` | Credential library state | Server credential attachment, active/inactive server references, connectivity, deployment, runtime, proxy, terminal, logs, or audit state |
 | Attach credential to server | `servers.configure-credential` | DeploymentTarget credential reference/snapshot | Credential library mutation, connectivity, deployment, runtime, or proxy state |
 
 Generic credential mutation operations such as `credentials.update` are not accepted business
@@ -83,11 +85,11 @@ credentials.list-ssh()
   -> credentials.show(credentialId, includeUsage = true)
 ```
 
-Future delete-when-unused must start from the same usage visibility:
+Delete-when-unused starts from the same usage visibility:
 
 ```text
 credentials.show(credentialId)
-  -> future credential delete safety or delete command
+  -> credentials.delete-ssh(credentialId, confirmation.credentialId)
 ```
 
 ## Safety And Redaction Rules
@@ -118,6 +120,18 @@ Usage visibility is based on durable server/deployment-target records that refer
 credential id. Direct private-key attachments and local SSH agent attachments are not usage of a
 reusable SSH credential.
 
+Credential delete safety uses the same usage meaning:
+
+- `usage.totalServers = 0` is required before deletion can proceed;
+- active visible server references block deletion;
+- inactive visible server references block deletion;
+- direct private-key and local-SSH-agent server credentials are not reusable credential usage;
+- deleted server tombstones are omitted from the first active delete safety surface;
+- usage-read failure rejects deletion and must not be treated as zero usage.
+
+The persistence adapter must guard the physical PG/PGlite delete so deletion cannot clear
+active/inactive server credential references through foreign-key behavior.
+
 ## Relationship To Server Lifecycle
 
 `servers.show` remains the server-owned detail query and may show the server's current masked
@@ -146,35 +160,38 @@ Quick Deploy must not:
 
 | Surface | Decision |
 | --- | --- |
-| CLI | `appaloft server credential-show <credentialId>` dispatches `ShowSshCredentialQuery` and displays masked metadata plus usage counts in structured output. |
-| HTTP/oRPC | `GET /api/credentials/ssh/{credentialId}` uses `ShowSshCredentialQueryInput`; no parallel transport-only schema. |
-| Web | Server detail exposes a read-only credential detail/usage affordance when its masked credential summary contains a stored reusable credential id. |
+| CLI | `appaloft server credential-show <credentialId>` dispatches `ShowSshCredentialQuery`; `appaloft server credential-delete <credentialId> --confirm <credentialId>` dispatches `DeleteSshCredentialCommand`. Both use structured command/query schemas. |
+| HTTP/oRPC | `GET /api/credentials/ssh/{credentialId}` uses `ShowSshCredentialQueryInput`; `DELETE /api/credentials/ssh/{credentialId}` uses `DeleteSshCredentialCommandInput`; no parallel transport-only schema. |
+| Web | Server detail exposes credential detail/usage when its masked credential summary contains a stored reusable credential id. The saved SSH credentials surface opens a destructive confirmation dialog, re-reads usage, requires exact credential-id confirmation, and dispatches `credentials.delete-ssh` through the typed oRPC client only when usage is zero. |
 | Repository config | Not applicable. Repository config must not select credential identity or raw credential material. |
-| Future MCP/tools | Generate a read-only `credentials.show` tool from the operation catalog when active. |
-| Public docs | Reuse existing `server.ssh-credential` help anchor. If rotate/delete ships later, add task-oriented docs for safe credential rotation/deletion before calling those behaviors complete. |
+| Future MCP/tools | Generate future read/write credential tools from operation catalog entries and reuse the same command/query schemas. |
+| Public docs | Reuse existing `server.ssh-credential` help anchor for show and delete; it must explain zero-usage deletion, in-use rejection, usage-read-unavailable rejection, and Web/CLI/API entrypoints. |
 
 ## ADR Decision
 
-No new ADR is required for the read-only `credentials.show` candidate because it does not change
-command boundaries, ownership scope, lifecycle stages, retry semantics, durable state shape, or
-async acceptance semantics.
+No new ADR is required for `credentials.show` because it is read-only.
 
-Future rotate/update or delete-when-unused may require ADR escalation if the behavior changes
-credential custody, server execution snapshots, secret-store state, deletion safety, audit
-retention, or attachment lifecycle semantics.
+No new ADR is required for `credentials.delete-ssh` because it is an intention-revealing aggregate
+mutation under ADR-026, deletes only the credential library row, does not detach or rewrite server
+credential state, does not change credential custody, does not introduce async acceptance, and keeps
+usage safety inside existing durable server usage visibility. Future rotation, audit retention,
+server detachment, secret-store migration, or tombstone-retention behavior may require ADR
+escalation.
 
 ## Current Implementation Notes And Migration Gaps
 
-The current implementation has reusable SSH credential create/list, server credential attachment,
-server detail masked credential summaries, and one-credential masked detail plus active/inactive
-server usage visibility through application, PG/PGlite, CLI, HTTP/oRPC, and Web server detail
-surfaces.
+The current implementation has reusable SSH credential create/list/delete, server credential
+attachment, server detail masked credential summaries, one-credential masked detail plus
+active/inactive server usage visibility, and Web saved-credential destructive deletion guarded by
+typed confirmation and usage re-read.
 
 `credentials.show` is active in `CORE_OPERATIONS.md`, `operation-catalog.ts`, CLI, API/oRPC,
 contracts, Web server detail, and tests.
 
-Credential rotate/update and delete-when-unused remain future behavior. They must be specified as
-separate commands after usage visibility is active.
+`credentials.delete-ssh` is active in `CORE_OPERATIONS.md`, `operation-catalog.ts`, CLI,
+API/oRPC, contracts, persistence, Web, and tests.
+
+Credential rotate/update remains future behavior.
 
 ## Open Questions
 

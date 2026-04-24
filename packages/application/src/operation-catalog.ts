@@ -47,6 +47,7 @@ import { configureServerEdgeProxyCommandInputSchema } from "./operations/servers
 import { createSshCredentialCommandInputSchema } from "./operations/servers/create-ssh-credential.command";
 import { deactivateServerCommandInputSchema } from "./operations/servers/deactivate-server.command";
 import { deleteServerCommandInputSchema } from "./operations/servers/delete-server.command";
+import { deleteSshCredentialCommandInputSchema } from "./operations/servers/delete-ssh-credential.command";
 import { listServersQueryInputSchema } from "./operations/servers/list-servers.query";
 import { listSshCredentialsQueryInputSchema } from "./operations/servers/list-ssh-credentials.query";
 import { registerServerCommandInputSchema } from "./operations/servers/register-server.command";
@@ -237,6 +238,20 @@ export const operationCatalog = [
     transports: {
       cli: "appaloft server credential-show <credentialId>",
       orpc: { method: "GET", path: "/api/credentials/ssh/{credentialId}" },
+    },
+  },
+  {
+    key: "credentials.delete-ssh",
+    kind: "command",
+    domain: "credentials",
+    messageName: "DeleteSshCredentialCommand",
+    handlerName: "DeleteSshCredentialCommandHandler",
+    serviceName: "DeleteSshCredentialUseCase",
+    inputSchema: deleteSshCredentialCommandInputSchema,
+    serviceToken: tokens.deleteSshCredentialUseCase,
+    transports: {
+      cli: "appaloft server credential-delete <credentialId> --confirm <credentialId>",
+      orpc: { method: "DELETE", path: "/api/credentials/ssh/{credentialId}" },
     },
   },
   {

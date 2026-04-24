@@ -42,6 +42,7 @@ import {
   DeactivateServerCommand,
   DeleteResourceCommand,
   DeleteServerCommand,
+  DeleteSshCredentialCommand,
   type DeploymentEventStreamEnvelope,
   DeploymentLogsQuery,
   type DeploymentProgressEvent,
@@ -50,6 +51,7 @@ import {
   deactivateServerCommandInputSchema,
   deleteResourceCommandInputSchema,
   deleteServerCommandInputSchema,
+  deleteSshCredentialCommandInputSchema,
   deploymentLogsQueryInputSchema,
   diffEnvironmentsQueryInputSchema,
   type ExecutionContext,
@@ -150,6 +152,7 @@ import {
   deactivateServerResponseSchema,
   deleteResourceResponseSchema,
   deleteServerResponseSchema,
+  deleteSshCredentialResponseSchema,
   deploymentEventStreamEnvelopeSchema,
   deploymentEventStreamResponseSchema,
   deploymentEventStreamStreamResponseSchema,
@@ -298,6 +301,10 @@ export const apiRouteDescriptions = {
   ),
   showSshCredential: routeDescription(
     "Reads one reusable SSH credential with masked detail and server usage visibility.",
+    "server.ssh-credential",
+  ),
+  deleteSshCredential: routeDescription(
+    "Deletes one reusable SSH credential only when no visible active or inactive server uses it.",
     "server.ssh-credential",
   ),
   testServerConnectivity: routeDescription(
@@ -1064,6 +1071,19 @@ export const showSshCredentialProcedure = base
     executeQuery(context, ShowSshCredentialQuery.create(input)),
   );
 
+export const deleteSshCredentialProcedure = base
+  .route({
+    method: "DELETE",
+    path: "/credentials/ssh/{credentialId}",
+    description: apiRouteDescriptions.deleteSshCredential,
+    successStatus: 200,
+  })
+  .input(deleteSshCredentialCommandInputSchema)
+  .output(deleteSshCredentialResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, DeleteSshCredentialCommand.create(input)),
+  );
+
 export const createSshCredentialProcedure = base
   .route({
     method: "POST",
@@ -1685,6 +1705,7 @@ export const appaloftOrpcRouter = {
       list: listSshCredentialsProcedure,
       show: showSshCredentialProcedure,
       create: createSshCredentialProcedure,
+      delete: deleteSshCredentialProcedure,
     },
   },
   environments: {

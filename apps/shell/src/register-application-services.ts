@@ -42,6 +42,8 @@ import {
   DeleteResourceUseCase,
   DeleteServerCommandHandler,
   DeleteServerUseCase,
+  DeleteSshCredentialCommandHandler,
+  DeleteSshCredentialUseCase,
   DeploymentContextBootstrapService,
   DeploymentContextDefaultsFactory,
   DeploymentContextResolver,
@@ -155,6 +157,7 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(DeleteResourceCommandHandler);
   container.registerSingleton(DeactivateServerCommandHandler);
   container.registerSingleton(DeleteServerCommandHandler);
+  container.registerSingleton(DeleteSshCredentialCommandHandler);
   container.registerSingleton(RenameServerCommandHandler);
   container.registerSingleton(ShowResourceQueryHandler);
   container.registerSingleton(ResourceEffectiveConfigQueryHandler);
@@ -228,6 +231,7 @@ export function registerApplicationServices(container: DependencyContainer): voi
   );
   container.registerSingleton(tokens.deactivateServerUseCase, DeactivateServerUseCase);
   container.registerSingleton(tokens.deleteServerUseCase, DeleteServerUseCase);
+  container.registerSingleton(tokens.deleteSshCredentialUseCase, DeleteSshCredentialUseCase);
   container.registerSingleton(
     tokens.checkServerDeleteSafetyQueryService,
     CheckServerDeleteSafetyQueryService,

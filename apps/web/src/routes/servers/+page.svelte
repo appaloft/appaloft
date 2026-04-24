@@ -1,10 +1,12 @@
 <script lang="ts">
   import { browser } from "$app/environment";
-  import { createMutation } from "@tanstack/svelte-query";
-  import { ArrowRight, Network, Server, ShieldCheck } from "@lucide/svelte";
+  import { createMutation, createQuery, queryOptions } from "@tanstack/svelte-query";
+  import { ArrowRight, KeyRound, Network, Server, ShieldCheck, Trash2, TriangleAlert } from "@lucide/svelte";
   import type {
     ConfigureDefaultAccessDomainPolicyInput,
+    DeleteSshCredentialInput,
     ServerSummary,
+    SshCredentialSummary,
   } from "@appaloft/contracts";
 
   import { readErrorMessage } from "$lib/api/client";
@@ -12,21 +14,34 @@
   import DocsHelpLink from "$lib/components/console/DocsHelpLink.svelte";
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
+  import * as Dialog from "$lib/components/ui/dialog";
   import { Input } from "$lib/components/ui/input";
   import * as Select from "$lib/components/ui/select";
   import { Skeleton } from "$lib/components/ui/skeleton";
   import { webDocsHrefs } from "$lib/console/docs-help";
   import { createConsoleQueries } from "$lib/console/queries";
+  import {
+    isSshCredentialDeleteConfirmationValid,
+    resolveSshCredentialDeleteReadiness,
+  } from "$lib/console/ssh-credential-delete";
   import { formatTime } from "$lib/console/utils";
   import { i18nKeys, t } from "$lib/i18n";
   import { orpcClient } from "$lib/orpc";
   import { queryClient } from "$lib/query-client";
 
   const { serversQuery, deploymentsQuery } = createConsoleQueries(browser);
+  const sshCredentialsQuery = createQuery(() =>
+    queryOptions({
+      queryKey: ["credentials", "ssh", "list"],
+      queryFn: () => orpcClient.credentials.ssh.list({}),
+      enabled: browser,
+    }),
+  );
   const defaultAccessModes = ["disabled", "provider", "custom-template"] as const;
 
   const servers = $derived(serversQuery.data?.items ?? []);
   const deployments = $derived(deploymentsQuery.data?.items ?? []);
+  const sshCredentials = $derived(sshCredentialsQuery.data?.items ?? []);
   const pageLoading = $derived(serversQuery.isPending || deploymentsQuery.isPending);
   const activeServers = $derived(
     servers.filter((server) => countServerDeployments(server) > 0).length,
@@ -39,7 +54,36 @@
     title: string;
     detail: string;
   } | null>(null);
+  let credentialDeleteDialogOpen = $state(false);
+  let selectedCredential = $state<SshCredentialSummary | null>(null);
+  let credentialDeleteConfirmation = $state("");
+  let credentialDeleteFeedback = $state<{
+    kind: "success" | "error";
+    title: string;
+    detail: string;
+  } | null>(null);
 
+  const selectedCredentialId = $derived(selectedCredential?.id ?? "");
+  const selectedCredentialDetailQuery = createQuery(() =>
+    queryOptions({
+      queryKey: ["credentials", "ssh", "show", selectedCredentialId],
+      queryFn: () =>
+        orpcClient.credentials.ssh.show({
+          credentialId: selectedCredentialId,
+          includeUsage: true,
+        }),
+      enabled: browser && credentialDeleteDialogOpen && selectedCredentialId.length > 0,
+      staleTime: 0,
+      retry: 0,
+    }),
+  );
+  const selectedCredentialDeleteReadiness = $derived(
+    resolveSshCredentialDeleteReadiness({
+      detail: selectedCredentialDetailQuery.data,
+      isPending: selectedCredentialDetailQuery.isPending,
+      hasError: Boolean(selectedCredentialDetailQuery.error),
+    }),
+  );
   const configureSystemDefaultAccessMutation = createMutation(() => ({
     mutationFn: (input: ConfigureDefaultAccessDomainPolicyInput) =>
       orpcClient.defaultAccessDomainPolicies.configure(input),
@@ -59,6 +103,32 @@
       };
     },
   }));
+  const deleteSshCredentialMutation = createMutation(() => ({
+    mutationFn: (input: DeleteSshCredentialInput) => orpcClient.credentials.ssh.delete(input),
+    onSuccess: (result) => {
+      credentialDeleteFeedback = {
+        kind: "success",
+        title: $t(i18nKeys.console.servers.deleteCredentialSucceeded),
+        detail: result.id,
+      };
+      credentialDeleteDialogOpen = false;
+      void queryClient.invalidateQueries({ queryKey: ["credentials", "ssh"] });
+      void queryClient.invalidateQueries({ queryKey: ["servers"] });
+    },
+    onError: (error) => {
+      credentialDeleteFeedback = {
+        kind: "error",
+        title: $t(i18nKeys.console.servers.deleteCredentialFailed),
+        detail: readErrorMessage(error),
+      };
+    },
+  }));
+  const canSubmitCredentialDelete = $derived(
+    Boolean(selectedCredential) &&
+      selectedCredentialDeleteReadiness.kind === "ready" &&
+      isSshCredentialDeleteConfirmationValid(selectedCredentialId, credentialDeleteConfirmation) &&
+      !deleteSshCredentialMutation.isPending,
+  );
 
   function countServerDeployments(server: ServerSummary): number {
     return deployments.filter((deployment) => deployment.serverId === server.id).length;
@@ -80,6 +150,39 @@
         : {}),
     });
   }
+
+  function openCredentialDeleteDialog(credential: SshCredentialSummary): void {
+    selectedCredential = credential;
+    credentialDeleteConfirmation = "";
+    credentialDeleteFeedback = null;
+    credentialDeleteDialogOpen = true;
+    void queryClient.invalidateQueries({ queryKey: ["credentials", "ssh", "show", credential.id] });
+  }
+
+  function submitCredentialDelete(event: SubmitEvent): void {
+    event.preventDefault();
+
+    if (!selectedCredential || !canSubmitCredentialDelete) {
+      return;
+    }
+
+    credentialDeleteFeedback = null;
+    deleteSshCredentialMutation.mutate({
+      credentialId: selectedCredential.id,
+      confirmation: {
+        credentialId: credentialDeleteConfirmation.trim(),
+      },
+    });
+  }
+
+  $effect(() => {
+    if (credentialDeleteDialogOpen) {
+      return;
+    }
+
+    selectedCredential = null;
+    credentialDeleteConfirmation = "";
+  });
 </script>
 
 <svelte:head>
@@ -102,61 +205,66 @@
         {/each}
       </div>
     </div>
-  {:else if servers.length === 0}
-    <section class="space-y-5 py-2">
-      <Badge class="w-fit" variant="outline">{$t(i18nKeys.common.domain.servers)}</Badge>
-      <div class="max-w-2xl space-y-3">
-        <h1 class="text-2xl font-semibold md:text-3xl">
-          {$t(i18nKeys.console.servers.emptyTitle)}
-        </h1>
-        <p class="text-sm leading-6 text-muted-foreground">
-          {$t(i18nKeys.console.servers.emptyBody)}
-        </p>
-      </div>
-      <div class="mt-6 flex flex-wrap gap-2">
-        <Button href="/servers/new">
-          {$t(i18nKeys.common.actions.createServer)}
-        </Button>
-        <Button href="/projects" variant="outline">
-          {$t(i18nKeys.common.actions.viewProjects)}
-        </Button>
-        <Button href="/deployments" variant="outline">
-          {$t(i18nKeys.common.actions.viewDeployments)}
-        </Button>
-      </div>
-    </section>
   {:else}
-    <div class="space-y-8">
-      <section class="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
-        <div class="max-w-2xl space-y-2">
-          <Badge class="w-fit" variant="outline">{$t(i18nKeys.common.domain.servers)}</Badge>
-          <h1 class="text-2xl font-semibold">{$t(i18nKeys.console.servers.focusTitle)}</h1>
+    {#if servers.length === 0}
+      <section class="space-y-5 py-2">
+        <Badge class="w-fit" variant="outline">{$t(i18nKeys.common.domain.servers)}</Badge>
+        <div class="max-w-2xl space-y-3">
+          <h1 class="text-2xl font-semibold md:text-3xl">
+            {$t(i18nKeys.console.servers.emptyTitle)}
+          </h1>
           <p class="text-sm leading-6 text-muted-foreground">
-            {$t(i18nKeys.console.servers.focusDescription)}
+            {$t(i18nKeys.console.servers.emptyBody)}
           </p>
         </div>
-        <div class="space-y-3 md:min-w-80">
-          <Button class="w-full" href="/servers/new">
+        <div class="mt-6 flex flex-wrap gap-2">
+          <Button href="/servers/new">
             {$t(i18nKeys.common.actions.createServer)}
           </Button>
-          <div class="grid grid-cols-3 divide-x border-y text-center">
-            <div class="px-3 py-3">
-              <p class="text-xl font-semibold">{servers.length}</p>
-              <p class="mt-1 text-xs text-muted-foreground">{$t(i18nKeys.common.domain.servers)}</p>
-            </div>
-            <div class="px-3 py-3">
-              <p class="text-xl font-semibold">{activeServers}</p>
-              <p class="mt-1 text-xs text-muted-foreground">{$t(i18nKeys.common.status.connected)}</p>
-            </div>
-            <div class="px-3 py-3">
-              <p class="text-xl font-semibold">{deployments.length}</p>
-              <p class="mt-1 text-xs text-muted-foreground">
-                {$t(i18nKeys.common.domain.deployments)}
-              </p>
-            </div>
-          </div>
+          <Button href="/projects" variant="outline">
+            {$t(i18nKeys.common.actions.viewProjects)}
+          </Button>
+          <Button href="/deployments" variant="outline">
+            {$t(i18nKeys.common.actions.viewDeployments)}
+          </Button>
         </div>
       </section>
+    {:else}
+      <div class="space-y-8">
+        <section class="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
+          <div class="max-w-2xl space-y-2">
+            <Badge class="w-fit" variant="outline">{$t(i18nKeys.common.domain.servers)}</Badge>
+            <h1 class="text-2xl font-semibold">{$t(i18nKeys.console.servers.focusTitle)}</h1>
+            <p class="text-sm leading-6 text-muted-foreground">
+              {$t(i18nKeys.console.servers.focusDescription)}
+            </p>
+          </div>
+          <div class="space-y-3 md:min-w-80">
+            <Button class="w-full" href="/servers/new">
+              {$t(i18nKeys.common.actions.createServer)}
+            </Button>
+            <div class="grid grid-cols-3 divide-x border-y text-center">
+              <div class="px-3 py-3">
+                <p class="text-xl font-semibold">{servers.length}</p>
+                <p class="mt-1 text-xs text-muted-foreground">
+                  {$t(i18nKeys.common.domain.servers)}
+                </p>
+              </div>
+              <div class="px-3 py-3">
+                <p class="text-xl font-semibold">{activeServers}</p>
+                <p class="mt-1 text-xs text-muted-foreground">
+                  {$t(i18nKeys.common.status.connected)}
+                </p>
+              </div>
+              <div class="px-3 py-3">
+                <p class="text-xl font-semibold">{deployments.length}</p>
+                <p class="mt-1 text-xs text-muted-foreground">
+                  {$t(i18nKeys.common.domain.deployments)}
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
 
       <section class="space-y-4 border-y py-6">
         <div class="max-w-3xl space-y-1">
@@ -313,6 +421,187 @@
           {/each}
         </div>
       </section>
-    </div>
+      </div>
+    {/if}
+
+    <section class="mt-8 space-y-4 border-y py-6">
+      <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div class="max-w-3xl space-y-1">
+          <div class="flex items-center gap-2">
+            <h2 class="text-lg font-semibold">
+              {$t(i18nKeys.console.servers.savedCredentialLibraryTitle)}
+            </h2>
+            <DocsHelpLink
+              href={webDocsHrefs.serverSshCredential}
+              ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+            />
+          </div>
+          <p class="text-sm text-muted-foreground">
+            {$t(i18nKeys.console.servers.savedCredentialLibraryDescription)}
+          </p>
+        </div>
+        <Badge variant="outline">
+          {$t(i18nKeys.console.servers.savedCredentialLibraryCount, {
+            count: sshCredentials.length,
+          })}
+        </Badge>
+      </div>
+
+      {#if sshCredentialsQuery.isPending}
+        <div class="space-y-3">
+          {#each Array.from({ length: 2 }) as _, index (index)}
+            <Skeleton class="h-16 w-full" />
+          {/each}
+        </div>
+      {:else if sshCredentials.length === 0}
+        <div class="border-y py-4">
+          <p class="text-sm font-medium">
+            {$t(i18nKeys.console.servers.savedCredentialLibraryEmptyTitle)}
+          </p>
+          <p class="mt-1 text-sm text-muted-foreground">
+            {$t(i18nKeys.console.servers.savedCredentialLibraryEmptyBody)}
+          </p>
+        </div>
+      {:else}
+        <div class="divide-y border-y">
+          {#each sshCredentials as credential (credential.id)}
+            <div class="grid gap-4 py-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:px-3">
+              <div class="min-w-0 space-y-1">
+                <div class="flex flex-wrap items-center gap-2">
+                  <KeyRound class="size-4 text-muted-foreground" />
+                  <h3 class="truncate text-sm font-semibold">{credential.name}</h3>
+                  <Badge variant="secondary">{credential.kind}</Badge>
+                </div>
+                <p class="truncate text-sm text-muted-foreground">{credential.id}</p>
+                <div class="flex flex-wrap gap-2 pt-1">
+                  <Badge variant={credential.privateKeyConfigured ? "secondary" : "outline"}>
+                    {$t(i18nKeys.console.servers.credentialPrivateKeyConfigured)}
+                  </Badge>
+                  <Badge variant={credential.publicKeyConfigured ? "secondary" : "outline"}>
+                    {$t(i18nKeys.console.servers.credentialPublicKeyConfigured)}
+                  </Badge>
+                  {#if credential.username}
+                    <Badge variant="outline">{credential.username}</Badge>
+                  {/if}
+                </div>
+              </div>
+              <Button
+                variant="destructive"
+                onclick={() => openCredentialDeleteDialog(credential)}
+                aria-label={$t(i18nKeys.console.servers.deleteCredentialActionAria, {
+                  name: credential.name,
+                })}
+              >
+                <Trash2 class="size-4" />
+                {$t(i18nKeys.console.servers.deleteCredentialAction)}
+              </Button>
+            </div>
+          {/each}
+        </div>
+      {/if}
+
+      {#if credentialDeleteFeedback}
+        <div
+          class={`rounded-md border p-3 text-sm ${credentialDeleteFeedback.kind === "error" ? "border-destructive/30 text-destructive" : "border-border text-foreground"}`}
+        >
+          <p class="font-medium">{credentialDeleteFeedback.title}</p>
+          <p class="mt-1 text-muted-foreground">{credentialDeleteFeedback.detail}</p>
+        </div>
+      {/if}
+    </section>
+
+    <Dialog.Root bind:open={credentialDeleteDialogOpen}>
+      {#if selectedCredential}
+        <Dialog.Content closeLabel={$t(i18nKeys.common.actions.close)}>
+          <form onsubmit={submitCredentialDelete}>
+            <Dialog.Header>
+              <Dialog.Title>
+                {$t(i18nKeys.console.servers.deleteCredentialDialogTitle)}
+              </Dialog.Title>
+              <Dialog.Description>
+                {$t(i18nKeys.console.servers.deleteCredentialDialogDescription, {
+                  id: selectedCredential.id,
+                })}
+              </Dialog.Description>
+            </Dialog.Header>
+
+            <div class="space-y-4 px-5 py-4">
+              <div
+                class={`rounded-md border p-3 text-sm ${selectedCredentialDeleteReadiness.kind === "ready" ? "border-border" : "border-destructive/30"}`}
+              >
+                {#if selectedCredentialDeleteReadiness.kind === "loading"}
+                  <p class="font-medium">
+                    {$t(i18nKeys.console.servers.deleteCredentialUsageChecking)}
+                  </p>
+                {:else if selectedCredentialDeleteReadiness.kind === "ready"}
+                  <p class="font-medium">
+                    {$t(i18nKeys.console.servers.deleteCredentialUsageReady)}
+                  </p>
+                {:else if selectedCredentialDeleteReadiness.kind === "in-use"}
+                  <div class="flex items-start gap-2 text-destructive">
+                    <TriangleAlert class="mt-0.5 size-4" />
+                    <div>
+                      <p class="font-medium">
+                        {$t(i18nKeys.console.servers.deleteCredentialUsageInUse, {
+                          total: selectedCredentialDeleteReadiness.totalServers,
+                          active: selectedCredentialDeleteReadiness.activeServers,
+                          inactive: selectedCredentialDeleteReadiness.inactiveServers,
+                        })}
+                      </p>
+                    </div>
+                  </div>
+                {:else}
+                  <div class="flex items-start gap-2 text-destructive">
+                    <TriangleAlert class="mt-0.5 size-4" />
+                    <p class="font-medium">
+                      {$t(i18nKeys.console.servers.deleteCredentialUsageUnavailable)}
+                    </p>
+                  </div>
+                {/if}
+              </div>
+
+              <label class="space-y-1.5 text-sm font-medium">
+                <span>
+                  {$t(i18nKeys.console.servers.deleteCredentialConfirmationLabel)}
+                </span>
+                <Input
+                  bind:value={credentialDeleteConfirmation}
+                  autocomplete="off"
+                  aria-invalid={!isSshCredentialDeleteConfirmationValid(
+                    selectedCredential.id,
+                    credentialDeleteConfirmation,
+                  )}
+                  placeholder={selectedCredential.id}
+                />
+              </label>
+
+              {#if credentialDeleteConfirmation.length > 0 && !isSshCredentialDeleteConfirmationValid(selectedCredential.id, credentialDeleteConfirmation)}
+                <p class="text-sm text-destructive">
+                  {$t(i18nKeys.console.servers.deleteCredentialConfirmMismatch)}
+                </p>
+              {/if}
+            </div>
+
+            <Dialog.Footer class="border-t p-5">
+              <Button
+                type="button"
+                variant="outline"
+                onclick={() => {
+                  credentialDeleteDialogOpen = false;
+                }}
+              >
+                {$t(i18nKeys.common.actions.close)}
+              </Button>
+              <Button type="submit" variant="destructive" disabled={!canSubmitCredentialDelete}>
+                <Trash2 class="size-4" />
+                {deleteSshCredentialMutation.isPending
+                  ? $t(i18nKeys.console.servers.deleteCredentialDeleting)
+                  : $t(i18nKeys.console.servers.deleteCredentialAction)}
+              </Button>
+            </Dialog.Footer>
+          </form>
+        </Dialog.Content>
+      {/if}
+    </Dialog.Root>
   {/if}
 </ConsoleShell>

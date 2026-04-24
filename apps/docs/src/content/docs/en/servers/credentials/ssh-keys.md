@@ -12,6 +12,8 @@ searchAliases:
 relatedOperations:
   - servers.configure-credential
   - credentials.create-ssh
+  - credentials.show
+  - credentials.delete-ssh
 sidebar:
   label: "SSH credentials"
   order: 3
@@ -58,5 +60,27 @@ Recommended flow:
 5. Remove the old credential.
 
 Do not delete the old credential while the new connectivity test fails, or you may lose both deployment and recovery access.
+
+<h2 id="server-credential-delete-unused">Delete an unused saved credential</h2>
+
+Only a saved credential with no active or inactive server references can be deleted. Check credential detail and usage first:
+
+- `totalServers = 0`: Web, CLI, or HTTP API deletion is allowed.
+- `totalServers > 0`: deletion is rejected with `credential_in_use`; switch or remove the servers that reference it first.
+- Usage cannot be read: this is not zero usage, and deletion is rejected. Retry or fix state visibility first.
+
+CLI deletion requires typed confirmation:
+
+```bash
+appaloft server credential-delete <credentialId> --confirm <credentialId>
+```
+
+HTTP API uses the same command semantics:
+
+```http
+DELETE /api/credentials/ssh/{credentialId}
+```
+
+The Web console saved SSH credentials surface opens a destructive confirmation dialog. It rechecks usage, disables delete when usage is unavailable or nonzero, and requires typing the exact credential id before dispatching the delete command.
 
 Related page: [Register and test a server](/docs/en/servers/register-connect/).

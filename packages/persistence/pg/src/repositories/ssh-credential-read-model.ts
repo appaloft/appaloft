@@ -6,7 +6,11 @@ import {
   type SshCredentialUsageReader,
   type SshCredentialUsageServerSummary,
 } from "@appaloft/application";
-import { type SshCredentialByIdSpec, type SshCredentialSelectionSpecVisitor } from "@appaloft/core";
+import {
+  type SshCredentialByIdSpec,
+  type SshCredentialSelectionSpecVisitor,
+  type UnusedSshCredentialByIdSpec,
+} from "@appaloft/core";
 import { type Kysely, type Selectable, type SelectQueryBuilder } from "kysely";
 
 import { type Database } from "../schema";
@@ -26,6 +30,24 @@ class KyselySshCredentialReadModelSelectionVisitor
     spec: SshCredentialByIdSpec,
   ): SshCredentialSelectionQuery {
     return query.where("id", "=", spec.id.value);
+  }
+
+  visitUnusedSshCredentialById(
+    query: SshCredentialSelectionQuery,
+    spec: UnusedSshCredentialByIdSpec,
+  ): SshCredentialSelectionQuery {
+    return query
+      .where("id", "=", spec.id.value)
+      .where(({ exists, not, selectFrom }) =>
+        not(
+          exists(
+            selectFrom("servers")
+              .select("servers.id")
+              .whereRef("servers.credential_id", "=", "ssh_credentials.id")
+              .where("servers.lifecycle_status", "in", ["active", "inactive"]),
+          ),
+        ),
+      );
   }
 }
 

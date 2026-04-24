@@ -947,6 +947,22 @@ export const enUS = {
         "Preview whether this server still has deployments, domains, credentials, routes, logs, or audit records that must remain visible before deletion exists.",
       deleteSafetyEligible: "Eligible",
       deleteSafetyTitle: "Delete safety",
+      deleteCredentialAction: "Delete",
+      deleteCredentialActionAria: "Delete SSH credential {{name}}",
+      deleteCredentialConfirmMismatch: "The typed credential id must match exactly.",
+      deleteCredentialConfirmationLabel: "Type the credential id to confirm",
+      deleteCredentialDeleting: "Deleting",
+      deleteCredentialDialogDescription:
+        "This permanently deletes {{id}} only after usage is read as zero active or inactive servers.",
+      deleteCredentialDialogTitle: "Delete saved SSH credential",
+      deleteCredentialFailed: "Unable to delete SSH credential",
+      deleteCredentialSucceeded: "SSH credential deleted",
+      deleteCredentialUsageChecking: "Checking credential usage before delete.",
+      deleteCredentialUsageInUse:
+        "This credential is still used by {{total}} servers: {{active}} active, {{inactive}} inactive.",
+      deleteCredentialUsageReady: "Usage is zero; typed confirmation is still required.",
+      deleteCredentialUsageUnavailable:
+        "Usage could not be read safely. Retry before deleting this credential.",
       emptyBody:
         "The deployment flow can create a local server automatically, or you can register a remote SSH target from the CLI first.",
       emptyTitle: "No server targets yet.",
@@ -970,6 +986,13 @@ export const enUS = {
       settingsDescription:
         "Change the display name without changing the server id, host, provider, credential, proxy, lifecycle, or deployment history.",
       settingsTitle: "Server settings",
+      savedCredentialLibraryCount: "{{count}} saved",
+      savedCredentialLibraryDescription:
+        "Reusable stored SSH private-key credentials. Delete is available only after usage is confirmed empty.",
+      savedCredentialLibraryEmptyBody:
+        "Create a server with a reusable private key or use the CLI to save a credential.",
+      savedCredentialLibraryEmptyTitle: "No saved SSH credentials",
+      savedCredentialLibraryTitle: "Saved SSH credentials",
     },
     shell: {
       noProjects: "No projects",

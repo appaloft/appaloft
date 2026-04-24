@@ -46,6 +46,7 @@ This query inherits:
 - [ADR-010: Quick Deploy Workflow Boundary](../decisions/ADR-010-quick-deploy-workflow-boundary.md)
 - [ADR-026: Aggregate Mutation Command Boundary](../decisions/ADR-026-aggregate-mutation-command-boundary.md)
 - [SSH Credential Lifecycle Workflow](../workflows/ssh-credential-lifecycle.md)
+- [credentials.delete-ssh Command Spec](../commands/credentials.delete-ssh.md)
 - [SSH Credential Lifecycle Error Spec](../errors/credentials.lifecycle.md)
 - [SSH Credential Lifecycle Test Matrix](../testing/ssh-credential-lifecycle-test-matrix.md)
 - [SSH Credential Lifecycle Implementation Plan](../implementation/ssh-credential-lifecycle-plan.md)
@@ -136,7 +137,7 @@ zero usage.
 | oRPC / HTTP | `GET /api/credentials/ssh/{credentialId}` using the query schema. | Implemented |
 | Repository config | Not applicable. Repository config must not select credential identity. | Not applicable |
 | Automation / MCP | Future query/tool over the same operation key. | Future |
-| Public docs | Existing `server.ssh-credential` anchor covers reusable SSH credential safety and usage visibility. | Existing anchor |
+| Public docs | Existing `server.ssh-credential` anchor covers reusable SSH credential safety, usage visibility, and delete-when-unused preconditions. | Existing anchor |
 
 ## Current Implementation Notes And Migration Gaps
 
@@ -146,9 +147,11 @@ Existing Web server registration and Quick Deploy surfaces can list and create r
 credentials; server detail is the first read-only owner-scoped Web affordance for one-credential
 usage visibility.
 
-This query is the required visibility step before credential rotate/update or delete-when-unused
-commands can become public. Those future mutations need their own command specs, safety rules, test
-matrix rows, and operation catalog entries before implementation.
+This query is the required visibility step before `credentials.delete-ssh`. The delete command
+must re-read usage for admission and must not treat usage-read failure as zero usage.
+
+Credential rotate/update remains future behavior and needs its own command specs, safety rules,
+test matrix rows, and operation catalog entries before implementation.
 
 ## Open Questions
 

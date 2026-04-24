@@ -3,6 +3,7 @@ import { type SshCredential, type SshCredentialState } from "./ssh-credential";
 
 export interface SshCredentialSelectionSpecVisitor<TResult> {
   visitSshCredentialById(query: TResult, spec: SshCredentialByIdSpec): TResult;
+  visitUnusedSshCredentialById(query: TResult, spec: UnusedSshCredentialByIdSpec): TResult;
 }
 
 export interface SshCredentialMutationSpecVisitor<TResult> {
@@ -26,6 +27,18 @@ export class SshCredentialByIdSpec implements SshCredentialSelectionSpec {
 
   accept<TResult>(query: TResult, visitor: SshCredentialSelectionSpecVisitor<TResult>): TResult {
     return visitor.visitSshCredentialById(query, this);
+  }
+}
+
+export class UnusedSshCredentialByIdSpec implements SshCredentialSelectionSpec {
+  private constructor(public readonly id: SshCredentialId) {}
+
+  static create(id: SshCredentialId): UnusedSshCredentialByIdSpec {
+    return new UnusedSshCredentialByIdSpec(id);
+  }
+
+  accept<TResult>(query: TResult, visitor: SshCredentialSelectionSpecVisitor<TResult>): TResult {
+    return visitor.visitUnusedSshCredentialById(query, this);
   }
 }
 

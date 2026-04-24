@@ -319,6 +319,18 @@ export const createSshCredentialResponseSchema = z.object({
   id: z.string(),
 });
 
+export const deleteSshCredentialInputSchema = z.object({
+  credentialId: z.string().min(1),
+  confirmation: z.object({
+    credentialId: z.string().min(1),
+  }),
+  idempotencyKey: z.string().min(1).optional(),
+});
+
+export const deleteSshCredentialResponseSchema = z.object({
+  id: z.string(),
+});
+
 export const listSshCredentialsResponseSchema = z.object({
   items: z.array(sshCredentialSummarySchema),
 });
@@ -2270,6 +2282,7 @@ export type DeleteServerInput = z.infer<typeof deleteServerInputSchema>;
 export type CheckServerDeleteSafetyInput = z.infer<typeof checkServerDeleteSafetyInputSchema>;
 export type ConfigureServerCredentialInput = z.infer<typeof configureServerCredentialInputSchema>;
 export type CreateSshCredentialInput = z.infer<typeof createSshCredentialInputSchema>;
+export type DeleteSshCredentialInput = z.infer<typeof deleteSshCredentialInputSchema>;
 export type RegisterServerResponse = z.infer<typeof registerServerResponseSchema>;
 export type ListServersResponse = z.infer<typeof listServersResponseSchema>;
 export type ServerDetail = z.infer<typeof serverDetailSchema>;
@@ -2284,6 +2297,7 @@ export type ServerDeleteBlocker = z.infer<typeof serverDeleteBlockerSchema>;
 export type ServerDeleteSafety = z.infer<typeof serverDeleteSafetySchema>;
 export type CheckServerDeleteSafetyResponse = z.infer<typeof checkServerDeleteSafetyResponseSchema>;
 export type CreateSshCredentialResponse = z.infer<typeof createSshCredentialResponseSchema>;
+export type DeleteSshCredentialResponse = z.infer<typeof deleteSshCredentialResponseSchema>;
 export type ListSshCredentialsResponse = z.infer<typeof listSshCredentialsResponseSchema>;
 export type ShowSshCredentialResponse = z.infer<typeof showSshCredentialResponseSchema>;
 export type ServerConnectivityCheck = z.infer<typeof serverConnectivityCheckSchema>;
