@@ -132,11 +132,12 @@ Reference pages should not be the only page explaining a common task.
 HTTP API reference pages must also expose a stable OpenAPI and Scalar reference entry. That entry
 must name the runtime OpenAPI document path `/api/openapi.json`, the runtime Scalar reference path
 `/api/reference`, and the docs-generated OpenAPI reference path `/docs/reference/openapi/`. The
-generated OpenAPI pages are a derived reference surface for integrators and automation authors; they
-must not replace task-oriented docs pages, stable public anchors, or shared operation schema
-descriptions. Framework-neutral OpenAPI generation and Scalar rendering should remain importable
-from `@appaloft/openapi` so Bun/Elysia composition roots and docs builds can consume the same
-document without coupling docs content to the HTTP adapter.
+generated OpenAPI document must tag operations by Appaloft business domain so Scalar and generated
+docs do not present a flat route list. The generated OpenAPI pages are a derived reference surface
+for integrators and automation authors; they must not replace task-oriented docs pages, stable
+public anchors, or shared operation schema descriptions. Framework-neutral OpenAPI generation and
+Scalar rendering should remain importable from `@appaloft/openapi` so Bun/Elysia composition roots
+and docs builds can consume the same document without coupling docs content to the HTTP adapter.
 
 ### Troubleshooting Pages
 

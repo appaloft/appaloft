@@ -42,6 +42,36 @@ describe("Appaloft OpenAPI reference package", () => {
     );
   });
 
+  test("groups operations by Appaloft business domain tags", async () => {
+    const spec = await createAppaloftOpenApiSpec();
+
+    expect(spec.tags?.map((tag) => tag.name)).toEqual([
+      "Projects",
+      "Servers And Credentials",
+      "Environments And Configuration",
+      "Resources",
+      "Deployments",
+      "Access And Domains",
+      "Certificates",
+      "Observability",
+      "Providers",
+      "Plugins",
+      "Integrations",
+    ]);
+    expect(spec.paths?.["/projects"]?.get?.tags).toEqual(["Projects"]);
+    expect(spec.paths?.["/credentials/ssh"]?.post?.tags).toEqual(["Servers And Credentials"]);
+    expect(spec.paths?.["/resources/{resourceId}/source"]?.post?.tags).toEqual(["Resources"]);
+    expect(spec.paths?.["/resources/{resourceId}/variables/{key}"]?.delete?.tags).toEqual([
+      "Environments And Configuration",
+    ]);
+    expect(spec.paths?.["/domain-bindings"]?.post?.tags).toEqual(["Access And Domains"]);
+    expect(spec.paths?.["/certificates"]?.get?.tags).toEqual(["Certificates"]);
+    expect(spec.paths?.["/deployments/{deploymentId}/events"]?.get?.tags).toEqual([
+      "Observability",
+    ]);
+    expect(spec.paths?.["/integrations/github/repositories"]?.get?.tags).toEqual(["Integrations"]);
+  });
+
   test("promotes schema examples into request media examples for Scalar", async () => {
     const spec = await createAppaloftOpenApiSpec();
     const operation = spec.paths?.["/resources/{resourceId}/source"]?.post;

@@ -16,6 +16,71 @@ export const defaultAppaloftOpenApiReferencePath = "/api/reference";
 export const defaultAppaloftOpenApiServerUrl = "/api";
 export const defaultAppaloftOpenApiTitle = "Appaloft HTTP API";
 
+const appaloftOpenApiTagNames = {
+  projects: "Projects",
+  serversAndCredentials: "Servers And Credentials",
+  environmentsAndConfiguration: "Environments And Configuration",
+  resources: "Resources",
+  deployments: "Deployments",
+  accessAndDomains: "Access And Domains",
+  certificates: "Certificates",
+  observability: "Observability",
+  providers: "Providers",
+  plugins: "Plugins",
+  integrations: "Integrations",
+} as const;
+
+type AppaloftOpenApiTagName =
+  (typeof appaloftOpenApiTagNames)[keyof typeof appaloftOpenApiTagNames];
+
+export const appaloftOpenApiTags = [
+  {
+    name: appaloftOpenApiTagNames.projects,
+    description: "Project lifecycle and project-scoped operations.",
+  },
+  {
+    name: appaloftOpenApiTagNames.serversAndCredentials,
+    description:
+      "Deployment servers, SSH credentials, connectivity, proxy readiness, and terminal sessions.",
+  },
+  {
+    name: appaloftOpenApiTagNames.environmentsAndConfiguration,
+    description: "Environments, variables, effective configuration, diff, and promotion.",
+  },
+  {
+    name: appaloftOpenApiTagNames.resources,
+    description: "Resources and their source, runtime, health, and network profiles.",
+  },
+  {
+    name: appaloftOpenApiTagNames.deployments,
+    description: "Deployment admission, detail, and deployment creation streams.",
+  },
+  {
+    name: appaloftOpenApiTagNames.accessAndDomains,
+    description: "Generated access routes, proxy configuration, and custom domain bindings.",
+  },
+  {
+    name: appaloftOpenApiTagNames.certificates,
+    description: "Certificate import, issuance, renewal, and readiness.",
+  },
+  {
+    name: appaloftOpenApiTagNames.observability,
+    description: "Logs, events, health summaries, and support-safe diagnostics.",
+  },
+  {
+    name: appaloftOpenApiTagNames.providers,
+    description: "Provider discovery and capabilities.",
+  },
+  {
+    name: appaloftOpenApiTagNames.plugins,
+    description: "Plugin discovery and compatibility.",
+  },
+  {
+    name: appaloftOpenApiTagNames.integrations,
+    description: "External integration surfaces such as GitHub repositories.",
+  },
+] as const satisfies readonly OpenAPI.TagObject[];
+
 export interface AppaloftOpenApiSpecOptions {
   readonly info?: OpenAPI.InfoObject;
   readonly servers?: OpenAPI.ServerObject[];
@@ -23,6 +88,7 @@ export interface AppaloftOpenApiSpecOptions {
   readonly router?: AppaloftOrpcRouter;
   readonly generateOptions?: Omit<OpenAPIGeneratorGenerateOptions, "info" | "servers">;
   readonly appVersion?: string;
+  readonly groupOperationsByDomain?: boolean;
   readonly promoteSchemaExamples?: boolean;
 }
 
@@ -85,11 +151,15 @@ export async function createAppaloftOpenApiSpec(
     ],
   });
 
-  if (options.promoteSchemaExamples === false) {
-    return document;
+  if (options.groupOperationsByDomain !== false) {
+    applyAppaloftOpenApiDomainTags(document);
   }
 
-  return promoteSchemaExamplesToMediaTypes(document);
+  if (options.promoteSchemaExamples !== false) {
+    promoteSchemaExamplesToMediaTypes(document);
+  }
+
+  return document;
 }
 
 export async function createAppaloftOpenApiSpecResponse(
@@ -256,6 +326,122 @@ const openApiHttpMethods = [
   "patch",
   "trace",
 ] as const;
+
+function applyAppaloftOpenApiDomainTags(document: OpenAPI.Document): OpenAPI.Document {
+  document.tags = mergeOpenApiTags(document.tags, appaloftOpenApiTags);
+
+  for (const [path, pathItem] of Object.entries(document.paths ?? {})) {
+    if (!pathItem || isReferenceObject(pathItem)) {
+      continue;
+    }
+
+    const tag = resolveAppaloftOpenApiDomainTag(path);
+
+    if (!tag) {
+      continue;
+    }
+
+    for (const method of openApiHttpMethods) {
+      const operation = pathItem[method];
+
+      if (operation && (!operation.tags || operation.tags.length === 0)) {
+        operation.tags = [tag];
+      }
+    }
+  }
+
+  return document;
+}
+
+function mergeOpenApiTags(
+  existing: OpenAPI.TagObject[] | undefined,
+  additions: readonly OpenAPI.TagObject[],
+): OpenAPI.TagObject[] {
+  const tags = [...(existing ?? [])];
+  const existingNames = new Set(tags.map((tag) => tag.name));
+
+  for (const tag of additions) {
+    if (!existingNames.has(tag.name)) {
+      tags.push(tag);
+      existingNames.add(tag.name);
+    }
+  }
+
+  return tags;
+}
+
+function resolveAppaloftOpenApiDomainTag(path: string): AppaloftOpenApiTagName | undefined {
+  if (path.startsWith("/projects")) {
+    return appaloftOpenApiTagNames.projects;
+  }
+
+  if (
+    path.startsWith("/servers") ||
+    path.startsWith("/credentials/ssh") ||
+    path.startsWith("/terminal-sessions")
+  ) {
+    return appaloftOpenApiTagNames.serversAndCredentials;
+  }
+
+  if (path.startsWith("/environments") || isResourceConfigurationPath(path)) {
+    return appaloftOpenApiTagNames.environmentsAndConfiguration;
+  }
+
+  if (
+    path.startsWith("/default-access-domain-policies") ||
+    path.startsWith("/domain-bindings") ||
+    path.endsWith("/proxy-configuration")
+  ) {
+    return appaloftOpenApiTagNames.accessAndDomains;
+  }
+
+  if (path.startsWith("/certificates")) {
+    return appaloftOpenApiTagNames.certificates;
+  }
+
+  if (isDeploymentObservabilityPath(path) || isResourceObservabilityPath(path)) {
+    return appaloftOpenApiTagNames.observability;
+  }
+
+  if (path.startsWith("/resources")) {
+    return appaloftOpenApiTagNames.resources;
+  }
+
+  if (path.startsWith("/deployments")) {
+    return appaloftOpenApiTagNames.deployments;
+  }
+
+  if (path.startsWith("/providers")) {
+    return appaloftOpenApiTagNames.providers;
+  }
+
+  if (path.startsWith("/plugins")) {
+    return appaloftOpenApiTagNames.plugins;
+  }
+
+  if (path.startsWith("/integrations")) {
+    return appaloftOpenApiTagNames.integrations;
+  }
+
+  return undefined;
+}
+
+function isResourceConfigurationPath(path: string): boolean {
+  return path.includes("/variables") || path.endsWith("/effective-config");
+}
+
+function isDeploymentObservabilityPath(path: string): boolean {
+  return path.endsWith("/logs") || path.endsWith("/events") || path.endsWith("/events/stream");
+}
+
+function isResourceObservabilityPath(path: string): boolean {
+  return (
+    path.endsWith("/runtime-logs") ||
+    path.endsWith("/runtime-logs/stream") ||
+    path.endsWith("/diagnostic-summary") ||
+    path.endsWith("/health")
+  );
+}
 
 function promoteSchemaExamplesToMediaTypes(document: OpenAPI.Document): OpenAPI.Document {
   for (const pathItem of Object.values(document.paths ?? {})) {

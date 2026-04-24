@@ -29,6 +29,8 @@ The backend serves the OpenAPI 3.1 document at `/api/openapi.json` and the Scala
 
 The public docs site also generates OpenAPI reference pages at `/docs/reference/openapi/`, with each operation expanded into its own page.
 
+OpenAPI operations are tagged by Appaloft business domain so Scalar and generated docs avoid a flat route list.
+
 Those entries are registered by the built-in OpenAPI Reference system plugin. Other Bun or Elysia servers can import `@appaloft/openapi` and mount the exported `Response` handlers on their own routes.
 
 <h2 id="api-lifecycle-status">Lifecycle status</h2>
