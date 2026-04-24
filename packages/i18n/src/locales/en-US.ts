@@ -904,6 +904,11 @@ export const enUS = {
       description: "Deployment targets, providers, and runtime health checks",
       detailDescription: "Server details, related deployments, and connectivity test",
       deactivatedAt: "Deactivated",
+      edgeProxyConfigureFailed: "Unable to save edge proxy",
+      edgeProxyConfigured: "Edge proxy intent saved",
+      edgeProxyDescription:
+        "Future generated access and custom-domain routes use this desired proxy kind. Existing route snapshots stay unchanged.",
+      edgeProxyKindLabel: "Edge proxy kind",
       defaultAccessCustomTemplateOption: "custom-template",
       defaultAccessDisabledOption: "disabled",
       defaultAccessModeLabel: "Default access mode",

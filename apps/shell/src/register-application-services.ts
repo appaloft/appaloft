@@ -25,6 +25,8 @@ import {
   ConfigureResourceSourceCommandHandler,
   ConfigureResourceSourceUseCase,
   ConfigureServerCredentialUseCase,
+  ConfigureServerEdgeProxyCommandHandler,
+  ConfigureServerEdgeProxyUseCase,
   ConfirmDomainBindingOwnershipUseCase,
   CreateDeploymentUseCase,
   CreateDomainBindingUseCase,
@@ -140,6 +142,7 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(CheckServerDeleteSafetyQueryHandler);
   container.registerSingleton(CleanupPreviewCommandHandler);
   container.registerSingleton(ConfigureDefaultAccessDomainPolicyCommandHandler);
+  container.registerSingleton(ConfigureServerEdgeProxyCommandHandler);
   container.registerSingleton(ConfigureResourceHealthCommandHandler);
   container.registerSingleton(ConfigureResourceNetworkCommandHandler);
   container.registerSingleton(ConfigureResourceRuntimeCommandHandler);
@@ -215,6 +218,10 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(tokens.listServersQueryService, ListServersQueryService);
   container.registerSingleton(tokens.showServerQueryService, ShowServerQueryService);
   container.registerSingleton(tokens.renameServerUseCase, RenameServerUseCase);
+  container.registerSingleton(
+    tokens.configureServerEdgeProxyUseCase,
+    ConfigureServerEdgeProxyUseCase,
+  );
   container.registerSingleton(tokens.deactivateServerUseCase, DeactivateServerUseCase);
   container.registerSingleton(tokens.deleteServerUseCase, DeleteServerUseCase);
   container.registerSingleton(

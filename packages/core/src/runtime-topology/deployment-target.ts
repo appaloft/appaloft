@@ -6,7 +6,7 @@ import { err, ok, type Result } from "../shared/result";
 import {
   type DeploymentTargetCredentialKindValue,
   DeploymentTargetLifecycleStatusValue,
-  type EdgeProxyKindValue,
+  EdgeProxyKindValue,
   EdgeProxyStatusValue,
   TargetKindValue,
 } from "../shared/state-machine";
@@ -193,6 +193,42 @@ export class DeploymentTarget extends AggregateRoot<DeploymentTargetState> {
     });
 
     return ok({ changed: true });
+  }
+
+  configureEdgeProxy(input: { kind: EdgeProxyKindValue; configuredAt: UpdatedAt }): Result<{
+    changed: boolean;
+    edgeProxy: DeploymentTargetEdgeProxyState;
+  }> {
+    const lifecycleGuard = this.ensureCanAcceptNewWork("servers.configure-edge-proxy");
+    if (lifecycleGuard.isErr()) {
+      return err(lifecycleGuard.error);
+    }
+
+    const currentEdgeProxy = this.state.edgeProxy ?? {
+      kind: EdgeProxyKindValue.rehydrate("none"),
+      status: EdgeProxyStatusValue.initialForKind(EdgeProxyKindValue.rehydrate("none")),
+    };
+
+    if (currentEdgeProxy.kind.equals(input.kind)) {
+      return ok({ changed: false, edgeProxy: currentEdgeProxy });
+    }
+
+    const nextEdgeProxy = {
+      kind: input.kind,
+      status: EdgeProxyStatusValue.initialForKind(input.kind),
+    };
+    this.state.edgeProxy = nextEdgeProxy;
+
+    this.recordDomainEvent("server-edge-proxy-configured", input.configuredAt, {
+      serverId: this.state.id.value,
+      previousKind: currentEdgeProxy.kind.value,
+      previousStatus: currentEdgeProxy.status.value,
+      kind: nextEdgeProxy.kind.value,
+      status: nextEdgeProxy.status.value,
+      configuredAt: input.configuredAt.value,
+    });
+
+    return ok({ changed: true, edgeProxy: nextEdgeProxy });
   }
 
   delete(input: { deletedAt: DeletedAt }): Result<{ changed: boolean }> {

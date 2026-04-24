@@ -81,6 +81,10 @@ export const cliCommandDescriptions = {
     "Repair provider-owned edge proxy infrastructure",
     "server.proxy-readiness",
   ),
+  serverProxyConfigure: withDocs(
+    "Configure desired edge proxy kind for future routes",
+    "server.proxy-readiness",
+  ),
   serverTerminal: withDocs("Open a server terminal session", "server.terminal-session"),
   resource: withDocs("Resource operations", "resource.concept"),
   resourceCreate: withDocs("Create a resource", "resource.concept"),

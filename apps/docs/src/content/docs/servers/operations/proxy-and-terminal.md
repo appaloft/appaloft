@@ -12,6 +12,7 @@ searchAliases:
   - "default access"
   - "代理"
 relatedOperations:
+  - servers.configure-edge-proxy
   - servers.bootstrap-proxy
   - terminal-sessions.open
 sidebar:
@@ -22,6 +23,18 @@ sidebar:
 <h2 id="server-proxy-readiness">代理准备状态</h2>
 
 代理准备状态决定默认访问地址和路由是否能正常工作。代理修复是显式操作，不应该被隐藏在普通部署按钮后面。
+
+服务器的 edge proxy 类型是未来路由使用的意图：`none` 表示后续生成访问或自定义域名路由不会选择这个服务器作为代理承载目标；`traefik` 和 `caddy` 表示后续代理准备或部署确保流程可以为这个服务器实现 provider-owned 代理配置。修改这个类型不会立即启动代理、删除已有路由快照，或清理历史部署/域名/审计记录。
+
+```bash title="修改未来代理意图"
+appaloft server proxy configure srv_primary --kind traefik
+```
+
+如果从 `none` 改为 `traefik` 或 `caddy`，下一步运行显式修复或等待后续部署确保流程处理代理准备：
+
+```bash title="显式修复代理准备状态"
+appaloft server proxy repair srv_primary
+```
 
 <h2 id="server-terminal-session">打开终端会话</h2>
 

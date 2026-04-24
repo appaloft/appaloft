@@ -84,6 +84,7 @@ Server lifecycle commands use these branches:
 | --- | --- | --- | --- | --- |
 | `validation_error` | `validation` | `command-validation` | No | Command input is missing or malformed. |
 | `not_found` | `not-found` | `server-admission` | No | Server cannot be found or is not visible. |
+| `server_inactive` | `conflict` | `server-lifecycle-guard` | No | Inactive server cannot receive new deployment, scheduling, proxy target configuration, or other new-work mutation. |
 | `server_delete_blocked` | `conflict` | `server-lifecycle-guard` | No | Delete or final removal is blocked by retained deployments, resources, domains, routes, terminal sessions, logs, audit, or support diagnostics. |
 | `invariant_violation` | `domain` | `server-lifecycle-guard` | No | DeploymentTarget rejected the requested lifecycle transition. |
 | `infra_error` | `infra` | `server-persistence` | Conditional | Server state could not be safely persisted. |
@@ -93,6 +94,12 @@ Server lifecycle commands use these branches:
 name. The server id remains the durable reference. Deleted server tombstones are immutable through
 ordinary rename and return `not_found` at `phase = server-admission` when resolved by the write-side
 repository.
+
+`servers.configure-edge-proxy` rejects inactive servers with `server_inactive` because changing
+edge proxy intent changes future proxy-backed target eligibility. It does not synchronously
+bootstrap, repair, delete, or reload proxy infrastructure. Deleted server tombstones are immutable
+through ordinary configure and return `not_found` at `phase = server-admission` when resolved by
+the write-side repository.
 
 `servers.deactivate` does not block on retained dependencies. It is designed to preserve visibility
 while preventing future use. Active deployments and retained dependencies appear in

@@ -847,6 +847,11 @@ export const zhCN = {
       description: "部署目标、Provider 和运行健康检查",
       detailDescription: "服务器详情、关联部署和连通性测试",
       deactivatedAt: "停用时间",
+      edgeProxyConfigureFailed: "无法保存边缘代理配置",
+      edgeProxyConfigured: "边缘代理意图已保存",
+      edgeProxyDescription:
+        "未来生成访问和自定义域名路由会使用这个期望代理类型；已有 route snapshot 不会被改写。",
+      edgeProxyKindLabel: "边缘代理类型",
       defaultAccessCustomTemplateOption: "custom-template",
       defaultAccessDisabledOption: "disabled",
       defaultAccessModeLabel: "默认访问模式",

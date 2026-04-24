@@ -13,6 +13,7 @@ relatedOperations:
   - servers.register
   - servers.show
   - servers.rename
+  - servers.configure-edge-proxy
   - servers.deactivate
   - servers.delete-check
   - servers.delete
@@ -35,6 +36,8 @@ Registering a server makes Appaloft able to execute deployment plans. It does no
 Reading server detail confirms a deployment target's host, provider, masked credential summary, proxy status, and current deployment, resource, and domain rollups. This read does not run connectivity checks, repair proxy state, or mutate the server.
 
 Renaming a server changes only the display name. It does not change server id, host, provider, credential, proxy, lifecycle, or historical deployment/domain/audit references. Active and inactive servers can both be renamed; deleted servers are not visible through the normal rename entrypoint.
+
+Changing the edge proxy kind saves the server's desired proxy intent for future routes. `none` means future generated access URLs or custom-domain routes should not treat this server as a proxy-backed target; `traefik` and `caddy` mark the server for later proxy readiness and route realization. This does not change server id, host, provider, credential, lifecycle, and it does not delete historical route snapshots, deployments, domains, or audit references. Only active servers can be changed; inactive servers do not receive new proxy target configuration work through the normal entrypoint.
 
 Deactivating a server prevents it from being used as a new deployment, scheduling, or proxy configuration target. Deactivation does not stop existing runtime work and does not delete deployment history, domains, certificates, credentials, routes, logs, or audit records.
 
@@ -106,6 +109,10 @@ appaloft server show srv_primary
 
 ```bash title="Rename a server"
 appaloft server rename srv_primary --name "Primary SSH server"
+```
+
+```bash title="Change edge proxy kind"
+appaloft server proxy configure srv_primary --kind caddy
 ```
 
 ```bash title="Deactivate a server"

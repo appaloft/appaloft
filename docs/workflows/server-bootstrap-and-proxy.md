@@ -173,6 +173,31 @@ server has provider-backed proxy intent. These checks are observational: they ca
 container image, scan provider logs, and run bounded temporary route probes, but they must clean up
 probe containers and must not mark the server connected, ready, failed, or repaired.
 
+## Edge Proxy Intent Reconfiguration
+
+`servers.configure-edge-proxy` is the intent-only operation for changing a server's desired edge
+proxy kind after registration.
+
+The operation belongs to the deployment target lifecycle workflow, not to proxy bootstrap work. It
+must not publish `proxy-bootstrap-requested`, run provider ensure plans, create or delete provider
+containers, reload the proxy, apply route configuration, or remove provider-owned artifacts.
+
+When the configured kind is `none`, later generated/default access and custom-domain proxy-backed
+target selection must treat the server as no-proxy. Historical deployment route snapshots,
+server-applied route state, domain bindings, audit records, and provider-owned artifacts remain in
+place until explicit future cleanup or route lifecycle operations handle them.
+
+When the configured kind changes from `none` to `traefik` or `caddy`, or between provider-backed
+kinds, the current edge proxy status becomes `pending`. The system does not synchronously bootstrap
+proxy infrastructure as part of the configure command. Operators can run
+`servers.bootstrap-proxy` / `appaloft server proxy repair <serverId>` to request a new bootstrap
+attempt, and later deployments that require proxy-backed access may run idempotent provider ensure
+according to the runtime route-realization workflow.
+
+Inactive servers reject `servers.configure-edge-proxy` with `server_inactive`; inactive targets do
+not receive new deployment, scheduling, or proxy target configuration work. Deleted servers remain
+hidden from the ordinary configure entrypoint with `not_found`.
+
 Generated-domain provider selection is not part of server registration input. Server/installation configuration may select the concrete provider adapter, but core/application server commands see only provider-neutral proxy readiness and route eligibility state.
 
 Edge proxy provider selection is resolved through the provider registry and composition-root configuration. Server registration may record provider intent or a provider key, but command handlers and process managers must not branch on concrete proxy products to render bootstrap commands, labels, logs, or diagnostics.
@@ -199,6 +224,10 @@ temporary probe container. Failed provider-rendered edge proxy diagnostic checks
 `repairCommand` metadata pointing to `appaloft server proxy repair <serverId>`.
 
 Current server read model exposes edge proxy fields but no top-level readiness status.
+
+Current `servers.configure-edge-proxy` changes desired `proxyKind` only. It resets the current
+summary status to `disabled` for `none` or `pending` for provider-backed kinds and records
+`server-edge-proxy-configured`. It does not create a proxy bootstrap attempt.
 
 Current event bus dispatch is in-memory and fire-and-forget; handler failures are logged and not returned to the original command.
 
