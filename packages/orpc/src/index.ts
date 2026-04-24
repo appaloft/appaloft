@@ -110,7 +110,8 @@ import {
   showServerQueryInputSchema,
   streamDeploymentEventsQueryInputSchema,
   TestServerConnectivityCommand,
-  testServerConnectivityCommandInputSchema,
+  testDraftServerConnectivityCommandInputSchema,
+  testRegisteredServerConnectivityCommandInputSchema,
   UnsetEnvironmentVariableCommand,
   UnsetResourceVariableCommand,
   unsetEnvironmentVariableCommandInputSchema,
@@ -961,7 +962,7 @@ export const testServerConnectivityProcedure = base
     description: apiRouteDescriptions.testServerConnectivity,
     successStatus: 200,
   })
-  .input(testServerConnectivityCommandInputSchema)
+  .input(testRegisteredServerConnectivityCommandInputSchema)
   .output(testServerConnectivityResponseSchema)
   .handler(async ({ input, context }) =>
     executeCommand(context, TestServerConnectivityCommand.create(input)),
@@ -974,7 +975,7 @@ export const testDraftServerConnectivityProcedure = base
     description: apiRouteDescriptions.testServerConnectivity,
     successStatus: 200,
   })
-  .input(testServerConnectivityCommandInputSchema)
+  .input(testDraftServerConnectivityCommandInputSchema)
   .output(testServerConnectivityResponseSchema)
   .handler(async ({ input, context }) =>
     executeCommand(context, TestServerConnectivityCommand.create(input)),

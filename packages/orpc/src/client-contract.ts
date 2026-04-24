@@ -44,7 +44,8 @@ import {
   type ShowResourceQueryInput,
   type ShowServerQueryInput,
   type StreamDeploymentEventsQueryInput,
-  type TestServerConnectivityCommandInput,
+  type TestDraftServerConnectivityCommandInput,
+  type TestRegisteredServerConnectivityCommandInput,
   type UnsetEnvironmentVariableCommandInput,
   type UnsetResourceVariableCommandInput,
 } from "@appaloft/application/schemas";
@@ -159,13 +160,13 @@ export type AppaloftOrpcClientContract = {
     >;
     testConnectivity: Client<
       AppaloftClientContext,
-      TestServerConnectivityCommandInput,
+      TestRegisteredServerConnectivityCommandInput,
       TestServerConnectivityResponse,
       AppaloftClientError
     >;
     testDraftConnectivity: Client<
       AppaloftClientContext,
-      TestServerConnectivityCommandInput,
+      TestDraftServerConnectivityCommandInput,
       TestServerConnectivityResponse,
       AppaloftClientError
     >;
