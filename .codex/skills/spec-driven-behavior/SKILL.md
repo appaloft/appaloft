@@ -60,59 +60,51 @@ When selecting the next behavior, prioritize this v1 minimum loop over technical
 
 ## Round Todo Gate
 
-Before executing any non-trivial round, create a round-specific todo checklist and keep it current.
-If a planning/todo tool is available, use it; otherwise write a compact checklist in the working
-response or notes before editing files.
+Before executing any non-trivial round, create a round-specific todo checklist and keep it current. If a planning/todo tool is available, use it; otherwise write a compact checklist in the working response or notes before editing files.
 
 The todo is a gate, not a summary:
 
 - do not edit files until the current round has a todo with concrete exit criteria;
-- when chaining rounds in one user-authorized turn, create a top-level chain todo first, then refresh
-  the detailed todo before starting each round;
+- when chaining rounds in one user-authorized turn, create a top-level chain todo first, then refresh the detailed todo before starting each round;
 - every todo item must be phrased as an observable outcome, not a vague activity;
-- mark items complete as they finish, and add missing items immediately when discovery reveals a
-  required surface;
-- do not start the next round while the current round has unchecked mandatory items, unless the item
-  is explicitly moved into documented migration gaps or a later authorized round;
+- mark items complete as they finish, and add missing items immediately when discovery reveals a required surface;
+- do not start the next round while the current round has unchecked mandatory items, unless the item is explicitly moved into documented migration gaps or a later authorized round;
 - include test matrix ids in todo items whenever tests or e2e/acceptance coverage are in scope.
 
 Minimum round todo contents:
 
-- **Spec Round**: governing docs read, behavior map position, ADR need/no-need decision, affected
-  command/event/workflow/error/testing/docs, implementation plan, and migration-gap updates.
-- **Test-First Round**: numbered matrix rows, automation level for each row, at least one CLI or
-  HTTP/oRPC e2e/acceptance row for every new/changed command, lower-level integration/unit rows,
-  test filenames, expected failing/passing state.
-- **Code Round**: core/application/persistence/read model/event/error changes, Web/API/CLI
-  entrypoints, public docs requirement, operation catalog/CORE_OPERATIONS sync, e2e closure path,
-  verification commands.
-- **Docs Round**: governing public docs ADR/spec/test matrix read, target public page or stable
-  anchor, Web `?`/CLI/API/future MCP help surfaces, locale state, search aliases, agent-readable
-  docs impact, and migration-gap updates.
-- **Post-Implementation Sync**: spec alignment, workflow alignment, error alignment, test matrix
-  alignment, public docs alignment, entrypoint bus/schema alignment, migration gaps,
-  Open Questions/ADR decision, ready/not-ready result.
+- **Spec Round**: governing docs read, behavior map position, ADR need/no-need decision, affected command/event/workflow/error/testing/docs, implementation plan, and migration-gap updates.
+- **Test-First Round**: numbered matrix rows, automation level for each row, at least one CLI or HTTP/oRPC e2e/acceptance row for every new/changed command, lower-level integration/unit rows, test filenames, expected failing/passing state.
+- **Code Round**: contract seed, lane ownership when parallelizing, core/application/persistence/read model/event/error changes, Web/API/CLI entrypoints, public docs requirement, operation catalog/CORE_OPERATIONS sync, e2e closure path, verification commands.
+- **Docs Round**: governing public docs ADR/spec/test matrix read, target public page or stable anchor, Web `?`/CLI/API/future MCP help surfaces, locale state, search aliases, agent-readable docs impact, and migration-gap updates.
+- **Post-Implementation Sync**: spec alignment, workflow alignment, error alignment, test matrix alignment, public docs alignment, entrypoint bus/schema alignment, migration gaps, Open Questions/ADR decision, ready/not-ready result.
 
 ## Entrypoint Surface Gate
 
-When a behavior becomes user-visible or changes user-controlled input, treat Web, CLI, API/oRPC,
-repository config files, public documentation, and future MCP/tool entrypoints as separate surfaces
-over the same operation. The governing specs, test matrix, public docs, and Code Round todo must
-explicitly decide the state of each relevant surface:
+When a behavior becomes user-visible or changes user-controlled input, treat Web, CLI, API/oRPC, repository config files, public documentation, and future MCP/tool entrypoints as separate surfaces over the same operation. The governing specs, test matrix, public docs, and Code Round todo must explicitly decide the state of each relevant surface:
 
 - implemented input or selection affordance;
 - read-only/status-only affordance;
 - intentionally not applicable, with the domain reason;
 - deferred migration gap, with the missing schema/command/UI work named.
 
-Do not call a behavior fully exposed if only one surface can accept the new input while another
-first-class surface for the same workflow silently cannot. For Web surfaces, identify whether the
-user needs a text input, select/radio choice, checkbox, or read-only display. For CLI surfaces,
-identify whether the user needs flags, positional arguments, interactive prompts, or config-file
-fields. For repository config files, identify the canonical field names and validation behavior.
-For public documentation, identify whether the behavior needs a task page, concept page, reference
-page, troubleshooting page, or a stable anchor on an existing page. Web `?` help, CLI help/docs
-links, API descriptions, and future MCP/tool descriptions should converge on that stable anchor.
+Do not call a behavior fully exposed if only one surface can accept the new input while another first-class surface for the same workflow silently cannot. For Web surfaces, identify whether the user needs a text input, select/radio choice, checkbox, or read-only display. For CLI surfaces, identify whether the user needs flags, positional arguments, interactive prompts, or config-file fields. For repository config files, identify the canonical field names and validation behavior. For public documentation, identify whether the behavior needs a task page, concept page, reference page, troubleshooting page, or a stable anchor on an existing page. Web `?` help, CLI help/docs links, API descriptions, and future MCP/tool descriptions should converge on that stable anchor.
+
+## Code Round Parallelization Gate
+
+When the user explicitly permits subagents, delegation, or parallel work, Code Round may split work into fixed lanes after the main agent seeds the shared `contract-seed`: operation key, command/query schema, public DTOs, application ports/tokens, operation catalog intent, test matrix ids, surface decisions, DI registration expectations, and disjoint file ownership.
+
+Use these lane names in worker prompts when parallelizing:
+
+- `domain-application-worker`: core/application messages, schemas, handlers, services/use cases, errors/events, and token registration expectations.
+- `persistence-readmodel-worker`: Kysely repositories, read models, projections, migrations, and fixtures.
+- `api-cli-transport-worker`: oRPC/HTTP routes, typed client contracts, OpenAPI/API descriptions, CLI commands/help, and bus dispatch over shared schemas.
+- `web-console-worker`: apps/web dataflow, owner-scoped UI, i18n keys, help links, and Web tests using shared contracts.
+- `verification-sync-worker`: focused verification and drift checks after or alongside integration; this lane reports failures and gaps unless explicitly assigned fixes.
+
+Every worker prompt must state that other agents may edit the codebase, list its owned files or modules, forbid reverting others' changes, and require a final list of changed files and remaining gaps. The main agent keeps the critical path, resolves contract conflicts, integrates results, and does not delegate work that blocks the next immediate local step.
+
+Parallel work does not reduce closure scope. Code Round still includes Web, API/oRPC, CLI, read/query observability, tests, docs/help outcome, operation catalog, and Post-Implementation Sync unless the governing spec explicitly marks a surface not applicable or records a named migration gap.
 
 ## Round Types
 
@@ -151,28 +143,19 @@ Do not change business code, tests, package files, or config in Spec Round.
 
 ### 3. Docs Round
 
-Use when the user asks for public documentation work, docs platform governance, help anchors, or
-when a behavior changes user-visible input, output, status, recovery, workflow sequencing, or
-entrypoint affordances.
+Use when the user asks for public documentation work, docs platform governance, help anchors, or when a behavior changes user-visible input, output, status, recovery, workflow sequencing, or entrypoint affordances.
 
 Do this:
 
-- read `docs/decisions/ADR-030-public-documentation-round-and-platform.md`,
-  `docs/documentation/public-docs-structure.md`, and
-  `docs/testing/public-documentation-test-matrix.md`;
-- decide whether the behavior needs a public task page, concept page, reference page,
-  troubleshooting page, or a stable anchor on an existing page;
+- read `docs/decisions/ADR-030-public-documentation-round-and-platform.md`, `docs/documentation/public-docs-structure.md`, and `docs/testing/public-documentation-test-matrix.md`;
+- decide whether the behavior needs a public task page, concept page, reference page, troubleshooting page, or a stable anchor on an existing page;
 - document Web, CLI, HTTP/oRPC, repository config, and future MCP/tool help surfaces when relevant;
-- keep public docs task-oriented and avoid exposing internal DDD/CQRS implementation terms in
-  primary user journeys;
-- define stable explicit anchors for product help links instead of relying on translated generated
-  heading ids;
+- keep public docs task-oriented and avoid exposing internal DDD/CQRS implementation terms in primary user journeys;
+- define stable explicit anchors for product help links instead of relying on translated generated heading ids;
 - record locale state for `zh-CN` and `en-US`, search aliases, and agent-readable docs impact;
-- update public docs migration gaps when the docs app, help registry, or packaging support is not
-  implemented yet.
+- update public docs migration gaps when the docs app, help registry, or packaging support is not implemented yet.
 
-Do not change business code or tests in Docs Round. Docs platform scaffolding belongs to a later
-Code Round once the governing docs app and packaging plan are clear.
+Do not change business code or tests in Docs Round. Docs platform scaffolding belongs to a later Code Round once the governing docs app and packaging plan are clear.
 
 ### 4. Test-First Round
 
@@ -197,6 +180,8 @@ Use only when the user allows implementation and the relevant ADRs, global contr
 Do this:
 
 - implement the smallest coherent behavior slice;
+- seed shared interfaces/contracts before delegating any workers;
+- when parallelizing, use the fixed lane names from `Code Round Parallelization Gate` with disjoint write scopes;
 - keep command/query/event/workflow/error/read-model/tests/Web/API/CLI aligned with the governing specs;
 - update tests in the same change when behavior or boundaries are touched, using the test case ids from the governing test matrix in automated test names;
 - update migration notes when implementation intentionally does not fully reach the spec yet.
@@ -212,6 +197,8 @@ Follow repository CQRS rules:
 - neverthrow boundaries follow `docs/errors/neverthrow-conventions.md`.
 
 Default Code Round closure includes an executable user-facing chain and the read/query surface needed for a user to observe the result of the behavior. Every new or changed command must have at least one real CLI or HTTP/oRPC e2e/acceptance test unless the test matrix explicitly marks the command as not externally executable and documents why. Browser automation is required only when the Web workflow itself is the behavior under test. Do not treat a write-side command as complete if the only way to confirm it worked is by inspecting persistence manually. If Web, API, CLI, or query/read model coverage is intentionally deferred, record that explicitly in the final gaps and in the relevant migration notes.
+
+Do not stop Code Round after backend or API work when Web or CLI is a relevant first-class surface. Finish those closure pieces in the same Code Round, or record the exact migration gap in specs, tests, and final output.
 
 For changed commands and workflows, the behavior test matrix must enumerate scenario coverage across happy path, validation, lifecycle transitions, workflow branches, error mapping, emitted events, read/query observability, and Web/API/CLI entrypoints where applicable. Each required matrix row must have a stable test case id and preferred automation level. Mark entrypoint-to-read-model chains as `e2e-preferred` when they can be executed through CLI or HTTP/oRPC, and add integration/unit tests underneath for branch coverage and pure domain behavior.
 
@@ -338,6 +325,7 @@ Include:
 - related Web/API/CLI entrypoints;
 - related public docs pages, stable anchors, and help surfaces;
 - related operation catalog entries.
+- candidate parallel lanes and file ownership when Code Round may use subagents.
 
 Use `CHECKLIST.md` for a compact checklist.
 
@@ -416,10 +404,13 @@ If Test-First Round:
 If Code Round:
 
 - create or refresh the Code Round todo before editing code;
+- create the contract seed before assigning workers;
+- when using subagents, assign fixed lane names from `Code Round Parallelization Gate`, disjoint write scopes, and explicit changed-file/gap reporting;
 - implement the smallest behavior slice across core/application/adapters/transports;
 - keep CLI as a frontend-like input collection flow, not an afterthought;
 - keep Web/API/CLI differences at the entry boundary and converge on shared command/query semantics;
 - include the read/query path and relevant user-facing entrypoint needed for a minimal closed loop unless the governing spec explicitly scopes them out;
+- finish Web/API/CLI closure in the same Code Round when those surfaces are relevant; do not leave Web or CLI to a follow-up without a named migration gap;
 - update tests according to the behavior test matrix, including executable CLI or HTTP/oRPC e2e/acceptance coverage for every new or changed command;
 - include the governing test case id in every automated test name that implements a matrix row, for example `test("[QUICK-DEPLOY-WF-001] accepts existing-context quick deploy through CLI", ...)`;
 - update docs only when behavior meaning, gaps, or coverage changed.
