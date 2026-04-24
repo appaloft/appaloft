@@ -705,25 +705,61 @@ function configurableRuntimeProfileFromDeploymentInput(
   return configurableRuntimeProfile;
 }
 
-function runtimeProfileUpdateForReusedResource(input: {
-  currentRuntimeProfile: ResourceDetail["runtimeProfile"] | undefined;
-  desiredRuntimeProfile: ResourceRuntimeProfileInput;
-}): ResourceRuntimeProfileInput | undefined {
-  const desiredRuntimeName = trimToUndefined(input.desiredRuntimeProfile.runtimeName ?? "");
-  if (!desiredRuntimeName) {
-    return undefined;
-  }
-
-  const currentRuntimeName = trimToUndefined(input.currentRuntimeProfile?.runtimeName ?? "");
-  if (currentRuntimeName === desiredRuntimeName) {
+function normalizedConfigurableRuntimeProfile(
+  runtimeProfile: ConfigurableResourceRuntimeProfileInput | undefined,
+): ConfigurableResourceRuntimeProfileInput | undefined {
+  if (!runtimeProfile) {
     return undefined;
   }
 
   return {
-    ...(configurableRuntimeProfileFromDetail(input.currentRuntimeProfile) ??
-      configurableRuntimeProfileFromDeploymentInput(input.desiredRuntimeProfile)),
-    runtimeName: desiredRuntimeName,
+    ...runtimeProfile,
+    ...(trimToUndefined(runtimeProfile.runtimeName ?? "")
+      ? { runtimeName: trimToUndefined(runtimeProfile.runtimeName ?? "") }
+      : {}),
   };
+}
+
+function configurableRuntimeProfilesMatch(input: {
+  current: ConfigurableResourceRuntimeProfileInput | undefined;
+  desired: ConfigurableResourceRuntimeProfileInput | undefined;
+}): boolean {
+  return (
+    JSON.stringify(normalizedConfigurableRuntimeProfile(input.current)) ===
+    JSON.stringify(normalizedConfigurableRuntimeProfile(input.desired))
+  );
+}
+
+function runtimeProfileUpdateForReusedResource(input: {
+  currentRuntimeProfile: ResourceDetail["runtimeProfile"] | undefined;
+  desiredRuntimeProfile: ResourceRuntimeProfileInput;
+}): ResourceRuntimeProfileInput | undefined {
+  const currentConfigurable = configurableRuntimeProfileFromDetail(input.currentRuntimeProfile);
+  const desiredConfigurable = configurableRuntimeProfileFromDeploymentInput(
+    input.desiredRuntimeProfile,
+  );
+  const currentRuntimeName = trimToUndefined(currentConfigurable?.runtimeName ?? "");
+  const desiredRuntimeName = trimToUndefined(desiredConfigurable.runtimeName ?? "");
+  const effectiveDesired = {
+    ...(currentConfigurable ?? {}),
+    ...desiredConfigurable,
+    ...(desiredRuntimeName
+      ? { runtimeName: desiredRuntimeName }
+      : currentRuntimeName
+        ? { runtimeName: currentRuntimeName }
+        : {}),
+  } satisfies ConfigurableResourceRuntimeProfileInput;
+
+  if (
+    configurableRuntimeProfilesMatch({
+      current: currentConfigurable,
+      desired: effectiveDesired,
+    })
+  ) {
+    return undefined;
+  }
+
+  return effectiveDesired;
 }
 
 function resolveReusableResourceRuntimeProfile(input: {
@@ -731,11 +767,6 @@ function resolveReusableResourceRuntimeProfile(input: {
   runtimeProfile: ResourceRuntimeProfileInput;
 }) {
   return Effect.gen(function* () {
-    const desiredRuntimeName = trimToUndefined(input.runtimeProfile.runtimeName ?? "");
-    if (!desiredRuntimeName) {
-      return undefined;
-    }
-
     const resource = yield* showResource(input.resourceId);
     return runtimeProfileUpdateForReusedResource({
       currentRuntimeProfile: resource.runtimeProfile,

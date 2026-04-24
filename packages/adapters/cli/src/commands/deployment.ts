@@ -1,5 +1,5 @@
 import { existsSync, readFileSync, statSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { dirname, isAbsolute, join, resolve } from "node:path";
 import {
   CleanupPreviewCommand,
   CreateDeploymentCommand,
@@ -51,7 +51,11 @@ import {
   resolveInteractiveDeploymentInput,
 } from "./deployment-interaction.js";
 import { type RemoteStateSession } from "./deployment-remote-state.js";
-import { deploymentMethods, normalizeCliPathOrSource } from "./deployment-source.js";
+import {
+  deploymentMethods,
+  isRemoteOrImageSource,
+  normalizeCliPathOrSource,
+} from "./deployment-source.js";
 import {
   createSourceFingerprint,
   type DeploymentStateBackendKind,
@@ -169,6 +173,71 @@ function resolveGitRoot(sourceDirectory: string): string | null {
   return gitRoot && existsSync(gitRoot) && statSync(gitRoot).isDirectory() ? gitRoot : null;
 }
 
+function isExistingFile(path: string): boolean {
+  return existsSync(path) && statSync(path).isFile();
+}
+
+function addDirectoryAncestors(searchDirectories: Set<string>, directory: string): void {
+  let current = resolve(directory);
+  const gitRoot = resolveGitRoot(current);
+
+  while (true) {
+    searchDirectories.add(current);
+    if (gitRoot ? current === gitRoot : dirname(current) === current) {
+      return;
+    }
+
+    current = dirname(current);
+  }
+}
+
+function explicitConfigSearchDirectories(sourceLocator: string): string[] {
+  const directories = new Set<string>();
+  const currentWorkingDirectory = process.cwd();
+  if (existsSync(currentWorkingDirectory) && statSync(currentWorkingDirectory).isDirectory()) {
+    addDirectoryAncestors(directories, currentWorkingDirectory);
+  }
+
+  const sourceDirectory = resolveLocalSourceDirectory(sourceLocator);
+  if (sourceDirectory) {
+    addDirectoryAncestors(directories, sourceDirectory);
+  }
+
+  return [...directories];
+}
+
+function resolveExplicitDeploymentConfigFile(input: {
+  sourceLocator: string;
+  configFilePath: string;
+}): Result<string> {
+  const requestedPath = input.configFilePath;
+
+  if (isAbsolute(requestedPath)) {
+    return isExistingFile(requestedPath)
+      ? ok(requestedPath)
+      : err(
+          domainError.validation("Deployment config file was not found", {
+            phase: "config-discovery",
+            configFilePath: input.configFilePath,
+          }),
+        );
+  }
+
+  for (const directory of explicitConfigSearchDirectories(input.sourceLocator)) {
+    const candidate = resolve(directory, requestedPath);
+    if (isExistingFile(candidate)) {
+      return ok(candidate);
+    }
+  }
+
+  return err(
+    domainError.validation("Deployment config file was not found", {
+      phase: "config-discovery",
+      configFilePath: input.configFilePath,
+    }),
+  );
+}
+
 function discoverDeploymentConfigFile(sourceLocator: string): Result<string | null> {
   const sourceDirectory = resolveLocalSourceDirectory(sourceLocator);
   if (!sourceDirectory) {
@@ -243,14 +312,10 @@ function readDeploymentConfigForCli(input: {
   explicit: boolean;
 } | null> {
   const resolvedPath = input.configFilePath
-    ? existsSync(resolve(input.configFilePath))
-      ? ok(resolve(input.configFilePath))
-      : err(
-          domainError.validation("Deployment config file was not found", {
-            phase: "config-discovery",
-            configFilePath: input.configFilePath,
-          }),
-        )
+    ? resolveExplicitDeploymentConfigFile({
+        sourceLocator: input.sourceLocator,
+        configFilePath: input.configFilePath,
+      })
     : discoverDeploymentConfigFile(input.sourceLocator);
 
   return resolvedPath.andThen((configFilePath) => {
@@ -294,6 +359,26 @@ function readDeploymentConfigForCli(input: {
       explicit: Boolean(input.configFilePath),
     });
   });
+}
+
+function resolveConfigAnchoredSourceLocator(input: {
+  sourceLocator?: string;
+  configResolution?: { configFilePath: string; explicit: boolean };
+}): string | undefined {
+  if (!input.configResolution?.explicit) {
+    return input.sourceLocator;
+  }
+
+  const configDirectory = dirname(input.configResolution.configFilePath);
+  if (!input.sourceLocator) {
+    return configDirectory;
+  }
+
+  if (isAbsolute(input.sourceLocator) || isRemoteOrImageSource(input.sourceLocator)) {
+    return input.sourceLocator;
+  }
+
+  return resolve(configDirectory, input.sourceLocator);
 }
 
 function parseAssignmentFlag(input: {
@@ -873,8 +958,13 @@ const previewCleanupCommand = EffectCommand.make(
           ...(configFilePath ? { configFilePath } : {}),
         }),
       );
+      const configAnchoredSourceLocator =
+        resolveConfigAnchoredSourceLocator({
+          sourceLocator,
+          ...(configResolution ? { configResolution } : {}),
+        }) ?? sourceLocator;
       const configuredSourceLocator = applyConfigSourceBase(
-        normalizedSourceLocator,
+        normalizeCliPathOrSource(configAnchoredSourceLocator, "auto"),
         configResolution?.config,
       );
 
@@ -1138,11 +1228,14 @@ export const deployCommand = EffectCommand.make(
         : [];
       const environmentVariables = [...configEnvironmentVariables, ...flagEnvironmentVariables];
       const deploymentMethod = requestedDeploymentMethod ?? configSeed.deploymentMethod;
-      const normalizedSourceLocator = sourceLocator
-        ? normalizeCliPathOrSource(sourceLocator, deploymentMethod ?? "auto")
-        : configResolution
-          ? normalizeCliPathOrSource(".", deploymentMethod ?? "auto")
-          : undefined;
+      const configAnchoredSourceLocator =
+        resolveConfigAnchoredSourceLocator({
+          ...(sourceLocator ? { sourceLocator } : {}),
+          ...(configResolution ? { configResolution } : {}),
+        }) ?? (configResolution ? "." : undefined);
+      const normalizedSourceLocator = configAnchoredSourceLocator
+        ? normalizeCliPathOrSource(configAnchoredSourceLocator, deploymentMethod ?? "auto")
+        : undefined;
       const configuredSourceLocator = normalizedSourceLocator
         ? applyConfigSourceBase(normalizedSourceLocator, configResolution?.config)
         : undefined;
