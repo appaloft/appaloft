@@ -11,7 +11,11 @@ import {
 
 export {
   type ParsedTestServerConnectivityCommandInput,
+  type TestDraftServerConnectivityCommandInput,
+  type TestRegisteredServerConnectivityCommandInput,
   type TestServerConnectivityCommandInput,
+  testDraftServerConnectivityCommandInputSchema,
+  testRegisteredServerConnectivityCommandInputSchema,
   testServerConnectivityCommandInputSchema,
 } from "./test-server-connectivity.schema";
 

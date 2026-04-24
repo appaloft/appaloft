@@ -1,6 +1,13 @@
-import { readFileSync } from "node:fs";
+import "reflect-metadata";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { createAppaloftOpenApiSpec } from "@appaloft/openapi";
 import starlight from "@astrojs/starlight";
 import { defineConfig } from "astro/config";
+import starlightOpenAPI, {
+  createOpenAPISidebarGroup,
+  openAPISidebarGroups,
+} from "starlight-openapi";
 
 const rootPackage = JSON.parse(
   readFileSync(new URL("../../package.json", import.meta.url), "utf8"),
@@ -9,6 +16,11 @@ const appaloftVersion = process.env.APPALOFT_APP_VERSION || rootPackage.version;
 const docsBase = normalizeDocsBase(process.env.APPALOFT_DOCS_BASE);
 const docsSite = normalizeDocsSite(process.env.APPALOFT_DOCS_SITE);
 const docsBasePrefix = docsBase === "/" ? "" : docsBase;
+const openApiSchemaFile = new URL("./.astro/appaloft-openapi.json", import.meta.url);
+const openApiSchemaPath = fileURLToPath(openApiSchemaFile);
+const hiddenEnglishOpenApiSidebarGroup = createOpenAPISidebarGroup();
+
+await writeAppaloftOpenApiSchema();
 
 function normalizeDocsBase(value) {
   const trimmed = value?.trim() || "/docs";
@@ -59,6 +71,15 @@ function rewriteDocsBaseLinks(node) {
 
 function rehypeAppaloftDocsBaseLinks() {
   return (tree) => rewriteDocsBaseLinks(tree);
+}
+
+async function writeAppaloftOpenApiSchema() {
+  const spec = await createAppaloftOpenApiSpec({
+    appVersion: appaloftVersion,
+  });
+
+  mkdirSync(new URL("./.astro/", import.meta.url), { recursive: true });
+  writeFileSync(openApiSchemaFile, `${JSON.stringify(spec, null, 2)}\n`);
 }
 
 const sidebar = [
@@ -209,6 +230,7 @@ const sidebar = [
           { slug: "reference/web-console" },
         ],
       },
+      ...openAPISidebarGroups,
       {
         label: "Contracts",
         items: [{ slug: "reference/errors-statuses" }, { slug: "reference/configuration" }],
@@ -273,6 +295,31 @@ export default defineConfig({
       components: {
         Header: "./src/components/Header.astro",
       },
+      plugins: [
+        starlightOpenAPI([
+          {
+            base: "reference/openapi",
+            schema: openApiSchemaPath,
+            sidebar: {
+              label: "OpenAPI",
+              operations: {
+                badges: true,
+              },
+            },
+          },
+          {
+            base: "en/reference/openapi",
+            schema: openApiSchemaPath,
+            sidebar: {
+              group: hiddenEnglishOpenApiSidebarGroup,
+              label: "OpenAPI",
+              operations: {
+                badges: true,
+              },
+            },
+          },
+        ]),
+      ],
       sidebar,
       tableOfContents: {
         minHeadingLevel: 2,

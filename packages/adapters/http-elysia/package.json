@@ -16,6 +16,7 @@
     "elysia": "^1.4.28"
   },
   "devDependencies": {
+    "@appaloft/openapi": "workspace:*",
     "reflect-metadata": "^0.2.2"
   },
   "scripts": {

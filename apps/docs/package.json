@@ -11,10 +11,13 @@
     "lint": "biome check ."
   },
   "devDependencies": {
+    "@appaloft/openapi": "workspace:*",
     "@appaloft/design": "workspace:*",
     "@astrojs/check": "^0.9.8",
     "@astrojs/starlight": "^0.38.3",
     "astro": "^6.1.9",
+    "reflect-metadata": "^0.2.2",
+    "starlight-openapi": "^0.25.0",
     "typescript": "^6.0.2"
   }
 }

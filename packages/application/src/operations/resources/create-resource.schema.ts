@@ -17,7 +17,7 @@ export const createResourceServiceInputSchema = z.object({
   kind: z.enum(resourceServiceKinds),
 });
 
-export const createResourceSourceBindingInputSchema = z.object({
+const createResourceSourceBindingInputBaseSchema = z.object({
   kind: z.enum(sourceKinds),
   locator: nonEmptyTrimmedString("Source locator"),
   displayName: nonEmptyTrimmedString("Source display name").optional(),
@@ -33,6 +33,45 @@ export const createResourceSourceBindingInputSchema = z.object({
   imageDigest: nonEmptyTrimmedString("Docker image digest").optional(),
   metadata: z.record(z.string(), z.string()).optional(),
 });
+
+export const localFolderResourceSourceBindingExample = {
+  kind: "local-folder",
+  locator: "./apps/web",
+  displayName: "Web console",
+  baseDirectory: ".",
+  metadata: {
+    framework: "sveltekit",
+  },
+} satisfies z.input<typeof createResourceSourceBindingInputBaseSchema>;
+
+export const remoteGitResourceSourceBindingExample = {
+  kind: "remote-git",
+  locator: "https://github.com/acme/storefront.git",
+  displayName: "Storefront",
+  gitRef: "main",
+  repositoryFullName: "acme/storefront",
+  defaultBranch: "main",
+} satisfies z.input<typeof createResourceSourceBindingInputBaseSchema>;
+
+export const dockerImageResourceSourceBindingExample = {
+  kind: "docker-image",
+  locator: "ghcr.io/acme/api:1.7.3",
+  displayName: "API image",
+  imageName: "ghcr.io/acme/api",
+  imageTag: "1.7.3",
+  imageDigest: "sha256:8b1a9953c4611296a827abf8c47804d7f6f4e6a6d7f4aaf8f6f5c6e6d7c8b9a0",
+} satisfies z.input<typeof createResourceSourceBindingInputBaseSchema>;
+
+export const resourceSourceBindingExamples = [
+  localFolderResourceSourceBindingExample,
+  remoteGitResourceSourceBindingExample,
+  dockerImageResourceSourceBindingExample,
+];
+
+export const createResourceSourceBindingInputSchema =
+  createResourceSourceBindingInputBaseSchema.meta({
+    examples: resourceSourceBindingExamples,
+  });
 
 export const resourceHealthCheckPolicyInputSchema = z
   .object({
