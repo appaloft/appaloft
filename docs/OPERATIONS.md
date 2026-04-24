@@ -66,6 +66,41 @@ The binary bundle is self-contained:
 - `APPALOFT_WEB_STATIC_DIR` remains available only as an override for an external web build
 - `APPALOFT_DOCS_STATIC_DIR` remains available only as an override for an external docs build
 
+## Docs Deployment
+
+Production docs deploys run from `.github/workflows/deploy-docs.yml` on `main` and use
+`appaloft.docs.yml` to deploy `docs.appaloft.com` through the Appaloft CLI itself.
+
+PR docs previews run from `.github/workflows/deploy-docs-preview.yml`. The preview job runs only for
+same-repository pull requests whose changed files affect docs content, the docs app, or docs build
+inputs. It invokes:
+
+```bash
+appaloft deploy . \
+  --config appaloft.docs.yml \
+  --preview pull-request \
+  --preview-id pr-<number> \
+  --preview-domain-template docs-pr-<number>.<APPALOFT_DOCS_PREVIEW_DOMAIN> \
+  --require-preview-url
+```
+
+The close job runs `appaloft preview cleanup` on `pull_request.closed`. Cleanup is idempotent, so it
+is allowed to run for same-repository PRs even if the final file list no longer contains docs
+changes.
+
+Required GitHub repository settings:
+
+- variable `APPALOFT_SSH_HOST`
+- optional variable `APPALOFT_SSH_USER` (defaults to `root`)
+- secret `APPALOFT_SSH_PRIVATE_KEY`
+- variable `APPALOFT_DOCS_PREVIEW_DOMAIN`, such as `preview.docs.appaloft.com`
+- optional variable `APPALOFT_DOCS_PREVIEW_TLS_MODE`, either `auto` or `disabled`
+
+For custom preview hosts, DNS must point a wildcard such as
+`*.preview.docs.appaloft.com` at the selected Appaloft deployment server before previews can expose
+public URLs. With `APPALOFT_DOCS_PREVIEW_TLS_MODE=auto`, the selected edge proxy must also be able
+to issue or serve certificates for those preview hosts.
+
 Run the Tauri desktop shell:
 
 ```bash
