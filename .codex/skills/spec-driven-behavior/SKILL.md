@@ -1,21 +1,32 @@
 ---
 name: spec-driven-behavior
-description: Use when Codex needs to discover, specify, document, implement, reconcile, post-check, or choose the next Appaloft business behavior/business operation from ADRs, global contracts, local command/query/event/workflow/error specs, implementation plans, operation catalog entries, read models, Web/API/CLI entrypoints, public docs anchors, or spec-driven test matrices. Supports explicit Discover Round, Spec Round, Docs Round, Code Round, Sync Round, Next Behavior Selection, and Post-Implementation Sync.
+description: Use when Codex needs to discover, specify, document, implement, reconcile, verify, post-check, or choose the next Appaloft business behavior/business operation from ADRs, global contracts, local command/query/event/workflow/error specs, implementation plans, operation catalog entries, read models, Web/API/CLI entrypoints, public docs anchors, or spec-driven test matrices. Supports artifact-guided behavior dossiers, incremental or complete readiness workflows, Discover Round, Spec Round, Docs Round, Test-First Round, Code Round, Sync Round, Next Behavior Selection, and Post-Implementation Sync.
 ---
 
 # Spec-Driven Behavior
 
 ## Purpose
 
-Use this skill to change one Appaloft business behavior as a complete operation, not as an isolated class or endpoint.
+Use this skill to change one Appaloft business behavior as a complete operation, not as an isolated class, route, test, or endpoint.
 
 Treat a behavior as the coordinated unit spanning command or query, event, workflow, error contract, read model/projection, test matrix, Web/API/CLI entrypoints, public documentation anchors, implementation plan, and ADR/global contracts when applicable.
 
 Do not treat this skill as permission to move from specs into code automatically. The default round is Spec Round. Docs Round is required when the current prompt asks for public documentation or when a behavior changes user-visible input, output, status, recovery, workflow sequencing, or entrypoint affordances. Test-First Round is allowed only when the current prompt permits automated test work and the governing specs/test matrix are clear enough to write executable expectations. Code Round is allowed only when the current prompt permits implementation and the governing ADRs, global contracts, local specs, public documentation requirement, test matrix, automated tests, and implementation plan are clear enough.
 
+## Load References
+
+Keep this file as the routing layer. Load extra files only when their condition applies:
+
+- `references/round-artifacts.md`: load before any non-trivial round to build the behavior artifact state, choose incremental vs complete readiness, maintain the behavior dossier, and record change intent.
+- `references/round-details.md`: load when entering a concrete round and before editing files; it contains detailed round todos, execution rules, entrypoint-surface gates, ADR escalation, and synchronization surfaces.
+- `references/verification.md`: load for Post-Implementation Sync, Sync Round, Code Round closure, or any request to verify whether implementation matches specs.
+- `DISCOVERY_TEMPLATE.md`: use when no concrete behavior is selected.
+- `CHECKLIST.md`: use to record the behavior dossier, artifact state, round todo, and coverage checklist.
+- `OUTPUT_TEMPLATE.md`: use for final summaries after a formal round.
+
 ## Source-Of-Truth Rules
 
-Always read governing documents before implementation:
+Always read governing documents before implementation, in this order:
 
 1. `AGENTS.md`
 2. `docs/decisions/README.md`
@@ -58,449 +69,105 @@ Appaloft's current product target is a self-hosted deployment platform v1 with t
 
 When selecting the next behavior, prioritize this v1 minimum loop over technical convenience or far-future platform depth.
 
-## Round Todo Gate
+## Artifact-Guided Workflow
 
-Before executing any non-trivial round, create a round-specific todo checklist and keep it current.
-If a planning/todo tool is available, use it; otherwise write a compact checklist in the working
-response or notes before editing files.
+For every non-trivial behavior, build an artifact state before editing files. Use `references/round-artifacts.md` for the full procedure.
 
-The todo is a gate, not a summary:
+Track these artifacts as `done`, `ready`, `blocked`, `not-applicable`, or `deferred-gap`:
 
-- do not edit files until the current round has a todo with concrete exit criteria;
-- when chaining rounds in one user-authorized turn, create a top-level chain todo first, then refresh
-  the detailed todo before starting each round;
-- every todo item must be phrased as an observable outcome, not a vague activity;
-- mark items complete as they finish, and add missing items immediately when discovery reveals a
-  required surface;
-- do not start the next round while the current round has unchecked mandatory items, unless the item
-  is explicitly moved into documented migration gaps or a later authorized round;
-- include test matrix ids in todo items whenever tests or e2e/acceptance coverage are in scope.
+1. Behavior identity and operation-map position
+2. ADR/global-contract decision
+3. Local command/query/event/workflow/error specs
+4. Public docs outcome and stable help anchor decision
+5. Test matrix rows with stable ids and automation levels
+6. Implementation plan or explicit small-scope rationale
+7. Automated tests that bind to matrix ids
+8. Code/read model/entrypoint implementation
+9. Post-Implementation Sync verification report
 
-Minimum round todo contents:
+Use a behavior dossier as the compact state carrier for the current behavior. Include the operation name, operation-map state, governed ADRs, global contracts, local specs, test matrix ids, public docs anchors, entrypoints, code modules, current gaps, and change intent.
 
-- **Spec Round**: governing docs read, behavior map position, ADR need/no-need decision, affected
-  command/event/workflow/error/testing/docs, implementation plan, and migration-gap updates.
-- **Test-First Round**: numbered matrix rows, automation level for each row, at least one CLI or
-  HTTP/oRPC e2e/acceptance row for every new/changed command, lower-level integration/unit rows,
-  test filenames, expected failing/passing state.
-- **Code Round**: core/application/persistence/read model/event/error changes, Web/API/CLI
-  entrypoints, public docs requirement, operation catalog/CORE_OPERATIONS sync, e2e closure path,
-  verification commands.
-- **Docs Round**: governing public docs ADR/spec/test matrix read, target public page or stable
-  anchor, Web `?`/CLI/API/future MCP help surfaces, locale state, search aliases, agent-readable
-  docs impact, and migration-gap updates.
-- **Post-Implementation Sync**: spec alignment, workflow alignment, error alignment, test matrix
-  alignment, public docs alignment, entrypoint bus/schema alignment, migration gaps,
-  Open Questions/ADR decision, ready/not-ready result.
+Record change intent in the dossier using `ADDED`, `MODIFIED`, `REMOVED`, and `RENAMED` for requirements, entrypoints, matrix rows, public docs anchors, and operation catalog entries. Apply accepted changes directly to Appaloft's source-of-truth docs; do not create a competing permanent delta-spec layer.
 
-## Entrypoint Surface Gate
+## Execution Modes
 
-When a behavior becomes user-visible or changes user-controlled input, treat Web, CLI, API/oRPC,
-repository config files, public documentation, and future MCP/tool entrypoints as separate surfaces
-over the same operation. The governing specs, test matrix, public docs, and Code Round todo must
-explicitly decide the state of each relevant surface:
+Choose one execution mode after the artifact state is known:
 
-- implemented input or selection affordance;
-- read-only/status-only affordance;
-- intentionally not applicable, with the domain reason;
-- deferred migration gap, with the missing schema/command/UI work named.
-
-Do not call a behavior fully exposed if only one surface can accept the new input while another
-first-class surface for the same workflow silently cannot. For Web surfaces, identify whether the
-user needs a text input, select/radio choice, checkbox, or read-only display. For CLI surfaces,
-identify whether the user needs flags, positional arguments, interactive prompts, or config-file
-fields. For repository config files, identify the canonical field names and validation behavior.
-For public documentation, identify whether the behavior needs a task page, concept page, reference
-page, troubleshooting page, or a stable anchor on an existing page. Web `?` help, CLI help/docs
-links, API descriptions, and future MCP/tool descriptions should converge on that stable anchor.
-
-## Round Types
-
-### 1. Discover Round
-
-Use when the user has not specified a concrete behavior, command, or business operation.
-
-Do this:
-
-- read `docs/BUSINESS_OPERATION_MAP.md`, `docs/CORE_OPERATIONS.md`, `packages/application/src/operation-catalog.ts`, and `docs/commands/**`;
-- search for user terms across command specs, workflow specs, event specs, and operation catalog entries;
-- list the most relevant candidate behaviors;
-- include each candidate's command name, workflow/spec paths, and a one-line rationale;
-- ask the user to pick one candidate before editing code or specs.
-
-Use `DISCOVERY_TEMPLATE.md` for the response shape.
-
-Do not edit code in Discover Round. Do not guess a behavior and proceed when the user has not selected one.
-
-### 2. Spec Round
-
-Use when the user asks for Markdown/spec work only, ADR work, implementation planning, or when the governing contract is not yet sufficient for code.
-
-This is the default round.
-
-Do this:
-
-- update ADRs first when boundaries or lifecycle rules change;
-- update `docs/BUSINESS_OPERATION_MAP.md` first when a behavior is new, absent, repositioned, or rebuild-required;
-- keep spec bodies source-of-truth / Normative Contract style;
-- place current implementation gaps only in `Current Implementation Notes And Migration Gaps`;
-- place undecided issues only in `Open Questions`;
-- update related command, event, workflow, error, testing, and implementation plan docs together.
-
-Do not change business code, tests, package files, or config in Spec Round.
-
-### 3. Docs Round
-
-Use when the user asks for public documentation work, docs platform governance, help anchors, or
-when a behavior changes user-visible input, output, status, recovery, workflow sequencing, or
-entrypoint affordances.
-
-Do this:
-
-- read `docs/decisions/ADR-030-public-documentation-round-and-platform.md`,
-  `docs/documentation/public-docs-structure.md`, and
-  `docs/testing/public-documentation-test-matrix.md`;
-- decide whether the behavior needs a public task page, concept page, reference page,
-  troubleshooting page, or a stable anchor on an existing page;
-- document Web, CLI, HTTP/oRPC, repository config, and future MCP/tool help surfaces when relevant;
-- keep public docs task-oriented and avoid exposing internal DDD/CQRS implementation terms in
-  primary user journeys;
-- define stable explicit anchors for product help links instead of relying on translated generated
-  heading ids;
-- record locale state for `zh-CN` and `en-US`, search aliases, and agent-readable docs impact;
-- update public docs migration gaps when the docs app, help registry, or packaging support is not
-  implemented yet.
-
-Do not change business code or tests in Docs Round. Docs platform scaffolding belongs to a later
-Code Round once the governing docs app and packaging plan are clear.
-
-### 4. Test-First Round
-
-Use when the user asks to implement tests before business code, or when a new/changed behavior needs executable expectations before Code Round.
-
-Do this:
-
-- update or add the governing `docs/testing/**` test matrix before writing tests if the changed behavior lacks numbered matrix rows;
-- implement or rename automated tests so each changed matrix row has a matching test name with the matrix id;
-- for every new or changed command, add at least one executable e2e/acceptance test through CLI or HTTP/oRPC that proves the command can be executed from a user-facing entrypoint and observed through a public read/query surface;
-- add integration/unit tests underneath for branch coverage, event payload details, persistence state, and pure domain rules;
-- classify every changed matrix row by the strongest boundary that can actually observe the assertion: `e2e-preferred` for CLI/HTTP/Web plus public read/query observability, `integration` for repository state/events/process-manager/adapter behavior, `unit` for pure domain/planner rules, and `contract` for schema/route/provider-port compatibility;
-- do not change business implementation code, package files, or config unless the change is limited to test fixtures or test harness wiring;
-- allow intentionally failing tests only when they express the target behavior from the governing specs.
-
-Output must list any failing matrix ids and the Code Round work expected to make them pass. The behavior remains `not aligned` until the tests pass or the matrix is revised by Spec Round.
-
-### 5. Code Round
-
-Use only when the user allows implementation and the relevant ADRs, global contracts, local specs, test matrix, automated tests, and implementation plan are sufficiently clear.
-
-Do this:
-
-- implement the smallest coherent behavior slice;
-- keep command/query/event/workflow/error/read-model/tests/Web/API/CLI aligned with the governing specs;
-- update tests in the same change when behavior or boundaries are touched, using the test case ids from the governing test matrix in automated test names;
-- update migration notes when implementation intentionally does not fully reach the spec yet.
-
-Follow repository CQRS rules:
-
-- new business endpoints and CLI commands dispatch via `CommandBus` or `QueryBus`;
-- transport inputs reuse command/query schemas rather than defining parallel transport-only shapes;
-- application handlers delegate to use cases or application services and do not contain persistence or transport logic;
-- query handlers delegate to query services/read models and do not read persistence directly from transports;
-- new business capabilities update both `docs/CORE_OPERATIONS.md` and `packages/application/src/operation-catalog.ts` in the same change;
-- new or changed behaviors must already be positioned in `docs/BUSINESS_OPERATION_MAP.md`;
-- neverthrow boundaries follow `docs/errors/neverthrow-conventions.md`.
-
-Default Code Round closure includes an executable user-facing chain and the read/query surface needed for a user to observe the result of the behavior. Every new or changed command must have at least one real CLI or HTTP/oRPC e2e/acceptance test unless the test matrix explicitly marks the command as not externally executable and documents why. Browser automation is required only when the Web workflow itself is the behavior under test. Do not treat a write-side command as complete if the only way to confirm it worked is by inspecting persistence manually. If Web, API, CLI, or query/read model coverage is intentionally deferred, record that explicitly in the final gaps and in the relevant migration notes.
-
-For changed commands and workflows, the behavior test matrix must enumerate scenario coverage across happy path, validation, lifecycle transitions, workflow branches, error mapping, emitted events, read/query observability, and Web/API/CLI entrypoints where applicable. Each required matrix row must have a stable test case id and preferred automation level. Mark entrypoint-to-read-model chains as `e2e-preferred` when they can be executed through CLI or HTTP/oRPC, and add integration/unit tests underneath for branch coverage and pure domain behavior.
-
-Do not use `e2e-preferred` for assertions an external user chain cannot observe directly, such as exact repository fields, internal method calls, hidden process-manager state, or adapter call ordering. Split those into companion `integration`, `unit`, or `contract` rows while keeping a separate `e2e-preferred` row for the user-visible chain when one exists.
-
-Treat every operation catalog entry as first-class test scope. New or changed tests for an explicit operation must live in operation-named test files, not only in generic smoke suites or as setup inside another operation's tests. If an operation has separate command, CLI, HTTP/oRPC, Web, or future MCP entrypoints, split the matrix rows and automated tests by those boundaries when each has distinct transport behavior to verify.
-
-When a behavior is owned by a specific aggregate or resource, Web closure should include an owner-scoped affordance on the relevant detail page, not only a standalone admin page, unless the governing spec explicitly makes the operation global-only.
-
-After implementation, run Post-Implementation Sync for the same behavior before recommending or starting another behavior. If the behavior is user-visible, also complete the Docs Round outcome or record the missing public documentation anchor as a migration gap before calling the behavior complete.
-
-### 6. Sync Round
-
-Use when implementation, specs, tests, or entrypoints have drifted.
-
-Do this:
-
-- compare the governing specs and test matrix against code and tests;
-- decide whether code should change, specs should change, tests should change, or an ADR is needed first;
-- reconcile command/event/workflow/error docs with actual intended behavior;
-- reconcile tests with the test matrix;
-- keep legacy gaps explicit in migration notes instead of hiding drift.
-
-### 7. Next Behavior Selection
-
-Use when the current behavior is implemented or basically implemented and the user asks what to do next.
-
-Do this:
-
-- verify whether the current behavior completed Post-Implementation Sync;
-- rank candidates by v1 minimum-loop value, not just implementation ease;
-- start candidate discovery from `docs/BUSINESS_OPERATION_MAP.md`;
-- prefer behaviors with Accepted ADRs, global-contract coverage, local specs, implementation plans, and a verifiable minimal deliverable;
-- identify blockers that require Spec Round before Code Round;
-- recommend exactly one next behavior and list backup candidates.
-
-Output must include:
-
-- recommended next behavior;
-- why this behavior matters to the v1 loop;
-- next round type: Spec Round or Code Round;
-- governed ADRs, global contracts, local specs, and implementation plan;
-- backup candidates and why they rank lower.
-
-Do not start writing the next spec or implementing the next behavior unless the current prompt explicitly asks to do so.
-
-### 8. Post-Implementation Sync
-
-Use immediately after a Code Round or when the user asks whether a behavior is implemented enough.
-
-Check:
-
-- code aligns with command/query spec;
-- code aligns with workflow spec;
-- error mapping aligns with error spec and neverthrow conventions;
-- tests align with the test matrix, including matrix ids and matching automated test names;
-- public docs and help anchors align with `docs/documentation/public-docs-structure.md` when the behavior is user-visible;
-- intentionally test-first failures are either resolved by Code Round or listed as remaining gaps;
-- Web/API/CLI entrypoints dispatch through the intended command/query schemas and buses;
-- migration gaps are updated;
-- Open Questions are resolved, still valid, or need ADR escalation.
-
-Output must include:
-
-- `aligned` or `not aligned`;
-- remaining gaps;
-- required doc/test/code updates;
-- whether a new ADR is needed;
-- whether the behavior is ready to move on from.
-
-## Fixed Workflow
-
-### Step 1. Identify Behavior
-
-Determine whether the user has specified a behavior.
-
-If the behavior is not specified:
-
-- enter Discover mode;
-- do not guess and edit;
-- return candidate behaviors and ask the user to choose.
-
-If the behavior is specified:
-
-- normalize the behavior name;
-- identify likely command/query name;
-- identify local spec paths, event names, workflow name, error spec, test matrix, implementation plan, and code modules.
-
-### Step 2. Load Governing Documents
-
-Read governing documents in source-of-truth order:
-
-- `AGENTS.md`;
-- `docs/decisions/README.md`;
-- relevant ADRs;
-- `docs/BUSINESS_OPERATION_MAP.md`;
-- `docs/CORE_OPERATIONS.md`;
-- `docs/DOMAIN_MODEL.md`;
-- global error/neverthrow/async contracts;
-- local command/event/workflow/error/testing specs;
-- public documentation specs;
-- implementation plan;
-- `packages/application/src/operation-catalog.ts`.
-
-Use `rg` and `rg --files` first for discovery.
-
-### Step 3. Build Behavior Change Map
-
-Build and share or use a behavior change map before edits when the task is non-trivial.
-
-Include:
-
-- governed ADRs;
-- operation-map position and state;
-- governed global contracts;
-- relevant command specs;
-- relevant event specs;
-- relevant workflow specs;
-- relevant error specs;
-- relevant testing specs/test matrix, including test case ids and preferred automation levels;
-- implementation plan;
-- related code modules;
-- related read models/projections and query handlers;
-- related Web/API/CLI entrypoints;
-- related public docs pages, stable anchors, and help surfaces;
-- related operation catalog entries.
-
-Use `CHECKLIST.md` for a compact checklist.
-
-Before edits, convert the behavior change map into the current round todo described in
-`Round Todo Gate`. For a chained Spec -> Test-First -> Code flow, keep separate todo sections for
-each round so coverage requirements cannot be hidden inside a broad "implement behavior" item.
-
-### Step 4. Decide Scope
-
-State or infer the round:
-
-- Discover Round when no behavior is selected;
-- Spec Round when docs-only, ADR-first, implementation plan work is requested, or governance is incomplete;
-- Docs Round when public docs, docs platform governance, stable help anchors, or user-visible documentation closure is requested;
-- Test-First Round when executable tests are requested before business implementation and the matrix/specs are clear;
-- Code Round when code is explicitly allowed and specs are clear;
-- Sync Round when reconciling drift;
-- Next Behavior Selection when choosing the next v1 behavior after an implemented behavior;
-- Post-Implementation Sync when checking an implemented behavior against specs/tests/contracts.
+- **Incremental readiness**: create or reconcile exactly the next ready artifact, then stop with updated state. Use when requirements are unclear, the user asks to continue step-by-step, or a governance decision needs review.
+- **Complete readiness**: complete all ready governance artifacts needed for the authorized next round, then stop at the next permission boundary. Use when scope is clear and the user asks to prepare the behavior for implementation or finish readiness.
 
 Do not chain multiple round types in one turn unless the prompt explicitly requests it. Exception: a Code Round must finish with Post-Implementation Sync for the same behavior.
 
-Before code changes, decide whether the task first needs:
+## Round Routing
 
-- a new or updated ADR;
-- a new or updated command/event/workflow/error spec;
-- a new or updated test matrix with stable case ids and preferred automation levels;
-- a new or updated public documentation page, stable help anchor, or docs migration gap;
-- new or updated automated tests that bind to the changed matrix ids;
-- a new or updated implementation plan.
+### Discover Round
 
-Enter Code Round only if the candidate behavior has:
+Use when the user has not specified a concrete behavior, command, or business operation.
 
-- relevant Accepted ADRs or no ADR-needed boundary change;
-- global-contract coverage for errors/neverthrow/async when applicable;
-- local command/query, event, workflow, error, and testing specs where relevant;
-- public documentation requirement decided when the behavior is user-visible;
-- automated tests for the changed matrix ids, or a documented reason they must be created inside the Code Round;
-- an implementation plan or an explicitly small enough implementation scope;
-- no unresolved Open Questions that would change command boundary, ownership, lifecycle, retry, readiness, durable state, or route/domain/TLS semantics.
+Read `docs/BUSINESS_OPERATION_MAP.md`, `docs/CORE_OPERATIONS.md`, `packages/application/src/operation-catalog.ts`, and `docs/commands/**`; search for user terms across command specs, workflow specs, event specs, and operation catalog entries; list relevant candidates with command name, workflow/spec paths, and rationale. Use `DISCOVERY_TEMPLATE.md`. Do not edit code or specs.
 
-If any of these are missing, enter Spec Round first.
+### Spec Round
 
-### Step 5. Execute
+Use when the user asks for Markdown/spec work only, ADR work, implementation planning, readiness preparation, or when the governing contract is not sufficient for code.
 
-If Spec Round:
+Update ADRs first when boundaries or lifecycle rules change. Update `docs/BUSINESS_OPERATION_MAP.md` first when a behavior is new, absent, repositioned, or rebuild-required. Keep spec bodies source-of-truth / Normative Contract style. Put temporary implementation reality only in `Current Implementation Notes And Migration Gaps`; put undecided issues only in `Open Questions`.
 
-- edit only allowed Markdown files;
-- update source-of-truth body text directly when the decision is accepted;
-- do not scatter analysis labels like `Current fact`, `Inference`, or `Target recommendation` through normative body text;
-- keep implementation reality in migration gaps.
+### Docs Round
 
-If Docs Round:
+Use when the user asks for public documentation work, docs platform governance, help anchors, or when a behavior changes user-visible input, output, status, recovery, workflow sequencing, or entrypoint affordances.
 
-- create or refresh the Docs Round todo before editing public docs or docs governance;
-- read ADR-030, public docs structure, and public documentation test matrix;
-- update public documentation pages, help anchor mappings, public docs migration gaps, or docs
-  governance only;
-- keep public docs user-task oriented and do not mirror internal spec folders one-to-one;
-- decide Web `?`, CLI help/docs, HTTP/API, repository config, and future MCP/tool documentation
-  surfaces when relevant;
-- record locale state, search aliases, and agent-readable docs impact;
-- do not change business implementation code, test code, package files, or generated docs app
-  scaffolding unless the current prompt explicitly authorizes a Code Round for docs platform work.
+Read ADR-030, public docs structure, and public documentation test matrix. Decide whether the behavior needs a task page, concept page, reference page, troubleshooting page, stable anchor on an existing page, not-user-facing reason, or migration gap. Keep public docs user-task oriented and avoid internal DDD/CQRS terminology in primary user journeys.
 
-If Test-First Round:
+### Test-First Round
 
-- create or refresh the Test-First Round todo before editing tests;
-- update the governing test matrix first when new or changed behavior lacks numbered rows;
-- implement automated tests before business implementation and name each test with the governing matrix id;
-- include at least one executable CLI or HTTP/oRPC e2e/acceptance test for every new or changed command, unless the test matrix explicitly documents why none can exist;
-- allow tests to fail only as executable target behavior for a future Code Round;
-- do not change production/business code, except for test fixtures or test harness wiring;
-- report failing matrix ids and the intended Code Round target.
+Use when the user asks to implement tests before business code, or when a new/changed behavior needs executable expectations before Code Round.
 
-If Code Round:
+Update the governing test matrix first when changed behavior lacks numbered rows. Implement or rename tests so each changed matrix row has a matching test name with the matrix id. For every new or changed command, include at least one CLI or HTTP/oRPC e2e/acceptance row unless the matrix explicitly documents why none can exist.
 
-- create or refresh the Code Round todo before editing code;
-- implement the smallest behavior slice across core/application/adapters/transports;
-- keep CLI as a frontend-like input collection flow, not an afterthought;
-- keep Web/API/CLI differences at the entry boundary and converge on shared command/query semantics;
-- include the read/query path and relevant user-facing entrypoint needed for a minimal closed loop unless the governing spec explicitly scopes them out;
-- update tests according to the behavior test matrix, including executable CLI or HTTP/oRPC e2e/acceptance coverage for every new or changed command;
-- include the governing test case id in every automated test name that implements a matrix row, for example `test("[QUICK-DEPLOY-WF-001] accepts existing-context quick deploy through CLI", ...)`;
-- update docs only when behavior meaning, gaps, or coverage changed.
-- run Post-Implementation Sync for the same behavior before final output.
+### Code Round
 
-If Next Behavior Selection:
+Use only when implementation is allowed and the artifact state shows required governance as done, not-applicable, or explicitly deferred-gap.
 
-- inspect `docs/BUSINESS_OPERATION_MAP.md`, `docs/PRODUCT_ROADMAP.md`, `docs/CORE_OPERATIONS.md`, operation catalog, ADRs, local specs, and implementation plans;
-- prefer behaviors on the v1 loop: SSH server setup, app deployment, basic access path, domain/TLS, status/error/event visibility;
-- choose Code Round only when ADR/spec/plan readiness is sufficient;
-- otherwise recommend Spec Round.
+Implement the smallest coherent behavior slice across core/application/adapters/transports. Keep command/query/event/workflow/error/read-model/tests/Web/API/CLI aligned with the governing specs. New business endpoints and CLI commands dispatch through `CommandBus` or `QueryBus`; transport inputs reuse command/query schemas; handlers delegate to use cases or query services. New business capabilities update both `docs/CORE_OPERATIONS.md` and `packages/application/src/operation-catalog.ts`.
 
-If Post-Implementation Sync:
+Default Code Round closure includes an executable user-facing chain and the read/query surface needed for a user to observe the result. Every new or changed command must have at least one real CLI or HTTP/oRPC e2e/acceptance test unless the test matrix explicitly documents an exception.
 
-- create or refresh the Post-Implementation Sync todo before checking alignment;
-- compare implementation, tests, entrypoints, and migration notes against the governing specs;
-- verify every new or changed test matrix row has a stable id, preferred automation level, and matching automated test name when implemented;
-- verify every new or changed command has at least one passing CLI or HTTP/oRPC e2e/acceptance test, or an explicit test-matrix exception;
-- verify user-visible behavior has a public docs anchor, an existing docs coverage decision, a
-  not-user-facing reason, or an explicit docs migration gap;
-- verify test-first failures are resolved or still listed as blockers;
-- report ready/not-ready and blockers without starting the next behavior.
+### Sync Round
 
-### Step 6. Output
+Use when implementation, specs, tests, or entrypoints have drifted.
 
-Use `OUTPUT_TEMPLATE.md` for the final response shape.
+Compare governing docs and test matrix against code and tests. Decide whether code should change, specs should change, tests should change, or an ADR is needed first. Keep legacy gaps explicit in migration notes instead of hiding drift.
 
-The final response must include:
+### Next Behavior Selection
 
-- round type;
-- target behavior;
-- operation-map position and state;
-- changed docs;
-- changed public docs pages or stable anchors;
-- changed code modules;
-- changed tests;
-- covered or missing test matrix ids;
-- intentionally failing test-first matrix ids when present;
-- changed Web/API/CLI entrypoints;
-- changed public documentation/help surfaces;
-- governed ADRs;
-- remaining migration gaps;
-- remaining open questions;
-- whether the behavior is now fully aligned with the spec.
-- recommended next behavior and next round type when relevant.
+Use when the current behavior is implemented or basically implemented and the user asks what to do next.
 
-## ADR Escalation
+Verify whether the current behavior completed Post-Implementation Sync. Rank candidates by v1 minimum-loop value. Start from `docs/BUSINESS_OPERATION_MAP.md`. Recommend exactly one next behavior, its next round type, governing sources, and lower-ranked backups. Do not start the next behavior unless explicitly asked.
 
-Create or update an ADR before local specs or code when a change touches:
+### Post-Implementation Sync
 
-- command boundary;
-- ownership scope;
-- lifecycle stages;
-- readiness rule;
-- retry semantics;
-- durable state shape;
-- route/domain/TLS boundary;
-- long-running async acceptance semantics.
+Use immediately after a Code Round or when the user asks whether a behavior is implemented enough.
 
-Do not resolve these boundary questions by only changing a local spec or implementation.
+Load `references/verification.md`. Check code, specs, workflows, error mapping, tests, public docs/help anchors, and Web/API/CLI bus/schema dispatch. Output `aligned` or `not aligned`, remaining gaps, required updates, ADR need, and ready/not-ready result.
 
-## Synchronization Surface
+## Core Gates
 
-When a behavior changes, check and synchronize:
+Before any non-trivial edit, create or refresh a concrete todo from the artifact state. Todo items must be observable outcomes, not vague activities. Add newly discovered surfaces immediately. Include test matrix ids whenever tests or e2e/acceptance coverage are in scope.
 
-- business operation map;
-- command spec and command implementation;
-- query spec/read model/projection when the behavior has observable state;
-- event specs and event publisher/consumer behavior;
-- workflow spec and process manager/worker behavior;
-- error spec and neverthrow return shape;
-- testing spec/test matrix ids, preferred automation levels, and actual tests with matching names;
-- Web entrypoint;
-- HTTP API/oRPC route and input schema;
-- CLI command/interactive flow;
-- public documentation page, stable help anchor, locale state, search aliases, and agent-readable docs impact;
-- implementation plan;
-- ADRs when boundaries change.
+Treat Web, CLI, API/oRPC, repository config files, public documentation, and future MCP/tool entrypoints as separate surfaces over the same operation. Do not call a behavior fully exposed if one first-class surface can accept new input while another silently cannot.
+
+Create or update an ADR before local specs or code when a change touches command boundary, ownership scope, lifecycle stages, readiness rule, retry semantics, durable state shape, route/domain/TLS boundary, or long-running async acceptance semantics.
+
+If implementation temporarily diverges from the normative spec, record that only under `Current Implementation Notes And Migration Gaps`; do not weaken the normative contract to match temporary code reality.
+
+## Output
+
+Use `OUTPUT_TEMPLATE.md` for formal final responses. Include round type, target behavior, operation-map position/state, artifact state summary, changed docs/code/tests/entrypoints, test matrix ids, public documentation/help surfaces, governed ADRs, remaining migration gaps, open questions, verification result, and next recommended behavior when relevant.
+
+For verification output, use the `Completeness`, `Correctness`, and `Coherence` dimensions from `references/verification.md`. Critical gaps make the behavior `not aligned`; warnings do not override a missing required artifact.
 
 ## Bundled Templates
 
 - `DISCOVERY_TEMPLATE.md`: use when behavior is not yet selected.
-- `CHECKLIST.md`: use to build the behavior change map and coverage checklist.
+- `CHECKLIST.md`: use to build the behavior dossier, artifact state, round todo, and coverage checklist.
 - `OUTPUT_TEMPLATE.md`: use for final response summaries.
