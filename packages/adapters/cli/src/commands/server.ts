@@ -1,7 +1,9 @@
 import {
   BootstrapServerProxyCommand,
+  CheckServerDeleteSafetyQuery,
   ConfigureServerCredentialCommand,
   CreateSshCredentialCommand,
+  DeactivateServerCommand,
   ListServersQuery,
   ListSshCredentialsQuery,
   OpenTerminalSessionCommand,
@@ -31,6 +33,7 @@ const publicKeyOption = Options.text("public-key").pipe(Options.optional);
 const privateKeyFileOption = Options.text("private-key-file").pipe(Options.optional);
 const requiredPrivateKeyFileOption = Options.text("private-key-file");
 const credentialIdOption = Options.text("credential-id").pipe(Options.optional);
+const reasonOption = Options.text("reason").pipe(Options.optional);
 const serverIdArg = Args.text({ name: "serverId" });
 const rowsOption = Options.text("rows").pipe(Options.withDefault("24"));
 const colsOption = Options.text("cols").pipe(Options.withDefault("80"));
@@ -72,6 +75,36 @@ const showCommand = EffectCommand.make(
       }),
     ),
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.serverShow));
+
+const deactivateCommand = EffectCommand.make(
+  "deactivate",
+  {
+    serverId: serverIdArg,
+    reason: reasonOption,
+  },
+  ({ reason, serverId }) => {
+    const reasonValue = optionalValue(reason);
+    return runCommand(
+      DeactivateServerCommand.create({
+        serverId,
+        ...(reasonValue ? { reason: reasonValue } : {}),
+      }),
+    );
+  },
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.serverDeactivate));
+
+const deleteCheckCommand = EffectCommand.make(
+  "delete-check",
+  {
+    serverId: serverIdArg,
+  },
+  ({ serverId }) =>
+    runQuery(
+      CheckServerDeleteSafetyQuery.create({
+        serverId,
+      }),
+    ),
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.serverDeleteCheck));
 
 const credentialCommand = EffectCommand.make(
   "credential",
@@ -217,6 +250,8 @@ export const serverCommand = EffectCommand.make("server").pipe(
     registerCommand,
     listCommand,
     showCommand,
+    deactivateCommand,
+    deleteCheckCommand,
     credentialCommand,
     credentialCreateCommand,
     credentialListCommand,

@@ -397,6 +397,37 @@ export interface ResourceDeletionBlockerReader {
   ): Promise<Result<ResourceDeletionBlocker[]>>;
 }
 
+export type ServerDeletionBlockerKind =
+  | "deployment-history"
+  | "active-deployment"
+  | "resource-placement"
+  | "domain-binding"
+  | "certificate"
+  | "credential"
+  | "source-link"
+  | "server-applied-route"
+  | "default-access-policy"
+  | "terminal-session"
+  | "runtime-task"
+  | "runtime-log-retention"
+  | "audit-retention";
+
+export interface ServerDeletionBlocker {
+  kind: ServerDeletionBlockerKind;
+  relatedEntityId?: string;
+  relatedEntityType?: string;
+  count?: number;
+}
+
+export interface ServerDeletionBlockerReader {
+  findBlockers(
+    context: RepositoryContext,
+    input: {
+      serverId: string;
+    },
+  ): Promise<Result<ServerDeletionBlocker[]>>;
+}
+
 export interface DeploymentRepository {
   findOne(context: RepositoryContext, spec: DeploymentSelectionSpec): Promise<Deployment | null>;
   insertOne(
@@ -904,6 +935,9 @@ export interface ServerSummary {
   host: string;
   port: number;
   providerKey: string;
+  lifecycleStatus: "active" | "inactive";
+  deactivatedAt?: string;
+  deactivationReason?: string;
   edgeProxy?: {
     kind: EdgeProxyKind;
     status: EdgeProxyStatus;
@@ -952,6 +986,24 @@ export interface ServerDetail {
   server: ServerSummary;
   rollups?: ServerRollups;
   generatedAt: string;
+}
+
+export type ServerDeleteBlockerKind = "active-server" | ServerDeletionBlockerKind;
+
+export interface ServerDeleteBlocker {
+  kind: ServerDeleteBlockerKind;
+  relatedEntityId?: string;
+  relatedEntityType?: string;
+  count?: number;
+}
+
+export interface ServerDeleteSafety {
+  schemaVersion: "servers.delete-check/v1";
+  serverId: string;
+  lifecycleStatus: "active" | "inactive";
+  eligible: boolean;
+  blockers: ServerDeleteBlocker[];
+  checkedAt: string;
 }
 
 export type ServerConnectivityStatus = "passed" | "failed" | "skipped";

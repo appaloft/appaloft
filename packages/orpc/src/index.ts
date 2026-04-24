@@ -6,6 +6,7 @@ import {
   archiveResourceCommandInputSchema,
   BootstrapServerProxyCommand,
   bootstrapServerProxyCommandInputSchema,
+  CheckServerDeleteSafetyQuery,
   type Command,
   type CommandBus,
   ConfigureDefaultAccessDomainPolicyCommand,
@@ -22,6 +23,7 @@ import {
   CreateProjectCommand,
   CreateResourceCommand,
   CreateSshCredentialCommand,
+  checkServerDeleteSafetyQueryInputSchema,
   configureDefaultAccessDomainPolicyCommandInputSchema,
   configureResourceHealthCommandInputSchema,
   configureResourceNetworkCommandInputSchema,
@@ -35,12 +37,14 @@ import {
   createProjectCommandInputSchema,
   createResourceCommandInputSchema,
   createSshCredentialCommandInputSchema,
+  DeactivateServerCommand,
   DeleteResourceCommand,
   type DeploymentEventStreamEnvelope,
   DeploymentLogsQuery,
   type DeploymentProgressEvent,
   type DeploymentProgressObserver,
   DiffEnvironmentsQuery,
+  deactivateServerCommandInputSchema,
   deleteResourceCommandInputSchema,
   deploymentLogsQueryInputSchema,
   diffEnvironmentsQueryInputSchema,
@@ -121,6 +125,7 @@ import {
   archiveProjectResponseSchema,
   archiveResourceResponseSchema,
   bootstrapServerProxyResponseSchema,
+  checkServerDeleteSafetyResponseSchema,
   configureDefaultAccessDomainPolicyResponseSchema,
   configureResourceHealthResponseSchema,
   configureResourceNetworkResponseSchema,
@@ -133,6 +138,7 @@ import {
   createProjectResponseSchema,
   createResourceResponseSchema,
   createSshCredentialResponseSchema,
+  deactivateServerResponseSchema,
   deleteResourceResponseSchema,
   deploymentEventStreamEnvelopeSchema,
   deploymentEventStreamResponseSchema,
@@ -248,6 +254,14 @@ export const apiRouteDescriptions = {
   projectLifecycle: routeDescription("Read, rename, and archive projects.", "project.lifecycle"),
   showServer: routeDescription(
     "Reads one deployment target with proxy status and usage rollups.",
+    "server.deployment-target",
+  ),
+  deactivateServer: routeDescription(
+    "Marks one deployment target inactive so it cannot receive new work.",
+    "server.deployment-target",
+  ),
+  checkServerDeleteSafety: routeDescription(
+    "Previews whether a deployment target can be safely deleted.",
     "server.deployment-target",
   ),
   configureServerCredential: routeDescription(
@@ -516,6 +530,8 @@ function toOrpcError(error: DomainError, context: ExecutionContext) {
     case "resource_slug_conflict":
     case "resource_archived":
     case "resource_delete_blocked":
+    case "server_delete_blocked":
+    case "server_inactive":
     case "deployment_not_redeployable":
       return new ORPCError("CONFLICT", {
         message,
@@ -906,6 +922,32 @@ export const showServerProcedure = base
   .input(showServerQueryInputSchema)
   .output(showServerResponseSchema)
   .handler(async ({ input, context }) => executeQuery(context, ShowServerQuery.create(input)));
+
+export const deactivateServerProcedure = base
+  .route({
+    method: "POST",
+    path: "/servers/{serverId}/deactivate",
+    description: apiRouteDescriptions.deactivateServer,
+    successStatus: 200,
+  })
+  .input(deactivateServerCommandInputSchema)
+  .output(deactivateServerResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, DeactivateServerCommand.create(input)),
+  );
+
+export const checkServerDeleteSafetyProcedure = base
+  .route({
+    method: "GET",
+    path: "/servers/{serverId}/delete-check",
+    description: apiRouteDescriptions.checkServerDeleteSafety,
+    successStatus: 200,
+  })
+  .input(checkServerDeleteSafetyQueryInputSchema)
+  .output(checkServerDeleteSafetyResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, CheckServerDeleteSafetyQuery.create(input)),
+  );
 
 export const registerServerProcedure = base
   .route({
@@ -1547,6 +1589,8 @@ export const appaloftOrpcRouter = {
   servers: {
     list: listServersProcedure,
     show: showServerProcedure,
+    deactivate: deactivateServerProcedure,
+    deleteCheck: checkServerDeleteSafetyProcedure,
     create: registerServerProcedure,
     configureCredential: configureServerCredentialProcedure,
     testConnectivity: testServerConnectivityProcedure,
@@ -1739,6 +1783,8 @@ export function mountAppaloftOrpcRoutes(
     "/api/credentials/ssh",
     "/api/servers",
     "/api/servers/:serverId",
+    "/api/servers/:serverId/deactivate",
+    "/api/servers/:serverId/delete-check",
     "/api/servers/connectivity-tests",
     "/api/servers/:serverId/credentials",
     "/api/servers/:serverId/connectivity-tests",

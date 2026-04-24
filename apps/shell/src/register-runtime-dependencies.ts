@@ -80,6 +80,7 @@ import {
   PgResourceDeletionBlockerReader,
   PgResourceReadModel,
   PgResourceRepository,
+  PgServerDeletionBlockerReader,
   PgServerReadModel,
   PgServerRepository,
   PgSshCredentialReadModel,
@@ -682,6 +683,9 @@ export function registerRuntimeDependencies(
   });
   container.register(tokens.serverRepository, {
     useFactory: instanceCachingFactory(() => new PgServerRepository(input.database.db)),
+  });
+  container.register(tokens.serverDeletionBlockerReader, {
+    useFactory: instanceCachingFactory(() => new PgServerDeletionBlockerReader(input.database.db)),
   });
   container.register(tokens.sshCredentialRepository, {
     useFactory: instanceCachingFactory(() => new PgSshCredentialRepository(input.database.db)),

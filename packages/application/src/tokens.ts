@@ -16,6 +16,7 @@ export const tokens = {
   deploymentConfigReader: Symbol.for("appaloft.deployment_config_reader"),
   projectRepository: Symbol.for("appaloft.project_repository"),
   serverRepository: Symbol.for("appaloft.server_repository"),
+  serverDeletionBlockerReader: Symbol.for("appaloft.server_deletion_blocker_reader"),
   destinationRepository: Symbol.for("appaloft.destination_repository"),
   environmentRepository: Symbol.for("appaloft.environment_repository"),
   resourceRepository: Symbol.for("appaloft.resource_repository"),
@@ -57,6 +58,10 @@ export const tokens = {
   listSshCredentialsQueryService: Symbol.for("appaloft.list_ssh_credentials_query_service"),
   listServersQueryService: Symbol.for("appaloft.list_servers_query_service"),
   showServerQueryService: Symbol.for("appaloft.show_server_query_service"),
+  deactivateServerUseCase: Symbol.for("appaloft.deactivate_server_use_case"),
+  checkServerDeleteSafetyQueryService: Symbol.for(
+    "appaloft.check_server_delete_safety_query_service",
+  ),
   testServerConnectivityUseCase: Symbol.for("appaloft.test_server_connectivity_use_case"),
   bootstrapServerProxyUseCase: Symbol.for("appaloft.bootstrap_server_proxy_use_case"),
   createEnvironmentUseCase: Symbol.for("appaloft.create_environment_use_case"),

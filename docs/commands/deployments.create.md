@@ -135,7 +135,8 @@ The command must perform or delegate these admission steps before returning acce
 3. Resolve project, environment, resource, server, and destination.
 4. Reject inconsistent context, including cross-project/environment/resource/destination mismatches.
 5. Reject archived resources with `resource_archived`.
-6. Resolve operation coordination for the command's `resource-runtime` scope.
+6. Reject inactive servers with `server_inactive`.
+7. Resolve operation coordination for the command's `resource-runtime` scope.
 7. Wait bounded time for the coordination scope or reject with a retriable coordination timeout.
 8. If the latest same-resource deployment is active, resolve the supersede branch:
    - `created`, `planning`, and `planned` attempts are canceled immediately and record
@@ -209,6 +210,7 @@ All errors use the shared shape and category rules in [Error Model](../errors/mo
 | `validation_error` | `resource-network-resolution` | No | Resource network profile cannot produce a resolved deployment network snapshot. |
 | `not_found` | `context-resolution` | No | Referenced project, environment, server, destination, or resource is missing or inaccessible. |
 | `resource_archived` | `resource-lifecycle-guard` | No | Referenced resource is archived and cannot accept new deployment attempts. |
+| `server_inactive` | `server-lifecycle-guard` | No | Referenced server is inactive and cannot accept new deployment attempts. |
 | `coordination_timeout` | `operation-coordination` | Yes | The command could not acquire its logical resource-runtime coordination scope within the bounded wait window before admission. |
 | `deployment_not_redeployable` | `redeploy-guard` | No | Latest deployment for the same resource is non-terminal. |
 | `conflict` | `admission-conflict` | No | A deployment-specific admission conflict not covered by redeployability. |

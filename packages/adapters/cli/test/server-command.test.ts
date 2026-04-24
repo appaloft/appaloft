@@ -44,6 +44,7 @@ describe("CLI server commands", () => {
             host: "203.0.113.10",
             port: 22,
             providerKey: "generic-ssh",
+            lifecycleStatus: "active",
             createdAt: "2026-01-01T00:00:00.000Z",
           },
           generatedAt: "2026-01-01T00:00:10.000Z",
@@ -78,6 +79,114 @@ describe("CLI server commands", () => {
     expect(queries[0]).toMatchObject({
       serverId: "srv_primary",
       includeRollups: true,
+    });
+  });
+
+  test("[SRV-LIFE-ENTRY-005] server deactivate dispatches the application command", async () => {
+    ensureReflectMetadata();
+    const { DeactivateServerCommand, createExecutionContext } = await import(
+      "@appaloft/application"
+    );
+    const { createCliProgram } = await import("../src");
+    const commands: AppCommand<unknown>[] = [];
+    const commandBus = {
+      execute: async <T>(_context: unknown, command: AppCommand<T>) => {
+        commands.push(command as AppCommand<unknown>);
+        return ok({ id: "srv_primary" } as T);
+      },
+    } as unknown as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: unknown, _query: AppQuery<T>) => ok({} as T),
+    } as unknown as QueryBus;
+    const executionContextFactory: ExecutionContextFactory = {
+      create: (input) =>
+        createExecutionContext({
+          ...input,
+          requestId: "req_cli_server_deactivate_test",
+        }),
+    };
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus,
+      queryBus,
+      executionContextFactory,
+    });
+
+    const writeStdout = process.stdout.write;
+    try {
+      process.stdout.write = (() => true) as typeof process.stdout.write;
+      await program.parseAsync([
+        "node",
+        "appaloft",
+        "server",
+        "deactivate",
+        "srv_primary",
+        "--reason",
+        "retired",
+      ]);
+    } finally {
+      process.stdout.write = writeStdout;
+    }
+
+    expect(commands).toHaveLength(1);
+    expect(commands[0]).toBeInstanceOf(DeactivateServerCommand);
+    expect(commands[0]).toMatchObject({
+      serverId: "srv_primary",
+      reason: "retired",
+    });
+  });
+
+  test("[SRV-LIFE-ENTRY-007] server delete-check dispatches the application query", async () => {
+    ensureReflectMetadata();
+    const { CheckServerDeleteSafetyQuery, createExecutionContext } = await import(
+      "@appaloft/application"
+    );
+    const { createCliProgram } = await import("../src");
+    const queries: AppQuery<unknown>[] = [];
+    const commandBus = {
+      execute: async <T>(_context: unknown, _command: AppCommand<T>) => ok({} as T),
+    } as unknown as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: unknown, query: AppQuery<T>) => {
+        queries.push(query as AppQuery<unknown>);
+        return ok({
+          schemaVersion: "servers.delete-check/v1",
+          serverId: "srv_primary",
+          lifecycleStatus: "inactive",
+          eligible: true,
+          blockers: [],
+          checkedAt: "2026-01-01T00:00:10.000Z",
+        } as T);
+      },
+    } as unknown as QueryBus;
+    const executionContextFactory: ExecutionContextFactory = {
+      create: (input) =>
+        createExecutionContext({
+          ...input,
+          requestId: "req_cli_server_delete_check_test",
+        }),
+    };
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus,
+      queryBus,
+      executionContextFactory,
+    });
+
+    const writeStdout = process.stdout.write;
+    try {
+      process.stdout.write = (() => true) as typeof process.stdout.write;
+      await program.parseAsync(["node", "appaloft", "server", "delete-check", "srv_primary"]);
+    } finally {
+      process.stdout.write = writeStdout;
+    }
+
+    expect(queries).toHaveLength(1);
+    expect(queries[0]).toBeInstanceOf(CheckServerDeleteSafetyQuery);
+    expect(queries[0]).toMatchObject({
+      serverId: "srv_primary",
     });
   });
 });

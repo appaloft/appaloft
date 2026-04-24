@@ -143,6 +143,7 @@ export class DeploymentContextResolver {
       if (!server) {
         return err(domainError.validation("serverId is required for this deployment context"));
       }
+      yield* server.ensureCanAcceptNewWork("deployments.create");
 
       const destination = explicitDestination;
       if (!destination) {

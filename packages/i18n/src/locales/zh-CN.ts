@@ -114,6 +114,7 @@ export const zhCN = {
       useExisting: "使用已有",
     },
     status: {
+      active: "活跃",
       configured: "已配置",
       connected: "已连接",
       bound: "已绑定",
@@ -121,6 +122,7 @@ export const zhCN = {
       degraded: "部分可用",
       failed: "失败",
       healthy: "健康",
+      inactive: "已停用",
       loading: "加载中",
       notConfigured: "未配置",
       notDeployed: "未部署",
@@ -844,6 +846,7 @@ export const zhCN = {
       createValidationError: "请先填写名称、Host 和有效 SSH 端口，再创建这个服务器。",
       description: "部署目标、Provider 和运行健康检查",
       detailDescription: "服务器详情、关联部署和连通性测试",
+      deactivatedAt: "停用时间",
       defaultAccessCustomTemplateOption: "custom-template",
       defaultAccessDisabledOption: "disabled",
       defaultAccessModeLabel: "默认访问模式",
@@ -860,6 +863,12 @@ export const zhCN = {
       defaultAccessSystemTitle: "系统默认访问策略",
       defaultAccessTemplateRefLabel: "Template ref",
       defaultAccessTemplateRefPlaceholder: "templates/shared/web",
+      deleteSafetyBlocked: "删除受阻",
+      deleteSafetyBlockerCount: "{{count}} 个阻塞项",
+      deleteSafetyDescription:
+        "在删除能力开放前，先预览这个服务器是否仍被部署、域名、凭据、路由、日志或审计记录引用。",
+      deleteSafetyEligible: "可删除",
+      deleteSafetyTitle: "删除安全检查",
       emptyBody: "新部署流程可以自动创建本地服务器，也可以先在 CLI 中注册远端 SSH 目标。",
       emptyTitle: "还没有服务器目标。",
       focusDescription:
@@ -867,6 +876,8 @@ export const zhCN = {
       focusTitle: "先确认部署目标是否可达。",
       listDescription: "按创建时间展示所有部署目标，点击进入详情后可以执行连通性测试。",
       listTitle: "服务器列表",
+      lifecycleInactiveDescription:
+        "已停用服务器仍会保留可见，但不会再接收新的部署、调度或代理配置工作。",
       noDeploymentsBody: "这个服务器还没有被部署记录引用。",
       noDeploymentsTitle: "暂无关联部署",
       notFoundBody: "当前列表没有这个服务器。它可能已经被删除，或后端没有返回该记录。",

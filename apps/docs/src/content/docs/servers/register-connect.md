@@ -13,6 +13,8 @@ searchAliases:
 relatedOperations:
   - servers.register
   - servers.show
+  - servers.deactivate
+  - servers.delete-check
   - servers.test-connectivity
 sidebar:
   label: "Register and test"
@@ -30,6 +32,10 @@ sidebar:
 注册服务器的目标是让 Appaloft 能安全地执行部署计划，而不是立即部署应用。
 
 读取服务器详情用于确认某个部署目标的 host、provider、已配置凭据摘要、代理状态，以及当前部署、资源和域名的汇总。这个读取不会运行连接测试、修复代理或修改服务器。
+
+停用服务器用于阻止它继续作为新的部署、调度或代理配置目标。停用不会停止已有运行任务，也不会删除部署历史、域名、证书、凭据、路由、日志或审计记录。
+
+删除前应先运行 delete safety check。检查会返回阻止删除的原因，例如服务器仍是 active、仍有部署历史或运行中的部署、资源 placement、域名、证书、已配置凭据、server-applied routes、default access policy、terminal session、runtime task、日志或审计保留。检查只是预览，不会删除任何内容。
 
 <h2 id="server-connectivity-test">连接测试</h2>
 
@@ -91,4 +97,12 @@ appaloft server test srv_primary
 
 ```bash title="读取服务器详情"
 appaloft server show srv_primary
+```
+
+```bash title="停用服务器"
+appaloft server deactivate srv_primary
+```
+
+```bash title="检查删除安全性"
+appaloft server delete-check srv_primary
 ```

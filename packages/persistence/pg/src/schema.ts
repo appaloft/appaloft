@@ -20,6 +20,9 @@ export interface ServersTable {
   host: string;
   port: number;
   provider_key: string;
+  lifecycle_status: ColumnType<string, string | undefined, string>;
+  deactivated_at: ColumnType<string | null, string | null | undefined, string | null>;
+  deactivation_reason: ColumnType<string | null, string | null | undefined, string | null>;
   edge_proxy_kind: string | null;
   edge_proxy_status: string | null;
   edge_proxy_last_attempt_at: string | null;
