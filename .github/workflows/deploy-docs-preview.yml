@@ -55,6 +55,10 @@ jobs:
     if: ${{ needs.changes.outputs.docs_preview_required == 'true' && github.event.pull_request.head.repo.full_name == github.repository }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    # Preview deploys share the same remote-state root as production docs deploys.
+    concurrency:
+      group: appaloft-www-remote-state
+      cancel-in-progress: false
     environment:
       name: docs-preview-pr-${{ github.event.pull_request.number }}
       url: ${{ steps.deploy.outputs.preview_url }}
@@ -75,8 +79,6 @@ jobs:
           APPALOFT_SSH_HOST: ${{ vars.APPALOFT_SSH_HOST }}
           APPALOFT_SSH_USER: ${{ vars.APPALOFT_SSH_USER }}
           APPALOFT_SSH_PRIVATE_KEY: ${{ secrets.APPALOFT_SSH_PRIVATE_KEY }}
-          APPALOFT_DOCS_PREVIEW_DOMAIN: ${{ vars.APPALOFT_DOCS_PREVIEW_DOMAIN }}
-          APPALOFT_DOCS_PREVIEW_TLS_MODE: ${{ vars.APPALOFT_DOCS_PREVIEW_TLS_MODE || 'auto' }}
         run: |
           set -euo pipefail
 
@@ -89,43 +91,18 @@ jobs:
             echo "::error::Missing repository secret APPALOFT_SSH_PRIVATE_KEY. Use the same deployment key as the docs production deploy."
             missing=1
           fi
-          if [ -z "$APPALOFT_DOCS_PREVIEW_DOMAIN" ]; then
-            echo "::error::Missing repository variable APPALOFT_DOCS_PREVIEW_DOMAIN, for example preview.docs.appaloft.com."
-            missing=1
-          fi
           if [ "$missing" -ne 0 ]; then
             exit 1
           fi
 
-          preview_domain="${APPALOFT_DOCS_PREVIEW_DOMAIN%.}"
-          preview_domain="$(printf '%s' "$preview_domain" | tr '[:upper:]' '[:lower:]')"
-          if [[ "$preview_domain" == http://* || "$preview_domain" == https://* || "$preview_domain" == *"/"* || "$preview_domain" == *":"* || "$preview_domain" == *"*"* || "$preview_domain" == *" "* || "$preview_domain" == "" ]]; then
-            echo "::error::APPALOFT_DOCS_PREVIEW_DOMAIN must be a hostname suffix without scheme, wildcard, port, or path."
-            exit 1
-          fi
-
-          tls_mode="$(printf '%s' "$APPALOFT_DOCS_PREVIEW_TLS_MODE" | tr '[:upper:]' '[:lower:]')"
-          case "$tls_mode" in
-            auto)
-              scheme="https"
-              ;;
-            disabled)
-              scheme="http"
-              ;;
-            *)
-              echo "::error::APPALOFT_DOCS_PREVIEW_TLS_MODE must be auto or disabled."
-              exit 1
-              ;;
-          esac
-
-          preview_host="docs-pr-${PR_NUMBER}.${preview_domain}"
-          preview_url="${scheme}://${preview_host}"
+          preview_host="docs-pr-${PR_NUMBER}.preview.appaloft.com"
+          preview_url="http://${preview_host}"
 
           {
             echo "ssh_user=${APPALOFT_SSH_USER:-root}"
             echo "preview_host=${preview_host}"
             echo "preview_url=${preview_url}"
-            echo "preview_tls_mode=${tls_mode}"
+            echo "preview_tls_mode=disabled"
             echo "resource_name=appaloft-docs-preview-pr-${PR_NUMBER}"
           } >> "$GITHUB_OUTPUT"
 
@@ -133,7 +110,7 @@ jobs:
             echo "### Docs preview"
             echo "- Preview URL: ${preview_url}"
             echo "- Preview host: ${preview_host}"
-            echo "- TLS mode: ${tls_mode}"
+            echo "- TLS mode: disabled"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Deploy Docs Preview
@@ -184,6 +161,10 @@ jobs:
     if: ${{ github.event.action == 'closed' && github.event.pull_request.head.repo.full_name == github.repository }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    # Cleanup mutates the same remote-state root as preview and production docs deploys.
+    concurrency:
+      group: appaloft-www-remote-state
+      cancel-in-progress: false
     steps:
       - name: Checkout Base Source
         uses: actions/checkout@v4
