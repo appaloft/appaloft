@@ -130,7 +130,7 @@ rollups for zero usage.
 
 | Entrypoint | Mapping | Status |
 | --- | --- | --- |
-| Web | Server detail page may read this query for identity, proxy status, credential summary, and rollups. | Deferred migration gap for this slice. |
+| Web | Server detail page reads this query for identity, proxy status, credential summary, and rollups. | Active |
 | CLI | `appaloft server show <serverId>`. | Active |
 | oRPC / HTTP | `GET /api/servers/{serverId}` using the query schema. | Active |
 | Repository config | Not applicable. Repository config must not select server identity. | Not applicable |
@@ -139,11 +139,8 @@ rollups for zero usage.
 
 ## Current Implementation Notes And Migration Gaps
 
-The first active implementation exposes `servers.show` through application, operation catalog,
-HTTP/oRPC, CLI, contracts, and public docs coverage.
-
-Web server detail still composes `servers.list` and server-scoped companion queries. Migrating that
-page to `servers.show` is a follow-up Web slice, not a blocker for API/CLI closure.
+The active implementation exposes `servers.show` through application, operation catalog,
+HTTP/oRPC, CLI, Web server detail, contracts, and public docs coverage.
 
 Server rename, edge-proxy configuration, deactivate, and delete safety remain future lifecycle
 commands. They must not be exposed as generic `servers.update`.

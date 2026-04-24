@@ -64,9 +64,9 @@ Do not expose `PATCH /api/servers/{serverId}` or generic `appaloft server update
 
 ## Expected Web Scope
 
-Web server detail migration is deferred for this first slice. The existing Web server detail page
-may continue composing list/detail-adjacent queries until a focused Web round moves it to
-`servers.show`.
+Web server detail reads `servers.show` for server identity, proxy status, credential summary, and
+rollups. The detail page may still use companion list queries for tables that require row-level
+deployment data, but it must not derive the selected server detail from `servers.list`.
 
 ## Minimal Deliverable
 
@@ -75,8 +75,8 @@ may continue composing list/detail-adjacent queries until a focused Web round mo
 - CLI and HTTP/oRPC dispatch through `ShowServerQuery`;
 - contracts and typed clients expose the response shape;
 - public docs coverage maps the operation to the server deployment-target anchor;
-- focused tests cover `SRV-LIFE-SHOW-001`, `SRV-LIFE-SHOW-002`, `SRV-LIFE-SHOW-003`, and
-  `SRV-LIFE-ENTRY-002`.
+- focused tests cover `SRV-LIFE-SHOW-001`, `SRV-LIFE-SHOW-002`, `SRV-LIFE-SHOW-003`,
+  `SRV-LIFE-ENTRY-002`, and `SRV-LIFE-ENTRY-004`.
 
 ## Verification
 
@@ -91,8 +91,8 @@ Run targeted checks before publishing:
 
 ## Current Implementation Notes And Migration Gaps
 
-Server rename, edge-proxy configuration, deactivate/delete safety, credential usage visibility,
-and Web server detail migration remain future work.
+Server rename, edge-proxy configuration, deactivate/delete safety, and credential usage visibility
+remain future work.
 
 ## Open Questions
 

@@ -1,12 +1,15 @@
 <script lang="ts">
   import { browser } from "$app/environment";
   import { page } from "$app/state";
-  import { createMutation } from "@tanstack/svelte-query";
+  import { createMutation, createQuery, queryOptions } from "@tanstack/svelte-query";
   import {
     Activity,
     ArrowLeft,
+    Boxes,
     CheckCircle2,
     CircleDashed,
+    Globe2,
+    KeyRound,
     Network,
     Server,
     TriangleAlert,
@@ -14,6 +17,7 @@
   } from "@lucide/svelte";
   import type {
     ConfigureDefaultAccessDomainPolicyInput,
+    ServerSummary,
     TestServerConnectivityResponse,
   } from "@appaloft/contracts";
 
@@ -28,27 +32,51 @@
   import * as Select from "$lib/components/ui/select";
   import { Skeleton } from "$lib/components/ui/skeleton";
   import { webDocsHrefs } from "$lib/console/docs-help";
-  import { createConsoleQueries } from "$lib/console/queries";
   import { orpcClient } from "$lib/orpc";
   import { queryClient } from "$lib/query-client";
-  import {
-    findServer,
-    formatTime,
-  } from "$lib/console/utils";
+  import { formatTime } from "$lib/console/utils";
   import { i18nKeys, t } from "$lib/i18n";
 
-  const { projectsQuery, serversQuery, deploymentsQuery } = createConsoleQueries(browser);
-
   const serverId = $derived(page.params.serverId ?? "");
+  const projectsQuery = createQuery(() =>
+    queryOptions({
+      queryKey: ["projects"],
+      queryFn: () => orpcClient.projects.list(),
+      enabled: browser,
+    }),
+  );
+  const deploymentsQuery = createQuery(() =>
+    queryOptions({
+      queryKey: ["deployments"],
+      queryFn: () => orpcClient.deployments.list({}),
+      enabled: browser,
+    }),
+  );
+  const serverDetailQuery = createQuery(() =>
+    queryOptions({
+      queryKey: ["servers", "show", serverId],
+      queryFn: () =>
+        orpcClient.servers.show({
+          serverId,
+          includeRollups: true,
+        }),
+      enabled: browser && serverId.length > 0,
+      staleTime: 5_000,
+    }),
+  );
   const projects = $derived(projectsQuery.data?.items ?? []);
-  const servers = $derived(serversQuery.data?.items ?? []);
   const deployments = $derived(deploymentsQuery.data?.items ?? []);
   const pageLoading = $derived(
-    projectsQuery.isPending || serversQuery.isPending || deploymentsQuery.isPending,
+    projectsQuery.isPending || deploymentsQuery.isPending || serverDetailQuery.isPending,
   );
-  const server = $derived(findServer(servers, serverId));
+  const serverDetail = $derived(serverDetailQuery.data ?? null);
+  const server = $derived(serverDetail?.server ?? null);
+  const serverRollups = $derived(serverDetail?.rollups ?? null);
   const serverDeployments = $derived(
     server ? deployments.filter((deployment) => deployment.serverId === server.id) : [],
+  );
+  const relatedDeploymentCount = $derived(
+    serverRollups?.deployments.total ?? serverDeployments.length,
   );
   const defaultAccessModes = ["disabled", "provider", "custom-template"] as const;
 
@@ -174,6 +202,38 @@
         return "outline";
     }
   }
+
+  function edgeProxyStatusLabel(status: NonNullable<ServerSummary["edgeProxy"]>["status"]): string {
+    switch (status) {
+      case "pending":
+        return $t(i18nKeys.common.status.requested);
+      case "starting":
+        return $t(i18nKeys.common.status.starting);
+      case "ready":
+        return $t(i18nKeys.common.status.ready);
+      case "failed":
+        return $t(i18nKeys.common.status.failed);
+      case "disabled":
+        return $t(i18nKeys.common.status.notConfigured);
+    }
+  }
+
+  function edgeProxyStatusVariant(
+    status: NonNullable<ServerSummary["edgeProxy"]>["status"] | undefined,
+  ): "default" | "secondary" | "outline" | "destructive" {
+    switch (status) {
+      case "ready":
+        return "default";
+      case "failed":
+        return "destructive";
+      case "starting":
+      case "pending":
+        return "secondary";
+      case "disabled":
+      default:
+        return "outline";
+    }
+  }
 </script>
 
 <svelte:head>
@@ -242,7 +302,7 @@
           </div>
         </div>
 
-        <div class="grid border-y sm:grid-cols-3 sm:divide-x">
+        <div class="grid border-y sm:grid-cols-2 xl:grid-cols-5 xl:divide-x">
           <div class="px-0 py-4 sm:px-4">
             <p class="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
               <Network class="size-4" />
@@ -257,14 +317,67 @@
             </p>
             <p class="mt-2 truncate font-semibold">{server.host}</p>
           </div>
-          <div class="border-t px-0 py-4 sm:border-t-0 sm:px-4">
+          <div class="border-t px-0 py-4 sm:px-4 xl:border-t-0">
             <p class="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
               <CircleDashed class="size-4" />
               {$t(i18nKeys.common.domain.port)}
             </p>
             <p class="mt-2 font-semibold">{server.port}</p>
           </div>
+          <div class="border-t px-0 py-4 sm:px-4 xl:border-t-0">
+            <p class="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              <KeyRound class="size-4" />
+              {$t(i18nKeys.console.serverForm.sshCredentialTitle)}
+            </p>
+            <p class="mt-2 truncate font-semibold">
+              {server.credential?.kind === "local-ssh-agent"
+                ? $t(i18nKeys.console.serverForm.localSshAgent)
+                : (server.credential?.credentialName ??
+                  server.credential?.username ??
+                  $t(i18nKeys.common.status.notConfigured))}
+            </p>
+          </div>
+          <div class="border-t px-0 py-4 sm:px-4 xl:border-t-0">
+            <p class="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              <CircleDashed class="size-4" />
+              {$t(i18nKeys.common.domain.proxy)}
+            </p>
+            <div class="mt-2 flex min-w-0 items-center gap-2">
+              <span class="truncate font-semibold">{server.edgeProxy?.kind ?? "none"}</span>
+              <Badge variant={edgeProxyStatusVariant(server.edgeProxy?.status)}>
+                {server.edgeProxy
+                  ? edgeProxyStatusLabel(server.edgeProxy.status)
+                  : $t(i18nKeys.common.status.notConfigured)}
+              </Badge>
+            </div>
+          </div>
         </div>
+
+        {#if serverRollups}
+          <div class="grid border-y sm:grid-cols-3 sm:divide-x">
+            <div class="px-0 py-4 sm:px-4">
+              <p class="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                <Boxes class="size-4" />
+                {$t(i18nKeys.common.domain.resources)}
+              </p>
+              <p class="mt-2 font-semibold">{serverRollups.resources.total}</p>
+            </div>
+            <div class="border-t px-0 py-4 sm:border-t-0 sm:px-4">
+              <p class="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                <Activity class="size-4" />
+                {$t(i18nKeys.common.domain.deployments)}
+              </p>
+              <p class="mt-2 font-semibold">{serverRollups.deployments.total}</p>
+            </div>
+            <div class="border-t px-0 py-4 sm:border-t-0 sm:px-4">
+              <p class="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                <Globe2 class="size-4" />
+                {$t(i18nKeys.common.domain.domainBindings)}
+              </p>
+              <p class="mt-2 font-semibold">{serverRollups.domains.total}</p>
+            </div>
+          </div>
+        {/if}
       </section>
 
       <section class="space-y-4 border-y py-6">
@@ -459,7 +572,7 @@
                 {$t(i18nKeys.console.servers.connectedDeploymentsDescription)}
               </p>
             </div>
-            <Badge variant="outline">{serverDeployments.length}</Badge>
+            <Badge variant="outline">{relatedDeploymentCount}</Badge>
           </div>
 
           <div>

@@ -63,18 +63,17 @@ slice must specify blocker rules for at least:
 | --- | --- |
 | CLI | Expose `server show <serverId>` with a positional id. Future lifecycle writes must use explicit verbs and confirmations. |
 | HTTP/oRPC | Expose `GET /api/servers/{serverId}` using `ShowServerQueryInput`; no `PATCH /api/servers/{id}` is allowed. |
-| Web | Server detail should migrate to `servers.show`; this first slice records a Web migration gap because API/CLI closure is the minimum deliverable. |
+| Web | Server detail reads `servers.show` for identity, proxy status, credential summary, and rollups. |
 | Repository config | Not applicable. Repository config must not select server identity. |
 | Future MCP/tools | Generate a read-only tool from the operation catalog entry. |
 | Public docs | Existing `server.deployment-target` anchor explains server detail/read semantics and safe next steps. |
 
 ## Current Implementation Notes And Migration Gaps
 
-The first Code Round implements `servers.show` as a read-only API/CLI operation with rollups.
-
-Web still derives server detail from list/read companion calls. A later Web round should move the
-server detail page to `servers.show` and keep owner-scoped actions such as proxy repair and
-terminal open as separate operations.
+The first Code Round implemented `servers.show` as a read-only API/CLI operation with rollups.
+The Web detail follow-up now reads the same query for server identity, proxy status, credential
+summary, and rollups while keeping owner-scoped actions such as connectivity test and terminal open
+as separate operations.
 
 Server rename, edge-proxy configuration, deactivation, delete safety, and credential usage
 visibility are not implemented by this slice.

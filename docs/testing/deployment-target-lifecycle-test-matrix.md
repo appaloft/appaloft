@@ -33,7 +33,7 @@ registration, connectivity, proxy bootstrap, and proxy repair behavior.
 | SRV-LIFE-ENTRY-001 | CLI | e2e-preferred | Server show command. | `appaloft server show <serverId>` dispatches `ShowServerQuery`; no repository bypass. |
 | SRV-LIFE-ENTRY-002 | HTTP/oRPC | e2e-preferred | Server show route. | `GET /api/servers/{serverId}` reuses `ShowServerQueryInput`, dispatches through `QueryBus`, and returns `ServerDetail`. |
 | SRV-LIFE-ENTRY-003 | Operation catalog | contract | Public exposure in Code Round. | `CORE_OPERATIONS.md`, `operation-catalog.ts`, and public docs operation coverage include `servers.show`. |
-| SRV-LIFE-ENTRY-004 | Web | e2e-preferred | Server detail page. | Future Web slice reads `servers.show` for identity/status/rollups while keeping repair/terminal actions separate. |
+| SRV-LIFE-ENTRY-004 | Web | e2e-preferred | Server detail page. | Web server detail reads `servers.show` for identity/status/rollups while keeping repair/terminal actions separate. |
 
 ## Required Non-Coverage Assertions
 
@@ -47,7 +47,7 @@ Tests must assert server lifecycle work does not:
 
 ## Current Implementation Notes And Migration Gaps
 
-The first Code Round should implement:
+The active implementation covers:
 
 - `SRV-LIFE-SHOW-001`, `SRV-LIFE-SHOW-002`, and `SRV-LIFE-SHOW-003` in
   `packages/application/test/show-server.test.ts`;
@@ -56,7 +56,7 @@ The first Code Round should implement:
 - operation catalog/docs coverage through existing catalog and docs-registry tests.
 
 `SRV-LIFE-SHOW-004` is covered as a companion branch in `packages/application/test/show-server.test.ts`.
-`SRV-LIFE-ENTRY-004` remains a follow-up Web automation gap after the API/CLI-capable slice lands.
+`SRV-LIFE-ENTRY-004` is covered in `apps/web/test/e2e-webview/home.webview.test.ts`.
 
 Deactivate/delete safety rows must be added before those commands are implemented.
 
