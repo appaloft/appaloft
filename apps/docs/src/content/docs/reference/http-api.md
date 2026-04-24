@@ -29,6 +29,8 @@ HTTP/oRPC 输入必须复用业务操作 schema。文档应解释字段含义，
 
 公共文档站点也会在 `/docs/reference/openapi/` 生成 OpenAPI reference 页面，并把每个 operation 展开到独立页面。
 
+OpenAPI operations 会按 Appaloft 业务 domain 标记 tag，避免 Scalar 和生成文档只显示平铺路由列表。
+
 这些入口由内置 OpenAPI Reference 系统插件注册。需要嵌入到其他 Bun/Elysia 服务时，可以 import `@appaloft/openapi` 并把它导出的 `Response` handler 挂到自己的路由上。
 
 <h2 id="api-lifecycle-status">生命周期状态</h2>
