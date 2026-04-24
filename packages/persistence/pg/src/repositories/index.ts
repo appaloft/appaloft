@@ -18,6 +18,7 @@ export * from "./resource-deletion-blocker-reader";
 export * from "./resource-read-model";
 export * from "./resource-repository";
 export * from "./server-applied-route-state-repository";
+export * from "./server-deletion-blocker-reader";
 export * from "./server-read-model";
 export * from "./server-repository";
 export * from "./source-link-repository";

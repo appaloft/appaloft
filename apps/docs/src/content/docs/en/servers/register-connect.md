@@ -12,6 +12,8 @@ searchAliases:
 relatedOperations:
   - servers.register
   - servers.show
+  - servers.deactivate
+  - servers.delete-check
   - servers.test-connectivity
 sidebar:
   label: "Register and test"
@@ -29,6 +31,10 @@ A server is not a project or a resource. One server can host multiple resources,
 Registering a server makes Appaloft able to execute deployment plans. It does not deploy an app by itself.
 
 Reading server detail confirms a deployment target's host, provider, masked credential summary, proxy status, and current deployment, resource, and domain rollups. This read does not run connectivity checks, repair proxy state, or mutate the server.
+
+Deactivating a server prevents it from being used as a new deployment, scheduling, or proxy configuration target. Deactivation does not stop existing runtime work and does not delete deployment history, domains, certificates, credentials, routes, logs, or audit records.
+
+Before deletion, run the delete safety check. The check returns blocker reasons such as the server still being active, retained deployment history, active deployments, resource placement, domains, certificates, attached credentials, server-applied routes, default access policy, terminal sessions, runtime tasks, logs, or audit retention. The check is a preview and does not delete anything.
 
 <h2 id="server-connectivity-test">Connectivity test</h2>
 
@@ -90,4 +96,12 @@ appaloft server test srv_primary
 
 ```bash title="Read server detail"
 appaloft server show srv_primary
+```
+
+```bash title="Deactivate a server"
+appaloft server deactivate srv_primary
+```
+
+```bash title="Check delete safety"
+appaloft server delete-check srv_primary
 ```

@@ -9,6 +9,7 @@ import {
   ConfigScopeValue,
   ConfigValueText,
   CreatedAt,
+  DeactivatedAt,
   Deployment,
   DeploymentByIdSpec,
   DeploymentId,
@@ -16,6 +17,7 @@ import {
   DeploymentPhaseValue,
   type DeploymentSelectionSpec,
   DeploymentTarget,
+  DeploymentTargetByIdSpec,
   DeploymentTargetDescriptor,
   DeploymentTargetId,
   DeploymentTargetName,
@@ -581,6 +583,7 @@ async function createDeploymentFixture(
     logger,
     repositoryContext,
     resources,
+    servers,
     createDeploymentInput: {
       projectId: "prj_demo",
       serverId: "srv_demo",
@@ -865,6 +868,47 @@ describe("CreateDeploymentUseCase", () => {
       details: {
         phase: "resource-lifecycle-guard",
         resourceId: "res_demo",
+        commandName: "deployments.create",
+      },
+    });
+    expect(eventBus.events).toHaveLength(0);
+  });
+
+  test("[SRV-LIFE-DEACT-004] rejects deployment creation for inactive servers", async () => {
+    const {
+      context,
+      createDeploymentInput,
+      createDeploymentUseCase,
+      eventBus,
+      repositoryContext,
+      servers,
+    } = await createDeploymentFixture();
+    const server = await servers.findOne(
+      repositoryContext,
+      DeploymentTargetByIdSpec.create(DeploymentTargetId.rehydrate("srv_demo")),
+    );
+    if (!server) {
+      throw new Error("Expected server fixture");
+    }
+    server
+      .deactivate({
+        deactivatedAt: DeactivatedAt.rehydrate("2026-01-01T00:00:05.000Z"),
+      })
+      ._unsafeUnwrap();
+    await servers.upsert(
+      repositoryContext,
+      server,
+      UpsertDeploymentTargetSpec.fromDeploymentTarget(server),
+    );
+
+    const result = await createDeploymentUseCase.execute(context, createDeploymentInput);
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "server_inactive",
+      details: {
+        phase: "server-lifecycle-guard",
+        serverId: "srv_demo",
         commandName: "deployments.create",
       },
     });

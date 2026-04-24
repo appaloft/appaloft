@@ -41,8 +41,10 @@ import { setResourceVariableCommandInputSchema } from "./operations/resources/se
 import { showResourceQueryInputSchema } from "./operations/resources/show-resource.query";
 import { unsetResourceVariableCommandInputSchema } from "./operations/resources/unset-resource-variable.command";
 import { bootstrapServerProxyCommandInputSchema } from "./operations/servers/bootstrap-server-proxy.command";
+import { checkServerDeleteSafetyQueryInputSchema } from "./operations/servers/check-server-delete-safety.query";
 import { configureServerCredentialCommandInputSchema } from "./operations/servers/configure-server-credential.command";
 import { createSshCredentialCommandInputSchema } from "./operations/servers/create-ssh-credential.command";
+import { deactivateServerCommandInputSchema } from "./operations/servers/deactivate-server.command";
 import { listServersQueryInputSchema } from "./operations/servers/list-servers.query";
 import { listSshCredentialsQueryInputSchema } from "./operations/servers/list-ssh-credentials.query";
 import { registerServerCommandInputSchema } from "./operations/servers/register-server.command";
@@ -245,6 +247,34 @@ export const operationCatalog = [
     transports: {
       cli: "appaloft server show <serverId>",
       orpc: { method: "GET", path: "/api/servers/{serverId}" },
+    },
+  },
+  {
+    key: "servers.deactivate",
+    kind: "command",
+    domain: "servers",
+    messageName: "DeactivateServerCommand",
+    handlerName: "DeactivateServerCommandHandler",
+    serviceName: "DeactivateServerUseCase",
+    inputSchema: deactivateServerCommandInputSchema,
+    serviceToken: tokens.deactivateServerUseCase,
+    transports: {
+      cli: "appaloft server deactivate <serverId>",
+      orpc: { method: "POST", path: "/api/servers/{serverId}/deactivate" },
+    },
+  },
+  {
+    key: "servers.delete-check",
+    kind: "query",
+    domain: "servers",
+    messageName: "CheckServerDeleteSafetyQuery",
+    handlerName: "CheckServerDeleteSafetyQueryHandler",
+    serviceName: "CheckServerDeleteSafetyQueryService",
+    inputSchema: checkServerDeleteSafetyQueryInputSchema,
+    serviceToken: tokens.checkServerDeleteSafetyQueryService,
+    transports: {
+      cli: "appaloft server delete-check <serverId>",
+      orpc: { method: "GET", path: "/api/servers/{serverId}/delete-check" },
     },
   },
   {

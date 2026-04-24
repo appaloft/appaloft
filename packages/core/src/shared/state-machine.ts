@@ -4,6 +4,7 @@ import {
   deploymentLogSources,
   deploymentStatuses,
   deploymentTargetCredentialKinds,
+  deploymentTargetLifecycleStatuses,
   destinationKinds,
   edgeProxyKinds,
   edgeProxyStatuses,
@@ -35,6 +36,7 @@ export {
   deploymentLogSources,
   deploymentStatuses,
   deploymentTargetCredentialKinds,
+  deploymentTargetLifecycleStatuses,
   destinationKinds,
   edgeProxyKinds,
   edgeProxyStatuses,
@@ -263,6 +265,52 @@ export class EdgeProxyStatusValue extends StateMachineValueObject<
 
   markFailed(): Result<EdgeProxyStatusValue> {
     return ok(new EdgeProxyStatusValue("failed"));
+  }
+}
+
+const deploymentTargetLifecycleStatusBrand: unique symbol = Symbol(
+  "DeploymentTargetLifecycleStatusValue",
+);
+export class DeploymentTargetLifecycleStatusValue extends StateMachineValueObject<
+  (typeof deploymentTargetLifecycleStatuses)[number]
+> {
+  private [deploymentTargetLifecycleStatusBrand]!: void;
+
+  private constructor(value: (typeof deploymentTargetLifecycleStatuses)[number]) {
+    super(value);
+  }
+
+  static create(value: string): Result<DeploymentTargetLifecycleStatusValue> {
+    return createEnumValue(
+      value,
+      deploymentTargetLifecycleStatuses,
+      "Deployment target lifecycle status",
+      (validated) => new DeploymentTargetLifecycleStatusValue(validated),
+    );
+  }
+
+  static rehydrate(
+    value: (typeof deploymentTargetLifecycleStatuses)[number],
+  ): DeploymentTargetLifecycleStatusValue {
+    return new DeploymentTargetLifecycleStatusValue(value);
+  }
+
+  static active(): DeploymentTargetLifecycleStatusValue {
+    return new DeploymentTargetLifecycleStatusValue("active");
+  }
+
+  deactivate(): Result<DeploymentTargetLifecycleStatusValue> {
+    return this.ensureCurrent(["active"], "Only active deployment targets can be deactivated").map(
+      () => new DeploymentTargetLifecycleStatusValue("inactive"),
+    );
+  }
+
+  isActive(): boolean {
+    return this.value === "active";
+  }
+
+  isInactive(): boolean {
+    return this.value === "inactive";
   }
 }
 

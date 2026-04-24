@@ -33,6 +33,7 @@ import { deploymentSupersedeFencingMigration } from "./migrations/025_deployment
 import { mutationCoordinationsMigration } from "./migrations/026_mutation_coordinations";
 import { resourceVariablesMigration } from "./migrations/027_resource_variables";
 import { projectLifecycleMigration } from "./migrations/028_project_lifecycle";
+import { serverLifecycleMigration } from "./migrations/029_server_lifecycle";
 import { PgliteDialect } from "./pglite-dialect";
 import { type Database } from "./schema";
 import { TracingDialect } from "./tracing-dialect";
@@ -155,6 +156,7 @@ class StaticMigrationProvider implements MigrationProvider {
       "026_mutation_coordinations": mutationCoordinationsMigration,
       "027_resource_variables": resourceVariablesMigration,
       "028_project_lifecycle": projectLifecycleMigration,
+      "029_server_lifecycle": serverLifecycleMigration,
     };
   }
 }

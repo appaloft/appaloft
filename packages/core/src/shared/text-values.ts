@@ -429,6 +429,33 @@ export class ArchiveReason extends NonEmptyTextValue {
   }
 }
 
+const deactivationReasonBrand: unique symbol = Symbol("DeactivationReason");
+export class DeactivationReason extends NonEmptyTextValue {
+  private [deactivationReasonBrand]!: void;
+
+  private constructor(value: string) {
+    super(value);
+  }
+
+  static create(value: string): Result<DeactivationReason> {
+    return validateSafeOptionalDomainText(value, {
+      label: "Deactivation reason",
+      maxLength: 280,
+      phase: "server-deactivate",
+      field: "reason",
+    }).map((normalized) => new DeactivationReason(normalized));
+  }
+
+  static rehydrate(value: string): DeactivationReason {
+    return new DeactivationReason(rehydrateRequiredText(value));
+  }
+
+  static fromOptional(value?: string): Result<DeactivationReason | undefined> {
+    const normalized = value?.trim();
+    return normalized ? DeactivationReason.create(normalized) : ok(undefined);
+  }
+}
+
 const resourceInstanceNameBrand: unique symbol = Symbol("ResourceInstanceName");
 export class ResourceInstanceName extends NonEmptyTextValue {
   private [resourceInstanceNameBrand]!: void;

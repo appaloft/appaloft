@@ -4,7 +4,7 @@
 
 Deployment target lifecycle queries and future lifecycle commands use the shared platform error
 model and neverthrow conventions. This file defines the server-lifecycle error profile for
-`servers.show` and reserves phases for future explicit server lifecycle mutations.
+`servers.show`, `servers.delete-check`, and explicit server lifecycle mutations.
 
 Errors must use stable `code`, `category`, `phase`, `retriable`, and related entity details. They
 must not rely on message text as the contract.
@@ -23,7 +23,7 @@ must not rely on message text as the contract.
 
 ```ts
 type ServerLifecycleErrorDetails = {
-  queryName?: "servers.show";
+  queryName?: "servers.show" | "servers.delete-check";
   commandName?:
     | "servers.rename"
     | "servers.configure-edge-proxy"
@@ -34,6 +34,7 @@ type ServerLifecycleErrorDetails = {
     | "command-validation"
     | "server-read"
     | "server-rollup-read"
+    | "server-delete-check-read"
     | "server-admission"
     | "server-lifecycle-guard"
     | "server-persistence"
@@ -41,8 +42,21 @@ type ServerLifecycleErrorDetails = {
     | "event-consumption";
   serverId?: string;
   relatedEntityId?: string;
-  relatedEntityType?: "server" | "deployment" | "resource" | "domain-binding" | "terminal-session";
+  relatedEntityType?:
+    | "server"
+    | "deployment"
+    | "resource"
+    | "domain-binding"
+    | "certificate"
+    | "credential"
+    | "server-applied-route"
+    | "default-access-policy"
+    | "terminal-session"
+    | "runtime-task"
+    | "runtime-log"
+    | "audit-log";
   relatedState?: string;
+  deletionBlockers?: string[];
 };
 ```
 
@@ -57,19 +71,27 @@ certificate material, or provider account secrets.
 | `not_found` | `not-found` | `server-read` | No | Server cannot be found or is not visible. |
 | `infra_error` | `infra` | `server-read` | Conditional | Base server read model cannot be safely read. |
 | `infra_error` | `infra` | `server-rollup-read` | Conditional | Deployment/resource/domain rollups cannot be safely derived. |
+| `infra_error` | `infra` | `server-delete-check-read` | Conditional | Delete safety blocker checks cannot be safely derived. |
 
-## Future Command Errors
+`servers.delete-check` returns blockers inside `ok({ eligible: false, blockers })`. Blocked
+eligibility is not itself a query error.
 
-Future server lifecycle commands must refine these branches before implementation:
+## Command Errors
+
+Server lifecycle commands use these branches:
 
 | Error code | Category | Phase | Retriable | Meaning |
 | --- | --- | --- | --- | --- |
 | `validation_error` | `validation` | `command-validation` | No | Command input is missing or malformed. |
 | `not_found` | `not-found` | `server-admission` | No | Server cannot be found or is not visible. |
 | `server_delete_blocked` | `conflict` | `server-lifecycle-guard` | No | Delete or final removal is blocked by retained deployments, resources, domains, routes, terminal sessions, logs, audit, or support diagnostics. |
-| `server_deactivate_blocked` | `conflict` | `server-lifecycle-guard` | No | Deactivation is blocked by active deployment execution or another specified lifecycle guard. |
 | `invariant_violation` | `domain` | `server-lifecycle-guard` | No | DeploymentTarget rejected the requested lifecycle transition. |
 | `infra_error` | `infra` | `server-persistence` | Conditional | Server state could not be safely persisted. |
+| `infra_error` | `infra` | `event-publication` | Conditional | A lifecycle event could not be recorded before command success. |
+
+`servers.deactivate` does not block on retained dependencies. It is designed to preserve visibility
+while preventing future use. Active deployments and retained dependencies appear in
+`servers.delete-check` blockers and future `servers.delete` guards.
 
 ## Async Error Profile
 
@@ -104,11 +126,11 @@ Tests must assert:
 
 ## Current Implementation Notes And Migration Gaps
 
-Only `servers.show` is active in this lifecycle spec today.
+`servers.show`, `servers.deactivate`, and `servers.delete-check` are active in this lifecycle spec.
 
-Delete/deactivate safety error codes are reserved here so the next Spec Round has a named place to
-define blockers before exposing those commands.
+Actual server deletion is still future work. The delete-check query defines blocker visibility for
+that future command without mutating server state.
 
 ## Open Questions
 
-- None for `servers.show`.
+- None for `servers.show`, one-way deactivate, or delete-check preview semantics.

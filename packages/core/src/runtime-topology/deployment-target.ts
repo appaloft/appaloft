@@ -1,15 +1,18 @@
 import { AggregateRoot } from "../shared/entity";
+import { domainError } from "../shared/errors";
 import { type DeploymentTargetId, type SshCredentialId } from "../shared/identifiers";
 import { type PortNumber } from "../shared/numeric-values";
-import { ok, type Result } from "../shared/result";
+import { err, ok, type Result } from "../shared/result";
 import {
   type DeploymentTargetCredentialKindValue,
+  DeploymentTargetLifecycleStatusValue,
   type EdgeProxyKindValue,
   EdgeProxyStatusValue,
   TargetKindValue,
 } from "../shared/state-machine";
-import { type CreatedAt, type UpdatedAt } from "../shared/temporal";
+import { type CreatedAt, type DeactivatedAt, type UpdatedAt } from "../shared/temporal";
 import {
+  type DeactivationReason,
   type DeploymentTargetName,
   type DeploymentTargetUsername,
   type ErrorCodeText,
@@ -44,10 +47,19 @@ export interface DeploymentTargetState {
   port: PortNumber;
   providerKey: ProviderKey;
   targetKind: TargetKindValue;
+  lifecycleStatus: DeploymentTargetLifecycleStatusValue;
+  deactivatedAt?: DeactivatedAt;
+  deactivationReason?: DeactivationReason;
   credential?: DeploymentTargetCredentialState;
   edgeProxy?: DeploymentTargetEdgeProxyState;
   createdAt: CreatedAt;
 }
+
+export type DeploymentTargetRehydrateState = Omit<
+  DeploymentTargetState,
+  "deactivatedAt" | "deactivationReason" | "lifecycleStatus"
+> &
+  Partial<Pick<DeploymentTargetState, "deactivatedAt" | "deactivationReason" | "lifecycleStatus">>;
 
 export interface DeploymentTargetVisitor<TContext, TResult> {
   visitDeploymentTarget(target: DeploymentTarget, context: TContext): TResult;
@@ -76,6 +88,7 @@ export class DeploymentTarget extends AggregateRoot<DeploymentTargetState> {
       port: input.port,
       providerKey: input.providerKey,
       targetKind: input.targetKind ?? TargetKindValue.rehydrate("single-server"),
+      lifecycleStatus: DeploymentTargetLifecycleStatusValue.active(),
       ...(edgeProxyKind
         ? {
             edgeProxy: {
@@ -110,7 +123,58 @@ export class DeploymentTarget extends AggregateRoot<DeploymentTargetState> {
     return ok(undefined);
   }
 
+  deactivate(input: {
+    deactivatedAt: DeactivatedAt;
+    reason?: DeactivationReason;
+  }): Result<{ changed: boolean }> {
+    if (this.state.lifecycleStatus.isInactive()) {
+      return ok({ changed: false });
+    }
+
+    const lifecycleStatus = this.state.lifecycleStatus.deactivate();
+    if (lifecycleStatus.isErr()) {
+      return lifecycleStatus.map(() => ({ changed: false }));
+    }
+
+    this.state.lifecycleStatus = lifecycleStatus.value;
+    this.state.deactivatedAt = input.deactivatedAt;
+    if (input.reason) {
+      this.state.deactivationReason = input.reason;
+    } else {
+      delete this.state.deactivationReason;
+    }
+
+    this.recordDomainEvent("server-deactivated", input.deactivatedAt, {
+      serverId: this.state.id.value,
+      deactivatedAt: input.deactivatedAt.value,
+      ...(input.reason ? { reason: input.reason.value } : {}),
+    });
+
+    return ok({ changed: true });
+  }
+
+  ensureCanAcceptNewWork(commandName: string): Result<void> {
+    if (this.state.lifecycleStatus.isInactive()) {
+      return err(
+        domainError.serverInactive("Inactive servers cannot accept new work", {
+          commandName,
+          phase: "server-lifecycle-guard",
+          serverId: this.state.id.value,
+          lifecycleStatus: this.state.lifecycleStatus.value,
+          ...(this.state.deactivatedAt ? { deactivatedAt: this.state.deactivatedAt.value } : {}),
+        }),
+      );
+    }
+
+    return ok(undefined);
+  }
+
   beginEdgeProxyBootstrap(input: { attemptedAt: UpdatedAt }): Result<void> {
+    const lifecycleGuard = this.ensureCanAcceptNewWork("servers.bootstrap-proxy");
+    if (lifecycleGuard.isErr()) {
+      return lifecycleGuard;
+    }
+
     const edgeProxy = this.state.edgeProxy;
     if (!edgeProxy) {
       return ok(undefined);
@@ -188,8 +252,11 @@ export class DeploymentTarget extends AggregateRoot<DeploymentTargetState> {
     return ok(undefined);
   }
 
-  static rehydrate(state: DeploymentTargetState): DeploymentTarget {
-    return new DeploymentTarget(state);
+  static rehydrate(state: DeploymentTargetRehydrateState): DeploymentTarget {
+    return new DeploymentTarget({
+      ...state,
+      lifecycleStatus: state.lifecycleStatus ?? DeploymentTargetLifecycleStatusValue.active(),
+    });
   }
 
   accept<TContext, TResult>(

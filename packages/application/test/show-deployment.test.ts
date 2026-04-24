@@ -245,6 +245,7 @@ function serverSummary(overrides?: Partial<ServerSummary>): ServerSummary {
     host: "203.0.113.10",
     port: 22,
     providerKey: "local-shell",
+    lifecycleStatus: "active",
     createdAt: "2026-01-01T00:00:00.000Z",
     ...overrides,
   };

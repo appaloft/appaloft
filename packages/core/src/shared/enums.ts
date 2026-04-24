@@ -78,6 +78,10 @@ export const edgeProxyStatuses = ["pending", "starting", "ready", "failed", "dis
 
 export type EdgeProxyStatus = (typeof edgeProxyStatuses)[number];
 
+export const deploymentTargetLifecycleStatuses = ["active", "inactive"] as const;
+
+export type DeploymentTargetLifecycleStatus = (typeof deploymentTargetLifecycleStatuses)[number];
+
 export const tlsModes = ["auto", "disabled"] as const;
 
 export type TlsMode = (typeof tlsModes)[number];

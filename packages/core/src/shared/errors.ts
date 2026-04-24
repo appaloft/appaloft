@@ -127,6 +127,12 @@ export const domainError = {
     message: string,
     details?: Record<string, string | number | boolean | null>,
   ): DomainError => createError("resource_archived", "user", message, details),
+  serverInactive: (
+    message: string,
+    details?: Record<string, string | number | boolean | null>,
+  ): DomainError => createError("server_inactive", "user", message, details),
+  serverDeleteBlocked: (message: string, details?: DomainErrorDetails): DomainError =>
+    createError("server_delete_blocked", "user", message, details),
   projectSlugConflict: (
     message: string,
     details?: Record<string, string | number | boolean | null>,

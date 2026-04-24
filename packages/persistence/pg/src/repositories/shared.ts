@@ -34,6 +34,8 @@ import {
   ConfigScopeValue,
   ConfigValueText,
   CreatedAt,
+  DeactivatedAt,
+  DeactivationReason,
   DeletedAt,
   DeploymentId,
   DeploymentLogEntry,
@@ -44,6 +46,7 @@ import {
   DeploymentTargetCredentialKindValue,
   DeploymentTargetDescriptor,
   DeploymentTargetId,
+  DeploymentTargetLifecycleStatusValue,
   DeploymentTargetName,
   DeploymentTargetUsername,
   DescriptionText,
@@ -945,6 +948,19 @@ export function rehydrateDeploymentTarget(row: Selectable<Database["servers"]>) 
     port: PortNumber.rehydrate(row.port),
     providerKey: ProviderKey.rehydrate(row.provider_key),
     targetKind: TargetKindValue.rehydrate("single-server"),
+    lifecycleStatus: DeploymentTargetLifecycleStatusValue.rehydrate(
+      row.lifecycle_status as "active" | "inactive",
+    ),
+    ...(row.deactivated_at
+      ? {
+          deactivatedAt: DeactivatedAt.rehydrate(
+            normalizeTimestamp(row.deactivated_at) ?? row.deactivated_at,
+          ),
+        }
+      : {}),
+    ...(row.deactivation_reason
+      ? { deactivationReason: DeactivationReason.rehydrate(row.deactivation_reason) }
+      : {}),
     ...(row.credential_kind
       ? {
           credential: {

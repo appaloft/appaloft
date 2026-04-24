@@ -53,6 +53,11 @@ function toServerSummary(
     host: row.host,
     port: row.port,
     providerKey: row.provider_key,
+    lifecycleStatus: row.lifecycle_status as "active" | "inactive",
+    ...(row.deactivated_at
+      ? { deactivatedAt: normalizeTimestamp(row.deactivated_at) ?? row.deactivated_at }
+      : {}),
+    ...(row.deactivation_reason ? { deactivationReason: row.deactivation_reason } : {}),
     ...(row.edge_proxy_kind && row.edge_proxy_status
       ? {
           edgeProxy: {

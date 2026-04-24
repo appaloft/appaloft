@@ -123,6 +123,9 @@ export const serverSummarySchema = z.object({
   host: z.string(),
   port: z.number(),
   providerKey: z.string(),
+  lifecycleStatus: z.enum(["active", "inactive"]),
+  deactivatedAt: z.string().optional(),
+  deactivationReason: z.string().optional(),
   edgeProxy: z
     .object({
       kind: z.enum(["none", "traefik", "caddy"]),
@@ -164,6 +167,55 @@ export const showServerInputSchema = z.object({
     ])
     .default(true),
 });
+
+export const deactivateServerInputSchema = z.object({
+  serverId: z.string().min(1),
+  reason: z.string().min(1).optional(),
+  idempotencyKey: z.string().min(1).optional(),
+});
+
+export const deactivateServerResponseSchema = z.object({
+  id: z.string(),
+});
+
+export const checkServerDeleteSafetyInputSchema = z.object({
+  serverId: z.string().min(1),
+});
+
+export const serverDeleteBlockerKindSchema = z.enum([
+  "active-server",
+  "deployment-history",
+  "active-deployment",
+  "resource-placement",
+  "domain-binding",
+  "certificate",
+  "credential",
+  "source-link",
+  "server-applied-route",
+  "default-access-policy",
+  "terminal-session",
+  "runtime-task",
+  "runtime-log-retention",
+  "audit-retention",
+]);
+
+export const serverDeleteBlockerSchema = z.object({
+  kind: serverDeleteBlockerKindSchema,
+  relatedEntityId: z.string().optional(),
+  relatedEntityType: z.string().optional(),
+  count: z.number().optional(),
+});
+
+export const serverDeleteSafetySchema = z.object({
+  schemaVersion: z.literal("servers.delete-check/v1"),
+  serverId: z.string(),
+  lifecycleStatus: z.enum(["active", "inactive"]),
+  eligible: z.boolean(),
+  blockers: z.array(serverDeleteBlockerSchema),
+  checkedAt: z.string(),
+});
+
+export const checkServerDeleteSafetyResponseSchema = serverDeleteSafetySchema;
 
 export const configureServerCredentialInputSchema = z.object({
   serverId: z.string().min(1),
@@ -2147,12 +2199,18 @@ export type ServerSummary = z.infer<typeof serverSummarySchema>;
 export type SshCredentialSummary = z.infer<typeof sshCredentialSummarySchema>;
 export type RegisterServerInput = z.infer<typeof registerServerInputSchema>;
 export type ShowServerInput = z.infer<typeof showServerInputSchema>;
+export type DeactivateServerInput = z.infer<typeof deactivateServerInputSchema>;
+export type CheckServerDeleteSafetyInput = z.infer<typeof checkServerDeleteSafetyInputSchema>;
 export type ConfigureServerCredentialInput = z.infer<typeof configureServerCredentialInputSchema>;
 export type CreateSshCredentialInput = z.infer<typeof createSshCredentialInputSchema>;
 export type RegisterServerResponse = z.infer<typeof registerServerResponseSchema>;
 export type ListServersResponse = z.infer<typeof listServersResponseSchema>;
 export type ServerDetail = z.infer<typeof serverDetailSchema>;
 export type ShowServerResponse = z.infer<typeof showServerResponseSchema>;
+export type DeactivateServerResponse = z.infer<typeof deactivateServerResponseSchema>;
+export type ServerDeleteBlocker = z.infer<typeof serverDeleteBlockerSchema>;
+export type ServerDeleteSafety = z.infer<typeof serverDeleteSafetySchema>;
+export type CheckServerDeleteSafetyResponse = z.infer<typeof checkServerDeleteSafetyResponseSchema>;
 export type CreateSshCredentialResponse = z.infer<typeof createSshCredentialResponseSchema>;
 export type ListSshCredentialsResponse = z.infer<typeof listSshCredentialsResponseSchema>;
 export type ServerConnectivityCheck = z.infer<typeof serverConnectivityCheckSchema>;

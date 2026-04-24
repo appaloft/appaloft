@@ -58,6 +58,11 @@ export const cliCommandDescriptions = {
   serverRegister: withDocs("Register a server", "server.deployment-target"),
   serverList: withDocs("List servers", "server.deployment-target"),
   serverShow: withDocs("Show server detail", "server.deployment-target"),
+  serverDeactivate: withDocs("Deactivate a server deployment target", "server.deployment-target"),
+  serverDeleteCheck: withDocs(
+    "Check whether a server can be safely deleted",
+    "server.deployment-target",
+  ),
   serverCredential: withDocs("Configure server SSH credential", "server.ssh-credential"),
   serverCredentialCreate: withDocs(
     "Create a reusable SSH credential from a private key file",

@@ -110,6 +110,8 @@ export const publicDocsHelpTopics = {
     specReferences: [
       "docs/workflows/deployment-target-lifecycle.md",
       "docs/queries/servers.show.md",
+      "docs/commands/servers.deactivate.md",
+      "docs/queries/servers.delete-check.md",
       "docs/errors/servers.lifecycle.md",
       "docs/testing/deployment-target-lifecycle-test-matrix.md",
       "docs/workflows/server-bootstrap-and-proxy.md",
@@ -665,6 +667,12 @@ export const publicDocsOperationCoverage = [
   },
   { operationKey: "servers.list", status: "documented", topicId: "server.deployment-target" },
   { operationKey: "servers.show", status: "documented", topicId: "server.deployment-target" },
+  { operationKey: "servers.deactivate", status: "documented", topicId: "server.deployment-target" },
+  {
+    operationKey: "servers.delete-check",
+    status: "documented",
+    topicId: "server.deployment-target",
+  },
   {
     operationKey: "servers.test-connectivity",
     status: "documented",

@@ -46,6 +46,8 @@ describe("operation catalog aggregate mutation boundary", () => {
       "credentials.list-ssh",
       "servers.list",
       "servers.show",
+      "servers.deactivate",
+      "servers.delete-check",
       "servers.test-connectivity",
       "resources.create",
       "resources.list",

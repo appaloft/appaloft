@@ -3,9 +3,11 @@ import "../../application/node_modules/reflect-metadata/Reflect.js";
 import { describe, expect, test } from "bun:test";
 import {
   type AppLogger,
+  CheckServerDeleteSafetyQuery,
   type Command,
   type CommandBus,
   createExecutionContext,
+  DeactivateServerCommand,
   type ExecutionContext,
   type ExecutionContextFactory,
   type Query,
@@ -45,6 +47,7 @@ function serverDetail(): ServerDetail {
       host: "203.0.113.10",
       port: 22,
       providerKey: "generic-ssh",
+      lifecycleStatus: "active",
       edgeProxy: {
         kind: "traefik",
         status: "ready",
@@ -115,6 +118,83 @@ describe("server show HTTP route", () => {
     expect(capturedQuery).toMatchObject({
       serverId: "srv_primary",
       includeRollups: true,
+    });
+  });
+
+  test("[SRV-LIFE-ENTRY-006] dispatches DeactivateServerCommand through HTTP", async () => {
+    let capturedCommand: Command<unknown> | undefined;
+    const commandBus = {
+      execute: async <T>(_context: ExecutionContext, command: Command<T>): Promise<Result<T>> => {
+        capturedCommand = command as Command<unknown>;
+        return ok({ id: "srv_primary" } as T);
+      },
+    } as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: ExecutionContext, _query: Query<T>): Promise<Result<T>> =>
+        ok({} as T),
+    } as QueryBus;
+    const app = mountAppaloftOrpcRoutes(new Elysia(), {
+      commandBus,
+      executionContextFactory: new TestExecutionContextFactory(),
+      logger: new NoopLogger(),
+      queryBus,
+    });
+
+    const response = await app.handle(
+      new Request("http://localhost/api/servers/srv_primary/deactivate", {
+        method: "POST",
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ id: "srv_primary" });
+    expect(capturedCommand).toBeInstanceOf(DeactivateServerCommand);
+    expect(capturedCommand).toMatchObject({
+      serverId: "srv_primary",
+    });
+  });
+
+  test("[SRV-LIFE-ENTRY-008] dispatches CheckServerDeleteSafetyQuery through HTTP", async () => {
+    let capturedQuery: Query<unknown> | undefined;
+    const commandBus = {
+      execute: async <T>(_context: ExecutionContext, _command: Command<T>): Promise<Result<T>> =>
+        ok({} as T),
+    } as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: ExecutionContext, query: Query<T>): Promise<Result<T>> => {
+        capturedQuery = query as Query<unknown>;
+        return ok({
+          schemaVersion: "servers.delete-check/v1",
+          serverId: "srv_primary",
+          lifecycleStatus: "inactive",
+          eligible: true,
+          blockers: [],
+          checkedAt: "2026-01-01T00:00:10.000Z",
+        } as T);
+      },
+    } as QueryBus;
+    const app = mountAppaloftOrpcRoutes(new Elysia(), {
+      commandBus,
+      executionContextFactory: new TestExecutionContextFactory(),
+      logger: new NoopLogger(),
+      queryBus,
+    });
+
+    const response = await app.handle(
+      new Request("http://localhost/api/servers/srv_primary/delete-check", {
+        method: "GET",
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      schemaVersion: "servers.delete-check/v1",
+      serverId: "srv_primary",
+      eligible: true,
+    });
+    expect(capturedQuery).toBeInstanceOf(CheckServerDeleteSafetyQuery);
+    expect(capturedQuery).toMatchObject({
+      serverId: "srv_primary",
     });
   });
 });
