@@ -178,12 +178,16 @@ from deployment snapshots, exposing server-applied config domains separately fro
 durable managed routes, and `resources.list` has focused coverage for exposing a planned generated
 route before the first deployment.
 
-Remaining gaps: policy-disabled observation across broader UI copy, durable-domain precedence over
-generated routes in broader regression suites, persistence-backed planned-route projection beyond
-focused tests, a real Docker/SSH same-`internalPort` e2e assertion, and richer end-to-end Web
+Remaining gaps: policy-disabled observation across broader UI copy, durable-domain/server-applied
+precedence in broader API/Web/CLI regression suites, persistence-backed planned-route projection
+beyond focused tests, a real Docker/SSH same-`internalPort` e2e assertion, and richer end-to-end Web
 assertion coverage.
 
-Web typecheck covers the resource detail and Quick Deploy generated URL surfaces, but there is not yet a browser/e2e assertion for those screens.
+Web typecheck covers the resource detail and Quick Deploy generated URL surfaces, and resource
+detail keeps generated access visually separate from durable domain bindings while exposing
+provider-rendered proxy configuration. It does not yet render `latestServerAppliedDomainRoute` as a
+first-class access row or assert generated/durable/server-applied route separation in a browser/e2e
+resource-detail test.
 
 `resources.proxy-configuration.preview` is active and renders provider-owned read-only
 configuration sections through the edge proxy provider boundary. Application/provider tests cover
