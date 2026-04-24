@@ -286,6 +286,16 @@ export const publicDocsHelpTopics = {
     surfaces: ["web", "cli", "http-api", "mcp"],
     relatedOperation: "servers.configure-credential",
     aliases: ["ssh", "credential", "private key", "server credential", "凭据"],
+    specReferences: [
+      "docs/workflows/ssh-credential-lifecycle.md",
+      "docs/queries/credentials.show.md",
+      "docs/errors/credentials.lifecycle.md",
+      "docs/testing/ssh-credential-lifecycle-test-matrix.md",
+      "docs/implementation/ssh-credential-lifecycle-plan.md",
+    ],
+    webSurfaces: [
+      "apps/web server registration, Quick Deploy credential step, and credential detail surfaces",
+    ],
   },
   "server.connectivity-test": {
     id: "server.connectivity-test",
@@ -696,6 +706,11 @@ export const publicDocsOperationCoverage = [
   },
   {
     operationKey: "credentials.list-ssh",
+    status: "documented",
+    topicId: "server.ssh-credential",
+  },
+  {
+    operationKey: "credentials.show",
     status: "documented",
     topicId: "server.ssh-credential",
   },

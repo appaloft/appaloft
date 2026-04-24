@@ -131,6 +131,7 @@ Implemented operations:
 | Repair deployment target edge proxy | Command | `servers.bootstrap-proxy` | `BootstrapServerProxyCommand` | `BootstrapServerProxyCommandInput` | `appaloft server proxy repair <serverId>` | `POST /api/servers/{serverId}/edge-proxy/bootstrap` |
 | Create reusable SSH credential | Command | `credentials.create-ssh` | `CreateSshCredentialCommand` | `CreateSshCredentialCommandInput` | `appaloft server credential-create` | `POST /api/credentials/ssh` |
 | List reusable SSH credentials | Query | `credentials.list-ssh` | `ListSshCredentialsQuery` | `ListSshCredentialsQueryInput` | `appaloft server credential-list` | `GET /api/credentials/ssh` |
+| Show reusable SSH credential usage | Query | `credentials.show` | `ShowSshCredentialQuery` | `ShowSshCredentialQueryInput` | `appaloft server credential-show <credentialId>` | `GET /api/credentials/ssh/{credentialId}` |
 | Open deployment target terminal | Command | `terminal-sessions.open` | `OpenTerminalSessionCommand` | `OpenTerminalSessionCommandInput` | `appaloft server terminal <serverId>` | `POST /api/terminal-sessions`; attach: `WS /api/terminal-sessions/{sessionId}/attach` |
 
 - server registration may carry edge proxy intent/provider selection; when omitted, the deployment

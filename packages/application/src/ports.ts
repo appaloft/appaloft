@@ -1018,6 +1018,29 @@ export interface SshCredentialSummary {
   createdAt: string;
 }
 
+export interface SshCredentialUsageServerSummary {
+  serverId: string;
+  serverName: string;
+  lifecycleStatus: "active" | "inactive";
+  providerKey: string;
+  host: string;
+  username?: string;
+}
+
+export interface SshCredentialUsageSummary {
+  totalServers: number;
+  activeServers: number;
+  inactiveServers: number;
+  servers: SshCredentialUsageServerSummary[];
+}
+
+export interface SshCredentialDetail {
+  schemaVersion: "credentials.show/v1";
+  credential: SshCredentialSummary;
+  usage?: SshCredentialUsageSummary;
+  generatedAt: string;
+}
+
 export interface ServerConnectivityCheck {
   name: string;
   status: ServerConnectivityStatus;
@@ -2419,6 +2442,17 @@ export interface ServerReadModel {
 
 export interface SshCredentialReadModel {
   list(context: RepositoryContext): Promise<SshCredentialSummary[]>;
+  findOne(
+    context: RepositoryContext,
+    spec: SshCredentialSelectionSpec,
+  ): Promise<SshCredentialSummary | null>;
+}
+
+export interface SshCredentialUsageReader {
+  listByCredentialId(
+    context: RepositoryContext,
+    credentialId: string,
+  ): Promise<SshCredentialUsageServerSummary[]>;
 }
 
 export interface EnvironmentReadModel {

@@ -800,6 +800,8 @@ Recommended next Spec Rounds before broad Code Rounds:
 
 - [ ] Resource profile lifecycle: `resources.show`, source/runtime/network update, archive/delete,
   resource detail workflow, and test matrix.
+- [x] SSH credential lifecycle: `credentials.show` masked detail and usage visibility before
+  rotate/delete safety.
 - [x] Framework support tier matrix: fixed-version detector/planner fixtures cover the current
   Next.js, Vite, Angular, SvelteKit, Nuxt, Astro, Remix, Express, FastAPI, Django, and Flask slice.
 - [ ] Framework support tier matrix: promote Web/CLI draft-field parity and real deploy smoke rows

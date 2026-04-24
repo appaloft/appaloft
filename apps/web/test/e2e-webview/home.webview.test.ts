@@ -302,11 +302,68 @@ function deploymentEventStreamFixture(deploymentId: string): Response {
   });
 }
 
+type ServerCredentialFixture =
+  | {
+      kind: "local-ssh-agent";
+      username?: string;
+      publicKeyConfigured: boolean;
+      privateKeyConfigured: boolean;
+    }
+  | {
+      kind: "ssh-private-key";
+      credentialId?: string;
+      credentialName?: string;
+      username?: string;
+      publicKeyConfigured: boolean;
+      privateKeyConfigured: boolean;
+    };
+
+type SshCredentialUsageServerFixture = {
+  serverId: string;
+  serverName: string;
+  lifecycleStatus: "active" | "inactive";
+  providerKey: string;
+  host: string;
+  username?: string;
+};
+
+function sshCredentialDetailFixture(input: {
+  credentialId: string;
+  name: string;
+  username?: string;
+  publicKeyConfigured?: boolean;
+  privateKeyConfigured?: boolean;
+  usageServers?: SshCredentialUsageServerFixture[];
+}) {
+  const servers = input.usageServers ?? [];
+
+  return {
+    schemaVersion: "credentials.show/v1",
+    credential: {
+      id: input.credentialId,
+      name: input.name,
+      kind: "ssh-private-key",
+      ...(input.username ? { username: input.username } : {}),
+      publicKeyConfigured: input.publicKeyConfigured ?? true,
+      privateKeyConfigured: input.privateKeyConfigured ?? true,
+      createdAt: "2026-01-01T00:00:00.000Z",
+    },
+    usage: {
+      totalServers: servers.length,
+      activeServers: servers.filter((server) => server.lifecycleStatus === "active").length,
+      inactiveServers: servers.filter((server) => server.lifecycleStatus === "inactive").length,
+      servers,
+    },
+    generatedAt: "2026-01-01T00:00:02.000Z",
+  };
+}
+
 function serverDetailFixture(
   serverId = "srv_demo",
   input: {
     edgeProxyKind?: "none" | "traefik" | "caddy";
     edgeProxyStatus?: "pending" | "starting" | "ready" | "failed" | "disabled";
+    credential?: ServerCredentialFixture;
     name?: string;
   } = {},
 ) {
@@ -327,7 +384,7 @@ function serverDetailFixture(
         lastAttemptAt: "2026-01-01T00:00:00.000Z",
         lastSucceededAt: "2026-01-01T00:00:01.000Z",
       },
-      credential: {
+      credential: input.credential ?? {
         kind: "local-ssh-agent",
         username: "deployer",
         publicKeyConfigured: false,
@@ -1765,6 +1822,100 @@ describe("console e2e with Bun.WebView", () => {
     expect(
       recordedApiRequests.some((request) => request.pathname === "/api/rpc/servers/list"),
     ).toBe(false);
+  }, 15_000);
+
+  test("[SSH-CRED-ENTRY-004] server detail reads credential usage and separates zero usage from unavailable usage", async () => {
+    activeScenario = "dashboard";
+    resetRecordedApiRequests();
+
+    const previousShowRoute = apiResponses.dashboard["/api/rpc/servers/show"];
+    const previousCredentialShowRoute = apiResponses.dashboard["/api/rpc/credentials/ssh/show"];
+
+    apiResponses.dashboard["/api/rpc/servers/show"] = (_request: Request, body: unknown) => {
+      const input = readOrpcJsonPayload(body) as { serverId?: string } | null;
+      const serverId = input?.serverId ?? "srv_zero_usage";
+      const credentialId =
+        serverId === "srv_usage_unavailable" ? "cred_usage_unavailable" : "cred_zero_usage";
+
+      return {
+        json: serverDetailFixture(serverId, {
+          name: serverId === "srv_usage_unavailable" ? "usage unavailable edge" : "zero usage edge",
+          credential: {
+            kind: "ssh-private-key",
+            credentialId,
+            credentialName:
+              serverId === "srv_usage_unavailable" ? "Broken usage key" : "Unused deploy key",
+            username: "deployer",
+            publicKeyConfigured: true,
+            privateKeyConfigured: true,
+          },
+        }),
+      };
+    };
+    apiResponses.dashboard["/api/rpc/credentials/ssh/show"] = (
+      _request: Request,
+      body: unknown,
+    ) => {
+      const input = readOrpcJsonPayload(body) as { credentialId?: string } | null;
+
+      if (input?.credentialId === "cred_usage_unavailable") {
+        return respondJson(
+          {
+            code: "infra_error",
+            message: "usage read unavailable",
+            phase: "credential-usage-read",
+          },
+          { status: 503 },
+        );
+      }
+
+      return {
+        json: sshCredentialDetailFixture({
+          credentialId: input?.credentialId ?? "cred_zero_usage",
+          name: "Unused deploy key",
+          username: "deployer",
+          usageServers: [],
+        }),
+      };
+    };
+
+    try {
+      await using view = createWebView();
+      await view.navigate(`${previewUrl}/servers/srv_zero_usage`);
+
+      await expectAnyText(view, ["SSH credential detail", "SSH 凭据详情"]);
+      await expectText(view, "Unused deploy key");
+      await expectAnyText(view, [
+        "No servers currently use this credential",
+        "当前没有服务器使用这个凭据",
+      ]);
+
+      const zeroUsageRequest = await waitForRecordedRequest("/api/rpc/credentials/ssh/show");
+      expect(zeroUsageRequest.method).toBe("POST");
+      expect(readOrpcJsonPayload(zeroUsageRequest.body)).toEqual({
+        credentialId: "cred_zero_usage",
+        includeUsage: true,
+      });
+
+      resetRecordedApiRequests();
+      await view.navigate(`${previewUrl}/servers/srv_usage_unavailable`);
+
+      await expectAnyText(view, ["Credential usage unavailable", "凭据使用情况暂不可用"]);
+
+      const unavailableUsageRequest = await waitForRecordedRequest("/api/rpc/credentials/ssh/show");
+      expect(unavailableUsageRequest.method).toBe("POST");
+      expect(readOrpcJsonPayload(unavailableUsageRequest.body)).toEqual({
+        credentialId: "cred_usage_unavailable",
+        includeUsage: true,
+      });
+    } finally {
+      apiResponses.dashboard["/api/rpc/servers/show"] = previousShowRoute;
+      if (previousCredentialShowRoute === undefined) {
+        delete apiResponses.dashboard["/api/rpc/credentials/ssh/show"];
+      } else {
+        apiResponses.dashboard["/api/rpc/credentials/ssh/show"] = previousCredentialShowRoute;
+      }
+    }
   }, 15_000);
 
   test("[SRV-LIFE-ENTRY-016] renames a server from server detail", async () => {

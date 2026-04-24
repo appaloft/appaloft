@@ -74,6 +74,10 @@ export const cliCommandDescriptions = {
     "server.ssh-credential",
   ),
   serverCredentialList: withDocs("List reusable SSH credentials", "server.ssh-credential"),
+  serverCredentialShow: withDocs(
+    "Show reusable SSH credential detail and usage",
+    "server.ssh-credential",
+  ),
   serverTest: withDocs("Test server connectivity", "server.connectivity-test"),
   serverDoctor: withDocs("Diagnose server SSH and Docker readiness", "server.connectivity-test"),
   serverProxy: withDocs("Server edge proxy operations", "server.proxy-readiness"),

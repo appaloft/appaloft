@@ -131,6 +131,23 @@ describe("operation catalog aggregate mutation boundary", () => {
     expect(entry?.inputSchema).toBeDefined();
   });
 
+  test("[SSH-CRED-ENTRY-001] reusable SSH credential detail is exposed through the active operation catalog", () => {
+    const entry = operationCatalog.find((candidate) => candidate.key === "credentials.show");
+
+    expect(entry).toMatchObject({
+      kind: "query",
+      domain: "credentials",
+      messageName: "ShowSshCredentialQuery",
+      handlerName: "ShowSshCredentialQueryHandler",
+      serviceName: "ShowSshCredentialQueryService",
+      transports: {
+        cli: "appaloft server credential-show <credentialId>",
+        orpc: { method: "GET", path: "/api/credentials/ssh/{credentialId}" },
+      },
+    });
+    expect(entry?.inputSchema).toBeDefined();
+  });
+
   test("[AGG-MUTATION-CATALOG-002] detects generic aggregate update operation keys and command names", () => {
     const violations = findGenericAggregateMutationOperations([
       catalogEntry({

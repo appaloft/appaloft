@@ -102,6 +102,8 @@ import {
   ShowResourceQueryHandler,
   ShowResourceQueryService,
   ShowServerQueryService,
+  ShowSshCredentialQueryHandler,
+  ShowSshCredentialQueryService,
   StreamDeploymentEventsQueryHandler,
   StreamDeploymentEventsQueryService,
   TestServerConnectivityUseCase,
@@ -164,6 +166,7 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(RenameProjectCommandHandler);
   container.registerSingleton(ListCertificatesQueryHandler);
   container.registerSingleton(ShowProjectQueryHandler);
+  container.registerSingleton(ShowSshCredentialQueryHandler);
   container.registerSingleton(
     tokens.certificateProviderSelectionPolicy,
     ShellCertificateProviderSelectionPolicy,
@@ -215,6 +218,7 @@ export function registerApplicationServices(container: DependencyContainer): voi
     tokens.listSshCredentialsQueryService,
     ListSshCredentialsQueryService,
   );
+  container.registerSingleton(tokens.showSshCredentialQueryService, ShowSshCredentialQueryService);
   container.registerSingleton(tokens.listServersQueryService, ListServersQueryService);
   container.registerSingleton(tokens.showServerQueryService, ShowServerQueryService);
   container.registerSingleton(tokens.renameServerUseCase, RenameServerUseCase);

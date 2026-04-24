@@ -85,6 +85,7 @@ import {
   PgServerRepository,
   PgSshCredentialReadModel,
   PgSshCredentialRepository,
+  PgSshCredentialUsageReader,
 } from "@appaloft/persistence-pg";
 import { createBuiltinPlugins } from "@appaloft/plugin-builtins";
 import { LocalPluginHost } from "@appaloft/plugin-host";
@@ -781,6 +782,9 @@ export function registerRuntimeDependencies(
   });
   container.register(tokens.sshCredentialReadModel, {
     useFactory: instanceCachingFactory(() => new PgSshCredentialReadModel(input.database.db)),
+  });
+  container.register(tokens.sshCredentialUsageReader, {
+    useFactory: instanceCachingFactory(() => new PgSshCredentialUsageReader(input.database.db)),
   });
   container.register(tokens.environmentReadModel, {
     useFactory: instanceCachingFactory(
