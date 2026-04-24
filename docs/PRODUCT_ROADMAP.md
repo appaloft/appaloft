@@ -42,11 +42,16 @@ Version selection rules:
 
 Current release alignment:
 
-- [x] On 2026-04-23, latest public release and package manifests agree on `0.2.13`, and there is no
-  open Release Please PR.
-- [x] On 2026-04-23, Phase 0 and Phase 1 are complete in this roadmap after the
-  `deployments.stream-events` Post-Implementation Sync, so the next allowed stable target is
-  `0.3.0`.
+<!-- release-alignment:start -->
+- [x] On 2026-04-24, the latest public release is `v0.3.0`; root package
+  and Release Please manifest on `main` are `0.3.0`; the release PR target is
+  `0.4.0`.
+- [x] On 2026-04-24, the roadmap gate allows `Release-As: 0.4.0` because
+  Phase 0 through Phase 2 release rules, required items, and exit criteria are checked.
+<!-- release-alignment:end -->
+
+Historical alignment notes:
+
 - [x] On 2026-04-23, the public docs app and standalone docs deployment workflow are merged on
   `origin/main`; `docs.appaloft.com` DNS and release deployment secrets/variables are configured,
   so the docs site should deploy after the next release publish run creates a GitHub Release.

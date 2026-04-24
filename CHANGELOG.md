@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.4.0](https://github.com/appaloft/appaloft/compare/v0.3.0...v0.4.0) (2026-04-24)
+
+
+### Features
+
+* add project lifecycle operations ([#80](https://github.com/appaloft/appaloft/issues/80)) ([315c130](https://github.com/appaloft/appaloft/commit/315c1301bc9e1a5321b47b8abe0baaf53fc0dd19))
+* **resource:** add resource-scoped config operations ([#77](https://github.com/appaloft/appaloft/issues/77)) ([f03822b](https://github.com/appaloft/appaloft/commit/f03822b7087c781ea7662f4455eead9fad888f1e))
+
+
+### Bug Fixes
+
+* **runtime:** externalize static docker build assets ([#78](https://github.com/appaloft/appaloft/issues/78)) ([550d1f8](https://github.com/appaloft/appaloft/commit/550d1f8bf78b9cbb7081a03e7bdfc32e8570ddf8))
+
 ## [0.3.0](https://github.com/appaloft/appaloft/compare/v0.2.13...v0.3.0) (2026-04-23)
 
 

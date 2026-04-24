@@ -101,17 +101,39 @@ jobs:
             args+=(--latest-release-tag "${latest_release_tag}")
           fi
 
+          body_file="$(mktemp)"
+          if [[ -n "${RELEASE_AS}" ]]; then
+            bun run scripts/release/enforce-release-pr-version.ts \
+              --target-version "${RELEASE_AS}" \
+              --current-version "${current_version}" \
+              --repository "${GITHUB_REPOSITORY}" \
+              --body-out "${body_file}"
+            gh pr edit "${pr_number}" --title "chore: release ${RELEASE_AS}" --body-file "${body_file}"
+          fi
+
           bun run scripts/release/align-roadmap-for-release.ts "${args[@]}"
 
-          if git diff --quiet -- docs/PRODUCT_ROADMAP.md; then
+          if git diff --quiet -- \
+            .github/.release-please-manifest.json \
+            CHANGELOG.md \
+            apps/desktop/src-tauri/Cargo.toml \
+            apps/desktop/src-tauri/tauri.conf.json \
+            docs/PRODUCT_ROADMAP.md \
+            package.json; then
             echo "Roadmap release alignment is already current."
             exit 0
           fi
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add docs/PRODUCT_ROADMAP.md
-          git commit -m "docs: align roadmap for release"
+          git add \
+            .github/.release-please-manifest.json \
+            CHANGELOG.md \
+            apps/desktop/src-tauri/Cargo.toml \
+            apps/desktop/src-tauri/tauri.conf.json \
+            docs/PRODUCT_ROADMAP.md \
+            package.json
+          git commit -m "chore: align release pull request"
           git push origin "HEAD:${branch}"
 
       - name: Dispatch CI for release pull requests

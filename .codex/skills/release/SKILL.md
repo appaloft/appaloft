@@ -31,6 +31,8 @@ description: Appaloft release runbook for manually triggered GitHub Actions rele
   or explicit hotfix version.
 - The manual run creates or updates the Release Please PR and adds roadmap release alignment to that
   same PR.
+- When `release_as` is set, the Release workflow must enforce that the release PR title, body,
+  version files, changelog, and roadmap alignment use that exact version before the PR is merged.
 - After that PR is merged, the push-triggered publish run creates the tag and GitHub Release, then publishes assets, npm packages, Homebrew tap files, GHCR images, desktop bundles, and CLI binaries.
 - Changelog source: `CHANGELOG.md`, maintained by Release Please.
 

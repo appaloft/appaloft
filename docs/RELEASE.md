@@ -121,7 +121,9 @@ flows.
 3. Open GitHub Actions and run `Release` from `main`. Set `release_as` only when the roadmap gate
    allows an explicit target such as `0.4.0`.
 4. Review the single Release Please PR. It must include the generated version/changelog changes and
-   the `docs/PRODUCT_ROADMAP.md` release alignment commit.
+   the `docs/PRODUCT_ROADMAP.md` release alignment commit. When `release_as` is set, the workflow
+   also enforces that the release PR title, body, version files, and changelog use that exact
+   version.
 5. Merge the Release Please PR when ready to publish. Use the default release PR title as the merge
    commit subject so it starts with `chore: release `. The merge commit is the publishing
    confirmation and triggers the release publish run automatically.
