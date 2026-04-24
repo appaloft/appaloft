@@ -302,14 +302,14 @@ function deploymentEventStreamFixture(deploymentId: string): Response {
   });
 }
 
-function serverDetailFixture(serverId = "srv_demo") {
+function serverDetailFixture(serverId = "srv_demo", input: { name?: string } = {}) {
   const isStaticServer = serverId === "srv_static";
 
   return {
     schemaVersion: "servers.show/v1",
     server: {
       id: serverId,
-      name: isStaticServer ? "static-edge" : "edge",
+      name: input.name ?? (isStaticServer ? "static-edge" : "edge"),
       host: "127.0.0.1",
       port: 22,
       providerKey: "generic-ssh",
@@ -447,6 +447,14 @@ const apiResponses: Record<ApiScenario, Record<string, ApiRoute>> = {
       const input = readOrpcJsonPayload(body) as { serverId?: string } | null;
       return {
         json: serverDetailFixture(input?.serverId ?? "srv_demo"),
+      };
+    },
+    "/api/rpc/servers/rename": (_request: Request, body: unknown) => {
+      const input = readOrpcJsonPayload(body) as { serverId?: string } | null;
+      return {
+        json: {
+          id: input?.serverId ?? "srv_demo",
+        },
       };
     },
     "/api/rpc/servers/deleteCheck": (_request: Request, body: unknown) => {
@@ -1735,6 +1743,54 @@ describe("console e2e with Bun.WebView", () => {
     expect(
       recordedApiRequests.some((request) => request.pathname === "/api/rpc/servers/list"),
     ).toBe(false);
+  }, 15_000);
+
+  test("[SRV-LIFE-ENTRY-016] renames a server from server detail", async () => {
+    activeScenario = "dashboard";
+    resetRecordedApiRequests();
+
+    const previousShowRoute = apiResponses.dashboard["/api/rpc/servers/show"];
+    const previousRenameRoute = apiResponses.dashboard["/api/rpc/servers/rename"];
+    let currentServerName = "edge";
+
+    apiResponses.dashboard["/api/rpc/servers/show"] = (_request: Request, body: unknown) => {
+      const input = readOrpcJsonPayload(body) as { serverId?: string } | null;
+      return {
+        json: serverDetailFixture(input?.serverId ?? "srv_demo", {
+          name: currentServerName,
+        }),
+      };
+    };
+    apiResponses.dashboard["/api/rpc/servers/rename"] = (_request: Request, body: unknown) => {
+      const input = readOrpcJsonPayload(body) as { name?: string; serverId?: string } | null;
+      currentServerName = input?.name ?? currentServerName;
+
+      return {
+        json: {
+          id: input?.serverId ?? "srv_demo",
+        },
+      };
+    };
+
+    try {
+      await using view = createWebView();
+      await view.navigate(`${previewUrl}/servers/srv_demo`);
+
+      await expectText(view, "edge");
+      await setInputValue(view, "#server-display-name-input", "Primary SSH server");
+      await clickFormSubmit(view, "#server-rename-form");
+
+      const renameRequest = await waitForRecordedRequest("/api/rpc/servers/rename");
+      expect(renameRequest.method).toBe("POST");
+      expect(readOrpcJsonPayload(renameRequest.body)).toEqual({
+        serverId: "srv_demo",
+        name: "Primary SSH server",
+      });
+      await expectText(view, "Primary SSH server");
+    } finally {
+      apiResponses.dashboard["/api/rpc/servers/show"] = previousShowRoute;
+      apiResponses.dashboard["/api/rpc/servers/rename"] = previousRenameRoute;
+    }
   }, 15_000);
 
   test("[DEP-SHOW-QRY-004] surfaces section errors as degraded deployment detail UI", async () => {

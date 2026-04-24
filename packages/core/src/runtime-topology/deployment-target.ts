@@ -164,6 +164,37 @@ export class DeploymentTarget extends AggregateRoot<DeploymentTargetState> {
     return ok({ changed: true });
   }
 
+  rename(input: {
+    name: DeploymentTargetName;
+    renamedAt: UpdatedAt;
+  }): Result<{ changed: boolean }> {
+    if (this.state.lifecycleStatus.isDeleted()) {
+      return err(
+        domainError.invariant("Deleted deployment targets cannot be renamed", {
+          phase: "server-lifecycle-guard",
+          serverId: this.state.id.value,
+          lifecycleStatus: this.state.lifecycleStatus.value,
+        }),
+      );
+    }
+
+    if (this.state.name.equals(input.name)) {
+      return ok({ changed: false });
+    }
+
+    const previousName = this.state.name;
+    this.state.name = input.name;
+
+    this.recordDomainEvent("server-renamed", input.renamedAt, {
+      serverId: this.state.id.value,
+      previousName: previousName.value,
+      name: input.name.value,
+      renamedAt: input.renamedAt.value,
+    });
+
+    return ok({ changed: true });
+  }
+
   delete(input: { deletedAt: DeletedAt }): Result<{ changed: boolean }> {
     if (this.state.lifecycleStatus.isDeleted()) {
       return ok({ changed: false });

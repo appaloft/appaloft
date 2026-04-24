@@ -9,13 +9,13 @@ runtime workload containers.
 The active operations in this lifecycle slice are:
 
 - `servers.show`;
+- `servers.rename`;
 - `servers.deactivate`;
 - `servers.delete-check`;
 - guarded `servers.delete`.
 
 Future lifecycle operations expected by the roadmap are:
 
-- `servers.rename`;
 - `servers.configure-edge-proxy`.
 
 Generic `servers.update` remains forbidden by ADR-026.
@@ -26,6 +26,7 @@ Generic `servers.update` remains forbidden by ADR-026.
 - [ADR-019: Edge Proxy Provider And Observable Configuration](../decisions/ADR-019-edge-proxy-provider-and-observable-configuration.md)
 - [ADR-026: Aggregate Mutation Command Boundary](../decisions/ADR-026-aggregate-mutation-command-boundary.md)
 - [servers.show Query Spec](../queries/servers.show.md)
+- [servers.rename Command Spec](../commands/servers.rename.md)
 - [Server Bootstrap And Proxy Workflow](./server-bootstrap-and-proxy.md)
 - [Deployment Target Lifecycle Error Spec](../errors/servers.lifecycle.md)
 - [Deployment Target Lifecycle Test Matrix](../testing/deployment-target-lifecycle-test-matrix.md)
@@ -49,6 +50,13 @@ It must not:
 - create, deploy, stop, or mutate resources;
 - mark server readiness;
 - rename, deactivate, delete, or configure server state.
+
+`servers.rename` changes only the server display name. It must preserve the server id, host, port,
+provider key, credential relationship, edge proxy state, lifecycle status, destination ids,
+deployment history, domain history, route state, logs, audit records, and all historical
+references. Active and inactive servers may be renamed. Deleted server tombstones are immutable
+through the ordinary rename entrypoint; normal command admission returns `not_found` for deleted
+servers.
 
 `servers.deactivate` changes only the deployment target lifecycle state from active to inactive.
 It must not stop workloads, cancel deployments, remove routes, revoke certificates, detach
@@ -85,12 +93,12 @@ them through explicit future cleanup or lifecycle commands before deletion can p
 
 | Surface | Decision |
 | --- | --- |
-| CLI | Expose `server show <serverId>`, `server deactivate <serverId>`, `server delete-check <serverId>`, and `server delete <serverId> --confirm <serverId>` with positional ids and explicit confirmation. |
-| HTTP/oRPC | Expose `GET /api/servers/{serverId}`, `POST /api/servers/{serverId}/deactivate`, `GET /api/servers/{serverId}/delete-check`, and `DELETE /api/servers/{serverId}` using operation schemas; no `PATCH /api/servers/{id}` is allowed. |
-| Web | Server detail reads `servers.show` for identity, proxy status, credential summary, rollups, and lifecycle status; it reads `servers.delete-check` for read-only delete-safety status. Destructive delete action UI is deferred until typed confirmation exists. |
+| CLI | Expose `server show <serverId>`, `server rename <serverId> --name <name>`, `server deactivate <serverId>`, `server delete-check <serverId>`, and `server delete <serverId> --confirm <serverId>` with positional ids and explicit confirmation where destructive. |
+| HTTP/oRPC | Expose `GET /api/servers/{serverId}`, `POST /api/servers/{serverId}/rename`, `POST /api/servers/{serverId}/deactivate`, `GET /api/servers/{serverId}/delete-check`, and `DELETE /api/servers/{serverId}` using operation schemas; no `PATCH /api/servers/{id}` is allowed. |
+| Web | Server detail reads `servers.show` for identity, proxy status, credential summary, rollups, and lifecycle status; it exposes a display-name rename text input/action for active and inactive servers when the detail page can carry the control; it reads `servers.delete-check` for read-only delete-safety status. Destructive delete action UI is deferred until typed confirmation exists. |
 | Repository config | Not applicable. Repository config must not select server identity. |
 | Future MCP/tools | Generate command/query tools from the operation catalog entries. |
-| Public docs | Existing `server.deployment-target` anchor explains server detail, deactivation, and delete-safety semantics. |
+| Public docs | Existing `server.deployment-target` anchor explains server display-name, detail, deactivation, and delete-safety semantics. |
 
 ## Current Implementation Notes And Migration Gaps
 
@@ -104,9 +112,10 @@ The deactivate/delete-safety Code Round implements API/oRPC and CLI closure for
 delete-safety status.
 
 The guarded delete Code Round implements API/oRPC and CLI closure for `servers.delete` with
-soft-delete lifecycle state. Reactivation, rename, edge-proxy configuration, broad credential usage
-visibility, Web deactivate action UI, and Web destructive delete controls remain future work. Web
-action UI is limited to read-only lifecycle/safety display until confirmation affordances exist.
+soft-delete lifecycle state. The rename Code Round promotes display-name changes to an active
+operation. Reactivation, edge-proxy configuration, broad credential usage visibility, Web
+deactivate action UI, and Web destructive delete controls remain future work. Web destructive action
+UI is limited to read-only lifecycle/safety display until confirmation affordances exist.
 
 ## Open Questions
 

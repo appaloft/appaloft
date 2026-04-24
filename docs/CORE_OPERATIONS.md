@@ -121,6 +121,7 @@ Implemented operations:
 | Configure deployment target credential | Command | `servers.configure-credential` | `ConfigureServerCredentialCommand` | `ConfigureServerCredentialCommandInput` | `appaloft server credential <serverId>` | `POST /api/servers/{serverId}/credentials` |
 | List deployment targets | Query | `servers.list` | `ListServersQuery` | `ListServersQueryInput` | `appaloft server list` | `GET /api/servers` |
 | Show deployment target | Query | `servers.show` | `ShowServerQuery` | `ShowServerQueryInput` | `appaloft server show <serverId>` | `GET /api/servers/{serverId}` |
+| Rename deployment target | Command | `servers.rename` | `RenameServerCommand` | `RenameServerCommandInput` | `appaloft server rename <serverId> --name <name>` | `POST /api/servers/{serverId}/rename` |
 | Deactivate deployment target | Command | `servers.deactivate` | `DeactivateServerCommand` | `DeactivateServerCommandInput` | `appaloft server deactivate <serverId>` | `POST /api/servers/{serverId}/deactivate` |
 | Check deployment target delete safety | Query | `servers.delete-check` | `CheckServerDeleteSafetyQuery` | `CheckServerDeleteSafetyQueryInput` | `appaloft server delete-check <serverId>` | `GET /api/servers/{serverId}/delete-check` |
 | Delete deployment target | Command | `servers.delete` | `DeleteServerCommand` | `DeleteServerCommandInput` | `appaloft server delete <serverId> --confirm <serverId>` | `DELETE /api/servers/{serverId}` |
@@ -147,6 +148,10 @@ Implemented operations:
   and deployment/resource/domain rollups. It does not test connectivity, repair proxy state, or
   mutate credentials, resources, deployments, domains, routes, terminal sessions, logs, or audit
   state.
+- `servers.rename` changes only the deployment target/server display name. It preserves the server
+  id, host, provider, credential, proxy, lifecycle state, and historical references. Active and
+  inactive servers may be renamed; deleted servers are not visible to the normal rename entrypoint.
+  Server names are display labels, not unique identities.
 - `servers.deactivate` moves a server to inactive lifecycle state. Inactive servers remain
   readable and keep history/dependency visibility, but deployment admission, scheduler target
   selection, and new proxy target configuration must not use them for future work.
@@ -164,7 +169,6 @@ Implemented operations:
   injection, not by core/application command input
 
 Core next operations expected here:
-- `servers.rename`
 - `servers.configure-edge-proxy`
 - rotate reusable SSH credential
 - delete reusable SSH credential when unused

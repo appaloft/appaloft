@@ -303,8 +303,8 @@ Exit criteria:
 
 Post-`0.4.0` gaps assigned to later phases:
 
-- Server rename/configure-edge-proxy and broad credential usage visibility remain Phase 4 work;
-  show, deactivate, delete safety, and guarded soft delete are active lifecycle slices.
+- Server configure-edge-proxy and broad credential usage visibility remain Phase 4 work; show,
+  rename, deactivate, delete safety, and guarded soft delete are active lifecycle slices.
 - Credential show/rotate/delete when unused remains Phase 4 work.
 - Remaining environment clone/lock/archive/effective-precedence/history work remains Phase 4 work.
 - Access policy editing, route precedence hardening, route intent repair, domain binding mutation
@@ -371,14 +371,15 @@ Already done:
   resource detail observation exist.
 - [x] Environment create/list/show/set/unset/diff/promote exists.
 - [x] Project create/list/show/rename/archive exists.
-- [x] Server register/list/show/deactivate/delete safety/guarded delete/connectivity/proxy-repair
-  and credential baseline exist.
+- [x] Server register/list/show/rename/deactivate/delete safety/guarded delete/connectivity,
+  proxy-repair, and credential baseline exist.
 
 Required:
 
 - [x] Add project show/rename/archive.
 - [x] Add server show with proxy status and initial deployment/resource/domain rollups.
-- [ ] Add server rename/configure-edge-proxy and broad credential usage visibility.
+- [x] Add server rename.
+- [ ] Add server configure-edge-proxy and broad credential usage visibility.
 - [ ] Add credential show/rotate/delete when unused.
 - [x] Add resource show/archive/delete.
 - [x] Add separate resource source update semantics where specs require a separate command.
@@ -644,7 +645,8 @@ work below before GA.
 - [ ] Environment: update, clone, lock/archive, effective precedence, history.
 - [x] Deployment target/server: register, list, show, configure credential, deactivate, delete
   safety, guarded soft delete, connectivity, proxy repair, terminal open.
-- [ ] Deployment target/server: rename/configure-edge-proxy and broad credential usage visibility.
+- [x] Deployment target/server: rename.
+- [ ] Deployment target/server: configure-edge-proxy and broad credential usage visibility.
 - [x] SSH credential: create/list, attach to server.
 - [ ] SSH credential: show, rotate/update, delete when unused, usage visibility.
 - [x] Resource: create/list/show, configure source/runtime/network/health, set/unset variables,

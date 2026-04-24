@@ -9,9 +9,11 @@ query, command, workflow, error, or test-matrix specs.
 
 - [Deployment Target Lifecycle Workflow](../workflows/deployment-target-lifecycle.md)
 - [servers.show Query Spec](../queries/servers.show.md)
+- [servers.rename Command Spec](../commands/servers.rename.md)
 - [servers.deactivate Command Spec](../commands/servers.deactivate.md)
 - [servers.delete-check Query Spec](../queries/servers.delete-check.md)
 - [servers.delete Command Spec](../commands/servers.delete.md)
+- [server-renamed Event Spec](../events/server-renamed.md)
 - [server-deactivated Event Spec](../events/server-deactivated.md)
 - [server-deleted Event Spec](../events/server-deleted.md)
 - [Deployment Target Lifecycle Error Spec](../errors/servers.lifecycle.md)
@@ -36,6 +38,13 @@ query, command, workflow, error, or test-matrix specs.
 - `deactivate-server.handler.ts`;
 - `deactivate-server.use-case.ts`.
 
+`servers.rename` must add a command slice:
+
+- `rename-server.schema.ts`;
+- `rename-server.command.ts`;
+- `rename-server.handler.ts`;
+- `rename-server.use-case.ts`.
+
 `servers.delete-check` must add a query slice:
 
 - `check-server-delete-safety.schema.ts`;
@@ -49,7 +58,8 @@ Add application types and tokens as needed:
 - `ServerRollups`;
 - `ServerDeleteSafety`;
 - `ServerDeleteBlocker`;
-- `tokens.showServerQueryService`.
+- `tokens.showServerQueryService`;
+- `tokens.renameServerUseCase`;
 - `tokens.deactivateServerUseCase`;
 - `tokens.checkServerDeleteSafetyQueryService`.
 
@@ -79,6 +89,12 @@ The query must not run live SSH, Docker, DNS, proxy, or runtime probes.
 Deactivate must use the write-side `ServerRepository`/`DeploymentTarget` aggregate and publish
 `server-deactivated` through the shared event bus after persistence.
 
+Rename must use the write-side `ServerRepository`/`DeploymentTarget` aggregate, normalize the new
+display name through `DeploymentTargetName`, reject deleted tombstones from the ordinary entrypoint
+with `not_found`, and publish `server-renamed` through the shared event bus after persistence. The
+first implementation should not add a server-name uniqueness query or index because the current
+domain model treats the name as a display label and server id as the durable reference.
+
 Delete-check may compose a dedicated `ServerDeletionBlockerReader` with server read-model state.
 The first PG implementation should cover blockers that already have durable tables: deployments,
 non-terminal deployments, domain bindings, certificates through domain bindings, source links,
@@ -95,7 +111,7 @@ the tombstone for idempotent retries.
 
 ## Expected Transport Scope
 
-During the Code Round that promotes this behavior to active, add `servers.show` to:
+During the Code Round that promotes a lifecycle behavior to active, add the operation to:
 
 - [Core Operations](../CORE_OPERATIONS.md) implemented operations table;
 - `packages/application/src/operation-catalog.ts`;
@@ -111,6 +127,8 @@ GET /api/servers/{serverId}
 appaloft server show <serverId>
 POST /api/servers/{serverId}/deactivate
 appaloft server deactivate <serverId>
+POST /api/servers/{serverId}/rename
+appaloft server rename <serverId> --name <name>
 GET /api/servers/{serverId}/delete-check
 appaloft server delete-check <serverId>
 DELETE /api/servers/{serverId}
@@ -133,6 +151,12 @@ status from `servers.show` and read-only delete-safety status from `servers.dele
 The guarded delete slice may keep Web destructive action UI deferred if it records the gap and
 continues to show read-only delete eligibility on server detail. Do not add a delete button without
 typed confirmation UX.
+
+The rename slice should add an owner-scoped server detail display-name form when the existing page
+can support it without broad redesign. The control must use a text input, submit through
+`servers.rename`, support active and inactive servers, and refresh the server detail/list-visible
+name. If the Web action is deferred, the plan and lifecycle spec must record the exact Web action
+gap; read-only display of the renamed value is still required.
 
 ## Minimal Deliverable
 
@@ -163,6 +187,24 @@ typed confirmation UX.
   `SRV-LIFE-ENTRY-006`, `SRV-LIFE-ENTRY-007`, `SRV-LIFE-ENTRY-008`, and
   `SRV-LIFE-ENTRY-009`.
 
+## Rename Minimal Deliverable
+
+- `servers.rename` is active in `CORE_OPERATIONS.md` and `operation-catalog.ts`;
+- `DeploymentTarget` has a rename method that accepts `DeploymentTargetName` and preserves all
+  non-name state;
+- server persistence updates the stored display name through the existing upsert/update path;
+- normal server list/show read models return the new name and still omit deleted servers;
+- `servers.rename` rejects missing or deleted servers with `not_found`;
+- CLI and HTTP/oRPC dispatch through `RenameServerCommand`;
+- Web server detail exposes the display-name rename action if the existing surface can carry it, or
+  records a named Web action migration gap while remaining read-observable;
+- contracts and typed clients expose the command shape;
+- public docs coverage maps the operation to the server deployment-target anchor;
+- focused tests cover `SRV-LIFE-RENAME-001`, `SRV-LIFE-RENAME-002`,
+  `SRV-LIFE-RENAME-003`, `SRV-LIFE-RENAME-004`, `SRV-LIFE-RENAME-005`,
+  `SRV-LIFE-ENTRY-013`, `SRV-LIFE-ENTRY-014`, `SRV-LIFE-ENTRY-015`, and
+  `SRV-LIFE-ENTRY-016` when the Web action ships in the same slice.
+
 ## Guarded Delete Minimal Deliverable
 
 - `servers.delete` is active in `CORE_OPERATIONS.md` and `operation-catalog.ts`;
@@ -186,6 +228,7 @@ typed confirmation UX.
 Run targeted checks before publishing:
 
 - `bun test packages/application/test/show-server.test.ts`
+- `bun test packages/application/test/rename-server.test.ts`
 - `bun test packages/application/test/deactivate-server.test.ts`
 - `bun test packages/application/test/check-server-delete-safety.test.ts`
 - `bun test packages/application/test/delete-server.test.ts`
@@ -201,13 +244,13 @@ Run targeted checks before publishing:
 
 ## Current Implementation Notes And Migration Gaps
 
-`servers.deactivate`, `servers.delete-check`, and guarded `servers.delete` are the current minimal
-lifecycle/safety slice. Guarded delete uses soft-delete lifecycle state. Reactivation, server
-rename, edge-proxy configuration, Web deactivate/delete action controls, terminal-session blocker
-durability, external runtime-task blocker durability, and broad credential usage visibility remain
-future work.
+`servers.deactivate`, `servers.delete-check`, guarded `servers.delete`, and display-name-only
+`servers.rename` are the current minimal lifecycle/safety slice. Guarded delete uses soft-delete
+lifecycle state. Reactivation, edge-proxy configuration, Web deactivate/delete action controls,
+terminal-session blocker durability, external runtime-task blocker durability, and broad credential
+usage visibility remain future work.
 
 ## Open Questions
 
-- None for `servers.show`, one-way deactivate, delete-check preview, or guarded soft delete
-  semantics.
+- None for `servers.show`, display-name-only rename, one-way deactivate, delete-check preview, or
+  guarded soft delete semantics.

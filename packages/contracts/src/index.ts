@@ -168,6 +168,16 @@ export const showServerInputSchema = z.object({
     .default(true),
 });
 
+export const renameServerInputSchema = z.object({
+  serverId: z.string().min(1),
+  name: z.string().min(1),
+  idempotencyKey: z.string().min(1).optional(),
+});
+
+export const renameServerResponseSchema = z.object({
+  id: z.string(),
+});
+
 export const deactivateServerInputSchema = z.object({
   serverId: z.string().min(1),
   reason: z.string().min(1).optional(),
@@ -2211,6 +2221,7 @@ export type ServerSummary = z.infer<typeof serverSummarySchema>;
 export type SshCredentialSummary = z.infer<typeof sshCredentialSummarySchema>;
 export type RegisterServerInput = z.infer<typeof registerServerInputSchema>;
 export type ShowServerInput = z.infer<typeof showServerInputSchema>;
+export type RenameServerInput = z.infer<typeof renameServerInputSchema>;
 export type DeactivateServerInput = z.infer<typeof deactivateServerInputSchema>;
 export type DeleteServerInput = z.infer<typeof deleteServerInputSchema>;
 export type CheckServerDeleteSafetyInput = z.infer<typeof checkServerDeleteSafetyInputSchema>;
@@ -2220,6 +2231,7 @@ export type RegisterServerResponse = z.infer<typeof registerServerResponseSchema
 export type ListServersResponse = z.infer<typeof listServersResponseSchema>;
 export type ServerDetail = z.infer<typeof serverDetailSchema>;
 export type ShowServerResponse = z.infer<typeof showServerResponseSchema>;
+export type RenameServerResponse = z.infer<typeof renameServerResponseSchema>;
 export type DeactivateServerResponse = z.infer<typeof deactivateServerResponseSchema>;
 export type DeleteServerResponse = z.infer<typeof deleteServerResponseSchema>;
 export type ServerDeleteBlocker = z.infer<typeof serverDeleteBlockerSchema>;

@@ -8,5 +8,6 @@ export * from "./operations/servers/delete-server.handler";
 export * from "./operations/servers/list-servers.handler";
 export * from "./operations/servers/list-ssh-credentials.handler";
 export * from "./operations/servers/register-server.handler";
+export * from "./operations/servers/rename-server.handler";
 export * from "./operations/servers/show-server.handler";
 export * from "./operations/servers/test-server-connectivity.handler";

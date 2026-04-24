@@ -82,6 +82,7 @@ import {
   type QueryBus,
   RegisterServerCommand,
   RenameProjectCommand,
+  RenameServerCommand,
   ResourceDiagnosticSummaryQuery,
   ResourceEffectiveConfigQuery,
   ResourceHealthQuery,
@@ -92,6 +93,7 @@ import {
   type ResourceRuntimeLogsResult,
   registerServerCommandInputSchema,
   renameProjectCommandInputSchema,
+  renameServerCommandInputSchema,
   resourceDiagnosticSummaryQueryInputSchema,
   resourceEffectiveConfigQueryInputSchema,
   resourceHealthQueryInputSchema,
@@ -167,6 +169,7 @@ import {
   proxyConfigurationViewSchema,
   registerServerResponseSchema,
   renameProjectResponseSchema,
+  renameServerResponseSchema,
   resourceDetailSchema,
   resourceDiagnosticSummarySchema,
   resourceEffectiveConfigResponseSchema,
@@ -257,6 +260,10 @@ export const apiRouteDescriptions = {
   projectLifecycle: routeDescription("Read, rename, and archive projects.", "project.lifecycle"),
   showServer: routeDescription(
     "Reads one deployment target with proxy status and usage rollups.",
+    "server.deployment-target",
+  ),
+  renameServer: routeDescription(
+    "Renames the display label for one deployment target without changing its identity.",
     "server.deployment-target",
   ),
   deactivateServer: routeDescription(
@@ -929,6 +936,19 @@ export const showServerProcedure = base
   .input(showServerQueryInputSchema)
   .output(showServerResponseSchema)
   .handler(async ({ input, context }) => executeQuery(context, ShowServerQuery.create(input)));
+
+export const renameServerProcedure = base
+  .route({
+    method: "POST",
+    path: "/servers/{serverId}/rename",
+    description: apiRouteDescriptions.renameServer,
+    successStatus: 200,
+  })
+  .input(renameServerCommandInputSchema)
+  .output(renameServerResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, RenameServerCommand.create(input)),
+  );
 
 export const deactivateServerProcedure = base
   .route({
@@ -1609,6 +1629,7 @@ export const appaloftOrpcRouter = {
   servers: {
     list: listServersProcedure,
     show: showServerProcedure,
+    rename: renameServerProcedure,
     deactivate: deactivateServerProcedure,
     deleteCheck: checkServerDeleteSafetyProcedure,
     delete: deleteServerProcedure,
@@ -1804,6 +1825,7 @@ export function mountAppaloftOrpcRoutes(
     "/api/credentials/ssh",
     "/api/servers",
     "/api/servers/:serverId",
+    "/api/servers/:serverId/rename",
     "/api/servers/:serverId/deactivate",
     "/api/servers/:serverId/delete-check",
     "/api/servers/connectivity-tests",

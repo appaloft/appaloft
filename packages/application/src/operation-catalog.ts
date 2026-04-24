@@ -49,6 +49,7 @@ import { deleteServerCommandInputSchema } from "./operations/servers/delete-serv
 import { listServersQueryInputSchema } from "./operations/servers/list-servers.query";
 import { listSshCredentialsQueryInputSchema } from "./operations/servers/list-ssh-credentials.query";
 import { registerServerCommandInputSchema } from "./operations/servers/register-server.command";
+import { renameServerCommandInputSchema } from "./operations/servers/rename-server.command";
 import { showServerQueryInputSchema } from "./operations/servers/show-server.query";
 import { testServerConnectivityCommandInputSchema } from "./operations/servers/test-server-connectivity.command";
 import { relinkSourceLinkCommandInputSchema } from "./operations/source-links/relink-source-link.command";
@@ -248,6 +249,20 @@ export const operationCatalog = [
     transports: {
       cli: "appaloft server show <serverId>",
       orpc: { method: "GET", path: "/api/servers/{serverId}" },
+    },
+  },
+  {
+    key: "servers.rename",
+    kind: "command",
+    domain: "servers",
+    messageName: "RenameServerCommand",
+    handlerName: "RenameServerCommandHandler",
+    serviceName: "RenameServerUseCase",
+    inputSchema: renameServerCommandInputSchema,
+    serviceToken: tokens.renameServerUseCase,
+    transports: {
+      cli: "appaloft server rename <serverId> --name <name>",
+      orpc: { method: "POST", path: "/api/servers/{serverId}/rename" },
     },
   },
   {

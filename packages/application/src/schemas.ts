@@ -45,6 +45,7 @@ export * from "./operations/servers/deactivate-server.schema";
 export * from "./operations/servers/delete-server.schema";
 export * from "./operations/servers/list-ssh-credentials.schema";
 export * from "./operations/servers/register-server.schema";
+export * from "./operations/servers/rename-server.schema";
 export * from "./operations/servers/show-server.schema";
 export * from "./operations/servers/test-server-connectivity.schema";
 export * from "./operations/system/list-github-repositories.schema";

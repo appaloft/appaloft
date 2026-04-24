@@ -34,6 +34,7 @@ import {
   type PromoteEnvironmentCommandInput,
   type RegisterServerCommandInput,
   type RenameProjectCommandInput,
+  type RenameServerCommandInput,
   type ResourceDiagnosticSummaryQueryInput,
   type ResourceEffectiveConfigQueryInput,
   type ResourceHealthQueryInput,
@@ -96,6 +97,7 @@ import {
   type ProxyConfigurationView,
   type RegisterServerResponse,
   type RenameProjectResponse,
+  type RenameServerResponse,
   type ResourceDetail,
   type ResourceDiagnosticSummary,
   type ResourceEffectiveConfigResponse,
@@ -150,6 +152,12 @@ export type AppaloftOrpcClientContract = {
       AppaloftClientContext,
       ShowServerQueryInput,
       ShowServerResponse,
+      AppaloftClientError
+    >;
+    rename: Client<
+      AppaloftClientContext,
+      RenameServerCommandInput,
+      RenameServerResponse,
       AppaloftClientError
     >;
     deactivate: Client<
