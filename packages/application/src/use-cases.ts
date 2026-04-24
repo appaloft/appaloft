@@ -68,6 +68,7 @@ export * from "./operations/servers/delete-server.use-case";
 export * from "./operations/servers/list-servers.query-service";
 export * from "./operations/servers/list-ssh-credentials.query-service";
 export * from "./operations/servers/register-server.use-case";
+export * from "./operations/servers/rename-server.use-case";
 export * from "./operations/servers/show-server.query-service";
 export * from "./operations/servers/test-server-connectivity.use-case";
 export * from "./operations/source-links/relink-source-link.use-case";

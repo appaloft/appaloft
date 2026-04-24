@@ -844,6 +844,11 @@ export const i18nKeys = {
       notFoundBody: "console:servers.notFoundBody",
       notFoundTitle: "console:servers.notFoundTitle",
       pageTitle: "console:servers.pageTitle",
+      renameFailed: "console:servers.renameFailed",
+      renameLabel: "console:servers.renameLabel",
+      renameSucceeded: "console:servers.renameSucceeded",
+      settingsDescription: "console:servers.settingsDescription",
+      settingsTitle: "console:servers.settingsTitle",
     },
     shell: {
       noProjects: "console:shell.noProjects",

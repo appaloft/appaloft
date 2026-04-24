@@ -9,6 +9,7 @@ import {
   ListSshCredentialsQuery,
   OpenTerminalSessionCommand,
   RegisterServerCommand,
+  RenameServerCommand,
   ShowServerQuery,
   TestServerConnectivityCommand,
 } from "@appaloft/application";
@@ -77,6 +78,21 @@ const showCommand = EffectCommand.make(
       }),
     ),
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.serverShow));
+
+const renameCommand = EffectCommand.make(
+  "rename",
+  {
+    serverId: serverIdArg,
+    name: nameOption,
+  },
+  ({ name, serverId }) =>
+    runCommand(
+      RenameServerCommand.create({
+        serverId,
+        name,
+      }),
+    ),
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.serverRename));
 
 const deactivateCommand = EffectCommand.make(
   "deactivate",
@@ -269,6 +285,7 @@ export const serverCommand = EffectCommand.make("server").pipe(
     registerCommand,
     listCommand,
     showCommand,
+    renameCommand,
     deactivateCommand,
     deleteCheckCommand,
     deleteCommand,

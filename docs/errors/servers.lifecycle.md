@@ -89,6 +89,11 @@ Server lifecycle commands use these branches:
 | `infra_error` | `infra` | `server-persistence` | Conditional | Server state could not be safely persisted. |
 | `infra_error` | `infra` | `event-publication` | Conditional | A lifecycle event could not be recorded before command success. |
 
+`servers.rename` does not block on retained dependencies and does not enforce a unique display
+name. The server id remains the durable reference. Deleted server tombstones are immutable through
+ordinary rename and return `not_found` at `phase = server-admission` when resolved by the write-side
+repository.
+
 `servers.deactivate` does not block on retained dependencies. It is designed to preserve visibility
 while preventing future use. Active deployments and retained dependencies appear in
 `servers.delete-check` blockers and `servers.delete` guards.
@@ -133,12 +138,13 @@ Tests must assert:
 
 ## Current Implementation Notes And Migration Gaps
 
-`servers.show`, `servers.deactivate`, `servers.delete-check`, and guarded `servers.delete` are
-active in this lifecycle spec.
+`servers.show`, `servers.rename`, `servers.deactivate`, `servers.delete-check`, and guarded
+`servers.delete` are active in this lifecycle spec.
 
 `servers.delete` uses soft-delete lifecycle state. Normal server reads omit deleted servers while
 historical records retain server ids.
 
 ## Open Questions
 
-- None for `servers.show`, one-way deactivate, or delete-check preview semantics.
+- None for `servers.show`, display-name-only rename, one-way deactivate, or delete-check preview
+  semantics.

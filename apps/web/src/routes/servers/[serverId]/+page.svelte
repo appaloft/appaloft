@@ -11,6 +11,7 @@
     Globe2,
     KeyRound,
     Network,
+    Save,
     Server,
     ShieldAlert,
     TriangleAlert,
@@ -18,6 +19,7 @@
   } from "@lucide/svelte";
   import type {
     ConfigureDefaultAccessDomainPolicyInput,
+    RenameServerInput,
     ServerDeleteSafety,
     ServerSummary,
     TestServerConnectivityResponse,
@@ -102,11 +104,21 @@
   let overrideMode = $state<ConfigureDefaultAccessDomainPolicyInput["mode"]>("provider");
   let overrideProviderKey = $state("sslip");
   let overrideTemplateRef = $state("");
+  let serverFormServerId = $state("");
+  let serverName = $state("");
+  let lifecycleFeedback = $state<{
+    kind: "success" | "error";
+    title: string;
+    detail: string;
+  } | null>(null);
   let overrideFeedback = $state<{
     kind: "success" | "error";
     title: string;
     detail: string;
   } | null>(null);
+  const canRenameServer = $derived(
+    Boolean(server) && serverName.trim().length > 0 && serverName.trim() !== server?.name,
+  );
 
   const connectivityMutation = createMutation(() => ({
     mutationFn: (inputServerId: string) =>
@@ -140,6 +152,36 @@
       };
     },
   }));
+  const renameServerMutation = createMutation(() => ({
+    mutationFn: (input: RenameServerInput) => orpcClient.servers.rename(input),
+    onSuccess: (result) => {
+      serverName = serverName.trim();
+      lifecycleFeedback = {
+        kind: "success",
+        title: $t(i18nKeys.console.servers.renameSucceeded),
+        detail: result.id,
+      };
+      void queryClient.invalidateQueries({ queryKey: ["servers"] });
+      void queryClient.invalidateQueries({ queryKey: ["servers", "show", result.id] });
+    },
+    onError: (error) => {
+      lifecycleFeedback = {
+        kind: "error",
+        title: $t(i18nKeys.console.servers.renameFailed),
+        detail: readErrorMessage(error),
+      };
+    },
+  }));
+
+  $effect(() => {
+    if (!server || serverFormServerId === server.id) {
+      return;
+    }
+
+    serverFormServerId = server.id;
+    serverName = server.name;
+    lifecycleFeedback = null;
+  });
 
   function testConnectivity(): void {
     if (!server) {
@@ -148,6 +190,20 @@
 
     connectivityError = "";
     connectivityMutation.mutate(server.id);
+  }
+
+  function renameServer(event: SubmitEvent): void {
+    event.preventDefault();
+
+    if (!server || !canRenameServer || renameServerMutation.isPending) {
+      return;
+    }
+
+    lifecycleFeedback = null;
+    renameServerMutation.mutate({
+      serverId: server.id,
+      name: serverName.trim(),
+    });
   }
 
   function saveDefaultAccessOverride(event: SubmitEvent): void {
@@ -432,6 +488,56 @@
             </div>
           </div>
         {/if}
+
+        <div class="border-y px-0 py-4 sm:px-4">
+          <form
+            id="server-rename-form"
+            class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(14rem,22rem)_auto]"
+            onsubmit={renameServer}
+          >
+            <div class="min-w-0 space-y-1">
+              <div class="flex items-center gap-2">
+                <h2 class="text-sm font-semibold">
+                  {$t(i18nKeys.console.servers.settingsTitle)}
+                </h2>
+                <DocsHelpLink
+                  href={webDocsHrefs.serverDeploymentTarget}
+                  ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+                />
+              </div>
+              <p class="text-sm text-muted-foreground">
+                {$t(i18nKeys.console.servers.settingsDescription)}
+              </p>
+            </div>
+
+            <label class="space-y-1.5 text-sm font-medium">
+              <span>{$t(i18nKeys.console.servers.renameLabel)}</span>
+              <Input id="server-display-name-input" bind:value={serverName} autocomplete="off" />
+            </label>
+
+            <div class="flex items-end">
+              <Button
+                type="submit"
+                class="w-full sm:w-auto"
+                disabled={!canRenameServer || renameServerMutation.isPending}
+              >
+                <Save class="size-4" />
+                {renameServerMutation.isPending
+                  ? $t(i18nKeys.common.actions.saving)
+                  : $t(i18nKeys.common.actions.save)}
+              </Button>
+            </div>
+          </form>
+
+          {#if lifecycleFeedback}
+            <div
+              class={`mt-4 rounded-md border p-3 text-sm ${lifecycleFeedback.kind === "error" ? "border-destructive/30 text-destructive" : "border-border text-foreground"}`}
+            >
+              <p class="font-medium">{lifecycleFeedback.title}</p>
+              <p class="mt-1 text-muted-foreground">{lifecycleFeedback.detail}</p>
+            </div>
+          {/if}
+        </div>
 
         <div class="border-y px-0 py-4 sm:px-4">
           <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">

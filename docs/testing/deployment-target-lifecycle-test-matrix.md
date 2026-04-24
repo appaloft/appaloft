@@ -5,10 +5,11 @@
 This matrix covers:
 
 - `servers.show`;
+- `servers.rename`;
 - `servers.deactivate`;
 - `servers.delete-check`;
 - guarded `servers.delete`;
-- operation catalog and public docs coverage for the server detail query;
+- operation catalog and public docs coverage for server lifecycle commands and queries;
 - explicit non-coverage for generic `servers.update`.
 
 It complements [Server Bootstrap Test Matrix](./server-bootstrap-test-matrix.md), which owns
@@ -18,8 +19,11 @@ registration, connectivity, proxy bootstrap, and proxy repair behavior.
 
 - [Deployment Target Lifecycle Workflow](../workflows/deployment-target-lifecycle.md)
 - [servers.show Query Spec](../queries/servers.show.md)
+- [servers.rename Command Spec](../commands/servers.rename.md)
+- [servers.deactivate Command Spec](../commands/servers.deactivate.md)
 - [servers.delete Command Spec](../commands/servers.delete.md)
 - [servers.delete-check Query Spec](../queries/servers.delete-check.md)
+- [server-renamed Event Spec](../events/server-renamed.md)
 - [server-deleted Event Spec](../events/server-deleted.md)
 - [Deployment Target Lifecycle Error Spec](../errors/servers.lifecycle.md)
 - [ADR-004](../decisions/ADR-004-server-readiness-state-storage.md)
@@ -35,6 +39,11 @@ registration, connectivity, proxy bootstrap, and proxy repair behavior.
 | SRV-LIFE-SHOW-002 | `servers.show` | integration | Missing server id. | Returns `not_found`, `phase = server-read`, and no rollup reads are required. |
 | SRV-LIFE-SHOW-003 | `servers.show` | integration | Existing server with deployments and domain bindings. | Returns deployment/resource/domain rollups derived from read models, including status counts and latest navigation ids. |
 | SRV-LIFE-SHOW-004 | `servers.show` | integration | Caller disables rollups. | Returns base server detail without rollups and does not require deployment/domain read-model queries. |
+| SRV-LIFE-RENAME-001 | `servers.rename` | integration | Active server is renamed. | Returns `ok({ id })`, persists only the display name, publishes `server-renamed`, and preserves id, host, provider, credential, proxy, lifecycle, and historical references. |
+| SRV-LIFE-RENAME-002 | `servers.rename` | integration | Inactive server is renamed. | Returns `ok({ id })`, persists the new display name, publishes `server-renamed`, and preserves inactive lifecycle metadata. |
+| SRV-LIFE-RENAME-003 | `servers.rename` | integration | Server is renamed to the same normalized name. | Returns idempotent `ok({ id })`, does not persist unrelated state, and does not publish a duplicate event. |
+| SRV-LIFE-RENAME-004 | `servers.rename` | integration | Deleted server tombstone is renamed through the ordinary entrypoint. | Returns `not_found`, `phase = server-admission`, does not change tombstone state, and does not publish `server-renamed`. |
+| SRV-LIFE-RENAME-005 | `servers.list` / `servers.show` | integration | Server was renamed successfully. | Normal list and show return the new name while retaining the same server id and lifecycle status. |
 | SRV-LIFE-DEACT-001 | `servers.deactivate` | integration | Active server is deactivated. | Returns `ok({ id })`, persists lifecycle status `inactive`, stores `deactivatedAt`, publishes `server-deactivated`, and leaves credentials/proxy/deployment/domain state intact. |
 | SRV-LIFE-DEACT-002 | `servers.deactivate` | integration | Already inactive server is deactivated again. | Returns idempotent `ok({ id })`, preserves original `deactivatedAt` and reason, and does not publish a duplicate event. |
 | SRV-LIFE-DEACT-003 | `servers.deactivate` | integration | Missing server id. | Returns `not_found`, `phase = server-admission`, and does not publish `server-deactivated`. |
@@ -62,6 +71,10 @@ registration, connectivity, proxy bootstrap, and proxy repair behavior.
 | SRV-LIFE-ENTRY-010 | CLI | e2e-preferred | Server delete command. | `appaloft server delete <serverId> --confirm <serverId>` dispatches `DeleteServerCommand`; no repository bypass. |
 | SRV-LIFE-ENTRY-011 | HTTP/oRPC | e2e-preferred | Server delete route. | `DELETE /api/servers/{serverId}` reuses `DeleteServerCommandInput`, dispatches through `CommandBus`, and returns `{ id }`. |
 | SRV-LIFE-ENTRY-012 | Operation catalog | contract | Public exposure in Code Round. | `CORE_OPERATIONS.md`, `operation-catalog.ts`, and public docs operation coverage include `servers.delete`. |
+| SRV-LIFE-ENTRY-013 | CLI | e2e-preferred | Server rename command. | `appaloft server rename <serverId> --name <name>` dispatches `RenameServerCommand`; no repository bypass. |
+| SRV-LIFE-ENTRY-014 | HTTP/oRPC | e2e-preferred | Server rename route. | `POST /api/servers/{serverId}/rename` reuses `RenameServerCommandInput`, dispatches through `CommandBus`, and returns `{ id }`. |
+| SRV-LIFE-ENTRY-015 | Operation catalog | contract | Public exposure in Code Round. | `CORE_OPERATIONS.md`, `operation-catalog.ts`, and public docs operation coverage include `servers.rename`. |
+| SRV-LIFE-ENTRY-016 | Web | e2e-preferred | Server detail rename action. | Web server detail exposes a display-name input/action for active and inactive servers, dispatches `servers.rename`, and refreshes detail/list-visible name. |
 
 ## Required Non-Coverage Assertions
 
@@ -70,6 +83,9 @@ Tests must assert server lifecycle work does not:
 - expose generic `servers.update`, `UpdateServerCommand`, or `PATCH /api/servers/{id}`;
 - run connectivity tests from `servers.show`;
 - bootstrap or repair proxy infrastructure from `servers.show`;
+- let `servers.rename` change server id, host, provider, credential, proxy, lifecycle, destinations,
+  historical references, or deleted tombstones;
+- enforce an unstated server-name uniqueness constraint before a governing spec defines one;
 - mutate credentials, resources, deployments, domain bindings, server-applied routes, terminal
   sessions, logs, or audit state from `servers.show` or `servers.delete-check`;
 - let `servers.delete` bypass the shared `ServerDeletionBlockerReader`;
@@ -95,6 +111,10 @@ The active implementation covers:
 `SRV-LIFE-DELETE-*` and `SRV-LIFE-ENTRY-010` through `SRV-LIFE-ENTRY-012` are the required coverage
 rows for the guarded delete Code Round.
 
+`SRV-LIFE-RENAME-*` and `SRV-LIFE-ENTRY-013` through `SRV-LIFE-ENTRY-016` are the required coverage
+rows for the server rename Code Round.
+
 ## Open Questions
 
-- None for `servers.show`, one-way deactivate, or delete-check preview semantics.
+- None for `servers.show`, display-name-only rename, one-way deactivate, or delete-check preview
+  semantics.

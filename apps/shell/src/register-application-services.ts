@@ -80,6 +80,8 @@ import {
   RelinkSourceLinkUseCase,
   RenameProjectCommandHandler,
   RenameProjectUseCase,
+  RenameServerCommandHandler,
+  RenameServerUseCase,
   ResourceDiagnosticSummaryQueryService,
   ResourceEffectiveConfigQueryHandler,
   ResourceEffectiveConfigQueryService,
@@ -148,6 +150,7 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(DeleteResourceCommandHandler);
   container.registerSingleton(DeactivateServerCommandHandler);
   container.registerSingleton(DeleteServerCommandHandler);
+  container.registerSingleton(RenameServerCommandHandler);
   container.registerSingleton(ShowResourceQueryHandler);
   container.registerSingleton(ResourceEffectiveConfigQueryHandler);
   container.registerSingleton(ShowDeploymentQueryHandler);
@@ -211,6 +214,7 @@ export function registerApplicationServices(container: DependencyContainer): voi
   );
   container.registerSingleton(tokens.listServersQueryService, ListServersQueryService);
   container.registerSingleton(tokens.showServerQueryService, ShowServerQueryService);
+  container.registerSingleton(tokens.renameServerUseCase, RenameServerUseCase);
   container.registerSingleton(tokens.deactivateServerUseCase, DeactivateServerUseCase);
   container.registerSingleton(tokens.deleteServerUseCase, DeleteServerUseCase);
   container.registerSingleton(
