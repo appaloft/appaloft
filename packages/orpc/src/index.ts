@@ -108,6 +108,7 @@ import {
   ShowProjectQuery,
   ShowResourceQuery,
   ShowServerQuery,
+  ShowSshCredentialQuery,
   StreamDeploymentEventsQuery,
   type StreamDeploymentEventsQueryInput,
   type StreamDeploymentEventsResult,
@@ -118,6 +119,7 @@ import {
   showProjectQueryInputSchema,
   showResourceQueryInputSchema,
   showServerQueryInputSchema,
+  showSshCredentialQueryInputSchema,
   streamDeploymentEventsQueryInputSchema,
   TestServerConnectivityCommand,
   testDraftServerConnectivityCommandInputSchema,
@@ -184,6 +186,7 @@ import {
   showDeploymentResponseSchema,
   showProjectResponseSchema,
   showServerResponseSchema,
+  showSshCredentialResponseSchema,
   terminalSessionDescriptorSchema,
   testServerConnectivityResponseSchema,
   unsetResourceVariableResponseSchema,
@@ -291,6 +294,10 @@ export const apiRouteDescriptions = {
   ),
   createSshCredential: routeDescription(
     "Creates a reusable SSH credential from a private key input.",
+    "server.ssh-credential",
+  ),
+  showSshCredential: routeDescription(
+    "Reads one reusable SSH credential with masked detail and server usage visibility.",
     "server.ssh-credential",
   ),
   testServerConnectivity: routeDescription(
@@ -1044,6 +1051,19 @@ export const listSshCredentialsProcedure = base
   .output(listSshCredentialsResponseSchema)
   .handler(async ({ context }) => executeQuery(context, ListSshCredentialsQuery.create()));
 
+export const showSshCredentialProcedure = base
+  .route({
+    method: "GET",
+    path: "/credentials/ssh/{credentialId}",
+    description: apiRouteDescriptions.showSshCredential,
+    successStatus: 200,
+  })
+  .input(showSshCredentialQueryInputSchema)
+  .output(showSshCredentialResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ShowSshCredentialQuery.create(input)),
+  );
+
 export const createSshCredentialProcedure = base
   .route({
     method: "POST",
@@ -1663,6 +1683,7 @@ export const appaloftOrpcRouter = {
   credentials: {
     ssh: {
       list: listSshCredentialsProcedure,
+      show: showSshCredentialProcedure,
       create: createSshCredentialProcedure,
     },
   },
@@ -1844,6 +1865,7 @@ export function mountAppaloftOrpcRoutes(
     "/api/projects/:projectId/rename",
     "/api/projects/:projectId/archive",
     "/api/credentials/ssh",
+    "/api/credentials/ssh/:credentialId",
     "/api/servers",
     "/api/servers/:serverId",
     "/api/servers/:serverId/rename",
