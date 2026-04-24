@@ -165,6 +165,12 @@ jobs:
     concurrency:
       group: appaloft-www-remote-state
       cancel-in-progress: false
+    permissions:
+      contents: read
+      deployments: write
+    env:
+      PREVIEW_ID: pr-${{ github.event.pull_request.number }}
+      PREVIEW_ENVIRONMENT: docs-preview-pr-${{ github.event.pull_request.number }}
     steps:
       - name: Checkout Base Source
         uses: actions/checkout@v4
@@ -205,7 +211,6 @@ jobs:
           APPALOFT_SSH_HOST: ${{ vars.APPALOFT_SSH_HOST }}
           APPALOFT_SSH_PRIVATE_KEY: ${{ secrets.APPALOFT_SSH_PRIVATE_KEY }}
           APPALOFT_SSH_USER: ${{ steps.settings.outputs.ssh_user }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
           set -euo pipefail
 
@@ -216,9 +221,49 @@ jobs:
           bun run apps/shell/src/index.ts preview cleanup . \
             --config appaloft.docs.yml \
             --preview pull-request \
-            --preview-id "pr-${PR_NUMBER}" \
+            --preview-id "$PREVIEW_ID" \
             --server-host "$APPALOFT_SSH_HOST" \
             --server-provider generic-ssh \
             --server-ssh-username "$APPALOFT_SSH_USER" \
             --server-ssh-private-key-file "$key_file" \
             --state-backend ssh-pglite
+
+      - name: Delete GitHub preview deployments
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.PREVIEW_CLEANUP_TOKEN || github.token }}
+        run: |
+          set -euo pipefail
+
+          deployment_ids="$(gh api --paginate "repos/${GITHUB_REPOSITORY}/deployments?environment=${PREVIEW_ENVIRONMENT}&per_page=100" --jq '.[].id')"
+          if [[ -z "$deployment_ids" ]]; then
+            exit 0
+          fi
+
+          while IFS= read -r deployment_id; do
+            [[ -n "$deployment_id" ]] || continue
+            gh api "repos/${GITHUB_REPOSITORY}/deployments/${deployment_id}/statuses" \
+              --method POST \
+              -H "Accept: application/vnd.github+json" \
+              -f state=inactive >/dev/null
+          done <<<"$deployment_ids"
+
+          while IFS= read -r deployment_id; do
+            [[ -n "$deployment_id" ]] || continue
+            gh api "repos/${GITHUB_REPOSITORY}/deployments/${deployment_id}" \
+              --method DELETE \
+              -H "Accept: application/vnd.github+json"
+          done <<<"$deployment_ids"
+
+      - name: Delete GitHub preview environment
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.PREVIEW_CLEANUP_TOKEN || github.token }}
+        run: |
+          set -euo pipefail
+
+          if gh api "repos/${GITHUB_REPOSITORY}/environments/${PREVIEW_ENVIRONMENT}" >/dev/null 2>&1; then
+            gh api "repos/${GITHUB_REPOSITORY}/environments/${PREVIEW_ENVIRONMENT}" \
+              --method DELETE \
+              -H "Accept: application/vnd.github+json"
+          fi
