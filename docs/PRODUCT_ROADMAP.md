@@ -21,7 +21,7 @@ This roadmap is the release gate for Appaloft versions before `1.0.0`.
   notes against this roadmap.
 - [x] Before every release, update this roadmap for work that was finished early, deferred, removed,
   or discovered as incomplete.
-- [x] Commit the roadmap alignment change before triggering or publishing a release.
+- [x] Include the current roadmap alignment in the Release Please PR before publishing a release.
 - [x] Use this roadmap to choose the release version.
 - [x] Before the next release, verify package manifests, Release Please state, and the latest
   published release agree on the current version line. The roadmap starts from the current public
@@ -65,8 +65,8 @@ Current release alignment:
   deployments.create(resourceId)`, and the local CLI smoke covers resource/deployment observation
   after deployment.
 - [x] Release Please keeps pre-`1.0.0` feature and minor bumps on the current patch line by
-  default; an explicit `Release-As` is required only when the roadmap gate allows a target minor or
-  explicit hotfix version.
+  default; the `release_as` workflow input is required only when the roadmap gate allows a target
+  minor or explicit hotfix version.
 
 ## Source-Of-Truth Inputs
 
@@ -250,7 +250,7 @@ Required:
 Exit criteria:
 
 - [x] Maintainers can decide between `0.2.x` patch and `0.3.0` by reading the roadmap checklist.
-- [x] Release preparation always updates and commits roadmap alignment before workflow dispatch.
+- [x] Release preparation includes roadmap alignment in the Release Please PR before merge.
 - [x] No roadmap phase before `0.3.0` remains implicit.
 
 ## Phase 2: Minimum Console And Deployment Loop Baseline

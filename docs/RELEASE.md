@@ -1,9 +1,11 @@
 # Release
 
-Appaloft uses a trunk-based release flow with manually triggered Release Please. Merges to `main`
-do not publish releases automatically. Run the `Release` GitHub Actions workflow manually to create
-or update the release PR from Conventional Commits. After merging that release PR, run `Release`
-manually again to create the tag, GitHub Release, and distribution artifacts.
+Appaloft uses a trunk-based release flow with a manually created Release Please PR. Normal merges to
+`main` do not publish releases automatically. Run the `Release` GitHub Actions workflow manually to
+create or update the release PR from Conventional Commits. The workflow also commits
+`docs/PRODUCT_ROADMAP.md` release alignment into that same release PR. Merging the release PR is the
+publishing confirmation: the `Release` workflow runs on the release merge commit, creates the tag,
+GitHub Release, and distribution artifacts.
 
 ## Versioning And Changelog
 
@@ -14,8 +16,8 @@ manually again to create the tag, GitHub Release, and distribution artifacts.
   release workflow run and reject any Release Please PR whose version is not allowed by the
   roadmap checklist.
 - Release Please is configured to keep pre-`1.0.0` feature and minor bumps on the current patch
-  line by default. Use a `Release-As: X.Y.Z` commit footer only when the roadmap gate explicitly
-  allows a target minor, or when a hotfix needs an explicit version.
+  line by default. Use the `release_as` workflow input only when the roadmap gate explicitly allows
+  a target minor, or when a hotfix needs an explicit version.
 - The GitHub Release body is generated from `CHANGELOG.md` plus the built release artifact list,
   so the release page includes install commands, direct download links, known gaps, and the
   conventional-commit changelog.
@@ -40,9 +42,9 @@ docker build --build-arg APPALOFT_APP_VERSION=0.1.0 -t appaloft-all-in-one:local
 - `ci.yml`: lint, typecheck, unit, integration, build, binary smoke, Docker build smoke.
 - `e2e.yml`: real Postgres, started backend, CLI/API/deployment E2E, web smoke.
 - `nightly.yml`: scheduled Compose/self-host smoke.
-- `release.yml`: manually runs Release Please on `main`; if a release is created, it calls
-  `release-build.yml` to publish distribution artifacts. Public docs deployment is no longer tied
-  to product releases.
+- `release.yml`: manually creates or updates a Release Please PR on `main`, adds roadmap release
+  alignment to that PR, and publishes only when the merged release PR pushes a `chore: release ...`
+  commit to `main`. Public docs deployment is no longer tied to product releases.
 - `deploy-docs.yml`: deploys `apps/docs` as a standalone static site to `https://docs.appaloft.com`
   with Appaloft from the checked-out source and `appaloft.docs.yml`. Pushes to `main` auto-deploy
   when docs content, docs config, or the source-side deployment stack used by docs changes. Manual
@@ -116,11 +118,13 @@ flows.
 1. Merge normal feature and fix PRs into `main`.
 2. Read `docs/PRODUCT_ROADMAP.md`, compare it with the implementation and release state, and choose
    the allowed version.
-3. Open GitHub Actions and run `Release` from `main`. This creates or updates the Release Please PR.
-4. Review the generated version and `CHANGELOG.md`; stop if the version violates the roadmap gate.
-5. Merge the Release Please PR when ready to publish.
-6. Run `Release` from `main` again. This creates `vX.Y.Z`, publishes the GitHub Release, and runs
-   the artifact/npm/Homebrew/GHCR jobs.
+3. Open GitHub Actions and run `Release` from `main`. Set `release_as` only when the roadmap gate
+   allows an explicit target such as `0.4.0`.
+4. Review the single Release Please PR. It must include the generated version/changelog changes and
+   the `docs/PRODUCT_ROADMAP.md` release alignment commit.
+5. Merge the Release Please PR when ready to publish. Use the default release PR title as the merge
+   commit subject so it starts with `chore: release `. The merge commit is the publishing
+   confirmation and triggers the release publish run automatically.
 
 If you do not want to publish yet, do not run `Release`, or leave the Release Please PR unmerged.
 

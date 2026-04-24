@@ -3,6 +3,10 @@ name: Release
 on:
   workflow_dispatch:
     inputs:
+      release_as:
+        description: Optional explicit SemVer allowed by docs/PRODUCT_ROADMAP.md, for example 0.4.0.
+        required: false
+        type: string
       prerelease:
         description: Publish npm with the next tag when this run creates a release.
         required: false
@@ -13,6 +17,9 @@ on:
         required: false
         default: false
         type: boolean
+  push:
+    branches:
+      - main
 
 concurrency:
   group: release-${{ github.ref }}
@@ -26,6 +33,7 @@ permissions:
 
 jobs:
   release-please:
+    if: "${{ github.event_name == 'workflow_dispatch' || startsWith(github.event.head_commit.message, 'chore: release ') }}"
     runs-on: ubuntu-latest
     outputs:
       release_created: ${{ steps.release.outputs.release_created }}
@@ -37,6 +45,74 @@ jobs:
           token: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
           config-file: .github/release-please-config.json
           manifest-file: .github/.release-please-manifest.json
+          release-as: ${{ inputs.release_as }}
+
+      - name: Check out release pull request branch
+        if: ${{ steps.release.outputs.prs_created == 'true' }}
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
+
+      - name: Set up Bun
+        if: ${{ steps.release.outputs.prs_created == 'true' }}
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
+
+      - name: Align roadmap in release pull request
+        if: ${{ steps.release.outputs.prs_created == 'true' }}
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
+          RELEASE_AS: ${{ inputs.release_as }}
+          RELEASE_PLEASE_PRS: ${{ steps.release.outputs.prs }}
+        run: |
+          set -euo pipefail
+
+          pr_number="$(node <<'NODE'
+          const prs = JSON.parse(process.env.RELEASE_PLEASE_PRS || "[]");
+          const pr = prs.find((candidate) => candidate.number);
+          if (!pr) {
+            throw new Error("Release Please did not return a PR number.");
+          }
+          console.log(pr.number);
+          NODE
+          )"
+          branch="$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${pr_number}" --jq '.head.ref')"
+          git fetch origin "refs/heads/main:refs/remotes/origin/main" "refs/heads/${branch}:refs/remotes/origin/${branch}" --tags
+          git checkout -B "${branch}" "origin/${branch}"
+
+          current_version="$(git show origin/main:.github/.release-please-manifest.json | node -e '
+          let input = "";
+          process.stdin.on("data", (chunk) => {
+            input += chunk;
+          });
+          process.stdin.on("end", () => {
+            console.log(JSON.parse(input)["."]);
+          });
+          ')"
+          latest_release_tag="$(gh release view --repo "${GITHUB_REPOSITORY}" --json tagName --jq '.tagName' 2>/dev/null || true)"
+
+          args=(--current-version "${current_version}")
+          if [[ -n "${RELEASE_AS}" ]]; then
+            args+=(--target-version "${RELEASE_AS}")
+          fi
+          if [[ -n "${latest_release_tag}" ]]; then
+            args+=(--latest-release-tag "${latest_release_tag}")
+          fi
+
+          bun run scripts/release/align-roadmap-for-release.ts "${args[@]}"
+
+          if git diff --quiet -- docs/PRODUCT_ROADMAP.md; then
+            echo "Roadmap release alignment is already current."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/PRODUCT_ROADMAP.md
+          git commit -m "docs: align roadmap for release"
+          git push origin "HEAD:${branch}"
 
       - name: Dispatch CI for release pull requests
         if: ${{ steps.release.outputs.prs_created == 'true' }}
@@ -61,7 +137,7 @@ jobs:
     if: ${{ needs.release-please.outputs.release_created == 'true' }}
     uses: ./.github/workflows/ssh-remote-state-e2e.yml
     with:
-      required: ${{ inputs.require_ssh_remote_state_e2e }}
+      required: ${{ github.event_name == 'workflow_dispatch' && inputs.require_ssh_remote_state_e2e || false }}
     secrets: inherit
 
   build-release:
@@ -78,5 +154,5 @@ jobs:
     uses: ./.github/workflows/release-build.yml
     with:
       tag_name: ${{ needs.release-please.outputs.tag_name }}
-      prerelease: ${{ inputs.prerelease }}
+      prerelease: ${{ github.event_name == 'workflow_dispatch' && inputs.prerelease || false }}
     secrets: inherit

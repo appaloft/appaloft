@@ -9,11 +9,14 @@ description: Appaloft release runbook for manually triggered GitHub Actions rele
 
 - Before every release, align `docs/PRODUCT_ROADMAP.md` with the current implementation and use it
   to decide the allowed version.
-- Do not trigger a release while required roadmap updates are uncommitted.
+- Do not merge a release PR while required roadmap updates are missing from that release PR.
 - Treat release execution as a public publishing action. Before running `gh workflow run release.yml`, clearly state what will happen and get explicit user confirmation.
 - Do not merge PRs, push branches, create tags, publish releases, create tokens, or edit secrets unless the user explicitly asks for that action.
 - Never print token values. Check only secret names and update timestamps.
-- Keep the flow manual. A merge to `main` does not publish by itself.
+- Keep release PR creation manual. A normal merge to `main` does not publish by itself; merging a
+  Release Please PR with a `chore: release ...` merge commit is the publishing confirmation.
+- Merge Release Please PRs with the default release PR title as the merge commit subject so the
+  pushed commit starts with `chore: release `.
 - Remember that `workflow_dispatch` requires `.github/workflows/release.yml` to exist on the default branch before GitHub can run it.
 
 ## Release Model
@@ -24,13 +27,16 @@ description: Appaloft release runbook for manually triggered GitHub Actions rele
 - Default branch: `main`
 - Stable release input: `prerelease=false`
 - Prerelease npm dist-tag input: `prerelease=true`
-- First manual run creates or updates the Release Please PR.
-- After that PR is merged, the second manual run creates the tag and GitHub Release, then publishes assets, npm packages, Homebrew tap files, GHCR images, desktop bundles, and CLI binaries.
+- Explicit version input: `release_as=X.Y.Z`, used only when the roadmap gate allows a target minor
+  or explicit hotfix version.
+- The manual run creates or updates the Release Please PR and adds roadmap release alignment to that
+  same PR.
+- After that PR is merged, the push-triggered publish run creates the tag and GitHub Release, then publishes assets, npm packages, Homebrew tap files, GHCR images, desktop bundles, and CLI binaries.
 - Changelog source: `CHANGELOG.md`, maintained by Release Please.
 
 ## Roadmap And Version Gate
 
-Run this before release preflight, Release Please PR creation, or publish runs:
+Run this before release preflight, Release Please PR creation, or release PR merge:
 
 1. Read `docs/PRODUCT_ROADMAP.md`.
 2. Compare the roadmap checklist with:
@@ -40,11 +46,12 @@ Run this before release preflight, Release Please PR creation, or publish runs:
    - `docs/CORE_OPERATIONS.md`;
    - relevant command/query/workflow/test-matrix/implementation-plan docs;
    - relevant code and tests for completed or incomplete release claims.
-3. Update `docs/PRODUCT_ROADMAP.md` when work was completed early, not completed as planned,
-   deferred, removed, or newly discovered.
-4. If roadmap changes were made, run `git diff --check`, show the roadmap diff summary, and create
-   a normal commit before triggering any release workflow. Do not create an empty commit when the
-   roadmap already matches the implementation.
+3. Update or verify `docs/PRODUCT_ROADMAP.md` when work was completed early, not completed as
+   planned, deferred, removed, or newly discovered.
+4. The Release workflow must add the current release alignment to the Release Please PR. If the
+   workflow cannot do that automatically, push the roadmap alignment commit to the Release Please PR
+   branch before merge. Do not open a separate roadmap-only PR unless the release PR cannot be
+   created.
 5. Use the roadmap checklist to accept or reject the intended release version.
 
 Version decision rules:
@@ -60,7 +67,7 @@ Version decision rules:
 - If a planned item is intentionally deferred, leave it unchecked and record why the selected
   version can still ship.
 - If Release Please proposes a version that violates the roadmap gate, stop and report the mismatch
-  instead of triggering the publish run.
+  instead of merging the release PR.
 
 ## Preflight
 
@@ -94,10 +101,10 @@ Create or update the Release Please PR:
 gh workflow run release.yml -R appaloft/appaloft -f prerelease=false
 ```
 
-Publish after the Release Please PR has been merged:
+Create or update a Release Please PR for a roadmap-approved explicit version:
 
 ```bash
-gh workflow run release.yml -R appaloft/appaloft -f prerelease=false
+gh workflow run release.yml -R appaloft/appaloft -f release_as=0.4.0 -f prerelease=false
 ```
 
 Publish with prerelease npm tagging only when the user asks for prerelease behavior:
@@ -143,7 +150,9 @@ gh release list -R appaloft/appaloft --limit 10
 ## Retry And Troubleshooting
 
 - If the first run does not create a release, look for an open Release Please PR and report its URL.
-- If the second run skips build jobs, verify the Release Please PR was merged and a release was actually created.
+- If merging the Release Please PR does not start a publish run, verify the merge commit starts with
+  `chore: release ` and rerun `Release` manually only after explaining the fallback and getting
+  confirmation.
 - If npm publish fails, check whether the package already exists, whether `NPM_TOKEN` exists, and whether trusted publishing is configured for `appaloft/appaloft` workflow filename `release.yml`.
 - If Homebrew fails, verify `HOMEBREW_TAP_TOKEN`, `appaloft/homebrew-tap` access, and whether generated files changed.
 - If GitHub Release asset upload fails, inspect the `publish-release-assets` job and retry with `release-retry.yml` only after explaining the failed job and getting confirmation.
