@@ -77,6 +77,23 @@ describe("operation catalog aggregate mutation boundary", () => {
     }
   });
 
+  test("[SRV-LIFE-ENTRY-012] server delete is exposed through the active operation catalog", () => {
+    const entry = operationCatalog.find((candidate) => candidate.key === "servers.delete");
+
+    expect(entry).toMatchObject({
+      kind: "command",
+      domain: "servers",
+      messageName: "DeleteServerCommand",
+      handlerName: "DeleteServerCommandHandler",
+      serviceName: "DeleteServerUseCase",
+      transports: {
+        cli: "appaloft server delete <serverId> --confirm <serverId>",
+        orpc: { method: "DELETE", path: "/api/servers/{serverId}" },
+      },
+    });
+    expect(entry?.inputSchema).toBeDefined();
+  });
+
   test("[AGG-MUTATION-CATALOG-002] detects generic aggregate update operation keys and command names", () => {
     const violations = findGenericAggregateMutationOperations([
       catalogEntry({

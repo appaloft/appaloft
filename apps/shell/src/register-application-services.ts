@@ -38,6 +38,8 @@ import {
   DeactivateServerUseCase,
   DeleteResourceCommandHandler,
   DeleteResourceUseCase,
+  DeleteServerCommandHandler,
+  DeleteServerUseCase,
   DeploymentContextBootstrapService,
   DeploymentContextDefaultsFactory,
   DeploymentContextResolver,
@@ -145,6 +147,7 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(ArchiveResourceCommandHandler);
   container.registerSingleton(DeleteResourceCommandHandler);
   container.registerSingleton(DeactivateServerCommandHandler);
+  container.registerSingleton(DeleteServerCommandHandler);
   container.registerSingleton(ShowResourceQueryHandler);
   container.registerSingleton(ResourceEffectiveConfigQueryHandler);
   container.registerSingleton(ShowDeploymentQueryHandler);
@@ -209,6 +212,7 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(tokens.listServersQueryService, ListServersQueryService);
   container.registerSingleton(tokens.showServerQueryService, ShowServerQueryService);
   container.registerSingleton(tokens.deactivateServerUseCase, DeactivateServerUseCase);
+  container.registerSingleton(tokens.deleteServerUseCase, DeleteServerUseCase);
   container.registerSingleton(
     tokens.checkServerDeleteSafetyQueryService,
     CheckServerDeleteSafetyQueryService,

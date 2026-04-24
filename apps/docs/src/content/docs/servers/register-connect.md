@@ -15,6 +15,7 @@ relatedOperations:
   - servers.show
   - servers.deactivate
   - servers.delete-check
+  - servers.delete
   - servers.test-connectivity
 sidebar:
   label: "Register and test"
@@ -36,6 +37,8 @@ sidebar:
 停用服务器用于阻止它继续作为新的部署、调度或代理配置目标。停用不会停止已有运行任务，也不会删除部署历史、域名、证书、凭据、路由、日志或审计记录。
 
 删除前应先运行 delete safety check。检查会返回阻止删除的原因，例如服务器仍是 active、仍有部署历史或运行中的部署、资源 placement、域名、证书、已配置凭据、server-applied routes、default access policy、terminal session、runtime task、日志或审计保留。检查只是预览，不会删除任何内容。
+
+删除服务器只适用于已经停用且检查没有 blocker 的服务器。删除会把服务器从普通列表、详情和新部署目标选择中移除，但不会自动清理部署历史、资源、域名、证书、凭据、路由、日志或审计记录。CLI 删除需要显式确认，例如 `--confirm srv_primary`。
 
 <h2 id="server-connectivity-test">连接测试</h2>
 
@@ -105,4 +108,8 @@ appaloft server deactivate srv_primary
 
 ```bash title="检查删除安全性"
 appaloft server delete-check srv_primary
+```
+
+```bash title="删除停用且无 blocker 的服务器"
+appaloft server delete srv_primary --confirm srv_primary
 ```

@@ -7,9 +7,9 @@ This matrix covers:
 - `servers.show`;
 - `servers.deactivate`;
 - `servers.delete-check`;
+- guarded `servers.delete`;
 - operation catalog and public docs coverage for the server detail query;
-- explicit non-coverage for generic `servers.update`;
-- explicit non-coverage for destructive `servers.delete` until its own guarded command is specified.
+- explicit non-coverage for generic `servers.update`.
 
 It complements [Server Bootstrap Test Matrix](./server-bootstrap-test-matrix.md), which owns
 registration, connectivity, proxy bootstrap, and proxy repair behavior.
@@ -18,6 +18,9 @@ registration, connectivity, proxy bootstrap, and proxy repair behavior.
 
 - [Deployment Target Lifecycle Workflow](../workflows/deployment-target-lifecycle.md)
 - [servers.show Query Spec](../queries/servers.show.md)
+- [servers.delete Command Spec](../commands/servers.delete.md)
+- [servers.delete-check Query Spec](../queries/servers.delete-check.md)
+- [server-deleted Event Spec](../events/server-deleted.md)
 - [Deployment Target Lifecycle Error Spec](../errors/servers.lifecycle.md)
 - [ADR-004](../decisions/ADR-004-server-readiness-state-storage.md)
 - [ADR-019](../decisions/ADR-019-edge-proxy-provider-and-observable-configuration.md)
@@ -40,6 +43,13 @@ registration, connectivity, proxy bootstrap, and proxy repair behavior.
 | SRV-LIFE-DELETE-CHECK-002 | `servers.delete-check` | integration | Inactive server has retained deployments/domains/routes/credential/log/audit blockers. | Returns `ok` with `eligible = false` and safe typed blocker kinds/counts. |
 | SRV-LIFE-DELETE-CHECK-003 | `servers.delete-check` | integration | Inactive server has no blockers. | Returns `ok` with `eligible = true` and an empty blocker list. |
 | SRV-LIFE-DELETE-CHECK-004 | `servers.delete-check` | integration | Missing server id. | Returns `not_found`, `phase = server-read`. |
+| SRV-LIFE-DELETE-001 | `servers.delete` | integration | Inactive server has no delete-check blockers and typed confirmation matches. | Returns `ok({ id })`, persists lifecycle status `deleted`, stores `deletedAt`, publishes `server-deleted`, and does not cascade cleanup. |
+| SRV-LIFE-DELETE-002 | `servers.delete` | integration | Active server is deleted. | Returns `server_delete_blocked`, `phase = server-lifecycle-guard`, `deletionBlockers = ["active-server"]`, and no event is published. |
+| SRV-LIFE-DELETE-003 | `servers.delete` | integration | Inactive server has deployment/resource/domain/certificate/proxy/credential/log/audit/source-link/default-access blockers. | Returns `server_delete_blocked` with safe typed blocker kinds/counts from the shared blocker reader and does not mutate server state. |
+| SRV-LIFE-DELETE-004 | `servers.delete` | integration | Confirmation server id does not match the selected server. | Returns `validation_error`, `phase = server-lifecycle-guard`, and no event is published. |
+| SRV-LIFE-DELETE-005 | `servers.delete` | integration | Missing server id. | Returns `not_found`, `phase = server-admission`, and does not read blockers. |
+| SRV-LIFE-DELETE-006 | `servers.delete` | integration | Already deleted tombstone is deleted again. | Returns idempotent `ok({ id })`, preserves original `deletedAt`, and does not publish a duplicate event. |
+| SRV-LIFE-DELETE-007 | `servers.list` / `servers.show` | integration | Server has lifecycle status `deleted`. | Normal list omits the server and show returns `not_found`, while write-side repository can still resolve the tombstone for idempotency. |
 | SRV-LIFE-ENTRY-001 | CLI | e2e-preferred | Server show command. | `appaloft server show <serverId>` dispatches `ShowServerQuery`; no repository bypass. |
 | SRV-LIFE-ENTRY-002 | HTTP/oRPC | e2e-preferred | Server show route. | `GET /api/servers/{serverId}` reuses `ShowServerQueryInput`, dispatches through `QueryBus`, and returns `ServerDetail`. |
 | SRV-LIFE-ENTRY-003 | Operation catalog | contract | Public exposure in Code Round. | `CORE_OPERATIONS.md`, `operation-catalog.ts`, and public docs operation coverage include `servers.show`. |
@@ -49,6 +59,9 @@ registration, connectivity, proxy bootstrap, and proxy repair behavior.
 | SRV-LIFE-ENTRY-007 | CLI | e2e-preferred | Server delete-check command. | `appaloft server delete-check <serverId>` dispatches `CheckServerDeleteSafetyQuery`; no repository bypass. |
 | SRV-LIFE-ENTRY-008 | HTTP/oRPC | e2e-preferred | Server delete-check route. | `GET /api/servers/{serverId}/delete-check` reuses `CheckServerDeleteSafetyQueryInput`, dispatches through `QueryBus`, and returns `ServerDeleteSafety`. |
 | SRV-LIFE-ENTRY-009 | Operation catalog | contract | Public exposure in Code Round. | `CORE_OPERATIONS.md`, `operation-catalog.ts`, and public docs operation coverage include `servers.deactivate` and `servers.delete-check`. |
+| SRV-LIFE-ENTRY-010 | CLI | e2e-preferred | Server delete command. | `appaloft server delete <serverId> --confirm <serverId>` dispatches `DeleteServerCommand`; no repository bypass. |
+| SRV-LIFE-ENTRY-011 | HTTP/oRPC | e2e-preferred | Server delete route. | `DELETE /api/servers/{serverId}` reuses `DeleteServerCommandInput`, dispatches through `CommandBus`, and returns `{ id }`. |
+| SRV-LIFE-ENTRY-012 | Operation catalog | contract | Public exposure in Code Round. | `CORE_OPERATIONS.md`, `operation-catalog.ts`, and public docs operation coverage include `servers.delete`. |
 
 ## Required Non-Coverage Assertions
 
@@ -59,8 +72,9 @@ Tests must assert server lifecycle work does not:
 - bootstrap or repair proxy infrastructure from `servers.show`;
 - mutate credentials, resources, deployments, domain bindings, server-applied routes, terminal
   sessions, logs, or audit state from `servers.show` or `servers.delete-check`;
-- expose destructive `servers.delete` before the guarded command spec, typed confirmation,
-  persistence/tombstone behavior, and entrypoint tests exist.
+- let `servers.delete` bypass the shared `ServerDeletionBlockerReader`;
+- let `servers.delete` cascade-delete credentials, resources, deployments, domain bindings,
+  certificates, server-applied routes, terminal sessions, logs, or audit state.
 
 ## Current Implementation Notes And Migration Gaps
 
@@ -78,7 +92,8 @@ The active implementation covers:
 `SRV-LIFE-DEACT-*`, `SRV-LIFE-DELETE-CHECK-*`, and `SRV-LIFE-ENTRY-005` through
 `SRV-LIFE-ENTRY-009` are the required coverage rows for the deactivate/delete-safety Code Round.
 
-Actual destructive `servers.delete` remains unimplemented and intentionally unexposed.
+`SRV-LIFE-DELETE-*` and `SRV-LIFE-ENTRY-010` through `SRV-LIFE-ENTRY-012` are the required coverage
+rows for the guarded delete Code Round.
 
 ## Open Questions
 

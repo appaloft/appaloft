@@ -189,4 +189,59 @@ describe("CLI server commands", () => {
       serverId: "srv_primary",
     });
   });
+
+  test("[SRV-LIFE-ENTRY-010] server delete dispatches the application command", async () => {
+    ensureReflectMetadata();
+    const { DeleteServerCommand, createExecutionContext } = await import("@appaloft/application");
+    const { createCliProgram } = await import("../src");
+    const commands: AppCommand<unknown>[] = [];
+    const commandBus = {
+      execute: async <T>(_context: unknown, command: AppCommand<T>) => {
+        commands.push(command as AppCommand<unknown>);
+        return ok({ id: "srv_primary" } as T);
+      },
+    } as unknown as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: unknown, _query: AppQuery<T>) => ok({} as T),
+    } as unknown as QueryBus;
+    const executionContextFactory: ExecutionContextFactory = {
+      create: (input) =>
+        createExecutionContext({
+          ...input,
+          requestId: "req_cli_server_delete_test",
+        }),
+    };
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus,
+      queryBus,
+      executionContextFactory,
+    });
+
+    const writeStdout = process.stdout.write;
+    try {
+      process.stdout.write = (() => true) as typeof process.stdout.write;
+      await program.parseAsync([
+        "node",
+        "appaloft",
+        "server",
+        "delete",
+        "srv_primary",
+        "--confirm",
+        "srv_primary",
+      ]);
+    } finally {
+      process.stdout.write = writeStdout;
+    }
+
+    expect(commands).toHaveLength(1);
+    expect(commands[0]).toBeInstanceOf(DeleteServerCommand);
+    expect(commands[0]).toMatchObject({
+      serverId: "srv_primary",
+      confirmation: {
+        serverId: "srv_primary",
+      },
+    });
+  });
 });

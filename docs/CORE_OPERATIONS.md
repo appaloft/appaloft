@@ -123,6 +123,7 @@ Implemented operations:
 | Show deployment target | Query | `servers.show` | `ShowServerQuery` | `ShowServerQueryInput` | `appaloft server show <serverId>` | `GET /api/servers/{serverId}` |
 | Deactivate deployment target | Command | `servers.deactivate` | `DeactivateServerCommand` | `DeactivateServerCommandInput` | `appaloft server deactivate <serverId>` | `POST /api/servers/{serverId}/deactivate` |
 | Check deployment target delete safety | Query | `servers.delete-check` | `CheckServerDeleteSafetyQuery` | `CheckServerDeleteSafetyQueryInput` | `appaloft server delete-check <serverId>` | `GET /api/servers/{serverId}/delete-check` |
+| Delete deployment target | Command | `servers.delete` | `DeleteServerCommand` | `DeleteServerCommandInput` | `appaloft server delete <serverId> --confirm <serverId>` | `DELETE /api/servers/{serverId}` |
 | Test deployment target connectivity | Command | `servers.test-connectivity` | `TestServerConnectivityCommand` | `TestServerConnectivityCommandInput` | `appaloft server test <serverId>`; `appaloft server doctor <serverId>` | `POST /api/servers/{serverId}/connectivity-tests` |
 | Test draft deployment target connectivity | Command | `servers.test-draft-connectivity` | `TestServerConnectivityCommand` | `TestServerConnectivityCommandInput` | - | `POST /api/servers/connectivity-tests` |
 | Repair deployment target edge proxy | Command | `servers.bootstrap-proxy` | `BootstrapServerProxyCommand` | `BootstrapServerProxyCommandInput` | `appaloft server proxy repair <serverId>` | `POST /api/servers/{serverId}/edge-proxy/bootstrap` |
@@ -153,7 +154,11 @@ Implemented operations:
   structured blocker reasons such as active server lifecycle, deployment history, active
   deployments, resource placements, domain bindings, certificates, attached credentials,
   server-applied routes, default-access policy overrides, terminal sessions, runtime tasks, runtime
-  logs, and audit retention. Actual `servers.delete` remains future work.
+  logs, and audit retention.
+- `servers.delete` soft-deletes only an inactive server after the same delete-safety blocker reader
+  reports no blockers. It does not cascade cleanup, stop workloads, detach credentials, remove
+  routes, revoke certificates, delete logs, or remove audit state. Normal server list/show target
+  selection omits deleted servers while historical records retain the server id.
 - generated default access routes require proxy readiness and a usable target public address, but
   the generated-domain provider is selected by infrastructure configuration and dependency
   injection, not by core/application command input
@@ -161,7 +166,6 @@ Implemented operations:
 Core next operations expected here:
 - `servers.rename`
 - `servers.configure-edge-proxy`
-- `servers.delete`
 - rotate reusable SSH credential
 - delete reusable SSH credential when unused
 

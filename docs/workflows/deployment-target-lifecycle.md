@@ -10,13 +10,13 @@ The active operations in this lifecycle slice are:
 
 - `servers.show`;
 - `servers.deactivate`;
-- `servers.delete-check`.
+- `servers.delete-check`;
+- guarded `servers.delete`.
 
 Future lifecycle operations expected by the roadmap are:
 
 - `servers.rename`;
-- `servers.configure-edge-proxy`;
-- guarded `servers.delete` after deactivation and blocker checks.
+- `servers.configure-edge-proxy`.
 
 Generic `servers.update` remains forbidden by ADR-026.
 
@@ -60,6 +60,13 @@ scheduling, or proxy configuration target selection.
 server is active or when any retained dependency still references the server. It must not mutate
 server, resource, deployment, route, credential, terminal, log, runtime, or audit state.
 
+`servers.delete` is the destructive lifecycle command gated by the same safety semantics as
+`servers.delete-check`. It must call the shared `ServerDeletionBlockerReader` and must reject active
+servers or any delete-check blocker with `server_delete_blocked`. When the inactive server has no
+blockers, the preferred v1 implementation soft-deletes the server with lifecycle `deleted` and
+`deletedAt` so normal list/show and target-selection paths omit it while deployment, domain, route,
+log, and audit history can continue to reference the server id.
+
 Server lifecycle mutations must use intention-revealing command names. Delete safety must specify
 blocker rules for at least:
 
@@ -71,16 +78,16 @@ blocker rules for at least:
 - terminal sessions;
 - retained logs, audit, runtime tasks, and support diagnostics.
 
-Actual server deletion remains a future destructive command. The preview/check query is the first
-active safety capability and is intentionally non-destructive.
+Actual server deletion must not perform implicit cleanup. If blockers exist, users must resolve
+them through explicit future cleanup or lifecycle commands before deletion can pass.
 
 ## Entrypoint Surface Decisions
 
 | Surface | Decision |
 | --- | --- |
-| CLI | Expose `server show <serverId>`, `server deactivate <serverId>`, and `server delete-check <serverId>` with positional ids. Future destructive deletion must use explicit confirmation. |
-| HTTP/oRPC | Expose `GET /api/servers/{serverId}`, `POST /api/servers/{serverId}/deactivate`, and `GET /api/servers/{serverId}/delete-check` using operation schemas; no `PATCH /api/servers/{id}` is allowed. |
-| Web | Server detail reads `servers.show` for identity, proxy status, credential summary, rollups, and lifecycle status; it reads `servers.delete-check` for read-only delete-safety status. Deactivate/destructive delete action UI may be deferred. |
+| CLI | Expose `server show <serverId>`, `server deactivate <serverId>`, `server delete-check <serverId>`, and `server delete <serverId> --confirm <serverId>` with positional ids and explicit confirmation. |
+| HTTP/oRPC | Expose `GET /api/servers/{serverId}`, `POST /api/servers/{serverId}/deactivate`, `GET /api/servers/{serverId}/delete-check`, and `DELETE /api/servers/{serverId}` using operation schemas; no `PATCH /api/servers/{id}` is allowed. |
+| Web | Server detail reads `servers.show` for identity, proxy status, credential summary, rollups, and lifecycle status; it reads `servers.delete-check` for read-only delete-safety status. Destructive delete action UI is deferred until typed confirmation exists. |
 | Repository config | Not applicable. Repository config must not select server identity. |
 | Future MCP/tools | Generate command/query tools from the operation catalog entries. |
 | Public docs | Existing `server.deployment-target` anchor explains server detail, deactivation, and delete-safety semantics. |
@@ -94,9 +101,12 @@ separate operations.
 
 The deactivate/delete-safety Code Round implements API/oRPC and CLI closure for
 `servers.deactivate` and `servers.delete-check`. Web server detail shows read-only lifecycle and
-delete-safety status. Actual server deletion, reactivation, rename, edge-proxy configuration, and
-broad credential usage visibility remain future work. Web action UI is limited to read-only
-lifecycle/safety display until confirmation affordances exist.
+delete-safety status.
+
+The guarded delete Code Round implements API/oRPC and CLI closure for `servers.delete` with
+soft-delete lifecycle state. Reactivation, rename, edge-proxy configuration, broad credential usage
+visibility, Web deactivate action UI, and Web destructive delete controls remain future work. Web
+action UI is limited to read-only lifecycle/safety display until confirmation affordances exist.
 
 ## Open Questions
 

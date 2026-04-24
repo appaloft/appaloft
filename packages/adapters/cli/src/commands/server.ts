@@ -4,6 +4,7 @@ import {
   ConfigureServerCredentialCommand,
   CreateSshCredentialCommand,
   DeactivateServerCommand,
+  DeleteServerCommand,
   ListServersQuery,
   ListSshCredentialsQuery,
   OpenTerminalSessionCommand,
@@ -34,6 +35,7 @@ const privateKeyFileOption = Options.text("private-key-file").pipe(Options.optio
 const requiredPrivateKeyFileOption = Options.text("private-key-file");
 const credentialIdOption = Options.text("credential-id").pipe(Options.optional);
 const reasonOption = Options.text("reason").pipe(Options.optional);
+const confirmServerIdOption = Options.text("confirm");
 const serverIdArg = Args.text({ name: "serverId" });
 const rowsOption = Options.text("rows").pipe(Options.withDefault("24"));
 const colsOption = Options.text("cols").pipe(Options.withDefault("80"));
@@ -105,6 +107,23 @@ const deleteCheckCommand = EffectCommand.make(
       }),
     ),
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.serverDeleteCheck));
+
+const deleteCommand = EffectCommand.make(
+  "delete",
+  {
+    serverId: serverIdArg,
+    confirm: confirmServerIdOption,
+  },
+  ({ confirm, serverId }) =>
+    runCommand(
+      DeleteServerCommand.create({
+        serverId,
+        confirmation: {
+          serverId: confirm,
+        },
+      }),
+    ),
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.serverDelete));
 
 const credentialCommand = EffectCommand.make(
   "credential",
@@ -252,6 +271,7 @@ export const serverCommand = EffectCommand.make("server").pipe(
     showCommand,
     deactivateCommand,
     deleteCheckCommand,
+    deleteCommand,
     credentialCommand,
     credentialCreateCommand,
     credentialListCommand,

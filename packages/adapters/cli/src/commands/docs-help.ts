@@ -63,6 +63,10 @@ export const cliCommandDescriptions = {
     "Check whether a server can be safely deleted",
     "server.deployment-target",
   ),
+  serverDelete: withDocs(
+    "Delete a deactivated server after delete-safety blockers are clear",
+    "server.deployment-target",
+  ),
   serverCredential: withDocs("Configure server SSH credential", "server.ssh-credential"),
   serverCredentialCreate: withDocs(
     "Create a reusable SSH credential from a private key file",

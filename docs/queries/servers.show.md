@@ -142,8 +142,9 @@ rollups for zero usage.
 The active implementation exposes `servers.show` through application, operation catalog,
 HTTP/oRPC, CLI, Web server detail, contracts, and public docs coverage.
 
-Server rename, edge-proxy configuration, deactivate, and delete safety remain future lifecycle
-commands. They must not be exposed as generic `servers.update`.
+Server rename and edge-proxy configuration remain future lifecycle commands. Deactivate,
+delete-safety, and guarded soft delete are separate active operations and must not be exposed as
+generic `servers.update`.
 
 Credential usage visibility beyond the selected server's credential summary remains future
 credential lifecycle work.

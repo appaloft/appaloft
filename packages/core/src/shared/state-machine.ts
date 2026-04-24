@@ -305,12 +305,22 @@ export class DeploymentTargetLifecycleStatusValue extends StateMachineValueObjec
     );
   }
 
+  delete(): Result<DeploymentTargetLifecycleStatusValue> {
+    return this.ensureCurrent(["inactive"], "Only inactive deployment targets can be deleted").map(
+      () => new DeploymentTargetLifecycleStatusValue("deleted"),
+    );
+  }
+
   isActive(): boolean {
     return this.value === "active";
   }
 
   isInactive(): boolean {
     return this.value === "inactive";
+  }
+
+  isDeleted(): boolean {
+    return this.value === "deleted";
   }
 }
 

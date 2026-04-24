@@ -11,7 +11,9 @@ query, command, workflow, error, or test-matrix specs.
 - [servers.show Query Spec](../queries/servers.show.md)
 - [servers.deactivate Command Spec](../commands/servers.deactivate.md)
 - [servers.delete-check Query Spec](../queries/servers.delete-check.md)
+- [servers.delete Command Spec](../commands/servers.delete.md)
 - [server-deactivated Event Spec](../events/server-deactivated.md)
+- [server-deleted Event Spec](../events/server-deleted.md)
 - [Deployment Target Lifecycle Error Spec](../errors/servers.lifecycle.md)
 - [Deployment Target Lifecycle Test Matrix](../testing/deployment-target-lifecycle-test-matrix.md)
 - [Server Bootstrap And Proxy Workflow](../workflows/server-bootstrap-and-proxy.md)
@@ -51,6 +53,17 @@ Add application types and tokens as needed:
 - `tokens.deactivateServerUseCase`;
 - `tokens.checkServerDeleteSafetyQueryService`.
 
+`servers.delete` must add a command slice:
+
+- `delete-server.schema.ts`;
+- `delete-server.command.ts`;
+- `delete-server.handler.ts`;
+- `delete-server.use-case.ts`.
+
+Add:
+
+- `tokens.deleteServerUseCase`.
+
 The query handler must delegate to the query service and return the typed `Result`.
 
 ## Expected Read-Model Scope
@@ -73,6 +86,13 @@ server-applied routes, attached credential, provider runtime logs through deploy
 for the server id, and default-access policy overrides. Terminal sessions and external runtime-task
 blockers may remain documented extension points until durable state exists.
 
+Guarded server delete must reuse the same `ServerDeletionBlockerReader`; it may share helper code
+with the delete-check query for active-server blocker construction. The first implementation should
+soft-delete the `DeploymentTarget` by adding lifecycle `deleted` plus `DeletedAt` instead of hard
+deleting the row, because deployment, domain, route, log, and audit history may retain server ids.
+Normal server read models must omit deleted rows while the write-side repository may still resolve
+the tombstone for idempotent retries.
+
 ## Expected Transport Scope
 
 During the Code Round that promotes this behavior to active, add `servers.show` to:
@@ -93,11 +113,12 @@ POST /api/servers/{serverId}/deactivate
 appaloft server deactivate <serverId>
 GET /api/servers/{serverId}/delete-check
 appaloft server delete-check <serverId>
+DELETE /api/servers/{serverId}
+appaloft server delete <serverId> --confirm <serverId>
 ```
 
 Do not expose `PATCH /api/servers/{serverId}` or generic `appaloft server update`.
-Do not expose destructive `DELETE /api/servers/{serverId}` or `appaloft server delete` until the
-guarded delete command is specified and implemented.
+Do not expose cascade cleanup flags on destructive server delete.
 
 ## Expected Web Scope
 
@@ -108,6 +129,10 @@ deployment data, but it must not derive the selected server detail from `servers
 The first deactivate/delete-safety slice keeps Web destructive action UI deferred because
 confirmation affordances are outside this PR boundary. Server detail must still display lifecycle
 status from `servers.show` and read-only delete-safety status from `servers.delete-check`.
+
+The guarded delete slice may keep Web destructive action UI deferred if it records the gap and
+continues to show read-only delete eligibility on server detail. Do not add a delete button without
+typed confirmation UX.
 
 ## Minimal Deliverable
 
@@ -138,6 +163,24 @@ status from `servers.show` and read-only delete-safety status from `servers.dele
   `SRV-LIFE-ENTRY-006`, `SRV-LIFE-ENTRY-007`, `SRV-LIFE-ENTRY-008`, and
   `SRV-LIFE-ENTRY-009`.
 
+## Guarded Delete Minimal Deliverable
+
+- `servers.delete` is active in `CORE_OPERATIONS.md` and `operation-catalog.ts`;
+- `DeploymentTarget` supports lifecycle `deleted` plus `DeletedAt`;
+- server persistence stores deleted tombstone state;
+- normal server list/show read models omit deleted servers;
+- `servers.delete` calls the shared `ServerDeletionBlockerReader` and returns
+  `server_delete_blocked` for active servers or retained blockers;
+- CLI and HTTP/oRPC dispatch through `DeleteServerCommand`;
+- Web server detail continues to display read-only delete-safety status and records the destructive
+  button as a migration gap;
+- contracts and typed clients expose the command shape;
+- public docs coverage maps the operation to the server deployment-target anchor;
+- focused tests cover `SRV-LIFE-DELETE-001`, `SRV-LIFE-DELETE-002`, `SRV-LIFE-DELETE-003`,
+  `SRV-LIFE-DELETE-004`, `SRV-LIFE-DELETE-005`, `SRV-LIFE-DELETE-006`,
+  `SRV-LIFE-DELETE-007`, `SRV-LIFE-ENTRY-010`, `SRV-LIFE-ENTRY-011`, and
+  `SRV-LIFE-ENTRY-012`.
+
 ## Verification
 
 Run targeted checks before publishing:
@@ -145,6 +188,7 @@ Run targeted checks before publishing:
 - `bun test packages/application/test/show-server.test.ts`
 - `bun test packages/application/test/deactivate-server.test.ts`
 - `bun test packages/application/test/check-server-delete-safety.test.ts`
+- `bun test packages/application/test/delete-server.test.ts`
 - `bun test packages/application/test/create-deployment.test.ts`
 - `bun test packages/orpc/test/server-show.http.test.ts`
 - `bun test packages/adapters/cli/test/server-command.test.ts`
@@ -157,11 +201,13 @@ Run targeted checks before publishing:
 
 ## Current Implementation Notes And Migration Gaps
 
-`servers.deactivate` and `servers.delete-check` are the current minimal lifecycle/safety slice.
-Actual destructive `servers.delete`, reactivation, server rename, edge-proxy configuration, Web
-deactivate/delete action controls, terminal-session blocker durability, external runtime-task
-blocker durability, and broad credential usage visibility remain future work.
+`servers.deactivate`, `servers.delete-check`, and guarded `servers.delete` are the current minimal
+lifecycle/safety slice. Guarded delete uses soft-delete lifecycle state. Reactivation, server
+rename, edge-proxy configuration, Web deactivate/delete action controls, terminal-session blocker
+durability, external runtime-task blocker durability, and broad credential usage visibility remain
+future work.
 
 ## Open Questions
 
-- None for `servers.show`, one-way deactivate, or delete-check preview semantics.
+- None for `servers.show`, one-way deactivate, delete-check preview, or guarded soft delete
+  semantics.

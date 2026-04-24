@@ -78,7 +78,7 @@ export const edgeProxyStatuses = ["pending", "starting", "ready", "failed", "dis
 
 export type EdgeProxyStatus = (typeof edgeProxyStatuses)[number];
 
-export const deploymentTargetLifecycleStatuses = ["active", "inactive"] as const;
+export const deploymentTargetLifecycleStatuses = ["active", "inactive", "deleted"] as const;
 
 export type DeploymentTargetLifecycleStatus = (typeof deploymentTargetLifecycleStatuses)[number];
 

@@ -12,13 +12,13 @@ import { inject, injectable } from "tsyringe";
 import { type ExecutionContext, toRepositoryContext } from "../../execution-context";
 import {
   type Clock,
-  type ServerDeleteBlocker,
   type ServerDeleteSafety,
   type ServerDeletionBlockerReader,
   type ServerReadModel,
 } from "../../ports";
 import { tokens } from "../../tokens";
 import { type CheckServerDeleteSafetyQuery } from "./check-server-delete-safety.query";
+import { buildServerDeleteBlockers } from "./server-delete-safety";
 
 function withDeleteCheckDetails(error: DomainError, details: Record<string, string>): DomainError {
   return {
@@ -90,19 +90,11 @@ export class CheckServerDeleteSafetyQueryService {
         return err(blockerResult.error);
       }
 
-      const blockers: ServerDeleteBlocker[] = [
-        ...(server.lifecycleStatus === "active"
-          ? [
-              {
-                kind: "active-server" as const,
-                relatedEntityId: server.id,
-                relatedEntityType: "server",
-                count: 1,
-              },
-            ]
-          : []),
-        ...blockerResult.value,
-      ];
+      const blockers = buildServerDeleteBlockers({
+        serverId: server.id,
+        lifecycleStatus: server.lifecycleStatus,
+        retainedBlockers: blockerResult.value,
+      });
 
       return ok({
         schemaVersion: "servers.delete-check/v1",

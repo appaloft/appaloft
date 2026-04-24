@@ -45,6 +45,7 @@ import { checkServerDeleteSafetyQueryInputSchema } from "./operations/servers/ch
 import { configureServerCredentialCommandInputSchema } from "./operations/servers/configure-server-credential.command";
 import { createSshCredentialCommandInputSchema } from "./operations/servers/create-ssh-credential.command";
 import { deactivateServerCommandInputSchema } from "./operations/servers/deactivate-server.command";
+import { deleteServerCommandInputSchema } from "./operations/servers/delete-server.command";
 import { listServersQueryInputSchema } from "./operations/servers/list-servers.query";
 import { listSshCredentialsQueryInputSchema } from "./operations/servers/list-ssh-credentials.query";
 import { registerServerCommandInputSchema } from "./operations/servers/register-server.command";
@@ -275,6 +276,20 @@ export const operationCatalog = [
     transports: {
       cli: "appaloft server delete-check <serverId>",
       orpc: { method: "GET", path: "/api/servers/{serverId}/delete-check" },
+    },
+  },
+  {
+    key: "servers.delete",
+    kind: "command",
+    domain: "servers",
+    messageName: "DeleteServerCommand",
+    handlerName: "DeleteServerCommandHandler",
+    serviceName: "DeleteServerUseCase",
+    inputSchema: deleteServerCommandInputSchema,
+    serviceToken: tokens.deleteServerUseCase,
+    transports: {
+      cli: "appaloft server delete <serverId> --confirm <serverId>",
+      orpc: { method: "DELETE", path: "/api/servers/{serverId}" },
     },
   },
   {

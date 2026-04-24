@@ -59,6 +59,7 @@ export const tokens = {
   listServersQueryService: Symbol.for("appaloft.list_servers_query_service"),
   showServerQueryService: Symbol.for("appaloft.show_server_query_service"),
   deactivateServerUseCase: Symbol.for("appaloft.deactivate_server_use_case"),
+  deleteServerUseCase: Symbol.for("appaloft.delete_server_use_case"),
   checkServerDeleteSafetyQueryService: Symbol.for(
     "appaloft.check_server_delete_safety_query_service",
   ),
