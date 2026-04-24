@@ -12,6 +12,7 @@ searchAliases:
   - "服务器"
 relatedOperations:
   - servers.register
+  - servers.show
   - servers.test-connectivity
 sidebar:
   label: "Register and test"
@@ -27,6 +28,8 @@ sidebar:
 服务器不是项目，也不是资源。一个服务器可以承载多个资源；资源是否能访问还取决于 resource network profile 和代理 readiness。
 
 注册服务器的目标是让 Appaloft 能安全地执行部署计划，而不是立即部署应用。
+
+读取服务器详情用于确认某个部署目标的 host、provider、已配置凭据摘要、代理状态，以及当前部署、资源和域名的汇总。这个读取不会运行连接测试、修复代理或修改服务器。
 
 <h2 id="server-connectivity-test">连接测试</h2>
 
@@ -84,4 +87,8 @@ appaloft server register \
 
 ```bash title="运行连接测试"
 appaloft server test srv_primary
+```
+
+```bash title="读取服务器详情"
+appaloft server show srv_primary
 ```

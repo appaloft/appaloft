@@ -46,6 +46,7 @@ import { createSshCredentialCommandInputSchema } from "./operations/servers/crea
 import { listServersQueryInputSchema } from "./operations/servers/list-servers.query";
 import { listSshCredentialsQueryInputSchema } from "./operations/servers/list-ssh-credentials.query";
 import { registerServerCommandInputSchema } from "./operations/servers/register-server.command";
+import { showServerQueryInputSchema } from "./operations/servers/show-server.query";
 import { testServerConnectivityCommandInputSchema } from "./operations/servers/test-server-connectivity.command";
 import { relinkSourceLinkCommandInputSchema } from "./operations/source-links/relink-source-link.command";
 import { listGitHubRepositoriesQueryInputSchema } from "./operations/system/list-github-repositories.query";
@@ -230,6 +231,20 @@ export const operationCatalog = [
     transports: {
       cli: "appaloft server list",
       orpc: { method: "GET", path: "/api/servers" },
+    },
+  },
+  {
+    key: "servers.show",
+    kind: "query",
+    domain: "servers",
+    messageName: "ShowServerQuery",
+    handlerName: "ShowServerQueryHandler",
+    serviceName: "ShowServerQueryService",
+    inputSchema: showServerQueryInputSchema,
+    serviceToken: tokens.showServerQueryService,
+    transports: {
+      cli: "appaloft server show <serverId>",
+      orpc: { method: "GET", path: "/api/servers/{serverId}" },
     },
   },
   {

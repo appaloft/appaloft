@@ -368,12 +368,13 @@ Already done:
   resource detail observation exist.
 - [x] Environment create/list/show/set/unset/diff/promote exists.
 - [x] Project create/list/show/rename/archive exists.
-- [x] Server register/list/connectivity/proxy-repair and credential baseline exist.
+- [x] Server register/list/show/connectivity/proxy-repair and credential baseline exist.
 
 Required:
 
 - [x] Add project show/rename/archive.
-- [ ] Add server show/update/deactivate/delete safety rules and credential usage visibility.
+- [x] Add server show with proxy status and initial deployment/resource/domain rollups.
+- [ ] Add server rename/configure/deactivate/delete safety rules and credential usage visibility.
 - [ ] Add credential show/rotate/delete when unused.
 - [x] Add resource show/archive/delete.
 - [x] Add separate resource source update semantics where specs require a separate command.
@@ -637,10 +638,10 @@ work below before GA.
 - [ ] Project: delete/restore safety, description editing, resource rollup.
 - [x] Environment: create/list/show, set/unset variable, diff, promote.
 - [ ] Environment: update, clone, lock/archive, effective precedence, history.
-- [x] Deployment target/server: register, list, configure credential, connectivity, proxy repair,
-  terminal open.
-- [ ] Deployment target/server: show, update, deactivate/delete safety, proxy status, resource/domain
-  rollups.
+- [x] Deployment target/server: register, list, show, configure credential, connectivity, proxy
+  repair, terminal open.
+- [ ] Deployment target/server: rename/configure-edge-proxy, deactivate/delete safety, and
+  credential usage visibility.
 - [x] SSH credential: create/list, attach to server.
 - [ ] SSH credential: show, rotate/update, delete when unused, usage visibility.
 - [x] Resource: create/list/show, configure source/runtime/network/health, set/unset variables,

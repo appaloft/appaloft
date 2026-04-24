@@ -197,7 +197,6 @@ export class PgResourceRepository implements ResourceRepository {
     spec: ResourceMutationSpec,
   ): Promise<void> {
     void resource;
-    const executor = resolveRepositoryExecutor(this.db, context);
     const mutation = spec.accept(new KyselyResourceMutationVisitor());
     await context.tracer.startActiveSpan(
       createRepositorySpanName("resource", "upsert"),

@@ -42,6 +42,7 @@ export * from "./operations/servers/configure-server-credential.schema";
 export * from "./operations/servers/create-ssh-credential.schema";
 export * from "./operations/servers/list-ssh-credentials.schema";
 export * from "./operations/servers/register-server.schema";
+export * from "./operations/servers/show-server.schema";
 export * from "./operations/servers/test-server-connectivity.schema";
 export * from "./operations/system/list-github-repositories.schema";
 export * from "./operations/terminal-sessions/open-terminal-session.schema";

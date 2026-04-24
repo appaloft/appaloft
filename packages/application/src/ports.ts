@@ -923,6 +923,37 @@ export interface ServerSummary {
   createdAt: string;
 }
 
+export interface ServerStatusCount<TStatus extends string> {
+  status: TStatus;
+  count: number;
+}
+
+export interface ServerRollups {
+  resources: {
+    total: number;
+    deployedResourceIds: string[];
+  };
+  deployments: {
+    total: number;
+    statusCounts: Array<ServerStatusCount<DeploymentStatus>>;
+    latestDeploymentId?: string;
+    latestDeploymentStatus?: DeploymentStatus;
+  };
+  domains: {
+    total: number;
+    statusCounts: Array<ServerStatusCount<DomainBindingStatus>>;
+    latestDomainBindingId?: string;
+    latestDomainBindingStatus?: DomainBindingStatus;
+  };
+}
+
+export interface ServerDetail {
+  schemaVersion: "servers.show/v1";
+  server: ServerSummary;
+  rollups?: ServerRollups;
+  generatedAt: string;
+}
+
 export type ServerConnectivityStatus = "passed" | "failed" | "skipped";
 
 export interface SshCredentialSummary {
