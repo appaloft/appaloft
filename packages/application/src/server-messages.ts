@@ -3,6 +3,7 @@ export * from "./operations/servers/check-server-delete-safety.query";
 export * from "./operations/servers/configure-server-credential.command";
 export * from "./operations/servers/create-ssh-credential.command";
 export * from "./operations/servers/deactivate-server.command";
+export * from "./operations/servers/delete-server.command";
 export * from "./operations/servers/list-servers.query";
 export * from "./operations/servers/list-ssh-credentials.query";
 export * from "./operations/servers/register-server.command";

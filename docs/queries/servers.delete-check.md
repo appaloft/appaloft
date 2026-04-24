@@ -14,7 +14,7 @@
 ## Normative Contract
 
 `servers.delete-check` is the source-of-truth query for previewing whether a server can be safely
-deleted before a future destructive `servers.delete` command exists.
+deleted by the guarded `servers.delete` command.
 
 The query is read-only. It must not delete the server, stop workloads, remove proxy routes, unbind
 domains, revoke certificates, detach credentials, cancel deployments, close terminal sessions,
@@ -132,8 +132,8 @@ All whole-query failures use [Deployment Target Lifecycle Error Spec](../errors/
 | `infra_error` | `server-delete-check-read` | Conditional | Delete blocker checks could not be safely assembled. |
 
 Blockers are not query errors. A server with blockers returns `ok({ eligible: false, blockers })`.
-A future destructive `servers.delete` command must convert the same blockers into
-`server_delete_blocked`.
+The destructive `servers.delete` command must convert the same blockers into
+`server_delete_blocked` by using the same blocker reader.
 
 ## Entrypoints
 
@@ -148,9 +148,9 @@ A future destructive `servers.delete` command must convert the same blockers int
 
 ## Current Implementation Notes And Migration Gaps
 
-The first active slice implements a preview/check query, not actual server deletion. Web server
-detail shows the read-only safety result and blocker count; destructive delete controls remain
-future work.
+The first active slice implements a preview/check query, and the guarded delete slice reuses the
+same blocker reader for command admission. Web server detail shows the read-only safety result and
+blocker count; destructive delete controls remain a Web action gap.
 
 The PG blocker reader covers inactive gating, retained deployments, non-terminal deployments,
 domain bindings, certificates tied through domain bindings, server-applied routes, source links
@@ -159,8 +159,9 @@ deployments, audit logs whose `aggregate_id` is the server id, and deployment-ta
 policy overrides. Terminal session and external runtime-task blocker detection remain extension
 points until durable tables exist.
 
-Actual `servers.delete`, typed confirmation, tombstone persistence, and `server-deleted` event
-remain future work.
+Actual `servers.delete` uses typed confirmation, soft-delete/tombstone persistence, and a
+`server-deleted` event. Terminal-session and external runtime-task blocker detection remain
+extension points until durable tables exist.
 
 ## Open Questions
 

@@ -4,6 +4,7 @@ export * from "./operations/servers/check-server-delete-safety.handler";
 export * from "./operations/servers/configure-server-credential.handler";
 export * from "./operations/servers/create-ssh-credential.handler";
 export * from "./operations/servers/deactivate-server.handler";
+export * from "./operations/servers/delete-server.handler";
 export * from "./operations/servers/list-servers.handler";
 export * from "./operations/servers/list-ssh-credentials.handler";
 export * from "./operations/servers/register-server.handler";

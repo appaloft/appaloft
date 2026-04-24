@@ -125,6 +125,7 @@ export class PgServerReadModel implements ServerReadModel {
           .leftJoin("ssh_credentials", "ssh_credentials.id", "servers.credential_id")
           .selectAll("servers")
           .select("ssh_credentials.name as credential_name")
+          .where("servers.lifecycle_status", "!=", "deleted")
           .orderBy("created_at", "desc")
           .execute()
           .then((rows) => rows.map(toServerSummary)),
@@ -144,6 +145,7 @@ export class PgServerReadModel implements ServerReadModel {
       async () => {
         const row = await spec
           .accept(executor.selectFrom("servers").selectAll(), new KyselyServerSelectionVisitor())
+          .where("lifecycle_status", "!=", "deleted")
           .executeTakeFirst();
 
         if (!row) {

@@ -8,6 +8,7 @@ import {
   type CommandBus,
   createExecutionContext,
   DeactivateServerCommand,
+  DeleteServerCommand,
   type ExecutionContext,
   type ExecutionContextFactory,
   type Query,
@@ -195,6 +196,50 @@ describe("server show HTTP route", () => {
     expect(capturedQuery).toBeInstanceOf(CheckServerDeleteSafetyQuery);
     expect(capturedQuery).toMatchObject({
       serverId: "srv_primary",
+    });
+  });
+
+  test("[SRV-LIFE-ENTRY-011] dispatches DeleteServerCommand through HTTP", async () => {
+    let capturedCommand: Command<unknown> | undefined;
+    const commandBus = {
+      execute: async <T>(_context: ExecutionContext, command: Command<T>): Promise<Result<T>> => {
+        capturedCommand = command as Command<unknown>;
+        return ok({ id: "srv_primary" } as T);
+      },
+    } as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: ExecutionContext, _query: Query<T>): Promise<Result<T>> =>
+        ok({} as T),
+    } as QueryBus;
+    const app = mountAppaloftOrpcRoutes(new Elysia(), {
+      commandBus,
+      executionContextFactory: new TestExecutionContextFactory(),
+      logger: new NoopLogger(),
+      queryBus,
+    });
+
+    const response = await app.handle(
+      new Request("http://localhost/api/servers/srv_primary", {
+        method: "DELETE",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          confirmation: {
+            serverId: "srv_primary",
+          },
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ id: "srv_primary" });
+    expect(capturedCommand).toBeInstanceOf(DeleteServerCommand);
+    expect(capturedCommand).toMatchObject({
+      serverId: "srv_primary",
+      confirmation: {
+        serverId: "srv_primary",
+      },
     });
   });
 });

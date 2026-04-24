@@ -346,19 +346,27 @@ export class MemoryServerReadModel implements ServerReadModel {
 
   async list(context: RepositoryContext) {
     void context;
-    return [...this.repository.items.values()].map((server) => {
+    return [...this.repository.items.values()].flatMap((server) => {
       const state = server.toState();
-      return {
-        id: state.id.value,
-        name: state.name.value,
-        host: state.host.value,
-        port: state.port.value,
-        providerKey: state.providerKey.value,
-        lifecycleStatus: state.lifecycleStatus.value,
-        ...(state.deactivatedAt ? { deactivatedAt: state.deactivatedAt.value } : {}),
-        ...(state.deactivationReason ? { deactivationReason: state.deactivationReason.value } : {}),
-        createdAt: state.createdAt.value,
-      };
+      if (state.lifecycleStatus.isDeleted()) {
+        return [];
+      }
+
+      return [
+        {
+          id: state.id.value,
+          name: state.name.value,
+          host: state.host.value,
+          port: state.port.value,
+          providerKey: state.providerKey.value,
+          lifecycleStatus: state.lifecycleStatus.value as "active" | "inactive",
+          ...(state.deactivatedAt ? { deactivatedAt: state.deactivatedAt.value } : {}),
+          ...(state.deactivationReason
+            ? { deactivationReason: state.deactivationReason.value }
+            : {}),
+          createdAt: state.createdAt.value,
+        },
+      ];
     });
   }
 
@@ -371,13 +379,17 @@ export class MemoryServerReadModel implements ServerReadModel {
       }
 
       const state = server.toState();
+      if (state.lifecycleStatus.isDeleted()) {
+        return null;
+      }
+
       return {
         id: state.id.value,
         name: state.name.value,
         host: state.host.value,
         port: state.port.value,
         providerKey: state.providerKey.value,
-        lifecycleStatus: state.lifecycleStatus.value,
+        lifecycleStatus: state.lifecycleStatus.value as "active" | "inactive",
         ...(state.deactivatedAt ? { deactivatedAt: state.deactivatedAt.value } : {}),
         ...(state.deactivationReason ? { deactivationReason: state.deactivationReason.value } : {}),
         createdAt: state.createdAt.value,
@@ -387,6 +399,9 @@ export class MemoryServerReadModel implements ServerReadModel {
     if (spec instanceof DeploymentTargetByProviderAndHostSpec) {
       for (const server of this.repository.items.values()) {
         const state = server.toState();
+        if (state.lifecycleStatus.isDeleted()) {
+          continue;
+        }
         if (state.providerKey.equals(spec.providerKey) && state.host.equals(spec.host)) {
           return {
             id: state.id.value,
@@ -394,7 +409,7 @@ export class MemoryServerReadModel implements ServerReadModel {
             host: state.host.value,
             port: state.port.value,
             providerKey: state.providerKey.value,
-            lifecycleStatus: state.lifecycleStatus.value,
+            lifecycleStatus: state.lifecycleStatus.value as "active" | "inactive",
             ...(state.deactivatedAt ? { deactivatedAt: state.deactivatedAt.value } : {}),
             ...(state.deactivationReason
               ? { deactivationReason: state.deactivationReason.value }
