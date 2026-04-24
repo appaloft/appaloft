@@ -43,6 +43,7 @@ import {
   type ResourceSummary,
   type ServerReadModel,
   type ServerRepository,
+  type ServerSummary,
 } from "@appaloft/application";
 import {
   ActiveDomainBindingByOwnerAndRouteSpec,
@@ -62,6 +63,7 @@ import {
   DeploymentTargetByProviderAndHostSpec,
   type DeploymentTargetMutationSpec,
   type DeploymentTargetSelectionSpec,
+  type DeploymentTargetState,
   Destination,
   DestinationByIdSpec,
   DestinationByServerAndNameSpec,
@@ -341,6 +343,26 @@ export class MemoryServerRepository implements ServerRepository {
   }
 }
 
+function memoryServerEdgeProxySummary(
+  state: DeploymentTargetState,
+): Pick<ServerSummary, "edgeProxy"> {
+  const edgeProxy = state.edgeProxy;
+  if (!edgeProxy) {
+    return {};
+  }
+
+  return {
+    edgeProxy: {
+      kind: edgeProxy.kind.value,
+      status: edgeProxy.status.value,
+      ...(edgeProxy.lastAttemptAt ? { lastAttemptAt: edgeProxy.lastAttemptAt.value } : {}),
+      ...(edgeProxy.lastSucceededAt ? { lastSucceededAt: edgeProxy.lastSucceededAt.value } : {}),
+      ...(edgeProxy.lastErrorCode ? { lastErrorCode: edgeProxy.lastErrorCode.value } : {}),
+      ...(edgeProxy.lastErrorMessage ? { lastErrorMessage: edgeProxy.lastErrorMessage.value } : {}),
+    },
+  };
+}
+
 export class MemoryServerReadModel implements ServerReadModel {
   constructor(private readonly repository: MemoryServerRepository) {}
 
@@ -360,6 +382,7 @@ export class MemoryServerReadModel implements ServerReadModel {
           port: state.port.value,
           providerKey: state.providerKey.value,
           lifecycleStatus: state.lifecycleStatus.value as "active" | "inactive",
+          ...memoryServerEdgeProxySummary(state),
           ...(state.deactivatedAt ? { deactivatedAt: state.deactivatedAt.value } : {}),
           ...(state.deactivationReason
             ? { deactivationReason: state.deactivationReason.value }
@@ -390,6 +413,7 @@ export class MemoryServerReadModel implements ServerReadModel {
         port: state.port.value,
         providerKey: state.providerKey.value,
         lifecycleStatus: state.lifecycleStatus.value as "active" | "inactive",
+        ...memoryServerEdgeProxySummary(state),
         ...(state.deactivatedAt ? { deactivatedAt: state.deactivatedAt.value } : {}),
         ...(state.deactivationReason ? { deactivationReason: state.deactivationReason.value } : {}),
         createdAt: state.createdAt.value,
@@ -410,6 +434,7 @@ export class MemoryServerReadModel implements ServerReadModel {
             port: state.port.value,
             providerKey: state.providerKey.value,
             lifecycleStatus: state.lifecycleStatus.value as "active" | "inactive",
+            ...memoryServerEdgeProxySummary(state),
             ...(state.deactivatedAt ? { deactivatedAt: state.deactivatedAt.value } : {}),
             ...(state.deactivationReason
               ? { deactivationReason: state.deactivationReason.value }

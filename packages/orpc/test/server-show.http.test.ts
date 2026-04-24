@@ -6,6 +6,7 @@ import {
   CheckServerDeleteSafetyQuery,
   type Command,
   type CommandBus,
+  ConfigureServerEdgeProxyCommand,
   createExecutionContext,
   DeactivateServerCommand,
   DeleteServerCommand,
@@ -193,6 +194,58 @@ describe("server show HTTP route", () => {
     expect(capturedCommand).toMatchObject({
       serverId: "srv_primary",
       name: "Primary SSH server",
+    });
+  });
+
+  test("[SRV-LIFE-ENTRY-018] dispatches ConfigureServerEdgeProxyCommand through HTTP", async () => {
+    let capturedCommand: Command<unknown> | undefined;
+    const commandBus = {
+      execute: async <T>(_context: ExecutionContext, command: Command<T>): Promise<Result<T>> => {
+        capturedCommand = command as Command<unknown>;
+        return ok({
+          id: "srv_primary",
+          edgeProxy: {
+            kind: "caddy",
+            status: "pending",
+          },
+        } as T);
+      },
+    } as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: ExecutionContext, _query: Query<T>): Promise<Result<T>> =>
+        ok({} as T),
+    } as QueryBus;
+    const app = mountAppaloftOrpcRoutes(new Elysia(), {
+      commandBus,
+      executionContextFactory: new TestExecutionContextFactory(),
+      logger: new NoopLogger(),
+      queryBus,
+    });
+
+    const response = await app.handle(
+      new Request("http://localhost/api/servers/srv_primary/edge-proxy/configuration", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          proxyKind: "caddy",
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      id: "srv_primary",
+      edgeProxy: {
+        kind: "caddy",
+        status: "pending",
+      },
+    });
+    expect(capturedCommand).toBeInstanceOf(ConfigureServerEdgeProxyCommand);
+    expect(capturedCommand).toMatchObject({
+      serverId: "srv_primary",
+      proxyKind: "caddy",
     });
   });
 

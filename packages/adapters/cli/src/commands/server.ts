@@ -2,6 +2,7 @@ import {
   BootstrapServerProxyCommand,
   CheckServerDeleteSafetyQuery,
   ConfigureServerCredentialCommand,
+  ConfigureServerEdgeProxyCommand,
   CreateSshCredentialCommand,
   DeactivateServerCommand,
   DeleteServerCommand,
@@ -27,6 +28,7 @@ const providerOption = Options.text("provider").pipe(Options.withDefault("generi
 const proxyKindOption = Options.choice("proxy-kind", edgeProxyKinds).pipe(
   Options.withDefault("traefik"),
 );
+const proxyConfigureKindOption = Options.choice("kind", edgeProxyKinds);
 const credentialKindOption = Options.choice("kind", deploymentTargetCredentialKinds).pipe(
   Options.withDefault("local-ssh-agent"),
 );
@@ -254,9 +256,24 @@ const proxyRepairCommand = EffectCommand.make(
     ),
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.serverProxyRepair));
 
+const proxyConfigureCommand = EffectCommand.make(
+  "configure",
+  {
+    serverId: serverIdArg,
+    kind: proxyConfigureKindOption,
+  },
+  ({ kind, serverId }) =>
+    runCommand(
+      ConfigureServerEdgeProxyCommand.create({
+        serverId,
+        proxyKind: kind,
+      }),
+    ),
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.serverProxyConfigure));
+
 const proxyCommand = EffectCommand.make("proxy").pipe(
   EffectCommand.withDescription(cliCommandDescriptions.serverProxy),
-  EffectCommand.withSubcommands([proxyRepairCommand]),
+  EffectCommand.withSubcommands([proxyRepairCommand, proxyConfigureCommand]),
 );
 
 const terminalCommand = EffectCommand.make(

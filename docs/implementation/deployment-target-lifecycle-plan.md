@@ -10,10 +10,12 @@ query, command, workflow, error, or test-matrix specs.
 - [Deployment Target Lifecycle Workflow](../workflows/deployment-target-lifecycle.md)
 - [servers.show Query Spec](../queries/servers.show.md)
 - [servers.rename Command Spec](../commands/servers.rename.md)
+- [servers.configure-edge-proxy Command Spec](../commands/servers.configure-edge-proxy.md)
 - [servers.deactivate Command Spec](../commands/servers.deactivate.md)
 - [servers.delete-check Query Spec](../queries/servers.delete-check.md)
 - [servers.delete Command Spec](../commands/servers.delete.md)
 - [server-renamed Event Spec](../events/server-renamed.md)
+- [server-edge-proxy-configured Event Spec](../events/server-edge-proxy-configured.md)
 - [server-deactivated Event Spec](../events/server-deactivated.md)
 - [server-deleted Event Spec](../events/server-deleted.md)
 - [Deployment Target Lifecycle Error Spec](../errors/servers.lifecycle.md)
@@ -45,6 +47,13 @@ query, command, workflow, error, or test-matrix specs.
 - `rename-server.handler.ts`;
 - `rename-server.use-case.ts`.
 
+`servers.configure-edge-proxy` must add a command slice:
+
+- `configure-server-edge-proxy.schema.ts`;
+- `configure-server-edge-proxy.command.ts`;
+- `configure-server-edge-proxy.handler.ts`;
+- `configure-server-edge-proxy.use-case.ts`.
+
 `servers.delete-check` must add a query slice:
 
 - `check-server-delete-safety.schema.ts`;
@@ -60,6 +69,7 @@ Add application types and tokens as needed:
 - `ServerDeleteBlocker`;
 - `tokens.showServerQueryService`;
 - `tokens.renameServerUseCase`;
+- `tokens.configureServerEdgeProxyUseCase`;
 - `tokens.deactivateServerUseCase`;
 - `tokens.checkServerDeleteSafetyQueryService`.
 
@@ -95,6 +105,14 @@ with `not_found`, and publish `server-renamed` through the shared event bus afte
 first implementation should not add a server-name uniqueness query or index because the current
 domain model treats the name as a display label and server id as the durable reference.
 
+Configure edge proxy must use the write-side `ServerRepository`/`DeploymentTarget` aggregate,
+normalize the requested proxy kind through `EdgeProxyKindValue`, reject deleted tombstones from the
+ordinary entrypoint with `not_found`, reject inactive servers with `server_inactive`, and publish
+`server-edge-proxy-configured` through the shared event bus after persistence. The first
+implementation must not call the proxy bootstrapper, provider SDKs, runtime route realization, or
+provider registry. It should reset the current proxy summary to `disabled` for `none` or `pending`
+for provider-backed kinds only when the kind changes, leaving same-kind configuration idempotent.
+
 Delete-check may compose a dedicated `ServerDeletionBlockerReader` with server read-model state.
 The first PG implementation should cover blockers that already have durable tables: deployments,
 non-terminal deployments, domain bindings, certificates through domain bindings, source links,
@@ -129,6 +147,8 @@ POST /api/servers/{serverId}/deactivate
 appaloft server deactivate <serverId>
 POST /api/servers/{serverId}/rename
 appaloft server rename <serverId> --name <name>
+POST /api/servers/{serverId}/edge-proxy/configuration
+appaloft server proxy configure <serverId> --kind none|traefik|caddy
 GET /api/servers/{serverId}/delete-check
 appaloft server delete-check <serverId>
 DELETE /api/servers/{serverId}
@@ -157,6 +177,13 @@ can support it without broad redesign. The control must use a text input, submit
 `servers.rename`, support active and inactive servers, and refresh the server detail/list-visible
 name. If the Web action is deferred, the plan and lifecycle spec must record the exact Web action
 gap; read-only display of the renamed value is still required.
+
+The configure edge proxy slice should add an owner-scoped server detail proxy kind selector when
+the existing page can support it without broad redesign. The control must use a select/radio choice
+over `none`, `traefik`, and `caddy`, submit through `servers.configure-edge-proxy`, support active
+servers only, and refresh the server detail/list-visible proxy status. If the Web action is
+deferred, the plan and lifecycle spec must record the exact Web action gap; read-only display of
+the configured value is still required.
 
 ## Minimal Deliverable
 
@@ -205,6 +232,30 @@ gap; read-only display of the renamed value is still required.
   `SRV-LIFE-ENTRY-013`, `SRV-LIFE-ENTRY-014`, `SRV-LIFE-ENTRY-015`, and
   `SRV-LIFE-ENTRY-016` when the Web action ships in the same slice.
 
+## Configure Edge Proxy Minimal Deliverable
+
+- `servers.configure-edge-proxy` is active in `CORE_OPERATIONS.md` and `operation-catalog.ts`;
+- `DeploymentTarget` has a configure edge proxy method that accepts `EdgeProxyKindValue` and
+  preserves all non-proxy state;
+- configuring `none` stores status `disabled` and prevents future proxy-backed target eligibility
+  without deleting historical route/deployment/domain/audit/provider-owned state;
+- configuring `traefik` or `caddy` stores status `pending` and does not synchronously run
+  `servers.bootstrap-proxy` or provider/runtime bootstrap work;
+- same-kind configuration is idempotent and preserves the current proxy status summary;
+- inactive servers return `server_inactive`; deleted servers return `not_found`;
+- normal server list/show read models return the new edge proxy kind/status and still omit deleted
+  servers;
+- CLI and HTTP/oRPC dispatch through `ConfigureServerEdgeProxyCommand`;
+- Web server detail exposes the proxy kind selector if the existing surface can carry it, or
+  records a named Web action migration gap while remaining read-observable;
+- contracts and typed clients expose the command shape and result shape;
+- public docs coverage maps the operation to the server proxy readiness anchor;
+- focused tests cover `SRV-LIFE-PROXY-CONFIG-001`, `SRV-LIFE-PROXY-CONFIG-002`,
+  `SRV-LIFE-PROXY-CONFIG-003`, `SRV-LIFE-PROXY-CONFIG-004`,
+  `SRV-LIFE-PROXY-CONFIG-005`, `SRV-LIFE-PROXY-CONFIG-006`,
+  `SRV-LIFE-PROXY-CONFIG-007`, `SRV-LIFE-ENTRY-017`, `SRV-LIFE-ENTRY-018`,
+  `SRV-LIFE-ENTRY-019`, and `SRV-LIFE-ENTRY-020` when the Web action ships in the same slice.
+
 ## Guarded Delete Minimal Deliverable
 
 - `servers.delete` is active in `CORE_OPERATIONS.md` and `operation-catalog.ts`;
@@ -229,6 +280,7 @@ Run targeted checks before publishing:
 
 - `bun test packages/application/test/show-server.test.ts`
 - `bun test packages/application/test/rename-server.test.ts`
+- `bun test packages/application/test/configure-server-edge-proxy.test.ts`
 - `bun test packages/application/test/deactivate-server.test.ts`
 - `bun test packages/application/test/check-server-delete-safety.test.ts`
 - `bun test packages/application/test/delete-server.test.ts`
@@ -244,13 +296,13 @@ Run targeted checks before publishing:
 
 ## Current Implementation Notes And Migration Gaps
 
-`servers.deactivate`, `servers.delete-check`, guarded `servers.delete`, and display-name-only
-`servers.rename` are the current minimal lifecycle/safety slice. Guarded delete uses soft-delete
-lifecycle state. Reactivation, edge-proxy configuration, Web deactivate/delete action controls,
-terminal-session blocker durability, external runtime-task blocker durability, and broad credential
-usage visibility remain future work.
+`servers.deactivate`, `servers.delete-check`, guarded `servers.delete`, display-name-only
+`servers.rename`, and intent-only `servers.configure-edge-proxy` are the current minimal
+lifecycle/safety slice. Guarded delete uses soft-delete lifecycle state. Reactivation, Web
+deactivate/delete action controls, terminal-session blocker durability, external runtime-task
+blocker durability, and broad credential usage visibility remain future work.
 
 ## Open Questions
 
-- None for `servers.show`, display-name-only rename, one-way deactivate, delete-check preview, or
-  guarded soft delete semantics.
+- None for `servers.show`, display-name-only rename, intent-only edge proxy configuration,
+  one-way deactivate, delete-check preview, or guarded soft delete semantics.

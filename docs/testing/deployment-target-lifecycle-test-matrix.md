@@ -6,6 +6,7 @@ This matrix covers:
 
 - `servers.show`;
 - `servers.rename`;
+- `servers.configure-edge-proxy`;
 - `servers.deactivate`;
 - `servers.delete-check`;
 - guarded `servers.delete`;
@@ -20,10 +21,12 @@ registration, connectivity, proxy bootstrap, and proxy repair behavior.
 - [Deployment Target Lifecycle Workflow](../workflows/deployment-target-lifecycle.md)
 - [servers.show Query Spec](../queries/servers.show.md)
 - [servers.rename Command Spec](../commands/servers.rename.md)
+- [servers.configure-edge-proxy Command Spec](../commands/servers.configure-edge-proxy.md)
 - [servers.deactivate Command Spec](../commands/servers.deactivate.md)
 - [servers.delete Command Spec](../commands/servers.delete.md)
 - [servers.delete-check Query Spec](../queries/servers.delete-check.md)
 - [server-renamed Event Spec](../events/server-renamed.md)
+- [server-edge-proxy-configured Event Spec](../events/server-edge-proxy-configured.md)
 - [server-deleted Event Spec](../events/server-deleted.md)
 - [Deployment Target Lifecycle Error Spec](../errors/servers.lifecycle.md)
 - [ADR-004](../decisions/ADR-004-server-readiness-state-storage.md)
@@ -44,6 +47,13 @@ registration, connectivity, proxy bootstrap, and proxy repair behavior.
 | SRV-LIFE-RENAME-003 | `servers.rename` | integration | Server is renamed to the same normalized name. | Returns idempotent `ok({ id })`, does not persist unrelated state, and does not publish a duplicate event. |
 | SRV-LIFE-RENAME-004 | `servers.rename` | integration | Deleted server tombstone is renamed through the ordinary entrypoint. | Returns `not_found`, `phase = server-admission`, does not change tombstone state, and does not publish `server-renamed`. |
 | SRV-LIFE-RENAME-005 | `servers.list` / `servers.show` | integration | Server was renamed successfully. | Normal list and show return the new name while retaining the same server id and lifecycle status. |
+| SRV-LIFE-PROXY-CONFIG-001 | `servers.configure-edge-proxy` | integration | Active server changes from provider-backed proxy kind to `none`. | Returns `ok({ id, edgeProxy })`, persists `kind = none` and `status = disabled`, publishes `server-edge-proxy-configured`, and preserves id, host, provider, credential, lifecycle, deployments, domains, routes, logs, and audit references. |
+| SRV-LIFE-PROXY-CONFIG-002 | `servers.configure-edge-proxy` | integration | Active server changes from `none` to a provider-backed kind. | Returns `ok({ id, edgeProxy })`, persists the selected kind with `status = pending`, publishes `server-edge-proxy-configured`, and does not publish `proxy-bootstrap-requested` or run provider bootstrap. |
+| SRV-LIFE-PROXY-CONFIG-003 | `servers.configure-edge-proxy` | integration | Active server changes between provider-backed kinds. | Returns `ok({ id, edgeProxy })`, persists the new kind with `status = pending`, clears stale current status/error summary for the previous kind, and does not mutate provider-owned artifacts. |
+| SRV-LIFE-PROXY-CONFIG-004 | `servers.configure-edge-proxy` | integration | Server is configured to the same normalized proxy kind. | Returns idempotent `ok({ id, edgeProxy })`, preserves the current proxy status summary, and does not publish a duplicate event. |
+| SRV-LIFE-PROXY-CONFIG-005 | `servers.configure-edge-proxy` | integration | Inactive server is configured through the ordinary entrypoint. | Returns `server_inactive`, `phase = server-lifecycle-guard`, does not mutate edge proxy state, and does not publish `server-edge-proxy-configured`. |
+| SRV-LIFE-PROXY-CONFIG-006 | `servers.configure-edge-proxy` | integration | Deleted server tombstone is configured through the ordinary entrypoint. | Returns `not_found`, `phase = server-admission`, does not change tombstone state, and does not publish `server-edge-proxy-configured`. |
+| SRV-LIFE-PROXY-CONFIG-007 | `servers.list` / `servers.show` | integration | Edge proxy was configured successfully. | Normal list and show return the new edge proxy kind/status while retaining the same server id and lifecycle status. |
 | SRV-LIFE-DEACT-001 | `servers.deactivate` | integration | Active server is deactivated. | Returns `ok({ id })`, persists lifecycle status `inactive`, stores `deactivatedAt`, publishes `server-deactivated`, and leaves credentials/proxy/deployment/domain state intact. |
 | SRV-LIFE-DEACT-002 | `servers.deactivate` | integration | Already inactive server is deactivated again. | Returns idempotent `ok({ id })`, preserves original `deactivatedAt` and reason, and does not publish a duplicate event. |
 | SRV-LIFE-DEACT-003 | `servers.deactivate` | integration | Missing server id. | Returns `not_found`, `phase = server-admission`, and does not publish `server-deactivated`. |
@@ -75,6 +85,10 @@ registration, connectivity, proxy bootstrap, and proxy repair behavior.
 | SRV-LIFE-ENTRY-014 | HTTP/oRPC | e2e-preferred | Server rename route. | `POST /api/servers/{serverId}/rename` reuses `RenameServerCommandInput`, dispatches through `CommandBus`, and returns `{ id }`. |
 | SRV-LIFE-ENTRY-015 | Operation catalog | contract | Public exposure in Code Round. | `CORE_OPERATIONS.md`, `operation-catalog.ts`, and public docs operation coverage include `servers.rename`. |
 | SRV-LIFE-ENTRY-016 | Web | e2e-preferred | Server detail rename action. | Web server detail exposes a display-name input/action for active and inactive servers, dispatches `servers.rename`, and refreshes detail/list-visible name. |
+| SRV-LIFE-ENTRY-017 | CLI | e2e-preferred | Server edge proxy configure command. | `appaloft server proxy configure <serverId> --kind none\|traefik\|caddy` dispatches `ConfigureServerEdgeProxyCommand`; no repository bypass. |
+| SRV-LIFE-ENTRY-018 | HTTP/oRPC | e2e-preferred | Server edge proxy configure route. | `POST /api/servers/{serverId}/edge-proxy/configuration` reuses `ConfigureServerEdgeProxyCommandInput`, dispatches through `CommandBus`, and returns `{ id, edgeProxy }`. |
+| SRV-LIFE-ENTRY-019 | Operation catalog | contract | Public exposure in Code Round. | `CORE_OPERATIONS.md`, `operation-catalog.ts`, and public docs operation coverage include `servers.configure-edge-proxy`. |
+| SRV-LIFE-ENTRY-020 | Web | e2e-preferred | Server detail edge proxy configure action. | Web server detail exposes an active-server proxy kind selector, dispatches `servers.configure-edge-proxy`, and refreshes detail/list-visible proxy status; inactive servers show read-only proxy state. |
 
 ## Required Non-Coverage Assertions
 
@@ -85,6 +99,14 @@ Tests must assert server lifecycle work does not:
 - bootstrap or repair proxy infrastructure from `servers.show`;
 - let `servers.rename` change server id, host, provider, credential, proxy, lifecycle, destinations,
   historical references, or deleted tombstones;
+- let `servers.configure-edge-proxy` change server id, host, provider, credential, lifecycle,
+  destinations, historical references, route snapshots, provider-owned artifacts, or deleted
+  tombstones;
+- let `servers.configure-edge-proxy` implicitly publish `proxy-bootstrap-requested`, call
+  `servers.bootstrap-proxy`, repair proxy infrastructure, apply route configuration, or delete
+  provider-owned artifacts;
+- let inactive servers receive new proxy target configuration through
+  `servers.configure-edge-proxy`;
 - enforce an unstated server-name uniqueness constraint before a governing spec defines one;
 - mutate credentials, resources, deployments, domain bindings, server-applied routes, terminal
   sessions, logs, or audit state from `servers.show` or `servers.delete-check`;
@@ -114,7 +136,10 @@ rows for the guarded delete Code Round.
 `SRV-LIFE-RENAME-*` and `SRV-LIFE-ENTRY-013` through `SRV-LIFE-ENTRY-016` are the required coverage
 rows for the server rename Code Round.
 
+`SRV-LIFE-PROXY-CONFIG-*` and `SRV-LIFE-ENTRY-017` through `SRV-LIFE-ENTRY-020` are the required
+coverage rows for the server edge proxy configure Code Round.
+
 ## Open Questions
 
-- None for `servers.show`, display-name-only rename, one-way deactivate, or delete-check preview
-  semantics.
+- None for `servers.show`, display-name-only rename, intent-only edge proxy configuration,
+  one-way deactivate, or delete-check preview semantics.

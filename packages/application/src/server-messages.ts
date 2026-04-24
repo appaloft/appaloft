@@ -1,6 +1,7 @@
 export * from "./operations/servers/bootstrap-server-proxy.command";
 export * from "./operations/servers/check-server-delete-safety.query";
 export * from "./operations/servers/configure-server-credential.command";
+export * from "./operations/servers/configure-server-edge-proxy.command";
 export * from "./operations/servers/create-ssh-credential.command";
 export * from "./operations/servers/deactivate-server.command";
 export * from "./operations/servers/delete-server.command";

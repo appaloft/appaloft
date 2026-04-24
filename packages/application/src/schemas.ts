@@ -40,6 +40,7 @@ export * from "./operations/resources/unset-resource-variable.schema";
 export * from "./operations/servers/bootstrap-server-proxy.schema";
 export * from "./operations/servers/check-server-delete-safety.schema";
 export * from "./operations/servers/configure-server-credential.schema";
+export * from "./operations/servers/configure-server-edge-proxy.schema";
 export * from "./operations/servers/create-ssh-credential.schema";
 export * from "./operations/servers/deactivate-server.schema";
 export * from "./operations/servers/delete-server.schema";
