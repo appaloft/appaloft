@@ -9,6 +9,7 @@ export const webDocsHrefs = {
   serverConnectivityTest: resolvePublicDocsHelpHref("server.connectivity-test"),
   serverProxyReadiness: resolvePublicDocsHelpHref("server.proxy-readiness"),
   serverTerminalSession: resolvePublicDocsHelpHref("server.terminal-session"),
+  projectLifecycle: resolvePublicDocsHelpHref("project.lifecycle"),
   defaultAccessPolicy: resolvePublicDocsHelpHref("default-access.policy"),
   resourceConcept: resolvePublicDocsHelpHref("resource.concept"),
   resourceSourceProfile: resolvePublicDocsHelpHref("resource.source-profile"),

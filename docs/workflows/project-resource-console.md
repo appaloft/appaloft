@@ -23,6 +23,10 @@ This workflow inherits:
 - [ADR-018: Resource Runtime Log Observation](../decisions/ADR-018-resource-runtime-log-observation.md)
 - [ADR-020: Resource Health Observation](../decisions/ADR-020-resource-health-observation.md)
 - [ADR-022: Operator Terminal Session Boundary](../decisions/ADR-022-operator-terminal-session-boundary.md)
+- [Project Lifecycle Workflow Spec](./project-lifecycle.md)
+- [projects.show Query Spec](../queries/projects.show.md)
+- [projects.rename Command Spec](../commands/projects.rename.md)
+- [projects.archive Command Spec](../commands/projects.archive.md)
 - [resources.create Command Spec](../commands/resources.create.md)
 - [resources.show Query Spec](../queries/resources.show.md)
 - [resources.configure-source Command Spec](../commands/resources.configure-source.md)
@@ -53,6 +57,10 @@ Project detail pages must prioritize:
 2. Resource list for the project.
 3. Create resource action.
 4. Secondary rollups such as environments, domain bindings, and all deployments for the project.
+
+Project identity and lifecycle must come from `projects.show` where a detail read is needed.
+Project name changes and project archive actions must dispatch `projects.rename` and
+`projects.archive`; no generic `projects.update` form is allowed.
 
 Project detail pages must not make "new deployment" look like a project-owned command.
 

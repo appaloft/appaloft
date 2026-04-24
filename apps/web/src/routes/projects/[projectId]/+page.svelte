@@ -1,14 +1,20 @@
 <script lang="ts">
   import { browser } from "$app/environment";
   import { page } from "$app/state";
-  import { ArrowLeft, ArrowRight, FolderOpen, Play, Plus } from "@lucide/svelte";
+  import { createMutation, createQuery, queryOptions } from "@tanstack/svelte-query";
+  import { Archive, ArrowLeft, ArrowRight, FolderOpen, Play, Plus, Save } from "@lucide/svelte";
+  import type { ArchiveProjectInput, RenameProjectInput } from "@appaloft/contracts";
 
+  import { readErrorMessage } from "$lib/api/client";
   import DeploymentTable from "$lib/components/console/DeploymentTable.svelte";
   import ConsoleShell from "$lib/components/console/ConsoleShell.svelte";
+  import DocsHelpLink from "$lib/components/console/DocsHelpLink.svelte";
   import ResourceHealthDot from "$lib/components/console/ResourceHealthDot.svelte";
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
+  import { Input } from "$lib/components/ui/input";
   import { Skeleton } from "$lib/components/ui/skeleton";
+  import { webDocsHrefs } from "$lib/console/docs-help";
   import { createConsoleQueries } from "$lib/console/queries";
   import {
     deploymentDetailHref,
@@ -19,11 +25,21 @@
     resourceDetailHref,
   } from "$lib/console/utils";
   import { i18nKeys, t } from "$lib/i18n";
+  import { orpcClient } from "$lib/orpc";
+  import { queryClient } from "$lib/query-client";
 
   const { projectsQuery, environmentsQuery, resourcesQuery, deploymentsQuery } =
     createConsoleQueries(browser);
 
   const projectId = $derived(page.params.projectId ?? "");
+  const projectDetailQuery = createQuery(() =>
+    queryOptions({
+      queryKey: ["projects", "show", projectId],
+      queryFn: () => orpcClient.projects.show({ projectId }),
+      enabled: browser && projectId.length > 0,
+      staleTime: 5_000,
+    }),
+  );
   const projects = $derived(projectsQuery.data?.items ?? []);
   const environments = $derived(environmentsQuery.data?.items ?? []);
   const resources = $derived(resourcesQuery.data?.items ?? []);
@@ -32,9 +48,11 @@
     projectsQuery.isPending ||
       environmentsQuery.isPending ||
       resourcesQuery.isPending ||
-      deploymentsQuery.isPending,
+      deploymentsQuery.isPending ||
+      projectDetailQuery.isPending,
   );
-  const project = $derived(findProject(projects, projectId));
+  const project = $derived(projectDetailQuery.data ?? findProject(projects, projectId));
+  const isProjectArchived = $derived(project?.lifecycleStatus === "archived");
   const projectEnvironments = $derived(
     project ? environments.filter((environment) => environment.projectId === project.id) : [],
   );
@@ -60,6 +78,94 @@
       ),
     ),
   );
+  let lifecycleFeedback = $state<{
+    kind: "success" | "error";
+    title: string;
+    detail: string;
+  } | null>(null);
+  let projectFormProjectId = $state("");
+  let projectName = $state("");
+  const canRenameProject = $derived(
+    Boolean(project) &&
+      !isProjectArchived &&
+      projectName.trim().length > 0 &&
+      projectName.trim() !== project?.name,
+  );
+  const renameProjectMutation = createMutation(() => ({
+    mutationFn: (input: RenameProjectInput) => orpcClient.projects.rename(input),
+    onSuccess: (result) => {
+      lifecycleFeedback = {
+        kind: "success",
+        title: $t(i18nKeys.console.projects.renameSucceeded),
+        detail: result.id,
+      };
+      void queryClient.invalidateQueries({ queryKey: ["projects"] });
+      void queryClient.invalidateQueries({ queryKey: ["projects", "show", result.id] });
+    },
+    onError: (error) => {
+      lifecycleFeedback = {
+        kind: "error",
+        title: $t(i18nKeys.console.projects.renameFailed),
+        detail: readErrorMessage(error),
+      };
+    },
+  }));
+  const archiveProjectMutation = createMutation(() => ({
+    mutationFn: (input: ArchiveProjectInput) => orpcClient.projects.archive(input),
+    onSuccess: (result) => {
+      lifecycleFeedback = {
+        kind: "success",
+        title: $t(i18nKeys.console.projects.archiveSucceeded),
+        detail: result.id,
+      };
+      void queryClient.invalidateQueries({ queryKey: ["projects"] });
+      void queryClient.invalidateQueries({ queryKey: ["projects", "show", result.id] });
+    },
+    onError: (error) => {
+      lifecycleFeedback = {
+        kind: "error",
+        title: $t(i18nKeys.console.projects.archiveFailed),
+        detail: readErrorMessage(error),
+      };
+    },
+  }));
+
+  $effect(() => {
+    if (!project || projectFormProjectId === project.id) {
+      return;
+    }
+
+    projectFormProjectId = project.id;
+    projectName = project.name;
+    lifecycleFeedback = null;
+  });
+
+  function renameProject(): void {
+    if (!browser || !project || !canRenameProject || renameProjectMutation.isPending) {
+      return;
+    }
+
+    lifecycleFeedback = null;
+    renameProjectMutation.mutate({
+      projectId: project.id,
+      name: projectName.trim(),
+    });
+  }
+
+  function archiveProject(): void {
+    if (!browser || !project || isProjectArchived || archiveProjectMutation.isPending) {
+      return;
+    }
+
+    if (!window.confirm($t(i18nKeys.console.projects.archiveConfirm))) {
+      return;
+    }
+
+    lifecycleFeedback = null;
+    archiveProjectMutation.mutate({
+      projectId: project.id,
+    });
+  }
 
 </script>
 
@@ -110,6 +216,11 @@
             <div class="flex flex-wrap items-center gap-2">
               <Badge variant="outline">{$t(i18nKeys.common.domain.project)}</Badge>
               <Badge variant="secondary">{project.slug}</Badge>
+              <Badge variant={isProjectArchived ? "destructive" : "secondary"}>
+                {isProjectArchived
+                  ? $t(i18nKeys.console.projects.archived)
+                  : $t(i18nKeys.console.projects.active)}
+              </Badge>
             </div>
             <div class="space-y-2">
               <h1 class="text-2xl font-semibold md:text-3xl">{project.name}</h1>
@@ -120,10 +231,15 @@
             <p class="text-xs text-muted-foreground">
               {$t(i18nKeys.common.domain.createdAt)} · {formatTime(project.createdAt)}
             </p>
+            {#if project.archivedAt}
+              <p class="text-xs text-muted-foreground">
+                {$t(i18nKeys.console.projects.archivedAt)} · {formatTime(project.archivedAt)}
+              </p>
+            {/if}
           </div>
 
           <div class="flex flex-wrap gap-2">
-            <Button href={projectCreateResourceHref(project.id)}>
+            <Button href={projectCreateResourceHref(project.id)} disabled={isProjectArchived}>
               <Plus class="size-4" />
               {$t(i18nKeys.common.actions.createResource)}
             </Button>
@@ -161,6 +277,80 @@
         </dl>
       </section>
 
+      <section class="space-y-4 border-y py-5">
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div class="space-y-1">
+            <div class="flex items-center gap-2">
+              <h2 class="text-lg font-semibold">{$t(i18nKeys.console.projects.settingsTitle)}</h2>
+              <DocsHelpLink
+                href={webDocsHrefs.projectLifecycle}
+                ariaLabel={$t(i18nKeys.common.actions.openDocumentation)}
+              />
+            </div>
+            <p class="text-sm text-muted-foreground">
+              {$t(i18nKeys.console.projects.settingsDescription)}
+            </p>
+          </div>
+          <Button
+            type="button"
+            variant="destructive"
+            disabled={isProjectArchived || archiveProjectMutation.isPending}
+            onclick={archiveProject}
+          >
+            <Archive class="size-4" />
+            {archiveProjectMutation.isPending
+              ? $t(i18nKeys.common.actions.saving)
+              : $t(i18nKeys.console.projects.archiveAction)}
+          </Button>
+        </div>
+
+        {#if isProjectArchived}
+          <div class="rounded-md border border-destructive/20 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+            {$t(i18nKeys.console.projects.archiveNotice)}
+          </div>
+        {/if}
+
+        {#if lifecycleFeedback}
+          <div
+            class={`rounded-md border px-3 py-2 text-sm ${
+              lifecycleFeedback.kind === "success"
+                ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+                : "border-destructive/20 bg-destructive/5 text-destructive"
+            }`}
+          >
+            <p class="font-medium">{lifecycleFeedback.title}</p>
+            <p class="mt-1 opacity-80">{lifecycleFeedback.detail}</p>
+          </div>
+        {/if}
+
+        <form
+          class="grid gap-3 sm:grid-cols-[minmax(0,22rem)_auto] sm:items-end"
+          onsubmit={(event) => {
+            event.preventDefault();
+            renameProject();
+          }}
+        >
+          <label class="grid gap-1 text-sm">
+            <span class="font-medium">{$t(i18nKeys.console.projects.renameLabel)}</span>
+            <Input
+              bind:value={projectName}
+              autocomplete="off"
+              disabled={isProjectArchived || renameProjectMutation.isPending}
+            />
+          </label>
+          <Button
+            type="submit"
+            variant="outline"
+            disabled={!canRenameProject || renameProjectMutation.isPending}
+          >
+            <Save class="size-4" />
+            {renameProjectMutation.isPending
+              ? $t(i18nKeys.common.actions.saving)
+              : $t(i18nKeys.common.actions.save)}
+          </Button>
+        </form>
+      </section>
+
       <section class="grid gap-8 xl:grid-cols-[minmax(0,1fr)_20rem]">
         <section class="min-w-0 space-y-4">
           <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
@@ -170,7 +360,11 @@
                 {$t(i18nKeys.console.projects.resourcesDescription)}
               </p>
             </div>
-            <Button href={projectCreateResourceHref(project.id)} variant="outline">
+            <Button
+              href={projectCreateResourceHref(project.id)}
+              variant="outline"
+              disabled={isProjectArchived}
+            >
               <Plus class="size-4" />
               {$t(i18nKeys.common.actions.createResource)}
             </Button>
@@ -321,7 +515,11 @@
                   <p class="text-sm text-muted-foreground">
                     {$t(i18nKeys.console.projects.noProjectDeploymentBody)}
                   </p>
-                  <Button size="sm" href={projectCreateResourceHref(project.id)}>
+                  <Button
+                    size="sm"
+                    href={projectCreateResourceHref(project.id)}
+                    disabled={isProjectArchived}
+                  >
                     <Play class="size-4" />
                     {$t(i18nKeys.common.actions.deploy)}
                   </Button>

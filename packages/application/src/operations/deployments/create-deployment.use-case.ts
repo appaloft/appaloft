@@ -791,6 +791,7 @@ export class CreateDeploymentUseCase {
         effectiveInput,
       );
       const { project, server, destination, environment, resource } = yield* resolvedContextResult;
+      yield* project.ensureCanAcceptMutation("deployments.create");
 
       const resourceSourceResult = createResourceSourceDescriptor(resource);
       const resourceSource = yield* resourceSourceResult;

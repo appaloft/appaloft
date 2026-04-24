@@ -65,13 +65,16 @@ Current status:
   diagnostics, and terminal surfaces. Covered help topics include source, server target, SSH
   credentials, connectivity testing, environment selection, variable precedence, resource identity,
   runtime, health, network profile, custom domain, generated access route, TLS certificate
-  readiness, proxy readiness, safe diagnostic payloads, runtime logs, and terminal sessions.
+  readiness, proxy readiness, project lifecycle, safe diagnostic payloads, runtime logs, and
+  terminal sessions.
 - `PUB-DOCS-011` has expanded CLI coverage for high-confusion operations including deployment
   source, preview cleanup, source relink, SSH credentials, server connectivity, terminal sessions,
-  resource profiles, environment variables, domains, certificates, logs, health, and diagnostics.
+  project lifecycle, resource profiles, environment variables, domains, certificates, logs, health,
+  and diagnostics.
 - `PUB-DOCS-012` has expanded HTTP/API route-description coverage for high-confusion operations
   including deployment source, SSH credentials, server connectivity, resource profiles, environment
-  variables, domains, certificates, logs, health, diagnostics, and terminal sessions.
+  variables, project lifecycle, domains, certificates, logs, health, diagnostics, and terminal
+  sessions.
 - `PUB-DOCS-013` is covered by HTTP adapter tests for embedded docs routing and binary bundle smoke
   verification that `/docs/*` is served separately from Web console assets.
 - `PUB-DOCS-014` is covered by HTTP adapter tests for `docsStaticDir` override behavior and binary

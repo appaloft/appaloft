@@ -892,6 +892,9 @@ export interface ProjectSummary {
   name: string;
   slug: string;
   description?: string;
+  lifecycleStatus: "active" | "archived";
+  archivedAt?: string;
+  archiveReason?: string;
   createdAt: string;
 }
 

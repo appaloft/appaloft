@@ -255,6 +255,9 @@ export class MemoryProjectReadModel implements ProjectReadModel {
         name: state.name.value,
         slug: state.slug.value,
         ...(state.description ? { description: state.description.value } : {}),
+        lifecycleStatus: state.lifecycleStatus.value,
+        ...(state.archivedAt ? { archivedAt: state.archivedAt.value } : {}),
+        ...(state.archiveReason ? { archiveReason: state.archiveReason.value } : {}),
         createdAt: state.createdAt.value,
       };
     });
@@ -274,6 +277,9 @@ export class MemoryProjectReadModel implements ProjectReadModel {
         name: state.name.value,
         slug: state.slug.value,
         ...(state.description ? { description: state.description.value } : {}),
+        lifecycleStatus: state.lifecycleStatus.value,
+        ...(state.archivedAt ? { archivedAt: state.archivedAt.value } : {}),
+        ...(state.archiveReason ? { archiveReason: state.archiveReason.value } : {}),
         createdAt: state.createdAt.value,
       };
     }
@@ -287,6 +293,9 @@ export class MemoryProjectReadModel implements ProjectReadModel {
             name: state.name.value,
             slug: state.slug.value,
             ...(state.description ? { description: state.description.value } : {}),
+            lifecycleStatus: state.lifecycleStatus.value,
+            ...(state.archivedAt ? { archivedAt: state.archivedAt.value } : {}),
+            ...(state.archiveReason ? { archiveReason: state.archiveReason.value } : {}),
             createdAt: state.createdAt.value,
           };
         }

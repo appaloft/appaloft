@@ -38,6 +38,11 @@ function toProjectSummary(
     name: row.name,
     slug: row.slug,
     createdAt: normalizeTimestamp(row.created_at) ?? row.created_at,
+    lifecycleStatus: row.lifecycle_status as "active" | "archived",
+    ...(row.archived_at
+      ? { archivedAt: normalizeTimestamp(row.archived_at) ?? row.archived_at }
+      : {}),
+    ...(row.archive_reason ? { archiveReason: row.archive_reason } : {}),
     ...(row.description ? { description: row.description } : {}),
   };
 }

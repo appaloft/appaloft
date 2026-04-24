@@ -191,12 +191,15 @@ function createTestContext(): ExecutionContext {
 }
 
 function projectSummary(overrides?: Partial<ProjectSummary>): ProjectSummary {
+  const { lifecycleStatus = "active", ...rest } = overrides ?? {};
+
   return {
     id: "prj_demo",
     name: "Demo",
     slug: "demo",
+    lifecycleStatus,
     createdAt: "2026-01-01T00:00:00.000Z",
-    ...overrides,
+    ...rest,
   };
 }
 

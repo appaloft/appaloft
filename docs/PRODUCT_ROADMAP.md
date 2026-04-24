@@ -342,12 +342,12 @@ Already done:
 - [x] Resource read/list, health, runtime logs, proxy preview, diagnostics, configure-health, and Web
   resource detail observation exist.
 - [x] Environment create/list/show/set/unset/diff/promote exists.
-- [x] Project create/list exists.
+- [x] Project create/list/show/rename/archive exists.
 - [x] Server register/list/connectivity/proxy-repair and credential baseline exist.
 
 Required:
 
-- [ ] Add project show/update/archive.
+- [x] Add project show/rename/archive.
 - [ ] Add server show/update/deactivate/delete safety rules and credential usage visibility.
 - [ ] Add credential show/rotate/delete when unused.
 - [ ] Add resource show/update/archive/delete.
@@ -608,7 +608,8 @@ This ledger is the horizontal closure checklist. Each resource or internal state
 work below before GA.
 
 - [x] Project: `projects.create`, `projects.list`.
-- [ ] Project: show, update profile, archive/delete safety, resource rollup.
+- [x] Project: show, rename, archive safety.
+- [ ] Project: delete/restore safety, description editing, resource rollup.
 - [x] Environment: create/list/show, set/unset variable, diff, promote.
 - [ ] Environment: update, clone, lock/archive, effective precedence, history.
 - [x] Deployment target/server: register, list, configure credential, connectivity, proxy repair,

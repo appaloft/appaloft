@@ -45,6 +45,9 @@ class KyselyProjectMutationVisitor
         name: spec.state.name.value,
         slug: spec.state.slug.value,
         description: spec.state.description?.value ?? null,
+        lifecycle_status: spec.state.lifecycleStatus.value,
+        archived_at: spec.state.archivedAt?.value ?? null,
+        archive_reason: spec.state.archiveReason?.value ?? null,
         created_at: spec.state.createdAt.value,
       },
     };
@@ -79,6 +82,9 @@ export class PgProjectRepository implements ProjectRepository {
               name: mutation.values.name,
               slug: mutation.values.slug,
               description: mutation.values.description,
+              lifecycle_status: mutation.values.lifecycle_status,
+              archived_at: mutation.values.archived_at,
+              archive_reason: mutation.values.archive_reason,
             }),
           )
           .execute();

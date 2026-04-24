@@ -8,6 +8,9 @@ export interface ProjectsTable {
   name: string;
   slug: string;
   description: string | null;
+  lifecycle_status: ColumnType<string, string | undefined, string>;
+  archived_at: ColumnType<string | null, string | null | undefined, string | null>;
+  archive_reason: ColumnType<string | null, string | null | undefined, string | null>;
   created_at: TimestampColumn;
 }
 

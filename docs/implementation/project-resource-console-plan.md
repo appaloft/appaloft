@@ -19,6 +19,10 @@ This document is an implementation-planning contract for aligning the Web consol
 
 - [Project Resource Console Workflow Spec](../workflows/project-resource-console.md)
 - [Project Resource Console Test Matrix](../testing/project-resource-console-test-matrix.md)
+- [Project Lifecycle Workflow Spec](../workflows/project-lifecycle.md)
+- [projects.show Query Spec](../queries/projects.show.md)
+- [projects.rename Command Spec](../commands/projects.rename.md)
+- [projects.archive Command Spec](../commands/projects.archive.md)
 - [resources.create Command Spec](../commands/resources.create.md)
 - [deployments.create Command Spec](../commands/deployments.create.md)
 - [resources.health Query Spec](../queries/resources.health.md)
@@ -39,6 +43,8 @@ This document is an implementation-planning contract for aligning the Web consol
 Expected Web implementation scope:
 
 - project detail page:
+  - read project identity and lifecycle through `projects.show` where available;
+  - expose project rename/archive only through `projects.rename` and `projects.archive`;
   - make resource list the primary body;
   - keep project-level deployment list as a secondary rollup;
   - make project-level new deployment enter Quick Deploy or resource selection;

@@ -65,6 +65,32 @@ export const publicDocsHelpTopics = {
     relatedOperation: "resources.create",
     aliases: ["resource", "app", "service", "资源"],
   },
+  "project.lifecycle": {
+    id: "project.lifecycle",
+    title: "Project lifecycle",
+    description:
+      "How to read, rename, and archive projects without turning deployments into project-owned actions.",
+    page: {
+      "zh-CN": "resources/projects",
+      "en-US": "en/resources/projects",
+    },
+    anchor: "project-lifecycle",
+    localeCoverage: {
+      "zh-CN": "complete",
+      "en-US": "complete",
+    },
+    surfaces: ["web", "cli", "http-api", "mcp"],
+    relatedOperation: "projects.show",
+    aliases: ["project show", "project rename", "project archive", "project lifecycle", "项目归档"],
+    specReferences: [
+      "docs/workflows/project-lifecycle.md",
+      "docs/queries/projects.show.md",
+      "docs/commands/projects.rename.md",
+      "docs/commands/projects.archive.md",
+      "docs/testing/project-lifecycle-test-matrix.md",
+    ],
+    webSurfaces: ["apps/web project detail/settings surfaces"],
+  },
   "server.deployment-target": {
     id: "server.deployment-target",
     title: "Server deployment target",
@@ -593,6 +619,9 @@ export type PublicDocsOperationCoverage =
 export const publicDocsOperationCoverage = [
   { operationKey: "projects.create", status: "documented", topicId: "project.concept" },
   { operationKey: "projects.list", status: "documented", topicId: "project.concept" },
+  { operationKey: "projects.show", status: "documented", topicId: "project.lifecycle" },
+  { operationKey: "projects.rename", status: "documented", topicId: "project.lifecycle" },
+  { operationKey: "projects.archive", status: "documented", topicId: "project.lifecycle" },
   { operationKey: "servers.register", status: "documented", topicId: "server.deployment-target" },
   {
     operationKey: "servers.configure-credential",
@@ -703,6 +732,11 @@ export const publicDocsOperationCoverage = [
   { operationKey: "deployments.list", status: "documented", topicId: "deployment.lifecycle" },
   { operationKey: "deployments.show", status: "documented", topicId: "deployment.lifecycle" },
   { operationKey: "deployments.logs", status: "documented", topicId: "observability.runtime-logs" },
+  {
+    operationKey: "deployments.stream-events",
+    status: "documented",
+    topicId: "deployment.lifecycle",
+  },
   {
     operationKey: "source-links.relink",
     status: "documented",
