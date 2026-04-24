@@ -12,11 +12,13 @@
     KeyRound,
     Network,
     Server,
+    ShieldAlert,
     TriangleAlert,
     XCircle,
   } from "@lucide/svelte";
   import type {
     ConfigureDefaultAccessDomainPolicyInput,
+    ServerDeleteSafety,
     ServerSummary,
     TestServerConnectivityResponse,
   } from "@appaloft/contracts";
@@ -64,6 +66,17 @@
       staleTime: 5_000,
     }),
   );
+  const serverDeleteSafetyQuery = createQuery(() =>
+    queryOptions({
+      queryKey: ["servers", "delete-check", serverId],
+      queryFn: () =>
+        orpcClient.servers.deleteCheck({
+          serverId,
+        }),
+      enabled: browser && serverId.length > 0,
+      staleTime: 5_000,
+    }),
+  );
   const projects = $derived(projectsQuery.data?.items ?? []);
   const deployments = $derived(deploymentsQuery.data?.items ?? []);
   const pageLoading = $derived(
@@ -71,6 +84,10 @@
   );
   const serverDetail = $derived(serverDetailQuery.data ?? null);
   const server = $derived(serverDetail?.server ?? null);
+  const serverDeleteSafety = $derived(serverDeleteSafetyQuery.data ?? null);
+  const serverDeleteSafetyError = $derived(
+    serverDeleteSafetyQuery.error ? readErrorMessage(serverDeleteSafetyQuery.error) : "",
+  );
   const serverRollups = $derived(serverDetail?.rollups ?? null);
   const serverDeployments = $derived(
     server ? deployments.filter((deployment) => deployment.serverId === server.id) : [],
@@ -234,6 +251,32 @@
         return "outline";
     }
   }
+
+  function serverLifecycleLabel(status: ServerSummary["lifecycleStatus"]): string {
+    switch (status) {
+      case "active":
+        return $t(i18nKeys.common.status.active);
+      case "inactive":
+        return $t(i18nKeys.common.status.inactive);
+    }
+  }
+
+  function serverLifecycleVariant(
+    status: ServerSummary["lifecycleStatus"],
+  ): "default" | "secondary" | "outline" | "destructive" {
+    switch (status) {
+      case "active":
+        return "default";
+      case "inactive":
+        return "outline";
+    }
+  }
+
+  function deleteSafetyLabel(safety: ServerDeleteSafety): string {
+    return safety.eligible
+      ? $t(i18nKeys.console.servers.deleteSafetyEligible)
+      : $t(i18nKeys.console.servers.deleteSafetyBlocked);
+  }
 </script>
 
 <svelte:head>
@@ -278,6 +321,9 @@
             <div class="flex flex-wrap items-center gap-2">
               <Badge variant="outline">{$t(i18nKeys.common.domain.server)}</Badge>
               <Badge variant="secondary">{server.providerKey}</Badge>
+              <Badge variant={serverLifecycleVariant(server.lifecycleStatus)}>
+                {serverLifecycleLabel(server.lifecycleStatus)}
+              </Badge>
             </div>
             <div class="space-y-2">
               <h1 class="text-2xl font-semibold md:text-3xl">{server.name}</h1>
@@ -288,6 +334,14 @@
             <p class="text-xs text-muted-foreground">
               {$t(i18nKeys.common.domain.createdAt)} · {formatTime(server.createdAt)}
             </p>
+            {#if server.lifecycleStatus === "inactive"}
+              <p class="text-xs text-muted-foreground">
+                {$t(i18nKeys.console.servers.lifecycleInactiveDescription)}
+                {#if server.deactivatedAt}
+                  · {$t(i18nKeys.console.servers.deactivatedAt)} {formatTime(server.deactivatedAt)}
+                {/if}
+              </p>
+            {/if}
           </div>
 
           <div class="flex flex-wrap gap-2">
@@ -378,6 +432,39 @@
             </div>
           </div>
         {/if}
+
+        <div class="border-y px-0 py-4 sm:px-4">
+          <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div class="min-w-0 space-y-1">
+              <p class="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                <ShieldAlert class="size-4" />
+                {$t(i18nKeys.console.servers.deleteSafetyTitle)}
+              </p>
+              <p class="text-sm text-muted-foreground">
+                {$t(i18nKeys.console.servers.deleteSafetyDescription)}
+              </p>
+            </div>
+            <div class="flex flex-wrap items-center gap-2">
+              {#if serverDeleteSafetyQuery.isPending}
+                <Badge variant="secondary">{$t(i18nKeys.common.status.loading)}</Badge>
+              {:else if serverDeleteSafety}
+                <Badge variant={serverDeleteSafety.eligible ? "default" : "destructive"}>
+                  {deleteSafetyLabel(serverDeleteSafety)}
+                </Badge>
+                <span class="text-sm text-muted-foreground">
+                  {$t(i18nKeys.console.servers.deleteSafetyBlockerCount, {
+                    count: serverDeleteSafety.blockers.length,
+                  })}
+                </span>
+              {:else if serverDeleteSafetyError}
+                <Badge variant="destructive">{$t(i18nKeys.common.status.failed)}</Badge>
+                <span class="max-w-xl truncate text-sm text-muted-foreground">
+                  {serverDeleteSafetyError}
+                </span>
+              {/if}
+            </div>
+          </div>
+        </div>
       </section>
 
       <section class="space-y-4 border-y py-6">

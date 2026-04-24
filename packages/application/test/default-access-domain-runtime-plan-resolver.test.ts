@@ -5,6 +5,7 @@ import {
   CreatedAt,
   DeploymentTargetDescriptor,
   DeploymentTargetId,
+  DeploymentTargetLifecycleStatusValue,
   DeploymentTargetName,
   type DeploymentTargetState,
   DetectSummary,
@@ -105,6 +106,7 @@ function createServer(): DeploymentTargetState {
     port: PortNumber.rehydrate(22),
     providerKey: ProviderKey.rehydrate("generic-ssh"),
     targetKind: TargetKindValue.rehydrate("single-server"),
+    lifecycleStatus: DeploymentTargetLifecycleStatusValue.active(),
     edgeProxy: {
       kind: EdgeProxyKindValue.rehydrate("traefik"),
       status: EdgeProxyStatusValue.rehydrate("ready"),

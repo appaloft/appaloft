@@ -5,9 +5,11 @@
 This matrix covers:
 
 - `servers.show`;
+- `servers.deactivate`;
+- `servers.delete-check`;
 - operation catalog and public docs coverage for the server detail query;
 - explicit non-coverage for generic `servers.update`;
-- future placeholders for server deactivate/delete safety.
+- explicit non-coverage for destructive `servers.delete` until its own guarded command is specified.
 
 It complements [Server Bootstrap Test Matrix](./server-bootstrap-test-matrix.md), which owns
 registration, connectivity, proxy bootstrap, and proxy repair behavior.
@@ -30,10 +32,23 @@ registration, connectivity, proxy bootstrap, and proxy repair behavior.
 | SRV-LIFE-SHOW-002 | `servers.show` | integration | Missing server id. | Returns `not_found`, `phase = server-read`, and no rollup reads are required. |
 | SRV-LIFE-SHOW-003 | `servers.show` | integration | Existing server with deployments and domain bindings. | Returns deployment/resource/domain rollups derived from read models, including status counts and latest navigation ids. |
 | SRV-LIFE-SHOW-004 | `servers.show` | integration | Caller disables rollups. | Returns base server detail without rollups and does not require deployment/domain read-model queries. |
+| SRV-LIFE-DEACT-001 | `servers.deactivate` | integration | Active server is deactivated. | Returns `ok({ id })`, persists lifecycle status `inactive`, stores `deactivatedAt`, publishes `server-deactivated`, and leaves credentials/proxy/deployment/domain state intact. |
+| SRV-LIFE-DEACT-002 | `servers.deactivate` | integration | Already inactive server is deactivated again. | Returns idempotent `ok({ id })`, preserves original `deactivatedAt` and reason, and does not publish a duplicate event. |
+| SRV-LIFE-DEACT-003 | `servers.deactivate` | integration | Missing server id. | Returns `not_found`, `phase = server-admission`, and does not publish `server-deactivated`. |
+| SRV-LIFE-DEACT-004 | `deployments.create` | integration | Caller requests a new deployment on an inactive server. | Admission returns `server_inactive` with `phase = server-lifecycle-guard`; no deployment attempt is accepted. |
+| SRV-LIFE-DELETE-CHECK-001 | `servers.delete-check` | integration | Active server is checked. | Returns `ok` with `schemaVersion = "servers.delete-check/v1"`, `eligible = false`, and an `active-server` blocker. |
+| SRV-LIFE-DELETE-CHECK-002 | `servers.delete-check` | integration | Inactive server has retained deployments/domains/routes/credential/log/audit blockers. | Returns `ok` with `eligible = false` and safe typed blocker kinds/counts. |
+| SRV-LIFE-DELETE-CHECK-003 | `servers.delete-check` | integration | Inactive server has no blockers. | Returns `ok` with `eligible = true` and an empty blocker list. |
+| SRV-LIFE-DELETE-CHECK-004 | `servers.delete-check` | integration | Missing server id. | Returns `not_found`, `phase = server-read`. |
 | SRV-LIFE-ENTRY-001 | CLI | e2e-preferred | Server show command. | `appaloft server show <serverId>` dispatches `ShowServerQuery`; no repository bypass. |
 | SRV-LIFE-ENTRY-002 | HTTP/oRPC | e2e-preferred | Server show route. | `GET /api/servers/{serverId}` reuses `ShowServerQueryInput`, dispatches through `QueryBus`, and returns `ServerDetail`. |
 | SRV-LIFE-ENTRY-003 | Operation catalog | contract | Public exposure in Code Round. | `CORE_OPERATIONS.md`, `operation-catalog.ts`, and public docs operation coverage include `servers.show`. |
 | SRV-LIFE-ENTRY-004 | Web | e2e-preferred | Server detail page. | Web server detail reads `servers.show` for identity/status/rollups while keeping repair/terminal actions separate. |
+| SRV-LIFE-ENTRY-005 | CLI | e2e-preferred | Server deactivate command. | `appaloft server deactivate <serverId>` dispatches `DeactivateServerCommand`; no repository bypass. |
+| SRV-LIFE-ENTRY-006 | HTTP/oRPC | e2e-preferred | Server deactivate route. | `POST /api/servers/{serverId}/deactivate` reuses `DeactivateServerCommandInput`, dispatches through `CommandBus`, and returns `{ id }`. |
+| SRV-LIFE-ENTRY-007 | CLI | e2e-preferred | Server delete-check command. | `appaloft server delete-check <serverId>` dispatches `CheckServerDeleteSafetyQuery`; no repository bypass. |
+| SRV-LIFE-ENTRY-008 | HTTP/oRPC | e2e-preferred | Server delete-check route. | `GET /api/servers/{serverId}/delete-check` reuses `CheckServerDeleteSafetyQueryInput`, dispatches through `QueryBus`, and returns `ServerDeleteSafety`. |
+| SRV-LIFE-ENTRY-009 | Operation catalog | contract | Public exposure in Code Round. | `CORE_OPERATIONS.md`, `operation-catalog.ts`, and public docs operation coverage include `servers.deactivate` and `servers.delete-check`. |
 
 ## Required Non-Coverage Assertions
 
@@ -43,7 +58,9 @@ Tests must assert server lifecycle work does not:
 - run connectivity tests from `servers.show`;
 - bootstrap or repair proxy infrastructure from `servers.show`;
 - mutate credentials, resources, deployments, domain bindings, server-applied routes, terminal
-  sessions, logs, or audit state from `servers.show`.
+  sessions, logs, or audit state from `servers.show` or `servers.delete-check`;
+- expose destructive `servers.delete` before the guarded command spec, typed confirmation,
+  persistence/tombstone behavior, and entrypoint tests exist.
 
 ## Current Implementation Notes And Migration Gaps
 
@@ -58,8 +75,11 @@ The active implementation covers:
 `SRV-LIFE-SHOW-004` is covered as a companion branch in `packages/application/test/show-server.test.ts`.
 `SRV-LIFE-ENTRY-004` is covered in `apps/web/test/e2e-webview/home.webview.test.ts`.
 
-Deactivate/delete safety rows must be added before those commands are implemented.
+`SRV-LIFE-DEACT-*`, `SRV-LIFE-DELETE-CHECK-*`, and `SRV-LIFE-ENTRY-005` through
+`SRV-LIFE-ENTRY-009` are the required coverage rows for the deactivate/delete-safety Code Round.
+
+Actual destructive `servers.delete` remains unimplemented and intentionally unexposed.
 
 ## Open Questions
 
-- None for `servers.show`.
+- None for `servers.show`, one-way deactivate, or delete-check preview semantics.

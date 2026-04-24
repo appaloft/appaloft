@@ -49,6 +49,7 @@ type DeploymentCreateErrorDetails = {
     | "config-profile-resolution"
     | "config-capability-resolution"
     | "context-resolution"
+    | "server-lifecycle-guard"
     | "operation-coordination"
     | "redeploy-guard"
     | "admission-conflict"
@@ -142,6 +143,7 @@ Admission errors reject the command and return `err(DomainError)`.
 | `validation_error` | `config-discovery`, `config-parse`, `config-schema`, `config-identity`, `config-secret-validation`, `config-profile-resolution` | No | Repository config file could not be safely used by the entry workflow. Details may include config path, format, safe schema issue paths, or rejected field names, but must not include secret values. |
 | `unsupported_config_field` | `config-capability-resolution` | No | Repository config requested a known future capability that Appaloft cannot enforce yet, such as CPU, memory, replicas, restart policy, rollout overlap, or rollout drain. |
 | `not_found` | `context-resolution` | No | Entity type, entity id, `commandName`, `phase`. |
+| `server_inactive` | `server-lifecycle-guard` | No | Server id, lifecycle status, `commandName`, `phase`, and deactivation timestamp when available. |
 | `coordination_timeout` | `operation-coordination` | Yes | Bounded waiting for the logical `resource-runtime` coordination scope elapsed before admission could proceed. Details should include `coordinationScopeKind`, safe `coordinationScope`, `coordinationMode`, `waitedSeconds`, and retry hint fields when available. |
 | `deployment_not_redeployable` | `redeploy-guard` | No | Existing or concurrently-admitted deployment id when available, resource id, current deployment status, and safe cause metadata when a concurrent submit lost the atomic active-attempt race or another request won the supersede race first. |
 | `conflict` | `supersede-previous-deployment` | No | The later request could not safely cancel the previous active deployment before taking ownership. |

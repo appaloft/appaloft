@@ -122,6 +122,7 @@ function deploymentDetailFixture(input: {
         host: "127.0.0.1",
         port: 22,
         providerKey: "generic-ssh",
+        lifecycleStatus: "active",
       },
       destination: {
         id: input.destinationId,
@@ -312,6 +313,7 @@ function serverDetailFixture(serverId = "srv_demo") {
       host: "127.0.0.1",
       port: 22,
       providerKey: "generic-ssh",
+      lifecycleStatus: "active",
       edgeProxy: {
         kind: "traefik",
         status: "ready",
@@ -435,6 +437,7 @@ const apiResponses: Record<ApiScenario, Record<string, ApiRoute>> = {
             host: "127.0.0.1",
             port: 22,
             providerKey: "generic-ssh",
+            lifecycleStatus: "active",
             createdAt: "2026-01-01T00:00:00.000Z",
           },
         ],
@@ -444,6 +447,26 @@ const apiResponses: Record<ApiScenario, Record<string, ApiRoute>> = {
       const input = readOrpcJsonPayload(body) as { serverId?: string } | null;
       return {
         json: serverDetailFixture(input?.serverId ?? "srv_demo"),
+      };
+    },
+    "/api/rpc/servers/deleteCheck": (_request: Request, body: unknown) => {
+      const input = readOrpcJsonPayload(body) as { serverId?: string } | null;
+      return {
+        json: {
+          schemaVersion: "servers.delete-check/v1",
+          serverId: input?.serverId ?? "srv_demo",
+          lifecycleStatus: "active",
+          eligible: false,
+          blockers: [
+            {
+              kind: "active-server",
+              relatedEntityId: input?.serverId ?? "srv_demo",
+              relatedEntityType: "server",
+              count: 1,
+            },
+          ],
+          checkedAt: "2026-01-01T00:00:10.000Z",
+        },
       };
     },
     "/api/rpc/environments/list": {
@@ -1008,6 +1031,7 @@ const apiResponses: Record<ApiScenario, Record<string, ApiRoute>> = {
             host: "127.0.0.1",
             port: 22,
             providerKey: "generic-ssh",
+            lifecycleStatus: "active",
             createdAt: "2026-01-01T00:00:00.000Z",
           },
         ],

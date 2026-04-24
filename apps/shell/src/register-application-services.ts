@@ -10,6 +10,8 @@ import {
   type CertificateProviderSelectionInput,
   type CertificateProviderSelectionPolicy,
   CertificateRetryScheduler,
+  CheckServerDeleteSafetyQueryHandler,
+  CheckServerDeleteSafetyQueryService,
   CleanupPreviewCommandHandler,
   CleanupPreviewUseCase,
   ConfigureDefaultAccessDomainPolicyCommandHandler,
@@ -32,6 +34,8 @@ import {
   CreateSshCredentialUseCase,
   DbMigrateUseCase,
   DbStatusQueryService,
+  DeactivateServerCommandHandler,
+  DeactivateServerUseCase,
   DeleteResourceCommandHandler,
   DeleteResourceUseCase,
   DeploymentContextBootstrapService,
@@ -129,6 +133,7 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(IssueCertificateOnCertificateRequestedHandler);
   container.registerSingleton(ArchiveProjectCommandHandler);
   container.registerSingleton(BootstrapServerProxyCommandHandler);
+  container.registerSingleton(CheckServerDeleteSafetyQueryHandler);
   container.registerSingleton(CleanupPreviewCommandHandler);
   container.registerSingleton(ConfigureDefaultAccessDomainPolicyCommandHandler);
   container.registerSingleton(ConfigureResourceHealthCommandHandler);
@@ -139,6 +144,7 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(UnsetResourceVariableCommandHandler);
   container.registerSingleton(ArchiveResourceCommandHandler);
   container.registerSingleton(DeleteResourceCommandHandler);
+  container.registerSingleton(DeactivateServerCommandHandler);
   container.registerSingleton(ShowResourceQueryHandler);
   container.registerSingleton(ResourceEffectiveConfigQueryHandler);
   container.registerSingleton(ShowDeploymentQueryHandler);
@@ -202,6 +208,11 @@ export function registerApplicationServices(container: DependencyContainer): voi
   );
   container.registerSingleton(tokens.listServersQueryService, ListServersQueryService);
   container.registerSingleton(tokens.showServerQueryService, ShowServerQueryService);
+  container.registerSingleton(tokens.deactivateServerUseCase, DeactivateServerUseCase);
+  container.registerSingleton(
+    tokens.checkServerDeleteSafetyQueryService,
+    CheckServerDeleteSafetyQueryService,
+  );
   container.registerSingleton(tokens.testServerConnectivityUseCase, TestServerConnectivityUseCase);
   container.registerSingleton(tokens.bootstrapServerProxyUseCase, BootstrapServerProxyUseCase);
   container.registerSingleton(tokens.createEnvironmentUseCase, CreateEnvironmentUseCase);

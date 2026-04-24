@@ -2,6 +2,7 @@ import {
   type ArchiveProjectCommandInput,
   type ArchiveResourceCommandInput,
   type BootstrapServerProxyCommandInput,
+  type CheckServerDeleteSafetyQueryInput,
   type ConfigureDefaultAccessDomainPolicyCommandInput,
   type ConfigureResourceHealthCommandInput,
   type ConfigureResourceNetworkCommandInput,
@@ -15,6 +16,7 @@ import {
   type CreateProjectCommandInput,
   type CreateResourceCommandInput,
   type CreateSshCredentialCommandInput,
+  type DeactivateServerCommandInput,
   type DeleteResourceCommandInput,
   type DeploymentLogsQueryInput,
   type DiffEnvironmentsQueryInput,
@@ -53,6 +55,7 @@ import {
   type ArchiveProjectResponse,
   type ArchiveResourceResponse,
   type BootstrapServerProxyResponse,
+  type CheckServerDeleteSafetyResponse,
   type ConfigureDefaultAccessDomainPolicyResponse,
   type ConfigureResourceHealthResponse,
   type ConfigureResourceNetworkResponse,
@@ -65,6 +68,7 @@ import {
   type CreateProjectResponse,
   type CreateResourceResponse,
   type CreateSshCredentialResponse,
+  type DeactivateServerResponse,
   type DeleteResourceResponse,
   type DeploymentEventStreamEnvelope,
   type DeploymentEventStreamResponse,
@@ -144,6 +148,18 @@ export type AppaloftOrpcClientContract = {
       AppaloftClientContext,
       ShowServerQueryInput,
       ShowServerResponse,
+      AppaloftClientError
+    >;
+    deactivate: Client<
+      AppaloftClientContext,
+      DeactivateServerCommandInput,
+      DeactivateServerResponse,
+      AppaloftClientError
+    >;
+    deleteCheck: Client<
+      AppaloftClientContext,
+      CheckServerDeleteSafetyQueryInput,
+      CheckServerDeleteSafetyResponse,
       AppaloftClientError
     >;
     create: Client<

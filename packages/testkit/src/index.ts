@@ -354,6 +354,9 @@ export class MemoryServerReadModel implements ServerReadModel {
         host: state.host.value,
         port: state.port.value,
         providerKey: state.providerKey.value,
+        lifecycleStatus: state.lifecycleStatus.value,
+        ...(state.deactivatedAt ? { deactivatedAt: state.deactivatedAt.value } : {}),
+        ...(state.deactivationReason ? { deactivationReason: state.deactivationReason.value } : {}),
         createdAt: state.createdAt.value,
       };
     });
@@ -374,6 +377,9 @@ export class MemoryServerReadModel implements ServerReadModel {
         host: state.host.value,
         port: state.port.value,
         providerKey: state.providerKey.value,
+        lifecycleStatus: state.lifecycleStatus.value,
+        ...(state.deactivatedAt ? { deactivatedAt: state.deactivatedAt.value } : {}),
+        ...(state.deactivationReason ? { deactivationReason: state.deactivationReason.value } : {}),
         createdAt: state.createdAt.value,
       };
     }
@@ -388,6 +394,11 @@ export class MemoryServerReadModel implements ServerReadModel {
             host: state.host.value,
             port: state.port.value,
             providerKey: state.providerKey.value,
+            lifecycleStatus: state.lifecycleStatus.value,
+            ...(state.deactivatedAt ? { deactivatedAt: state.deactivatedAt.value } : {}),
+            ...(state.deactivationReason
+              ? { deactivationReason: state.deactivationReason.value }
+              : {}),
             createdAt: state.createdAt.value,
           };
         }

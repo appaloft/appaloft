@@ -121,6 +121,8 @@ Implemented operations:
 | Configure deployment target credential | Command | `servers.configure-credential` | `ConfigureServerCredentialCommand` | `ConfigureServerCredentialCommandInput` | `appaloft server credential <serverId>` | `POST /api/servers/{serverId}/credentials` |
 | List deployment targets | Query | `servers.list` | `ListServersQuery` | `ListServersQueryInput` | `appaloft server list` | `GET /api/servers` |
 | Show deployment target | Query | `servers.show` | `ShowServerQuery` | `ShowServerQueryInput` | `appaloft server show <serverId>` | `GET /api/servers/{serverId}` |
+| Deactivate deployment target | Command | `servers.deactivate` | `DeactivateServerCommand` | `DeactivateServerCommandInput` | `appaloft server deactivate <serverId>` | `POST /api/servers/{serverId}/deactivate` |
+| Check deployment target delete safety | Query | `servers.delete-check` | `CheckServerDeleteSafetyQuery` | `CheckServerDeleteSafetyQueryInput` | `appaloft server delete-check <serverId>` | `GET /api/servers/{serverId}/delete-check` |
 | Test deployment target connectivity | Command | `servers.test-connectivity` | `TestServerConnectivityCommand` | `TestServerConnectivityCommandInput` | `appaloft server test <serverId>`; `appaloft server doctor <serverId>` | `POST /api/servers/{serverId}/connectivity-tests` |
 | Test draft deployment target connectivity | Command | `servers.test-draft-connectivity` | `TestServerConnectivityCommand` | `TestServerConnectivityCommandInput` | - | `POST /api/servers/connectivity-tests` |
 | Repair deployment target edge proxy | Command | `servers.bootstrap-proxy` | `BootstrapServerProxyCommand` | `BootstrapServerProxyCommandInput` | `appaloft server proxy repair <serverId>` | `POST /api/servers/{serverId}/edge-proxy/bootstrap` |
@@ -144,6 +146,14 @@ Implemented operations:
   and deployment/resource/domain rollups. It does not test connectivity, repair proxy state, or
   mutate credentials, resources, deployments, domains, routes, terminal sessions, logs, or audit
   state.
+- `servers.deactivate` moves a server to inactive lifecycle state. Inactive servers remain
+  readable and keep history/dependency visibility, but deployment admission, scheduler target
+  selection, and new proxy target configuration must not use them for future work.
+- `servers.delete-check` previews delete safety for a server without mutating state. It returns
+  structured blocker reasons such as active server lifecycle, deployment history, active
+  deployments, resource placements, domain bindings, certificates, attached credentials,
+  server-applied routes, default-access policy overrides, terminal sessions, runtime tasks, runtime
+  logs, and audit retention. Actual `servers.delete` remains future work.
 - generated default access routes require proxy readiness and a usable target public address, but
   the generated-domain provider is selected by infrastructure configuration and dependency
   injection, not by core/application command input
@@ -151,7 +161,7 @@ Implemented operations:
 Core next operations expected here:
 - `servers.rename`
 - `servers.configure-edge-proxy`
-- `servers.deactivate`
+- `servers.delete`
 - rotate reusable SSH credential
 - delete reusable SSH credential when unused
 

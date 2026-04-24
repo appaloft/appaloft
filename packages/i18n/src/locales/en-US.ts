@@ -108,6 +108,7 @@ export const enUS = {
       useExisting: "Use existing",
     },
     status: {
+      active: "Active",
       configured: "Configured",
       connected: "Connected",
       bound: "Bound",
@@ -115,6 +116,7 @@ export const enUS = {
       degraded: "Degraded",
       failed: "Failed",
       healthy: "Healthy",
+      inactive: "Inactive",
       loading: "Loading",
       notConfigured: "Not configured",
       notDeployed: "Not deployed",
@@ -901,6 +903,7 @@ export const enUS = {
       createValidationError: "Enter a name, host, and valid SSH port before creating this server.",
       description: "Deployment targets, providers, and runtime health checks",
       detailDescription: "Server details, related deployments, and connectivity test",
+      deactivatedAt: "Deactivated",
       defaultAccessCustomTemplateOption: "custom-template",
       defaultAccessDisabledOption: "disabled",
       defaultAccessModeLabel: "Default access mode",
@@ -917,6 +920,12 @@ export const enUS = {
       defaultAccessSystemTitle: "System default access policy",
       defaultAccessTemplateRefLabel: "Template ref",
       defaultAccessTemplateRefPlaceholder: "templates/shared/web",
+      deleteSafetyBlocked: "Deletion blocked",
+      deleteSafetyBlockerCount: "{{count}} blockers",
+      deleteSafetyDescription:
+        "Preview whether this server still has deployments, domains, credentials, routes, logs, or audit records that must remain visible before deletion exists.",
+      deleteSafetyEligible: "Eligible",
+      deleteSafetyTitle: "Delete safety",
       emptyBody:
         "The deployment flow can create a local server automatically, or you can register a remote SSH target from the CLI first.",
       emptyTitle: "No server targets yet.",
@@ -926,6 +935,8 @@ export const enUS = {
       listDescription:
         "All deployment targets by creation time. Open details to run a connectivity test.",
       listTitle: "Server list",
+      lifecycleInactiveDescription:
+        "Inactive servers stay visible but are blocked from new deployments, scheduling, and proxy work.",
       noDeploymentsBody: "No deployment records reference this server yet.",
       noDeploymentsTitle: "No related deployments",
       notFoundBody:
