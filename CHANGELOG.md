@@ -1,5 +1,29 @@
 # Changelog
 
+## [0.5.0](https://github.com/appaloft/appaloft/compare/v0.4.0...v0.5.0) (2026-04-24)
+
+
+### Features
+
+* add guarded server delete ([#92](https://github.com/appaloft/appaloft/issues/92)) ([36ef99e](https://github.com/appaloft/appaloft/commit/36ef99e0ca53434a6780b872f4880de276ba9a92))
+* add server deactivate and delete safety checks ([#89](https://github.com/appaloft/appaloft/issues/89)) ([5946f86](https://github.com/appaloft/appaloft/commit/5946f86d7d1bfb9b35266ccfee7f58c48db5a266))
+* add server edge proxy configuration ([#95](https://github.com/appaloft/appaloft/issues/95)) ([10c08c8](https://github.com/appaloft/appaloft/commit/10c08c88884e231d96bb035c019c8fbc0017b04e))
+* add server rename lifecycle operation ([#94](https://github.com/appaloft/appaloft/issues/94)) ([c34836f](https://github.com/appaloft/appaloft/commit/c34836fb3e6e22f9cfa37139743fb87d6babe03e))
+* add ssh credential usage visibility ([#98](https://github.com/appaloft/appaloft/issues/98)) ([bbf5f6a](https://github.com/appaloft/appaloft/commit/bbf5f6a9d673b2fdf590d5494919fb319a563e65))
+* **openapi:** add scalar reference integration ([#88](https://github.com/appaloft/appaloft/issues/88)) ([a7a12de](https://github.com/appaloft/appaloft/commit/a7a12de8402c4d2ef4e98066370c5b1f536b9f05))
+* **openapi:** group operations by domain ([#90](https://github.com/appaloft/appaloft/issues/90)) ([6eff43c](https://github.com/appaloft/appaloft/commit/6eff43c12c33f71455bc56fec1b729838e4b67bd))
+
+
+### Documentation
+
+* refine spec-driven behavior workflow ([#97](https://github.com/appaloft/appaloft/issues/97)) ([08c3200](https://github.com/appaloft/appaloft/commit/08c3200556360da7c61f46cea14ce4f66425eb65))
+* verify phase 3 release gate ([#96](https://github.com/appaloft/appaloft/issues/96)) ([b443ada](https://github.com/appaloft/appaloft/commit/b443ada5df2635801c9f96456509384674a5ab88))
+
+
+### Miscellaneous
+
+* update codex env ([#87](https://github.com/appaloft/appaloft/issues/87)) ([c9fc77b](https://github.com/appaloft/appaloft/commit/c9fc77be13a1c1fb6182661ac60b5c88f04b7531))
+
 ## [0.4.0](https://github.com/appaloft/appaloft/compare/v0.3.0...v0.4.0) (2026-04-24)
 
 
