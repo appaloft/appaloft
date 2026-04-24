@@ -23,6 +23,7 @@
     RenameServerInput,
     ServerDeleteSafety,
     ServerSummary,
+    SshCredentialUsageServer,
     TestServerConnectivityResponse,
   } from "@appaloft/contracts";
   import { configureServerEdgeProxyInputSchema } from "@appaloft/contracts";
@@ -88,6 +89,25 @@
   );
   const serverDetail = $derived(serverDetailQuery.data ?? null);
   const server = $derived(serverDetail?.server ?? null);
+  const storedSshCredentialId = $derived(
+    server?.credential?.kind === "ssh-private-key" ? (server.credential.credentialId ?? "") : "",
+  );
+  const sshCredentialDetailQuery = createQuery(() =>
+    queryOptions({
+      queryKey: ["credentials", "ssh", "show", storedSshCredentialId],
+      queryFn: () =>
+        orpcClient.credentials.ssh.show({
+          credentialId: storedSshCredentialId,
+          includeUsage: true,
+        }),
+      enabled: browser && storedSshCredentialId.length > 0,
+      staleTime: 5_000,
+    }),
+  );
+  const sshCredentialDetail = $derived(sshCredentialDetailQuery.data ?? null);
+  const sshCredentialDetailError = $derived(
+    sshCredentialDetailQuery.error ? readErrorMessage(sshCredentialDetailQuery.error) : "",
+  );
   const serverDeleteSafety = $derived(serverDeleteSafetyQuery.data ?? null);
   const serverDeleteSafetyError = $derived(
     serverDeleteSafetyQuery.error ? readErrorMessage(serverDeleteSafetyQuery.error) : "",
@@ -378,6 +398,12 @@
       ? $t(i18nKeys.console.servers.deleteSafetyEligible)
       : $t(i18nKeys.console.servers.deleteSafetyBlocked);
   }
+
+  function credentialUsageServerVariant(
+    status: SshCredentialUsageServer["lifecycleStatus"],
+  ): "default" | "secondary" | "outline" | "destructive" {
+    return status === "active" ? "default" : "outline";
+  }
 </script>
 
 <svelte:head>
@@ -531,6 +557,159 @@
               </p>
               <p class="mt-2 font-semibold">{serverRollups.domains.total}</p>
             </div>
+          </div>
+        {/if}
+
+        {#if storedSshCredentialId}
+          <div class="border-y px-0 py-4 sm:px-4">
+            <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+              <div class="min-w-0 space-y-1">
+                <div class="flex items-center gap-2">
+                  <h2 class="text-sm font-semibold">
+                    {$t(i18nKeys.console.servers.credentialDetailTitle)}
+                  </h2>
+                  <DocsHelpLink
+                    href={webDocsHrefs.serverSshCredential}
+                    ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+                  />
+                </div>
+                <p class="text-sm text-muted-foreground">
+                  {$t(i18nKeys.console.servers.credentialDetailDescription)}
+                </p>
+              </div>
+
+              <div class="flex flex-wrap items-center gap-2">
+                {#if sshCredentialDetailQuery.isPending}
+                  <Badge variant="secondary">{$t(i18nKeys.common.status.loading)}</Badge>
+                {:else if sshCredentialDetail}
+                  <Badge variant="outline">{$t(i18nKeys.common.status.configured)}</Badge>
+                  {#if sshCredentialDetail.usage}
+                    <Badge variant="secondary">
+                      {$t(i18nKeys.console.servers.credentialUsageTotal, {
+                        count: sshCredentialDetail.usage.totalServers,
+                      })}
+                    </Badge>
+                  {/if}
+                {:else if sshCredentialDetailError}
+                  <Badge variant="destructive">{$t(i18nKeys.common.status.failed)}</Badge>
+                {/if}
+              </div>
+            </div>
+
+            {#if sshCredentialDetail}
+              <div class="mt-4 grid gap-4 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
+                <div class="bg-muted/25 px-4 py-4">
+                  <p class="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    <KeyRound class="size-4" />
+                    {$t(i18nKeys.console.servers.credentialMaterialSummary)}
+                  </p>
+                  <p class="mt-2 truncate font-semibold">{sshCredentialDetail.credential.name}</p>
+                  <div class="mt-3 flex flex-wrap gap-2">
+                    <Badge
+                      variant={sshCredentialDetail.credential.privateKeyConfigured
+                        ? "secondary"
+                        : "outline"}
+                    >
+                      {$t(i18nKeys.console.servers.credentialPrivateKeyConfigured)}
+                    </Badge>
+                    <Badge
+                      variant={sshCredentialDetail.credential.publicKeyConfigured
+                        ? "secondary"
+                        : "outline"}
+                    >
+                      {$t(i18nKeys.console.servers.credentialPublicKeyConfigured)}
+                    </Badge>
+                  </div>
+                  <dl class="mt-4 space-y-2 text-sm">
+                    <div class="flex flex-wrap justify-between gap-2">
+                      <dt class="text-muted-foreground">
+                        {$t(i18nKeys.console.servers.credentialDefaultUsername)}
+                      </dt>
+                      <dd class="font-medium">
+                        {sshCredentialDetail.credential.username ??
+                          $t(i18nKeys.common.status.notConfigured)}
+                      </dd>
+                    </div>
+                    <div class="flex flex-wrap justify-between gap-2">
+                      <dt class="text-muted-foreground">
+                        {$t(i18nKeys.common.domain.createdAt)}
+                      </dt>
+                      <dd class="font-medium">{formatTime(sshCredentialDetail.credential.createdAt)}</dd>
+                    </div>
+                  </dl>
+                </div>
+
+                <div class="bg-muted/25 px-4 py-4">
+                  <div class="flex flex-wrap items-center justify-between gap-2">
+                    <p class="text-sm font-semibold">
+                      {$t(i18nKeys.console.servers.credentialUsageTitle)}
+                    </p>
+                    {#if sshCredentialDetail.usage}
+                      <div class="flex flex-wrap gap-2">
+                        <Badge variant="default">
+                          {$t(i18nKeys.console.servers.credentialUsageActive, {
+                            count: sshCredentialDetail.usage.activeServers,
+                          })}
+                        </Badge>
+                        <Badge variant="outline">
+                          {$t(i18nKeys.console.servers.credentialUsageInactive, {
+                            count: sshCredentialDetail.usage.inactiveServers,
+                          })}
+                        </Badge>
+                      </div>
+                    {/if}
+                  </div>
+
+                  {#if sshCredentialDetail.usage && sshCredentialDetail.usage.totalServers === 0}
+                    <div class="mt-4 border-y px-0 py-4">
+                      <p class="text-sm font-medium">
+                        {$t(i18nKeys.console.servers.credentialUsageEmptyTitle)}
+                      </p>
+                      <p class="mt-1 text-sm text-muted-foreground">
+                        {$t(i18nKeys.console.servers.credentialUsageEmptyBody)}
+                      </p>
+                    </div>
+                  {:else if sshCredentialDetail.usage}
+                    <div class="mt-4 divide-y border-y">
+                      {#each sshCredentialDetail.usage.servers as usageServer (usageServer.serverId)}
+                        <a
+                          class="flex flex-col gap-2 px-0 py-3 text-sm sm:flex-row sm:items-center sm:justify-between"
+                          href={`/servers/${usageServer.serverId}`}
+                        >
+                          <span class="min-w-0">
+                            <span class="block truncate font-medium">{usageServer.serverName}</span>
+                            <span class="block truncate text-xs text-muted-foreground">
+                              {usageServer.providerKey} · {usageServer.host}
+                              {#if usageServer.username}
+                                · {usageServer.username}
+                              {/if}
+                            </span>
+                          </span>
+                          <Badge variant={credentialUsageServerVariant(usageServer.lifecycleStatus)}>
+                            {serverLifecycleLabel(usageServer.lifecycleStatus)}
+                          </Badge>
+                        </a>
+                      {/each}
+                    </div>
+                  {/if}
+                </div>
+              </div>
+            {:else if sshCredentialDetailError}
+              <div class="mt-4 rounded-md border border-destructive/30 p-4 text-sm text-destructive">
+                <div class="flex items-start gap-2">
+                  <TriangleAlert class="mt-0.5 size-4" />
+                  <div class="space-y-1">
+                    <p class="font-medium">
+                      {$t(i18nKeys.console.servers.credentialUsageUnavailableTitle)}
+                    </p>
+                    <p class="text-muted-foreground">
+                      {$t(i18nKeys.console.servers.credentialUsageUnavailableBody)}
+                    </p>
+                    <p class="text-muted-foreground">{sshCredentialDetailError}</p>
+                  </div>
+                </div>
+              </div>
+            {/if}
           </div>
         {/if}
 

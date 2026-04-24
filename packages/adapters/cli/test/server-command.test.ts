@@ -305,6 +305,83 @@ describe("CLI server commands", () => {
     });
   });
 
+  test("[SSH-CRED-ENTRY-002] server credential-show dispatches the reusable SSH credential detail query", async () => {
+    ensureReflectMetadata();
+    const application = (await import("@appaloft/application")) as Record<string, unknown> & {
+      createExecutionContext: typeof import("@appaloft/application").createExecutionContext;
+    };
+    const ShowSshCredentialQuery = application.ShowSshCredentialQuery as
+      | (new (
+          ...args: never[]
+        ) => AppQuery<unknown>)
+      | undefined;
+    const { createCliProgram } = await import("../src");
+    const queries: AppQuery<unknown>[] = [];
+    const commandBus = {
+      execute: async <T>(_context: unknown, _command: AppCommand<T>) => ok({} as T),
+    } as unknown as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: unknown, query: AppQuery<T>) => {
+        queries.push(query as AppQuery<unknown>);
+        return ok({
+          schemaVersion: "credentials.show/v1",
+          credential: {
+            id: "cred_primary",
+            name: "primary-key",
+            kind: "ssh-private-key",
+            username: "deploy",
+            publicKeyConfigured: true,
+            privateKeyConfigured: true,
+            createdAt: "2026-01-01T00:00:00.000Z",
+          },
+          usage: {
+            totalServers: 0,
+            activeServers: 0,
+            inactiveServers: 0,
+            servers: [],
+          },
+          generatedAt: "2026-01-01T00:00:10.000Z",
+        } as T);
+      },
+    } as unknown as QueryBus;
+    const executionContextFactory: ExecutionContextFactory = {
+      create: (input) =>
+        application.createExecutionContext({
+          ...input,
+          requestId: "req_cli_ssh_credential_show_test",
+        }),
+    };
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus,
+      queryBus,
+      executionContextFactory,
+    });
+
+    const writeStdout = process.stdout.write;
+    const writeStderr = process.stderr.write;
+    try {
+      process.stdout.write = (() => true) as typeof process.stdout.write;
+      process.stderr.write = (() => true) as typeof process.stderr.write;
+      await program.parseAsync(["node", "appaloft", "server", "credential-show", "cred_primary"]);
+    } finally {
+      process.stdout.write = writeStdout;
+      process.stderr.write = writeStderr;
+    }
+
+    expect(ShowSshCredentialQuery, "ShowSshCredentialQuery export").toBeDefined();
+    expect(queries).toHaveLength(1);
+    if (!ShowSshCredentialQuery) {
+      throw new Error("ShowSshCredentialQuery is not exported yet");
+    }
+    expect(queries[0]).toBeInstanceOf(ShowSshCredentialQuery);
+    expect(queries[0]).toMatchObject({
+      credentialId: "cred_primary",
+      includeUsage: true,
+    });
+  });
+
   test("[SRV-LIFE-ENTRY-010] server delete dispatches the application command", async () => {
     ensureReflectMetadata();
     const { DeleteServerCommand, createExecutionContext } = await import("@appaloft/application");

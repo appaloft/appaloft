@@ -52,6 +52,7 @@ import { listSshCredentialsQueryInputSchema } from "./operations/servers/list-ss
 import { registerServerCommandInputSchema } from "./operations/servers/register-server.command";
 import { renameServerCommandInputSchema } from "./operations/servers/rename-server.command";
 import { showServerQueryInputSchema } from "./operations/servers/show-server.query";
+import { showSshCredentialQueryInputSchema } from "./operations/servers/show-ssh-credential.query";
 import { testServerConnectivityCommandInputSchema } from "./operations/servers/test-server-connectivity.command";
 import { relinkSourceLinkCommandInputSchema } from "./operations/source-links/relink-source-link.command";
 import { listGitHubRepositoriesQueryInputSchema } from "./operations/system/list-github-repositories.query";
@@ -222,6 +223,20 @@ export const operationCatalog = [
     transports: {
       cli: "appaloft server credential-list",
       orpc: { method: "GET", path: "/api/credentials/ssh" },
+    },
+  },
+  {
+    key: "credentials.show",
+    kind: "query",
+    domain: "credentials",
+    messageName: "ShowSshCredentialQuery",
+    handlerName: "ShowSshCredentialQueryHandler",
+    serviceName: "ShowSshCredentialQueryService",
+    inputSchema: showSshCredentialQueryInputSchema,
+    serviceToken: tokens.showSshCredentialQueryService,
+    transports: {
+      cli: "appaloft server credential-show <credentialId>",
+      orpc: { method: "GET", path: "/api/credentials/ssh/{credentialId}" },
     },
   },
   {

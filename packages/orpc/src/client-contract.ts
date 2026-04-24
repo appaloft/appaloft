@@ -48,6 +48,7 @@ import {
   type ShowProjectQueryInput,
   type ShowResourceQueryInput,
   type ShowServerQueryInput,
+  type ShowSshCredentialQueryInput,
   type StreamDeploymentEventsQueryInput,
   type TestDraftServerConnectivityCommandInput,
   type TestRegisteredServerConnectivityCommandInput,
@@ -111,6 +112,7 @@ import {
   type ShowDeploymentResponse,
   type ShowProjectResponse,
   type ShowServerResponse,
+  type ShowSshCredentialResponse,
   type TerminalSessionDescriptor,
   type TestServerConnectivityResponse,
   type UnsetResourceVariableResponse,
@@ -231,6 +233,12 @@ export type AppaloftOrpcClientContract = {
         AppaloftClientContext,
         ListSshCredentialsQueryInput,
         ListSshCredentialsResponse,
+        AppaloftClientError
+      >;
+      show: Client<
+        AppaloftClientContext,
+        ShowSshCredentialQueryInput,
+        ShowSshCredentialResponse,
         AppaloftClientError
       >;
       create: Client<

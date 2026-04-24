@@ -47,4 +47,24 @@ describe("public docs operation coverage", () => {
       expect(coverage.reason.trim().length, coverage.operationKey).toBeGreaterThan(0);
     }
   });
+
+  test("[SSH-CRED-ENTRY-005] reusable SSH credential detail maps to the SSH credential help topic", () => {
+    const topic = publicDocsHelpTopics["server.ssh-credential"];
+
+    expect(topic).toBeDefined();
+    expect(topic.surfaces).toEqual(expect.arrayContaining(["web", "cli", "http-api", "mcp"]));
+    expect(topic.specReferences).toEqual(
+      expect.arrayContaining([
+        "docs/workflows/ssh-credential-lifecycle.md",
+        "docs/queries/credentials.show.md",
+        "docs/errors/credentials.lifecycle.md",
+        "docs/testing/ssh-credential-lifecycle-test-matrix.md",
+      ]),
+    );
+    expect(topic.webSurfaces).toEqual(
+      expect.arrayContaining([
+        "apps/web server registration, Quick Deploy credential step, and credential detail surfaces",
+      ]),
+    );
+  });
 });

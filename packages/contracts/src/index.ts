@@ -284,6 +284,29 @@ export const sshCredentialSummarySchema = z.object({
   createdAt: z.string(),
 });
 
+export const sshCredentialUsageServerSchema = z.object({
+  serverId: z.string(),
+  serverName: z.string(),
+  lifecycleStatus: z.enum(["active", "inactive"]),
+  providerKey: z.string(),
+  host: z.string(),
+  username: z.string().optional(),
+});
+
+export const sshCredentialUsageSummarySchema = z.object({
+  totalServers: z.number(),
+  activeServers: z.number(),
+  inactiveServers: z.number(),
+  servers: z.array(sshCredentialUsageServerSchema),
+});
+
+export const sshCredentialDetailSchema = z.object({
+  schemaVersion: z.literal("credentials.show/v1"),
+  credential: sshCredentialSummarySchema,
+  usage: sshCredentialUsageSummarySchema.optional(),
+  generatedAt: z.string(),
+});
+
 export const createSshCredentialInputSchema = z.object({
   name: z.string().min(1),
   kind: z.literal("ssh-private-key"),
@@ -299,6 +322,8 @@ export const createSshCredentialResponseSchema = z.object({
 export const listSshCredentialsResponseSchema = z.object({
   items: z.array(sshCredentialSummarySchema),
 });
+
+export const showSshCredentialResponseSchema = sshCredentialDetailSchema;
 
 export const registerServerResponseSchema = z.object({
   id: z.string(),
@@ -2233,6 +2258,9 @@ export type RenameProjectResponse = z.infer<typeof renameProjectResponseSchema>;
 export type ArchiveProjectResponse = z.infer<typeof archiveProjectResponseSchema>;
 export type ServerSummary = z.infer<typeof serverSummarySchema>;
 export type SshCredentialSummary = z.infer<typeof sshCredentialSummarySchema>;
+export type SshCredentialUsageServer = z.infer<typeof sshCredentialUsageServerSchema>;
+export type SshCredentialUsageSummary = z.infer<typeof sshCredentialUsageSummarySchema>;
+export type SshCredentialDetail = z.infer<typeof sshCredentialDetailSchema>;
 export type RegisterServerInput = z.infer<typeof registerServerInputSchema>;
 export type ShowServerInput = z.infer<typeof showServerInputSchema>;
 export type RenameServerInput = z.infer<typeof renameServerInputSchema>;
@@ -2257,6 +2285,7 @@ export type ServerDeleteSafety = z.infer<typeof serverDeleteSafetySchema>;
 export type CheckServerDeleteSafetyResponse = z.infer<typeof checkServerDeleteSafetyResponseSchema>;
 export type CreateSshCredentialResponse = z.infer<typeof createSshCredentialResponseSchema>;
 export type ListSshCredentialsResponse = z.infer<typeof listSshCredentialsResponseSchema>;
+export type ShowSshCredentialResponse = z.infer<typeof showSshCredentialResponseSchema>;
 export type ServerConnectivityCheck = z.infer<typeof serverConnectivityCheckSchema>;
 export type TestServerConnectivityResponse = z.infer<typeof testServerConnectivityResponseSchema>;
 export type BootstrapServerProxyResponse = z.infer<typeof bootstrapServerProxyResponseSchema>;
