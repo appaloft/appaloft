@@ -474,6 +474,9 @@ export const environmentSummarySchema = z.object({
   name: z.string(),
   kind: z.enum(["local", "development", "test", "staging", "production", "preview", "custom"]),
   parentEnvironmentId: z.string().optional(),
+  lifecycleStatus: z.enum(["active", "archived"]),
+  archivedAt: z.string().optional(),
+  archiveReason: z.string().optional(),
   createdAt: z.string(),
   maskedVariables: z.array(environmentVariableSchema),
 });
@@ -1385,6 +1388,15 @@ export const createEnvironmentResponseSchema = z.object({
 
 export const listEnvironmentsResponseSchema = z.object({
   items: z.array(environmentSummarySchema),
+});
+
+export const archiveEnvironmentInputSchema = z.object({
+  environmentId: z.string().min(1),
+  reason: z.string().min(1).max(280).optional(),
+});
+
+export const archiveEnvironmentResponseSchema = z.object({
+  id: z.string(),
 });
 
 export const setEnvironmentVariableInputSchema = z.object({
@@ -2392,6 +2404,8 @@ export type ConfigureDefaultAccessDomainPolicyResponse = z.infer<
 export type CreateEnvironmentInput = z.infer<typeof createEnvironmentInputSchema>;
 export type CreateEnvironmentResponse = z.infer<typeof createEnvironmentResponseSchema>;
 export type ListEnvironmentsResponse = z.infer<typeof listEnvironmentsResponseSchema>;
+export type ArchiveEnvironmentInput = z.infer<typeof archiveEnvironmentInputSchema>;
+export type ArchiveEnvironmentResponse = z.infer<typeof archiveEnvironmentResponseSchema>;
 export type ListResourcesResponse = z.infer<typeof listResourcesResponseSchema>;
 export type DomainBindingSummary = z.infer<typeof domainBindingSummarySchema>;
 export type CreateDomainBindingInput = z.infer<typeof createDomainBindingInputSchema>;

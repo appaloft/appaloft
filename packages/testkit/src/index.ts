@@ -536,6 +536,9 @@ export class MemoryEnvironmentReadModel implements EnvironmentReadModel {
           projectId: environment.projectId.value,
           name: environment.name.value,
           kind: environment.kind.value,
+          lifecycleStatus: environment.lifecycleStatus.value,
+          ...(environment.archivedAt ? { archivedAt: environment.archivedAt.value } : {}),
+          ...(environment.archiveReason ? { archiveReason: environment.archiveReason.value } : {}),
           createdAt: environment.createdAt.value,
           ...(environment.parentEnvironmentId
             ? { parentEnvironmentId: environment.parentEnvironmentId.value }
@@ -567,6 +570,9 @@ export class MemoryEnvironmentReadModel implements EnvironmentReadModel {
         projectId: state.projectId.value,
         name: state.name.value,
         kind: state.kind.value,
+        lifecycleStatus: state.lifecycleStatus.value,
+        ...(state.archivedAt ? { archivedAt: state.archivedAt.value } : {}),
+        ...(state.archiveReason ? { archiveReason: state.archiveReason.value } : {}),
         createdAt: state.createdAt.value,
         ...(state.parentEnvironmentId
           ? { parentEnvironmentId: state.parentEnvironmentId.value }
@@ -591,6 +597,9 @@ export class MemoryEnvironmentReadModel implements EnvironmentReadModel {
             projectId: state.projectId.value,
             name: state.name.value,
             kind: state.kind.value,
+            lifecycleStatus: state.lifecycleStatus.value,
+            ...(state.archivedAt ? { archivedAt: state.archivedAt.value } : {}),
+            ...(state.archiveReason ? { archiveReason: state.archiveReason.value } : {}),
             createdAt: state.createdAt.value,
             ...(state.parentEnvironmentId
               ? { parentEnvironmentId: state.parentEnvironmentId.value }

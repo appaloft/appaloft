@@ -10,6 +10,10 @@ export const environmentKinds = [
 
 export type EnvironmentKind = (typeof environmentKinds)[number];
 
+export const environmentLifecycleStatuses = ["active", "archived"] as const;
+
+export type EnvironmentLifecycleStatus = (typeof environmentLifecycleStatuses)[number];
+
 export const sourceKinds = [
   "local-folder",
   "local-git",

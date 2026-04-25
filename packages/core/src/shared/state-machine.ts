@@ -9,6 +9,7 @@ import {
   edgeProxyKinds,
   edgeProxyStatuses,
   environmentKinds,
+  environmentLifecycleStatuses,
   executionStrategyKinds,
   healthCheckHttpMethods,
   healthCheckSchemes,
@@ -41,6 +42,7 @@ export {
   edgeProxyKinds,
   edgeProxyStatuses,
   environmentKinds,
+  environmentLifecycleStatuses,
   executionStrategyKinds,
   healthCheckHttpMethods,
   healthCheckSchemes,
@@ -129,6 +131,50 @@ export class EnvironmentKindValue extends EnumValueObject<(typeof environmentKin
 
   static rehydrate(value: (typeof environmentKinds)[number]): EnvironmentKindValue {
     return new EnvironmentKindValue(value);
+  }
+}
+
+const environmentLifecycleStatusBrand: unique symbol = Symbol("EnvironmentLifecycleStatusValue");
+export class EnvironmentLifecycleStatusValue extends StateMachineValueObject<
+  (typeof environmentLifecycleStatuses)[number]
+> {
+  private [environmentLifecycleStatusBrand]!: void;
+
+  private constructor(value: (typeof environmentLifecycleStatuses)[number]) {
+    super(value);
+  }
+
+  static create(value: string): Result<EnvironmentLifecycleStatusValue> {
+    return createEnumValue(
+      value,
+      environmentLifecycleStatuses,
+      "Environment lifecycle status",
+      (validated) => new EnvironmentLifecycleStatusValue(validated),
+    );
+  }
+
+  static rehydrate(
+    value: (typeof environmentLifecycleStatuses)[number],
+  ): EnvironmentLifecycleStatusValue {
+    return new EnvironmentLifecycleStatusValue(value);
+  }
+
+  static active(): EnvironmentLifecycleStatusValue {
+    return new EnvironmentLifecycleStatusValue("active");
+  }
+
+  archive(): Result<EnvironmentLifecycleStatusValue> {
+    return this.ensureCurrent(["active"], "Only active environments can be archived").map(
+      () => new EnvironmentLifecycleStatusValue("archived"),
+    );
+  }
+
+  isActive(): boolean {
+    return this.value === "active";
+  }
+
+  isArchived(): boolean {
+    return this.value === "archived";
   }
 }
 

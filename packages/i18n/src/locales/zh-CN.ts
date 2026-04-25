@@ -359,6 +359,13 @@ export const zhCN = {
         "快速部署会把 source、项目、服务器和环境一次性串起来。之后部署页按项目展示每一次发布结果。",
       emptyTitle: "先创建一个项目，再让部署记录挂到它下面。",
       environmentCount: "{{count}} 个变量",
+      environmentArchiveAction: "归档",
+      environmentArchiveConfirm:
+        "确定归档这个环境吗？归档后不能新增变量、资源或部署；已有历史仍会保留可见。",
+      environmentArchiveFailed: "环境归档失败",
+      environmentArchiveSucceeded: "环境已归档",
+      environmentArchived: "已归档",
+      environmentArchivedAt: "归档时间",
       environmentsDescription: "按项目聚合的配置边界。",
       environmentsTitle: "环境",
       focusDescription:

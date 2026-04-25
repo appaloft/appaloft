@@ -1,4 +1,6 @@
 import {
+  ArchiveEnvironmentCommandHandler,
+  ArchiveEnvironmentUseCase,
   ArchiveProjectCommandHandler,
   ArchiveProjectUseCase,
   ArchiveResourceCommandHandler,
@@ -146,6 +148,7 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(MarkServerAppliedRouteStatusOnDeploymentFinishedHandler);
   container.registerSingleton(IssueCertificateOnCertificateRequestedHandler);
   container.registerSingleton(ArchiveProjectCommandHandler);
+  container.registerSingleton(ArchiveEnvironmentCommandHandler);
   container.registerSingleton(BootstrapServerProxyCommandHandler);
   container.registerSingleton(CheckServerDeleteSafetyQueryHandler);
   container.registerSingleton(CleanupPreviewCommandHandler);
@@ -245,6 +248,7 @@ export function registerApplicationServices(container: DependencyContainer): voi
   );
   container.registerSingleton(tokens.testServerConnectivityUseCase, TestServerConnectivityUseCase);
   container.registerSingleton(tokens.bootstrapServerProxyUseCase, BootstrapServerProxyUseCase);
+  container.registerSingleton(tokens.archiveEnvironmentUseCase, ArchiveEnvironmentUseCase);
   container.registerSingleton(tokens.createEnvironmentUseCase, CreateEnvironmentUseCase);
   container.registerSingleton(tokens.listEnvironmentsQueryService, ListEnvironmentsQueryService);
   container.registerSingleton(tokens.showEnvironmentQueryService, ShowEnvironmentQueryService);
