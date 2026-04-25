@@ -4,6 +4,7 @@ Use these sources for conceptual grounding. Do not paste long excerpts into user
 
 ## Domain-Driven Design
 
+- Eric Evans, "Domain-Driven Design Reference": concise definitions and pattern summaries including ubiquitous language, bounded context, context map, anticorruption layer, open-host service, and published language. https://www.domainlanguage.com/ddd/reference/
 - Microsoft Learn, "Designing a microservice domain model": aggregate roots maintain consistency boundaries and should be the entry point for updates inside the aggregate. https://learn.microsoft.com/en-us/dotnet/architecture/microservices/microservice-ddd-cqrs-patterns/microservice-domain-model
 - Microsoft Learn, "Implementing value objects": value objects are part of the domain model and have persistence implications distinct from entities. https://learn.microsoft.com/en-us/dotnet/architecture/microservices/microservice-ddd-cqrs-patterns/implement-value-objects
 - David Laribee, "An Introduction To Domain-Driven Design": DDD uses concepts such as ubiquitous language, bounded contexts, entities, value objects, aggregate roots, domain services, and repositories to close the gap between business reality and code. https://learn.microsoft.com/en-us/archive/msdn-magazine/2009/february/best-practice-an-introduction-to-domain-driven-design
@@ -16,6 +17,10 @@ Use these sources for conceptual grounding. Do not paste long excerpts into user
 ## Spec-Driven Development
 
 - GitHub Spec Kit, "Spec-Driven Development": specs become the central source of truth and code serves the specification. https://github.com/github/spec-kit/blob/main/spec-driven.md
+
+## Versioning
+
+- Semantic Versioning 2.0.0: version changes communicate public API compatibility; projects must define a public API before applying SemVer. https://semver.org/
 
 ## CQRS
 
