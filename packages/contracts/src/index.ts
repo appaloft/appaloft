@@ -992,6 +992,16 @@ export const resourceEffectiveConfigSchema = z.object({
   generatedAt: z.string(),
 });
 
+export const environmentEffectivePrecedenceSchema = z.object({
+  schemaVersion: z.literal("environments.effective-precedence/v1"),
+  environmentId: z.string(),
+  projectId: z.string(),
+  ownedEntries: z.array(resourceConfigEntrySchema),
+  effectiveEntries: z.array(resourceConfigEntrySchema),
+  precedence: z.array(z.string()),
+  generatedAt: z.string(),
+});
+
 export const setResourceVariableResponseSchema = z.null();
 export const unsetResourceVariableResponseSchema = z.null();
 export const resourceEffectiveConfigResponseSchema = resourceEffectiveConfigSchema;
@@ -1404,6 +1414,8 @@ export const promoteEnvironmentInputSchema = z.object({
 export const promoteEnvironmentResponseSchema = z.object({
   id: z.string(),
 });
+
+export const environmentEffectivePrecedenceResponseSchema = environmentEffectivePrecedenceSchema;
 
 export const diffEnvironmentResponseSchema = z.array(
   z.object({
@@ -2332,6 +2344,7 @@ export type ServerConnectivityCheck = z.infer<typeof serverConnectivityCheckSche
 export type TestServerConnectivityResponse = z.infer<typeof testServerConnectivityResponseSchema>;
 export type BootstrapServerProxyResponse = z.infer<typeof bootstrapServerProxyResponseSchema>;
 export type EnvironmentSummary = z.infer<typeof environmentSummarySchema>;
+export type EnvironmentEffectivePrecedence = z.infer<typeof environmentEffectivePrecedenceSchema>;
 export type ResourceAccessRouteSummary = z.infer<typeof resourceAccessRouteSummarySchema>;
 export type PlannedResourceAccessRouteSummary = z.infer<
   typeof plannedResourceAccessRouteSummarySchema
@@ -2400,6 +2413,9 @@ export type ListCertificatesResponse = z.infer<typeof listCertificatesResponseSc
 export type SetEnvironmentVariableInput = z.infer<typeof setEnvironmentVariableInputSchema>;
 export type PromoteEnvironmentInput = z.infer<typeof promoteEnvironmentInputSchema>;
 export type PromoteEnvironmentResponse = z.infer<typeof promoteEnvironmentResponseSchema>;
+export type EnvironmentEffectivePrecedenceResponse = z.infer<
+  typeof environmentEffectivePrecedenceResponseSchema
+>;
 export type DiffEnvironmentResponse = z.infer<typeof diffEnvironmentResponseSchema>;
 export type DeploymentSummary = z.infer<typeof deploymentSummarySchema>;
 export type DeploymentProgressEvent = z.infer<typeof deploymentProgressEventSchema>;

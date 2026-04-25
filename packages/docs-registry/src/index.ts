@@ -438,6 +438,12 @@ export const publicDocsHelpTopics = {
     surfaces: ["web", "cli", "http-api", "repository-config", "mcp"],
     relatedOperation: "environments.set-variable",
     aliases: ["env", "variables", "secret", "snapshot", "环境变量"],
+    specReferences: [
+      "docs/queries/environments.effective-precedence.md",
+      "docs/testing/environment-effective-precedence-test-matrix.md",
+      "docs/queries/resources.effective-config.md",
+      "docs/testing/resource-profile-lifecycle-test-matrix.md",
+    ],
   },
   "environment.diff-promote": {
     id: "environment.diff-promote",
@@ -824,6 +830,11 @@ export const publicDocsOperationCoverage = [
   },
   {
     operationKey: "environments.unset-variable",
+    status: "documented",
+    topicId: "environment.variable-precedence",
+  },
+  {
+    operationKey: "environments.effective-precedence",
     status: "documented",
     topicId: "environment.variable-precedence",
   },

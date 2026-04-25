@@ -181,6 +181,7 @@ flowchart TD
 | Show environment | Query | `environments.show` | Environment read model | Exposes config context for one environment. | [Core Operations](./CORE_OPERATIONS.md) |
 | Set environment variable | Command | `environments.set-variable` | Environment | Mutates environment config before deployment snapshot. | [Core Operations](./CORE_OPERATIONS.md) |
 | Unset environment variable | Command | `environments.unset-variable` | Environment | Removes environment config before deployment snapshot. | [Core Operations](./CORE_OPERATIONS.md) |
+| Read environment effective precedence | Active query | `environments.effective-precedence` | Environment configuration read model | Exposes masked environment-owned variables and the environment-level effective value for each `key + exposure` identity before resource overrides or deployment snapshots apply. | [environments.effective-precedence](./queries/environments.effective-precedence.md), [Environment Effective Precedence Test Matrix](./testing/environment-effective-precedence-test-matrix.md), [ADR-012](./decisions/ADR-012-resource-runtime-profile-and-deployment-snapshot-boundary.md) |
 | Diff environments | Query | `environments.diff` | Environment read model | Compares configuration scopes. | [Core Operations](./CORE_OPERATIONS.md) |
 | Promote environment | Command | `environments.promote` | Environment | Creates a promoted environment state. | [Core Operations](./CORE_OPERATIONS.md) |
 

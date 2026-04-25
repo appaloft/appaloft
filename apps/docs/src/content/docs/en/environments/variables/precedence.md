@@ -13,6 +13,7 @@ searchAliases:
 relatedOperations:
   - environments.set-variable
   - environments.unset-variable
+  - environments.effective-precedence
   - resources.set-variable
   - resources.unset-variable
   - resources.effective-config
@@ -61,10 +62,14 @@ Deployment details should show the configuration summary used by that deployment
 The Web console should show environment and resource variables, masked secret status, last update
 time, ownership scope, and deployment snapshot hints.
 
-The CLI fits `set`, `unset`, `effective-config`, `diff`, and automation scripts. CLI output should
-show masked status for secrets, not values.
+The CLI fits `set`, `unset`, `effective-precedence`, `effective-config`, `diff`, and automation
+scripts. CLI output should show masked status for secrets, not values.
 
 The HTTP API should return variable key, scope, whether it is secret, source layer, and masked value. It should not return plaintext secrets.
+
+Use `environments.effective-precedence` to inspect the values one environment contributes before
+resource overrides. Use `resources.effective-config` to inspect the deployment input view after
+resource variables override environment variables.
 
 <h2 id="environment-variable-recovery">Common issues</h2>
 
