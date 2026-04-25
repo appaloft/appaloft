@@ -100,6 +100,7 @@ Minimum capability language:
 | `runtime.logs` | Can read bounded or streaming runtime stdout/stderr for `resources.runtime-logs`. |
 | `runtime.health` | Can provide runtime state signals for `resources.health`. |
 | `runtime.cleanup` | Can clean up previous runtime instances for the same resource without cross-resource deletion. |
+| `runtime.capacity` | Can report safe target capacity signals such as disk, inode, memory, CPU, Docker image usage, and build-cache usage. |
 | `proxy.route` | Can realize provider-neutral access route intent or delegate to an edge proxy provider. |
 
 Backend-specific capability details may live in adapter/provider descriptors. They must not become
@@ -124,8 +125,62 @@ It must:
   instances;
 - treat direct host-port collisions as conflicts or post-acceptance runtime failures without
   stopping another resource;
+- classify target disk, inode, memory, CPU, Docker image, or build-cache exhaustion as runtime
+  target infrastructure capacity failures when safe signals are available;
 - read logs and health through normalized application ports;
 - store only sanitized Docker/Compose identity in snapshots, logs, diagnostics, or read models.
+
+## Runtime Target Capacity And Retention
+
+Runtime target capacity is part of the target backend contract. A target backend that builds or
+runs Docker/OCI artifacts must be able to diagnose target resource pressure before or during
+materialization and rollout when the selected executor can provide safe signals.
+
+External baseline research points to four product rules Appaloft should follow:
+
+- Docker does not automatically remove unused images, stopped containers, unused networks, volumes,
+  or build cache; cleanup must be explicit and scoped.
+- Self-hosted deployment products commonly pair server/disk monitoring with cleanup guidance or
+  automatic cleanup when a configured threshold is exceeded.
+- Hosted deployment products expose CPU, memory, disk, network, and deployment-marker metrics so
+  operators can correlate resource spikes with releases.
+- Metrics export to OpenTelemetry-compatible systems is a useful advanced path, but Appaloft still
+  needs a first-party summary for the single-server minimum loop.
+
+The Appaloft target rule is:
+
+- capacity failures detected before safe deployment acceptance may reject admission only when no
+  durable attempt can be safely created;
+- capacity failures after acceptance must keep the original `deployments.create` response accepted,
+  persist failed or retryable state, and publish `deployment-failed`;
+- disk, inode, memory, CPU, Docker image, and build-cache exhaustion should use
+  `runtime_target_resource_exhausted`;
+- capacity details must be sanitized and bounded; raw shell output, secret paths, environment
+  values, and credential-bearing command lines must not be stored.
+
+Runtime artifact retention is target-owned and rollout-aware:
+
+| Artifact or state | Retention rule |
+| --- | --- |
+| Active runtime containers, Compose projects, networks, and routes | Preserve until the owning resource is explicitly replaced, cleaned, archived, or deleted through a governed operation. |
+| Explicit rollback candidates | Preserve according to rollback-candidate retention until rollback/redeploy/prune specs say otherwise. |
+| Failed replacement candidates | Remove after failure capture when doing so cannot affect the previous successful runtime. |
+| Preview runtime artifacts | Prefer short retention; `deployments.cleanup-preview` should remove preview-owned inert artifacts and workspaces when ownership can be proven. |
+| Docker build cache | Prunable by age, size, or threshold; cache pruning must not be treated as deployment history deletion. |
+| Unused Docker images | Prunable when no container references them and they are outside explicit rollback retention. |
+| Docker volumes and stateful persistent data | Never pruned by default. Volume pruning requires a separate explicit operation with dry-run and ownership evidence. |
+| Remote `ssh-pglite` / Appaloft state roots | Never runtime-pruned; state retention is governed by control-plane storage and backup specs. |
+| Materialized source workspaces | Prunable when no active runtime, diagnostic capture, or rollback candidate depends on them. |
+
+Operator-facing surfaces should expose this without making deployment admission target-specific:
+
+- `resources.diagnostic-summary` should include capacity context when a deployment or cleanup
+  failure links to target capacity;
+- `resources.health` may degrade or report unknown when capacity blocks runtime observation;
+- future deployment-target/server queries should expose disk, inode, Docker image/cache, source
+  workspace, and reclaimable summaries;
+- future prune/repair commands must support dry-run, preserve active runtime and rollback
+  candidates, exclude Docker volumes by default, and emit audit/diagnostic facts.
 
 ## Docker Swarm Target
 
@@ -192,6 +247,12 @@ failures. They must:
    the rollout strategy has not superseded;
 6. require a new deployment attempt or future retry command for retry.
 
+Capacity failures are runtime target infrastructure failures. Disk-full, inode-full, Docker image
+store exhaustion, build-cache exhaustion, and target CPU/memory limits must be represented with
+`runtime_target_resource_exhausted` when the backend can safely classify them. This code is
+retriable after cleanup, prune, or target resize; it is not a domain validation error and it must
+not remove the previous successful runtime as an attempted recovery side effect.
+
 Cleanup is rollout-strategy aware. Reverse-proxy and ephemeral-port strategies must distinguish
 candidate cleanup from superseded-runtime cleanup; superseded cleanup happens only after terminal
 success. Direct-port strategies may release the previous same-resource runtime earlier only when the
@@ -211,6 +272,11 @@ Current implementation is single-server oriented:
 - Runtime logs, health, terminal sessions, and proxy configuration are being normalized through
   application ports and read/query services, but only execution/cancel/rollback selection is backed
   by the runtime target backend registry so far.
+- Generic SSH execution currently materializes deployment-scoped source workspaces and builds
+  deployment-scoped Docker images on the target. Preview cleanup stops selected runtime instances
+  and route/link state, but it does not yet prune unused Docker images, BuildKit/build cache, or
+  orphaned materialized source workspaces. Long-lived single-server targets can therefore exhaust
+  disk or inodes even after preview routes are cleaned.
 
 The current runtime command spec work is aligned with this workflow because it keeps rendered shell
 strings at the adapter boundary. The next abstraction step is target-specific render/apply result
