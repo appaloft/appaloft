@@ -1,6 +1,6 @@
 ---
 name: appaloft-develop
-description: Appaloft project-specific Domain Driven Develop profile. Use with the installed domain-driven-develop skill when Codex works on Appaloft business behavior, roadmap/version-based next behavior selection, ADR/decision alignment, source-of-truth specs, public docs, tests, Web/API/CLI entrypoints, operation catalog alignment, release-sensitive compatibility impact, or Code Round implementation. This profile only binds Appaloft business facts and repository paths; use domain-driven-develop for the generic Init/Discover/Spec/Docs/Test-First/Code/Sync/Next-Behavior/Post-Implementation workflow and DDD tactical rules.
+description: Appaloft project-specific Domain Driven Develop profile. Use with the installed domain-driven-develop skill when Codex works on Appaloft business behavior, roadmap/version-based next behavior selection, event-storming discovery, future docs/specs feature artifacts, ADR/decision alignment, source-of-truth specs, public docs, tests, Web/API/CLI entrypoints, operation catalog alignment, release-sensitive compatibility impact, or Code Round implementation. This profile only binds Appaloft business facts and repository paths; use domain-driven-develop for the generic Init/Discover/Spec/Docs/Test-First/Code/Sync/Next-Behavior/Post-Implementation workflow and DDD tactical rules.
 ---
 
 # Appaloft Develop
@@ -47,8 +47,12 @@ Read Appaloft governing sources in this order before non-trivial behavior work:
    - `docs/decisions/ADR-030-public-documentation-round-and-platform.md`
    - `docs/documentation/public-docs-structure.md`
    - `docs/testing/public-documentation-test-matrix.md`
-12. Implementation plans under `docs/implementation/**`
-13. `packages/application/src/operation-catalog.ts`
+12. Future new formal behavior artifacts under `docs/specs/<id>-<slug>/` when present:
+   - `spec.md`
+   - `plan.md`
+   - `tasks.md`
+13. Implementation plans under `docs/implementation/**`
+14. `packages/application/src/operation-catalog.ts`
 
 Use `docs/ai/**` only as background analysis. It must not override accepted ADRs, the business operation map, global contracts, local specs, public documentation specs, or implementation plans.
 
@@ -71,6 +75,28 @@ When asked what to do next, use `domain-driven-develop` Next Behavior Selection,
 3. recommend exactly one next behavior;
 4. state the next round type, usually Spec Round when governance is missing and Code Round only when specs/tests/docs/readiness are sufficient;
 5. do not start the next behavior unless explicitly asked.
+
+## New Behavior Artifact Convention
+
+Use the installed `domain-driven-develop` `references/spec-plan-tasks-artifacts.md` for new Appaloft formal behavior after this profile change.
+
+For Appaloft:
+
+- use `docs/specs/<id>-<behavior-slug>/` as the feature artifact directory;
+- include `spec.md`, `plan.md`, and `tasks.md` for new formal behavior that needs Discover Round, Spec Round, Testing/Test-First Round, Code Round, or public/entrypoint/roadmap/event impact;
+- do not backfill historical Appaloft behavior into this structure unless explicitly asked;
+- keep `docs/specs/**` as a coordination layer, not a replacement for accepted ADRs, `docs/DOMAIN_MODEL.md`, `docs/BUSINESS_OPERATION_MAP.md`, local command/query/event/workflow/error specs, testing matrices, public docs, implementation plans, or operation catalog entries;
+- `spec.md` states Appaloft business WHAT/WHY, canonical terms, scenarios, acceptance criteria, public surfaces, and open questions;
+- `plan.md` maps the behavior to Appaloft bounded contexts, packages, operation catalog, entrypoints, persistence/read models, event/CQRS effects, roadmap/version impact, and test strategy;
+- `tasks.md` is the executable checklist and should include test matrix ids, source-of-truth doc updates, entrypoint/docs work, verification commands, and Post-Implementation Sync.
+
+Small Sync Rounds, narrow bug fixes, or purely mechanical changes may mark the feature artifact as `not-applicable` with a reason in the behavior dossier.
+
+## Event Storming Discovery
+
+Use the installed `domain-driven-develop` `references/event-storming-discovery.md` during Discover Round when an Appaloft behavior lacks clear lifecycle order, events, actors, policies, aggregate ownership, read model needs, external-system translation, or ubiquitous language.
+
+Event-storming output is discovery input. Promote only confirmed Appaloft facts into `docs/specs/**/spec.md`, `docs/DOMAIN_MODEL.md`, ADRs, local specs, test matrices, and public docs. Candidate events are not implementation events until `docs/events/**` and relevant tests govern producer, payload, consumers, publication boundary, replay/backfill, and compatibility.
 
 ## Appaloft Roadmap And Version Gate
 
@@ -116,6 +142,8 @@ If the behavior fits existing accepted ADRs and `docs/DOMAIN_MODEL.md`, record t
 Use the installed `domain-driven-develop` `references/round-checklists.md` before non-trivial edits and `references/reporting.md` for Discovery, formal round summaries, artifact-state reports, coverage reports, and ready/not-ready output.
 
 For Appaloft formal work, include operation-map position/state, operation catalog and `docs/CORE_OPERATIONS.md` sync state, Web/API/CLI/repository-config/future MCP coverage, public docs/help outcome, test matrix ids, and remaining migration gaps.
+
+For new formal behavior, also include `docs/specs/<id>-<slug>/` path and `spec.md`/`plan.md`/`tasks.md` state.
 
 When formal work is roadmap or release-sensitive, also include roadmap target, version target when known, compatibility impact, affected public surfaces, and release-note/changelog/migration outcome.
 
@@ -222,6 +250,7 @@ For formal work, summarize:
 - round type;
 - target behavior;
 - governing Appaloft docs;
+- feature artifact path and `spec.md`/`plan.md`/`tasks.md` state when relevant;
 - roadmap target, version target, and compatibility impact when relevant;
 - operation-map position/state;
 - domain owner and canonical terms;
