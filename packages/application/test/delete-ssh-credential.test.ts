@@ -134,6 +134,10 @@ class RecordingSshCredentialRepository implements SshCredentialRepository {
     throw new Error("SshCredentialRepository.upsert should not be used by delete use case");
   }
 
+  async updateOne(..._args: Parameters<SshCredentialRepository["updateOne"]>): Promise<never> {
+    throw new Error("SshCredentialRepository.updateOne should not be used by delete use case");
+  }
+
   async deleteOne(...args: Parameters<SshCredentialRepository["deleteOne"]>): Promise<boolean> {
     this.deleteCalls += 1;
     this.deleteSpecNames.push(args[1].constructor.name);

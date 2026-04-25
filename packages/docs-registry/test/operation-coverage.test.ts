@@ -58,13 +58,14 @@ describe("public docs operation coverage", () => {
         "docs/workflows/ssh-credential-lifecycle.md",
         "docs/queries/credentials.show.md",
         "docs/commands/credentials.delete-ssh.md",
+        "docs/commands/credentials.rotate-ssh.md",
         "docs/errors/credentials.lifecycle.md",
         "docs/testing/ssh-credential-lifecycle-test-matrix.md",
       ]),
     );
     expect(topic.webSurfaces).toEqual(
       expect.arrayContaining([
-        "apps/web server registration, Quick Deploy credential step, credential detail surfaces, and saved credential destructive delete dialog",
+        "apps/web server registration, Quick Deploy credential step, credential detail surfaces, saved credential destructive delete dialog, and saved credential rotation dialog",
       ]),
     );
   });
@@ -80,8 +81,20 @@ describe("public docs operation coverage", () => {
     });
     expect(topic.webSurfaces).toEqual(
       expect.arrayContaining([
-        "apps/web server registration, Quick Deploy credential step, credential detail surfaces, and saved credential destructive delete dialog",
+        "apps/web server registration, Quick Deploy credential step, credential detail surfaces, saved credential destructive delete dialog, and saved credential rotation dialog",
       ]),
     );
+  });
+
+  test("[SSH-CRED-ENTRY-011] [SSH-CRED-ENTRY-015] reusable SSH credential rotate records docs coverage and Web surface", () => {
+    const coverage = getPublicDocsOperationCoverage("credentials.rotate-ssh");
+    const topic = publicDocsHelpTopics["server.ssh-credential"];
+
+    expect(coverage).toMatchObject({
+      operationKey: "credentials.rotate-ssh",
+      status: "documented",
+      topicId: "server.ssh-credential",
+    });
+    expect(topic.webSurfaces?.join("\n")).toContain("saved credential rotation dialog");
   });
 });

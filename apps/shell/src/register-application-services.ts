@@ -92,6 +92,8 @@ import {
   ResourceHealthQueryService,
   ResourceProxyConfigurationPreviewQueryService,
   ResourceRuntimeLogsQueryService,
+  RotateSshCredentialCommandHandler,
+  RotateSshCredentialUseCase,
   RuntimePlanResolutionInputBuilder,
   SetEnvironmentVariableUseCase,
   SetResourceVariableCommandHandler,
@@ -158,6 +160,7 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(DeactivateServerCommandHandler);
   container.registerSingleton(DeleteServerCommandHandler);
   container.registerSingleton(DeleteSshCredentialCommandHandler);
+  container.registerSingleton(RotateSshCredentialCommandHandler);
   container.registerSingleton(RenameServerCommandHandler);
   container.registerSingleton(ShowResourceQueryHandler);
   container.registerSingleton(ResourceEffectiveConfigQueryHandler);
@@ -232,6 +235,7 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(tokens.deactivateServerUseCase, DeactivateServerUseCase);
   container.registerSingleton(tokens.deleteServerUseCase, DeleteServerUseCase);
   container.registerSingleton(tokens.deleteSshCredentialUseCase, DeleteSshCredentialUseCase);
+  container.registerSingleton(tokens.rotateSshCredentialUseCase, RotateSshCredentialUseCase);
   container.registerSingleton(
     tokens.checkServerDeleteSafetyQueryService,
     CheckServerDeleteSafetyQueryService,

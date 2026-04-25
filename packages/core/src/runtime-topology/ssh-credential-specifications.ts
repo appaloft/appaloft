@@ -8,6 +8,7 @@ export interface SshCredentialSelectionSpecVisitor<TResult> {
 
 export interface SshCredentialMutationSpecVisitor<TResult> {
   visitUpsertSshCredential(spec: UpsertSshCredentialSpec): TResult;
+  visitRotateSshCredential(spec: RotateSshCredentialSpec): TResult;
 }
 
 export interface SshCredentialSelectionSpec {
@@ -51,5 +52,17 @@ export class UpsertSshCredentialSpec implements SshCredentialMutationSpec {
 
   accept<TResult>(visitor: SshCredentialMutationSpecVisitor<TResult>): TResult {
     return visitor.visitUpsertSshCredential(this);
+  }
+}
+
+export class RotateSshCredentialSpec implements SshCredentialMutationSpec {
+  private constructor(public readonly state: SshCredentialState) {}
+
+  static fromSshCredential(credential: SshCredential): RotateSshCredentialSpec {
+    return new RotateSshCredentialSpec(credential.toState());
+  }
+
+  accept<TResult>(visitor: SshCredentialMutationSpecVisitor<TResult>): TResult {
+    return visitor.visitRotateSshCredential(this);
   }
 }

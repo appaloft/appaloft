@@ -1,10 +1,11 @@
 <script lang="ts">
   import { browser } from "$app/environment";
   import { createMutation, createQuery, queryOptions } from "@tanstack/svelte-query";
-  import { ArrowRight, KeyRound, Network, Server, ShieldCheck, Trash2, TriangleAlert } from "@lucide/svelte";
+  import { ArrowRight, KeyRound, Network, RotateCcw, Server, ShieldCheck, Trash2, TriangleAlert } from "@lucide/svelte";
   import type {
     ConfigureDefaultAccessDomainPolicyInput,
     DeleteSshCredentialInput,
+    RotateSshCredentialInput,
     ServerSummary,
     SshCredentialSummary,
   } from "@appaloft/contracts";
@@ -18,12 +19,17 @@
   import { Input } from "$lib/components/ui/input";
   import * as Select from "$lib/components/ui/select";
   import { Skeleton } from "$lib/components/ui/skeleton";
+  import { Textarea } from "$lib/components/ui/textarea";
   import { webDocsHrefs } from "$lib/console/docs-help";
   import { createConsoleQueries } from "$lib/console/queries";
   import {
     isSshCredentialDeleteConfirmationValid,
     resolveSshCredentialDeleteReadiness,
   } from "$lib/console/ssh-credential-delete";
+  import {
+    isSshCredentialRotateConfirmationValid,
+    resolveSshCredentialRotateReadiness,
+  } from "$lib/console/ssh-credential-rotation";
   import { formatTime } from "$lib/console/utils";
   import { i18nKeys, t } from "$lib/i18n";
   import { orpcClient } from "$lib/orpc";
@@ -62,6 +68,17 @@
     title: string;
     detail: string;
   } | null>(null);
+  let credentialRotateDialogOpen = $state(false);
+  let credentialRotatePrivateKey = $state("");
+  let credentialRotatePublicKey = $state("");
+  let credentialRotateUsername = $state("");
+  let credentialRotateConfirmation = $state("");
+  let credentialRotateAcknowledgeServerUsage = $state(false);
+  let credentialRotateFeedback = $state<{
+    kind: "success" | "error";
+    title: string;
+    detail: string;
+  } | null>(null);
 
   const selectedCredentialId = $derived(selectedCredential?.id ?? "");
   const selectedCredentialDetailQuery = createQuery(() =>
@@ -72,7 +89,10 @@
           credentialId: selectedCredentialId,
           includeUsage: true,
         }),
-      enabled: browser && credentialDeleteDialogOpen && selectedCredentialId.length > 0,
+      enabled:
+        browser &&
+        (credentialDeleteDialogOpen || credentialRotateDialogOpen) &&
+        selectedCredentialId.length > 0,
       staleTime: 0,
       retry: 0,
     }),
@@ -84,6 +104,15 @@
       hasError: Boolean(selectedCredentialDetailQuery.error),
     }),
   );
+  const selectedCredentialRotateReadiness = $derived(
+    resolveSshCredentialRotateReadiness({
+      detail: selectedCredentialDetailQuery.data,
+      isPending: selectedCredentialDetailQuery.isPending,
+      hasError: Boolean(selectedCredentialDetailQuery.error),
+      acknowledgedServerUsage: credentialRotateAcknowledgeServerUsage,
+    }),
+  );
+  const selectedCredentialUsage = $derived(selectedCredentialDetailQuery.data?.usage);
   const configureSystemDefaultAccessMutation = createMutation(() => ({
     mutationFn: (input: ConfigureDefaultAccessDomainPolicyInput) =>
       orpcClient.defaultAccessDomainPolicies.configure(input),
@@ -123,11 +152,38 @@
       };
     },
   }));
+  const rotateSshCredentialMutation = createMutation(() => ({
+    mutationFn: (input: RotateSshCredentialInput) => orpcClient.credentials.ssh.rotate(input),
+    onSuccess: (result) => {
+      credentialRotateFeedback = {
+        kind: "success",
+        title: $t(i18nKeys.console.servers.rotateCredentialSucceeded),
+        detail: result.credential.id,
+      };
+      credentialRotateDialogOpen = false;
+      void queryClient.invalidateQueries({ queryKey: ["credentials", "ssh"] });
+      void queryClient.invalidateQueries({ queryKey: ["servers"] });
+    },
+    onError: (error) => {
+      credentialRotateFeedback = {
+        kind: "error",
+        title: $t(i18nKeys.console.servers.rotateCredentialFailed),
+        detail: readErrorMessage(error),
+      };
+    },
+  }));
   const canSubmitCredentialDelete = $derived(
     Boolean(selectedCredential) &&
       selectedCredentialDeleteReadiness.kind === "ready" &&
       isSshCredentialDeleteConfirmationValid(selectedCredentialId, credentialDeleteConfirmation) &&
       !deleteSshCredentialMutation.isPending,
+  );
+  const canSubmitCredentialRotate = $derived(
+    Boolean(selectedCredential) &&
+      credentialRotatePrivateKey.trim().length > 0 &&
+      selectedCredentialRotateReadiness.kind === "ready" &&
+      isSshCredentialRotateConfirmationValid(selectedCredentialId, credentialRotateConfirmation) &&
+      !rotateSshCredentialMutation.isPending,
   );
 
   function countServerDeployments(server: ServerSummary): number {
@@ -159,6 +215,18 @@
     void queryClient.invalidateQueries({ queryKey: ["credentials", "ssh", "show", credential.id] });
   }
 
+  function openCredentialRotateDialog(credential: SshCredentialSummary): void {
+    selectedCredential = credential;
+    credentialRotatePrivateKey = "";
+    credentialRotatePublicKey = "";
+    credentialRotateUsername = credential.username ?? "";
+    credentialRotateConfirmation = "";
+    credentialRotateAcknowledgeServerUsage = false;
+    credentialRotateFeedback = null;
+    credentialRotateDialogOpen = true;
+    void queryClient.invalidateQueries({ queryKey: ["credentials", "ssh", "show", credential.id] });
+  }
+
   function submitCredentialDelete(event: SubmitEvent): void {
     event.preventDefault();
 
@@ -175,13 +243,42 @@
     });
   }
 
+  function submitCredentialRotate(event: SubmitEvent): void {
+    event.preventDefault();
+
+    if (!selectedCredential || !canSubmitCredentialRotate) {
+      return;
+    }
+
+    credentialRotateFeedback = null;
+    rotateSshCredentialMutation.mutate({
+      credentialId: selectedCredential.id,
+      privateKey: credentialRotatePrivateKey.trim(),
+      ...(credentialRotatePublicKey.trim()
+        ? { publicKey: credentialRotatePublicKey.trim() }
+        : {}),
+      ...(credentialRotateUsername.trim() ? { username: credentialRotateUsername.trim() } : {}),
+      confirmation: {
+        credentialId: credentialRotateConfirmation.trim(),
+        ...(credentialRotateAcknowledgeServerUsage
+          ? { acknowledgeServerUsage: credentialRotateAcknowledgeServerUsage }
+          : {}),
+      },
+    });
+  }
+
   $effect(() => {
-    if (credentialDeleteDialogOpen) {
+    if (credentialDeleteDialogOpen || credentialRotateDialogOpen) {
       return;
     }
 
     selectedCredential = null;
     credentialDeleteConfirmation = "";
+    credentialRotatePrivateKey = "";
+    credentialRotatePublicKey = "";
+    credentialRotateUsername = "";
+    credentialRotateConfirmation = "";
+    credentialRotateAcknowledgeServerUsage = false;
   });
 </script>
 
@@ -485,16 +582,28 @@
                   {/if}
                 </div>
               </div>
-              <Button
-                variant="destructive"
-                onclick={() => openCredentialDeleteDialog(credential)}
-                aria-label={$t(i18nKeys.console.servers.deleteCredentialActionAria, {
-                  name: credential.name,
-                })}
-              >
-                <Trash2 class="size-4" />
-                {$t(i18nKeys.console.servers.deleteCredentialAction)}
-              </Button>
+              <div class="flex flex-wrap justify-start gap-2 sm:justify-end">
+                <Button
+                  variant="outline"
+                  onclick={() => openCredentialRotateDialog(credential)}
+                  aria-label={$t(i18nKeys.console.servers.rotateCredentialActionAria, {
+                    name: credential.name,
+                  })}
+                >
+                  <RotateCcw class="size-4" />
+                  {$t(i18nKeys.console.servers.rotateCredentialAction)}
+                </Button>
+                <Button
+                  variant="destructive"
+                  onclick={() => openCredentialDeleteDialog(credential)}
+                  aria-label={$t(i18nKeys.console.servers.deleteCredentialActionAria, {
+                    name: credential.name,
+                  })}
+                >
+                  <Trash2 class="size-4" />
+                  {$t(i18nKeys.console.servers.deleteCredentialAction)}
+                </Button>
+              </div>
             </div>
           {/each}
         </div>
@@ -506,6 +615,15 @@
         >
           <p class="font-medium">{credentialDeleteFeedback.title}</p>
           <p class="mt-1 text-muted-foreground">{credentialDeleteFeedback.detail}</p>
+        </div>
+      {/if}
+
+      {#if credentialRotateFeedback}
+        <div
+          class={`rounded-md border p-3 text-sm ${credentialRotateFeedback.kind === "error" ? "border-destructive/30 text-destructive" : "border-border text-foreground"}`}
+        >
+          <p class="font-medium">{credentialRotateFeedback.title}</p>
+          <p class="mt-1 text-muted-foreground">{credentialRotateFeedback.detail}</p>
         </div>
       {/if}
     </section>
@@ -597,6 +715,149 @@
                 {deleteSshCredentialMutation.isPending
                   ? $t(i18nKeys.console.servers.deleteCredentialDeleting)
                   : $t(i18nKeys.console.servers.deleteCredentialAction)}
+              </Button>
+            </Dialog.Footer>
+          </form>
+        </Dialog.Content>
+      {/if}
+    </Dialog.Root>
+
+    <Dialog.Root bind:open={credentialRotateDialogOpen}>
+      {#if selectedCredential}
+        <Dialog.Content closeLabel={$t(i18nKeys.common.actions.close)}>
+          <form onsubmit={submitCredentialRotate}>
+            <Dialog.Header>
+              <Dialog.Title>
+                {$t(i18nKeys.console.servers.rotateCredentialDialogTitle)}
+              </Dialog.Title>
+              <Dialog.Description>
+                {$t(i18nKeys.console.servers.rotateCredentialDialogDescription, {
+                  id: selectedCredential.id,
+                })}
+              </Dialog.Description>
+            </Dialog.Header>
+
+            <div class="space-y-4 px-5 py-4">
+              <div
+                class={`rounded-md border p-3 text-sm ${selectedCredentialRotateReadiness.kind === "usage-unavailable" ? "border-destructive/30" : "border-border"}`}
+              >
+                {#if selectedCredentialRotateReadiness.kind === "loading"}
+                  <p class="font-medium">
+                    {$t(i18nKeys.console.servers.rotateCredentialUsageChecking)}
+                  </p>
+                {:else if selectedCredentialRotateReadiness.kind === "usage-unavailable"}
+                  <div class="flex items-start gap-2 text-destructive">
+                    <TriangleAlert class="mt-0.5 size-4" />
+                    <p class="font-medium">
+                      {$t(i18nKeys.console.servers.rotateCredentialUsageUnavailable)}
+                    </p>
+                  </div>
+                {:else if selectedCredentialRotateReadiness.kind === "requires-acknowledgement"}
+                  <div class="flex items-start gap-2">
+                    <TriangleAlert class="mt-0.5 size-4 text-muted-foreground" />
+                    <p class="font-medium">
+                      {$t(i18nKeys.console.servers.rotateCredentialUsageRequiresAcknowledgement, {
+                        total: selectedCredentialRotateReadiness.totalServers,
+                        active: selectedCredentialRotateReadiness.activeServers,
+                        inactive: selectedCredentialRotateReadiness.inactiveServers,
+                      })}
+                    </p>
+                  </div>
+                {:else}
+                  <p class="font-medium">
+                    {selectedCredentialRotateReadiness.requiresAcknowledgement && selectedCredentialUsage
+                      ? $t(i18nKeys.console.servers.rotateCredentialUsageRequiresAcknowledgement, {
+                          total: selectedCredentialUsage.totalServers,
+                          active: selectedCredentialUsage.activeServers,
+                          inactive: selectedCredentialUsage.inactiveServers,
+                        })
+                      : $t(i18nKeys.console.servers.rotateCredentialUsageReady)}
+                  </p>
+                {/if}
+              </div>
+
+              {#if selectedCredentialUsage && selectedCredentialUsage.totalServers > 0}
+                <label class="flex items-start gap-2 text-sm font-medium">
+                  <input
+                    bind:checked={credentialRotateAcknowledgeServerUsage}
+                    class="mt-1 size-4"
+                    type="checkbox"
+                  />
+                  <span>{$t(i18nKeys.console.servers.rotateCredentialAcknowledgeLabel)}</span>
+                </label>
+              {/if}
+
+              <label class="space-y-1.5 text-sm font-medium">
+                <span>{$t(i18nKeys.console.servers.rotateCredentialPrivateKeyLabel)}</span>
+                <Textarea
+                  bind:value={credentialRotatePrivateKey}
+                  autocomplete="off"
+                  placeholder={$t(i18nKeys.console.servers.rotateCredentialPrivateKeyPlaceholder)}
+                  rows={7}
+                />
+              </label>
+
+              <div class="grid gap-4 md:grid-cols-2">
+                <label class="space-y-1.5 text-sm font-medium">
+                  <span>{$t(i18nKeys.console.servers.rotateCredentialPublicKeyLabel)}</span>
+                  <Input
+                    bind:value={credentialRotatePublicKey}
+                    autocomplete="off"
+                    placeholder={$t(i18nKeys.console.servers.rotateCredentialPublicKeyPlaceholder)}
+                  />
+                </label>
+
+                <label class="space-y-1.5 text-sm font-medium">
+                  <span>{$t(i18nKeys.console.servers.rotateCredentialUsernameLabel)}</span>
+                  <Input
+                    bind:value={credentialRotateUsername}
+                    autocomplete="off"
+                    placeholder={$t(i18nKeys.console.servers.rotateCredentialUsernamePlaceholder)}
+                  />
+                </label>
+              </div>
+
+              <label class="space-y-1.5 text-sm font-medium">
+                <span>
+                  {$t(i18nKeys.console.servers.rotateCredentialConfirmationLabel)}
+                </span>
+                <Input
+                  bind:value={credentialRotateConfirmation}
+                  autocomplete="off"
+                  aria-invalid={!isSshCredentialRotateConfirmationValid(
+                    selectedCredential.id,
+                    credentialRotateConfirmation,
+                  )}
+                  placeholder={selectedCredential.id}
+                />
+              </label>
+
+              {#if credentialRotateConfirmation.length > 0 && !isSshCredentialRotateConfirmationValid(selectedCredential.id, credentialRotateConfirmation)}
+                <p class="text-sm text-destructive">
+                  {$t(i18nKeys.console.servers.rotateCredentialConfirmMismatch)}
+                </p>
+              {/if}
+
+              <p class="text-sm text-muted-foreground">
+                {$t(i18nKeys.console.servers.rotateCredentialTestHint)}
+              </p>
+            </div>
+
+            <Dialog.Footer class="border-t p-5">
+              <Button
+                type="button"
+                variant="outline"
+                onclick={() => {
+                  credentialRotateDialogOpen = false;
+                }}
+              >
+                {$t(i18nKeys.common.actions.close)}
+              </Button>
+              <Button type="submit" disabled={!canSubmitCredentialRotate}>
+                <RotateCcw class="size-4" />
+                {rotateSshCredentialMutation.isPending
+                  ? $t(i18nKeys.console.servers.rotateCredentialRotating)
+                  : $t(i18nKeys.console.servers.rotateCredentialAction)}
               </Button>
             </Dialog.Footer>
           </form>

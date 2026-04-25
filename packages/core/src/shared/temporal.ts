@@ -69,6 +69,23 @@ export class UpdatedAt extends DateTimeValue {
   }
 }
 
+const rotatedAtBrand: unique symbol = Symbol("RotatedAt");
+export class RotatedAt extends DateTimeValue {
+  private [rotatedAtBrand]!: void;
+
+  private constructor(value: string) {
+    super(value);
+  }
+
+  static create(value: string | Date): Result<RotatedAt> {
+    return createDateTimeValue(value, "RotatedAt", (normalized) => new RotatedAt(normalized));
+  }
+
+  static rehydrate(value: string): RotatedAt {
+    return new RotatedAt(new Date(value).toISOString());
+  }
+}
+
 const archivedAtBrand: unique symbol = Symbol("ArchivedAt");
 export class ArchivedAt extends DateTimeValue {
   private [archivedAtBrand]!: void;

@@ -12,6 +12,7 @@ import {
   OpenTerminalSessionCommand,
   RegisterServerCommand,
   RenameServerCommand,
+  RotateSshCredentialCommand,
   ShowServerQuery,
   ShowSshCredentialQuery,
   TestServerConnectivityCommand,
@@ -42,6 +43,9 @@ const credentialIdOption = Options.text("credential-id").pipe(Options.optional);
 const reasonOption = Options.text("reason").pipe(Options.optional);
 const confirmServerIdOption = Options.text("confirm");
 const confirmCredentialIdOption = Options.text("confirm");
+const acknowledgeServerUsageOption = Options.boolean("acknowledge-server-usage").pipe(
+  Options.withDefault(false),
+);
 const serverIdArg = Args.text({ name: "serverId" });
 const credentialIdArg = Args.text({ name: "credentialId" });
 const rowsOption = Options.text("rows").pipe(Options.withDefault("24"));
@@ -251,6 +255,37 @@ const credentialDeleteCommand = EffectCommand.make(
     ),
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.serverCredentialDelete));
 
+const credentialRotateCommand = EffectCommand.make(
+  "credential-rotate",
+  {
+    credentialId: credentialIdArg,
+    privateKeyFile: requiredPrivateKeyFileOption,
+    publicKey: publicKeyOption,
+    username: usernameOption,
+    confirm: confirmCredentialIdOption,
+    acknowledgeServerUsage: acknowledgeServerUsageOption,
+  },
+  ({ acknowledgeServerUsage, confirm, credentialId, privateKeyFile, publicKey, username }) =>
+    Effect.gen(function* () {
+      const usernameValue = optionalValue(username);
+      const publicKeyValue = optionalValue(publicKey);
+      const privateKey = yield* Effect.promise(() => Bun.file(privateKeyFile).text());
+
+      yield* runCommand(
+        RotateSshCredentialCommand.create({
+          credentialId,
+          privateKey,
+          ...(publicKeyValue ? { publicKey: publicKeyValue } : {}),
+          ...(usernameValue ? { username: usernameValue } : {}),
+          confirmation: {
+            credentialId: confirm,
+            ...(acknowledgeServerUsage ? { acknowledgeServerUsage } : {}),
+          },
+        }),
+      );
+    }),
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.serverCredentialRotate));
+
 const testCommand = EffectCommand.make(
   "test",
   {
@@ -346,6 +381,7 @@ export const serverCommand = EffectCommand.make("server").pipe(
     credentialListCommand,
     credentialShowCommand,
     credentialDeleteCommand,
+    credentialRotateCommand,
     testCommand,
     doctorCommand,
     terminalCommand,

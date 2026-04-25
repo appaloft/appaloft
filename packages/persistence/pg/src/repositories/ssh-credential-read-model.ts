@@ -62,6 +62,7 @@ function toSshCredentialSummary(
     publicKeyConfigured: Boolean(row.public_key),
     privateKeyConfigured: Boolean(row.private_key),
     createdAt: normalizeTimestamp(row.created_at) ?? row.created_at,
+    ...(row.rotated_at ? { rotatedAt: normalizeTimestamp(row.rotated_at) ?? row.rotated_at } : {}),
   };
 }
 

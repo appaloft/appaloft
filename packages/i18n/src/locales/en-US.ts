@@ -963,6 +963,31 @@ export const enUS = {
       deleteCredentialUsageReady: "Usage is zero; typed confirmation is still required.",
       deleteCredentialUsageUnavailable:
         "Usage could not be read safely. Retry before deleting this credential.",
+      rotateCredentialAcknowledgeLabel:
+        "I understand active and inactive servers using this credential will use the rotated material for future work.",
+      rotateCredentialAction: "Rotate",
+      rotateCredentialActionAria: "Rotate SSH credential {{name}}",
+      rotateCredentialConfirmMismatch: "The typed credential id must match exactly.",
+      rotateCredentialConfirmationLabel: "Type the credential id to confirm",
+      rotateCredentialDialogDescription:
+        "This replaces stored key material for {{id}} while preserving server references.",
+      rotateCredentialDialogTitle: "Rotate saved SSH credential",
+      rotateCredentialFailed: "Unable to rotate SSH credential",
+      rotateCredentialPrivateKeyLabel: "New private key",
+      rotateCredentialPrivateKeyPlaceholder: "Paste the replacement private key",
+      rotateCredentialPublicKeyLabel: "Public key metadata",
+      rotateCredentialPublicKeyPlaceholder: "Optional replacement public key",
+      rotateCredentialRotating: "Rotating",
+      rotateCredentialSucceeded: "SSH credential rotated",
+      rotateCredentialTestHint: "Run a connectivity test after rotation before deploying.",
+      rotateCredentialUsageChecking: "Checking credential usage before rotation.",
+      rotateCredentialUsageReady: "Usage is zero; typed confirmation is still required.",
+      rotateCredentialUsageRequiresAcknowledgement:
+        "This credential is used by {{total}} servers: {{active}} active, {{inactive}} inactive.",
+      rotateCredentialUsageUnavailable:
+        "Usage could not be read safely. Retry before rotating this credential.",
+      rotateCredentialUsernameLabel: "Default username",
+      rotateCredentialUsernamePlaceholder: "Optional replacement username",
       emptyBody:
         "The deployment flow can create a local server automatically, or you can register a remote SSH target from the CLI first.",
       emptyTitle: "No server targets yet.",

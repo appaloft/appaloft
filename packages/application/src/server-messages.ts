@@ -10,6 +10,7 @@ export * from "./operations/servers/list-servers.query";
 export * from "./operations/servers/list-ssh-credentials.query";
 export * from "./operations/servers/register-server.command";
 export * from "./operations/servers/rename-server.command";
+export * from "./operations/servers/rotate-ssh-credential.command";
 export * from "./operations/servers/show-server.query";
 export * from "./operations/servers/show-ssh-credential.query";
 export * from "./operations/servers/test-server-connectivity.command";

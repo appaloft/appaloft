@@ -42,6 +42,7 @@ import {
   type ResourceHealthQueryInput,
   type ResourceProxyConfigurationPreviewQueryInput,
   type ResourceRuntimeLogsQueryInput,
+  type RotateSshCredentialCommandInput,
   type SetEnvironmentVariableCommandInput,
   type SetResourceVariableCommandInput,
   type ShowDeploymentQueryInput,
@@ -110,6 +111,7 @@ import {
   type ResourceRuntimeLogEvent,
   type ResourceRuntimeLogsResponse,
   type ResourceRuntimeLogsStreamResponse,
+  type RotateSshCredentialResponse,
   type SetResourceVariableResponse,
   type ShowDeploymentResponse,
   type ShowProjectResponse,
@@ -253,6 +255,12 @@ export type AppaloftOrpcClientContract = {
         AppaloftClientContext,
         DeleteSshCredentialCommandInput,
         DeleteSshCredentialResponse,
+        AppaloftClientError
+      >;
+      rotate: Client<
+        AppaloftClientContext,
+        RotateSshCredentialCommandInput,
+        RotateSshCredentialResponse,
         AppaloftClientError
       >;
     };

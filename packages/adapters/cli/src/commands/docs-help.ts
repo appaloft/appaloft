@@ -82,6 +82,10 @@ export const cliCommandDescriptions = {
     "Delete an unused reusable SSH credential after typed confirmation",
     "server.ssh-credential",
   ),
+  serverCredentialRotate: withDocs(
+    "Rotate a reusable SSH credential after typed confirmation and usage acknowledgement",
+    "server.ssh-credential",
+  ),
   serverTest: withDocs("Test server connectivity", "server.connectivity-test"),
   serverDoctor: withDocs("Diagnose server SSH and Docker readiness", "server.connectivity-test"),
   serverProxy: withDocs("Server edge proxy operations", "server.proxy-readiness"),

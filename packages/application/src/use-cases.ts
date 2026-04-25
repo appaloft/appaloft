@@ -71,6 +71,7 @@ export * from "./operations/servers/list-servers.query-service";
 export * from "./operations/servers/list-ssh-credentials.query-service";
 export * from "./operations/servers/register-server.use-case";
 export * from "./operations/servers/rename-server.use-case";
+export * from "./operations/servers/rotate-ssh-credential.use-case";
 export * from "./operations/servers/show-server.query-service";
 export * from "./operations/servers/show-ssh-credential.query-service";
 export * from "./operations/servers/test-server-connectivity.use-case";
