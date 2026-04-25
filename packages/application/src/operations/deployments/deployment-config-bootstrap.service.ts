@@ -402,6 +402,7 @@ export class DeploymentContextBootstrapService {
       );
 
       if (existing) {
+        yield* existing.ensureCanCreateDeployment();
         return ok(existing.toState().id.value);
       }
 
@@ -540,7 +541,8 @@ export class DeploymentContextBootstrapService {
     resourceConfig: DeploymentConfiguredResource,
     destinationIdValue?: string,
   ): Promise<Result<string>> {
-    const { clock, eventBus, idGenerator, logger, resourceRepository } = this;
+    const { clock, environmentRepository, eventBus, idGenerator, logger, resourceRepository } =
+      this;
     const repositoryContext = toRepositoryContext(context);
 
     return safeTry(async function* () {
@@ -551,6 +553,17 @@ export class DeploymentContextBootstrapService {
         : undefined;
       const name = yield* ResourceName.create(resourceConfig.name);
       const slug = yield* ResourceSlug.fromName(name);
+      const environment = await environmentRepository.findOne(
+        repositoryContext,
+        EnvironmentByIdSpec.create(environmentId),
+      );
+
+      if (!environment) {
+        return err(domainError.notFound("environment", environmentIdValue));
+      }
+
+      yield* environment.ensureCanCreateDeployment();
+
       const existing = await resourceRepository.findOne(
         repositoryContext,
         ResourceByEnvironmentAndSlugSpec.create(projectId, environmentId, slug),
@@ -687,6 +700,7 @@ export class DeploymentContextBootstrapService {
       const existing = await environmentRepository.findOne(repositoryContext, selection);
 
       if (existing) {
+        yield* existing.ensureCanCreateDeployment();
         return ok(existing.toState().id.value);
       }
 
@@ -748,6 +762,7 @@ export class DeploymentContextBootstrapService {
       if (!environment) {
         return err(domainError.notFound("environment", environmentIdValue));
       }
+      yield* environment.ensureCanCreateDeployment();
 
       const destination = await destinationRepository.findOne(
         repositoryContext,

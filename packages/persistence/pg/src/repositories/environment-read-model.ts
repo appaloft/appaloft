@@ -52,6 +52,13 @@ function toEnvironmentSummary(
     projectId: row.project_id,
     name: row.name,
     kind: row.kind as Awaited<ReturnType<EnvironmentReadModel["list"]>>[number]["kind"],
+    lifecycleStatus: (row.lifecycle_status ?? "active") as Awaited<
+      ReturnType<EnvironmentReadModel["list"]>
+    >[number]["lifecycleStatus"],
+    ...(row.archived_at
+      ? { archivedAt: normalizeTimestamp(row.archived_at) ?? row.archived_at }
+      : {}),
+    ...(row.archive_reason ? { archiveReason: row.archive_reason } : {}),
     createdAt: normalizeTimestamp(row.created_at) ?? row.created_at,
     maskedVariables: variables.map((variable) => ({
       key: variable.key,

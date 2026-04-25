@@ -1,7 +1,9 @@
 import {
   type AppLogger,
+  ArchiveEnvironmentCommand,
   ArchiveProjectCommand,
   ArchiveResourceCommand,
+  archiveEnvironmentCommandInputSchema,
   archiveProjectCommandInputSchema,
   archiveResourceCommandInputSchema,
   BootstrapServerProxyCommand,
@@ -136,6 +138,7 @@ import {
   unsetResourceVariableCommandInputSchema,
 } from "@appaloft/application";
 import {
+  archiveEnvironmentResponseSchema,
   archiveProjectResponseSchema,
   archiveResourceResponseSchema,
   bootstrapServerProxyResponseSchema,
@@ -252,6 +255,7 @@ export const apiDocsHrefs = {
   serverProxyReadiness: resolvePublicDocsHelpHref("server.proxy-readiness"),
   environmentVariablePrecedence: resolvePublicDocsHelpHref("environment.variable-precedence"),
   environmentDiffPromote: resolvePublicDocsHelpHref("environment.diff-promote"),
+  environmentLifecycle: resolvePublicDocsHelpHref("environment.lifecycle"),
   defaultAccessRoute: resolvePublicDocsHelpHref("domain.generated-access-route"),
   resourceSourceProfile: resolvePublicDocsHelpHref("resource.source-profile"),
   resourceRuntimeProfile: resolvePublicDocsHelpHref("resource.runtime-profile"),
@@ -388,6 +392,10 @@ export const apiRouteDescriptions = {
   promoteEnvironment: routeDescription(
     "Promotes one environment configuration set into another.",
     "environment.diff-promote",
+  ),
+  archiveEnvironment: routeDescription(
+    "Archives one environment while keeping deployment history readable.",
+    "environment.lifecycle",
   ),
   diffEnvironments: routeDescription(
     "Compares two environment configuration sets.",
@@ -576,6 +584,8 @@ function toOrpcError(error: DomainError, context: ExecutionContext) {
       });
     case "conflict":
     case "certificate_attempt_conflict":
+    case "project_archived":
+    case "environment_archived":
     case "resource_slug_conflict":
     case "resource_archived":
     case "resource_delete_blocked":
@@ -1435,6 +1445,19 @@ export const showEnvironmentProcedure = base
   .output(environmentSummarySchema)
   .handler(async ({ input, context }) => executeQuery(context, ShowEnvironmentQuery.create(input)));
 
+export const archiveEnvironmentProcedure = base
+  .route({
+    method: "POST",
+    path: "/environments/{environmentId}/archive",
+    description: apiRouteDescriptions.archiveEnvironment,
+    successStatus: 200,
+  })
+  .input(archiveEnvironmentCommandInputSchema)
+  .output(archiveEnvironmentResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, ArchiveEnvironmentCommand.create(input)),
+  );
+
 export const setEnvironmentVariableProcedure = base
   .route({
     method: "POST",
@@ -1755,6 +1778,7 @@ export const appaloftOrpcRouter = {
     list: listEnvironmentsProcedure,
     create: createEnvironmentProcedure,
     show: showEnvironmentProcedure,
+    archive: archiveEnvironmentProcedure,
     setVariable: setEnvironmentVariableProcedure,
     unsetVariable: unsetEnvironmentVariableProcedure,
     effectivePrecedence: environmentEffectivePrecedenceProcedure,
@@ -1945,6 +1969,7 @@ export function mountAppaloftOrpcRoutes(
     "/api/environments",
     "/api/default-access-domain-policies",
     "/api/environments/:environmentId",
+    "/api/environments/:environmentId/archive",
     "/api/environments/:environmentId/variables",
     "/api/environments/:environmentId/variables/:key",
     "/api/environments/:environmentId/effective-precedence",

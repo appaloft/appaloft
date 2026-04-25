@@ -5,16 +5,23 @@ import {
   type EnvironmentSnapshot,
 } from "../configuration/environment-config-set";
 import { AggregateRoot } from "../shared/entity";
+import { domainError } from "../shared/errors";
 import { type EnvironmentId, EnvironmentSnapshotId, type ProjectId } from "../shared/identifiers";
-import { ok, type Result } from "../shared/result";
+import { err, ok, type Result } from "../shared/result";
 import {
   ConfigScopeValue,
   type EnvironmentKindValue,
+  EnvironmentLifecycleStatusValue,
   type VariableExposureValue,
   type VariableKindValue,
 } from "../shared/state-machine";
-import { type CreatedAt, GeneratedAt, UpdatedAt } from "../shared/temporal";
-import { type ConfigKey, type ConfigValueText, type EnvironmentName } from "../shared/text-values";
+import { type ArchivedAt, type CreatedAt, GeneratedAt, UpdatedAt } from "../shared/temporal";
+import {
+  type ArchiveReason,
+  type ConfigKey,
+  type ConfigValueText,
+  type EnvironmentName,
+} from "../shared/text-values";
 
 export type EnvironmentVariableState = ReturnType<EnvironmentConfigSet["toState"]>[number];
 export type EnvironmentDiffEntry = EnvironmentConfigDiffEntry;
@@ -25,12 +32,41 @@ export interface EnvironmentState {
   name: EnvironmentName;
   kind: EnvironmentKindValue;
   parentEnvironmentId?: EnvironmentId;
+  lifecycleStatus: EnvironmentLifecycleStatusValue;
+  archivedAt?: ArchivedAt;
+  archiveReason?: ArchiveReason;
   createdAt: CreatedAt;
   variables: EnvironmentConfigSet;
 }
 
 export interface EnvironmentVisitor<TContext, TResult> {
   visitEnvironment(environment: Environment, context: TContext): TResult;
+}
+
+type EnvironmentRehydrateState = Omit<
+  EnvironmentState,
+  "archiveReason" | "archivedAt" | "lifecycleStatus" | "variables"
+> &
+  Partial<Pick<EnvironmentState, "archiveReason" | "archivedAt" | "lifecycleStatus">> & {
+    variables: EnvironmentConfigSet;
+  };
+
+function environmentArchivedError(input: {
+  environmentId: EnvironmentId;
+  projectId: ProjectId;
+  commandName: string;
+  environmentName: EnvironmentName;
+  archivedAt?: ArchivedAt;
+}) {
+  return domainError.environmentArchived("Archived environments cannot accept new mutations", {
+    phase: "environment-lifecycle-guard",
+    environmentId: input.environmentId.value,
+    projectId: input.projectId.value,
+    environmentName: input.environmentName.value,
+    lifecycleStatus: "archived",
+    commandName: input.commandName,
+    ...(input.archivedAt ? { archivedAt: input.archivedAt.value } : {}),
+  });
 }
 
 export class Environment extends AggregateRoot<EnvironmentState> {
@@ -54,15 +90,19 @@ export class Environment extends AggregateRoot<EnvironmentState> {
         kind: input.kind,
         createdAt: input.createdAt,
         variables: EnvironmentConfigSet.empty(),
+        lifecycleStatus: EnvironmentLifecycleStatusValue.active(),
         ...(input.parentEnvironmentId ? { parentEnvironmentId: input.parentEnvironmentId } : {}),
       }),
     );
   }
 
-  static rehydrate(state: EnvironmentState): Environment {
+  static rehydrate(state: EnvironmentRehydrateState): Environment {
     return new Environment({
       ...state,
       variables: EnvironmentConfigSet.rehydrate(state.variables.toState()),
+      lifecycleStatus: state.lifecycleStatus ?? EnvironmentLifecycleStatusValue.active(),
+      ...(state.archivedAt ? { archivedAt: state.archivedAt } : {}),
+      ...(state.archiveReason ? { archiveReason: state.archiveReason } : {}),
     });
   }
 
@@ -82,6 +122,11 @@ export class Environment extends AggregateRoot<EnvironmentState> {
     isSecret?: boolean;
     updatedAt: UpdatedAt;
   }): Result<void> {
+    const lifecycleGuard = this.ensureCanAcceptMutation("environments.set-variable");
+    if (lifecycleGuard.isErr()) {
+      return err(lifecycleGuard.error);
+    }
+
     const configSet = EnvironmentConfigSet.rehydrate(this.state.variables.toState());
     return configSet.setEntry(input).map((nextEntry) => {
       this.state.variables = configSet;
@@ -100,6 +145,11 @@ export class Environment extends AggregateRoot<EnvironmentState> {
     scope?: ConfigScopeValue;
     updatedAt: UpdatedAt;
   }): Result<void> {
+    const lifecycleGuard = this.ensureCanAcceptMutation("environments.unset-variable");
+    if (lifecycleGuard.isErr()) {
+      return err(lifecycleGuard.error);
+    }
+
     const configSet = EnvironmentConfigSet.rehydrate(this.state.variables.toState());
     return configSet.unsetEntry(input).map(() => {
       this.state.variables = configSet;
@@ -138,33 +188,93 @@ export class Environment extends AggregateRoot<EnvironmentState> {
     targetName: EnvironmentName;
     targetKind: EnvironmentKindValue;
     createdAt: CreatedAt;
-  }): Environment {
-    return Environment.rehydrate({
-      id: input.targetEnvironmentId,
-      projectId: this.state.projectId,
-      name: input.targetName,
-      kind: input.targetKind,
-      parentEnvironmentId: this.state.id,
-      createdAt: input.createdAt,
-      variables: EnvironmentConfigSet.rehydrate(
-        this.materializeSnapshot({
-          snapshotId: EnvironmentSnapshotId.rehydrate(
-            `${input.targetEnvironmentId.value}-promotion`,
-          ),
-          createdAt: GeneratedAt.rehydrate(input.createdAt.value),
-        })
-          .toState()
-          .variables.map((variable: EnvironmentConfigSnapshotEntryState) => ({
-            key: variable.key,
-            value: variable.value,
-            kind: variable.kind,
-            exposure: variable.exposure,
-            scope: ConfigScopeValue.rehydrate("environment"),
-            isSecret: variable.isSecret,
-            updatedAt: UpdatedAt.rehydrate(input.createdAt.value),
-          })),
-      ),
+  }): Result<Environment> {
+    const lifecycleGuard = this.ensureCanAcceptMutation("environments.promote");
+    if (lifecycleGuard.isErr()) {
+      return err(lifecycleGuard.error);
+    }
+
+    return ok(
+      Environment.rehydrate({
+        id: input.targetEnvironmentId,
+        projectId: this.state.projectId,
+        name: input.targetName,
+        kind: input.targetKind,
+        parentEnvironmentId: this.state.id,
+        createdAt: input.createdAt,
+        variables: EnvironmentConfigSet.rehydrate(
+          this.materializeSnapshot({
+            snapshotId: EnvironmentSnapshotId.rehydrate(
+              `${input.targetEnvironmentId.value}-promotion`,
+            ),
+            createdAt: GeneratedAt.rehydrate(input.createdAt.value),
+          })
+            .toState()
+            .variables.map((variable: EnvironmentConfigSnapshotEntryState) => ({
+              key: variable.key,
+              value: variable.value,
+              kind: variable.kind,
+              exposure: variable.exposure,
+              scope: ConfigScopeValue.rehydrate("environment"),
+              isSecret: variable.isSecret,
+              updatedAt: UpdatedAt.rehydrate(input.createdAt.value),
+            })),
+        ),
+      }),
+    );
+  }
+
+  archive(input: { archivedAt: ArchivedAt; reason?: ArchiveReason }): Result<{ changed: boolean }> {
+    if (this.state.lifecycleStatus.isArchived()) {
+      return ok({ changed: false });
+    }
+
+    const nextStatus = this.state.lifecycleStatus.archive();
+    if (nextStatus.isErr()) {
+      return err(nextStatus.error);
+    }
+
+    this.state.lifecycleStatus = nextStatus.value;
+    this.state.archivedAt = input.archivedAt;
+    if (input.reason) {
+      this.state.archiveReason = input.reason;
+    } else {
+      delete this.state.archiveReason;
+    }
+    this.recordDomainEvent("environment-archived", input.archivedAt, {
+      environmentId: this.state.id.value,
+      projectId: this.state.projectId.value,
+      environmentName: this.state.name.value,
+      environmentKind: this.state.kind.value,
+      archivedAt: input.archivedAt.value,
+      ...(input.reason ? { reason: input.reason.value } : {}),
     });
+
+    return ok({ changed: true });
+  }
+
+  ensureCanCreateResource(): Result<void> {
+    return this.ensureCanAcceptMutation("resources.create");
+  }
+
+  ensureCanCreateDeployment(): Result<void> {
+    return this.ensureCanAcceptMutation("deployments.create");
+  }
+
+  private ensureCanAcceptMutation(commandName: string): Result<void> {
+    if (this.state.lifecycleStatus.isActive()) {
+      return ok(undefined);
+    }
+
+    return err(
+      environmentArchivedError({
+        environmentId: this.state.id,
+        projectId: this.state.projectId,
+        commandName,
+        environmentName: this.state.name,
+        ...(this.state.archivedAt ? { archivedAt: this.state.archivedAt } : {}),
+      }),
+    );
   }
 
   toState(): EnvironmentState {

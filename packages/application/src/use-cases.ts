@@ -30,6 +30,7 @@ export * from "./operations/domain-bindings/mark-domain-ready-on-certificate-iss
 export * from "./operations/domain-bindings/mark-domain-ready-on-deployment-finished.handler";
 export * from "./operations/domain-bindings/mark-domain-ready-on-domain-bound.handler";
 export * from "./operations/domain-bindings/mark-domain-route-failed-on-deployment-finished.handler";
+export * from "./operations/environments/archive-environment.use-case";
 export * from "./operations/environments/create-environment.use-case";
 export * from "./operations/environments/diff-environments.query-service";
 export * from "./operations/environments/environment-effective-precedence.query-service";

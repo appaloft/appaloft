@@ -123,6 +123,7 @@ export class CreateResourceUseCase {
           ),
         );
       }
+      yield* environment.ensureCanCreateResource();
 
       const destinationId = input.destinationId
         ? yield* DestinationId.create(input.destinationId)

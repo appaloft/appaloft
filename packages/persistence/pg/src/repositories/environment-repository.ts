@@ -64,6 +64,9 @@ class KyselyEnvironmentMutationVisitor
         name: spec.state.name.value,
         kind: spec.state.kind.value,
         parent_environment_id: spec.state.parentEnvironmentId?.value ?? null,
+        lifecycle_status: spec.state.lifecycleStatus.value,
+        archived_at: spec.state.archivedAt?.value ?? null,
+        archive_reason: spec.state.archiveReason?.value ?? null,
         created_at: spec.state.createdAt.value,
       },
       variables: spec.state.variables.map(
@@ -112,6 +115,9 @@ export class PgEnvironmentRepository implements EnvironmentRepository {
                 name: mutation.environment.name,
                 kind: mutation.environment.kind,
                 parent_environment_id: mutation.environment.parent_environment_id ?? null,
+                lifecycle_status: mutation.environment.lifecycle_status,
+                archived_at: mutation.environment.archived_at ?? null,
+                archive_reason: mutation.environment.archive_reason ?? null,
               }),
             )
             .execute();

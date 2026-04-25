@@ -114,4 +114,25 @@ describe("public docs operation coverage", () => {
       ]),
     );
   });
+
+  test("[ENV-LIFE-ENTRY-004] environment archive records lifecycle docs coverage", () => {
+    const coverage = getPublicDocsOperationCoverage("environments.archive");
+    const topic = publicDocsHelpTopics["environment.lifecycle"];
+
+    expect(coverage).toMatchObject({
+      operationKey: "environments.archive",
+      status: "documented",
+      topicId: "environment.lifecycle",
+    });
+    expect(topic.specReferences).toEqual(
+      expect.arrayContaining([
+        "docs/workflows/environment-lifecycle.md",
+        "docs/commands/environments.archive.md",
+        "docs/events/environment-archived.md",
+        "docs/errors/environments.lifecycle.md",
+        "docs/testing/environment-lifecycle-test-matrix.md",
+      ]),
+    );
+    expect(topic.webSurfaces?.join("\n")).toContain("environment lifecycle action");
+  });
 });

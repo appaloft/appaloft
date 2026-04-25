@@ -71,6 +71,7 @@ export const tokens = {
   ),
   testServerConnectivityUseCase: Symbol.for("appaloft.test_server_connectivity_use_case"),
   bootstrapServerProxyUseCase: Symbol.for("appaloft.bootstrap_server_proxy_use_case"),
+  archiveEnvironmentUseCase: Symbol.for("appaloft.archive_environment_use_case"),
   createEnvironmentUseCase: Symbol.for("appaloft.create_environment_use_case"),
   listEnvironmentsQueryService: Symbol.for("appaloft.list_environments_query_service"),
   showEnvironmentQueryService: Symbol.for("appaloft.show_environment_query_service"),

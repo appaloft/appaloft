@@ -202,6 +202,23 @@ describe("operation catalog aggregate mutation boundary", () => {
     expect(entry?.inputSchema).toBeDefined();
   });
 
+  test("[ENV-LIFE-ENTRY-004] environment archive is exposed through the active operation catalog", () => {
+    const entry = operationCatalog.find((candidate) => candidate.key === "environments.archive");
+
+    expect(entry).toMatchObject({
+      kind: "command",
+      domain: "environments",
+      messageName: "ArchiveEnvironmentCommand",
+      handlerName: "ArchiveEnvironmentCommandHandler",
+      serviceName: "ArchiveEnvironmentUseCase",
+      transports: {
+        cli: "appaloft env archive <environmentId>",
+        orpc: { method: "POST", path: "/api/environments/{environmentId}/archive" },
+      },
+    });
+    expect(entry?.inputSchema).toBeDefined();
+  });
+
   test("[AGG-MUTATION-CATALOG-002] detects generic aggregate update operation keys and command names", () => {
     const violations = findGenericAggregateMutationOperations([
       catalogEntry({

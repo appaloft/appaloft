@@ -564,6 +564,7 @@ const apiResponses: Record<ApiScenario, Record<string, ApiRoute>> = {
             projectId: "prj_demo",
             name: "production",
             kind: "production",
+            lifecycleStatus: "active",
             createdAt: "2026-01-01T00:00:00.000Z",
             maskedVariables: [
               {
@@ -801,6 +802,11 @@ const apiResponses: Record<ApiScenario, Record<string, ApiRoute>> = {
     "/api/rpc/resources/archive": {
       json: {
         id: "res_demo",
+      },
+    },
+    "/api/rpc/environments/archive": {
+      json: {
+        id: "env_demo",
       },
     },
     "/api/rpc/resources/delete": {
@@ -2178,6 +2184,42 @@ describe("console e2e with Bun.WebView", () => {
 
     expect(archiveInput).toEqual({
       resourceId: "res_demo",
+    });
+  }, 15_000);
+
+  test("[ENV-LIFE-ENTRY-005] submits environment archive through Web", async () => {
+    activeScenario = "dashboard";
+    resetRecordedApiRequests();
+
+    await using view = createWebView();
+    await view.navigate(`${previewUrl}/projects/prj_demo`);
+    await expectAnyText(view, ["Environments", "环境"]);
+    await view.evaluate("window.confirm = () => true");
+    const clicked = await waitFor(
+      () =>
+        view.evaluate<boolean>(
+          `(() => {
+            const button = Array.from(document.querySelectorAll("button")).find((candidate) =>
+              candidate.getAttribute("title") === "Archive" ||
+              candidate.getAttribute("title") === "归档"
+            );
+            if (!(button instanceof HTMLButtonElement)) {
+              return false;
+            }
+            button.click();
+            return true;
+          })()`,
+        ),
+      Boolean,
+      "Expected environment archive button",
+    );
+    expect(clicked).toBe(true);
+
+    const archiveRequest = await waitForRecordedRequest("/api/rpc/environments/archive");
+    const archiveInput = readOrpcJsonPayload(archiveRequest.body);
+
+    expect(archiveInput).toEqual({
+      environmentId: "env_demo",
     });
   }, 15_000);
 

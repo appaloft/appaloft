@@ -210,13 +210,13 @@ Implemented operations:
 | Read environment effective precedence | Query | `environments.effective-precedence` | `EnvironmentEffectivePrecedenceQuery` | `EnvironmentEffectivePrecedenceQueryInput` | `appaloft env effective-precedence <environmentId>` | `GET /api/environments/{environmentId}/effective-precedence` |
 | Diff environments | Query | `environments.diff` | `DiffEnvironmentsQuery` | `DiffEnvironmentsQueryInput` | `appaloft env diff <environmentId> <otherEnvironmentId>` | `GET /api/environments/{environmentId}/diff/{otherEnvironmentId}` |
 | Promote environment | Command | `environments.promote` | `PromoteEnvironmentCommand` | `PromoteEnvironmentCommandInput` | `appaloft env promote <environmentId> <targetName>` | `POST /api/environments/{environmentId}/promote` |
+| Archive environment | Command | `environments.archive` | `ArchiveEnvironmentCommand` | `ArchiveEnvironmentCommandInput` | `appaloft env archive <environmentId>` | `POST /api/environments/{environmentId}/archive` |
 
 Core next operations expected here:
 - clone environment
 - lock environment
 - list environment change history
-- remaining effective precedence hardening belongs to resource/deployment snapshot-specific
-  observability after `environments.effective-precedence`
+- remaining named edit semantics, restore/delete, and lifecycle history
 
 ## Resources
 

@@ -367,6 +367,13 @@ export const enUS = {
         "Quick deploy links the source, project, server, and environment in one flow. The deployments page will then show every release result by project.",
       emptyTitle: "Create a project before attaching deployment records.",
       environmentCount: "{{count}} variables",
+      environmentArchiveAction: "Archive",
+      environmentArchiveConfirm:
+        "Archive this environment? New variables, resources, and deployments will be blocked while existing history remains visible.",
+      environmentArchiveFailed: "Environment was not archived",
+      environmentArchiveSucceeded: "Environment archived",
+      environmentArchived: "Archived",
+      environmentArchivedAt: "Archived at",
       environmentsDescription: "Configuration boundaries grouped under this project.",
       environmentsTitle: "Environments",
       focusDescription:

@@ -113,6 +113,7 @@ export class DeploymentContextResolver {
           }),
         );
       }
+      yield* environment.ensureCanCreateDeployment();
 
       const resource = explicitResource;
       if (!resource) {

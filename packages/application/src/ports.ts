@@ -29,6 +29,7 @@ import {
   type EdgeProxyKind,
   type EdgeProxyStatus,
   type EnvironmentKind,
+  type EnvironmentLifecycleStatus,
   type EnvironmentMutationSpec,
   type EnvironmentProfile,
   type EnvironmentSelectionSpec,
@@ -1361,6 +1362,9 @@ export interface EnvironmentSummary {
   name: string;
   kind: EnvironmentKind;
   parentEnvironmentId?: string;
+  lifecycleStatus: EnvironmentLifecycleStatus;
+  archivedAt?: string;
+  archiveReason?: string;
   createdAt: string;
   maskedVariables: Array<{
     key: string;

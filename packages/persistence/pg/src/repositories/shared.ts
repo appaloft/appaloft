@@ -78,6 +78,7 @@ import {
   EnvironmentConfigSnapshotEntry,
   EnvironmentId,
   EnvironmentKindValue,
+  EnvironmentLifecycleStatusValue,
   EnvironmentName,
   type EnvironmentConfigSnapshot as EnvironmentSnapshot,
   EnvironmentSnapshotId,
@@ -181,6 +182,9 @@ type ConfigScopeInput = Parameters<typeof ConfigScopeValue.rehydrate>[0];
 type VariableKindInput = Parameters<typeof VariableKindValue.rehydrate>[0];
 type VariableExposureInput = Parameters<typeof VariableExposureValue.rehydrate>[0];
 type EnvironmentKindInput = Parameters<typeof EnvironmentKindValue.rehydrate>[0];
+type EnvironmentLifecycleStatusInput = Parameters<
+  typeof EnvironmentLifecycleStatusValue.rehydrate
+>[0];
 type DeploymentStatusInput = Parameters<typeof DeploymentStatusValue.rehydrate>[0];
 type DestinationKindInput = Parameters<typeof DestinationKindValue.rehydrate>[0];
 type DeploymentPhaseInput = Parameters<typeof DeploymentPhaseValue.rehydrate>[0];
@@ -1056,6 +1060,19 @@ export function rehydrateEnvironmentRow(
     projectId: ProjectId.rehydrate(environmentRow.project_id),
     name: EnvironmentName.rehydrate(environmentRow.name),
     kind: EnvironmentKindValue.rehydrate(environmentRow.kind as EnvironmentKindInput),
+    lifecycleStatus: EnvironmentLifecycleStatusValue.rehydrate(
+      (environmentRow.lifecycle_status ?? "active") as EnvironmentLifecycleStatusInput,
+    ),
+    ...(environmentRow.archived_at
+      ? {
+          archivedAt: ArchivedAt.rehydrate(
+            normalizeTimestamp(environmentRow.archived_at) ?? environmentRow.archived_at,
+          ),
+        }
+      : {}),
+    ...(environmentRow.archive_reason
+      ? { archiveReason: ArchiveReason.rehydrate(environmentRow.archive_reason) }
+      : {}),
     createdAt: CreatedAt.rehydrate(
       normalizeTimestamp(environmentRow.created_at) ?? environmentRow.created_at,
     ),

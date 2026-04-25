@@ -12,6 +12,7 @@ searchAliases:
   - "环境"
 relatedOperations:
   - environments.create
+  - environments.archive
 sidebar:
   label: "Model"
   order: 2
@@ -24,3 +25,9 @@ Environment 是一组部署时配置的用户边界，例如 development、stagi
 <h2 id="environment-deployment-scope">部署作用域</h2>
 
 资源可以在不同环境下部署。每次部署读取目标环境的配置并保存不可变快照。
+
+<h2 id="environment-lifecycle">环境生命周期</h2>
+
+环境默认是 active。归档环境会保留环境、变量、资源、部署和历史记录，但会阻止新的环境变量写入、环境提升、新资源创建和新部署准入。
+
+归档不会停止运行时、删除资源、清理域名或移除证书。需要清理时，应使用对应资源、部署、域名或证书命令。

@@ -1,6 +1,8 @@
 import { describe, expect, test } from "bun:test";
 
 import {
+  ArchivedAt,
+  ArchiveReason,
   ConfigKey,
   ConfigScopeValue,
   ConfigValueText,
@@ -95,12 +97,14 @@ describe("EnvironmentProfile", () => {
       updatedAt: UpdatedAt.rehydrate("2026-01-01T00:01:00.000Z"),
     });
 
-    const promoted = source.promoteTo({
-      targetEnvironmentId: EnvironmentId.rehydrate("env_prod"),
-      targetName: EnvironmentName.rehydrate("production"),
-      targetKind: EnvironmentKindValue.rehydrate("production"),
-      createdAt: CreatedAt.rehydrate("2026-01-02T00:00:00.000Z"),
-    });
+    const promoted = source
+      .promoteTo({
+        targetEnvironmentId: EnvironmentId.rehydrate("env_prod"),
+        targetName: EnvironmentName.rehydrate("production"),
+        targetKind: EnvironmentKindValue.rehydrate("production"),
+        createdAt: CreatedAt.rehydrate("2026-01-02T00:00:00.000Z"),
+      })
+      ._unsafeUnwrap();
     promoted.setVariable({
       key: ConfigKey.rehydrate("DATABASE_URL"),
       value: ConfigValueText.rehydrate("postgres://prod"),
@@ -157,5 +161,70 @@ describe("EnvironmentProfile", () => {
         })
         .isOk(),
     ).toBe(true);
+  });
+
+  test("[ENV-LIFE-AGG-001] archives idempotently and blocks configuration and promotion mutations", () => {
+    const environment = EnvironmentProfile.create({
+      id: EnvironmentId.rehydrate("env_prod"),
+      projectId: ProjectId.rehydrate("prj_demo"),
+      name: EnvironmentName.rehydrate("production"),
+      kind: EnvironmentKindValue.rehydrate("production"),
+      createdAt: CreatedAt.rehydrate("2026-01-01T00:00:00.000Z"),
+    })._unsafeUnwrap();
+
+    const archiveResult = environment.archive({
+      archivedAt: ArchivedAt.rehydrate("2026-01-03T00:00:00.000Z"),
+      reason: ArchiveReason.rehydrate("Retired"),
+    });
+
+    expect(archiveResult._unsafeUnwrap()).toEqual({ changed: true });
+    expect(environment.toState().lifecycleStatus.value).toBe("archived");
+    expect(environment.pullDomainEvents()).toMatchObject([
+      {
+        type: "environment-archived",
+        payload: {
+          environmentId: "env_prod",
+          projectId: "prj_demo",
+          environmentName: "production",
+          environmentKind: "production",
+          archivedAt: "2026-01-03T00:00:00.000Z",
+          reason: "Retired",
+        },
+      },
+    ]);
+
+    expect(
+      environment
+        .archive({
+          archivedAt: ArchivedAt.rehydrate("2026-01-04T00:00:00.000Z"),
+        })
+        ._unsafeUnwrap(),
+    ).toEqual({ changed: false });
+    expect(environment.pullDomainEvents()).toEqual([]);
+
+    const setResult = environment.setVariable({
+      key: ConfigKey.rehydrate("APP_PORT"),
+      value: ConfigValueText.rehydrate("3000"),
+      kind: VariableKindValue.rehydrate("plain-config"),
+      exposure: VariableExposureValue.rehydrate("runtime"),
+      updatedAt: UpdatedAt.rehydrate("2026-01-04T00:00:00.000Z"),
+    });
+    expect(setResult.isErr()).toBe(true);
+    if (setResult.isErr()) {
+      expect(setResult.error.code).toBe("environment_archived");
+      expect(setResult.error.details?.commandName).toBe("environments.set-variable");
+    }
+
+    const promoteResult = environment.promoteTo({
+      targetEnvironmentId: EnvironmentId.rehydrate("env_prod_next"),
+      targetName: EnvironmentName.rehydrate("production-next"),
+      targetKind: EnvironmentKindValue.rehydrate("production"),
+      createdAt: CreatedAt.rehydrate("2026-01-04T00:00:00.000Z"),
+    });
+    expect(promoteResult.isErr()).toBe(true);
+    if (promoteResult.isErr()) {
+      expect(promoteResult.error.code).toBe("environment_archived");
+      expect(promoteResult.error.details?.commandName).toBe("environments.promote");
+    }
   });
 });

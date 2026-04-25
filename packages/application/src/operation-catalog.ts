@@ -12,6 +12,7 @@ import { streamDeploymentEventsQueryInputSchema } from "./operations/deployments
 import { confirmDomainBindingOwnershipCommandInputSchema } from "./operations/domain-bindings/confirm-domain-binding-ownership.command";
 import { createDomainBindingCommandInputSchema } from "./operations/domain-bindings/create-domain-binding.command";
 import { listDomainBindingsQueryInputSchema } from "./operations/domain-bindings/list-domain-bindings.query";
+import { archiveEnvironmentCommandInputSchema } from "./operations/environments/archive-environment.command";
 import { createEnvironmentCommandInputSchema } from "./operations/environments/create-environment.command";
 import { diffEnvironmentsQueryInputSchema } from "./operations/environments/diff-environments.query";
 import { environmentEffectivePrecedenceQueryInputSchema } from "./operations/environments/environment-effective-precedence.query";
@@ -688,6 +689,20 @@ export const operationCatalog = [
     transports: {
       cli: "appaloft env show <environmentId>",
       orpc: { method: "GET", path: "/api/environments/{environmentId}" },
+    },
+  },
+  {
+    key: "environments.archive",
+    kind: "command",
+    domain: "environments",
+    messageName: "ArchiveEnvironmentCommand",
+    handlerName: "ArchiveEnvironmentCommandHandler",
+    serviceName: "ArchiveEnvironmentUseCase",
+    inputSchema: archiveEnvironmentCommandInputSchema,
+    serviceToken: tokens.archiveEnvironmentUseCase,
+    transports: {
+      cli: "appaloft env archive <environmentId>",
+      orpc: { method: "POST", path: "/api/environments/{environmentId}/archive" },
     },
   },
   {

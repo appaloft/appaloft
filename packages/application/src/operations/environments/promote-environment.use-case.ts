@@ -62,7 +62,7 @@ export class PromoteEnvironmentUseCase {
       const targetKind = yield* EnvironmentKindValue.create(input.targetKind);
       const createdAt = yield* CreatedAt.create(clock.now());
 
-      const promoted = source.promoteTo({
+      const promoted = yield* source.promoteTo({
         targetEnvironmentId,
         targetName,
         targetKind,

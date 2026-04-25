@@ -20,6 +20,7 @@ export const cliDocsHrefs = {
   resourceHealthProfile: resolvePublicDocsHelpHref("resource.health-profile"),
   resourceNetworkProfile: resolvePublicDocsHelpHref("resource.network-profile"),
   environmentConcept: resolvePublicDocsHelpHref("environment.concept"),
+  environmentLifecycle: resolvePublicDocsHelpHref("environment.lifecycle"),
   environmentVariablePrecedence: resolvePublicDocsHelpHref("environment.variable-precedence"),
   environmentDiffPromote: resolvePublicDocsHelpHref("environment.diff-promote"),
   domainGeneratedAccessRoute: resolvePublicDocsHelpHref("domain.generated-access-route"),
@@ -138,6 +139,7 @@ export const cliCommandDescriptions = {
   environmentCreate: withDocs("Create an environment", "environment.concept"),
   environmentList: withDocs("List environments", "environment.concept"),
   environmentShow: withDocs("Show an environment", "environment.concept"),
+  environmentArchive: withDocs("Archive an environment", "environment.lifecycle"),
   environmentSet: withDocs("Set an environment variable", "environment.variable-precedence"),
   environmentUnset: withDocs("Unset an environment variable", "environment.variable-precedence"),
   environmentEffectivePrecedence: withDocs(
