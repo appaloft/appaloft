@@ -380,12 +380,15 @@ export const publicDocsHelpTopics = {
     specReferences: [
       "docs/decisions/ADR-017-default-access-domain-and-proxy-routing.md",
       "docs/commands/default-access-domain-policies.configure.md",
+      "docs/queries/default-access-domain-policies.show.md",
+      "docs/queries/default-access-domain-policies.list.md",
       "docs/workflows/default-access-domain-and-proxy-routing.md",
       "docs/testing/default-access-domain-and-proxy-routing-test-matrix.md",
+      "docs/specs/004-default-access-policy-readback/spec.md",
     ],
     webSurfaces: [
-      "apps/web/src/routes/servers/+page.svelte: system default access policy form",
-      "apps/web/src/routes/servers/[serverId]/+page.svelte: server default access override form",
+      "apps/web/src/routes/servers/+page.svelte: system default access policy form and readback",
+      "apps/web/src/routes/servers/[serverId]/+page.svelte: server default access override form and readback",
     ],
   },
   "server.terminal-session": {
@@ -911,6 +914,16 @@ export const publicDocsOperationCoverage = [
   },
   {
     operationKey: "default-access-domain-policies.configure",
+    status: "documented",
+    topicId: "default-access.policy",
+  },
+  {
+    operationKey: "default-access-domain-policies.list",
+    status: "documented",
+    topicId: "default-access.policy",
+  },
+  {
+    operationKey: "default-access-domain-policies.show",
     status: "documented",
     topicId: "default-access.policy",
   },

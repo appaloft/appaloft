@@ -119,6 +119,9 @@ describe("console docs help links", () => {
       ],
     ).toContain("deploymentLifecycle");
     expect(sourceByPath["routes/servers/+page.svelte"]).toContain("defaultAccessPolicy");
+    expect(sourceByPath["routes/servers/+page.svelte"]).toContain(
+      "orpcClient.defaultAccessDomainPolicies.show",
+    );
     expect(sourceByPath["routes/servers/+page.svelte"]).toContain("serverSshCredential");
     expect(sourceByPath["routes/servers/+page.svelte"]).toContain(
       "orpcClient.credentials.ssh.delete",
@@ -132,6 +135,9 @@ describe("console docs help links", () => {
       "serverConnectivityTest",
     );
     expect(sourceByPath["routes/servers/[serverId]/+page.svelte"]).toContain("defaultAccessPolicy");
+    expect(sourceByPath["routes/servers/[serverId]/+page.svelte"]).toContain(
+      "orpcClient.defaultAccessDomainPolicies.show",
+    );
     expect(sourceByPath["routes/servers/[serverId]/+page.svelte"]).toContain(
       "serverTerminalSession",
     );

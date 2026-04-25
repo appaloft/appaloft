@@ -1155,6 +1155,52 @@ export const configureDefaultAccessDomainPolicyResponseSchema = z.object({
   id: z.string(),
 });
 
+export const defaultAccessDomainPolicyReadSchema = z.object({
+  schemaVersion: z.literal("default-access-domain-policies.policy/v1"),
+  id: z.string(),
+  scope: defaultAccessDomainPolicyScopeSchema,
+  mode: z.enum(["disabled", "provider", "custom-template"]),
+  providerKey: z.string().optional(),
+  templateRef: z.string().optional(),
+  updatedAt: z.string(),
+});
+
+export const listDefaultAccessDomainPoliciesInputSchema = z.object({});
+
+export const listDefaultAccessDomainPoliciesResponseSchema = z.object({
+  schemaVersion: z.literal("default-access-domain-policies.list/v1"),
+  items: z.array(defaultAccessDomainPolicyReadSchema),
+});
+
+export const showDefaultAccessDomainPolicyInputSchema = z
+  .object({
+    scopeKind: z.enum(["system", "deployment-target"]).default("system"),
+    serverId: z.string().min(1).optional(),
+  })
+  .superRefine((value, context) => {
+    if (value.scopeKind === "deployment-target" && !value.serverId) {
+      context.addIssue({
+        code: "custom",
+        path: ["serverId"],
+        message: "Server id is required for deployment-target scope",
+      });
+    }
+
+    if (value.scopeKind === "system" && value.serverId) {
+      context.addIssue({
+        code: "custom",
+        path: ["serverId"],
+        message: "Server id is only allowed for deployment-target scope",
+      });
+    }
+  });
+
+export const showDefaultAccessDomainPolicyResponseSchema = z.object({
+  schemaVersion: z.literal("default-access-domain-policies.show/v1"),
+  scope: defaultAccessDomainPolicyScopeSchema,
+  policy: defaultAccessDomainPolicyReadSchema.nullable(),
+});
+
 export const listResourcesResponseSchema = z.object({
   items: z.array(resourceSummarySchema),
 });
@@ -2400,6 +2446,19 @@ export type ConfigureDefaultAccessDomainPolicyInput = z.infer<
 >;
 export type ConfigureDefaultAccessDomainPolicyResponse = z.infer<
   typeof configureDefaultAccessDomainPolicyResponseSchema
+>;
+export type DefaultAccessDomainPolicyRead = z.infer<typeof defaultAccessDomainPolicyReadSchema>;
+export type ListDefaultAccessDomainPoliciesInput = z.infer<
+  typeof listDefaultAccessDomainPoliciesInputSchema
+>;
+export type ListDefaultAccessDomainPoliciesResponse = z.infer<
+  typeof listDefaultAccessDomainPoliciesResponseSchema
+>;
+export type ShowDefaultAccessDomainPolicyInput = z.infer<
+  typeof showDefaultAccessDomainPolicyInputSchema
+>;
+export type ShowDefaultAccessDomainPolicyResponse = z.infer<
+  typeof showDefaultAccessDomainPolicyResponseSchema
 >;
 export type CreateEnvironmentInput = z.infer<typeof createEnvironmentInputSchema>;
 export type CreateEnvironmentResponse = z.infer<typeof createEnvironmentResponseSchema>;

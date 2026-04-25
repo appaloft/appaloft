@@ -38,6 +38,10 @@ class MemoryDefaultAccessDomainPolicyRepository implements DefaultAccessDomainPo
     return ok(this.items.get(this.scopeKey(spec.scope)) ?? null);
   }
 
+  async list(): Promise<Result<DefaultAccessDomainPolicyRecord[]>> {
+    return ok(Array.from(this.items.values()));
+  }
+
   async upsert(
     record: DefaultAccessDomainPolicyRecord,
   ): Promise<Result<DefaultAccessDomainPolicyRecord>> {

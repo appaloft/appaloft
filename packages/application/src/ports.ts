@@ -2680,6 +2680,27 @@ export interface DefaultAccessDomainPolicyRecord extends DefaultAccessDomainPoli
   idempotencyKey?: string;
 }
 
+export interface DefaultAccessDomainPolicyRead {
+  schemaVersion: "default-access-domain-policies.policy/v1";
+  id: string;
+  scope: DefaultAccessDomainPolicyScope;
+  mode: DefaultAccessDomainPolicyMode;
+  updatedAt: string;
+  providerKey?: string;
+  templateRef?: string;
+}
+
+export interface ShowDefaultAccessDomainPolicyResult {
+  schemaVersion: "default-access-domain-policies.show/v1";
+  scope: DefaultAccessDomainPolicyScope;
+  policy: DefaultAccessDomainPolicyRead | null;
+}
+
+export interface ListDefaultAccessDomainPoliciesResult {
+  schemaVersion: "default-access-domain-policies.list/v1";
+  items: DefaultAccessDomainPolicyRead[];
+}
+
 export interface DefaultAccessDomainPolicySelectionSpecVisitor<TResult> {
   visitDefaultAccessDomainPolicyByScope(
     query: TResult,
@@ -2735,6 +2756,7 @@ export interface DefaultAccessDomainPolicyRepository {
   findOne(
     spec: DefaultAccessDomainPolicySelectionSpec,
   ): Promise<Result<DefaultAccessDomainPolicyRecord | null>>;
+  list(): Promise<Result<DefaultAccessDomainPolicyRecord[]>>;
   upsert(
     record: DefaultAccessDomainPolicyRecord,
     spec: DefaultAccessDomainPolicyUpsertSpec,

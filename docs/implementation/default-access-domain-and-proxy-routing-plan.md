@@ -89,6 +89,8 @@ Policy editing must be exposed through the accepted future command:
 
 ```text
 default-access-domain-policies.configure
+default-access-domain-policies.show
+default-access-domain-policies.list
 ```
 
 The first implementation may read static installation/server configuration while the command is not active, but any Web/CLI/API policy-editing surface must wait for the command spec, operation catalog entry, transport contracts, tests, and read model to exist.
@@ -165,6 +167,7 @@ Minimum tests:
 
 - provider adapter contract: concrete provider produces expected hostname from provider-neutral input;
 - policy command contract: `default-access-domain-policies.configure` persists provider-neutral policy state and does not mutate deployments or domain bindings;
+- policy readback contract: `default-access-domain-policies.show` and `default-access-domain-policies.list` return persisted provider-neutral policy records without resolving generated hostnames or static fallback state;
 - application route resolver: policy disabled, policy enabled, provider failure, missing public
   address, durable binding precedence over server-applied/generated, server-applied precedence over
   generated;
@@ -220,9 +223,10 @@ Existing proxy label/config generation is still runtime-adapter owned. ADR-019 r
 
 Current deployment progress streaming remains the route-realization observation channel. More granular route-realization progress may be added when route realization becomes an independently retryable workflow.
 
-`default-access-domain-policies.configure` is now active through CLI, API/oRPC, and minimal Web
-forms. Static shell configuration remains the temporary fallback seam only when no durable policy
-record exists.
+`default-access-domain-policies.configure`, `default-access-domain-policies.show`, and
+`default-access-domain-policies.list` are now active through CLI and API/oRPC. Web policy forms
+prefill from `show` readback and refetch the query after writes. Static shell configuration remains
+the temporary fallback seam only when no durable policy record exists.
 
 ## Open Questions
 

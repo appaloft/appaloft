@@ -189,6 +189,21 @@ export class PgDefaultAccessDomainPolicyRepository implements DefaultAccessDomai
     }
   }
 
+  async list(): Promise<Result<DefaultAccessDomainPolicyRecord[]>> {
+    try {
+      const rows = await this.db
+        .selectFrom("default_access_domain_policies")
+        .selectAll()
+        .orderBy("scope_kind", "asc")
+        .orderBy("server_id", "asc")
+        .execute();
+
+      return ok(rows.map(mapRow));
+    } catch (error) {
+      return err(persistenceError("Default access domain policies could not be listed", error));
+    }
+  }
+
   async upsert(
     record: DefaultAccessDomainPolicyRecord,
     spec: DefaultAccessDomainPolicyUpsertSpec,
