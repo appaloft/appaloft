@@ -65,6 +65,7 @@ export const tokens = {
   deactivateServerUseCase: Symbol.for("appaloft.deactivate_server_use_case"),
   deleteServerUseCase: Symbol.for("appaloft.delete_server_use_case"),
   deleteSshCredentialUseCase: Symbol.for("appaloft.delete_ssh_credential_use_case"),
+  rotateSshCredentialUseCase: Symbol.for("appaloft.rotate_ssh_credential_use_case"),
   checkServerDeleteSafetyQueryService: Symbol.for(
     "appaloft.check_server_delete_safety_query_service",
   ),

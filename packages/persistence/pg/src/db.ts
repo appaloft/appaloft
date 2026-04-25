@@ -35,6 +35,7 @@ import { resourceVariablesMigration } from "./migrations/027_resource_variables"
 import { projectLifecycleMigration } from "./migrations/028_project_lifecycle";
 import { serverLifecycleMigration } from "./migrations/029_server_lifecycle";
 import { serverDeleteTombstoneMigration } from "./migrations/030_server_delete_tombstone";
+import { sshCredentialRotationMigration } from "./migrations/031_ssh_credential_rotation";
 import { PgliteDialect } from "./pglite-dialect";
 import { type Database } from "./schema";
 import { TracingDialect } from "./tracing-dialect";
@@ -159,6 +160,7 @@ class StaticMigrationProvider implements MigrationProvider {
       "028_project_lifecycle": projectLifecycleMigration,
       "029_server_lifecycle": serverLifecycleMigration,
       "030_server_delete_tombstone": serverDeleteTombstoneMigration,
+      "031_ssh_credential_rotation": sshCredentialRotationMigration,
     };
   }
 }

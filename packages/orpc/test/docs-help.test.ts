@@ -33,6 +33,7 @@ describe("HTTP API docs help links", () => {
     );
 
     expect(apiRouteDescriptions.configureServerCredential).toContain(apiDocsHrefs.serverCredential);
+    expect(apiRouteDescriptions.rotateSshCredential).toContain(apiDocsHrefs.serverCredential);
     expect(apiRouteDescriptions.setEnvironmentVariable).toContain(
       apiDocsHrefs.environmentVariablePrecedence,
     );

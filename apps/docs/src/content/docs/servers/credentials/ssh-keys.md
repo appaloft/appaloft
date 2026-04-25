@@ -15,6 +15,7 @@ relatedOperations:
   - credentials.create-ssh
   - credentials.show
   - credentials.delete-ssh
+  - credentials.rotate-ssh
 sidebar:
   label: "SSH credentials"
   order: 3
@@ -50,17 +51,32 @@ CLI 可以读取本机密钥路径，例如用户明确传入的 key path。Web 
 
 <h2 id="server-credential-rotation">轮换凭据</h2>
 
-轮换凭据后需要重新运行连接测试，确认后续部署使用新凭据。
+已保存的可复用 SSH 凭据可以原地轮换。原地轮换会保留 credential id 和已有服务器引用，只替换后续连接、部署和恢复操作使用的凭据材料。轮换成功不代表新 key 已经能连通服务器；轮换后仍需要重新运行连接测试。
 
-轮换建议：
+轮换前 Appaloft 会读取同一个 usage surface：
 
-1. 添加新凭据。
-2. 将服务器切换到新凭据。
-3. 运行连接测试。
-4. 确认新部署可以执行。
-5. 再移除旧凭据。
+- `totalServers = 0`：可以输入完整 credential id 后轮换。
+- `totalServers > 0`：需要明确确认这些活跃或已停用服务器后续会使用轮换后的凭据材料。
+- usage 暂不可读：不能继续轮换，请先重试或修复状态读取问题。
 
-不要在连接测试失败时删除旧凭据，否则可能同时失去部署和恢复入口。
+CLI 轮换从本机文件读取新私钥：
+
+```bash
+appaloft server credential-rotate <credentialId> \
+  --private-key-file ~/.ssh/appaloft-new \
+  --confirm <credentialId> \
+  --acknowledge-server-usage
+```
+
+当 usage 为 0 时可以省略 `--acknowledge-server-usage`。HTTP API 使用同一个命令语义：
+
+```http
+POST /api/credentials/ssh/{credentialId}/rotate
+```
+
+Web 控制台的已保存 SSH 凭据区域会打开轮换对话框。它会重新检查 usage，要求输入完整 credential id，并在 usage 不为 0 时要求确认影响范围。轮换后请在关联服务器上运行连接测试，再继续部署。
+
+如果你想创建一个新的 credential id，而不是保留原引用，可以添加新凭据、把服务器切换到新凭据、运行连接测试，再删除旧凭据。
 
 <h2 id="server-credential-delete-unused">删除未使用的已保存凭据</h2>
 

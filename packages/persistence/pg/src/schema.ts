@@ -2,6 +2,11 @@ import { type ColumnType } from "kysely";
 
 type TimestampColumn = ColumnType<string, string | undefined, never>;
 type UpdatableTimestampColumn = ColumnType<string, string, string>;
+type NullableUpdatableTimestampColumn = ColumnType<
+  string | null,
+  string | null | undefined,
+  string | null
+>;
 
 export interface ProjectsTable {
   id: string;
@@ -46,6 +51,7 @@ export interface SshCredentialsTable {
   public_key: string | null;
   private_key: string;
   created_at: TimestampColumn;
+  rotated_at: NullableUpdatableTimestampColumn;
 }
 
 export interface DestinationsTable {

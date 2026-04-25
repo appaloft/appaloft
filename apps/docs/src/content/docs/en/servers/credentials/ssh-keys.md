@@ -14,6 +14,7 @@ relatedOperations:
   - credentials.create-ssh
   - credentials.show
   - credentials.delete-ssh
+  - credentials.rotate-ssh
 sidebar:
   label: "SSH credentials"
   order: 3
@@ -49,17 +50,32 @@ Validation should cover:
 
 <h2 id="server-credential-rotation">Credential rotation</h2>
 
-Run connectivity checks after rotating credentials so later deployments use the new credential.
+Saved reusable SSH credentials can be rotated in place. In-place rotation preserves the credential id and existing server references, and replaces the material used by later connectivity, deployment, and recovery operations. A successful rotation does not prove that the new key can reach the server; run a connectivity test after rotation.
 
-Recommended flow:
+Before rotating, Appaloft reads the same usage surface:
 
-1. Add the new credential.
-2. Switch the server to the new credential.
-3. Run connectivity test.
-4. Confirm a new deployment can execute.
-5. Remove the old credential.
+- `totalServers = 0`: rotation is allowed after typing the exact credential id.
+- `totalServers > 0`: explicitly acknowledge that active or inactive servers using this credential will use the rotated material.
+- Usage cannot be read: rotation is blocked. Retry or fix state visibility first.
 
-Do not delete the old credential while the new connectivity test fails, or you may lose both deployment and recovery access.
+The CLI reads the replacement private key from a local file:
+
+```bash
+appaloft server credential-rotate <credentialId> \
+  --private-key-file ~/.ssh/appaloft-new \
+  --confirm <credentialId> \
+  --acknowledge-server-usage
+```
+
+You may omit `--acknowledge-server-usage` when usage is zero. The HTTP API uses the same command semantics:
+
+```http
+POST /api/credentials/ssh/{credentialId}/rotate
+```
+
+The Web console saved SSH credentials surface opens a rotation dialog. It rechecks usage, requires the exact credential id, and requires an acknowledgement when usage is nonzero. After rotation, run a connectivity test on affected servers before deploying.
+
+If you want a new credential id instead of preserving the existing references, add a new credential, switch servers to it, run connectivity tests, and then delete the old credential.
 
 <h2 id="server-credential-delete-unused">Delete an unused saved credential</h2>
 
