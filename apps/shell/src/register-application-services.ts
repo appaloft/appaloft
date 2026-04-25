@@ -53,6 +53,8 @@ import {
   DeploymentSnapshotFactory,
   DiffEnvironmentsQueryService,
   DoctorQueryService,
+  EnvironmentEffectivePrecedenceQueryHandler,
+  EnvironmentEffectivePrecedenceQueryService,
   type ExecutionContext,
   ImportCertificateCommandHandler,
   ImportCertificateUseCase,
@@ -164,6 +166,7 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(RenameServerCommandHandler);
   container.registerSingleton(ShowResourceQueryHandler);
   container.registerSingleton(ResourceEffectiveConfigQueryHandler);
+  container.registerSingleton(EnvironmentEffectivePrecedenceQueryHandler);
   container.registerSingleton(ShowDeploymentQueryHandler);
   container.registerSingleton(StreamDeploymentEventsQueryHandler);
   container.registerSingleton(ImportCertificateCommandHandler);
@@ -245,6 +248,10 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(tokens.createEnvironmentUseCase, CreateEnvironmentUseCase);
   container.registerSingleton(tokens.listEnvironmentsQueryService, ListEnvironmentsQueryService);
   container.registerSingleton(tokens.showEnvironmentQueryService, ShowEnvironmentQueryService);
+  container.registerSingleton(
+    tokens.environmentEffectivePrecedenceQueryService,
+    EnvironmentEffectivePrecedenceQueryService,
+  );
   container.registerSingleton(tokens.setEnvironmentVariableUseCase, SetEnvironmentVariableUseCase);
   container.registerSingleton(
     tokens.unsetEnvironmentVariableUseCase,

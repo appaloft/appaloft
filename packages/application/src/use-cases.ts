@@ -32,6 +32,7 @@ export * from "./operations/domain-bindings/mark-domain-ready-on-domain-bound.ha
 export * from "./operations/domain-bindings/mark-domain-route-failed-on-deployment-finished.handler";
 export * from "./operations/environments/create-environment.use-case";
 export * from "./operations/environments/diff-environments.query-service";
+export * from "./operations/environments/environment-effective-precedence.query-service";
 export * from "./operations/environments/list-environments.query-service";
 export * from "./operations/environments/promote-environment.use-case";
 export * from "./operations/environments/set-environment-variable.use-case";

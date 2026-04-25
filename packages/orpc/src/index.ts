@@ -54,8 +54,10 @@ import {
   deleteSshCredentialCommandInputSchema,
   deploymentLogsQueryInputSchema,
   diffEnvironmentsQueryInputSchema,
+  EnvironmentEffectivePrecedenceQuery,
   type ExecutionContext,
   type ExecutionContextFactory,
+  environmentEffectivePrecedenceQueryInputSchema,
   ImportCertificateCommand,
   IssueOrRenewCertificateCommand,
   importCertificateCommandInputSchema,
@@ -161,6 +163,7 @@ import {
   deploymentLogsResponseSchema,
   deploymentProgressEventSchema,
   diffEnvironmentResponseSchema,
+  environmentEffectivePrecedenceResponseSchema,
   environmentSummarySchema,
   importCertificateResponseSchema,
   issueOrRenewCertificateResponseSchema,
@@ -352,6 +355,10 @@ export const apiRouteDescriptions = {
   ),
   resourceEffectiveConfig: routeDescription(
     "Reads the masked effective configuration for one resource.",
+    "environment.variable-precedence",
+  ),
+  environmentEffectivePrecedence: routeDescription(
+    "Reads masked environment variables after environment precedence resolution.",
     "environment.variable-precedence",
   ),
   createDomainBinding: routeDescription(
@@ -1480,6 +1487,19 @@ export const diffEnvironmentsProcedure = base
     executeQuery(context, DiffEnvironmentsQuery.create(input)),
   );
 
+export const environmentEffectivePrecedenceProcedure = base
+  .route({
+    method: "GET",
+    path: "/environments/{environmentId}/effective-precedence",
+    description: apiRouteDescriptions.environmentEffectivePrecedence,
+    successStatus: 200,
+  })
+  .input(environmentEffectivePrecedenceQueryInputSchema)
+  .output(environmentEffectivePrecedenceResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, EnvironmentEffectivePrecedenceQuery.create(input)),
+  );
+
 export const listDeploymentsProcedure = base
   .route({
     method: "GET",
@@ -1737,6 +1757,7 @@ export const appaloftOrpcRouter = {
     show: showEnvironmentProcedure,
     setVariable: setEnvironmentVariableProcedure,
     unsetVariable: unsetEnvironmentVariableProcedure,
+    effectivePrecedence: environmentEffectivePrecedenceProcedure,
     promote: promoteEnvironmentProcedure,
     diff: diffEnvironmentsProcedure,
   },
@@ -1926,6 +1947,7 @@ export function mountAppaloftOrpcRoutes(
     "/api/environments/:environmentId",
     "/api/environments/:environmentId/variables",
     "/api/environments/:environmentId/variables/:key",
+    "/api/environments/:environmentId/effective-precedence",
     "/api/environments/:environmentId/promote",
     "/api/environments/:environmentId/diff/:otherEnvironmentId",
     "/api/resources",

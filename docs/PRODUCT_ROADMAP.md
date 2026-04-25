@@ -273,8 +273,8 @@ Release rule:
 Already done:
 
 - [x] Projects can be created and listed.
-- [x] Environments can be created, listed, shown, diffed, promoted, and updated through baseline
-  variable set/unset operations.
+- [x] Environments can be created, listed, shown, inspected for effective precedence, diffed,
+  promoted, and updated through baseline variable set/unset operations.
 - [x] Servers can be registered, listed, tested for connectivity, assigned credentials, and repaired
   for proxy bootstrap.
 - [x] Resources can be created and listed.
@@ -402,6 +402,7 @@ Already done:
   overrides/effective config, archive/delete, runtime logs, proxy preview, diagnostics, and Web
   resource detail observation exist.
 - [x] Environment create/list/show/set/unset/diff/promote exists.
+- [x] Environment effective-precedence query exists.
 - [x] Project create/list/show/rename/archive exists.
 - [x] Server register/list/show/rename/deactivate/delete safety/guarded delete/connectivity,
   proxy-repair, and credential baseline exist.
@@ -422,7 +423,7 @@ Required:
 - [x] Add separate resource network update semantics where specs require a separate command.
 - [ ] Add reusable access-profile update semantics where specs require a separate command.
 - [ ] Add environment update/clone/lock/archive.
-- [ ] Add environment effective-precedence query.
+- [x] Add environment effective-precedence query.
 - [ ] Complete resource detail editing affordances for source/runtime/network profile changes.
 - [ ] Ensure CLI, HTTP/oRPC, Web, and future MCP naming reuse the same command/query schemas.
 
@@ -682,7 +683,8 @@ work below before GA.
 - [x] Project: show, rename, archive safety.
 - [ ] Project: delete/restore safety, description editing, resource rollup.
 - [x] Environment: create/list/show, set/unset variable, diff, promote.
-- [ ] Environment: update, clone, lock/archive, effective precedence, history.
+- [x] Environment: effective precedence query.
+- [ ] Environment: update, clone, lock/archive, history.
 - [x] Deployment target/server: register, list, show, configure credential, deactivate, delete
   safety, guarded soft delete, connectivity, proxy repair, terminal open.
 - [x] Deployment target/server: rename.

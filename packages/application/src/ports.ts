@@ -1372,6 +1372,26 @@ export interface EnvironmentSummary {
   }>;
 }
 
+export interface EnvironmentConfigEntryView {
+  key: string;
+  value: string;
+  scope: ConfigScope;
+  exposure: VariableExposure;
+  isSecret: boolean;
+  kind: VariableKind;
+  updatedAt?: string;
+}
+
+export interface EnvironmentEffectivePrecedenceView {
+  schemaVersion: "environments.effective-precedence/v1";
+  environmentId: string;
+  projectId: string;
+  ownedEntries: EnvironmentConfigEntryView[];
+  effectiveEntries: EnvironmentConfigEntryView[];
+  precedence: ConfigScope[];
+  generatedAt: string;
+}
+
 export interface ResourceSummary {
   id: string;
   projectId: string;
