@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "skills": {
+    "domain-driven-develop": {
+      "source": "nichenqin/domain-driven-develop-skill",
+      "ref": "main",
+      "sourceType": "github",
+      "computedHash": "c376c66d850076bbbcf2dba27a568a9ff073119fcfd17cd9eabac4b703ff5a16"
+    }
+  }
+}
