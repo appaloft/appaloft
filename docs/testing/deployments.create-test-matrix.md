@@ -164,6 +164,7 @@ Then:
 | DEP-CREATE-ASYNC-016 | integration | Public route verification failure preserves previous runtime | A reverse-proxy resource has a previously successful runtime and the replacement candidate starts, but generated or durable public route verification fails because DNS, proxy route readiness, or HTTP verification is not ready | `ok({ id })` | `deployment-failed` for the new attempt | Previous successful runtime and route remain active; failed candidate is removed or isolated; failure details include the observed public route error |
 | DEP-CREATE-ASYNC-017 | integration | Static artifact package failure | Accepted static deployment resolves source, but static package/build step cannot produce the publish directory image artifact | `ok({ id })` | `deployment-failed` | Terminal `failed` with `failurePhase = image-build` or `runtime-artifact-resolution`; no replacement runtime is promoted |
 | DEP-CREATE-ASYNC-018 | integration | Git source resolved commit snapshot | Accepted Git-backed deployment clones or checks out source for a new attempt | `ok({ id })` | Later terminal event according to execution result | Deployment execution metadata and read model expose the exact resolved commit SHA; Web and CLI surfaces display it for the attempt |
+| DEP-CREATE-ASYNC-019 | integration, opt-in SSH | Runtime target capacity exhausted during build | Accepted SSH or Docker-backed deployment starts source materialization or image build, but target cannot create files or layers because disk, inode, or build-cache capacity is exhausted | `ok({ id })` | `deployment-failed` | Terminal `failed` with code `runtime_target_resource_exhausted`, phase `image-build` or `runtime-target-apply`, safe capacity details, and no promotion |
 
 ## Event Matrix
 
@@ -253,6 +254,10 @@ Runtime target backend registry unit tests now cover local/generic-SSH single-se
 selection and `runtime_target_unsupported` details. Deployment admission tests still need coverage
 for pre-acceptance unsupported-target rejection once the use case consults the registry before
 accepting the command.
+
+`DEP-CREATE-ASYNC-019` is not implemented yet. Current generic SSH Docker build failures surface as
+adapter-specific build failures; they are not yet classified into
+`runtime_target_resource_exhausted` with disk, inode, Docker image, or build-cache details.
 
 Static site deployment rows `DEP-CREATE-ADM-026`, `DEP-CREATE-ADM-027`, and
 `DEP-CREATE-ASYNC-017` are covered by `packages/application/test/create-deployment.test.ts` and
