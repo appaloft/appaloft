@@ -1,0 +1,4 @@
+interface:
+  display_name: "Appaloft Develop"
+  short_description: "Project profile for Appaloft Domain Driven Develop."
+  default_prompt: "Use Appaloft Develop with domain-driven-develop to choose the next round or implement a governed behavior."
