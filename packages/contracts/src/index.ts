@@ -282,6 +282,7 @@ export const sshCredentialSummarySchema = z.object({
   publicKeyConfigured: z.boolean(),
   privateKeyConfigured: z.boolean(),
   createdAt: z.string(),
+  rotatedAt: z.string().optional(),
 });
 
 export const sshCredentialUsageServerSchema = z.object({
@@ -329,6 +330,31 @@ export const deleteSshCredentialInputSchema = z.object({
 
 export const deleteSshCredentialResponseSchema = z.object({
   id: z.string(),
+});
+
+export const rotateSshCredentialInputSchema = z.object({
+  credentialId: z.string().min(1),
+  privateKey: z.string().min(1),
+  publicKey: z.string().min(1).nullable().optional(),
+  username: z.string().min(1).nullable().optional(),
+  confirmation: z.object({
+    credentialId: z.string().min(1),
+    acknowledgeServerUsage: z.boolean().optional(),
+  }),
+  idempotencyKey: z.string().min(1).optional(),
+});
+
+export const rotateSshCredentialResponseSchema = z.object({
+  schemaVersion: z.literal("credentials.rotate-ssh/v1"),
+  credential: z.object({
+    id: z.string(),
+    kind: z.literal("ssh-private-key"),
+    usernameConfigured: z.boolean(),
+    publicKeyConfigured: z.boolean(),
+    privateKeyConfigured: z.boolean(),
+    rotatedAt: z.string(),
+  }),
+  affectedUsage: sshCredentialUsageSummarySchema,
 });
 
 export const listSshCredentialsResponseSchema = z.object({
@@ -2283,6 +2309,7 @@ export type CheckServerDeleteSafetyInput = z.infer<typeof checkServerDeleteSafet
 export type ConfigureServerCredentialInput = z.infer<typeof configureServerCredentialInputSchema>;
 export type CreateSshCredentialInput = z.infer<typeof createSshCredentialInputSchema>;
 export type DeleteSshCredentialInput = z.infer<typeof deleteSshCredentialInputSchema>;
+export type RotateSshCredentialInput = z.infer<typeof rotateSshCredentialInputSchema>;
 export type RegisterServerResponse = z.infer<typeof registerServerResponseSchema>;
 export type ListServersResponse = z.infer<typeof listServersResponseSchema>;
 export type ServerDetail = z.infer<typeof serverDetailSchema>;
@@ -2298,6 +2325,7 @@ export type ServerDeleteSafety = z.infer<typeof serverDeleteSafetySchema>;
 export type CheckServerDeleteSafetyResponse = z.infer<typeof checkServerDeleteSafetyResponseSchema>;
 export type CreateSshCredentialResponse = z.infer<typeof createSshCredentialResponseSchema>;
 export type DeleteSshCredentialResponse = z.infer<typeof deleteSshCredentialResponseSchema>;
+export type RotateSshCredentialResponse = z.infer<typeof rotateSshCredentialResponseSchema>;
 export type ListSshCredentialsResponse = z.infer<typeof listSshCredentialsResponseSchema>;
 export type ShowSshCredentialResponse = z.infer<typeof showSshCredentialResponseSchema>;
 export type ServerConnectivityCheck = z.infer<typeof serverConnectivityCheckSchema>;

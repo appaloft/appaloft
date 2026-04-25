@@ -3,11 +3,11 @@
 ## Normative Contract
 
 SSH credential lifecycle errors must use structured, stable `DomainError` values. Expected query,
-validation, usage-read, and future safety failures must not be represented by thrown exceptions or
+validation, usage-read, and safety failures must not be represented by thrown exceptions or
 localized message branching.
 
-This spec currently governs the active `credentials.show` query and the active
-`credentials.delete-ssh` command.
+This spec currently governs the active `credentials.show` query, the active
+`credentials.delete-ssh` command, and the active `credentials.rotate-ssh` command.
 
 ## Global References
 
@@ -19,6 +19,7 @@ This error spec inherits:
 - [SSH Credential Lifecycle Workflow](../workflows/ssh-credential-lifecycle.md)
 - [credentials.show Query Spec](../queries/credentials.show.md)
 - [credentials.delete-ssh Command Spec](../commands/credentials.delete-ssh.md)
+- [credentials.rotate-ssh Command Spec](../commands/credentials.rotate-ssh.md)
 - [SSH Credential Lifecycle Test Matrix](../testing/ssh-credential-lifecycle-test-matrix.md)
 
 ## Error Shape
@@ -79,18 +80,30 @@ logs, or provider credentials.
 When usage read fails, the command must fail the whole request rather than continuing to the delete
 adapter. This prevents users from mistaking unavailable usage for unused credential state.
 
-## Future Safety Errors
+## `credentials.rotate-ssh` Errors
 
-Future rotate/update commands must define command-specific errors before implementation. Expected
-candidates include, but are not yet active:
+`credentials.rotate-ssh` replaces stored credential material for the same credential id. It may
+affect active and inactive visible servers that reference that credential, so usage visibility and
+explicit acknowledgement are part of the error contract.
 
 | Error code | Category | Phase | Retriable | Meaning |
 | --- | --- | --- | --- | --- |
-| `credential_rotation_conflict` | `conflict` | `credential-safety-check` | No | A future rotation command conflicts with current attachment or snapshot policy. |
-| `credential_secret_unavailable` | `infra` | `credential-mutation` | Conditional | A future mutation could not safely read or persist secret material through the credential store. |
+| `validation_error` | `validation` | `command-validation` | No | Credential id, new credential material, confirmation, optional metadata, or optional command input is invalid. |
+| `not_found` | `not-found` | `credential-read` | No | Credential does not exist or is not visible. |
+| `infra_error` | `infra` | `credential-read` | Conditional | Masked credential metadata cannot be read safely. |
+| `infra_error` | `infra` | `credential-usage-read` | Conditional | Usage reader failed before rotation safety could be evaluated. |
+| `credential_rotation_requires_usage_acknowledgement` | `conflict` | `credential-safety-check` | No | Active or inactive visible server usage exists and the caller did not acknowledge the in-use rotation impact. |
+| `credential_secret_unavailable` | `infra` | `credential-mutation` | Conditional | New credential material could not be safely stored through the credential store. |
+| `infra_error` | `infra` | `credential-mutation` | Conditional | Persistence adapter failed or could not safely persist the rotated credential. |
 
-These rows are planning placeholders only. They must be moved into concrete command specs and test
-matrix rows before any rotate/delete behavior is implemented.
+`credential_rotation_requires_usage_acknowledgement` details should include `credentialId`,
+`totalServers`, `activeServers`, and `inactiveServers`. Details may include safe server ids. They
+must not include private keys, public key bodies, local key paths, passphrases, raw SSH command
+output, terminal transcripts, deployment logs, or provider credentials.
+
+When usage read fails, the command must fail the whole request rather than continuing to credential
+mutation. This prevents users from accepting an in-use rotation without seeing the affected server
+usage.
 
 ## Consumer Mapping
 
@@ -113,6 +126,17 @@ For `credentials.delete-ssh`:
 - `validation_error` for confirmation mismatch maps to bad input and must not attempt deletion;
 - successful output contains only the credential id.
 
+For `credentials.rotate-ssh`:
+
+- `credential_rotation_requires_usage_acknowledgement` maps to a conflict response and should tell
+  users to review affected server usage and explicitly acknowledge in-use rotation before retrying;
+- `infra_error` with phase `credential-usage-read` maps to a retryable unavailable state when
+  `retriable = true` and must not display usage as zero;
+- `credential_secret_unavailable` maps to an unavailable mutation state with secret-safe details;
+- `validation_error` for confirmation mismatch or invalid credential material maps to bad input and
+  must not attempt mutation;
+- successful output contains only safe rotated metadata and affected usage counts.
+
 ## Current Implementation Notes And Migration Gaps
 
 `credentials.show` maps query validation, missing credential, credential-read infrastructure, and
@@ -120,6 +144,10 @@ usage-read infrastructure failures to this spec.
 
 `credentials.delete-ssh` maps command validation, confirmation mismatch, missing credential,
 usage-read infrastructure, in-use safety, and mutation persistence failures to this spec.
+
+`credentials.rotate-ssh` maps command validation, confirmation mismatch, missing credential,
+usage-read infrastructure, in-use acknowledgement safety, and mutation persistence failures to this
+spec.
 
 Existing credential create/list and server attachment paths have their own local error handling but
 do not yet fully share this lifecycle error spec.

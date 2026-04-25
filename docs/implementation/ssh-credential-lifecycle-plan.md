@@ -9,6 +9,7 @@ does not replace the query, command, workflow, error, or testing specs.
 
 - `credentials.show`
 - `credentials.delete-ssh`
+- `credentials.rotate-ssh`
 
 Existing operations used for context:
 
@@ -23,8 +24,10 @@ Existing operations used for context:
 - [SSH Credential Lifecycle Workflow](../workflows/ssh-credential-lifecycle.md)
 - [credentials.show Query Spec](../queries/credentials.show.md)
 - [credentials.delete-ssh Command Spec](../commands/credentials.delete-ssh.md)
+- [credentials.rotate-ssh Command Spec](../commands/credentials.rotate-ssh.md)
 - [SSH Credential Lifecycle Error Spec](../errors/credentials.lifecycle.md)
 - [SSH Credential Lifecycle Test Matrix](../testing/ssh-credential-lifecycle-test-matrix.md)
+- [Reusable SSH Credential Rotation Spec](../specs/001-reusable-ssh-credential-rotation/spec.md)
 - [Deployment Target Lifecycle Workflow](../workflows/deployment-target-lifecycle.md)
 - [Server Bootstrap And Proxy Workflow](../workflows/server-bootstrap-and-proxy.md)
 - [Core Operations](../CORE_OPERATIONS.md)
@@ -76,6 +79,37 @@ Existing operations used for context:
     [SSH Credential Lifecycle Test Matrix](../testing/ssh-credential-lifecycle-test-matrix.md).
 12. Update public docs/help coverage under `server.ssh-credential`.
 
+## Rotation Code Round Ordering
+
+1. Add Test-First coverage for `SSH-CRED-ROTATE-001` through `SSH-CRED-ROTATE-008` and
+   `SSH-CRED-ENTRY-011` through `SSH-CRED-ENTRY-015`.
+2. Add application command schema/message/handler/use case for `credentials.rotate-ssh`.
+3. Validate command input, exact credential-id confirmation, and secret redaction before mutation.
+4. Read masked credential metadata and verify the selected credential is a stored reusable
+   `ssh-private-key` credential.
+5. Reuse the existing credential usage reader to derive active/inactive visible server references.
+6. Reject usage-read failure with `infra_error`, phase `credential-usage-read`; do not treat it as
+   zero usage.
+7. Reject nonzero usage without explicit `acknowledgeServerUsage` with
+   `credential_rotation_requires_usage_acknowledgement`, phase `credential-safety-check`.
+8. Add aggregate/value-object support for replacing private-key material and optional
+   public-key/username metadata while preserving credential id.
+9. Add a named collection-style credential mutation specification and PG/PGlite adapter support for
+   updating the credential row without clearing server references.
+10. Add nullable rotated metadata such as `rotatedAt` to persistence/read models if the Code Round
+    stores ongoing rotation visibility.
+11. Extend `credentials.show` read models with backward-compatible rotated metadata.
+12. Add `CORE_OPERATIONS.md` implemented row and `packages/application/src/operation-catalog.ts`
+    entry in the same Code Round that exposes the command publicly.
+13. Add oRPC/OpenAPI route using the application command schema, not a transport-only input shape.
+14. Add CLI command dispatching `RotateSshCredentialCommand`, with key-file reading kept at the CLI
+    adapter boundary.
+15. Add Web affordance that re-reads usage, blocks unavailable usage, requires exact credential-id
+    confirmation, requires in-use acknowledgement when usage is nonzero, and dispatches through the
+    typed oRPC client.
+16. Update public docs/help coverage under `server.ssh-credential`.
+17. Run Post-Implementation Sync before marking the Phase 4 roadmap row complete.
+
 ## Expected Application Scope
 
 Add a vertical query slice under `packages/application/src/operations/servers` or a future
@@ -115,6 +149,13 @@ Add a vertical command slice in the same operation area:
 - `delete-ssh-credential.handler.ts`;
 - `delete-ssh-credential.use-case.ts`.
 
+Add a vertical command slice for rotation:
+
+- `rotate-ssh-credential.schema.ts`;
+- `rotate-ssh-credential.command.ts`;
+- `rotate-ssh-credential.handler.ts`;
+- `rotate-ssh-credential.use-case.ts`.
+
 Expected command shape:
 
 ```ts
@@ -127,11 +168,44 @@ type DeleteSshCredentialCommandInput = {
 };
 ```
 
+Expected rotation command shape:
+
+```ts
+type RotateSshCredentialCommandInput = {
+  credentialId: string;
+  privateKey: string;
+  publicKey?: string | null;
+  username?: string | null;
+  confirmation: {
+    credentialId: string;
+    acknowledgeServerUsage?: boolean;
+  };
+  idempotencyKey?: string;
+};
+```
+
 Expected service result:
 
 ```ts
 type DeleteSshCredentialCommandOutput = {
   id: string;
+};
+```
+
+Expected rotation service result:
+
+```ts
+type RotateSshCredentialCommandOutput = {
+  schemaVersion: "credentials.rotate-ssh/v1";
+  credential: {
+    id: string;
+    kind: "ssh-private-key";
+    usernameConfigured: boolean;
+    publicKeyConfigured: boolean;
+    privateKeyConfigured: boolean;
+    rotatedAt: string;
+  };
+  affectedUsage: SshCredentialUsageSummary;
 };
 ```
 
@@ -161,6 +235,15 @@ The delete repository path must:
 - return `false` without clearing `servers.credential_id` when visible usage exists;
 - avoid selecting or returning private key material and public key bodies.
 
+The rotation repository path must:
+
+- update only the selected reusable SSH credential row;
+- preserve credential id and active/inactive server references;
+- avoid selecting or returning old or new private key material and public key bodies in read-model
+  or error output;
+- support omitted versus `null` public-key and username input according to the command spec;
+- expose safe rotated metadata through the credential read model when the Code Round stores it.
+
 ## Expected Transport Scope
 
 When promoted to active, add the operation to:
@@ -179,6 +262,8 @@ GET /api/credentials/ssh/{credentialId}
 appaloft server credential-show <credentialId>
 appaloft server credential-delete <credentialId> --confirm <credentialId>
 DELETE /api/credentials/ssh/{credentialId}
+appaloft server credential-rotate <credentialId> --private-key-file <path> --confirm <credentialId>
+POST /api/credentials/ssh/{credentialId}/rotate
 ```
 
 The CLI command name may receive a later credential namespace alias, but it must map to operation
@@ -194,16 +279,21 @@ The current Code Round implements `credentials.delete-ssh` through application c
 PG/PGlite guarded delete via `deleteOne(context, spec)`, CLI, HTTP/oRPC, Web, contracts, operation
 catalog, and docs/help coverage.
 
+The current Code Round implements `credentials.rotate-ssh` through application command use case,
+core aggregate rotation behavior, PG/PGlite guarded update via `updateOne(context, spec)`, nullable
+`rotatedAt` metadata, CLI, HTTP/oRPC, Web, contracts, operation catalog, and docs/help coverage.
+
 Existing Web server registration and Quick Deploy credential steps still list and create reusable
 SSH credentials. Server detail calls `credentials.show` for one-credential usage visibility when a
 stored reusable credential id exists. The Web saved SSH credentials surface can delete an unused
-stored credential after exact typed confirmation and a usage re-read.
+stored credential after exact typed confirmation and a usage re-read, and can rotate a stored
+credential after usage visibility, exact typed confirmation, and in-use acknowledgement when needed.
 
 ## Expected Web Scope
 
 Web exposes usage visibility from server detail when the server's masked credential summary includes
 a stored reusable credential id. The saved SSH credentials surface lists reusable credentials and
-uses the same query/display contract before destructive deletion.
+uses the same query/display contract before destructive deletion or rotation.
 
 The Web affordance must:
 
@@ -213,6 +303,8 @@ The Web affordance must:
 - use `packages/i18n` keys for user-facing copy;
 - expose destructive delete only through a modal requiring the exact credential id;
 - disable submission when usage is unavailable, usage is nonzero, or confirmation mismatches;
+- expose rotation through a modal requiring a new private key, exact credential id, and in-use
+  acknowledgement when usage is nonzero;
 - dispatch through the typed oRPC client.
 
 ## Public Documentation Requirement
@@ -224,8 +316,11 @@ If Web, CLI, or API help needs a more specific usage-visibility anchor, complete
 calling the behavior fully user-visible.
 
 `credentials.delete-ssh` requires the public page to explain unused-only deletion, in-use
-rejection, usage-read-unavailable rejection, and Web/CLI/API entrypoints. Future rotate/update
-commands require task-oriented public docs for safe rotation before they are complete.
+rejection, usage-read-unavailable rejection, and Web/CLI/API entrypoints.
+
+`credentials.rotate-ssh` reuses the public topic `server.ssh-credential` and explains in-place
+rotation, affected server usage, exact confirmation, in-use acknowledgement, post-rotation
+connectivity testing, secret redaction, and Web/CLI/API entrypoints.
 
 ## Minimal Deliverable
 
@@ -244,11 +339,23 @@ commands require task-oriented public docs for safe rotation before they are com
 - tests cover `SSH-CRED-SHOW-001` through `SSH-CRED-SHOW-008` and applicable
   `SSH-CRED-DELETE-*` / `SSH-CRED-ENTRY-*` rows.
 
+Rotation minimal deliverable:
+
+- `credentials.rotate-ssh` is active in `CORE_OPERATIONS.md` and `operation-catalog.ts`;
+- application command slice replaces credential material for the same credential id;
+- command admission requires exact confirmation and usage acknowledgement for nonzero usage;
+- PG/PGlite mutation preserves server references and exposes safe rotated metadata;
+- `credentials.show` can confirm rotated metadata without exposing secrets;
+- CLI and HTTP/oRPC dispatch through `RotateSshCredentialCommand`;
+- Web exposes a safe rotation affordance with usage re-read, exact confirmation, and
+  acknowledgement gating;
+- public docs/help points to `server.ssh-credential`;
+- tests cover applicable `SSH-CRED-ROTATE-*` and `SSH-CRED-ENTRY-*` rows.
+
 ## Non-Goals
 
 This plan does not implement:
 
-- credential rotation/update;
 - credential detachment from servers;
 - live connectivity testing;
 - secret-store migration;
@@ -257,7 +364,9 @@ This plan does not implement:
 
 ## Open Questions
 
-- None for the active `credentials.show` and `credentials.delete-ssh` slices. A future
+- None for the active `credentials.show`, `credentials.delete-ssh`, and `credentials.rotate-ssh`
+  slices. A future
   `appaloft credential ...` namespace alias may be specified later, but the active CLI entrypoints
   remain `appaloft server credential-show <credentialId>` and
-  `appaloft server credential-delete <credentialId> --confirm <credentialId>`.
+  `appaloft server credential-delete <credentialId> --confirm <credentialId>` plus
+  `appaloft server credential-rotate <credentialId> --private-key-file <path> --confirm <credentialId>`.

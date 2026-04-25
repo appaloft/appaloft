@@ -2,7 +2,7 @@ import { AggregateRoot } from "../shared/entity";
 import { type SshCredentialId } from "../shared/identifiers";
 import { ok, type Result } from "../shared/result";
 import { type DeploymentTargetCredentialKindValue } from "../shared/state-machine";
-import { type CreatedAt } from "../shared/temporal";
+import { type CreatedAt, type RotatedAt } from "../shared/temporal";
 import {
   type DeploymentTargetUsername,
   type SshCredentialName,
@@ -18,6 +18,14 @@ export interface SshCredentialState {
   publicKey?: SshPublicKeyText;
   privateKey: SshPrivateKeyText;
   createdAt: CreatedAt;
+  rotatedAt?: RotatedAt;
+}
+
+export interface RotateSshCredentialInput {
+  privateKey: SshPrivateKeyText;
+  publicKey?: SshPublicKeyText | null;
+  username?: DeploymentTargetUsername | null;
+  rotatedAt: RotatedAt;
 }
 
 export interface SshCredentialVisitor<TContext, TResult> {
@@ -55,5 +63,28 @@ export class SshCredential extends AggregateRoot<SshCredentialState> {
 
   toState(): SshCredentialState {
     return { ...this.state };
+  }
+
+  rotate(input: RotateSshCredentialInput): Result<void> {
+    this.state.privateKey = input.privateKey;
+    this.state.rotatedAt = input.rotatedAt;
+
+    if (input.publicKey !== undefined) {
+      if (input.publicKey) {
+        this.state.publicKey = input.publicKey;
+      } else {
+        delete this.state.publicKey;
+      }
+    }
+
+    if (input.username !== undefined) {
+      if (input.username) {
+        this.state.username = input.username;
+      } else {
+        delete this.state.username;
+      }
+    }
+
+    return ok(undefined);
   }
 }

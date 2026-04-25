@@ -123,6 +123,7 @@ import {
   ResourceServiceKindValue,
   ResourceServiceName,
   ResourceSlug,
+  RotatedAt,
   RoutePathPrefix,
   RuntimeArtifactIntentValue,
   RuntimeArtifactKindValue,
@@ -1030,6 +1031,9 @@ export function rehydrateSshCredential(row: Selectable<Database["ssh_credentials
     ...(row.public_key ? { publicKey: SshPublicKeyText.rehydrate(row.public_key) } : {}),
     privateKey: SshPrivateKeyText.rehydrate(row.private_key),
     createdAt: CreatedAt.rehydrate(normalizeTimestamp(row.created_at) ?? row.created_at),
+    ...(row.rotated_at
+      ? { rotatedAt: RotatedAt.rehydrate(normalizeTimestamp(row.rotated_at) ?? row.rotated_at) }
+      : {}),
   };
 }
 

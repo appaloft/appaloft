@@ -116,7 +116,11 @@ describe("console docs help links", () => {
     expect(sourceByPath["routes/servers/+page.svelte"]).toContain(
       "orpcClient.credentials.ssh.delete",
     );
+    expect(sourceByPath["routes/servers/+page.svelte"]).toContain(
+      "orpcClient.credentials.ssh.rotate",
+    );
     expect(sourceByPath["routes/servers/+page.svelte"]).toContain("deleteCredentialDialogTitle");
+    expect(sourceByPath["routes/servers/+page.svelte"]).toContain("rotateCredentialDialogTitle");
     expect(sourceByPath["routes/servers/[serverId]/+page.svelte"]).toContain(
       "serverConnectivityTest",
     );

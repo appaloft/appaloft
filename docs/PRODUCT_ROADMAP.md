@@ -303,8 +303,8 @@ Exit criteria:
 
 Post-`0.4.0` gaps assigned to later phases:
 
-- Credential rotation remains Phase 4 work; broad credential usage visibility and
-  delete-when-unused are active lifecycle slices.
+- Credential rotation, broad credential usage visibility, and delete-when-unused are active
+  lifecycle slices.
 - Remaining environment clone/lock/archive/effective-precedence/history work remains Phase 4 work.
 - Access policy editing, route precedence hardening, route intent repair, domain binding mutation
   lifecycle, and certificate import/revoke/retry/delete remain Phase 6 work.
@@ -414,7 +414,8 @@ Required:
 - [x] Add server configure-edge-proxy.
 - [x] Add broad credential usage visibility.
 - [x] Add credential show/delete when unused.
-- [ ] Add credential rotate/update.
+- [x] Add `credentials.rotate-ssh` reusable SSH credential rotation across CLI, HTTP/oRPC, Web,
+  public docs/help, and tests.
 - [x] Add resource show/archive/delete.
 - [x] Add separate resource source update semantics where specs require a separate command.
 - [x] Add separate resource runtime update semantics where specs require a separate command.
@@ -689,7 +690,7 @@ work below before GA.
 - [x] Deployment target/server: broad credential usage visibility.
 - [x] SSH credential: create/list, attach to server.
 - [x] SSH credential: show, delete when unused, usage visibility.
-- [ ] SSH credential: rotate/update.
+- [x] SSH credential: `credentials.rotate-ssh` in-place rotation with usage acknowledgement.
 - [x] Resource: create/list/show, configure source/runtime/network/health, set/unset variables,
   effective config, health, logs, proxy preview, diagnostics, archive/delete, and Web detail
   observation.

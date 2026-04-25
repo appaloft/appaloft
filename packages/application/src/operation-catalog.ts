@@ -52,6 +52,7 @@ import { listServersQueryInputSchema } from "./operations/servers/list-servers.q
 import { listSshCredentialsQueryInputSchema } from "./operations/servers/list-ssh-credentials.query";
 import { registerServerCommandInputSchema } from "./operations/servers/register-server.command";
 import { renameServerCommandInputSchema } from "./operations/servers/rename-server.command";
+import { rotateSshCredentialCommandInputSchema } from "./operations/servers/rotate-ssh-credential.command";
 import { showServerQueryInputSchema } from "./operations/servers/show-server.query";
 import { showSshCredentialQueryInputSchema } from "./operations/servers/show-ssh-credential.query";
 import { testServerConnectivityCommandInputSchema } from "./operations/servers/test-server-connectivity.command";
@@ -252,6 +253,20 @@ export const operationCatalog = [
     transports: {
       cli: "appaloft server credential-delete <credentialId> --confirm <credentialId>",
       orpc: { method: "DELETE", path: "/api/credentials/ssh/{credentialId}" },
+    },
+  },
+  {
+    key: "credentials.rotate-ssh",
+    kind: "command",
+    domain: "credentials",
+    messageName: "RotateSshCredentialCommand",
+    handlerName: "RotateSshCredentialCommandHandler",
+    serviceName: "RotateSshCredentialUseCase",
+    inputSchema: rotateSshCredentialCommandInputSchema,
+    serviceToken: tokens.rotateSshCredentialUseCase,
+    transports: {
+      cli: "appaloft server credential-rotate <credentialId> --private-key-file <path> --confirm <credentialId>",
+      orpc: { method: "POST", path: "/api/credentials/ssh/{credentialId}/rotate" },
     },
   },
   {

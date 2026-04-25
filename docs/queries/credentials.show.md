@@ -47,6 +47,7 @@ This query inherits:
 - [ADR-026: Aggregate Mutation Command Boundary](../decisions/ADR-026-aggregate-mutation-command-boundary.md)
 - [SSH Credential Lifecycle Workflow](../workflows/ssh-credential-lifecycle.md)
 - [credentials.delete-ssh Command Spec](../commands/credentials.delete-ssh.md)
+- [credentials.rotate-ssh Command Spec](../commands/credentials.rotate-ssh.md)
 - [SSH Credential Lifecycle Error Spec](../errors/credentials.lifecycle.md)
 - [SSH Credential Lifecycle Test Matrix](../testing/ssh-credential-lifecycle-test-matrix.md)
 - [SSH Credential Lifecycle Implementation Plan](../implementation/ssh-credential-lifecycle-plan.md)
@@ -84,6 +85,7 @@ type SshCredentialDetail = {
     publicKeyConfigured: boolean;
     privateKeyConfigured: boolean;
     createdAt: string;
+    rotatedAt?: string;
   };
   usage?: {
     totalServers: number;
@@ -104,6 +106,11 @@ type SshCredentialDetail = {
 
 `credential` is a masked credential summary. It exposes only metadata and booleans for configured
 key material.
+
+`rotatedAt` is absent for credentials that have never been rotated and for implementations that
+predate the `credentials.rotate-ssh` Code Round. After rotation is active, successful rotations
+should update this optional field as the ongoing read-side confirmation that the credential id was
+preserved and key material was replaced.
 
 `usage` includes only deployment targets/servers that currently reference the reusable SSH
 credential through stored credential reference state. Servers configured with a direct private key
@@ -150,8 +157,8 @@ usage visibility.
 This query is the required visibility step before `credentials.delete-ssh`. The delete command
 must re-read usage for admission and must not treat usage-read failure as zero usage.
 
-Credential rotate/update remains future behavior and needs its own command specs, safety rules,
-test matrix rows, and operation catalog entries before implementation.
+`credentials.rotate-ssh` is active and writes optional `rotatedAt` metadata. `credentials.show`
+returns that metadata when present without exposing old or new key material.
 
 ## Open Questions
 

@@ -41,6 +41,9 @@ describe("CLI docs help links", () => {
     );
 
     expect(cliCommandDescriptions.serverCredential).toContain(cliDocsHrefs.serverSshCredential);
+    expect(cliCommandDescriptions.serverCredentialRotate).toContain(
+      cliDocsHrefs.serverSshCredential,
+    );
     expect(cliCommandDescriptions.environmentSet).toContain(
       cliDocsHrefs.environmentVariablePrecedence,
     );

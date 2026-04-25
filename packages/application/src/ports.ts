@@ -338,6 +338,11 @@ export interface SshCredentialRepository {
     credential: SshCredential,
     spec: SshCredentialMutationSpec,
   ): Promise<void>;
+  updateOne(
+    context: RepositoryContext,
+    credential: SshCredential,
+    spec: SshCredentialMutationSpec,
+  ): Promise<boolean>;
   deleteOne(context: RepositoryContext, spec: SshCredentialSelectionSpec): Promise<boolean>;
 }
 
@@ -1017,6 +1022,7 @@ export interface SshCredentialSummary {
   publicKeyConfigured: boolean;
   privateKeyConfigured: boolean;
   createdAt: string;
+  rotatedAt?: string;
 }
 
 export interface SshCredentialUsageServerSummary {

@@ -133,6 +133,7 @@ Implemented operations:
 | List reusable SSH credentials | Query | `credentials.list-ssh` | `ListSshCredentialsQuery` | `ListSshCredentialsQueryInput` | `appaloft server credential-list` | `GET /api/credentials/ssh` |
 | Show reusable SSH credential usage | Query | `credentials.show` | `ShowSshCredentialQuery` | `ShowSshCredentialQueryInput` | `appaloft server credential-show <credentialId>` | `GET /api/credentials/ssh/{credentialId}` |
 | Delete reusable SSH credential when unused | Command | `credentials.delete-ssh` | `DeleteSshCredentialCommand` | `DeleteSshCredentialCommandInput` | `appaloft server credential-delete <credentialId> --confirm <credentialId>` | `DELETE /api/credentials/ssh/{credentialId}` |
+| Rotate reusable SSH credential in place | Command | `credentials.rotate-ssh` | `RotateSshCredentialCommand` | `RotateSshCredentialCommandInput` | `appaloft server credential-rotate <credentialId> --private-key-file <path> --confirm <credentialId>` | `POST /api/credentials/ssh/{credentialId}/rotate` |
 | Open deployment target terminal | Command | `terminal-sessions.open` | `OpenTerminalSessionCommand` | `OpenTerminalSessionCommandInput` | `appaloft server terminal <serverId>` | `POST /api/terminal-sessions`; attach: `WS /api/terminal-sessions/{sessionId}/attach` |
 
 - server registration may carry edge proxy intent/provider selection; when omitted, the deployment
@@ -181,12 +182,14 @@ Implemented operations:
   reject with `credential_in_use`. A usage-read failure rejects the command and must not be treated
   as zero usage. The command never returns private key material, public key bodies, local key paths,
   or credential-bearing strings.
+- `credentials.rotate-ssh` replaces stored reusable SSH private-key material in place while
+  preserving the credential id and server references. The command reuses the durable
+  active/inactive usage surface from `credentials.show`; nonzero usage requires explicit
+  `acknowledgeServerUsage`, and usage-read failure rejects the command. Rotation success does not
+  prove connectivity, so affected servers should run `servers.test-connectivity` before deployment.
 - generated default access routes require proxy readiness and a usable target public address, but
   the generated-domain provider is selected by infrastructure configuration and dependency
   injection, not by core/application command input
-
-Core next operations expected here:
-- rotate reusable SSH credential
 
 ## Environments
 

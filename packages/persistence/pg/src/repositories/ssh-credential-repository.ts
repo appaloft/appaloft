@@ -5,6 +5,7 @@ import {
   type SshCredentialRepository,
 } from "@appaloft/application";
 import {
+  type RotateSshCredentialSpec,
   SshCredential,
   type SshCredentialByIdSpec,
   type SshCredentialMutationSpec,
@@ -94,18 +95,27 @@ class KyselySshCredentialDeleteVisitor
 class KyselySshCredentialMutationVisitor
   implements SshCredentialMutationSpecVisitor<{ values: Insertable<Database["ssh_credentials"]> }>
 {
-  visitUpsertSshCredential(spec: UpsertSshCredentialSpec) {
+  private valuesFromState(state: UpsertSshCredentialSpec["state"]) {
     return {
       values: {
-        id: spec.state.id.value,
-        name: spec.state.name.value,
-        kind: spec.state.kind.value,
-        username: spec.state.username?.value ?? null,
-        public_key: spec.state.publicKey?.value ?? null,
-        private_key: spec.state.privateKey.value,
-        created_at: spec.state.createdAt.value,
+        id: state.id.value,
+        name: state.name.value,
+        kind: state.kind.value,
+        username: state.username?.value ?? null,
+        public_key: state.publicKey?.value ?? null,
+        private_key: state.privateKey.value,
+        created_at: state.createdAt.value,
+        rotated_at: state.rotatedAt?.value ?? null,
       },
     };
+  }
+
+  visitUpsertSshCredential(spec: UpsertSshCredentialSpec) {
+    return this.valuesFromState(spec.state);
+  }
+
+  visitRotateSshCredential(spec: RotateSshCredentialSpec) {
+    return this.valuesFromState(spec.state);
   }
 }
 
@@ -139,6 +149,7 @@ export class PgSshCredentialRepository implements SshCredentialRepository {
               username: mutation.values.username,
               public_key: mutation.values.public_key,
               private_key: mutation.values.private_key,
+              rotated_at: mutation.values.rotated_at,
             }),
           )
           .execute();
@@ -168,6 +179,42 @@ export class PgSshCredentialRepository implements SshCredentialRepository {
           .executeTakeFirst();
 
         return row ? SshCredential.rehydrate(rehydrateSshCredential(row)) : null;
+      },
+    );
+  }
+
+  async updateOne(
+    context: RepositoryContext,
+    credential: SshCredential,
+    spec: SshCredentialMutationSpec,
+  ): Promise<boolean> {
+    void credential;
+    const executor = resolveRepositoryExecutor(this.db, context);
+    const mutation = spec.accept(new KyselySshCredentialMutationVisitor());
+    return context.tracer.startActiveSpan(
+      createRepositorySpanName("ssh_credential", "update_one"),
+      {
+        attributes: {
+          [appaloftTraceAttributes.repositoryName]: "ssh_credential",
+          [appaloftTraceAttributes.mutationSpecName]: spec.constructor.name,
+        },
+      },
+      async () => {
+        const updated = await executor
+          .updateTable("ssh_credentials")
+          .set({
+            name: mutation.values.name,
+            kind: mutation.values.kind,
+            username: mutation.values.username,
+            public_key: mutation.values.public_key,
+            private_key: mutation.values.private_key,
+            rotated_at: mutation.values.rotated_at,
+          })
+          .where("id", "=", mutation.values.id)
+          .returning("id")
+          .executeTakeFirst();
+
+        return Boolean(updated);
       },
     );
   }

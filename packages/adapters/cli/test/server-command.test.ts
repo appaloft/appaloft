@@ -1,4 +1,7 @@
 import { describe, expect, test } from "bun:test";
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
   type Command as AppCommand,
   type Query as AppQuery,
@@ -490,6 +493,93 @@ describe("CLI server commands", () => {
       credentialId: "cred_primary",
       confirmation: {
         credentialId: "cred_primary",
+      },
+    });
+  });
+
+  test("[SSH-CRED-ENTRY-012] server credential-rotate dispatches the application command", async () => {
+    ensureReflectMetadata();
+    const { RotateSshCredentialCommand, createExecutionContext } = await import(
+      "@appaloft/application"
+    );
+    const { createCliProgram } = await import("../src");
+    const workspaceDir = mkdtempSync(join(tmpdir(), "appaloft-cli-ssh-credential-rotate-"));
+    const privateKeyPath = join(workspaceDir, "id_appaloft");
+    writeFileSync(privateKeyPath, "NEW_PRIVATE");
+    const commands: AppCommand<unknown>[] = [];
+    const commandBus = {
+      execute: async <T>(_context: unknown, command: AppCommand<T>) => {
+        commands.push(command as AppCommand<unknown>);
+        return ok({
+          schemaVersion: "credentials.rotate-ssh/v1",
+          credential: {
+            id: "cred_primary",
+            kind: "ssh-private-key",
+            usernameConfigured: true,
+            publicKeyConfigured: true,
+            privateKeyConfigured: true,
+            rotatedAt: "2026-01-01T00:00:10.000Z",
+          },
+          affectedUsage: {
+            totalServers: 1,
+            activeServers: 1,
+            inactiveServers: 0,
+            servers: [],
+          },
+        } as T);
+      },
+    } as unknown as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: unknown, _query: AppQuery<T>) => ok({} as T),
+    } as unknown as QueryBus;
+    const executionContextFactory: ExecutionContextFactory = {
+      create: (input) =>
+        createExecutionContext({
+          ...input,
+          requestId: "req_cli_ssh_credential_rotate_test",
+        }),
+    };
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus,
+      queryBus,
+      executionContextFactory,
+    });
+
+    const writeStdout = process.stdout.write;
+    try {
+      process.stdout.write = (() => true) as typeof process.stdout.write;
+      await program.parseAsync([
+        "node",
+        "appaloft",
+        "server",
+        "credential-rotate",
+        "cred_primary",
+        "--private-key-file",
+        privateKeyPath,
+        "--public-key",
+        "ssh-ed25519 NEW_PUBLIC",
+        "--username",
+        "deploy-new",
+        "--confirm",
+        "cred_primary",
+        "--acknowledge-server-usage",
+      ]);
+    } finally {
+      process.stdout.write = writeStdout;
+    }
+
+    expect(commands).toHaveLength(1);
+    expect(commands[0]).toBeInstanceOf(RotateSshCredentialCommand);
+    expect(commands[0]).toMatchObject({
+      credentialId: "cred_primary",
+      privateKey: "NEW_PRIVATE",
+      publicKey: "ssh-ed25519 NEW_PUBLIC",
+      username: "deploy-new",
+      confirmation: {
+        credentialId: "cred_primary",
+        acknowledgeServerUsage: true,
       },
     });
   });

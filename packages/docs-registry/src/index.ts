@@ -285,17 +285,26 @@ export const publicDocsHelpTopics = {
     },
     surfaces: ["web", "cli", "http-api", "mcp"],
     relatedOperation: "servers.configure-credential",
-    aliases: ["ssh", "credential", "private key", "server credential", "delete credential", "凭据"],
+    aliases: [
+      "ssh",
+      "credential",
+      "private key",
+      "server credential",
+      "delete credential",
+      "rotate credential",
+      "凭据",
+    ],
     specReferences: [
       "docs/workflows/ssh-credential-lifecycle.md",
       "docs/queries/credentials.show.md",
       "docs/commands/credentials.delete-ssh.md",
+      "docs/commands/credentials.rotate-ssh.md",
       "docs/errors/credentials.lifecycle.md",
       "docs/testing/ssh-credential-lifecycle-test-matrix.md",
       "docs/implementation/ssh-credential-lifecycle-plan.md",
     ],
     webSurfaces: [
-      "apps/web server registration, Quick Deploy credential step, credential detail surfaces, and saved credential destructive delete dialog",
+      "apps/web server registration, Quick Deploy credential step, credential detail surfaces, saved credential destructive delete dialog, and saved credential rotation dialog",
     ],
   },
   "server.connectivity-test": {
@@ -717,6 +726,11 @@ export const publicDocsOperationCoverage = [
   },
   {
     operationKey: "credentials.delete-ssh",
+    status: "documented",
+    topicId: "server.ssh-credential",
+  },
+  {
+    operationKey: "credentials.rotate-ssh",
     status: "documented",
     topicId: "server.ssh-credential",
   },

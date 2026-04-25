@@ -165,6 +165,23 @@ describe("operation catalog aggregate mutation boundary", () => {
     expect(entry?.inputSchema).toBeDefined();
   });
 
+  test("[SSH-CRED-ENTRY-011] reusable SSH credential rotate is exposed through the active operation catalog", () => {
+    const entry = operationCatalog.find((candidate) => candidate.key === "credentials.rotate-ssh");
+
+    expect(entry).toMatchObject({
+      kind: "command",
+      domain: "credentials",
+      messageName: "RotateSshCredentialCommand",
+      handlerName: "RotateSshCredentialCommandHandler",
+      serviceName: "RotateSshCredentialUseCase",
+      transports: {
+        cli: "appaloft server credential-rotate <credentialId> --private-key-file <path> --confirm <credentialId>",
+        orpc: { method: "POST", path: "/api/credentials/ssh/{credentialId}/rotate" },
+      },
+    });
+    expect(entry?.inputSchema).toBeDefined();
+  });
+
   test("[AGG-MUTATION-CATALOG-002] detects generic aggregate update operation keys and command names", () => {
     const violations = findGenericAggregateMutationOperations([
       catalogEntry({

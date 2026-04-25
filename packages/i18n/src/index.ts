@@ -139,6 +139,8 @@ export function translateDomainError(error: LocalizableDomainError, t: AppaloftT
     case "resource_delete_blocked":
     case "server_delete_blocked":
     case "server_inactive":
+    case "credential_in_use":
+    case "credential_rotation_requires_usage_acknowledgement":
       return t(i18nKeys.errors.domain.conflict, { message: error.message });
     case "deployment_not_redeployable":
       return t(i18nKeys.errors.domain.deploymentNotRedeployable, {

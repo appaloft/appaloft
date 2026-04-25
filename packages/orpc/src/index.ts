@@ -95,6 +95,7 @@ import {
   ResourceRuntimeLogsQuery,
   type ResourceRuntimeLogsQueryInput,
   type ResourceRuntimeLogsResult,
+  RotateSshCredentialCommand,
   registerServerCommandInputSchema,
   renameProjectCommandInputSchema,
   renameServerCommandInputSchema,
@@ -103,6 +104,7 @@ import {
   resourceHealthQueryInputSchema,
   resourceProxyConfigurationPreviewQueryInputSchema,
   resourceRuntimeLogsQueryInputSchema,
+  rotateSshCredentialCommandInputSchema,
   SetEnvironmentVariableCommand,
   SetResourceVariableCommand,
   ShowDeploymentQuery,
@@ -185,6 +187,7 @@ import {
   resourceRuntimeLogEventSchema,
   resourceRuntimeLogsResponseSchema,
   resourceRuntimeLogsStreamResponseSchema,
+  rotateSshCredentialResponseSchema,
   setResourceVariableResponseSchema,
   showDeploymentResponseSchema,
   showProjectResponseSchema,
@@ -305,6 +308,10 @@ export const apiRouteDescriptions = {
   ),
   deleteSshCredential: routeDescription(
     "Deletes one reusable SSH credential only when no visible active or inactive server uses it.",
+    "server.ssh-credential",
+  ),
+  rotateSshCredential: routeDescription(
+    "Rotates one reusable SSH credential in place after usage visibility and acknowledgement checks.",
     "server.ssh-credential",
   ),
   testServerConnectivity: routeDescription(
@@ -568,6 +575,8 @@ function toOrpcError(error: DomainError, context: ExecutionContext) {
     case "server_delete_blocked":
     case "server_inactive":
     case "deployment_not_redeployable":
+    case "credential_in_use":
+    case "credential_rotation_requires_usage_acknowledgement":
       return new ORPCError("CONFLICT", {
         message,
         status: 409,
@@ -1082,6 +1091,19 @@ export const deleteSshCredentialProcedure = base
   .output(deleteSshCredentialResponseSchema)
   .handler(async ({ input, context }) =>
     executeCommand(context, DeleteSshCredentialCommand.create(input)),
+  );
+
+export const rotateSshCredentialProcedure = base
+  .route({
+    method: "POST",
+    path: "/credentials/ssh/{credentialId}/rotate",
+    description: apiRouteDescriptions.rotateSshCredential,
+    successStatus: 200,
+  })
+  .input(rotateSshCredentialCommandInputSchema)
+  .output(rotateSshCredentialResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, RotateSshCredentialCommand.create(input)),
   );
 
 export const createSshCredentialProcedure = base
@@ -1706,6 +1728,7 @@ export const appaloftOrpcRouter = {
       show: showSshCredentialProcedure,
       create: createSshCredentialProcedure,
       delete: deleteSshCredentialProcedure,
+      rotate: rotateSshCredentialProcedure,
     },
   },
   environments: {
@@ -1887,6 +1910,7 @@ export function mountAppaloftOrpcRoutes(
     "/api/projects/:projectId/archive",
     "/api/credentials/ssh",
     "/api/credentials/ssh/:credentialId",
+    "/api/credentials/ssh/:credentialId/rotate",
     "/api/servers",
     "/api/servers/:serverId",
     "/api/servers/:serverId/rename",
