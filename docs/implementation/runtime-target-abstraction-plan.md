@@ -91,6 +91,7 @@ type RuntimeTargetCapability =
   | "runtime.logs"
   | "runtime.health"
   | "runtime.cleanup"
+  | "runtime.capacity"
   | "proxy.route";
 
 interface RuntimeTargetBackend {
@@ -103,6 +104,7 @@ interface RuntimeTargetBackend {
   apply(input: RuntimeTargetApplyInput): Promise<Result<RuntimeTargetApplyResult>>;
   verify(input: RuntimeTargetVerifyInput): Promise<Result<RuntimeTargetVerifyResult>>;
   cleanup(input: RuntimeTargetCleanupInput): Promise<Result<RuntimeTargetCleanupResult>>;
+  capacity?(input: RuntimeTargetCapacityInput): Promise<Result<RuntimeTargetCapacityResult>>;
 }
 ```
 
@@ -197,6 +199,11 @@ Runtime target abstraction Code Rounds should add tests for:
 - runtime logs and health queries return normalized shapes regardless of target backend;
 - target backend registry does not require Web/CLI/API transport-specific input;
 - Docker/Compose cleanup remains resource-scoped after the registry is introduced;
+- target capacity diagnostics classify disk, inode, memory, CPU, Docker image, and build-cache
+  exhaustion as `runtime_target_resource_exhausted` when safe signals are available;
+- prune dry-runs preserve active runtime, rollback candidates, Docker volumes, and remote Appaloft
+  state while reporting reclaimable source workspaces, stopped containers, unused images, and build
+  cache;
 - future fake Swarm/Kubernetes test backends can prove pluggability without real clusters.
 
 Backend-specific Code Rounds must add contract tests for their own render/apply/verify/log/cleanup
@@ -233,6 +240,9 @@ Current code has the initial target backend shape, but it is still running throu
 - `ResourceRuntimeLogReader`, resource health, diagnostic summary, and proxy configuration previews
   are being normalized as read/query surfaces, but target backend capabilities are not yet their
   shared selection mechanism.
+- Runtime target capacity diagnostics and prune contracts are not first-class yet. Current
+  single-server Docker/SSH behavior can leave unused images, BuildKit/build cache, and materialized
+  source workspaces behind after preview cleanup or failed rollout.
 
 The current state is acceptable for the single-server v1 loop. It is not yet ready to add
 Kubernetes because deployment admission still needs to use the registry for pre-acceptance support

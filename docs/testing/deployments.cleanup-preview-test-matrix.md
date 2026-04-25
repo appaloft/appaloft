@@ -14,6 +14,8 @@ Tests must prove:
   required order;
 - cleanup sweeps stale preview deployments and preview-fingerprint route rows that remain after
   preview retargets;
+- cleanup removes preview-owned inert runtime artifacts and materialized workspaces when ownership
+  can be proven without touching active runtime, rollback candidates, volumes, or remote state;
 - runtime cleanup failure stops later cleanup stages;
 - CLI preview cleanup derives the same fingerprint/state-backend context as preview deploy.
 
@@ -38,7 +40,7 @@ This matrix inherits:
 
 | Layer | Required focus |
 | --- | --- |
-| Application command/use case | Idempotent missing-link result, latest plus stale preview runtime cleanup, route-state delete, source-link unlink, and failure staging. |
+| Application command/use case | Idempotent missing-link result, latest plus stale preview runtime cleanup, artifact/workspace cleanup decision, route-state delete, source-link unlink, and failure staging. |
 | CLI | Preview fingerprint derivation, preview-id validation, config-path contribution, and remote-state prepare/release. |
 | State adapters | Source-link unlink and route desired-state deletion by target and by preview source fingerprint. |
 | Entry workflow | `pull_request.closed` preview cleanup remains a user-authored workflow over the same CLI command and may also delete GitHub preview deployment/environment metadata. |
@@ -53,6 +55,7 @@ This matrix inherits:
 | DEPLOYMENTS-CLEANUP-PREVIEW-004 | integration | Cleanup sweeps stale preview state after retarget | Preview link points at the current preview resource while older preview deployments and route rows still carry the same preview source fingerprint | `ok` with `status = cleaned`; latest and stale preview runtimes are cleaned before linked-target and preview-fingerprint route rows are removed, then the preview source link is unlinked | None |
 | DEPLOYMENTS-CLEANUP-PREVIEW-005 | integration | Preview cleanup waits only on same preview scope | Another command currently owns mutation for the same preview fingerprint while a different preview fingerprint exists on the same server/state backend | Cleanup waits only for the same logical preview-lifecycle scope; unrelated preview scopes must not be blocked by whole-server coordination | `coordination_timeout`, phase `operation-coordination` only when the bounded wait for the same preview scope expires |
 | DEPLOYMENTS-CLEANUP-PREVIEW-006 | integration | SSH final upload merges disjoint preview cleanup state changes | `ssh-pglite` preview cleanup runs against a local mirror and another command advances the remote revision for a different logical scope with disjoint authoritative rows | Cleanup still completes after final upload retries against the fresher remote snapshot | None |
+| DEPLOYMENTS-CLEANUP-PREVIEW-007 | integration | Preview artifact/workspace cleanup is ownership-scoped | Preview link exists, runtime cleanup succeeds, and target has preview-owned source workspaces, stopped preview containers, unused preview images, and unrelated volumes/state | Cleanup removes or marks cleaned the preview-owned inert artifacts/workspaces, preserves Docker volumes, remote Appaloft state, active runtime, and retained rollback candidates, then proceeds to route/link deletion | None, or `runtime_target_resource_exhausted` with `cleanupStage = artifact-cleanup` when target capacity prevents safe inspection/removal |
 
 ## CLI Matrix
 
@@ -71,6 +74,10 @@ coverage in `packages/application/test/cleanup-preview.test.ts`.
 `DEPLOYMENTS-CLEANUP-PREVIEW-006` currently relies on the shared shell-level SSH mirror coverage in
 `apps/shell/test/remote-pglite-state-sync.test.ts`; a cleanup-specific overlapping fixture is still
 follow-up work.
+
+`DEPLOYMENTS-CLEANUP-PREVIEW-007` is not implemented yet. Current cleanup coverage proves runtime,
+route, and source-link cleanup, but not ownership-scoped Docker image/build-cache/source-workspace
+pruning.
 
 Source-link unlink and server-applied route desired-state delete-by-target and
 delete-by-source-fingerprint coverage also live in

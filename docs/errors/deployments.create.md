@@ -114,6 +114,14 @@ type DeploymentCreateErrorDetails = {
   targetProviderKey?: string;
   targetBackendKey?: string;
   targetCapability?: string;
+  capacityResource?: "disk" | "inode" | "memory" | "cpu" | "build-cache" | "unknown";
+  capacityPath?: string;
+  mount?: string;
+  availableBytes?: number;
+  availableInodes?: number;
+  requiredBytes?: number;
+  dockerReclaimableBytes?: number;
+  buildCacheReclaimableBytes?: number;
   coordinationScopeKind?: string;
   coordinationScope?: string;
   coordinationMode?: string;
@@ -152,6 +160,7 @@ Admission errors reject the command and return `err(DomainError)`.
 | `infra_error` | `deployment-creation`, `event-publication` | Conditional | Adapter/operation and sanitized cause. |
 | `provider_error` | `runtime-plan-resolution`, `runtime-artifact-resolution`, `image-build`, `image-pull` | Conditional | Provider key, operation, sanitized image/artifact cause. |
 | `runtime_target_unsupported` | `runtime-target-resolution` | No | Target kind, provider key, missing capability, and safe selected target/destination context. |
+| `runtime_target_resource_exhausted` | `image-build`, `runtime-target-apply`, `runtime-target-observation` | Yes after cleanup, prune, or target resize | Capacity resource such as disk, inode, memory, CPU, or build cache; safe target/destination/path, available capacity, and Docker/build-cache reclaimable capacity when available. |
 | `provider_error` | `runtime-target-resolution`, `runtime-target-render`, `runtime-target-apply`, `runtime-target-observation` | Conditional | Runtime target backend key, provider key, operation, missing capability, and sanitized cause. |
 | `default_access_route_unavailable` | `default-access-policy-resolution`, `default-access-domain-generation`, `proxy-readiness`, `route-snapshot-resolution` | Conditional | Generated default access route is required but cannot be resolved before safe acceptance. |
 
@@ -206,6 +215,14 @@ digest, requested/effective runtime name, container id, Compose project name, co
 code, and bounded log excerpts when they do not contain secrets. It is not valid to include
 registry credentials, private key material, raw secret environment values, or full unbounded
 command output.
+
+Runtime target capacity failures, such as SSH target disk exhaustion, inode exhaustion, Docker
+build-cache exhaustion, or bounded CPU/memory admission failures, must not be collapsed into generic
+domain or validation errors. When the selected target can classify the failure safely, the failed
+deployment state must use `runtime_target_resource_exhausted` with phase `image-build`,
+`runtime-target-apply`, or `runtime-target-observation`. Details may include safe capacity facts
+such as mount/path, available bytes or inodes, and Docker image/build-cache reclaimable bytes; they
+must not include raw command output that may contain secrets.
 
 Git source materialization failures may record `remote_git_clone_failed` or
 `remote_git_commit_resolution_failed` on the failed deployment attempt. Safe failure metadata may
@@ -267,6 +284,9 @@ Migration gaps:
 - runtime target backend registry lookup now returns `runtime_target_unsupported` with
   `runtime-target-resolution` details; `deployments.create` admission does not yet consult that
   registry before accepting the command.
+- generic SSH Docker build capacity failures such as Bun `NoSpaceLeft` currently surface as
+  adapter-specific build failures; they need classification into
+  `runtime_target_resource_exhausted` with safe disk, inode, and build-cache details.
 - repository config file errors are target entry-workflow errors; current implementation does not
   yet populate these phases uniformly and still carries a legacy config-bootstrap shape.
 

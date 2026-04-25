@@ -28,6 +28,7 @@ type CleanupPreviewResult = Result<
     sourceFingerprint: string;
     status: "cleaned" | "already-clean";
     cleanedRuntime: boolean;
+    cleanedArtifacts?: boolean;
     removedServerAppliedRoute: boolean;
     removedSourceLink: boolean;
     projectId?: string;
@@ -47,9 +48,10 @@ The command contract is:
 - when no preview source link exists, the command returns `ok({ status: "already-clean", ... })`;
 - when preview state exists, the command stops the latest runtime for the linked resource and also
   stops any additional preview deployments in the same linked preview scope that still carry the
-  selected preview source fingerprint, removes preview route desired state for the linked target
-  and any matching preview-fingerprint route rows, unlinks the preview source fingerprint, and
-  returns `ok({ status: "cleaned", ... })`;
+  selected preview source fingerprint, removes preview-owned inert runtime artifacts and
+  materialized workspaces when ownership can be proven, removes preview route desired state for the
+  linked target and any matching preview-fingerprint route rows, unlinks the preview source
+  fingerprint, and returns `ok({ status: "cleaned", ... })`;
 - runtime cleanup failure is terminal for the command and must stop later cleanup stages so route
   state and source-link identity are not removed ahead of runtime cleanup.
 
@@ -117,11 +119,14 @@ The cleanup boundary is intentionally narrow:
    runtime metadata still carries the selected preview source fingerprint.
 7. Invoke runtime cleanup against the linked latest deployment first and then any additional stale
    preview deployments discovered for the same preview fingerprint.
-8. Delete server-applied preview route desired state for the linked project/environment/resource/
+8. Remove preview-owned inert runtime artifacts and materialized workspaces when the runtime backend
+   can prove ownership without deleting active runtime, retained rollback candidates, Docker
+   volumes, or remote Appaloft state.
+9. Delete server-applied preview route desired state for the linked project/environment/resource/
    server/destination target when the preview link owns a server target, and also delete any
    additional server-applied route rows that still carry the selected preview source fingerprint.
-9. Unlink the preview source fingerprint.
-10. Return safe ids describing what was cleaned.
+10. Unlink the preview source fingerprint.
+11. Return safe ids describing what was cleaned.
 
 The command must not:
 
@@ -149,6 +154,13 @@ The command must not:
   another preview's route row or any managed domain workflow state.
 - Source-link cleanup removes only the selected preview fingerprint. It must not relink or delete
   regular non-preview source identity.
+- Preview artifact cleanup must be ownership-proven. It may remove stopped preview containers,
+  unused preview images, build cache, and materialized source workspaces that are not referenced by
+  active runtime, retained rollback candidates, diagnostic capture, Docker volumes, or remote
+  Appaloft state.
+- Inability to prove or complete inert artifact cleanup must be surfaced as
+  `cleanedArtifacts = false` or a future diagnostic warning, but must not keep preview routes or
+  source links live after runtime cleanup succeeded.
 - The command may use low-level runtime backend cancel/remove support internally, but this does not
   reintroduce public `deployments.cancel`.
 
@@ -169,6 +181,7 @@ The command must not:
 | `coordination_timeout` | `operation-coordination` | Yes | The command could not acquire its logical preview-lifecycle coordination scope within the bounded wait window. |
 | `infra_error` | `preview-cleanup` | Conditional | State backend read/write, route-state deletion, source-link unlink, or runtime cleanup failed. |
 | `provider_error` | `preview-cleanup` | Conditional | Runtime backend/provider rejected preview runtime cleanup. |
+| `runtime_target_resource_exhausted` | `preview-cleanup` | Yes after cleanup, prune, or target resize | Target disk, inode, Docker image, or build-cache capacity prevented safe runtime/artifact cleanup or inspection. Details should include `cleanupStage = artifact-cleanup` when available. |
 
 `preview-cleanup` failures must include `cleanupStage` in safe details when available, for example
 `source-link-read`, `runtime-cleanup`, `server-applied-route-delete`, or `source-link-delete`.
@@ -204,3 +217,7 @@ path. In SSH `ssh-pglite` mode, shell still performs brief backend state-root ma
 mirror prepare/upload, and final upload may retry after `remote_state_revision_conflict` by merging
 non-overlapping PG/PGlite row changes onto a fresher remote snapshot. Overlapping row edits still
 fail with a structured infrastructure merge conflict.
+
+Current implementation does not yet remove all preview-owned inert Docker images, BuildKit/build
+cache, or remote SSH source workspaces. On long-lived single-server targets this can accumulate
+substantial disk and inode usage even when preview routes and source links have been cleaned.

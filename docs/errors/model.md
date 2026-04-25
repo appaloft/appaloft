@@ -93,6 +93,7 @@ Codes must be stable identifiers, not localized text. Examples:
 | `coordination_timeout` | `timeout` | coordination scope kind/key, coordination mode, waited seconds, retry hint when available |
 | `provider_error` | `integration` | provider key and operation |
 | `runtime_target_unsupported` | `application` or `integration` | target kind, provider key, missing capability, selected target/destination context |
+| `runtime_target_resource_exhausted` | `infra` | phase `image-build`, `runtime-target-apply`, `runtime-target-observation`, or `preview-cleanup`; capacity resource such as disk, inode, memory, CPU, or build cache; safe target/destination/path and reclaimable capacity details when available |
 | `unsupported_config_field` | `validation` or `application` | config path, field path, requested capability, selected entry/workflow context |
 | `resource_profile_drift` | `application` or `conflict` | resource id, changed profile section, required configuration command when known |
 | `infra_error` | `infra` | adapter and operation |

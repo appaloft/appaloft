@@ -310,8 +310,9 @@ Post-`0.4.0` gaps assigned to later phases:
   lifecycle, and certificate import/revoke/retry/delete remain Phase 6 work.
 - Deployment retry/redeploy, cancel, rollback, dependency resources, storage, secrets, webhooks,
   auto-deploy, and product-grade preview deployments remain Phase 7 work.
-- Durable outbox/inbox/job state, recovery/prune commands, audit/event history, remote SSH state
-  diagnostics, and terminal session lifecycle closure remain Phase 8 work.
+- Durable outbox/inbox/job state, recovery/prune commands, runtime target capacity diagnostics,
+  audit/event history, remote SSH state diagnostics, and terminal session lifecycle closure remain
+  Phase 8 work.
 
 ## Phase 3: Access, Static, SSH Config, And Planner Baseline
 
@@ -623,8 +624,13 @@ Required:
 - [ ] Add operator queries for certificate attempts.
 - [ ] Add operator queries for remote SSH state locks, migrations, backups, and recovery markers.
 - [ ] Add operator queries for source links, route realization attempts, and worker/job status.
+- [ ] Add runtime target capacity diagnostics for disk, inode, memory, CPU, Docker image usage,
+  build-cache usage, source workspace usage, and safe reclaimable estimates.
 - [ ] Add lifecycle commands for retry, cancel, mark-recovered, dead-letter, and prune where state
   can block deployments or create support load.
+- [ ] Add runtime artifact/workspace prune with dry-run, active-runtime preservation, rollback
+  candidate retention, preview-owned artifact cleanup, no-volume-by-default safety, and audit and
+  diagnostic output.
 - [ ] Add audit/event read surfaces with retention policy and redaction rules.
 - [ ] Add terminal session list/show/attach/close/expire if terminal sessions remain public.
 - [ ] Ensure provider/plugin/system operations expose capability details and configuration
@@ -636,8 +642,8 @@ Required:
 Exit criteria:
 
 - [ ] Operators can see and repair stuck work through Appaloft operations.
-- [ ] Historical attempts, logs, events, and remote state backups have documented retention/prune
-  behavior.
+- [ ] Historical attempts, logs, events, remote state backups, runtime artifacts, source
+  workspaces, and build cache have documented retention/prune behavior.
 - [ ] The release candidate passes local, PGlite, PostgreSQL, Docker, and opt-in SSH smoke suites.
 
 ## 1.0.0 GA
@@ -695,7 +701,8 @@ work below before GA.
 - [x] Deployment attempt: stream events.
 - [ ] Deployment attempt: retry/redeploy, cancel, rollback candidate/readiness, archive/prune.
 - [x] Runtime artifact/instance: internal snapshot and resource/deployment diagnostic context.
-- [ ] Runtime artifact/instance: cleanup/prune and rollback-candidate retention.
+- [ ] Runtime artifact/instance: capacity diagnostics, cleanup/prune, preview artifact cleanup, and
+  rollback-candidate retention.
 - [x] Default access policy: static/shell configuration selects provider; generated routes are
   visible through `ResourceAccessSummary`.
 - [ ] Default access policy: configure, show, update/disable, preserve resource access projection.
@@ -814,5 +821,5 @@ Recommended next Spec Rounds before broad Code Rounds:
   binding show/update/delete/retry, and certificate import/revoke/retry.
 - [ ] Dependency resource lifecycle: Postgres/Redis provision/import, bind/unbind, secret rotation,
   backup/restore, and delete.
-- [ ] Operator state closure: outbox/inbox/jobs, remote SSH state diagnostics, audit/event
-  retention, and prune/recovery commands.
+- [ ] Operator state closure: outbox/inbox/jobs, remote SSH state diagnostics, runtime target
+  capacity diagnostics, audit/event retention, and prune/recovery commands.
