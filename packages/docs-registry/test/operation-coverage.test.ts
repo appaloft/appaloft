@@ -97,4 +97,21 @@ describe("public docs operation coverage", () => {
     });
     expect(topic.webSurfaces?.join("\n")).toContain("saved credential rotation dialog");
   });
+
+  test("[ENV-PRECEDENCE-ENTRY-001] environment effective precedence records docs coverage", () => {
+    const coverage = getPublicDocsOperationCoverage("environments.effective-precedence");
+    const topic = publicDocsHelpTopics["environment.variable-precedence"];
+
+    expect(coverage).toMatchObject({
+      operationKey: "environments.effective-precedence",
+      status: "documented",
+      topicId: "environment.variable-precedence",
+    });
+    expect(topic.specReferences).toEqual(
+      expect.arrayContaining([
+        "docs/queries/environments.effective-precedence.md",
+        "docs/testing/environment-effective-precedence-test-matrix.md",
+      ]),
+    );
+  });
 });

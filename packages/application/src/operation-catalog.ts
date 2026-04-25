@@ -14,6 +14,7 @@ import { createDomainBindingCommandInputSchema } from "./operations/domain-bindi
 import { listDomainBindingsQueryInputSchema } from "./operations/domain-bindings/list-domain-bindings.query";
 import { createEnvironmentCommandInputSchema } from "./operations/environments/create-environment.command";
 import { diffEnvironmentsQueryInputSchema } from "./operations/environments/diff-environments.query";
+import { environmentEffectivePrecedenceQueryInputSchema } from "./operations/environments/environment-effective-precedence.query";
 import { listEnvironmentsQueryInputSchema } from "./operations/environments/list-environments.query";
 import { promoteEnvironmentCommandInputSchema } from "./operations/environments/promote-environment.command";
 import { setEnvironmentVariableCommandInputSchema } from "./operations/environments/set-environment-variable.command";
@@ -715,6 +716,20 @@ export const operationCatalog = [
     transports: {
       cli: "appaloft env unset <environmentId> <key>",
       orpc: { method: "DELETE", path: "/api/environments/{environmentId}/variables/{key}" },
+    },
+  },
+  {
+    key: "environments.effective-precedence",
+    kind: "query",
+    domain: "environments",
+    messageName: "EnvironmentEffectivePrecedenceQuery",
+    handlerName: "EnvironmentEffectivePrecedenceQueryHandler",
+    serviceName: "EnvironmentEffectivePrecedenceQueryService",
+    inputSchema: environmentEffectivePrecedenceQueryInputSchema,
+    serviceToken: tokens.environmentEffectivePrecedenceQueryService,
+    transports: {
+      cli: "appaloft env effective-precedence <environmentId>",
+      orpc: { method: "GET", path: "/api/environments/{environmentId}/effective-precedence" },
     },
   },
   {

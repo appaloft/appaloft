@@ -38,6 +38,7 @@ describe("operation catalog aggregate mutation boundary", () => {
       "environments.show",
       "environments.set-variable",
       "environments.unset-variable",
+      "environments.effective-precedence",
       "environments.diff",
       "environments.promote",
       "servers.register",
@@ -177,6 +178,25 @@ describe("operation catalog aggregate mutation boundary", () => {
       transports: {
         cli: "appaloft server credential-rotate <credentialId> --private-key-file <path> --confirm <credentialId>",
         orpc: { method: "POST", path: "/api/credentials/ssh/{credentialId}/rotate" },
+      },
+    });
+    expect(entry?.inputSchema).toBeDefined();
+  });
+
+  test("[ENV-PRECEDENCE-ENTRY-001] environment effective precedence is exposed through the active operation catalog", () => {
+    const entry = operationCatalog.find(
+      (candidate) => candidate.key === "environments.effective-precedence",
+    );
+
+    expect(entry).toMatchObject({
+      kind: "query",
+      domain: "environments",
+      messageName: "EnvironmentEffectivePrecedenceQuery",
+      handlerName: "EnvironmentEffectivePrecedenceQueryHandler",
+      serviceName: "EnvironmentEffectivePrecedenceQueryService",
+      transports: {
+        cli: "appaloft env effective-precedence <environmentId>",
+        orpc: { method: "GET", path: "/api/environments/{environmentId}/effective-precedence" },
       },
     });
     expect(entry?.inputSchema).toBeDefined();

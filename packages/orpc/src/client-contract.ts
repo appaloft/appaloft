@@ -23,6 +23,7 @@ import {
   type DeleteSshCredentialCommandInput,
   type DeploymentLogsQueryInput,
   type DiffEnvironmentsQueryInput,
+  type EnvironmentEffectivePrecedenceQueryInput,
   type ImportCertificateCommandInput,
   type IssueOrRenewCertificateCommandInput,
   type ListCertificatesQueryInput,
@@ -85,6 +86,7 @@ import {
   type DeploymentLogsResponse,
   type DeploymentProgressEvent,
   type DiffEnvironmentResponse,
+  type EnvironmentEffectivePrecedenceResponse,
   type EnvironmentSummary,
   type ImportCertificateResponse,
   type IssueOrRenewCertificateResponse,
@@ -294,6 +296,12 @@ export type AppaloftOrpcClientContract = {
       AppaloftClientContext,
       UnsetEnvironmentVariableCommandInput,
       null,
+      AppaloftClientError
+    >;
+    effectivePrecedence: Client<
+      AppaloftClientContext,
+      EnvironmentEffectivePrecedenceQueryInput,
+      EnvironmentEffectivePrecedenceResponse,
       AppaloftClientError
     >;
     promote: Client<

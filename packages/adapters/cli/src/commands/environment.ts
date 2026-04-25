@@ -1,6 +1,7 @@
 import {
   CreateEnvironmentCommand,
   DiffEnvironmentsQuery,
+  EnvironmentEffectivePrecedenceQuery,
   ListEnvironmentsQuery,
   PromoteEnvironmentCommand,
   SetEnvironmentVariableCommand,
@@ -127,6 +128,14 @@ const diffCommand = EffectCommand.make(
     ),
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.environmentDiff));
 
+const effectivePrecedenceCommand = EffectCommand.make(
+  "effective-precedence",
+  {
+    environmentId: environmentIdArg,
+  },
+  ({ environmentId }) => runQuery(EnvironmentEffectivePrecedenceQuery.create({ environmentId })),
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.environmentEffectivePrecedence));
+
 const promoteCommand = EffectCommand.make(
   "promote",
   {
@@ -152,6 +161,7 @@ export const envCommand = EffectCommand.make("env").pipe(
     showCommand,
     setCommand,
     unsetCommand,
+    effectivePrecedenceCommand,
     diffCommand,
     promoteCommand,
   ]),

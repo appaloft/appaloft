@@ -74,6 +74,9 @@ export const tokens = {
   createEnvironmentUseCase: Symbol.for("appaloft.create_environment_use_case"),
   listEnvironmentsQueryService: Symbol.for("appaloft.list_environments_query_service"),
   showEnvironmentQueryService: Symbol.for("appaloft.show_environment_query_service"),
+  environmentEffectivePrecedenceQueryService: Symbol.for(
+    "appaloft.environment_effective_precedence_query_service",
+  ),
   createResourceUseCase: Symbol.for("appaloft.create_resource_use_case"),
   archiveResourceUseCase: Symbol.for("appaloft.archive_resource_use_case"),
   deleteResourceUseCase: Symbol.for("appaloft.delete_resource_use_case"),
