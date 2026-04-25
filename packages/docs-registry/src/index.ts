@@ -422,6 +422,32 @@ export const publicDocsHelpTopics = {
     relatedOperation: "environments.create",
     aliases: ["environment", "stage", "production", "环境"],
   },
+  "environment.lifecycle": {
+    id: "environment.lifecycle",
+    title: "Environment lifecycle",
+    description:
+      "How active and archived environments affect configuration and deployment admission.",
+    page: {
+      "zh-CN": "environments/model",
+      "en-US": "en/environments/model",
+    },
+    anchor: "environment-lifecycle",
+    localeCoverage: {
+      "zh-CN": "complete",
+      "en-US": "complete",
+    },
+    surfaces: ["web", "cli", "http-api", "mcp"],
+    relatedOperation: "environments.archive",
+    aliases: ["environment archive", "archived environment", "env archive", "环境归档"],
+    specReferences: [
+      "docs/workflows/environment-lifecycle.md",
+      "docs/commands/environments.archive.md",
+      "docs/events/environment-archived.md",
+      "docs/errors/environments.lifecycle.md",
+      "docs/testing/environment-lifecycle-test-matrix.md",
+    ],
+    webSurfaces: ["apps/web project detail environment lifecycle action"],
+  },
   "environment.variable-precedence": {
     id: "environment.variable-precedence",
     title: "Variable precedence",
@@ -823,6 +849,11 @@ export const publicDocsOperationCoverage = [
   { operationKey: "environments.create", status: "documented", topicId: "environment.concept" },
   { operationKey: "environments.list", status: "documented", topicId: "environment.concept" },
   { operationKey: "environments.show", status: "documented", topicId: "environment.concept" },
+  {
+    operationKey: "environments.archive",
+    status: "documented",
+    topicId: "environment.lifecycle",
+  },
   {
     operationKey: "environments.set-variable",
     status: "documented",

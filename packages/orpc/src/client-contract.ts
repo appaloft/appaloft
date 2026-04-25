@@ -1,4 +1,5 @@
 import {
+  type ArchiveEnvironmentCommandInput,
   type ArchiveProjectCommandInput,
   type ArchiveResourceCommandInput,
   type BootstrapServerProxyCommandInput,
@@ -59,6 +60,7 @@ import {
   type UnsetResourceVariableCommandInput,
 } from "@appaloft/application/schemas";
 import {
+  type ArchiveEnvironmentResponse,
   type ArchiveProjectResponse,
   type ArchiveResourceResponse,
   type BootstrapServerProxyResponse,
@@ -284,6 +286,12 @@ export type AppaloftOrpcClientContract = {
       AppaloftClientContext,
       ShowEnvironmentQueryInput,
       EnvironmentSummary,
+      AppaloftClientError
+    >;
+    archive: Client<
+      AppaloftClientContext,
+      ArchiveEnvironmentCommandInput,
+      ArchiveEnvironmentResponse,
       AppaloftClientError
     >;
     setVariable: Client<

@@ -25,6 +25,9 @@ describe("console docs help links", () => {
     expect(webDocsHrefs.environmentVariablePrecedence).toBe(
       "/docs/environments/variables/precedence/#environment-variable-precedence",
     );
+    expect(webDocsHrefs.environmentLifecycle).toBe(
+      "/docs/environments/model/#environment-lifecycle",
+    );
     expect(webDocsHrefs.resourceRuntimeProfile).toBe(
       "/docs/resources/profiles/source-runtime/#resource-runtime-profile",
     );
@@ -69,6 +72,7 @@ describe("console docs help links", () => {
       await Promise.all(
         [
           "routes/domain-bindings/+page.svelte",
+          "routes/projects/[projectId]/+page.svelte",
           "routes/resources/[resourceId]/+page.svelte",
           "routes/projects/[projectId]/environments/[environmentId]/resources/[resourceId]/deployments/new/+page.svelte",
           "routes/servers/+page.svelte",
@@ -86,6 +90,9 @@ describe("console docs help links", () => {
     );
     expect(sourceByPath["routes/domain-bindings/+page.svelte"]).toContain("certificateReadiness");
     expect(sourceByPath["routes/domain-bindings/+page.svelte"]).toContain("serverProxyReadiness");
+    expect(sourceByPath["routes/projects/[projectId]/+page.svelte"]).toContain(
+      "environmentLifecycle",
+    );
 
     expect(sourceByPath["routes/resources/[resourceId]/+page.svelte"]).toContain(
       "resourceSourceProfile",

@@ -17,6 +17,7 @@ export const webDocsHrefs = {
   resourceHealthProfile: resolvePublicDocsHelpHref("resource.health-profile"),
   resourceNetworkProfile: resolvePublicDocsHelpHref("resource.network-profile"),
   environmentConcept: resolvePublicDocsHelpHref("environment.concept"),
+  environmentLifecycle: resolvePublicDocsHelpHref("environment.lifecycle"),
   environmentVariablePrecedence: resolvePublicDocsHelpHref("environment.variable-precedence"),
   domainGeneratedAccessRoute: resolvePublicDocsHelpHref("domain.generated-access-route"),
   domainCustomDomainBinding: resolvePublicDocsHelpHref("domain.custom-domain-binding"),

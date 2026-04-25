@@ -3,7 +3,11 @@
   import { page } from "$app/state";
   import { createMutation, createQuery, queryOptions } from "@tanstack/svelte-query";
   import { Archive, ArrowLeft, ArrowRight, FolderOpen, Play, Plus, Save } from "@lucide/svelte";
-  import type { ArchiveProjectInput, RenameProjectInput } from "@appaloft/contracts";
+  import type {
+    ArchiveEnvironmentInput,
+    ArchiveProjectInput,
+    RenameProjectInput,
+  } from "@appaloft/contracts";
 
   import { readErrorMessage } from "$lib/api/client";
   import DeploymentTable from "$lib/components/console/DeploymentTable.svelte";
@@ -129,6 +133,28 @@
       };
     },
   }));
+  const archiveEnvironmentMutation = createMutation(() => ({
+    mutationFn: (input: ArchiveEnvironmentInput) => orpcClient.environments.archive(input),
+    onSuccess: (result) => {
+      lifecycleFeedback = {
+        kind: "success",
+        title: $t(i18nKeys.console.projects.environmentArchiveSucceeded),
+        detail: result.id,
+      };
+      void queryClient.invalidateQueries({ queryKey: ["environments"] });
+      void queryClient.invalidateQueries({ queryKey: ["projects"] });
+      if (project) {
+        void queryClient.invalidateQueries({ queryKey: ["projects", "show", project.id] });
+      }
+    },
+    onError: (error) => {
+      lifecycleFeedback = {
+        kind: "error",
+        title: $t(i18nKeys.console.projects.environmentArchiveFailed),
+        detail: readErrorMessage(error),
+      };
+    },
+  }));
 
   $effect(() => {
     if (!project || projectFormProjectId === project.id) {
@@ -164,6 +190,26 @@
     lifecycleFeedback = null;
     archiveProjectMutation.mutate({
       projectId: project.id,
+    });
+  }
+
+  function archiveEnvironment(environmentId: string): void {
+    if (!browser || !project || isProjectArchived || archiveEnvironmentMutation.isPending) {
+      return;
+    }
+
+    const environment = projectEnvironments.find((item) => item.id === environmentId);
+    if (!environment || environment.lifecycleStatus === "archived") {
+      return;
+    }
+
+    if (!window.confirm($t(i18nKeys.console.projects.environmentArchiveConfirm))) {
+      return;
+    }
+
+    lifecycleFeedback = null;
+    archiveEnvironmentMutation.mutate({
+      environmentId,
     });
   }
 
@@ -412,7 +458,15 @@
           <section class="space-y-3">
             <div>
               <div class="flex items-center justify-between gap-3">
-                <h2 class="text-sm font-semibold">{$t(i18nKeys.console.projects.environmentsTitle)}</h2>
+                <div class="flex items-center gap-2">
+                  <h2 class="text-sm font-semibold">
+                    {$t(i18nKeys.console.projects.environmentsTitle)}
+                  </h2>
+                  <DocsHelpLink
+                    href={webDocsHrefs.environmentLifecycle}
+                    ariaLabel={$t(i18nKeys.common.actions.openDocumentation)}
+                  />
+                </div>
                 <span class="text-sm text-muted-foreground">{projectEnvironments.length}</span>
               </div>
               <p class="mt-1 text-xs leading-5 text-muted-foreground">
@@ -424,15 +478,44 @@
               {#if projectEnvironments.length > 0}
                 {#each projectEnvironments as environment (environment.id)}
                   <div class="py-3">
-                    <div class="flex flex-wrap items-center justify-between gap-2">
-                      <p class="truncate text-sm font-medium">{environment.name}</p>
-                      <Badge variant="secondary">{environment.kind}</Badge>
+                    <div class="flex items-start justify-between gap-2">
+                      <div class="min-w-0 space-y-1">
+                        <div class="flex min-w-0 flex-wrap items-center gap-2">
+                          <p class="truncate text-sm font-medium">{environment.name}</p>
+                          <Badge variant="secondary">{environment.kind}</Badge>
+                          {#if environment.lifecycleStatus === "archived"}
+                            <Badge variant="destructive">
+                              {$t(i18nKeys.console.projects.environmentArchived)}
+                            </Badge>
+                          {/if}
+                        </div>
+                        <p class="text-xs text-muted-foreground">
+                          {$t(i18nKeys.console.projects.environmentCount, {
+                            count: environment.maskedVariables.length,
+                          })}
+                        </p>
+                        {#if environment.archivedAt}
+                          <p class="text-xs text-muted-foreground">
+                            {$t(i18nKeys.console.projects.environmentArchivedAt)} · {formatTime(
+                              environment.archivedAt,
+                            )}
+                          </p>
+                        {/if}
+                      </div>
+                      <Button
+                        type="button"
+                        size="icon-sm"
+                        variant="ghost"
+                        aria-label={$t(i18nKeys.console.projects.environmentArchiveAction)}
+                        title={$t(i18nKeys.console.projects.environmentArchiveAction)}
+                        disabled={isProjectArchived ||
+                          environment.lifecycleStatus === "archived" ||
+                          archiveEnvironmentMutation.isPending}
+                        onclick={() => archiveEnvironment(environment.id)}
+                      >
+                        <Archive class="size-4" />
+                      </Button>
                     </div>
-                    <p class="mt-1 text-xs text-muted-foreground">
-                      {$t(i18nKeys.console.projects.environmentCount, {
-                        count: environment.maskedVariables.length,
-                      })}
-                    </p>
                   </div>
                 {/each}
               {:else}

@@ -184,6 +184,7 @@ flowchart TD
 | Read environment effective precedence | Active query | `environments.effective-precedence` | Environment configuration read model | Exposes masked environment-owned variables and the environment-level effective value for each `key + exposure` identity before resource overrides or deployment snapshots apply. | [environments.effective-precedence](./queries/environments.effective-precedence.md), [Environment Effective Precedence Test Matrix](./testing/environment-effective-precedence-test-matrix.md), [ADR-012](./decisions/ADR-012-resource-runtime-profile-and-deployment-snapshot-boundary.md) |
 | Diff environments | Query | `environments.diff` | Environment read model | Compares configuration scopes. | [Core Operations](./CORE_OPERATIONS.md) |
 | Promote environment | Command | `environments.promote` | Environment | Creates a promoted environment state. | [Core Operations](./CORE_OPERATIONS.md) |
+| Archive environment | Active command | `environments.archive` | Environment | Retires an environment from new configuration writes, resource creation, and deployment admission while retaining environment/resource/deployment history. | [environments.archive](./commands/environments.archive.md), [Environment Lifecycle](./workflows/environment-lifecycle.md), [environment-archived](./events/environment-archived.md), [Environment Lifecycle Test Matrix](./testing/environment-lifecycle-test-matrix.md), [ADR-026](./decisions/ADR-026-aggregate-mutation-command-boundary.md) |
 
 ### Deployment Target And Credential
 

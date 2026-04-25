@@ -22,6 +22,9 @@ describe("HTTP API docs help links", () => {
     expect(apiDocsHrefs.environmentVariablePrecedence).toBe(
       "/docs/environments/variables/precedence/#environment-variable-precedence",
     );
+    expect(apiDocsHrefs.environmentLifecycle).toBe(
+      "/docs/environments/model/#environment-lifecycle",
+    );
     expect(apiDocsHrefs.resourceHealthProfile).toBe(
       "/docs/resources/profiles/health-network/#resource-health-profile",
     );
@@ -37,6 +40,7 @@ describe("HTTP API docs help links", () => {
     expect(apiRouteDescriptions.setEnvironmentVariable).toContain(
       apiDocsHrefs.environmentVariablePrecedence,
     );
+    expect(apiRouteDescriptions.archiveEnvironment).toContain(apiDocsHrefs.environmentLifecycle);
     expect(apiRouteDescriptions.configureResourceHealth).toContain(
       apiDocsHrefs.resourceHealthProfile,
     );

@@ -204,14 +204,17 @@ function projectSummary(overrides?: Partial<ProjectSummary>): ProjectSummary {
 }
 
 function environmentSummary(overrides?: Partial<EnvironmentSummary>): EnvironmentSummary {
+  const { lifecycleStatus = "active", ...rest } = overrides ?? {};
+
   return {
     id: "env_demo",
     projectId: "prj_demo",
     name: "Production",
     kind: "production",
+    lifecycleStatus,
     maskedVariables: [],
     createdAt: "2026-01-01T00:00:00.000Z",
-    ...overrides,
+    ...rest,
   };
 }
 
