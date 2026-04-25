@@ -1,6 +1,6 @@
 ---
 name: appaloft-develop
-description: Appaloft project-specific Domain Driven Develop profile. Use with the installed domain-driven-develop skill when Codex works on Appaloft business behavior, roadmap-based next behavior selection, ADR/decision alignment, source-of-truth specs, public docs, tests, Web/API/CLI entrypoints, operation catalog alignment, or Code Round implementation. This profile only binds Appaloft business facts and repository paths; use domain-driven-develop for the generic Init/Discover/Spec/Docs/Test-First/Code/Sync/Next-Behavior/Post-Implementation workflow and DDD tactical rules.
+description: Appaloft project-specific Domain Driven Develop profile. Use with the installed domain-driven-develop skill when Codex works on Appaloft business behavior, roadmap/version-based next behavior selection, ADR/decision alignment, source-of-truth specs, public docs, tests, Web/API/CLI entrypoints, operation catalog alignment, release-sensitive compatibility impact, or Code Round implementation. This profile only binds Appaloft business facts and repository paths; use domain-driven-develop for the generic Init/Discover/Spec/Docs/Test-First/Code/Sync/Next-Behavior/Post-Implementation workflow and DDD tactical rules.
 ---
 
 # Appaloft Develop
@@ -21,26 +21,34 @@ Read Appaloft governing sources in this order before non-trivial behavior work:
 2. `docs/decisions/README.md`
 3. Relevant accepted ADRs under `docs/decisions/**`
 4. `docs/PRODUCT_ROADMAP.md`
-5. `docs/BUSINESS_OPERATION_MAP.md`
-6. `docs/CORE_OPERATIONS.md`
-7. `docs/DOMAIN_MODEL.md`
-8. Global contracts:
+5. Release and version sources when release-sensitive:
+   - `.codex/skills/release/SKILL.md`
+   - `.github/release-please-config.json`
+   - `.github/.release-please-manifest.json`
+   - `.github/workflows/release.yml`
+   - `CHANGELOG.md`
+   - `package.json`
+   - `scripts/release/**`
+6. `docs/BUSINESS_OPERATION_MAP.md`
+7. `docs/CORE_OPERATIONS.md`
+8. `docs/DOMAIN_MODEL.md`
+9. Global contracts:
    - `docs/errors/model.md`
    - `docs/errors/neverthrow-conventions.md`
    - `docs/architecture/async-lifecycle-and-acceptance.md`
-9. Relevant local specs:
+10. Relevant local specs:
    - `docs/commands/**`
    - `docs/queries/**`
    - `docs/events/**`
    - `docs/workflows/**`
    - `docs/errors/**`
    - `docs/testing/**`
-10. Public docs governance when user-visible:
+11. Public docs governance when user-visible:
    - `docs/decisions/ADR-030-public-documentation-round-and-platform.md`
    - `docs/documentation/public-docs-structure.md`
    - `docs/testing/public-documentation-test-matrix.md`
-11. Implementation plans under `docs/implementation/**`
-12. `packages/application/src/operation-catalog.ts`
+12. Implementation plans under `docs/implementation/**`
+13. `packages/application/src/operation-catalog.ts`
 
 Use `docs/ai/**` only as background analysis. It must not override accepted ADRs, the business operation map, global contracts, local specs, public documentation specs, or implementation plans.
 
@@ -63,6 +71,21 @@ When asked what to do next, use `domain-driven-develop` Next Behavior Selection,
 3. recommend exactly one next behavior;
 4. state the next round type, usually Spec Round when governance is missing and Code Round only when specs/tests/docs/readiness are sufficient;
 5. do not start the next behavior unless explicitly asked.
+
+## Appaloft Roadmap And Version Gate
+
+Use the installed `domain-driven-develop` `references/roadmap-and-versioning.md` for generic roadmap, version, and SemVer rules.
+
+For Appaloft:
+
+- `docs/PRODUCT_ROADMAP.md` is the release gate for all versions before `1.0.0`.
+- Current package and release-line facts live in `package.json`, `.github/.release-please-manifest.json`, `CHANGELOG.md`, and the release-alignment block in `docs/PRODUCT_ROADMAP.md`; do not copy a current version number into this profile.
+- Before `1.0.0`, classify public-surface compatibility as `pre-1.0-policy` plus the concrete public impact. Do not use pre-`1.0.0` flexibility to skip roadmap, docs, test, or migration-gap updates.
+- Release-sensitive behavior must state roadmap target, intended version target when known, compatibility impact, affected public surfaces, and release-note/changelog/migration requirement.
+- Public surfaces include CLI commands and help, HTTP/oRPC schemas, Web-visible behavior, repository config fields, public docs anchors, event schemas, plugin/tool schemas, release artifacts, installation scripts, and generated release manifests.
+- If a behavior belongs to a later roadmap phase, do not implement it as current work unless the user explicitly asks to pull it forward; update the roadmap or implementation plan if it is pulled forward.
+- If implementation, operation catalog, specs, tests, or public docs disagree with `docs/PRODUCT_ROADMAP.md`, treat that as Sync Round before Code Round.
+- When preparing, triggering, publishing, retrying, or explaining an actual release, use the local `release` skill in addition to this profile and follow its explicit confirmation rules.
 
 ## Appaloft Ubiquitous Language
 
@@ -93,6 +116,8 @@ If the behavior fits existing accepted ADRs and `docs/DOMAIN_MODEL.md`, record t
 Use the installed `domain-driven-develop` `references/round-checklists.md` before non-trivial edits and `references/reporting.md` for Discovery, formal round summaries, artifact-state reports, coverage reports, and ready/not-ready output.
 
 For Appaloft formal work, include operation-map position/state, operation catalog and `docs/CORE_OPERATIONS.md` sync state, Web/API/CLI/repository-config/future MCP coverage, public docs/help outcome, test matrix ids, and remaining migration gaps.
+
+When formal work is roadmap or release-sensitive, also include roadmap target, version target when known, compatibility impact, affected public surfaces, and release-note/changelog/migration outcome.
 
 ## Business Operation Rules
 
@@ -197,6 +222,7 @@ For formal work, summarize:
 - round type;
 - target behavior;
 - governing Appaloft docs;
+- roadmap target, version target, and compatibility impact when relevant;
 - operation-map position/state;
 - domain owner and canonical terms;
 - artifact state and relevant coverage surfaces;
