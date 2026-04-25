@@ -1,4 +1,4 @@
 interface:
   display_name: "Appaloft Develop"
-  short_description: "Project profile for Appaloft Domain Driven Develop and roadmap/version gates."
-  default_prompt: "Use Appaloft Develop with domain-driven-develop to choose the next roadmap-aligned round or implement a governed behavior with Appaloft domain, test, docs, entrypoint, and version gates."
+  short_description: "Project profile for Appaloft Domain Driven Develop, feature specs, and roadmap/version gates."
+  default_prompt: "Use Appaloft Develop with domain-driven-develop to choose the next roadmap-aligned round, use docs/specs feature artifacts for new formal behavior, and implement governed behavior with Appaloft domain, test, docs, entrypoint, and version gates."
