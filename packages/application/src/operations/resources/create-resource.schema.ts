@@ -2,6 +2,7 @@ import {
   healthCheckHttpMethods,
   healthCheckSchemes,
   resourceExposureModes,
+  resourceGeneratedAccessModes,
   resourceKinds,
   resourceNetworkProtocols,
   resourceServiceKinds,
@@ -150,6 +151,13 @@ export const createResourceNetworkProfileInputSchema = z
     }
   });
 
+export const resourceAccessProfileInputSchema = z
+  .object({
+    generatedAccessMode: z.enum(resourceGeneratedAccessModes).default("inherit"),
+    pathPrefix: z.string().trim().min(1).default("/"),
+  })
+  .strict();
+
 export const createResourceCommandInputSchema = z.object({
   projectId: nonEmptyTrimmedString("Project id"),
   environmentId: nonEmptyTrimmedString("Environment id"),
@@ -182,3 +190,4 @@ export type ResourceHealthCheckPolicyCommandInput = z.input<
 export type CreateResourceNetworkProfileInput = z.output<
   typeof createResourceNetworkProfileInputSchema
 >;
+export type ResourceAccessProfileInput = z.output<typeof resourceAccessProfileInputSchema>;

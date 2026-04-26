@@ -18,6 +18,7 @@ import {
   packagingModes,
   projectLifecycleStatuses,
   resourceExposureModes,
+  resourceGeneratedAccessModes,
   resourceLifecycleStatuses,
   resourceNetworkProtocols,
   runtimePlanStrategies,
@@ -51,6 +52,7 @@ export {
   packagingModes,
   projectLifecycleStatuses,
   resourceExposureModes,
+  resourceGeneratedAccessModes,
   resourceLifecycleStatuses,
   resourceNetworkProtocols,
   runtimePlanStrategies,
@@ -1031,6 +1033,36 @@ export class ResourceExposureModeValue extends EnumValueObject<
 
   static rehydrate(value: (typeof resourceExposureModes)[number]): ResourceExposureModeValue {
     return new ResourceExposureModeValue(value);
+  }
+}
+
+const resourceGeneratedAccessModeBrand: unique symbol = Symbol("ResourceGeneratedAccessModeValue");
+export class ResourceGeneratedAccessModeValue extends EnumValueObject<
+  (typeof resourceGeneratedAccessModes)[number]
+> {
+  private [resourceGeneratedAccessModeBrand]!: void;
+
+  private constructor(value: (typeof resourceGeneratedAccessModes)[number]) {
+    super(value);
+  }
+
+  static create(value: string): Result<ResourceGeneratedAccessModeValue> {
+    return createEnumValue(
+      value,
+      resourceGeneratedAccessModes,
+      "Resource generated access mode",
+      (validated) => new ResourceGeneratedAccessModeValue(validated),
+    );
+  }
+
+  static rehydrate(
+    value: (typeof resourceGeneratedAccessModes)[number],
+  ): ResourceGeneratedAccessModeValue {
+    return new ResourceGeneratedAccessModeValue(value);
+  }
+
+  isDisabled(): boolean {
+    return this.value === "disabled";
   }
 }
 

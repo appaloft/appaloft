@@ -21,6 +21,7 @@
   import type {
     ArchiveResourceInput,
     CertificateSummary,
+    ConfigureResourceAccessInput,
     ConfigureResourceHealthInput,
     ConfigureResourceNetworkInput,
     ConfigureResourceRuntimeInput,
@@ -100,6 +101,8 @@
   type NetworkExposureMode = NetworkProfileInput["exposureMode"];
   type RuntimeProfileInput = ConfigureResourceRuntimeInput["runtimeProfile"];
   type RuntimePlanStrategy = NonNullable<RuntimeProfileInput["strategy"]>;
+  type AccessProfileInput = ConfigureResourceAccessInput["accessProfile"];
+  type GeneratedAccessMode = AccessProfileInput["generatedAccessMode"];
   type SourceProfileInput = ConfigureResourceSourceInput["source"];
   type SourceKind = SourceProfileInput["kind"];
   type DomainRouteMode = "serve" | "redirect";
@@ -272,6 +275,11 @@
     title: string;
     detail: string;
   } | null>(null);
+  let accessFeedback = $state<{
+    kind: "success" | "error";
+    title: string;
+    detail: string;
+  } | null>(null);
   let runtimeFeedback = $state<{
     kind: "success" | "error";
     title: string;
@@ -307,6 +315,9 @@
   let networkUpstreamProtocol = $state<NetworkProtocol>("http");
   let networkExposureMode = $state<NetworkExposureMode>("reverse-proxy");
   let networkTargetServiceName = $state("");
+  let accessFormResourceId = $state("");
+  let accessGeneratedAccessMode = $state<GeneratedAccessMode>("inherit");
+  let accessPathPrefix = $state("/");
   let healthFormResourceId = $state("");
   let healthEnabled = $state(true);
   let healthMethod = $state<HealthCheckMethod>("GET");
@@ -477,6 +488,14 @@
           resource.services.some((service) => service.name === networkTargetServiceName.trim())),
     ),
   );
+  const canConfigureAccess = $derived(
+    Boolean(
+      resource &&
+        !isResourceArchived &&
+        accessGeneratedAccessMode &&
+        accessPathPrefix.trim().startsWith("/"),
+    ),
+  );
   const canConfigureHealth = $derived(
     Boolean(
       resource &&
@@ -643,6 +662,32 @@
       networkFeedback = {
         kind: "error",
         title: $t(i18nKeys.console.resources.networkProfileSaveFailed),
+        detail: readErrorMessage(error),
+      };
+    },
+  }));
+  const configureResourceAccessMutation = createMutation(() => ({
+    mutationFn: (input: ConfigureResourceAccessInput) =>
+      orpcClient.resources.configureAccess(input),
+    onSuccess: (result) => {
+      accessFeedback = {
+        kind: "success",
+        title: $t(i18nKeys.console.resources.accessProfileSaved),
+        detail: result.id,
+      };
+      void queryClient.invalidateQueries({ queryKey: ["resources"] });
+      void queryClient.invalidateQueries({ queryKey: ["resources", "show", resourceId] });
+      void queryClient.invalidateQueries({
+        queryKey: ["resources", "health", resourceId, "detail"],
+      });
+      if (resource) {
+        void loadProxyConfiguration(resource.id);
+      }
+    },
+    onError: (error) => {
+      accessFeedback = {
+        kind: "error",
+        title: $t(i18nKeys.console.resources.accessProfileSaveFailed),
         detail: readErrorMessage(error),
       };
     },
@@ -1207,6 +1252,22 @@
       return;
     }
 
+    if (accessFormResourceId === resource.id) {
+      return;
+    }
+
+    const profile = resource.accessProfile;
+    accessFormResourceId = resource.id;
+    accessGeneratedAccessMode = profile?.generatedAccessMode ?? "inherit";
+    accessPathPrefix = profile?.pathPrefix ?? "/";
+    accessFeedback = null;
+  });
+
+  $effect(() => {
+    if (!browser || !resource) {
+      return;
+    }
+
     if (configFormResourceId === resource.id) {
       return;
     }
@@ -1302,6 +1363,9 @@
     }
     if (detail.networkProfile) {
       summary.networkProfile = detail.networkProfile;
+    }
+    if (detail.accessProfile) {
+      summary.accessProfile = detail.accessProfile;
     }
     if (detail.accessSummary) {
       summary.accessSummary = detail.accessSummary;
@@ -1460,6 +1524,23 @@
         upstreamProtocol: networkUpstreamProtocol,
         exposureMode: networkExposureMode,
         ...(targetServiceName ? { targetServiceName } : {}),
+      },
+    });
+  }
+
+  function configureResourceAccess(event: SubmitEvent): void {
+    event.preventDefault();
+
+    if (!resource || !canConfigureAccess || configureResourceAccessMutation.isPending) {
+      return;
+    }
+
+    accessFeedback = null;
+    configureResourceAccessMutation.mutate({
+      resourceId: resource.id,
+      accessProfile: {
+        generatedAccessMode: accessGeneratedAccessMode,
+        pathPrefix: accessPathPrefix.trim() || "/",
       },
     });
   }
@@ -1764,6 +1845,15 @@
         return $t(i18nKeys.console.resources.networkExposureReverseProxy);
       case "direct-port":
         return $t(i18nKeys.console.resources.networkExposureDirectPort);
+    }
+  }
+
+  function generatedAccessModeLabel(mode: GeneratedAccessMode): string {
+    switch (mode) {
+      case "inherit":
+        return $t(i18nKeys.console.resources.accessGeneratedModeInherit);
+      case "disabled":
+        return $t(i18nKeys.console.resources.accessGeneratedModeDisabled);
     }
   }
 
@@ -2813,6 +2903,102 @@
                       disabled={!canConfigureNetwork || configureResourceNetworkMutation.isPending}
                     >
                       {configureResourceNetworkMutation.isPending
+                        ? $t(i18nKeys.common.actions.saving)
+                        : $t(i18nKeys.common.actions.save)}
+                    </Button>
+                  </div>
+                </form>
+
+                <form
+                  id="resource-access-profile-form"
+                  class="rounded-md border bg-background p-4"
+                  onsubmit={configureResourceAccess}
+                >
+                  <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div class="min-w-0">
+                      <div class="flex flex-wrap items-center gap-2">
+                        <h2 class="text-lg font-semibold">
+                          {$t(i18nKeys.console.resources.accessProfileTitle)}
+                        </h2>
+                        <DocsHelpLink
+                          href={webDocsHrefs.resourceAccessProfile}
+                          ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+                        />
+                        <Badge variant={resource.accessProfile ? "default" : "outline"}>
+                          {resource.accessProfile
+                            ? $t(i18nKeys.common.status.configured)
+                            : $t(i18nKeys.common.status.notConfigured)}
+                        </Badge>
+                      </div>
+                      <p class="mt-1 text-sm leading-6 text-muted-foreground">
+                        {$t(i18nKeys.console.resources.accessProfileFormDescription)}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div class="mt-4 grid gap-4 sm:grid-cols-2">
+                    <label class="space-y-1.5 text-sm font-medium">
+                      <span class="inline-flex items-center gap-1.5">
+                        {$t(i18nKeys.console.resources.accessGeneratedModeLabel)}
+                        <DocsHelpLink
+                          href={webDocsHrefs.resourceAccessProfile}
+                          ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+                          className="size-5"
+                        />
+                      </span>
+                      <Select.Root bind:value={accessGeneratedAccessMode} type="single">
+                        <Select.Trigger class="w-full">
+                          {generatedAccessModeLabel(accessGeneratedAccessMode)}
+                        </Select.Trigger>
+                        <Select.Content>
+                          <Select.Item value="inherit">
+                            {$t(i18nKeys.console.resources.accessGeneratedModeInherit)}
+                          </Select.Item>
+                          <Select.Item value="disabled">
+                            {$t(i18nKeys.console.resources.accessGeneratedModeDisabled)}
+                          </Select.Item>
+                        </Select.Content>
+                      </Select.Root>
+                    </label>
+
+                    <label class="space-y-1.5 text-sm font-medium" for="resource-access-path-prefix">
+                      <span class="inline-flex items-center gap-1.5">
+                        {$t(i18nKeys.console.resources.accessPathPrefix)}
+                        <DocsHelpLink
+                          href={webDocsHrefs.resourceAccessProfile}
+                          ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+                          className="size-5"
+                        />
+                      </span>
+                      <Input
+                        id="resource-access-path-prefix"
+                        bind:value={accessPathPrefix}
+                        autocomplete="off"
+                        placeholder="/"
+                      />
+                    </label>
+                  </div>
+
+                  {#if accessFeedback}
+                    <div
+                      class={[
+                        "mt-4 rounded-md border px-3 py-2 text-sm",
+                        accessFeedback.kind === "success"
+                          ? "border-primary/25 bg-primary/5"
+                          : "border-destructive/30 bg-destructive/5 text-destructive",
+                      ]}
+                    >
+                      <p class="font-medium">{accessFeedback.title}</p>
+                      <p class="mt-1 break-all text-xs">{accessFeedback.detail}</p>
+                    </div>
+                  {/if}
+
+                  <div class="mt-4 flex justify-end">
+                    <Button
+                      type="submit"
+                      disabled={!canConfigureAccess || configureResourceAccessMutation.isPending}
+                    >
+                      {configureResourceAccessMutation.isPending
                         ? $t(i18nKeys.common.actions.saving)
                         : $t(i18nKeys.common.actions.save)}
                     </Button>

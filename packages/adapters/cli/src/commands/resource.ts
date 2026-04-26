@@ -1,5 +1,6 @@
 import {
   ArchiveResourceCommand,
+  ConfigureResourceAccessCommand,
   ConfigureResourceHealthCommand,
   ConfigureResourceNetworkCommand,
   ConfigureResourceRuntimeCommand,
@@ -19,6 +20,7 @@ import {
 } from "@appaloft/application";
 import {
   resourceExposureModes,
+  resourceGeneratedAccessModes,
   resourceKinds,
   resourceNetworkProtocols,
   runtimePlanStrategies,
@@ -85,6 +87,10 @@ const exposureModeOption = Options.choice("exposure-mode", resourceExposureModes
 );
 const targetServiceOption = Options.text("target-service").pipe(Options.optional);
 const hostPortOption = Options.text("host-port").pipe(Options.optional);
+const generatedAccessOption = Options.choice("generated-access", resourceGeneratedAccessModes).pipe(
+  Options.withDefault("inherit"),
+);
+const accessPathPrefixOption = Options.text("path-prefix").pipe(Options.optional);
 const deploymentOption = Options.text("deployment").pipe(Options.optional);
 const directoryOption = Options.text("directory").pipe(Options.optional);
 const rowsOption = Options.text("rows").pipe(Options.withDefault("24"));
@@ -500,6 +506,30 @@ const configureNetworkCommand = EffectCommand.make(
   },
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.resourceConfigureNetwork));
 
+const configureAccessCommand = EffectCommand.make(
+  "configure-access",
+  {
+    resourceId: resourceIdArg,
+    generatedAccess: generatedAccessOption,
+    pathPrefix: accessPathPrefixOption,
+    json: jsonOption,
+  },
+  ({ generatedAccess, json, pathPrefix, resourceId }) => {
+    void json;
+    const pathPrefixValue = optionalValue(pathPrefix);
+
+    return runCommand(
+      ConfigureResourceAccessCommand.create({
+        resourceId,
+        accessProfile: {
+          generatedAccessMode: generatedAccess,
+          ...(pathPrefixValue ? { pathPrefix: pathPrefixValue } : {}),
+        },
+      }),
+    );
+  },
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.resourceConfigureAccess));
+
 const configureRuntimeCommand = EffectCommand.make(
   "configure-runtime",
   {
@@ -649,6 +679,7 @@ export const resourceCommand = EffectCommand.make("resource").pipe(
     configureRuntimeCommand,
     configureHealthCommand,
     configureNetworkCommand,
+    configureAccessCommand,
     proxyConfigCommand,
     diagnoseCommand,
   ]),

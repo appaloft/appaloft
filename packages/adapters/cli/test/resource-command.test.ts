@@ -155,6 +155,66 @@ describe("CLI resource commands", () => {
     });
   });
 
+  test("[RES-PROFILE-ENTRY-010] resource configure-access dispatches the application command", async () => {
+    ensureReflectMetadata();
+    const { ConfigureResourceAccessCommand, createExecutionContext } = await import(
+      "@appaloft/application"
+    );
+    const { createCliProgram } = await import("../src");
+    const commands: AppCommand<unknown>[] = [];
+    const commandBus = {
+      execute: async <T>(_context: unknown, command: AppCommand<T>) => {
+        commands.push(command as AppCommand<unknown>);
+        return ok({ id: "res_demo" } as T);
+      },
+    } as unknown as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: unknown, _query: AppQuery<T>) => ok({} as T),
+    } as unknown as QueryBus;
+    const executionContextFactory: ExecutionContextFactory = {
+      create: (input) =>
+        createExecutionContext({
+          ...input,
+          requestId: "req_cli_resource_access_test",
+        }),
+    };
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus,
+      queryBus,
+      executionContextFactory,
+    });
+
+    const writeStdout = process.stdout.write;
+    try {
+      process.stdout.write = (() => true) as typeof process.stdout.write;
+      await program.parseAsync([
+        "node",
+        "appaloft",
+        "resource",
+        "configure-access",
+        "res_demo",
+        "--generated-access",
+        "disabled",
+        "--path-prefix",
+        "/internal",
+      ]);
+    } finally {
+      process.stdout.write = writeStdout;
+    }
+
+    expect(commands).toHaveLength(1);
+    expect(commands[0]).toBeInstanceOf(ConfigureResourceAccessCommand);
+    expect(commands[0]).toMatchObject({
+      resourceId: "res_demo",
+      accessProfile: {
+        generatedAccessMode: "disabled",
+        pathPrefix: "/internal",
+      },
+    });
+  });
+
   test("[RES-PROFILE-ENTRY-003] resource set-variable dispatches the application command", async () => {
     ensureReflectMetadata();
     const { SetResourceVariableCommand, createExecutionContext } = await import(

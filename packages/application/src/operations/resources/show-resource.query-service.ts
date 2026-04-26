@@ -3,6 +3,7 @@ import {
   domainError,
   err,
   ok,
+  type ResourceAccessProfileState,
   ResourceByIdSpec,
   type ResourceHealthCheckPolicyState,
   ResourceId,
@@ -20,6 +21,7 @@ import {
   type DeploymentReadModel,
   type DeploymentSummary,
   type RequestedDeploymentHealthCheck,
+  type ResourceAccessProfile,
   type ResourceAccessSummary,
   type ResourceDetail,
   type ResourceDetailDeploymentContext,
@@ -180,6 +182,19 @@ function networkProfileFromState(
   };
 }
 
+function accessProfileFromState(
+  profile: ResourceAccessProfileState | undefined,
+): ResourceAccessProfile | undefined {
+  if (!profile) {
+    return undefined;
+  }
+
+  return {
+    generatedAccessMode: profile.generatedAccessMode.value,
+    pathPrefix: profile.pathPrefix.value,
+  };
+}
+
 function identityFromState(
   state: ResourceState,
   summary: ResourceSummary | undefined,
@@ -324,6 +339,7 @@ export class ShowResourceQueryService {
       const source = sourceProfileFromState(state.sourceBinding);
       const runtimeProfile = runtimeProfileFromState(state.runtimeProfile);
       const networkProfile = networkProfileFromState(state.networkProfile);
+      const accessProfile = accessProfileFromState(state.accessProfile);
       const healthPolicy = healthCheckFromState(state.runtimeProfile?.healthCheck);
       const accessSummary: ResourceAccessSummary | undefined = query.includeAccessSummary
         ? summary?.accessSummary
@@ -335,6 +351,7 @@ export class ShowResourceQueryService {
         ...(source ? { source } : {}),
         ...(runtimeProfile ? { runtimeProfile } : {}),
         ...(networkProfile ? { networkProfile } : {}),
+        ...(accessProfile ? { accessProfile } : {}),
         ...(healthPolicy ? { healthPolicy } : {}),
         ...(accessSummary ? { accessSummary } : {}),
         ...(deployment ? { latestDeployment: deploymentContextFromSummary(deployment) } : {}),

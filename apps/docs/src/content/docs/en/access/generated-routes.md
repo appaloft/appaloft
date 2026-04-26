@@ -13,6 +13,7 @@ relatedOperations:
   - default-access-domain-policies.configure
   - default-access-domain-policies.show
   - default-access-domain-policies.list
+  - resources.configure-access
   - domain-bindings.create
 sidebar:
   label: "Generated routes"
@@ -56,6 +57,18 @@ Common uses:
 - Confirm the first deployment is reachable.
 - Validate a resource before configuring a custom domain.
 - Troubleshoot whether a failure belongs to the app/proxy layer or the domain layer.
+
+<h2 id="resource-access-profile">Resource access profile</h2>
+
+A resource access profile controls whether one resource participates in generated default access.
+It does not bind a custom domain and it does not change the system or server default access policy.
+
+The profile has two generated access modes:
+
+- **Inherit**: use the system or server default access policy when future deployments need a generated URL.
+- **Disabled**: skip generated URL planning for this resource. Custom domain bindings and server-applied config routes still keep their own lifecycle.
+
+The optional path prefix changes the path Appaloft asks the generated access provider to route for future planned routes and deployment snapshots. Existing deployment snapshots are not rewritten after the profile changes.
 
 <h2 id="access-generated-route-inputs">Inputs it depends on</h2>
 

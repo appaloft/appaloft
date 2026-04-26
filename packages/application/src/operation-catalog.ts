@@ -32,6 +32,7 @@ import { listProjectsQueryInputSchema } from "./operations/projects/list-project
 import { renameProjectCommandInputSchema } from "./operations/projects/rename-project.command";
 import { showProjectQueryInputSchema } from "./operations/projects/show-project.query";
 import { archiveResourceCommandInputSchema } from "./operations/resources/archive-resource.command";
+import { configureResourceAccessCommandInputSchema } from "./operations/resources/configure-resource-access.command";
 import { configureResourceHealthCommandInputSchema } from "./operations/resources/configure-resource-health.command";
 import { configureResourceNetworkCommandInputSchema } from "./operations/resources/configure-resource-network.command";
 import { configureResourceRuntimeCommandInputSchema } from "./operations/resources/configure-resource-runtime.command";
@@ -539,6 +540,20 @@ export const operationCatalog = [
     transports: {
       cli: "appaloft resource configure-network <resourceId>",
       orpc: { method: "POST", path: "/api/resources/{resourceId}/network-profile" },
+    },
+  },
+  {
+    key: "resources.configure-access",
+    kind: "command",
+    domain: "resources",
+    messageName: "ConfigureResourceAccessCommand",
+    handlerName: "ConfigureResourceAccessCommandHandler",
+    serviceName: "ConfigureResourceAccessUseCase",
+    inputSchema: configureResourceAccessCommandInputSchema,
+    serviceToken: tokens.configureResourceAccessUseCase,
+    transports: {
+      cli: "appaloft resource configure-access <resourceId>",
+      orpc: { method: "POST", path: "/api/resources/{resourceId}/access-profile" },
     },
   },
   {

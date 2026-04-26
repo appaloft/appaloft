@@ -118,6 +118,7 @@ import {
   ProviderKey,
   PublicDomainName,
   ResourceExposureModeValue,
+  ResourceGeneratedAccessModeValue,
   ResourceId,
   ResourceKindValue,
   ResourceLifecycleStatusValue,
@@ -388,6 +389,11 @@ export interface SerializedResourceNetworkProfile extends Record<string, unknown
   exposureMode: ResourceExposureModeInput;
   targetServiceName?: string;
   hostPort?: number;
+}
+
+export interface SerializedResourceAccessProfile extends Record<string, unknown> {
+  generatedAccessMode: "inherit" | "disabled";
+  pathPrefix: string;
 }
 
 export interface SerializedDomainVerificationAttempt extends Record<string, unknown> {
@@ -1383,6 +1389,9 @@ export function rehydrateResourceRow(
   const networkProfile = row.network_profile
     ? (row.network_profile as unknown as SerializedResourceNetworkProfile)
     : undefined;
+  const accessProfile = row.access_profile
+    ? (row.access_profile as unknown as SerializedResourceAccessProfile)
+    : undefined;
 
   return {
     id: ResourceId.rehydrate(row.id),
@@ -1541,6 +1550,16 @@ export function rehydrateResourceRow(
             ...(networkProfile.hostPort
               ? { hostPort: PortNumber.rehydrate(networkProfile.hostPort) }
               : {}),
+          },
+        }
+      : {}),
+    ...(accessProfile
+      ? {
+          accessProfile: {
+            generatedAccessMode: ResourceGeneratedAccessModeValue.rehydrate(
+              accessProfile.generatedAccessMode,
+            ),
+            pathPrefix: RoutePathPrefix.rehydrate(accessProfile.pathPrefix),
           },
         }
       : {}),

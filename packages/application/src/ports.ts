@@ -1419,6 +1419,7 @@ export interface ResourceSummary {
     targetServiceName?: string;
     hostPort?: number;
   };
+  accessProfile?: ResourceAccessProfile;
   deploymentCount: number;
   lastDeploymentId?: string;
   lastDeploymentStatus?: DeploymentStatus;
@@ -1515,6 +1516,13 @@ export interface ResourceDetailNetworkProfile {
   hostPort?: number;
 }
 
+export type ResourceGeneratedAccessMode = "inherit" | "disabled";
+
+export interface ResourceAccessProfile {
+  generatedAccessMode: ResourceGeneratedAccessMode;
+  pathPrefix: string;
+}
+
 export type ResourceDetailHealthPolicy = RequestedDeploymentHealthCheck;
 export type ResourceDetailAccessSummary = ResourceAccessSummary;
 
@@ -1547,6 +1555,7 @@ export interface ResourceDetail {
   source?: ResourceDetailSourceProfile;
   runtimeProfile?: ResourceDetailRuntimeProfile;
   networkProfile?: ResourceDetailNetworkProfile;
+  accessProfile?: ResourceAccessProfile;
   healthPolicy?: ResourceDetailHealthPolicy;
   accessSummary?: ResourceDetailAccessSummary;
   latestDeployment?: ResourceDetailDeploymentContext;
@@ -2619,6 +2628,7 @@ export interface RequestedDeploymentAccessContext {
   exposureMode: ResourceExposureMode;
   upstreamProtocol: ResourceNetworkProtocol;
   routePurpose: "default-resource-access";
+  pathPrefix?: string;
 }
 
 export type DefaultAccessRoutePurpose = "default-resource-access" | "preview-access";

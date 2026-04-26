@@ -15,7 +15,7 @@
 
 `resources.show` is the source-of-truth query for one resource detail/profile surface.
 
-It is read-only. It must not create deployments, mutate source/runtime/network/health profile,
+It is read-only. It must not create deployments, mutate source/runtime/network/access/health profile,
 archive or delete a resource, open terminal sessions, bind domains, issue certificates, apply proxy
 routes, or perform runtime probes.
 
@@ -41,6 +41,7 @@ This query inherits:
 - [ADR-015: Resource Network Profile](../decisions/ADR-015-resource-network-profile.md)
 - [ADR-017: Default Access Domain And Proxy Routing](../decisions/ADR-017-default-access-domain-and-proxy-routing.md)
 - [resources.create Command Spec](../commands/resources.create.md)
+- [resources.configure-access Command Spec](../commands/resources.configure-access.md)
 - [resources.configure-health Command Spec](../commands/resources.configure-health.md)
 - [Resource Profile Lifecycle Workflow](../workflows/resource-profile-lifecycle.md)
 - [Resource Lifecycle Error Spec](../errors/resources.lifecycle.md)
@@ -78,6 +79,7 @@ type ResourceDetail = {
   source?: ResourceDetailSourceProfile;
   runtimeProfile?: ResourceDetailRuntimeProfile;
   networkProfile?: ResourceDetailNetworkProfile;
+  accessProfile?: ResourceDetailAccessProfile;
   healthPolicy?: ResourceDetailHealthPolicy;
   accessSummary?: ResourceDetailAccessSummary;
   latestDeployment?: ResourceDetailDeploymentContext;
@@ -99,6 +101,8 @@ Required behavior:
   command.
 - `networkProfile` shows `internalPort`, `upstreamProtocol`, `exposureMode`, optional
   `targetServiceName`, and explicit `hostPort` only when a direct-port profile is accepted.
+- `accessProfile` shows resource-owned generated access preferences, including
+  `generatedAccessMode` and normalized generated route `pathPrefix`.
 - `accessSummary` reports resource-owned access state from read models. It must not infer domain
   ownership from deployment snapshots.
 - `latestDeployment` is contextual history only. It must not override resource lifecycle or health.

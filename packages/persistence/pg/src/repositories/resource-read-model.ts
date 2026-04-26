@@ -18,6 +18,7 @@ import { type Database } from "../schema";
 import {
   normalizeTimestamp,
   resolveRepositoryExecutor,
+  type SerializedResourceAccessProfile,
   type SerializedResourceNetworkProfile,
   type SerializedResourceService,
   type SerializedRuntimePlan,
@@ -74,6 +75,9 @@ function toResourceSummary(
   const services = (row.services ?? []) as unknown as SerializedResourceService[];
   const networkProfile = row.network_profile
     ? (row.network_profile as unknown as SerializedResourceNetworkProfile)
+    : undefined;
+  const accessProfile = row.access_profile
+    ? (row.access_profile as unknown as SerializedResourceAccessProfile)
     : undefined;
   const deployments = deploymentRows.filter((deployment) => deployment.resource_id === row.id);
   const domainBindings = domainBindingRows.filter(
@@ -141,6 +145,14 @@ function toResourceSummary(
               ? { targetServiceName: networkProfile.targetServiceName }
               : {}),
             ...(networkProfile.hostPort ? { hostPort: networkProfile.hostPort } : {}),
+          },
+        }
+      : {}),
+    ...(accessProfile
+      ? {
+          accessProfile: {
+            generatedAccessMode: accessProfile.generatedAccessMode,
+            pathPrefix: accessProfile.pathPrefix,
           },
         }
       : {}),

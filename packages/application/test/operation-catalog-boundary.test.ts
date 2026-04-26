@@ -272,6 +272,25 @@ describe("operation catalog aggregate mutation boundary", () => {
     expect(entry?.inputSchema).toBeDefined();
   });
 
+  test("[RES-PROFILE-ENTRY-010] resource access profile configure is exposed through the active operation catalog", () => {
+    const entry = operationCatalog.find(
+      (candidate) => candidate.key === "resources.configure-access",
+    );
+
+    expect(entry).toMatchObject({
+      kind: "command",
+      domain: "resources",
+      messageName: "ConfigureResourceAccessCommand",
+      handlerName: "ConfigureResourceAccessCommandHandler",
+      serviceName: "ConfigureResourceAccessUseCase",
+      transports: {
+        cli: "appaloft resource configure-access <resourceId>",
+        orpc: { method: "POST", path: "/api/resources/{resourceId}/access-profile" },
+      },
+    });
+    expect(entry?.inputSchema).toBeDefined();
+  });
+
   test("[ENV-LIFE-ENTRY-006] environment lock and unlock are exposed through the active operation catalog", () => {
     const lockEntry = operationCatalog.find((candidate) => candidate.key === "environments.lock");
     const unlockEntry = operationCatalog.find(

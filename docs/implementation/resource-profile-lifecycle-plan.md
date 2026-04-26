@@ -12,6 +12,7 @@ specs.
 - `resources.configure-source`
 - `resources.configure-runtime`
 - `resources.configure-network`
+- `resources.configure-access`
 - `resources.archive`
 - `resources.delete`
 
@@ -26,6 +27,7 @@ profile mutation.
 - [resources.configure-source Command Spec](../commands/resources.configure-source.md)
 - [resources.configure-runtime Command Spec](../commands/resources.configure-runtime.md)
 - [resources.configure-network Command Spec](../commands/resources.configure-network.md)
+- [resources.configure-access Command Spec](../commands/resources.configure-access.md)
 - [resources.archive Command Spec](../commands/resources.archive.md)
 - [resources.delete Command Spec](../commands/resources.delete.md)
 - [Resource Lifecycle Error Spec](../errors/resources.lifecycle.md)
@@ -37,8 +39,8 @@ profile mutation.
 
 ## Code Round Ordering
 
-1. Add/confirm core value objects and aggregate methods for source, runtime, network, archived, and
-   delete/tombstone lifecycle transitions without adding framework or persistence dependencies to
+1. Add/confirm core value objects and aggregate methods for source, runtime, network, access,
+   archived, and delete/tombstone lifecycle transitions without adding framework or persistence dependencies to
    `packages/core`.
 2. Add repository specs and persistence support needed for `findOne`, profile mutation, archive,
    delete/tombstone, and deletion-blocker reads.
@@ -57,7 +59,7 @@ profile mutation.
 ## Expected Modules And Packages
 
 - `packages/core/src/workload-delivery`: `Resource` aggregate transitions, lifecycle value object,
-  source/runtime/network value objects, deletion guard value objects where they are pure domain
+  source/runtime/network/access value objects, deletion guard value objects where they are pure domain
   concepts.
 - `packages/application/src/operations/resources`: command/query schemas, messages, handlers, use
   cases, query services, and exports for all governed operations.
@@ -82,6 +84,9 @@ model stores health under runtime profile.
 
 `resources.configure-network` updates only network profile fields.
 
+`resources.configure-access` updates only resource access profile fields for generated default
+access eligibility and generated route path prefix.
+
 Initial implementation status: `resources.show` is active for application query handling,
 operation catalog, CLI, HTTP/oRPC, and the Web resource detail page. `resources.configure-source`
 is active for core aggregate mutation, application command handling, operation catalog, CLI,
@@ -90,7 +95,9 @@ for core aggregate mutation, application command handling, operation catalog, CL
 the Web resource detail runtime profile form. `resources.configure-network` is active for
 application command handling, operation catalog, CLI, HTTP/oRPC, and the Web resource detail profile
 form for reverse-proxy network profile changes. Direct-port exposure remains follow-up work
-governed by the same specs.
+governed by the same specs. `resources.configure-access` is active for core aggregate mutation,
+application command handling, operation catalog, CLI, HTTP/oRPC, Web resource detail access profile
+form, and generated access route planning/read-model behavior.
 
 `resources.archive` updates resource lifecycle status and optional safe reason.
 
@@ -204,7 +211,7 @@ Repository or event publication failures before safe command success must return
 The minimal Code Round deliverable is:
 
 - one query slice for `resources.show`;
-- command slices for source/runtime/network/archive/delete;
+- command slices for source/runtime/network/access/archive/delete;
 - event publication or outbox recording for each mutation command;
 - PostgreSQL/PGlite persistence updates and migrations where needed;
 - operation catalog and `CORE_OPERATIONS.md` implemented rows;
@@ -237,6 +244,7 @@ Direct-port user-facing configuration remains blocked until placement conflict g
 behavior, and tests are implemented in the same Code Round.
 
 `resources.configure-source`, `resources.configure-runtime`, `resources.configure-network`,
+`resources.configure-access`,
 `resources.configure-health`, `resources.archive`, `resources.delete`, and `deployments.create`
 archived-resource blocking is active through Resource lifecycle state. Duplicate configured-event
 consumer idempotency remains future read-model projection work.

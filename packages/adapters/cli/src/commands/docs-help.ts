@@ -19,6 +19,7 @@ export const cliDocsHrefs = {
   resourceRuntimeProfile: resolvePublicDocsHelpHref("resource.runtime-profile"),
   resourceHealthProfile: resolvePublicDocsHelpHref("resource.health-profile"),
   resourceNetworkProfile: resolvePublicDocsHelpHref("resource.network-profile"),
+  resourceAccessProfile: resolvePublicDocsHelpHref("resource.access-profile"),
   environmentConcept: resolvePublicDocsHelpHref("environment.concept"),
   environmentLifecycle: resolvePublicDocsHelpHref("environment.lifecycle"),
   environmentVariablePrecedence: resolvePublicDocsHelpHref("environment.variable-precedence"),
@@ -117,6 +118,10 @@ export const cliCommandDescriptions = {
   resourceConfigureNetwork: withDocs(
     "Configure resource network profile",
     "resource.network-profile",
+  ),
+  resourceConfigureAccess: withDocs(
+    "Configure resource generated access profile",
+    "resource.access-profile",
   ),
   resourceSetVariable: withDocs(
     "Set a resource-scoped variable override",

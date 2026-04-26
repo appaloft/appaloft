@@ -26,6 +26,7 @@ import {
   ProjectId,
   Resource,
   ResourceExposureModeValue,
+  ResourceGeneratedAccessModeValue,
   ResourceId,
   ResourceKindValue,
   type ResourceMutationSpec,
@@ -36,6 +37,7 @@ import {
   ResourceServiceName,
   ResourceSlug,
   type Result,
+  RoutePathPrefix,
   RuntimePlanStrategyValue,
   SourceBaseDirectory,
   SourceKindValue,
@@ -216,6 +218,10 @@ function detailedResource(): Resource {
       exposureMode: ResourceExposureModeValue.rehydrate("reverse-proxy"),
       targetServiceName: ResourceServiceName.rehydrate("web"),
     },
+    accessProfile: {
+      generatedAccessMode: ResourceGeneratedAccessModeValue.rehydrate("inherit"),
+      pathPrefix: RoutePathPrefix.rehydrate("/docs"),
+    },
     createdAt: CreatedAt.rehydrate("2026-01-01T00:00:00.000Z"),
   });
 }
@@ -274,6 +280,10 @@ function resourceSummary(overrides?: Partial<ResourceSummary>): ResourceSummary 
       upstreamProtocol: "http",
       exposureMode: "reverse-proxy",
       targetServiceName: "web",
+    },
+    accessProfile: {
+      generatedAccessMode: "inherit",
+      pathPrefix: "/docs",
     },
     deploymentCount: 1,
     lastDeploymentId: "dep_new",
@@ -411,6 +421,10 @@ describe("ShowResourceQueryService", () => {
       upstreamProtocol: "http",
       exposureMode: "reverse-proxy",
       targetServiceName: "web",
+    });
+    expect(detail.accessProfile).toEqual({
+      generatedAccessMode: "inherit",
+      pathPrefix: "/docs",
     });
     expect(detail.healthPolicy?.http?.path).toBe("/health");
     expect(detail.accessSummary?.latestGeneratedAccessRoute?.url).toContain("sslip.io");
