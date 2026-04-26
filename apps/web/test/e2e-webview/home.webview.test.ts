@@ -1735,6 +1735,59 @@ describe("console e2e with Bun.WebView", () => {
     });
   }, 15_000);
 
+  test("[DEF-ACCESS-ENTRY-008] resource detail selects server-applied access before generated access", async () => {
+    activeScenario = "dashboard";
+    resetRecordedApiRequests();
+
+    const previousShowRoute = apiResponses.dashboard["/api/rpc/resources/show"];
+    const showFixture = (previousShowRoute as { json: Record<string, unknown> }).json;
+
+    apiResponses.dashboard["/api/rpc/resources/show"] = {
+      json: {
+        ...showFixture,
+        accessSummary: {
+          latestGeneratedAccessRoute: {
+            url: "https://generated.example.test",
+            hostname: "generated.example.test",
+            scheme: "https",
+            deploymentId: "dep_generated",
+            deploymentStatus: "succeeded",
+            pathPrefix: "/",
+            proxyKind: "traefik",
+            targetPort: 3000,
+            updatedAt: "2026-01-01T00:01:00.000Z",
+          },
+          latestServerAppliedDomainRoute: {
+            url: "https://server-applied.example.test",
+            hostname: "server-applied.example.test",
+            scheme: "https",
+            deploymentId: "dep_server_applied",
+            deploymentStatus: "succeeded",
+            pathPrefix: "/",
+            proxyKind: "traefik",
+            targetPort: 3000,
+            updatedAt: "2026-01-01T00:02:00.000Z",
+          },
+          proxyRouteStatus: "ready",
+          lastRouteRealizationDeploymentId: "dep_server_applied",
+        },
+      },
+    };
+
+    try {
+      await using view = createWebView();
+      await view.navigate(`${previewUrl}/resources/res_demo`);
+
+      await expectText(view, "https://server-applied.example.test");
+      await expectAnyText(view, ["Server-applied domain access", "服务器应用域名访问"]);
+
+      const content = await pageText(view);
+      expect(content).not.toContain("https://generated.example.test");
+    } finally {
+      apiResponses.dashboard["/api/rpc/resources/show"] = previousShowRoute;
+    }
+  }, 15_000);
+
   test("[RES-PROFILE-ENTRY-002] submits resource network profile changes through Web", async () => {
     activeScenario = "dashboard";
     resetRecordedApiRequests();

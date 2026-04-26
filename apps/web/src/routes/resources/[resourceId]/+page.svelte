@@ -59,6 +59,11 @@
   import { webDocsHrefs } from "$lib/console/docs-help";
   import { createConsoleQueries } from "$lib/console/queries";
   import {
+    selectCurrentResourceAccessRoute,
+    type CurrentResourceAccessRoute,
+    type CurrentResourceAccessRouteKind,
+  } from "$lib/console/resource-access-route";
+  import {
     findEnvironment,
     findProject,
     findServer,
@@ -83,15 +88,8 @@
     };
   type ResourceDetailTab = "settings" | "deployments" | "logs" | "terminal";
   type ResourceAccessSummary = NonNullable<ResourceSummary["accessSummary"]>;
-  type ResourceAccessRoute =
-    | NonNullable<ResourceAccessSummary["latestGeneratedAccessRoute"]>
-    | NonNullable<ResourceAccessSummary["plannedGeneratedAccessRoute"]>
-    | NonNullable<ResourceAccessSummary["latestDurableDomainRoute"]>;
-  type ResourceAccessKind =
-    | "domain-binding"
-    | "durable-domain"
-    | "generated-latest"
-    | "generated-planned";
+  type ResourceAccessRoute = CurrentResourceAccessRoute["route"];
+  type ResourceAccessKind = "domain-binding" | CurrentResourceAccessRouteKind;
   type ResourceAccessStatus = NonNullable<ResourceAccessSummary["proxyRouteStatus"]>;
   type ResourceHealthViewStatus = ResourceHealthOverall | "loading";
   type HealthCheckHttpInput = NonNullable<ConfigureResourceHealthInput["healthCheck"]["http"]>;
@@ -228,18 +226,7 @@
 
     return resourceHealth?.overall ?? "unknown";
   });
-  const latestGeneratedAccessRoute = $derived(
-    resource?.accessSummary?.latestGeneratedAccessRoute ?? null,
-  );
-  const plannedGeneratedAccessRoute = $derived(
-    resource?.accessSummary?.plannedGeneratedAccessRoute ?? null,
-  );
-  const latestDurableAccessRoute = $derived(
-    resource?.accessSummary?.latestDurableDomainRoute ?? null,
-  );
-  const generatedAccessRoute = $derived(
-    latestGeneratedAccessRoute ?? plannedGeneratedAccessRoute ?? null,
-  );
+  const currentAccessRoute = $derived(selectCurrentResourceAccessRoute(resource?.accessSummary));
   const defaultDestinationId = $derived(
     resource?.destinationId ?? latestDeployment?.destinationId ?? "",
   );
@@ -382,35 +369,21 @@
       null,
   );
   const primaryAccessHref = $derived(
-    primaryDomainBinding
-      ? domainBindingHref(primaryDomainBinding)
-      : (latestDurableAccessRoute?.url ?? generatedAccessRoute?.url ?? ""),
+    primaryDomainBinding ? domainBindingHref(primaryDomainBinding) : (currentAccessRoute?.route.url ?? ""),
   );
   const primaryAccessKind = $derived.by((): ResourceAccessKind | null => {
     if (primaryDomainBinding) {
       return "domain-binding";
     }
 
-    if (latestDurableAccessRoute) {
-      return "durable-domain";
-    }
-
-    if (latestGeneratedAccessRoute) {
-      return "generated-latest";
-    }
-
-    if (plannedGeneratedAccessRoute) {
-      return "generated-planned";
-    }
-
-    return null;
+    return currentAccessRoute?.kind ?? null;
   });
   const primaryAccessRoute = $derived.by((): ResourceAccessRoute | null => {
     if (primaryDomainBinding) {
       return null;
     }
 
-    return latestDurableAccessRoute ?? generatedAccessRoute ?? null;
+    return currentAccessRoute?.route ?? null;
   });
   const shouldShowServerField = $derived(!latestDeployment?.serverId);
   const shouldShowDestinationField = $derived(!defaultDestinationId);
@@ -1930,6 +1903,8 @@
       case "domain-binding":
       case "durable-domain":
         return $t(i18nKeys.console.resources.durableDomainAccess);
+      case "server-applied-domain":
+        return $t(i18nKeys.console.resources.serverAppliedDomainAccess);
       case "generated-latest":
         return $t(i18nKeys.console.resources.generatedAccessRoute);
       case "generated-planned":

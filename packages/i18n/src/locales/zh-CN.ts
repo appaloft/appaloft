@@ -619,6 +619,7 @@ export const zhCN = {
       plannedAccessRoute: "计划生成访问",
       profileDescription: "稳定的项目、环境、类型和 Slug 身份信息。",
       profileTitle: "资源档案",
+      serverAppliedDomainAccess: "服务器应用域名访问",
       proxyConfigurationDescription: "由 provider 渲染的资源边缘代理路由配置。",
       proxyConfigurationEmpty: "这个资源还没有可查看的代理配置。",
       proxyConfigurationGeneratedAt: "生成时间",

@@ -660,6 +660,7 @@ export const enUS = {
       plannedAccessRoute: "Planned generated access",
       profileDescription: "Stable project, environment, kind, and slug identity.",
       profileTitle: "Resource profile",
+      serverAppliedDomainAccess: "Server-applied domain access",
       proxyConfigurationDescription:
         "Provider-rendered route configuration for the resource's edge proxy.",
       proxyConfigurationEmpty: "No proxy configuration is available for this resource yet.",

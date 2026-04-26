@@ -520,9 +520,11 @@ export const publicDocsHelpTopics = {
       "docs/decisions/ADR-017-default-access-domain-and-proxy-routing.md",
       "docs/workflows/default-access-domain-and-proxy-routing.md",
       "docs/testing/default-access-domain-and-proxy-routing-test-matrix.md",
+      "docs/specs/005-resource-access-route-precedence/spec.md",
     ],
     webSurfaces: [
       "apps/web/src/routes/resources/[resourceId]/+page.svelte: resource access area",
+      "apps/web/src/lib/components/console/QuickDeploySheet.svelte: completion feedback",
       "apps/web/src/routes/deployments/[deploymentId]/+page.svelte: deployment access URL area",
     ],
   },
