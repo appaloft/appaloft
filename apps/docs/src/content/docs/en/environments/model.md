@@ -11,6 +11,7 @@ searchAliases:
   - "production"
 relatedOperations:
   - environments.create
+  - environments.clone
   - environments.archive
 sidebar:
   label: "Model"
@@ -28,5 +29,7 @@ A resource can be deployed in different environments. Each deployment reads the 
 <h2 id="environment-lifecycle">Environment lifecycle</h2>
 
 Environments start as active. Archiving an environment keeps the environment, variables, resources, deployments, and history readable, but blocks new environment variable writes, promotion, resource creation, and deployment admission.
+
+Cloning an active environment creates a new active environment in the same project with a new name and a copy of the source environment variables. It does not copy resources, deployments, domains, certificates, or runtime state.
 
 Archive does not stop runtime, delete resources, clean up domains, or remove certificates. Use the explicit resource, deployment, domain, or certificate commands for those cleanup tasks.

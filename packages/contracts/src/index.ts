@@ -1445,6 +1445,18 @@ export const archiveEnvironmentResponseSchema = z.object({
   id: z.string(),
 });
 
+export const cloneEnvironmentInputSchema = z.object({
+  environmentId: z.string().min(1),
+  targetName: z.string().min(1),
+  targetKind: z
+    .enum(["local", "development", "test", "staging", "production", "preview", "custom"])
+    .optional(),
+});
+
+export const cloneEnvironmentResponseSchema = z.object({
+  id: z.string(),
+});
+
 export const setEnvironmentVariableInputSchema = z.object({
   key: z.string().min(1),
   value: z.string(),
@@ -2465,6 +2477,8 @@ export type CreateEnvironmentResponse = z.infer<typeof createEnvironmentResponse
 export type ListEnvironmentsResponse = z.infer<typeof listEnvironmentsResponseSchema>;
 export type ArchiveEnvironmentInput = z.infer<typeof archiveEnvironmentInputSchema>;
 export type ArchiveEnvironmentResponse = z.infer<typeof archiveEnvironmentResponseSchema>;
+export type CloneEnvironmentInput = z.infer<typeof cloneEnvironmentInputSchema>;
+export type CloneEnvironmentResponse = z.infer<typeof cloneEnvironmentResponseSchema>;
 export type ListResourcesResponse = z.infer<typeof listResourcesResponseSchema>;
 export type DomainBindingSummary = z.infer<typeof domainBindingSummarySchema>;
 export type CreateDomainBindingInput = z.infer<typeof createDomainBindingInputSchema>;

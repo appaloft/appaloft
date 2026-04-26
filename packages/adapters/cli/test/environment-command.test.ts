@@ -25,6 +25,64 @@ function ensureReflectMetadata(): void {
 }
 
 describe("CLI environment commands", () => {
+  test("[ENV-LIFE-CLONE-ENTRY-001] environment clone dispatches the application command", async () => {
+    ensureReflectMetadata();
+    const { CloneEnvironmentCommand, createExecutionContext } = await import(
+      "@appaloft/application"
+    );
+    const { createCliProgram } = await import("../src");
+    const commands: AppCommand<unknown>[] = [];
+    const commandBus = {
+      execute: async <T>(_context: unknown, command: AppCommand<T>) => {
+        commands.push(command as AppCommand<unknown>);
+        return ok({ id: "env_clone" } as T);
+      },
+    } as unknown as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: unknown, _query: AppQuery<T>) => ok({} as T),
+    } as unknown as QueryBus;
+    const executionContextFactory: ExecutionContextFactory = {
+      create: (input) =>
+        createExecutionContext({
+          ...input,
+          requestId: "req_cli_environment_clone_test",
+        }),
+    };
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus,
+      queryBus,
+      executionContextFactory,
+    });
+
+    const writeStdout = process.stdout.write;
+    try {
+      process.stdout.write = (() => true) as typeof process.stdout.write;
+      await program.parseAsync([
+        "node",
+        "appaloft",
+        "env",
+        "clone",
+        "env_production",
+        "--name",
+        "production-copy",
+        "--kind",
+        "staging",
+      ]);
+    } finally {
+      process.stdout.write = writeStdout;
+    }
+
+    expect(commands).toHaveLength(1);
+    expect(commands[0]).toBeInstanceOf(CloneEnvironmentCommand);
+    expect(commands[0]).toMatchObject({
+      environmentId: "env_production",
+      targetName: "production-copy",
+      targetKind: "staging",
+    });
+  });
+
   test("[ENV-LIFE-ENTRY-003] environment archive dispatches the application command", async () => {
     ensureReflectMetadata();
     const { ArchiveEnvironmentCommand, createExecutionContext } = await import(

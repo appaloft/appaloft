@@ -140,6 +140,7 @@ export const cliCommandDescriptions = {
   environmentList: withDocs("List environments", "environment.concept"),
   environmentShow: withDocs("Show an environment", "environment.concept"),
   environmentArchive: withDocs("Archive an environment", "environment.lifecycle"),
+  environmentClone: withDocs("Clone an environment", "environment.lifecycle"),
   environmentSet: withDocs("Set an environment variable", "environment.variable-precedence"),
   environmentUnset: withDocs("Unset an environment variable", "environment.variable-precedence"),
   environmentEffectivePrecedence: withDocs(

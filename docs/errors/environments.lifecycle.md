@@ -26,6 +26,7 @@ type EnvironmentLifecycleErrorDetails = {
   commandName?:
     | "environments.set-variable"
     | "environments.unset-variable"
+    | "environments.clone"
     | "environments.promote"
     | "environments.archive"
     | "resources.create"
@@ -88,9 +89,11 @@ or plaintext environment values.
 
 | Error code | Category | Phase | Retriable | Meaning |
 | --- | --- | --- | --- | --- |
-| `validation_error` | `validation` | `command-validation` | No | Command input shape, variable identity, or archive reason is invalid. |
+| `validation_error` | `validation` | `command-validation` | No | Command input shape, clone target identity, variable identity, or archive reason is invalid. |
 | `not_found` | `not-found` | `context-resolution` | No | Environment cannot be found or is not visible. |
 | `environment_archived` | `conflict` | `environment-lifecycle-guard` | No | Mutation, resource creation, or deployment admission targeted an archived environment. |
+| `project_archived` | `conflict` | `project-lifecycle-guard` | No | Environment clone targeted a source environment whose project is archived. |
+| `conflict` | `conflict` | `environment-admission` | No | Environment clone target name already exists in the source project. |
 | `invariant_violation` | `domain` | `environment-lifecycle-guard` | No | Environment aggregate lifecycle transition rejected the requested change. |
 | `validation_error` | `validation` | `config-identity`, `config-secret-validation`, `config-profile-resolution` | No | Environment variable shape, exposure, scope, or secret policy is invalid. |
 | `not_found` | `not-found` | `config-read` | No | Requested environment variable identity cannot be found for removal. |
@@ -131,8 +134,8 @@ Tests must assert:
 
 ## Current Implementation Notes And Migration Gaps
 
-No migration gaps are recorded for this archive slice.
+No migration gaps are recorded for this environment lifecycle slice.
 
 ## Open Questions
 
-- None for archive.
+- None.
