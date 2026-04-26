@@ -239,6 +239,8 @@ A future `ProxyInstallation`, `ProxyRoute`, or `ResourceAccessProfile` aggregate
 - [deployments.create Command Spec](../commands/deployments.create.md)
 - [resources.create Command Spec](../commands/resources.create.md)
 - [default-access-domain-policies.configure Command Spec](../commands/default-access-domain-policies.configure.md)
+- [default-access-domain-policies.show Query Spec](../queries/default-access-domain-policies.show.md)
+- [default-access-domain-policies.list Query Spec](../queries/default-access-domain-policies.list.md)
 - [deployments.create Workflow Spec](../workflows/deployments.create.md)
 - [Server Bootstrap And Proxy Workflow Spec](../workflows/server-bootstrap-and-proxy.md)
 - [Routing Domain And TLS Workflow Spec](../workflows/routing-domain-and-tls.md)
@@ -306,7 +308,7 @@ No read-only full proxy configuration view exists yet beyond generated access UR
 
 Current server bootstrap starts proxy bootstrap from the registration event path rather than the canonical `server-connected -> proxy-bootstrap-requested` chain.
 
-The future `default-access-domain-policies.configure` command is not implemented. Static shell configuration remains the temporary provider-selection seam.
+`default-access-domain-policies.configure` is active for durable system and deployment-target policy writes. `default-access-domain-policies.show` and `default-access-domain-policies.list` provide durable readback for operators. Static shell configuration remains a fallback only when no durable policy record exists; readback queries must not fabricate fallback config as persisted policy state.
 
 Durable domain binding precedence over generated routes has not yet been wired into the default access route resolver.
 

@@ -556,6 +556,53 @@ const apiResponses: Record<ApiScenario, Record<string, ApiRoute>> = {
         },
       };
     },
+    "/api/rpc/defaultAccessDomainPolicies/show": (_request: Request, body: unknown) => {
+      const input = readOrpcJsonPayload(body) as {
+        scopeKind?: "system" | "deployment-target";
+        serverId?: string;
+      } | null;
+
+      if (input?.scopeKind === "deployment-target") {
+        return {
+          json: {
+            schemaVersion: "default-access-domain-policies.show/v1",
+            scope: { kind: "deployment-target", serverId: input.serverId ?? "srv_demo" },
+            policy: {
+              schemaVersion: "default-access-domain-policies.policy/v1",
+              id: "dap_server",
+              scope: { kind: "deployment-target", serverId: input.serverId ?? "srv_demo" },
+              mode: "custom-template",
+              providerKey: "internal-dns",
+              templateRef: "apps/{{resourceSlug}}",
+              updatedAt: "2026-01-01T00:00:11.000Z",
+            },
+          },
+        };
+      }
+
+      return {
+        json: {
+          schemaVersion: "default-access-domain-policies.show/v1",
+          scope: { kind: "system" },
+          policy: {
+            schemaVersion: "default-access-domain-policies.policy/v1",
+            id: "dap_system",
+            scope: { kind: "system" },
+            mode: "provider",
+            providerKey: "sslip",
+            updatedAt: "2026-01-01T00:00:10.000Z",
+          },
+        },
+      };
+    },
+    "/api/rpc/defaultAccessDomainPolicies/configure": (_request: Request, body: unknown) => {
+      const input = readOrpcJsonPayload(body) as { scope?: { serverId?: string } } | null;
+      return {
+        json: {
+          id: input?.scope?.serverId ? "dap_server" : "dap_system",
+        },
+      };
+    },
     "/api/rpc/environments/list": {
       json: {
         items: [
@@ -1579,6 +1626,24 @@ async function setInputValue(view: Bun.WebView, selector: string, value: string)
   expect(found).toBe(true);
 }
 
+async function expectInputValue(view: Bun.WebView, selector: string, value: string): Promise<void> {
+  await waitFor(
+    () =>
+      view.evaluate<string | null>(
+        `(() => {
+          const input = document.querySelector(${JSON.stringify(selector)});
+          if (!(input instanceof HTMLInputElement || input instanceof HTMLTextAreaElement)) {
+            return null;
+          }
+
+          return input.value;
+        })()`,
+      ),
+    (current) => current === value,
+    `Expected input ${selector} to equal ${value}`,
+  );
+}
+
 async function clickFormSubmit(view: Bun.WebView, selector: string): Promise<void> {
   const found = await waitFor(
     () =>
@@ -1808,6 +1873,25 @@ describe("console e2e with Bun.WebView", () => {
     await expectText(view, "Application is ready for dep_demo");
   }, 15_000);
 
+  test("[DEF-ACCESS-ENTRY-007] server list reads persisted system default access policy", async () => {
+    activeScenario = "dashboard";
+    resetRecordedApiRequests();
+
+    await using view = createWebView();
+    await view.navigate(`${previewUrl}/servers`);
+
+    await expectAnyText(view, ["System default access policy", "系统默认访问策略"]);
+    await expectInputValue(view, "#servers-default-access-provider-key-input", "sslip");
+
+    const readbackRequest = await waitForRecordedRequest(
+      "/api/rpc/defaultAccessDomainPolicies/show",
+    );
+    expect(readbackRequest.method).toBe("POST");
+    expect(readOrpcJsonPayload(readbackRequest.body)).toEqual({
+      scopeKind: "system",
+    });
+  }, 15_000);
+
   test("[SRV-LIFE-ENTRY-004] loads server detail through servers.show", async () => {
     activeScenario = "dashboard";
     resetRecordedApiRequests();
@@ -1828,6 +1912,51 @@ describe("console e2e with Bun.WebView", () => {
     expect(
       recordedApiRequests.some((request) => request.pathname === "/api/rpc/servers/list"),
     ).toBe(false);
+  }, 15_000);
+
+  test("[DEF-ACCESS-ENTRY-007] server detail reads and refreshes deployment-target default access override", async () => {
+    activeScenario = "dashboard";
+    resetRecordedApiRequests();
+
+    await using view = createWebView();
+    await view.navigate(`${previewUrl}/servers/srv_demo`);
+
+    await expectInputValue(view, "#server-default-access-provider-key-input", "internal-dns");
+    await expectInputValue(
+      view,
+      "#server-default-access-template-ref-input",
+      "apps/{{resourceSlug}}",
+    );
+
+    const readbackRequest = await waitForRecordedRequest(
+      "/api/rpc/defaultAccessDomainPolicies/show",
+    );
+    expect(readbackRequest.method).toBe("POST");
+    expect(readOrpcJsonPayload(readbackRequest.body)).toEqual({
+      scopeKind: "deployment-target",
+      serverId: "srv_demo",
+    });
+
+    await clickFormSubmit(view, "#server-default-access-override-form");
+
+    const configureRequest = await waitForRecordedRequest(
+      "/api/rpc/defaultAccessDomainPolicies/configure",
+    );
+    expect(configureRequest.method).toBe("POST");
+    expect(readOrpcJsonPayload(configureRequest.body)).toEqual({
+      scope: { kind: "deployment-target", serverId: "srv_demo" },
+      mode: "custom-template",
+      providerKey: "internal-dns",
+      templateRef: "apps/{{resourceSlug}}",
+    });
+    await waitFor(
+      async () =>
+        recordedApiRequests.filter(
+          (request) => request.pathname === "/api/rpc/defaultAccessDomainPolicies/show",
+        ).length,
+      (count) => count >= 2,
+      "Expected default access policy readback to refresh after save",
+    );
   }, 15_000);
 
   test("[SSH-CRED-ENTRY-004] server detail reads credential usage and separates zero usage from unavailable usage", async () => {

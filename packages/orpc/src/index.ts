@@ -65,6 +65,7 @@ import {
   importCertificateCommandInputSchema,
   issueOrRenewCertificateCommandInputSchema,
   ListCertificatesQuery,
+  ListDefaultAccessDomainPoliciesQuery,
   ListDeploymentsQuery,
   ListDomainBindingsQuery,
   ListEnvironmentsQuery,
@@ -76,6 +77,7 @@ import {
   ListServersQuery,
   ListSshCredentialsQuery,
   listCertificatesQueryInputSchema,
+  listDefaultAccessDomainPoliciesQueryInputSchema,
   listDeploymentsQueryInputSchema,
   listDomainBindingsQueryInputSchema,
   listEnvironmentsQueryInputSchema,
@@ -111,6 +113,7 @@ import {
   rotateSshCredentialCommandInputSchema,
   SetEnvironmentVariableCommand,
   SetResourceVariableCommand,
+  ShowDefaultAccessDomainPolicyQuery,
   ShowDeploymentQuery,
   ShowEnvironmentQuery,
   ShowProjectQuery,
@@ -122,6 +125,7 @@ import {
   type StreamDeploymentEventsResult,
   setEnvironmentVariableCommandInputSchema,
   setResourceVariableCommandInputSchema,
+  showDefaultAccessDomainPolicyQueryInputSchema,
   showDeploymentQueryInputSchema,
   showEnvironmentQueryInputSchema,
   showProjectQueryInputSchema,
@@ -171,6 +175,7 @@ import {
   importCertificateResponseSchema,
   issueOrRenewCertificateResponseSchema,
   listCertificatesResponseSchema,
+  listDefaultAccessDomainPoliciesResponseSchema,
   listDeploymentsResponseSchema,
   listDomainBindingsResponseSchema,
   listEnvironmentsResponseSchema,
@@ -195,6 +200,7 @@ import {
   resourceRuntimeLogsStreamResponseSchema,
   rotateSshCredentialResponseSchema,
   setResourceVariableResponseSchema,
+  showDefaultAccessDomainPolicyResponseSchema,
   showDeploymentResponseSchema,
   showProjectResponseSchema,
   showServerResponseSchema,
@@ -257,6 +263,7 @@ export const apiDocsHrefs = {
   environmentDiffPromote: resolvePublicDocsHelpHref("environment.diff-promote"),
   environmentLifecycle: resolvePublicDocsHelpHref("environment.lifecycle"),
   defaultAccessRoute: resolvePublicDocsHelpHref("domain.generated-access-route"),
+  defaultAccessPolicy: resolvePublicDocsHelpHref("default-access.policy"),
   resourceSourceProfile: resolvePublicDocsHelpHref("resource.source-profile"),
   resourceRuntimeProfile: resolvePublicDocsHelpHref("resource.runtime-profile"),
   resourceHealthProfile: resolvePublicDocsHelpHref("resource.health-profile"),
@@ -331,7 +338,15 @@ export const apiRouteDescriptions = {
   ),
   configureDefaultAccessDomainPolicy: routeDescription(
     "Configures generated access routes for deployed resources.",
-    "domain.generated-access-route",
+    "default-access.policy",
+  ),
+  listDefaultAccessDomainPolicies: routeDescription(
+    "Lists persisted default access policy records.",
+    "default-access.policy",
+  ),
+  showDefaultAccessDomainPolicy: routeDescription(
+    "Reads one persisted default access policy scope.",
+    "default-access.policy",
   ),
   configureResourceSource: routeDescription(
     "Configures the source profile used by later deployment detect and plan stages.",
@@ -1212,6 +1227,32 @@ export const configureDefaultAccessDomainPolicyProcedure = base
     executeCommand(context, ConfigureDefaultAccessDomainPolicyCommand.create(input)),
   );
 
+export const listDefaultAccessDomainPoliciesProcedure = base
+  .route({
+    method: "GET",
+    path: "/default-access-domain-policies",
+    description: apiRouteDescriptions.listDefaultAccessDomainPolicies,
+    successStatus: 200,
+  })
+  .input(listDefaultAccessDomainPoliciesQueryInputSchema)
+  .output(listDefaultAccessDomainPoliciesResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ListDefaultAccessDomainPoliciesQuery.create(input)),
+  );
+
+export const showDefaultAccessDomainPolicyProcedure = base
+  .route({
+    method: "GET",
+    path: "/default-access-domain-policies/show",
+    description: apiRouteDescriptions.showDefaultAccessDomainPolicy,
+    successStatus: 200,
+  })
+  .input(showDefaultAccessDomainPolicyQueryInputSchema)
+  .output(showDefaultAccessDomainPolicyResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ShowDefaultAccessDomainPolicyQuery.create(input)),
+  );
+
 export const listResourcesProcedure = base
   .route({
     method: "GET",
@@ -1787,6 +1828,8 @@ export const appaloftOrpcRouter = {
   },
   defaultAccessDomainPolicies: {
     configure: configureDefaultAccessDomainPolicyProcedure,
+    list: listDefaultAccessDomainPoliciesProcedure,
+    show: showDefaultAccessDomainPolicyProcedure,
   },
   resources: {
     list: listResourcesProcedure,
@@ -1968,6 +2011,7 @@ export function mountAppaloftOrpcRoutes(
     "/api/servers/:serverId/edge-proxy/bootstrap",
     "/api/environments",
     "/api/default-access-domain-policies",
+    "/api/default-access-domain-policies/show",
     "/api/environments/:environmentId",
     "/api/environments/:environmentId/archive",
     "/api/environments/:environmentId/variables",

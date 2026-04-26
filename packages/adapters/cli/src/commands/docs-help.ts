@@ -156,6 +156,11 @@ export const cliCommandDescriptions = {
     "Configure default access domain policy",
     "domain.generated-access-route",
   ),
+  defaultAccessList: withDocs(
+    "List default access domain policies",
+    "domain.generated-access-route",
+  ),
+  defaultAccessShow: withDocs("Show default access domain policy", "domain.generated-access-route"),
   domainBinding: withDocs("Domain binding operations", "domain.custom-domain-binding"),
   domainBindingCreate: withDocs("Create a durable domain binding", "domain.custom-domain-binding"),
   domainBindingConfirmOwnership: withDocs(

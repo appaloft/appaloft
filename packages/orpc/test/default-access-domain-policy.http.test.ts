@@ -9,8 +9,10 @@ import {
   createExecutionContext,
   type ExecutionContext,
   type ExecutionContextFactory,
+  ListDefaultAccessDomainPoliciesQuery,
   type Query,
   type QueryBus,
+  ShowDefaultAccessDomainPolicyQuery,
 } from "@appaloft/application";
 import { ok, type Result } from "@appaloft/core";
 import { Elysia } from "elysia";
@@ -76,5 +78,116 @@ describe("default access domain policy HTTP route", () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ id: "dap_demo" });
     expect(capturedCommand).toBeInstanceOf(ConfigureDefaultAccessDomainPolicyCommand);
+  });
+
+  test("[DEF-ACCESS-ENTRY-007] dispatches ListDefaultAccessDomainPoliciesQuery through HTTP", async () => {
+    let capturedQuery: Query<unknown> | undefined;
+    const commandBus = {
+      execute: async <T>(_context: ExecutionContext, _command: Command<T>): Promise<Result<T>> =>
+        ok({} as T),
+    } as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: ExecutionContext, query: Query<T>): Promise<Result<T>> => {
+        capturedQuery = query as Query<unknown>;
+        return ok({
+          schemaVersion: "default-access-domain-policies.list/v1",
+          items: [
+            {
+              schemaVersion: "default-access-domain-policies.policy/v1",
+              id: "dap_system",
+              scope: { kind: "system" },
+              mode: "provider",
+              providerKey: "sslip",
+              updatedAt: "2026-01-01T00:00:10.000Z",
+            },
+          ],
+        } as T);
+      },
+    } as QueryBus;
+    const app = mountAppaloftOrpcRoutes(new Elysia(), {
+      commandBus,
+      executionContextFactory: new TestExecutionContextFactory(),
+      logger: new NoopLogger(),
+      queryBus,
+    });
+
+    const response = await app.handle(
+      new Request("http://localhost/api/default-access-domain-policies", {
+        method: "GET",
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      schemaVersion: "default-access-domain-policies.list/v1",
+      items: [
+        {
+          schemaVersion: "default-access-domain-policies.policy/v1",
+          id: "dap_system",
+          scope: { kind: "system" },
+          mode: "provider",
+          providerKey: "sslip",
+          updatedAt: "2026-01-01T00:00:10.000Z",
+        },
+      ],
+    });
+    expect(capturedQuery).toBeInstanceOf(ListDefaultAccessDomainPoliciesQuery);
+  });
+
+  test("[DEF-ACCESS-ENTRY-007] dispatches ShowDefaultAccessDomainPolicyQuery through HTTP", async () => {
+    let capturedQuery: Query<unknown> | undefined;
+    const commandBus = {
+      execute: async <T>(_context: ExecutionContext, _command: Command<T>): Promise<Result<T>> =>
+        ok({} as T),
+    } as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: ExecutionContext, query: Query<T>): Promise<Result<T>> => {
+        capturedQuery = query as Query<unknown>;
+        return ok({
+          schemaVersion: "default-access-domain-policies.show/v1",
+          scope: { kind: "deployment-target", serverId: "srv_demo" },
+          policy: {
+            schemaVersion: "default-access-domain-policies.policy/v1",
+            id: "dap_server",
+            scope: { kind: "deployment-target", serverId: "srv_demo" },
+            mode: "disabled",
+            updatedAt: "2026-01-01T00:00:11.000Z",
+          },
+        } as T);
+      },
+    } as QueryBus;
+    const app = mountAppaloftOrpcRoutes(new Elysia(), {
+      commandBus,
+      executionContextFactory: new TestExecutionContextFactory(),
+      logger: new NoopLogger(),
+      queryBus,
+    });
+
+    const response = await app.handle(
+      new Request(
+        "http://localhost/api/default-access-domain-policies/show?scopeKind=deployment-target&serverId=srv_demo",
+        {
+          method: "GET",
+        },
+      ),
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      schemaVersion: "default-access-domain-policies.show/v1",
+      scope: { kind: "deployment-target", serverId: "srv_demo" },
+      policy: {
+        schemaVersion: "default-access-domain-policies.policy/v1",
+        id: "dap_server",
+        scope: { kind: "deployment-target", serverId: "srv_demo" },
+        mode: "disabled",
+        updatedAt: "2026-01-01T00:00:11.000Z",
+      },
+    });
+    expect(capturedQuery).toBeInstanceOf(ShowDefaultAccessDomainPolicyQuery);
+    expect(capturedQuery).toMatchObject({
+      scopeKind: "deployment-target",
+      serverId: "srv_demo",
+    });
   });
 });

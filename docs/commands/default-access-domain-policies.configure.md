@@ -118,7 +118,9 @@ packages/providers/default-access-domain-*
 
 ## Current Implementation Notes And Migration Gaps
 
-CLI, API/oRPC, and Web now dispatch `default-access-domain-policies.configure`.
+CLI, API/oRPC, and Web now dispatch `default-access-domain-policies.configure`. Readback uses
+`default-access-domain-policies.show` and `default-access-domain-policies.list`; configure does not
+return the full policy body because the read/query surface owns operator visibility.
 
 Shell/static configuration remains the fallback seam only when no durable system or deployment-target
 policy record exists.

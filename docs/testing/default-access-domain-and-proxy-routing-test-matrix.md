@@ -100,6 +100,10 @@ Then:
 | DEF-ACCESS-POLICY-005 | integration | Unsupported provider | Provider mode references an unregistered/unavailable provider key or unsupported custom-template mode | Command rejects | `default_access_provider_unavailable` | No route side effect | Client receives provider-resolution failure with no hidden fallback write | Conditional |
 | DEF-ACCESS-POLICY-006 | integration | Missing deployment target | Deployment-target scope references a server that does not exist | Command rejects | `not_found` | No route side effect | No policy row is created | No |
 | DEF-ACCESS-POLICY-007 | integration | Durable persistence round-trip | System and deployment-target policy rows are stored in PG/PGlite and read back after migration | Store round-trip succeeds | None | Resolver/runtime can consume durable policy after restart | CLI/API/Web writes survive restart through the selected state backend | Query retry only |
+| DEF-ACCESS-POLICY-008 | integration | Show system policy | Persisted system policy exists | Query succeeds | None | No route state mutation | CLI/API/Web read back provider-neutral policy fields | Query retry only |
+| DEF-ACCESS-POLICY-009 | integration | Show deployment-target override | Persisted override exists for an existing server | Query succeeds after server scope resolution | None | No route state mutation | Server detail can prefill override fields from durable state | Query retry only |
+| DEF-ACCESS-POLICY-010 | integration | Missing durable policy readback | Requested scope has no persisted policy | Query succeeds with `policy = null` | None | Static fallback is not fabricated as durable state | Entrypoints keep explicit defaults or inherited labels without claiming a saved policy | Query retry only |
+| DEF-ACCESS-POLICY-011 | integration | List persisted policies | System and deployment-target policy rows exist | Query succeeds with all persisted rows | None | No route state mutation | CLI/API can inspect durable system and server overrides together | Query retry only |
 
 ## Pre-Deployment Read Model Matrix
 
@@ -160,6 +164,7 @@ Then:
 | DEF-ACCESS-ENTRY-004 | e2e-preferred | API | Returns/queries provider-neutral route metadata; strict deployment create input remains ids-only; proxy configuration preview is a read-only query. |
 | DEF-ACCESS-ENTRY-005 | e2e-preferred | Domain binding UI | Keeps custom domain creation separate from generated default access. |
 | DEF-ACCESS-ENTRY-006 | e2e-preferred | Policy configuration | Web/CLI/API policy editing dispatches `default-access-domain-policies.configure`; static config is only fallback state, not a hidden public business operation. |
+| DEF-ACCESS-ENTRY-007 | e2e-preferred | Policy readback | Web/CLI/API policy readback dispatches `default-access-domain-policies.show` or `default-access-domain-policies.list`; Web policy forms prefill from persisted policy state and refetch readback after save. |
 
 ## Current Implementation Notes And Migration Gaps
 
@@ -192,7 +197,8 @@ resource-detail test.
 `resources.proxy-configuration.preview` is active and renders provider-owned read-only
 configuration sections through the edge proxy provider boundary. Application/provider tests cover
 the query-service path, provider-rendered sections, generated-access provider-key guard, and the
-default-access policy command path; broader API/Web/CLI regression coverage remains follow-up.
+default-access policy command and readback paths; broader API/Web/CLI regression coverage for
+route precedence remains follow-up.
 
 ## Open Questions
 

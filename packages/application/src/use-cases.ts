@@ -5,6 +5,8 @@ export * from "./operations/certificates/issue-certificate-on-certificate-reques
 export * from "./operations/certificates/issue-or-renew-certificate.use-case";
 export * from "./operations/certificates/list-certificates.query-service";
 export * from "./operations/default-access-domain-policies/configure-default-access-domain-policy.use-case";
+export * from "./operations/default-access-domain-policies/list-default-access-domain-policies.query-service";
+export * from "./operations/default-access-domain-policies/show-default-access-domain-policy.query-service";
 export * from "./operations/deployments/cleanup-preview.use-case";
 export * from "./operations/deployments/create-deployment.use-case";
 export * from "./operations/deployments/default-access-domain-runtime-plan.resolver";

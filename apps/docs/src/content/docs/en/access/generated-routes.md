@@ -11,6 +11,8 @@ searchAliases:
   - "generated domain"
 relatedOperations:
   - default-access-domain-policies.configure
+  - default-access-domain-policies.show
+  - default-access-domain-policies.list
   - domain-bindings.create
 sidebar:
   label: "Generated routes"
@@ -34,6 +36,12 @@ The Web console shows this policy on server pages. The common fields mean:
 - **Default access mode**: whether generated access is enabled. `provider` uses a registered default-access-domain provider; `disabled` skips generation; `custom-template` uses a configured template.
 - **Provider key**: which default-access-domain provider to use. In local or self-hosted setups, `sslip` is the common provider key and generates hostnames from the server public address.
 - **Server default access override**: one server can override the system default; servers without an override use the system default policy.
+
+Web reads saved policy state when the system policy or server override form opens. CLI users can
+run `appaloft default-access show --scope system`, `appaloft default-access show --scope deployment-target --server <serverId>`,
+or `appaloft default-access list` to inspect persisted policies. When no saved record exists,
+readback returns an empty policy; that does not mean default access is disabled, because runtime
+route resolution may still use the installation's static fallback configuration.
 
 Policy changes affect future generated access resolution. They do not rewrite URLs already persisted in deployment snapshots. If you want to use your own hostname, configure a custom domain binding instead of changing the default access policy.
 

@@ -53,6 +53,12 @@ export const tokens = {
   configureDefaultAccessDomainPolicyUseCase: Symbol.for(
     "appaloft.configure_default_access_domain_policy_use_case",
   ),
+  listDefaultAccessDomainPoliciesQueryService: Symbol.for(
+    "appaloft.list_default_access_domain_policies_query_service",
+  ),
+  showDefaultAccessDomainPolicyQueryService: Symbol.for(
+    "appaloft.show_default_access_domain_policy_query_service",
+  ),
   registerServerUseCase: Symbol.for("appaloft.register_server_use_case"),
   configureServerCredentialUseCase: Symbol.for("appaloft.configure_server_credential_use_case"),
   createSshCredentialUseCase: Symbol.for("appaloft.create_ssh_credential_use_case"),

@@ -132,6 +132,40 @@ describe("operation catalog aggregate mutation boundary", () => {
     expect(entry?.inputSchema).toBeDefined();
   });
 
+  test("[DEF-ACCESS-ENTRY-007] default access policy readback is exposed through the active operation catalog", () => {
+    const listEntry = operationCatalog.find(
+      (candidate) => candidate.key === "default-access-domain-policies.list",
+    );
+    const showEntry = operationCatalog.find(
+      (candidate) => candidate.key === "default-access-domain-policies.show",
+    );
+
+    expect(listEntry).toMatchObject({
+      kind: "query",
+      domain: "default-access-domain-policies",
+      messageName: "ListDefaultAccessDomainPoliciesQuery",
+      handlerName: "ListDefaultAccessDomainPoliciesQueryHandler",
+      serviceName: "ListDefaultAccessDomainPoliciesQueryService",
+      transports: {
+        cli: "appaloft default-access list",
+        orpc: { method: "GET", path: "/api/default-access-domain-policies" },
+      },
+    });
+    expect(showEntry).toMatchObject({
+      kind: "query",
+      domain: "default-access-domain-policies",
+      messageName: "ShowDefaultAccessDomainPolicyQuery",
+      handlerName: "ShowDefaultAccessDomainPolicyQueryHandler",
+      serviceName: "ShowDefaultAccessDomainPolicyQueryService",
+      transports: {
+        cli: "appaloft default-access show --scope system|deployment-target [--server <serverId>]",
+        orpc: { method: "GET", path: "/api/default-access-domain-policies/show" },
+      },
+    });
+    expect(listEntry?.inputSchema).toBeDefined();
+    expect(showEntry?.inputSchema).toBeDefined();
+  });
+
   test("[SSH-CRED-ENTRY-001] reusable SSH credential detail is exposed through the active operation catalog", () => {
     const entry = operationCatalog.find((candidate) => candidate.key === "credentials.show");
 

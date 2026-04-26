@@ -20,6 +20,7 @@
   import * as Select from "$lib/components/ui/select";
   import { Skeleton } from "$lib/components/ui/skeleton";
   import { Textarea } from "$lib/components/ui/textarea";
+  import { toDefaultAccessPolicyFormState } from "$lib/console/default-access-policy-form";
   import { webDocsHrefs } from "$lib/console/docs-help";
   import { createConsoleQueries } from "$lib/console/queries";
   import {
@@ -43,18 +44,34 @@
       enabled: browser,
     }),
   );
+  const systemDefaultAccessPolicyQuery = createQuery(() =>
+    queryOptions({
+      queryKey: ["default-access-domain-policies", "show", "system"],
+      queryFn: () =>
+        orpcClient.defaultAccessDomainPolicies.show({
+          scopeKind: "system",
+        }),
+      enabled: browser,
+      staleTime: 5_000,
+    }),
+  );
   const defaultAccessModes = ["disabled", "provider", "custom-template"] as const;
 
   const servers = $derived(serversQuery.data?.items ?? []);
   const deployments = $derived(deploymentsQuery.data?.items ?? []);
   const sshCredentials = $derived(sshCredentialsQuery.data?.items ?? []);
-  const pageLoading = $derived(serversQuery.isPending || deploymentsQuery.isPending);
+  const pageLoading = $derived(
+    serversQuery.isPending ||
+      deploymentsQuery.isPending ||
+      systemDefaultAccessPolicyQuery.isPending,
+  );
   const activeServers = $derived(
     servers.filter((server) => countServerDeployments(server) > 0).length,
   );
   let systemMode = $state<ConfigureDefaultAccessDomainPolicyInput["mode"]>("provider");
   let systemProviderKey = $state("sslip");
   let systemTemplateRef = $state("");
+  let systemPolicyReadbackSource = $state("");
   let systemFeedback = $state<{
     kind: "success" | "error";
     title: string;
@@ -123,6 +140,7 @@
         detail: result.id,
       };
       void queryClient.invalidateQueries({ queryKey: ["resources"] });
+      void queryClient.invalidateQueries({ queryKey: ["default-access-domain-policies"] });
     },
     onError: (error) => {
       systemFeedback = {
@@ -185,6 +203,25 @@
       isSshCredentialRotateConfirmationValid(selectedCredentialId, credentialRotateConfirmation) &&
       !rotateSshCredentialMutation.isPending,
   );
+
+  $effect(() => {
+    const readback = systemDefaultAccessPolicyQuery.data;
+    if (!readback) {
+      return;
+    }
+
+    const policy = readback.policy;
+    const source = policy ? `${policy.id}:${policy.updatedAt}` : "system:none";
+    if (systemPolicyReadbackSource === source) {
+      return;
+    }
+
+    const formState = toDefaultAccessPolicyFormState(policy);
+    systemMode = formState.mode;
+    systemProviderKey = formState.providerKey;
+    systemTemplateRef = formState.templateRef;
+    systemPolicyReadbackSource = source;
+  });
 
   function countServerDeployments(server: ServerSummary): number {
     return deployments.filter((deployment) => deployment.serverId === server.id).length;
@@ -380,6 +417,7 @@
         </div>
 
         <form
+          id="servers-default-access-policy-form"
           class="grid gap-4 lg:grid-cols-[minmax(0,14rem)_minmax(0,1fr)_auto]"
           onsubmit={submitSystemPolicy}
         >
@@ -426,6 +464,7 @@
                   />
                 </span>
                 <Input
+                  id="servers-default-access-provider-key-input"
                   bind:value={systemProviderKey}
                   autocomplete="off"
                   placeholder={$t(i18nKeys.console.servers.defaultAccessProviderKeyPlaceholder)}
@@ -444,6 +483,7 @@
                   />
                 </span>
                 <Input
+                  id="servers-default-access-template-ref-input"
                   bind:value={systemTemplateRef}
                   autocomplete="off"
                   placeholder={$t(i18nKeys.console.servers.defaultAccessTemplateRefPlaceholder)}
@@ -453,7 +493,11 @@
           </div>
 
           <div class="flex items-end">
-            <Button class="w-full sm:w-auto" disabled={configureSystemDefaultAccessMutation.isPending}>
+            <Button
+              class="w-full sm:w-auto"
+              disabled={configureSystemDefaultAccessMutation.isPending}
+              type="submit"
+            >
               {configureSystemDefaultAccessMutation.isPending
                 ? $t(i18nKeys.common.actions.saving)
                 : $t(i18nKeys.common.actions.save)}

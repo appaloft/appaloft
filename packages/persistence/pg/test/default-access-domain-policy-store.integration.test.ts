@@ -116,9 +116,11 @@ describe("default access domain policy store pglite integration", () => {
             serverId: "srv_demo",
           }),
         );
+        const persistedPolicies = await repository.list();
 
         expect(persistedSystem.isOk()).toBe(true);
         expect(persistedTarget.isOk()).toBe(true);
+        expect(persistedPolicies.isOk()).toBe(true);
         expect(persistedSystem._unsafeUnwrap()).toEqual({
           id: "dap_system",
           scope: { kind: "system" },
@@ -133,6 +135,22 @@ describe("default access domain policy store pglite integration", () => {
           mode: "disabled",
           updatedAt: "2026-01-01T00:00:11.000Z",
         });
+        expect(persistedPolicies._unsafeUnwrap()).toEqual([
+          {
+            id: "dap_server",
+            scope: { kind: "deployment-target", serverId: "srv_demo" },
+            mode: "disabled",
+            updatedAt: "2026-01-01T00:00:11.000Z",
+          },
+          {
+            id: "dap_system",
+            scope: { kind: "system" },
+            mode: "provider",
+            providerKey: "sslip",
+            updatedAt: "2026-01-01T00:00:10.000Z",
+            idempotencyKey: "policy-1",
+          },
+        ]);
       } finally {
         await database.close();
       }

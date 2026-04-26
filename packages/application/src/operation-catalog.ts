@@ -3,6 +3,8 @@ import { importCertificateCommandInputSchema } from "./operations/certificates/i
 import { issueOrRenewCertificateCommandInputSchema } from "./operations/certificates/issue-or-renew-certificate.command";
 import { listCertificatesQueryInputSchema } from "./operations/certificates/list-certificates.query";
 import { configureDefaultAccessDomainPolicyCommandInputSchema } from "./operations/default-access-domain-policies/configure-default-access-domain-policy.command";
+import { listDefaultAccessDomainPoliciesQueryInputSchema } from "./operations/default-access-domain-policies/list-default-access-domain-policies.query";
+import { showDefaultAccessDomainPolicyQueryInputSchema } from "./operations/default-access-domain-policies/show-default-access-domain-policy.query";
 import { cleanupPreviewCommandInputSchema } from "./operations/deployments/cleanup-preview.command";
 import { createDeploymentCommandInputSchema } from "./operations/deployments/create-deployment.command";
 import { deploymentLogsQueryInputSchema } from "./operations/deployments/deployment-logs.query";
@@ -888,6 +890,34 @@ export const operationCatalog = [
     transports: {
       cli: "appaloft default-access configure",
       orpc: { method: "POST", path: "/api/default-access-domain-policies" },
+    },
+  },
+  {
+    key: "default-access-domain-policies.list",
+    kind: "query",
+    domain: "default-access-domain-policies",
+    messageName: "ListDefaultAccessDomainPoliciesQuery",
+    handlerName: "ListDefaultAccessDomainPoliciesQueryHandler",
+    serviceName: "ListDefaultAccessDomainPoliciesQueryService",
+    inputSchema: listDefaultAccessDomainPoliciesQueryInputSchema,
+    serviceToken: tokens.listDefaultAccessDomainPoliciesQueryService,
+    transports: {
+      cli: "appaloft default-access list",
+      orpc: { method: "GET", path: "/api/default-access-domain-policies" },
+    },
+  },
+  {
+    key: "default-access-domain-policies.show",
+    kind: "query",
+    domain: "default-access-domain-policies",
+    messageName: "ShowDefaultAccessDomainPolicyQuery",
+    handlerName: "ShowDefaultAccessDomainPolicyQueryHandler",
+    serviceName: "ShowDefaultAccessDomainPolicyQueryService",
+    inputSchema: showDefaultAccessDomainPolicyQueryInputSchema,
+    serviceToken: tokens.showDefaultAccessDomainPolicyQueryService,
+    transports: {
+      cli: "appaloft default-access show --scope system|deployment-target [--server <serverId>]",
+      orpc: { method: "GET", path: "/api/default-access-domain-policies/show" },
     },
   },
   {
