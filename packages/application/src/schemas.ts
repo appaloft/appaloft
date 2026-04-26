@@ -29,6 +29,7 @@ export * from "./operations/projects/create-project.schema";
 export * from "./operations/projects/rename-project.schema";
 export * from "./operations/projects/show-project.schema";
 export * from "./operations/resources/archive-resource.schema";
+export * from "./operations/resources/configure-resource-access.schema";
 export * from "./operations/resources/configure-resource-health.schema";
 export * from "./operations/resources/configure-resource-network.schema";
 export * from "./operations/resources/configure-resource-runtime.schema";

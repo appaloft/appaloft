@@ -60,6 +60,7 @@ export class ListResourcesQueryService {
     | Record<string, never>
   > {
     if (
+      resource.accessProfile?.generatedAccessMode === "disabled" ||
       !resource.destinationId ||
       resource.networkProfile?.exposureMode !== "reverse-proxy" ||
       !resource.networkProfile.internalPort
@@ -115,7 +116,7 @@ export class ListResourcesQueryService {
         hostname: generated.hostname,
         scheme: generated.scheme,
         providerKey: generated.providerKey,
-        pathPrefix: "/",
+        pathPrefix: resource.accessProfile?.pathPrefix ?? "/",
         proxyKind: edgeProxy.kind.value,
         targetPort: resource.networkProfile.internalPort,
       },

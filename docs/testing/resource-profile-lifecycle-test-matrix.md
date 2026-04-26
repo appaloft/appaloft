@@ -8,6 +8,7 @@ This matrix covers the active resource profile lifecycle operations:
 - `resources.configure-source`
 - `resources.configure-runtime`
 - `resources.configure-network`
+- `resources.configure-access`
 - `resources.set-variable`
 - `resources.unset-variable`
 - `resources.effective-config`
@@ -24,6 +25,7 @@ command and that no entrypoint exposes a generic `resources.update`.
 - [resources.configure-source Command Spec](../commands/resources.configure-source.md)
 - [resources.configure-runtime Command Spec](../commands/resources.configure-runtime.md)
 - [resources.configure-network Command Spec](../commands/resources.configure-network.md)
+- [resources.configure-access Command Spec](../commands/resources.configure-access.md)
 - [resources.set-variable Command Spec](../commands/resources.set-variable.md)
 - [resources.unset-variable Command Spec](../commands/resources.unset-variable.md)
 - [resources.effective-config Query Spec](../queries/resources.effective-config.md)
@@ -63,6 +65,12 @@ command and that no entrypoint exposes a generic `resources.update`.
 | RES-PROFILE-NETWORK-004 | `resources.configure-network` | Command use case | `direct-port` requested without implemented placement guards. | Rejects before persistence. |
 | RES-PROFILE-NETWORK-005 | `resources.configure-network` | Command use case | Two reverse-proxy resources share the same `internalPort`. | Command accepts; no port-collision failure for reverse proxy. |
 | RES-PROFILE-NETWORK-006 | `resources.configure-network` | Command use case | Archived resource. | Returns `resource_archived`, no event. |
+| RES-PROFILE-ACCESS-001 | `resources.configure-access` | Command use case | Valid profile disables generated default access. | Persists `accessProfile.generatedAccessMode = "disabled"`, publishes `resource-access-configured`, and returns `ok({ id })`. |
+| RES-PROFILE-ACCESS-002 | `resources.configure-access` / `resources.show` | Command/query service | Disabled generated access is changed back to inherit. | Persists `generatedAccessMode = "inherit"` and `resources.show` returns the resource access profile. |
+| RES-PROFILE-ACCESS-003 | `resources.configure-access` / planned access / deployment route snapshot | Command and read model | Valid path prefix `/app` is supplied. | Planned generated access and future generated route snapshots use `/app`; historical snapshots remain unchanged. |
+| RES-PROFILE-ACCESS-004 | `resources.configure-access` | Command use case | Path prefix is missing `/` or otherwise unsafe. | Returns `validation_error`, `phase = resource-access-resolution`, no aggregate mutation, and no event. |
+| RES-PROFILE-ACCESS-005 | `resources.configure-access` | Command use case | Archived resource. | Returns `resource_archived`, no event. |
+| RES-PROFILE-ACCESS-006 | `resource-access-configured` | Event payload | Access profile is configured. | Event includes resource ids, `generatedAccessMode`, normalized `pathPrefix`, configured timestamp, and no provider configs, route credentials, logs, or secrets. |
 | RES-PROFILE-HEALTH-001 | `resources.configure-health` | Command use case | Archived resource. | Returns `resource_archived`, no event. |
 | RES-PROFILE-CONFIG-001 | `resources.set-variable` | Command use case | Valid runtime plain-config variable. | Persists resource-scoped override, publishes `resource-variable-set`, returns `ok({ id })`. |
 | RES-PROFILE-CONFIG-002 | `resources.set-variable` | Command use case | Valid runtime secret variable. | Persists secret override, publishes `resource-variable-set`, and future read models return only masked values. |
@@ -98,6 +106,9 @@ command and that no entrypoint exposes a generic `resources.update`.
 | RES-PROFILE-ENTRY-006 | CLI | Entrypoint | Delete command submitted with `--confirm-slug`. | Dispatches `DeleteResourceCommand` through `CommandBus`; no generic delete/update helper bypass. |
 | RES-PROFILE-ENTRY-007 | HTTP/oRPC | Entrypoint | Delete route submitted with command schema. | Dispatches `DeleteResourceCommand`; a follow-up `resources.show` for the deleted resource returns `not_found`. |
 | RES-PROFILE-ENTRY-008 | Web | Entrypoint | Archived resource delete action submitted after typed slug confirmation. | Dispatches `resources.delete`, invalidates resources/detail/list state, and does not hide cleanup side effects. |
+| RES-PROFILE-ENTRY-009 | HTTP/oRPC | Entrypoint | Access profile route submitted with command schema. | Dispatches `ConfigureResourceAccessCommand`; a follow-up `resources.show` returns the access profile. |
+| RES-PROFILE-ENTRY-010 | CLI | Entrypoint | Access profile command submitted. | Dispatches `ConfigureResourceAccessCommand` through `CommandBus`; no generic resource update helper bypass. |
+| RES-PROFILE-ENTRY-011 | Web | Entrypoint | Resource detail access settings submitted. | Dispatches `resources.configure-access`, invalidates resource detail/list state, and does not bind domains or apply proxy routes. |
 | RES-PROFILE-ERROR-001 | Error mapping | Contract | Persistence failure before command success. | Returns `infra_error`, `phase = resource-persistence`. |
 | RES-PROFILE-ERROR-002 | Error mapping | Contract | Event publication/outbox failure before command success. | Returns `infra_error`, `phase = event-publication`. |
 | RES-PROFILE-ERROR-003 | Error mapping | Contract | Event consumer projection failure. | Records `phase = event-consumption` and does not reinterpret command success. |

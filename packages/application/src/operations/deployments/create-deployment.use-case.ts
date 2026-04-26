@@ -137,6 +137,7 @@ function requestedDeploymentFromResource(resource: Resource): Result<RequestedDe
   const resourceState = resource.toState();
   const runtimeProfile = resourceState.runtimeProfile;
   const networkProfile = resourceState.networkProfile;
+  const accessProfile = resourceState.accessProfile;
   const internalPort = networkProfile?.internalPort.value;
   const method = runtimeProfile?.strategy.value ?? "auto";
 
@@ -185,18 +186,25 @@ function requestedDeploymentFromResource(resource: Resource): Result<RequestedDe
       ? {
           exposureMode: networkProfile.exposureMode.value,
           upstreamProtocol: networkProfile.upstreamProtocol.value,
-          accessContext: {
-            projectId: resourceState.projectId.value,
-            environmentId: resourceState.environmentId.value,
-            resourceId: resourceState.id.value,
-            resourceSlug: resourceState.slug.value,
-            ...(resourceState.destinationId
-              ? { destinationId: resourceState.destinationId.value }
-              : {}),
-            exposureMode: networkProfile.exposureMode.value,
-            upstreamProtocol: networkProfile.upstreamProtocol.value,
-            routePurpose: "default-resource-access",
-          },
+          ...(accessProfile?.generatedAccessMode.isDisabled()
+            ? {}
+            : {
+                accessContext: {
+                  projectId: resourceState.projectId.value,
+                  environmentId: resourceState.environmentId.value,
+                  resourceId: resourceState.id.value,
+                  resourceSlug: resourceState.slug.value,
+                  ...(resourceState.destinationId
+                    ? { destinationId: resourceState.destinationId.value }
+                    : {}),
+                  exposureMode: networkProfile.exposureMode.value,
+                  upstreamProtocol: networkProfile.upstreamProtocol.value,
+                  routePurpose: "default-resource-access",
+                  ...(accessProfile?.pathPrefix
+                    ? { pathPrefix: accessProfile.pathPrefix.value }
+                    : {}),
+                },
+              }),
         }
       : {}),
     ...(runtimeProfile?.healthCheckPath

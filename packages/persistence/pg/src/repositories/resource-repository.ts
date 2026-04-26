@@ -22,6 +22,7 @@ import {
   type RepositoryExecutor,
   rehydrateResourceRow,
   resolveRepositoryExecutor,
+  type SerializedResourceAccessProfile,
   type SerializedResourceNetworkProfile,
   type SerializedResourceRuntimeProfile,
   type SerializedResourceSourceBinding,
@@ -152,6 +153,12 @@ class KyselyResourceMutationVisitor
             : {}),
         } satisfies SerializedResourceNetworkProfile)
       : null;
+    const accessProfile = spec.state.accessProfile
+      ? ({
+          generatedAccessMode: spec.state.accessProfile.generatedAccessMode.value,
+          pathPrefix: spec.state.accessProfile.pathPrefix.value,
+        } satisfies SerializedResourceAccessProfile)
+      : null;
 
     return {
       resource: {
@@ -167,6 +174,7 @@ class KyselyResourceMutationVisitor
         source_binding: sourceBinding,
         runtime_profile: runtimeProfile,
         network_profile: networkProfile,
+        access_profile: accessProfile,
         lifecycle_status: spec.state.lifecycleStatus.value,
         archived_at: spec.state.archivedAt?.value ?? null,
         archive_reason: spec.state.archiveReason?.value ?? null,
@@ -222,6 +230,7 @@ export class PgResourceRepository implements ResourceRepository {
                 source_binding: mutation.resource.source_binding,
                 runtime_profile: mutation.resource.runtime_profile,
                 network_profile: mutation.resource.network_profile,
+                access_profile: mutation.resource.access_profile,
                 lifecycle_status: mutation.resource.lifecycle_status,
                 archived_at: mutation.resource.archived_at ?? null,
                 archive_reason: mutation.resource.archive_reason ?? null,
