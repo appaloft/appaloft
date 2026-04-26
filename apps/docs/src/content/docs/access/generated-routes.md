@@ -12,6 +12,8 @@ searchAliases:
   - "访问地址"
 relatedOperations:
   - default-access-domain-policies.configure
+  - default-access-domain-policies.show
+  - default-access-domain-policies.list
   - domain-bindings.create
 sidebar:
   label: "Generated routes"
@@ -35,6 +37,10 @@ Web console 的服务器页会显示这个策略，常见字段含义如下：
 - **Default access mode**：是否生成默认访问地址。`provider` 表示使用已注册的默认访问域名 provider；`disabled` 表示不生成；`custom-template` 表示使用后续配置的模板。
 - **Provider key**：选择哪个默认访问域名 provider。当前本地/自托管常见值是 `sslip`，表示根据服务器公共地址生成可访问 hostname。
 - **Server default access override**：某台服务器可以覆盖系统默认值；未覆盖时使用系统默认策略。
+
+Web console 打开系统策略或服务器覆盖表单时，会读取已保存策略。CLI 可以用
+`appaloft default-access show --scope system`、`appaloft default-access show --scope deployment-target --server <serverId>`
+或 `appaloft default-access list` 检查持久化策略。没有保存记录时，readback 会返回空策略；这不等于禁用默认访问，因为运行时解析仍可能使用安装时的静态 fallback 配置。
 
 策略变更只影响之后解析出来的默认访问地址。已经持久化到 deployment snapshot 里的历史部署访问地址不会被回写修改。如果你只是想绑定自己的域名，应使用自定义域名绑定，而不是修改默认访问策略。
 

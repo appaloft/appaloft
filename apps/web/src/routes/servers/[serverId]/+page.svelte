@@ -38,6 +38,7 @@
   import { Input } from "$lib/components/ui/input";
   import * as Select from "$lib/components/ui/select";
   import { Skeleton } from "$lib/components/ui/skeleton";
+  import { toDefaultAccessPolicyFormState } from "$lib/console/default-access-policy-form";
   import { webDocsHrefs } from "$lib/console/docs-help";
   import { orpcClient } from "$lib/orpc";
   import { queryClient } from "$lib/query-client";
@@ -82,10 +83,25 @@
       staleTime: 5_000,
     }),
   );
+  const defaultAccessOverridePolicyQuery = createQuery(() =>
+    queryOptions({
+      queryKey: ["default-access-domain-policies", "show", "deployment-target", serverId],
+      queryFn: () =>
+        orpcClient.defaultAccessDomainPolicies.show({
+          scopeKind: "deployment-target",
+          serverId,
+        }),
+      enabled: browser && serverId.length > 0,
+      staleTime: 5_000,
+    }),
+  );
   const projects = $derived(projectsQuery.data?.items ?? []);
   const deployments = $derived(deploymentsQuery.data?.items ?? []);
   const pageLoading = $derived(
-    projectsQuery.isPending || deploymentsQuery.isPending || serverDetailQuery.isPending,
+    projectsQuery.isPending ||
+      deploymentsQuery.isPending ||
+      serverDetailQuery.isPending ||
+      defaultAccessOverridePolicyQuery.isPending,
   );
   const serverDetail = $derived(serverDetailQuery.data ?? null);
   const server = $derived(serverDetail?.server ?? null);
@@ -127,6 +143,7 @@
   let overrideMode = $state<ConfigureDefaultAccessDomainPolicyInput["mode"]>("provider");
   let overrideProviderKey = $state("sslip");
   let overrideTemplateRef = $state("");
+  let overridePolicyReadbackSource = $state("");
   let serverFormServerId = $state("");
   let serverName = $state("");
   let edgeProxyKind = $state<ConfigureServerEdgeProxyInput["proxyKind"]>("none");
@@ -172,6 +189,7 @@
         detail: result.id,
       };
       void queryClient.invalidateQueries({ queryKey: ["resources"] });
+      void queryClient.invalidateQueries({ queryKey: ["default-access-domain-policies"] });
     },
     onError: (error) => {
       overrideFeedback = {
@@ -232,6 +250,25 @@
     serverName = server.name;
     edgeProxyKind = server.edgeProxy?.kind ?? "none";
     lifecycleFeedback = null;
+  });
+
+  $effect(() => {
+    const readback = defaultAccessOverridePolicyQuery.data;
+    if (!readback || !serverId) {
+      return;
+    }
+
+    const policy = readback.policy;
+    const source = policy ? `${serverId}:${policy.id}:${policy.updatedAt}` : `${serverId}:none`;
+    if (overridePolicyReadbackSource === source) {
+      return;
+    }
+
+    const formState = toDefaultAccessPolicyFormState(policy);
+    overrideMode = formState.mode;
+    overrideProviderKey = formState.providerKey;
+    overrideTemplateRef = formState.templateRef;
+    overridePolicyReadbackSource = source;
   });
 
   function testConnectivity(): void {
@@ -871,6 +908,7 @@
         </div>
 
         <form
+          id="server-default-access-override-form"
           class="grid gap-4 lg:grid-cols-[minmax(0,14rem)_minmax(0,1fr)_auto]"
           onsubmit={saveDefaultAccessOverride}
         >
@@ -917,6 +955,7 @@
                   />
                 </span>
                 <Input
+                  id="server-default-access-provider-key-input"
                   bind:value={overrideProviderKey}
                   autocomplete="off"
                   placeholder={$t(i18nKeys.console.servers.defaultAccessProviderKeyPlaceholder)}
@@ -935,6 +974,7 @@
                   />
                 </span>
                 <Input
+                  id="server-default-access-template-ref-input"
                   bind:value={overrideTemplateRef}
                   autocomplete="off"
                   placeholder={$t(i18nKeys.console.servers.defaultAccessTemplateRefPlaceholder)}
@@ -944,7 +984,11 @@
           </div>
 
           <div class="flex items-end">
-            <Button class="w-full sm:w-auto" disabled={configureDefaultAccessOverrideMutation.isPending}>
+            <Button
+              class="w-full sm:w-auto"
+              disabled={configureDefaultAccessOverrideMutation.isPending}
+              type="submit"
+            >
               {configureDefaultAccessOverrideMutation.isPending
                 ? $t(i18nKeys.common.actions.saving)
                 : $t(i18nKeys.common.actions.save)}

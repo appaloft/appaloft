@@ -28,6 +28,7 @@ import {
   type ImportCertificateCommandInput,
   type IssueOrRenewCertificateCommandInput,
   type ListCertificatesQueryInput,
+  type ListDefaultAccessDomainPoliciesQueryInput,
   type ListDeploymentsQueryInput,
   type ListDomainBindingsQueryInput,
   type ListEnvironmentsQueryInput,
@@ -47,6 +48,7 @@ import {
   type RotateSshCredentialCommandInput,
   type SetEnvironmentVariableCommandInput,
   type SetResourceVariableCommandInput,
+  type ShowDefaultAccessDomainPolicyQueryInput,
   type ShowDeploymentQueryInput,
   type ShowEnvironmentQueryInput,
   type ShowProjectQueryInput,
@@ -93,6 +95,7 @@ import {
   type ImportCertificateResponse,
   type IssueOrRenewCertificateResponse,
   type ListCertificatesResponse,
+  type ListDefaultAccessDomainPoliciesResponse,
   type ListDeploymentsResponse,
   type ListDomainBindingsResponse,
   type ListEnvironmentsResponse,
@@ -117,6 +120,7 @@ import {
   type ResourceRuntimeLogsStreamResponse,
   type RotateSshCredentialResponse,
   type SetResourceVariableResponse,
+  type ShowDefaultAccessDomainPolicyResponse,
   type ShowDeploymentResponse,
   type ShowProjectResponse,
   type ShowServerResponse,
@@ -232,6 +236,18 @@ export type AppaloftOrpcClientContract = {
       AppaloftClientContext,
       ConfigureDefaultAccessDomainPolicyCommandInput,
       ConfigureDefaultAccessDomainPolicyResponse,
+      AppaloftClientError
+    >;
+    list: Client<
+      AppaloftClientContext,
+      ListDefaultAccessDomainPoliciesQueryInput,
+      ListDefaultAccessDomainPoliciesResponse,
+      AppaloftClientError
+    >;
+    show: Client<
+      AppaloftClientContext,
+      ShowDefaultAccessDomainPolicyQueryInput,
+      ShowDefaultAccessDomainPolicyResponse,
       AppaloftClientError
     >;
   };

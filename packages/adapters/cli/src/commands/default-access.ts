@@ -1,7 +1,11 @@
-import { ConfigureDefaultAccessDomainPolicyCommand } from "@appaloft/application";
+import {
+  ConfigureDefaultAccessDomainPolicyCommand,
+  ListDefaultAccessDomainPoliciesQuery,
+  ShowDefaultAccessDomainPolicyQuery,
+} from "@appaloft/application";
 import { Command as EffectCommand, Options } from "@effect/cli";
 
-import { optionalValue, runCommand } from "../runtime.js";
+import { optionalValue, runCommand, runQuery } from "../runtime.js";
 import { cliCommandDescriptions } from "./docs-help.js";
 
 const policyScopes = ["system", "deployment-target"] as const;
@@ -13,6 +17,25 @@ const modeOption = Options.choice("mode", policyModes).pipe(Options.withDefault(
 const providerOption = Options.text("provider").pipe(Options.optional);
 const templateRefOption = Options.text("template-ref").pipe(Options.optional);
 const idempotencyKeyOption = Options.text("idempotency-key").pipe(Options.optional);
+
+const listCommand = EffectCommand.make("list", {}, () =>
+  runQuery(ListDefaultAccessDomainPoliciesQuery.create()),
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.defaultAccessList));
+
+const showCommand = EffectCommand.make(
+  "show",
+  {
+    scope: scopeOption,
+    server: serverOption,
+  },
+  ({ scope, server }) =>
+    runQuery(
+      ShowDefaultAccessDomainPolicyQuery.create({
+        scopeKind: scope,
+        ...(optionalValue(server) ? { serverId: optionalValue(server) } : {}),
+      }),
+    ),
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.defaultAccessShow));
 
 const configureCommand = EffectCommand.make(
   "configure",
@@ -46,5 +69,5 @@ const configureCommand = EffectCommand.make(
 
 export const defaultAccessCommand = EffectCommand.make("default-access").pipe(
   EffectCommand.withDescription(cliCommandDescriptions.defaultAccess),
-  EffectCommand.withSubcommands([configureCommand]),
+  EffectCommand.withSubcommands([listCommand, showCommand, configureCommand]),
 );

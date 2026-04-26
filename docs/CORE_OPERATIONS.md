@@ -589,6 +589,8 @@ Implemented operations:
 | Capability | Kind | Operation Key | Message | Schema | CLI | oRPC / HTTP |
 | --- | --- | --- | --- | --- | --- | --- |
 | Configure default access domain policy | Command | `default-access-domain-policies.configure` | `ConfigureDefaultAccessDomainPolicyCommand` | `ConfigureDefaultAccessDomainPolicyCommandInput` | `appaloft default-access configure --scope system\|deployment-target [--server <serverId>] --mode disabled\|provider\|custom-template [--provider <key>] [--template-ref <ref>]` | `POST /api/default-access-domain-policies` |
+| List default access domain policies | Query | `default-access-domain-policies.list` | `ListDefaultAccessDomainPoliciesQuery` | `ListDefaultAccessDomainPoliciesQueryInput` | `appaloft default-access list` | `GET /api/default-access-domain-policies` |
+| Show default access domain policy | Query | `default-access-domain-policies.show` | `ShowDefaultAccessDomainPolicyQuery` | `ShowDefaultAccessDomainPolicyQueryInput` | `appaloft default-access show --scope system\|deployment-target [--server <serverId>]` | `GET /api/default-access-domain-policies/show` |
 | Create domain binding | Command | `domain-bindings.create` | `CreateDomainBindingCommand` | `CreateDomainBindingCommandInput` | `appaloft domain-binding create <domainName> [--redirect-to <domain>] [--redirect-status 301\|302\|307\|308]` | `POST /api/domain-bindings` |
 | Confirm domain binding ownership | Command | `domain-bindings.confirm-ownership` | `ConfirmDomainBindingOwnershipCommand` | `ConfirmDomainBindingOwnershipCommandInput` | `appaloft domain-binding confirm-ownership <domainBindingId> [--verification-mode dns\|manual]` | `POST /api/domain-bindings/{domainBindingId}/ownership-confirmations` |
 | List domain bindings | Query | `domain-bindings.list` | `ListDomainBindingsQuery` | `ListDomainBindingsQueryInput` | `appaloft domain-binding list` | `GET /api/domain-bindings` |
@@ -604,6 +606,10 @@ Current boundary:
   override, publishes `domain-bound`, and returns `ok({ id, verificationAttemptId })`
 - `domain-binding-requested` is a request event and does not mean the domain is bound, certificate
   issuance succeeded, or traffic is ready
+- `default-access-domain-policies.list` and `default-access-domain-policies.show` expose durable
+  policy readback only. A missing durable record returns `policy = null` for the scoped show query
+  and does not imply generated access is disabled; static installation configuration remains a
+  fallback inside route resolution until the operator persists a policy.
 - public DNS propagation is external to Appaloft; `domain-bindings.list` must expose DNS
   observation status so pending/mismatch DNS is a visible wait/recheck state rather than a hidden
   deployment failure

@@ -244,7 +244,7 @@ User-facing policy changes must go through:
 default-access-domain-policies.configure
 ```
 
-The command must configure provider-neutral policy fields such as scope, mode, provider key, template reference, and enablement. It must not expose provider-specific hostname algorithms, DNS suffix internals, or concrete adapter types as domain concepts.
+The command must configure provider-neutral policy fields such as scope, mode, provider key, template reference, and enablement. `default-access-domain-policies.show` and `default-access-domain-policies.list` read the persisted policy state back for operators. These operations must not expose provider-specific hostname algorithms, DNS suffix internals, or concrete adapter types as domain concepts.
 
 Until the command is active, static installation/server configuration may select a provider for local operation, but Web/CLI/API must not expose policy editing as if it were already a business operation.
 
@@ -322,8 +322,10 @@ Durable domain binding precedence is not yet merged into the default access rout
 Server-applied config domain precedence from ADR-024 is not yet merged into the route resolver.
 
 `default-access-domain-policies.configure` is now the active public command for system and
-deployment-target policy state. Shell/static configuration remains only as the fallback seam when
-no durable policy record exists.
+deployment-target policy state. `default-access-domain-policies.show` and
+`default-access-domain-policies.list` are the active readback queries for persisted policy records.
+Shell/static configuration remains only as the fallback seam when no durable policy record exists
+and is not fabricated as query output.
 
 ## Open Questions
 

@@ -65,6 +65,8 @@ import {
   IssueOrRenewCertificateUseCase,
   ListCertificatesQueryHandler,
   ListCertificatesQueryService,
+  ListDefaultAccessDomainPoliciesQueryHandler,
+  ListDefaultAccessDomainPoliciesQueryService,
   ListDeploymentsQueryService,
   ListDomainBindingsQueryService,
   ListEnvironmentsQueryService,
@@ -102,6 +104,8 @@ import {
   SetEnvironmentVariableUseCase,
   SetResourceVariableCommandHandler,
   SetResourceVariableUseCase,
+  ShowDefaultAccessDomainPolicyQueryHandler,
+  ShowDefaultAccessDomainPolicyQueryService,
   ShowDeploymentQueryHandler,
   ShowDeploymentQueryService,
   ShowEnvironmentQueryService,
@@ -153,6 +157,8 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(CheckServerDeleteSafetyQueryHandler);
   container.registerSingleton(CleanupPreviewCommandHandler);
   container.registerSingleton(ConfigureDefaultAccessDomainPolicyCommandHandler);
+  container.registerSingleton(ListDefaultAccessDomainPoliciesQueryHandler);
+  container.registerSingleton(ShowDefaultAccessDomainPolicyQueryHandler);
   container.registerSingleton(ConfigureServerEdgeProxyCommandHandler);
   container.registerSingleton(ConfigureResourceHealthCommandHandler);
   container.registerSingleton(ConfigureResourceNetworkCommandHandler);
@@ -192,6 +198,14 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(
     tokens.configureDefaultAccessDomainPolicyUseCase,
     ConfigureDefaultAccessDomainPolicyUseCase,
+  );
+  container.registerSingleton(
+    tokens.listDefaultAccessDomainPoliciesQueryService,
+    ListDefaultAccessDomainPoliciesQueryService,
+  );
+  container.registerSingleton(
+    tokens.showDefaultAccessDomainPolicyQueryService,
+    ShowDefaultAccessDomainPolicyQueryService,
   );
   container.registerSingleton(tokens.createResourceUseCase, CreateResourceUseCase);
   container.registerSingleton(tokens.archiveResourceUseCase, ArchiveResourceUseCase);

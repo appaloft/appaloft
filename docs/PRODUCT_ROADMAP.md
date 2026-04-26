@@ -514,9 +514,9 @@ Already done:
 
 Required:
 
-- [ ] Activate `default-access-domain-policies.configure`.
-- [ ] Add default access policy list/show/update/disable behavior.
-- [ ] Add operation catalog coverage for default access policy operations.
+- [x] Activate `default-access-domain-policies.configure`.
+- [x] Add default access policy list/show/update/disable behavior.
+- [x] Add operation catalog coverage for default access policy operations.
 - [ ] Harden `ResourceAccessSummary` route precedence so durable domain bindings and server-applied
   config routes consistently win where specs require it.
 - [ ] Add dedicated route intent/status read or repair surfaces only where existing access, proxy,
