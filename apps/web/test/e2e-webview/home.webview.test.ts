@@ -866,6 +866,11 @@ const apiResponses: Record<ApiScenario, Record<string, ApiRoute>> = {
         id: "env_demo",
       },
     },
+    "/api/rpc/environments/clone": {
+      json: {
+        id: "env_clone",
+      },
+    },
     "/api/rpc/resources/delete": {
       json: {
         id: "res_demo",
@@ -2412,6 +2417,25 @@ describe("console e2e with Bun.WebView", () => {
 
     expect(archiveInput).toEqual({
       environmentId: "env_demo",
+    });
+  }, 15_000);
+
+  test("[ENV-LIFE-CLONE-ENTRY-003] submits environment clone through Web", async () => {
+    activeScenario = "dashboard";
+    resetRecordedApiRequests();
+
+    await using view = createWebView();
+    await view.navigate(`${previewUrl}/projects/prj_demo`);
+    await expectAnyText(view, ["Environments", "环境"]);
+    await setInputValue(view, "#environment-clone-name-env_demo", "production-copy");
+    await clickFormSubmit(view, "#environment-clone-form-env_demo");
+
+    const cloneRequest = await waitForRecordedRequest("/api/rpc/environments/clone");
+    const cloneInput = readOrpcJsonPayload(cloneRequest.body);
+
+    expect(cloneInput).toEqual({
+      environmentId: "env_demo",
+      targetName: "production-copy",
     });
   }, 15_000);
 

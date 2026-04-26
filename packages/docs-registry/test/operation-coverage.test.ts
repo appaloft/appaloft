@@ -127,6 +127,7 @@ describe("public docs operation coverage", () => {
     expect(topic.specReferences).toEqual(
       expect.arrayContaining([
         "docs/workflows/environment-lifecycle.md",
+        "docs/commands/environments.clone.md",
         "docs/commands/environments.archive.md",
         "docs/events/environment-archived.md",
         "docs/errors/environments.lifecycle.md",
@@ -134,6 +135,25 @@ describe("public docs operation coverage", () => {
       ]),
     );
     expect(topic.webSurfaces?.join("\n")).toContain("environment lifecycle action");
+  });
+
+  test("[ENV-LIFE-CLONE-DOCS-001] environment clone records lifecycle docs coverage", () => {
+    const coverage = getPublicDocsOperationCoverage("environments.clone");
+    const topic = publicDocsHelpTopics["environment.lifecycle"];
+
+    expect(coverage).toMatchObject({
+      operationKey: "environments.clone",
+      status: "documented",
+      topicId: "environment.lifecycle",
+    });
+    expect(topic.specReferences).toEqual(
+      expect.arrayContaining([
+        "docs/workflows/environment-lifecycle.md",
+        "docs/commands/environments.clone.md",
+        "docs/errors/environments.lifecycle.md",
+        "docs/testing/environment-lifecycle-test-matrix.md",
+      ]),
+    );
   });
 
   test("[ENV-LIFE-DOCS-002] environment lock and unlock record lifecycle docs coverage", () => {

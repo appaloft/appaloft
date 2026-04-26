@@ -15,6 +15,7 @@ import { confirmDomainBindingOwnershipCommandInputSchema } from "./operations/do
 import { createDomainBindingCommandInputSchema } from "./operations/domain-bindings/create-domain-binding.command";
 import { listDomainBindingsQueryInputSchema } from "./operations/domain-bindings/list-domain-bindings.query";
 import { archiveEnvironmentCommandInputSchema } from "./operations/environments/archive-environment.command";
+import { cloneEnvironmentCommandInputSchema } from "./operations/environments/clone-environment.command";
 import { createEnvironmentCommandInputSchema } from "./operations/environments/create-environment.command";
 import { diffEnvironmentsQueryInputSchema } from "./operations/environments/diff-environments.query";
 import { environmentEffectivePrecedenceQueryInputSchema } from "./operations/environments/environment-effective-precedence.query";
@@ -735,6 +736,20 @@ export const operationCatalog = [
     transports: {
       cli: "appaloft env archive <environmentId>",
       orpc: { method: "POST", path: "/api/environments/{environmentId}/archive" },
+    },
+  },
+  {
+    key: "environments.clone",
+    kind: "command",
+    domain: "environments",
+    messageName: "CloneEnvironmentCommand",
+    handlerName: "CloneEnvironmentCommandHandler",
+    serviceName: "CloneEnvironmentUseCase",
+    inputSchema: cloneEnvironmentCommandInputSchema,
+    serviceToken: tokens.cloneEnvironmentUseCase,
+    transports: {
+      cli: "appaloft env clone <environmentId> --name <targetName>",
+      orpc: { method: "POST", path: "/api/environments/{environmentId}/clone" },
     },
   },
   {

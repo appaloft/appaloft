@@ -11,6 +11,7 @@ searchAliases:
   - "production"
 relatedOperations:
   - environments.create
+  - environments.clone
   - environments.lock
   - environments.unlock
   - environments.archive
@@ -31,6 +32,8 @@ A resource can be deployed in different environments. Each deployment reads the 
 
 Environments start as active. Locking an environment keeps the environment, variables, resources, deployments, and history readable, but blocks new environment variable writes, promotion, resource creation, and deployment admission. Unlocking returns it to active.
 
+Cloning an active environment creates a new active environment in the same project with a new name and a copy of the source environment variables. It does not copy resources, deployments, domains, certificates, or runtime state.
+
 Archiving an environment keeps the same history readable, but it is a retired state and is not restored by unlock.
 
-Lock, unlock, and archive do not stop runtime, delete resources, clean up domains, or remove certificates. Use the explicit resource, deployment, domain, or certificate commands for those cleanup tasks.
+Clone, lock, unlock, and archive do not stop runtime, delete resources, clean up domains, or remove certificates. Use the explicit resource, deployment, domain, or certificate commands for those cleanup tasks.

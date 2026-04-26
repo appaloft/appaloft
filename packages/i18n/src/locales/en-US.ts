@@ -374,6 +374,12 @@ export const enUS = {
       environmentArchiveSucceeded: "Environment archived",
       environmentArchived: "Archived",
       environmentArchivedAt: "Archived at",
+      environmentCloneAction: "Clone",
+      environmentCloneFailed: "Environment was not cloned",
+      environmentCloneNameLabel: "Clone name",
+      environmentCloneNamePlaceholder: "production-copy",
+      environmentCloneSucceeded: "Environment cloned",
+      environmentCloneValidation: "Enter a clone name before cloning.",
       environmentLockAction: "Lock",
       environmentLockConfirm:
         "Lock this environment? Variables, resources, promotions, and deployments will be blocked until it is unlocked.",

@@ -50,6 +50,7 @@ describe("CLI docs help links", () => {
     expect(cliCommandDescriptions.environmentSet).toContain(
       cliDocsHrefs.environmentVariablePrecedence,
     );
+    expect(cliCommandDescriptions.environmentClone).toContain(cliDocsHrefs.environmentLifecycle);
     expect(cliCommandDescriptions.environmentLock).toContain(cliDocsHrefs.environmentLifecycle);
     expect(cliCommandDescriptions.environmentUnlock).toContain(cliDocsHrefs.environmentLifecycle);
     expect(cliCommandDescriptions.resourceConfigureRuntime).toContain(

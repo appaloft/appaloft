@@ -4,6 +4,9 @@ import { describe, expect, test } from "bun:test";
 import {
   ArchivedAt,
   ArchiveReason,
+  ConfigKey,
+  ConfigScopeValue,
+  ConfigValueText,
   CreatedAt,
   DeploymentTarget,
   DeploymentTargetId,
@@ -16,6 +19,7 @@ import {
   EdgeProxyKindValue,
   Environment,
   EnvironmentByIdSpec,
+  EnvironmentByProjectAndNameSpec,
   EnvironmentId,
   EnvironmentKindValue,
   EnvironmentLifecycleStatusValue,
@@ -26,17 +30,21 @@ import {
   PortNumber,
   Project,
   ProjectId,
+  ProjectLifecycleStatusValue,
   ProjectName,
   ProviderKey,
   Resource,
   ResourceId,
   ResourceKindValue,
   ResourceName,
+  UpdatedAt,
   UpsertDeploymentTargetSpec,
   UpsertDestinationSpec,
   UpsertEnvironmentSpec,
   UpsertProjectSpec,
   UpsertResourceSpec,
+  VariableExposureValue,
+  VariableKindValue,
 } from "@appaloft/core";
 import {
   CapturedEventBus,
@@ -54,6 +62,7 @@ import {
 import { createExecutionContext, toRepositoryContext } from "../src";
 import {
   ArchiveEnvironmentUseCase,
+  CloneEnvironmentUseCase,
   CreateResourceUseCase,
   DeploymentContextResolver,
   LockEnvironmentUseCase,
@@ -66,6 +75,7 @@ import {
 
 function environmentFixture(input?: {
   id?: string;
+  name?: string;
   lifecycleStatus?: "active" | "locked" | "archived";
   lockedAt?: string;
   lockReason?: string;
@@ -75,7 +85,7 @@ function environmentFixture(input?: {
   const active = Environment.create({
     id: EnvironmentId.rehydrate(input?.id ?? "env_demo"),
     projectId: ProjectId.rehydrate("prj_demo"),
-    name: EnvironmentName.rehydrate("production"),
+    name: EnvironmentName.rehydrate(input?.name ?? "production"),
     kind: EnvironmentKindValue.rehydrate("production"),
     createdAt: CreatedAt.rehydrate("2026-01-01T00:00:00.000Z"),
   })._unsafeUnwrap();
@@ -101,12 +111,44 @@ function environmentFixture(input?: {
   });
 }
 
-function projectFixture(): Project {
-  return Project.create({
+function environmentWithSecretVariable(): Environment {
+  const environment = environmentFixture();
+  environment
+    .setVariable({
+      key: ConfigKey.rehydrate("DATABASE_URL"),
+      value: ConfigValueText.rehydrate("postgres://source"),
+      kind: VariableKindValue.rehydrate("secret"),
+      exposure: VariableExposureValue.rehydrate("runtime"),
+      scope: ConfigScopeValue.rehydrate("environment"),
+      isSecret: true,
+      updatedAt: UpdatedAt.rehydrate("2026-01-01T00:00:01.000Z"),
+    })
+    ._unsafeUnwrap();
+  environment.pullDomainEvents();
+  return environment;
+}
+
+function projectFixture(input?: {
+  lifecycleStatus?: "active" | "archived";
+  archivedAt?: string;
+  archiveReason?: string;
+}): Project {
+  const active = Project.create({
     id: ProjectId.rehydrate("prj_demo"),
     name: ProjectName.rehydrate("Demo"),
     createdAt: CreatedAt.rehydrate("2026-01-01T00:00:00.000Z"),
   })._unsafeUnwrap();
+
+  if (input?.lifecycleStatus !== "archived") {
+    return active;
+  }
+
+  return Project.rehydrate({
+    ...active.toState(),
+    lifecycleStatus: ProjectLifecycleStatusValue.rehydrate("archived"),
+    archivedAt: ArchivedAt.rehydrate(input.archivedAt ?? "2026-01-01T00:00:05.000Z"),
+    archiveReason: ArchiveReason.rehydrate(input.archiveReason ?? "Retired"),
+  });
 }
 
 function serverFixture(): DeploymentTarget {
@@ -163,7 +205,9 @@ function archivedEvent(events: unknown[]): DomainEvent {
   return lifecycleEvent(events, "environment-archived");
 }
 
-async function createHarness(environment = environmentFixture()) {
+async function createHarness(
+  input?: Environment | { environment?: Environment; project?: Project },
+) {
   const context = createExecutionContext({
     requestId: "req_archive_environment_test",
     entrypoint: "system",
@@ -178,7 +222,10 @@ async function createHarness(environment = environmentFixture()) {
   const clock = new FixedClock("2026-01-01T00:00:10.000Z");
   const logger = new NoopLogger();
 
-  const project = projectFixture();
+  const environment =
+    input instanceof Environment ? input : (input?.environment ?? environmentFixture());
+  const project =
+    input instanceof Environment ? projectFixture() : (input?.project ?? projectFixture());
   const server = serverFixture();
   const destination = destinationFixture();
   const resource = resourceFixture();
@@ -216,6 +263,142 @@ async function createHarness(environment = environmentFixture()) {
 }
 
 describe("environment archive operations", () => {
+  test("[ENV-LIFE-CLONE-001] clones an active environment into the same project with copied variables", async () => {
+    const { clock, context, environments, eventBus, logger, projects, repositoryContext } =
+      await createHarness(environmentWithSecretVariable());
+    const useCase = new CloneEnvironmentUseCase(
+      projects,
+      environments,
+      clock,
+      new SequenceIdGenerator(),
+      eventBus,
+      logger,
+    );
+
+    const result = await useCase.execute(context, {
+      environmentId: "env_demo",
+      targetName: "production-copy",
+    });
+
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap()).toEqual({ id: "env_0001" });
+    const persisted = await environments.findOne(
+      repositoryContext,
+      EnvironmentByIdSpec.create(EnvironmentId.rehydrate("env_0001")),
+    );
+    const state = persisted?.toState();
+    const variables = state?.variables.toState() ?? [];
+    expect(state?.projectId.value).toBe("prj_demo");
+    expect(state?.parentEnvironmentId?.value).toBe("env_demo");
+    expect(state?.name.value).toBe("production-copy");
+    expect(state?.kind.value).toBe("production");
+    expect(state?.lifecycleStatus.value).toBe("active");
+    expect(state?.createdAt.value).toBe("2026-01-01T00:00:10.000Z");
+    expect(variables).toHaveLength(1);
+    expect(variables[0]?.key.value).toBe("DATABASE_URL");
+    expect(variables[0]?.value.value).toBe("postgres://source");
+    expect(variables[0]?.isSecret).toBe(true);
+    expect(eventBus.events).toHaveLength(0);
+  });
+
+  test("[ENV-LIFE-CLONE-002] rejects clone from an archived source environment", async () => {
+    const { clock, context, environments, eventBus, logger, projects } = await createHarness(
+      environmentFixture({ lifecycleStatus: "archived" }),
+    );
+    const useCase = new CloneEnvironmentUseCase(
+      projects,
+      environments,
+      clock,
+      new SequenceIdGenerator(),
+      eventBus,
+      logger,
+    );
+
+    const result = await useCase.execute(context, {
+      environmentId: "env_demo",
+      targetName: "production-copy",
+    });
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "environment_archived",
+      details: {
+        commandName: "environments.clone",
+        environmentId: "env_demo",
+      },
+    });
+    expect(environments.items.has("env_0001")).toBe(false);
+    expect(eventBus.events).toHaveLength(0);
+  });
+
+  test("[ENV-LIFE-CLONE-003] rejects duplicate target environment names", async () => {
+    const { clock, context, environments, eventBus, logger, projects, repositoryContext } =
+      await createHarness();
+    const existing = environmentFixture({ id: "env_existing", name: "production-copy" });
+    await environments.upsert(
+      repositoryContext,
+      existing,
+      UpsertEnvironmentSpec.fromEnvironment(existing),
+    );
+    const useCase = new CloneEnvironmentUseCase(
+      projects,
+      environments,
+      clock,
+      new SequenceIdGenerator(),
+      eventBus,
+      logger,
+    );
+
+    const result = await useCase.execute(context, {
+      environmentId: "env_demo",
+      targetName: "production-copy",
+    });
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "conflict",
+    });
+    expect(environments.items.has("env_0001")).toBe(false);
+    const duplicateLookup = await environments.findOne(
+      repositoryContext,
+      EnvironmentByProjectAndNameSpec.create(
+        ProjectId.rehydrate("prj_demo"),
+        EnvironmentName.rehydrate("production-copy"),
+      ),
+    );
+    expect(duplicateLookup?.toState().id.value).toBe("env_existing");
+  });
+
+  test("[ENV-LIFE-CLONE-004] rejects clone when the source project is archived", async () => {
+    const { clock, context, environments, eventBus, logger, projects } = await createHarness({
+      environment: environmentFixture(),
+      project: projectFixture({ lifecycleStatus: "archived" }),
+    });
+    const useCase = new CloneEnvironmentUseCase(
+      projects,
+      environments,
+      clock,
+      new SequenceIdGenerator(),
+      eventBus,
+      logger,
+    );
+
+    const result = await useCase.execute(context, {
+      environmentId: "env_demo",
+      targetName: "production-copy",
+    });
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "project_archived",
+      details: {
+        commandName: "environments.clone",
+        projectId: "prj_demo",
+      },
+    });
+    expect(environments.items.has("env_0001")).toBe(false);
+  });
+
   test("[ENV-LIFE-ARCHIVE-001] archives an active environment and publishes environment-archived", async () => {
     const { clock, context, environments, eventBus, logger, repositoryContext } =
       await createHarness();

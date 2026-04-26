@@ -9,6 +9,7 @@ import {
   BootstrapServerProxyCommand,
   bootstrapServerProxyCommandInputSchema,
   CheckServerDeleteSafetyQuery,
+  CloneEnvironmentCommand,
   type Command,
   type CommandBus,
   ConfigureDefaultAccessDomainPolicyCommand,
@@ -27,6 +28,7 @@ import {
   CreateResourceCommand,
   CreateSshCredentialCommand,
   checkServerDeleteSafetyQueryInputSchema,
+  cloneEnvironmentCommandInputSchema,
   configureDefaultAccessDomainPolicyCommandInputSchema,
   configureResourceHealthCommandInputSchema,
   configureResourceNetworkCommandInputSchema,
@@ -151,6 +153,7 @@ import {
   archiveResourceResponseSchema,
   bootstrapServerProxyResponseSchema,
   checkServerDeleteSafetyResponseSchema,
+  cloneEnvironmentResponseSchema,
   configureDefaultAccessDomainPolicyResponseSchema,
   configureResourceHealthResponseSchema,
   configureResourceNetworkResponseSchema,
@@ -413,6 +416,10 @@ export const apiRouteDescriptions = {
   promoteEnvironment: routeDescription(
     "Promotes one environment configuration set into another.",
     "environment.diff-promote",
+  ),
+  cloneEnvironment: routeDescription(
+    "Clones one active environment into a new environment in the same project.",
+    "environment.lifecycle",
   ),
   archiveEnvironment: routeDescription(
     "Archives one environment while keeping deployment history readable.",
@@ -1514,6 +1521,19 @@ export const archiveEnvironmentProcedure = base
     executeCommand(context, ArchiveEnvironmentCommand.create(input)),
   );
 
+export const cloneEnvironmentProcedure = base
+  .route({
+    method: "POST",
+    path: "/environments/{environmentId}/clone",
+    description: apiRouteDescriptions.cloneEnvironment,
+    successStatus: 200,
+  })
+  .input(cloneEnvironmentCommandInputSchema)
+  .output(cloneEnvironmentResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, CloneEnvironmentCommand.create(input)),
+  );
+
 export const lockEnvironmentProcedure = base
   .route({
     method: "POST",
@@ -1863,6 +1883,7 @@ export const appaloftOrpcRouter = {
     lock: lockEnvironmentProcedure,
     unlock: unlockEnvironmentProcedure,
     archive: archiveEnvironmentProcedure,
+    clone: cloneEnvironmentProcedure,
     setVariable: setEnvironmentVariableProcedure,
     unsetVariable: unsetEnvironmentVariableProcedure,
     effectivePrecedence: environmentEffectivePrecedenceProcedure,
@@ -2059,6 +2080,7 @@ export function mountAppaloftOrpcRoutes(
     "/api/environments/:environmentId/lock",
     "/api/environments/:environmentId/unlock",
     "/api/environments/:environmentId/archive",
+    "/api/environments/:environmentId/clone",
     "/api/environments/:environmentId/variables",
     "/api/environments/:environmentId/variables/:key",
     "/api/environments/:environmentId/effective-precedence",

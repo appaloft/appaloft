@@ -4,6 +4,7 @@ import { describe, expect, test } from "bun:test";
 import {
   type AppLogger,
   ArchiveEnvironmentCommand,
+  CloneEnvironmentCommand,
   type Command,
   type CommandBus,
   createExecutionContext,
@@ -38,6 +39,49 @@ class TestExecutionContextFactory implements ExecutionContextFactory {
 }
 
 describe("environment lifecycle HTTP routes", () => {
+  test("[ENV-LIFE-CLONE-ENTRY-002] dispatches CloneEnvironmentCommand through HTTP", async () => {
+    let capturedCommand: Command<unknown> | undefined;
+    const commandBus = {
+      execute: async <T>(_context: ExecutionContext, command: Command<T>): Promise<Result<T>> => {
+        capturedCommand = command as Command<unknown>;
+        return ok({ id: "env_clone" } as T);
+      },
+    } as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: ExecutionContext, _query: Query<T>): Promise<Result<T>> =>
+        ok({} as T),
+    } as QueryBus;
+    const app = mountAppaloftOrpcRoutes(new Elysia(), {
+      commandBus,
+      executionContextFactory: new TestExecutionContextFactory(),
+      logger: new NoopLogger(),
+      queryBus,
+    });
+
+    const response = await app.handle(
+      new Request("http://localhost/api/environments/env_demo/clone", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          environmentId: "env_demo",
+          targetName: "production-copy",
+          targetKind: "staging",
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ id: "env_clone" });
+    expect(capturedCommand).toBeInstanceOf(CloneEnvironmentCommand);
+    expect(capturedCommand).toMatchObject({
+      environmentId: "env_demo",
+      targetName: "production-copy",
+      targetKind: "staging",
+    });
+  });
+
   test("[ENV-LIFE-ENTRY-002] dispatches ArchiveEnvironmentCommand through HTTP", async () => {
     let capturedCommand: Command<unknown> | undefined;
     const commandBus = {

@@ -209,16 +209,18 @@ Implemented operations:
 | Unset environment variable | Command | `environments.unset-variable` | `UnsetEnvironmentVariableCommand` | `UnsetEnvironmentVariableCommandInput` | `appaloft env unset <environmentId> <key>` | `DELETE /api/environments/{environmentId}/variables/{key}` |
 | Read environment effective precedence | Query | `environments.effective-precedence` | `EnvironmentEffectivePrecedenceQuery` | `EnvironmentEffectivePrecedenceQueryInput` | `appaloft env effective-precedence <environmentId>` | `GET /api/environments/{environmentId}/effective-precedence` |
 | Diff environments | Query | `environments.diff` | `DiffEnvironmentsQuery` | `DiffEnvironmentsQueryInput` | `appaloft env diff <environmentId> <otherEnvironmentId>` | `GET /api/environments/{environmentId}/diff/{otherEnvironmentId}` |
+| Clone environment | Command | `environments.clone` | `CloneEnvironmentCommand` | `CloneEnvironmentCommandInput` | `appaloft env clone <environmentId> --name <targetName>` | `POST /api/environments/{environmentId}/clone` |
 | Promote environment | Command | `environments.promote` | `PromoteEnvironmentCommand` | `PromoteEnvironmentCommandInput` | `appaloft env promote <environmentId> <targetName>` | `POST /api/environments/{environmentId}/promote` |
 | Lock environment | Command | `environments.lock` | `LockEnvironmentCommand` | `LockEnvironmentCommandInput` | `appaloft env lock <environmentId> --reason <reason>` | `POST /api/environments/{environmentId}/lock` |
 | Unlock environment | Command | `environments.unlock` | `UnlockEnvironmentCommand` | `UnlockEnvironmentCommandInput` | `appaloft env unlock <environmentId>` | `POST /api/environments/{environmentId}/unlock` |
 | Archive environment | Command | `environments.archive` | `ArchiveEnvironmentCommand` | `ArchiveEnvironmentCommandInput` | `appaloft env archive <environmentId>` | `POST /api/environments/{environmentId}/archive` |
 
 Core next operations expected here:
-- clone environment
 - list environment change history
 - remaining named edit semantics, restore/delete, and lifecycle history
 
+- `environments.clone` creates a new active environment in the same project from an active source
+  environment's current environment-owned variables.
 - `environments.lock` freezes one environment from new config/deployment work while keeping it
   readable.
 - `environments.unlock` returns a locked environment to active. Archived environments remain

@@ -14,6 +14,7 @@ The active environment lifecycle operations are:
 - `environments.unset-variable`
 - `environments.effective-precedence`
 - `environments.diff`
+- `environments.clone`
 - `environments.promote`
 - `environments.lock`
 - `environments.unlock`
@@ -27,6 +28,7 @@ Generic `environments.update` remains forbidden by ADR-026.
 - [ADR-013: Project Resource Navigation And Deployment Ownership](../decisions/ADR-013-project-resource-navigation-and-deployment-ownership.md)
 - [ADR-026: Aggregate Mutation Command Boundary](../decisions/ADR-026-aggregate-mutation-command-boundary.md)
 - [ADR-032: Environment Lock Lifecycle](../decisions/ADR-032-environment-lock-lifecycle.md)
+- [environments.clone Command Spec](../commands/environments.clone.md)
 - [environments.lock Command Spec](../commands/environments.lock.md)
 - [environments.unlock Command Spec](../commands/environments.unlock.md)
 - [environments.archive Command Spec](../commands/environments.archive.md)
@@ -42,12 +44,11 @@ Environment lifecycle status is value-object backed.
 
 | Status | Meaning | Allowed public mutations |
 | --- | --- | --- |
-| `active` | Environment can accept configuration writes, promotion, resource creation, and deployment admission. | `environments.set-variable`, `environments.unset-variable`, `environments.promote`, `environments.lock`, `environments.archive`, child operations where their specs allow. |
+| `active` | Environment can accept configuration writes, clone, promotion, resource creation, and deployment admission. | `environments.set-variable`, `environments.unset-variable`, `environments.clone`, `environments.promote`, `environments.lock`, `environments.archive`, child operations where their specs allow. |
 | `locked` | Environment identity, variables, resources, deployments, and history are retained and readable, but new mutations/admission are blocked until unlock. | Read queries, `environments.unlock`, and `environments.archive`. |
 | `archived` | Environment identity, variables, resources, deployments, and history are retained, but new mutations/admission are blocked. | Read queries only, plus future explicit restore/delete if specified. |
 
-Environment hard delete, restore, clone, and history are future behaviors and require separate
-specs.
+Environment hard delete, restore, and history are future behaviors and require separate specs.
 
 ## Workflow Rules
 
@@ -55,10 +56,15 @@ specs.
 variables.
 
 `environments.set-variable` and `environments.unset-variable` change only environment-owned
-configuration entries. They must reject archived environments.
+configuration entries. They must reject locked or archived environments.
 
 `environments.effective-precedence` and `environments.diff` are read-only and may operate on archived
 environments.
+
+`environments.clone` creates a new active environment in the same project from an active source
+environment's current environment-owned variables. It must reject archived source environments,
+locked source environments, archived source projects, and duplicate target names. It does not copy
+resources, deployments, domains, certificates, source links, runtime state, logs, or audit state.
 
 `environments.promote` creates a new active environment from an active source environment. It must
 reject locked or archived source environments.
@@ -86,12 +92,12 @@ context.
 
 | Surface | Decision |
 | --- | --- |
-| CLI | Expose `env lock`, `env unlock`, and `env archive`; do not expose generic `env update`. |
-| HTTP/oRPC | Expose lock, unlock, and archive routes that reuse application command schemas. |
-| Web | Project detail environment list can lock active environments, unlock locked environments, archive active or locked environments after confirmation, and keep locked/archived environments visible. |
+| CLI | Expose `env clone`, `env lock`, `env unlock`, and `env archive`; do not expose generic `env update`. |
+| HTTP/oRPC | Expose clone, lock, unlock, and archive routes that reuse application command schemas. |
+| Web | Project detail environment list can clone active environments, lock active environments, unlock locked environments, archive active or locked environments after confirmation, and keep locked/archived environments visible. |
 | Repository config | Not applicable. Repository config may select/create environments through deployment bootstrap but must not lock, unlock, or archive them. |
 | Future MCP/tools | Generate the tool from the operation catalog entry. |
-| Public docs | Stable environment lifecycle anchor describes lock/unlock, archive, and lifecycle guard behavior. |
+| Public docs | Stable environment lifecycle anchor describes clone, lock/unlock, archive, and lifecycle guard behavior. |
 
 ## Current Implementation Notes And Migration Gaps
 
@@ -99,5 +105,5 @@ No migration gaps are recorded for this lifecycle slice.
 
 ## Open Questions
 
-- None for lock/unlock/archive. Clone, history, delete/restore, and cleanup remain separate
+- None for clone, lock/unlock, and archive. History, delete/restore, and cleanup remain separate
   behaviors.

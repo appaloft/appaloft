@@ -8,6 +8,7 @@ This matrix covers:
 - `environments.list`
 - `environments.set-variable`
 - `environments.unset-variable`
+- `environments.clone`
 - `environments.promote`
 - `environments.lock`
 - `environments.unlock`
@@ -20,6 +21,7 @@ It also verifies that no entrypoint exposes generic `environments.update`.
 ## Global References
 
 - [Environment Lifecycle Workflow](../workflows/environment-lifecycle.md)
+- [environments.clone Command Spec](../commands/environments.clone.md)
 - [environments.lock Command Spec](../commands/environments.lock.md)
 - [environments.unlock Command Spec](../commands/environments.unlock.md)
 - [environments.archive Command Spec](../commands/environments.archive.md)
@@ -46,6 +48,10 @@ It also verifies that no entrypoint exposes generic `environments.update`.
 | ENV-LIFE-ARCHIVE-002 | `environments.archive` | core/application | Already archived environment. | Returns idempotent `ok({ id })`, preserves archive metadata, and publishes no duplicate event. |
 | ENV-LIFE-ARCHIVE-003 | `environment-archived` | event payload | Archive has safe reason. | Event includes environment id, project id, name, kind, archived timestamp, optional reason, and no secrets. |
 | ENV-LIFE-ARCHIVE-004 | `environments.archive` | core/application | Locked environment archived. | Transitions to archived, clears lock metadata, publishes `environment-archived`, and keeps no duplicate lock/unlock event. |
+| ENV-LIFE-CLONE-001 | `environments.clone` | core/application | Active environment cloned. | Persists a new active environment in the same project, sets `parentEnvironmentId`, copies environment-owned variables, and returns `ok({ id })`. |
+| ENV-LIFE-CLONE-002 | `environments.clone` | core/application | Archived source environment selected. | Returns `environment_archived`, no cloned environment. |
+| ENV-LIFE-CLONE-003 | `environments.clone` | application | Target name already exists in the source project. | Returns `conflict`, no cloned environment. |
+| ENV-LIFE-CLONE-004 | `environments.clone` | application | Source project is archived. | Returns `project_archived`, no cloned environment. |
 | ENV-LIFE-READ-001 | `environments.show` / `environments.list` | read model | Archived environment queried. | Returns lifecycle status, archive metadata, created time, and masked variables. |
 | ENV-LIFE-READ-002 | `environments.show` / `environments.list` | read model | Locked environment queried. | Returns lifecycle status, lock metadata, created time, and masked variables. |
 | ENV-LIFE-GUARD-001 | `environments.set-variable` | application | Archived environment selected. | Returns `environment_archived`, `phase = environment-lifecycle-guard`, no event. |
@@ -59,22 +65,30 @@ It also verifies that no entrypoint exposes generic `environments.update`.
 | ENV-LIFE-GUARD-009 | `deployments.create` | application | Locked environment selected. | Returns `environment_locked` before deployment state or bootstrap resource creation. |
 | ENV-LIFE-PERSIST-001 | PG/PGlite | integration | Environment archive state persisted and read back. | Repository rehydrates archive state; read model exposes lifecycle metadata. |
 | ENV-LIFE-PERSIST-002 | PG/PGlite | integration | Environment lock state persisted and read back. | Repository rehydrates lock state; read model exposes lifecycle metadata; unlock clears lock metadata. |
+| ENV-LIFE-CLONE-PERSIST-001 | PG/PGlite | integration | Cloned environment persisted and read back. | Repository rehydrates cloned environment parent id and copied variables. |
 | ENV-LIFE-ENTRY-001 | CLI | e2e-preferred | `appaloft env archive <environmentId> --reason ...`. | Dispatches `ArchiveEnvironmentCommand`; no repository bypass. |
 | ENV-LIFE-ENTRY-002 | HTTP/oRPC | e2e-preferred | `POST /api/environments/{environmentId}/archive`. | Reuses application schema and dispatches `ArchiveEnvironmentCommand`. |
 | ENV-LIFE-ENTRY-003 | Web | e2e-preferred | Project detail environment lifecycle control. | Dispatches `environments.archive`, invalidates environment/project state, and leaves archived environments visible. |
 | ENV-LIFE-ENTRY-006 | CLI / HTTP/oRPC / Web | e2e-preferred | Lock and unlock controls. | Dispatches `LockEnvironmentCommand` and `UnlockEnvironmentCommand` through shared schemas; no repository bypass. |
-| ENV-LIFE-ENTRY-004 | Operation catalog | contract | Public exposure in Code Round. | `CORE_OPERATIONS.md` and `operation-catalog.ts` include `environments.lock`, `environments.unlock`, and `environments.archive`. |
+| ENV-LIFE-ENTRY-004 | Operation catalog | contract | Public exposure in Code Round. | `CORE_OPERATIONS.md` and `operation-catalog.ts` include `environments.clone`, `environments.lock`, `environments.unlock`, and `environments.archive`. |
 | ENV-LIFE-DOCS-001 | Public docs | contract | Archive behavior has a public help anchor. | Docs registry maps `environments.archive` to `environment.lifecycle`. |
 | ENV-LIFE-DOCS-002 | Public docs | contract | Lock/unlock behavior has a public help anchor. | Docs registry maps `environments.lock` and `environments.unlock` to `environment.lifecycle`. |
+| ENV-LIFE-CLONE-ENTRY-001 | CLI | e2e-preferred | `appaloft env clone <environmentId> --name ...`. | Dispatches `CloneEnvironmentCommand`; no repository bypass. |
+| ENV-LIFE-CLONE-ENTRY-002 | HTTP/oRPC | e2e-preferred | `POST /api/environments/{environmentId}/clone`. | Reuses application schema and dispatches `CloneEnvironmentCommand`. |
+| ENV-LIFE-CLONE-ENTRY-003 | Web | e2e-preferred | Project detail environment clone control. | Dispatches `environments.clone`, invalidates environment/project state, and keeps source environment visible. |
+| ENV-LIFE-CLONE-ENTRY-004 | Operation catalog | contract | Public exposure in Code Round. | `CORE_OPERATIONS.md` and `operation-catalog.ts` include `environments.clone`. |
+| ENV-LIFE-CLONE-DOCS-001 | Public docs | contract | Clone behavior has a public help anchor. | Docs registry maps `environments.clone` to `environment.lifecycle`. |
 
 ## Required Non-Coverage Assertions
 
-Tests must assert environment lock/unlock/archive does not:
+Tests must assert environment clone/lock/unlock/archive do not:
 
 - delete or archive resources;
 - create deployments;
 - mutate historical deployment snapshots;
 - stop runtime;
+- copy resources, deployments, domains, certificates, source links, runtime state, logs, or audit
+  records during clone;
 - bind or unbind domains;
 - issue, renew, revoke, or import certificates;
 - apply or remove proxy routes;
@@ -89,24 +103,25 @@ Automated coverage exists for all rows in this matrix:
 
 - `ENV-LIFE-LOCK-001` through `ENV-LIFE-LOCK-003`, `ENV-LIFE-UNLOCK-001` through
   `ENV-LIFE-UNLOCK-003`, `ENV-LIFE-ARCHIVE-001` through `ENV-LIFE-ARCHIVE-004`,
-  `ENV-LIFE-READ-001` through `ENV-LIFE-READ-002`, and `ENV-LIFE-GUARD-001` through
-  `ENV-LIFE-GUARD-009` in
+  `ENV-LIFE-CLONE-001` through `ENV-LIFE-CLONE-004`, `ENV-LIFE-READ-001` through
+  `ENV-LIFE-READ-002`, and `ENV-LIFE-GUARD-001` through `ENV-LIFE-GUARD-009` in
   `packages/application/test/environment-lifecycle.test.ts` and
   `packages/core/test/environment.test.ts`;
-- `ENV-LIFE-PERSIST-001` and `ENV-LIFE-PERSIST-002` in
+- `ENV-LIFE-PERSIST-001`, `ENV-LIFE-PERSIST-002`, and `ENV-LIFE-CLONE-PERSIST-001` in
   `packages/persistence/pg/test/environment-lifecycle.pglite.test.ts`;
-- `ENV-LIFE-ENTRY-001` and `ENV-LIFE-ENTRY-006` CLI coverage in
+- `ENV-LIFE-ENTRY-001`, `ENV-LIFE-ENTRY-006`, and `ENV-LIFE-CLONE-ENTRY-001` CLI coverage in
   `packages/adapters/cli/test/environment-command.test.ts`;
-- `ENV-LIFE-ENTRY-002` and `ENV-LIFE-ENTRY-006` HTTP/oRPC coverage in
+- `ENV-LIFE-ENTRY-002`, `ENV-LIFE-ENTRY-006`, and `ENV-LIFE-CLONE-ENTRY-002` HTTP/oRPC coverage in
   `packages/orpc/test/environment-lifecycle.http.test.ts`;
-- `ENV-LIFE-ENTRY-003` and `ENV-LIFE-ENTRY-006` Web coverage in
+- `ENV-LIFE-ENTRY-003`, `ENV-LIFE-ENTRY-006`, and `ENV-LIFE-CLONE-ENTRY-003` Web coverage in
   `apps/web/test/e2e-webview/home.webview.test.ts`;
-- `ENV-LIFE-ENTRY-004` in `packages/application/test/operation-catalog-boundary.test.ts`;
-- `ENV-LIFE-DOCS-001` and `ENV-LIFE-DOCS-002` in
+- `ENV-LIFE-ENTRY-004` and `ENV-LIFE-CLONE-ENTRY-004` in
+  `packages/application/test/operation-catalog-boundary.test.ts`;
+- `ENV-LIFE-DOCS-001`, `ENV-LIFE-DOCS-002`, and `ENV-LIFE-CLONE-DOCS-001` in
   `packages/docs-registry/test/operation-coverage.test.ts`.
 
 No migration gaps are recorded for this slice.
 
 ## Open Questions
 
-- None for lock/unlock/archive.
+- None.
