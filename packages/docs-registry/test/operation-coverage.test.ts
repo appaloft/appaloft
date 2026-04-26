@@ -135,4 +135,29 @@ describe("public docs operation coverage", () => {
     );
     expect(topic.webSurfaces?.join("\n")).toContain("environment lifecycle action");
   });
+
+  test("[ENV-LIFE-DOCS-002] environment lock and unlock record lifecycle docs coverage", () => {
+    const lockCoverage = getPublicDocsOperationCoverage("environments.lock");
+    const unlockCoverage = getPublicDocsOperationCoverage("environments.unlock");
+    const topic = publicDocsHelpTopics["environment.lifecycle"];
+
+    expect(lockCoverage).toMatchObject({
+      operationKey: "environments.lock",
+      status: "documented",
+      topicId: "environment.lifecycle",
+    });
+    expect(unlockCoverage).toMatchObject({
+      operationKey: "environments.unlock",
+      status: "documented",
+      topicId: "environment.lifecycle",
+    });
+    expect(topic.specReferences).toEqual(
+      expect.arrayContaining([
+        "docs/commands/environments.lock.md",
+        "docs/commands/environments.unlock.md",
+        "docs/events/environment-locked.md",
+        "docs/events/environment-unlocked.md",
+      ]),
+    );
+  });
 });

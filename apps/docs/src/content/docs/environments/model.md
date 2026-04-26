@@ -12,6 +12,8 @@ searchAliases:
   - "环境"
 relatedOperations:
   - environments.create
+  - environments.lock
+  - environments.unlock
   - environments.archive
 sidebar:
   label: "Model"
@@ -28,6 +30,8 @@ Environment 是一组部署时配置的用户边界，例如 development、stagi
 
 <h2 id="environment-lifecycle">环境生命周期</h2>
 
-环境默认是 active。归档环境会保留环境、变量、资源、部署和历史记录，但会阻止新的环境变量写入、环境提升、新资源创建和新部署准入。
+环境默认是 active。锁定环境会保留环境、变量、资源、部署和历史记录，并阻止新的环境变量写入、环境提升、新资源创建和新部署准入；解锁后环境回到 active。
 
-归档不会停止运行时、删除资源、清理域名或移除证书。需要清理时，应使用对应资源、部署、域名或证书命令。
+归档环境同样保留环境、变量、资源、部署和历史记录，但它是退役状态，不会通过解锁恢复。
+
+锁定、解锁和归档都不会停止运行时、删除资源、清理域名或移除证书。需要清理时，应使用对应资源、部署、域名或证书命令。

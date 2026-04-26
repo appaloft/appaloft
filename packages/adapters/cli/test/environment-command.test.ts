@@ -80,6 +80,107 @@ describe("CLI environment commands", () => {
     });
   });
 
+  test("[ENV-LIFE-ENTRY-006] environment lock dispatches the application command", async () => {
+    ensureReflectMetadata();
+    const { LockEnvironmentCommand, createExecutionContext } = await import(
+      "@appaloft/application"
+    );
+    const { createCliProgram } = await import("../src");
+    const commands: AppCommand<unknown>[] = [];
+    const commandBus = {
+      execute: async <T>(_context: unknown, command: AppCommand<T>) => {
+        commands.push(command as AppCommand<unknown>);
+        return ok({ id: "env_production" } as T);
+      },
+    } as unknown as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: unknown, _query: AppQuery<T>) => ok({} as T),
+    } as unknown as QueryBus;
+    const executionContextFactory: ExecutionContextFactory = {
+      create: (input) =>
+        createExecutionContext({
+          ...input,
+          requestId: "req_cli_environment_lock_test",
+        }),
+    };
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus,
+      queryBus,
+      executionContextFactory,
+    });
+
+    const writeStdout = process.stdout.write;
+    try {
+      process.stdout.write = (() => true) as typeof process.stdout.write;
+      await program.parseAsync([
+        "node",
+        "appaloft",
+        "env",
+        "lock",
+        "env_production",
+        "--reason",
+        "Change freeze",
+      ]);
+    } finally {
+      process.stdout.write = writeStdout;
+    }
+
+    expect(commands).toHaveLength(1);
+    expect(commands[0]).toBeInstanceOf(LockEnvironmentCommand);
+    expect(commands[0]).toMatchObject({
+      environmentId: "env_production",
+      reason: "Change freeze",
+    });
+  });
+
+  test("[ENV-LIFE-ENTRY-006] environment unlock dispatches the application command", async () => {
+    ensureReflectMetadata();
+    const { UnlockEnvironmentCommand, createExecutionContext } = await import(
+      "@appaloft/application"
+    );
+    const { createCliProgram } = await import("../src");
+    const commands: AppCommand<unknown>[] = [];
+    const commandBus = {
+      execute: async <T>(_context: unknown, command: AppCommand<T>) => {
+        commands.push(command as AppCommand<unknown>);
+        return ok({ id: "env_production" } as T);
+      },
+    } as unknown as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: unknown, _query: AppQuery<T>) => ok({} as T),
+    } as unknown as QueryBus;
+    const executionContextFactory: ExecutionContextFactory = {
+      create: (input) =>
+        createExecutionContext({
+          ...input,
+          requestId: "req_cli_environment_unlock_test",
+        }),
+    };
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus,
+      queryBus,
+      executionContextFactory,
+    });
+
+    const writeStdout = process.stdout.write;
+    try {
+      process.stdout.write = (() => true) as typeof process.stdout.write;
+      await program.parseAsync(["node", "appaloft", "env", "unlock", "env_production"]);
+    } finally {
+      process.stdout.write = writeStdout;
+    }
+
+    expect(commands).toHaveLength(1);
+    expect(commands[0]).toBeInstanceOf(UnlockEnvironmentCommand);
+    expect(commands[0]).toMatchObject({
+      environmentId: "env_production",
+    });
+  });
+
   test("[ENV-PRECEDENCE-ENTRY-003] environment effective-precedence dispatches the application query", async () => {
     ensureReflectMetadata();
     const { EnvironmentEffectivePrecedenceQuery, createExecutionContext } = await import(

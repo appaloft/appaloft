@@ -2,11 +2,13 @@
   import { browser } from "$app/environment";
   import { page } from "$app/state";
   import { createMutation, createQuery, queryOptions } from "@tanstack/svelte-query";
-  import { Archive, ArrowLeft, ArrowRight, FolderOpen, Play, Plus, Save } from "@lucide/svelte";
+  import { Archive, ArrowLeft, ArrowRight, FolderOpen, Lock, Play, Plus, Save, Unlock } from "@lucide/svelte";
   import type {
     ArchiveEnvironmentInput,
     ArchiveProjectInput,
+    LockEnvironmentInput,
     RenameProjectInput,
+    UnlockEnvironmentInput,
   } from "@appaloft/contracts";
 
   import { readErrorMessage } from "$lib/api/client";
@@ -155,6 +157,50 @@
       };
     },
   }));
+  const lockEnvironmentMutation = createMutation(() => ({
+    mutationFn: (input: LockEnvironmentInput) => orpcClient.environments.lock(input),
+    onSuccess: (result) => {
+      lifecycleFeedback = {
+        kind: "success",
+        title: $t(i18nKeys.console.projects.environmentLockSucceeded),
+        detail: result.id,
+      };
+      void queryClient.invalidateQueries({ queryKey: ["environments"] });
+      void queryClient.invalidateQueries({ queryKey: ["projects"] });
+      if (project) {
+        void queryClient.invalidateQueries({ queryKey: ["projects", "show", project.id] });
+      }
+    },
+    onError: (error) => {
+      lifecycleFeedback = {
+        kind: "error",
+        title: $t(i18nKeys.console.projects.environmentLockFailed),
+        detail: readErrorMessage(error),
+      };
+    },
+  }));
+  const unlockEnvironmentMutation = createMutation(() => ({
+    mutationFn: (input: UnlockEnvironmentInput) => orpcClient.environments.unlock(input),
+    onSuccess: (result) => {
+      lifecycleFeedback = {
+        kind: "success",
+        title: $t(i18nKeys.console.projects.environmentUnlockSucceeded),
+        detail: result.id,
+      };
+      void queryClient.invalidateQueries({ queryKey: ["environments"] });
+      void queryClient.invalidateQueries({ queryKey: ["projects"] });
+      if (project) {
+        void queryClient.invalidateQueries({ queryKey: ["projects", "show", project.id] });
+      }
+    },
+    onError: (error) => {
+      lifecycleFeedback = {
+        kind: "error",
+        title: $t(i18nKeys.console.projects.environmentUnlockFailed),
+        detail: readErrorMessage(error),
+      };
+    },
+  }));
 
   $effect(() => {
     if (!project || projectFormProjectId === project.id) {
@@ -209,6 +255,42 @@
 
     lifecycleFeedback = null;
     archiveEnvironmentMutation.mutate({
+      environmentId,
+    });
+  }
+
+  function lockEnvironment(environmentId: string): void {
+    if (!browser || !project || isProjectArchived || lockEnvironmentMutation.isPending) {
+      return;
+    }
+
+    const environment = projectEnvironments.find((item) => item.id === environmentId);
+    if (!environment || environment.lifecycleStatus !== "active") {
+      return;
+    }
+
+    if (!window.confirm($t(i18nKeys.console.projects.environmentLockConfirm))) {
+      return;
+    }
+
+    lifecycleFeedback = null;
+    lockEnvironmentMutation.mutate({
+      environmentId,
+    });
+  }
+
+  function unlockEnvironment(environmentId: string): void {
+    if (!browser || !project || isProjectArchived || unlockEnvironmentMutation.isPending) {
+      return;
+    }
+
+    const environment = projectEnvironments.find((item) => item.id === environmentId);
+    if (!environment || environment.lifecycleStatus !== "locked") {
+      return;
+    }
+
+    lifecycleFeedback = null;
+    unlockEnvironmentMutation.mutate({
       environmentId,
     });
   }
@@ -487,6 +569,10 @@
                             <Badge variant="destructive">
                               {$t(i18nKeys.console.projects.environmentArchived)}
                             </Badge>
+                          {:else if environment.lifecycleStatus === "locked"}
+                            <Badge variant="outline">
+                              {$t(i18nKeys.console.projects.environmentLocked)}
+                            </Badge>
                           {/if}
                         </div>
                         <p class="text-xs text-muted-foreground">
@@ -500,21 +586,56 @@
                               environment.archivedAt,
                             )}
                           </p>
+                        {:else if environment.lockedAt}
+                          <p class="text-xs text-muted-foreground">
+                            {$t(i18nKeys.console.projects.environmentLockedAt)} · {formatTime(
+                              environment.lockedAt,
+                            )}
+                          </p>
                         {/if}
                       </div>
-                      <Button
-                        type="button"
-                        size="icon-sm"
-                        variant="ghost"
-                        aria-label={$t(i18nKeys.console.projects.environmentArchiveAction)}
-                        title={$t(i18nKeys.console.projects.environmentArchiveAction)}
-                        disabled={isProjectArchived ||
-                          environment.lifecycleStatus === "archived" ||
-                          archiveEnvironmentMutation.isPending}
-                        onclick={() => archiveEnvironment(environment.id)}
-                      >
-                        <Archive class="size-4" />
-                      </Button>
+                      <div class="flex shrink-0 items-center gap-1">
+                        {#if environment.lifecycleStatus === "locked"}
+                          <Button
+                            type="button"
+                            size="icon-sm"
+                            variant="ghost"
+                            aria-label={$t(i18nKeys.console.projects.environmentUnlockAction)}
+                            title={$t(i18nKeys.console.projects.environmentUnlockAction)}
+                            disabled={isProjectArchived || unlockEnvironmentMutation.isPending}
+                            onclick={() => unlockEnvironment(environment.id)}
+                          >
+                            <Unlock class="size-4" />
+                          </Button>
+                        {:else}
+                          <Button
+                            type="button"
+                            size="icon-sm"
+                            variant="ghost"
+                            aria-label={$t(i18nKeys.console.projects.environmentLockAction)}
+                            title={$t(i18nKeys.console.projects.environmentLockAction)}
+                            disabled={isProjectArchived ||
+                              environment.lifecycleStatus !== "active" ||
+                              lockEnvironmentMutation.isPending}
+                            onclick={() => lockEnvironment(environment.id)}
+                          >
+                            <Lock class="size-4" />
+                          </Button>
+                        {/if}
+                        <Button
+                          type="button"
+                          size="icon-sm"
+                          variant="ghost"
+                          aria-label={$t(i18nKeys.console.projects.environmentArchiveAction)}
+                          title={$t(i18nKeys.console.projects.environmentArchiveAction)}
+                          disabled={isProjectArchived ||
+                            environment.lifecycleStatus === "archived" ||
+                            archiveEnvironmentMutation.isPending}
+                          onclick={() => archiveEnvironment(environment.id)}
+                        >
+                          <Archive class="size-4" />
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 {/each}

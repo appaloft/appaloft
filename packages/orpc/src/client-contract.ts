@@ -35,6 +35,7 @@ import {
   type ListGitHubRepositoriesQueryInput,
   type ListResourcesQueryInput,
   type ListSshCredentialsQueryInput,
+  type LockEnvironmentCommandInput,
   type OpenTerminalSessionCommandInput,
   type PromoteEnvironmentCommandInput,
   type RegisterServerCommandInput,
@@ -58,6 +59,7 @@ import {
   type StreamDeploymentEventsQueryInput,
   type TestDraftServerConnectivityCommandInput,
   type TestRegisteredServerConnectivityCommandInput,
+  type UnlockEnvironmentCommandInput,
   type UnsetEnvironmentVariableCommandInput,
   type UnsetResourceVariableCommandInput,
 } from "@appaloft/application/schemas";
@@ -106,6 +108,7 @@ import {
   type ListResourcesResponse,
   type ListServersResponse,
   type ListSshCredentialsResponse,
+  type LockEnvironmentResponse,
   type PromoteEnvironmentResponse,
   type ProxyConfigurationView,
   type RegisterServerResponse,
@@ -127,6 +130,7 @@ import {
   type ShowSshCredentialResponse,
   type TerminalSessionDescriptor,
   type TestServerConnectivityResponse,
+  type UnlockEnvironmentResponse,
   type UnsetResourceVariableResponse,
 } from "@appaloft/contracts";
 import { type AsyncIteratorClass, type Client, type ORPCError } from "@orpc/client";
@@ -308,6 +312,18 @@ export type AppaloftOrpcClientContract = {
       AppaloftClientContext,
       ArchiveEnvironmentCommandInput,
       ArchiveEnvironmentResponse,
+      AppaloftClientError
+    >;
+    lock: Client<
+      AppaloftClientContext,
+      LockEnvironmentCommandInput,
+      LockEnvironmentResponse,
+      AppaloftClientError
+    >;
+    unlock: Client<
+      AppaloftClientContext,
+      UnlockEnvironmentCommandInput,
+      UnlockEnvironmentResponse,
       AppaloftClientError
     >;
     setVariable: Client<

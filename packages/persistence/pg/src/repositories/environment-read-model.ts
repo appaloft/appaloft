@@ -55,6 +55,8 @@ function toEnvironmentSummary(
     lifecycleStatus: (row.lifecycle_status ?? "active") as Awaited<
       ReturnType<EnvironmentReadModel["list"]>
     >[number]["lifecycleStatus"],
+    ...(row.locked_at ? { lockedAt: normalizeTimestamp(row.locked_at) ?? row.locked_at } : {}),
+    ...(row.lock_reason ? { lockReason: row.lock_reason } : {}),
     ...(row.archived_at
       ? { archivedAt: normalizeTimestamp(row.archived_at) ?? row.archived_at }
       : {}),

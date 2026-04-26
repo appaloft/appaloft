@@ -366,6 +366,16 @@ export const zhCN = {
       environmentArchiveSucceeded: "环境已归档",
       environmentArchived: "已归档",
       environmentArchivedAt: "归档时间",
+      environmentLockAction: "锁定",
+      environmentLockConfirm:
+        "确定锁定这个环境吗？锁定后变量、资源、提升和部署都会被阻止，直到环境解锁。",
+      environmentLockFailed: "环境锁定失败",
+      environmentLockSucceeded: "环境已锁定",
+      environmentLocked: "已锁定",
+      environmentLockedAt: "锁定时间",
+      environmentUnlockAction: "解锁",
+      environmentUnlockFailed: "环境解锁失败",
+      environmentUnlockSucceeded: "环境已解锁",
       environmentsDescription: "按项目聚合的配置边界。",
       environmentsTitle: "环境",
       focusDescription:

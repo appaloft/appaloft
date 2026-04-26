@@ -27,6 +27,8 @@ type EnvironmentLifecycleErrorDetails = {
     | "environments.set-variable"
     | "environments.unset-variable"
     | "environments.promote"
+    | "environments.lock"
+    | "environments.unlock"
     | "environments.archive"
     | "resources.create"
     | "deployments.create";
@@ -35,7 +37,7 @@ type EnvironmentLifecycleErrorDetails = {
     | "environments.list"
     | "environments.effective-precedence"
     | "environments.diff";
-  eventName?: "environment-archived";
+  eventName?: "environment-locked" | "environment-unlocked" | "environment-archived";
   phase:
     | "command-validation"
     | "query-validation"
@@ -54,7 +56,9 @@ type EnvironmentLifecycleErrorDetails = {
   environmentId?: string;
   environmentName?: string;
   environmentKind?: string;
-  lifecycleStatus?: "active" | "archived";
+  lifecycleStatus?: "active" | "locked" | "archived";
+  lockedAt?: string;
+  lockReason?: string;
   archivedAt?: string;
   archiveReason?: string;
   variableKey?: string;
@@ -90,6 +94,7 @@ or plaintext environment values.
 | --- | --- | --- | --- | --- |
 | `validation_error` | `validation` | `command-validation` | No | Command input shape, variable identity, or archive reason is invalid. |
 | `not_found` | `not-found` | `context-resolution` | No | Environment cannot be found or is not visible. |
+| `environment_locked` | `conflict` | `environment-lifecycle-guard` | No | Mutation, resource creation, or deployment admission targeted a locked environment. |
 | `environment_archived` | `conflict` | `environment-lifecycle-guard` | No | Mutation, resource creation, or deployment admission targeted an archived environment. |
 | `invariant_violation` | `domain` | `environment-lifecycle-guard` | No | Environment aggregate lifecycle transition rejected the requested change. |
 | `validation_error` | `validation` | `config-identity`, `config-secret-validation`, `config-profile-resolution` | No | Environment variable shape, exposure, scope, or secret policy is invalid. |
@@ -112,6 +117,7 @@ Web, CLI, HTTP API, workers, and tests must use [Error Model](./model.md).
 Environment consumers additionally must:
 
 - distinguish missing environments from archived-environment guards;
+- distinguish locked-environment guards from archived-environment guards;
 - avoid retry affordances for validation, not-found, conflict, and invariant errors;
 - keep resource/deployment cleanup routed through explicit resource or deployment operations.
 
@@ -124,15 +130,16 @@ Tests must assert:
 - `error.category`;
 - `error.retriable`;
 - phase in `details.phase`;
-- `environmentId`, `projectId`, `environmentName`, `lifecycleStatus`, or `archivedAt` when
-  relevant;
+- `environmentId`, `projectId`, `environmentName`, `lifecycleStatus`, `lockedAt`, or `archivedAt`
+  when relevant;
 - no duplicate event when archive is idempotent;
+- no duplicate event when lock/unlock are idempotent;
 - no plaintext secret values in errors, events, read models, or logs.
 
 ## Current Implementation Notes And Migration Gaps
 
-No migration gaps are recorded for this archive slice.
+No migration gaps are recorded for this lifecycle slice.
 
 ## Open Questions
 
-- None for archive.
+- None for lock/unlock/archive.

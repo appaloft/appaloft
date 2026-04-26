@@ -163,14 +163,31 @@ export class EnvironmentLifecycleStatusValue extends StateMachineValueObject<
     return new EnvironmentLifecycleStatusValue("active");
   }
 
-  archive(): Result<EnvironmentLifecycleStatusValue> {
-    return this.ensureCurrent(["active"], "Only active environments can be archived").map(
-      () => new EnvironmentLifecycleStatusValue("archived"),
+  lock(): Result<EnvironmentLifecycleStatusValue> {
+    return this.ensureCurrent(["active"], "Only active environments can be locked").map(
+      () => new EnvironmentLifecycleStatusValue("locked"),
     );
+  }
+
+  unlock(): Result<EnvironmentLifecycleStatusValue> {
+    return this.ensureCurrent(["locked"], "Only locked environments can be unlocked").map(
+      () => new EnvironmentLifecycleStatusValue("active"),
+    );
+  }
+
+  archive(): Result<EnvironmentLifecycleStatusValue> {
+    return this.ensureCurrent(
+      ["active", "locked"],
+      "Only active or locked environments can be archived",
+    ).map(() => new EnvironmentLifecycleStatusValue("archived"));
   }
 
   isActive(): boolean {
     return this.value === "active";
+  }
+
+  isLocked(): boolean {
+    return this.value === "locked";
   }
 
   isArchived(): boolean {

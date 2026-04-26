@@ -36,6 +36,8 @@ describe("operation catalog aggregate mutation boundary", () => {
       "environments.create",
       "environments.list",
       "environments.show",
+      "environments.lock",
+      "environments.unlock",
       "environments.set-variable",
       "environments.unset-variable",
       "environments.effective-precedence",
@@ -251,6 +253,38 @@ describe("operation catalog aggregate mutation boundary", () => {
       },
     });
     expect(entry?.inputSchema).toBeDefined();
+  });
+
+  test("[ENV-LIFE-ENTRY-006] environment lock and unlock are exposed through the active operation catalog", () => {
+    const lockEntry = operationCatalog.find((candidate) => candidate.key === "environments.lock");
+    const unlockEntry = operationCatalog.find(
+      (candidate) => candidate.key === "environments.unlock",
+    );
+
+    expect(lockEntry).toMatchObject({
+      kind: "command",
+      domain: "environments",
+      messageName: "LockEnvironmentCommand",
+      handlerName: "LockEnvironmentCommandHandler",
+      serviceName: "LockEnvironmentUseCase",
+      transports: {
+        cli: "appaloft env lock <environmentId>",
+        orpc: { method: "POST", path: "/api/environments/{environmentId}/lock" },
+      },
+    });
+    expect(unlockEntry).toMatchObject({
+      kind: "command",
+      domain: "environments",
+      messageName: "UnlockEnvironmentCommand",
+      handlerName: "UnlockEnvironmentCommandHandler",
+      serviceName: "UnlockEnvironmentUseCase",
+      transports: {
+        cli: "appaloft env unlock <environmentId>",
+        orpc: { method: "POST", path: "/api/environments/{environmentId}/unlock" },
+      },
+    });
+    expect(lockEntry?.inputSchema).toBeDefined();
+    expect(unlockEntry?.inputSchema).toBeDefined();
   });
 
   test("[AGG-MUTATION-CATALOG-002] detects generic aggregate update operation keys and command names", () => {

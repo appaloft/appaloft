@@ -10,7 +10,7 @@ export const environmentKinds = [
 
 export type EnvironmentKind = (typeof environmentKinds)[number];
 
-export const environmentLifecycleStatuses = ["active", "archived"] as const;
+export const environmentLifecycleStatuses = ["active", "locked", "archived"] as const;
 
 export type EnvironmentLifecycleStatus = (typeof environmentLifecycleStatuses)[number];
 

@@ -11,6 +11,8 @@ searchAliases:
   - "production"
 relatedOperations:
   - environments.create
+  - environments.lock
+  - environments.unlock
   - environments.archive
 sidebar:
   label: "Model"
@@ -27,6 +29,8 @@ A resource can be deployed in different environments. Each deployment reads the 
 
 <h2 id="environment-lifecycle">Environment lifecycle</h2>
 
-Environments start as active. Archiving an environment keeps the environment, variables, resources, deployments, and history readable, but blocks new environment variable writes, promotion, resource creation, and deployment admission.
+Environments start as active. Locking an environment keeps the environment, variables, resources, deployments, and history readable, but blocks new environment variable writes, promotion, resource creation, and deployment admission. Unlocking returns it to active.
 
-Archive does not stop runtime, delete resources, clean up domains, or remove certificates. Use the explicit resource, deployment, domain, or certificate commands for those cleanup tasks.
+Archiving an environment keeps the same history readable, but it is a retired state and is not restored by unlock.
+
+Lock, unlock, and archive do not stop runtime, delete resources, clean up domains, or remove certificates. Use the explicit resource, deployment, domain, or certificate commands for those cleanup tasks.

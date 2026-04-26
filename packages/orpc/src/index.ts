@@ -76,6 +76,7 @@ import {
   ListResourcesQuery,
   ListServersQuery,
   ListSshCredentialsQuery,
+  LockEnvironmentCommand,
   listCertificatesQueryInputSchema,
   listDefaultAccessDomainPoliciesQueryInputSchema,
   listDeploymentsQueryInputSchema,
@@ -84,6 +85,7 @@ import {
   listGitHubRepositoriesQueryInputSchema,
   listResourcesQueryInputSchema,
   listSshCredentialsQueryInputSchema,
+  lockEnvironmentCommandInputSchema,
   OpenTerminalSessionCommand,
   openTerminalSessionCommandInputSchema,
   PromoteEnvironmentCommand,
@@ -136,8 +138,10 @@ import {
   TestServerConnectivityCommand,
   testDraftServerConnectivityCommandInputSchema,
   testRegisteredServerConnectivityCommandInputSchema,
+  UnlockEnvironmentCommand,
   UnsetEnvironmentVariableCommand,
   UnsetResourceVariableCommand,
+  unlockEnvironmentCommandInputSchema,
   unsetEnvironmentVariableCommandInputSchema,
   unsetResourceVariableCommandInputSchema,
 } from "@appaloft/application";
@@ -186,6 +190,7 @@ import {
   listResourcesResponseSchema,
   listServersResponseSchema,
   listSshCredentialsResponseSchema,
+  lockEnvironmentResponseSchema,
   promoteEnvironmentResponseSchema,
   proxyConfigurationViewSchema,
   registerServerResponseSchema,
@@ -207,6 +212,7 @@ import {
   showSshCredentialResponseSchema,
   terminalSessionDescriptorSchema,
   testServerConnectivityResponseSchema,
+  unlockEnvironmentResponseSchema,
   unsetResourceVariableResponseSchema,
 } from "@appaloft/contracts";
 import { type DomainError, type Result } from "@appaloft/core";
@@ -412,6 +418,14 @@ export const apiRouteDescriptions = {
     "Archives one environment while keeping deployment history readable.",
     "environment.lifecycle",
   ),
+  lockEnvironment: routeDescription(
+    "Locks one environment to block mutable work while keeping it readable.",
+    "environment.lifecycle",
+  ),
+  unlockEnvironment: routeDescription(
+    "Unlocks one environment so mutable work can resume.",
+    "environment.lifecycle",
+  ),
   diffEnvironments: routeDescription(
     "Compares two environment configuration sets.",
     "environment.diff-promote",
@@ -601,6 +615,7 @@ function toOrpcError(error: DomainError, context: ExecutionContext) {
     case "certificate_attempt_conflict":
     case "project_archived":
     case "environment_archived":
+    case "environment_locked":
     case "resource_slug_conflict":
     case "resource_archived":
     case "resource_delete_blocked":
@@ -1499,6 +1514,32 @@ export const archiveEnvironmentProcedure = base
     executeCommand(context, ArchiveEnvironmentCommand.create(input)),
   );
 
+export const lockEnvironmentProcedure = base
+  .route({
+    method: "POST",
+    path: "/environments/{environmentId}/lock",
+    description: apiRouteDescriptions.lockEnvironment,
+    successStatus: 200,
+  })
+  .input(lockEnvironmentCommandInputSchema)
+  .output(lockEnvironmentResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, LockEnvironmentCommand.create(input)),
+  );
+
+export const unlockEnvironmentProcedure = base
+  .route({
+    method: "POST",
+    path: "/environments/{environmentId}/unlock",
+    description: apiRouteDescriptions.unlockEnvironment,
+    successStatus: 200,
+  })
+  .input(unlockEnvironmentCommandInputSchema)
+  .output(unlockEnvironmentResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, UnlockEnvironmentCommand.create(input)),
+  );
+
 export const setEnvironmentVariableProcedure = base
   .route({
     method: "POST",
@@ -1819,6 +1860,8 @@ export const appaloftOrpcRouter = {
     list: listEnvironmentsProcedure,
     create: createEnvironmentProcedure,
     show: showEnvironmentProcedure,
+    lock: lockEnvironmentProcedure,
+    unlock: unlockEnvironmentProcedure,
     archive: archiveEnvironmentProcedure,
     setVariable: setEnvironmentVariableProcedure,
     unsetVariable: unsetEnvironmentVariableProcedure,
@@ -2013,6 +2056,8 @@ export function mountAppaloftOrpcRoutes(
     "/api/default-access-domain-policies",
     "/api/default-access-domain-policies/show",
     "/api/environments/:environmentId",
+    "/api/environments/:environmentId/lock",
+    "/api/environments/:environmentId/unlock",
     "/api/environments/:environmentId/archive",
     "/api/environments/:environmentId/variables",
     "/api/environments/:environmentId/variables/:key",

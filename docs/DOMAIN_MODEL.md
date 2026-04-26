@@ -442,14 +442,15 @@ Rules:
 - names are unique within a project
 - snapshots are immutable
 - build-time variables must be explicitly public
-- lifecycle state is explicit; archived environments remain readable but reject new configuration
-  writes, promotion, resource creation, and deployment admission
+- lifecycle state is explicit; locked environments remain readable but reject new configuration
+  writes, promotion, resource creation, and deployment admission until unlocked; archived
+  environments remain readable and retired
 
 Current scope:
 - variables and snapshot logic are inside the aggregate
 - `EnvironmentConfigSet` is modeled as a value object used by `Environment`
-- `EnvironmentLifecycleStatus`, `ArchivedAt`, and optional `ArchiveReason` are part of the
-  aggregate state
+- `EnvironmentLifecycleStatus`, `LockedAt`, optional `LockReason`, `ArchivedAt`, and optional
+  `ArchiveReason` are part of the aggregate state
 
 ### DeploymentTarget
 

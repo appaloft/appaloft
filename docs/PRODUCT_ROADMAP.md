@@ -425,7 +425,8 @@ Required:
 - [x] Add separate resource network update semantics where specs require a separate command.
 - [ ] Add reusable access-profile update semantics where specs require a separate command.
 - [x] Add environment archive.
-- [ ] Add environment clone/lock and remaining named edit semantics.
+- [ ] Add environment clone and remaining named edit semantics.
+- [x] Add environment lock/unlock lifecycle.
 - [x] Add environment effective-precedence query.
 - [ ] Complete resource detail editing affordances for source/runtime/network profile changes.
 - [ ] Ensure CLI, HTTP/oRPC, Web, and future MCP naming reuse the same command/query schemas.
