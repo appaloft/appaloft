@@ -652,6 +652,10 @@ const apiResponses: Record<ApiScenario, Record<string, ApiRoute>> = {
               upstreamProtocol: "http",
               exposureMode: "reverse-proxy",
             },
+            accessProfile: {
+              generatedAccessMode: "inherit",
+              pathPrefix: "/",
+            },
             createdAt: "2026-01-01T00:00:00.000Z",
           },
         ],
@@ -693,6 +697,10 @@ const apiResponses: Record<ApiScenario, Record<string, ApiRoute>> = {
           internalPort: 3000,
           upstreamProtocol: "http",
           exposureMode: "reverse-proxy",
+        },
+        accessProfile: {
+          generatedAccessMode: "inherit",
+          pathPrefix: "/",
         },
         healthPolicy: {
           enabled: true,
@@ -780,6 +788,11 @@ const apiResponses: Record<ApiScenario, Record<string, ApiRoute>> = {
       },
     },
     "/api/rpc/resources/configureNetwork": {
+      json: {
+        id: "res_demo",
+      },
+    },
+    "/api/rpc/resources/configureAccess": {
       json: {
         id: "res_demo",
       },
@@ -1820,6 +1833,31 @@ describe("console e2e with Bun.WebView", () => {
         internalPort: 8080,
         upstreamProtocol: "http",
         exposureMode: "reverse-proxy",
+      },
+    });
+  }, 15_000);
+
+  test("[RES-PROFILE-ENTRY-011] submits resource access profile changes through Web", async () => {
+    activeScenario = "dashboard";
+    resetRecordedApiRequests();
+
+    await using view = createWebView();
+    await view.navigate(`${previewUrl}/resources/res_demo`);
+
+    await expectAnyText(view, ["Access profile", "访问配置"]);
+    await setInputValue(view, "#resource-access-path-prefix", "/internal");
+    await clickFormSubmit(view, "#resource-access-profile-form");
+
+    const configureAccessRequest = await waitForRecordedRequest(
+      "/api/rpc/resources/configureAccess",
+    );
+    const configureAccessInput = readOrpcJsonPayload(configureAccessRequest.body);
+
+    expect(configureAccessInput).toEqual({
+      resourceId: "res_demo",
+      accessProfile: {
+        generatedAccessMode: "inherit",
+        pathPrefix: "/internal",
       },
     });
   }, 15_000);

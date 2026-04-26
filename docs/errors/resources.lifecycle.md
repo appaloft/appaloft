@@ -5,7 +5,7 @@
 Resource lifecycle commands and queries use the shared platform error model and neverthrow
 conventions. This file defines the resource-specific error profile for `resources.create`,
 `resources.show`, `resources.configure-source`, `resources.configure-runtime`,
-`resources.configure-network`, `resources.configure-health`, `resources.set-variable`,
+`resources.configure-network`, `resources.configure-access`, `resources.configure-health`, `resources.set-variable`,
 `resources.unset-variable`, `resources.effective-config`, `resources.archive`, `resources.delete`,
 and the minimum resource lifecycle.
 
@@ -48,6 +48,7 @@ type ResourceLifecycleErrorDetails = {
     | "resources.configure-source"
     | "resources.configure-runtime"
     | "resources.configure-network"
+    | "resources.configure-access"
     | "resources.configure-health"
     | "resources.set-variable"
     | "resources.unset-variable"
@@ -59,6 +60,7 @@ type ResourceLifecycleErrorDetails = {
     | "resource-source-configured"
     | "resource-runtime-configured"
     | "resource-network-configured"
+    | "resource-access-configured"
     | "resource-health-policy-configured"
     | "resource-variable-set"
     | "resource-variable-unset"
@@ -73,6 +75,7 @@ type ResourceLifecycleErrorDetails = {
     | "resource-source-resolution"
     | "resource-runtime-resolution"
     | "resource-network-resolution"
+    | "resource-access-resolution"
     | "health-policy-resolution"
     | "resource-lifecycle-guard"
     | "resource-deletion-guard"
@@ -110,6 +113,8 @@ type ResourceLifecycleErrorDetails = {
   exposureMode?: "none" | "reverse-proxy" | "direct-port";
   upstreamProtocol?: "http" | "tcp";
   targetServiceName?: string;
+  generatedAccessMode?: "inherit" | "disabled";
+  pathPrefix?: string;
   variableKey?: string;
   variableExposure?: "build-time" | "runtime";
   variableScope?:
@@ -158,6 +163,7 @@ Admission errors reject `resources.create` and return `err(DomainError)`.
 | `validation_error` | `validation` | `resource-source-resolution` | No | Source variant metadata is invalid, such as an uncloneable deep Git URL, ambiguous Git ref/base-directory split, invalid source-relative path, or invalid Docker image tag/digest pair. |
 | `validation_error` | `validation` | `resource-runtime-resolution` | No | Runtime profile strategy or strategy-specific fields are invalid, such as missing or unsafe static publish directory. |
 | `validation_error` | `validation` | `resource-network-resolution` | No | Resource network profile is missing, invalid, or ambiguous for an inbound resource endpoint. |
+| `validation_error` | `validation` | `resource-access-resolution` | No | Resource access profile is invalid, such as an unsupported generated access mode or unsafe path prefix. |
 | `validation_error` | `validation` | `health-policy-resolution` | No | Resource health policy is missing required HTTP fields, has invalid probe fields, or requests an unsupported policy type. |
 | `validation_error` | `validation` | `config-identity`, `config-secret-validation`, `config-profile-resolution` | No | Repository config file profile input cannot be safely mapped into `resources.create`. Error details must identify safe field paths only and must not include secret values. |
 | `infra_error` | `infra` | `resource-persistence` | Conditional | Persistence failed before the resource could be safely created. |
@@ -166,7 +172,7 @@ Admission errors reject `resources.create` and return `err(DomainError)`.
 ## Profile Lifecycle Errors
 
 These errors apply to `resources.show`, `resources.configure-source`, `resources.configure-runtime`,
-`resources.configure-network`, `resources.configure-health`, `resources.set-variable`,
+`resources.configure-network`, `resources.configure-access`, `resources.configure-health`, `resources.set-variable`,
 `resources.unset-variable`, `resources.effective-config`, `resources.archive`, `resources.delete`,
 and `deployments.create` where deployment admission reads resource lifecycle or configuration state.
 
@@ -176,11 +182,12 @@ and `deployments.create` where deployment admission reads resource lifecycle or 
 | `not_found` | `not-found` | `resource-read` | No | Resource cannot be found or is not visible. |
 | `infra_error` | `infra` | `resource-read` | Conditional | Resource detail read model cannot be safely read or assembled. |
 | `validation_error` | `validation` | `command-validation` | No | Profile command input shape, idempotency key, confirmation value, or lifecycle reason is invalid. |
-| `resource_archived` | `conflict` | `resource-lifecycle-guard` | No | A source, runtime, network, health, or deployment command targeted an archived resource. |
+| `resource_archived` | `conflict` | `resource-lifecycle-guard` | No | A source, runtime, network, access, health, or deployment command targeted an archived resource. |
 | `invariant_violation` | `domain` | `resource-lifecycle-guard` | No | Resource aggregate lifecycle transition rejected the requested change. |
 | `validation_error` | `validation` | `resource-source-resolution` | No | Source profile update is invalid, ambiguous, unsafe, or contains forbidden secret/credential material. |
 | `validation_error` | `validation` | `resource-runtime-resolution` | No | Runtime profile update is invalid, unsafe, includes health-policy mutation, or includes unsupported runtime target fields. |
 | `validation_error` | `validation` | `resource-network-resolution` | No | Network profile update is invalid, unsafe, missing required endpoint data, or requests unsupported direct-port exposure. |
+| `validation_error` | `validation` | `resource-access-resolution` | No | Access profile update is invalid, unsafe, or requests generated access semantics not supported by this command. |
 | `validation_error` | `validation` | `config-identity` | No | Variable key, exposure, or scope identity is invalid. |
 | `validation_error` | `validation` | `config-secret-validation` | No | A resource variable requested secret storage for a build-time value or another forbidden secret combination. |
 | `validation_error` | `validation` | `config-profile-resolution` | No | Resource variable shape, exposure, or prefix policy is invalid for the requested override. |

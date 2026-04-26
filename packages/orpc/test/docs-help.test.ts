@@ -28,6 +28,9 @@ describe("HTTP API docs help links", () => {
     expect(apiDocsHrefs.resourceHealthProfile).toBe(
       "/docs/resources/profiles/health-network/#resource-health-profile",
     );
+    expect(apiDocsHrefs.resourceAccessProfile).toBe(
+      "/docs/access/generated-routes/#resource-access-profile",
+    );
     expect(apiDocsHrefs.domainOwnershipCheck).toBe(
       "/docs/access/domains/ownership/#domain-binding-ownership-check",
     );
@@ -46,6 +49,9 @@ describe("HTTP API docs help links", () => {
     expect(apiRouteDescriptions.unlockEnvironment).toContain(apiDocsHrefs.environmentLifecycle);
     expect(apiRouteDescriptions.configureResourceHealth).toContain(
       apiDocsHrefs.resourceHealthProfile,
+    );
+    expect(apiRouteDescriptions.configureResourceAccess).toContain(
+      apiDocsHrefs.resourceAccessProfile,
     );
     expect(apiRouteDescriptions.confirmDomainBindingOwnership).toContain(
       apiDocsHrefs.domainOwnershipCheck,

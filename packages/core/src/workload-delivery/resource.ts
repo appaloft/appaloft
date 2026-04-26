@@ -27,6 +27,7 @@ import {
   type HealthCheckSchemeValue,
   type HealthCheckTypeValue,
   type ResourceExposureModeValue,
+  type ResourceGeneratedAccessModeValue,
   type ResourceKindValue,
   ResourceLifecycleStatusValue,
   type ResourceNetworkProtocolValue,
@@ -54,6 +55,7 @@ import {
   type ResourceName,
   type ResourceServiceName,
   ResourceSlug,
+  type RoutePathPrefix,
   type RuntimeNameText,
 } from "../shared/text-values";
 import { ScalarValueObject } from "../shared/value-object";
@@ -341,6 +343,11 @@ export interface ResourceNetworkProfileState {
   hostPort?: PortNumber;
 }
 
+export interface ResourceAccessProfileState {
+  generatedAccessMode: ResourceGeneratedAccessModeValue;
+  pathPrefix: RoutePathPrefix;
+}
+
 export interface ResourceState {
   id: ResourceId;
   projectId: ProjectId;
@@ -353,6 +360,7 @@ export interface ResourceState {
   sourceBinding?: ResourceSourceBindingState;
   runtimeProfile?: ResourceRuntimeProfileState;
   networkProfile?: ResourceNetworkProfileState;
+  accessProfile?: ResourceAccessProfileState;
   variables: EnvironmentConfigSet;
   lifecycleStatus: ResourceLifecycleStatusValue;
   archivedAt?: ArchivedAt;
@@ -389,6 +397,12 @@ function cloneResourceNetworkProfileState(
   return { ...profile };
 }
 
+function cloneResourceAccessProfileState(
+  profile: ResourceAccessProfileState,
+): ResourceAccessProfileState {
+  return { ...profile };
+}
+
 export type ResourceVariableState = ReturnType<EnvironmentConfigSet["toState"]>[number];
 
 function serializedNetworkProfile(profile: ResourceNetworkProfileState): Record<string, unknown> {
@@ -398,6 +412,13 @@ function serializedNetworkProfile(profile: ResourceNetworkProfileState): Record<
     exposureMode: profile.exposureMode.value,
     ...(profile.targetServiceName ? { targetServiceName: profile.targetServiceName.value } : {}),
     ...(profile.hostPort ? { hostPort: profile.hostPort.value } : {}),
+  };
+}
+
+function serializedAccessProfile(profile: ResourceAccessProfileState): Record<string, unknown> {
+  return {
+    generatedAccessMode: profile.generatedAccessMode.value,
+    pathPrefix: profile.pathPrefix.value,
   };
 }
 
@@ -619,6 +640,7 @@ export class Resource extends AggregateRoot<ResourceState> {
     sourceBinding?: ResourceSourceBindingState;
     runtimeProfile?: ResourceRuntimeProfileState;
     networkProfile?: ResourceNetworkProfileState;
+    accessProfile?: ResourceAccessProfileState;
     variables?: ResourceVariableState[];
     createdAt: CreatedAt;
     description?: DescriptionText;
@@ -680,6 +702,9 @@ export class Resource extends AggregateRoot<ResourceState> {
         ...(input.networkProfile
           ? { networkProfile: cloneResourceNetworkProfileState(input.networkProfile) }
           : {}),
+        ...(input.accessProfile
+          ? { accessProfile: cloneResourceAccessProfileState(input.accessProfile) }
+          : {}),
         variables: EnvironmentConfigSet.rehydrate(input.variables ?? []),
         lifecycleStatus: ResourceLifecycleStatusValue.active(),
         createdAt: input.createdAt,
@@ -717,6 +742,9 @@ export class Resource extends AggregateRoot<ResourceState> {
         ...(input.networkProfile
           ? { networkProfile: serializedNetworkProfile(input.networkProfile) }
           : {}),
+        ...(input.accessProfile
+          ? { accessProfile: serializedAccessProfile(input.accessProfile) }
+          : {}),
         createdAt: input.createdAt.value,
       });
       return ok(resource);
@@ -739,6 +767,9 @@ export class Resource extends AggregateRoot<ResourceState> {
         : {}),
       ...(state.networkProfile
         ? { networkProfile: cloneResourceNetworkProfileState(state.networkProfile) }
+        : {}),
+      ...(state.accessProfile
+        ? { accessProfile: cloneResourceAccessProfileState(state.accessProfile) }
         : {}),
       variables: EnvironmentConfigSet.rehydrate(state.variables?.toState() ?? []),
       lifecycleStatus: state.lifecycleStatus ?? ResourceLifecycleStatusValue.active(),
@@ -1086,6 +1117,28 @@ export class Resource extends AggregateRoot<ResourceState> {
     return ok(undefined);
   }
 
+  configureAccessProfile(input: {
+    accessProfile: ResourceAccessProfileState;
+    configuredAt: UpdatedAt;
+  }): Result<void> {
+    const lifecycleGuard = this.rejectInactiveResource("resources.configure-access");
+    if (lifecycleGuard.isErr()) {
+      return err(lifecycleGuard.error);
+    }
+
+    this.state.accessProfile = cloneResourceAccessProfileState(input.accessProfile);
+
+    this.recordDomainEvent("resource-access-configured", input.configuredAt, {
+      resourceId: this.state.id.value,
+      projectId: this.state.projectId.value,
+      environmentId: this.state.environmentId.value,
+      ...serializedAccessProfile(input.accessProfile),
+      configuredAt: input.configuredAt.value,
+    });
+
+    return ok(undefined);
+  }
+
   configureSourceBinding(input: {
     sourceBinding: ResourceSourceBindingState;
     configuredAt: UpdatedAt;
@@ -1138,6 +1191,9 @@ export class Resource extends AggregateRoot<ResourceState> {
         : {}),
       ...(this.state.networkProfile
         ? { networkProfile: cloneResourceNetworkProfileState(this.state.networkProfile) }
+        : {}),
+      ...(this.state.accessProfile
+        ? { accessProfile: cloneResourceAccessProfileState(this.state.accessProfile) }
         : {}),
       variables: EnvironmentConfigSet.rehydrate(this.state.variables.toState()),
     };

@@ -76,11 +76,13 @@ function enrichRequestedDeployment(
   generated: GeneratedAccessDomain,
   proxyKind: NonNullable<RequestedDeploymentConfig["proxyKind"]>,
 ): Result<RequestedDeploymentConfig> {
+  const pathPrefix = input.requestedDeployment.accessContext?.pathPrefix ?? "/";
+
   return ok({
     ...input.requestedDeployment,
     proxyKind,
     domains: [generated.hostname],
-    pathPrefix: "/",
+    pathPrefix,
     tlsMode: generated.scheme === "https" ? "auto" : "disabled",
     accessRouteMetadata: {
       ...(input.requestedDeployment.accessRouteMetadata ?? {}),

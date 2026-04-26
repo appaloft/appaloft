@@ -10,6 +10,7 @@ It is not a single command. Every user-visible mutation must dispatch one explic
 - `resources.configure-source`
 - `resources.configure-runtime`
 - `resources.configure-network`
+- `resources.configure-access`
 - `resources.configure-health`
 - `resources.set-variable`
 - `resources.unset-variable`
@@ -36,6 +37,7 @@ This workflow inherits:
 - [resources.configure-source Command Spec](../commands/resources.configure-source.md)
 - [resources.configure-runtime Command Spec](../commands/resources.configure-runtime.md)
 - [resources.configure-network Command Spec](../commands/resources.configure-network.md)
+- [resources.configure-access Command Spec](../commands/resources.configure-access.md)
 - [resources.configure-health Command Spec](../commands/resources.configure-health.md)
 - [resources.set-variable Command Spec](../commands/resources.set-variable.md)
 - [resources.unset-variable Command Spec](../commands/resources.unset-variable.md)
@@ -72,6 +74,7 @@ cleanup.
 | Change repository/image/source root | `resources.configure-source` | `ResourceSourceBinding` | Runtime profile, network profile, health policy, deployment snapshots, source links |
 | Change build/start/static/Compose planning and reusable runtime naming | `resources.configure-runtime` | Runtime planning profile | Source binding, network profile, health policy, runtime target state |
 | Change internal listener/exposure profile | `resources.configure-network` | `ResourceNetworkProfile` | Domains, generated access policy, proxy routes, current runtime |
+| Change generated access preferences | `resources.configure-access` | `ResourceAccessProfile` | Network endpoint, default access policy records, domains, certificates, current runtime |
 | Change health probe policy | `resources.configure-health` | Resource health policy | Source/runtime/network profile outside health policy fields |
 | Set one resource-scoped variable override | `resources.set-variable` | Resource config override layer | Environment variables, deployment snapshots, current runtime, domains |
 | Remove one resource-scoped variable override | `resources.unset-variable` | Resource config override layer | Environment variables, deployment snapshots, current runtime, domains |
@@ -111,6 +114,14 @@ Network configuration:
 ```text
 resources.show(resourceId)
   -> resources.configure-network(resourceId, networkProfile)
+  -> resources.show(resourceId)
+```
+
+Access configuration:
+
+```text
+resources.show(resourceId)
+  -> resources.configure-access(resourceId, accessProfile)
   -> resources.show(resourceId)
 ```
 
@@ -168,6 +179,7 @@ Archived resources:
 - reject `resources.configure-source`;
 - reject `resources.configure-runtime`;
 - reject `resources.configure-network`;
+- reject `resources.configure-access`;
 - reject `resources.configure-health`;
 - reject `resources.set-variable`;
 - reject `resources.unset-variable`;
@@ -208,10 +220,15 @@ rebuild-required under ADR-016 and is not introduced by this workflow.
 ## Access And Domain Relationship
 
 Network profile configures the resource endpoint. It does not configure public domains, generated
-default access policy, path prefixes, certificate policy, or TLS.
+default access provider policy, certificate policy, or TLS.
+
+Access profile configures resource-owned generated access preferences for future route resolution.
+It may disable generated default access for one resource or choose the route path prefix used for
+generated default access. It does not create durable custom domains, issue certificates, change
+system/server default access policy records, or apply proxy routes to current runtime state.
 
 Domain, default access, certificate, and proxy route realization workflows may observe the resource
-network profile, but they keep their own commands and lifecycle events.
+network and access profiles, but they keep their own commands and lifecycle events.
 
 ## Entrypoints
 
@@ -226,13 +243,13 @@ network profile, but they keep their own commands and lifecycle events.
 
 Current implementation has active resource create/list, `resources.show`,
 `resources.configure-source`, `resources.configure-runtime`, `resources.configure-health`,
-`resources.configure-network`, `resources.set-variable`, `resources.unset-variable`,
+`resources.configure-network`, `resources.configure-access`, `resources.set-variable`, `resources.unset-variable`,
 `resources.effective-config`, `resources.archive`, and `resources.delete` surfaces. The Web
 resource detail page dispatches `resources.show` for durable profile data, dispatches
-source/runtime/network/health/configuration forms through separate commands, and dispatches
+source/runtime/network/access/health/configuration forms through separate commands, and dispatches
 archive/delete through dedicated lifecycle actions.
 
-Archived-resource guards are active for source/runtime/network/health mutations and deployment
+Archived-resource guards are active for source/runtime/network/access/health mutations and deployment
 admission. `resources.delete` may delete only archived resources with matching slug confirmation
 and no retained blockers. Each future Code Round must update `CORE_OPERATIONS.md` and
 `operation-catalog.ts` in the same change that exposes the operation.
