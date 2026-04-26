@@ -4,6 +4,7 @@ import {
   type ArchiveResourceCommandInput,
   type BootstrapServerProxyCommandInput,
   type CheckServerDeleteSafetyQueryInput,
+  type CloneEnvironmentCommandInput,
   type ConfigureDefaultAccessDomainPolicyCommandInput,
   type ConfigureResourceHealthCommandInput,
   type ConfigureResourceNetworkCommandInput,
@@ -67,6 +68,7 @@ import {
   type ArchiveResourceResponse,
   type BootstrapServerProxyResponse,
   type CheckServerDeleteSafetyResponse,
+  type CloneEnvironmentResponse,
   type ConfigureDefaultAccessDomainPolicyResponse,
   type ConfigureResourceHealthResponse,
   type ConfigureResourceNetworkResponse,
@@ -308,6 +310,12 @@ export type AppaloftOrpcClientContract = {
       AppaloftClientContext,
       ArchiveEnvironmentCommandInput,
       ArchiveEnvironmentResponse,
+      AppaloftClientError
+    >;
+    clone: Client<
+      AppaloftClientContext,
+      CloneEnvironmentCommandInput,
+      CloneEnvironmentResponse,
       AppaloftClientError
     >;
     setVariable: Client<

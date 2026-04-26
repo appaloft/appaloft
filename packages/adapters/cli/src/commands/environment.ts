@@ -1,5 +1,6 @@
 import {
   ArchiveEnvironmentCommand,
+  CloneEnvironmentCommand,
   CreateEnvironmentCommand,
   DiffEnvironmentsQuery,
   EnvironmentEffectivePrecedenceQuery,
@@ -26,6 +27,7 @@ const nameOption = Options.text("name");
 const kindOption = Options.choice("kind", environmentKinds);
 const parentOption = Options.text("parent").pipe(Options.optional);
 const archiveReasonOption = Options.text("reason").pipe(Options.optional);
+const cloneKindOption = Options.choice("kind", environmentKinds).pipe(Options.optional);
 const exposureOption = Options.choice("exposure", variableExposures);
 const scopeOption = Options.choice("scope", configScopes).pipe(Options.optional);
 const secretOption = Options.boolean("secret").pipe(Options.withDefault(false));
@@ -85,6 +87,23 @@ const archiveCommand = EffectCommand.make(
       }),
     ),
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.environmentArchive));
+
+const cloneCommand = EffectCommand.make(
+  "clone",
+  {
+    environmentId: environmentIdArg,
+    name: nameOption,
+    kind: cloneKindOption,
+  },
+  ({ environmentId, kind, name }) =>
+    runCommand(
+      CloneEnvironmentCommand.create({
+        environmentId,
+        targetName: name,
+        targetKind: optionalValue(kind),
+      }),
+    ),
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.environmentClone));
 
 const setCommand = EffectCommand.make(
   "set",
@@ -177,6 +196,7 @@ export const envCommand = EffectCommand.make("env").pipe(
     createCommand,
     showCommand,
     archiveCommand,
+    cloneCommand,
     setCommand,
     unsetCommand,
     effectivePrecedenceCommand,
