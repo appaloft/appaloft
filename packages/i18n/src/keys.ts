@@ -585,6 +585,7 @@ export const i18nKeys = {
       plannedAccessRoute: "console:resources.plannedAccessRoute",
       profileDescription: "console:resources.profileDescription",
       profileTitle: "console:resources.profileTitle",
+      serverAppliedDomainAccess: "console:resources.serverAppliedDomainAccess",
       proxyConfigurationDescription: "console:resources.proxyConfigurationDescription",
       proxyConfigurationEmpty: "console:resources.proxyConfigurationEmpty",
       proxyConfigurationGeneratedAt: "console:resources.proxyConfigurationGeneratedAt",
