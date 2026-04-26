@@ -79,6 +79,8 @@ import {
   ListResourcesQueryService,
   ListServersQueryService,
   ListSshCredentialsQueryService,
+  LockEnvironmentCommandHandler,
+  LockEnvironmentUseCase,
   MarkDomainReadyOnCertificateImportedHandler,
   MarkDomainReadyOnCertificateIssuedHandler,
   MarkDomainReadyOnDeploymentFinishedHandler,
@@ -122,6 +124,8 @@ import {
   StreamDeploymentEventsQueryService,
   TestServerConnectivityUseCase,
   tokens,
+  UnlockEnvironmentCommandHandler,
+  UnlockEnvironmentUseCase,
   UnsetEnvironmentVariableUseCase,
   UnsetResourceVariableCommandHandler,
   UnsetResourceVariableUseCase,
@@ -156,6 +160,8 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(ArchiveProjectCommandHandler);
   container.registerSingleton(ArchiveEnvironmentCommandHandler);
   container.registerSingleton(CloneEnvironmentCommandHandler);
+  container.registerSingleton(LockEnvironmentCommandHandler);
+  container.registerSingleton(UnlockEnvironmentCommandHandler);
   container.registerSingleton(BootstrapServerProxyCommandHandler);
   container.registerSingleton(CheckServerDeleteSafetyQueryHandler);
   container.registerSingleton(CleanupPreviewCommandHandler);
@@ -267,6 +273,8 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(tokens.bootstrapServerProxyUseCase, BootstrapServerProxyUseCase);
   container.registerSingleton(tokens.archiveEnvironmentUseCase, ArchiveEnvironmentUseCase);
   container.registerSingleton(tokens.cloneEnvironmentUseCase, CloneEnvironmentUseCase);
+  container.registerSingleton(tokens.lockEnvironmentUseCase, LockEnvironmentUseCase);
+  container.registerSingleton(tokens.unlockEnvironmentUseCase, UnlockEnvironmentUseCase);
   container.registerSingleton(tokens.createEnvironmentUseCase, CreateEnvironmentUseCase);
   container.registerSingleton(tokens.listEnvironmentsQueryService, ListEnvironmentsQueryService);
   container.registerSingleton(tokens.showEnvironmentQueryService, ShowEnvironmentQueryService);

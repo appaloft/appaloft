@@ -69,6 +69,8 @@ export interface EnvironmentsTable {
   kind: string;
   parent_environment_id: string | null;
   lifecycle_status: ColumnType<string, string | undefined, string>;
+  locked_at: ColumnType<string | null, string | null | undefined, string | null>;
+  lock_reason: ColumnType<string | null, string | null | undefined, string | null>;
   archived_at: ColumnType<string | null, string | null | undefined, string | null>;
   archive_reason: ColumnType<string | null, string | null | undefined, string | null>;
   created_at: TimestampColumn;

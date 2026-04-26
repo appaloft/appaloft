@@ -25,6 +25,8 @@ import {
   EnvironmentLifecycleStatusValue,
   EnvironmentName,
   HostAddress,
+  LockedAt,
+  LockReason,
   PortNumber,
   Project,
   ProjectId,
@@ -63,16 +65,20 @@ import {
   CloneEnvironmentUseCase,
   CreateResourceUseCase,
   DeploymentContextResolver,
+  LockEnvironmentUseCase,
   PromoteEnvironmentUseCase,
   SetEnvironmentVariableUseCase,
   ShowEnvironmentQueryService,
+  UnlockEnvironmentUseCase,
   UnsetEnvironmentVariableUseCase,
 } from "../src/use-cases";
 
 function environmentFixture(input?: {
   id?: string;
   name?: string;
-  lifecycleStatus?: "active" | "archived";
+  lifecycleStatus?: "active" | "locked" | "archived";
+  lockedAt?: string;
+  lockReason?: string;
   archivedAt?: string;
   archiveReason?: string;
 }): Environment {
@@ -83,6 +89,15 @@ function environmentFixture(input?: {
     kind: EnvironmentKindValue.rehydrate("production"),
     createdAt: CreatedAt.rehydrate("2026-01-01T00:00:00.000Z"),
   })._unsafeUnwrap();
+
+  if (input?.lifecycleStatus === "locked") {
+    return Environment.rehydrate({
+      ...active.toState(),
+      lifecycleStatus: EnvironmentLifecycleStatusValue.rehydrate("locked"),
+      lockedAt: LockedAt.rehydrate(input.lockedAt ?? "2026-01-01T00:00:05.000Z"),
+      lockReason: LockReason.rehydrate(input.lockReason ?? "Change freeze"),
+    });
+  }
 
   if (input?.lifecycleStatus !== "archived") {
     return active;
@@ -171,19 +186,23 @@ function resourceFixture(): Resource {
   })._unsafeUnwrap();
 }
 
-function archivedEvent(events: unknown[]): DomainEvent {
+function lifecycleEvent(events: unknown[], type: string): DomainEvent {
   const event = events.find(
     (candidate): candidate is DomainEvent =>
       Boolean(candidate) &&
       typeof candidate === "object" &&
-      (candidate as { type?: unknown }).type === "environment-archived",
+      (candidate as { type?: unknown }).type === type,
   );
 
   if (!event) {
-    throw new Error("environment-archived event was not captured");
+    throw new Error(`${type} event was not captured`);
   }
 
   return event;
+}
+
+function archivedEvent(events: unknown[]): DomainEvent {
+  return lifecycleEvent(events, "environment-archived");
 }
 
 async function createHarness(
@@ -438,6 +457,153 @@ describe("environment archive operations", () => {
     expect(persisted?.toState().archiveReason?.value).toBe("Existing reason");
   });
 
+  test("[ENV-LIFE-LOCK-001] [ENV-LIFE-LOCK-003] locks an active environment and publishes environment-locked", async () => {
+    const { clock, context, environments, eventBus, logger, repositoryContext } =
+      await createHarness();
+    const useCase = new LockEnvironmentUseCase(environments, clock, eventBus, logger);
+
+    const result = await useCase.execute(context, {
+      environmentId: "env_demo",
+      reason: "Change freeze",
+    });
+
+    expect(result.isOk()).toBe(true);
+    const persisted = await environments.findOne(
+      repositoryContext,
+      EnvironmentByIdSpec.create(EnvironmentId.rehydrate("env_demo")),
+    );
+    const state = persisted?.toState();
+    expect(state?.lifecycleStatus.value).toBe("locked");
+    expect(state?.lockedAt?.value).toBe("2026-01-01T00:00:10.000Z");
+    expect(state?.lockReason?.value).toBe("Change freeze");
+
+    const event = lifecycleEvent(eventBus.events, "environment-locked");
+    expect(event.aggregateId).toBe("env_demo");
+    expect(event.payload).toMatchObject({
+      environmentId: "env_demo",
+      projectId: "prj_demo",
+      environmentName: "production",
+      environmentKind: "production",
+      lockedAt: "2026-01-01T00:00:10.000Z",
+      reason: "Change freeze",
+    });
+  });
+
+  test("[ENV-LIFE-LOCK-002] treats an already locked environment as idempotent", async () => {
+    const { clock, context, environments, eventBus, logger, repositoryContext } =
+      await createHarness(
+        environmentFixture({
+          lifecycleStatus: "locked",
+          lockedAt: "2026-01-01T00:00:05.000Z",
+          lockReason: "Existing freeze",
+        }),
+      );
+    const useCase = new LockEnvironmentUseCase(environments, clock, eventBus, logger);
+
+    const result = await useCase.execute(context, {
+      environmentId: "env_demo",
+      reason: "New reason must not overwrite",
+    });
+
+    expect(result.isOk()).toBe(true);
+    expect(eventBus.events).toHaveLength(0);
+    const persisted = await environments.findOne(
+      repositoryContext,
+      EnvironmentByIdSpec.create(EnvironmentId.rehydrate("env_demo")),
+    );
+    expect(persisted?.toState().lifecycleStatus.value).toBe("locked");
+    expect(persisted?.toState().lockedAt?.value).toBe("2026-01-01T00:00:05.000Z");
+    expect(persisted?.toState().lockReason?.value).toBe("Existing freeze");
+  });
+
+  test("[ENV-LIFE-UNLOCK-001] [ENV-LIFE-UNLOCK-003] unlocks a locked environment and publishes environment-unlocked", async () => {
+    const { clock, context, environments, eventBus, logger, repositoryContext } =
+      await createHarness(
+        environmentFixture({
+          lifecycleStatus: "locked",
+          lockedAt: "2026-01-01T00:00:05.000Z",
+          lockReason: "Change freeze",
+        }),
+      );
+    const useCase = new UnlockEnvironmentUseCase(environments, clock, eventBus, logger);
+
+    const result = await useCase.execute(context, {
+      environmentId: "env_demo",
+    });
+
+    expect(result.isOk()).toBe(true);
+    const persisted = await environments.findOne(
+      repositoryContext,
+      EnvironmentByIdSpec.create(EnvironmentId.rehydrate("env_demo")),
+    );
+    const state = persisted?.toState();
+    expect(state?.lifecycleStatus.value).toBe("active");
+    expect(state?.lockedAt).toBeUndefined();
+    expect(state?.lockReason).toBeUndefined();
+
+    const event = lifecycleEvent(eventBus.events, "environment-unlocked");
+    expect(event.aggregateId).toBe("env_demo");
+    expect(event.payload).toMatchObject({
+      environmentId: "env_demo",
+      projectId: "prj_demo",
+      environmentName: "production",
+      environmentKind: "production",
+      lockedAt: "2026-01-01T00:00:05.000Z",
+      unlockedAt: "2026-01-01T00:00:10.000Z",
+      reason: "Change freeze",
+    });
+  });
+
+  test("[ENV-LIFE-UNLOCK-002] treats an active environment unlock as idempotent", async () => {
+    const { clock, context, environments, eventBus, logger, repositoryContext } =
+      await createHarness();
+    const useCase = new UnlockEnvironmentUseCase(environments, clock, eventBus, logger);
+
+    const result = await useCase.execute(context, {
+      environmentId: "env_demo",
+    });
+
+    expect(result.isOk()).toBe(true);
+    expect(eventBus.events).toHaveLength(0);
+    const persisted = await environments.findOne(
+      repositoryContext,
+      EnvironmentByIdSpec.create(EnvironmentId.rehydrate("env_demo")),
+    );
+    expect(persisted?.toState().lifecycleStatus.value).toBe("active");
+  });
+
+  test("[ENV-LIFE-ARCHIVE-004] archives a locked environment and clears lock metadata", async () => {
+    const { clock, context, environments, eventBus, logger, repositoryContext } =
+      await createHarness(
+        environmentFixture({
+          lifecycleStatus: "locked",
+          lockedAt: "2026-01-01T00:00:05.000Z",
+          lockReason: "Change freeze",
+        }),
+      );
+    const useCase = new ArchiveEnvironmentUseCase(environments, clock, eventBus, logger);
+
+    const result = await useCase.execute(context, {
+      environmentId: "env_demo",
+      reason: "Retired while locked",
+    });
+
+    expect(result.isOk()).toBe(true);
+    const persisted = await environments.findOne(
+      repositoryContext,
+      EnvironmentByIdSpec.create(EnvironmentId.rehydrate("env_demo")),
+    );
+    const state = persisted?.toState();
+    expect(state?.lifecycleStatus.value).toBe("archived");
+    expect(state?.lockedAt).toBeUndefined();
+    expect(state?.lockReason).toBeUndefined();
+    expect(state?.archiveReason?.value).toBe("Retired while locked");
+    expect(lifecycleEvent(eventBus.events, "environment-archived").payload).toMatchObject({
+      archivedAt: "2026-01-01T00:00:10.000Z",
+      reason: "Retired while locked",
+    });
+  });
+
   test("[ENV-LIFE-READ-001] exposes lifecycle metadata through the environment read model", async () => {
     const { context, environments } = await createHarness(
       environmentFixture({
@@ -456,6 +622,27 @@ describe("environment archive operations", () => {
       lifecycleStatus: "archived",
       archivedAt: "2026-01-01T00:00:05.000Z",
       archiveReason: "Existing reason",
+    });
+  });
+
+  test("[ENV-LIFE-READ-002] exposes locked metadata through the environment read model", async () => {
+    const { context, environments } = await createHarness(
+      environmentFixture({
+        lifecycleStatus: "locked",
+        lockedAt: "2026-01-01T00:00:05.000Z",
+        lockReason: "Change freeze",
+      }),
+    );
+    const service = new ShowEnvironmentQueryService(new MemoryEnvironmentReadModel(environments));
+
+    const result = await service.execute(context, "env_demo");
+
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap()).toMatchObject({
+      id: "env_demo",
+      lifecycleStatus: "locked",
+      lockedAt: "2026-01-01T00:00:05.000Z",
+      lockReason: "Change freeze",
     });
   });
 
@@ -599,5 +786,172 @@ describe("environment archive operations", () => {
         environmentId: "env_demo",
       },
     });
+  });
+
+  test("[ENV-LIFE-GUARD-006] rejects variable writes and removals while locked", async () => {
+    const { clock, context, environments, eventBus, logger } = await createHarness(
+      environmentFixture({ lifecycleStatus: "locked" }),
+    );
+    const setUseCase = new SetEnvironmentVariableUseCase(environments, clock, eventBus, logger);
+    const unsetUseCase = new UnsetEnvironmentVariableUseCase(environments, clock, eventBus, logger);
+
+    const setResult = await setUseCase.execute(context, {
+      environmentId: "env_demo",
+      key: "APP_PORT",
+      value: "3000",
+      kind: "plain-config",
+      exposure: "runtime",
+    });
+    const unsetResult = await unsetUseCase.execute(context, {
+      environmentId: "env_demo",
+      key: "APP_PORT",
+      exposure: "runtime",
+    });
+
+    expect(setResult.isErr()).toBe(true);
+    expect(setResult._unsafeUnwrapErr()).toMatchObject({
+      code: "environment_locked",
+      details: {
+        commandName: "environments.set-variable",
+        environmentId: "env_demo",
+        lifecycleStatus: "locked",
+      },
+    });
+    expect(unsetResult.isErr()).toBe(true);
+    expect(unsetResult._unsafeUnwrapErr()).toMatchObject({
+      code: "environment_locked",
+      details: {
+        commandName: "environments.unset-variable",
+        environmentId: "env_demo",
+        lifecycleStatus: "locked",
+      },
+    });
+    expect(eventBus.events).toHaveLength(0);
+  });
+
+  test("[ENV-LIFE-GUARD-007] rejects promotion from a locked environment", async () => {
+    const { clock, context, environments, eventBus, logger } = await createHarness(
+      environmentFixture({ lifecycleStatus: "locked" }),
+    );
+    const useCase = new PromoteEnvironmentUseCase(
+      environments,
+      clock,
+      new SequenceIdGenerator(),
+      eventBus,
+      logger,
+    );
+
+    const result = await useCase.execute(context, {
+      environmentId: "env_demo",
+      targetName: "production-next",
+      targetKind: "production",
+    });
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "environment_locked",
+      details: {
+        commandName: "environments.promote",
+        environmentId: "env_demo",
+      },
+    });
+    expect(environments.items.has("env_0001")).toBe(false);
+    expect(eventBus.events).toHaveLength(0);
+  });
+
+  test("[ENV-LIFE-GUARD-008] rejects resource creation in a locked environment", async () => {
+    const { clock, context, destinations, environments, eventBus, logger, projects, resources } =
+      await createHarness(environmentFixture({ lifecycleStatus: "locked" }));
+    const useCase = new CreateResourceUseCase(
+      projects,
+      environments,
+      destinations,
+      resources,
+      clock,
+      new SequenceIdGenerator(),
+      eventBus,
+      logger,
+    );
+
+    const result = await useCase.execute(context, {
+      projectId: "prj_demo",
+      environmentId: "env_demo",
+      destinationId: "dst_demo",
+      name: "Worker",
+      kind: "worker",
+    });
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "environment_locked",
+      details: {
+        commandName: "resources.create",
+        environmentId: "env_demo",
+      },
+    });
+    expect(resources.items.has("res_0001")).toBe(false);
+  });
+
+  test("[ENV-LIFE-GUARD-009] rejects deployment admission in a locked environment", async () => {
+    const { context, destinations, environments, projects, resources, servers } =
+      await createHarness(environmentFixture({ lifecycleStatus: "locked" }));
+    const resolver = new DeploymentContextResolver(
+      projects,
+      servers,
+      destinations,
+      environments,
+      resources,
+    );
+
+    const result = await resolver.resolve(context, {
+      projectId: "prj_demo",
+      environmentId: "env_demo",
+      resourceId: "res_web",
+      serverId: "srv_demo",
+      destinationId: "dst_demo",
+    });
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "environment_locked",
+      details: {
+        commandName: "deployments.create",
+        environmentId: "env_demo",
+      },
+    });
+  });
+
+  test("[ENV-LIFE-LOCK-004] rejects lock and unlock for archived environments", async () => {
+    const { clock, context, environments, eventBus, logger } = await createHarness(
+      environmentFixture({ lifecycleStatus: "archived" }),
+    );
+    const lockUseCase = new LockEnvironmentUseCase(environments, clock, eventBus, logger);
+    const unlockUseCase = new UnlockEnvironmentUseCase(environments, clock, eventBus, logger);
+
+    const lockResult = await lockUseCase.execute(context, {
+      environmentId: "env_demo",
+      reason: "Change freeze",
+    });
+    const unlockResult = await unlockUseCase.execute(context, {
+      environmentId: "env_demo",
+    });
+
+    expect(lockResult.isErr()).toBe(true);
+    expect(lockResult._unsafeUnwrapErr()).toMatchObject({
+      code: "environment_archived",
+      details: {
+        commandName: "environments.lock",
+        environmentId: "env_demo",
+      },
+    });
+    expect(unlockResult.isErr()).toBe(true);
+    expect(unlockResult._unsafeUnwrapErr()).toMatchObject({
+      code: "environment_archived",
+      details: {
+        commandName: "environments.unlock",
+        environmentId: "env_demo",
+      },
+    });
+    expect(eventBus.events).toHaveLength(0);
   });
 });

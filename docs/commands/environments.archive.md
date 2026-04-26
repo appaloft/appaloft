@@ -62,8 +62,9 @@ multiline/control characters, cap length to 280 characters, and reject obvious s
 
 ## Lifecycle Rules
 
-New environments start as `active`. An active environment can transition to `archived` exactly
-once. Already archived environments are idempotent for this command: the command returns
+New environments start as `active`. An active or locked environment can transition to `archived`
+exactly once. When archiving a locked environment, the command clears `lockedAt` and `lockReason`.
+Already archived environments are idempotent for this command: the command returns
 `ok({ id })`, does not change `archivedAt` or `reason`, and does not publish a duplicate
 `environment-archived` event.
 

@@ -429,6 +429,33 @@ export class ArchiveReason extends NonEmptyTextValue {
   }
 }
 
+const lockReasonBrand: unique symbol = Symbol("LockReason");
+export class LockReason extends NonEmptyTextValue {
+  private [lockReasonBrand]!: void;
+
+  private constructor(value: string) {
+    super(value);
+  }
+
+  static create(value: string): Result<LockReason> {
+    return validateSafeOptionalDomainText(value, {
+      label: "Lock reason",
+      maxLength: 280,
+      phase: "environment-lock",
+      field: "reason",
+    }).map((normalized) => new LockReason(normalized));
+  }
+
+  static rehydrate(value: string): LockReason {
+    return new LockReason(rehydrateRequiredText(value));
+  }
+
+  static fromOptional(value?: string): Result<LockReason | undefined> {
+    const normalized = value?.trim();
+    return normalized ? LockReason.create(normalized) : ok(undefined);
+  }
+}
+
 const deactivationReasonBrand: unique symbol = Symbol("DeactivationReason");
 export class DeactivationReason extends NonEmptyTextValue {
   private [deactivationReasonBrand]!: void;

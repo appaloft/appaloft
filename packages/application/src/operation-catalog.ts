@@ -20,9 +20,11 @@ import { createEnvironmentCommandInputSchema } from "./operations/environments/c
 import { diffEnvironmentsQueryInputSchema } from "./operations/environments/diff-environments.query";
 import { environmentEffectivePrecedenceQueryInputSchema } from "./operations/environments/environment-effective-precedence.query";
 import { listEnvironmentsQueryInputSchema } from "./operations/environments/list-environments.query";
+import { lockEnvironmentCommandInputSchema } from "./operations/environments/lock-environment.command";
 import { promoteEnvironmentCommandInputSchema } from "./operations/environments/promote-environment.command";
 import { setEnvironmentVariableCommandInputSchema } from "./operations/environments/set-environment-variable.command";
 import { showEnvironmentQueryInputSchema } from "./operations/environments/show-environment.query";
+import { unlockEnvironmentCommandInputSchema } from "./operations/environments/unlock-environment.command";
 import { unsetEnvironmentVariableCommandInputSchema } from "./operations/environments/unset-environment-variable.command";
 import { archiveProjectCommandInputSchema } from "./operations/projects/archive-project.command";
 import { createProjectCommandInputSchema } from "./operations/projects/create-project.command";
@@ -692,6 +694,34 @@ export const operationCatalog = [
     transports: {
       cli: "appaloft env show <environmentId>",
       orpc: { method: "GET", path: "/api/environments/{environmentId}" },
+    },
+  },
+  {
+    key: "environments.lock",
+    kind: "command",
+    domain: "environments",
+    messageName: "LockEnvironmentCommand",
+    handlerName: "LockEnvironmentCommandHandler",
+    serviceName: "LockEnvironmentUseCase",
+    inputSchema: lockEnvironmentCommandInputSchema,
+    serviceToken: tokens.lockEnvironmentUseCase,
+    transports: {
+      cli: "appaloft env lock <environmentId>",
+      orpc: { method: "POST", path: "/api/environments/{environmentId}/lock" },
+    },
+  },
+  {
+    key: "environments.unlock",
+    kind: "command",
+    domain: "environments",
+    messageName: "UnlockEnvironmentCommand",
+    handlerName: "UnlockEnvironmentCommandHandler",
+    serviceName: "UnlockEnvironmentUseCase",
+    inputSchema: unlockEnvironmentCommandInputSchema,
+    serviceToken: tokens.unlockEnvironmentUseCase,
+    transports: {
+      cli: "appaloft env unlock <environmentId>",
+      orpc: { method: "POST", path: "/api/environments/{environmentId}/unlock" },
     },
   },
   {

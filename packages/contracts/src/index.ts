@@ -474,7 +474,9 @@ export const environmentSummarySchema = z.object({
   name: z.string(),
   kind: z.enum(["local", "development", "test", "staging", "production", "preview", "custom"]),
   parentEnvironmentId: z.string().optional(),
-  lifecycleStatus: z.enum(["active", "archived"]),
+  lifecycleStatus: z.enum(["active", "locked", "archived"]),
+  lockedAt: z.string().optional(),
+  lockReason: z.string().optional(),
   archivedAt: z.string().optional(),
   archiveReason: z.string().optional(),
   createdAt: z.string(),
@@ -1454,6 +1456,23 @@ export const cloneEnvironmentInputSchema = z.object({
 });
 
 export const cloneEnvironmentResponseSchema = z.object({
+  id: z.string(),
+});
+
+export const lockEnvironmentInputSchema = z.object({
+  environmentId: z.string().min(1),
+  reason: z.string().min(1).max(280).optional(),
+});
+
+export const lockEnvironmentResponseSchema = z.object({
+  id: z.string(),
+});
+
+export const unlockEnvironmentInputSchema = z.object({
+  environmentId: z.string().min(1),
+});
+
+export const unlockEnvironmentResponseSchema = z.object({
   id: z.string(),
 });
 
@@ -2479,6 +2498,10 @@ export type ArchiveEnvironmentInput = z.infer<typeof archiveEnvironmentInputSche
 export type ArchiveEnvironmentResponse = z.infer<typeof archiveEnvironmentResponseSchema>;
 export type CloneEnvironmentInput = z.infer<typeof cloneEnvironmentInputSchema>;
 export type CloneEnvironmentResponse = z.infer<typeof cloneEnvironmentResponseSchema>;
+export type LockEnvironmentInput = z.infer<typeof lockEnvironmentInputSchema>;
+export type LockEnvironmentResponse = z.infer<typeof lockEnvironmentResponseSchema>;
+export type UnlockEnvironmentInput = z.infer<typeof unlockEnvironmentInputSchema>;
+export type UnlockEnvironmentResponse = z.infer<typeof unlockEnvironmentResponseSchema>;
 export type ListResourcesResponse = z.infer<typeof listResourcesResponseSchema>;
 export type DomainBindingSummary = z.infer<typeof domainBindingSummarySchema>;
 export type CreateDomainBindingInput = z.infer<typeof createDomainBindingInputSchema>;

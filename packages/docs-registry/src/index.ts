@@ -429,7 +429,7 @@ export const publicDocsHelpTopics = {
     id: "environment.lifecycle",
     title: "Environment lifecycle",
     description:
-      "How active and archived environments affect configuration and deployment admission.",
+      "How active, locked, and archived environments affect configuration and deployment admission.",
     page: {
       "zh-CN": "environments/model",
       "en-US": "en/environments/model",
@@ -443,17 +443,26 @@ export const publicDocsHelpTopics = {
     relatedOperation: "environments.archive",
     aliases: [
       "environment clone",
+      "environment lock",
+      "environment unlock",
       "environment archive",
+      "locked environment",
       "archived environment",
       "env clone",
+      "env lock",
       "env archive",
       "环境克隆",
+      "环境锁定",
       "环境归档",
     ],
     specReferences: [
       "docs/workflows/environment-lifecycle.md",
       "docs/commands/environments.clone.md",
+      "docs/commands/environments.lock.md",
+      "docs/commands/environments.unlock.md",
       "docs/commands/environments.archive.md",
+      "docs/events/environment-locked.md",
+      "docs/events/environment-unlocked.md",
       "docs/events/environment-archived.md",
       "docs/errors/environments.lifecycle.md",
       "docs/testing/environment-lifecycle-test-matrix.md",
@@ -870,6 +879,16 @@ export const publicDocsOperationCoverage = [
   },
   {
     operationKey: "environments.archive",
+    status: "documented",
+    topicId: "environment.lifecycle",
+  },
+  {
+    operationKey: "environments.lock",
+    status: "documented",
+    topicId: "environment.lifecycle",
+  },
+  {
+    operationKey: "environments.unlock",
     status: "documented",
     topicId: "environment.lifecycle",
   },

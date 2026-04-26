@@ -2,8 +2,8 @@
 
 ## Normative Contract
 
-`environment-archived` means an `Environment` aggregate transitioned from active to archived after
-durable persistence.
+`environment-archived` means an `Environment` aggregate transitioned from active or locked to
+archived after durable persistence.
 
 It is a lifecycle fact. It does not mean resources, deployments, domains, certificates, logs, source
 links, runtime state, or audit records were deleted, stopped, or archived.
@@ -29,7 +29,8 @@ or runtime output.
 
 ## Publication And Idempotency
 
-The event is published or recorded only when an environment transitions from active to archived.
+The event is published or recorded only when an environment transitions from active or locked to
+archived.
 
 Repeated `environments.archive` calls against an already archived environment are idempotent command
 successes and must not publish duplicate `environment-archived` events.

@@ -380,6 +380,16 @@ export const enUS = {
       environmentCloneNamePlaceholder: "production-copy",
       environmentCloneSucceeded: "Environment cloned",
       environmentCloneValidation: "Enter a clone name before cloning.",
+      environmentLockAction: "Lock",
+      environmentLockConfirm:
+        "Lock this environment? Variables, resources, promotions, and deployments will be blocked until it is unlocked.",
+      environmentLockFailed: "Environment was not locked",
+      environmentLockSucceeded: "Environment locked",
+      environmentLocked: "Locked",
+      environmentLockedAt: "Locked at",
+      environmentUnlockAction: "Unlock",
+      environmentUnlockFailed: "Environment was not unlocked",
+      environmentUnlockSucceeded: "Environment unlocked",
       environmentsDescription: "Configuration boundaries grouped under this project.",
       environmentsTitle: "Environments",
       focusDescription:
