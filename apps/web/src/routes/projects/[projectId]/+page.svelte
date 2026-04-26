@@ -2,10 +2,11 @@
   import { browser } from "$app/environment";
   import { page } from "$app/state";
   import { createMutation, createQuery, queryOptions } from "@tanstack/svelte-query";
-  import { Archive, ArrowLeft, ArrowRight, FolderOpen, Play, Plus, Save } from "@lucide/svelte";
+  import { Archive, ArrowLeft, ArrowRight, Copy, FolderOpen, Play, Plus, Save } from "@lucide/svelte";
   import type {
     ArchiveEnvironmentInput,
     ArchiveProjectInput,
+    CloneEnvironmentInput,
     RenameProjectInput,
   } from "@appaloft/contracts";
 
@@ -89,6 +90,7 @@
   } | null>(null);
   let projectFormProjectId = $state("");
   let projectName = $state("");
+  let cloneEnvironmentNames = $state<Record<string, string>>({});
   const canRenameProject = $derived(
     Boolean(project) &&
       !isProjectArchived &&
@@ -155,6 +157,29 @@
       };
     },
   }));
+  const cloneEnvironmentMutation = createMutation(() => ({
+    mutationFn: (input: CloneEnvironmentInput) => orpcClient.environments.clone(input),
+    onSuccess: (result) => {
+      lifecycleFeedback = {
+        kind: "success",
+        title: $t(i18nKeys.console.projects.environmentCloneSucceeded),
+        detail: result.id,
+      };
+      cloneEnvironmentNames = {};
+      void queryClient.invalidateQueries({ queryKey: ["environments"] });
+      void queryClient.invalidateQueries({ queryKey: ["projects"] });
+      if (project) {
+        void queryClient.invalidateQueries({ queryKey: ["projects", "show", project.id] });
+      }
+    },
+    onError: (error) => {
+      lifecycleFeedback = {
+        kind: "error",
+        title: $t(i18nKeys.console.projects.environmentCloneFailed),
+        detail: readErrorMessage(error),
+      };
+    },
+  }));
 
   $effect(() => {
     if (!project || projectFormProjectId === project.id) {
@@ -165,6 +190,17 @@
     projectName = project.name;
     lifecycleFeedback = null;
   });
+
+  function cloneEnvironmentName(environmentId: string): string {
+    return cloneEnvironmentNames[environmentId] ?? "";
+  }
+
+  function setCloneEnvironmentName(environmentId: string, value: string): void {
+    cloneEnvironmentNames = {
+      ...cloneEnvironmentNames,
+      [environmentId]: value,
+    };
+  }
 
   function renameProject(): void {
     if (!browser || !project || !canRenameProject || renameProjectMutation.isPending) {
@@ -210,6 +246,33 @@
     lifecycleFeedback = null;
     archiveEnvironmentMutation.mutate({
       environmentId,
+    });
+  }
+
+  function cloneEnvironment(environmentId: string): void {
+    if (!browser || !project || isProjectArchived || cloneEnvironmentMutation.isPending) {
+      return;
+    }
+
+    const environment = projectEnvironments.find((item) => item.id === environmentId);
+    if (!environment || environment.lifecycleStatus === "archived") {
+      return;
+    }
+
+    const targetName = cloneEnvironmentName(environmentId).trim();
+    if (!targetName) {
+      lifecycleFeedback = {
+        kind: "error",
+        title: $t(i18nKeys.console.projects.environmentCloneFailed),
+        detail: $t(i18nKeys.console.projects.environmentCloneValidation),
+      };
+      return;
+    }
+
+    lifecycleFeedback = null;
+    cloneEnvironmentMutation.mutate({
+      environmentId,
+      targetName,
     });
   }
 
@@ -516,6 +579,40 @@
                         <Archive class="size-4" />
                       </Button>
                     </div>
+                    {#if environment.lifecycleStatus !== "archived"}
+                      <form
+                        id={`environment-clone-form-${environment.id}`}
+                        class="mt-3 flex gap-2"
+                        onsubmit={(event) => {
+                          event.preventDefault();
+                          cloneEnvironment(environment.id);
+                        }}
+                      >
+                        <label class="sr-only" for={`environment-clone-name-${environment.id}`}>
+                          {$t(i18nKeys.console.projects.environmentCloneNameLabel)}
+                        </label>
+                        <Input
+                          id={`environment-clone-name-${environment.id}`}
+                          value={cloneEnvironmentName(environment.id)}
+                          placeholder={$t(i18nKeys.console.projects.environmentCloneNamePlaceholder)}
+                          disabled={isProjectArchived || cloneEnvironmentMutation.isPending}
+                          oninput={(event) =>
+                            setCloneEnvironmentName(environment.id, event.currentTarget.value)}
+                        />
+                        <Button
+                          type="submit"
+                          size="icon-sm"
+                          variant="outline"
+                          aria-label={$t(i18nKeys.console.projects.environmentCloneAction)}
+                          title={$t(i18nKeys.console.projects.environmentCloneAction)}
+                          disabled={isProjectArchived ||
+                            cloneEnvironmentMutation.isPending ||
+                            cloneEnvironmentName(environment.id).trim().length === 0}
+                        >
+                          <Copy class="size-4" />
+                        </Button>
+                      </form>
+                    {/if}
                   </div>
                 {/each}
               {:else}

@@ -253,6 +253,23 @@ describe("operation catalog aggregate mutation boundary", () => {
     expect(entry?.inputSchema).toBeDefined();
   });
 
+  test("[ENV-LIFE-CLONE-ENTRY-004] environment clone is exposed through the active operation catalog", () => {
+    const entry = operationCatalog.find((candidate) => candidate.key === "environments.clone");
+
+    expect(entry).toMatchObject({
+      kind: "command",
+      domain: "environments",
+      messageName: "CloneEnvironmentCommand",
+      handlerName: "CloneEnvironmentCommandHandler",
+      serviceName: "CloneEnvironmentUseCase",
+      transports: {
+        cli: "appaloft env clone <environmentId> --name <targetName>",
+        orpc: { method: "POST", path: "/api/environments/{environmentId}/clone" },
+      },
+    });
+    expect(entry?.inputSchema).toBeDefined();
+  });
+
   test("[AGG-MUTATION-CATALOG-002] detects generic aggregate update operation keys and command names", () => {
     const violations = findGenericAggregateMutationOperations([
       catalogEntry({

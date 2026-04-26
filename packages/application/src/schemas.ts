@@ -13,6 +13,7 @@ export * from "./operations/domain-bindings/confirm-domain-binding-ownership.sch
 export * from "./operations/domain-bindings/create-domain-binding.schema";
 export * from "./operations/domain-bindings/list-domain-bindings.schema";
 export * from "./operations/environments/archive-environment.schema";
+export * from "./operations/environments/clone-environment.schema";
 export * from "./operations/environments/create-environment.schema";
 export * from "./operations/environments/diff-environments.schema";
 export * from "./operations/environments/environment-effective-precedence.schema";

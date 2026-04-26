@@ -441,9 +441,18 @@ export const publicDocsHelpTopics = {
     },
     surfaces: ["web", "cli", "http-api", "mcp"],
     relatedOperation: "environments.archive",
-    aliases: ["environment archive", "archived environment", "env archive", "环境归档"],
+    aliases: [
+      "environment clone",
+      "environment archive",
+      "archived environment",
+      "env clone",
+      "env archive",
+      "环境克隆",
+      "环境归档",
+    ],
     specReferences: [
       "docs/workflows/environment-lifecycle.md",
+      "docs/commands/environments.clone.md",
       "docs/commands/environments.archive.md",
       "docs/events/environment-archived.md",
       "docs/errors/environments.lifecycle.md",
@@ -854,6 +863,11 @@ export const publicDocsOperationCoverage = [
   { operationKey: "environments.create", status: "documented", topicId: "environment.concept" },
   { operationKey: "environments.list", status: "documented", topicId: "environment.concept" },
   { operationKey: "environments.show", status: "documented", topicId: "environment.concept" },
+  {
+    operationKey: "environments.clone",
+    status: "documented",
+    topicId: "environment.lifecycle",
+  },
   {
     operationKey: "environments.archive",
     status: "documented",

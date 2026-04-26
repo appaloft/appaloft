@@ -129,6 +129,47 @@ describe("EnvironmentProfile", () => {
     expect(diff[0]?.exposure.value).toBe("runtime");
   });
 
+  test("[ENV-LIFE-CLONE-001] clones active environment variables into a new active environment", () => {
+    const source = EnvironmentProfile.create({
+      id: EnvironmentId.rehydrate("env_stage"),
+      projectId: ProjectId.rehydrate("prj_demo"),
+      name: EnvironmentName.rehydrate("staging"),
+      kind: EnvironmentKindValue.rehydrate("staging"),
+      createdAt: CreatedAt.rehydrate("2026-01-01T00:00:00.000Z"),
+    })._unsafeUnwrap();
+    source.setVariable({
+      key: ConfigKey.rehydrate("DATABASE_URL"),
+      value: ConfigValueText.rehydrate("postgres://stage"),
+      kind: VariableKindValue.rehydrate("secret"),
+      exposure: VariableExposureValue.rehydrate("runtime"),
+      scope: ConfigScopeValue.rehydrate("environment"),
+      isSecret: true,
+      updatedAt: UpdatedAt.rehydrate("2026-01-01T00:01:00.000Z"),
+    });
+
+    const cloned = source
+      .cloneTo({
+        targetEnvironmentId: EnvironmentId.rehydrate("env_copy"),
+        targetName: EnvironmentName.rehydrate("staging-copy"),
+        createdAt: CreatedAt.rehydrate("2026-01-02T00:00:00.000Z"),
+      })
+      ._unsafeUnwrap();
+
+    const state = cloned.toState();
+    const variables = state.variables.toState();
+
+    expect(state.projectId.value).toBe("prj_demo");
+    expect(state.parentEnvironmentId?.value).toBe("env_stage");
+    expect(state.lifecycleStatus.value).toBe("active");
+    expect(state.kind.value).toBe("staging");
+    expect(state.createdAt.value).toBe("2026-01-02T00:00:00.000Z");
+    expect(variables).toHaveLength(1);
+    expect(variables[0]?.key.value).toBe("DATABASE_URL");
+    expect(variables[0]?.value.value).toBe("postgres://stage");
+    expect(variables[0]?.isSecret).toBe(true);
+    expect(variables[0]?.updatedAt.value).toBe("2026-01-02T00:00:00.000Z");
+  });
+
   test("rejects unsafe build-time variables", () => {
     const environment = EnvironmentProfile.create({
       id: EnvironmentId.rehydrate("env_web"),
@@ -225,6 +266,17 @@ describe("EnvironmentProfile", () => {
     if (promoteResult.isErr()) {
       expect(promoteResult.error.code).toBe("environment_archived");
       expect(promoteResult.error.details?.commandName).toBe("environments.promote");
+    }
+
+    const cloneResult = environment.cloneTo({
+      targetEnvironmentId: EnvironmentId.rehydrate("env_prod_copy"),
+      targetName: EnvironmentName.rehydrate("production-copy"),
+      createdAt: CreatedAt.rehydrate("2026-01-04T00:00:00.000Z"),
+    });
+    expect(cloneResult.isErr()).toBe(true);
+    if (cloneResult.isErr()) {
+      expect(cloneResult.error.code).toBe("environment_archived");
+      expect(cloneResult.error.details?.commandName).toBe("environments.clone");
     }
   });
 });

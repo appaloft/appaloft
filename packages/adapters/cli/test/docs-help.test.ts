@@ -21,6 +21,9 @@ describe("CLI docs help links", () => {
     expect(cliDocsHrefs.environmentVariablePrecedence).toBe(
       "/docs/environments/variables/precedence/#environment-variable-precedence",
     );
+    expect(cliDocsHrefs.environmentLifecycle).toBe(
+      "/docs/environments/model/#environment-lifecycle",
+    );
     expect(cliDocsHrefs.resourceRuntimeProfile).toBe(
       "/docs/resources/profiles/source-runtime/#resource-runtime-profile",
     );
@@ -47,6 +50,7 @@ describe("CLI docs help links", () => {
     expect(cliCommandDescriptions.environmentSet).toContain(
       cliDocsHrefs.environmentVariablePrecedence,
     );
+    expect(cliCommandDescriptions.environmentClone).toContain(cliDocsHrefs.environmentLifecycle);
     expect(cliCommandDescriptions.resourceConfigureRuntime).toContain(
       cliDocsHrefs.resourceRuntimeProfile,
     );

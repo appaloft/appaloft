@@ -305,8 +305,8 @@ Post-`0.4.0` gaps assigned to later phases:
 
 - Credential rotation, broad credential usage visibility, and delete-when-unused are active
   lifecycle slices.
-- Remaining environment clone/lock/history work remains Phase 4 work after effective-precedence and
-  archive slices.
+- Remaining environment lock/history work remains Phase 4 work after effective-precedence, archive,
+  and clone slices.
 - Access policy editing, route precedence hardening, route intent repair, domain binding mutation
   lifecycle, and certificate import/revoke/retry/delete remain Phase 6 work.
 - Deployment retry/redeploy, cancel, rollback, dependency resources, storage, secrets, webhooks,
@@ -425,7 +425,8 @@ Required:
 - [x] Add separate resource network update semantics where specs require a separate command.
 - [ ] Add reusable access-profile update semantics where specs require a separate command.
 - [x] Add environment archive.
-- [ ] Add environment clone/lock and remaining named edit semantics.
+- [x] Add environment clone.
+- [ ] Add environment lock and remaining named edit semantics.
 - [x] Add environment effective-precedence query.
 - [ ] Complete resource detail editing affordances for source/runtime/network profile changes.
 - [ ] Ensure CLI, HTTP/oRPC, Web, and future MCP naming reuse the same command/query schemas.
@@ -688,7 +689,8 @@ work below before GA.
 - [x] Environment: create/list/show, set/unset variable, diff, promote.
 - [x] Environment: effective precedence query.
 - [x] Environment: archive.
-- [ ] Environment: clone, lock, remaining named edit semantics, history.
+- [x] Environment: clone.
+- [ ] Environment: lock, remaining named edit semantics, history.
 - [x] Deployment target/server: register, list, show, configure credential, deactivate, delete
   safety, guarded soft delete, connectivity, proxy repair, terminal open.
 - [x] Deployment target/server: rename.

@@ -224,6 +224,45 @@ export class Environment extends AggregateRoot<EnvironmentState> {
     );
   }
 
+  cloneTo(input: {
+    targetEnvironmentId: EnvironmentId;
+    targetName: EnvironmentName;
+    targetKind?: EnvironmentKindValue;
+    createdAt: CreatedAt;
+  }): Result<Environment> {
+    const lifecycleGuard = this.ensureCanAcceptMutation("environments.clone");
+    if (lifecycleGuard.isErr()) {
+      return err(lifecycleGuard.error);
+    }
+
+    return ok(
+      Environment.rehydrate({
+        id: input.targetEnvironmentId,
+        projectId: this.state.projectId,
+        name: input.targetName,
+        kind: input.targetKind ?? this.state.kind,
+        parentEnvironmentId: this.state.id,
+        createdAt: input.createdAt,
+        variables: EnvironmentConfigSet.rehydrate(
+          this.materializeSnapshot({
+            snapshotId: EnvironmentSnapshotId.rehydrate(`${input.targetEnvironmentId.value}-clone`),
+            createdAt: GeneratedAt.rehydrate(input.createdAt.value),
+          })
+            .toState()
+            .variables.map((variable: EnvironmentConfigSnapshotEntryState) => ({
+              key: variable.key,
+              value: variable.value,
+              kind: variable.kind,
+              exposure: variable.exposure,
+              scope: ConfigScopeValue.rehydrate("environment"),
+              isSecret: variable.isSecret,
+              updatedAt: UpdatedAt.rehydrate(input.createdAt.value),
+            })),
+        ),
+      }),
+    );
+  }
+
   archive(input: { archivedAt: ArchivedAt; reason?: ArchiveReason }): Result<{ changed: boolean }> {
     if (this.state.lifecycleStatus.isArchived()) {
       return ok({ changed: false });
@@ -255,6 +294,10 @@ export class Environment extends AggregateRoot<EnvironmentState> {
 
   ensureCanCreateResource(): Result<void> {
     return this.ensureCanAcceptMutation("resources.create");
+  }
+
+  ensureCanClone(): Result<void> {
+    return this.ensureCanAcceptMutation("environments.clone");
   }
 
   ensureCanCreateDeployment(): Result<void> {
