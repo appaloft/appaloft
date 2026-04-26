@@ -5,9 +5,11 @@ import {
   DiffEnvironmentsQuery,
   EnvironmentEffectivePrecedenceQuery,
   ListEnvironmentsQuery,
+  LockEnvironmentCommand,
   PromoteEnvironmentCommand,
   SetEnvironmentVariableCommand,
   ShowEnvironmentQuery,
+  UnlockEnvironmentCommand,
   UnsetEnvironmentVariableCommand,
 } from "@appaloft/application";
 import { configScopes, environmentKinds, variableExposures, variableKinds } from "@appaloft/core";
@@ -28,6 +30,7 @@ const kindOption = Options.choice("kind", environmentKinds);
 const parentOption = Options.text("parent").pipe(Options.optional);
 const archiveReasonOption = Options.text("reason").pipe(Options.optional);
 const cloneKindOption = Options.choice("kind", environmentKinds).pipe(Options.optional);
+const lockReasonOption = Options.text("reason").pipe(Options.optional);
 const exposureOption = Options.choice("exposure", variableExposures);
 const scopeOption = Options.choice("scope", configScopes).pipe(Options.optional);
 const secretOption = Options.boolean("secret").pipe(Options.withDefault(false));
@@ -104,6 +107,34 @@ const cloneCommand = EffectCommand.make(
       }),
     ),
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.environmentClone));
+
+const lockCommand = EffectCommand.make(
+  "lock",
+  {
+    environmentId: environmentIdArg,
+    reason: lockReasonOption,
+  },
+  ({ environmentId, reason }) =>
+    runCommand(
+      LockEnvironmentCommand.create({
+        environmentId,
+        reason: optionalValue(reason),
+      }),
+    ),
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.environmentLock));
+
+const unlockCommand = EffectCommand.make(
+  "unlock",
+  {
+    environmentId: environmentIdArg,
+  },
+  ({ environmentId }) =>
+    runCommand(
+      UnlockEnvironmentCommand.create({
+        environmentId,
+      }),
+    ),
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.environmentUnlock));
 
 const setCommand = EffectCommand.make(
   "set",
@@ -195,6 +226,8 @@ export const envCommand = EffectCommand.make("env").pipe(
     listCommand,
     createCommand,
     showCommand,
+    lockCommand,
+    unlockCommand,
     archiveCommand,
     cloneCommand,
     setCommand,

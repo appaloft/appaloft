@@ -856,6 +856,16 @@ const apiResponses: Record<ApiScenario, Record<string, ApiRoute>> = {
         id: "env_demo",
       },
     },
+    "/api/rpc/environments/lock": {
+      json: {
+        id: "env_demo",
+      },
+    },
+    "/api/rpc/environments/unlock": {
+      json: {
+        id: "env_demo",
+      },
+    },
     "/api/rpc/environments/clone": {
       json: {
         id: "env_clone",
@@ -2427,6 +2437,97 @@ describe("console e2e with Bun.WebView", () => {
       environmentId: "env_demo",
       targetName: "production-copy",
     });
+  }, 15_000);
+
+  test("[ENV-LIFE-ENTRY-006] submits environment lock through Web", async () => {
+    activeScenario = "dashboard";
+    resetRecordedApiRequests();
+
+    await using view = createWebView();
+    await view.navigate(`${previewUrl}/projects/prj_demo`);
+    await expectAnyText(view, ["Environments", "环境"]);
+    await view.evaluate("window.confirm = () => true");
+    const clicked = await waitFor(
+      () =>
+        view.evaluate<boolean>(
+          `(() => {
+            const button = Array.from(document.querySelectorAll("button")).find((candidate) =>
+              candidate.getAttribute("title") === "Lock" ||
+              candidate.getAttribute("title") === "锁定"
+            );
+            if (!(button instanceof HTMLButtonElement)) {
+              return false;
+            }
+            button.click();
+            return true;
+          })()`,
+        ),
+      Boolean,
+      "Expected environment lock button",
+    );
+    expect(clicked).toBe(true);
+
+    const lockRequest = await waitForRecordedRequest("/api/rpc/environments/lock");
+    const lockInput = readOrpcJsonPayload(lockRequest.body);
+
+    expect(lockInput).toEqual({
+      environmentId: "env_demo",
+    });
+  }, 15_000);
+
+  test("[ENV-LIFE-ENTRY-006] submits environment unlock through Web", async () => {
+    activeScenario = "dashboard";
+    resetRecordedApiRequests();
+    const listResponse = apiResponses.dashboard["/api/rpc/environments/list"] as {
+      json: {
+        items: Array<{
+          lifecycleStatus: string;
+          lockedAt?: string;
+          lockReason?: string;
+        }>;
+      };
+    };
+    const previousEnvironment = { ...listResponse.json.items[0] };
+    listResponse.json.items[0] = {
+      ...previousEnvironment,
+      lifecycleStatus: "locked",
+      lockedAt: "2026-01-01T00:00:10.000Z",
+      lockReason: "Change freeze",
+    };
+
+    try {
+      await using view = createWebView();
+      await view.navigate(`${previewUrl}/projects/prj_demo`);
+      await expectAnyText(view, ["Locked", "已锁定"]);
+      const clicked = await waitFor(
+        () =>
+          view.evaluate<boolean>(
+            `(() => {
+              const button = Array.from(document.querySelectorAll("button")).find((candidate) =>
+                candidate.getAttribute("title") === "Unlock" ||
+                candidate.getAttribute("title") === "解锁"
+              );
+              if (!(button instanceof HTMLButtonElement)) {
+                return false;
+              }
+              button.click();
+              return true;
+            })()`,
+          ),
+        Boolean,
+        "Expected environment unlock button",
+      );
+      expect(clicked).toBe(true);
+
+      const unlockRequest = await waitForRecordedRequest("/api/rpc/environments/unlock");
+      const unlockInput = readOrpcJsonPayload(unlockRequest.body);
+
+      expect(unlockInput).toEqual({
+        environmentId: "env_demo",
+      });
+    } finally {
+      listResponse.json.items[0] = previousEnvironment;
+    }
   }, 15_000);
 
   test("[RES-PROFILE-ENTRY-008] submits archived resource delete through Web", async () => {

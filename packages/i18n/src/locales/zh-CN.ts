@@ -372,6 +372,16 @@ export const zhCN = {
       environmentCloneNamePlaceholder: "production-copy",
       environmentCloneSucceeded: "环境已克隆",
       environmentCloneValidation: "克隆前请输入新环境名称。",
+      environmentLockAction: "锁定",
+      environmentLockConfirm:
+        "确定锁定这个环境吗？锁定后变量、资源、提升和部署都会被阻止，直到环境解锁。",
+      environmentLockFailed: "环境锁定失败",
+      environmentLockSucceeded: "环境已锁定",
+      environmentLocked: "已锁定",
+      environmentLockedAt: "锁定时间",
+      environmentUnlockAction: "解锁",
+      environmentUnlockFailed: "环境解锁失败",
+      environmentUnlockSucceeded: "环境已解锁",
       environmentsDescription: "按项目聚合的配置边界。",
       environmentsTitle: "环境",
       focusDescription:

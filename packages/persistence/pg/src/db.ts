@@ -37,6 +37,7 @@ import { serverLifecycleMigration } from "./migrations/029_server_lifecycle";
 import { serverDeleteTombstoneMigration } from "./migrations/030_server_delete_tombstone";
 import { sshCredentialRotationMigration } from "./migrations/031_ssh_credential_rotation";
 import { environmentLifecycleMigration } from "./migrations/032_environment_lifecycle";
+import { environmentLockLifecycleMigration } from "./migrations/033_environment_lock_lifecycle";
 import { PgliteDialect } from "./pglite-dialect";
 import { type Database } from "./schema";
 import { TracingDialect } from "./tracing-dialect";
@@ -163,6 +164,7 @@ class StaticMigrationProvider implements MigrationProvider {
       "030_server_delete_tombstone": serverDeleteTombstoneMigration,
       "031_ssh_credential_rotation": sshCredentialRotationMigration,
       "032_environment_lifecycle": environmentLifecycleMigration,
+      "033_environment_lock_lifecycle": environmentLockLifecycleMigration,
     };
   }
 }

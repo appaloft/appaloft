@@ -1363,6 +1363,8 @@ export interface EnvironmentSummary {
   kind: EnvironmentKind;
   parentEnvironmentId?: string;
   lifecycleStatus: EnvironmentLifecycleStatus;
+  lockedAt?: string;
+  lockReason?: string;
   archivedAt?: string;
   archiveReason?: string;
   createdAt: string;

@@ -103,6 +103,8 @@ import {
   HostAddress,
   IdempotencyKeyValue,
   ImageReference,
+  LockedAt,
+  LockReason,
   LogLevelValue,
   MessageText,
   OccurredAt,
@@ -1063,6 +1065,16 @@ export function rehydrateEnvironmentRow(
     lifecycleStatus: EnvironmentLifecycleStatusValue.rehydrate(
       (environmentRow.lifecycle_status ?? "active") as EnvironmentLifecycleStatusInput,
     ),
+    ...(environmentRow.locked_at
+      ? {
+          lockedAt: LockedAt.rehydrate(
+            normalizeTimestamp(environmentRow.locked_at) ?? environmentRow.locked_at,
+          ),
+        }
+      : {}),
+    ...(environmentRow.lock_reason
+      ? { lockReason: LockReason.rehydrate(environmentRow.lock_reason) }
+      : {}),
     ...(environmentRow.archived_at
       ? {
           archivedAt: ArchivedAt.rehydrate(

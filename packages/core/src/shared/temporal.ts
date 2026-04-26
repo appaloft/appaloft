@@ -103,6 +103,40 @@ export class ArchivedAt extends DateTimeValue {
   }
 }
 
+const lockedAtBrand: unique symbol = Symbol("LockedAt");
+export class LockedAt extends DateTimeValue {
+  private [lockedAtBrand]!: void;
+
+  private constructor(value: string) {
+    super(value);
+  }
+
+  static create(value: string | Date): Result<LockedAt> {
+    return createDateTimeValue(value, "LockedAt", (normalized) => new LockedAt(normalized));
+  }
+
+  static rehydrate(value: string): LockedAt {
+    return new LockedAt(new Date(value).toISOString());
+  }
+}
+
+const unlockedAtBrand: unique symbol = Symbol("UnlockedAt");
+export class UnlockedAt extends DateTimeValue {
+  private [unlockedAtBrand]!: void;
+
+  private constructor(value: string) {
+    super(value);
+  }
+
+  static create(value: string | Date): Result<UnlockedAt> {
+    return createDateTimeValue(value, "UnlockedAt", (normalized) => new UnlockedAt(normalized));
+  }
+
+  static rehydrate(value: string): UnlockedAt {
+    return new UnlockedAt(new Date(value).toISOString());
+  }
+}
+
 const deletedAtBrand: unique symbol = Symbol("DeletedAt");
 export class DeletedAt extends DateTimeValue {
   private [deletedAtBrand]!: void;

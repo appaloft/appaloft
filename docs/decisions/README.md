@@ -56,6 +56,7 @@ rebuild-required there, update the operation map and required ADR before local s
 | [ADR-029: Deployment Event Stream And Recovery Boundary](./ADR-029-deployment-event-stream-and-recovery-boundary.md) | Accepted | Splits deployment detail, event-stream observation, and logs into separate read boundaries; keeps reconnect as read behavior and leaves recovery write commands gated by ADR-016. |
 | [ADR-030: Public Documentation Round And Platform](./ADR-030-public-documentation-round-and-platform.md) | Accepted | Makes public documentation a first-class Docs Round completion gate, selects Starlight/Astro for `apps/docs`, and defines docs packaging and help-anchor contracts. |
 | [ADR-031: Static Server Routing Policy](./ADR-031-static-server-routing-policy.md) | Accepted | Defines Appaloft-owned static-server routing for directory indexes, asset 404s, and extensionless app-route fallback. |
+| [ADR-032: Environment Lock Lifecycle](./ADR-032-environment-lock-lifecycle.md) | Accepted | Defines reversible environment lock/unlock lifecycle semantics and locked-environment mutation/admission guards. |
 
 ## Authoring Rules
 

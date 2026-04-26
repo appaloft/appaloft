@@ -15,12 +15,20 @@ import {
   type VariableExposureValue,
   type VariableKindValue,
 } from "../shared/state-machine";
-import { type ArchivedAt, type CreatedAt, GeneratedAt, UpdatedAt } from "../shared/temporal";
+import {
+  type ArchivedAt,
+  type CreatedAt,
+  GeneratedAt,
+  type LockedAt,
+  type UnlockedAt,
+  UpdatedAt,
+} from "../shared/temporal";
 import {
   type ArchiveReason,
   type ConfigKey,
   type ConfigValueText,
   type EnvironmentName,
+  type LockReason,
 } from "../shared/text-values";
 
 export type EnvironmentVariableState = ReturnType<EnvironmentConfigSet["toState"]>[number];
@@ -33,6 +41,8 @@ export interface EnvironmentState {
   kind: EnvironmentKindValue;
   parentEnvironmentId?: EnvironmentId;
   lifecycleStatus: EnvironmentLifecycleStatusValue;
+  lockedAt?: LockedAt;
+  lockReason?: LockReason;
   archivedAt?: ArchivedAt;
   archiveReason?: ArchiveReason;
   createdAt: CreatedAt;
@@ -45,9 +55,14 @@ export interface EnvironmentVisitor<TContext, TResult> {
 
 type EnvironmentRehydrateState = Omit<
   EnvironmentState,
-  "archiveReason" | "archivedAt" | "lifecycleStatus" | "variables"
+  "archiveReason" | "archivedAt" | "lifecycleStatus" | "lockReason" | "lockedAt" | "variables"
 > &
-  Partial<Pick<EnvironmentState, "archiveReason" | "archivedAt" | "lifecycleStatus">> & {
+  Partial<
+    Pick<
+      EnvironmentState,
+      "archiveReason" | "archivedAt" | "lifecycleStatus" | "lockReason" | "lockedAt"
+    >
+  > & {
     variables: EnvironmentConfigSet;
   };
 
@@ -66,6 +81,24 @@ function environmentArchivedError(input: {
     lifecycleStatus: "archived",
     commandName: input.commandName,
     ...(input.archivedAt ? { archivedAt: input.archivedAt.value } : {}),
+  });
+}
+
+function environmentLockedError(input: {
+  environmentId: EnvironmentId;
+  projectId: ProjectId;
+  commandName: string;
+  environmentName: EnvironmentName;
+  lockedAt?: LockedAt;
+}) {
+  return domainError.environmentLocked("Locked environments cannot accept new mutations", {
+    phase: "environment-lifecycle-guard",
+    environmentId: input.environmentId.value,
+    projectId: input.projectId.value,
+    environmentName: input.environmentName.value,
+    lifecycleStatus: "locked",
+    commandName: input.commandName,
+    ...(input.lockedAt ? { lockedAt: input.lockedAt.value } : {}),
   });
 }
 
@@ -101,6 +134,8 @@ export class Environment extends AggregateRoot<EnvironmentState> {
       ...state,
       variables: EnvironmentConfigSet.rehydrate(state.variables.toState()),
       lifecycleStatus: state.lifecycleStatus ?? EnvironmentLifecycleStatusValue.active(),
+      ...(state.lockedAt ? { lockedAt: state.lockedAt } : {}),
+      ...(state.lockReason ? { lockReason: state.lockReason } : {}),
       ...(state.archivedAt ? { archivedAt: state.archivedAt } : {}),
       ...(state.archiveReason ? { archiveReason: state.archiveReason } : {}),
     });
@@ -275,6 +310,8 @@ export class Environment extends AggregateRoot<EnvironmentState> {
 
     this.state.lifecycleStatus = nextStatus.value;
     this.state.archivedAt = input.archivedAt;
+    delete this.state.lockedAt;
+    delete this.state.lockReason;
     if (input.reason) {
       this.state.archiveReason = input.reason;
     } else {
@@ -287,6 +324,87 @@ export class Environment extends AggregateRoot<EnvironmentState> {
       environmentKind: this.state.kind.value,
       archivedAt: input.archivedAt.value,
       ...(input.reason ? { reason: input.reason.value } : {}),
+    });
+
+    return ok({ changed: true });
+  }
+
+  lock(input: { lockedAt: LockedAt; reason?: LockReason }): Result<{ changed: boolean }> {
+    if (this.state.lifecycleStatus.isArchived()) {
+      return err(
+        environmentArchivedError({
+          environmentId: this.state.id,
+          projectId: this.state.projectId,
+          commandName: "environments.lock",
+          environmentName: this.state.name,
+          ...(this.state.archivedAt ? { archivedAt: this.state.archivedAt } : {}),
+        }),
+      );
+    }
+
+    if (this.state.lifecycleStatus.isLocked()) {
+      return ok({ changed: false });
+    }
+
+    const nextStatus = this.state.lifecycleStatus.lock();
+    if (nextStatus.isErr()) {
+      return err(nextStatus.error);
+    }
+
+    this.state.lifecycleStatus = nextStatus.value;
+    this.state.lockedAt = input.lockedAt;
+    if (input.reason) {
+      this.state.lockReason = input.reason;
+    } else {
+      delete this.state.lockReason;
+    }
+    this.recordDomainEvent("environment-locked", input.lockedAt, {
+      environmentId: this.state.id.value,
+      projectId: this.state.projectId.value,
+      environmentName: this.state.name.value,
+      environmentKind: this.state.kind.value,
+      lockedAt: input.lockedAt.value,
+      ...(input.reason ? { reason: input.reason.value } : {}),
+    });
+
+    return ok({ changed: true });
+  }
+
+  unlock(input: { unlockedAt: UnlockedAt }): Result<{ changed: boolean }> {
+    if (this.state.lifecycleStatus.isArchived()) {
+      return err(
+        environmentArchivedError({
+          environmentId: this.state.id,
+          projectId: this.state.projectId,
+          commandName: "environments.unlock",
+          environmentName: this.state.name,
+          ...(this.state.archivedAt ? { archivedAt: this.state.archivedAt } : {}),
+        }),
+      );
+    }
+
+    if (this.state.lifecycleStatus.isActive()) {
+      return ok({ changed: false });
+    }
+
+    const nextStatus = this.state.lifecycleStatus.unlock();
+    if (nextStatus.isErr()) {
+      return err(nextStatus.error);
+    }
+
+    const previousLockedAt = this.state.lockedAt;
+    const previousLockReason = this.state.lockReason;
+    this.state.lifecycleStatus = nextStatus.value;
+    delete this.state.lockedAt;
+    delete this.state.lockReason;
+    this.recordDomainEvent("environment-unlocked", input.unlockedAt, {
+      environmentId: this.state.id.value,
+      projectId: this.state.projectId.value,
+      environmentName: this.state.name.value,
+      environmentKind: this.state.kind.value,
+      unlockedAt: input.unlockedAt.value,
+      ...(previousLockedAt ? { lockedAt: previousLockedAt.value } : {}),
+      ...(previousLockReason ? { reason: previousLockReason.value } : {}),
     });
 
     return ok({ changed: true });
@@ -307,6 +425,18 @@ export class Environment extends AggregateRoot<EnvironmentState> {
   private ensureCanAcceptMutation(commandName: string): Result<void> {
     if (this.state.lifecycleStatus.isActive()) {
       return ok(undefined);
+    }
+
+    if (this.state.lifecycleStatus.isLocked()) {
+      return err(
+        environmentLockedError({
+          environmentId: this.state.id,
+          projectId: this.state.projectId,
+          commandName,
+          environmentName: this.state.name,
+          ...(this.state.lockedAt ? { lockedAt: this.state.lockedAt } : {}),
+        }),
+      );
     }
 
     return err(

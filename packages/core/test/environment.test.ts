@@ -13,7 +13,10 @@ import {
   EnvironmentProfile,
   EnvironmentSnapshotId,
   GeneratedAt,
+  LockedAt,
+  LockReason,
   ProjectId,
+  UnlockedAt,
   UpdatedAt,
   VariableExposureValue,
   VariableKindValue,
@@ -278,5 +281,129 @@ describe("EnvironmentProfile", () => {
       expect(cloneResult.error.code).toBe("environment_archived");
       expect(cloneResult.error.details?.commandName).toBe("environments.clone");
     }
+  });
+
+  test("[ENV-LIFE-LOCK-001] [ENV-LIFE-LOCK-003] [ENV-LIFE-UNLOCK-001] [ENV-LIFE-UNLOCK-003] locks and unlocks idempotently", () => {
+    const environment = EnvironmentProfile.create({
+      id: EnvironmentId.rehydrate("env_prod"),
+      projectId: ProjectId.rehydrate("prj_demo"),
+      name: EnvironmentName.rehydrate("production"),
+      kind: EnvironmentKindValue.rehydrate("production"),
+      createdAt: CreatedAt.rehydrate("2026-01-01T00:00:00.000Z"),
+    })._unsafeUnwrap();
+
+    expect(
+      environment
+        .lock({
+          lockedAt: LockedAt.rehydrate("2026-01-03T00:00:00.000Z"),
+          reason: LockReason.rehydrate("Change freeze"),
+        })
+        ._unsafeUnwrap(),
+    ).toEqual({ changed: true });
+    expect(environment.toState().lifecycleStatus.value).toBe("locked");
+    expect(environment.toState().lockedAt?.value).toBe("2026-01-03T00:00:00.000Z");
+    expect(environment.toState().lockReason?.value).toBe("Change freeze");
+    expect(environment.pullDomainEvents()).toMatchObject([
+      {
+        type: "environment-locked",
+        payload: {
+          environmentId: "env_prod",
+          projectId: "prj_demo",
+          environmentName: "production",
+          environmentKind: "production",
+          lockedAt: "2026-01-03T00:00:00.000Z",
+          reason: "Change freeze",
+        },
+      },
+    ]);
+
+    expect(
+      environment
+        .lock({
+          lockedAt: LockedAt.rehydrate("2026-01-04T00:00:00.000Z"),
+          reason: LockReason.rehydrate("New reason"),
+        })
+        ._unsafeUnwrap(),
+    ).toEqual({ changed: false });
+    expect(environment.toState().lockedAt?.value).toBe("2026-01-03T00:00:00.000Z");
+    expect(environment.toState().lockReason?.value).toBe("Change freeze");
+    expect(environment.pullDomainEvents()).toEqual([]);
+
+    const setResult = environment.setVariable({
+      key: ConfigKey.rehydrate("APP_PORT"),
+      value: ConfigValueText.rehydrate("3000"),
+      kind: VariableKindValue.rehydrate("plain-config"),
+      exposure: VariableExposureValue.rehydrate("runtime"),
+      updatedAt: UpdatedAt.rehydrate("2026-01-04T00:00:00.000Z"),
+    });
+    expect(setResult.isErr()).toBe(true);
+    if (setResult.isErr()) {
+      expect(setResult.error.code).toBe("environment_locked");
+      expect(setResult.error.details?.commandName).toBe("environments.set-variable");
+    }
+
+    expect(
+      environment
+        .unlock({
+          unlockedAt: UnlockedAt.rehydrate("2026-01-05T00:00:00.000Z"),
+        })
+        ._unsafeUnwrap(),
+    ).toEqual({ changed: true });
+    expect(environment.toState().lifecycleStatus.value).toBe("active");
+    expect(environment.toState().lockedAt).toBeUndefined();
+    expect(environment.toState().lockReason).toBeUndefined();
+    expect(environment.pullDomainEvents()).toMatchObject([
+      {
+        type: "environment-unlocked",
+        payload: {
+          environmentId: "env_prod",
+          projectId: "prj_demo",
+          environmentName: "production",
+          environmentKind: "production",
+          lockedAt: "2026-01-03T00:00:00.000Z",
+          unlockedAt: "2026-01-05T00:00:00.000Z",
+          reason: "Change freeze",
+        },
+      },
+    ]);
+
+    expect(
+      environment
+        .unlock({
+          unlockedAt: UnlockedAt.rehydrate("2026-01-06T00:00:00.000Z"),
+        })
+        ._unsafeUnwrap(),
+    ).toEqual({ changed: false });
+    expect(environment.pullDomainEvents()).toEqual([]);
+  });
+
+  test("[ENV-LIFE-ARCHIVE-004] archives a locked environment and clears lock metadata", () => {
+    const environment = EnvironmentProfile.create({
+      id: EnvironmentId.rehydrate("env_prod"),
+      projectId: ProjectId.rehydrate("prj_demo"),
+      name: EnvironmentName.rehydrate("production"),
+      kind: EnvironmentKindValue.rehydrate("production"),
+      createdAt: CreatedAt.rehydrate("2026-01-01T00:00:00.000Z"),
+    })._unsafeUnwrap();
+
+    environment
+      .lock({
+        lockedAt: LockedAt.rehydrate("2026-01-03T00:00:00.000Z"),
+        reason: LockReason.rehydrate("Change freeze"),
+      })
+      ._unsafeUnwrap();
+    environment.pullDomainEvents();
+
+    expect(
+      environment
+        .archive({
+          archivedAt: ArchivedAt.rehydrate("2026-01-04T00:00:00.000Z"),
+          reason: ArchiveReason.rehydrate("Retired"),
+        })
+        ._unsafeUnwrap(),
+    ).toEqual({ changed: true });
+    expect(environment.toState().lifecycleStatus.value).toBe("archived");
+    expect(environment.toState().lockedAt).toBeUndefined();
+    expect(environment.toState().lockReason).toBeUndefined();
   });
 });

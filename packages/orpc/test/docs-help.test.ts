@@ -42,6 +42,8 @@ describe("HTTP API docs help links", () => {
     );
     expect(apiRouteDescriptions.archiveEnvironment).toContain(apiDocsHrefs.environmentLifecycle);
     expect(apiRouteDescriptions.cloneEnvironment).toContain(apiDocsHrefs.environmentLifecycle);
+    expect(apiRouteDescriptions.lockEnvironment).toContain(apiDocsHrefs.environmentLifecycle);
+    expect(apiRouteDescriptions.unlockEnvironment).toContain(apiDocsHrefs.environmentLifecycle);
     expect(apiRouteDescriptions.configureResourceHealth).toContain(
       apiDocsHrefs.resourceHealthProfile,
     );

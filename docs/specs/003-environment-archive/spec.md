@@ -21,6 +21,7 @@ named lifecycle command, not a generic environment update command.
 | --- | --- | --- | --- |
 | Environment archive | Lifecycle transition that marks an environment unavailable for new mutations and deployment admission while retaining reads/history. | Workspace / Environment lifecycle | retire environment, archived environment |
 | Active environment | Environment that can accept environment-owned config writes, promotion, new resources, and new deployments. | Workspace | live environment |
+| Locked environment | Readable environment that temporarily blocks config writes, promotion, new resources, and new deployments until unlock or archive. | Workspace | frozen environment |
 | Archived environment | Retained environment that stays readable but rejects new mutation/admission operations. | Workspace | retired environment |
 | Environment lifecycle guard | The aggregate rule that rejects mutations against archived environments with `environment_archived`. | Domain/application | archive guard |
 
@@ -30,6 +31,7 @@ named lifecycle command, not a generic environment update command.
 | --- | --- | --- | --- | --- |
 | ENV-LIFE-ARCHIVE-001 | Archive active environment | An active environment exists. | The operator dispatches `environments.archive`. | The environment is persisted with `lifecycleStatus = "archived"`, `archivedAt`, optional reason, and `environment-archived` is published. |
 | ENV-LIFE-ARCHIVE-002 | Retry archived environment | An environment is already archived. | The operator dispatches `environments.archive` again. | The command returns `ok({ id })`, preserves original archive metadata, and publishes no duplicate event. |
+| ENV-LIFE-ARCHIVE-004 | Archive locked environment | A locked environment exists. | The operator dispatches `environments.archive`. | The environment is persisted as archived, lock metadata is cleared, and `environment-archived` is published. |
 | ENV-LIFE-READ-001 | Read archived environment | An environment is archived. | The operator lists or shows environments. | The read model returns lifecycle metadata and masked variables. |
 | ENV-LIFE-GUARD-001 | Block config writes | An environment is archived. | The operator sets or unsets an environment variable. | The command returns `environment_archived`, `phase = environment-lifecycle-guard`, with no mutation/event. |
 | ENV-LIFE-GUARD-002 | Block promotion | An environment is archived. | The operator promotes it into a new environment. | The command returns `environment_archived`, with no promoted environment. |
