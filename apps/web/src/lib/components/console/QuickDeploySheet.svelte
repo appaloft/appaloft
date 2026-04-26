@@ -58,6 +58,7 @@
   import { createDeploymentWithProgress } from "$lib/console/deployment-progress";
   import { quickDeploySourceHelpHref, webDocsHrefs } from "$lib/console/docs-help";
   import { defaultAuthSession, type ProviderSummary } from "$lib/console/queries";
+  import { selectCurrentResourceAccessRoute } from "$lib/console/resource-access-route";
   import {
     createQuickDeployServerCredential,
     createRegisterServerInput,
@@ -374,7 +375,7 @@
   } | null>(null);
   let workflowProgressDialogOpen = $state(false);
   let lastCreatedDeploymentId = $state("");
-  let lastGeneratedAccessUrl = $state("");
+  let lastAccessUrl = $state("");
 
   const createProjectMutation = createMutation(() => ({
     mutationFn: (input: { name: string; description?: string }) => orpcClient.projects.create(input),
@@ -475,9 +476,7 @@
     resources.find((resource) => resource.id === selectedResourceId) ?? null,
   );
   const selectedResourceAccessRoute = $derived(
-    selectedResource?.accessSummary?.latestGeneratedAccessRoute ??
-      selectedResource?.accessSummary?.plannedGeneratedAccessRoute ??
-      null,
+    selectCurrentResourceAccessRoute(selectedResource?.accessSummary)?.route ?? null,
   );
   const filteredEnvironments = $derived.by(() => {
     if (projectMode === "existing" && selectedProjectId) {
@@ -2032,16 +2031,14 @@
       const refreshedResource = refreshedResources.items.find(
         (candidate) => candidate.id === workflowResult.resourceId,
       );
-      lastGeneratedAccessUrl =
-        refreshedResource?.accessSummary?.latestGeneratedAccessRoute?.url ??
-        refreshedResource?.accessSummary?.plannedGeneratedAccessRoute?.url ??
-        "";
+      lastAccessUrl =
+        selectCurrentResourceAccessRoute(refreshedResource?.accessSummary)?.route.url ?? "";
 
       deployFeedback = {
         kind: "success",
         title: $t(i18nKeys.console.quickDeploy.deployFeedbackSuccessTitle),
         detail:
-          lastGeneratedAccessUrl ||
+          lastAccessUrl ||
           $t(i18nKeys.console.quickDeploy.deploymentIdDetail, {
             deploymentId: workflowResult.deploymentId,
           }),
@@ -2049,7 +2046,7 @@
       lastCreatedDeploymentId = workflowResult.deploymentId;
     } catch (error) {
       workflowProgressError = readErrorMessage(error);
-      lastGeneratedAccessUrl = "";
+      lastAccessUrl = "";
       deployFeedback = {
         kind: "error",
         title: $t(i18nKeys.console.quickDeploy.deployFeedbackErrorTitle),
@@ -3349,9 +3346,9 @@
             <p class="text-sm text-muted-foreground">{deployFeedback.detail}</p>
             {#if deployFeedback.kind === "success" && lastCreatedDeploymentId}
               <div class="mt-4 flex flex-wrap gap-2">
-                {#if lastGeneratedAccessUrl}
+                {#if lastAccessUrl}
                   <Button
-                    href={lastGeneratedAccessUrl}
+                    href={lastAccessUrl}
                     target="_blank"
                     rel="noreferrer"
                     size="sm"

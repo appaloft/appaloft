@@ -315,11 +315,15 @@ The default access provider boundary now exists as an injected application port 
 
 Route inputs still use adapter/deployment-config shaped fields internally after resolution. These fields are no longer transport command input, but they remain a runtime-plan migration seam.
 
-Generated default access route status is separated into a resource-scoped `ResourceAccessSummary` projection. The projection now has a planned pre-deployment route and a latest realized post-deployment route. It is visible through the resource read model/API, resource detail Web page, and Quick Deploy completion feedback when the projection is available.
+Generated default access route status is separated into a resource-scoped `ResourceAccessSummary`
+projection. The projection now has a planned pre-deployment route, latest realized generated route,
+latest durable domain route, and latest server-applied route. It is visible through the resource
+read model/API, resource detail Web page, and Quick Deploy completion feedback when the projection
+is available.
 
-Durable domain binding precedence is not yet merged into the default access route resolver.
-
-Server-applied config domain precedence from ADR-024 is not yet merged into the route resolver.
+Deployment route resolution and current-route observers now apply durable-domain and server-applied
+precedence before generated/default access. Route intent update/delete/reconcile remains a separate
+future behavior.
 
 `default-access-domain-policies.configure` is now the active public command for system and
 deployment-target policy state. `default-access-domain-policies.show` and

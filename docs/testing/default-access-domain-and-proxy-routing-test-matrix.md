@@ -165,6 +165,7 @@ Then:
 | DEF-ACCESS-ENTRY-005 | e2e-preferred | Domain binding UI | Keeps custom domain creation separate from generated default access. |
 | DEF-ACCESS-ENTRY-006 | e2e-preferred | Policy configuration | Web/CLI/API policy editing dispatches `default-access-domain-policies.configure`; static config is only fallback state, not a hidden public business operation. |
 | DEF-ACCESS-ENTRY-007 | e2e-preferred | Policy readback | Web/CLI/API policy readback dispatches `default-access-domain-policies.show` or `default-access-domain-policies.list`; Web policy forms prefill from persisted policy state and refetch readback after save. |
+| DEF-ACCESS-ENTRY-008 | e2e-preferred | Web current access route | Resource detail and Quick Deploy completion select the current access URL from `ResourceAccessSummary` using durable ready domain, server-applied config domain, latest generated, then planned generated precedence. |
 
 ## Current Implementation Notes And Migration Gaps
 
@@ -184,15 +185,15 @@ durable managed routes, and `resources.list` has focused coverage for exposing a
 route before the first deployment.
 
 Remaining gaps: policy-disabled observation across broader UI copy, durable-domain/server-applied
-precedence in broader API/Web/CLI regression suites, persistence-backed planned-route projection
-beyond focused tests, a real Docker/SSH same-`internalPort` e2e assertion, and richer end-to-end Web
-assertion coverage.
+precedence in broader CLI/API regression suites, persistence-backed planned-route projection beyond
+focused tests, a real Docker/SSH same-`internalPort` e2e assertion, and richer Web assertion
+coverage outside the current access URL selector.
 
 Web typecheck covers the resource detail and Quick Deploy generated URL surfaces, and resource
-detail keeps generated access visually separate from durable domain bindings while exposing
-provider-rendered proxy configuration. It does not yet render `latestServerAppliedDomainRoute` as a
-first-class access row or assert generated/durable/server-applied route separation in a browser/e2e
-resource-detail test.
+detail keeps generated access visually separate from durable and server-applied domain routes while
+exposing provider-rendered proxy configuration. `DEF-ACCESS-ENTRY-008` covers the Web current access
+URL selector so resource detail and Quick Deploy do not prefer generated access when a durable or
+server-applied route exists.
 
 `resources.proxy-configuration.preview` is active and renders provider-owned read-only
 configuration sections through the edge proxy provider boundary. Application/provider tests cover

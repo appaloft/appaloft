@@ -219,7 +219,12 @@ under proxy routing.
 
 Existing proxy label/config generation is still runtime-adapter owned. ADR-019 requires wrapping or moving it behind concrete edge proxy provider packages.
 
-`ResourceAccessSummary` is now projected from both persisted resource/server/policy state for pre-deployment planned routes and deployment runtime-plan route snapshots for post-deployment realized routes. It is surfaced through the resource read model/API, the resource detail Web page, and Quick Deploy completion feedback when the projection is available.
+`ResourceAccessSummary` is now projected from both persisted resource/server/policy state for
+pre-deployment planned routes, deployment runtime-plan route snapshots for post-deployment realized
+routes, ready durable domain binding state, and server-applied route state. Resource detail, Quick
+Deploy completion, health, diagnostics, and proxy preview select the current route with the same
+durable ready domain -> server-applied config domain -> latest generated -> planned generated
+precedence while preserving separate fields for explanation.
 
 Current deployment progress streaming remains the route-realization observation channel. More granular route-realization progress may be added when route realization becomes an independently retryable workflow.
 

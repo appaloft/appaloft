@@ -27,6 +27,12 @@ The generated access URL is the URL Appaloft provides before a custom domain is 
 
 The generated URL is not deployment input. It is derived from the resource network profile, the target server public entrypoint, proxy readiness, and deployment state.
 
+When one resource has multiple access routes, resource detail and deployment completion feedback
+select the current URL in one order: ready durable custom domain, then SSH/CLI server-applied config
+domain, then the latest generated URL, then a planned generated URL before first deployment.
+Generated URLs are still labeled separately as default access and are not treated as custom domain
+bindings.
+
 <h2 id="default-access-policy">Default access policy</h2>
 
 The default access policy decides how Appaloft will generate default access URLs in the future. It is not input for one deployment and it is not a custom domain binding.

@@ -187,9 +187,9 @@ Still blocking 1.0.0:
   `deployments.stream-events` are already active.
 - [ ] `deployments.create` progress stream is still create-time observation; standalone replay/follow
   deployment observation is now owned by `deployments.stream-events`.
-- [ ] Default access policy editing is not public.
-- [ ] Durable-domain and server-applied route precedence still need hardening inside the default
-  route resolver.
+- [x] Default access policy editing is public through explicit configure/list/show operations.
+- [x] Durable-domain and server-applied route precedence is hardened in deployment route resolution
+  and current-route consumers.
 - [ ] Provider-route projection/retention and route intent update/delete/reconcile surfaces are not
   complete.
 - [ ] Generated access, proxy preview, server-applied domains, and durable domain routes still need
@@ -517,7 +517,7 @@ Required:
 - [x] Activate `default-access-domain-policies.configure`.
 - [x] Add default access policy list/show/update/disable behavior.
 - [x] Add operation catalog coverage for default access policy operations.
-- [ ] Harden `ResourceAccessSummary` route precedence so durable domain bindings and server-applied
+- [x] Harden `ResourceAccessSummary` route precedence so durable domain bindings and server-applied
   config routes consistently win where specs require it.
 - [ ] Add dedicated route intent/status read or repair surfaces only where existing access, proxy,
   health, and diagnostic surfaces are insufficient.
@@ -712,11 +712,12 @@ work below before GA.
   rollback-candidate retention.
 - [x] Default access policy: static/shell configuration selects provider; generated routes are
   visible through `ResourceAccessSummary`.
-- [ ] Default access policy: configure, show, update/disable, preserve resource access projection.
+- [x] Default access policy: configure, show, update/disable, preserve resource access projection.
 - [x] Generated/server-applied route state: planned/latest generated routes, latest server-applied
   routes, latest durable routes, proxy status, and proxy preview are visible through read models.
-- [ ] Generated/server-applied route state: precedence hardening, route intent
-  update/delete/reconcile where needed, admin repair/prune diagnostics.
+- [x] Generated/server-applied route state: precedence hardening.
+- [ ] Generated/server-applied route state: route intent update/delete/reconcile where needed,
+  admin repair/prune diagnostics.
 - [x] Domain binding: create, confirm ownership, list, ready routes projected into resource access
   summary.
 - [ ] Domain binding: show, update route behavior where allowed, retry verification, delete/archive.
@@ -824,8 +825,8 @@ Recommended next Spec Rounds before broad Code Rounds:
 - [ ] Deployment observation and recovery: harden `deployments.stream-events` reconnect/gap/CLI
   coverage, then rebuild retry/redeploy, rollback candidate/readiness, and ADR-016 recovery
   decisions.
-- [ ] Access/domain/TLS closure: default access policy editing, route precedence hardening, domain
-  binding show/update/delete/retry, and certificate import/revoke/retry.
+- [ ] Access/domain/TLS closure: domain binding show/update/delete/retry and certificate
+  import/revoke/retry.
 - [ ] Dependency resource lifecycle: Postgres/Redis provision/import, bind/unbind, secret rotation,
   backup/restore, and delete.
 - [ ] Operator state closure: outbox/inbox/jobs, remote SSH state diagnostics, runtime target
