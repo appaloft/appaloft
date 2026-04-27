@@ -6,7 +6,6 @@ import {
   CreateEnvironmentCommand,
   CreateProjectCommand,
   CreateResourceCommand,
-  type CreateResourceCommandInput,
   CreateSshCredentialCommand,
   type CreateSshCredentialCommandInput,
   type EnvironmentSummary,
@@ -25,8 +24,21 @@ import {
   ShowResourceQuery,
 } from "@appaloft/application";
 import {
+  type ConfigureResourceRuntimeInput,
+  type CreateProjectInput,
+  type CreateResourceInput,
   createQuickDeployGeneratedResourceName,
   normalizeQuickDeployGeneratedNameBase,
+  type QuickDeployCreateEnvironmentInput,
+  type QuickDeployEnvironmentVariableInput,
+  type QuickDeployReference,
+  type QuickDeployResourceReference,
+  type QuickDeployServerCredential,
+  type QuickDeployServerReference,
+  type QuickDeployWorkflowInput,
+  type QuickDeployWorkflowStep,
+  type QuickDeployWorkflowStepOutput,
+  quickDeployWorkflow,
 } from "@appaloft/contracts";
 import {
   domainError,
@@ -84,22 +96,14 @@ export interface DeploymentPromptSeed {
   serverAppliedRoutes?: DeploymentServerAppliedRouteSeed[];
 }
 
-type ResourceDraftInput = Pick<CreateResourceCommandInput, "name"> &
-  Partial<Pick<CreateResourceCommandInput, "kind" | "description" | "services">>;
-type ResourceSourceInput = NonNullable<CreateResourceCommandInput["source"]>;
-type ResourceRuntimeProfileInput = NonNullable<CreateResourceCommandInput["runtimeProfile"]>;
-type ResourceNetworkProfileInput = NonNullable<CreateResourceCommandInput["networkProfile"]>;
+type ResourceDraftInput = Pick<CreateResourceInput, "name"> &
+  Partial<Pick<CreateResourceInput, "kind" | "description" | "services">>;
+type ResourceSourceInput = NonNullable<CreateResourceInput["source"]>;
+type ResourceRuntimeProfileInput = NonNullable<CreateResourceInput["runtimeProfile"]>;
+type ResourceNetworkProfileInput = NonNullable<CreateResourceInput["networkProfile"]>;
 type ResourceRuntimeProfileDraftInput = Partial<ResourceRuntimeProfileInput>;
-type ConfigurableResourceRuntimeProfileInput = Omit<
-  ResourceRuntimeProfileInput,
-  "healthCheck" | "healthCheckPath"
->;
-export type DeploymentEnvironmentVariableSeed = Omit<
-  SetEnvironmentVariableCommandInput,
-  "environmentId"
-> & {
-  environmentId?: string;
-};
+type ConfigurableResourceRuntimeProfileInput = ConfigureResourceRuntimeInput["runtimeProfile"];
+export type DeploymentEnvironmentVariableSeed = QuickDeployEnvironmentVariableInput;
 export type DeploymentServerAppliedRouteSeed = ServerAppliedRouteDomainIntent;
 
 export interface DeploymentEnvironmentVariablesFromConfigOptions {
@@ -121,15 +125,19 @@ export interface DeploymentEnvironmentDraft {
   kind: EnvironmentKind;
 }
 
-interface ResolvedReference {
-  id: string;
+interface ResolvedWorkflowReference<CreateInput> {
+  reference: QuickDeployReference<CreateInput>;
   label: string;
 }
 
-interface ResolvedOptionalReference {
-  id?: string;
+interface ResolvedWorkflowServerReference {
+  reference: QuickDeployServerReference;
   label: string;
-  resource?: ResourceDraftInput;
+}
+
+interface ResolvedWorkflowResourceReference {
+  reference: QuickDeployResourceReference;
+  label: string;
 }
 
 const defaultProjectName = "Local Workspace";
@@ -143,6 +151,12 @@ const defaultApplicationInternalPort = 3000;
 const defaultStaticInternalPort = 80;
 const defaultStaticPublishDirectory = "/dist";
 const ciEnvSecretReferencePrefix = "ci-env:";
+
+function cliRuntimeEffect<A, E>(
+  effect: Effect.Effect<A, E, unknown>,
+): Effect.Effect<A, E, CliRuntime> {
+  return effect as Effect.Effect<A, E, CliRuntime>;
+}
 
 function trimToUndefined(value: string): string | undefined {
   const trimmed = value.trim();
@@ -165,7 +179,7 @@ function inferGeneratedResourceNameFromSource(sourceLocator: string): string {
 
 export function resourceKindForDeploymentMethod(
   deploymentMethod: DeploymentMethod,
-): NonNullable<CreateResourceCommandInput["kind"]> {
+): NonNullable<CreateResourceInput["kind"]> {
   if (deploymentMethod === "static") {
     return "static-site";
   }
@@ -571,30 +585,24 @@ function configureServerCredential(input: ConfigureServerCredentialCommandInput)
   });
 }
 
-function applyServerCredential(input: { serverId: string; seed: DeploymentPromptSeed }) {
-  return Effect.gen(function* () {
-    const reusableCredential = input.seed.server?.reusableSshCredential;
-    if (reusableCredential) {
-      const created = yield* createSshCredential(reusableCredential);
-      yield* configureServerCredential({
-        serverId: input.serverId,
-        credential: {
-          kind: "stored-ssh-private-key",
-          credentialId: created.id,
-          ...(reusableCredential.username ? { username: reusableCredential.username } : {}),
-        },
-      });
-      return;
-    }
+function serverCredentialFromSeed(
+  seed: DeploymentPromptSeed,
+): QuickDeployServerCredential | undefined {
+  if (seed.server?.reusableSshCredential) {
+    return {
+      mode: "create-ssh-and-configure",
+      input: seed.server.reusableSshCredential,
+    };
+  }
 
-    const credential = input.seed.server?.credential;
-    if (credential) {
-      yield* configureServerCredential({
-        serverId: input.serverId,
-        credential,
-      });
-    }
-  });
+  if (seed.server?.credential) {
+    return {
+      mode: "configure",
+      credential: seed.server.credential,
+    };
+  }
+
+  return undefined;
 }
 
 function createEnvironment(input: { projectId: string; name: string; kind: EnvironmentKind }) {
@@ -606,31 +614,10 @@ function createEnvironment(input: { projectId: string; name: string; kind: Envir
   });
 }
 
-function createResource(input: {
-  projectId: string;
-  environmentId: string;
-  resource: ResourceDraftInput;
-  source: ResourceSourceInput;
-  runtimeProfile: ResourceRuntimeProfileInput;
-  networkProfile: ResourceNetworkProfileInput;
-}) {
+function createResource(input: CreateResourceInput) {
   return Effect.gen(function* () {
     const cli = yield* CliRuntime;
-    const message = yield* resultToEffect(
-      CreateResourceCommand.create({
-        projectId: input.projectId,
-        environmentId: input.environmentId,
-        name: input.resource.name,
-        kind: input.resource.kind ?? "application",
-        ...(input.resource.description ? { description: input.resource.description } : {}),
-        ...(input.resource.services && input.resource.services.length > 0
-          ? { services: input.resource.services }
-          : {}),
-        source: input.source,
-        runtimeProfile: input.runtimeProfile,
-        networkProfile: input.networkProfile,
-      }),
-    );
+    const message = yield* resultToEffect(CreateResourceCommand.create(input));
     const result = yield* Effect.promise(() => cli.executeCommand(message));
     return yield* resultToEffect(result);
   });
@@ -762,11 +749,27 @@ function runtimeProfileUpdateForReusedResource(input: {
   return effectiveDesired;
 }
 
+function shouldConfigureReusableResourceRuntime(seed: DeploymentPromptSeed): boolean {
+  return Boolean(
+    (seed.deploymentMethod && seed.deploymentMethod !== "workspace-commands") ||
+      seed.installCommand ||
+      seed.buildCommand ||
+      seed.startCommand ||
+      seed.runtimeName ||
+      seed.publishDirectory,
+  );
+}
+
 function resolveReusableResourceRuntimeProfile(input: {
+  seed: DeploymentPromptSeed;
   resourceId: string;
   runtimeProfile: ResourceRuntimeProfileInput;
 }) {
   return Effect.gen(function* () {
+    if (!shouldConfigureReusableResourceRuntime(input.seed)) {
+      return undefined;
+    }
+
     const resource = yield* showResource(input.resourceId);
     return runtimeProfileUpdateForReusedResource({
       currentRuntimeProfile: resource.runtimeProfile,
@@ -784,27 +787,13 @@ function setEnvironmentVariable(input: SetEnvironmentVariableCommandInput) {
   });
 }
 
-function applyEnvironmentVariables(input: {
-  environmentId: string;
-  variables?: DeploymentEnvironmentVariableSeed[];
-}) {
-  return Effect.gen(function* () {
-    for (const variable of input.variables ?? []) {
-      yield* setEnvironmentVariable({
-        ...variable,
-        environmentId: variable.environmentId ?? input.environmentId,
-      });
-    }
-  });
-}
-
 function printDeploymentSummary(input: {
   sourceLocator: string;
   deploymentMethod: DeploymentMethod;
-  project: ResolvedReference;
-  server: ResolvedReference;
-  environment: ResolvedReference;
-  resource: ResolvedOptionalReference;
+  project: { label: string };
+  server: { label: string };
+  environment: { label: string };
+  resource: { label: string };
 }) {
   return Effect.sync(() => {
     process.stderr.write(
@@ -826,307 +815,338 @@ function resolveProject(input: {
   projects: ProjectSummary[];
   seed: DeploymentPromptSeed;
   sourceLocator: string;
-}) {
-  return Effect.gen(function* () {
-    if (input.seed.projectId) {
-      return {
-        id: input.seed.projectId,
-        label: input.seed.projectId,
-      };
-    }
+}): Effect.Effect<ResolvedWorkflowReference<CreateProjectInput>, unknown, CliRuntime> {
+  return cliRuntimeEffect(
+    Effect.gen(function* () {
+      if (input.seed.projectId) {
+        return {
+          reference: { mode: "existing", id: input.seed.projectId },
+          label: input.seed.projectId,
+        };
+      }
 
-    const defaultName = inferNameFromSource(input.sourceLocator);
-    const canPrompt = Boolean(process.stdin.isTTY && process.stdout.isTTY);
-    const projectName = canPrompt
-      ? yield* input.interaction.text({
-          message: "Project name",
-          defaultValue: defaultName,
-          validate: requireNonEmpty("Project name"),
-        })
-      : defaultName;
-    const existing = findProject(input.projects, projectName);
-    if (existing) {
-      return {
-        id: existing.id,
-        label: `${existing.name} (${existing.slug})`,
-      };
-    }
+      const defaultName = inferNameFromSource(input.sourceLocator);
+      const canPrompt = Boolean(process.stdin.isTTY && process.stdout.isTTY);
+      const projectName = canPrompt
+        ? yield* input.interaction.text({
+            message: "Project name",
+            defaultValue: defaultName,
+            validate: requireNonEmpty("Project name"),
+          })
+        : defaultName;
+      const existing = findProject(input.projects, projectName);
+      if (existing) {
+        return {
+          reference: { mode: "existing", id: existing.id },
+          label: `${existing.name} (${existing.slug})`,
+        };
+      }
 
-    const created = yield* createProject({ name: projectName.trim() });
-    return {
-      id: created.id,
-      label: projectName.trim(),
-    };
-  });
+      return {
+        reference: { mode: "create", input: { name: projectName.trim() } },
+        label: projectName.trim(),
+      };
+    }),
+  );
 }
 
 function resolveServer(input: {
   interaction: CliInteraction;
   servers: ServerSummary[];
   seed: DeploymentPromptSeed;
-}) {
-  return Effect.gen(function* () {
-    if (input.seed.serverId) {
-      yield* applyServerCredential({
-        serverId: input.seed.serverId,
-        seed: input.seed,
-      });
-      return {
-        id: input.seed.serverId,
-        label: input.seed.serverId,
-      };
-    }
+}): Effect.Effect<ResolvedWorkflowServerReference, unknown, CliRuntime> {
+  return cliRuntimeEffect(
+    Effect.gen(function* () {
+      const credential = serverCredentialFromSeed(input.seed);
+      if (input.seed.serverId) {
+        return {
+          reference: {
+            mode: "existing",
+            id: input.seed.serverId,
+            ...(credential ? { credential } : {}),
+          },
+          label: input.seed.serverId,
+        };
+      }
 
-    const canPrompt = Boolean(process.stdin.isTTY && process.stdout.isTTY);
-    const defaultProviderKey = input.seed.server?.host
-      ? defaultRemoteServerProviderKey
-      : defaultServerProviderKey;
-    const host =
-      input.seed.server?.host ??
-      (canPrompt
-        ? yield* input.interaction.text({
-            message: "Server host",
-            defaultValue: defaultServerHost,
-            validate: requireNonEmpty("Server host"),
-          })
-        : defaultServerHost);
-    const providerKey =
-      input.seed.server?.providerKey ??
-      (canPrompt
-        ? yield* input.interaction.text({
-            message: "Server provider",
-            defaultValue: defaultProviderKey,
-            validate: requireNonEmpty("Server provider"),
-          })
-        : defaultProviderKey);
-    const port =
-      input.seed.server?.port ??
-      (canPrompt
-        ? Number(
-            yield* input.interaction.text({
-              message: "Server port",
-              defaultValue: String(defaultServerPort),
-              validate: requirePositiveInteger("Server port"),
-            }),
-          )
-        : defaultServerPort);
-    const existing = findServer(input.servers, {
-      host: host.trim(),
-      providerKey: providerKey.trim(),
-      port,
-    });
-    if (existing) {
-      yield* applyServerCredential({
-        serverId: existing.id,
-        seed: input.seed,
+      const canPrompt = Boolean(process.stdin.isTTY && process.stdout.isTTY);
+      const defaultProviderKey = input.seed.server?.host
+        ? defaultRemoteServerProviderKey
+        : defaultServerProviderKey;
+      const host =
+        input.seed.server?.host ??
+        (canPrompt
+          ? yield* input.interaction.text({
+              message: "Server host",
+              defaultValue: defaultServerHost,
+              validate: requireNonEmpty("Server host"),
+            })
+          : defaultServerHost);
+      const providerKey =
+        input.seed.server?.providerKey ??
+        (canPrompt
+          ? yield* input.interaction.text({
+              message: "Server provider",
+              defaultValue: defaultProviderKey,
+              validate: requireNonEmpty("Server provider"),
+            })
+          : defaultProviderKey);
+      const port =
+        input.seed.server?.port ??
+        (canPrompt
+          ? Number(
+              yield* input.interaction.text({
+                message: "Server port",
+                defaultValue: String(defaultServerPort),
+                validate: requirePositiveInteger("Server port"),
+              }),
+            )
+          : defaultServerPort);
+      const existing = findServer(input.servers, {
+        host: host.trim(),
+        providerKey: providerKey.trim(),
+        port,
       });
-      return {
-        id: existing.id,
-        label: `${existing.name} ${existing.providerKey} ${existing.host}:${existing.port}`,
-      };
-    }
+      if (existing) {
+        return {
+          reference: {
+            mode: "existing",
+            id: existing.id,
+            ...(credential ? { credential } : {}),
+          },
+          label: `${existing.name} ${existing.providerKey} ${existing.host}:${existing.port}`,
+        };
+      }
 
-    const name =
-      input.seed.server?.name ??
-      (canPrompt
-        ? yield* input.interaction.text({
-            message: "Server name",
-            defaultValue: defaultServerName,
-            validate: requireNonEmpty("Server name"),
-          })
-        : defaultServerName);
-    const created = yield* createServer({
-      name: name.trim(),
-      host: host.trim(),
-      providerKey: providerKey.trim(),
-      port,
-      ...(input.seed.server?.proxyKind ? { proxyKind: input.seed.server.proxyKind } : {}),
-    });
-    yield* applyServerCredential({
-      serverId: created.id,
-      seed: input.seed,
-    });
-    return {
-      id: created.id,
-      label: `${name.trim()} ${providerKey.trim()} ${host.trim()}:${port}`,
-    };
-  });
+      const name =
+        input.seed.server?.name ??
+        (canPrompt
+          ? yield* input.interaction.text({
+              message: "Server name",
+              defaultValue: defaultServerName,
+              validate: requireNonEmpty("Server name"),
+            })
+          : defaultServerName);
+      return {
+        reference: {
+          mode: "create",
+          input: {
+            name: name.trim(),
+            host: host.trim(),
+            providerKey: providerKey.trim(),
+            port,
+            proxyKind: input.seed.server?.proxyKind ?? "traefik",
+          },
+          ...(credential ? { credential } : {}),
+        },
+        label: `${name.trim()} ${providerKey.trim()} ${host.trim()}:${port}`,
+      };
+    }),
+  );
 }
 
 function resolveEnvironment(input: {
   interaction: CliInteraction;
   seed: DeploymentPromptSeed;
-  projectId: string;
-}) {
-  return Effect.gen(function* () {
-    if (input.seed.environmentId) {
-      return {
-        id: input.seed.environmentId,
-        label: input.seed.environmentId,
-      };
-    }
+  projectId?: string;
+}): Effect.Effect<
+  ResolvedWorkflowReference<QuickDeployCreateEnvironmentInput>,
+  unknown,
+  CliRuntime
+> {
+  return cliRuntimeEffect(
+    Effect.gen(function* () {
+      if (input.seed.environmentId) {
+        return {
+          reference: { mode: "existing", id: input.seed.environmentId },
+          label: input.seed.environmentId,
+        };
+      }
 
-    const environments = (yield* listEnvironments(input.projectId)).items;
-    const canPrompt = Boolean(process.stdin.isTTY && process.stdout.isTTY);
-    const name =
-      input.seed.environment?.name ??
-      (canPrompt
-        ? yield* input.interaction.text({
-            message: "Environment name",
-            defaultValue: defaultEnvironmentName,
-            validate: requireNonEmpty("Environment name"),
+      const environments = input.projectId ? (yield* listEnvironments(input.projectId)).items : [];
+      const canPrompt = Boolean(process.stdin.isTTY && process.stdout.isTTY);
+      const name =
+        input.seed.environment?.name ??
+        (canPrompt
+          ? yield* input.interaction.text({
+              message: "Environment name",
+              defaultValue: defaultEnvironmentName,
+              validate: requireNonEmpty("Environment name"),
+            })
+          : defaultEnvironmentName);
+      const kind =
+        input.seed.environment?.kind ??
+        (canPrompt
+          ? yield* input.interaction.select<EnvironmentKind>({
+              message: "Environment kind",
+              choices: environmentKinds.map((environmentKind) => ({
+                title: environmentKind,
+                value: environmentKind,
+              })),
+            })
+          : "local");
+      const existing = input.projectId
+        ? findEnvironment(environments, {
+            projectId: input.projectId,
+            name,
+            kind,
           })
-        : defaultEnvironmentName);
-    const kind =
-      input.seed.environment?.kind ??
-      (canPrompt
-        ? yield* input.interaction.select<EnvironmentKind>({
-            message: "Environment kind",
-            choices: environmentKinds.map((environmentKind) => ({
-              title: environmentKind,
-              value: environmentKind,
-            })),
-          })
-        : "local");
-    const existing = findEnvironment(environments, {
-      projectId: input.projectId,
-      name,
-      kind,
-    });
-    if (existing) {
-      return {
-        id: existing.id,
-        label: `${existing.name} (${existing.kind})`,
-      };
-    }
+        : undefined;
+      if (existing) {
+        return {
+          reference: { mode: "existing", id: existing.id },
+          label: `${existing.name} (${existing.kind})`,
+        };
+      }
 
-    const created = yield* createEnvironment({
-      projectId: input.projectId,
-      name: name.trim(),
-      kind,
-    });
-    return {
-      id: created.id,
-      label: `${name.trim()} (${kind})`,
-    };
-  });
+      return {
+        reference: {
+          mode: "create",
+          input: {
+            name: name.trim(),
+            kind,
+          },
+        },
+        label: `${name.trim()} (${kind})`,
+      };
+    }),
+  );
 }
 
 function resolveResource(input: {
   interaction: CliInteraction;
   seed: DeploymentPromptSeed;
-  projectId: string;
-  environmentId: string;
+  projectId?: string;
+  environmentId?: string;
   sourceLocator: string;
   deploymentMethod: DeploymentMethod;
   runtimeProfile: ResourceRuntimeProfileInput;
   networkProfile: ResourceNetworkProfileInput;
-}) {
-  return Effect.gen(function* () {
-    const reuseResolvedResource = (resource: { id: string; label: string }) =>
-      Effect.gen(function* () {
-        const runtimeProfile = yield* resolveReusableResourceRuntimeProfile({
-          resourceId: resource.id,
-          runtimeProfile: input.runtimeProfile,
-        });
-        if (runtimeProfile) {
-          yield* configureResourceRuntime({
+}): Effect.Effect<ResolvedWorkflowResourceReference, unknown, CliRuntime> {
+  return cliRuntimeEffect(
+    Effect.gen(function* () {
+      const reuseResolvedResource = (resource: { id: string; label: string }) =>
+        Effect.gen(function* () {
+          const runtimeProfile = yield* resolveReusableResourceRuntimeProfile({
+            seed: input.seed,
             resourceId: resource.id,
-            runtimeProfile,
+            runtimeProfile: input.runtimeProfile,
           });
-        }
-        return resource;
-      });
-
-    if (input.seed.resourceId) {
-      return yield* reuseResolvedResource({
-        id: input.seed.resourceId,
-        label: input.seed.resourceId,
-      });
-    }
-
-    const sourceResource =
-      input.seed.resource ?? inferResourceFromSource(input.sourceLocator, input.deploymentMethod);
-    const sourceResourceLabel = `${sourceResource.name} (${sourceResource.kind ?? "application"})`;
-    const resources = (yield* listResources(input.projectId, input.environmentId)).items;
-
-    const createOrReuseSourceResource = (resource: NonNullable<typeof sourceResource>) =>
-      Effect.gen(function* () {
-        const existing = findResource(resources, {
-          projectId: input.projectId,
-          environmentId: input.environmentId,
-          name: resource.name,
+          return {
+            reference: {
+              mode: "existing",
+              id: resource.id,
+              ...(runtimeProfile ? { configureRuntime: { runtimeProfile } } : {}),
+            },
+            label: resource.label,
+          } satisfies ResolvedWorkflowResourceReference;
         });
 
-        if (existing) {
-          return yield* reuseResolvedResource({
-            id: existing.id,
-            label: `${existing.name} (${existing.kind})`,
-          });
-        }
-
-        const created = yield* createResource({
-          projectId: input.projectId,
-          environmentId: input.environmentId,
-          resource,
-          source: sourceBindingForDeploymentInput(
-            input.sourceLocator,
-            input.deploymentMethod,
-            input.seed.sourceProfile,
-          ),
-          runtimeProfile: input.runtimeProfile,
-          networkProfile: input.networkProfile,
+      if (input.seed.resourceId) {
+        return yield* reuseResolvedResource({
+          id: input.seed.resourceId,
+          label: input.seed.resourceId,
         });
-        return {
-          id: created.id,
-          label: sourceResourceLabel,
-        };
-      });
+      }
 
-    if (input.seed.resource) {
-      return yield* createOrReuseSourceResource(input.seed.resource);
-    }
+      const sourceResource =
+        input.seed.resource ?? inferResourceFromSource(input.sourceLocator, input.deploymentMethod);
+      const sourceResourceLabel = `${sourceResource.name} (${sourceResource.kind ?? "application"})`;
+      const resources =
+        input.projectId && input.environmentId
+          ? (yield* listResources(input.projectId, input.environmentId)).items
+          : [];
 
-    if (resources.length === 0) {
-      return yield* createOrReuseSourceResource(sourceResource);
-    }
+      const createOrReuseSourceResource = (resource: NonNullable<typeof sourceResource>) =>
+        Effect.gen(function* () {
+          const existing =
+            input.projectId && input.environmentId
+              ? findResource(resources, {
+                  projectId: input.projectId,
+                  environmentId: input.environmentId,
+                  name: resource.name,
+                })
+              : undefined;
 
-    const sourceResourceChoice = "__source_resource__";
-    const resourceId = yield* input.interaction.select<string | undefined>({
-      message: "Resource",
-      choices: [
-        ...(sourceResource
-          ? [
-              {
-                title: `Use source as resource: ${sourceResourceLabel}`,
-                value: sourceResourceChoice,
-                description:
-                  "The deployment will reuse or create this resource by project/environment slug.",
+          if (existing) {
+            return yield* reuseResolvedResource({
+              id: existing.id,
+              label: `${existing.name} (${existing.kind})`,
+            });
+          }
+
+          return {
+            reference: {
+              mode: "create",
+              input: {
+                name: resource.name,
+                kind: resource.kind ?? "application",
+                ...(resource.description ? { description: resource.description } : {}),
+                ...(resource.services && resource.services.length > 0
+                  ? { services: resource.services }
+                  : {}),
+                ...(input.projectId ? { projectId: input.projectId } : {}),
+                ...(input.environmentId ? { environmentId: input.environmentId } : {}),
+                source: sourceBindingForDeploymentInput(
+                  input.sourceLocator,
+                  input.deploymentMethod,
+                  input.seed.sourceProfile,
+                ),
+                runtimeProfile: input.runtimeProfile,
+                networkProfile: input.networkProfile,
               },
-            ]
-          : []),
-        ...resources.map((resource: ResourceSummary) => ({
-          title: `${resource.name} (${resource.kind})`,
-          value: resource.id,
-          description: `deployments: ${resource.deploymentCount}`,
-        })),
-      ],
-    });
-    const selectedResource = resources.find((resource) => resource.id === resourceId);
+            },
+            label: sourceResourceLabel,
+          } satisfies ResolvedWorkflowResourceReference;
+        });
 
-    if (resourceId === sourceResourceChoice && sourceResource) {
-      return yield* createOrReuseSourceResource(sourceResource);
-    }
+      if (input.seed.resource) {
+        return yield* createOrReuseSourceResource(input.seed.resource);
+      }
 
-    if (!resourceId) {
-      return yield* createOrReuseSourceResource(sourceResource);
-    }
+      if (resources.length === 0) {
+        return yield* createOrReuseSourceResource(sourceResource);
+      }
 
-    return yield* reuseResolvedResource({
-      id: resourceId,
-      label: selectedResource ? `${selectedResource.name} (${selectedResource.kind})` : resourceId,
-    });
-  });
+      const sourceResourceChoice = "__source_resource__";
+      const resourceId = yield* input.interaction.select<string | undefined>({
+        message: "Resource",
+        choices: [
+          ...(sourceResource
+            ? [
+                {
+                  title: `Use source as resource: ${sourceResourceLabel}`,
+                  value: sourceResourceChoice,
+                  description:
+                    "The deployment will reuse or create this resource by project/environment slug.",
+                },
+              ]
+            : []),
+          ...resources.map((resource: ResourceSummary) => ({
+            title: `${resource.name} (${resource.kind})`,
+            value: resource.id,
+            description: `deployments: ${resource.deploymentCount}`,
+          })),
+        ],
+      });
+      const selectedResource = resources.find((resource) => resource.id === resourceId);
+
+      if (resourceId === sourceResourceChoice && sourceResource) {
+        return yield* createOrReuseSourceResource(sourceResource);
+      }
+
+      if (!resourceId) {
+        return yield* createOrReuseSourceResource(sourceResource);
+      }
+
+      return yield* reuseResolvedResource({
+        id: resourceId,
+        label: selectedResource
+          ? `${selectedResource.name} (${selectedResource.kind})`
+          : resourceId,
+      });
+    }),
+  );
 }
 
 function resolveAdvancedDeploymentConfig(input: {
@@ -1524,132 +1544,193 @@ function persistServerAppliedRouteDesiredStateIfNeeded(input: {
   });
 }
 
+function executeQuickDeployWorkflowStep(step: QuickDeployWorkflowStep) {
+  switch (step.kind) {
+    case "projects.create":
+      return createProject(step.input);
+    case "servers.register":
+      return createServer(step.input);
+    case "credentials.ssh.create":
+      return createSshCredential(step.input);
+    case "servers.configureCredential":
+      return configureServerCredential(step.input);
+    case "environments.create":
+      return createEnvironment(step.input);
+    case "resources.create":
+      return createResource(step.input);
+    case "resources.configureRuntime":
+      return configureResourceRuntime(step.input);
+    case "environments.setVariable":
+      return setEnvironmentVariable(step.input);
+    case "deployments.create":
+      return Effect.succeed({ id: "__cli_deployment_pending__" });
+  }
+}
+
+function resolveDeploymentInputFromQuickDeployWorkflow(input: QuickDeployWorkflowInput) {
+  return Effect.gen(function* () {
+    const workflow = quickDeployWorkflow(input);
+    let state = workflow.next();
+
+    while (!state.done) {
+      const step = state.value;
+      if (step.kind === "deployments.create") {
+        return step.input satisfies CreateDeploymentCommandInput;
+      }
+
+      const output = (yield* executeQuickDeployWorkflowStep(step)) as QuickDeployWorkflowStepOutput;
+      state = workflow.next(output);
+    }
+
+    return yield* Effect.fail(
+      domainError.validation("Quick Deploy workflow completed without deployment admission", {
+        phase: "workflow-program",
+      }),
+    );
+  });
+}
+
 export function resolveInteractiveDeploymentInput(
   seed: DeploymentPromptSeed,
   interaction: CliInteraction = effectCliInteraction,
-) {
-  return Effect.gen(function* () {
-    if (!seed.sourceLocator && (!process.stdin.isTTY || !process.stdout.isTTY)) {
-      yield* Effect.sync(() => {
-        process.exitCode = 1;
-      });
-      return yield* Effect.fail(
-        domainError.validation("pathOrSource is required outside an interactive terminal"),
-      );
-    }
+): Effect.Effect<CreateDeploymentCommandInput, unknown, CliRuntime> {
+  return cliRuntimeEffect(
+    Effect.gen(function* () {
+      if (!seed.sourceLocator && (!process.stdin.isTTY || !process.stdout.isTTY)) {
+        yield* Effect.sync(() => {
+          process.exitCode = 1;
+        });
+        return yield* Effect.fail(
+          domainError.validation("pathOrSource is required outside an interactive terminal", {
+            phase: "input-collection",
+          }),
+        );
+      }
 
-    const sourceLocator =
-      seed.sourceLocator ??
-      (yield* interaction.text({
-        message: "Source (path/git/image/compose)",
-        defaultValue: ".",
-        validate: requireNonEmpty("Source"),
-      }));
-    const deploymentMethod =
-      seed.deploymentMethod ??
-      (yield* interaction.select<DeploymentMethod>({
-        message: "Deployment method",
-        choices: deploymentMethods.map((method) => ({
-          title: method,
-          value: method,
-        })),
-      }));
-    const normalizedSourceLocator = normalizeCliPathOrSource(sourceLocator, deploymentMethod);
-    const stateSession = yield* prepareDeploymentStateBackendIfNeeded(seed);
+      const sourceLocator =
+        seed.sourceLocator ??
+        (yield* interaction.text({
+          message: "Source (path/git/image/compose)",
+          defaultValue: ".",
+          validate: requireNonEmpty("Source"),
+        }));
+      const deploymentMethod =
+        seed.deploymentMethod ??
+        (yield* interaction.select<DeploymentMethod>({
+          message: "Deployment method",
+          choices: deploymentMethods.map((method) => ({
+            title: method,
+            value: method,
+          })),
+        }));
+      const normalizedSourceLocator = normalizeCliPathOrSource(sourceLocator, deploymentMethod);
+      const stateSession = yield* prepareDeploymentStateBackendIfNeeded(seed);
 
-    const resolveInput = Effect.gen(function* () {
-      yield* requireServerAppliedRouteStateSupportIfNeeded(seed);
-      const resolvedSeed = yield* mergeSourceLinkSeed(seed);
-      const projects = (yield* listProjects()).items;
-      const servers = (yield* listServers()).items;
-      const project = yield* resolveProject({
-        interaction,
-        projects,
-        seed: resolvedSeed,
-        sourceLocator: normalizedSourceLocator,
-      });
-      const server = yield* resolveServer({
-        interaction,
-        servers,
-        seed: resolvedSeed,
-      });
-      const environment = yield* resolveEnvironment({
-        interaction,
-        seed: resolvedSeed,
-        projectId: project.id,
-      });
-      const advancedConfig = yield* resolveAdvancedDeploymentConfig({
-        interaction,
-        seed: resolvedSeed,
-        deploymentMethod,
-      });
-      const runtimeProfile = runtimeProfileFromDeploymentInput(deploymentMethod, advancedConfig);
-      const networkProfile = networkProfileFromDeploymentInput(deploymentMethod, advancedConfig);
-      yield* validateServerAppliedRouteNetworkIfNeeded({
-        seed: resolvedSeed,
-        networkProfile,
-      });
-      const resource = yield* resolveResource({
-        interaction,
-        seed: resolvedSeed,
-        projectId: project.id,
-        environmentId: environment.id,
-        sourceLocator: normalizedSourceLocator,
-        deploymentMethod,
-        runtimeProfile,
-        networkProfile,
-      });
-      yield* applyEnvironmentVariables({
-        environmentId: environment.id,
-        ...(resolvedSeed.environmentVariables
-          ? { variables: resolvedSeed.environmentVariables }
-          : {}),
-      });
-      yield* persistSourceLinkIfNeeded({
-        seed: resolvedSeed,
-        projectId: project.id,
-        serverId: server.id,
-        ...(resolvedSeed.destinationId ? { destinationId: resolvedSeed.destinationId } : {}),
-        environmentId: environment.id,
-        resourceId: resource.id,
-      });
-      yield* persistServerAppliedRouteDesiredStateIfNeeded({
-        seed: resolvedSeed,
-        projectId: project.id,
-        serverId: server.id,
-        ...(resolvedSeed.destinationId ? { destinationId: resolvedSeed.destinationId } : {}),
-        environmentId: environment.id,
-        resourceId: resource.id,
+      const resolveInput = Effect.gen(function* () {
+        yield* requireServerAppliedRouteStateSupportIfNeeded(seed);
+        const resolvedSeed = yield* mergeSourceLinkSeed(seed);
+        const projects = (yield* listProjects()).items;
+        const servers = (yield* listServers()).items;
+        const project = yield* resolveProject({
+          interaction,
+          projects,
+          seed: resolvedSeed,
+          sourceLocator: normalizedSourceLocator,
+        });
+        const projectIdForLookup =
+          project.reference.mode === "existing" ? project.reference.id : undefined;
+        const server = yield* resolveServer({
+          interaction,
+          servers,
+          seed: resolvedSeed,
+        });
+        const environment = yield* resolveEnvironment({
+          interaction,
+          seed: resolvedSeed,
+          ...(projectIdForLookup ? { projectId: projectIdForLookup } : {}),
+        });
+        const environmentIdForLookup =
+          environment.reference.mode === "existing" ? environment.reference.id : undefined;
+        const advancedConfig = yield* resolveAdvancedDeploymentConfig({
+          interaction,
+          seed: resolvedSeed,
+          deploymentMethod,
+        });
+        const runtimeProfile = runtimeProfileFromDeploymentInput(deploymentMethod, advancedConfig);
+        const networkProfile = networkProfileFromDeploymentInput(deploymentMethod, advancedConfig);
+        yield* validateServerAppliedRouteNetworkIfNeeded({
+          seed: resolvedSeed,
+          networkProfile,
+        });
+        const resource = yield* resolveResource({
+          interaction,
+          seed: resolvedSeed,
+          ...(projectIdForLookup ? { projectId: projectIdForLookup } : {}),
+          ...(environmentIdForLookup ? { environmentId: environmentIdForLookup } : {}),
+          sourceLocator: normalizedSourceLocator,
+          deploymentMethod,
+          runtimeProfile,
+          networkProfile,
+        });
+
+        const workflowInput: QuickDeployWorkflowInput = {
+          project: project.reference,
+          server: server.reference,
+          environment: environment.reference,
+          resource: resource.reference,
+          ...(resolvedSeed.environmentVariables && resolvedSeed.environmentVariables.length > 0
+            ? { environmentVariables: resolvedSeed.environmentVariables }
+            : {}),
+          ...(resolvedSeed.destinationId
+            ? { deployment: { destinationId: resolvedSeed.destinationId } }
+            : {}),
+        };
+        const deploymentInput = yield* resolveDeploymentInputFromQuickDeployWorkflow(workflowInput);
+
+        yield* persistSourceLinkIfNeeded({
+          seed: resolvedSeed,
+          projectId: deploymentInput.projectId,
+          serverId: deploymentInput.serverId,
+          ...(deploymentInput.destinationId
+            ? { destinationId: deploymentInput.destinationId }
+            : {}),
+          environmentId: deploymentInput.environmentId,
+          resourceId: deploymentInput.resourceId,
+        });
+        yield* persistServerAppliedRouteDesiredStateIfNeeded({
+          seed: resolvedSeed,
+          projectId: deploymentInput.projectId,
+          serverId: deploymentInput.serverId,
+          ...(deploymentInput.destinationId
+            ? { destinationId: deploymentInput.destinationId }
+            : {}),
+          environmentId: deploymentInput.environmentId,
+          resourceId: deploymentInput.resourceId,
+        });
+
+        yield* printDeploymentSummary({
+          sourceLocator: normalizedSourceLocator,
+          deploymentMethod,
+          project,
+          server,
+          environment,
+          resource,
+        });
+
+        return deploymentInput satisfies CreateDeploymentCommandInput;
       });
 
-      yield* printDeploymentSummary({
-        sourceLocator: normalizedSourceLocator,
-        deploymentMethod,
-        project,
-        server,
-        environment,
-        resource,
-      });
+      if (!stateSession) {
+        return yield* resolveInput;
+      }
 
-      return {
-        projectId: project.id,
-        serverId: server.id,
-        ...(resolvedSeed.destinationId ? { destinationId: resolvedSeed.destinationId } : {}),
-        environmentId: environment.id,
-        resourceId: resource.id,
-      } satisfies CreateDeploymentCommandInput;
-    });
+      const result = yield* Effect.either(resolveInput);
+      yield* releaseDeploymentStateSession(stateSession);
+      if (Either.isLeft(result)) {
+        return yield* Effect.fail(result.left);
+      }
 
-    if (!stateSession) {
-      return yield* resolveInput;
-    }
-
-    const result = yield* Effect.either(resolveInput);
-    yield* releaseDeploymentStateSession(stateSession);
-    if (Either.isLeft(result)) {
-      return yield* Effect.fail(result.left);
-    }
-
-    return result.right;
-  });
+      return result.right;
+    }),
+  );
 }

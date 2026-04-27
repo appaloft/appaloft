@@ -645,6 +645,38 @@ describe("quick deploy workflow", () => {
       },
     },
     {
+      id: "[QUICK-DEPLOY-WF-010A]",
+      name: "shared workflow configures existing resource runtime profile before ids-only deployment",
+      input: workflowInput({
+        resource: {
+          mode: "existing",
+          id: "res_existing",
+          configureRuntime: {
+            runtimeProfile: {
+              strategy: "workspace-commands",
+              runtimeName: "preview-125",
+            },
+          },
+        },
+      }),
+      expectedKinds: ["resources.configureRuntime", "deployments.create"],
+      assert: ({ steps }) => {
+        expect(findStep(steps, "resources.configureRuntime").input).toEqual({
+          resourceId: "res_existing",
+          runtimeProfile: {
+            strategy: "workspace-commands",
+            runtimeName: "preview-125",
+          },
+        });
+        expect(findStep(steps, "deployments.create").input).toEqual({
+          projectId: "proj_existing",
+          serverId: "srv_existing",
+          environmentId: "env_existing",
+          resourceId: "res_existing",
+        });
+      },
+    },
+    {
       id: "[QUICK-DEPLOY-WF-039]",
       name: "workflow executor can report per-step progress and stop on failed steps",
       input: workflowInput({ resource: { mode: "create", input: resourceInput() } }),
@@ -685,6 +717,51 @@ describe("quick deploy workflow", () => {
       },
     },
     {
+      id: "[QUICK-DEPLOY-ENTRY-009]",
+      name: "framework detection draft enters resources.create and stays out of deployments.create",
+      input: workflowInput({
+        resource: {
+          mode: "create",
+          input: resourceInput({
+            source: {
+              kind: "local-folder",
+              locator: "/workspace",
+              baseDirectory: "/apps/web",
+            },
+            runtimeProfile: {
+              strategy: "workspace-commands",
+              installCommand: "bun install",
+              buildCommand: "bun run build",
+              startCommand: "bun run start",
+            },
+            networkProfile: {
+              internalPort: 3000,
+              upstreamProtocol: "http",
+              exposureMode: "reverse-proxy",
+            },
+          }),
+        },
+      }),
+      expectedKinds: ["resources.create", "deployments.create"],
+      assert: ({ steps }) => {
+        expect(findStep(steps, "resources.create").input).toMatchObject({
+          source: {
+            baseDirectory: "/apps/web",
+          },
+          runtimeProfile: {
+            strategy: "workspace-commands",
+            installCommand: "bun install",
+            buildCommand: "bun run build",
+            startCommand: "bun run start",
+          },
+          networkProfile: {
+            internalPort: 3000,
+          },
+        });
+        expectDeploymentInputDoesNotContainWorkflowDrafts(steps);
+      },
+    },
+    {
       id: "[QUICK-DEPLOY-ENTRY-001]",
       name: "id-only deploy path can skip source while create-resource paths require entry preflight",
       input: existingContextInput(),
@@ -702,7 +779,12 @@ describe("quick deploy workflow", () => {
       input: workflowInput({
         server: {
           mode: "create",
-          input: { name: "Target", host: "127.0.0.1", providerKey: "local-shell" },
+          input: {
+            name: "Target",
+            host: "127.0.0.1",
+            providerKey: "local-shell",
+            proxyKind: "traefik",
+          },
         },
       }),
       expectedKinds: ["servers.register", "deployments.create"],
@@ -836,7 +918,12 @@ describe("quick deploy workflow", () => {
       input: workflowInput({
         server: {
           mode: "create",
-          input: { name: "Bad Target", host: "192.0.2.10", providerKey: "generic-ssh" },
+          input: {
+            name: "Bad Target",
+            host: "192.0.2.10",
+            providerKey: "generic-ssh",
+            proxyKind: "traefik",
+          },
         },
       }),
       failAt: "servers.register",
@@ -849,7 +936,12 @@ describe("quick deploy workflow", () => {
       input: workflowInput({
         server: {
           mode: "create",
-          input: { name: "Target", host: "127.0.0.1", providerKey: "generic-ssh" },
+          input: {
+            name: "Target",
+            host: "127.0.0.1",
+            providerKey: "generic-ssh",
+            proxyKind: "traefik",
+          },
           credential: {
             mode: "configure",
             credential: { kind: "ssh-private-key", username: "root", privateKey: "secret" },
@@ -1103,6 +1195,8 @@ function outputForStep(step: QuickDeployWorkflowStep): QuickDeployWorkflowStepOu
     case "environments.create":
       return { id: "env_1" };
     case "resources.create":
+      return { id: "res_1" };
+    case "resources.configureRuntime":
       return { id: "res_1" };
     case "environments.setVariable":
       return;
