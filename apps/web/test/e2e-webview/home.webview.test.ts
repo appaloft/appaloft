@@ -828,6 +828,11 @@ const apiResponses: Record<ApiScenario, Record<string, ApiRoute>> = {
         id: "res_demo",
       },
     },
+    "/api/rpc/resources/configureHealth": {
+      json: {
+        id: "res_demo",
+      },
+    },
     "/api/rpc/resources/configureRuntime": {
       json: {
         id: "res_demo",
@@ -1924,7 +1929,7 @@ describe("console e2e with Bun.WebView", () => {
     resetRecordedApiRequests();
 
     await using view = createWebView();
-    await view.navigate(`${previewUrl}/resources/res_demo`);
+    await view.navigate(`${previewUrl}/resources/res_demo?section=health`);
 
     await expectAnyText(view, ["Durable profile edit", "持久资源配置编辑"]);
     await expectAnyText(view, [
@@ -1936,6 +1941,7 @@ describe("console e2e with Bun.WebView", () => {
       "历史部署快照保持不变。",
     ]);
     await expectAnyText(view, ["Current runtime is not restarted.", "当前运行时不会被立即重启。"]);
+    await expectAnyText(view, ["do not bind domains", "不会绑定域名"]);
   }, 15_000);
 
   test("[DEF-ACCESS-ENTRY-008] resource detail selects server-applied access before generated access", async () => {
@@ -2125,6 +2131,67 @@ describe("console e2e with Bun.WebView", () => {
       key: "DATABASE_URL",
       value: "postgres://resource",
       kind: "plain-config",
+      exposure: "runtime",
+    });
+  }, 15_000);
+
+  test("[RES-PROFILE-ENTRY-013] submits resource health policy changes through Web", async () => {
+    activeScenario = "dashboard";
+    resetRecordedApiRequests();
+
+    await using view = createWebView();
+    await view.navigate(`${previewUrl}/resources/res_demo?section=health`);
+
+    await expectAnyText(view, ["Health policy", "健康策略"]);
+    await setInputValue(view, "#resource-health-path", "/ready");
+    await setInputValue(view, "#resource-health-expected-status", "204");
+    await setInputValue(view, "#resource-health-interval-seconds", "7");
+    await setInputValue(view, "#resource-health-timeout-seconds", "3");
+    await setInputValue(view, "#resource-health-retries", "4");
+    await setInputValue(view, "#resource-health-start-period-seconds", "2");
+    await clickFormSubmit(view, "#resource-health-policy-form");
+
+    const configureHealthRequest = await waitForRecordedRequest(
+      "/api/rpc/resources/configureHealth",
+    );
+    const configureHealthInput = readOrpcJsonPayload(configureHealthRequest.body);
+
+    expect(configureHealthInput).toEqual({
+      resourceId: "res_demo",
+      healthCheck: {
+        enabled: true,
+        type: "http",
+        intervalSeconds: 7,
+        timeoutSeconds: 3,
+        retries: 4,
+        startPeriodSeconds: 2,
+        http: {
+          method: "GET",
+          scheme: "http",
+          host: "localhost",
+          path: "/ready",
+          expectedStatusCode: 204,
+        },
+      },
+    });
+  }, 15_000);
+
+  test("[RES-PROFILE-ENTRY-014] removes resource variable overrides through Web", async () => {
+    activeScenario = "dashboard";
+    resetRecordedApiRequests();
+
+    await using view = createWebView();
+    await view.navigate(`${previewUrl}/resources/res_demo?section=configuration`);
+
+    await expectAnyText(view, ["Resource-owned entries", "资源自有条目"]);
+    await clickButtonByAnyText(view, ["Unset", "移除"]);
+
+    const unsetVariableRequest = await waitForRecordedRequest("/api/rpc/resources/unsetVariable");
+    const unsetVariableInput = readOrpcJsonPayload(unsetVariableRequest.body);
+
+    expect(unsetVariableInput).toEqual({
+      resourceId: "res_demo",
+      key: "DATABASE_URL",
       exposure: "runtime",
     });
   }, 15_000);
