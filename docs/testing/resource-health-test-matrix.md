@@ -126,6 +126,7 @@ Then:
 | RES-HEALTH-CFG-003 | integration | Disable health policy | Existing resource, `enabled = false` | `ok({ id })`, `resources.health` reports policy `not-configured` | Disabled policy is not treated as proof of health. |
 | RES-HEALTH-CFG-004 | integration | Resource missing | Unknown resource id | `err(not_found)` | No event is published and no resource is persisted. |
 | RES-HEALTH-CFG-005 | contract | Invalid HTTP policy | Enabled HTTP policy without HTTP config or invalid port/status/path | `err(validation_error)` | Input schema rejects invalid policy before use case execution. |
+| RES-HEALTH-CFG-006 | e2e-preferred | Configure HTTP policy through Web resource detail | Existing resource detail health settings form | `resources.configure-health` is dispatched and health/detail state is invalidated | Web does not present the save as deployment creation, runtime restart, or proof of current health. |
 
 ## Current Implementation Notes And Migration Gaps
 
@@ -140,8 +141,8 @@ Current covered cases:
 - in-flight latest deployment returns `overall = "starting"`;
 - configured policy remains `overall = "unknown"` in cached mode until a current probe exists;
 - live HTTP policy pass/fail is covered in application tests;
-- `resources.configure-health` is covered by application integration tests and at least one public
-  CLI or HTTP/oRPC acceptance path.
+- `resources.configure-health` is covered by application integration tests, HTTP/oRPC entrypoint
+  tests, CLI dispatch tests, and Web resource detail WebView coverage.
 
 Current runtime adapter tests cover some deployment-time health checks. Those tests should remain
 attempt-scoped and new tests should cover the resource-owned observation contract separately.

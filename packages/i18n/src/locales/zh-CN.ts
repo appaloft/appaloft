@@ -643,7 +643,7 @@ export const zhCN = {
       pageTitle: "资源",
       plannedAccessRoute: "计划生成访问",
       profileEditBoundaryDescription:
-        "后续部署会使用这些已保存的资源配置。历史部署快照保持不变。当前运行时不会被立即重启。",
+        "后续部署会使用这些已保存的资源配置。历史部署快照保持不变。当前运行时不会被立即重启。这些保存不会绑定域名、签发证书或应用 proxy route。",
       profileEditBoundaryTitle: "持久资源配置编辑",
       profileDescription: "稳定的项目、环境、类型和 Slug 身份信息。",
       profileTitle: "资源档案",

@@ -66,8 +66,9 @@ Current status:
   topics include source, server target, SSH credentials, connectivity testing, environment
   selection, variable precedence, project lifecycle, project setting side effects, resource
   identity, runtime, health, network profile, custom domain, generated access route, TLS
-  certificate readiness, proxy readiness, safe diagnostic payloads, runtime logs, and terminal
-  sessions.
+  certificate readiness, proxy readiness, safe diagnostic payloads, runtime logs, terminal
+  sessions, and resource detail/profile editing closure for source/runtime/network/access/health/
+  configuration sections.
 - `PUB-DOCS-011` has expanded CLI coverage for high-confusion operations including deployment
   source, preview cleanup, source relink, SSH credentials, server connectivity, terminal sessions,
   project lifecycle, resource profiles, environment variables, domains, certificates, logs, health,
@@ -82,8 +83,9 @@ Current status:
   verification that `/docs/*` is served separately from Web console assets.
 - `PUB-DOCS-014` is covered by HTTP adapter tests for `docsStaticDir` override behavior and binary
   bundle documentation of `APPALOFT_DOCS_STATIC_DIR`.
-- `PUB-DOCS-016` is covered for initial high-confusion access topics by `@appaloft/docs-registry`
-  topic metadata and `docs/documentation/public-docs-traceability.md`.
+- `PUB-DOCS-016` is covered for initial high-confusion access and resource profile topics by
+  `@appaloft/docs-registry` topic metadata and
+  `docs/documentation/public-docs-traceability.md`.
 
 There is still no dedicated automated public documentation checker for every product help
 affordance, complete link resolution in built output, search alias freshness, or future MCP/tool

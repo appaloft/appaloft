@@ -7,7 +7,7 @@ override owned by one resource.
 
 Command success means the resource-owned override layer no longer contains the requested
 `key + exposure` identity. It does not mutate environment scope, historical deployment snapshots,
-current runtime, or domains.
+current runtime, domains, certificates, or proxy routes.
 
 ```ts
 type UnsetResourceVariableResult = Result<{ id: string }, DomainError>;
@@ -54,12 +54,13 @@ The command must:
 
 | Entrypoint | Mapping | Status |
 | --- | --- | --- |
-| Web | Resource detail configuration row action dispatches this command and refetches `resources.effective-config`. | Required in Code Round |
-| CLI | `appaloft resource unset-variable <resourceId> <key> --exposure <...>`. | Required in Code Round |
-| oRPC / HTTP | `DELETE /api/resources/{resourceId}/variables/{key}` using the command schema. | Required in Code Round |
+| Web | Resource detail configuration row action dispatches this command and refetches `resources.effective-config`. | Active |
+| CLI | `appaloft resource unset-variable <resourceId> <key> --exposure <...>`. | Active |
+| oRPC / HTTP | `DELETE /api/resources/{resourceId}/variables/{key}` using the command schema. | Active |
 | Automation / MCP | Future command/tool over the same operation key. | Future |
 
 ## Current Implementation Notes And Migration Gaps
 
-This command must land in the same Code Round as `resources.set-variable`,
-`resources.effective-config`, and deployment snapshot precedence updates.
+This command is active in the same operation-catalog, CLI, HTTP/oRPC, Web, persistence, and
+deployment snapshot precedence surface as `resources.set-variable` and
+`resources.effective-config`.

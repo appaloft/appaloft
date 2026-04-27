@@ -2412,6 +2412,23 @@
             </aside>
 
             <div class="space-y-8">
+              <div
+                class="rounded-md border border-primary/25 bg-primary/5 px-4 py-3 text-sm"
+                role="note"
+              >
+                <div class="flex gap-3">
+                  <ShieldCheck class="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" />
+                  <div class="min-w-0">
+                    <p class="font-medium text-foreground">
+                      {$t(i18nKeys.console.resources.profileEditBoundaryTitle)}
+                    </p>
+                    <p class="mt-1 leading-6 text-muted-foreground">
+                      {$t(i18nKeys.console.resources.profileEditBoundaryDescription)}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
               {#if activeSettingsSection === "profile"}
               <div id="resource-overview-profile" class="space-y-4">
                 <ResourceProfileSummary
@@ -2420,23 +2437,6 @@
                   environmentName={environment?.name ?? resource.environmentId}
                   destinationId={defaultDestinationId}
                 />
-
-                <div
-                  class="rounded-md border border-primary/25 bg-primary/5 px-4 py-3 text-sm"
-                  role="note"
-                >
-                  <div class="flex gap-3">
-                    <ShieldCheck class="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" />
-                    <div class="min-w-0">
-                      <p class="font-medium text-foreground">
-                        {$t(i18nKeys.console.resources.profileEditBoundaryTitle)}
-                      </p>
-                      <p class="mt-1 leading-6 text-muted-foreground">
-                        {$t(i18nKeys.console.resources.profileEditBoundaryDescription)}
-                      </p>
-                    </div>
-                  </div>
-                </div>
 
                 <form
                   id="resource-source-profile-form"
@@ -3970,7 +3970,11 @@
                   </div>
                 </div>
 
-                <form class="mt-5 border-t pt-4" onsubmit={configureResourceHealth}>
+                <form
+                  id="resource-health-policy-form"
+                  class="mt-5 border-t pt-4"
+                  onsubmit={configureResourceHealth}
+                >
                   <div class="flex flex-wrap items-center gap-2">
                     <Button
                       type="button"
@@ -4022,7 +4026,12 @@
 
                     <label class="space-y-1.5 text-sm font-medium">
                       <span>{$t(i18nKeys.console.quickDeploy.healthCheckHost)}</span>
-                      <Input bind:value={healthHost} autocomplete="off" disabled={!healthEnabled} />
+                      <Input
+                        id="resource-health-host"
+                        bind:value={healthHost}
+                        autocomplete="off"
+                        disabled={!healthEnabled}
+                      />
                     </label>
 
                     <label class="space-y-1.5 text-sm font-medium">
@@ -4034,12 +4043,22 @@
                           className="size-5"
                         />
                       </span>
-                      <Input bind:value={healthPath} autocomplete="off" disabled={!healthEnabled} />
+                      <Input
+                        id="resource-health-path"
+                        bind:value={healthPath}
+                        autocomplete="off"
+                        disabled={!healthEnabled}
+                      />
                     </label>
 
                     <label class="space-y-1.5 text-sm font-medium">
                       <span>{$t(i18nKeys.console.quickDeploy.healthCheckPort)}</span>
-                      <Input bind:value={healthPort} autocomplete="off" disabled={!healthEnabled} />
+                      <Input
+                        id="resource-health-port"
+                        bind:value={healthPort}
+                        autocomplete="off"
+                        disabled={!healthEnabled}
+                      />
                     </label>
 
                     <label class="space-y-1.5 text-sm font-medium">
@@ -4053,6 +4072,7 @@
                       </span>
                       <Input
                         bind:value={healthExpectedStatus}
+                        id="resource-health-expected-status"
                         autocomplete="off"
                         disabled={!healthEnabled}
                       />
@@ -4067,28 +4087,45 @@
                           className="size-5"
                         />
                       </span>
-                      <Input bind:value={healthIntervalSeconds} autocomplete="off" />
+                      <Input
+                        id="resource-health-interval-seconds"
+                        bind:value={healthIntervalSeconds}
+                        autocomplete="off"
+                      />
                     </label>
 
                     <label class="space-y-1.5 text-sm font-medium">
                       <span>{$t(i18nKeys.console.quickDeploy.healthCheckTimeoutSeconds)}</span>
-                      <Input bind:value={healthTimeoutSeconds} autocomplete="off" />
+                      <Input
+                        id="resource-health-timeout-seconds"
+                        bind:value={healthTimeoutSeconds}
+                        autocomplete="off"
+                      />
                     </label>
 
                     <label class="space-y-1.5 text-sm font-medium">
                       <span>{$t(i18nKeys.console.quickDeploy.healthCheckRetries)}</span>
-                      <Input bind:value={healthRetries} autocomplete="off" />
+                      <Input
+                        id="resource-health-retries"
+                        bind:value={healthRetries}
+                        autocomplete="off"
+                      />
                     </label>
 
                     <label class="space-y-1.5 text-sm font-medium">
                       <span>{$t(i18nKeys.console.quickDeploy.healthCheckStartPeriodSeconds)}</span>
-                      <Input bind:value={healthStartPeriodSeconds} autocomplete="off" />
+                      <Input
+                        id="resource-health-start-period-seconds"
+                        bind:value={healthStartPeriodSeconds}
+                        autocomplete="off"
+                      />
                     </label>
 
                     <label class="space-y-1.5 text-sm font-medium sm:col-span-2">
                       <span>{$t(i18nKeys.console.quickDeploy.healthCheckResponseText)}</span>
                       <Input
                         bind:value={healthExpectedText}
+                        id="resource-health-expected-text"
                         autocomplete="off"
                         disabled={!healthEnabled}
                       />

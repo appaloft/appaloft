@@ -45,8 +45,9 @@ Current release alignment:
 <!-- release-alignment:start -->
 - [x] On 2026-04-27, the latest public release is `v0.5.0`; root package
   and Release Please manifest on `main` are `0.5.0`; there is no open Release Please PR.
-- [x] On 2026-04-27, the roadmap gate does not yet allow `Release-As: 0.6.0`
-  because Phase 4 required items and exit criteria are still incomplete.
+- [x] On 2026-04-27, Phase 4 resource detail/profile editing closure is represented by
+  `docs/specs/009-resource-detail-profile-editing-closure/`; after that closure PR is merged,
+  release preflight may re-evaluate `Release-As: 0.6.0` on `main`.
 <!-- release-alignment:end -->
 
 Historical alignment notes:
@@ -180,8 +181,8 @@ Still blocking 1.0.0:
 - [ ] Top-level resource CRUD/lifecycle is uneven across projects, servers, credentials, resources,
   deployments, domain bindings, certificates, default access policy, dependency resources, storage,
   webhooks, and internal process state.
-- [ ] Resource profile editing affordances, profile-drift handling, and remaining non-resource
-  lifecycle gaps are still major horizontal work.
+- [ ] Resource profile drift handling and remaining non-resource lifecycle gaps are still major
+  horizontal work. Resource detail/profile editing affordances are Phase 4 closure work.
 - [ ] Retry/redeploy, cancel, and rollback are not public operations. `deployments.show` and
   `deployments.stream-events` are already active.
 - [ ] `deployments.create` progress stream is still create-time observation; standalone replay/follow
@@ -392,7 +393,7 @@ Target: `0.6.0`.
 
 Release rule:
 
-- [ ] Select `0.6.0` only when all required Phase 4 items, earlier phase items, and exit criteria
+- [x] Select `0.6.0` only when all required Phase 4 items, earlier phase items, and exit criteria
   are checked. If any Phase 4 item remains unchecked, release a `0.5.x` patch instead.
 
 Already done:
@@ -432,7 +433,8 @@ Required:
 - [x] Add environment clone.
 - [x] Add remaining named edit semantics.
 - [x] Add environment effective-precedence query.
-- [x] Complete resource detail editing affordances for source/runtime/network profile changes.
+- [x] Complete resource detail editing affordances for source/runtime/network/access/health/
+  configuration profile changes.
 - [x] Ensure CLI, HTTP/oRPC, Web, and future MCP naming reuse the same command/query schemas.
 
 Phase 4 resource profile editing verification notes from 2026-04-27:
@@ -440,12 +442,21 @@ Phase 4 resource profile editing verification notes from 2026-04-27:
 - Resource detail source/runtime/network profile forms dispatch `resources.configure-source`,
   `resources.configure-runtime`, and `resources.configure-network` through the typed oRPC client,
   then invalidate the resource detail/list read paths instead of storing Web-only configuration.
-- Resource detail now states that source/runtime/network saves are durable resource profile edits
-  for future deployments only. They do not mutate historical deployment snapshots and do not
-  immediately restart running runtime state. Covered by `RES-PROFILE-ENTRY-012`.
+- Resource detail access, health, and configuration forms dispatch `resources.configure-access`,
+  `resources.configure-health`, `resources.set-variable`, and `resources.unset-variable` through
+  the typed oRPC client, then invalidate the resource detail/health/effective-config/list read paths
+  owned by those operations.
+- Resource detail now states that source/runtime/network/access/health/configuration saves are
+  durable resource-level profile or override edits for future deployments, verification, route
+  planning, or deployment snapshot materialization only. They do not create deployments, mutate
+  historical deployment snapshots, immediately restart running runtime state, bind domains, issue
+  certificates, or apply proxy routes. Covered by `RES-PROFILE-ENTRY-012`,
+  `RES-PROFILE-ENTRY-013`, and `RES-PROFILE-ENTRY-014`.
 - CLI, HTTP/oRPC, Web help, and future MCP/tool naming all point at the existing operation keys,
-  command schemas, and docs-registry topics for source/runtime/network profile editing. No generic
-  `resources.update` surface is introduced.
+  command/query schemas, and docs-registry topics for source/runtime/network/access/health/
+  configuration profile editing. No generic `resources.update` surface is introduced.
+- Resource profile drift visibility remains a later resource/internal-state ledger item; it is not
+  part of this Phase 4 resource detail/profile editing closure.
 
 Exit criteria:
 
@@ -454,6 +465,10 @@ Exit criteria:
 - [x] `resources.create` is no longer the only durable resource profile write.
 - [x] Web resource configuration is a projection of resource-owned commands and queries, not a
   Svelte-only configuration store.
+- [x] Resource detail/profile editing closure covers source, runtime, network, access, health, and
+  resource-owned configuration without creating deployments, mutating historical deployment
+  snapshots, immediately affecting runtime/workload state, binding domains, issuing certificates, or
+  applying proxy routes.
 
 ## Phase 5: First-Deploy Engine And Framework Breadth
 

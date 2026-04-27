@@ -24,6 +24,48 @@ function ensureReflectMetadata(): void {
   reflectObject.metadata ??= () => () => {};
 }
 
+async function createCommandCaptureHarness(requestId: string) {
+  ensureReflectMetadata();
+  const { createExecutionContext } = await import("@appaloft/application");
+  const { createCliProgram } = await import("../src");
+  const commands: AppCommand<unknown>[] = [];
+  const commandBus = {
+    execute: async <T>(_context: unknown, command: AppCommand<T>) => {
+      commands.push(command as AppCommand<unknown>);
+      return ok({ id: "res_demo" } as T);
+    },
+  } as unknown as CommandBus;
+  const queryBus = {
+    execute: async <T>(_context: unknown, _query: AppQuery<T>) => ok({} as T),
+  } as unknown as QueryBus;
+  const executionContextFactory: ExecutionContextFactory = {
+    create: (input) =>
+      createExecutionContext({
+        ...input,
+        requestId,
+      }),
+  };
+  const program = createCliProgram({
+    version: "0.1.0-test",
+    startServer: async () => {},
+    commandBus,
+    queryBus,
+    executionContextFactory,
+  });
+
+  return { commands, program };
+}
+
+async function parseCli(program: { parseAsync(args: string[]): Promise<unknown> }, args: string[]) {
+  const writeStdout = process.stdout.write;
+  try {
+    process.stdout.write = (() => true) as typeof process.stdout.write;
+    await program.parseAsync(args);
+  } finally {
+    process.stdout.write = writeStdout;
+  }
+}
+
 describe("CLI resource commands", () => {
   test("[RES-PROFILE-ENTRY-003] resource configure-runtime dispatches the application command", async () => {
     ensureReflectMetadata();
@@ -215,6 +257,123 @@ describe("CLI resource commands", () => {
     });
   });
 
+  test("[RES-PROFILE-ENTRY-003] resource configure-source dispatches the application command", async () => {
+    const { ConfigureResourceSourceCommand } = await import("@appaloft/application");
+    const { commands, program } = await createCommandCaptureHarness("req_cli_resource_source_test");
+
+    await parseCli(program, [
+      "node",
+      "appaloft",
+      "resource",
+      "configure-source",
+      "res_demo",
+      "--kind",
+      "git-public",
+      "--locator",
+      "https://github.com/appaloft/demo",
+      "--display-name",
+      "demo repo",
+      "--git-ref",
+      "main",
+      "--base-directory",
+      "apps/web",
+    ]);
+
+    expect(commands).toHaveLength(1);
+    expect(commands[0]).toBeInstanceOf(ConfigureResourceSourceCommand);
+    expect(commands[0]).toMatchObject({
+      resourceId: "res_demo",
+      source: {
+        kind: "git-public",
+        locator: "https://github.com/appaloft/demo",
+        displayName: "demo repo",
+        gitRef: "main",
+        baseDirectory: "apps/web",
+      },
+    });
+  });
+
+  test("[RES-PROFILE-ENTRY-003] resource configure-network dispatches the application command", async () => {
+    const { ConfigureResourceNetworkCommand } = await import("@appaloft/application");
+    const { commands, program } = await createCommandCaptureHarness(
+      "req_cli_resource_network_test",
+    );
+
+    await parseCli(program, [
+      "node",
+      "appaloft",
+      "resource",
+      "configure-network",
+      "res_demo",
+      "--internal-port",
+      "8080",
+      "--upstream-protocol",
+      "http",
+      "--exposure-mode",
+      "reverse-proxy",
+      "--target-service",
+      "web",
+    ]);
+
+    expect(commands).toHaveLength(1);
+    expect(commands[0]).toBeInstanceOf(ConfigureResourceNetworkCommand);
+    expect(commands[0]).toMatchObject({
+      resourceId: "res_demo",
+      networkProfile: {
+        internalPort: 8080,
+        upstreamProtocol: "http",
+        exposureMode: "reverse-proxy",
+        targetServiceName: "web",
+      },
+    });
+  });
+
+  test("[RES-PROFILE-ENTRY-003] resource configure-health dispatches the application command", async () => {
+    const { ConfigureResourceHealthCommand } = await import("@appaloft/application");
+    const { commands, program } = await createCommandCaptureHarness("req_cli_resource_health_test");
+
+    await parseCli(program, [
+      "node",
+      "appaloft",
+      "resource",
+      "configure-health",
+      "res_demo",
+      "--path",
+      "/ready",
+      "--expected-status",
+      "204",
+      "--interval",
+      "7",
+      "--timeout",
+      "3",
+      "--retries",
+      "4",
+      "--start-period",
+      "2",
+    ]);
+
+    expect(commands).toHaveLength(1);
+    expect(commands[0]).toBeInstanceOf(ConfigureResourceHealthCommand);
+    expect(commands[0]).toMatchObject({
+      resourceId: "res_demo",
+      healthCheck: {
+        enabled: true,
+        type: "http",
+        intervalSeconds: 7,
+        timeoutSeconds: 3,
+        retries: 4,
+        startPeriodSeconds: 2,
+        http: {
+          method: "GET",
+          scheme: "http",
+          host: "localhost",
+          path: "/ready",
+          expectedStatusCode: 204,
+        },
+      },
+    });
+  });
+
   test("[RES-PROFILE-ENTRY-003] resource set-variable dispatches the application command", async () => {
     ensureReflectMetadata();
     const { SetResourceVariableCommand, createExecutionContext } = await import(
@@ -276,6 +435,32 @@ describe("CLI resource commands", () => {
       kind: "secret",
       exposure: "runtime",
       isSecret: true,
+    });
+  });
+
+  test("[RES-PROFILE-ENTRY-003] resource unset-variable dispatches the application command", async () => {
+    const { UnsetResourceVariableCommand } = await import("@appaloft/application");
+    const { commands, program } = await createCommandCaptureHarness(
+      "req_cli_resource_unset_variable_test",
+    );
+
+    await parseCli(program, [
+      "node",
+      "appaloft",
+      "resource",
+      "unset-variable",
+      "res_demo",
+      "DATABASE_URL",
+      "--exposure",
+      "runtime",
+    ]);
+
+    expect(commands).toHaveLength(1);
+    expect(commands[0]).toBeInstanceOf(UnsetResourceVariableCommand);
+    expect(commands[0]).toMatchObject({
+      resourceId: "res_demo",
+      key: "DATABASE_URL",
+      exposure: "runtime",
     });
   });
 

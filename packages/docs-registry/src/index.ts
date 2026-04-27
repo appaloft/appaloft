@@ -241,6 +241,7 @@ export const publicDocsHelpTopics = {
       "docs/workflows/resource-profile-lifecycle.md",
       "docs/testing/resource-profile-lifecycle-test-matrix.md",
       "docs/specs/008-resource-detail-profile-editing/spec.md",
+      "docs/specs/009-resource-detail-profile-editing-closure/spec.md",
     ],
     webSurfaces: ["apps/web/src/routes/resources/[resourceId]/+page.svelte: resource source form"],
   },
@@ -273,6 +274,7 @@ export const publicDocsHelpTopics = {
       "docs/workflows/resource-profile-lifecycle.md",
       "docs/testing/resource-profile-lifecycle-test-matrix.md",
       "docs/specs/008-resource-detail-profile-editing/spec.md",
+      "docs/specs/009-resource-detail-profile-editing-closure/spec.md",
     ],
     webSurfaces: [
       "apps/web/src/routes/resources/[resourceId]/+page.svelte: resource runtime profile form",
@@ -294,6 +296,19 @@ export const publicDocsHelpTopics = {
     surfaces: ["web", "cli", "http-api", "repository-config", "mcp"],
     relatedOperation: "resources.configure-health",
     aliases: ["health", "readiness", "probe", "健康检查"],
+    specReferences: [
+      "docs/decisions/ADR-012-resource-runtime-profile-and-deployment-snapshot-boundary.md",
+      "docs/decisions/ADR-020-resource-health-observation.md",
+      "docs/commands/resources.configure-health.md",
+      "docs/workflows/resource-profile-lifecycle.md",
+      "docs/workflows/resource-health-observation.md",
+      "docs/testing/resource-profile-lifecycle-test-matrix.md",
+      "docs/testing/resource-health-test-matrix.md",
+      "docs/specs/009-resource-detail-profile-editing-closure/spec.md",
+    ],
+    webSurfaces: [
+      "apps/web/src/routes/resources/[resourceId]/+page.svelte: resource health policy form",
+    ],
   },
   "resource.network-profile": {
     id: "resource.network-profile",
@@ -325,6 +340,7 @@ export const publicDocsHelpTopics = {
       "docs/workflows/resource-profile-lifecycle.md",
       "docs/testing/resource-profile-lifecycle-test-matrix.md",
       "docs/specs/008-resource-detail-profile-editing/spec.md",
+      "docs/specs/009-resource-detail-profile-editing-closure/spec.md",
     ],
     webSurfaces: [
       "apps/web/src/routes/resources/[resourceId]/+page.svelte: resource network profile form",
@@ -359,6 +375,7 @@ export const publicDocsHelpTopics = {
       "docs/workflows/resource-profile-lifecycle.md",
       "docs/testing/resource-profile-lifecycle-test-matrix.md",
       "docs/specs/007-resource-access-profile-configuration/spec.md",
+      "docs/specs/009-resource-detail-profile-editing-closure/spec.md",
     ],
     webSurfaces: ["apps/web/src/routes/resources/[resourceId]/+page.svelte: resource access form"],
   },
@@ -584,9 +601,15 @@ export const publicDocsHelpTopics = {
     aliases: ["env", "variables", "secret", "snapshot", "环境变量"],
     specReferences: [
       "docs/queries/environments.effective-precedence.md",
+      "docs/commands/resources.set-variable.md",
+      "docs/commands/resources.unset-variable.md",
       "docs/testing/environment-effective-precedence-test-matrix.md",
       "docs/queries/resources.effective-config.md",
       "docs/testing/resource-profile-lifecycle-test-matrix.md",
+      "docs/specs/009-resource-detail-profile-editing-closure/spec.md",
+    ],
+    webSurfaces: [
+      "apps/web/src/routes/resources/[resourceId]/+page.svelte: resource configuration section",
     ],
   },
   "environment.diff-promote": {

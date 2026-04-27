@@ -684,7 +684,7 @@ export const enUS = {
       pageTitle: "Resources",
       plannedAccessRoute: "Planned generated access",
       profileEditBoundaryDescription:
-        "Future deployments use these saved profiles. Historical deployment snapshots stay unchanged. Current runtime is not restarted.",
+        "Future deployments use these saved profiles. Historical deployment snapshots stay unchanged. Current runtime is not restarted. These saves do not bind domains, issue certificates, or apply proxy routes.",
       profileEditBoundaryTitle: "Durable profile edit",
       profileDescription: "Stable project, environment, kind, and slug identity.",
       profileTitle: "Resource profile",

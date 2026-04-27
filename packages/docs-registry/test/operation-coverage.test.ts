@@ -232,11 +232,13 @@ describe("public docs operation coverage", () => {
     );
   });
 
-  test("[RES-PROFILE-ENTRY-012] source runtime and network topics record resource detail profile editing coverage", () => {
+  test("[RES-PROFILE-ENTRY-012] resource profile topics record resource detail editing closure coverage", () => {
     for (const [operationKey, topicId] of [
       ["resources.configure-source", "resource.source-profile"],
       ["resources.configure-runtime", "resource.runtime-profile"],
       ["resources.configure-network", "resource.network-profile"],
+      ["resources.configure-access", "resource.access-profile"],
+      ["resources.configure-health", "resource.health-profile"],
     ] as const) {
       const coverage = getPublicDocsOperationCoverage(operationKey);
       const topic = publicDocsHelpTopics[topicId];
@@ -250,7 +252,32 @@ describe("public docs operation coverage", () => {
         expect.arrayContaining([
           "docs/workflows/resource-profile-lifecycle.md",
           "docs/testing/resource-profile-lifecycle-test-matrix.md",
-          "docs/specs/008-resource-detail-profile-editing/spec.md",
+          "docs/specs/009-resource-detail-profile-editing-closure/spec.md",
+        ]),
+      );
+      expect(topic.webSurfaces?.join("\n")).toContain(
+        "apps/web/src/routes/resources/[resourceId]/+page.svelte",
+      );
+    }
+
+    for (const operationKey of [
+      "resources.set-variable",
+      "resources.unset-variable",
+      "resources.effective-config",
+    ] as const) {
+      const coverage = getPublicDocsOperationCoverage(operationKey);
+      const topic = publicDocsHelpTopics["environment.variable-precedence"];
+
+      expect(coverage).toMatchObject({
+        operationKey,
+        status: "documented",
+        topicId: "environment.variable-precedence",
+      });
+      expect(topic.specReferences).toEqual(
+        expect.arrayContaining([
+          "docs/queries/resources.effective-config.md",
+          "docs/testing/resource-profile-lifecycle-test-matrix.md",
+          "docs/specs/009-resource-detail-profile-editing-closure/spec.md",
         ]),
       );
       expect(topic.webSurfaces?.join("\n")).toContain(
