@@ -60,13 +60,14 @@ Current status:
 - `PUB-DOCS-007` is covered at content-schema level by required `localeState` frontmatter for each
   docs page.
 - `PUB-DOCS-008` is covered by the curated `apps/docs/public/llms.txt` file.
-- `PUB-DOCS-010` has expanded Web coverage for quick deploy, resource-create, domain binding,
-  resource detail, deployment target, server default-access, connectivity, runtime logs,
-  diagnostics, and terminal surfaces. Covered help topics include source, server target, SSH
-  credentials, connectivity testing, environment selection, variable precedence, resource identity,
-  runtime, health, network profile, custom domain, generated access route, TLS certificate
-  readiness, proxy readiness, project lifecycle, safe diagnostic payloads, runtime logs, and
-  terminal sessions.
+- `PUB-DOCS-010` has expanded Web coverage for quick deploy, resource-create, project
+  detail/settings lifecycle, domain binding, resource detail, deployment target, server
+  default-access, connectivity, runtime logs, diagnostics, and terminal surfaces. Covered help
+  topics include source, server target, SSH credentials, connectivity testing, environment
+  selection, variable precedence, project lifecycle, project setting side effects, resource
+  identity, runtime, health, network profile, custom domain, generated access route, TLS
+  certificate readiness, proxy readiness, safe diagnostic payloads, runtime logs, and terminal
+  sessions.
 - `PUB-DOCS-011` has expanded CLI coverage for high-confusion operations including deployment
   source, preview cleanup, source relink, SSH credentials, server connectivity, terminal sessions,
   project lifecycle, resource profiles, environment variables, domains, certificates, logs, health,

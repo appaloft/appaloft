@@ -405,12 +405,16 @@ Already done:
 - [x] Environment effective-precedence query exists.
 - [x] Environment archive exists.
 - [x] Project create/list/show/rename/archive exists.
+- [x] Project detail/settings reads `projects.show`, exposes rename/archive through the named
+  commands, shows resource/environment/deployment/access rollups, and explains that project-level
+  lifecycle changes do not create deployments, mutate historical deployment snapshots, or
+  immediately affect runtime state.
 - [x] Server register/list/show/rename/deactivate/delete safety/guarded delete/connectivity,
   proxy-repair, and credential baseline exist.
 
 Required:
 
-- [x] Add project show/rename/archive.
+- [x] Add project show/rename/archive with Web detail/settings closure and side-effect clarity.
 - [x] Add server show with proxy status and initial deployment/resource/domain rollups.
 - [x] Add server rename.
 - [x] Add server configure-edge-proxy.
@@ -445,7 +449,7 @@ Phase 4 resource profile editing verification notes from 2026-04-27:
 
 Exit criteria:
 
-- [ ] A user can create, read, update, and archive/delete project, environment, server, credential,
+- [x] A user can create, read, update, and archive/delete project, environment, server, credential,
   and resource configuration without creating a deployment as a side effect.
 - [x] `resources.create` is no longer the only durable resource profile write.
 - [x] Web resource configuration is a projection of resource-owned commands and queries, not a
@@ -696,8 +700,10 @@ This ledger is the horizontal closure checklist. Each resource or internal state
 work below before GA.
 
 - [x] Project: `projects.create`, `projects.list`.
-- [x] Project: show, rename, archive safety.
-- [ ] Project: delete/restore safety, description editing, resource rollup.
+- [x] Project: show, rename, archive safety, Web detail/settings closure, and
+  resource/environment/deployment/access rollups.
+- [ ] Project post-Phase 4: description editing through a future `projects.set-description`
+  command, and delete/restore safety through future explicit specs if accepted.
 - [x] Environment: create/list/show, set/unset variable, diff, promote.
 - [x] Environment: effective precedence query.
 - [x] Environment: archive.

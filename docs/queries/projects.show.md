@@ -63,8 +63,9 @@ The input must not accept deployment, resource, provider, source, or config fiel
 - `lifecycleStatus` with `active` or `archived` for normal project reads;
 - optional `archivedAt` and `archiveReason` when the project is archived.
 
-Project detail pages may separately query resources, environments, or deployment rollups, but those
-remain separate read surfaces. `projects.show` is only the project identity and lifecycle read.
+Project detail pages may separately query resources, environments, deployment rollups, or access
+rollups, but those remain separate read surfaces. `projects.show` is only the project identity and
+lifecycle read.
 
 ## Error Contract
 

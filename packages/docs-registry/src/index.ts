@@ -69,7 +69,7 @@ export const publicDocsHelpTopics = {
     id: "project.lifecycle",
     title: "Project lifecycle",
     description:
-      "How to read, rename, and archive projects without turning deployments into project-owned actions.",
+      "How to read, rename, and archive projects without turning deployments or runtime state into project-owned actions.",
     page: {
       "zh-CN": "resources/projects",
       "en-US": "en/resources/projects",
@@ -81,15 +81,25 @@ export const publicDocsHelpTopics = {
     },
     surfaces: ["web", "cli", "http-api", "mcp"],
     relatedOperation: "projects.show",
-    aliases: ["project show", "project rename", "project archive", "project lifecycle", "项目归档"],
+    aliases: [
+      "project show",
+      "project rename",
+      "project archive",
+      "project lifecycle",
+      "project settings",
+      "deployment snapshot",
+      "项目归档",
+      "项目设置",
+    ],
     specReferences: [
       "docs/workflows/project-lifecycle.md",
       "docs/queries/projects.show.md",
       "docs/commands/projects.rename.md",
       "docs/commands/projects.archive.md",
       "docs/testing/project-lifecycle-test-matrix.md",
+      "docs/specs/008-project-lifecycle-settings-closure/spec.md",
     ],
-    webSurfaces: ["apps/web project detail/settings surfaces"],
+    webSurfaces: ["apps/web project detail/settings surfaces with read-only rollups"],
   },
   "server.deployment-target": {
     id: "server.deployment-target",

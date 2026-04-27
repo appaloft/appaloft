@@ -72,6 +72,10 @@ Project archive does not delete or archive resources, environments, deployment r
 bindings, certificates, source links, logs, or audit history. It only blocks new project-scoped
 mutations and deployment admission from that project context.
 
+Project archive must not create a deployment, mutate historical deployment snapshots, or immediately
+stop, restart, delete, or otherwise affect runtime state. Existing runtime cleanup remains owned by
+future resource/runtime lifecycle operations.
+
 After archive:
 
 - `projects.show` and `projects.list` may return the project with lifecycle metadata;

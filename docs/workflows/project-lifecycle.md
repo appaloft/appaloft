@@ -33,7 +33,8 @@ Project lifecycle status is value-object backed.
 | `active` | Project can be used for project-scoped child creation and deployment admission. | `projects.rename`, `projects.archive`, child operations where their own specs allow. |
 | `archived` | Project identity and history are retained, but new project-scoped mutations are blocked. | Read queries only, plus future explicit restore/delete if specified. |
 
-Project hard delete and restore are future behaviors and require separate specs.
+Project hard delete, restore, and description editing are future behaviors and require separate
+specs.
 
 ## Workflow Rules
 
@@ -45,6 +46,11 @@ projects and slug conflicts.
 `projects.archive` transitions an active project to archived. It is idempotent for already archived
 projects. It must not cascade archive or delete child resources, environments, deployments, domain
 bindings, certificates, logs, source links, or audit state.
+
+Project detail/settings surfaces may compose resource, environment, deployment, and access-route
+rollups from their own read models. Those rollups are read-only context. Project lifecycle commands
+must not create a deployment, mutate historical deployment snapshots, or immediately affect runtime
+state.
 
 Archived project guards apply to child operations that would create new project-scoped work:
 
@@ -61,7 +67,7 @@ context.
 | --- | --- |
 | CLI | Expose `project show`, `project rename`, and `project archive`; do not expose `project update`. |
 | HTTP/oRPC | Expose show, rename, and archive routes that reuse operation schemas. |
-| Web | Project detail/settings may read identity, submit rename, and submit archive after confirmation. Project deploy actions still route through Resource or Quick Deploy. |
+| Web | Project detail/settings reads identity through `projects.show`, submits rename/archive through the named operations after confirmation where destructive, shows read-only resource/environment/deployment/access rollups, and labels project lifecycle changes as non-deployment, non-snapshot, non-runtime mutations. Project deploy actions still route through Resource or Quick Deploy. |
 | Repository config | Not applicable. Repository config must not select project identity. |
 | Future MCP/tools | Generate tools from operation catalog entries for the three operations. |
 | Public docs | Stable project-management anchors describe show, rename, archive, and archived project behavior. |

@@ -18,6 +18,8 @@ slug.
 
 It is not a generic project update command. It must not mutate description, source identity,
 resources, environments, deployments, access policy, credentials, or any resource-owned profile.
+It must not create a deployment, mutate historical deployment snapshots, or immediately affect
+runtime state.
 
 ```ts
 type RenameProjectResult = Result<{ id: string }, DomainError>;

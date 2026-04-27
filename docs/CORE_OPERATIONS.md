@@ -87,6 +87,11 @@ Current boundary:
 - project detail surfaces should make resources the primary list and resource creation the primary
   write affordance
 - project-level "view deployments" is a secondary rollup over resources
+- project detail/settings may compose read-only resource, environment, deployment, and access
+  rollups, but those rollups are not `projects.show` output and do not make Project the owner of
+  child mutation or runtime state
+- project rename/archive must not create deployments, mutate historical deployment snapshots, or
+  immediately affect runtime state
 - project-level "new deployment" must be labeled and implemented as Quick Deploy or another entry
   workflow that selects or creates a resource before dispatching `deployments.create`
 - project source binding is not yet a first-class aggregate concept
@@ -99,6 +104,10 @@ Core next operations expected here:
 - `projects.configure-source` if project source binding becomes a first-class aggregate concept
 - `projects.set-description` if description editing becomes a first-class mutation
 - project hard delete or restore only after safety rules are specified
+
+Those future operations are not required for the Phase 4 project lifecycle/settings closure. Until
+they are specified, the project-level closure is `projects.show`, `projects.rename`, and
+`projects.archive`.
 
 Those are expected domain operations, but they are not implemented yet and must not be assumed by
 transports until added here and to the operation catalog.

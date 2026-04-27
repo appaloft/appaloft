@@ -48,6 +48,37 @@ describe("public docs operation coverage", () => {
     }
   });
 
+  test("[PROJ-LIFE-ENTRY-004] project lifecycle operations record docs coverage", () => {
+    const topic = publicDocsHelpTopics["project.lifecycle"];
+
+    expect(getPublicDocsOperationCoverage("projects.show")).toMatchObject({
+      operationKey: "projects.show",
+      status: "documented",
+      topicId: "project.lifecycle",
+    });
+    expect(getPublicDocsOperationCoverage("projects.rename")).toMatchObject({
+      operationKey: "projects.rename",
+      status: "documented",
+      topicId: "project.lifecycle",
+    });
+    expect(getPublicDocsOperationCoverage("projects.archive")).toMatchObject({
+      operationKey: "projects.archive",
+      status: "documented",
+      topicId: "project.lifecycle",
+    });
+    expect(topic.specReferences).toEqual(
+      expect.arrayContaining([
+        "docs/workflows/project-lifecycle.md",
+        "docs/queries/projects.show.md",
+        "docs/commands/projects.rename.md",
+        "docs/commands/projects.archive.md",
+        "docs/testing/project-lifecycle-test-matrix.md",
+        "docs/specs/008-project-lifecycle-settings-closure/spec.md",
+      ]),
+    );
+    expect(topic.webSurfaces?.join("\n")).toContain("project detail/settings");
+  });
+
   test("[SSH-CRED-ENTRY-005] reusable SSH credential detail maps to the SSH credential help topic", () => {
     const topic = publicDocsHelpTopics["server.ssh-credential"];
 
