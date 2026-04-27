@@ -1459,6 +1459,15 @@ export const cloneEnvironmentResponseSchema = z.object({
   id: z.string(),
 });
 
+export const renameEnvironmentInputSchema = z.object({
+  environmentId: z.string().min(1),
+  name: z.string().min(1),
+});
+
+export const renameEnvironmentResponseSchema = z.object({
+  id: z.string(),
+});
+
 export const lockEnvironmentInputSchema = z.object({
   environmentId: z.string().min(1),
   reason: z.string().min(1).max(280).optional(),
@@ -2498,6 +2507,8 @@ export type ArchiveEnvironmentInput = z.infer<typeof archiveEnvironmentInputSche
 export type ArchiveEnvironmentResponse = z.infer<typeof archiveEnvironmentResponseSchema>;
 export type CloneEnvironmentInput = z.infer<typeof cloneEnvironmentInputSchema>;
 export type CloneEnvironmentResponse = z.infer<typeof cloneEnvironmentResponseSchema>;
+export type RenameEnvironmentInput = z.infer<typeof renameEnvironmentInputSchema>;
+export type RenameEnvironmentResponse = z.infer<typeof renameEnvironmentResponseSchema>;
 export type LockEnvironmentInput = z.infer<typeof lockEnvironmentInputSchema>;
 export type LockEnvironmentResponse = z.infer<typeof lockEnvironmentResponseSchema>;
 export type UnlockEnvironmentInput = z.infer<typeof unlockEnvironmentInputSchema>;

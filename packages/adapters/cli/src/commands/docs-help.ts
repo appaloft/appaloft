@@ -139,6 +139,7 @@ export const cliCommandDescriptions = {
   environmentCreate: withDocs("Create an environment", "environment.concept"),
   environmentList: withDocs("List environments", "environment.concept"),
   environmentShow: withDocs("Show an environment", "environment.concept"),
+  environmentRename: withDocs("Rename an environment", "environment.lifecycle"),
   environmentArchive: withDocs("Archive an environment", "environment.lifecycle"),
   environmentClone: withDocs("Clone an environment", "environment.lifecycle"),
   environmentLock: withDocs("Lock an environment", "environment.lifecycle"),

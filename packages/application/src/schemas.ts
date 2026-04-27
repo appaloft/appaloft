@@ -20,6 +20,7 @@ export * from "./operations/environments/environment-effective-precedence.schema
 export * from "./operations/environments/list-environments.schema";
 export * from "./operations/environments/lock-environment.schema";
 export * from "./operations/environments/promote-environment.schema";
+export * from "./operations/environments/rename-environment.schema";
 export * from "./operations/environments/set-environment-variable.schema";
 export * from "./operations/environments/show-environment.schema";
 export * from "./operations/environments/unlock-environment.schema";

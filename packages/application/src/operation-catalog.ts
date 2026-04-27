@@ -22,6 +22,7 @@ import { environmentEffectivePrecedenceQueryInputSchema } from "./operations/env
 import { listEnvironmentsQueryInputSchema } from "./operations/environments/list-environments.query";
 import { lockEnvironmentCommandInputSchema } from "./operations/environments/lock-environment.command";
 import { promoteEnvironmentCommandInputSchema } from "./operations/environments/promote-environment.command";
+import { renameEnvironmentCommandInputSchema } from "./operations/environments/rename-environment.command";
 import { setEnvironmentVariableCommandInputSchema } from "./operations/environments/set-environment-variable.command";
 import { showEnvironmentQueryInputSchema } from "./operations/environments/show-environment.query";
 import { unlockEnvironmentCommandInputSchema } from "./operations/environments/unlock-environment.command";
@@ -694,6 +695,20 @@ export const operationCatalog = [
     transports: {
       cli: "appaloft env show <environmentId>",
       orpc: { method: "GET", path: "/api/environments/{environmentId}" },
+    },
+  },
+  {
+    key: "environments.rename",
+    kind: "command",
+    domain: "environments",
+    messageName: "RenameEnvironmentCommand",
+    handlerName: "RenameEnvironmentCommandHandler",
+    serviceName: "RenameEnvironmentUseCase",
+    inputSchema: renameEnvironmentCommandInputSchema,
+    serviceToken: tokens.renameEnvironmentUseCase,
+    transports: {
+      cli: "appaloft env rename <environmentId> --name <name>",
+      orpc: { method: "POST", path: "/api/environments/{environmentId}/rename" },
     },
   },
   {
