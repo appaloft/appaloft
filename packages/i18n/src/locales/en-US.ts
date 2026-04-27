@@ -354,10 +354,10 @@ export const enUS = {
       active: "Active",
       archiveAction: "Archive",
       archiveConfirm:
-        "Archive this project? New resources, environments, deployments, and project renames will be blocked while existing history remains visible.",
+        "Archive this project? New resources, environments, deployments, and project renames will be blocked while existing history remains visible. This will not create a deployment, rewrite snapshots, or change running runtime state.",
       archiveFailed: "Project was not archived",
       archiveNotice:
-        "This project is archived. Existing resources, environments, deployments, and access routes remain visible, but new mutations are blocked.",
+        "This project is archived. Existing resources, environments, deployments, snapshots, runtime state, and access routes remain visible, but new mutations are blocked.",
       archiveSucceeded: "Project archived",
       archived: "Archived",
       archivedAt: "Archived at",
@@ -424,7 +424,7 @@ export const enUS = {
       renameLabel: "Project name",
       renameSucceeded: "Project renamed",
       settingsDescription:
-        "Project lifecycle changes use dedicated operations and keep history readable.",
+        "Project lifecycle changes use dedicated operations. They do not create deployments, rewrite historical snapshots, or immediately change runtime state.",
       settingsTitle: "Project settings",
       createResourceDescription:
         "Define the resource source and network, then start the first deployment in the current project, environment, and server.",

@@ -557,6 +557,7 @@
             </p>
           </div>
           <Button
+            id="project-archive-button"
             type="button"
             variant="destructive"
             disabled={isProjectArchived || archiveProjectMutation.isPending}
@@ -589,15 +590,17 @@
         {/if}
 
         <form
+          id="project-rename-form"
           class="grid gap-3 sm:grid-cols-[minmax(0,22rem)_auto] sm:items-end"
           onsubmit={(event) => {
             event.preventDefault();
             renameProject();
           }}
         >
-          <label class="grid gap-1 text-sm">
+          <label class="grid gap-1 text-sm" for="project-name">
             <span class="font-medium">{$t(i18nKeys.console.projects.renameLabel)}</span>
             <Input
+              id="project-name"
               bind:value={projectName}
               autocomplete="off"
               disabled={isProjectArchived || renameProjectMutation.isPending}

@@ -346,10 +346,10 @@ export const zhCN = {
       active: "活跃",
       archiveAction: "归档",
       archiveConfirm:
-        "确定归档这个项目吗？归档后不能新建资源、环境、部署，也不能重命名项目；已有历史仍会保留可见。",
+        "确定归档这个项目吗？归档后不能新建资源、环境、部署，也不能重命名项目；已有历史仍会保留可见。这个操作不会创建 deployment、改写 snapshot 或改变正在运行的 runtime。",
       archiveFailed: "项目归档失败",
       archiveNotice:
-        "这个项目已经归档；已有资源、环境、部署和访问路由仍可查看，但新的变更会被阻止。",
+        "这个项目已经归档；已有资源、环境、部署、snapshot、runtime 状态和访问路由仍可查看，但新的变更会被阻止。",
       archiveSucceeded: "项目已归档",
       archived: "已归档",
       archivedAt: "归档时间",
@@ -412,7 +412,8 @@ export const zhCN = {
       renameFailed: "项目重命名失败",
       renameLabel: "项目名称",
       renameSucceeded: "项目已重命名",
-      settingsDescription: "项目生命周期通过专用操作变更，并保留历史可读性。",
+      settingsDescription:
+        "项目生命周期通过专用操作变更；不会创建 deployment、改写历史 snapshot，也不会立即改变 runtime 状态。",
       settingsTitle: "项目设置",
       createResourceDescription:
         "先定义资源来源和网络，再在当前项目、环境、服务器上发起第一次部署。",

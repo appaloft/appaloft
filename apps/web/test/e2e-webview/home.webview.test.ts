@@ -487,10 +487,41 @@ const apiResponses: Record<ApiScenario, Record<string, ApiRoute>> = {
             id: "prj_demo",
             name: "Demo",
             slug: "demo",
+            description: "Demo project",
+            lifecycleStatus: "active",
             createdAt: "2026-01-01T00:00:00.000Z",
           },
         ],
       },
+    },
+    "/api/rpc/projects/show": (_request: Request, body: unknown) => {
+      const input = readOrpcJsonPayload(body) as { projectId?: string } | null;
+      return {
+        json: {
+          id: input?.projectId ?? "prj_demo",
+          name: "Demo",
+          slug: "demo",
+          description: "Demo project",
+          lifecycleStatus: "active",
+          createdAt: "2026-01-01T00:00:00.000Z",
+        },
+      };
+    },
+    "/api/rpc/projects/rename": (_request: Request, body: unknown) => {
+      const input = readOrpcJsonPayload(body) as { projectId?: string } | null;
+      return {
+        json: {
+          id: input?.projectId ?? "prj_demo",
+        },
+      };
+    },
+    "/api/rpc/projects/archive": (_request: Request, body: unknown) => {
+      const input = readOrpcJsonPayload(body) as { projectId?: string } | null;
+      return {
+        json: {
+          id: input?.projectId ?? "prj_demo",
+        },
+      };
     },
     "/api/rpc/servers/list": {
       json: {
@@ -1736,6 +1767,136 @@ describe("console e2e with Bun.WebView", () => {
       "GitHub OAuth is not configured on the backend.",
       "后端尚未配置 GitHub OAuth",
     ]);
+  }, 15_000);
+
+  test("[PROJ-LIFE-ENTRY-005][PROJ-LIFE-ENTRY-006] manages project settings through named operations", async () => {
+    activeScenario = "dashboard";
+    resetRecordedApiRequests();
+
+    await using view = createWebView();
+    await view.navigate(`${previewUrl}/projects/prj_demo`);
+    await expectAnyText(view, ["Project settings", "项目设置"]);
+    await expectAnyText(view, ["They do not create deployments", "不会创建 deployment"]);
+    await expectAnyText(view, ["Resources", "资源"]);
+    await expectAnyText(view, ["Environments", "环境"]);
+    await expectAnyText(view, ["Recent deployments", "最近部署"]);
+
+    const showRequest = await waitForRecordedRequest("/api/rpc/projects/show");
+    expect(readOrpcJsonPayload(showRequest.body)).toEqual({
+      projectId: "prj_demo",
+    });
+
+    await setInputValue(view, "#project-name", "Customer API");
+    await clickFormSubmit(view, "#project-rename-form");
+
+    const renameRequest = await waitForRecordedRequest("/api/rpc/projects/rename");
+    expect(readOrpcJsonPayload(renameRequest.body)).toEqual({
+      projectId: "prj_demo",
+      name: "Customer API",
+    });
+
+    await view.evaluate("window.confirm = () => true");
+    const archiveClicked = await waitFor(
+      () =>
+        view.evaluate<boolean>(
+          `(() => {
+            const button = document.querySelector("#project-archive-button");
+            if (!(button instanceof HTMLButtonElement)) {
+              return false;
+            }
+            button.click();
+            return true;
+          })()`,
+        ),
+      Boolean,
+      "Expected project archive button",
+    );
+    expect(archiveClicked).toBe(true);
+
+    const archiveRequest = await waitForRecordedRequest("/api/rpc/projects/archive");
+    expect(readOrpcJsonPayload(archiveRequest.body)).toEqual({
+      projectId: "prj_demo",
+    });
+
+    expect(recordedApiRequests.some((request) => request.pathname === "/api/deployments")).toBe(
+      false,
+    );
+    expect(
+      recordedApiRequests.some((request) => request.pathname === "/api/rpc/resources/create"),
+    ).toBe(false);
+    expect(
+      recordedApiRequests.some((request) => request.pathname === "/api/rpc/environments/create"),
+    ).toBe(false);
+  }, 15_000);
+
+  test("[PROJ-LIFE-ENTRY-007] disables project-scoped creation affordances for archived projects", async () => {
+    activeScenario = "dashboard";
+    resetRecordedApiRequests();
+    const previousListRoute = apiResponses.dashboard["/api/rpc/projects/list"];
+    const previousShowRoute = apiResponses.dashboard["/api/rpc/projects/show"];
+    const archivedProject = {
+      id: "prj_demo",
+      name: "Demo",
+      slug: "demo",
+      description: "Demo project",
+      lifecycleStatus: "archived",
+      archivedAt: "2026-01-01T00:00:05.000Z",
+      createdAt: "2026-01-01T00:00:00.000Z",
+    };
+    apiResponses.dashboard["/api/rpc/projects/list"] = {
+      json: {
+        items: [archivedProject],
+      },
+    };
+    apiResponses.dashboard["/api/rpc/projects/show"] = {
+      json: archivedProject,
+    };
+
+    try {
+      await using view = createWebView();
+      await view.navigate(`${previewUrl}/projects/prj_demo`);
+      await expectAnyText(view, ["Archived", "已归档"]);
+      await expectAnyText(view, ["new mutations are blocked", "新的变更会被阻止"]);
+
+      const createResourceLinksDisabled = await waitFor(
+        () =>
+          view.evaluate<boolean>(
+            `(() => {
+              const anchors = Array.from(document.querySelectorAll("a")).filter((candidate) =>
+                candidate.textContent?.includes("Create resource") ||
+                candidate.textContent?.includes("创建资源")
+              );
+              return anchors.length > 0 && anchors.every((anchor) =>
+                anchor.getAttribute("aria-disabled") === "true" &&
+                !anchor.hasAttribute("href")
+              );
+            })()`,
+          ),
+        Boolean,
+        "Expected archived project create-resource links to be disabled",
+      );
+      expect(createResourceLinksDisabled).toBe(true);
+
+      const renameDisabled = await waitFor(
+        () =>
+          view.evaluate<boolean>(
+            `(() => {
+              const input = document.querySelector("#project-name");
+              const archiveButton = document.querySelector("#project-archive-button");
+              return input instanceof HTMLInputElement &&
+                archiveButton instanceof HTMLButtonElement &&
+                input.disabled &&
+                archiveButton.disabled;
+            })()`,
+          ),
+        Boolean,
+        "Expected archived project settings controls to be disabled",
+      );
+      expect(renameDisabled).toBe(true);
+    } finally {
+      apiResponses.dashboard["/api/rpc/projects/list"] = previousListRoute;
+      apiResponses.dashboard["/api/rpc/projects/show"] = previousShowRoute;
+    }
   }, 15_000);
 
   test("[RES-PROFILE-ENTRY-001] loads resource detail through resources.show", async () => {

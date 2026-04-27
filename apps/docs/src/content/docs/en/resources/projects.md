@@ -28,6 +28,8 @@ A project is the user boundary for a set of resources, environments, and deploym
 
 Projects can be read, renamed, and archived. Archiving a project keeps the project, resources, and deployment history visible, but blocks new environments, resources, and deployments under that project.
 
+Rename and archive in project settings only change the project-level lifecycle. They do not create a deployment, rewrite historical deployment snapshots, or immediately stop, restart, or delete running runtime state.
+
 <h3 id="project-rename">Rename a project</h3>
 
 When you rename a project through Web, CLI, or API, Appaloft derives a new project slug from the new name. Pick a different name if another project already owns that slug.
