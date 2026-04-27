@@ -99,9 +99,9 @@ command and that no entrypoint exposes a generic `resources.update`.
 | RES-PROFILE-DELETE-008 | `resources.show` / `resources.list` | Read model | Deleted resource queried by normal active read paths. | `resources.show` returns `not_found`; list omits the resource. |
 | RES-PROFILE-DELETE-009 | `resource-deleted` | Event payload | Delete succeeds. | Event includes resource ids, `resourceSlug`, deleted timestamp, and no secrets, logs, certificate material, or provider configs. |
 | RES-PROFILE-ENTRY-001 | Web | Entrypoint | Resource detail page loads durable profile. | Dispatches `resources.show`; does not synthesize full detail from list-only data. |
-| RES-PROFILE-ENTRY-002 | Web | Entrypoint | Source/runtime/network/config/archive/delete actions submitted independently. | Each form/action dispatches its matching command and refetches detail/health/effective-config/list. |
-| RES-PROFILE-ENTRY-003 | CLI | Entrypoint | Resource profile commands are listed. | CLI exposes separate subcommands and no generic `resource update`. |
-| RES-PROFILE-ENTRY-004 | HTTP/oRPC | Entrypoint | Routes accept show/source/runtime/network/config/archive/delete requests. | Each route reuses the application schema; no transport-only schema. |
+| RES-PROFILE-ENTRY-002 | Web | Entrypoint | Source/runtime/network/access/health/config/archive/delete actions submitted independently. | Each form/action dispatches its matching command and refetches detail/health/effective-config/list. |
+| RES-PROFILE-ENTRY-003 | CLI | Entrypoint | Resource profile commands are listed. | CLI exposes separate source/runtime/network/access/health/config/archive/delete subcommands and no generic `resource update`. |
+| RES-PROFILE-ENTRY-004 | HTTP/oRPC | Entrypoint | Routes accept show/source/runtime/network/access/health/config/archive/delete requests. | Each route reuses the application schema; no transport-only schema. |
 | RES-PROFILE-ENTRY-005 | Operation catalog | Catalog | Public exposure in Code Round. | Each active operation appears in `CORE_OPERATIONS.md` and `operation-catalog.ts` in the same change. |
 | RES-PROFILE-ENTRY-006 | CLI | Entrypoint | Delete command submitted with `--confirm-slug`. | Dispatches `DeleteResourceCommand` through `CommandBus`; no generic delete/update helper bypass. |
 | RES-PROFILE-ENTRY-007 | HTTP/oRPC | Entrypoint | Delete route submitted with command schema. | Dispatches `DeleteResourceCommand`; a follow-up `resources.show` for the deleted resource returns `not_found`. |
@@ -109,7 +109,9 @@ command and that no entrypoint exposes a generic `resources.update`.
 | RES-PROFILE-ENTRY-009 | HTTP/oRPC | Entrypoint | Access profile route submitted with command schema. | Dispatches `ConfigureResourceAccessCommand`; a follow-up `resources.show` returns the access profile. |
 | RES-PROFILE-ENTRY-010 | CLI | Entrypoint | Access profile command submitted. | Dispatches `ConfigureResourceAccessCommand` through `CommandBus`; no generic resource update helper bypass. |
 | RES-PROFILE-ENTRY-011 | Web | Entrypoint | Resource detail access settings submitted. | Dispatches `resources.configure-access`, invalidates resource detail/list state, and does not bind domains or apply proxy routes. |
-| RES-PROFILE-ENTRY-012 | Web | Entrypoint | Resource detail source/runtime/network profile editors are visible. | The page states saves are durable resource profile edits for future deployments, historical deployment snapshots stay unchanged, and current runtime is not restarted. |
+| RES-PROFILE-ENTRY-012 | Web | Entrypoint | Resource detail source/runtime/network/access/health/configuration profile editors are visible. | The page states saves are durable resource-level edits for future deployments, verification, route planning, or deployment snapshot materialization; deployments are not created, historical deployment snapshots stay unchanged, current runtime is not restarted, domains are not bound, certificates are not issued, and proxy routes are not applied. |
+| RES-PROFILE-ENTRY-013 | Web | Entrypoint | Resource detail health settings submitted. | Dispatches `resources.configure-health`, invalidates resource detail/health state, and does not present the save as deployment, restart, or live health proof. |
+| RES-PROFILE-ENTRY-014 | Web | Entrypoint | Resource detail configuration override removed. | Dispatches `resources.unset-variable`, invalidates `resources.effective-config`, and does not mutate environment variables, historical deployment snapshots, or current runtime. |
 | RES-PROFILE-ERROR-001 | Error mapping | Contract | Persistence failure before command success. | Returns `infra_error`, `phase = resource-persistence`. |
 | RES-PROFILE-ERROR-002 | Error mapping | Contract | Event publication/outbox failure before command success. | Returns `infra_error`, `phase = event-publication`. |
 | RES-PROFILE-ERROR-003 | Error mapping | Contract | Event consumer projection failure. | Records `phase = event-consumption` and does not reinterpret command success. |
@@ -145,9 +147,8 @@ Automated coverage now exists for:
 - `RES-PROFILE-NETWORK-006` in
   `packages/application/test/configure-resource-network.test.ts`;
 - `RES-PROFILE-HEALTH-001` in `packages/application/test/configure-resource-health.test.ts`;
-- `RES-PROFILE-CONFIG-001` through `RES-PROFILE-CONFIG-012` remain part of this Code Round;
-  application, HTTP/oRPC, CLI, Web, and persistence coverage must land in the same change before
-  the migration gap can be cleared;
+- `RES-PROFILE-CONFIG-001` through `RES-PROFILE-CONFIG-012` in
+  `packages/application/test/resource-config.test.ts`;
 - `RES-PROFILE-ARCHIVE-001`, `RES-PROFILE-ARCHIVE-002`, `RES-PROFILE-ARCHIVE-003`, and
   `RES-PROFILE-ARCHIVE-005` in `packages/application/test/archive-resource.test.ts`;
 - `RES-PROFILE-ARCHIVE-004` in `packages/application/test/create-deployment.test.ts`;
@@ -174,10 +175,16 @@ Automated coverage now exists for:
 - CLI dispatch for `resources.archive` in `packages/adapters/cli/test/resource-command.test.ts`;
 - CLI dispatch for `resources.delete` in `packages/adapters/cli/test/resource-command.test.ts`;
 - Web detail dispatch for `resources.show` in `apps/web/test/e2e-webview/home.webview.test.ts`;
-- Web source, runtime, network, archive, and delete submissions in
+- Web source, runtime, network, access, configuration set, archive, and delete submissions in
   `apps/web/test/e2e-webview/home.webview.test.ts`.
-- Web durable future-only profile editing guidance for source/runtime/network profile forms in
+- Web durable future-only profile editing guidance for source/runtime/network/access/health/
+  configuration profile forms in
   `apps/web/test/e2e-webview/home.webview.test.ts` under `RES-PROFILE-ENTRY-012`.
+- Web health policy submission for `RES-PROFILE-ENTRY-013` and configuration removal for
+  `RES-PROFILE-ENTRY-014` in `apps/web/test/e2e-webview/home.webview.test.ts`.
+- CLI dispatch coverage for source/runtime/network/access/health/config/archive/delete profile
+  commands in `packages/adapters/cli/test/resource-command.test.ts` under `RES-PROFILE-ENTRY-003`,
+  `RES-PROFILE-ENTRY-006`, and `RES-PROFILE-ENTRY-010`.
 
 `RES-PROFILE-SOURCE-006` remains future event-consumer projection work. `RES-PROFILE-DELETE-009`
 event payload coverage is asserted through the successful delete command test.

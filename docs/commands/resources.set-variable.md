@@ -105,9 +105,9 @@ create duplicate active entries for the same identity at resource scope.
 
 | Entrypoint | Mapping | Status |
 | --- | --- | --- |
-| Web | Resource detail configuration form dispatches this command and refetches `resources.effective-config`. | Required in Code Round |
-| CLI | `appaloft resource set-variable <resourceId> <key> <value> ...`. | Required in Code Round |
-| oRPC / HTTP | `POST /api/resources/{resourceId}/variables` using the command schema. | Required in Code Round |
+| Web | Resource detail configuration form dispatches this command and refetches `resources.effective-config`. | Active |
+| CLI | `appaloft resource set-variable <resourceId> <key> <value> ...`. | Active |
+| oRPC / HTTP | `POST /api/resources/{resourceId}/variables` using the command schema. | Active |
 | Automation / MCP | Future command/tool over the same operation key. | Future |
 
 ## Events
@@ -119,9 +119,9 @@ Canonical event spec:
 
 ## Current Implementation Notes And Migration Gaps
 
-This command is introduced in the same Spec Round and Code Round as `resources.unset-variable` and
-`resources.effective-config`. It must not be exposed without operation-catalog, CLI, HTTP/oRPC,
-Web, persistence, and deployment-snapshot alignment in the same change.
+This command is active in operation catalog, CLI, HTTP/oRPC, Web resource detail configuration,
+persistence, and deployment-snapshot materialization. It remains paired with
+`resources.unset-variable` and `resources.effective-config` for the observable read path.
 
 ## Open Questions
 

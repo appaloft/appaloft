@@ -6,8 +6,8 @@
 owned by a resource.
 
 Command success means the policy was durably stored on the resource. It does not deploy the
-resource, restart runtime, prove runtime reachability, apply proxy configuration, or mark the
-resource healthy.
+resource, restart runtime, mutate historical deployment snapshots, prove runtime reachability, bind
+domains, issue certificates, apply proxy configuration, or mark the resource healthy.
 
 ```ts
 type ConfigureResourceHealthResult = Result<{ id: string }, DomainError>;
@@ -126,9 +126,9 @@ variables, local file paths, provider tokens, or deployment logs.
 
 | Entrypoint | Mapping | Status |
 | --- | --- | --- |
-| Web | Resource detail health settings form dispatches the command and refetches `resources.health`. | Required |
-| CLI | `appaloft resource configure-health <resourceId> [--path /] [--expected-status 200] [--json]`. | Required |
-| oRPC / HTTP | `POST /api/resources/{resourceId}/health-policy` using the command schema. | Required |
+| Web | Resource detail health settings form dispatches the command and refetches `resources.health`. | Active |
+| CLI | `appaloft resource configure-health <resourceId> [--path /] [--expected-status 200] [--json]`. | Active |
+| oRPC / HTTP | `POST /api/resources/{resourceId}/health-policy` using the command schema. | Active |
 | Automation / MCP | Future command/tool over the same operation key. | Future |
 
 ## Current Implementation Notes And Migration Gaps
@@ -139,8 +139,7 @@ remain blocked until a stronger command sandbox model is accepted.
 Configuring the policy does not automatically rerun a deployment. `resources.health({ mode:
 "live" })` can evaluate the policy against the current runtime when a safe URL can be resolved.
 
-Archived-resource blocking remains a migration gap until `resources.archive` introduces explicit
-resource lifecycle state.
+Archived-resource blocking is active through the resource lifecycle guard.
 
 ## Open Questions
 

@@ -77,12 +77,12 @@ Required behavior:
 
 | Entrypoint | Mapping | Status |
 | --- | --- | --- |
-| Web | Resource detail configuration section uses this query for owned and effective views. | Required in Code Round |
-| CLI | `appaloft resource effective-config <resourceId>`. | Required in Code Round |
-| oRPC / HTTP | `GET /api/resources/{resourceId}/effective-config` using the query schema. | Required in Code Round |
+| Web | Resource detail configuration section uses this query for owned and effective views. | Active |
+| CLI | `appaloft resource effective-config <resourceId>`. | Active |
+| oRPC / HTTP | `GET /api/resources/{resourceId}/effective-config` using the query schema. | Active |
 | Automation / MCP | Future query/tool over the same operation key. | Future |
 
 ## Current Implementation Notes And Migration Gaps
 
-This query is introduced together with resource-scoped variable mutation commands. It must use
-masked read models and must not leak secret values even though the write side stores them.
+This query is active together with resource-scoped variable mutation commands. It uses masked read
+models and must not leak secret values even though the write side stores them.
