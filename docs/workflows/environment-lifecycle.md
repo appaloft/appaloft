@@ -10,6 +10,7 @@ The active environment lifecycle operations are:
 
 - `environments.show`
 - `environments.list`
+- `environments.rename`
 - `environments.set-variable`
 - `environments.unset-variable`
 - `environments.effective-precedence`
@@ -28,10 +29,12 @@ Generic `environments.update` remains forbidden by ADR-026.
 - [ADR-013: Project Resource Navigation And Deployment Ownership](../decisions/ADR-013-project-resource-navigation-and-deployment-ownership.md)
 - [ADR-026: Aggregate Mutation Command Boundary](../decisions/ADR-026-aggregate-mutation-command-boundary.md)
 - [ADR-032: Environment Lock Lifecycle](../decisions/ADR-032-environment-lock-lifecycle.md)
+- [environments.rename Command Spec](../commands/environments.rename.md)
 - [environments.clone Command Spec](../commands/environments.clone.md)
 - [environments.lock Command Spec](../commands/environments.lock.md)
 - [environments.unlock Command Spec](../commands/environments.unlock.md)
 - [environments.archive Command Spec](../commands/environments.archive.md)
+- [environment-renamed Event Spec](../events/environment-renamed.md)
 - [environment-locked Event Spec](../events/environment-locked.md)
 - [environment-unlocked Event Spec](../events/environment-unlocked.md)
 - [environment-archived Event Spec](../events/environment-archived.md)
@@ -44,7 +47,7 @@ Environment lifecycle status is value-object backed.
 
 | Status | Meaning | Allowed public mutations |
 | --- | --- | --- |
-| `active` | Environment can accept configuration writes, clone, promotion, resource creation, and deployment admission. | `environments.set-variable`, `environments.unset-variable`, `environments.clone`, `environments.promote`, `environments.lock`, `environments.archive`, child operations where their specs allow. |
+| `active` | Environment can accept identity rename, configuration writes, clone, promotion, resource creation, and deployment admission. | `environments.rename`, `environments.set-variable`, `environments.unset-variable`, `environments.clone`, `environments.promote`, `environments.lock`, `environments.archive`, child operations where their specs allow. |
 | `locked` | Environment identity, variables, resources, deployments, and history are retained and readable, but new mutations/admission are blocked until unlock. | Read queries, `environments.unlock`, and `environments.archive`. |
 | `archived` | Environment identity, variables, resources, deployments, and history are retained, but new mutations/admission are blocked. | Read queries only, plus future explicit restore/delete if specified. |
 
@@ -54,6 +57,11 @@ Environment hard delete, restore, and history are future behaviors and require s
 
 `environments.show` and `environments.list` read environment identity, lifecycle metadata, and masked
 variables.
+
+`environments.rename` changes only the environment display name inside its owning project. It must
+reject duplicate target names in the same project, locked environments, and archived environments.
+It does not change environment id, kind, parent environment, variables, resources, deployments,
+domains, certificates, logs, source links, runtime state, or audit history.
 
 `environments.set-variable` and `environments.unset-variable` change only environment-owned
 configuration entries. They must reject locked or archived environments.
@@ -92,18 +100,21 @@ context.
 
 | Surface | Decision |
 | --- | --- |
-| CLI | Expose `env clone`, `env lock`, `env unlock`, and `env archive`; do not expose generic `env update`. |
-| HTTP/oRPC | Expose clone, lock, unlock, and archive routes that reuse application command schemas. |
-| Web | Project detail environment list can clone active environments, lock active environments, unlock locked environments, archive active or locked environments after confirmation, and keep locked/archived environments visible. |
-| Repository config | Not applicable. Repository config may select/create environments through deployment bootstrap but must not lock, unlock, or archive them. |
+| CLI | Expose `env rename`, `env clone`, `env lock`, `env unlock`, and `env archive`; do not expose generic `env update`. |
+| HTTP/oRPC | Expose rename, clone, lock, unlock, and archive routes that reuse application command schemas. |
+| Web | Project detail environment list can rename active environments, clone active environments, lock active environments, unlock locked environments, archive active or locked environments after confirmation, and keep locked/archived environments visible. |
+| Repository config | Not applicable. Repository config may select/create environments through deployment bootstrap but must not rename, lock, unlock, or archive them. |
 | Future MCP/tools | Generate the tool from the operation catalog entry. |
-| Public docs | Stable environment lifecycle anchor describes clone, lock/unlock, archive, and lifecycle guard behavior. |
+| Public docs | Stable environment lifecycle anchor describes rename, clone, lock/unlock, archive, and lifecycle guard behavior. |
 
 ## Current Implementation Notes And Migration Gaps
+
+Environment rename, clone, lock/unlock, and archive are active in specs, operation catalog,
+application, CLI, HTTP/oRPC, Web, public docs/help, and focused tests.
 
 No migration gaps are recorded for this lifecycle slice.
 
 ## Open Questions
 
-- None for clone, lock/unlock, and archive. History, delete/restore, and cleanup remain separate
+- None for rename, clone, lock/unlock, and archive. History, delete/restore, and cleanup remain separate
   behaviors.

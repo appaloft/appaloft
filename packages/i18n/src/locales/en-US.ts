@@ -380,6 +380,12 @@ export const enUS = {
       environmentCloneNamePlaceholder: "production-copy",
       environmentCloneSucceeded: "Environment cloned",
       environmentCloneValidation: "Enter a clone name before cloning.",
+      environmentRenameAction: "Rename",
+      environmentRenameFailed: "Environment was not renamed",
+      environmentRenameNameLabel: "Environment name",
+      environmentRenameNamePlaceholder: "production",
+      environmentRenameSucceeded: "Environment renamed",
+      environmentRenameValidation: "Enter a new environment name before renaming.",
       environmentLockAction: "Lock",
       environmentLockConfirm:
         "Lock this environment? Variables, resources, promotions, and deployments will be blocked until it is unlocked.",

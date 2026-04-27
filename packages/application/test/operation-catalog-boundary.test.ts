@@ -238,6 +238,23 @@ describe("operation catalog aggregate mutation boundary", () => {
     expect(entry?.inputSchema).toBeDefined();
   });
 
+  test("[ENV-LIFE-RENAME-ENTRY-004] environment rename is exposed through the active operation catalog", () => {
+    const entry = operationCatalog.find((candidate) => candidate.key === "environments.rename");
+
+    expect(entry).toMatchObject({
+      kind: "command",
+      domain: "environments",
+      messageName: "RenameEnvironmentCommand",
+      handlerName: "RenameEnvironmentCommandHandler",
+      serviceName: "RenameEnvironmentUseCase",
+      transports: {
+        cli: "appaloft env rename <environmentId> --name <name>",
+        orpc: { method: "POST", path: "/api/environments/{environmentId}/rename" },
+      },
+    });
+    expect(entry?.inputSchema).toBeDefined();
+  });
+
   test("[ENV-LIFE-ENTRY-004] environment archive is exposed through the active operation catalog", () => {
     const entry = operationCatalog.find((candidate) => candidate.key === "environments.archive");
 

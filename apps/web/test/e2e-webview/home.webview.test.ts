@@ -2496,6 +2496,25 @@ describe("console e2e with Bun.WebView", () => {
     });
   }, 15_000);
 
+  test("[ENV-LIFE-RENAME-ENTRY-003] submits environment rename through Web", async () => {
+    activeScenario = "dashboard";
+    resetRecordedApiRequests();
+
+    await using view = createWebView();
+    await view.navigate(`${previewUrl}/projects/prj_demo`);
+    await expectAnyText(view, ["Environments", "环境"]);
+    await setInputValue(view, "#environment-rename-name-env_demo", "customer-production");
+    await clickFormSubmit(view, "#environment-rename-form-env_demo");
+
+    const renameRequest = await waitForRecordedRequest("/api/rpc/environments/rename");
+    const renameInput = readOrpcJsonPayload(renameRequest.body);
+
+    expect(renameInput).toEqual({
+      environmentId: "env_demo",
+      name: "customer-production",
+    });
+  }, 15_000);
+
   test("[ENV-LIFE-ENTRY-006] submits environment lock through Web", async () => {
     activeScenario = "dashboard";
     resetRecordedApiRequests();

@@ -156,6 +156,26 @@ describe("public docs operation coverage", () => {
     );
   });
 
+  test("[ENV-LIFE-RENAME-DOCS-001] environment rename records lifecycle docs coverage", () => {
+    const coverage = getPublicDocsOperationCoverage("environments.rename");
+    const topic = publicDocsHelpTopics["environment.lifecycle"];
+
+    expect(coverage).toMatchObject({
+      operationKey: "environments.rename",
+      status: "documented",
+      topicId: "environment.lifecycle",
+    });
+    expect(topic.specReferences).toEqual(
+      expect.arrayContaining([
+        "docs/workflows/environment-lifecycle.md",
+        "docs/commands/environments.rename.md",
+        "docs/events/environment-renamed.md",
+        "docs/errors/environments.lifecycle.md",
+        "docs/testing/environment-lifecycle-test-matrix.md",
+      ]),
+    );
+  });
+
   test("[ENV-LIFE-DOCS-002] environment lock and unlock record lifecycle docs coverage", () => {
     const lockCoverage = getPublicDocsOperationCoverage("environments.lock");
     const unlockCoverage = getPublicDocsOperationCoverage("environments.unlock");
