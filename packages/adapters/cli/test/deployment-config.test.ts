@@ -204,7 +204,11 @@ async function createPreviewDeployCliHarness(
                 updatedAt: routeInput.updatedAt,
               });
             },
+            read: async () => ok(null),
+            markApplied: async () => ok(null),
+            markFailed: async () => ok(null),
             deleteDesired: async () => ok(false),
+            deleteDesiredBySourceFingerprint: async () => ok(0),
           },
         }
       : {}),
@@ -648,7 +652,11 @@ describe("CLI deployment config entry workflow", () => {
             updatedAt: input.updatedAt,
           });
         },
+        read: async () => ok(null),
+        markApplied: async () => ok(null),
+        markFailed: async () => ok(null),
         deleteDesired: async () => ok(false),
+        deleteDesiredBySourceFingerprint: async () => ok(0),
       },
     });
     const workspace = mkdtempSync(join(tmpdir(), "appaloft-domain-config-"));
@@ -704,8 +712,6 @@ describe("CLI deployment config entry workflow", () => {
     expect(queries.map((query) => query.constructor.name)).toEqual([
       "ListProjectsQuery",
       "ListServersQuery",
-      "ListEnvironmentsQuery",
-      "ListResourcesQuery",
     ]);
     expect(operations).toEqual([
       "PrepareState:ssh-pglite",
@@ -713,9 +719,7 @@ describe("CLI deployment config entry workflow", () => {
       "ListServersQuery",
       "CreateProjectCommand",
       "RegisterServerCommand",
-      "ListEnvironmentsQuery",
       "CreateEnvironmentCommand",
-      "ListResourcesQuery",
       "CreateResourceCommand",
       "UpsertServerAppliedRoutes",
       "CreateDeploymentCommand",
@@ -2108,9 +2112,7 @@ describe("CLI deployment config entry workflow", () => {
       "CreateProjectCommand",
       "RegisterServerCommand",
       "ConfigureServerCredentialCommand",
-      "ListEnvironmentsQuery",
       "CreateEnvironmentCommand",
-      "ListResourcesQuery",
       "CreateResourceCommand",
       "ReleaseState:ssh-pglite",
     ]);

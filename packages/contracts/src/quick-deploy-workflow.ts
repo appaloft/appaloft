@@ -1,6 +1,7 @@
 import { customAlphabet } from "nanoid";
 
 import {
+  type ConfigureResourceRuntimeInput,
   type ConfigureServerCredentialInput,
   type CreateDeploymentInput,
   type CreateDeploymentResponse,
@@ -68,6 +69,7 @@ export type QuickDeployServerReference =
   | {
       mode: "existing";
       id: string;
+      credential?: QuickDeployServerCredential;
     }
   | {
       mode: "create";
@@ -75,12 +77,24 @@ export type QuickDeployServerReference =
       credential?: QuickDeployServerCredential;
     };
 
+export type QuickDeployResourceReference =
+  | {
+      mode: "existing";
+      id: string;
+      configureRuntime?: Omit<ConfigureResourceRuntimeInput, "resourceId">;
+    }
+  | {
+      mode: "create";
+      input: QuickDeployCreateResourceInput;
+    };
+
 export type QuickDeployWorkflowInput = {
   project: QuickDeployReference<CreateProjectInput>;
   server: QuickDeployServerReference;
   environment: QuickDeployReference<QuickDeployCreateEnvironmentInput>;
-  resource: QuickDeployReference<QuickDeployCreateResourceInput>;
+  resource: QuickDeployResourceReference;
   environmentVariable?: QuickDeployEnvironmentVariableInput;
+  environmentVariables?: QuickDeployEnvironmentVariableInput[];
   deployment?: {
     destinationId?: string;
   };
@@ -118,6 +132,10 @@ export type QuickDeployWorkflowStep =
   | {
       kind: "resources.create";
       input: CreateResourceInput;
+    }
+  | {
+      kind: "resources.configureRuntime";
+      input: ConfigureResourceRuntimeInput;
     }
   | {
       kind: "environments.setVariable";
@@ -186,7 +204,7 @@ export function* quickDeployWorkflow(
           "servers.register",
         );
 
-  if (input.server.mode === "create" && input.server.credential) {
+  if (input.server.credential) {
     if (input.server.credential.mode === "create-ssh-and-configure") {
       const createdCredentialId = readStepId(
         yield {
@@ -249,12 +267,25 @@ export function* quickDeployWorkflow(
           "resources.create",
         );
 
-  if (input.environmentVariable) {
+  if (input.resource.mode === "existing" && input.resource.configureRuntime) {
+    yield {
+      kind: "resources.configureRuntime",
+      input: {
+        resourceId,
+        ...input.resource.configureRuntime,
+      },
+    };
+  }
+
+  for (const environmentVariable of [
+    ...(input.environmentVariable ? [input.environmentVariable] : []),
+    ...(input.environmentVariables ?? []),
+  ]) {
     yield {
       kind: "environments.setVariable",
       input: {
-        ...input.environmentVariable,
-        environmentId: input.environmentVariable.environmentId ?? environmentId,
+        ...environmentVariable,
+        environmentId: environmentVariable.environmentId ?? environmentId,
       },
     };
   }
