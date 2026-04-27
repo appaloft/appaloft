@@ -428,15 +428,27 @@ Required:
 - [x] Add environment clone.
 - [x] Add remaining named edit semantics.
 - [x] Add environment effective-precedence query.
-- [ ] Complete resource detail editing affordances for source/runtime/network profile changes.
-- [ ] Ensure CLI, HTTP/oRPC, Web, and future MCP naming reuse the same command/query schemas.
+- [x] Complete resource detail editing affordances for source/runtime/network profile changes.
+- [x] Ensure CLI, HTTP/oRPC, Web, and future MCP naming reuse the same command/query schemas.
+
+Phase 4 resource profile editing verification notes from 2026-04-27:
+
+- Resource detail source/runtime/network profile forms dispatch `resources.configure-source`,
+  `resources.configure-runtime`, and `resources.configure-network` through the typed oRPC client,
+  then invalidate the resource detail/list read paths instead of storing Web-only configuration.
+- Resource detail now states that source/runtime/network saves are durable resource profile edits
+  for future deployments only. They do not mutate historical deployment snapshots and do not
+  immediately restart running runtime state. Covered by `RES-PROFILE-ENTRY-012`.
+- CLI, HTTP/oRPC, Web help, and future MCP/tool naming all point at the existing operation keys,
+  command schemas, and docs-registry topics for source/runtime/network profile editing. No generic
+  `resources.update` surface is introduced.
 
 Exit criteria:
 
 - [ ] A user can create, read, update, and archive/delete project, environment, server, credential,
   and resource configuration without creating a deployment as a side effect.
-- [ ] `resources.create` is no longer the only durable resource profile write.
-- [ ] Web resource configuration is a projection of resource-owned commands and queries, not a
+- [x] `resources.create` is no longer the only durable resource profile write.
+- [x] Web resource configuration is a projection of resource-owned commands and queries, not a
   Svelte-only configuration store.
 
 ## Phase 5: First-Deploy Engine And Framework Breadth

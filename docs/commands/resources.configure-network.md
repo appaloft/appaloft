@@ -113,7 +113,7 @@ domain bindings, or certificates.
 
 | Entrypoint | Mapping | Status |
 | --- | --- | --- |
-| Web | Resource detail network settings dispatch this command and refetch `resources.show`. | Active |
+| Web | Resource detail network settings dispatch this command, refetch `resources.show`, and identify the save as durable future-only profile state rather than proxy apply, redeploy, or runtime restart. | Active |
 | CLI | `appaloft resource configure-network <resourceId> ...`. | Active |
 | oRPC / HTTP | `POST /api/resources/{resourceId}/network-profile` using the command schema. | Active |
 | Automation / MCP | Future command/tool over the same operation key. | Future |
@@ -134,7 +134,9 @@ reverse-proxy network profiles.
 
 The Web form observes resources through the dedicated `resources.show` detail query and refetches
 that query after network profile changes. This preserves the command boundary: the form dispatches
-`resources.configure-network` and observes state through `resources.show`.
+`resources.configure-network` and observes state through `resources.show`. The form states that
+network profile edits affect future deployments and route planning without rewriting historical
+deployment snapshots, applying proxy routes, or restarting current runtime.
 
 Direct-port configuration remains blocked unless the Code Round also implements the explicit guard
 and runtime behavior required by ADR-015.

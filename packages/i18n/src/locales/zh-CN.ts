@@ -641,6 +641,9 @@ export const zhCN = {
       notFoundTitle: "没有找到这个资源。",
       pageTitle: "资源",
       plannedAccessRoute: "计划生成访问",
+      profileEditBoundaryDescription:
+        "后续部署会使用这些已保存的资源配置。历史部署快照保持不变。当前运行时不会被立即重启。",
+      profileEditBoundaryTitle: "持久资源配置编辑",
       profileDescription: "稳定的项目、环境、类型和 Slug 身份信息。",
       profileTitle: "资源档案",
       serverAppliedDomainAccess: "服务器应用域名访问",

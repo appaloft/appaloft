@@ -234,7 +234,7 @@ network and access profiles, but they keep their own commands and lifecycle even
 
 | Entrypoint | Required behavior |
 | --- | --- |
-| Web | Resource detail is owner-scoped. Each profile section dispatches the matching operation and refetches `resources.show`, `resources.effective-config`, or the relevant observation query. |
+| Web | Resource detail is owner-scoped. Each profile section dispatches the matching operation and refetches `resources.show`, `resources.effective-config`, or the relevant observation query. Source/runtime/network editors must make the future deployment boundary visible: saving them persists durable resource profile state, does not rewrite historical deployment snapshots, and does not immediately restart current runtime. |
 | CLI | Each operation has its own `appaloft resource ...` subcommand. No `appaloft resource update` generic mutation. |
 | oRPC / HTTP | Each operation has its own route using the application command/query schema. No parallel transport-only input shape. |
 | Automation / MCP | Future tools map one-to-one to operation keys. Tools must not combine unrelated source/runtime/network/archive/delete behavior. |
@@ -243,11 +243,13 @@ network and access profiles, but they keep their own commands and lifecycle even
 
 Current implementation has active resource create/list, `resources.show`,
 `resources.configure-source`, `resources.configure-runtime`, `resources.configure-health`,
-`resources.configure-network`, `resources.configure-access`, `resources.set-variable`, `resources.unset-variable`,
-`resources.effective-config`, `resources.archive`, and `resources.delete` surfaces. The Web
-resource detail page dispatches `resources.show` for durable profile data, dispatches
-source/runtime/network/access/health/configuration forms through separate commands, and dispatches
-archive/delete through dedicated lifecycle actions.
+`resources.configure-network`, `resources.configure-access`, `resources.set-variable`,
+`resources.unset-variable`, `resources.effective-config`, `resources.archive`, and
+`resources.delete` surfaces. The Web resource detail page dispatches `resources.show` for durable
+profile data, dispatches source/runtime/network/access/health/configuration forms through separate
+commands, and dispatches archive/delete through dedicated lifecycle actions. Source/runtime/network
+profile editing also renders the future deployment boundary so operators can distinguish durable
+profile edits from redeploy, restart, route apply, or historical snapshot mutation.
 
 Archived-resource guards are active for source/runtime/network/access/health mutations and deployment
 admission. `resources.delete` may delete only archived resources with matching slug confirmation

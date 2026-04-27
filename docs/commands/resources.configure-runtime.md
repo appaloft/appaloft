@@ -133,7 +133,7 @@ planner-time incompatibilities appear as future deployment admission failures or
 
 | Entrypoint | Mapping | Status |
 | --- | --- | --- |
-| Web | Resource detail runtime settings dispatch this command and refetch `resources.show`. | Required in Code Round |
+| Web | Resource detail runtime settings dispatch this command, refetch `resources.show`, and identify the save as durable future-only profile state rather than redeploy or runtime restart. | Active |
 | CLI | `appaloft resource configure-runtime <resourceId> ...`. | Required in Code Round |
 | oRPC / HTTP | `POST /api/resources/{resourceId}/runtime-profile` using the command schema. | Required in Code Round |
 | Automation / MCP | Future command/tool over the same operation key. | Future |
@@ -151,6 +151,8 @@ Canonical event spec:
 CLI, HTTP/oRPC, and the Web resource detail runtime profile form. Current implementation persists
 runtime planning fields on the `Resource` aggregate, emits `resource-runtime-configured`, rejects
 health policy mutation through this command, and rejects unsupported target/orchestrator fields.
+The Web form states that runtime profile edits affect future deployments and do not rewrite
+historical deployment snapshots or restart current runtime.
 
 Archived-resource blocking remains a migration gap until `resources.archive` introduces explicit
 resource lifecycle state.
