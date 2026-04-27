@@ -69,10 +69,13 @@ Run targeted checks before publishing:
 ## Current Implementation Notes And Migration Gaps
 
 The first Code Round implements Web project settings controls for show, rename, and archive, plus
-disabled project-scoped creation affordances for archived projects.
+disabled project-scoped creation affordances for archived projects. WebView coverage now proves the
+project detail/settings page reads `projects.show`, dispatches `projects.rename` and
+`projects.archive`, and communicates that project lifecycle changes do not create deployments,
+mutate historical deployment snapshots, or immediately affect runtime state.
 
-Project hard delete, restore, description editing, and resource rollup counters remain future
-operations.
+Project hard delete, restore, and description editing remain future operations. Resource,
+environment, deployment, and access rollups on project detail are read-only composed summaries.
 
 ## Open Questions
 

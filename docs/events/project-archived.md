@@ -7,6 +7,8 @@ persistence.
 
 It is a lifecycle fact. It does not mean child resources, environments, deployments, domains,
 certificates, logs, or audit records were deleted or archived.
+It does not mean a deployment was created, a historical deployment snapshot was edited, or runtime
+state changed.
 
 ## Payload
 

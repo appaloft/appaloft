@@ -7,6 +7,8 @@ persistence.
 
 It is a fact event. It must not imply resources, environments, deployments, source links, or
 external systems were mutated.
+It must not imply a deployment was created, a historical deployment snapshot was edited, or runtime
+state changed.
 
 ## Payload
 
