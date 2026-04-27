@@ -26,6 +26,7 @@ type EnvironmentLifecycleErrorDetails = {
   commandName?:
     | "environments.set-variable"
     | "environments.unset-variable"
+    | "environments.rename"
     | "environments.clone"
     | "environments.promote"
     | "environments.lock"
@@ -38,7 +39,11 @@ type EnvironmentLifecycleErrorDetails = {
     | "environments.list"
     | "environments.effective-precedence"
     | "environments.diff";
-  eventName?: "environment-locked" | "environment-unlocked" | "environment-archived";
+  eventName?:
+    | "environment-renamed"
+    | "environment-locked"
+    | "environment-unlocked"
+    | "environment-archived";
   phase:
     | "command-validation"
     | "query-validation"
@@ -93,12 +98,12 @@ or plaintext environment values.
 
 | Error code | Category | Phase | Retriable | Meaning |
 | --- | --- | --- | --- | --- |
-| `validation_error` | `validation` | `command-validation` | No | Command input shape, clone target identity, variable identity, or archive reason is invalid. |
+| `validation_error` | `validation` | `command-validation` | No | Command input shape, rename target identity, clone target identity, variable identity, or archive reason is invalid. |
 | `not_found` | `not-found` | `context-resolution` | No | Environment cannot be found or is not visible. |
 | `environment_locked` | `conflict` | `environment-lifecycle-guard` | No | Mutation, resource creation, or deployment admission targeted a locked environment. |
 | `environment_archived` | `conflict` | `environment-lifecycle-guard` | No | Mutation, resource creation, or deployment admission targeted an archived environment. |
 | `project_archived` | `conflict` | `project-lifecycle-guard` | No | Environment clone targeted a source environment whose project is archived. |
-| `conflict` | `conflict` | `environment-admission` | No | Environment clone target name already exists in the source project. |
+| `conflict` | `conflict` | `environment-admission` | No | Environment rename target name or clone target name already exists in the source project. |
 | `invariant_violation` | `domain` | `environment-lifecycle-guard` | No | Environment aggregate lifecycle transition rejected the requested change. |
 | `validation_error` | `validation` | `config-identity`, `config-secret-validation`, `config-profile-resolution` | No | Environment variable shape, exposure, scope, or secret policy is invalid. |
 | `not_found` | `not-found` | `config-read` | No | Requested environment variable identity cannot be found for removal. |
@@ -107,8 +112,8 @@ or plaintext environment values.
 
 ## Async Error Profile
 
-Environment configuration and archive commands are synchronous workspace-state operations. They do
-not start long-running platform work.
+Environment rename, configuration, and archive commands are synchronous workspace-state operations.
+They do not start long-running platform work.
 
 Projection or audit consumer failures after environment events are recorded must be represented as
 event-consumer failures. They must not reinterpret the original command result.

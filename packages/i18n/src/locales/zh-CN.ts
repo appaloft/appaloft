@@ -372,6 +372,12 @@ export const zhCN = {
       environmentCloneNamePlaceholder: "production-copy",
       environmentCloneSucceeded: "环境已克隆",
       environmentCloneValidation: "克隆前请输入新环境名称。",
+      environmentRenameAction: "重命名",
+      environmentRenameFailed: "环境重命名失败",
+      environmentRenameNameLabel: "环境名称",
+      environmentRenameNamePlaceholder: "production",
+      environmentRenameSucceeded: "环境已重命名",
+      environmentRenameValidation: "重命名前请输入新的环境名称。",
       environmentLockAction: "锁定",
       environmentLockConfirm:
         "确定锁定这个环境吗？锁定后变量、资源、提升和部署都会被阻止，直到环境解锁。",

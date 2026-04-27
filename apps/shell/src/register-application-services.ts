@@ -94,6 +94,8 @@ import {
   RegisterServerUseCase,
   RelinkSourceLinkCommandHandler,
   RelinkSourceLinkUseCase,
+  RenameEnvironmentCommandHandler,
+  RenameEnvironmentUseCase,
   RenameProjectCommandHandler,
   RenameProjectUseCase,
   RenameServerCommandHandler,
@@ -162,6 +164,7 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(ArchiveProjectCommandHandler);
   container.registerSingleton(ArchiveEnvironmentCommandHandler);
   container.registerSingleton(CloneEnvironmentCommandHandler);
+  container.registerSingleton(RenameEnvironmentCommandHandler);
   container.registerSingleton(LockEnvironmentCommandHandler);
   container.registerSingleton(UnlockEnvironmentCommandHandler);
   container.registerSingleton(BootstrapServerProxyCommandHandler);
@@ -280,6 +283,7 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(tokens.bootstrapServerProxyUseCase, BootstrapServerProxyUseCase);
   container.registerSingleton(tokens.archiveEnvironmentUseCase, ArchiveEnvironmentUseCase);
   container.registerSingleton(tokens.cloneEnvironmentUseCase, CloneEnvironmentUseCase);
+  container.registerSingleton(tokens.renameEnvironmentUseCase, RenameEnvironmentUseCase);
   container.registerSingleton(tokens.lockEnvironmentUseCase, LockEnvironmentUseCase);
   container.registerSingleton(tokens.unlockEnvironmentUseCase, UnlockEnvironmentUseCase);
   container.registerSingleton(tokens.createEnvironmentUseCase, CreateEnvironmentUseCase);

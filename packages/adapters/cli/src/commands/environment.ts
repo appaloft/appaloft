@@ -7,6 +7,7 @@ import {
   ListEnvironmentsQuery,
   LockEnvironmentCommand,
   PromoteEnvironmentCommand,
+  RenameEnvironmentCommand,
   SetEnvironmentVariableCommand,
   ShowEnvironmentQuery,
   UnlockEnvironmentCommand,
@@ -107,6 +108,21 @@ const cloneCommand = EffectCommand.make(
       }),
     ),
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.environmentClone));
+
+const renameCommand = EffectCommand.make(
+  "rename",
+  {
+    environmentId: environmentIdArg,
+    name: nameOption,
+  },
+  ({ environmentId, name }) =>
+    runCommand(
+      RenameEnvironmentCommand.create({
+        environmentId,
+        name,
+      }),
+    ),
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.environmentRename));
 
 const lockCommand = EffectCommand.make(
   "lock",
@@ -226,6 +242,7 @@ export const envCommand = EffectCommand.make("env").pipe(
     listCommand,
     createCommand,
     showCommand,
+    renameCommand,
     lockCommand,
     unlockCommand,
     archiveCommand,

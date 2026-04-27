@@ -6,6 +6,7 @@ export * from "./operations/environments/environment-effective-precedence.handle
 export * from "./operations/environments/list-environments.handler";
 export * from "./operations/environments/lock-environment.handler";
 export * from "./operations/environments/promote-environment.handler";
+export * from "./operations/environments/rename-environment.handler";
 export * from "./operations/environments/set-environment-variable.handler";
 export * from "./operations/environments/show-environment.handler";
 export * from "./operations/environments/unlock-environment.handler";

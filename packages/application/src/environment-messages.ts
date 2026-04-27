@@ -6,6 +6,7 @@ export * from "./operations/environments/environment-effective-precedence.query"
 export * from "./operations/environments/list-environments.query";
 export * from "./operations/environments/lock-environment.command";
 export * from "./operations/environments/promote-environment.command";
+export * from "./operations/environments/rename-environment.command";
 export * from "./operations/environments/set-environment-variable.command";
 export * from "./operations/environments/show-environment.query";
 export * from "./operations/environments/unlock-environment.command";

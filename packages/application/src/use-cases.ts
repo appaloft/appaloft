@@ -40,6 +40,7 @@ export * from "./operations/environments/environment-effective-precedence.query-
 export * from "./operations/environments/list-environments.query-service";
 export * from "./operations/environments/lock-environment.use-case";
 export * from "./operations/environments/promote-environment.use-case";
+export * from "./operations/environments/rename-environment.use-case";
 export * from "./operations/environments/set-environment-variable.use-case";
 export * from "./operations/environments/show-environment.query-service";
 export * from "./operations/environments/unlock-environment.use-case";

@@ -197,6 +197,30 @@ export class Environment extends AggregateRoot<EnvironmentState> {
     });
   }
 
+  rename(input: { name: EnvironmentName; renamedAt: UpdatedAt }): Result<{ changed: boolean }> {
+    const lifecycleGuard = this.ensureCanAcceptMutation("environments.rename");
+    if (lifecycleGuard.isErr()) {
+      return err(lifecycleGuard.error);
+    }
+
+    if (this.state.name.equals(input.name)) {
+      return ok({ changed: false });
+    }
+
+    const previousName = this.state.name;
+    this.state.name = input.name;
+    this.recordDomainEvent("environment-renamed", input.renamedAt, {
+      environmentId: this.state.id.value,
+      projectId: this.state.projectId.value,
+      previousName: previousName.value,
+      nextName: input.name.value,
+      environmentKind: this.state.kind.value,
+      renamedAt: input.renamedAt.value,
+    });
+
+    return ok({ changed: true });
+  }
+
   materializeSnapshot(input: {
     snapshotId: EnvironmentSnapshotId;
     createdAt: GeneratedAt;
@@ -416,6 +440,10 @@ export class Environment extends AggregateRoot<EnvironmentState> {
 
   ensureCanClone(): Result<void> {
     return this.ensureCanAcceptMutation("environments.clone");
+  }
+
+  ensureCanRename(): Result<void> {
+    return this.ensureCanAcceptMutation("environments.rename");
   }
 
   ensureCanCreateDeployment(): Result<void> {

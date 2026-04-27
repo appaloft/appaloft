@@ -66,7 +66,7 @@ sub-profile being changed. Generic update operations such as `projects.update`, 
 Allowed mutation names are specific to the aggregate language, for example:
 
 - `projects.rename` instead of `projects.update`;
-- `environments.set-variable` and `environments.unset-variable` instead of
+- `environments.rename`, `environments.set-variable`, and `environments.unset-variable` instead of
   `environments.update`;
 - `servers.configure-credential` and `servers.bootstrap-proxy` instead of `servers.update`;
 - `resources.configure-source`, `resources.configure-runtime`, `resources.configure-network`,

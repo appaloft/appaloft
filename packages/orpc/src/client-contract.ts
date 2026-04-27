@@ -41,6 +41,7 @@ import {
   type OpenTerminalSessionCommandInput,
   type PromoteEnvironmentCommandInput,
   type RegisterServerCommandInput,
+  type RenameEnvironmentCommandInput,
   type RenameProjectCommandInput,
   type RenameServerCommandInput,
   type ResourceDiagnosticSummaryQueryInput,
@@ -116,6 +117,7 @@ import {
   type PromoteEnvironmentResponse,
   type ProxyConfigurationView,
   type RegisterServerResponse,
+  type RenameEnvironmentResponse,
   type RenameProjectResponse,
   type RenameServerResponse,
   type ResourceDetail,
@@ -322,6 +324,12 @@ export type AppaloftOrpcClientContract = {
       AppaloftClientContext,
       CloneEnvironmentCommandInput,
       CloneEnvironmentResponse,
+      AppaloftClientError
+    >;
+    rename: Client<
+      AppaloftClientContext,
+      RenameEnvironmentCommandInput,
+      RenameEnvironmentResponse,
       AppaloftClientError
     >;
     lock: Client<

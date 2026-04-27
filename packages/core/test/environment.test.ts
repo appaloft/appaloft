@@ -173,6 +173,49 @@ describe("EnvironmentProfile", () => {
     expect(variables[0]?.updatedAt.value).toBe("2026-01-02T00:00:00.000Z");
   });
 
+  test("[ENV-LIFE-RENAME-001] [ENV-LIFE-RENAME-002] [ENV-LIFE-RENAME-006] renames active environments idempotently", () => {
+    const environment = EnvironmentProfile.create({
+      id: EnvironmentId.rehydrate("env_prod"),
+      projectId: ProjectId.rehydrate("prj_demo"),
+      name: EnvironmentName.rehydrate("production"),
+      kind: EnvironmentKindValue.rehydrate("production"),
+      createdAt: CreatedAt.rehydrate("2026-01-01T00:00:00.000Z"),
+    })._unsafeUnwrap();
+
+    expect(
+      environment
+        .rename({
+          name: EnvironmentName.rehydrate("customer-production"),
+          renamedAt: UpdatedAt.rehydrate("2026-01-03T00:00:00.000Z"),
+        })
+        ._unsafeUnwrap(),
+    ).toEqual({ changed: true });
+    expect(environment.toState().name.value).toBe("customer-production");
+    expect(environment.pullDomainEvents()).toMatchObject([
+      {
+        type: "environment-renamed",
+        payload: {
+          environmentId: "env_prod",
+          projectId: "prj_demo",
+          previousName: "production",
+          nextName: "customer-production",
+          environmentKind: "production",
+          renamedAt: "2026-01-03T00:00:00.000Z",
+        },
+      },
+    ]);
+
+    expect(
+      environment
+        .rename({
+          name: EnvironmentName.rehydrate("customer-production"),
+          renamedAt: UpdatedAt.rehydrate("2026-01-04T00:00:00.000Z"),
+        })
+        ._unsafeUnwrap(),
+    ).toEqual({ changed: false });
+    expect(environment.pullDomainEvents()).toEqual([]);
+  });
+
   test("rejects unsafe build-time variables", () => {
     const environment = EnvironmentProfile.create({
       id: EnvironmentId.rehydrate("env_web"),
@@ -281,6 +324,16 @@ describe("EnvironmentProfile", () => {
       expect(cloneResult.error.code).toBe("environment_archived");
       expect(cloneResult.error.details?.commandName).toBe("environments.clone");
     }
+
+    const renameResult = environment.rename({
+      name: EnvironmentName.rehydrate("production-renamed"),
+      renamedAt: UpdatedAt.rehydrate("2026-01-04T00:00:00.000Z"),
+    });
+    expect(renameResult.isErr()).toBe(true);
+    if (renameResult.isErr()) {
+      expect(renameResult.error.code).toBe("environment_archived");
+      expect(renameResult.error.details?.commandName).toBe("environments.rename");
+    }
   });
 
   test("[ENV-LIFE-LOCK-001] [ENV-LIFE-LOCK-003] [ENV-LIFE-UNLOCK-001] [ENV-LIFE-UNLOCK-003] locks and unlocks idempotently", () => {
@@ -340,6 +393,16 @@ describe("EnvironmentProfile", () => {
     if (setResult.isErr()) {
       expect(setResult.error.code).toBe("environment_locked");
       expect(setResult.error.details?.commandName).toBe("environments.set-variable");
+    }
+
+    const renameResult = environment.rename({
+      name: EnvironmentName.rehydrate("production-renamed"),
+      renamedAt: UpdatedAt.rehydrate("2026-01-04T00:00:00.000Z"),
+    });
+    expect(renameResult.isErr()).toBe(true);
+    if (renameResult.isErr()) {
+      expect(renameResult.error.code).toBe("environment_locked");
+      expect(renameResult.error.details?.commandName).toBe("environments.rename");
     }
 
     expect(
