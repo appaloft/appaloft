@@ -97,6 +97,7 @@ import {
   type Query,
   type QueryBus,
   RegisterServerCommand,
+  RenameEnvironmentCommand,
   RenameProjectCommand,
   RenameServerCommand,
   ResourceDiagnosticSummaryQuery,
@@ -109,6 +110,7 @@ import {
   type ResourceRuntimeLogsResult,
   RotateSshCredentialCommand,
   registerServerCommandInputSchema,
+  renameEnvironmentCommandInputSchema,
   renameProjectCommandInputSchema,
   renameServerCommandInputSchema,
   resourceDiagnosticSummaryQueryInputSchema,
@@ -200,6 +202,7 @@ import {
   promoteEnvironmentResponseSchema,
   proxyConfigurationViewSchema,
   registerServerResponseSchema,
+  renameEnvironmentResponseSchema,
   renameProjectResponseSchema,
   renameServerResponseSchema,
   resourceDetailSchema,
@@ -424,6 +427,10 @@ export const apiRouteDescriptions = {
   promoteEnvironment: routeDescription(
     "Promotes one environment configuration set into another.",
     "environment.diff-promote",
+  ),
+  renameEnvironment: routeDescription(
+    "Renames one active environment without changing configuration or deployments.",
+    "environment.lifecycle",
   ),
   cloneEnvironment: routeDescription(
     "Clones one active environment into a new environment in the same project.",
@@ -1555,6 +1562,19 @@ export const cloneEnvironmentProcedure = base
     executeCommand(context, CloneEnvironmentCommand.create(input)),
   );
 
+export const renameEnvironmentProcedure = base
+  .route({
+    method: "POST",
+    path: "/environments/{environmentId}/rename",
+    description: apiRouteDescriptions.renameEnvironment,
+    successStatus: 200,
+  })
+  .input(renameEnvironmentCommandInputSchema)
+  .output(renameEnvironmentResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, RenameEnvironmentCommand.create(input)),
+  );
+
 export const lockEnvironmentProcedure = base
   .route({
     method: "POST",
@@ -1905,6 +1925,7 @@ export const appaloftOrpcRouter = {
     unlock: unlockEnvironmentProcedure,
     archive: archiveEnvironmentProcedure,
     clone: cloneEnvironmentProcedure,
+    rename: renameEnvironmentProcedure,
     setVariable: setEnvironmentVariableProcedure,
     unsetVariable: unsetEnvironmentVariableProcedure,
     effectivePrecedence: environmentEffectivePrecedenceProcedure,
@@ -2103,6 +2124,7 @@ export function mountAppaloftOrpcRoutes(
     "/api/environments/:environmentId/unlock",
     "/api/environments/:environmentId/archive",
     "/api/environments/:environmentId/clone",
+    "/api/environments/:environmentId/rename",
     "/api/environments/:environmentId/variables",
     "/api/environments/:environmentId/variables/:key",
     "/api/environments/:environmentId/effective-precedence",

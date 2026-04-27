@@ -205,6 +205,7 @@ Implemented operations:
 | Create environment | Command | `environments.create` | `CreateEnvironmentCommand` | `CreateEnvironmentCommandInput` | `appaloft env create` | `POST /api/environments` |
 | List environments | Query | `environments.list` | `ListEnvironmentsQuery` | `ListEnvironmentsQueryInput` | `appaloft env list` | `GET /api/environments` |
 | Show environment | Query | `environments.show` | `ShowEnvironmentQuery` | `ShowEnvironmentQueryInput` | `appaloft env show <environmentId>` | `GET /api/environments/{environmentId}` |
+| Rename environment | Command | `environments.rename` | `RenameEnvironmentCommand` | `RenameEnvironmentCommandInput` | `appaloft env rename <environmentId> --name <name>` | `POST /api/environments/{environmentId}/rename` |
 | Set environment variable | Command | `environments.set-variable` | `SetEnvironmentVariableCommand` | `SetEnvironmentVariableCommandInput` | `appaloft env set <environmentId> <key> <value>` | `POST /api/environments/{environmentId}/variables` |
 | Unset environment variable | Command | `environments.unset-variable` | `UnsetEnvironmentVariableCommand` | `UnsetEnvironmentVariableCommandInput` | `appaloft env unset <environmentId> <key>` | `DELETE /api/environments/{environmentId}/variables/{key}` |
 | Read environment effective precedence | Query | `environments.effective-precedence` | `EnvironmentEffectivePrecedenceQuery` | `EnvironmentEffectivePrecedenceQueryInput` | `appaloft env effective-precedence <environmentId>` | `GET /api/environments/{environmentId}/effective-precedence` |
@@ -217,8 +218,11 @@ Implemented operations:
 
 Core next operations expected here:
 - list environment change history
-- remaining named edit semantics, restore/delete, and lifecycle history
+- restore/delete and lifecycle history
 
+- `environments.rename` changes only the environment display name inside its owning project. It
+  preserves environment id, kind, parent environment, variables, resources, deployments, and
+  runtime state.
 - `environments.clone` creates a new active environment in the same project from an active source
   environment's current environment-owned variables.
 - `environments.lock` freezes one environment from new config/deployment work while keeping it

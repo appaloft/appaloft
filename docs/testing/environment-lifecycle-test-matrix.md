@@ -6,6 +6,7 @@ This matrix covers:
 
 - `environments.show`
 - `environments.list`
+- `environments.rename`
 - `environments.set-variable`
 - `environments.unset-variable`
 - `environments.clone`
@@ -21,10 +22,12 @@ It also verifies that no entrypoint exposes generic `environments.update`.
 ## Global References
 
 - [Environment Lifecycle Workflow](../workflows/environment-lifecycle.md)
+- [environments.rename Command Spec](../commands/environments.rename.md)
 - [environments.clone Command Spec](../commands/environments.clone.md)
 - [environments.lock Command Spec](../commands/environments.lock.md)
 - [environments.unlock Command Spec](../commands/environments.unlock.md)
 - [environments.archive Command Spec](../commands/environments.archive.md)
+- [environment-renamed Event Spec](../events/environment-renamed.md)
 - [environment-locked Event Spec](../events/environment-locked.md)
 - [environment-unlocked Event Spec](../events/environment-unlocked.md)
 - [environment-archived Event Spec](../events/environment-archived.md)
@@ -38,6 +41,12 @@ It also verifies that no entrypoint exposes generic `environments.update`.
 
 | ID | Operation | Level | Scenario | Expected |
 | --- | --- | --- | --- | --- |
+| ENV-LIFE-RENAME-001 | `environments.rename` | core/application | Active environment renamed. | Persists the new environment name, publishes `environment-renamed`, returns `ok({ id })`, and does not mutate variables/resources/deployments. |
+| ENV-LIFE-RENAME-002 | `environments.rename` | core/application | Requested name matches the current normalized name. | Returns idempotent `ok({ id })`, persists no duplicate change, and publishes no duplicate event. |
+| ENV-LIFE-RENAME-003 | `environments.rename` | application | Another environment in the same project already owns the requested name. | Returns `conflict`, `phase = environment-admission`, no mutation, no event. |
+| ENV-LIFE-RENAME-004 | `environments.rename` | core/application | Locked environment selected. | Returns `environment_locked`, `phase = environment-lifecycle-guard`, no mutation, no event. |
+| ENV-LIFE-RENAME-005 | `environments.rename` | core/application | Archived environment selected. | Returns `environment_archived`, `phase = environment-lifecycle-guard`, no mutation, no event. |
+| ENV-LIFE-RENAME-006 | `environment-renamed` | event payload | Rename succeeds. | Event includes environment id, project id, previous name, next name, environment kind, renamed timestamp, and no secrets. |
 | ENV-LIFE-LOCK-001 | `environments.lock` | core/application | Active environment locked. | Persists locked lifecycle, publishes `environment-locked`, returns `ok({ id })`. |
 | ENV-LIFE-LOCK-002 | `environments.lock` | core/application | Already locked environment. | Returns idempotent `ok({ id })`, preserves lock metadata, and publishes no duplicate event. |
 | ENV-LIFE-LOCK-003 | `environment-locked` | event payload | Lock has safe reason. | Event includes environment id, project id, name, kind, locked timestamp, optional reason, and no secrets. |
@@ -71,8 +80,13 @@ It also verifies that no entrypoint exposes generic `environments.update`.
 | ENV-LIFE-ENTRY-003 | Web | e2e-preferred | Project detail environment lifecycle control. | Dispatches `environments.archive`, invalidates environment/project state, and leaves archived environments visible. |
 | ENV-LIFE-ENTRY-006 | CLI / HTTP/oRPC / Web | e2e-preferred | Lock and unlock controls. | Dispatches `LockEnvironmentCommand` and `UnlockEnvironmentCommand` through shared schemas; no repository bypass. |
 | ENV-LIFE-ENTRY-004 | Operation catalog | contract | Public exposure in Code Round. | `CORE_OPERATIONS.md` and `operation-catalog.ts` include `environments.clone`, `environments.lock`, `environments.unlock`, and `environments.archive`. |
+| ENV-LIFE-RENAME-ENTRY-001 | CLI | e2e-preferred | `appaloft env rename <environmentId> --name ...`. | Dispatches `RenameEnvironmentCommand`; no repository bypass. |
+| ENV-LIFE-RENAME-ENTRY-002 | HTTP/oRPC | e2e-preferred | `POST /api/environments/{environmentId}/rename`. | Reuses application schema and dispatches `RenameEnvironmentCommand`. |
+| ENV-LIFE-RENAME-ENTRY-003 | Web | e2e-preferred | Project detail environment rename control. | Dispatches `environments.rename`, invalidates environment/project state, and keeps the same environment id visible. |
+| ENV-LIFE-RENAME-ENTRY-004 | Operation catalog | contract | Public exposure in Code Round. | `CORE_OPERATIONS.md` and `operation-catalog.ts` include `environments.rename`. |
 | ENV-LIFE-DOCS-001 | Public docs | contract | Archive behavior has a public help anchor. | Docs registry maps `environments.archive` to `environment.lifecycle`. |
 | ENV-LIFE-DOCS-002 | Public docs | contract | Lock/unlock behavior has a public help anchor. | Docs registry maps `environments.lock` and `environments.unlock` to `environment.lifecycle`. |
+| ENV-LIFE-RENAME-DOCS-001 | Public docs | contract | Rename behavior has a public help anchor. | Docs registry maps `environments.rename` to `environment.lifecycle`. |
 | ENV-LIFE-CLONE-ENTRY-001 | CLI | e2e-preferred | `appaloft env clone <environmentId> --name ...`. | Dispatches `CloneEnvironmentCommand`; no repository bypass. |
 | ENV-LIFE-CLONE-ENTRY-002 | HTTP/oRPC | e2e-preferred | `POST /api/environments/{environmentId}/clone`. | Reuses application schema and dispatches `CloneEnvironmentCommand`. |
 | ENV-LIFE-CLONE-ENTRY-003 | Web | e2e-preferred | Project detail environment clone control. | Dispatches `environments.clone`, invalidates environment/project state, and keeps source environment visible. |
@@ -93,6 +107,7 @@ Tests must assert environment clone/lock/unlock/archive do not:
 - issue, renew, revoke, or import certificates;
 - apply or remove proxy routes;
 - retarget source links;
+- rename environment ids or clone/copy environment state during rename;
 - expose generic `environments.update`, `UpdateEnvironmentCommand`, or
   `PATCH /api/environments/{id}`;
 - write plaintext secret values into events, read models, errors, logs, or diagnostics.
@@ -101,7 +116,8 @@ Tests must assert environment clone/lock/unlock/archive do not:
 
 Automated coverage exists for all rows in this matrix:
 
-- `ENV-LIFE-LOCK-001` through `ENV-LIFE-LOCK-003`, `ENV-LIFE-UNLOCK-001` through
+- `ENV-LIFE-RENAME-001` through `ENV-LIFE-RENAME-006`,
+  `ENV-LIFE-LOCK-001` through `ENV-LIFE-LOCK-003`, `ENV-LIFE-UNLOCK-001` through
   `ENV-LIFE-UNLOCK-003`, `ENV-LIFE-ARCHIVE-001` through `ENV-LIFE-ARCHIVE-004`,
   `ENV-LIFE-CLONE-001` through `ENV-LIFE-CLONE-004`, `ENV-LIFE-READ-001` through
   `ENV-LIFE-READ-002`, and `ENV-LIFE-GUARD-001` through `ENV-LIFE-GUARD-009` in
@@ -109,15 +125,20 @@ Automated coverage exists for all rows in this matrix:
   `packages/core/test/environment.test.ts`;
 - `ENV-LIFE-PERSIST-001`, `ENV-LIFE-PERSIST-002`, and `ENV-LIFE-CLONE-PERSIST-001` in
   `packages/persistence/pg/test/environment-lifecycle.pglite.test.ts`;
-- `ENV-LIFE-ENTRY-001`, `ENV-LIFE-ENTRY-006`, and `ENV-LIFE-CLONE-ENTRY-001` CLI coverage in
+- `ENV-LIFE-RENAME-ENTRY-001`, `ENV-LIFE-ENTRY-001`, `ENV-LIFE-ENTRY-006`, and
+  `ENV-LIFE-CLONE-ENTRY-001` CLI coverage in
   `packages/adapters/cli/test/environment-command.test.ts`;
-- `ENV-LIFE-ENTRY-002`, `ENV-LIFE-ENTRY-006`, and `ENV-LIFE-CLONE-ENTRY-002` HTTP/oRPC coverage in
+- `ENV-LIFE-RENAME-ENTRY-002`, `ENV-LIFE-ENTRY-002`, `ENV-LIFE-ENTRY-006`, and
+  `ENV-LIFE-CLONE-ENTRY-002` HTTP/oRPC coverage in
   `packages/orpc/test/environment-lifecycle.http.test.ts`;
-- `ENV-LIFE-ENTRY-003`, `ENV-LIFE-ENTRY-006`, and `ENV-LIFE-CLONE-ENTRY-003` Web coverage in
+- `ENV-LIFE-RENAME-ENTRY-003`, `ENV-LIFE-ENTRY-003`, `ENV-LIFE-ENTRY-006`, and
+  `ENV-LIFE-CLONE-ENTRY-003` Web coverage in
   `apps/web/test/e2e-webview/home.webview.test.ts`;
-- `ENV-LIFE-ENTRY-004` and `ENV-LIFE-CLONE-ENTRY-004` in
+- `ENV-LIFE-RENAME-ENTRY-004`, `ENV-LIFE-ENTRY-004`, and
+  `ENV-LIFE-CLONE-ENTRY-004` in
   `packages/application/test/operation-catalog-boundary.test.ts`;
-- `ENV-LIFE-DOCS-001`, `ENV-LIFE-DOCS-002`, and `ENV-LIFE-CLONE-DOCS-001` in
+- `ENV-LIFE-RENAME-DOCS-001`, `ENV-LIFE-DOCS-001`, `ENV-LIFE-DOCS-002`, and
+  `ENV-LIFE-CLONE-DOCS-001` in
   `packages/docs-registry/test/operation-coverage.test.ts`.
 
 No migration gaps are recorded for this slice.

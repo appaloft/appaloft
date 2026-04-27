@@ -11,6 +11,7 @@ searchAliases:
   - "production"
 relatedOperations:
   - environments.create
+  - environments.rename
   - environments.clone
   - environments.lock
   - environments.unlock
@@ -31,6 +32,8 @@ A resource can be deployed in different environments. Each deployment reads the 
 <h2 id="environment-lifecycle">Environment lifecycle</h2>
 
 Environments start as active. Locking an environment keeps the environment, variables, resources, deployments, and history readable, but blocks new environment variable writes, promotion, resource creation, and deployment admission. Unlocking returns it to active.
+
+Renaming an active environment changes only the environment name. It does not change the environment id, variables, resources, deployments, domains, certificates, or runtime state. Locked and archived environments cannot be renamed.
 
 Cloning an active environment creates a new active environment in the same project with a new name and a copy of the source environment variables. It does not copy resources, deployments, domains, certificates, or runtime state.
 

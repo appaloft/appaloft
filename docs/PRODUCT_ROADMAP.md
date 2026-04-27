@@ -43,15 +43,10 @@ Version selection rules:
 Current release alignment:
 
 <!-- release-alignment:start -->
-- [x] On 2026-04-24, the latest public release is `v0.4.0`; root package
-  and Release Please manifest on `main` are `0.4.0`; the release PR target is
-  `0.5.0`.
-- [x] On 2026-04-24, the roadmap gate allows `Release-As: 0.5.0` because
-  Phase 0 through Phase 3 release rules, required items, and exit criteria are checked.
-- [x] On 2026-04-26, the latest public release is `v0.5.0`; root package
-  and Release Please manifest on `main` are `0.5.0`. Phase 4 still has unchecked
-  items, so the next release remains on the `0.5.x` line unless all Phase 4 gates are
-  completed before release.
+- [x] On 2026-04-27, the latest public release is `v0.5.0`; root package
+  and Release Please manifest on `main` are `0.5.0`; there is no open Release Please PR.
+- [x] On 2026-04-27, the roadmap gate does not yet allow `Release-As: 0.6.0`
+  because Phase 4 required items and exit criteria are still incomplete.
 <!-- release-alignment:end -->
 
 Historical alignment notes:
@@ -142,7 +137,7 @@ Already implemented or materially present:
 - [x] Core models projects, environments, deployment targets, destinations, resources, resource
   instances, bindings, releases, deployments, rollback plans, domain bindings, and runtime plans.
 - [x] Active operations cover project create/list.
-- [x] Active operations cover environment create/list/show/set/unset/diff/promote.
+- [x] Active operations cover environment create/list/show/rename/set/unset/diff/promote.
 - [x] Active operations cover resource create/list/show, source/runtime/network/health
   configuration, resource variables/effective config, archive/delete, health, logs, proxy preview,
   diagnostics, and Web detail observation.
@@ -431,7 +426,7 @@ Required:
 - [x] Add environment archive.
 - [x] Add environment lock/unlock lifecycle.
 - [x] Add environment clone.
-- [ ] Add remaining named edit semantics.
+- [x] Add remaining named edit semantics.
 - [x] Add environment effective-precedence query.
 - [ ] Complete resource detail editing affordances for source/runtime/network profile changes.
 - [ ] Ensure CLI, HTTP/oRPC, Web, and future MCP naming reuse the same command/query schemas.

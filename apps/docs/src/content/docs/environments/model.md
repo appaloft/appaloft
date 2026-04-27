@@ -12,6 +12,7 @@ searchAliases:
   - "环境"
 relatedOperations:
   - environments.create
+  - environments.rename
   - environments.clone
   - environments.lock
   - environments.unlock
@@ -32,6 +33,8 @@ Environment 是一组部署时配置的用户边界，例如 development、stagi
 <h2 id="environment-lifecycle">环境生命周期</h2>
 
 环境默认是 active。锁定环境会保留环境、变量、资源、部署和历史记录，并阻止新的环境变量写入、环境提升、新资源创建和新部署准入；解锁后环境回到 active。
+
+重命名 active 环境只改变环境名称，不会改变环境 ID、变量、资源、部署、域名、证书或运行时状态。锁定或归档环境不能重命名。
 
 克隆 active 环境会在同一项目中创建一个新的 active 环境，使用新的名称并复制源环境变量。它不会复制资源、部署、域名、证书或运行时状态。
 

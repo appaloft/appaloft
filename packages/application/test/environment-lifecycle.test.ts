@@ -67,6 +67,7 @@ import {
   DeploymentContextResolver,
   LockEnvironmentUseCase,
   PromoteEnvironmentUseCase,
+  RenameEnvironmentUseCase,
   SetEnvironmentVariableUseCase,
   ShowEnvironmentQueryService,
   UnlockEnvironmentUseCase,
@@ -205,6 +206,10 @@ function archivedEvent(events: unknown[]): DomainEvent {
   return lifecycleEvent(events, "environment-archived");
 }
 
+function renamedEvent(events: unknown[]): DomainEvent {
+  return lifecycleEvent(events, "environment-renamed");
+}
+
 async function createHarness(
   input?: Environment | { environment?: Environment; project?: Project },
 ) {
@@ -263,6 +268,134 @@ async function createHarness(
 }
 
 describe("environment archive operations", () => {
+  test("[ENV-LIFE-RENAME-001] [ENV-LIFE-RENAME-006] renames an active environment and publishes environment-renamed", async () => {
+    const { clock, context, environments, eventBus, logger, repositoryContext } =
+      await createHarness();
+    const useCase = new RenameEnvironmentUseCase(environments, clock, eventBus, logger);
+
+    const result = await useCase.execute(context, {
+      environmentId: "env_demo",
+      name: "customer-production",
+    });
+
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap()).toEqual({ id: "env_demo" });
+    const persisted = await environments.findOne(
+      repositoryContext,
+      EnvironmentByIdSpec.create(EnvironmentId.rehydrate("env_demo")),
+    );
+    expect(persisted?.toState().name.value).toBe("customer-production");
+    expect(persisted?.toState().variables.toState()).toEqual([]);
+
+    const event = renamedEvent(eventBus.events);
+    expect(event.aggregateId).toBe("env_demo");
+    expect(event.payload).toMatchObject({
+      environmentId: "env_demo",
+      projectId: "prj_demo",
+      previousName: "production",
+      nextName: "customer-production",
+      environmentKind: "production",
+      renamedAt: "2026-01-01T00:00:10.000Z",
+    });
+  });
+
+  test("[ENV-LIFE-RENAME-002] treats same-name environment rename as idempotent", async () => {
+    const { clock, context, environments, eventBus, logger, repositoryContext } =
+      await createHarness();
+    const useCase = new RenameEnvironmentUseCase(environments, clock, eventBus, logger);
+
+    const result = await useCase.execute(context, {
+      environmentId: "env_demo",
+      name: "production",
+    });
+
+    expect(result.isOk()).toBe(true);
+    expect(eventBus.events).toHaveLength(0);
+    const persisted = await environments.findOne(
+      repositoryContext,
+      EnvironmentByIdSpec.create(EnvironmentId.rehydrate("env_demo")),
+    );
+    expect(persisted?.toState().name.value).toBe("production");
+  });
+
+  test("[ENV-LIFE-RENAME-003] rejects duplicate environment names inside one project", async () => {
+    const { clock, context, environments, eventBus, logger, repositoryContext } =
+      await createHarness();
+    const existing = environmentFixture({ id: "env_existing", name: "staging" });
+    await environments.upsert(
+      repositoryContext,
+      existing,
+      UpsertEnvironmentSpec.fromEnvironment(existing),
+    );
+    const useCase = new RenameEnvironmentUseCase(environments, clock, eventBus, logger);
+
+    const result = await useCase.execute(context, {
+      environmentId: "env_demo",
+      name: "staging",
+    });
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "conflict",
+      details: {
+        phase: "environment-admission",
+        environmentId: "env_demo",
+        projectId: "prj_demo",
+        environmentName: "staging",
+      },
+    });
+    expect(eventBus.events).toHaveLength(0);
+    const persisted = await environments.findOne(
+      repositoryContext,
+      EnvironmentByIdSpec.create(EnvironmentId.rehydrate("env_demo")),
+    );
+    expect(persisted?.toState().name.value).toBe("production");
+  });
+
+  test("[ENV-LIFE-RENAME-004] rejects rename for locked environments", async () => {
+    const { clock, context, environments, eventBus, logger } = await createHarness(
+      environmentFixture({ lifecycleStatus: "locked" }),
+    );
+    const useCase = new RenameEnvironmentUseCase(environments, clock, eventBus, logger);
+
+    const result = await useCase.execute(context, {
+      environmentId: "env_demo",
+      name: "customer-production",
+    });
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "environment_locked",
+      details: {
+        commandName: "environments.rename",
+        environmentId: "env_demo",
+      },
+    });
+    expect(eventBus.events).toHaveLength(0);
+  });
+
+  test("[ENV-LIFE-RENAME-005] rejects rename for archived environments", async () => {
+    const { clock, context, environments, eventBus, logger } = await createHarness(
+      environmentFixture({ lifecycleStatus: "archived" }),
+    );
+    const useCase = new RenameEnvironmentUseCase(environments, clock, eventBus, logger);
+
+    const result = await useCase.execute(context, {
+      environmentId: "env_demo",
+      name: "customer-production",
+    });
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr()).toMatchObject({
+      code: "environment_archived",
+      details: {
+        commandName: "environments.rename",
+        environmentId: "env_demo",
+      },
+    });
+    expect(eventBus.events).toHaveLength(0);
+  });
+
   test("[ENV-LIFE-CLONE-001] clones an active environment into the same project with copied variables", async () => {
     const { clock, context, environments, eventBus, logger, projects, repositoryContext } =
       await createHarness(environmentWithSecretVariable());
