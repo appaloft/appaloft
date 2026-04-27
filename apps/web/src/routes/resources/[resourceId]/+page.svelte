@@ -15,6 +15,7 @@
     Plus,
     RefreshCw,
     Route,
+    ShieldCheck,
     Terminal,
     Trash2,
   } from "@lucide/svelte";
@@ -2419,6 +2420,23 @@
                   environmentName={environment?.name ?? resource.environmentId}
                   destinationId={defaultDestinationId}
                 />
+
+                <div
+                  class="rounded-md border border-primary/25 bg-primary/5 px-4 py-3 text-sm"
+                  role="note"
+                >
+                  <div class="flex gap-3">
+                    <ShieldCheck class="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" />
+                    <div class="min-w-0">
+                      <p class="font-medium text-foreground">
+                        {$t(i18nKeys.console.resources.profileEditBoundaryTitle)}
+                      </p>
+                      <p class="mt-1 leading-6 text-muted-foreground">
+                        {$t(i18nKeys.console.resources.profileEditBoundaryDescription)}
+                      </p>
+                    </div>
+                  </div>
+                </div>
 
                 <form
                   id="resource-source-profile-form"

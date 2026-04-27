@@ -683,6 +683,9 @@ export const enUS = {
       notFoundTitle: "Resource not found.",
       pageTitle: "Resources",
       plannedAccessRoute: "Planned generated access",
+      profileEditBoundaryDescription:
+        "Future deployments use these saved profiles. Historical deployment snapshots stay unchanged. Current runtime is not restarted.",
+      profileEditBoundaryTitle: "Durable profile edit",
       profileDescription: "Stable project, environment, kind, and slug identity.",
       profileTitle: "Resource profile",
       serverAppliedDomainAccess: "Server-applied domain access",

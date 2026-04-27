@@ -30,7 +30,7 @@ Existing entrypoints should cover:
 - Source snapshot provided by automation.
 - Image, static site, or Compose source summaries.
 
-After source profile changes, new deployments read the new source. Completed and running deployments keep their own deployment snapshots.
+After source profile changes, new deployments read the new source. Completed and running deployments keep their own deployment snapshots. Saving the source profile does not pull source, create a deployment, or restart the current runtime.
 
 <h2 id="resource-runtime-profile">Runtime profile</h2>
 
@@ -45,6 +45,8 @@ Users should be able to configure or observe:
 - The expected listener port, confirmed in the network profile.
 
 During deployment, Appaloft combines source and runtime profiles into a runtime plan. The plan should explain what will run instead of exposing internal structures.
+
+Saving the runtime profile is a durable resource profile edit. It only changes planning input for future deployments. It does not edit historical deployment snapshots or immediately restart, rename, or replace a running workload.
 
 <h2 id="resource-source-runtime-fit">Source and runtime fit</h2>
 
@@ -67,7 +69,7 @@ The HTTP API should reuse resource configuration schemas and avoid transport-onl
 
 <h2 id="resource-source-runtime-verification">Verify the configuration</h2>
 
-After configuration, inspect resource details for the source/runtime summary. The next deployment writes these profiles into its deployment snapshot. If deployment fails, detect failures usually point to source, while plan failures usually point to source/runtime/profile mismatch.
+After configuration, inspect resource details for the source/runtime summary. The next deployment writes these profiles into its deployment snapshot, while old deployment details keep the values captured at the time. If deployment fails, detect failures usually point to source, while plan failures usually point to source/runtime/profile mismatch.
 
 CLI examples:
 

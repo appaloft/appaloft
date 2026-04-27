@@ -118,7 +118,7 @@ safe diagnostics in `resources.show`. Pure source validation failures must retur
 
 | Entrypoint | Mapping | Status |
 | --- | --- | --- |
-| Web | Resource detail source settings dispatch this command and refetch `resources.show`. | Required in Code Round |
+| Web | Resource detail source settings dispatch this command, refetch `resources.show`, and identify the save as durable future-only profile state rather than redeploy or runtime restart. | Active |
 | CLI | `appaloft resource configure-source <resourceId> ...`. | Required in Code Round |
 | oRPC / HTTP | `POST /api/resources/{resourceId}/source` using the command schema. | Required in Code Round |
 | Automation / MCP | Future command/tool over the same operation key. | Future |
@@ -134,6 +134,8 @@ Canonical event spec:
 
 `resources.configure-source` is active for core aggregate mutation, application command handling,
 operation catalog exposure, CLI, HTTP/oRPC, and the Web resource detail source profile form.
+The Web form states that source profile edits affect future deployments and do not rewrite
+historical deployment snapshots or restart current runtime.
 
 Current covered behavior includes valid Git source changes, ambiguous GitHub tree rejection,
 Docker image tag/digest conflict rejection, secret-like source field rejection, and

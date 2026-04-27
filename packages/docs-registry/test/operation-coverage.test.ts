@@ -200,4 +200,31 @@ describe("public docs operation coverage", () => {
       ]),
     );
   });
+
+  test("[RES-PROFILE-ENTRY-012] source runtime and network topics record resource detail profile editing coverage", () => {
+    for (const [operationKey, topicId] of [
+      ["resources.configure-source", "resource.source-profile"],
+      ["resources.configure-runtime", "resource.runtime-profile"],
+      ["resources.configure-network", "resource.network-profile"],
+    ] as const) {
+      const coverage = getPublicDocsOperationCoverage(operationKey);
+      const topic = publicDocsHelpTopics[topicId];
+
+      expect(coverage).toMatchObject({
+        operationKey,
+        status: "documented",
+        topicId,
+      });
+      expect(topic.specReferences).toEqual(
+        expect.arrayContaining([
+          "docs/workflows/resource-profile-lifecycle.md",
+          "docs/testing/resource-profile-lifecycle-test-matrix.md",
+          "docs/specs/008-resource-detail-profile-editing/spec.md",
+        ]),
+      );
+      expect(topic.webSurfaces?.join("\n")).toContain(
+        "apps/web/src/routes/resources/[resourceId]/+page.svelte",
+      );
+    }
+  });
 });

@@ -349,6 +349,10 @@ Current boundary:
   command replaces the durable workload endpoint profile for future deployment admission and route
   planning without binding domains, applying proxy routes, restarting runtime, or mutating
   deployment snapshots.
+- Web resource detail source/runtime/network editors are owner-scoped projections of those
+  commands and `resources.show`. They must make the durable future-only profile boundary visible to
+  operators and must not introduce Web-only configuration state or imply an immediate runtime
+  restart.
 - resource-scoped variables and secrets are resource-owned through `resources.set-variable` and
   `resources.unset-variable`; these commands replace only the resource override layer used during
   future deployment snapshot materialization after environment precedence is resolved.

@@ -44,6 +44,8 @@ Common fields:
 
 Custom domains are separate access configuration. Make network profile and generated access work before handling DNS/TLS.
 
+Saving the network profile is a durable resource profile edit. It only affects future deployment admission and route planning. It does not edit historical deployment snapshots, immediately apply proxy routes, or restart the current runtime.
+
 <h2 id="resource-readiness-failures">Readiness failures</h2>
 
 If health checks fail, inspect the listener port, path, startup time, and proxy target before retrying or changing the profile.

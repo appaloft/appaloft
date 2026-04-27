@@ -109,6 +109,7 @@ command and that no entrypoint exposes a generic `resources.update`.
 | RES-PROFILE-ENTRY-009 | HTTP/oRPC | Entrypoint | Access profile route submitted with command schema. | Dispatches `ConfigureResourceAccessCommand`; a follow-up `resources.show` returns the access profile. |
 | RES-PROFILE-ENTRY-010 | CLI | Entrypoint | Access profile command submitted. | Dispatches `ConfigureResourceAccessCommand` through `CommandBus`; no generic resource update helper bypass. |
 | RES-PROFILE-ENTRY-011 | Web | Entrypoint | Resource detail access settings submitted. | Dispatches `resources.configure-access`, invalidates resource detail/list state, and does not bind domains or apply proxy routes. |
+| RES-PROFILE-ENTRY-012 | Web | Entrypoint | Resource detail source/runtime/network profile editors are visible. | The page states saves are durable resource profile edits for future deployments, historical deployment snapshots stay unchanged, and current runtime is not restarted. |
 | RES-PROFILE-ERROR-001 | Error mapping | Contract | Persistence failure before command success. | Returns `infra_error`, `phase = resource-persistence`. |
 | RES-PROFILE-ERROR-002 | Error mapping | Contract | Event publication/outbox failure before command success. | Returns `infra_error`, `phase = event-publication`. |
 | RES-PROFILE-ERROR-003 | Error mapping | Contract | Event consumer projection failure. | Records `phase = event-consumption` and does not reinterpret command success. |
@@ -175,6 +176,8 @@ Automated coverage now exists for:
 - Web detail dispatch for `resources.show` in `apps/web/test/e2e-webview/home.webview.test.ts`;
 - Web source, runtime, network, archive, and delete submissions in
   `apps/web/test/e2e-webview/home.webview.test.ts`.
+- Web durable future-only profile editing guidance for source/runtime/network profile forms in
+  `apps/web/test/e2e-webview/home.webview.test.ts` under `RES-PROFILE-ENTRY-012`.
 
 `RES-PROFILE-SOURCE-006` remains future event-consumer projection work. `RES-PROFILE-DELETE-009`
 event payload coverage is asserted through the successful delete command test.

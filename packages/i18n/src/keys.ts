@@ -612,6 +612,8 @@ export const i18nKeys = {
       notFoundTitle: "console:resources.notFoundTitle",
       pageTitle: "console:resources.pageTitle",
       plannedAccessRoute: "console:resources.plannedAccessRoute",
+      profileEditBoundaryDescription: "console:resources.profileEditBoundaryDescription",
+      profileEditBoundaryTitle: "console:resources.profileEditBoundaryTitle",
       profileDescription: "console:resources.profileDescription",
       profileTitle: "console:resources.profileTitle",
       serverAppliedDomainAccess: "console:resources.serverAppliedDomainAccess",

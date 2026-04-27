@@ -1758,6 +1758,25 @@ describe("console e2e with Bun.WebView", () => {
     });
   }, 15_000);
 
+  test("[RES-PROFILE-ENTRY-012] explains resource detail profile edits are durable and future-only", async () => {
+    activeScenario = "dashboard";
+    resetRecordedApiRequests();
+
+    await using view = createWebView();
+    await view.navigate(`${previewUrl}/resources/res_demo`);
+
+    await expectAnyText(view, ["Durable profile edit", "持久资源配置编辑"]);
+    await expectAnyText(view, [
+      "Future deployments use these saved profiles.",
+      "后续部署会使用这些已保存的资源配置。",
+    ]);
+    await expectAnyText(view, [
+      "Historical deployment snapshots stay unchanged.",
+      "历史部署快照保持不变。",
+    ]);
+    await expectAnyText(view, ["Current runtime is not restarted.", "当前运行时不会被立即重启。"]);
+  }, 15_000);
+
   test("[DEF-ACCESS-ENTRY-008] resource detail selects server-applied access before generated access", async () => {
     activeScenario = "dashboard";
     resetRecordedApiRequests();
