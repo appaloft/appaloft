@@ -1,5 +1,41 @@
 # Changelog
 
+## [0.6.0](https://github.com/appaloft/appaloft/compare/v0.5.0...v0.6.0) (2026-04-27)
+
+
+### Features
+
+* add default access policy readback ([#109](https://github.com/appaloft/appaloft/issues/109)) ([0ef9350](https://github.com/appaloft/appaloft/commit/0ef9350b0624c1e3cf4b87aed1c075b7745bc2f9))
+* add environment clone operation ([#112](https://github.com/appaloft/appaloft/issues/112)) ([e5734d2](https://github.com/appaloft/appaloft/commit/e5734d21c726371118b714460a053e12bb7bc10d))
+* add environment effective precedence query ([#107](https://github.com/appaloft/appaloft/issues/107)) ([ab2e423](https://github.com/appaloft/appaloft/commit/ab2e423f451a53ed39f313c34e91d57cc471351e))
+* add environment lock lifecycle ([#113](https://github.com/appaloft/appaloft/issues/113)) ([1c005a9](https://github.com/appaloft/appaloft/commit/1c005a9e468738b1902530174f40812ae82937f5))
+* add environment rename lifecycle ([#115](https://github.com/appaloft/appaloft/issues/115)) ([14b2c29](https://github.com/appaloft/appaloft/commit/14b2c29720e81c0bc96eb554ed72681f1f81aa69))
+* add reusable ssh credential rotation ([#106](https://github.com/appaloft/appaloft/issues/106)) ([9f282ff](https://github.com/appaloft/appaloft/commit/9f282fff9848a486cd6bce3ba304b48e013f97c9))
+* **environments:** archive environments ([#108](https://github.com/appaloft/appaloft/issues/108)) ([8fa957c](https://github.com/appaloft/appaloft/commit/8fa957c4ac8a343c432bc169f222e7270f4c0b1c))
+* **resources:** configure access profiles ([#114](https://github.com/appaloft/appaloft/issues/114)) ([a68968d](https://github.com/appaloft/appaloft/commit/a68968d258349fa850e1d51cf9d957bc7a516360))
+
+
+### Bug Fixes
+
+* clarify resource detail profile editing ([#116](https://github.com/appaloft/appaloft/issues/116)) ([d12651d](https://github.com/appaloft/appaloft/commit/d12651d34953b5ec3a7428412f6eb906bbf8605b))
+* close project lifecycle settings coverage ([#117](https://github.com/appaloft/appaloft/issues/117)) ([780e02b](https://github.com/appaloft/appaloft/commit/780e02b2ec6df81ff196aaeb3bce4420741c239d))
+* close resource detail profile editing coverage ([#118](https://github.com/appaloft/appaloft/issues/118)) ([1b60190](https://github.com/appaloft/appaloft/commit/1b60190bdacbf2342f001b78be506d628a431112))
+* delete unused ssh credentials ([#101](https://github.com/appaloft/appaloft/issues/101)) ([abde9e5](https://github.com/appaloft/appaloft/commit/abde9e509c33545dde43875b9aecf44a226f6032))
+* select current resource access route in web ([#110](https://github.com/appaloft/appaloft/issues/110)) ([d74c933](https://github.com/appaloft/appaloft/commit/d74c933a95021b419ae133e18e6ca36a9b42e7fa))
+
+
+### Documentation
+
+* add feature artifact workflow ([#105](https://github.com/appaloft/appaloft/issues/105)) ([c786ea8](https://github.com/appaloft/appaloft/commit/c786ea8c917c595b57aa72a8d138d659b4c59349))
+* document runtime capacity cleanup ([#102](https://github.com/appaloft/appaloft/issues/102)) ([2f4c28a](https://github.com/appaloft/appaloft/commit/2f4c28a0c4db6a24f3e416fe839412765ae59b34))
+* install domain driven develop skill ([#103](https://github.com/appaloft/appaloft/issues/103)) ([61ba16e](https://github.com/appaloft/appaloft/commit/61ba16e956f317ccd08d32b74dbd1fa587373a90))
+* require domain modeling gate for code rounds ([#100](https://github.com/appaloft/appaloft/issues/100)) ([a4881ca](https://github.com/appaloft/appaloft/commit/a4881ca094f4415e947e497a0d7244109781e72c))
+
+
+### Miscellaneous
+
+* update domain-driven-develop skill ([#111](https://github.com/appaloft/appaloft/issues/111)) ([8f36d9d](https://github.com/appaloft/appaloft/commit/8f36d9d83aa355b1c024a337b676a117fd4238cb))
+
 ## [0.5.0](https://github.com/appaloft/appaloft/compare/v0.4.0...v0.5.0) (2026-04-24)
 
 
