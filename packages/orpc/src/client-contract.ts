@@ -6,6 +6,7 @@ import {
   type CheckServerDeleteSafetyQueryInput,
   type CloneEnvironmentCommandInput,
   type ConfigureDefaultAccessDomainPolicyCommandInput,
+  type ConfigureResourceAccessCommandInput,
   type ConfigureResourceHealthCommandInput,
   type ConfigureResourceNetworkCommandInput,
   type ConfigureResourceRuntimeCommandInput,
@@ -73,6 +74,7 @@ import {
   type CheckServerDeleteSafetyResponse,
   type CloneEnvironmentResponse,
   type ConfigureDefaultAccessDomainPolicyResponse,
+  type ConfigureResourceAccessResponse,
   type ConfigureResourceHealthResponse,
   type ConfigureResourceNetworkResponse,
   type ConfigureResourceRuntimeResponse,
@@ -414,6 +416,12 @@ export type AppaloftOrpcClientContract = {
       AppaloftClientContext,
       ConfigureResourceNetworkCommandInput,
       ConfigureResourceNetworkResponse,
+      AppaloftClientError
+    >;
+    configureAccess: Client<
+      AppaloftClientContext,
+      ConfigureResourceAccessCommandInput,
+      ConfigureResourceAccessResponse,
       AppaloftClientError
     >;
     configureRuntime: Client<

@@ -130,6 +130,10 @@ export const resourceExposureModes = ["none", "reverse-proxy", "direct-port"] as
 
 export type ResourceExposureMode = (typeof resourceExposureModes)[number];
 
+export const resourceGeneratedAccessModes = ["inherit", "disabled"] as const;
+
+export type ResourceGeneratedAccessMode = (typeof resourceGeneratedAccessModes)[number];
+
 export const resourceLifecycleStatuses = ["active", "archived", "deleted"] as const;
 
 export type ResourceLifecycleStatus = (typeof resourceLifecycleStatuses)[number];

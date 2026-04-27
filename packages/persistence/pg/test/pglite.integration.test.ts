@@ -83,12 +83,15 @@ import {
   ProjectName,
   ProviderKey,
   Resource,
+  ResourceByIdSpec,
   ResourceExposureModeValue,
+  ResourceGeneratedAccessModeValue,
   ResourceId,
   ResourceKindValue,
   ResourceName,
   ResourceNetworkProtocolValue,
   type Result,
+  RoutePathPrefix,
   RuntimeExecutionPlan,
   RuntimePlan,
   RuntimePlanId,
@@ -918,6 +921,7 @@ describe("pglite persistence integration", () => {
         PgEnvironmentReadModel,
         PgEnvironmentRepository,
         PgProjectRepository,
+        PgResourceReadModel,
         PgResourceRepository,
         PgServerRepository,
       } = await import("../src/index");
@@ -973,6 +977,10 @@ describe("pglite persistence integration", () => {
           internalPort: PortNumber.rehydrate(3000),
           upstreamProtocol: ResourceNetworkProtocolValue.rehydrate("http"),
           exposureMode: ResourceExposureModeValue.rehydrate("reverse-proxy"),
+        },
+        accessProfile: {
+          generatedAccessMode: ResourceGeneratedAccessModeValue.rehydrate("disabled"),
+          pathPrefix: RoutePathPrefix.rehydrate("/internal"),
         },
         createdAt: CreatedAt.rehydrate("2026-01-01T00:00:00.000Z"),
       })._unsafeUnwrap();
@@ -1087,13 +1095,31 @@ describe("pglite persistence integration", () => {
       });
       const reopenedMigrator = createMigrator(reopened.db);
       const migrationStatus = await reopenedMigrator.getMigrations();
+      const reopenedResourceRepository = new PgResourceRepository(reopened.db);
       const environmentReadModel = new PgEnvironmentReadModel(reopened.db, "****");
       const deploymentReadModel = new PgDeploymentReadModel(reopened.db);
+      const resourceReadModel = new PgResourceReadModel(reopened.db);
 
       const environments = await environmentReadModel.list(context, `prj_${suffix}`);
       const deployments = await deploymentReadModel.list(context, { projectId: `prj_${suffix}` });
+      const persistedResource = await reopenedResourceRepository.findOne(
+        context,
+        ResourceByIdSpec.create(ResourceId.rehydrate(`res_${suffix}`)),
+      );
+      const resourceSummary = await resourceReadModel.findOne(
+        context,
+        ResourceByIdSpec.create(ResourceId.rehydrate(`res_${suffix}`)),
+      );
 
       expect(migrationStatus.every((migration) => migration.executedAt !== undefined)).toBe(true);
+      expect(persistedResource?.toState().accessProfile?.generatedAccessMode.value).toBe(
+        "disabled",
+      );
+      expect(persistedResource?.toState().accessProfile?.pathPrefix.value).toBe("/internal");
+      expect(resourceSummary?.accessProfile).toEqual({
+        generatedAccessMode: "disabled",
+        pathPrefix: "/internal",
+      });
       expect(environments[0]?.maskedVariables).toEqual([
         expect.objectContaining({
           key: "PUBLIC_SITE_NAME",

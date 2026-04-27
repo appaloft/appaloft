@@ -20,6 +20,8 @@ import {
   CloneEnvironmentUseCase,
   ConfigureDefaultAccessDomainPolicyCommandHandler,
   ConfigureDefaultAccessDomainPolicyUseCase,
+  ConfigureResourceAccessCommandHandler,
+  ConfigureResourceAccessUseCase,
   ConfigureResourceHealthCommandHandler,
   ConfigureResourceHealthUseCase,
   ConfigureResourceNetworkCommandHandler,
@@ -172,6 +174,7 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(ListDefaultAccessDomainPoliciesQueryHandler);
   container.registerSingleton(ShowDefaultAccessDomainPolicyQueryHandler);
   container.registerSingleton(ConfigureServerEdgeProxyCommandHandler);
+  container.registerSingleton(ConfigureResourceAccessCommandHandler);
   container.registerSingleton(ConfigureResourceHealthCommandHandler);
   container.registerSingleton(ConfigureResourceNetworkCommandHandler);
   container.registerSingleton(ConfigureResourceRuntimeCommandHandler);
@@ -225,6 +228,10 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(
     tokens.configureResourceSourceUseCase,
     ConfigureResourceSourceUseCase,
+  );
+  container.registerSingleton(
+    tokens.configureResourceAccessUseCase,
+    ConfigureResourceAccessUseCase,
   );
   container.registerSingleton(
     tokens.configureResourceHealthUseCase,

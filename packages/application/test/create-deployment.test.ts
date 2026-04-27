@@ -57,6 +57,7 @@ import {
   Resource,
   ResourceByIdSpec,
   ResourceExposureModeValue,
+  ResourceGeneratedAccessModeValue,
   ResourceId,
   ResourceKindValue,
   ResourceName,
@@ -64,6 +65,7 @@ import {
   ResourceSlug,
   type Result,
   type RollbackPlan,
+  RoutePathPrefix,
   RuntimeExecutionPlan,
   RuntimeNameText,
   RuntimePlan,
@@ -106,6 +108,8 @@ import {
 } from "../src/execution-context";
 import { CreateDeploymentCommand } from "../src/operations/deployments/create-deployment.command";
 import {
+  type DefaultAccessDomainProvider,
+  type DefaultAccessDomainRequest,
   type DeploymentConfigReader,
   type DeploymentConfigSnapshot,
   type DeploymentContextDefaultsPolicy,
@@ -125,6 +129,7 @@ import {
 } from "../src/ports";
 import {
   CreateDeploymentUseCase,
+  DefaultAccessDomainRuntimePlanResolver,
   DeploymentContextBootstrapService,
   DeploymentContextDefaultsFactory,
   DeploymentContextResolver,
@@ -186,6 +191,22 @@ class CapturingRuntimePlanResolver implements RuntimePlanResolver {
   async resolve(context: ExecutionContext, input: Parameters<RuntimePlanResolver["resolve"]>[1]) {
     this.input = input;
     return new StaticRuntimePlanResolver().resolve(context, input);
+  }
+}
+
+class StaticDefaultAccessDomainProvider implements DefaultAccessDomainProvider {
+  public readonly calls: DefaultAccessDomainRequest[] = [];
+
+  async generate(_context: ExecutionContext, input: DefaultAccessDomainRequest) {
+    this.calls.push(input);
+    return ok({
+      kind: "generated" as const,
+      domain: {
+        hostname: "web.203-0-113-10.sslip.io",
+        scheme: "https" as const,
+        providerKey: "sslip",
+      },
+    });
   }
 }
 
@@ -835,6 +856,102 @@ describe("CreateDeploymentUseCase", () => {
     expect(runtimePlanResolver.input?.requestedDeployment.runtimeMetadata?.["preview.id"]).toBe(
       undefined,
     );
+  });
+
+  test("[RES-PROFILE-ACCESS-003] resource access path prefix reaches generated route planning input", async () => {
+    const innerRuntimePlanResolver = new CapturingRuntimePlanResolver();
+    const defaultAccessDomainProvider = new StaticDefaultAccessDomainProvider();
+    const {
+      context,
+      createDeploymentInput,
+      createDeploymentUseCase,
+      repositoryContext,
+      resources,
+    } = await createDeploymentFixture(new ExplicitContextRequiredPolicy(), {
+      runtimePlanResolver: new DefaultAccessDomainRuntimePlanResolver(
+        innerRuntimePlanResolver,
+        defaultAccessDomainProvider,
+      ),
+      edgeProxyKind: "traefik",
+    });
+    const resource = await resources.findOne(
+      repositoryContext,
+      ResourceByIdSpec.create(ResourceId.rehydrate("res_demo")),
+    );
+    if (!resource) {
+      throw new Error("Expected resource fixture");
+    }
+    resource
+      .configureAccessProfile({
+        accessProfile: {
+          generatedAccessMode: ResourceGeneratedAccessModeValue.rehydrate("inherit"),
+          pathPrefix: RoutePathPrefix.rehydrate("/docs"),
+        },
+        configuredAt: UpdatedAt.rehydrate("2026-01-01T00:00:05.000Z"),
+      })
+      ._unsafeUnwrap();
+    await resources.upsert(repositoryContext, resource, UpsertResourceSpec.fromResource(resource));
+
+    const result = await createDeploymentUseCase.execute(context, createDeploymentInput);
+
+    expect(result.isOk()).toBe(true);
+    expect(defaultAccessDomainProvider.calls).toHaveLength(1);
+    expect(innerRuntimePlanResolver.input?.requestedDeployment).toMatchObject({
+      domains: ["web.203-0-113-10.sslip.io"],
+      pathPrefix: "/docs",
+      tlsMode: "auto",
+      accessContext: {
+        resourceId: "res_demo",
+        pathPrefix: "/docs",
+      },
+      accessRouteMetadata: {
+        "access.routeSource": "generated-default",
+        "access.hostname": "web.203-0-113-10.sslip.io",
+        "access.providerKey": "sslip",
+      },
+    });
+  });
+
+  test("[RES-PROFILE-ACCESS-001] disabled resource access profile skips generated route resolution", async () => {
+    const innerRuntimePlanResolver = new CapturingRuntimePlanResolver();
+    const defaultAccessDomainProvider = new StaticDefaultAccessDomainProvider();
+    const {
+      context,
+      createDeploymentInput,
+      createDeploymentUseCase,
+      repositoryContext,
+      resources,
+    } = await createDeploymentFixture(new ExplicitContextRequiredPolicy(), {
+      runtimePlanResolver: new DefaultAccessDomainRuntimePlanResolver(
+        innerRuntimePlanResolver,
+        defaultAccessDomainProvider,
+      ),
+      edgeProxyKind: "traefik",
+    });
+    const resource = await resources.findOne(
+      repositoryContext,
+      ResourceByIdSpec.create(ResourceId.rehydrate("res_demo")),
+    );
+    if (!resource) {
+      throw new Error("Expected resource fixture");
+    }
+    resource
+      .configureAccessProfile({
+        accessProfile: {
+          generatedAccessMode: ResourceGeneratedAccessModeValue.rehydrate("disabled"),
+          pathPrefix: RoutePathPrefix.rehydrate("/"),
+        },
+        configuredAt: UpdatedAt.rehydrate("2026-01-01T00:00:05.000Z"),
+      })
+      ._unsafeUnwrap();
+    await resources.upsert(repositoryContext, resource, UpsertResourceSpec.fromResource(resource));
+
+    const result = await createDeploymentUseCase.execute(context, createDeploymentInput);
+
+    expect(result.isOk()).toBe(true);
+    expect(defaultAccessDomainProvider.calls).toHaveLength(0);
+    expect(innerRuntimePlanResolver.input?.requestedDeployment.accessContext).toBeUndefined();
+    expect(innerRuntimePlanResolver.input?.requestedDeployment.domains).toBeUndefined();
   });
 
   test("[RES-PROFILE-ARCHIVE-004] rejects deployment creation for archived resources", async () => {

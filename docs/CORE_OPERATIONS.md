@@ -254,6 +254,7 @@ Implemented operations:
 | Configure resource health policy | Command | `resources.configure-health` | `ConfigureResourceHealthCommand` | `ConfigureResourceHealthCommandInput` | `appaloft resource configure-health <resourceId>` | `POST /api/resources/{resourceId}/health-policy` |
 | Configure resource runtime profile | Command | `resources.configure-runtime` | `ConfigureResourceRuntimeCommand` | `ConfigureResourceRuntimeCommandInput` | `appaloft resource configure-runtime <resourceId>` | `POST /api/resources/{resourceId}/runtime-profile` |
 | Configure resource network profile | Command | `resources.configure-network` | `ConfigureResourceNetworkCommand` | `ConfigureResourceNetworkCommandInput` | `appaloft resource configure-network <resourceId>` | `POST /api/resources/{resourceId}/network-profile` |
+| Configure resource access profile | Command | `resources.configure-access` | `ConfigureResourceAccessCommand` | `ConfigureResourceAccessCommandInput` | `appaloft resource configure-access <resourceId>` | `POST /api/resources/{resourceId}/access-profile` |
 | Set resource variable | Command | `resources.set-variable` | `SetResourceVariableCommand` | `SetResourceVariableCommandInput` | `appaloft resource set-variable <resourceId> <key> <value>` | `POST /api/resources/{resourceId}/variables` |
 | Unset resource variable | Command | `resources.unset-variable` | `UnsetResourceVariableCommand` | `UnsetResourceVariableCommandInput` | `appaloft resource unset-variable <resourceId> <key>` | `DELETE /api/resources/{resourceId}/variables/{key}` |
 | Archive resource | Command | `resources.archive` | `ArchiveResourceCommand` | `ArchiveResourceCommandInput` | `appaloft resource archive <resourceId>` | `POST /api/resources/{resourceId}/archive` |
@@ -306,6 +307,10 @@ Current boundary:
 - reverse-proxy resources can be eligible for generated default access routes when the configured
   default access domain policy is enabled; the resource still owns only the internal endpoint, not
   concrete generated-domain or edge-proxy provider behavior
+- `resources.configure-access` stores resource-owned generated access preference and generated
+  route path prefix for future planned/deployment route resolution; it does not change system or
+  server default access policy, bind custom domains, issue certificates, or apply proxy routes to
+  existing runtime state
 - project/resource console ownership is governed by
   [ADR-013: Project Resource Navigation And Deployment Ownership](./decisions/ADR-013-project-resource-navigation-and-deployment-ownership.md)
 - sidebar navigation may show Project -> Resource hierarchy with latest deployment status derived

@@ -505,6 +505,15 @@ export const enUS = {
         "The public entry for this resource. Bound domains take priority; otherwise Appaloft uses the generated address.",
       accessUrlEmpty: "This resource has no public access URL yet.",
       accessUrlTitle: "Access URL",
+      accessGeneratedModeDisabled: "Disabled",
+      accessGeneratedModeInherit: "Inherit policy",
+      accessGeneratedModeLabel: "Generated access",
+      accessPathPrefix: "Path prefix",
+      accessProfileFormDescription:
+        "Control generated default access for future deployments of this resource.",
+      accessProfileSaveFailed: "Access profile was not saved",
+      accessProfileSaved: "Access profile saved",
+      accessProfileTitle: "Access profile",
       applicationProfileDescription:
         "Entry resources focus on listener port, protocol, and default routing.",
       applicationProfileTitle: "Application entry",

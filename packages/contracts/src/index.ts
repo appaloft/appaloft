@@ -506,6 +506,11 @@ export const resourceNetworkProfileSchema = z
     }
   });
 
+export const resourceAccessProfileSchema = z.object({
+  generatedAccessMode: z.enum(["inherit", "disabled"]).default("inherit"),
+  pathPrefix: z.string().min(1).default("/"),
+});
+
 export const resourceAccessRouteSummarySchema = z.object({
   url: z.string(),
   hostname: z.string(),
@@ -696,6 +701,7 @@ export const resourceSummarySchema = z.object({
   createdAt: z.string(),
   services: z.array(resourceServiceSummarySchema),
   networkProfile: resourceNetworkProfileSchema.optional(),
+  accessProfile: resourceAccessProfileSchema.optional(),
   deploymentCount: z.number(),
   lastDeploymentId: z.string().optional(),
   lastDeploymentStatus: z
@@ -956,6 +962,7 @@ export const resourceDetailSchema = z.object({
   source: resourceDetailSourceProfileSchema.optional(),
   runtimeProfile: resourceDetailRuntimeProfileSchema.optional(),
   networkProfile: resourceNetworkProfileSchema.optional(),
+  accessProfile: resourceAccessProfileSchema.optional(),
   healthPolicy: requestedDeploymentHealthCheckSchema.optional(),
   accessSummary: resourceAccessSummarySchema.optional(),
   latestDeployment: resourceDetailDeploymentContextSchema.optional(),
@@ -1081,6 +1088,15 @@ export const configureResourceNetworkInputSchema = z.object({
 });
 
 export const configureResourceNetworkResponseSchema = z.object({
+  id: z.string(),
+});
+
+export const configureResourceAccessInputSchema = z.object({
+  resourceId: z.string().min(1),
+  accessProfile: resourceAccessProfileSchema,
+});
+
+export const configureResourceAccessResponseSchema = z.object({
   id: z.string(),
 });
 
@@ -2448,6 +2464,7 @@ export type PlannedResourceAccessRouteSummary = z.infer<
   typeof plannedResourceAccessRouteSummarySchema
 >;
 export type ResourceAccessSummary = z.infer<typeof resourceAccessSummarySchema>;
+export type ResourceAccessProfile = z.infer<typeof resourceAccessProfileSchema>;
 export type ResourceHealthOverall = z.infer<typeof resourceHealthOverallSchema>;
 export type ResourceHealthSummary = z.infer<typeof resourceHealthSummarySchema>;
 export type ResourceSummary = z.infer<typeof resourceSummarySchema>;
@@ -2470,6 +2487,8 @@ export type ConfigureResourceNetworkInput = z.infer<typeof configureResourceNetw
 export type ConfigureResourceNetworkResponse = z.infer<
   typeof configureResourceNetworkResponseSchema
 >;
+export type ConfigureResourceAccessInput = z.infer<typeof configureResourceAccessInputSchema>;
+export type ConfigureResourceAccessResponse = z.infer<typeof configureResourceAccessResponseSchema>;
 export type ConfigureResourceRuntimeInput = z.infer<typeof configureResourceRuntimeInputSchema>;
 export type ConfigureResourceRuntimeResponse = z.infer<
   typeof configureResourceRuntimeResponseSchema

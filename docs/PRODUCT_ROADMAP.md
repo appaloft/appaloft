@@ -25,7 +25,7 @@ This roadmap is the release gate for Appaloft versions before `1.0.0`.
 - [x] Use this roadmap to choose the release version.
 - [x] Before the next release, verify package manifests, Release Please state, and the latest
   published release agree on the current version line. The roadmap starts from the current public
-  line `0.2.x` because the current release is `0.2.13`.
+  line `0.5.x` because the current release is `0.5.0`.
 
 Version selection rules:
 
@@ -422,7 +422,7 @@ Required:
 - [x] Add separate resource source update semantics where specs require a separate command.
 - [x] Add separate resource runtime update semantics where specs require a separate command.
 - [x] Add separate resource network update semantics where specs require a separate command.
-- [ ] Add reusable access-profile update semantics where specs require a separate command.
+- [x] Add reusable access-profile update semantics where specs require a separate command.
 - [x] Add environment archive.
 - [x] Add environment lock/unlock lifecycle.
 - [x] Add environment clone.
@@ -702,8 +702,8 @@ work below before GA.
 - [x] Resource: create/list/show, configure source/runtime/network/health, set/unset variables,
   effective config, health, logs, proxy preview, diagnostics, archive/delete, and Web detail
   observation.
-- [ ] Resource: profile drift visibility and reusable access-profile mutation semantics where specs
-  require separate commands.
+- [x] Resource: reusable access-profile mutation semantics where specs require separate commands.
+- [ ] Resource: profile drift visibility.
 - [x] Source link: relink through CLI.
 - [ ] Source link: list/show/delete or archive, PostgreSQL/control-plane persistence before API/Web.
 - [x] Deployment attempt: create/list/show/logs.
@@ -816,8 +816,8 @@ External baseline research points to this practical minimum:
 
 Recommended next Spec Rounds before broad Code Rounds:
 
-- [ ] Resource profile lifecycle: `resources.show`, source/runtime/network update, archive/delete,
-  resource detail workflow, and test matrix.
+- [ ] Resource profile lifecycle: remaining profile drift visibility, reset/delete policy
+  semantics, and test matrix coverage after source/runtime/network/access profile configuration.
 - [x] SSH credential lifecycle: `credentials.show` masked detail and usage visibility plus
   `credentials.delete-ssh` delete-when-unused safety across CLI, API, and Web typed confirmation.
 - [x] Framework support tier matrix: fixed-version detector/planner fixtures cover the current

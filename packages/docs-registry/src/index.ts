@@ -270,6 +270,38 @@ export const publicDocsHelpTopics = {
     relatedOperation: "resources.configure-network",
     aliases: ["network", "port", "proxy", "网络配置"],
   },
+  "resource.access-profile": {
+    id: "resource.access-profile",
+    title: "Resource access profile",
+    description: "How one resource opts into or out of generated default access route planning.",
+    page: {
+      "zh-CN": "access/generated-routes",
+      "en-US": "en/access/generated-routes",
+    },
+    anchor: "resource-access-profile",
+    localeCoverage: {
+      "zh-CN": "complete",
+      "en-US": "complete",
+    },
+    surfaces: ["web", "cli", "http-api", "mcp"],
+    relatedOperation: "resources.configure-access",
+    aliases: [
+      "resource access",
+      "access profile",
+      "generated access",
+      "disable default access",
+      "资源访问配置",
+    ],
+    specReferences: [
+      "docs/decisions/ADR-017-default-access-domain-and-proxy-routing.md",
+      "docs/commands/resources.configure-access.md",
+      "docs/events/resource-access-configured.md",
+      "docs/workflows/resource-profile-lifecycle.md",
+      "docs/testing/resource-profile-lifecycle-test-matrix.md",
+      "docs/specs/007-resource-access-profile-configuration/spec.md",
+    ],
+    webSurfaces: ["apps/web/src/routes/resources/[resourceId]/+page.svelte: resource access form"],
+  },
   "server.ssh-credential": {
     id: "server.ssh-credential",
     title: "SSH credential",
@@ -848,6 +880,11 @@ export const publicDocsOperationCoverage = [
     operationKey: "resources.configure-network",
     status: "documented",
     topicId: "resource.network-profile",
+  },
+  {
+    operationKey: "resources.configure-access",
+    status: "documented",
+    topicId: "resource.access-profile",
   },
   {
     operationKey: "resources.runtime-logs",

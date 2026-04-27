@@ -92,6 +92,7 @@ export const tokens = {
   archiveResourceUseCase: Symbol.for("appaloft.archive_resource_use_case"),
   deleteResourceUseCase: Symbol.for("appaloft.delete_resource_use_case"),
   configureResourceSourceUseCase: Symbol.for("appaloft.configure_resource_source_use_case"),
+  configureResourceAccessUseCase: Symbol.for("appaloft.configure_resource_access_use_case"),
   configureResourceHealthUseCase: Symbol.for("appaloft.configure_resource_health_use_case"),
   configureResourceNetworkUseCase: Symbol.for("appaloft.configure_resource_network_use_case"),
   configureResourceRuntimeUseCase: Symbol.for("appaloft.configure_resource_runtime_use_case"),

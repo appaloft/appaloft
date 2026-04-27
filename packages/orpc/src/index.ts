@@ -13,6 +13,7 @@ import {
   type Command,
   type CommandBus,
   ConfigureDefaultAccessDomainPolicyCommand,
+  ConfigureResourceAccessCommand,
   ConfigureResourceHealthCommand,
   ConfigureResourceNetworkCommand,
   ConfigureResourceRuntimeCommand,
@@ -30,6 +31,7 @@ import {
   checkServerDeleteSafetyQueryInputSchema,
   cloneEnvironmentCommandInputSchema,
   configureDefaultAccessDomainPolicyCommandInputSchema,
+  configureResourceAccessCommandInputSchema,
   configureResourceHealthCommandInputSchema,
   configureResourceNetworkCommandInputSchema,
   configureResourceRuntimeCommandInputSchema,
@@ -157,6 +159,7 @@ import {
   checkServerDeleteSafetyResponseSchema,
   cloneEnvironmentResponseSchema,
   configureDefaultAccessDomainPolicyResponseSchema,
+  configureResourceAccessResponseSchema,
   configureResourceHealthResponseSchema,
   configureResourceNetworkResponseSchema,
   configureResourceRuntimeResponseSchema,
@@ -280,6 +283,7 @@ export const apiDocsHrefs = {
   resourceRuntimeProfile: resolvePublicDocsHelpHref("resource.runtime-profile"),
   resourceHealthProfile: resolvePublicDocsHelpHref("resource.health-profile"),
   resourceNetworkProfile: resolvePublicDocsHelpHref("resource.network-profile"),
+  resourceAccessProfile: resolvePublicDocsHelpHref("resource.access-profile"),
   domainCustomBinding: resolvePublicDocsHelpHref("domain.custom-domain-binding"),
   domainOwnershipCheck: resolvePublicDocsHelpHref("domain.ownership-check"),
   certificateReadiness: resolvePublicDocsHelpHref("certificate.readiness"),
@@ -375,6 +379,10 @@ export const apiRouteDescriptions = {
   configureResourceNetwork: routeDescription(
     "Configures ports, protocols, and exposure behavior for resource access.",
     "resource.network-profile",
+  ),
+  configureResourceAccess: routeDescription(
+    "Configures resource participation in generated default access route planning.",
+    "resource.access-profile",
   ),
   setResourceVariable: routeDescription(
     "Sets one resource-scoped variable or secret override.",
@@ -1364,6 +1372,19 @@ export const configureResourceNetworkProcedure = base
     executeCommand(context, ConfigureResourceNetworkCommand.create(input)),
   );
 
+export const configureResourceAccessProcedure = base
+  .route({
+    method: "POST",
+    path: "/resources/{resourceId}/access-profile",
+    description: apiRouteDescriptions.configureResourceAccess,
+    successStatus: 200,
+  })
+  .input(configureResourceAccessCommandInputSchema)
+  .output(configureResourceAccessResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, ConfigureResourceAccessCommand.create(input)),
+  );
+
 export const configureResourceRuntimeProcedure = base
   .route({
     method: "POST",
@@ -1924,6 +1945,7 @@ export const appaloftOrpcRouter = {
     delete: deleteResourceProcedure,
     configureHealth: configureResourceHealthProcedure,
     configureNetwork: configureResourceNetworkProcedure,
+    configureAccess: configureResourceAccessProcedure,
     configureRuntime: configureResourceRuntimeProcedure,
     configureSource: configureResourceSourceProcedure,
     setVariable: setResourceVariableProcedure,
@@ -2115,6 +2137,7 @@ export function mountAppaloftOrpcRoutes(
     "/api/resources/:resourceId/health",
     "/api/resources/:resourceId/health-policy",
     "/api/resources/:resourceId/network-profile",
+    "/api/resources/:resourceId/access-profile",
     "/api/resources/:resourceId/runtime-profile",
     "/api/resources/:resourceId/diagnostic-summary",
     "/api/resources/:resourceId/proxy-configuration",
