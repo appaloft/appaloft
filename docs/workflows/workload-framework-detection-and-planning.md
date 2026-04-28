@@ -380,9 +380,14 @@ Current typed detection is limited to:
 - local Python detection for FastAPI, Django, Flask, `uv`, Poetry, pip, lockfiles, and `manage.py`;
 - local Java project detection;
 - fixed-version fixture coverage for Next.js, Vite, Angular, SvelteKit, Nuxt, Astro, Remix,
-  Express, FastAPI, Django, and Flask source inspection;
+  Express, Fastify, NestJS, Hono, Koa, generic Node package scripts, FastAPI, Django, and Flask
+  source inspection;
 - Vite, Angular, Astro, Nuxt generate, Next.js standalone/static export, and SvelteKit
   adapter-static artifact planning.
+- Node API framework and generic package-script fixtures plan through the generic Node workspace
+  image planner with framework metadata, `serverful-http` application shape, package-manager
+  policy, base-image policy, install/build/start command metadata, generated Dockerfile assertions,
+  and structured `runtime-plan-resolution` errors when production start evidence is missing.
 - SvelteKit ambiguous auto planning is rejected unless the workflow selects static explicitly or
   provides an explicit start command.
 

@@ -9,6 +9,7 @@ import {
   FilePathText,
   GeneratedAt,
   SourceDescriptor,
+  SourceApplicationShapeValue,
   SourceDetectedFileValue,
   SourceDetectedScriptValue,
   SourceFrameworkValue,
@@ -20,6 +21,7 @@ import {
   SourceRuntimeVersionText,
   type SourceDetectedFile,
   type SourceDetectedScript,
+  type SourceApplicationShape,
   type SourceFramework,
   type SourceKind,
   type SourcePackageManager,
@@ -86,6 +88,7 @@ function createSourceInspection(input: {
   runtimeFamily?: SourceRuntimeFamily;
   framework?: SourceFramework;
   packageManager?: SourcePackageManager;
+  applicationShape?: SourceApplicationShape;
   runtimeVersion?: string;
   detectedFiles?: SourceDetectedFile[];
   detectedScripts?: SourceDetectedScript[];
@@ -99,6 +102,9 @@ function createSourceInspection(input: {
     ...(input.framework ? { framework: SourceFrameworkValue.rehydrate(input.framework) } : {}),
     ...(input.packageManager
       ? { packageManager: SourcePackageManagerValue.rehydrate(input.packageManager) }
+      : {}),
+    ...(input.applicationShape
+      ? { applicationShape: SourceApplicationShapeValue.rehydrate(input.applicationShape) }
       : {}),
     ...(input.runtimeVersion
       ? { runtimeVersion: SourceRuntimeVersionText.rehydrate(input.runtimeVersion) }
@@ -902,6 +908,7 @@ describe("DefaultRuntimePlanResolver", () => {
           runtimeFamily: "node",
           framework: "remix",
           packageManager: "npm",
+          applicationShape: "ssr",
           runtimeVersion: "22",
           detectedFiles: ["package-json", "remix-config", "package-lock"],
           detectedScripts: ["build", "start"],
@@ -1000,6 +1007,106 @@ describe("DefaultRuntimePlanResolver", () => {
         packageManager: "pnpm",
       }),
     );
+  });
+
+  test("[DEP-CREATE-ADM-029][WF-PLAN-DET-012][WF-PLAN-CAT-008] rejects Node API framework evidence without production start", async () => {
+    ensureReflectMetadata();
+    const { DefaultRuntimePlanResolver } = await import("../src");
+    const resolver = new DefaultRuntimePlanResolver();
+    const context = createTestExecutionContext();
+
+    const result = await resolver.resolve(context, {
+      id: "plan_fastify_missing_start",
+      source: createSource({
+        kind: "local-folder",
+        locator: "/tmp/fastify-no-start",
+        displayName: "fastify-no-start",
+        inspection: createSourceInspection({
+          runtimeFamily: "node",
+          framework: "fastify",
+          packageManager: "npm",
+          applicationShape: "serverful-http",
+          runtimeVersion: "22",
+          detectedFiles: ["package-json", "package-lock"],
+          detectedScripts: ["build"],
+        }),
+      }),
+      server: {
+        id: "srv_fastify_missing_start",
+        providerKey: "local-shell",
+      },
+      environmentSnapshot: createEnvironmentSnapshot("snap_fastify_missing_start"),
+      detectedReasoning: ["detected fastify app without production start"],
+      requestedDeployment: {
+        method: "auto",
+        port: 3000,
+      },
+      generatedAt: "2026-01-01T00:00:00.000Z",
+    });
+
+    expect(result.isErr()).toBe(true);
+    const error = result._unsafeUnwrapErr();
+    expect(error.code).toBe("validation_error");
+    expect(error.details).toEqual(
+      expect.objectContaining({
+        phase: "runtime-plan-resolution",
+        runtimeFamily: "node",
+        framework: "fastify",
+        packageManager: "npm",
+        applicationShape: "serverful-http",
+      }),
+    );
+  });
+
+  test("[DEP-CREATE-ADM-030][WF-PLAN-CAT-008] accepts explicit custom start for Node API framework fallback", async () => {
+    ensureReflectMetadata();
+    const { DefaultRuntimePlanResolver } = await import("../src");
+    const resolver = new DefaultRuntimePlanResolver();
+    const context = createTestExecutionContext();
+
+    const result = await resolver.resolve(context, {
+      id: "plan_fastify_explicit_start",
+      source: createSource({
+        kind: "local-folder",
+        locator: "/tmp/fastify-explicit-start",
+        displayName: "fastify-explicit-start",
+        inspection: createSourceInspection({
+          runtimeFamily: "node",
+          framework: "fastify",
+          packageManager: "npm",
+          runtimeVersion: "22",
+          detectedFiles: ["package-json", "package-lock"],
+          detectedScripts: ["build"],
+        }),
+      }),
+      server: {
+        id: "srv_fastify_explicit_start",
+        providerKey: "local-shell",
+      },
+      environmentSnapshot: createEnvironmentSnapshot("snap_fastify_explicit_start"),
+      detectedReasoning: ["detected fastify app with explicit production start"],
+      requestedDeployment: {
+        method: "auto",
+        buildCommand: "npm run build",
+        startCommand: "node dist/server.js",
+        port: 3000,
+      },
+      generatedAt: "2026-01-01T00:00:00.000Z",
+    });
+
+    expect(result.isOk()).toBe(true);
+    const plan = result._unsafeUnwrap();
+    expect(plan.runtimeArtifact?.metadata).toEqual(
+      expect.objectContaining({
+        planner: "node",
+        runtimeKind: "node",
+        framework: "fastify",
+        packageManager: "npm",
+        baseImage: "node:22-alpine",
+        applicationShape: "serverful-http",
+      }),
+    );
+    expect(plan.execution.startCommand).toBe("node dist/server.js");
   });
 
   test("uses the Python workspace planner when Python metadata is detected", async () => {

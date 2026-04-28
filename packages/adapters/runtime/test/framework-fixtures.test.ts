@@ -8,6 +8,7 @@ import {
   EnvironmentSnapshotId,
   GeneratedAt,
 } from "@appaloft/core";
+import { pinnedBunAlpineImage } from "../src/workspace-planners/bun";
 
 function createTestExecutionContext(): ExecutionContext {
   return {
@@ -74,6 +75,9 @@ interface PlannerFixtureExpectation {
   planner: string;
   runtimeKind: string;
   applicationShape: string;
+  framework?: string;
+  packageManager?: string;
+  baseImage?: string;
   publishDirectory?: string;
   installCommand?: string;
   buildCommand?: string;
@@ -89,6 +93,9 @@ const plannerFixtures: PlannerFixtureExpectation[] = [
     planner: "nextjs",
     runtimeKind: "nextjs",
     applicationShape: "ssr",
+    framework: "nextjs",
+    packageManager: "pnpm",
+    baseImage: "node:22-alpine",
     installCommand: "pnpm install",
     buildCommand: "pnpm build",
     startCommand: "pnpm start",
@@ -101,6 +108,9 @@ const plannerFixtures: PlannerFixtureExpectation[] = [
     planner: "nextjs-static",
     runtimeKind: "static",
     applicationShape: "static",
+    framework: "nextjs",
+    packageManager: "pnpm",
+    baseImage: "node:22-alpine",
     publishDirectory: "/out",
     installCommand: "pnpm install",
     buildCommand: "pnpm build",
@@ -113,6 +123,9 @@ const plannerFixtures: PlannerFixtureExpectation[] = [
     planner: "vite-static",
     runtimeKind: "static",
     applicationShape: "static",
+    framework: "vite",
+    packageManager: "bun",
+    baseImage: pinnedBunAlpineImage,
     publishDirectory: "/dist",
     installCommand: "bun install",
     buildCommand: "bun run build",
@@ -125,6 +138,9 @@ const plannerFixtures: PlannerFixtureExpectation[] = [
     planner: "angular-static",
     runtimeKind: "static",
     applicationShape: "static",
+    framework: "angular",
+    packageManager: "npm",
+    baseImage: "node:22-alpine",
     publishDirectory: "/dist/angular-spa",
     installCommand: "npm install",
     buildCommand: "npm run build",
@@ -137,6 +153,9 @@ const plannerFixtures: PlannerFixtureExpectation[] = [
     planner: "sveltekit-static",
     runtimeKind: "static",
     applicationShape: "static",
+    framework: "sveltekit",
+    packageManager: "pnpm",
+    baseImage: "node:22-alpine",
     publishDirectory: "/build",
     installCommand: "pnpm install",
     buildCommand: "pnpm build",
@@ -149,6 +168,9 @@ const plannerFixtures: PlannerFixtureExpectation[] = [
     planner: "nuxt-static",
     runtimeKind: "static",
     applicationShape: "static",
+    framework: "nuxt",
+    packageManager: "pnpm",
+    baseImage: "node:22-alpine",
     publishDirectory: "/.output/public",
     installCommand: "pnpm install",
     buildCommand: "pnpm generate",
@@ -161,6 +183,9 @@ const plannerFixtures: PlannerFixtureExpectation[] = [
     planner: "astro-static",
     runtimeKind: "static",
     applicationShape: "static",
+    framework: "astro",
+    packageManager: "npm",
+    baseImage: "node:22-alpine",
     publishDirectory: "/dist",
     installCommand: "npm install",
     buildCommand: "npm run build",
@@ -173,6 +198,9 @@ const plannerFixtures: PlannerFixtureExpectation[] = [
     planner: "remix",
     runtimeKind: "remix",
     applicationShape: "ssr",
+    framework: "remix",
+    packageManager: "npm",
+    baseImage: "node:22-alpine",
     installCommand: "npm install",
     buildCommand: "npm run build",
     startCommand: "npm run start",
@@ -185,9 +213,86 @@ const plannerFixtures: PlannerFixtureExpectation[] = [
     planner: "node",
     runtimeKind: "node",
     applicationShape: "serverful-http",
+    framework: "express",
+    packageManager: "npm",
+    baseImage: "node:22-alpine",
     installCommand: "npm install",
     buildCommand: "npm run build",
     startCommand: "npm run start",
+  },
+  {
+    matrixIds: "WF-PLAN-CAT-008",
+    fixture: "fastify-server",
+    port: 3000,
+    buildStrategy: "workspace-commands",
+    planner: "node",
+    runtimeKind: "node",
+    applicationShape: "serverful-http",
+    framework: "fastify",
+    packageManager: "pnpm",
+    baseImage: "node:22-alpine",
+    installCommand: "pnpm install",
+    buildCommand: "pnpm build",
+    startCommand: "pnpm start",
+  },
+  {
+    matrixIds: "WF-PLAN-CAT-008",
+    fixture: "nestjs-server",
+    port: 3000,
+    buildStrategy: "workspace-commands",
+    planner: "node",
+    runtimeKind: "node",
+    applicationShape: "serverful-http",
+    framework: "nestjs",
+    packageManager: "npm",
+    baseImage: "node:22-alpine",
+    installCommand: "npm install",
+    buildCommand: "npm run build",
+    startCommand: "npm run start:built",
+  },
+  {
+    matrixIds: "WF-PLAN-CAT-008",
+    fixture: "hono-server",
+    port: 3000,
+    buildStrategy: "workspace-commands",
+    planner: "node",
+    runtimeKind: "node",
+    applicationShape: "serverful-http",
+    framework: "hono",
+    packageManager: "bun",
+    baseImage: pinnedBunAlpineImage,
+    installCommand: "bun install",
+    buildCommand: "bun run build",
+    startCommand: "bun run start",
+  },
+  {
+    matrixIds: "WF-PLAN-CAT-008",
+    fixture: "koa-server",
+    port: 3000,
+    buildStrategy: "workspace-commands",
+    planner: "node",
+    runtimeKind: "node",
+    applicationShape: "serverful-http",
+    framework: "koa",
+    packageManager: "yarn",
+    baseImage: "node:22-alpine",
+    installCommand: "yarn install --frozen-lockfile",
+    buildCommand: "yarn build",
+    startCommand: "yarn start",
+  },
+  {
+    matrixIds: "WF-PLAN-CAT-008",
+    fixture: "generic-node-server",
+    port: 3000,
+    buildStrategy: "workspace-commands",
+    planner: "node",
+    runtimeKind: "node",
+    applicationShape: "serverful-http",
+    packageManager: "npm",
+    baseImage: "node:22-alpine",
+    installCommand: "npm install",
+    buildCommand: "npm run build",
+    startCommand: "npm run start:built",
   },
   {
     matrixIds: "WF-PLAN-CAT-009",
@@ -197,6 +302,9 @@ const plannerFixtures: PlannerFixtureExpectation[] = [
     planner: "fastapi",
     runtimeKind: "fastapi",
     applicationShape: "serverful-http",
+    framework: "fastapi",
+    packageManager: "uv",
+    baseImage: "python:3.12-slim",
     installCommand: "pip install --no-cache-dir uv && uv sync --frozen --no-dev",
     startCommand: "uv run python -m uvicorn main:app --host 0.0.0.0 --port 3000",
   },
@@ -208,6 +316,9 @@ const plannerFixtures: PlannerFixtureExpectation[] = [
     planner: "django",
     runtimeKind: "django",
     applicationShape: "serverful-http",
+    framework: "django",
+    packageManager: "pip",
+    baseImage: "python:3.12-slim",
     installCommand: "pip install --no-cache-dir -r requirements.txt",
     startCommand: "python manage.py runserver 0.0.0.0:3000",
   },
@@ -219,6 +330,9 @@ const plannerFixtures: PlannerFixtureExpectation[] = [
     planner: "flask",
     runtimeKind: "flask",
     applicationShape: "serverful-http",
+    framework: "flask",
+    packageManager: "pip",
+    baseImage: "python:3.12-slim",
     installCommand: "pip install --no-cache-dir -r requirements.txt",
     startCommand: "python -m flask run --host 0.0.0.0 --port 3000",
   },
@@ -228,9 +342,14 @@ describe("DefaultRuntimePlanResolver framework fixtures", () => {
   for (const fixture of plannerFixtures) {
     test(`[${fixture.matrixIds}][WF-PLAN-DET-007] plans pinned ${fixture.fixture} fixture`, async () => {
       ensureReflectMetadata();
-      const [{ FileSystemSourceDetector }, { DefaultRuntimePlanResolver }] = await Promise.all([
+      const [
+        { FileSystemSourceDetector },
+        { DefaultRuntimePlanResolver },
+        { generateWorkspaceDockerBuild },
+      ] = await Promise.all([
         import("@appaloft/adapter-filesystem"),
         import("../src"),
+        import("../src/workspace-planners"),
       ]);
       const context = createTestExecutionContext();
       const sourceResult = await new FileSystemSourceDetector().detect(
@@ -264,6 +383,9 @@ describe("DefaultRuntimePlanResolver framework fixtures", () => {
           planner: fixture.planner,
           runtimeKind: fixture.runtimeKind,
           applicationShape: fixture.applicationShape,
+          ...(fixture.framework ? { framework: fixture.framework } : {}),
+          ...(fixture.packageManager ? { packageManager: fixture.packageManager } : {}),
+          ...(fixture.baseImage ? { baseImage: fixture.baseImage } : {}),
           ...(fixture.publishDirectory
             ? { publishDirectory: fixture.publishDirectory }
             : {}),
@@ -273,6 +395,24 @@ describe("DefaultRuntimePlanResolver framework fixtures", () => {
       expect(plan.execution.installCommand).toBe(fixture.installCommand);
       expect(plan.execution.buildCommand).toBe(fixture.buildCommand);
       expect(plan.execution.startCommand).toBe(fixture.startCommand);
+
+      if (fixture.buildStrategy === "workspace-commands" && fixture.baseImage) {
+        const dockerBuild = generateWorkspaceDockerBuild({
+          execution: plan.execution,
+          sourceInspection: plan.source.inspection,
+        });
+
+        expect(dockerBuild?.dockerfile).toContain(`FROM ${fixture.baseImage}`);
+        if (fixture.installCommand) {
+          expect(dockerBuild?.dockerfile).toContain(fixture.installCommand);
+        }
+        if (fixture.buildCommand) {
+          expect(dockerBuild?.dockerfile).toContain(fixture.buildCommand);
+        }
+        if (fixture.startCommand) {
+          expect(dockerBuild?.dockerfile).toContain(fixture.startCommand);
+        }
+      }
     });
   }
 

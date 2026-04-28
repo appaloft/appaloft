@@ -30,7 +30,7 @@ interface FrameworkFixtureExpectation {
   matrixIds: string;
   fixture: string;
   runtimeFamily: SourceRuntimeFamily;
-  framework: SourceFramework;
+  framework?: SourceFramework;
   packageManager: SourcePackageManager;
   applicationShape: SourceApplicationShape;
   detectedFiles?: SourceDetectedFile[];
@@ -225,6 +225,87 @@ const frameworkFixtures: FrameworkFixtureExpectation[] = [
       devDependencies: {
         typescript: "5.8.2",
       },
+    },
+  },
+  {
+    matrixIds: "WF-PLAN-CAT-008",
+    fixture: "fastify-server",
+    runtimeFamily: "node",
+    framework: "fastify",
+    packageManager: "pnpm",
+    applicationShape: "serverful-http",
+    detectedFiles: ["pnpm-lock"],
+    fixedVersions: {
+      packageManager: "pnpm@10.6.0",
+      dependencies: {
+        fastify: "5.2.1",
+      },
+      devDependencies: {
+        typescript: "5.8.2",
+      },
+    },
+  },
+  {
+    matrixIds: "WF-PLAN-CAT-008",
+    fixture: "nestjs-server",
+    runtimeFamily: "node",
+    framework: "nestjs",
+    packageManager: "npm",
+    applicationShape: "serverful-http",
+    detectedFiles: ["package-lock"],
+    fixedVersions: {
+      packageManager: "npm@10.9.0",
+      dependencies: {
+        "@nestjs/common": "11.0.11",
+        "@nestjs/core": "11.0.11",
+        "@nestjs/platform-express": "11.0.11",
+        "reflect-metadata": "0.2.2",
+        rxjs: "7.8.2",
+      },
+      devDependencies: {
+        typescript: "5.8.2",
+      },
+    },
+  },
+  {
+    matrixIds: "WF-PLAN-CAT-008",
+    fixture: "hono-server",
+    runtimeFamily: "node",
+    framework: "hono",
+    packageManager: "bun",
+    applicationShape: "serverful-http",
+    detectedFiles: ["bun-lock"],
+    fixedVersions: {
+      packageManager: "bun@1.2.4",
+      dependencies: {
+        hono: "4.7.5",
+      },
+    },
+  },
+  {
+    matrixIds: "WF-PLAN-CAT-008",
+    fixture: "koa-server",
+    runtimeFamily: "node",
+    framework: "koa",
+    packageManager: "yarn",
+    applicationShape: "serverful-http",
+    detectedFiles: ["yarn-lock"],
+    fixedVersions: {
+      packageManager: "yarn@4.6.0",
+      dependencies: {
+        koa: "2.16.0",
+      },
+    },
+  },
+  {
+    matrixIds: "WF-PLAN-CAT-008",
+    fixture: "generic-node-server",
+    runtimeFamily: "node",
+    packageManager: "npm",
+    applicationShape: "serverful-http",
+    detectedFiles: ["package-lock"],
+    fixedVersions: {
+      packageManager: "npm@10.9.0",
     },
   },
   {

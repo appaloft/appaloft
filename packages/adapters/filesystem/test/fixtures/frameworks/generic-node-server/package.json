@@ -1,0 +1,11 @@
+{
+  "name": "generic-node-server",
+  "private": true,
+  "type": "module",
+  "packageManager": "npm@10.9.0",
+  "scripts": {
+    "build": "node build.mjs",
+    "start": "node server.js",
+    "start:built": "node dist/server.js"
+  }
+}

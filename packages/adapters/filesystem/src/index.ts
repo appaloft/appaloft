@@ -300,6 +300,13 @@ function applicationShapeForNodeProject(input: {
       break;
   }
 
+  if (
+    !input.framework &&
+    (input.detectedScripts.includes("start") || input.detectedScripts.includes("start-built"))
+  ) {
+    return "serverful-http";
+  }
+
   return applicationShapeForFramework(input.framework);
 }
 
