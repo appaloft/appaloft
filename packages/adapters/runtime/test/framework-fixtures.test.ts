@@ -132,6 +132,66 @@ const plannerFixtures: PlannerFixtureExpectation[] = [
   },
   {
     matrixIds: "WF-PLAN-CAT-007",
+    fixture: "react-spa",
+    port: 80,
+    buildStrategy: "static-artifact",
+    planner: "react-static",
+    runtimeKind: "static",
+    applicationShape: "static",
+    framework: "react",
+    packageManager: "npm",
+    baseImage: "node:22-alpine",
+    publishDirectory: "/build",
+    installCommand: "npm install",
+    buildCommand: "npm run build",
+  },
+  {
+    matrixIds: "WF-PLAN-CAT-007",
+    fixture: "vue-spa",
+    port: 80,
+    buildStrategy: "static-artifact",
+    planner: "vue-static",
+    runtimeKind: "static",
+    applicationShape: "static",
+    framework: "vue",
+    packageManager: "pnpm",
+    baseImage: "node:22-alpine",
+    publishDirectory: "/dist",
+    installCommand: "pnpm install",
+    buildCommand: "pnpm build",
+  },
+  {
+    matrixIds: "WF-PLAN-CAT-007",
+    fixture: "svelte-spa",
+    port: 80,
+    buildStrategy: "static-artifact",
+    planner: "svelte-static",
+    runtimeKind: "static",
+    applicationShape: "static",
+    framework: "svelte",
+    packageManager: "yarn",
+    baseImage: "node:22-alpine",
+    publishDirectory: "/public",
+    installCommand: "yarn install --frozen-lockfile",
+    buildCommand: "yarn build",
+  },
+  {
+    matrixIds: "WF-PLAN-CAT-007",
+    fixture: "solid-spa",
+    port: 80,
+    buildStrategy: "static-artifact",
+    planner: "solid-static",
+    runtimeKind: "static",
+    applicationShape: "static",
+    framework: "solid",
+    packageManager: "bun",
+    baseImage: pinnedBunAlpineImage,
+    publishDirectory: "/dist",
+    installCommand: "bun install",
+    buildCommand: "bun run build",
+  },
+  {
+    matrixIds: "WF-PLAN-CAT-007",
     fixture: "angular-spa",
     port: 80,
     buildStrategy: "static-artifact",
@@ -345,7 +405,7 @@ describe("DefaultRuntimePlanResolver framework fixtures", () => {
       const [
         { FileSystemSourceDetector },
         { DefaultRuntimePlanResolver },
-        { generateWorkspaceDockerBuild },
+        { generateStaticSiteDockerBuild, generateWorkspaceDockerBuild },
       ] = await Promise.all([
         import("@appaloft/adapter-filesystem"),
         import("../src"),
@@ -411,6 +471,31 @@ describe("DefaultRuntimePlanResolver framework fixtures", () => {
         }
         if (fixture.startCommand) {
           expect(dockerBuild?.dockerfile).toContain(fixture.startCommand);
+        }
+      }
+
+      if (fixture.buildStrategy === "static-artifact" && fixture.baseImage) {
+        const dockerBuild = generateStaticSiteDockerBuild({
+          execution: plan.execution,
+          sourceInspection: plan.source.inspection,
+        });
+
+        expect(dockerBuild?.dockerfile).toContain(`FROM ${fixture.baseImage} AS build`);
+        expect(dockerBuild?.dockerfile).toContain("FROM nginx:1.27-alpine");
+        if (fixture.publishDirectory) {
+          expect(plan.execution.metadata).toEqual(
+            expect.objectContaining({
+              "static.publishDirectory": fixture.publishDirectory,
+              "static.serverConfig": "appaloft-nginx",
+              "workspace.packageCommand": "static-server",
+            }),
+          );
+        }
+        if (fixture.installCommand) {
+          expect(dockerBuild?.dockerfile).toContain(fixture.installCommand);
+        }
+        if (fixture.buildCommand) {
+          expect(dockerBuild?.dockerfile).toContain(fixture.buildCommand);
         }
       }
     });

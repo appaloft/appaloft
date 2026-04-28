@@ -1628,13 +1628,17 @@ export const runtimePlanSchema = z.object({
             "phoenix",
             "quarkus",
             "rails",
+            "react",
             "remix",
             "rocket",
             "sinatra",
             "spring-boot",
+            "solid",
+            "svelte",
             "sveltekit",
             "symfony",
             "vite",
+            "vue",
           ])
           .optional(),
         packageManager: z

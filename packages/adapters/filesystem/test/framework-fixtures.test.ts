@@ -106,10 +106,80 @@ const frameworkFixtures: FrameworkFixtureExpectation[] = [
     applicationShape: "static",
     fixedVersions: {
       dependencies: {
-        "@vitejs/plugin-react": "4.3.4",
+        vite: "5.4.11",
+      },
+    },
+  },
+  {
+    matrixIds: "WF-PLAN-CAT-007",
+    fixture: "react-spa",
+    runtimeFamily: "node",
+    framework: "react",
+    packageManager: "npm",
+    applicationShape: "static",
+    detectedFiles: ["package-lock"],
+    fixedVersions: {
+      packageManager: "npm@10.9.0",
+      dependencies: {
         react: "18.3.1",
         "react-dom": "18.3.1",
-        vite: "5.4.11",
+        "react-scripts": "5.0.1",
+      },
+    },
+  },
+  {
+    matrixIds: "WF-PLAN-CAT-007",
+    fixture: "vue-spa",
+    runtimeFamily: "node",
+    framework: "vue",
+    packageManager: "pnpm",
+    applicationShape: "static",
+    detectedFiles: ["pnpm-lock"],
+    fixedVersions: {
+      packageManager: "pnpm@10.6.0",
+      dependencies: {
+        vue: "3.5.13",
+      },
+      devDependencies: {
+        "@vue/cli-service": "5.0.8",
+      },
+    },
+  },
+  {
+    matrixIds: "WF-PLAN-CAT-007",
+    fixture: "svelte-spa",
+    runtimeFamily: "node",
+    framework: "svelte",
+    packageManager: "yarn",
+    applicationShape: "static",
+    detectedFiles: ["yarn-lock"],
+    fixedVersions: {
+      packageManager: "yarn@4.6.0",
+      dependencies: {
+        svelte: "5.19.7",
+      },
+      devDependencies: {
+        "@rollup/plugin-svelte": "7.2.2",
+        rollup: "4.34.8",
+      },
+    },
+  },
+  {
+    matrixIds: "WF-PLAN-CAT-007",
+    fixture: "solid-spa",
+    runtimeFamily: "node",
+    framework: "solid",
+    packageManager: "bun",
+    applicationShape: "static",
+    detectedFiles: ["bun-lock", "vite-config"],
+    fixedVersions: {
+      packageManager: "bun@1.2.4",
+      dependencies: {
+        "solid-js": "1.9.5",
+      },
+      devDependencies: {
+        vite: "6.1.0",
+        "vite-plugin-solid": "2.11.2",
       },
     },
   },

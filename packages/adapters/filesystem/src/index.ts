@@ -215,6 +215,22 @@ function detectNodeFramework(input: {
     return "angular";
   }
 
+  if (hasPackage(dependencies, devDependencies, "react")) {
+    return "react";
+  }
+
+  if (hasPackage(dependencies, devDependencies, "vue")) {
+    return "vue";
+  }
+
+  if (hasPackage(dependencies, devDependencies, "svelte")) {
+    return "svelte";
+  }
+
+  if (hasPackage(dependencies, devDependencies, "solid-js")) {
+    return "solid";
+  }
+
   if (
     hasPackage(dependencies, devDependencies, "vite") ||
     existsSync(join(path, "vite.config.js")) ||
@@ -253,7 +269,11 @@ function applicationShapeForFramework(
   switch (framework) {
     case "angular":
     case "astro":
+    case "react":
+    case "solid":
+    case "svelte":
     case "vite":
+    case "vue":
       return "static";
     case "nextjs":
     case "nuxt":
