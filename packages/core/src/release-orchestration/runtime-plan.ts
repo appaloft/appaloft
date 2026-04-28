@@ -101,13 +101,17 @@ export const sourceFrameworks = [
   "phoenix",
   "quarkus",
   "rails",
+  "react",
   "remix",
   "rocket",
   "sinatra",
+  "solid",
   "spring-boot",
+  "svelte",
   "sveltekit",
   "symfony",
   "vite",
+  "vue",
 ] as const;
 export const sourcePackageManagers = [
   "bun",

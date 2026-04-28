@@ -113,7 +113,7 @@ Minimum evidence categories:
 | Evidence | Examples |
 | --- | --- |
 | Language/runtime family | `node`, `python`, `ruby`, `php`, `go`, `java`, `dotnet`, `elixir`, `rust`, `static`, `custom`. |
-| Framework | `nextjs`, `remix`, `nuxt`, `sveltekit`, `astro`, `vite`, `angular`, `express`, `fastify`, `nestjs`, `hono`, `django`, `flask`, `fastapi`, `rails`, `laravel`, `spring-boot`, `aspnet-core`, `phoenix`, `axum`. |
+| Framework | `nextjs`, `remix`, `nuxt`, `sveltekit`, `astro`, `vite`, `react`, `vue`, `svelte`, `solid`, `angular`, `express`, `fastify`, `nestjs`, `hono`, `django`, `flask`, `fastapi`, `rails`, `laravel`, `spring-boot`, `aspnet-core`, `phoenix`, `axum`. |
 | Package/project name | `package.json.name`, `pyproject.toml project.name`, `composer.json.name`, Maven/Gradle artifact/root name, `.csproj` assembly/project name, `go.mod` module, `Cargo.toml package.name`, `mix.exs` app name. |
 | Package manager/build tool | `bun`, `npm`, `pnpm`, `yarn`, `pip`, `uv`, `poetry`, `composer`, `maven`, `gradle`, `go`, `dotnet`, `cargo`, `mix`. |
 | Runtime version | `.node-version`, `.nvmrc`, `package.json.engines.node`, `.python-version`, `.ruby-version`, `.java-version`, `global.json`, `go.mod`, `rust-toolchain`, `elixir`/`erlang` files. |
@@ -228,7 +228,7 @@ The target support catalog for mainstream web application deployment is:
 | Nuxt | `ssr` or `static` | `nuxt` dependency or `nuxt.config.*`; generate/static evidence when selected | SSR uses `nuxi build` and `.output/server`; static uses `nuxi generate` and `.output/public`; package image or static-server image accordingly | SSR starts Nitro server from `.output`; static starts static server on port 80. |
 | SvelteKit | `hybrid-static-server` | `svelte.config.*`, SvelteKit dependency, and adapter evidence | `adapter-static` or explicit static strategy packages static output; server adapters package the generated server runtime into Docker/OCI image | Static uses port 80; server adapters require a start command or supported adapter entrypoint plus resource network port. |
 | Astro | `static` or `ssr` | `astro.config.*` or Astro dependency; adapter/output mode | Default static output packages `dist`; SSR adapter output packages a server runtime image | Static uses port 80; SSR requires supported adapter start evidence and resource network port. |
-| Vite, Angular, React/Vue/Svelte/Solid SPA, Docusaurus | `static` | Vite/Angular/Docusaurus config or package scripts; output convention | Run build script and package `dist`, `build`, Angular browser output, or explicit publish directory into static-server image | Static server on port 80 by default. Preview/dev servers are not production runtime commands. |
+| Vite, Angular, React/Vue/Svelte/Solid SPA, Docusaurus | `static` | Vite/Angular/Docusaurus config or package scripts; output convention | Run build script and package `dist`, `build`, `public`, Angular browser output, or explicit publish directory into static-server image | Static server on port 80 by default. Preview/dev servers are not production runtime commands. |
 | Express, Fastify, NestJS, Hono, Koa, generic Node HTTP apps | `serverful-http` | Package manifest plus framework dependency, entrypoint, or non-dev start script | Install/build when script exists; package app into Docker/OCI image with selected Node/Bun base policy | Production `start` script or deterministic framework start is required; internal port must be supplied or inferred from accepted profile evidence. |
 | FastAPI | `serverful-http` | Python project metadata plus FastAPI dependency, ASGI module hint, or explicit start command | Install with detected Python tool; package Docker/OCI image | Start with `uvicorn` only when ASGI module/app can be safely identified; otherwise require explicit start command. |
 | Django | `serverful-http` | `manage.py`, Django dependency, settings/module evidence | Install with detected Python tool; collect/static/package as needed; Docker/OCI image | Start with supported WSGI/ASGI command only when project module is known; otherwise explicit start required. |
@@ -355,6 +355,10 @@ Implemented planner families:
 - `nextjs-static` for detected export/static output evidence or explicit static strategy;
 - generic `node`;
 - `vite-static`;
+- `react-static`;
+- `vue-static`;
+- `svelte-static`;
+- `solid-static`;
 - `astro-static`;
 - `nuxt-static`;
 - `sveltekit-static` for explicit static strategy or publish-directory selection;
@@ -374,7 +378,8 @@ Current typed detection is limited to:
   detection, plus planner output metadata for `static`, `serverful-http`, `ssr`, and explicit
   `container-native` strategies;
 - local JavaScript/TypeScript detection for common framework dependencies/config files and
-  lockfiles, including Next.js App/Pages Router evidence, `output: "standalone"`,
+  lockfiles, including React/Vue/Svelte/Solid SPA static evidence, Next.js App/Pages Router
+  evidence, `output: "standalone"`,
   `output: "export"`/export-script, Nuxt `generate`, and SvelteKit `adapter-static`
   classification as `static`;
 - local Python detection for FastAPI, Django, Flask, `uv`, Poetry, pip, lockfiles, and `manage.py`;
@@ -382,8 +387,8 @@ Current typed detection is limited to:
 - fixed-version fixture coverage for Next.js, Vite, Angular, SvelteKit, Nuxt, Astro, Remix,
   Express, Fastify, NestJS, Hono, Koa, generic Node package scripts, FastAPI, Django, and Flask
   source inspection;
-- Vite, Angular, Astro, Nuxt generate, Next.js standalone/static export, and SvelteKit
-  adapter-static artifact planning.
+- Vite, React SPA, Vue SPA, Svelte SPA, Solid SPA, Angular, Astro, Nuxt generate, Next.js
+  standalone/static export, and SvelteKit adapter-static artifact planning.
 - Node API framework and generic package-script fixtures plan through the generic Node workspace
   image planner with framework metadata, `serverful-http` application shape, package-manager
   policy, base-image policy, install/build/start command metadata, generated Dockerfile assertions,

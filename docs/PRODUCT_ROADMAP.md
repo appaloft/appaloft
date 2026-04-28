@@ -807,7 +807,7 @@ mapping, matrix rows, and Web/CLI draft parity are all checked.
   `angular-static` planner.
 - [x] React/Vue/Svelte/Solid/Angular SPA baseline: Vite static and generic Node/static coverage
   exist.
-- [ ] React/Vue/Svelte/Solid SPA: detect framework-specific outputs and route static output through
+- [x] React/Vue/Svelte/Solid SPA: detect framework-specific outputs and route static output through
   static-server artifacts where Vite evidence is not sufficient.
 - [x] Nuxt/SvelteKit/Astro/Remix: Nuxt generate static, SvelteKit adapter-static/static, Astro
   static, and Remix server planner exist.
