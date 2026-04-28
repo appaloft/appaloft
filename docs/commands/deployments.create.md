@@ -469,9 +469,10 @@ Migration gaps:
 - Docker build/run/Compose command composition now uses typed runtime command specs with local/SSH
   renderers in the runtime adapter. Legacy workspace install/build/start command text remains a
   shell-script leaf until runtime profile command fields are fully remodeled.
-- runtime target execution selection now uses a `RuntimeTargetBackendRegistry` for local-shell and
-  generic-SSH single-server backends; deployment admission still needs to use that registry for
-  pre-acceptance `runtime_target_unsupported` checks before Swarm or Kubernetes backends are added.
+- runtime target execution selection and deployment admission now use a
+  `RuntimeTargetBackendRegistry` for local-shell and generic-SSH single-server backends; admission
+  rejects unresolved backends with pre-acceptance `runtime_target_unsupported` checks before Swarm
+  or Kubernetes backends are added.
 - generated default access routing is governed by ADR-017, but the current runtime adapter path still contains adapter-facing requested deployment route fields that must be replaced by provider-neutral route resolution.
 
 ## Open Questions
