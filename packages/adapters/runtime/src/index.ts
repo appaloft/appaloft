@@ -415,11 +415,7 @@ function hasEdgeProxyRoute(accessRoutes: AccessRoute[]): boolean {
 }
 
 function hasDerivedDefaultAccessRoute(requestedDeployment: RequestedDeploymentConfig): boolean {
-  const routeSource = requestedDeployment.accessRouteMetadata?.["access.routeSource"];
-  return (
-    requestedDeployment.accessContext?.routePurpose === "default-resource-access" &&
-    (routeSource === "durable-domain-binding" || routeSource === "server-applied-config-domain")
-  );
+  return requestedDeployment.accessContext?.routePurpose === "default-resource-access";
 }
 
 function runtimeVerificationStepsFor(input: {

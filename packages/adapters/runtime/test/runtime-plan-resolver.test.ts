@@ -1653,6 +1653,68 @@ describe("DefaultRuntimePlanResolver", () => {
     );
   });
 
+  test("[DEP-CREATE-SMOKE-002] allows generated default access domains on Compose plans", async () => {
+    ensureReflectMetadata();
+    const { DefaultRuntimePlanResolver } = await import("../src");
+    const resolver = new DefaultRuntimePlanResolver();
+    const context = createTestExecutionContext();
+
+    const result = await resolver.resolve(context, {
+      id: "plan_compose_generated_default_access",
+      source: createSource({
+        kind: "compose",
+        locator: "/tmp/compose-app/docker-compose.yml",
+        displayName: "compose-app",
+      }),
+      server: {
+        id: "srv_compose_generated_default_access",
+        providerKey: "local-shell",
+      },
+      environmentSnapshot: createEnvironmentSnapshot("snap_compose_generated_default_access"),
+      detectedReasoning: ["configured resource compose profile"],
+      requestedDeployment: {
+        method: "docker-compose",
+        port: 3000,
+        proxyKind: "traefik",
+        domains: ["compose.203-0-113-10.sslip.io"],
+        pathPrefix: "/",
+        tlsMode: "auto",
+        accessContext: {
+          projectId: "prj_demo",
+          environmentId: "env_demo",
+          resourceId: "res_demo",
+          resourceSlug: "compose",
+          destinationId: "dst_demo",
+          exposureMode: "reverse-proxy",
+          upstreamProtocol: "http",
+          routePurpose: "default-resource-access",
+        },
+        accessRouteMetadata: {
+          "access.routeSource": "generated-default",
+          "access.hostname": "compose.203-0-113-10.sslip.io",
+          "access.providerKey": "sslip",
+        },
+      },
+      generatedAt: "2026-01-01T00:00:00.000Z",
+    });
+
+    expect(result.isOk()).toBe(true);
+    const plan = result._unsafeUnwrap();
+
+    expect(plan.execution).toEqual(
+      expect.objectContaining({
+        kind: "docker-compose-stack",
+        accessRoutes: [],
+        metadata: expect.objectContaining({
+          "access.routeSource": "generated-default",
+          "access.hostname": "compose.203-0-113-10.sslip.io",
+          "access.providerKey": "sslip",
+          "resource.id": "res_demo",
+        }),
+      }),
+    );
+  });
+
   test("rejects explicit edge access routes on Compose plans", async () => {
     ensureReflectMetadata();
     const { DefaultRuntimePlanResolver } = await import("../src");
