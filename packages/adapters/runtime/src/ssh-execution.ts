@@ -2502,6 +2502,8 @@ export class SshExecutionBackend implements ExecutionBackend {
       metadata: state.runtimePlan.execution.metadata,
     });
     const containerName = metadata.containerName ?? runtimeInstanceNames.containerName;
+    const remoteRoot = this.remoteRuntimeDirectory(state.id.value);
+    const remoteWorkdir = metadata.remoteWorkdir ?? remoteSourceWorkdir(remoteRoot, state.runtimePlan.source.metadata);
 
     try {
       if (state.runtimePlan.execution.kind === "docker-container") {
@@ -2511,17 +2513,35 @@ export class SshExecutionBackend implements ExecutionBackend {
           cwd: runtimeDir,
           env,
         });
+      } else if (state.runtimePlan.execution.kind === "docker-compose-stack") {
+        const composeFile = metadata.composeFile ?? state.runtimePlan.execution.composeFile;
+        if (composeFile) {
+          const remoteComposeFile = composeFile.startsWith("/")
+            ? composeFile
+            : `${remoteWorkdir}/${composeFile}`;
+          this.runRemoteCommand({
+            target,
+            command: `docker compose -p ${shellQuote(
+              metadata.composeProjectName ?? runtimeInstanceNames.composeProjectName,
+            )} -f ${shellQuote(remoteComposeFile)} down`,
+            cwd: runtimeDir,
+            env,
+          });
+        }
       }
     } finally {
       this.cleanupPrivateKey(target);
     }
 
+    const composeFile = metadata.composeFile ?? state.runtimePlan.execution.composeFile;
     const logs = [
       phaseLog(
         "deploy",
         state.runtimePlan.execution.kind === "docker-container"
           ? `Removed SSH container ${containerName}`
-          : "No SSH cancellation cleanup required",
+          : state.runtimePlan.execution.kind === "docker-compose-stack" && composeFile
+            ? `Stopped SSH compose stack ${composeFile}`
+            : "No SSH cancellation cleanup required",
       ),
     ];
     this.report(context, {
@@ -2557,6 +2577,8 @@ export class SshExecutionBackend implements ExecutionBackend {
       deploymentId: state.id.value,
       metadata: state.runtimePlan.execution.metadata,
     });
+    const remoteRoot = this.remoteRuntimeDirectory(state.id.value);
+    const remoteWorkdir = metadata.remoteWorkdir ?? remoteSourceWorkdir(remoteRoot, state.runtimePlan.source.metadata);
 
     try {
       if (state.runtimePlan.execution.kind === "docker-container") {
@@ -2566,11 +2588,27 @@ export class SshExecutionBackend implements ExecutionBackend {
           cwd: runtimeDir,
           env,
         });
+      } else if (state.runtimePlan.execution.kind === "docker-compose-stack") {
+        const composeFile = metadata.composeFile ?? state.runtimePlan.execution.composeFile;
+        if (composeFile) {
+          const remoteComposeFile = composeFile.startsWith("/")
+            ? composeFile
+            : `${remoteWorkdir}/${composeFile}`;
+          this.runRemoteCommand({
+            target,
+            command: `docker compose -p ${shellQuote(
+              metadata.composeProjectName ?? runtimeInstanceNames.composeProjectName,
+            )} -f ${shellQuote(remoteComposeFile)} down`,
+            cwd: runtimeDir,
+            env,
+          });
+        }
       }
     } finally {
       this.cleanupPrivateKey(target);
     }
 
+    const composeFile = metadata.composeFile ?? state.runtimePlan.execution.composeFile;
     logs.push(
       phaseLog(
         "rollback",
@@ -2578,7 +2616,9 @@ export class SshExecutionBackend implements ExecutionBackend {
           ? `Removed SSH container ${metadata.containerName}`
           : state.runtimePlan.execution.kind === "docker-container"
             ? `Removed SSH container ${runtimeInstanceNames.containerName}`
-            : "No SSH container metadata recorded",
+            : state.runtimePlan.execution.kind === "docker-compose-stack" && composeFile
+              ? `Stopped SSH compose stack ${composeFile}`
+              : "No SSH container metadata recorded",
       ),
     );
     deployment.applyExecutionResult(
