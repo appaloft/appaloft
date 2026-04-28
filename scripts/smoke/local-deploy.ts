@@ -2,7 +2,12 @@ import { mkdirSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { $ } from "bun";
 
-type SmokeMethod = "workspace-commands" | "dockerfile" | "static";
+type SmokeMethod =
+  | "workspace-commands"
+  | "dockerfile"
+  | "docker-compose"
+  | "prebuilt-image"
+  | "static";
 
 function parseMethod(argv: string[]): SmokeMethod {
   const methodFlag = argv.find((argument) => argument.startsWith("--method="));
@@ -11,6 +16,8 @@ function parseMethod(argv: string[]): SmokeMethod {
   if (
     methodValue === "workspace-commands" ||
     methodValue === "dockerfile" ||
+    methodValue === "docker-compose" ||
+    methodValue === "prebuilt-image" ||
     methodValue === "static"
   ) {
     return methodValue;
@@ -130,6 +137,30 @@ async function createStaticSourceDir(workspaceDir: string): Promise<string> {
   return sourceDir;
 }
 
+function buildSmokeImage(input: { sourceDir: string; tag: string }): void {
+  const result = Bun.spawnSync(["docker", "build", "-t", input.tag, input.sourceDir], {
+    stderr: "pipe",
+    stdout: "pipe",
+  });
+  if (result.exitCode !== 0) {
+    throw new Error(
+      `Docker smoke image build failed\nstdout:\n${result.stdout.toString()}\nstderr:\n${result.stderr.toString()}`,
+    );
+  }
+}
+
+async function createComposeSourceDir(input: {
+  image: string;
+  workspaceDir: string;
+}): Promise<{ composeFile: string; sourceDir: string }> {
+  const sourceDir = join(input.workspaceDir, "compose-app");
+  const composeFile = join(sourceDir, "docker-compose.yml");
+  mkdirSync(sourceDir, { recursive: true });
+  await Bun.write(composeFile, ["services:", "  web:", `    image: ${input.image}`].join("\n"));
+
+  return { composeFile, sourceDir };
+}
+
 function parseRuntimeUrl(logs: string): string {
   const runtimeUrl = /Container is reachable at (http:\/\/127\.0\.0\.1:\d+(?:\/[^"\\\s]*)?)/u.exec(
     logs,
@@ -148,10 +179,24 @@ async function main(): Promise<void> {
   const workspaceDir = await createWorkspaceDir(tempRoot);
   const dataDir = join(workspaceDir, ".appaloft", "data");
   const pgliteDataDir = join(dataDir, "pglite");
-  const sourceDir =
-    method === "static"
-      ? await createStaticSourceDir(workspaceDir)
-      : resolve("examples/express-hello");
+  const suffix = crypto.randomUUID().slice(0, 8);
+  const defaultSourceDir = resolve("examples/express-hello");
+  const smokeImage = dockerName(`appaloft-smoke-${method}-${suffix}`);
+  let composeFile: string | undefined;
+  let sourceDir: string;
+  if (method === "static") {
+    sourceDir = await createStaticSourceDir(workspaceDir);
+  } else if (method === "prebuilt-image") {
+    buildSmokeImage({ sourceDir: defaultSourceDir, tag: smokeImage });
+    sourceDir = `docker://${smokeImage}`;
+  } else if (method === "docker-compose") {
+    buildSmokeImage({ sourceDir: defaultSourceDir, tag: smokeImage });
+    const composeSource = await createComposeSourceDir({ image: smokeImage, workspaceDir });
+    composeFile = composeSource.composeFile;
+    sourceDir = composeSource.composeFile;
+  } else {
+    sourceDir = defaultSourceDir;
+  }
   let serverProcess: Bun.Subprocess | null = null;
   let deploymentId: string | undefined;
   let preserveWorkspace = false;
@@ -175,7 +220,6 @@ async function main(): Promise<void> {
 
     await waitForHealth("http://127.0.0.1:3001/api/health");
 
-    const suffix = crypto.randomUUID().slice(0, 8);
     const project = runCli(["project", "create", "--name", `Smoke ${method} ${suffix}`], {
       dataDir,
       pgliteDataDir,
@@ -234,6 +278,10 @@ async function main(): Promise<void> {
       );
     } else if (method === "dockerfile") {
       deployArgs.push("--port", String(port), "--health-path", "/health");
+    } else if (method === "prebuilt-image") {
+      deployArgs.push("--port", String(port), "--health-path", "/health");
+    } else if (method === "docker-compose") {
+      deployArgs.push("--port", String(port));
     } else {
       deployArgs.push("--publish-dir", "/dist", "--health-path", "/");
     }
@@ -245,18 +293,31 @@ async function main(): Promise<void> {
     const logs = runCli(["logs", deploymentId], { dataDir, pgliteDataDir });
     expectCliSuccess(logs, "logs");
 
-    const appUrl = parseRuntimeUrl(logs.stdout);
-    await waitForHealth(appUrl);
+    const appUrl = method === "docker-compose" ? null : parseRuntimeUrl(logs.stdout);
+    if (appUrl) {
+      await waitForHealth(appUrl);
+    }
 
-    const response = await fetch(appUrl);
+    const response = appUrl ? await fetch(appUrl) : null;
     let payload: unknown;
-    if (method === "static") {
+    if (method === "docker-compose") {
+      if (!logs.stdout.includes("Compose stack started successfully")) {
+        throw new Error(`Compose smoke did not report a successful stack start:\n${logs.stdout}`);
+      }
+      payload = { composeStarted: true };
+    } else if (method === "static") {
+      if (!response) {
+        throw new Error("Static smoke response is missing");
+      }
       const html = await response.text();
       if (!html.includes("appaloft static smoke")) {
         throw new Error("Static smoke response did not include marker text");
       }
       payload = { htmlIncludesMarker: true };
     } else {
+      if (!response) {
+        throw new Error("Application smoke response is missing");
+      }
       payload = await response.json();
     }
     preserveWorkspace = true;
@@ -288,6 +349,24 @@ async function main(): Promise<void> {
     await serverProcess?.exited;
     if (!preserveWorkspace) {
       if (deploymentId) {
+        if (composeFile) {
+          Bun.spawnSync(
+            [
+              "docker",
+              "compose",
+              "-p",
+              dockerName(`appaloft-${deploymentId}`),
+              "-f",
+              composeFile,
+              "down",
+              "--remove-orphans",
+            ],
+            {
+              stderr: "ignore",
+              stdout: "ignore",
+            },
+          );
+        }
         Bun.spawnSync(["docker", "rm", "-f", dockerName(`appaloft-${deploymentId}`)], {
           stderr: "ignore",
           stdout: "ignore",
@@ -300,6 +379,10 @@ async function main(): Promise<void> {
           },
         );
       }
+      Bun.spawnSync(["docker", "image", "rm", "-f", smokeImage], {
+        stderr: "ignore",
+        stdout: "ignore",
+      });
       await $`rm -rf ${workspaceDir}`;
     }
   }

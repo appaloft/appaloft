@@ -80,6 +80,7 @@ import {
   type RuntimePlanResolver,
 } from "@appaloft/application";
 import { i18nKeys } from "@appaloft/i18n";
+import { basename, dirname } from "node:path";
 import { LocalExecutionBackend } from "./local-execution";
 import { SshExecutionBackend } from "./ssh-execution";
 import { resolveStaticFrameworkPlan } from "./workspace-planners/javascript/static-frameworks";
@@ -124,6 +125,46 @@ function composeRuntimeArtifact(input: {
 
 function dockerContainerPort(requestedDeployment: RequestedDeploymentConfig): PortNumber {
   return PortNumber.rehydrate(requestedDeployment.port ?? 3000);
+}
+
+function looksLikeComposeFile(locator: string): boolean {
+  return /(^|[/\\])(compose|docker-compose)\.ya?ml$/iu.test(locator);
+}
+
+function composeSourcePaths(
+  source: SourceDescriptor,
+  requestedDeployment: RequestedDeploymentConfig,
+): { composeFile: string; workingDirectory: string } {
+  if (source.kind === "docker-compose-inline") {
+    return {
+      composeFile:
+        source.inspection?.composeFilePath ?? source.metadata?.composeFilePath ?? "docker-compose.yml",
+      workingDirectory: source.locator,
+    };
+  }
+
+  const configuredComposeFile =
+    requestedDeployment.dockerComposeFilePath ??
+    source.inspection?.composeFilePath ??
+    source.metadata?.composeFilePath;
+  if (configuredComposeFile) {
+    return {
+      composeFile: configuredComposeFile,
+      workingDirectory: source.locator,
+    };
+  }
+
+  if (source.kind === "compose" && looksLikeComposeFile(source.locator)) {
+    return {
+      composeFile: basename(source.locator),
+      workingDirectory: dirname(source.locator),
+    };
+  }
+
+  return {
+    composeFile: source.locator,
+    workingDirectory: source.locator,
+  };
 }
 
 function runtimeHealthCheckFields(requestedDeployment: RequestedDeploymentConfig) {
@@ -507,13 +548,10 @@ function chooseStrategies(input: {
       : requestedDeployment.method;
 
   if (requestedMethod === "docker-compose") {
-    const composeFile =
-      source.kind === "docker-compose-inline"
-        ? (source.inspection?.composeFilePath ?? source.metadata?.composeFilePath ?? "docker-compose.yml")
-        : source.locator;
+    const { composeFile, workingDirectory } = composeSourcePaths(source, requestedDeployment);
     const execution = RuntimeExecutionPlan.rehydrate({
       kind: ExecutionStrategyKindValue.rehydrate("docker-compose-stack"),
-      workingDirectory: FilePathText.rehydrate(source.locator),
+      workingDirectory: FilePathText.rehydrate(workingDirectory),
       composeFile: FilePathText.rehydrate(composeFile),
       ...runtimeHealthCheckFields(requestedDeployment),
       ...(requestedDeployment.port ? { port: PortNumber.rehydrate(requestedDeployment.port) } : {}),
@@ -650,7 +688,11 @@ function chooseStrategies(input: {
 
   if (requestedMethod === "dockerfile") {
     const port = dockerContainerPort(requestedDeployment);
-    const dockerfilePath = source.inspection?.dockerfilePath ?? source.metadata?.dockerfilePath ?? "Dockerfile";
+    const dockerfilePath =
+      requestedDeployment.dockerfilePath ??
+      source.inspection?.dockerfilePath ??
+      source.metadata?.dockerfilePath ??
+      "Dockerfile";
     const execution = RuntimeExecutionPlan.rehydrate({
       kind: ExecutionStrategyKindValue.rehydrate("docker-container"),
       workingDirectory: FilePathText.rehydrate(source.locator),

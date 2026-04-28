@@ -1136,6 +1136,54 @@ describe("DefaultRuntimePlanResolver", () => {
     expect(plan.steps).not.toContain("Configure edge proxy");
   });
 
+  test("[DEP-CREATE-SMOKE-001] resolves resource-owned Dockerfile path into the runtime plan", async () => {
+    ensureReflectMetadata();
+    const { DefaultRuntimePlanResolver } = await import("../src");
+    const resolver = new DefaultRuntimePlanResolver();
+    const context = createTestExecutionContext();
+
+    const result = await resolver.resolve(context, {
+      id: "plan_dockerfile_profile",
+      source: createSource({
+        kind: "local-folder",
+        locator: "/tmp/docker-app",
+        displayName: "docker-app",
+        inspection: createSourceInspection({
+          detectedFiles: ["dockerfile", "package-json"],
+          dockerfilePath: "Dockerfile",
+        }),
+      }),
+      server: {
+        id: "srv_dockerfile_profile",
+        providerKey: "local-shell",
+      },
+      environmentSnapshot: createEnvironmentSnapshot("snap_dockerfile_profile"),
+      detectedReasoning: ["configured resource runtime profile"],
+      requestedDeployment: {
+        method: "dockerfile",
+        dockerfilePath: "deploy/Dockerfile",
+        port: 4311,
+      },
+      generatedAt: "2026-01-01T00:00:00.000Z",
+    });
+
+    expect(result.isOk()).toBe(true);
+    const plan = result._unsafeUnwrap();
+
+    expect(plan.buildStrategy).toBe("dockerfile");
+    expect(plan.runtimeArtifact?.metadata).toEqual(
+      expect.objectContaining({
+        dockerfilePath: "deploy/Dockerfile",
+      }),
+    );
+    expect(plan.execution).toEqual(
+      expect.objectContaining({
+        kind: "docker-container",
+        dockerfilePath: "deploy/Dockerfile",
+      }),
+    );
+  });
+
   test("adds a direct-port access route only when the resource exposure mode is direct-port", async () => {
     ensureReflectMetadata();
     const { DefaultRuntimePlanResolver } = await import("../src");
@@ -1392,6 +1440,54 @@ describe("DefaultRuntimePlanResolver", () => {
       expect.objectContaining({
         kind: "docker-compose-stack",
         composeFile: "compose.yml",
+      }),
+    );
+  });
+
+  test("[DEP-CREATE-SMOKE-002][DEP-CREATE-SMOKE-006] resolves compose file sources to a stable workdir and compose file", async () => {
+    ensureReflectMetadata();
+    const { DefaultRuntimePlanResolver } = await import("../src");
+    const resolver = new DefaultRuntimePlanResolver();
+    const context = createTestExecutionContext();
+
+    const result = await resolver.resolve(context, {
+      id: "plan_compose_file",
+      source: createSource({
+        kind: "compose",
+        locator: "/tmp/compose-app/docker-compose.yml",
+        displayName: "compose-app",
+        inspection: createSourceInspection({
+          detectedFiles: ["compose-manifest"],
+        }),
+      }),
+      server: {
+        id: "srv_compose_file",
+        providerKey: "generic-ssh",
+      },
+      environmentSnapshot: createEnvironmentSnapshot("snap_compose_file"),
+      detectedReasoning: ["configured resource compose profile"],
+      requestedDeployment: {
+        method: "docker-compose",
+        port: 4312,
+      },
+      generatedAt: "2026-01-01T00:00:00.000Z",
+    });
+
+    expect(result.isOk()).toBe(true);
+    const plan = result._unsafeUnwrap();
+
+    expect(plan.buildStrategy).toBe("compose-deploy");
+    expect(plan.runtimeArtifact).toEqual(
+      expect.objectContaining({
+        kind: "compose-project",
+        composeFile: "docker-compose.yml",
+      }),
+    );
+    expect(plan.execution).toEqual(
+      expect.objectContaining({
+        kind: "docker-compose-stack",
+        workingDirectory: "/tmp/compose-app",
+        composeFile: "docker-compose.yml",
       }),
     );
   });

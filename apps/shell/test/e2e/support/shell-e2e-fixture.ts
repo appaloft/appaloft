@@ -242,6 +242,25 @@ export function cleanupLocalDockerDeployment(deploymentId: string | undefined): 
   runDocker(["image", "rm", "-f", dockerName(`appaloft-image-${deploymentId}`)]);
 }
 
+export function cleanupLocalDockerComposeDeployment(
+  deploymentId: string | undefined,
+  composeFile: string,
+): void {
+  if (!deploymentId) {
+    return;
+  }
+
+  runDocker([
+    "compose",
+    "-p",
+    dockerName(`appaloft-${deploymentId}`),
+    "-f",
+    composeFile,
+    "down",
+    "--remove-orphans",
+  ]);
+}
+
 export async function reservePort(): Promise<number> {
   return await new Promise<number>((resolvePort, reject) => {
     const server = createServer();

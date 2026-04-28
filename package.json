@@ -36,6 +36,8 @@
     "checksums": "bun run scripts/release/generate-checksums.ts",
     "smoke:local:commands": "bun run scripts/smoke/local-deploy.ts --method=workspace-commands --port=4310",
     "smoke:local:docker": "bun run scripts/smoke/local-deploy.ts --method=dockerfile --port=4311",
+    "smoke:local:compose": "bun run scripts/smoke/local-deploy.ts --method=docker-compose --port=4312",
+    "smoke:local:prebuilt": "bun run scripts/smoke/local-deploy.ts --method=prebuilt-image --port=4313",
     "smoke:local:static": "bun run scripts/smoke/local-deploy.ts --method=static",
     "prepare": "husky"
   },

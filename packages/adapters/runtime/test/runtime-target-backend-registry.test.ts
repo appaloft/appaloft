@@ -177,6 +177,31 @@ describe("DefaultRuntimeTargetBackendRegistry", () => {
       );
     }
   });
+
+  test("[DEP-CREATE-SMOKE-005][DEP-CREATE-SMOKE-006] resolves generic-ssh for Dockerfile and Compose apply/log capabilities", async () => {
+    ensureReflectMetadata();
+    const { createDefaultRuntimeTargetBackendRegistry } = await import("../src");
+    const registry = createDefaultRuntimeTargetBackendRegistry({
+      localBackend: new RecordingExecutionBackend("local"),
+      sshBackend: new RecordingExecutionBackend("ssh"),
+    });
+
+    const dockerfileResult = registry.find({
+      targetKind: "single-server",
+      providerKey: "generic-ssh",
+      requiredCapabilities: ["runtime.apply", "runtime.verify", "runtime.logs"],
+    });
+    const composeResult = registry.find({
+      targetKind: "single-server",
+      providerKey: "generic-ssh",
+      requiredCapabilities: ["runtime.apply", "runtime.logs"],
+    });
+
+    expect(dockerfileResult.isOk()).toBe(true);
+    expect(composeResult.isOk()).toBe(true);
+    expect(dockerfileResult._unsafeUnwrap().descriptor.providerKey).toBe("generic-ssh");
+    expect(composeResult._unsafeUnwrap().descriptor.targetKinds).toContain("single-server");
+  });
 });
 
 describe("RoutingExecutionBackend", () => {

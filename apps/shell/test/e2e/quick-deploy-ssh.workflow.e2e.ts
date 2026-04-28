@@ -16,6 +16,7 @@ const enabled = process.env.APPALOFT_E2E_SSH_QUICK_DEPLOY === "true";
 const successfulFixtureDir = fixturePath("docker-express-hello");
 const failingFixtureDir = fixturePath("docker-exits-fast");
 const staticFixtureDir = fixturePath("static-site");
+const composeFixtureFile = join(fixturePath("docker-compose-hello"), "docker-compose.yml");
 
 interface SshConfig {
   host: string;
@@ -98,6 +99,7 @@ function remoteCleanup(config: SshConfig, deploymentId: string): void {
   runSsh(
     config,
     [
+      `docker compose -p '${containerName}' down --remove-orphans >/dev/null 2>&1 || true`,
       `docker rm -f '${containerName}' >/dev/null 2>&1 || true`,
       `docker image rm -f '${imageName}' >/dev/null 2>&1 || true`,
       `rm -rf '${remoteRoot}'`,
@@ -184,6 +186,7 @@ function bootstrapSshContext(input: {
 describe("quick deploy SSH workflow e2e", () => {
   if (!enabled) {
     test.skip("[QUICK-DEPLOY-WF-022] opt-in SSH Docker workflow requires APPALOFT_E2E_SSH_QUICK_DEPLOY=true", () => {});
+    test.skip("[QUICK-DEPLOY-WF-060] opt-in SSH Docker Compose workflow requires APPALOFT_E2E_SSH_QUICK_DEPLOY=true", () => {});
     test.skip("[QUICK-DEPLOY-WF-034] opt-in SSH failure diagnostics workflow requires APPALOFT_E2E_SSH_QUICK_DEPLOY=true", () => {});
     test.skip("[QUICK-DEPLOY-WF-040] opt-in SSH static site workflow requires APPALOFT_E2E_SSH_QUICK_DEPLOY=true", () => {});
     return;
@@ -271,6 +274,57 @@ describe("quick deploy SSH workflow e2e", () => {
       expect(logs.stdout).toContain("Using SSH docker-container execution");
       expect(logs.stdout).toContain("SSH container is reachable internally");
       expect(logs.stdout).toContain("SSH public route is reachable");
+    } finally {
+      if (deploymentId) {
+        remoteCleanup(config, deploymentId);
+      }
+    }
+  }, 240000);
+
+  test("[QUICK-DEPLOY-WF-060] quick deploys a Docker Compose stack to an SSH target", () => {
+    let deploymentId: string | undefined;
+
+    try {
+      const deployment = runShellCli(
+        [
+          "deploy",
+          composeFixtureFile,
+          "--project",
+          failedRuntimeContext.projectId,
+          "--server",
+          failedRuntimeContext.serverId,
+          "--environment",
+          failedRuntimeContext.environmentId,
+          "--method",
+          "docker-compose",
+          "--port",
+          "3000",
+          "--app-log-lines",
+          "8",
+        ],
+        workspace.cliOptions,
+      );
+      expectCliSuccess(deployment, "quick deploy SSH Docker Compose");
+      deploymentId = parseJson<{ id: string }>(deployment.stdout).id;
+
+      const deployments = runShellCli(["deployments", "list"], workspace.cliOptions);
+      expectCliSuccess(deployments, "list deployments");
+      expect(
+        parseJson<{ items: Array<{ id: string; status: string }> }>(deployments.stdout).items,
+      ).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            id: deploymentId,
+            status: "succeeded",
+          }),
+        ]),
+      );
+
+      const logs = runShellCli(["logs", deploymentId], workspace.cliOptions);
+      expectCliSuccess(logs, "deployment logs");
+      expect(logs.stdout).toContain("Using SSH docker-compose-stack execution");
+      expect(logs.stdout).toContain("SSH compose stack started");
+      expect(logs.stdout).toContain("docker-compose.yml");
     } finally {
       if (deploymentId) {
         remoteCleanup(config, deploymentId);

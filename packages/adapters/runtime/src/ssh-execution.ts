@@ -1264,7 +1264,7 @@ export class SshExecutionBackend implements ExecutionBackend {
     }
 
     const localWorkdir = localSourceWorkdir(
-      state.runtimePlan.execution.workingDirectory ?? normalizeWorkingDirectory(source.locator),
+      normalizeWorkingDirectory(state.runtimePlan.execution.workingDirectory ?? source.locator),
       source.metadata,
     );
 
