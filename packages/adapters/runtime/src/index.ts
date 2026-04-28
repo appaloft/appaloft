@@ -135,6 +135,7 @@ function composeSourcePaths(
   source: SourceDescriptor,
   requestedDeployment: RequestedDeploymentConfig,
 ): { composeFile: string; workingDirectory: string } {
+  const sourceLocatorIsComposeFile = source.kind === "compose" && looksLikeComposeFile(source.locator);
   if (source.kind === "docker-compose-inline") {
     return {
       composeFile:
@@ -150,11 +151,11 @@ function composeSourcePaths(
   if (configuredComposeFile) {
     return {
       composeFile: configuredComposeFile,
-      workingDirectory: source.locator,
+      workingDirectory: sourceLocatorIsComposeFile ? dirname(source.locator) : source.locator,
     };
   }
 
-  if (source.kind === "compose" && looksLikeComposeFile(source.locator)) {
+  if (sourceLocatorIsComposeFile) {
     return {
       composeFile: basename(source.locator),
       workingDirectory: dirname(source.locator),
@@ -413,6 +414,10 @@ function hasEdgeProxyRoute(accessRoutes: AccessRoute[]): boolean {
   return accessRoutes.some((route) => route.proxyKind !== "none");
 }
 
+function hasDerivedDefaultAccessRoute(requestedDeployment: RequestedDeploymentConfig): boolean {
+  return requestedDeployment.accessContext?.routePurpose === "default-resource-access";
+}
+
 function runtimeVerificationStepsFor(input: {
   execution: RuntimeExecutionPlan;
   accessRoutes: AccessRoute[];
@@ -482,15 +487,19 @@ function withRequestedAccessRoutes(input: {
     requestedDeployment: input.requestedDeployment,
     ...(input.execution.port ? { fallbackPort: input.execution.port } : {}),
   }).andThen((accessRoutes) => {
+    const metadata = executionMetadataFor(input.requestedDeployment);
+    const executionWithMetadata =
+      Object.keys(metadata).length > 0 ? input.execution.withMetadata(metadata) : input.execution;
+
     if (accessRoutes.length > 0 && input.execution.kind !== "docker-container") {
-      if (!hasEdgeProxyRoute(accessRoutes)) {
+      if (!hasEdgeProxyRoute(accessRoutes) || hasDerivedDefaultAccessRoute(input.requestedDeployment)) {
         return ok({
           buildStrategy: input.buildStrategy,
           packagingMode: input.packagingMode,
-          execution: input.execution,
+          execution: executionWithMetadata,
           runtimeArtifact: input.runtimeArtifact,
           steps: runtimePlanStepsFor({
-            execution: input.execution,
+            execution: executionWithMetadata,
             accessRoutes: [],
             steps: input.steps,
           }),
@@ -504,9 +513,6 @@ function withRequestedAccessRoutes(input: {
       );
     }
 
-    const metadata = executionMetadataFor(input.requestedDeployment);
-    const executionWithMetadata =
-      Object.keys(metadata).length > 0 ? input.execution.withMetadata(metadata) : input.execution;
     const execution =
       accessRoutes.length > 0
         ? executionWithMetadata.withAccessRoutes(accessRoutes)
@@ -555,6 +561,13 @@ function chooseStrategies(input: {
       composeFile: FilePathText.rehydrate(composeFile),
       ...runtimeHealthCheckFields(requestedDeployment),
       ...(requestedDeployment.port ? { port: PortNumber.rehydrate(requestedDeployment.port) } : {}),
+      metadata: {
+        "compose.file": composeFile,
+        "compose.workingDirectory": workingDirectory,
+        "compose.projectNameSource": "runtime-instance-name",
+        composeFile,
+        workdir: workingDirectory,
+      },
     });
     return withRequestedAccessRoutes({
       requestedDeployment,
@@ -566,6 +579,9 @@ function chooseStrategies(input: {
         metadata: {
           sourceKind: source.kind,
           applicationShape: "container-native",
+          composeFile,
+          composeWorkingDirectory: workingDirectory,
+          composeProjectNameSource: "runtime-instance-name",
         },
       }),
       steps: [
@@ -578,6 +594,16 @@ function chooseStrategies(input: {
   }
 
   if (requestedMethod === "prebuilt-image") {
+    if (source.kind !== "docker-image") {
+      return err(
+        domainError.validation("Prebuilt image deployments require a docker-image source", {
+          phase: "runtime-artifact-resolution",
+          sourceKind: source.kind,
+          runtimePlanStrategy: "prebuilt-image",
+        }),
+      );
+    }
+
     const port = dockerContainerPort(requestedDeployment);
     const image = normalizeDockerImage(source.locator);
     const execution = RuntimeExecutionPlan.rehydrate({
@@ -585,6 +611,10 @@ function chooseStrategies(input: {
       image: ImageReference.rehydrate(image),
       ...runtimeHealthCheckFields(requestedDeployment),
       port,
+      metadata: {
+        "image.reference": image,
+        "artifact.intent": "prebuilt-image",
+      },
     });
     return withRequestedAccessRoutes({
       requestedDeployment,

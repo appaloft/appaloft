@@ -496,8 +496,8 @@ Required:
 - [x] Finish CLI migration to the shared Quick Deploy workflow program.
 - [x] Make deployment admission use the runtime target backend registry before acceptance.
 - [x] Add unsupported-target rejection before acceptance.
-- [ ] Broaden local/generic-SSH Docker/Compose smoke coverage.
-- [ ] Harden generated Dockerfile, Compose, prebuilt image, static artifact, and workspace-command
+- [x] Broaden local/generic-SSH Docker/Compose smoke coverage.
+- [x] Harden generated Dockerfile, Compose, prebuilt image, static artifact, and workspace-command
   planning as Docker/OCI artifact paths.
 - [ ] Make Next.js first-class across SSR, standalone, and static-export modes.
 - [ ] Add useful Next.js app/pages router and output detection where it affects planning.

@@ -1184,6 +1184,41 @@ describe("DefaultRuntimePlanResolver", () => {
     );
   });
 
+  test("[DEP-CREATE-SMOKE-003] rejects prebuilt image planning for non-image sources with structured details", async () => {
+    ensureReflectMetadata();
+    const { DefaultRuntimePlanResolver } = await import("../src");
+    const resolver = new DefaultRuntimePlanResolver();
+    const context = createTestExecutionContext();
+
+    const result = await resolver.resolve(context, {
+      id: "plan_prebuilt_incompatible_source",
+      source: createSource({
+        kind: "local-folder",
+        locator: "/tmp/app",
+        displayName: "app",
+      }),
+      server: {
+        id: "srv_prebuilt_incompatible_source",
+        providerKey: "local-shell",
+      },
+      environmentSnapshot: createEnvironmentSnapshot("snap_prebuilt_incompatible_source"),
+      detectedReasoning: ["configured prebuilt image profile"],
+      requestedDeployment: {
+        method: "prebuilt-image",
+        port: 4314,
+      },
+      generatedAt: "2026-01-01T00:00:00.000Z",
+    });
+
+    expect(result.isErr()).toBe(true);
+    const error = result._unsafeUnwrapErr();
+    expect(error.details).toMatchObject({
+      phase: "runtime-artifact-resolution",
+      sourceKind: "local-folder",
+      runtimePlanStrategy: "prebuilt-image",
+    });
+  });
+
   test("adds a direct-port access route only when the resource exposure mode is direct-port", async () => {
     ensureReflectMetadata();
     const { DefaultRuntimePlanResolver } = await import("../src");
@@ -1488,7 +1523,228 @@ describe("DefaultRuntimePlanResolver", () => {
         kind: "docker-compose-stack",
         workingDirectory: "/tmp/compose-app",
         composeFile: "docker-compose.yml",
+        metadata: expect.objectContaining({
+          "compose.file": "docker-compose.yml",
+          "compose.workingDirectory": "/tmp/compose-app",
+          "compose.projectNameSource": "runtime-instance-name",
+          composeFile: "docker-compose.yml",
+          workdir: "/tmp/compose-app",
+        }),
       }),
+    );
+    expect(plan.runtimeArtifact?.metadata).toEqual(
+      expect.objectContaining({
+        composeFile: "docker-compose.yml",
+        composeWorkingDirectory: "/tmp/compose-app",
+        composeProjectNameSource: "runtime-instance-name",
+      }),
+    );
+  });
+
+  test("[DEP-CREATE-SMOKE-002][DEP-CREATE-SMOKE-006] keeps configured compose paths source-root relative when the source locator is a file", async () => {
+    ensureReflectMetadata();
+    const { DefaultRuntimePlanResolver } = await import("../src");
+    const resolver = new DefaultRuntimePlanResolver();
+    const context = createTestExecutionContext();
+
+    const result = await resolver.resolve(context, {
+      id: "plan_configured_compose_file",
+      source: createSource({
+        kind: "compose",
+        locator: "/tmp/compose-app/docker-compose.yml",
+        displayName: "compose-app",
+      }),
+      server: {
+        id: "srv_configured_compose_file",
+        providerKey: "generic-ssh",
+      },
+      environmentSnapshot: createEnvironmentSnapshot("snap_configured_compose_file"),
+      detectedReasoning: ["configured resource compose profile"],
+      requestedDeployment: {
+        method: "docker-compose",
+        dockerComposeFilePath: "deploy/compose.yml",
+        port: 4312,
+      },
+      generatedAt: "2026-01-01T00:00:00.000Z",
+    });
+
+    expect(result.isOk()).toBe(true);
+    const plan = result._unsafeUnwrap();
+
+    expect(plan.runtimeArtifact).toEqual(
+      expect.objectContaining({
+        kind: "compose-project",
+        composeFile: "deploy/compose.yml",
+        metadata: expect.objectContaining({
+          composeFile: "deploy/compose.yml",
+          composeWorkingDirectory: "/tmp/compose-app",
+        }),
+      }),
+    );
+    expect(plan.execution).toEqual(
+      expect.objectContaining({
+        kind: "docker-compose-stack",
+        workingDirectory: "/tmp/compose-app",
+        composeFile: "deploy/compose.yml",
+        metadata: expect.objectContaining({
+          composeFile: "deploy/compose.yml",
+          workdir: "/tmp/compose-app",
+        }),
+      }),
+    );
+  });
+
+  test("[DEP-CREATE-SMOKE-002] allows derived default access route metadata on Compose plans", async () => {
+    ensureReflectMetadata();
+    const { DefaultRuntimePlanResolver } = await import("../src");
+    const resolver = new DefaultRuntimePlanResolver();
+    const context = createTestExecutionContext();
+
+    const result = await resolver.resolve(context, {
+      id: "plan_compose_derived_access",
+      source: createSource({
+        kind: "compose",
+        locator: "/tmp/compose-app/docker-compose.yml",
+        displayName: "compose-app",
+      }),
+      server: {
+        id: "srv_compose_derived_access",
+        providerKey: "local-shell",
+      },
+      environmentSnapshot: createEnvironmentSnapshot("snap_compose_derived_access"),
+      detectedReasoning: ["configured resource compose profile"],
+      requestedDeployment: {
+        method: "docker-compose",
+        port: 3000,
+        proxyKind: "traefik",
+        domains: ["compose.localtest.me"],
+        accessContext: {
+          projectId: "prj_demo",
+          environmentId: "env_demo",
+          resourceId: "res_demo",
+          resourceSlug: "compose",
+          destinationId: "dst_demo",
+          exposureMode: "reverse-proxy",
+          upstreamProtocol: "http",
+          routePurpose: "default-resource-access",
+        },
+        accessRouteMetadata: {
+          "access.routeSource": "server-applied-config-domain",
+          "access.hostname": "compose.localtest.me",
+        },
+      },
+      generatedAt: "2026-01-01T00:00:00.000Z",
+    });
+
+    expect(result.isOk()).toBe(true);
+    const plan = result._unsafeUnwrap();
+
+    expect(plan.execution).toEqual(
+      expect.objectContaining({
+        kind: "docker-compose-stack",
+        accessRoutes: [],
+        metadata: expect.objectContaining({
+          "access.routeSource": "server-applied-config-domain",
+          "access.hostname": "compose.localtest.me",
+          "resource.id": "res_demo",
+          composeFile: "docker-compose.yml",
+        }),
+      }),
+    );
+  });
+
+  test("[DEP-CREATE-SMOKE-002] allows generated default access domains on Compose plans", async () => {
+    ensureReflectMetadata();
+    const { DefaultRuntimePlanResolver } = await import("../src");
+    const resolver = new DefaultRuntimePlanResolver();
+    const context = createTestExecutionContext();
+
+    const result = await resolver.resolve(context, {
+      id: "plan_compose_generated_default_access",
+      source: createSource({
+        kind: "compose",
+        locator: "/tmp/compose-app/docker-compose.yml",
+        displayName: "compose-app",
+      }),
+      server: {
+        id: "srv_compose_generated_default_access",
+        providerKey: "local-shell",
+      },
+      environmentSnapshot: createEnvironmentSnapshot("snap_compose_generated_default_access"),
+      detectedReasoning: ["configured resource compose profile"],
+      requestedDeployment: {
+        method: "docker-compose",
+        port: 3000,
+        proxyKind: "traefik",
+        domains: ["compose.203-0-113-10.sslip.io"],
+        pathPrefix: "/",
+        tlsMode: "auto",
+        accessContext: {
+          projectId: "prj_demo",
+          environmentId: "env_demo",
+          resourceId: "res_demo",
+          resourceSlug: "compose",
+          destinationId: "dst_demo",
+          exposureMode: "reverse-proxy",
+          upstreamProtocol: "http",
+          routePurpose: "default-resource-access",
+        },
+        accessRouteMetadata: {
+          "access.routeSource": "generated-default",
+          "access.hostname": "compose.203-0-113-10.sslip.io",
+          "access.providerKey": "sslip",
+        },
+      },
+      generatedAt: "2026-01-01T00:00:00.000Z",
+    });
+
+    expect(result.isOk()).toBe(true);
+    const plan = result._unsafeUnwrap();
+
+    expect(plan.execution).toEqual(
+      expect.objectContaining({
+        kind: "docker-compose-stack",
+        accessRoutes: [],
+        metadata: expect.objectContaining({
+          "access.routeSource": "generated-default",
+          "access.hostname": "compose.203-0-113-10.sslip.io",
+          "access.providerKey": "sslip",
+          "resource.id": "res_demo",
+        }),
+      }),
+    );
+  });
+
+  test("rejects explicit edge access routes on Compose plans", async () => {
+    ensureReflectMetadata();
+    const { DefaultRuntimePlanResolver } = await import("../src");
+    const resolver = new DefaultRuntimePlanResolver();
+    const context = createTestExecutionContext();
+
+    const result = await resolver.resolve(context, {
+      id: "plan_compose_explicit_access",
+      source: createSource({
+        kind: "compose",
+        locator: "/tmp/compose-app/docker-compose.yml",
+        displayName: "compose-app",
+      }),
+      server: {
+        id: "srv_compose_explicit_access",
+        providerKey: "local-shell",
+      },
+      environmentSnapshot: createEnvironmentSnapshot("snap_compose_explicit_access"),
+      detectedReasoning: ["configured resource compose profile"],
+      requestedDeployment: {
+        method: "docker-compose",
+        port: 3000,
+        domains: ["compose.example.com"],
+      },
+      generatedAt: "2026-01-01T00:00:00.000Z",
+    });
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr().message).toBe(
+      "Access routing is currently supported for Docker container deployments",
     );
   });
 

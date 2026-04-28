@@ -2377,24 +2377,31 @@ export class LocalExecutionBackend implements ExecutionBackend {
         break;
       }
       case "docker-compose-stack":
-        if (metadata.composeFile) {
-          const composeProjectFlag = metadata.composeProjectName
-            ? `-p ${shellQuote(metadata.composeProjectName)} `
-            : "";
-          runSyncCommand({
-            command: `docker compose ${composeProjectFlag}-f ${shellQuote(metadata.composeFile)} down`,
-            cwd: workdir,
-            env,
+        {
+          const runtimeInstanceNames = deriveRuntimeInstanceNames({
+            deploymentId: state.id.value,
+            metadata: state.runtimePlan.execution.metadata,
           });
+          const composeFile = metadata.composeFile ?? state.runtimePlan.execution.composeFile;
+          const composeProjectName =
+            metadata.composeProjectName ?? runtimeInstanceNames.composeProjectName;
+          if (composeFile) {
+            const composeProjectFlag = `-p ${shellQuote(composeProjectName)} `;
+            runSyncCommand({
+              command: `docker compose ${composeProjectFlag}-f ${shellQuote(composeFile)} down`,
+              cwd: workdir,
+              env,
+            });
+          }
+          logs.push(
+            phaseLog(
+              "deploy",
+              composeFile
+                ? `Stopped compose stack ${composeFile}`
+                : "No compose metadata recorded",
+            ),
+          );
         }
-        logs.push(
-          phaseLog(
-            "deploy",
-            metadata.composeFile
-              ? `Stopped compose stack ${metadata.composeFile}`
-              : "No compose metadata recorded",
-          ),
-        );
         break;
     }
 
@@ -2458,24 +2465,27 @@ export class LocalExecutionBackend implements ExecutionBackend {
           );
           break;
         case "docker-compose-stack":
-          if (metadata.composeFile) {
-            const composeProjectFlag = metadata.composeProjectName
-              ? `-p ${shellQuote(metadata.composeProjectName)} `
-              : "";
-            runSyncCommand({
-              command: `docker compose ${composeProjectFlag}-f ${metadata.composeFile} down`,
-              cwd: workdir,
-              env,
-            });
+          {
+            const composeFile = metadata.composeFile ?? state.runtimePlan.execution.composeFile;
+            const composeProjectName =
+              metadata.composeProjectName ?? runtimeInstanceNames.composeProjectName;
+            if (composeFile) {
+              const composeProjectFlag = `-p ${shellQuote(composeProjectName)} `;
+              runSyncCommand({
+                command: `docker compose ${composeProjectFlag}-f ${shellQuote(composeFile)} down`,
+                cwd: workdir,
+                env,
+              });
+            }
+            logs.push(
+              phaseLog(
+                "rollback",
+                composeFile
+                  ? `Stopped compose stack ${composeFile}`
+                  : "No compose metadata recorded",
+              ),
+            );
           }
-          logs.push(
-            phaseLog(
-              "rollback",
-              metadata.composeFile
-                ? `Stopped compose stack ${metadata.composeFile}`
-                : "No compose metadata recorded",
-            ),
-          );
           break;
       }
 
