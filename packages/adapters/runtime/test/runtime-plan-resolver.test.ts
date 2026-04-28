@@ -734,6 +734,188 @@ describe("DefaultRuntimePlanResolver", () => {
     );
   });
 
+  const namedSpaStaticCases: Array<{
+    framework: Extract<SourceFramework, "react" | "solid" | "svelte" | "vue">;
+    packageManager: Extract<SourcePackageManager, "bun" | "npm" | "pnpm" | "yarn">;
+    planner: string;
+    baseImage: string;
+    publishDirectory: string;
+    installCommand: string;
+    buildCommand: string;
+  }> = [
+    {
+      framework: "react",
+      packageManager: "npm",
+      planner: "react-static",
+      baseImage: "node:22-alpine",
+      publishDirectory: "/build",
+      installCommand: "npm install",
+      buildCommand: "npm run build",
+    },
+    {
+      framework: "vue",
+      packageManager: "pnpm",
+      planner: "vue-static",
+      baseImage: "node:22-alpine",
+      publishDirectory: "/dist",
+      installCommand: "pnpm install",
+      buildCommand: "pnpm build",
+    },
+    {
+      framework: "svelte",
+      packageManager: "yarn",
+      planner: "svelte-static",
+      baseImage: "node:22-alpine",
+      publishDirectory: "/public",
+      installCommand: "yarn install --frozen-lockfile",
+      buildCommand: "yarn build",
+    },
+    {
+      framework: "solid",
+      packageManager: "bun",
+      planner: "solid-static",
+      baseImage: pinnedBunAlpineImage,
+      publishDirectory: "/dist",
+      installCommand: "bun install",
+      buildCommand: "bun run build",
+    },
+  ];
+
+  for (const fixture of namedSpaStaticCases) {
+    test(`[DEP-CREATE-ADM-033][WF-PLAN-CAT-007] packages ${fixture.framework} SPA static output as static artifact`, async () => {
+      ensureReflectMetadata();
+      const [{ DefaultRuntimePlanResolver }, { generateStaticSiteDockerBuild }] = await Promise.all([
+        import("../src"),
+        import("../src/workspace-planners"),
+      ]);
+      const resolver = new DefaultRuntimePlanResolver();
+      const context = createTestExecutionContext();
+
+      const result = await resolver.resolve(context, {
+        id: `plan_${fixture.framework}_spa_static`,
+        source: createSource({
+          kind: "local-folder",
+          locator: `/tmp/${fixture.framework}-spa`,
+          displayName: `${fixture.framework}-spa`,
+          inspection: createSourceInspection({
+            runtimeFamily: "node",
+            framework: fixture.framework,
+            packageManager: fixture.packageManager,
+            applicationShape: "static",
+            detectedFiles: ["package-json"],
+            detectedScripts: ["build", "preview"],
+          }),
+        }),
+        server: {
+          id: `srv_${fixture.framework}_spa`,
+          providerKey: "local-shell",
+        },
+        environmentSnapshot: createEnvironmentSnapshot(`snap_${fixture.framework}_spa`),
+        detectedReasoning: [`detected ${fixture.framework} SPA static app`],
+        requestedDeployment: {
+          method: "auto",
+          port: 80,
+        },
+        generatedAt: "2026-01-01T00:00:00.000Z",
+      });
+
+      expect(result.isOk()).toBe(true);
+      const plan = result._unsafeUnwrap();
+      const dockerBuild = generateStaticSiteDockerBuild({
+        execution: plan.execution,
+        sourceInspection: plan.source.inspection,
+      });
+
+      expect(plan.buildStrategy).toBe("static-artifact");
+      expect(plan.runtimeArtifact?.metadata).toEqual(
+        expect.objectContaining({
+          planner: fixture.planner,
+          runtimeKind: "static",
+          framework: fixture.framework,
+          packageManager: fixture.packageManager,
+          baseImage: fixture.baseImage,
+          publishDirectory: fixture.publishDirectory,
+          applicationShape: "static",
+          packageCommand: "static-server",
+        }),
+      );
+      expect(plan.execution).toEqual(
+        expect.objectContaining({
+          kind: "docker-container",
+          dockerfilePath: "Dockerfile.appaloft-static",
+          installCommand: fixture.installCommand,
+          buildCommand: fixture.buildCommand,
+          port: 80,
+        }),
+      );
+      expect(plan.execution.startCommand).toBeUndefined();
+      expect(plan.execution.metadata).toEqual(
+        expect.objectContaining({
+          "static.publishDirectory": fixture.publishDirectory,
+          "workspace.planner": fixture.planner,
+          "workspace.framework": fixture.framework,
+          "workspace.packageManager": fixture.packageManager,
+          "workspace.baseImage": fixture.baseImage,
+          "workspace.applicationShape": "static",
+          "workspace.packageCommand": "static-server",
+        }),
+      );
+      expect(dockerBuild?.dockerfile).toContain(`FROM ${fixture.baseImage} AS build`);
+      expect(dockerBuild?.dockerfile).toContain(fixture.installCommand);
+      expect(dockerBuild?.dockerfile).toContain(fixture.buildCommand);
+      expect(dockerBuild?.dockerfile).toContain("FROM nginx:1.27-alpine");
+    });
+  }
+
+  test("[DEP-CREATE-ADM-029][WF-PLAN-DET-012][WF-PLAN-CAT-007] rejects SPA dev or preview evidence without static output", async () => {
+    ensureReflectMetadata();
+    const { DefaultRuntimePlanResolver } = await import("../src");
+    const resolver = new DefaultRuntimePlanResolver();
+    const context = createTestExecutionContext();
+
+    const result = await resolver.resolve(context, {
+      id: "plan_react_preview_only",
+      source: createSource({
+        kind: "local-folder",
+        locator: "/tmp/react-preview-only",
+        displayName: "react-preview-only",
+        inspection: createSourceInspection({
+          runtimeFamily: "node",
+          framework: "react",
+          packageManager: "npm",
+          applicationShape: "static",
+          detectedFiles: ["package-json"],
+          detectedScripts: ["start", "preview"],
+        }),
+      }),
+      server: {
+        id: "srv_react_preview_only",
+        providerKey: "local-shell",
+      },
+      environmentSnapshot: createEnvironmentSnapshot("snap_react_preview_only"),
+      detectedReasoning: ["detected react preview-only app"],
+      requestedDeployment: {
+        method: "auto",
+        port: 80,
+      },
+      generatedAt: "2026-01-01T00:00:00.000Z",
+    });
+
+    expect(result.isErr()).toBe(true);
+    const error = result._unsafeUnwrapErr();
+    expect(error.code).toBe("validation_error");
+    expect(error.details).toEqual(
+      expect.objectContaining({
+        phase: "runtime-plan-resolution",
+        framework: "react",
+        packageManager: "npm",
+        applicationShape: "static",
+        runtimePlanStrategy: "auto",
+      }),
+    );
+    expect(error.details?.detectedScripts).toEqual(["start", "preview"]);
+  });
+
   test("[DEP-CREATE-ADM-033] packages Nuxt generate output as static artifact", async () => {
     ensureReflectMetadata();
     const { DefaultRuntimePlanResolver } = await import("../src");

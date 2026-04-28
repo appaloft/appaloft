@@ -724,6 +724,7 @@ function chooseStrategies(input: {
                 ...selectedPlannerMetadata(staticFrameworkPlan.metadata, [
                   "nextOutputMode",
                   "nextRouterEvidence",
+                  "packageCommand",
                 ]),
               }
             : {}),

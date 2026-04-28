@@ -2146,13 +2146,17 @@ export interface DeploymentSummary {
           | "phoenix"
           | "quarkus"
           | "rails"
+          | "react"
           | "remix"
           | "rocket"
           | "sinatra"
           | "spring-boot"
+          | "solid"
+          | "svelte"
           | "sveltekit"
           | "symfony"
-          | "vite";
+          | "vite"
+          | "vue";
         packageManager?:
           | "bun"
           | "cargo"

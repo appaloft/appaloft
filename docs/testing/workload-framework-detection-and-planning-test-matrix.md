@@ -72,7 +72,11 @@ test expectations in the same change.
 | `next-ssr` | `WF-PLAN-CAT-001` | `next 15.2.4`, `react 19.0.0`, `react-dom 19.0.0`, `pnpm` marker | `node`, `nextjs`, `pnpm`, `ssr`, App Router evidence | `nextjs`, workspace image, `next build`, `next start`, Next router/output metadata |
 | `next-standalone` | `WF-PLAN-CAT-001` | `next 15.2.4`, `react 19.0.0`, `react-dom 19.0.0`, `pnpm` marker, `output: "standalone"` | `node`, `nextjs`, `pnpm`, `ssr`, standalone output evidence, Pages Router evidence | `nextjs`, workspace image, `next build`, `node .next/standalone/server.js`, Next router/output metadata |
 | `next-static-export` | `WF-PLAN-CAT-002` | `next 15.2.4`, `react 19.0.0`, `react-dom 19.0.0`, `pnpm` marker | `node`, `nextjs`, `pnpm`, `static` from `output: "export"`, Pages Router evidence | `nextjs-static`, static image, publish `/out`, Next router/output metadata |
-| `vite-spa` | `WF-PLAN-CAT-007` | `vite 5.4.11`, `@vitejs/plugin-react 4.3.4`, `react 18.3.1`, `bun` marker | `node`, `vite`, `bun`, `static` | `vite-static`, static image, publish `/dist` |
+| `vite-spa` | `WF-PLAN-CAT-007` | `vite 5.4.11`, `bun` marker | `node`, `vite`, `bun`, `static` | `vite-static`, static image, publish `/dist` |
+| `react-spa` | `WF-PLAN-CAT-007` | `react 18.3.1`, `react-dom 18.3.1`, `react-scripts 5.0.1`, `npm` marker | `node`, `react`, `npm`, `static` | `react-static`, static image, publish `/build` |
+| `vue-spa` | `WF-PLAN-CAT-007` | `vue 3.5.13`, `@vue/cli-service 5.0.8`, `pnpm` marker | `node`, `vue`, `pnpm`, `static` | `vue-static`, static image, publish `/dist` |
+| `svelte-spa` | `WF-PLAN-CAT-007` | `svelte 5.19.7`, `@rollup/plugin-svelte 7.2.2`, `rollup 4.34.8`, `yarn` marker | `node`, `svelte`, `yarn`, `static` | `svelte-static`, static image, publish `/public` |
+| `solid-spa` | `WF-PLAN-CAT-007` | `solid-js 1.9.5`, `vite 6.1.0`, `vite-plugin-solid 2.11.2`, `bun` marker | `node`, `solid`, `bun`, `static` | `solid-static`, static image, publish `/dist` |
 | `angular-spa` | `WF-PLAN-CAT-007` | `@angular/core 19.2.0`, `@angular/cli 19.2.0`, `@angular-devkit/build-angular 19.2.0`, `npm` marker | `node`, `angular`, `npm`, `static` | `angular-static`, static image, publish `/dist/angular-spa` from `angular.json` |
 | `sveltekit-static` | `WF-PLAN-CAT-005` | `@sveltejs/kit 2.16.1`, `@sveltejs/adapter-static 3.0.8`, `svelte 5.19.7`, `vite 6.1.0`, `pnpm` marker | `node`, `sveltekit`, `pnpm`, `static` from `adapter-static` | `sveltekit-static`, static image, publish `/build` |
 | `sveltekit-ambiguous` | `WF-PLAN-CAT-005` | `@sveltejs/kit 2.16.1`, `svelte 5.19.7`, `vite 6.1.0`, `pnpm` marker | `node`, `sveltekit`, `pnpm`, `hybrid-static-server` | `validation_error`, phase `runtime-plan-resolution` unless explicit strategy/start command is supplied |
@@ -171,9 +175,10 @@ adding framework-specific deployment command fields.
 Fixed-version framework fixture tests now cover detector evidence for the table above, enforce exact
 manifest/requirements versions, and feed supported fixtures through runtime planning without
 installing dependencies or executing framework CLIs. Planner fixture coverage includes Next.js SSR,
-Next.js standalone output, Next.js static export, Vite, SvelteKit adapter-static, Nuxt generate,
-Astro static, Remix, Express, Fastify, NestJS, Hono, Koa, generic Node package scripts, FastAPI,
-Django, and Flask, including Angular `angular.json` output-path planning.
+Next.js standalone output, Next.js static export, Vite, React SPA static, Vue SPA static, Svelte SPA
+static, Solid SPA static, SvelteKit adapter-static, Nuxt generate, Astro static, Remix, Express,
+Fastify, NestJS, Hono, Koa, generic Node package scripts, FastAPI, Django, and Flask, including
+Angular `angular.json` output-path planning.
 `WF-PLAN-BOUND-001` has command-schema coverage for rejecting framework/package/base-image/buildpack
 deployment fields. This does not yet complete unsupported catalog families, SvelteKit server-adapter
 start inference, Astro SSR, worker plans, or Web/CLI entry parity.

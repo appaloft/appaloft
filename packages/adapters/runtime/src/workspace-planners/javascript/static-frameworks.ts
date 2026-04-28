@@ -52,6 +52,24 @@ const staticFrameworkDefaults: Partial<Record<SourceFramework, StaticFrameworkDe
     buildScript: "build",
     autoSelection: "detected-export-script",
   },
+  react: {
+    plannerKey: "react-static",
+    publishDirectory: "/build",
+    buildScript: "build",
+    autoSelection: "detected-build-script",
+  },
+  solid: {
+    plannerKey: "solid-static",
+    publishDirectory: "/dist",
+    buildScript: "build",
+    autoSelection: "detected-build-script",
+  },
+  svelte: {
+    plannerKey: "svelte-static",
+    publishDirectory: "/public",
+    buildScript: "build",
+    autoSelection: "detected-build-script",
+  },
   nuxt: {
     plannerKey: "nuxt-static",
     publishDirectory: "/.output/public",
@@ -69,6 +87,12 @@ const staticFrameworkDefaults: Partial<Record<SourceFramework, StaticFrameworkDe
     publishDirectory: "/dist",
     buildScript: "build",
     autoSelection: "framework",
+  },
+  vue: {
+    plannerKey: "vue-static",
+    publishDirectory: "/dist",
+    buildScript: "build",
+    autoSelection: "detected-build-script",
   },
 };
 
@@ -232,7 +256,11 @@ function canSelectStaticFrameworkPlan(input: {
     input.requestedDeployment.method === "static" ||
     Boolean(input.requestedDeployment.publishDirectory);
 
-  if (input.inspection?.applicationShape === "static") {
+  if (
+    input.inspection?.applicationShape === "static" &&
+    input.defaults.autoSelection !== "detected-build-script" &&
+    input.defaults.autoSelection !== "detected-export-script"
+  ) {
     return true;
   }
 
@@ -314,6 +342,7 @@ export function resolveStaticFrameworkPlan(input: {
       packageManager,
       baseImage,
       applicationShape: "static",
+      packageCommand: "static-server",
       ...(outputMode ? { nextOutputMode: outputMode } : {}),
       ...(routerEvidence ? { nextRouterEvidence: routerEvidence } : {}),
       ...(input.source.inspection?.projectName

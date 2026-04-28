@@ -1,0 +1,16 @@
+{
+  "name": "svelte-spa",
+  "private": true,
+  "packageManager": "yarn@4.6.0",
+  "scripts": {
+    "build": "rollup -c",
+    "dev": "rollup -c -w"
+  },
+  "dependencies": {
+    "svelte": "5.19.7"
+  },
+  "devDependencies": {
+    "@rollup/plugin-svelte": "7.2.2",
+    "rollup": "4.34.8"
+  }
+}

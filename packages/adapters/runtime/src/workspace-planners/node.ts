@@ -1,4 +1,10 @@
-import { err, ok, type Result, type SourceInspectionSnapshot } from "@appaloft/core";
+import {
+  err,
+  ok,
+  type Result,
+  type SourceFramework,
+  type SourceInspectionSnapshot,
+} from "@appaloft/core";
 import {
   commandMentions,
   dockerBuildFromExecution,
@@ -13,6 +19,12 @@ import {
 import { pinnedBunAlpineImage } from "./bun";
 
 export type NodePackageManager = "bun" | "npm" | "pnpm" | "yarn";
+
+const staticSpaFrameworks = ["react", "solid", "svelte", "vue"] as const satisfies readonly SourceFramework[];
+
+function isStaticSpaFramework(framework: SourceFramework | undefined): boolean {
+  return Boolean(framework && (staticSpaFrameworks as readonly SourceFramework[]).includes(framework));
+}
 
 export function resolveNodePackageManager(inspection?: SourceInspectionSnapshot): NodePackageManager {
   const packageManager = inspection?.packageManager;
@@ -64,6 +76,13 @@ function nodeBaseImage(inspection?: SourceInspectionSnapshot): string {
 }
 
 function nodeStartCommand(input: WorkspacePlannerInput, packageManager: NodePackageManager): string | undefined {
+  if (
+    input.source.inspection?.applicationShape === "static" &&
+    isStaticSpaFramework(input.source.inspection.framework)
+  ) {
+    return input.requestedDeployment.startCommand;
+  }
+
   return (
     input.requestedDeployment.startCommand ??
     (input.source.inspection?.hasDetectedScript("start-built")

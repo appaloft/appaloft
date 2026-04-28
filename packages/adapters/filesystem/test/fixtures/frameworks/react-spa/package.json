@@ -1,0 +1,14 @@
+{
+  "name": "react-spa",
+  "private": true,
+  "packageManager": "npm@10.9.0",
+  "scripts": {
+    "build": "react-scripts build",
+    "start": "react-scripts start"
+  },
+  "dependencies": {
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "react-scripts": "5.0.1"
+  }
+}
