@@ -136,6 +136,36 @@ does not create transport fields. Entry workflows may use evidence to prefill re
 drafts, but the write boundary remains `resources.create` or a future resource profile update
 operation followed by ids-only `deployments.create`.
 
+Web Quick Deploy, CLI interactive deploy, and repository config/headless deploy must use the same
+resource-profile draft vocabulary before dispatch. The shared draft vocabulary is:
+
+| Draft field | Resource owner field |
+| --- | --- |
+| Source directory or source root subdirectory | `ResourceSourceBinding.baseDirectory` |
+| Publish directory | `ResourceRuntimeProfile.publishDirectory` |
+| Dockerfile path | `ResourceRuntimeProfile.dockerfilePath` |
+| Docker Compose file path | `ResourceRuntimeProfile.dockerComposeFilePath` |
+| Docker build target | `ResourceRuntimeProfile.buildTarget` |
+| Install command | `ResourceRuntimeProfile.installCommand` |
+| Build command | `ResourceRuntimeProfile.buildCommand` |
+| Start command | `ResourceRuntimeProfile.startCommand` |
+| Runtime name | `ResourceRuntimeProfile.runtimeName` |
+| Internal application port | `ResourceNetworkProfile.internalPort` |
+| Upstream protocol, exposure mode, target service, and host port | `ResourceNetworkProfile` |
+| Health path or HTTP health policy | `ResourceRuntimeProfile.healthCheckPath` or resource health policy input |
+
+Framework detection may prefill this draft vocabulary. Repository config may declare the same
+profile fields. CLI flags may override the same profile fields. None of these fields may be
+forwarded to `deployments.create`.
+
+When detection cannot derive a safe production start command, publish directory, Dockerfile path,
+Compose path, or internal port for an inbound app, Web/CLI entry workflows must collect the missing
+field explicitly or fail before mutation. Repository config/headless workflows must either provide
+the missing profile field or receive a structured `validation_error`/`unsupported_config_field`
+before mutation. Generic fallback commands are accepted only as explicit
+`ResourceRuntimeProfile.installCommand`, `buildCommand`, and `startCommand` values that still plan a
+Docker/OCI image.
+
 ### Package Manager And Build Tool Resolution
 
 Planner selection must record the selected package manager or build tool when that choice changes

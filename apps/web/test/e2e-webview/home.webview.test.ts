@@ -3168,4 +3168,81 @@ describe("console e2e with Bun.WebView", () => {
       includeLatestFailure: true,
     });
   }, 15_000);
+
+  test("[QUICK-DEPLOY-ENTRY-013][WF-PLAN-ENTRY-005] maps Web framework runtime draft fields through resources.create", async () => {
+    activeScenario = "static-quick-deploy";
+    resetRecordedApiRequests();
+
+    const deployState = new URL(`${previewUrl}/deploy`);
+    deployState.searchParams.set("step", "review");
+    deployState.searchParams.set("source", "local-folder");
+    deployState.searchParams.set("sourceLocator", "/workspace");
+    deployState.searchParams.set(
+      "sourceBaseDirectory",
+      "packages/adapters/filesystem/test/fixtures/frameworks/fastapi-uv",
+    );
+    deployState.searchParams.set("resourceInstallCommand", "uv sync --frozen");
+    deployState.searchParams.set("resourceBuildCommand", "bun run build");
+    deployState.searchParams.set(
+      "resourceStartCommand",
+      "uv run fastapi run app/main.py --host 0.0.0.0",
+    );
+    deployState.searchParams.set("resourceDockerfilePath", "deploy/Dockerfile");
+    deployState.searchParams.set("resourceBuildTarget", "runner");
+    deployState.searchParams.set("resourceInternalPort", "8000");
+    deployState.searchParams.set("projectId", "prj_static");
+    deployState.searchParams.set("serverId", "srv_static");
+
+    await using view = createWebView();
+    await view.navigate(deployState.toString());
+
+    await expectText(
+      view,
+      "--source-base-directory packages/adapters/filesystem/test/fixtures/frameworks/fastapi-uv",
+    );
+    await expectText(view, "--dockerfile-path deploy/Dockerfile");
+    await expectText(view, "--build-target runner");
+    await clickButtonByAnyText(view, ["Create and deploy", "创建并部署"]);
+
+    const resourcesCreateRequest = await waitForRecordedRequest("/api/rpc/resources/create");
+    const resourceInput = readOrpcJsonPayload(resourcesCreateRequest.body);
+
+    expect(resourceInput).toEqual(
+      expect.objectContaining({
+        projectId: "prj_static",
+        environmentId: "env_static",
+        kind: "application",
+        source: expect.objectContaining({
+          kind: "local-folder",
+          locator: "/workspace",
+          baseDirectory: "packages/adapters/filesystem/test/fixtures/frameworks/fastapi-uv",
+        }),
+        runtimeProfile: expect.objectContaining({
+          strategy: "dockerfile",
+          installCommand: "uv sync --frozen",
+          buildCommand: "bun run build",
+          startCommand: "uv run fastapi run app/main.py --host 0.0.0.0",
+          dockerfilePath: "deploy/Dockerfile",
+          buildTarget: "runner",
+        }),
+        networkProfile: expect.objectContaining({
+          internalPort: 8000,
+          upstreamProtocol: "http",
+          exposureMode: "reverse-proxy",
+        }),
+      }),
+    );
+
+    const resourceRecord = resourceInput as Record<string, unknown>;
+    expect(resourceRecord.deploymentMethod).toBeUndefined();
+    expect(resourceRecord.port).toBeUndefined();
+
+    const deploymentRequest = await waitForRecordedRequest("/api/deployments");
+    expect(deploymentRequest.body).toEqual({
+      projectId: "prj_static",
+      serverId: "srv_static",
+      environmentId: "env_static",
+      resourceId: "res_static",
+    });
+  }, 15_000);
 });

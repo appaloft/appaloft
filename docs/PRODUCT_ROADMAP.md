@@ -492,6 +492,9 @@ Already done:
 - [x] Dockerfile, Compose, and prebuilt image paths exist.
 - [x] Local-shell and generic-SSH single-server backend registry coverage exists.
 - [x] Repository config parser/entry-seed coverage exists for the current headless/CLI flow.
+- [x] Web, CLI, and repository config now share the same Quick Deploy resource draft vocabulary for
+  source/runtime/network/health profile fields, with acceptance coverage proving those fields enter
+  `resources.create` or resource runtime configuration before ids-only deployment admission.
 
 Required:
 
@@ -522,7 +525,7 @@ Exit criteria:
   Java, Dockerfile, Docker Compose, prebuilt image, and explicit custom commands.
 - [ ] Unsupported frameworks fail with structured `validation_error` in `runtime-plan-resolution`
   unless explicit custom commands make a Docker/OCI image plan possible.
-- [ ] Web and CLI can collect the same draft fields for source base directory, publish directory,
+- [x] Web and CLI can collect the same draft fields for source base directory, publish directory,
   Dockerfile path, Compose path, build target, install/build/start commands, and internal port.
 
 ## Phase 6: Access Policy, Domain/TLS Lifecycle, And Observability Hardening
@@ -796,6 +799,9 @@ mapping, matrix rows, and Web/CLI draft parity are all checked.
 - [x] Container-native: Dockerfile, Compose, and prebuilt image paths exist.
 - [ ] Container-native: harden path/build-target/profile updates, Compose target service selection,
   and image digest visibility.
+- [x] Web/CLI/repository config draft parity: source base directory, publish directory, Dockerfile
+  path, Compose path, build target, install/build/start commands, runtime name, internal port,
+  network exposure, and health fields map to resource profiles before ids-only deployment.
 - [x] Static sites: static strategy, Vite static, Angular static, Astro static, Nuxt generate,
   Next static export, SvelteKit adapter-static/static, and generic static server packaging exist.
 - [ ] Static sites: add common static generators and generic static generator fallback with explicit
@@ -857,8 +863,10 @@ Recommended next Spec Rounds before broad Code Rounds:
   `credentials.delete-ssh` delete-when-unused safety across CLI, API, and Web typed confirmation.
 - [x] Framework support tier matrix: fixed-version detector/planner fixtures cover the current
   Next.js, Vite, Angular, SvelteKit, Nuxt, Astro, Remix, Express, FastAPI, Django, and Flask slice.
-- [ ] Framework support tier matrix: promote Web/CLI draft-field parity and real deploy smoke rows
-  for the JavaScript/TypeScript/Python catalog.
+- [x] Framework support tier matrix: promote Web/CLI/repository config draft-field parity and
+  equivalent Quick Deploy smoke/acceptance rows for the current JavaScript/TypeScript/Python slice.
+- [ ] Framework support tier matrix: broaden fixture-by-fixture real deployment smoke rows for the
+  full JavaScript/TypeScript/Python catalog.
 - [ ] Deployment observation and recovery: harden `deployments.stream-events` reconnect/gap/CLI
   coverage, then rebuild retry/redeploy, rollback candidate/readiness, and ADR-016 recovery
   decisions.

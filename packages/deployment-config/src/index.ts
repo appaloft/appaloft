@@ -98,8 +98,6 @@ const unsupportedConfigFields = new Set([
   "restartPolicy",
   "rollout",
   "deploymentStrategy",
-  "dockerComposeFilePath",
-  "dockerfilePath",
   "instanceType",
   "disk",
   "gpu",
@@ -257,6 +255,9 @@ export const appaloftDeploymentRuntimeConfigSchema = z
     startCommand: nonEmptyStringSchema.optional(),
     name: runtimeNameConfigSchema.optional(),
     publishDirectory: safeRelativePathSchema.optional(),
+    dockerfilePath: safeRelativePathSchema.optional(),
+    dockerComposeFilePath: safeRelativePathSchema.optional(),
+    buildTarget: nonEmptyStringSchema.optional(),
     healthCheckPath: nonEmptyStringSchema.optional(),
     healthCheck: appaloftDeploymentHealthCheckConfigSchema.optional(),
   })

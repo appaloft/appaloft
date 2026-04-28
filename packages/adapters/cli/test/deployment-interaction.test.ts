@@ -70,4 +70,48 @@ describe("CLI quick deploy draft mapping", () => {
       exposureMode: "reverse-proxy",
     });
   });
+
+  test("[QUICK-DEPLOY-ENTRY-013][WF-PLAN-ENTRY-005] maps non-static CLI framework draft fields to resource profiles", async () => {
+    ensureReflectMetadata();
+    const {
+      networkProfileFromDeploymentInput,
+      runtimeProfileFromDeploymentInput,
+      sourceBindingForDeploymentInput,
+    } = await import("../src/commands/deployment-interaction");
+
+    const seed = {
+      sourceProfile: {
+        baseDirectory: "apps/api",
+      },
+      installCommand: "pnpm install --frozen-lockfile",
+      buildCommand: "pnpm build",
+      startCommand: "pnpm start",
+      dockerfilePath: "deploy/Dockerfile",
+      dockerComposeFilePath: "deploy/compose.yaml",
+      buildTarget: "runner",
+      port: 3000,
+    };
+
+    expect(
+      sourceBindingForDeploymentInput(".", "workspace-commands", seed.sourceProfile),
+    ).toMatchObject({
+      kind: "local-folder",
+      locator: ".",
+      baseDirectory: "apps/api",
+    });
+    expect(runtimeProfileFromDeploymentInput("workspace-commands", seed)).toEqual({
+      strategy: "workspace-commands",
+      installCommand: "pnpm install --frozen-lockfile",
+      buildCommand: "pnpm build",
+      startCommand: "pnpm start",
+      dockerfilePath: "deploy/Dockerfile",
+      dockerComposeFilePath: "deploy/compose.yaml",
+      buildTarget: "runner",
+    });
+    expect(networkProfileFromDeploymentInput("workspace-commands", seed)).toEqual({
+      internalPort: 3000,
+      upstreamProtocol: "http",
+      exposureMode: "reverse-proxy",
+    });
+  });
 });

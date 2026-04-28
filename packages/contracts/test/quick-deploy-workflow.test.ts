@@ -53,6 +53,12 @@ const forbiddenDeploymentInputKeys = [
   "resource",
   "deploymentMethod",
   "method",
+  "installCommand",
+  "buildCommand",
+  "startCommand",
+  "dockerfilePath",
+  "dockerComposeFilePath",
+  "buildTarget",
   "port",
   "networkProfile",
   "runtimeProfile",
@@ -762,6 +768,101 @@ describe("quick deploy workflow", () => {
       },
     },
     {
+      id: "[QUICK-DEPLOY-ENTRY-013][WF-PLAN-ENTRY-005]",
+      name: "shared framework runtime draft vocabulary enters resources.create only",
+      input: workflowInput({
+        resource: {
+          mode: "create",
+          input: resourceInput({
+            source: {
+              kind: "local-folder",
+              locator: "/workspace",
+              baseDirectory: "apps/api",
+            },
+            runtimeProfile: {
+              strategy: "workspace-commands",
+              installCommand: "uv sync --frozen",
+              buildCommand: "bun run build",
+              startCommand: "uv run fastapi run app/main.py --host 0.0.0.0",
+              runtimeName: "api",
+              publishDirectory: "dist",
+              dockerfilePath: "deploy/Dockerfile",
+              dockerComposeFilePath: "deploy/compose.yaml",
+              buildTarget: "runtime",
+              healthCheckPath: "/health",
+            },
+            networkProfile: {
+              internalPort: 8000,
+              upstreamProtocol: "http",
+              exposureMode: "reverse-proxy",
+              targetServiceName: "api",
+            },
+          }),
+        },
+      }),
+      expectedKinds: ["resources.create", "deployments.create"],
+      assert: ({ steps }) => {
+        expect(findStep(steps, "resources.create").input).toMatchObject({
+          source: {
+            baseDirectory: "apps/api",
+          },
+          runtimeProfile: {
+            installCommand: "uv sync --frozen",
+            buildCommand: "bun run build",
+            startCommand: "uv run fastapi run app/main.py --host 0.0.0.0",
+            runtimeName: "api",
+            publishDirectory: "dist",
+            dockerfilePath: "deploy/Dockerfile",
+            dockerComposeFilePath: "deploy/compose.yaml",
+            buildTarget: "runtime",
+            healthCheckPath: "/health",
+          },
+          networkProfile: {
+            internalPort: 8000,
+            targetServiceName: "api",
+          },
+        });
+        expectDeploymentInputDoesNotContainWorkflowDrafts(steps);
+      },
+    },
+    {
+      id: "[QUICK-DEPLOY-ENTRY-014][WF-PLAN-ENTRY-006]",
+      name: "explicit fallback commands are resource runtime fields",
+      input: workflowInput({
+        resource: {
+          mode: "create",
+          input: resourceInput({
+            source: {
+              kind: "local-folder",
+              locator: "/workspace",
+              baseDirectory: "packages/adapters/filesystem/test/fixtures/frameworks/fastify-server",
+            },
+            runtimeProfile: {
+              strategy: "workspace-commands",
+              installCommand: "pnpm install --frozen-lockfile",
+              buildCommand: "pnpm build",
+              startCommand: "pnpm start",
+            },
+            networkProfile: {
+              internalPort: 3000,
+              upstreamProtocol: "http",
+              exposureMode: "reverse-proxy",
+            },
+          }),
+        },
+      }),
+      expectedKinds: ["resources.create", "deployments.create"],
+      assert: ({ steps }) => {
+        expect(findStep(steps, "resources.create").input.runtimeProfile).toMatchObject({
+          strategy: "workspace-commands",
+          installCommand: "pnpm install --frozen-lockfile",
+          buildCommand: "pnpm build",
+          startCommand: "pnpm start",
+        });
+        expectDeploymentInputDoesNotContainWorkflowDrafts(steps);
+      },
+    },
+    {
       id: "[QUICK-DEPLOY-ENTRY-001]",
       name: "id-only deploy path can skip source while create-resource paths require entry preflight",
       input: existingContextInput(),
@@ -840,6 +941,36 @@ describe("quick deploy workflow", () => {
       projectId: "proj_existing",
       environmentId: "env_existing",
       ...staticSiteResourceInput(),
+    });
+
+    expect(parsed.success).toBe(true);
+  });
+
+  test("[QUICK-DEPLOY-ENTRY-013][WF-PLAN-ENTRY-005] framework runtime draft validates through shared resources.create schema", () => {
+    const parsed = createResourceInputSchema.safeParse({
+      projectId: "proj_existing",
+      environmentId: "env_existing",
+      ...resourceInput({
+        source: {
+          kind: "local-folder",
+          locator: "/workspace",
+          baseDirectory: "packages/adapters/filesystem/test/fixtures/frameworks/next-ssr",
+        },
+        runtimeProfile: {
+          strategy: "workspace-commands",
+          installCommand: "pnpm install --frozen-lockfile",
+          buildCommand: "pnpm build",
+          startCommand: "pnpm start",
+          dockerfilePath: "deploy/Dockerfile",
+          dockerComposeFilePath: "deploy/compose.yaml",
+          buildTarget: "runner",
+        },
+        networkProfile: {
+          internalPort: 3000,
+          upstreamProtocol: "http",
+          exposureMode: "reverse-proxy",
+        },
+      }),
     });
 
     expect(parsed.success).toBe(true);

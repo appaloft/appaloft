@@ -14,6 +14,9 @@ describe("Appaloft deployment config schema", () => {
         installCommand: "bun install",
         buildCommand: "bun run build",
         startCommand: "bun run start",
+        dockerfilePath: "deploy/Dockerfile",
+        dockerComposeFilePath: "deploy/compose.yaml",
+        buildTarget: "runtime",
         name: "preview-{pr_number}",
         healthCheckPath: "/ready",
       },
@@ -41,6 +44,9 @@ describe("Appaloft deployment config schema", () => {
       expect("targets" in parsed.data).toBe(false);
       expect(parsed.data.runtime?.strategy).toBe("workspace-commands");
       expect(parsed.data.runtime?.name).toBe("preview-{pr_number}");
+      expect(parsed.data.runtime?.dockerfilePath).toBe("deploy/Dockerfile");
+      expect(parsed.data.runtime?.dockerComposeFilePath).toBe("deploy/compose.yaml");
+      expect(parsed.data.runtime?.buildTarget).toBe("runtime");
       expect(parsed.data.network?.internalPort).toBe(4310);
     }
 
@@ -262,10 +268,18 @@ describe("Appaloft deployment config schema", () => {
       runtime: {
         strategy: "static",
         publishDirectory: "dist",
+        dockerfilePath: "deploy/Dockerfile",
+        dockerComposeFilePath: "deploy/compose.yaml",
+        buildTarget: "runner",
       },
     });
 
     expect(safePath.success).toBe(true);
+    if (safePath.success) {
+      expect(safePath.data.runtime?.dockerfilePath).toBe("deploy/Dockerfile");
+      expect(safePath.data.runtime?.dockerComposeFilePath).toBe("deploy/compose.yaml");
+      expect(safePath.data.runtime?.buildTarget).toBe("runner");
+    }
   });
 
   test("[CONFIG-FILE-DOMAIN-001] accepts provider-neutral access domains", () => {

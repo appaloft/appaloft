@@ -89,7 +89,10 @@ export interface DeploymentPromptSeed {
   hostPort?: number;
   healthCheckPath?: string;
   healthCheck?: ResourceRuntimeProfileInput["healthCheck"];
-  sourceProfile?: Partial<Pick<ResourceSourceInput, "gitRef" | "commitSha">>;
+  dockerfilePath?: string;
+  dockerComposeFilePath?: string;
+  buildTarget?: string;
+  sourceProfile?: Partial<Pick<ResourceSourceInput, "gitRef" | "commitSha" | "baseDirectory">>;
   sourceFingerprint?: string;
   stateBackend?: DeploymentStateBackendDecision;
   stateBackendPrepared?: boolean;
@@ -227,7 +230,7 @@ export function sourceKindForDeploymentInput(
 export function sourceBindingForDeploymentInput(
   sourceLocator: string,
   deploymentMethod: DeploymentMethod,
-  profile: Partial<Pick<ResourceSourceInput, "gitRef" | "commitSha">> = {},
+  profile: Partial<Pick<ResourceSourceInput, "gitRef" | "commitSha" | "baseDirectory">> = {},
 ): ResourceSourceInput {
   return {
     kind: sourceKindForDeploymentInput(sourceLocator, deploymentMethod),
@@ -235,6 +238,7 @@ export function sourceBindingForDeploymentInput(
     displayName: inferNameFromSource(sourceLocator),
     ...(profile.gitRef ? { gitRef: profile.gitRef } : {}),
     ...(profile.commitSha ? { commitSha: profile.commitSha } : {}),
+    ...(profile.baseDirectory ? { baseDirectory: profile.baseDirectory } : {}),
   };
 }
 
@@ -249,6 +253,11 @@ export function runtimeProfileFromDeploymentInput(
       ...(input.buildCommand ? { buildCommand: input.buildCommand } : {}),
       ...(input.runtimeName ? { runtimeName: input.runtimeName } : {}),
       ...(input.publishDirectory ? { publishDirectory: input.publishDirectory } : {}),
+      ...(input.dockerfilePath ? { dockerfilePath: input.dockerfilePath } : {}),
+      ...(input.dockerComposeFilePath
+        ? { dockerComposeFilePath: input.dockerComposeFilePath }
+        : {}),
+      ...(input.buildTarget ? { buildTarget: input.buildTarget } : {}),
       ...(input.healthCheckPath ? { healthCheckPath: input.healthCheckPath } : {}),
       ...(input.healthCheck ? { healthCheck: input.healthCheck } : {}),
     };
@@ -260,6 +269,10 @@ export function runtimeProfileFromDeploymentInput(
     ...(input.buildCommand ? { buildCommand: input.buildCommand } : {}),
     ...(input.startCommand ? { startCommand: input.startCommand } : {}),
     ...(input.runtimeName ? { runtimeName: input.runtimeName } : {}),
+    ...(input.publishDirectory ? { publishDirectory: input.publishDirectory } : {}),
+    ...(input.dockerfilePath ? { dockerfilePath: input.dockerfilePath } : {}),
+    ...(input.dockerComposeFilePath ? { dockerComposeFilePath: input.dockerComposeFilePath } : {}),
+    ...(input.buildTarget ? { buildTarget: input.buildTarget } : {}),
     ...(input.healthCheckPath ? { healthCheckPath: input.healthCheckPath } : {}),
     ...(input.healthCheck ? { healthCheck: input.healthCheck } : {}),
   };
@@ -318,6 +331,7 @@ export function deploymentPromptSeedFromConfig(
   const healthCheckPath =
     config.runtime?.healthCheckPath ?? config.runtime?.healthCheck?.path ?? config.health?.path;
   const sourceProfile = {
+    ...(config.source?.baseDirectory ? { baseDirectory: config.source.baseDirectory } : {}),
     ...(config.source?.gitRef ? { gitRef: config.source.gitRef } : {}),
     ...(config.source?.commitSha ? { commitSha: config.source.commitSha } : {}),
   };
@@ -340,6 +354,11 @@ export function deploymentPromptSeedFromConfig(
     ...(config.runtime?.publishDirectory
       ? { publishDirectory: config.runtime.publishDirectory }
       : {}),
+    ...(config.runtime?.dockerfilePath ? { dockerfilePath: config.runtime.dockerfilePath } : {}),
+    ...(config.runtime?.dockerComposeFilePath
+      ? { dockerComposeFilePath: config.runtime.dockerComposeFilePath }
+      : {}),
+    ...(config.runtime?.buildTarget ? { buildTarget: config.runtime.buildTarget } : {}),
     ...(config.network?.internalPort ? { port: config.network.internalPort } : {}),
     ...(config.network?.upstreamProtocol
       ? { upstreamProtocol: config.network.upstreamProtocol }
@@ -756,7 +775,10 @@ function shouldConfigureReusableResourceRuntime(seed: DeploymentPromptSeed): boo
       seed.buildCommand ||
       seed.startCommand ||
       seed.runtimeName ||
-      seed.publishDirectory,
+      seed.publishDirectory ||
+      seed.dockerfilePath ||
+      seed.dockerComposeFilePath ||
+      seed.buildTarget,
   );
 }
 
@@ -1163,6 +1185,9 @@ function resolveAdvancedDeploymentConfig(input: {
         input.seed.startCommand ||
         input.seed.runtimeName ||
         input.seed.publishDirectory ||
+        input.seed.dockerfilePath ||
+        input.seed.dockerComposeFilePath ||
+        input.seed.buildTarget ||
         input.seed.port ||
         input.seed.upstreamProtocol ||
         input.seed.exposureMode ||
@@ -1254,6 +1279,9 @@ function resolveAdvancedDeploymentConfig(input: {
             )
           : undefined))
       : undefined;
+    const dockerfilePath = input.seed.dockerfilePath;
+    const dockerComposeFilePath = input.seed.dockerComposeFilePath;
+    const buildTarget = input.seed.buildTarget;
     const port =
       input.seed.port ??
       (canPrompt
@@ -1286,6 +1314,9 @@ function resolveAdvancedDeploymentConfig(input: {
       ...(startCommand ? { startCommand } : {}),
       ...(input.seed.runtimeName ? { runtimeName: input.seed.runtimeName } : {}),
       ...(publishDirectory ? { publishDirectory } : {}),
+      ...(dockerfilePath ? { dockerfilePath } : {}),
+      ...(dockerComposeFilePath ? { dockerComposeFilePath } : {}),
+      ...(buildTarget ? { buildTarget } : {}),
       ...(Number.isInteger(port) && port > 0 ? { port } : {}),
       ...(input.seed.upstreamProtocol ? { upstreamProtocol: input.seed.upstreamProtocol } : {}),
       ...(input.seed.exposureMode ? { exposureMode: input.seed.exposureMode } : {}),

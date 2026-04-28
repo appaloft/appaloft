@@ -67,6 +67,7 @@ import { cliCommandDescriptions, cliDocsHrefs } from "./docs-help.js";
 const pathOrSourceArg = Args.text({ name: "pathOrSource" }).pipe(Args.optional);
 const deploymentIdArg = Args.text({ name: "deploymentId" });
 
+const sourceBaseDirectoryOption = Options.text("source-base-directory").pipe(Options.optional);
 const projectOption = Options.text("project").pipe(Options.optional);
 const serverOption = Options.text("server").pipe(Options.optional);
 const serverHostOption = Options.text("server-host").pipe(Options.optional);
@@ -105,6 +106,9 @@ const buildOption = Options.text("build").pipe(Options.optional);
 const startOption = Options.text("start").pipe(Options.optional);
 const runtimeNameOption = Options.text("runtime-name").pipe(Options.optional);
 const publishDirOption = Options.text("publish-dir").pipe(Options.optional);
+const dockerfilePathOption = Options.text("dockerfile-path").pipe(Options.optional);
+const dockerComposeFilePathOption = Options.text("docker-compose-file-path").pipe(Options.optional);
+const buildTargetOption = Options.text("build-target").pipe(Options.optional);
 const portOption = Options.text("port").pipe(Options.optional);
 const upstreamProtocolOption = Options.choice("upstream-protocol", resourceNetworkProtocols).pipe(
   Options.optional,
@@ -506,22 +510,6 @@ function deploymentEnvironmentVariablesFromCliFlags(input: {
   return deploymentEnvironmentVariablesFromConfig(parsedConfig.data, { env: input.env ?? Bun.env });
 }
 
-function applyConfigSourceBase(
-  sourceLocator: string,
-  config: AppaloftDeploymentConfig | undefined,
-): string {
-  const baseDirectory = config?.source?.baseDirectory;
-  if (!baseDirectory) {
-    return sourceLocator;
-  }
-
-  if (!existsSync(sourceLocator) || !statSync(sourceLocator).isDirectory()) {
-    return sourceLocator;
-  }
-
-  return resolve(sourceLocator, baseDirectory);
-}
-
 function githubScopeFromEnv(env: Record<string, string | undefined>): SourceFingerprintScope {
   const ref = env.GITHUB_REF;
   const pullRequestMatch = ref?.match(/^refs\/pull\/(\d+)\/(?:merge|head)$/);
@@ -752,6 +740,7 @@ function resolveRuntimeNameSeed(input: {
 
 function sourceFingerprintForConfigDeploy(input: {
   sourceLocator: string;
+  baseDirectory?: string;
   configResolution?: { config: AppaloftDeploymentConfig; configFilePath: string };
   previewContext?: PreviewDeployContext;
 }): string {
@@ -766,7 +755,8 @@ function sourceFingerprintForConfigDeploy(input: {
     provider: env.GITHUB_REPOSITORY ? "github" : "local",
     ...(env.GITHUB_REPOSITORY_ID ? { providerRepositoryId: env.GITHUB_REPOSITORY_ID } : {}),
     repositoryLocator,
-    baseDirectory: input.configResolution?.config.source?.baseDirectory ?? ".",
+    baseDirectory:
+      input.baseDirectory ?? input.configResolution?.config.source?.baseDirectory ?? ".",
     configPath: input.configResolution?.configFilePath ?? "appaloft.yml",
     workspaceRoot,
     ...(env.GITHUB_REF ? { gitRef: env.GITHUB_REF } : {}),
@@ -963,10 +953,7 @@ const previewCleanupCommand = EffectCommand.make(
           sourceLocator,
           ...(configResolution ? { configResolution } : {}),
         }) ?? sourceLocator;
-      const configuredSourceLocator = applyConfigSourceBase(
-        normalizeCliPathOrSource(configAnchoredSourceLocator, "auto"),
-        configResolution?.config,
-      );
+      const configuredSourceLocator = normalizeCliPathOrSource(configAnchoredSourceLocator, "auto");
 
       const stateBackendDecision =
         configResolution || previewContext || requestedStateBackend || serverHostValue
@@ -1049,6 +1036,10 @@ export const deployCommand = EffectCommand.make(
     start: startOption,
     runtimeName: runtimeNameOption,
     publishDir: publishDirOption,
+    sourceBaseDirectory: sourceBaseDirectoryOption,
+    dockerfilePath: dockerfilePathOption,
+    dockerComposeFilePath: dockerComposeFilePathOption,
+    buildTarget: buildTargetOption,
     port: portOption,
     upstreamProtocol: upstreamProtocolOption,
     exposureMode: exposureModeOption,
@@ -1064,8 +1055,11 @@ export const deployCommand = EffectCommand.make(
   ({
     appLogLines,
     build,
+    buildTarget,
     config,
     destination,
+    dockerComposeFilePath,
+    dockerfilePath,
     environment,
     env,
     exposureMode,
@@ -1098,6 +1092,7 @@ export const deployCommand = EffectCommand.make(
     serverSshPrivateKeyFile,
     serverSshPublicKey,
     serverSshUsername,
+    sourceBaseDirectory,
     start,
     stateBackend,
     targetServiceName,
@@ -1129,6 +1124,10 @@ export const deployCommand = EffectCommand.make(
       const startCommand = optionalValue(start);
       const runtimeNameValue = optionalValue(runtimeName);
       const publishDirectory = optionalValue(publishDir);
+      const sourceBaseDirectoryValue = optionalValue(sourceBaseDirectory);
+      const dockerfilePathValue = optionalValue(dockerfilePath);
+      const dockerComposeFilePathValue = optionalValue(dockerComposeFilePath);
+      const buildTargetValue = optionalValue(buildTarget);
       const upstreamProtocolValue = optionalValue(upstreamProtocol);
       const exposureModeValue = optionalValue(exposureMode);
       const targetServiceNameValue = optionalValue(targetServiceName);
@@ -1169,6 +1168,10 @@ export const deployCommand = EffectCommand.make(
           startCommand ||
           runtimeNameValue ||
           publishDirectory ||
+          sourceBaseDirectoryValue ||
+          dockerfilePathValue ||
+          dockerComposeFilePathValue ||
+          buildTargetValue ||
           portValue !== undefined ||
           upstreamProtocolValue ||
           exposureModeValue ||
@@ -1236,9 +1239,7 @@ export const deployCommand = EffectCommand.make(
       const normalizedSourceLocator = configAnchoredSourceLocator
         ? normalizeCliPathOrSource(configAnchoredSourceLocator, deploymentMethod ?? "auto")
         : undefined;
-      const configuredSourceLocator = normalizedSourceLocator
-        ? applyConfigSourceBase(normalizedSourceLocator, configResolution?.config)
-        : undefined;
+      const configuredSourceLocator = normalizedSourceLocator;
       const resourceSpec =
         !resourceId && (resourceNameValue || configuredSourceLocator)
           ? {
@@ -1319,12 +1320,18 @@ export const deployCommand = EffectCommand.make(
         configResolution || requestedStateBackend || previewContext || stateBackendDecision
           ? sourceFingerprintForConfigDeploy({
               sourceLocator: configuredSourceLocator ?? configSourceLocator,
+              ...(sourceBaseDirectoryValue ? { baseDirectory: sourceBaseDirectoryValue } : {}),
               ...(configResolution ? { configResolution } : {}),
               ...(previewContext ? { previewContext } : {}),
             })
           : undefined;
+      const sourceProfile = {
+        ...configSeed.sourceProfile,
+        ...(sourceBaseDirectoryValue ? { baseDirectory: sourceBaseDirectoryValue } : {}),
+      };
       const seed = {
         ...configSeed,
+        ...(Object.keys(sourceProfile).length > 0 ? { sourceProfile } : {}),
         ...(projectId ? { projectId } : {}),
         ...(serverId ? { serverId } : {}),
         ...(serverSpec ? { server: serverSpec } : {}),
@@ -1341,6 +1348,11 @@ export const deployCommand = EffectCommand.make(
         ...(startCommand ? { startCommand } : {}),
         ...(resolvedRuntimeName ? { runtimeName: resolvedRuntimeName } : {}),
         ...(publishDirectory ? { publishDirectory } : {}),
+        ...(dockerfilePathValue ? { dockerfilePath: dockerfilePathValue } : {}),
+        ...(dockerComposeFilePathValue
+          ? { dockerComposeFilePath: dockerComposeFilePathValue }
+          : {}),
+        ...(buildTargetValue ? { buildTarget: buildTargetValue } : {}),
         ...(portValue === undefined ? {} : { port: portValue }),
         ...(upstreamProtocolValue ? { upstreamProtocol: upstreamProtocolValue } : {}),
         ...(exposureModeValue ? { exposureMode: exposureModeValue } : {}),

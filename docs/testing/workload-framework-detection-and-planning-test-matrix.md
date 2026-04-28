@@ -151,6 +151,8 @@ test expectations in the same change.
 | WF-PLAN-ENTRY-002 | e2e-preferred | CLI Quick Deploy | CLI uses the same inspection/planner contract as Web, prompts or errors for missing fallback commands, and never sends framework/base-image fields to `deployments.create`. |
 | WF-PLAN-ENTRY-003 | contract | HTTP/oRPC strict deployment admission | HTTP/oRPC deployment create accepts only the shared ids-only command schema and does not read local source files or repository config files. |
 | WF-PLAN-ENTRY-004 | e2e-preferred | Repository config / headless profile | Config profile fields map to resource source/runtime/network/health operations before deployment; unsupported framework/runtime sizing/orchestrator fields are rejected before mutation. |
+| WF-PLAN-ENTRY-005 | contract | Shared draft field vocabulary | Web, CLI, and repository config normalize source base directory, publish directory, Dockerfile path, Compose path, build target, install/build/start commands, runtime name, internal port, network exposure, target service, host port, and health fields into the same `resources.create` profile shape before ids-only `deployments.create`. |
+| WF-PLAN-ENTRY-006 | contract | Explicit fallback commands | For supported JavaScript/TypeScript/Python sources whose framework evidence lacks safe production start or static output evidence, entry workflows accept only explicit profile fallback commands or fail with structured `validation_error` before deployment admission; fallback commands are never deployment command fields. |
 
 ## Current Implementation Notes And Migration Gaps
 
@@ -180,8 +182,10 @@ static, Solid SPA static, SvelteKit adapter-static, Nuxt generate, Astro static,
 Fastify, NestJS, Hono, Koa, generic Node package scripts, FastAPI, Django, and Flask, including
 Angular `angular.json` output-path planning.
 `WF-PLAN-BOUND-001` has command-schema coverage for rejecting framework/package/base-image/buildpack
-deployment fields. This does not yet complete unsupported catalog families, SvelteKit server-adapter
-start inference, Astro SSR, worker plans, or Web/CLI entry parity.
+deployment fields. `WF-PLAN-ENTRY-005` and `WF-PLAN-ENTRY-006` govern the current Web/CLI/repository
+config draft parity slice for JavaScript/TypeScript/Python support. This does not yet complete
+unsupported catalog families, SvelteKit server-adapter start inference, Astro SSR, worker plans, or
+full browser-level Web/CLI entry parity for every catalog fixture.
 
 Before a framework family can be marked first-class, Code Round must add at least one planner or
 fallback test for its `WF-PLAN-CAT-*` row plus boundary coverage proving base-image policy,
