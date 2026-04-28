@@ -1021,8 +1021,9 @@ export class LocalExecutionBackend implements ExecutionBackend {
     const preparedSource = await this.prepareLocalSource(context, deployment, logs, {
       runtimeDir,
       env,
-      fallbackWorkdir:
-        state.runtimePlan.execution.workingDirectory ?? normalizeWorkingDirectory(state.runtimePlan.source.locator),
+      fallbackWorkdir: normalizeWorkingDirectory(
+        state.runtimePlan.execution.workingDirectory ?? state.runtimePlan.source.locator,
+      ),
     });
 
     if (!preparedSource.prepared) {
@@ -1307,8 +1308,9 @@ export class LocalExecutionBackend implements ExecutionBackend {
     const preparedSource = await this.prepareLocalSource(context, deployment, logs, {
       runtimeDir,
       env,
-      fallbackWorkdir:
-        state.runtimePlan.execution.workingDirectory ?? normalizeWorkingDirectory(state.runtimePlan.source.locator),
+      fallbackWorkdir: normalizeWorkingDirectory(
+        state.runtimePlan.execution.workingDirectory ?? state.runtimePlan.source.locator,
+      ),
     });
 
     if (!preparedSource.prepared) {
@@ -2167,8 +2169,9 @@ export class LocalExecutionBackend implements ExecutionBackend {
     const preparedSource = await this.prepareLocalSource(context, deployment, logs, {
       runtimeDir,
       env,
-      fallbackWorkdir:
-        state.runtimePlan.execution.workingDirectory ?? normalizeWorkingDirectory(state.runtimePlan.source.locator),
+      fallbackWorkdir: normalizeWorkingDirectory(
+        state.runtimePlan.execution.workingDirectory ?? state.runtimePlan.source.locator,
+      ),
     });
 
     if (!preparedSource.prepared) {
