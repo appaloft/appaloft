@@ -69,8 +69,9 @@ test expectations in the same change.
 
 | Fixture | Matrix rows | Fixed framework/tool versions | Expected detector result | Planner expectation |
 | --- | --- | --- | --- | --- |
-| `next-ssr` | `WF-PLAN-CAT-001` | `next 15.2.4`, `react 19.0.0`, `react-dom 19.0.0`, `pnpm` marker | `node`, `nextjs`, `pnpm`, `ssr` | `nextjs`, workspace image, `next build`, `next start` |
-| `next-static-export` | `WF-PLAN-CAT-002` | `next 15.2.4`, `react 19.0.0`, `react-dom 19.0.0`, `pnpm` marker | `node`, `nextjs`, `pnpm`, `static` from `output: "export"` | `nextjs-static`, static image, publish `/out` |
+| `next-ssr` | `WF-PLAN-CAT-001` | `next 15.2.4`, `react 19.0.0`, `react-dom 19.0.0`, `pnpm` marker | `node`, `nextjs`, `pnpm`, `ssr`, App Router evidence | `nextjs`, workspace image, `next build`, `next start`, Next router/output metadata |
+| `next-standalone` | `WF-PLAN-CAT-001` | `next 15.2.4`, `react 19.0.0`, `react-dom 19.0.0`, `pnpm` marker, `output: "standalone"` | `node`, `nextjs`, `pnpm`, `ssr`, standalone output evidence, Pages Router evidence | `nextjs`, workspace image, `next build`, `node .next/standalone/server.js`, Next router/output metadata |
+| `next-static-export` | `WF-PLAN-CAT-002` | `next 15.2.4`, `react 19.0.0`, `react-dom 19.0.0`, `pnpm` marker | `node`, `nextjs`, `pnpm`, `static` from `output: "export"`, Pages Router evidence | `nextjs-static`, static image, publish `/out`, Next router/output metadata |
 | `vite-spa` | `WF-PLAN-CAT-007` | `vite 5.4.11`, `@vitejs/plugin-react 4.3.4`, `react 18.3.1`, `bun` marker | `node`, `vite`, `bun`, `static` | `vite-static`, static image, publish `/dist` |
 | `angular-spa` | `WF-PLAN-CAT-007` | `@angular/core 19.2.0`, `@angular/cli 19.2.0`, `@angular-devkit/build-angular 19.2.0`, `npm` marker | `node`, `angular`, `npm`, `static` | `angular-static`, static image, publish `/dist/angular-spa` from `angular.json` |
 | `sveltekit-static` | `WF-PLAN-CAT-005` | `@sveltejs/kit 2.16.1`, `@sveltejs/adapter-static 3.0.8`, `svelte 5.19.7`, `vite 6.1.0`, `pnpm` marker | `node`, `sveltekit`, `pnpm`, `static` from `adapter-static` | `sveltekit-static`, static image, publish `/build` |
@@ -99,13 +100,14 @@ test expectations in the same change.
 | WF-PLAN-DET-010 | unit | Framework port is only a hint | Framework default port is known but resource network profile has a different `internalPort` | Persisted `networkProfile.internalPort` wins and no deployment `port` field is produced | None |
 | WF-PLAN-DET-011 | integration | Inbound app lacks port | Serverful/SSR source has no persisted port and no deterministic accepted inference | Deployment admission rejects before acceptance | `validation_error`, phase `resource-network-resolution` |
 | WF-PLAN-DET-012 | integration | Unsupported framework without fallback | Source detects a framework/runtime family with no active planner and no explicit custom commands | Deployment admission rejects before acceptance with safe evidence details | `validation_error`, phase `runtime-plan-resolution` |
+| WF-PLAN-DET-013 | unit | Next.js output/router evidence | `next.config.*`, `app`/`src/app`, `pages`/`src/pages`, and `output: "standalone"` or `output: "export"` evidence | Detection records output and App/Pages Router evidence for planner diagnostics without creating deployment command fields | Conflicting Next output evidence fails as ambiguous unless explicit custom commands select a Docker/OCI image plan |
 
 ## Planner Catalog Matrix
 
 | Test ID | Preferred automation | Framework/app shape | Expected planner behavior |
 | --- | --- | --- | --- |
-| WF-PLAN-CAT-001 | integration | Next.js SSR/serverful | Detect Next evidence, selected package manager, build `next build`, standalone/server output when configured, Node/Bun base policy, HTTP runtime port from resource network profile. |
-| WF-PLAN-CAT-002 | integration | Next static export | Detect explicit static/export mode, package `out` or explicit publish directory into static-server image, default internal port 80 for first-deploy draft. |
+| WF-PLAN-CAT-001 | integration | Next.js SSR/serverful | Detect Next evidence, selected package manager, App/Pages Router evidence, default server output, or standalone output; emit `workspace-commands` / `all-in-one-docker` image plans with Node/Bun base policy, install/build/start metadata, generated Dockerfile metadata, and HTTP runtime port from the resource network profile. Standalone output starts `.next/standalone/server.js` unless explicit custom commands override it. |
+| WF-PLAN-CAT-002 | integration | Next static export | Detect explicit static/export mode and App/Pages Router evidence, emit `static-artifact` / `all-in-one-docker`, package `out` or explicit publish directory into the adapter-owned static-server image, record static server config metadata, and use default internal port 80 for first-deploy draft. |
 | WF-PLAN-CAT-003 | integration | Remix | Detect Remix evidence, package server artifact and public assets, require supported server adapter start command or explicit start command. |
 | WF-PLAN-CAT-004 | integration | Nuxt SSR and generate static | SSR packages `.output/server` with Nitro start; generate packages `.output/public` as static-server artifact. |
 | WF-PLAN-CAT-005 | integration | SvelteKit static and server adapters | Adapter-static selects static output; server adapters require supported runtime entrypoint or explicit start command. |
@@ -159,12 +161,14 @@ container-native override coverage for `WF-PLAN-DET-009`/`WF-PLAN-CAT-016`. Cata
 with `WF-PLAN-CAT-001`, `WF-PLAN-CAT-002`, `WF-PLAN-CAT-003`, `WF-PLAN-CAT-005`,
 `WF-PLAN-CAT-007`, `WF-PLAN-CAT-008`, `WF-PLAN-CAT-009`, and `WF-PLAN-CAT-010` prove the selected
 planner records `static`, `serverful-http`, `hybrid-static-server`, or `ssr` classification metadata
-where covered.
+where covered. `WF-PLAN-DET-013` binds Next.js output/router evidence to planner metadata without
+adding framework-specific deployment command fields.
 Fixed-version framework fixture tests now cover detector evidence for the table above, enforce exact
 manifest/requirements versions, and feed supported fixtures through runtime planning without
 installing dependencies or executing framework CLIs. Planner fixture coverage includes Next.js SSR,
-Next.js static export, Vite, SvelteKit adapter-static, Nuxt generate, Astro static, Remix, Express,
-FastAPI, Django, and Flask, including Angular `angular.json` output-path planning.
+Next.js standalone output, Next.js static export, Vite, SvelteKit adapter-static, Nuxt generate,
+Astro static, Remix, Express, FastAPI, Django, and Flask, including Angular `angular.json`
+output-path planning.
 `WF-PLAN-BOUND-001` has command-schema coverage for rejecting framework/package/base-image/buildpack
 deployment fields. This does not yet complete unsupported catalog families, SvelteKit server-adapter
 start inference, Astro SSR, worker plans, or Web/CLI entry parity.

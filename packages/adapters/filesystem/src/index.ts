@@ -313,6 +313,16 @@ function hasNextStaticExportConfig(path: string): boolean {
   return /\boutput\s*:\s*["']export["']/u.test(config ?? "");
 }
 
+function hasNextStandaloneOutputConfig(path: string): boolean {
+  const config = readFirstExistingText(path, [
+    "next.config.js",
+    "next.config.mjs",
+    "next.config.ts",
+  ]);
+
+  return /\boutput\s*:\s*["']standalone["']/u.test(config ?? "");
+}
+
 function hasSvelteKitStaticAdapter(path: string): boolean {
   const config = readFirstExistingText(path, [
     "svelte.config.js",
@@ -337,6 +347,14 @@ function nodeDetectedFiles(path: string): SourceDetectedFile[] {
     existsSync(join(path, "next.config.ts"))
       ? ["next-config" as const]
       : []),
+    ...(existsSync(join(path, "app")) || existsSync(join(path, "src", "app"))
+      ? ["next-app-router" as const]
+      : []),
+    ...(existsSync(join(path, "pages")) || existsSync(join(path, "src", "pages"))
+      ? ["next-pages-router" as const]
+      : []),
+    ...(hasNextStandaloneOutputConfig(path) ? ["next-standalone-output" as const] : []),
+    ...(hasNextStaticExportConfig(path) ? ["next-static-output" as const] : []),
     ...(existsSync(join(path, "vite.config.js")) ||
     existsSync(join(path, "vite.config.mjs")) ||
     existsSync(join(path, "vite.config.ts"))

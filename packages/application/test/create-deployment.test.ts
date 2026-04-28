@@ -909,6 +909,8 @@ describe("CreateDeploymentUseCase", () => {
       runtimePreset: "nextjs",
       buildpack: "node",
       nodeVersion: "22",
+      nextOutputMode: "standalone",
+      nextRouter: "app",
     } as never);
 
     expect(command.isErr()).toBe(true);

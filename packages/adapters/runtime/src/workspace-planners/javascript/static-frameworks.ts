@@ -106,6 +106,39 @@ function baseImageFor(inspection?: SourceInspectionSnapshot): string {
   return `node:${inspection?.runtimeVersion ?? "22"}-alpine`;
 }
 
+function nextRouterEvidence(inspection?: SourceInspectionSnapshot): string | undefined {
+  if (inspection?.framework !== "nextjs") {
+    return undefined;
+  }
+
+  const routers = [
+    ...(inspection.hasDetectedFile("next-app-router") ? ["app-router"] : []),
+    ...(inspection.hasDetectedFile("next-pages-router") ? ["pages-router"] : []),
+  ];
+
+  return routers.length > 0 ? routers.join(",") : "unknown";
+}
+
+function nextOutputMode(inspection?: SourceInspectionSnapshot): string | undefined {
+  if (inspection?.framework !== "nextjs") {
+    return undefined;
+  }
+
+  if (inspection.hasDetectedFile("next-static-output")) {
+    return "export";
+  }
+
+  return undefined;
+}
+
+function hasConflictingNextOutputEvidence(inspection?: SourceInspectionSnapshot): boolean {
+  return Boolean(
+    inspection?.framework === "nextjs" &&
+      inspection.hasDetectedFile("next-standalone-output") &&
+      inspection.hasDetectedFile("next-static-output"),
+  );
+}
+
 function objectRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)
@@ -209,7 +242,11 @@ function canSelectStaticFrameworkPlan(input: {
     case "detected-build-script":
       return explicitStatic || Boolean(input.inspection?.hasDetectedScript(input.defaults.buildScript));
     case "detected-export-script":
-      return explicitStatic || Boolean(input.inspection?.hasDetectedScript("export"));
+      return (
+        explicitStatic ||
+        Boolean(input.inspection?.hasDetectedScript("export")) ||
+        Boolean(input.inspection?.hasDetectedFile("next-static-output"))
+      );
     case "explicit-static":
       return explicitStatic;
   }
@@ -221,8 +258,15 @@ export function resolveStaticFrameworkPlan(input: {
 }): StaticFrameworkPlan | null {
   const framework = input.source.inspection?.framework;
   const defaults = framework ? staticFrameworkDefaults[framework] : undefined;
+  const explicitStatic =
+    input.requestedDeployment.method === "static" ||
+    Boolean(input.requestedDeployment.publishDirectory);
 
   if (!framework || !defaults) {
+    return null;
+  }
+
+  if (hasConflictingNextOutputEvidence(input.source.inspection) && !explicitStatic) {
     return null;
   }
 
@@ -242,6 +286,8 @@ export function resolveStaticFrameworkPlan(input: {
 
   const packageManager = resolveNodePackageManager(input.source.inspection);
   const baseImage = baseImageFor(input.source.inspection);
+  const outputMode = nextOutputMode(input.source.inspection);
+  const routerEvidence = nextRouterEvidence(input.source.inspection);
   const buildCommand =
     input.requestedDeployment.buildCommand ??
     (input.source.inspection?.hasDetectedScript(defaults.buildScript)
@@ -268,6 +314,8 @@ export function resolveStaticFrameworkPlan(input: {
       packageManager,
       baseImage,
       applicationShape: "static",
+      ...(outputMode ? { nextOutputMode: outputMode } : {}),
+      ...(routerEvidence ? { nextRouterEvidence: routerEvidence } : {}),
       ...(input.source.inspection?.projectName
         ? { projectName: input.source.inspection.projectName }
         : {}),

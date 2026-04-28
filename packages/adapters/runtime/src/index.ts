@@ -410,6 +410,22 @@ function executionMetadataFor(
   };
 }
 
+function selectedPlannerMetadata(
+  metadata: Record<string, string>,
+  keys: readonly string[],
+): Record<string, string> {
+  const selected: Record<string, string> = {};
+
+  for (const key of keys) {
+    const value = metadata[key];
+    if (value) {
+      selected[key] = value;
+    }
+  }
+
+  return selected;
+}
+
 function hasEdgeProxyRoute(accessRoutes: AccessRoute[]): boolean {
   return accessRoutes.some((route) => route.proxyKind !== "none");
 }
@@ -667,6 +683,7 @@ function chooseStrategies(input: {
         "workspace.applicationShape": "static",
         "static.publishDirectory": publishDirectory,
         "static.server": "adapter-owned",
+        "static.serverConfig": "appaloft-nginx",
         ...(staticFrameworkPlan?.metadata
           ? Object.fromEntries(
               Object.entries(staticFrameworkPlan.metadata).map(([key, value]) => [
@@ -689,6 +706,7 @@ function chooseStrategies(input: {
           sourceKind: source.kind,
           publishDirectory,
           staticServer: "adapter-owned",
+          staticServerConfig: "appaloft-nginx",
           dockerfilePath,
           applicationShape: staticFrameworkPlan?.applicationShape ?? "static",
           ...(staticFrameworkPlan
@@ -703,6 +721,10 @@ function chooseStrategies(input: {
                 ...(staticFrameworkPlan.metadata.projectName
                   ? { projectName: staticFrameworkPlan.metadata.projectName }
                   : {}),
+                ...selectedPlannerMetadata(staticFrameworkPlan.metadata, [
+                  "nextOutputMode",
+                  "nextRouterEvidence",
+                ]),
               }
             : {}),
         },
@@ -797,6 +819,7 @@ function chooseStrategies(input: {
           ...(plan.metadata.packageManager ? { packageManager: plan.metadata.packageManager } : {}),
           ...(plan.metadata.framework ? { framework: plan.metadata.framework } : {}),
           ...(plan.metadata.projectName ? { projectName: plan.metadata.projectName } : {}),
+          ...selectedPlannerMetadata(plan.metadata, ["nextOutputMode", "nextRouterEvidence"]),
         },
       }),
       steps: [
