@@ -495,6 +495,10 @@ Already done:
 - [x] Web, CLI, and repository config now share the same Quick Deploy resource draft vocabulary for
   source/runtime/network/health profile fields, with acceptance coverage proving those fields enter
   `resources.create` or resource runtime configuration before ids-only deployment admission.
+- [x] Representative fixture deploy smoke now proves Vite static, Fastify Node, and FastAPI Python
+  resource profiles resolve to Docker/OCI image plans, generated Dockerfiles, docker-container
+  execution metadata, internal HTTP verification steps, and typed Docker build/run commands without
+  adding framework-specific deployment input.
 
 Required:
 
@@ -815,6 +819,8 @@ mapping, matrix rows, and Web/CLI draft parity are all checked.
   exist.
 - [x] React/Vue/Svelte/Solid SPA: detect framework-specific outputs and route static output through
   static-server artifacts where Vite evidence is not sufficient.
+- [x] Representative static/Node/Python fixture smoke: Vite static, Fastify Node, and FastAPI
+  Python resource profiles produce Docker/OCI image artifact plans and headless execution evidence.
 - [x] Nuxt/SvelteKit/Astro/Remix: Nuxt generate static, SvelteKit adapter-static/static, Astro
   static, and Remix server planner exist.
 - [ ] Nuxt/SvelteKit/Astro/Remix: add SSR/server modes where Docker/OCI start command is
@@ -865,6 +871,8 @@ Recommended next Spec Rounds before broad Code Rounds:
   Next.js, Vite, Angular, SvelteKit, Nuxt, Astro, Remix, Express, FastAPI, Django, and Flask slice.
 - [x] Framework support tier matrix: promote Web/CLI/repository config draft-field parity and
   equivalent Quick Deploy smoke/acceptance rows for the current JavaScript/TypeScript/Python slice.
+- [x] Framework support tier matrix: add representative fixture-by-fixture Docker/OCI smoke rows
+  and executable headless coverage for Vite static, Fastify Node, and FastAPI Python.
 - [ ] Framework support tier matrix: broaden fixture-by-fixture real deployment smoke rows for the
   full JavaScript/TypeScript/Python catalog.
 - [ ] Deployment observation and recovery: harden `deployments.stream-events` reconnect/gap/CLI

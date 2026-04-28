@@ -56,6 +56,11 @@ const forbiddenDeploymentInputKeys = [
   "installCommand",
   "buildCommand",
   "startCommand",
+  "framework",
+  "packageName",
+  "baseImage",
+  "runtimePreset",
+  "buildpack",
   "dockerfilePath",
   "dockerComposeFilePath",
   "buildTarget",
@@ -858,6 +863,53 @@ describe("quick deploy workflow", () => {
           installCommand: "pnpm install --frozen-lockfile",
           buildCommand: "pnpm build",
           startCommand: "pnpm start",
+        });
+        expectDeploymentInputDoesNotContainWorkflowDrafts(steps);
+      },
+    },
+    {
+      id: "[QUICK-DEPLOY-ENTRY-015]",
+      name: "framework fixture smoke profile stays resource-owned before ids-only deployment",
+      input: workflowInput({
+        resource: {
+          mode: "create",
+          input: resourceInput({
+            source: {
+              kind: "local-folder",
+              locator: "/workspace",
+              baseDirectory: "packages/adapters/filesystem/test/fixtures/frameworks/vite-spa",
+            },
+            runtimeProfile: {
+              strategy: "auto",
+            },
+            networkProfile: {
+              internalPort: 80,
+              upstreamProtocol: "http",
+              exposureMode: "reverse-proxy",
+            },
+          }),
+        },
+      }),
+      expectedKinds: ["resources.create", "deployments.create"],
+      assert: ({ steps }) => {
+        expect(findStep(steps, "resources.create").input).toMatchObject({
+          source: {
+            baseDirectory: "packages/adapters/filesystem/test/fixtures/frameworks/vite-spa",
+          },
+          runtimeProfile: {
+            strategy: "auto",
+          },
+          networkProfile: {
+            internalPort: 80,
+            upstreamProtocol: "http",
+            exposureMode: "reverse-proxy",
+          },
+        });
+        expect(findStep(steps, "deployments.create").input).toEqual({
+          projectId: "proj_existing",
+          serverId: "srv_existing",
+          environmentId: "env_existing",
+          resourceId: "res_1",
         });
         expectDeploymentInputDoesNotContainWorkflowDrafts(steps);
       },

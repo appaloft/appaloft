@@ -278,6 +278,14 @@ repository config now share the current JavaScript/TypeScript/Python draft vocab
 source, runtime, network, and health profile fields; full browser-level entry parity for every
 catalog fixture remains a follow-up hardening gap.
 
+The first fixture deploy smoke slice is headless for CI portability. Vite static, Fastify Node, and
+FastAPI Python fixtures now prove that the shared resource source/runtime/network profile can flow
+through source inspection into Docker/OCI image artifact intent, generated Dockerfile evidence,
+docker-container execution metadata, internal HTTP verification steps, and typed Docker
+build/run-command rendering. This is equivalent smoke rather than real Docker execution because the
+fixture contract avoids dependency installation and framework CLI execution by default. Full real
+Docker/SSH smoke for every JavaScript/TypeScript/Python catalog fixture remains a migration gap.
+
 `build-requested`, resolved image ids/digests, runtime instance identity, rollback candidate
 capture, command specs on the durable runtime plan boundary, and richer source-file analysis are
 not yet fully implemented across the application and persistence boundary. The remaining generic

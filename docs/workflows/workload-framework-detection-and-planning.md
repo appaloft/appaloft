@@ -231,6 +231,34 @@ deterministic for the selected framework and source base directory.
   construction. Detection may report warnings, package names, or likely health/port hints, but it
   must not replace an explicit Dockerfile, Compose project, or image reference.
 
+### Fixture Deploy Smoke Contract
+
+Framework fixture smoke tests are headless deployment-planning acceptance tests for the current
+support catalog. They must start from the same resource profile fields that Web, CLI, and
+repository config collect, then prove that ids-only deployment admission can resolve a Docker/OCI
+runtime plan.
+
+The canonical smoke path is:
+
+```text
+ResourceSourceBinding + ResourceRuntimeProfile + ResourceNetworkProfile
+  -> SourceInspectionSnapshot
+  -> RuntimePlanResolver
+  -> RuntimeArtifactSnapshot(kind = image or compose-project)
+  -> docker-container or docker-compose execution plan
+  -> generated Dockerfile/build/run command evidence or an opt-in real Docker run
+```
+
+Smoke tests may be headless when the CI environment cannot install dependencies, build images, or
+run Docker. A headless smoke still must prove equivalent execution readiness by asserting the
+selected planner, image/Compose artifact intent, generated Dockerfile or Compose plan, runtime
+port, verification steps, and typed Docker command rendering. It must not execute framework CLIs
+during source detection.
+
+Fixture smoke coverage must be table-driven by fixture descriptors and planner descriptors. Adding
+a new framework should mean adding detection/planner data and a fixture expectation, not adding a
+new public command, framework-specific deployment input field, or transport-only branch.
+
 ### Port And Readiness Rules
 
 `ResourceNetworkProfile.internalPort` is the durable resource endpoint. Framework default ports are

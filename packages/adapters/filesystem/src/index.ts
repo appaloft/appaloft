@@ -126,6 +126,10 @@ function hasAnyPackage(
   return packageNames.some((packageName) => hasPackage(dependencies, devDependencies, packageName));
 }
 
+function hasAnyFile(path: string, fileNames: readonly string[]): boolean {
+  return fileNames.some((fileName) => existsSync(join(path, fileName)));
+}
+
 function detectNodePackageManager(
   path: string,
   packageJson: Record<string, unknown> | null,
@@ -160,164 +164,129 @@ function detectNodePackageManager(
   return "npm";
 }
 
+interface NodeFrameworkSignal {
+  framework: SourceFramework;
+  packages?: readonly string[];
+  files?: readonly string[];
+}
+
+const nodeFrameworkSignals: readonly NodeFrameworkSignal[] = [
+  {
+    framework: "nextjs",
+    packages: ["next"],
+    files: ["next.config.js", "next.config.mjs", "next.config.ts"],
+  },
+  {
+    framework: "sveltekit",
+    packages: ["@sveltejs/kit"],
+    files: ["svelte.config.js", "svelte.config.mjs", "svelte.config.ts"],
+  },
+  {
+    framework: "nuxt",
+    packages: ["nuxt"],
+    files: ["nuxt.config.js", "nuxt.config.mjs", "nuxt.config.ts"],
+  },
+  {
+    framework: "astro",
+    packages: ["astro"],
+    files: ["astro.config.mjs"],
+  },
+  {
+    framework: "remix",
+    packages: ["@remix-run/node", "@remix-run/react"],
+    files: ["remix.config.js"],
+  },
+  {
+    framework: "angular",
+    packages: ["@angular/core"],
+    files: ["angular.json"],
+  },
+  { framework: "react", packages: ["react"] },
+  { framework: "vue", packages: ["vue"] },
+  { framework: "svelte", packages: ["svelte"] },
+  { framework: "solid", packages: ["solid-js"] },
+  {
+    framework: "vite",
+    packages: ["vite"],
+    files: ["vite.config.js", "vite.config.mjs", "vite.config.ts"],
+  },
+  { framework: "nestjs", packages: ["@nestjs/core"] },
+  { framework: "fastify", packages: ["fastify"] },
+  { framework: "hono", packages: ["hono"] },
+  { framework: "koa", packages: ["koa"] },
+  { framework: "express", packages: ["express"] },
+];
+
+function matchesNodeFrameworkSignal(input: {
+  path: string;
+  dependencies: Record<string, unknown>;
+  devDependencies: Record<string, unknown>;
+  signal: NodeFrameworkSignal;
+}): boolean {
+  return Boolean(
+    (input.signal.packages &&
+      hasAnyPackage(input.dependencies, input.devDependencies, input.signal.packages)) ||
+      (input.signal.files && hasAnyFile(input.path, input.signal.files)),
+  );
+}
+
 function detectNodeFramework(input: {
   path: string;
   dependencies: Record<string, unknown>;
   devDependencies: Record<string, unknown>;
 }): SourceFramework | undefined {
-  const { path, dependencies, devDependencies } = input;
-
-  if (
-    hasPackage(dependencies, devDependencies, "next") ||
-    existsSync(join(path, "next.config.js")) ||
-    existsSync(join(path, "next.config.mjs")) ||
-    existsSync(join(path, "next.config.ts"))
-  ) {
-    return "nextjs";
-  }
-
-  if (
-    hasPackage(dependencies, devDependencies, "@sveltejs/kit") ||
-    existsSync(join(path, "svelte.config.js")) ||
-    existsSync(join(path, "svelte.config.mjs")) ||
-    existsSync(join(path, "svelte.config.ts"))
-  ) {
-    return "sveltekit";
-  }
-
-  if (
-    hasPackage(dependencies, devDependencies, "nuxt") ||
-    existsSync(join(path, "nuxt.config.js")) ||
-    existsSync(join(path, "nuxt.config.mjs")) ||
-    existsSync(join(path, "nuxt.config.ts"))
-  ) {
-    return "nuxt";
-  }
-
-  if (
-    hasPackage(dependencies, devDependencies, "astro") ||
-    existsSync(join(path, "astro.config.mjs"))
-  ) {
-    return "astro";
-  }
-
-  if (
-    hasAnyPackage(dependencies, devDependencies, ["@remix-run/node", "@remix-run/react"]) ||
-    existsSync(join(path, "remix.config.js"))
-  ) {
-    return "remix";
-  }
-
-  if (
-    hasPackage(dependencies, devDependencies, "@angular/core") ||
-    existsSync(join(path, "angular.json"))
-  ) {
-    return "angular";
-  }
-
-  if (hasPackage(dependencies, devDependencies, "react")) {
-    return "react";
-  }
-
-  if (hasPackage(dependencies, devDependencies, "vue")) {
-    return "vue";
-  }
-
-  if (hasPackage(dependencies, devDependencies, "svelte")) {
-    return "svelte";
-  }
-
-  if (hasPackage(dependencies, devDependencies, "solid-js")) {
-    return "solid";
-  }
-
-  if (
-    hasPackage(dependencies, devDependencies, "vite") ||
-    existsSync(join(path, "vite.config.js")) ||
-    existsSync(join(path, "vite.config.mjs")) ||
-    existsSync(join(path, "vite.config.ts"))
-  ) {
-    return "vite";
-  }
-
-  if (hasPackage(dependencies, devDependencies, "@nestjs/core")) {
-    return "nestjs";
-  }
-
-  if (hasPackage(dependencies, devDependencies, "fastify")) {
-    return "fastify";
-  }
-
-  if (hasPackage(dependencies, devDependencies, "hono")) {
-    return "hono";
-  }
-
-  if (hasPackage(dependencies, devDependencies, "koa")) {
-    return "koa";
-  }
-
-  if (hasPackage(dependencies, devDependencies, "express")) {
-    return "express";
-  }
-
-  return undefined;
+  return nodeFrameworkSignals.find((signal) => matchesNodeFrameworkSignal({ ...input, signal }))
+    ?.framework;
 }
+
+const frameworkApplicationShapes: Partial<Record<SourceFramework, SourceApplicationShape>> = {
+  angular: "static",
+  astro: "static",
+  react: "static",
+  solid: "static",
+  svelte: "static",
+  vite: "static",
+  vue: "static",
+  nextjs: "ssr",
+  nuxt: "ssr",
+  remix: "ssr",
+  sveltekit: "hybrid-static-server",
+  django: "serverful-http",
+  express: "serverful-http",
+  fastapi: "serverful-http",
+  fastify: "serverful-http",
+  flask: "serverful-http",
+  hono: "serverful-http",
+  koa: "serverful-http",
+  nestjs: "serverful-http",
+};
 
 function applicationShapeForFramework(
   framework: SourceFramework | undefined,
 ): SourceApplicationShape | undefined {
-  switch (framework) {
-    case "angular":
-    case "astro":
-    case "react":
-    case "solid":
-    case "svelte":
-    case "vite":
-    case "vue":
-      return "static";
-    case "nextjs":
-    case "nuxt":
-    case "remix":
-      return "ssr";
-    case "sveltekit":
-      return "hybrid-static-server";
-    case "django":
-    case "express":
-    case "fastapi":
-    case "fastify":
-    case "flask":
-    case "hono":
-    case "koa":
-    case "nestjs":
-      return "serverful-http";
-    default:
-      return undefined;
-  }
+  return framework ? frameworkApplicationShapes[framework] : undefined;
 }
+
+type NodeStaticShapePredicate = (input: {
+  path: string;
+  detectedScripts: SourceDetectedScript[];
+}) => boolean;
+
+const nodeStaticShapeOverrides: Partial<Record<SourceFramework, NodeStaticShapePredicate>> = {
+  nextjs: (input) =>
+    input.detectedScripts.includes("export") || hasNextStaticExportConfig(input.path),
+  nuxt: (input) => input.detectedScripts.includes("generate"),
+  sveltekit: (input) => hasSvelteKitStaticAdapter(input.path),
+};
 
 function applicationShapeForNodeProject(input: {
   path: string;
   framework: SourceFramework | undefined;
   detectedScripts: SourceDetectedScript[];
 }): SourceApplicationShape | undefined {
-  switch (input.framework) {
-    case "nextjs":
-      if (input.detectedScripts.includes("export") || hasNextStaticExportConfig(input.path)) {
-        return "static";
-      }
-      break;
-    case "nuxt":
-      if (input.detectedScripts.includes("generate")) {
-        return "static";
-      }
-      break;
-    case "sveltekit":
-      if (hasSvelteKitStaticAdapter(input.path)) {
-        return "static";
-      }
-      break;
-    default:
-      break;
+  const staticOverride = input.framework ? nodeStaticShapeOverrides[input.framework] : undefined;
+  if (staticOverride?.(input)) {
+    return "static";
   }
 
   if (
