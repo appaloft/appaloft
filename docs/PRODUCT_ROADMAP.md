@@ -165,9 +165,9 @@ Already implemented or materially present:
   detail.
 - [x] Edge proxy providers render read-only proxy configuration sections from planned/latest/
   deployment-snapshot route input.
-- [x] Runtime planner coverage exists for Next.js SSR and static export, Remix, Vite static,
-  Angular static, Astro static, Nuxt generate static, SvelteKit adapter-static/static, FastAPI,
-  Django, Flask, generic Node, generic Python, generic Java, and custom command fallback.
+- [x] Runtime planner coverage exists for Next.js SSR, standalone output, and static export, Remix,
+  Vite static, Angular static, Astro static, Nuxt generate static, SvelteKit adapter-static/static,
+  FastAPI, Django, Flask, generic Node, generic Python, generic Java, and custom command fallback.
 - [x] Runtime target backend selection has local-shell and generic-SSH single-server registry
   coverage.
 - [x] Repository config, SSH-server PGlite state, source fingerprint links, server-applied route
@@ -334,9 +334,10 @@ Already done:
 - [x] `resources.proxy-configuration.preview` is active.
 - [x] Server-applied config domains for pure CLI/SSH mode have target-local desired/applied state.
 - [x] Local-shell and generic-SSH single-server runtime target registry coverage exists.
-- [x] Initial framework planner coverage exists for Next.js SSR and static export, Remix, Vite
-  static, Angular static, Astro static, Nuxt generate static, SvelteKit adapter-static/static,
-  FastAPI, Django, Flask, generic Node, generic Python, generic Java, and custom command fallback.
+- [x] Initial framework planner coverage exists for Next.js SSR, standalone output, and static export,
+  Remix, Vite static, Angular static, Astro static, Nuxt generate static, SvelteKit
+  adapter-static/static, FastAPI, Django, Flask, generic Node, generic Python, generic Java, and
+  custom command fallback.
 
 Required:
 
@@ -484,7 +485,8 @@ Already done:
 - [x] Static strategy, Vite static, Angular static, Astro static, Nuxt generate static, Next.js
   static export, SvelteKit adapter-static/static, and generic static server packaging have
   implementation coverage.
-- [x] Next.js baseline planner builds and starts with package manager defaults.
+- [x] Next.js planner builds and starts with package manager defaults, standalone output, and static
+  export metadata.
 - [x] Remix, FastAPI, Django, Flask, generic Node, generic Python, generic Java, and custom command
   fallback planner coverage exists.
 - [x] Dockerfile, Compose, and prebuilt image paths exist.
@@ -499,8 +501,8 @@ Required:
 - [x] Broaden local/generic-SSH Docker/Compose smoke coverage.
 - [x] Harden generated Dockerfile, Compose, prebuilt image, static artifact, and workspace-command
   planning as Docker/OCI artifact paths.
-- [ ] Make Next.js first-class across SSR, standalone, and static-export modes.
-- [ ] Add useful Next.js app/pages router and output detection where it affects planning.
+- [x] Make Next.js first-class across SSR, standalone, and static-export modes.
+- [x] Add useful Next.js app/pages router and output detection where it affects planning.
 - [ ] Promote JavaScript/TypeScript support to a tested catalog: Next.js, Remix, Nuxt, SvelteKit,
   Astro, Vite, React, Vue, Svelte, Solid, Angular, Express, Fastify, NestJS, Hono, Koa, and generic
   package scripts.

@@ -308,7 +308,7 @@ describe("DefaultRuntimePlanResolver", () => {
     expect(plan.steps).toContain("Run docker container");
   });
 
-  test("[WF-PLAN-DET-007][WF-PLAN-CAT-001] classifies Next.js workspace plans as SSR", async () => {
+  test("[WF-PLAN-DET-007][WF-PLAN-DET-013][WF-PLAN-CAT-001] classifies Next.js workspace plans as SSR", async () => {
     ensureReflectMetadata();
     const { DefaultRuntimePlanResolver } = await import("../src");
     const resolver = new DefaultRuntimePlanResolver();
@@ -325,7 +325,7 @@ describe("DefaultRuntimePlanResolver", () => {
           framework: "nextjs",
           packageManager: "pnpm",
           runtimeVersion: "22",
-          detectedFiles: ["package-json", "next-config"],
+          detectedFiles: ["package-json", "next-config", "next-app-router"],
           detectedScripts: ["build", "start"],
         }),
       }),
@@ -352,6 +352,8 @@ describe("DefaultRuntimePlanResolver", () => {
         runtimeKind: "nextjs",
         baseImage: "node:22-alpine",
         applicationShape: "ssr",
+        nextOutputMode: "server",
+        nextRouterEvidence: "app-router",
       }),
     );
     expect(plan.execution).toEqual(
@@ -366,8 +368,92 @@ describe("DefaultRuntimePlanResolver", () => {
     expect(plan.execution.metadata).toEqual(
       expect.objectContaining({
         "workspace.applicationShape": "ssr",
+        nextOutputMode: "server",
+        nextRouterEvidence: "app-router",
       }),
     );
+  });
+
+  test("[WF-PLAN-DET-013][WF-PLAN-CAT-001] packages Next.js standalone output with deterministic start", async () => {
+    ensureReflectMetadata();
+    const { DefaultRuntimePlanResolver } = await import("../src");
+    const { generateWorkspaceDockerBuild } = await import("../src/workspace-planners");
+    const resolver = new DefaultRuntimePlanResolver();
+    const context = createTestExecutionContext();
+
+    const result = await resolver.resolve(context, {
+      id: "plan_next_standalone",
+      source: createSource({
+        kind: "local-folder",
+        locator: "/tmp/next-standalone-app",
+        displayName: "next-standalone-app",
+        inspection: createSourceInspection({
+          runtimeFamily: "node",
+          framework: "nextjs",
+          packageManager: "pnpm",
+          runtimeVersion: "22",
+          detectedFiles: [
+            "package-json",
+            "next-config",
+            "pnpm-lock",
+            "next-standalone-output",
+            "next-pages-router",
+          ],
+          detectedScripts: ["build", "start"],
+        }),
+      }),
+      server: {
+        id: "srv_next_standalone",
+        providerKey: "local-shell",
+      },
+      environmentSnapshot: createEnvironmentSnapshot("snap_next_standalone"),
+      detectedReasoning: ["detected next standalone app"],
+      requestedDeployment: {
+        method: "auto",
+        port: 4316,
+      },
+      generatedAt: "2026-01-01T00:00:00.000Z",
+    });
+
+    expect(result.isOk()).toBe(true);
+    const plan = result._unsafeUnwrap();
+
+    expect(plan.buildStrategy).toBe("workspace-commands");
+    expect(plan.packagingMode).toBe("all-in-one-docker");
+    expect(plan.runtimeArtifact?.metadata).toEqual(
+      expect.objectContaining({
+        planner: "nextjs",
+        runtimeKind: "nextjs",
+        baseImage: "node:22-alpine",
+        applicationShape: "ssr",
+        packageManager: "pnpm",
+        framework: "nextjs",
+        nextOutputMode: "standalone",
+        nextRouterEvidence: "pages-router",
+      }),
+    );
+    expect(plan.execution).toEqual(
+      expect.objectContaining({
+        kind: "docker-container",
+        installCommand: "pnpm install",
+        buildCommand: "pnpm build",
+        startCommand: "node .next/standalone/server.js",
+        port: 4316,
+      }),
+    );
+    expect(plan.execution.metadata).toEqual(
+      expect.objectContaining({
+        "artifact.generatedDockerfile": "true",
+        nextOutputMode: "standalone",
+        nextRouterEvidence: "pages-router",
+      }),
+    );
+
+    const dockerBuild = generateWorkspaceDockerBuild({
+      execution: plan.execution,
+      sourceInspection: plan.source.inspection,
+    });
+    expect(dockerBuild?.dockerfile).toContain('CMD ["sh","-lc","node .next/standalone/server.js"]');
   });
 
   test("preserves runtime context metadata in execution plans", async () => {
@@ -443,7 +529,7 @@ describe("DefaultRuntimePlanResolver", () => {
     );
   });
 
-  test("[WF-PLAN-DET-007][WF-PLAN-CAT-002] packages detected Next.js static export as static artifact", async () => {
+  test("[WF-PLAN-DET-007][WF-PLAN-DET-013][WF-PLAN-CAT-002] packages detected Next.js static export as static artifact", async () => {
     ensureReflectMetadata();
     const { DefaultRuntimePlanResolver } = await import("../src");
     const resolver = new DefaultRuntimePlanResolver();
@@ -460,7 +546,13 @@ describe("DefaultRuntimePlanResolver", () => {
           framework: "nextjs",
           packageManager: "pnpm",
           runtimeVersion: "22",
-          detectedFiles: ["package-json", "next-config", "pnpm-lock"],
+          detectedFiles: [
+            "package-json",
+            "next-config",
+            "pnpm-lock",
+            "next-static-output",
+            "next-pages-router",
+          ],
           detectedScripts: ["build", "export"],
         }),
       }),
@@ -489,7 +581,10 @@ describe("DefaultRuntimePlanResolver", () => {
         packageManager: "pnpm",
         baseImage: "node:22-alpine",
         publishDirectory: "/out",
+        staticServerConfig: "appaloft-nginx",
         applicationShape: "static",
+        nextOutputMode: "export",
+        nextRouterEvidence: "pages-router",
       }),
     );
     expect(plan.execution).toEqual(
@@ -503,8 +598,62 @@ describe("DefaultRuntimePlanResolver", () => {
     expect(plan.execution.metadata).toEqual(
       expect.objectContaining({
         "static.publishDirectory": "/out",
+        "static.serverConfig": "appaloft-nginx",
         "workspace.planner": "nextjs-static",
         "workspace.applicationShape": "static",
+        "workspace.nextOutputMode": "export",
+        "workspace.nextRouterEvidence": "pages-router",
+      }),
+    );
+  });
+
+  test("[WF-PLAN-DET-012][WF-PLAN-DET-013] refuses ambiguous Next.js output evidence without explicit commands", async () => {
+    ensureReflectMetadata();
+    const { DefaultRuntimePlanResolver } = await import("../src");
+    const resolver = new DefaultRuntimePlanResolver();
+    const context = createTestExecutionContext();
+
+    const result = await resolver.resolve(context, {
+      id: "plan_next_ambiguous",
+      source: createSource({
+        kind: "local-folder",
+        locator: "/tmp/next-ambiguous-app",
+        displayName: "next-ambiguous-app",
+        inspection: createSourceInspection({
+          runtimeFamily: "node",
+          framework: "nextjs",
+          packageManager: "pnpm",
+          detectedFiles: [
+            "package-json",
+            "next-config",
+            "next-standalone-output",
+            "next-static-output",
+            "next-app-router",
+          ],
+          detectedScripts: ["build"],
+        }),
+      }),
+      server: {
+        id: "srv_next_ambiguous",
+        providerKey: "local-shell",
+      },
+      environmentSnapshot: createEnvironmentSnapshot("snap_next_ambiguous"),
+      detectedReasoning: ["detected conflicting next output evidence"],
+      requestedDeployment: {
+        method: "auto",
+        port: 4317,
+      },
+      generatedAt: "2026-01-01T00:00:00.000Z",
+    });
+
+    expect(result.isErr()).toBe(true);
+    const error = result._unsafeUnwrapErr();
+    expect(error.code).toBe("validation_error");
+    expect(error.details).toEqual(
+      expect.objectContaining({
+        phase: "runtime-plan-resolution",
+        framework: "nextjs",
+        detectedFiles: expect.stringContaining("next-standalone-output"),
       }),
     );
   });

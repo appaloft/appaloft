@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { join } from "node:path";
 import {
   type SourceApplicationShape,
+  type SourceDetectedFile,
   type SourceFramework,
   type SourcePackageManager,
   type SourceRuntimeFamily,
@@ -32,6 +33,7 @@ interface FrameworkFixtureExpectation {
   framework: SourceFramework;
   packageManager: SourcePackageManager;
   applicationShape: SourceApplicationShape;
+  detectedFiles?: SourceDetectedFile[];
   fixedVersions: FixedVersionExpectation;
 }
 
@@ -51,6 +53,7 @@ const frameworkFixtures: FrameworkFixtureExpectation[] = [
     framework: "nextjs",
     packageManager: "pnpm",
     applicationShape: "ssr",
+    detectedFiles: ["next-app-router"],
     fixedVersions: {
       packageManager: "pnpm@10.6.0",
       dependencies: {
@@ -61,12 +64,30 @@ const frameworkFixtures: FrameworkFixtureExpectation[] = [
     },
   },
   {
-    matrixIds: "WF-PLAN-CAT-002",
+    matrixIds: "WF-PLAN-CAT-001,WF-PLAN-DET-013",
+    fixture: "next-standalone",
+    runtimeFamily: "node",
+    framework: "nextjs",
+    packageManager: "pnpm",
+    applicationShape: "ssr",
+    detectedFiles: ["next-standalone-output", "next-pages-router"],
+    fixedVersions: {
+      packageManager: "pnpm@10.6.0",
+      dependencies: {
+        next: "15.2.4",
+        react: "19.0.0",
+        "react-dom": "19.0.0",
+      },
+    },
+  },
+  {
+    matrixIds: "WF-PLAN-CAT-002,WF-PLAN-DET-013",
     fixture: "next-static-export",
     runtimeFamily: "node",
     framework: "nextjs",
     packageManager: "pnpm",
     applicationShape: "static",
+    detectedFiles: ["next-static-output", "next-pages-router"],
     fixedVersions: {
       packageManager: "pnpm@10.6.0",
       dependencies: {
@@ -330,6 +351,9 @@ describe("FileSystemSourceDetector framework fixtures", () => {
       expect(inspection?.framework).toBe(fixture.framework);
       expect(inspection?.packageManager).toBe(fixture.packageManager);
       expect(inspection?.applicationShape).toBe(fixture.applicationShape);
+      for (const file of fixture.detectedFiles ?? []) {
+        expect(inspection?.detectedFiles).toContain(file);
+      }
     });
   }
 });

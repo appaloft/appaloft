@@ -222,8 +222,8 @@ The target support catalog for mainstream web application deployment is:
 
 | Family/frameworks | Classification | Required signals | Default build/package and artifact rule | Start/readiness rule |
 | --- | --- | --- | --- | --- |
-| Next.js runtime app | `ssr` or `serverful-http` | `next` dependency or `next.config.*` under selected source root; package manager evidence | Install, run `next build`; prefer standalone/server output when configured; package as Docker/OCI image with Node or Bun base policy selected by package manager/runtime evidence | Start with deterministic Next server/standalone command only when output is known; otherwise require explicit start command. Port hint is 3000 unless resource network profile supplies another port. |
-| Next static export | `static` | Explicit static strategy, `output: "export"`, or safe export/build script evidence | Build static output and package `out` or explicit publish directory into static-server image | Static server on port 80 by default; no Next runtime server is started. |
+| Next.js runtime app | `ssr` or `serverful-http` | `next` dependency or `next.config.*` under selected source root; package manager evidence; App Router (`app`/`src/app`) and Pages Router (`pages`/`src/pages`) evidence when present | Install, run `next build`; package default server output as a Docker/OCI image, or package `output: "standalone"` as a Docker/OCI image that starts `.next/standalone/server.js`; record router/output evidence, base image policy, and install/build/start metadata in planner diagnostics | Start with deterministic Next server/standalone command only when output is known; otherwise require explicit start command. Port hint is 3000 unless resource network profile supplies another port. Conflicting output evidence fails `runtime-plan-resolution` unless explicit custom commands select a Docker/OCI image plan. |
+| Next static export | `static` | Explicit static strategy, `output: "export"`, or safe export/build script evidence; App/Pages Router evidence when present | Build static output and package `out` or explicit publish directory into the adapter-owned static-server image; record publish directory, static server config, router/output evidence, base image policy, and install/build metadata in planner diagnostics | Static server on port 80 by default; no Next runtime server is started. |
 | Remix | `ssr` | Remix dependency/config and build script evidence | Install and run selected Remix build; package server artifact and public assets into Docker/OCI image | Start command must be explicit or derived from supported server adapter output; port is resource network input or deterministic adapter hint. |
 | Nuxt | `ssr` or `static` | `nuxt` dependency or `nuxt.config.*`; generate/static evidence when selected | SSR uses `nuxi build` and `.output/server`; static uses `nuxi generate` and `.output/public`; package image or static-server image accordingly | SSR starts Nitro server from `.output`; static starts static server on port 80. |
 | SvelteKit | `hybrid-static-server` | `svelte.config.*`, SvelteKit dependency, and adapter evidence | `adapter-static` or explicit static strategy packages static output; server adapters package the generated server runtime into Docker/OCI image | Static uses port 80; server adapters require a start command or supported adapter entrypoint plus resource network port. |
@@ -374,14 +374,15 @@ Current typed detection is limited to:
   detection, plus planner output metadata for `static`, `serverful-http`, `ssr`, and explicit
   `container-native` strategies;
 - local JavaScript/TypeScript detection for common framework dependencies/config files and
-  lockfiles, including Next.js `output: "export"`/export-script, Nuxt `generate`, and SvelteKit
-  `adapter-static` classification as `static`;
+  lockfiles, including Next.js App/Pages Router evidence, `output: "standalone"`,
+  `output: "export"`/export-script, Nuxt `generate`, and SvelteKit `adapter-static`
+  classification as `static`;
 - local Python detection for FastAPI, Django, Flask, `uv`, Poetry, pip, lockfiles, and `manage.py`;
 - local Java project detection;
 - fixed-version fixture coverage for Next.js, Vite, Angular, SvelteKit, Nuxt, Astro, Remix,
   Express, FastAPI, Django, and Flask source inspection;
-- Vite, Angular, Astro, Nuxt generate, Next.js static export, and SvelteKit adapter-static artifact
-  planning.
+- Vite, Angular, Astro, Nuxt generate, Next.js standalone/static export, and SvelteKit
+  adapter-static artifact planning.
 - SvelteKit ambiguous auto planning is rejected unless the workflow selects static explicitly or
   provides an explicit start command.
 
