@@ -1184,6 +1184,41 @@ describe("DefaultRuntimePlanResolver", () => {
     );
   });
 
+  test("[DEP-CREATE-SMOKE-003] rejects prebuilt image planning for non-image sources with structured details", async () => {
+    ensureReflectMetadata();
+    const { DefaultRuntimePlanResolver } = await import("../src");
+    const resolver = new DefaultRuntimePlanResolver();
+    const context = createTestExecutionContext();
+
+    const result = await resolver.resolve(context, {
+      id: "plan_prebuilt_incompatible_source",
+      source: createSource({
+        kind: "local-folder",
+        locator: "/tmp/app",
+        displayName: "app",
+      }),
+      server: {
+        id: "srv_prebuilt_incompatible_source",
+        providerKey: "local-shell",
+      },
+      environmentSnapshot: createEnvironmentSnapshot("snap_prebuilt_incompatible_source"),
+      detectedReasoning: ["configured prebuilt image profile"],
+      requestedDeployment: {
+        method: "prebuilt-image",
+        port: 4314,
+      },
+      generatedAt: "2026-01-01T00:00:00.000Z",
+    });
+
+    expect(result.isErr()).toBe(true);
+    const error = result._unsafeUnwrapErr();
+    expect(error.details).toMatchObject({
+      phase: "runtime-artifact-resolution",
+      sourceKind: "local-folder",
+      runtimePlanStrategy: "prebuilt-image",
+    });
+  });
+
   test("adds a direct-port access route only when the resource exposure mode is direct-port", async () => {
     ensureReflectMetadata();
     const { DefaultRuntimePlanResolver } = await import("../src");
@@ -1488,6 +1523,73 @@ describe("DefaultRuntimePlanResolver", () => {
         kind: "docker-compose-stack",
         workingDirectory: "/tmp/compose-app",
         composeFile: "docker-compose.yml",
+        metadata: expect.objectContaining({
+          "compose.file": "docker-compose.yml",
+          "compose.workingDirectory": "/tmp/compose-app",
+          "compose.projectNameSource": "runtime-instance-name",
+          composeFile: "docker-compose.yml",
+          workdir: "/tmp/compose-app",
+        }),
+      }),
+    );
+    expect(plan.runtimeArtifact?.metadata).toEqual(
+      expect.objectContaining({
+        composeFile: "docker-compose.yml",
+        composeWorkingDirectory: "/tmp/compose-app",
+        composeProjectNameSource: "runtime-instance-name",
+      }),
+    );
+  });
+
+  test("[DEP-CREATE-SMOKE-002][DEP-CREATE-SMOKE-006] keeps configured compose paths source-root relative when the source locator is a file", async () => {
+    ensureReflectMetadata();
+    const { DefaultRuntimePlanResolver } = await import("../src");
+    const resolver = new DefaultRuntimePlanResolver();
+    const context = createTestExecutionContext();
+
+    const result = await resolver.resolve(context, {
+      id: "plan_configured_compose_file",
+      source: createSource({
+        kind: "compose",
+        locator: "/tmp/compose-app/docker-compose.yml",
+        displayName: "compose-app",
+      }),
+      server: {
+        id: "srv_configured_compose_file",
+        providerKey: "generic-ssh",
+      },
+      environmentSnapshot: createEnvironmentSnapshot("snap_configured_compose_file"),
+      detectedReasoning: ["configured resource compose profile"],
+      requestedDeployment: {
+        method: "docker-compose",
+        dockerComposeFilePath: "deploy/compose.yml",
+        port: 4312,
+      },
+      generatedAt: "2026-01-01T00:00:00.000Z",
+    });
+
+    expect(result.isOk()).toBe(true);
+    const plan = result._unsafeUnwrap();
+
+    expect(plan.runtimeArtifact).toEqual(
+      expect.objectContaining({
+        kind: "compose-project",
+        composeFile: "deploy/compose.yml",
+        metadata: expect.objectContaining({
+          composeFile: "deploy/compose.yml",
+          composeWorkingDirectory: "/tmp/compose-app",
+        }),
+      }),
+    );
+    expect(plan.execution).toEqual(
+      expect.objectContaining({
+        kind: "docker-compose-stack",
+        workingDirectory: "/tmp/compose-app",
+        composeFile: "deploy/compose.yml",
+        metadata: expect.objectContaining({
+          composeFile: "deploy/compose.yml",
+          workdir: "/tmp/compose-app",
+        }),
       }),
     );
   });
