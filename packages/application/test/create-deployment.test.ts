@@ -27,6 +27,8 @@ import {
   DestinationName,
   DetectSummary,
   DisplayNameText,
+  DockerComposeFilePath,
+  DockerfilePath,
   domainError,
   EdgeProxyKindValue,
   Environment,
@@ -685,6 +687,46 @@ function createStaticSiteResource(input: { publishDirectory?: string } = {}): Re
     },
     networkProfile: {
       internalPort: PortNumber.rehydrate(80),
+      upstreamProtocol: ResourceNetworkProtocolValue.rehydrate("http"),
+      exposureMode: ResourceExposureModeValue.rehydrate("reverse-proxy"),
+    },
+    createdAt: CreatedAt.rehydrate("2026-01-01T00:00:00.000Z"),
+  });
+}
+
+function createRuntimeSmokeResource(input: {
+  kind?: "application" | "compose-stack";
+  sourceKind?: "local-folder" | "compose" | "docker-image";
+  sourceLocator?: string;
+  strategy: "dockerfile" | "docker-compose" | "prebuilt-image" | "workspace-commands";
+  dockerfilePath?: string;
+  dockerComposeFilePath?: string;
+}): Resource {
+  return Resource.rehydrate({
+    id: ResourceId.rehydrate("res_demo"),
+    projectId: ProjectId.rehydrate("prj_demo"),
+    environmentId: EnvironmentId.rehydrate("env_demo"),
+    destinationId: DestinationId.rehydrate("dst_demo"),
+    name: ResourceName.rehydrate("web"),
+    slug: ResourceSlug.rehydrate("web"),
+    kind: ResourceKindValue.rehydrate(input.kind ?? "application"),
+    services: [],
+    sourceBinding: {
+      kind: SourceKindValue.rehydrate(input.sourceKind ?? "local-folder"),
+      locator: SourceLocator.rehydrate(input.sourceLocator ?? "."),
+      displayName: DisplayNameText.rehydrate("workspace"),
+    },
+    runtimeProfile: {
+      strategy: RuntimePlanStrategyValue.rehydrate(input.strategy),
+      ...(input.dockerfilePath
+        ? { dockerfilePath: DockerfilePath.rehydrate(input.dockerfilePath) }
+        : {}),
+      ...(input.dockerComposeFilePath
+        ? { dockerComposeFilePath: DockerComposeFilePath.rehydrate(input.dockerComposeFilePath) }
+        : {}),
+    },
+    networkProfile: {
+      internalPort: PortNumber.rehydrate(3000),
       upstreamProtocol: ResourceNetworkProtocolValue.rehydrate("http"),
       exposureMode: ResourceExposureModeValue.rehydrate("reverse-proxy"),
     },
@@ -1817,6 +1859,116 @@ describe("CreateDeploymentUseCase", () => {
       port: 80,
       exposureMode: "reverse-proxy",
       upstreamProtocol: "http",
+    });
+  });
+
+  test("[DEP-CREATE-SMOKE-001] resolves Dockerfile resource profile without transport runtime fields", async () => {
+    const runtimePlanResolver = new CapturingRuntimePlanResolver();
+    const {
+      context,
+      createDeploymentInput,
+      createDeploymentUseCase,
+      resources,
+      repositoryContext,
+    } = await createDeploymentFixture(new ExplicitContextRequiredPolicy(), {
+      runtimePlanResolver,
+    });
+    const dockerfileResource = createRuntimeSmokeResource({
+      strategy: "dockerfile",
+      dockerfilePath: "deploy/Dockerfile",
+    });
+
+    await resources.upsert(
+      repositoryContext,
+      dockerfileResource,
+      UpsertResourceSpec.fromResource(dockerfileResource),
+    );
+
+    const result = await createDeploymentUseCase.execute(context, createDeploymentInput);
+
+    expect(result.isOk()).toBe(true);
+    expect(runtimePlanResolver.input?.requestedDeployment).toMatchObject({
+      method: "dockerfile",
+      dockerfilePath: "deploy/Dockerfile",
+      port: 3000,
+      exposureMode: "reverse-proxy",
+      upstreamProtocol: "http",
+    });
+  });
+
+  test("[DEP-CREATE-SMOKE-006] resolves Docker Compose resource profile before generic-SSH backend execution", async () => {
+    const runtimePlanResolver = new CapturingRuntimePlanResolver();
+    const {
+      context,
+      createDeploymentInput,
+      createDeploymentUseCase,
+      resources,
+      repositoryContext,
+    } = await createDeploymentFixture(new ExplicitContextRequiredPolicy(), {
+      runtimePlanResolver,
+    });
+    const composeResource = createRuntimeSmokeResource({
+      kind: "compose-stack",
+      sourceKind: "compose",
+      sourceLocator: "/workspace/compose-app",
+      strategy: "docker-compose",
+      dockerComposeFilePath: "docker-compose.yml",
+    });
+
+    await resources.upsert(
+      repositoryContext,
+      composeResource,
+      UpsertResourceSpec.fromResource(composeResource),
+    );
+
+    const result = await createDeploymentUseCase.execute(context, createDeploymentInput);
+
+    expect(result.isOk()).toBe(true);
+    expect(runtimePlanResolver.input?.requestedDeployment).toMatchObject({
+      method: "docker-compose",
+      dockerComposeFilePath: "docker-compose.yml",
+      port: 3000,
+    });
+    expect(runtimePlanResolver.input?.server.providerKey.value).toBe("generic-ssh");
+  });
+
+  test("[DEP-CREATE-SMOKE-003] resolves prebuilt image resource profile through ids-only create input", async () => {
+    const runtimePlanResolver = new CapturingRuntimePlanResolver();
+    const {
+      context,
+      createDeploymentInput,
+      createDeploymentUseCase,
+      resources,
+      repositoryContext,
+    } = await createDeploymentFixture(new ExplicitContextRequiredPolicy(), {
+      runtimePlanResolver,
+    });
+    const imageResource = createRuntimeSmokeResource({
+      sourceKind: "docker-image",
+      sourceLocator: "docker://appaloft-smoke-prebuilt:latest",
+      strategy: "prebuilt-image",
+    });
+
+    await resources.upsert(
+      repositoryContext,
+      imageResource,
+      UpsertResourceSpec.fromResource(imageResource),
+    );
+
+    const result = await createDeploymentUseCase.execute(context, createDeploymentInput);
+
+    expect(result.isOk()).toBe(true);
+    expect(runtimePlanResolver.input?.source.kind).toBe("docker-image");
+    expect(runtimePlanResolver.input?.requestedDeployment).toMatchObject({
+      method: "prebuilt-image",
+      port: 3000,
+    });
+    expect(createDeploymentInput).toEqual({
+      projectId: "prj_demo",
+      serverId: "srv_demo",
+      destinationId: "dst_demo",
+      environmentId: "env_demo",
+      resourceId: "res_demo",
     });
   });
 
