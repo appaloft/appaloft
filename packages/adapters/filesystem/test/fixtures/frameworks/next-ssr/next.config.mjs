@@ -1,3 +1,1 @@
-export default {
-  output: "standalone",
-};
+export default {};
