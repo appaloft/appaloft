@@ -414,6 +414,14 @@ function hasEdgeProxyRoute(accessRoutes: AccessRoute[]): boolean {
   return accessRoutes.some((route) => route.proxyKind !== "none");
 }
 
+function hasDerivedDefaultAccessRoute(requestedDeployment: RequestedDeploymentConfig): boolean {
+  const routeSource = requestedDeployment.accessRouteMetadata?.["access.routeSource"];
+  return (
+    requestedDeployment.accessContext?.routePurpose === "default-resource-access" &&
+    (routeSource === "durable-domain-binding" || routeSource === "server-applied-config-domain")
+  );
+}
+
 function runtimeVerificationStepsFor(input: {
   execution: RuntimeExecutionPlan;
   accessRoutes: AccessRoute[];
@@ -483,15 +491,19 @@ function withRequestedAccessRoutes(input: {
     requestedDeployment: input.requestedDeployment,
     ...(input.execution.port ? { fallbackPort: input.execution.port } : {}),
   }).andThen((accessRoutes) => {
+    const metadata = executionMetadataFor(input.requestedDeployment);
+    const executionWithMetadata =
+      Object.keys(metadata).length > 0 ? input.execution.withMetadata(metadata) : input.execution;
+
     if (accessRoutes.length > 0 && input.execution.kind !== "docker-container") {
-      if (!hasEdgeProxyRoute(accessRoutes)) {
+      if (!hasEdgeProxyRoute(accessRoutes) || hasDerivedDefaultAccessRoute(input.requestedDeployment)) {
         return ok({
           buildStrategy: input.buildStrategy,
           packagingMode: input.packagingMode,
-          execution: input.execution,
+          execution: executionWithMetadata,
           runtimeArtifact: input.runtimeArtifact,
           steps: runtimePlanStepsFor({
-            execution: input.execution,
+            execution: executionWithMetadata,
             accessRoutes: [],
             steps: input.steps,
           }),
@@ -505,9 +517,6 @@ function withRequestedAccessRoutes(input: {
       );
     }
 
-    const metadata = executionMetadataFor(input.requestedDeployment);
-    const executionWithMetadata =
-      Object.keys(metadata).length > 0 ? input.execution.withMetadata(metadata) : input.execution;
     const execution =
       accessRoutes.length > 0
         ? executionWithMetadata.withAccessRoutes(accessRoutes)

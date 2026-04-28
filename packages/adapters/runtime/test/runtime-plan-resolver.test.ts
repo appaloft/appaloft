@@ -1594,6 +1594,98 @@ describe("DefaultRuntimePlanResolver", () => {
     );
   });
 
+  test("[DEP-CREATE-SMOKE-002] allows derived default access route metadata on Compose plans", async () => {
+    ensureReflectMetadata();
+    const { DefaultRuntimePlanResolver } = await import("../src");
+    const resolver = new DefaultRuntimePlanResolver();
+    const context = createTestExecutionContext();
+
+    const result = await resolver.resolve(context, {
+      id: "plan_compose_derived_access",
+      source: createSource({
+        kind: "compose",
+        locator: "/tmp/compose-app/docker-compose.yml",
+        displayName: "compose-app",
+      }),
+      server: {
+        id: "srv_compose_derived_access",
+        providerKey: "local-shell",
+      },
+      environmentSnapshot: createEnvironmentSnapshot("snap_compose_derived_access"),
+      detectedReasoning: ["configured resource compose profile"],
+      requestedDeployment: {
+        method: "docker-compose",
+        port: 3000,
+        proxyKind: "traefik",
+        domains: ["compose.localtest.me"],
+        accessContext: {
+          projectId: "prj_demo",
+          environmentId: "env_demo",
+          resourceId: "res_demo",
+          resourceSlug: "compose",
+          destinationId: "dst_demo",
+          exposureMode: "reverse-proxy",
+          upstreamProtocol: "http",
+          routePurpose: "default-resource-access",
+        },
+        accessRouteMetadata: {
+          "access.routeSource": "server-applied-config-domain",
+          "access.hostname": "compose.localtest.me",
+        },
+      },
+      generatedAt: "2026-01-01T00:00:00.000Z",
+    });
+
+    expect(result.isOk()).toBe(true);
+    const plan = result._unsafeUnwrap();
+
+    expect(plan.execution).toEqual(
+      expect.objectContaining({
+        kind: "docker-compose-stack",
+        accessRoutes: [],
+        metadata: expect.objectContaining({
+          "access.routeSource": "server-applied-config-domain",
+          "access.hostname": "compose.localtest.me",
+          "resource.id": "res_demo",
+          composeFile: "docker-compose.yml",
+        }),
+      }),
+    );
+  });
+
+  test("rejects explicit edge access routes on Compose plans", async () => {
+    ensureReflectMetadata();
+    const { DefaultRuntimePlanResolver } = await import("../src");
+    const resolver = new DefaultRuntimePlanResolver();
+    const context = createTestExecutionContext();
+
+    const result = await resolver.resolve(context, {
+      id: "plan_compose_explicit_access",
+      source: createSource({
+        kind: "compose",
+        locator: "/tmp/compose-app/docker-compose.yml",
+        displayName: "compose-app",
+      }),
+      server: {
+        id: "srv_compose_explicit_access",
+        providerKey: "local-shell",
+      },
+      environmentSnapshot: createEnvironmentSnapshot("snap_compose_explicit_access"),
+      detectedReasoning: ["configured resource compose profile"],
+      requestedDeployment: {
+        method: "docker-compose",
+        port: 3000,
+        domains: ["compose.example.com"],
+      },
+      generatedAt: "2026-01-01T00:00:00.000Z",
+    });
+
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr().message).toBe(
+      "Access routing is currently supported for Docker container deployments",
+    );
+  });
+
   test("[DEP-CREATE-ADM-026] static strategy packages publish directory as static server image artifact", async () => {
     ensureReflectMetadata();
     const { DefaultRuntimePlanResolver } = await import("../src");
