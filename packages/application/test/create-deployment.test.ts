@@ -120,6 +120,9 @@ import {
   type ProviderDescriptor,
   type ProviderRegistry,
   type RuntimePlanResolver,
+  type RuntimeTargetBackend,
+  type RuntimeTargetBackendRegistry,
+  type RuntimeTargetCapability,
   type ServerAppliedRouteDesiredStateReader,
   type ServerAppliedRouteDesiredStateRecord,
   type ServerAppliedRouteDesiredStateTarget,
@@ -315,6 +318,46 @@ class HermeticExecutionBackend implements ExecutionBackend {
   }
 }
 
+class HermeticRuntimeTargetBackend
+  extends HermeticExecutionBackend
+  implements RuntimeTargetBackend
+{
+  readonly descriptor = {
+    key: "single-server-generic-ssh",
+    providerKey: "generic-ssh",
+    targetKinds: ["single-server" as const],
+    capabilities: [
+      "runtime.apply",
+      "runtime.verify",
+      "runtime.logs",
+      "runtime.health",
+      "runtime.cleanup",
+      "proxy.route",
+    ] satisfies RuntimeTargetCapability[],
+  };
+}
+
+class StaticRuntimeTargetBackendRegistry implements RuntimeTargetBackendRegistry {
+  private readonly backend = new HermeticRuntimeTargetBackend();
+
+  constructor(private readonly supported = true) {}
+
+  find(): Result<RuntimeTargetBackend> {
+    if (this.supported) {
+      return ok(this.backend);
+    }
+
+    return err(
+      domainError.runtimeTargetUnsupported("Runtime target backend is not registered", {
+        phase: "runtime-target-resolution",
+        targetKind: "single-server",
+        providerKey: "generic-ssh",
+        missingCapability: "runtime.apply",
+      }),
+    );
+  }
+}
+
 class FailingStaticPackageExecutionBackend extends HermeticExecutionBackend {
   async execute(): Promise<Result<{ deployment: Deployment }>> {
     return err(
@@ -468,6 +511,7 @@ async function createDeploymentFixture(
   options: {
     runtimePlanResolver?: RuntimePlanResolver;
     executionBackend?: ExecutionBackend;
+    runtimeTargetBackendRegistry?: RuntimeTargetBackendRegistry;
     edgeProxyKind?: "traefik" | "caddy";
     domainRouteBindingReader?: DomainRouteBindingReader;
     serverAppliedRouteDesiredStateReader?: ServerAppliedRouteDesiredStateReader;
@@ -592,6 +636,7 @@ async function createDeploymentFixture(
     new DeploymentFactory(clock, idGenerator),
     new DeploymentLifecycleService(clock),
     new PassThroughMutationCoordinator(),
+    options.runtimeTargetBackendRegistry ?? new StaticRuntimeTargetBackendRegistry(),
     options.domainRouteBindingReader,
     options.serverAppliedRouteDesiredStateReader,
   );
@@ -1187,6 +1232,7 @@ describe("CreateDeploymentUseCase", () => {
       new DeploymentFactory(clock, idGenerator),
       new DeploymentLifecycleService(clock),
       new PassThroughMutationCoordinator(),
+      new StaticRuntimeTargetBackendRegistry(),
     );
 
     const result = await useCase.execute(context, {
@@ -1389,6 +1435,7 @@ describe("CreateDeploymentUseCase", () => {
       new DeploymentFactory(clock, idGenerator),
       new DeploymentLifecycleService(clock),
       new PassThroughMutationCoordinator(),
+      new StaticRuntimeTargetBackendRegistry(),
     );
 
     const result = await useCase.execute(context, {
@@ -1557,6 +1604,7 @@ describe("CreateDeploymentUseCase", () => {
       new DeploymentFactory(clock, idGenerator),
       new DeploymentLifecycleService(clock),
       new PassThroughMutationCoordinator(),
+      new StaticRuntimeTargetBackendRegistry(),
     );
 
     const result = await useCase.execute(context, {
@@ -2249,6 +2297,32 @@ describe("CreateDeploymentUseCase", () => {
     expect(deployments.items.size).toBe(0);
   });
 
+  test("[DEP-CREATE-ADM-011] rejects unsupported runtime target backend before acceptance", async () => {
+    const { context, createDeploymentInput, createDeploymentUseCase, deployments } =
+      await createDeploymentFixture(new ExplicitContextRequiredPolicy(), {
+        runtimeTargetBackendRegistry: new StaticRuntimeTargetBackendRegistry(false),
+      });
+
+    const result = await createDeploymentUseCase.execute(context, createDeploymentInput);
+
+    expect(result.isErr()).toBe(true);
+    const error = result._unsafeUnwrapErr();
+    expect(error.code).toBe("runtime_target_unsupported");
+    expect(error.details).toMatchObject({
+      commandName: "deployments.create",
+      phase: "runtime-target-resolution",
+      projectId: "prj_demo",
+      environmentId: "env_demo",
+      resourceId: "res_demo",
+      serverId: "srv_demo",
+      destinationId: "dst_demo",
+      runtimePlanStrategy: "auto",
+      targetKind: "single-server",
+      targetProviderKey: "generic-ssh",
+    });
+    expect(deployments.items.size).toBe(0);
+  });
+
   test("[DEP-CREATE-ASYNC-017] keeps accepted static deployment ok when package fails after acceptance", async () => {
     const {
       context,
@@ -2339,6 +2413,7 @@ describe("CreateDeploymentUseCase", () => {
       new DeploymentFactory(clock, idGenerator),
       new DeploymentLifecycleService(clock),
       new PassThroughMutationCoordinator(),
+      new StaticRuntimeTargetBackendRegistry(),
     );
 
     const result = await useCase.execute(context, {
@@ -2415,6 +2490,7 @@ describe("CreateDeploymentUseCase", () => {
       new DeploymentFactory(clock, idGenerator),
       new DeploymentLifecycleService(clock),
       new PassThroughMutationCoordinator(),
+      new StaticRuntimeTargetBackendRegistry(),
     );
 
     const result = await useCase.execute(context, {
@@ -2511,6 +2587,7 @@ describe("CreateDeploymentUseCase", () => {
       new DeploymentFactory(clock, idGenerator),
       new DeploymentLifecycleService(clock),
       new PassThroughMutationCoordinator(),
+      new StaticRuntimeTargetBackendRegistry(),
     );
 
     const result = await useCase.execute(context, {

@@ -34,6 +34,8 @@ import {
   type RequestedDeploymentConfig,
   type RequestedDeploymentHealthCheck,
   type RuntimePlanResolver,
+  type RuntimeTargetBackendRegistry,
+  type RuntimeTargetCapability,
   type ServerAppliedRouteDesiredStateDomain,
   type ServerAppliedRouteDesiredStateReader,
   type ServerAppliedRouteDesiredStateRecord,
@@ -596,6 +598,22 @@ function requestedDeploymentWithServerAppliedRoutes(input: {
   });
 }
 
+function requiredRuntimeTargetCapabilities(runtimePlan: {
+  execution: { accessRoutes: readonly unknown[] };
+}): RuntimeTargetCapability[] {
+  const capabilities: RuntimeTargetCapability[] = [
+    "runtime.apply",
+    "runtime.verify",
+    "runtime.logs",
+  ];
+
+  if (runtimePlan.execution.accessRoutes.length > 0) {
+    capabilities.push("proxy.route");
+  }
+
+  return capabilities;
+}
+
 @injectable()
 export class CreateDeploymentUseCase {
   constructor(
@@ -627,6 +645,8 @@ export class CreateDeploymentUseCase {
     private readonly deploymentLifecycleService: DeploymentLifecycleService,
     @inject(tokens.mutationCoordinator)
     private readonly mutationCoordinator: MutationCoordinator,
+    @inject(tokens.runtimeTargetBackendRegistry)
+    private readonly runtimeTargetBackendRegistry: RuntimeTargetBackendRegistry,
     @inject(tokens.domainRouteBindingReader)
     private readonly domainRouteBindingReader?: DomainRouteBindingReader,
     @inject(tokens.serverAppliedRouteStateRepository)
@@ -771,6 +791,7 @@ export class CreateDeploymentUseCase {
       executionBackend,
       logger,
       mutationCoordinator,
+      runtimeTargetBackendRegistry,
       deploymentProgressReporter,
       runtimePlanResolutionInputBuilder,
       runtimePlanResolver,
@@ -891,6 +912,27 @@ export class CreateDeploymentUseCase {
       const runtimePlanInput = yield* runtimePlanInputResult;
       const runtimePlanResult = await runtimePlanResolver.resolve(context, runtimePlanInput);
       const runtimePlan = yield* runtimePlanResult;
+      const runtimeTargetBackend = runtimeTargetBackendRegistry.find({
+        targetKind: runtimePlan.target.kind,
+        providerKey: runtimePlan.target.providerKey,
+        requiredCapabilities: requiredRuntimeTargetCapabilities(runtimePlan),
+      });
+      if (runtimeTargetBackend.isErr()) {
+        return err(
+          domainError.runtimeTargetUnsupported(runtimeTargetBackend.error.message, {
+            ...(runtimeTargetBackend.error.details ?? {}),
+            commandName: "deployments.create",
+            projectId: project.toState().id.value,
+            environmentId: environment.toState().id.value,
+            resourceId: resource.toState().id.value,
+            serverId: server.toState().id.value,
+            destinationId: destination.toState().id.value,
+            runtimePlanStrategy: requestedDeploymentWithRuntimeMetadata.method,
+            targetKind: runtimePlan.target.kind,
+            targetProviderKey: runtimePlan.target.providerKey,
+          }),
+        );
+      }
       const admittedDeploymentResult = await mutationCoordinator.runExclusive({
         context,
         policy: mutationCoordinationPolicies.createDeployment,

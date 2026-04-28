@@ -281,9 +281,9 @@ Migration gaps:
 - no durable process-manager/outbox failure handling was confirmed for this flow.
 - resource listener port is represented as `networkProfile.internalPort`; `runtimeProfile.port` is not part of the command or resource contract.
 - generated default access and proxy route realization errors are not yet uniformly represented with ADR-017 phases.
-- runtime target backend registry lookup now returns `runtime_target_unsupported` with
-  `runtime-target-resolution` details; `deployments.create` admission does not yet consult that
-  registry before accepting the command.
+- `deployments.create` admission now consults the runtime target backend registry before acceptance
+  and returns `runtime_target_unsupported` with `runtime-target-resolution` details when no backend
+  can satisfy the resolved plan capabilities.
 - generic SSH Docker build capacity failures such as Bun `NoSpaceLeft` currently surface as
   adapter-specific build failures; they need classification into
   `runtime_target_resource_exhausted` with safe disk, inode, and build-cache details.
