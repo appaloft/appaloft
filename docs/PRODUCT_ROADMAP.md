@@ -493,9 +493,9 @@ Already done:
 
 Required:
 
-- [ ] Finish CLI migration to the shared Quick Deploy workflow program.
-- [ ] Make deployment admission use the runtime target backend registry before acceptance.
-- [ ] Add unsupported-target rejection before acceptance.
+- [x] Finish CLI migration to the shared Quick Deploy workflow program.
+- [x] Make deployment admission use the runtime target backend registry before acceptance.
+- [x] Add unsupported-target rejection before acceptance.
 - [ ] Broaden local/generic-SSH Docker/Compose smoke coverage.
 - [ ] Harden generated Dockerfile, Compose, prebuilt image, static artifact, and workspace-command
   planning as Docker/OCI artifact paths.
