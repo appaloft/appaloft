@@ -814,8 +814,8 @@ mapping, matrix rows, and Web/CLI draft parity are all checked.
 - [ ] Nuxt/SvelteKit/Astro/Remix: add SSR/server modes where Docker/OCI start command is
   deterministic.
 - [x] Node API frameworks: generic Node and framework metadata baseline exist.
-- [ ] Node API frameworks: add explicit Express, Fastify, NestJS, Hono, and Koa detection/start
-  defaults with internal port behavior.
+- [x] Node API frameworks: add explicit Express, Fastify, NestJS, Hono, and Koa detection/start
+  defaults with internal port behavior, plus generic package-script fixture coverage.
 - [x] Python: FastAPI, Django, Flask, generic Python, `uv`, Poetry, and pip baseline exist.
 - [ ] Python: harden ASGI/WSGI app discovery, module/app target selection, collectstatic/static
   handling, and Docker/SSH smoke.

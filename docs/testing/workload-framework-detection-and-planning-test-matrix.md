@@ -80,6 +80,11 @@ test expectations in the same change.
 | `astro-static` | `WF-PLAN-CAT-006` | `astro 5.5.5`, `npm` marker | `node`, `astro`, `npm`, `static` | `astro-static`, static image, publish `/dist` |
 | `remix-ssr` | `WF-PLAN-CAT-003` | `@remix-run/node 2.16.3`, `@remix-run/react 2.16.3`, `@remix-run/serve 2.16.3`, `react 18.3.1`, `npm` marker | `node`, `remix`, `npm`, `ssr` | `remix`, workspace image, build/start scripts |
 | `express-server` | `WF-PLAN-CAT-008` | `express 4.21.2`, `npm` marker | `node`, `express`, `npm`, `serverful-http` | generic `node`, workspace image, build/start scripts |
+| `fastify-server` | `WF-PLAN-CAT-008` | `fastify 5.2.1`, `typescript 5.8.2`, `pnpm` marker | `node`, `fastify`, `pnpm`, `serverful-http` | generic `node`, workspace image, build/start scripts |
+| `nestjs-server` | `WF-PLAN-CAT-008` | `@nestjs/common 11.0.11`, `@nestjs/core 11.0.11`, `@nestjs/platform-express 11.0.11`, `reflect-metadata 0.2.2`, `rxjs 7.8.2`, `typescript 5.8.2`, `npm` marker | `node`, `nestjs`, `npm`, `serverful-http` | generic `node`, workspace image, build script plus `start:built` production start script |
+| `hono-server` | `WF-PLAN-CAT-008` | `hono 4.7.5`, `bun` marker | `node`, `hono`, `bun`, `serverful-http` | generic `node`, Bun workspace image, build/start scripts |
+| `koa-server` | `WF-PLAN-CAT-008` | `koa 2.16.0`, `yarn` marker | `node`, `koa`, `yarn`, `serverful-http` | generic `node`, workspace image, build/start scripts |
+| `generic-node-server` | `WF-PLAN-CAT-008` | `npm` marker, production package scripts | `node`, no named framework, `npm`, `serverful-http` from non-dev start script evidence | generic `node`, workspace image, build script plus `start:built` production start script |
 | `fastapi-uv` | `WF-PLAN-CAT-009` | `fastapi 0.115.8`, `uvicorn 0.34.0`, `uv` marker | `python`, `fastapi`, `uv`, `serverful-http` | `fastapi`, workspace image, uv install/start defaults |
 | `django-pip` | `WF-PLAN-CAT-010` | `Django 5.1.7`, `pip` requirements | `python`, `django`, `pip`, `serverful-http` | `django`, workspace image, pip install/start default |
 | `flask-pip` | `WF-PLAN-CAT-010` | `Flask 3.1.0`, `pip` requirements | `python`, `flask`, `pip`, `serverful-http` | `flask`, workspace image, pip install/start default |
@@ -167,8 +172,8 @@ Fixed-version framework fixture tests now cover detector evidence for the table 
 manifest/requirements versions, and feed supported fixtures through runtime planning without
 installing dependencies or executing framework CLIs. Planner fixture coverage includes Next.js SSR,
 Next.js standalone output, Next.js static export, Vite, SvelteKit adapter-static, Nuxt generate,
-Astro static, Remix, Express, FastAPI, Django, and Flask, including Angular `angular.json`
-output-path planning.
+Astro static, Remix, Express, Fastify, NestJS, Hono, Koa, generic Node package scripts, FastAPI,
+Django, and Flask, including Angular `angular.json` output-path planning.
 `WF-PLAN-BOUND-001` has command-schema coverage for rejecting framework/package/base-image/buildpack
 deployment fields. This does not yet complete unsupported catalog families, SvelteKit server-adapter
 start inference, Astro SSR, worker plans, or Web/CLI entry parity.

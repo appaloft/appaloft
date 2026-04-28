@@ -1,0 +1,13 @@
+{
+  "name": "hono-server",
+  "private": true,
+  "type": "module",
+  "packageManager": "bun@1.2.4",
+  "scripts": {
+    "build": "bun build src/index.ts --outdir dist --target bun",
+    "start": "bun dist/index.js"
+  },
+  "dependencies": {
+    "hono": "4.7.5"
+  }
+}

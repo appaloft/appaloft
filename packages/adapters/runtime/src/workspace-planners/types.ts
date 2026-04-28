@@ -93,9 +93,22 @@ export function requiredStartCommand(
   const command = input.requestedDeployment.startCommand ?? fallback;
 
   if (!command) {
+    const inspection = input.source.inspection;
+
     return err(
       domainError.validation(
-        "Workspace command deployments require a start command or detected runtime start script",
+        "Workspace command deployments require a production start command or detected runtime start script",
+        {
+          phase: "runtime-plan-resolution",
+          ...(inspection?.runtimeFamily ? { runtimeFamily: inspection.runtimeFamily } : {}),
+          ...(inspection?.framework ? { framework: inspection.framework } : {}),
+          ...(inspection?.packageManager ? { packageManager: inspection.packageManager } : {}),
+          ...(inspection?.applicationShape
+            ? { applicationShape: inspection.applicationShape }
+            : {}),
+          detectedScripts: inspection?.detectedScripts ?? [],
+          runtimePlanStrategy: input.requestedDeployment.method,
+        },
       ),
     );
   }
