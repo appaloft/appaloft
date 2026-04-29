@@ -74,6 +74,7 @@ import {
   ListDomainBindingsQuery,
   ListEnvironmentsQuery,
   ListGitHubRepositoriesQuery,
+  ListOperatorWorkQuery,
   ListPluginsQuery,
   ListProjectsQuery,
   ListProvidersQuery,
@@ -87,6 +88,7 @@ import {
   listDomainBindingsQueryInputSchema,
   listEnvironmentsQueryInputSchema,
   listGitHubRepositoriesQueryInputSchema,
+  listOperatorWorkQueryInputSchema,
   listResourcesQueryInputSchema,
   listSshCredentialsQueryInputSchema,
   lockEnvironmentCommandInputSchema,
@@ -124,6 +126,7 @@ import {
   ShowDefaultAccessDomainPolicyQuery,
   ShowDeploymentQuery,
   ShowEnvironmentQuery,
+  ShowOperatorWorkQuery,
   ShowProjectQuery,
   ShowResourceQuery,
   ShowServerQuery,
@@ -136,6 +139,7 @@ import {
   showDefaultAccessDomainPolicyQueryInputSchema,
   showDeploymentQueryInputSchema,
   showEnvironmentQueryInputSchema,
+  showOperatorWorkQueryInputSchema,
   showProjectQueryInputSchema,
   showResourceQueryInputSchema,
   showServerQueryInputSchema,
@@ -192,6 +196,7 @@ import {
   listDomainBindingsResponseSchema,
   listEnvironmentsResponseSchema,
   listGitHubRepositoriesResponseSchema,
+  listOperatorWorkResponseSchema,
   listPluginsResponseSchema,
   listProjectsResponseSchema,
   listProvidersResponseSchema,
@@ -216,6 +221,7 @@ import {
   setResourceVariableResponseSchema,
   showDefaultAccessDomainPolicyResponseSchema,
   showDeploymentResponseSchema,
+  showOperatorWorkResponseSchema,
   showProjectResponseSchema,
   showServerResponseSchema,
   showSshCredentialResponseSchema,
@@ -290,6 +296,7 @@ export const apiDocsHrefs = {
   runtimeLogs: resolvePublicDocsHelpHref("observability.runtime-logs"),
   healthSummary: resolvePublicDocsHelpHref("observability.health-summary"),
   diagnosticSummary: resolvePublicDocsHelpHref("diagnostics.safe-support-payload"),
+  operatorWorkLedger: resolvePublicDocsHelpHref("operator.work-ledger"),
   terminalSession: resolvePublicDocsHelpHref("server.terminal-session"),
   projectLifecycle: resolvePublicDocsHelpHref("project.lifecycle"),
 } as const;
@@ -468,6 +475,10 @@ export const apiRouteDescriptions = {
   resourceProxyConfigurationPreview: routeDescription(
     "Previews generated proxy configuration for a resource.",
     "resource.network-profile",
+  ),
+  operatorWorkLedger: routeDescription(
+    "Reads background work, failed attempts, and diagnostic next actions without recovery mutation.",
+    "operator.work-ledger",
   ),
   openTerminalSession: routeDescription(
     "Opens a controlled terminal session for server or resource troubleshooting.",
@@ -1676,6 +1687,32 @@ export const listDeploymentsProcedure = base
   .output(listDeploymentsResponseSchema)
   .handler(async ({ input, context }) => executeQuery(context, ListDeploymentsQuery.create(input)));
 
+export const listOperatorWorkProcedure = base
+  .route({
+    method: "GET",
+    path: "/operator-work",
+    description: apiRouteDescriptions.operatorWorkLedger,
+    successStatus: 200,
+  })
+  .input(listOperatorWorkQueryInputSchema)
+  .output(listOperatorWorkResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ListOperatorWorkQuery.create(input)),
+  );
+
+export const showOperatorWorkProcedure = base
+  .route({
+    method: "GET",
+    path: "/operator-work/{workId}",
+    description: apiRouteDescriptions.operatorWorkLedger,
+    successStatus: 200,
+  })
+  .input(showOperatorWorkQueryInputSchema)
+  .output(showOperatorWorkResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ShowOperatorWorkQuery.create(input)),
+  );
+
 export const createDeploymentProcedure = base
   .route({
     method: "POST",
@@ -1979,6 +2016,10 @@ export const appaloftOrpcRouter = {
     events: deploymentEventReplayProcedure,
     eventsStream: deploymentEventStreamProcedure,
   },
+  operatorWork: {
+    list: listOperatorWorkProcedure,
+    show: showOperatorWorkProcedure,
+  },
   providers: {
     list: listProvidersProcedure,
   },
@@ -2155,6 +2196,8 @@ export function mountAppaloftOrpcRoutes(
     "/api/deployments/:deploymentId/logs",
     "/api/deployments/:deploymentId/events",
     "/api/deployments/:deploymentId/events/stream",
+    "/api/operator-work",
+    "/api/operator-work/:workId",
     "/api/providers",
     "/api/plugins",
     "/api/integrations/github/repositories",

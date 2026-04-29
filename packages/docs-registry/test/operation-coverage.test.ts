@@ -101,6 +101,31 @@ describe("public docs operation coverage", () => {
     );
   });
 
+  test("[OP-WORK-DOCS-001] operator work queries record read-only docs coverage", () => {
+    const listCoverage = getPublicDocsOperationCoverage("operator-work.list");
+    const showCoverage = getPublicDocsOperationCoverage("operator-work.show");
+    const topic = publicDocsHelpTopics["operator.work-ledger"];
+
+    expect(listCoverage).toMatchObject({
+      operationKey: "operator-work.list",
+      status: "documented",
+      topicId: "operator.work-ledger",
+    });
+    expect(showCoverage).toMatchObject({
+      operationKey: "operator-work.show",
+      status: "documented",
+      topicId: "operator.work-ledger",
+    });
+    expect(topic.specReferences).toEqual(
+      expect.arrayContaining([
+        "docs/queries/operator-work.list.md",
+        "docs/queries/operator-work.show.md",
+        "docs/testing/operator-work-ledger-test-matrix.md",
+      ]),
+    );
+    expect(topic.description).toContain("without recovery mutations");
+  });
+
   test("[SSH-CRED-ENTRY-009] [SSH-CRED-ENTRY-010] reusable SSH credential delete records docs coverage and Web surface", () => {
     const coverage = getPublicDocsOperationCoverage("credentials.delete-ssh");
     const topic = publicDocsHelpTopics["server.ssh-credential"];

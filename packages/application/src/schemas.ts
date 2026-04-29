@@ -25,6 +25,8 @@ export * from "./operations/environments/set-environment-variable.schema";
 export * from "./operations/environments/show-environment.schema";
 export * from "./operations/environments/unlock-environment.schema";
 export * from "./operations/environments/unset-environment-variable.schema";
+export * from "./operations/operator-work/list-operator-work.schema";
+export * from "./operations/operator-work/show-operator-work.schema";
 export * from "./operations/projects/archive-project.schema";
 export * from "./operations/projects/create-project.schema";
 export * from "./operations/projects/rename-project.schema";

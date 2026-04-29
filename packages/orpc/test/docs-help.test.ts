@@ -37,6 +37,9 @@ describe("HTTP API docs help links", () => {
     expect(apiDocsHrefs.terminalSession).toBe(
       "/docs/servers/operations/proxy-and-terminal/#server-terminal-session",
     );
+    expect(apiDocsHrefs.operatorWorkLedger).toBe(
+      "/docs/reference/errors-statuses/#operator-work-ledger",
+    );
 
     expect(apiRouteDescriptions.configureServerCredential).toContain(apiDocsHrefs.serverCredential);
     expect(apiRouteDescriptions.rotateSshCredential).toContain(apiDocsHrefs.serverCredential);
@@ -57,5 +60,6 @@ describe("HTTP API docs help links", () => {
       apiDocsHrefs.domainOwnershipCheck,
     );
     expect(apiRouteDescriptions.openTerminalSession).toContain(apiDocsHrefs.terminalSession);
+    expect(apiRouteDescriptions.operatorWorkLedger).toContain(apiDocsHrefs.operatorWorkLedger);
   });
 });

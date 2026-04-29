@@ -34,6 +34,7 @@ export const cliDocsHrefs = {
   diagnosticsRuntimeTargetCapacity: resolvePublicDocsHelpHref(
     "diagnostics.runtime-target-capacity",
   ),
+  operatorWorkLedger: resolvePublicDocsHelpHref("operator.work-ledger"),
   remoteStateLock: resolvePublicDocsHelpHref("errors.remote-state-lock"),
 } as const;
 
@@ -63,6 +64,15 @@ export const cliCommandDescriptions = {
   remoteStateLockRecoverStale: withDocs(
     "Archive a stale SSH remote-state mutation lock",
     "errors.remote-state-lock",
+  ),
+  operatorWork: withDocs("Background work visibility", "operator.work-ledger"),
+  operatorWorkList: withDocs(
+    "List background work and latest failure state without recovery mutation",
+    "operator.work-ledger",
+  ),
+  operatorWorkShow: withDocs(
+    "Show one background work item without retrying or cleaning it up",
+    "operator.work-ledger",
   ),
   project: withDocs("Project operations", "project.lifecycle"),
   projectCreate: withDocs("Create a project", "project.concept"),

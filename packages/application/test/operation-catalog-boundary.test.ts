@@ -50,6 +50,8 @@ describe("operation catalog aggregate mutation boundary", () => {
       "servers.list",
       "servers.show",
       "servers.capacity.inspect",
+      "operator-work.list",
+      "operator-work.show",
       "servers.rename",
       "servers.deactivate",
       "servers.delete-check",
@@ -116,6 +118,36 @@ describe("operation catalog aggregate mutation boundary", () => {
       },
     });
     expect(entry?.inputSchema).toBeDefined();
+  });
+
+  test("[OP-WORK-CATALOG-001] operator work ledger is exposed as read-only queries", () => {
+    const listEntry = operationCatalog.find((candidate) => candidate.key === "operator-work.list");
+    const showEntry = operationCatalog.find((candidate) => candidate.key === "operator-work.show");
+
+    expect(listEntry).toMatchObject({
+      kind: "query",
+      domain: "operator-work",
+      messageName: "ListOperatorWorkQuery",
+      handlerName: "ListOperatorWorkQueryHandler",
+      serviceName: "OperatorWorkQueryService",
+      transports: {
+        cli: "appaloft work list",
+        orpc: { method: "GET", path: "/api/operator-work" },
+      },
+    });
+    expect(showEntry).toMatchObject({
+      kind: "query",
+      domain: "operator-work",
+      messageName: "ShowOperatorWorkQuery",
+      handlerName: "ShowOperatorWorkQueryHandler",
+      serviceName: "OperatorWorkQueryService",
+      transports: {
+        cli: "appaloft work show <workId>",
+        orpc: { method: "GET", path: "/api/operator-work/{workId}" },
+      },
+    });
+    expect(listEntry?.inputSchema).toBeDefined();
+    expect(showEntry?.inputSchema).toBeDefined();
   });
 
   test("[SRV-LIFE-ENTRY-015] server rename is exposed through the active operation catalog", () => {
