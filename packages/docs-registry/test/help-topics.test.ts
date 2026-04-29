@@ -102,6 +102,24 @@ describe("public docs help registry", () => {
     ).toBe(true);
   });
 
+  test("[RUNTIME-CAPACITY-INSPECT-001] capacity exhaustion errors point to read-only inspect", () => {
+    const guide = findPublicDocsErrorGuide({
+      code: "runtime_target_resource_exhausted",
+    });
+
+    expect(guide?.topicId).toBe("diagnostics.runtime-target-capacity");
+
+    const knowledge = resolvePublicDocsErrorKnowledge("runtime_target_resource_exhausted");
+
+    expect(knowledge.actionability).toBe("run-diagnostic");
+    expect(knowledge.remedies?.some((remedy) => remedy.kind === "diagnostic")).toBe(true);
+    expect(
+      knowledge.remedies?.some((remedy) =>
+        remedy.command?.join(" ").includes("server capacity inspect"),
+      ),
+    ).toBe(true);
+  });
+
   test("[ERROR-KNOWLEDGE-004] public error guides point to existing agent-readable assets", () => {
     for (const guide of Object.values(publicDocsErrorGuides)) {
       const agentHref = resolvePublicDocsErrorAgentGuideHref(guide.id);

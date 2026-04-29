@@ -11,6 +11,7 @@ searchAliases:
   - "secret masking"
 relatedOperations:
   - resources.diagnostic-summary
+  - servers.capacity.inspect
 sidebar:
   label: "Diagnostics"
   order: 4
@@ -30,6 +31,23 @@ Diagnostic summaries should include:
 - Server and proxy readiness summary.
 - Access URL, domain, and certificate status.
 - Masked secret key names and presence, without values.
+
+<h2 id="runtime-target-capacity-inspect">Runtime target capacity inspect</h2>
+
+When a deployment fails because the target is out of disk, inodes, Docker image store, or build
+cache capacity, start with the read-only capacity diagnostic:
+
+```bash title="Inspect server capacity without cleanup"
+appaloft server capacity inspect srv_primary
+```
+
+This entrypoint only reads capacity signals. It does not run prune, delete Docker volumes, delete
+`/var/lib/appaloft/runtime/state`, or stop containers. The output includes disk, inodes, Docker
+image/build-cache usage, Appaloft runtime/state/source workspace usage, safe reclaimable estimates,
+and warnings.
+
+`safeReclaimableEstimate` is input for a later cleanup or prune decision. It does not mean Appaloft
+has cleaned anything.
 
 <h2 id="diagnostic-secret-masking">Secret masking</h2>
 

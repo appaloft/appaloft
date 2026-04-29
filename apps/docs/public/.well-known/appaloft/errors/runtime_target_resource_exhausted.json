@@ -1,0 +1,24 @@
+{
+  "id": "runtime_target_resource_exhausted",
+  "code": "runtime_target_resource_exhausted",
+  "responsibility": "operator",
+  "actionability": "run-diagnostic",
+  "operation": "deployments.create",
+  "summary": "The runtime target ran out of safe capacity such as disk, inodes, memory, CPU, Docker image store, or build cache.",
+  "safeDiagnostic": {
+    "command": ["appaloft", "server", "capacity", "inspect", "<serverId>"],
+    "mutatesState": false,
+    "forbiddenActions": [
+      "docker system prune",
+      "docker volume prune",
+      "delete /var/lib/appaloft/runtime/state",
+      "stop running workload containers"
+    ]
+  },
+  "links": [
+    {
+      "rel": "human-doc",
+      "href": "/docs/observe/diagnostics/#runtime-target-capacity-inspect"
+    }
+  ]
+}

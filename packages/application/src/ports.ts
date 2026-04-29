@@ -1068,6 +1068,114 @@ export interface ServerConnectivityResult {
   checks: ServerConnectivityCheck[];
 }
 
+export interface RuntimeTargetDiskCapacity {
+  path: string;
+  mount: string;
+  size: number;
+  used: number;
+  available: number;
+  usePercent: number;
+}
+
+export interface RuntimeTargetInodeCapacity {
+  path: string;
+  mount: string;
+  used: number;
+  free: number;
+  usePercent: number;
+}
+
+export interface RuntimeTargetDockerCapacity {
+  imagesSize: number;
+  reclaimableImagesSize: number;
+  buildCacheSize: number;
+  reclaimableBuildCacheSize: number;
+  containersSize: number;
+  volumesSize: number;
+}
+
+export interface RuntimeTargetPathCapacity {
+  path: string;
+  size: number | null;
+  detectable: boolean;
+}
+
+export interface RuntimeTargetAppaloftCapacity {
+  runtimeRoot: RuntimeTargetPathCapacity;
+  stateRoot: RuntimeTargetPathCapacity;
+  sourceWorkspace: RuntimeTargetPathCapacity;
+}
+
+export interface RuntimeTargetSafeReclaimableEstimate {
+  stoppedContainersSize: number;
+  danglingImagesSize: number;
+  oldBuildCacheSize: number;
+  oldPreviewWorkspaceCandidatesSize: number;
+  total: number;
+}
+
+export type RuntimeTargetCapacityWarningCode =
+  | "full-disk"
+  | "high-disk-usage"
+  | "high-inode-usage"
+  | "docker-unavailable"
+  | "timeout"
+  | "partial-diagnostic"
+  | "unsupported-provider";
+
+export interface RuntimeTargetCapacityWarning {
+  code: RuntimeTargetCapacityWarningCode;
+  message: string;
+  path?: string;
+  mount?: string;
+  resource?: "disk" | "inode" | "docker" | "memory" | "cpu" | "appaloft-runtime";
+}
+
+export interface RuntimeTargetMemoryCapacity {
+  total: number | null;
+  available: number | null;
+  used: number | null;
+  usePercent: number | null;
+}
+
+export interface RuntimeTargetCpuCapacity {
+  logicalCores: number | null;
+  loadAverage1m: number | null;
+  loadAverage5m: number | null;
+  loadAverage15m: number | null;
+}
+
+export interface RuntimeTargetCapacityInspection {
+  schemaVersion: "servers.capacity.inspect/v1";
+  server: {
+    id: string;
+    name: string;
+    host: string;
+    port: number;
+    providerKey: string;
+    targetKind: string;
+  };
+  inspectedAt: string;
+  disk: RuntimeTargetDiskCapacity[];
+  inodes: RuntimeTargetInodeCapacity[];
+  docker: RuntimeTargetDockerCapacity;
+  memory: RuntimeTargetMemoryCapacity;
+  cpu: RuntimeTargetCpuCapacity;
+  appaloftRuntime: RuntimeTargetAppaloftCapacity;
+  safeReclaimableEstimate: RuntimeTargetSafeReclaimableEstimate;
+  warnings: RuntimeTargetCapacityWarning[];
+  partial: boolean;
+}
+
+export interface RuntimeTargetCapacityInspector {
+  inspect(
+    context: ExecutionContext,
+    input: {
+      server: DeploymentTargetState;
+    },
+  ): Promise<Result<RuntimeTargetCapacityInspection>>;
+}
+
 export interface ServerEdgeProxyBootstrapResult {
   serverId: string;
   kind: EdgeProxyKind;
@@ -2994,6 +3102,7 @@ export type RuntimeTargetCapability =
   | "runtime.logs"
   | "runtime.health"
   | "runtime.cleanup"
+  | "runtime.capacity"
   | "proxy.route";
 
 export interface RuntimeTargetBackendDescriptor {
