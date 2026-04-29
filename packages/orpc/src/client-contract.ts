@@ -35,6 +35,7 @@ import {
   type ListDomainBindingsQueryInput,
   type ListEnvironmentsQueryInput,
   type ListGitHubRepositoriesQueryInput,
+  type ListOperatorWorkQueryInput,
   type ListResourcesQueryInput,
   type ListSshCredentialsQueryInput,
   type LockEnvironmentCommandInput,
@@ -55,6 +56,7 @@ import {
   type ShowDefaultAccessDomainPolicyQueryInput,
   type ShowDeploymentQueryInput,
   type ShowEnvironmentQueryInput,
+  type ShowOperatorWorkQueryInput,
   type ShowProjectQueryInput,
   type ShowResourceQueryInput,
   type ShowServerQueryInput,
@@ -107,6 +109,7 @@ import {
   type ListDomainBindingsResponse,
   type ListEnvironmentsResponse,
   type ListGitHubRepositoriesResponse,
+  type ListOperatorWorkResponse,
   type ListPluginsResponse,
   type ListProjectsResponse,
   type ListProvidersResponse,
@@ -131,6 +134,7 @@ import {
   type SetResourceVariableResponse,
   type ShowDefaultAccessDomainPolicyResponse,
   type ShowDeploymentResponse,
+  type ShowOperatorWorkResponse,
   type ShowProjectResponse,
   type ShowServerResponse,
   type ShowSshCredentialResponse,
@@ -574,6 +578,20 @@ export type AppaloftOrpcClientContract = {
       AppaloftClientContext,
       StreamDeploymentEventsQueryInput,
       AsyncIteratorClass<DeploymentEventStreamEnvelope, DeploymentEventStreamStreamResponse, void>,
+      AppaloftClientError
+    >;
+  };
+  operatorWork: {
+    list: Client<
+      AppaloftClientContext,
+      ListOperatorWorkQueryInput,
+      ListOperatorWorkResponse,
+      AppaloftClientError
+    >;
+    show: Client<
+      AppaloftClientContext,
+      ShowOperatorWorkQueryInput,
+      ShowOperatorWorkResponse,
       AppaloftClientError
     >;
   };

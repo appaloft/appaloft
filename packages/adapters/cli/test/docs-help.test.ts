@@ -46,6 +46,9 @@ describe("CLI docs help links", () => {
       "/docs/servers/operations/proxy-and-terminal/#server-terminal-session",
     );
     expect(cliDocsHrefs.remoteStateLock).toBe("/docs/reference/errors-statuses/#remote-state-lock");
+    expect(cliDocsHrefs.operatorWorkLedger).toBe(
+      "/docs/reference/errors-statuses/#operator-work-ledger",
+    );
 
     expect(cliCommandDescriptions.serverCredential).toContain(cliDocsHrefs.serverSshCredential);
     expect(cliCommandDescriptions.serverCredentialRotate).toContain(
@@ -74,5 +77,7 @@ describe("CLI docs help links", () => {
       cliDocsHrefs.remoteStateLock,
     );
     expect(cliCommandDescriptions.serverTerminal).toContain(cliDocsHrefs.serverTerminalSession);
+    expect(cliCommandDescriptions.operatorWorkList).toContain(cliDocsHrefs.operatorWorkLedger);
+    expect(cliCommandDescriptions.operatorWorkShow).toContain(cliDocsHrefs.operatorWorkLedger);
   });
 });

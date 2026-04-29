@@ -884,6 +884,40 @@ export const publicDocsHelpTopics = {
     relatedOperation: "servers.capacity.inspect",
     aliases: ["capacity", "disk full", "build cache", "docker system df", "容量诊断"],
   },
+  "operator.work-ledger": {
+    id: "operator.work-ledger",
+    title: "Operator work ledger",
+    description:
+      "How to view background work attempts, failures, and next diagnostic actions without recovery mutations.",
+    page: {
+      "zh-CN": "reference/errors-statuses",
+      "en-US": "en/reference/errors-statuses",
+    },
+    anchor: "operator-work-ledger",
+    localeCoverage: {
+      "zh-CN": "complete",
+      "en-US": "complete",
+    },
+    surfaces: ["web", "cli", "http-api", "mcp"],
+    relatedOperation: "operator-work.list",
+    specReferences: [
+      "docs/decisions/ADR-029-deployment-event-stream-and-recovery-boundary.md",
+      "docs/queries/operator-work.list.md",
+      "docs/queries/operator-work.show.md",
+      "docs/testing/operator-work-ledger-test-matrix.md",
+      "docs/specs/010-operator-work-ledger/spec.md",
+    ],
+    webSurfaces: ["Web/MCP operator console backlog and CLI/HTTP background work visibility"],
+    aliases: [
+      "operator work",
+      "work ledger",
+      "background work",
+      "attempt visibility",
+      "failed attempts",
+      "后台工作",
+      "工作台账",
+    ],
+  },
   "advanced.control-plane": {
     id: "advanced.control-plane",
     title: "Control-plane modes",
@@ -1012,6 +1046,12 @@ export const publicDocsErrorGuides = {
       },
       {
         kind: "command",
+        label: "List background work attempts before choosing a recovery action.",
+        safeByDefault: true,
+        command: ["appaloft", "work", "list"],
+      },
+      {
+        kind: "command",
         label:
           "Archive a stale remote state lock only after diagnostics show the heartbeat is older than the stale window.",
         safeByDefault: false,
@@ -1041,6 +1081,12 @@ export const publicDocsErrorGuides = {
         command: ["appaloft", "server", "capacity", "inspect"],
       },
       {
+        kind: "command",
+        label: "List background work attempts before choosing a retry or recovery action.",
+        safeByDefault: true,
+        command: ["appaloft", "work", "list"],
+      },
+      {
         kind: "retry",
         label: "Retry after freeing target capacity or resizing the target.",
         safeByDefault: true,
@@ -1066,6 +1112,12 @@ export const publicDocsErrorGuides = {
         label: "Inspect target disk, inode, Docker image, build-cache, and Appaloft runtime usage.",
         safeByDefault: true,
         command: ["appaloft", "server", "capacity", "inspect"],
+      },
+      {
+        kind: "command",
+        label: "List background work attempts before choosing a retry or recovery action.",
+        safeByDefault: true,
+        command: ["appaloft", "work", "list"],
       },
       {
         kind: "none",
@@ -1204,6 +1256,16 @@ export const publicDocsOperationCoverage = [
     operationKey: "servers.capacity.inspect",
     status: "documented",
     topicId: "diagnostics.runtime-target-capacity",
+  },
+  {
+    operationKey: "operator-work.list",
+    status: "documented",
+    topicId: "operator.work-ledger",
+  },
+  {
+    operationKey: "operator-work.show",
+    status: "documented",
+    topicId: "operator.work-ledger",
   },
   { operationKey: "servers.rename", status: "documented", topicId: "server.deployment-target" },
   {

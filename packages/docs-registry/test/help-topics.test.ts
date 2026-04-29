@@ -118,6 +118,9 @@ describe("public docs help registry", () => {
         remedy.command?.join(" ").includes("server capacity inspect"),
       ),
     ).toBe(true);
+    expect(
+      knowledge.remedies?.some((remedy) => remedy.command?.join(" ").includes("work list")),
+    ).toBe(true);
   });
 
   test("[ERROR-KNOWLEDGE-004] public error guides point to existing agent-readable assets", () => {

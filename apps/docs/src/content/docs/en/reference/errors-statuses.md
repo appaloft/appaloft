@@ -9,7 +9,9 @@ searchAliases:
   - "error"
   - "status"
   - "phase"
-relatedOperations: []
+relatedOperations:
+  - operator-work.list
+  - operator-work.show
 sidebar:
   label: "Errors and statuses"
   order: 4
@@ -29,6 +31,19 @@ Appaloft errors should not collapse to a message string. Public entrypoints shou
 - `remedies`: recovery actions that are safe to show or suggest.
 
 Web, CLI, HTTP/API, and future MCP tools should render errors from those fields instead of branching on message text.
+
+<h2 id="operator-work-ledger">Operator work ledger</h2>
+
+When deployment, proxy bootstrap, certificate, or remote-state background work does not finish as expected, inspect the work ledger before guessing which recovery command to run:
+
+```bash title="View background work"
+appaloft work list
+appaloft work show <workId>
+```
+
+The work ledger is read-only. It summarizes attempt kind, status, phase, related resource/server/deployment/certificate ids, stable error code/category, retriability, and safe `nextActions`. `diagnostic` means run a diagnostic first; `manual-review` means an operator should inspect the item; `retry` only means a future recovery command may consider retrying, and the query itself will not execute a retry; `no-action` means the item does not currently require user action.
+
+This entrypoint does not retry, cancel, recover, dead-letter, delete, or prune anything. Recovery, cleanup, and retry capabilities are exposed through separate explicit commands so viewing status cannot accidentally mutate runtime or remote SSH state.
 
 <h2 id="remote-state-lock">SSH remote state lock</h2>
 

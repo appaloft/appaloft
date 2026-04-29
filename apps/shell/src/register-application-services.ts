@@ -77,6 +77,7 @@ import {
   ListDomainBindingsQueryService,
   ListEnvironmentsQueryService,
   ListGitHubRepositoriesQueryService,
+  ListOperatorWorkQueryHandler,
   ListPluginsQueryService,
   ListProjectsQueryService,
   ListProvidersQueryService,
@@ -92,6 +93,7 @@ import {
   MarkDomainRouteFailedOnDeploymentFinishedHandler,
   MarkServerAppliedRouteStatusOnDeploymentFinishedHandler,
   OpenTerminalSessionUseCase,
+  OperatorWorkQueryService,
   PromoteEnvironmentUseCase,
   RegisterServerUseCase,
   RelinkSourceLinkCommandHandler,
@@ -119,6 +121,7 @@ import {
   ShowDeploymentQueryHandler,
   ShowDeploymentQueryService,
   ShowEnvironmentQueryService,
+  ShowOperatorWorkQueryHandler,
   ShowProjectQueryHandler,
   ShowProjectQueryService,
   ShowResourceQueryHandler,
@@ -200,6 +203,8 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(RelinkSourceLinkCommandHandler);
   container.registerSingleton(RenameProjectCommandHandler);
   container.registerSingleton(ListCertificatesQueryHandler);
+  container.registerSingleton(ListOperatorWorkQueryHandler);
+  container.registerSingleton(ShowOperatorWorkQueryHandler);
   container.registerSingleton(ShowProjectQueryHandler);
   container.registerSingleton(ShowSshCredentialQueryHandler);
   container.registerSingleton(InspectServerCapacityQueryHandler);
@@ -343,6 +348,7 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(tokens.listCertificatesQueryService, ListCertificatesQueryService);
   container.registerSingleton(tokens.listDeploymentsQueryService, ListDeploymentsQueryService);
   container.registerSingleton(tokens.showDeploymentQueryService, ShowDeploymentQueryService);
+  container.registerSingleton(tokens.operatorWorkQueryService, OperatorWorkQueryService);
   container.registerSingleton(
     tokens.streamDeploymentEventsQueryService,
     StreamDeploymentEventsQueryService,
