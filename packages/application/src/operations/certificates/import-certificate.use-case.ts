@@ -39,7 +39,9 @@ import {
   type DomainBindingRepository,
   type EventBus,
   type IdGenerator,
+  type ProcessAttemptRecorder,
 } from "../../ports";
+import { NoopProcessAttemptRecorder } from "../../process-attempt-journal";
 import { tokens } from "../../tokens";
 import { publishDomainEventsAndReturn } from "../publish-domain-events";
 import {
@@ -76,6 +78,62 @@ function conflictingIdempotencyKey(details: {
   });
 }
 
+async function recordImportedCertificateAttempt(input: {
+  recorder: ProcessAttemptRecorder;
+  repositoryContext: ReturnType<typeof toRepositoryContext>;
+  logger: AppLogger;
+  requestId: string;
+  certificateId: string;
+  domainBindingId: string;
+  domainName: string;
+  attemptId: string;
+  reason: string;
+  importedAt: string;
+  expiresAt: string;
+  projectId: string;
+  resourceId: string;
+  serverId: string;
+}): Promise<void> {
+  const result = await input.recorder.record(input.repositoryContext, {
+    id: input.attemptId,
+    kind: "certificate",
+    status: "succeeded",
+    operationKey: "certificates.import",
+    dedupeKey: `certificate:${input.domainBindingId}:${input.attemptId}`,
+    correlationId: input.requestId,
+    requestId: input.requestId,
+    phase: "certificate-import",
+    step: "issued",
+    projectId: input.projectId,
+    resourceId: input.resourceId,
+    serverId: input.serverId,
+    domainBindingId: input.domainBindingId,
+    certificateId: input.certificateId,
+    startedAt: input.importedAt,
+    updatedAt: input.importedAt,
+    finishedAt: input.importedAt,
+    retriable: false,
+    nextActions: ["no-action"],
+    safeDetails: {
+      providerKey: manualImportProviderKey,
+      challengeType: manualImportChallengeType,
+      reason: input.reason,
+      domainName: input.domainName,
+      certificateSource: "imported",
+      expiresAt: input.expiresAt,
+    },
+  });
+
+  if (result.isErr()) {
+    input.logger.warn("certificate_import.process_attempt_record_failed", {
+      requestId: input.requestId,
+      certificateId: input.certificateId,
+      attemptId: input.attemptId,
+      errorCode: result.error.code,
+    });
+  }
+}
+
 @injectable()
 export class ImportCertificateUseCase {
   constructor(
@@ -95,6 +153,8 @@ export class ImportCertificateUseCase {
     private readonly eventBus: EventBus,
     @inject(tokens.logger)
     private readonly logger: AppLogger,
+    @inject(tokens.processAttemptRecorder)
+    private readonly processAttemptRecorder: ProcessAttemptRecorder = new NoopProcessAttemptRecorder(),
   ) {}
 
   async execute(
@@ -110,6 +170,7 @@ export class ImportCertificateUseCase {
       eventBus,
       idGenerator,
       logger,
+      processAttemptRecorder,
     } = this;
     const repositoryContext = toRepositoryContext(context);
 
@@ -286,6 +347,22 @@ export class ImportCertificateUseCase {
         certificate,
         UpsertCertificateSpec.fromCertificate(certificate),
       );
+      await recordImportedCertificateAttempt({
+        recorder: processAttemptRecorder,
+        repositoryContext,
+        logger,
+        requestId: context.requestId,
+        certificateId: certificate.toState().id.value,
+        domainBindingId: domainBindingState.id.value,
+        domainName: domainBindingState.domainName.value,
+        attemptId: attemptId.value,
+        reason: reason.value,
+        importedAt: importedAt.value,
+        expiresAt: expiresAt.value,
+        projectId: domainBindingState.projectId.value,
+        resourceId: domainBindingState.resourceId.value,
+        serverId: domainBindingState.serverId.value,
+      });
       await publishDomainEventsAndReturn(context, eventBus, logger, certificate, undefined);
 
       return ok({

@@ -34,6 +34,7 @@ type ShowOperatorWorkQueryInput = {
 
 The output is one `OperatorWorkItem` wrapped in `operator-work.show/v1`.
 
-For deployment items the work id is the deployment id. For certificate items the work id is the
-latest visible attempt id. For proxy bootstrap items, the first slice uses
-`proxy-bootstrap:<serverId>` until durable proxy attempt history is introduced.
+For deployment items the work id is the deployment id. For durable process attempts, the work id is
+the process attempt id. Older certificate compatibility items use the latest visible attempt id.
+Older proxy bootstrap compatibility items use `proxy-bootstrap:<serverId>` when no durable process
+attempt exists for that proxy bootstrap scope.

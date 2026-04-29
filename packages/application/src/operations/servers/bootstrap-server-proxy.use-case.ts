@@ -21,10 +21,12 @@ import {
   type Clock,
   type EventBus,
   type IdGenerator,
+  type ProcessAttemptRecorder,
   type ServerEdgeProxyBootstrapper,
   type ServerEdgeProxyBootstrapResult,
   type ServerRepository,
 } from "../../ports";
+import { NoopProcessAttemptRecorder } from "../../process-attempt-journal";
 import { tokens } from "../../tokens";
 import {
   type BootstrapServerProxyResult,
@@ -64,6 +66,58 @@ function isProxyFailureRetriable(errorCode: string, fallback: boolean): boolean 
       return true;
     default:
       return fallback;
+  }
+}
+
+async function recordProxyAttempt(input: {
+  recorder: ProcessAttemptRecorder;
+  repositoryContext: ReturnType<typeof toRepositoryContext>;
+  logger: AppLogger;
+  requestId: string;
+  attemptId: string;
+  serverId: string;
+  edgeProxyProviderKey: string;
+  reason: ParsedBootstrapServerProxyCommandInput["reason"];
+  status: "running" | "succeeded" | "failed";
+  phase: string;
+  step: string;
+  updatedAt: string;
+  startedAt?: string;
+  finishedAt?: string;
+  errorCode?: string;
+  retriable?: boolean;
+}): Promise<void> {
+  const result = await input.recorder.record(input.repositoryContext, {
+    id: input.attemptId,
+    kind: "proxy-bootstrap",
+    status: input.status,
+    operationKey: "servers.bootstrap-proxy",
+    dedupeKey: `proxy-bootstrap:${input.serverId}:${input.attemptId}`,
+    correlationId: input.requestId,
+    requestId: input.requestId,
+    phase: input.phase,
+    step: input.step,
+    serverId: input.serverId,
+    ...(input.startedAt ? { startedAt: input.startedAt } : {}),
+    updatedAt: input.updatedAt,
+    ...(input.finishedAt ? { finishedAt: input.finishedAt } : {}),
+    ...(input.errorCode ? { errorCode: input.errorCode, errorCategory: "async-processing" } : {}),
+    ...(input.retriable === undefined ? {} : { retriable: input.retriable }),
+    nextActions: input.status === "failed" ? ["diagnostic", "manual-review"] : ["no-action"],
+    safeDetails: {
+      proxyKind: input.edgeProxyProviderKey,
+      providerKey: input.edgeProxyProviderKey,
+      reason: input.reason,
+    },
+  });
+
+  if (result.isErr()) {
+    input.logger.warn("server_proxy_bootstrap.process_attempt_record_failed", {
+      requestId: input.requestId,
+      serverId: input.serverId,
+      attemptId: input.attemptId,
+      errorCode: result.error.code,
+    });
   }
 }
 
@@ -148,13 +202,23 @@ export class BootstrapServerProxyUseCase {
     private readonly eventBus: EventBus,
     @inject(tokens.logger)
     private readonly logger: AppLogger,
+    @inject(tokens.processAttemptRecorder)
+    private readonly processAttemptRecorder: ProcessAttemptRecorder = new NoopProcessAttemptRecorder(),
   ) {}
 
   async execute(
     context: ExecutionContext,
     input: ParsedBootstrapServerProxyCommandInput,
   ): Promise<Result<BootstrapServerProxyResult>> {
-    const { bootstrapper, clock, eventBus, idGenerator, logger, serverRepository } = this;
+    const {
+      bootstrapper,
+      clock,
+      eventBus,
+      idGenerator,
+      logger,
+      processAttemptRecorder,
+      serverRepository,
+    } = this;
     const repositoryContext = toRepositoryContext(context);
 
     return safeTry(async function* () {
@@ -214,6 +278,21 @@ export class BootstrapServerProxyUseCase {
         server,
         UpsertDeploymentTargetSpec.fromDeploymentTarget(server),
       );
+      await recordProxyAttempt({
+        recorder: processAttemptRecorder,
+        repositoryContext,
+        logger,
+        requestId: context.requestId,
+        attemptId,
+        serverId: serverId.value,
+        edgeProxyProviderKey,
+        reason: input.reason,
+        status: "running",
+        phase: "proxy-bootstrap",
+        step: "starting",
+        startedAt: attemptedAt.value,
+        updatedAt: attemptedAt.value,
+      });
 
       await eventBus.publish(context, [
         createProxyBootstrapRequestedEvent({
@@ -237,6 +316,7 @@ export class BootstrapServerProxyUseCase {
 
       if (result.isErr()) {
         const error = result.error;
+        const retriable = isProxyFailureRetriable(error.code, error.retryable);
         yield* server.markEdgeProxyFailed({
           failedAt: completedAt,
           errorCode: ErrorCodeText.rehydrate(error.code),
@@ -249,8 +329,26 @@ export class BootstrapServerProxyUseCase {
           failedAt: completedAt.value,
           errorCode: error.code,
           errorMessage: error.message,
-          retryable: isProxyFailureRetriable(error.code, error.retryable),
+          retryable: retriable,
           correlationId: context.requestId,
+        });
+        await recordProxyAttempt({
+          recorder: processAttemptRecorder,
+          repositoryContext,
+          logger,
+          requestId: context.requestId,
+          attemptId,
+          serverId: serverId.value,
+          edgeProxyProviderKey,
+          reason: input.reason,
+          status: "failed",
+          phase: mapFailurePhase(error.code),
+          step: "failed",
+          startedAt: attemptedAt.value,
+          updatedAt: completedAt.value,
+          finishedAt: completedAt.value,
+          errorCode: error.code,
+          retriable,
         });
       } else if (result.value.status === "ready") {
         yield* server.markEdgeProxyReady({ completedAt });
@@ -262,9 +360,26 @@ export class BootstrapServerProxyUseCase {
           result: result.value,
           correlationId: context.requestId,
         });
+        await recordProxyAttempt({
+          recorder: processAttemptRecorder,
+          repositoryContext,
+          logger,
+          requestId: context.requestId,
+          attemptId,
+          serverId: serverId.value,
+          edgeProxyProviderKey,
+          reason: input.reason,
+          status: "succeeded",
+          phase: "server-ready",
+          step: "ready",
+          startedAt: attemptedAt.value,
+          updatedAt: completedAt.value,
+          finishedAt: completedAt.value,
+        });
       } else {
         const errorCode = result.value.errorCode ?? "edge_proxy_bootstrap_failed";
         const errorMessage = result.value.message;
+        const retriable = isProxyFailureRetriable(errorCode, true);
         yield* server.markEdgeProxyFailed({
           failedAt: completedAt,
           errorCode: ErrorCodeText.rehydrate(errorCode),
@@ -277,8 +392,26 @@ export class BootstrapServerProxyUseCase {
           failedAt: completedAt.value,
           errorCode,
           errorMessage,
-          retryable: isProxyFailureRetriable(errorCode, true),
+          retryable: retriable,
           correlationId: context.requestId,
+        });
+        await recordProxyAttempt({
+          recorder: processAttemptRecorder,
+          repositoryContext,
+          logger,
+          requestId: context.requestId,
+          attemptId,
+          serverId: serverId.value,
+          edgeProxyProviderKey,
+          reason: input.reason,
+          status: "failed",
+          phase: mapFailurePhase(errorCode),
+          step: "failed",
+          startedAt: attemptedAt.value,
+          updatedAt: completedAt.value,
+          finishedAt: completedAt.value,
+          errorCode,
+          retriable,
         });
       }
 
