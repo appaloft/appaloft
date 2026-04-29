@@ -2575,6 +2575,61 @@ export interface OperatorWorkDetail {
   generatedAt: string;
 }
 
+export type ProcessAttemptKind = OperatorWorkKind;
+export type ProcessAttemptStatus = OperatorWorkStatus;
+export type ProcessAttemptNextAction = OperatorWorkNextAction;
+
+export interface ProcessAttemptRecord {
+  id: string;
+  kind: ProcessAttemptKind;
+  status: ProcessAttemptStatus;
+  operationKey: string;
+  dedupeKey?: string;
+  correlationId?: string;
+  requestId?: string;
+  phase?: string;
+  step?: string;
+  projectId?: string;
+  resourceId?: string;
+  deploymentId?: string;
+  serverId?: string;
+  domainBindingId?: string;
+  certificateId?: string;
+  startedAt?: string;
+  updatedAt: string;
+  finishedAt?: string;
+  errorCode?: string;
+  errorCategory?: string;
+  retriable?: boolean;
+  nextEligibleAt?: string;
+  nextActions: ProcessAttemptNextAction[];
+  safeDetails?: Record<string, string | number | boolean | null>;
+}
+
+export interface ProcessAttemptListFilter {
+  kind?: ProcessAttemptKind;
+  status?: ProcessAttemptStatus;
+  resourceId?: string;
+  serverId?: string;
+  deploymentId?: string;
+  limit?: number;
+}
+
+export interface ProcessAttemptRecorder {
+  record(
+    context: RepositoryContext,
+    attempt: ProcessAttemptRecord,
+  ): Promise<Result<ProcessAttemptRecord>>;
+}
+
+export interface ProcessAttemptReadModel {
+  list(
+    context: RepositoryContext,
+    filter?: ProcessAttemptListFilter,
+  ): Promise<ProcessAttemptRecord[]>;
+  findOne(context: RepositoryContext, id: string): Promise<ProcessAttemptRecord | null>;
+}
+
 export type StreamDeploymentEventsResult =
   | {
       mode: "bounded";

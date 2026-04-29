@@ -631,8 +631,9 @@ Implemented operations:
 Current boundary:
 - `operator-work.list` and `operator-work.show` are read-only; they do not retry, cancel, mark
   recovered, dead-letter, prune, or clean up work
-- the first slice aggregates deployment attempts, latest proxy bootstrap state, and latest
-  certificate attempts from existing read models
+- the current slice reads the internal durable process attempt journal first, then aggregates
+  deployment attempts, latest proxy bootstrap state, and latest certificate attempts from existing
+  read models for compatibility
 - remote-state locks, source links, route realization attempts, runtime maintenance jobs, and
   worker status remain future extensions when their persisted read models exist
 - next actions are guidance such as diagnostic/manual review/no-action, not hidden mutation

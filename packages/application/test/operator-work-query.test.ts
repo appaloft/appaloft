@@ -14,6 +14,9 @@ import {
   type DeploymentSummary,
   type DomainBindingReadModel,
   type DomainBindingSummary,
+  type ProcessAttemptListFilter,
+  type ProcessAttemptReadModel,
+  type ProcessAttemptRecord,
   type ServerReadModel,
   type ServerSummary,
 } from "../src/ports";
@@ -77,6 +80,28 @@ class StaticCertificateReadModel implements CertificateReadModel {
 
   async list(): Promise<CertificateSummary[]> {
     return this.certificates;
+  }
+}
+
+class StaticProcessAttemptReadModel implements ProcessAttemptReadModel {
+  constructor(private readonly attempts: ProcessAttemptRecord[]) {}
+
+  async list(
+    _context: RepositoryContext,
+    filter?: ProcessAttemptListFilter,
+  ): Promise<ProcessAttemptRecord[]> {
+    return this.attempts.filter(
+      (attempt) =>
+        (!filter?.kind || attempt.kind === filter.kind) &&
+        (!filter?.status || attempt.status === filter.status) &&
+        (!filter?.resourceId || attempt.resourceId === filter.resourceId) &&
+        (!filter?.serverId || attempt.serverId === filter.serverId) &&
+        (!filter?.deploymentId || attempt.deploymentId === filter.deploymentId),
+    );
+  }
+
+  async findOne(_context: RepositoryContext, id: string): Promise<ProcessAttemptRecord | null> {
+    return this.attempts.find((attempt) => attempt.id === id) ?? null;
   }
 }
 
@@ -207,6 +232,7 @@ function createService(input?: {
   servers?: ServerSummary[];
   bindings?: DomainBindingSummary[];
   certificates?: CertificateSummary[];
+  processAttempts?: ProcessAttemptRecord[];
 }): OperatorWorkQueryService {
   return new OperatorWorkQueryService(
     new StaticDeploymentReadModel(input?.deployments ?? [deploymentSummary()]),
@@ -214,6 +240,7 @@ function createService(input?: {
     new StaticCertificateReadModel(input?.certificates ?? [certificateSummary()]),
     new StaticDomainBindingReadModel(input?.bindings ?? [domainBindingSummary()]),
     new FixedClock(),
+    new StaticProcessAttemptReadModel(input?.processAttempts ?? []),
   );
 }
 
@@ -337,5 +364,65 @@ describe("operator work query service", () => {
     expect(missing._unsafeUnwrapErr()).toMatchObject({
       code: "not_found",
     });
+  });
+
+  test("[OP-WORK-QRY-006] durable process attempts are read first and win during merge", async () => {
+    const service = createService({
+      deployments: [],
+      servers: [serverSummary()],
+      certificates: [],
+      processAttempts: [
+        {
+          id: "pxy_attempt_1",
+          kind: "proxy-bootstrap",
+          status: "retry-scheduled",
+          operationKey: "servers.bootstrap-proxy",
+          dedupeKey: "proxy-bootstrap:srv_primary:pxy_attempt_1",
+          correlationId: "req_attempt",
+          requestId: "req_attempt",
+          phase: "proxy-container",
+          step: "retry_scheduled",
+          serverId: "srv_primary",
+          startedAt: "2026-01-01T00:00:07.000Z",
+          updatedAt: "2026-01-01T00:00:11.000Z",
+          errorCode: "edge_proxy_start_failed",
+          errorCategory: "async-processing",
+          retriable: true,
+          nextEligibleAt: "2026-01-01T00:05:11.000Z",
+          nextActions: ["diagnostic", "manual-review"],
+          safeDetails: {
+            providerKey: "caddy",
+            proxyKind: "caddy",
+            commandLine: "PRIVATE_KEY=raw-value caddy run",
+          },
+        },
+      ],
+    });
+
+    const result = await service.list(
+      context(),
+      new ListOperatorWorkQuery(
+        "proxy-bootstrap",
+        undefined,
+        undefined,
+        "srv_primary",
+        undefined,
+        10,
+      ),
+    );
+    const shown = await service.show(context(), new ShowOperatorWorkQuery("pxy_attempt_1"));
+
+    expect(result.items.map((item) => item.id)).toEqual(["pxy_attempt_1"]);
+    expect(result.items[0]).toMatchObject({
+      id: "pxy_attempt_1",
+      kind: "proxy-bootstrap",
+      status: "retry-scheduled",
+      phase: "proxy-container",
+      serverId: "srv_primary",
+      errorCode: "edge_proxy_start_failed",
+      retriable: true,
+    });
+    expect(shown._unsafeUnwrap().item.id).toBe("pxy_attempt_1");
+    expect(JSON.stringify(result)).not.toContain("PRIVATE_KEY");
   });
 });

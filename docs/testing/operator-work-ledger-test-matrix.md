@@ -26,6 +26,9 @@ background work state without exposing recovery mutations or secret-bearing deta
 | OP-WORK-QRY-003 | application | Certificate attempt aggregation | Latest certificate attempts become `kind = certificate` work items with safe related ids. |
 | OP-WORK-QRY-004 | application | Filters | `kind`, `status`, `resourceId`, `serverId`, `deploymentId`, and `limit` filter the aggregate list. |
 | OP-WORK-QRY-005 | application | Show one item | `operator-work.show` returns the matching item or `not_found`. |
+| OP-WORK-QRY-006 | application | Durable process attempt merge | Durable process attempts are read before legacy aggregation and win when the same work id appears in both sources. |
+| OP-WORK-JOURNAL-001 | application | Process attempt recorder contract | Recorder writes pending/running/terminal process attempt state with operation key, dedupe key, correlation/request ids, related ids, error fields, next actions, and safe details. |
+| OP-WORK-JOURNAL-002 | persistence/pg | Process attempt journal migration and adapter | Migration creates a durable process attempt table and the PG adapter can upsert, list, filter, show, and preserve only safe details. |
 | OP-WORK-REDAC-001 | application | No secret leakage | Work items do not include raw log messages, environment values, private keys, certificate material, or provider command lines. |
 | OP-WORK-ENTRY-001 | CLI | `appaloft work list` dispatches query | CLI dispatches `ListOperatorWorkQuery`. |
 | OP-WORK-ENTRY-002 | CLI | `appaloft work show <workId>` dispatches query | CLI dispatches `ShowOperatorWorkQuery`. |
@@ -34,6 +37,6 @@ background work state without exposing recovery mutations or secret-bearing deta
 
 ## Current Implementation Notes
 
-This matrix begins with deployment, proxy-bootstrap, and certificate aggregation. Remote-state,
-source-link, route-realization, runtime-maintenance, and worker/job status rows remain future
-extensions once their persisted read models exist.
+This matrix begins with durable process attempt journal reads plus deployment, proxy-bootstrap, and
+certificate aggregation. Remote-state, source-link, route-realization, runtime-maintenance, and
+worker/job status rows remain future extensions once their persisted read models exist.

@@ -16,9 +16,12 @@ import {
   type OperatorWorkList,
   type OperatorWorkNextAction,
   type OperatorWorkStatus,
+  type ProcessAttemptReadModel,
+  type ProcessAttemptRecord,
   type ServerReadModel,
   type ServerSummary,
 } from "../../ports";
+import { EmptyProcessAttemptReadModel } from "../../process-attempt-journal";
 import { tokens } from "../../tokens";
 import { ListOperatorWorkQuery } from "./list-operator-work.query";
 import { type ShowOperatorWorkQuery } from "./show-operator-work.query";
@@ -33,6 +36,10 @@ type OperatorWorkFilter = {
 };
 
 const defaultLimit = 50;
+const unsafeDetailKeyPattern =
+  /secret|password|passphrase|private[_-]?key|token|credential|command[_-]?line|commandline/i;
+const unsafeDetailValuePattern =
+  /(BEGIN .*PRIVATE KEY|PRIVATE_KEY|SECRET_|PASSWORD=|TOKEN=|PASS=)/i;
 
 function deploymentStatusToOperatorWorkStatus(
   status: DeploymentSummary["status"],
@@ -270,6 +277,56 @@ function certificateToWorkItem(
   };
 }
 
+function sanitizeSafeDetails(
+  details?: Record<string, string | number | boolean | null>,
+): Record<string, string | number | boolean | null> | undefined {
+  if (!details) {
+    return undefined;
+  }
+
+  const sanitized: Record<string, string | number | boolean | null> = {};
+  for (const [key, value] of Object.entries(details)) {
+    if (unsafeDetailKeyPattern.test(key)) {
+      continue;
+    }
+
+    if (typeof value === "string" && unsafeDetailValuePattern.test(value)) {
+      continue;
+    }
+
+    sanitized[key] = value;
+  }
+
+  return Object.keys(sanitized).length > 0 ? sanitized : undefined;
+}
+
+function processAttemptToWorkItem(attempt: ProcessAttemptRecord): OperatorWorkItem {
+  const safeDetails = sanitizeSafeDetails(attempt.safeDetails);
+
+  return {
+    id: attempt.id,
+    kind: attempt.kind,
+    status: attempt.status,
+    operationKey: attempt.operationKey,
+    ...(attempt.phase ? { phase: attempt.phase } : {}),
+    ...(attempt.step ? { step: attempt.step } : {}),
+    ...(attempt.projectId ? { projectId: attempt.projectId } : {}),
+    ...(attempt.resourceId ? { resourceId: attempt.resourceId } : {}),
+    ...(attempt.deploymentId ? { deploymentId: attempt.deploymentId } : {}),
+    ...(attempt.serverId ? { serverId: attempt.serverId } : {}),
+    ...(attempt.domainBindingId ? { domainBindingId: attempt.domainBindingId } : {}),
+    ...(attempt.certificateId ? { certificateId: attempt.certificateId } : {}),
+    ...(attempt.startedAt ? { startedAt: attempt.startedAt } : {}),
+    updatedAt: attempt.updatedAt,
+    ...(attempt.finishedAt ? { finishedAt: attempt.finishedAt } : {}),
+    ...(attempt.errorCode ? { errorCode: attempt.errorCode } : {}),
+    ...(attempt.errorCategory ? { errorCategory: attempt.errorCategory } : {}),
+    ...(attempt.retriable === undefined ? {} : { retriable: attempt.retriable }),
+    nextActions: attempt.nextActions,
+    ...(safeDetails ? { safeDetails } : {}),
+  };
+}
+
 function matchesFilter(item: OperatorWorkItem, filter: OperatorWorkFilter): boolean {
   return (
     (!filter.kind || item.kind === filter.kind) &&
@@ -282,6 +339,21 @@ function matchesFilter(item: OperatorWorkItem, filter: OperatorWorkFilter): bool
 
 function compareByUpdatedAtDesc(left: OperatorWorkItem, right: OperatorWorkItem): number {
   return right.updatedAt.localeCompare(left.updatedAt);
+}
+
+function hasDurableSameProxyScope(
+  durableItems: OperatorWorkItem[],
+  candidate: OperatorWorkItem,
+): boolean {
+  return (
+    candidate.kind === "proxy-bootstrap" &&
+    durableItems.some(
+      (item) =>
+        item.kind === "proxy-bootstrap" &&
+        item.serverId !== undefined &&
+        item.serverId === candidate.serverId,
+    )
+  );
 }
 
 @injectable()
@@ -297,6 +369,8 @@ export class OperatorWorkQueryService {
     private readonly domainBindingReadModel: DomainBindingReadModel,
     @inject(tokens.clock)
     private readonly clock: Clock,
+    @inject(tokens.processAttemptReadModel)
+    private readonly processAttemptReadModel: ProcessAttemptReadModel = new EmptyProcessAttemptReadModel(),
   ) {}
 
   async list(context: ExecutionContext, query: ListOperatorWorkQuery): Promise<OperatorWorkList> {
@@ -313,6 +387,7 @@ export class OperatorWorkQueryService {
       ...(filter.resourceId ? { resourceId: filter.resourceId } : {}),
     });
     const bindingsById = new Map(bindings.map((binding) => [binding.id, binding]));
+    const processAttempts = await this.processAttemptReadModel.list(repositoryContext, filter);
     const deployments =
       filter.kind && filter.kind !== "deployment"
         ? []
@@ -337,8 +412,19 @@ export class OperatorWorkQueryService {
         certificateToWorkItem(certificate, bindingsById.get(certificate.domainBindingId)),
       )
       .filter((item): item is OperatorWorkItem => item !== null);
+    const durableItems = processAttempts.map(processAttemptToWorkItem);
 
-    const items = [...deploymentItems, ...serverItems, ...certificateItems]
+    const itemsById = new Map<string, OperatorWorkItem>();
+    for (const item of durableItems) {
+      itemsById.set(item.id, item);
+    }
+    for (const item of [...deploymentItems, ...serverItems, ...certificateItems]) {
+      if (!itemsById.has(item.id) && !hasDurableSameProxyScope(durableItems, item)) {
+        itemsById.set(item.id, item);
+      }
+    }
+
+    const items = [...itemsById.values()]
       .filter((item) => matchesFilter(item, filter))
       .sort(compareByUpdatedAtDesc)
       .slice(0, filter.limit);
@@ -354,6 +440,20 @@ export class OperatorWorkQueryService {
     context: ExecutionContext,
     query: ShowOperatorWorkQuery,
   ): Promise<Result<OperatorWorkDetail>> {
+    const repositoryContext = toRepositoryContext(context);
+    const processAttempt = await this.processAttemptReadModel.findOne(
+      repositoryContext,
+      query.workId,
+    );
+
+    if (processAttempt) {
+      return ok({
+        schemaVersion: "operator-work.show/v1",
+        item: processAttemptToWorkItem(processAttempt),
+        generatedAt: this.clock.now(),
+      });
+    }
+
     const list = await this.list(
       context,
       new ListOperatorWorkQuery(undefined, undefined, undefined, undefined, undefined, 200),

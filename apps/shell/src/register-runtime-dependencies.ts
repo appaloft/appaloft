@@ -76,6 +76,7 @@ import {
   PgEnvironmentReadModel,
   PgEnvironmentRepository,
   PgMutationCoordinator,
+  PgProcessAttemptJournal,
   PgProjectReadModel,
   PgProjectRepository,
   PgResourceDeletionBlockerReader,
@@ -812,6 +813,12 @@ export function registerRuntimeDependencies(
   });
   container.register(tokens.certificateReadModel, {
     useFactory: instanceCachingFactory(() => new PgCertificateReadModel(input.database.db)),
+  });
+  container.register(tokens.processAttemptRecorder, {
+    useFactory: instanceCachingFactory(() => new PgProcessAttemptJournal(input.database.db)),
+  });
+  container.register(tokens.processAttemptReadModel, {
+    useFactory: instanceCachingFactory(() => new PgProcessAttemptJournal(input.database.db)),
   });
 
   container.register(tokens.sourceDetector, {

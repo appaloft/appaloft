@@ -34,7 +34,9 @@ import {
   type CertificateSecretStore,
   type Clock,
   type EventBus,
+  type ProcessAttemptRecorder,
 } from "../../ports";
+import { NoopProcessAttemptRecorder } from "../../process-attempt-journal";
 import { tokens } from "../../tokens";
 import { publishDomainEventsAndReturn } from "../publish-domain-events";
 
@@ -76,6 +78,69 @@ function safeFailureMessage(error: DomainError): Result<CertificateFailureMessag
   return CertificateFailureMessageValue.create(error.message || error.code);
 }
 
+async function recordCertificateAttempt(input: {
+  recorder: ProcessAttemptRecorder;
+  repositoryContext: ReturnType<typeof toRepositoryContext>;
+  logger: AppLogger;
+  requestId: string;
+  certificateId: string;
+  domainBindingId: string;
+  domainName: string;
+  attemptId: string;
+  reason: string;
+  providerKey: string;
+  challengeType: string;
+  status: "running" | "succeeded" | "failed" | "retry-scheduled";
+  phase: string;
+  step: string;
+  requestedAt: string;
+  updatedAt: string;
+  finishedAt?: string;
+  expiresAt?: string;
+  errorCode?: string;
+  retriable?: boolean;
+}): Promise<void> {
+  const result = await input.recorder.record(input.repositoryContext, {
+    id: input.attemptId,
+    kind: "certificate",
+    status: input.status,
+    operationKey: "certificates.issue-or-renew",
+    dedupeKey: `certificate:${input.domainBindingId}:${input.attemptId}`,
+    correlationId: input.requestId,
+    requestId: input.requestId,
+    phase: input.phase,
+    step: input.step,
+    domainBindingId: input.domainBindingId,
+    certificateId: input.certificateId,
+    startedAt: input.requestedAt,
+    updatedAt: input.updatedAt,
+    ...(input.finishedAt ? { finishedAt: input.finishedAt } : {}),
+    ...(input.errorCode ? { errorCode: input.errorCode, errorCategory: "async-processing" } : {}),
+    ...(input.retriable === undefined ? {} : { retriable: input.retriable }),
+    nextActions:
+      input.status === "failed" || input.status === "retry-scheduled"
+        ? ["diagnostic", "manual-review"]
+        : ["no-action"],
+    safeDetails: {
+      providerKey: input.providerKey,
+      challengeType: input.challengeType,
+      reason: input.reason,
+      domainName: input.domainName,
+      certificateSource: "managed",
+      ...(input.expiresAt ? { expiresAt: input.expiresAt } : {}),
+    },
+  });
+
+  if (result.isErr()) {
+    input.logger.warn("certificate_request.process_attempt_record_failed", {
+      requestId: input.requestId,
+      certificateId: input.certificateId,
+      attemptId: input.attemptId,
+      errorCode: result.error.code,
+    });
+  }
+}
+
 @EventHandler("certificate-requested")
 @injectable()
 export class IssueCertificateOnCertificateRequestedHandler
@@ -94,6 +159,8 @@ export class IssueCertificateOnCertificateRequestedHandler
     private readonly eventBus: EventBus,
     @inject(tokens.logger)
     private readonly logger: AppLogger,
+    @inject(tokens.processAttemptRecorder)
+    private readonly processAttemptRecorder: ProcessAttemptRecorder = new NoopProcessAttemptRecorder(),
   ) {}
 
   async handle(context: ExecutionContext, event: DomainEvent): Promise<Result<void>> {
@@ -104,6 +171,7 @@ export class IssueCertificateOnCertificateRequestedHandler
       clock,
       eventBus,
       logger,
+      processAttemptRecorder,
     } = this;
     const repositoryContext = toRepositoryContext(context);
 
@@ -155,6 +223,24 @@ export class IssueCertificateOnCertificateRequestedHandler
         certificate,
         UpsertCertificateSpec.fromCertificate(certificate),
       );
+      await recordCertificateAttempt({
+        recorder: processAttemptRecorder,
+        repositoryContext,
+        logger,
+        requestId: context.requestId,
+        certificateId: state.id.value,
+        domainBindingId: state.domainBindingId.value,
+        domainName: state.domainName.value,
+        attemptId: attempt.id.value,
+        reason: attempt.reason.value,
+        providerKey: attempt.providerKey.value,
+        challengeType: attempt.challengeType.value,
+        status: "running",
+        phase: "provider-request",
+        step: "issuing",
+        requestedAt: attempt.requestedAt.value,
+        updatedAt: clock.now(),
+      });
 
       const issueInput: CertificateProviderIssueInput = {
         certificateId: state.id.value,
@@ -192,6 +278,27 @@ export class IssueCertificateOnCertificateRequestedHandler
           certificate,
           UpsertCertificateSpec.fromCertificate(certificate),
         );
+        await recordCertificateAttempt({
+          recorder: processAttemptRecorder,
+          repositoryContext,
+          logger,
+          requestId: context.requestId,
+          certificateId: state.id.value,
+          domainBindingId: state.domainBindingId.value,
+          domainName: state.domainName.value,
+          attemptId: attempt.id.value,
+          reason: attempt.reason.value,
+          providerKey: issueInput.providerKey,
+          challengeType: issueInput.challengeType,
+          status: error.retryable ? "retry-scheduled" : "failed",
+          phase: failurePhase.value,
+          step: error.retryable ? "retry_scheduled" : "failed",
+          requestedAt: attempt.requestedAt.value,
+          updatedAt: failedAt.value,
+          finishedAt: failedAt.value,
+          errorCode: error.code,
+          retriable: error.retryable,
+        });
         await publishDomainEventsAndReturn(context, eventBus, logger, certificate, undefined);
         return ok(undefined);
       }
@@ -231,6 +338,27 @@ export class IssueCertificateOnCertificateRequestedHandler
           certificate,
           UpsertCertificateSpec.fromCertificate(certificate),
         );
+        await recordCertificateAttempt({
+          recorder: processAttemptRecorder,
+          repositoryContext,
+          logger,
+          requestId: context.requestId,
+          certificateId: state.id.value,
+          domainBindingId: state.domainBindingId.value,
+          domainName: state.domainName.value,
+          attemptId: attempt.id.value,
+          reason: attempt.reason.value,
+          providerKey: issueInput.providerKey,
+          challengeType: issueInput.challengeType,
+          status: error.retryable ? "retry-scheduled" : "failed",
+          phase: failurePhase.value,
+          step: error.retryable ? "retry_scheduled" : "failed",
+          requestedAt: attempt.requestedAt.value,
+          updatedAt: failedAt.value,
+          finishedAt: failedAt.value,
+          errorCode: failureCode.value,
+          retriable: error.retryable,
+        });
         await publishDomainEventsAndReturn(context, eventBus, logger, certificate, undefined);
         return ok(undefined);
       }
@@ -254,6 +382,27 @@ export class IssueCertificateOnCertificateRequestedHandler
         certificate,
         UpsertCertificateSpec.fromCertificate(certificate),
       );
+      await recordCertificateAttempt({
+        recorder: processAttemptRecorder,
+        repositoryContext,
+        logger,
+        requestId: context.requestId,
+        certificateId: state.id.value,
+        domainBindingId: state.domainBindingId.value,
+        domainName: state.domainName.value,
+        attemptId: attempt.id.value,
+        reason: attempt.reason.value,
+        providerKey: issueInput.providerKey,
+        challengeType: issueInput.challengeType,
+        status: "succeeded",
+        phase: "certificate-issued",
+        step: "issued",
+        requestedAt: attempt.requestedAt.value,
+        updatedAt: issuedAt.value,
+        finishedAt: issuedAt.value,
+        expiresAt: expiresAt.value,
+        retriable: false,
+      });
       await publishDomainEventsAndReturn(context, eventBus, logger, certificate, undefined);
 
       return ok(undefined);

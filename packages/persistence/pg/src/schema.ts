@@ -316,6 +316,33 @@ export interface MutationCoordinationsTable {
   metadata: ColumnType<JsonRecord, JsonRecord, JsonRecord>;
 }
 
+export interface ProcessAttemptJournalTable {
+  id: string;
+  kind: string;
+  status: string;
+  operation_key: string;
+  dedupe_key: string | null;
+  correlation_id: string | null;
+  request_id: string | null;
+  phase: string | null;
+  step: string | null;
+  project_id: string | null;
+  resource_id: string | null;
+  deployment_id: string | null;
+  server_id: string | null;
+  domain_binding_id: string | null;
+  certificate_id: string | null;
+  started_at: string | null;
+  updated_at: UpdatableTimestampColumn;
+  finished_at: string | null;
+  error_code: string | null;
+  error_category: string | null;
+  retriable: boolean | null;
+  next_eligible_at: string | null;
+  next_actions: ColumnType<string[], string[], string[]>;
+  safe_details: ColumnType<JsonRecord, JsonRecord, JsonRecord>;
+}
+
 export interface Database {
   projects: ProjectsTable;
   servers: ServersTable;
@@ -335,4 +362,5 @@ export interface Database {
   default_access_domain_policies: DefaultAccessDomainPoliciesTable;
   server_applied_route_states: ServerAppliedRouteStatesTable;
   mutation_coordinations: MutationCoordinationsTable;
+  process_attempt_journal: ProcessAttemptJournalTable;
 }

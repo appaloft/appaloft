@@ -39,6 +39,7 @@ import { sshCredentialRotationMigration } from "./migrations/031_ssh_credential_
 import { environmentLifecycleMigration } from "./migrations/032_environment_lifecycle";
 import { environmentLockLifecycleMigration } from "./migrations/033_environment_lock_lifecycle";
 import { resourceAccessProfileMigration } from "./migrations/034_resource_access_profile";
+import { processAttemptJournalMigration } from "./migrations/035_process_attempt_journal";
 import { PgliteDialect } from "./pglite-dialect";
 import { type Database } from "./schema";
 import { TracingDialect } from "./tracing-dialect";
@@ -167,6 +168,7 @@ class StaticMigrationProvider implements MigrationProvider {
       "032_environment_lifecycle": environmentLifecycleMigration,
       "033_environment_lock_lifecycle": environmentLockLifecycleMigration,
       "034_resource_access_profile": resourceAccessProfileMigration,
+      "035_process_attempt_journal": processAttemptJournalMigration,
     };
   }
 }
