@@ -55,6 +55,8 @@ describe("CLI SSH remote state lifecycle", () => {
     expect(commands[0]?.command).toContain("mutation.lock");
     expect(commands[0]?.command).toContain("lastHeartbeatAt");
     expect(commands[0]?.command).toContain("staleAfterSeconds");
+    expect(commands[0]?.command).toContain('date -j -u -f "%Y-%m-%dT%H:%M:%SZ"');
+    expect(commands[0]?.command).toContain('stat -f %m "$lock_dir"');
     expect(commands[0]?.command).toContain("locks/recovered");
     expect(commands[0]?.command).toContain("backups");
     expect(commands[0]?.command).toContain("journals");
@@ -99,6 +101,10 @@ describe("CLI SSH remote state lifecycle", () => {
     expect(prepared.error).toMatchObject({
       code: "infra_error",
       retryable: true,
+      knowledge: {
+        responsibility: "operator",
+        actionability: "run-diagnostic",
+      },
       details: {
         phase: "remote-state-lock",
         stateBackend: "ssh-pglite",
@@ -111,6 +117,8 @@ describe("CLI SSH remote state lifecycle", () => {
         staleAfterSeconds: 1200,
       },
     });
+    expect(prepared.error.knowledge?.links?.some((link) => link.rel === "human-doc")).toBe(true);
+    expect(prepared.error.knowledge?.links?.some((link) => link.rel === "llm-guide")).toBe(true);
     expect(JSON.stringify(prepared.error)).not.toContain("OPENSSH PRIVATE KEY");
   });
 

@@ -43,6 +43,30 @@ type ErrorDetails = {
   [key: string]: string | number | boolean | null | undefined;
 };
 
+type ErrorKnowledge = {
+  responsibility: "user" | "operator" | "system" | "provider" | "appaloft";
+  actionability:
+    | "fix-input"
+    | "wait-retry"
+    | "run-diagnostic"
+    | "auto-recoverable"
+    | "report-bug"
+    | "no-user-action";
+  operation?: string;
+  links?: Array<{
+    rel: "human-doc" | "llm-guide" | "runbook" | "spec" | "source-symbol" | "support";
+    href: string;
+    mediaType?: string;
+    title?: string;
+  }>;
+  remedies?: Array<{
+    kind: "retry" | "command" | "workflow-action" | "diagnostic" | "none";
+    label: string;
+    safeByDefault: boolean;
+    command?: string[];
+  }>;
+};
+
 type PlatformError = {
   code: string;
   category: ErrorCategory;
@@ -55,12 +79,35 @@ type PlatformError = {
   relatedState?: string;
   correlationId?: string;
   causationId?: string;
+  knowledge?: ErrorKnowledge;
 };
 ```
 
 The implementation may carry some fields inside `details` while the richer shape is introduced. The contract still requires every spec to define the logical fields.
 
 Secrets, private keys, access tokens, raw environment secret values, and command output that may contain secrets must not be stored in error details.
+
+## Error Knowledge Contract
+
+The Error Knowledge Contract is governed by
+[ADR-033: Error Knowledge Contract](../decisions/ADR-033-error-knowledge-contract.md).
+
+Error knowledge is resolved by stable error identity, usually `(code, phase)`. It is optional for
+low-confusion internal errors, but required for public errors that need recovery guidance, support
+triage, or agent/tool handling.
+
+Rules:
+
+- `message` remains human text only and must not be used as the knowledge lookup key;
+- `responsibility` says who can act on the failure;
+- `actionability` says what kind of action is appropriate;
+- `links` may include human docs and agent-readable guides;
+- `remedies` must mark whether the suggested action is safe by default;
+- docs, runbooks, agent guides, and source links must not expose secrets or raw private output.
+
+Entrypoints may attach `knowledge` directly to the returned/presented error or resolve it at render
+time from the public docs registry. Domain aggregates and value objects should keep returning
+structured domain errors and must not depend on public documentation URLs.
 
 ## Error Categories
 

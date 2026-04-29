@@ -6,6 +6,7 @@ export * from "./release-orchestration";
 export * from "./runtime-topology";
 export * from "./shared/entity";
 export * from "./shared/enums";
+export * from "./shared/error-knowledge";
 export * from "./shared/errors";
 export * from "./shared/events";
 export * from "./shared/identifiers";

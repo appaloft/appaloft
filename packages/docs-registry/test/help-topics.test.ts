@@ -3,7 +3,15 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { publicDocsHelpTopics, publicDocsLocales, resolvePublicDocsHelpHref } from "../src";
+import {
+  findPublicDocsErrorGuide,
+  publicDocsErrorGuides,
+  publicDocsHelpTopics,
+  publicDocsLocales,
+  resolvePublicDocsErrorAgentGuideHref,
+  resolvePublicDocsErrorKnowledge,
+  resolvePublicDocsHelpHref,
+} from "../src";
 
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const repositoryRoot = resolve(packageRoot, "../..");
@@ -69,6 +77,40 @@ describe("public docs help registry", () => {
 
       for (const webSurface of topic.webSurfaces ?? []) {
         expect(webSurface.trim().length, topic.id).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  test("[ERROR-KNOWLEDGE-002] public error guides resolve docs, agent guide, and remedies", () => {
+    const guide = findPublicDocsErrorGuide({
+      code: "infra_error",
+      phase: "remote-state-lock",
+    });
+
+    expect(guide?.id).toBe("infra_error.remote-state-lock");
+    expect(guide?.responsibility).toBe("operator");
+    expect(guide?.actionability).toBe("run-diagnostic");
+
+    const knowledge = resolvePublicDocsErrorKnowledge("infra_error.remote-state-lock");
+
+    expect(knowledge.links?.some((link) => link.rel === "human-doc")).toBe(true);
+    expect(knowledge.links?.some((link) => link.rel === "llm-guide")).toBe(true);
+    expect(knowledge.remedies?.some((remedy) => remedy.safeByDefault)).toBe(true);
+  });
+
+  test("[ERROR-KNOWLEDGE-004] public error guides point to existing agent-readable assets", () => {
+    for (const guide of Object.values(publicDocsErrorGuides)) {
+      const agentHref = resolvePublicDocsErrorAgentGuideHref(guide.id);
+      const assetPath = resolve(
+        repositoryRoot,
+        "apps/docs/public",
+        agentHref.replace(/^\/docs\//, ""),
+      );
+
+      expect(existsSync(assetPath), `${guide.id} agent guide exists`).toBe(true);
+
+      for (const specReference of guide.specReferences) {
+        expect(existsSync(resolve(repositoryRoot, specReference)), specReference).toBe(true);
       }
     }
   });
