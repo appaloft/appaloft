@@ -36,6 +36,7 @@ and final round summaries must identify the row as a documented manual or deferr
 | PUB-DOCS-014 | Docs static directory override works. | e2e-preferred | Setting the docs static override environment variable serves replacement docs assets without overriding Web console assets. |
 | PUB-DOCS-015 | Secret and diagnostic guidance is safe. | contract | Troubleshooting and diagnostic docs explain masked secrets and safe support payload sharing without instructing users to expose secret values. |
 | PUB-DOCS-016 | Public docs topics are traceable to specs and product surfaces. | contract | Topics that explain governed behavior record the public page/anchor, internal spec references, and the Web/CLI/API surface that links users to the topic. |
+| PUB-DOCS-017 | Public error guides are human- and agent-readable. | contract | Registered public error guides resolve to a human docs anchor and an agent-readable JSON guide with safe details, responsibility, actionability, remedies, and governing specs. |
 
 ## Current Implementation Notes And Migration Gaps
 
@@ -86,6 +87,8 @@ Current status:
 - `PUB-DOCS-016` is covered for initial high-confusion access and resource profile topics by
   `@appaloft/docs-registry` topic metadata and
   `docs/documentation/public-docs-traceability.md`.
+- `PUB-DOCS-017` is covered for registered public error guides by
+  `packages/docs-registry/test/help-topics.test.ts`.
 
 There is still no dedicated automated public documentation checker for every product help
 affordance, complete link resolution in built output, search alias freshness, or future MCP/tool

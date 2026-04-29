@@ -207,6 +207,8 @@ Recovery requirements:
   `remote-state-lock` error for an active lock;
 - abandoned locks must be visible through diagnostics and recoverable by a deliberate operator
   action or a safe stale-lock policy that records the recovered lock metadata before continuing;
+- out-of-band remote-state diagnostics and stale recovery must run without acquiring the same
+  state-root mutation lock they are diagnosing;
 - releasing a lock must be owner-aware so an older workflow cannot delete a newer lock after
   recovery or superseding takeover;
 - failed migrations must leave either the previous state readable or an explicit recovery marker

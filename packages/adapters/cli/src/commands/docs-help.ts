@@ -31,6 +31,7 @@ export const cliDocsHrefs = {
   observabilityRuntimeLogs: resolvePublicDocsHelpHref("observability.runtime-logs"),
   observabilityHealthSummary: resolvePublicDocsHelpHref("observability.health-summary"),
   diagnosticsSafeSupportPayload: resolvePublicDocsHelpHref("diagnostics.safe-support-payload"),
+  remoteStateLock: resolvePublicDocsHelpHref("errors.remote-state-lock"),
 } as const;
 
 export const cliCommandDescriptions = {
@@ -49,6 +50,16 @@ export const cliCommandDescriptions = {
   sourceLinkRelink: withDocs(
     "Relink a source fingerprint to an explicit resource",
     "deployment.source-relink",
+  ),
+  remoteState: withDocs("Remote state diagnostics", "errors.remote-state-lock"),
+  remoteStateLock: withDocs("SSH remote-state lock diagnostics", "errors.remote-state-lock"),
+  remoteStateLockInspect: withDocs(
+    "Inspect the SSH remote-state mutation lock",
+    "errors.remote-state-lock",
+  ),
+  remoteStateLockRecoverStale: withDocs(
+    "Archive a stale SSH remote-state mutation lock",
+    "errors.remote-state-lock",
   ),
   project: withDocs("Project operations", "project.lifecycle"),
   projectCreate: withDocs("Create a project", "project.concept"),

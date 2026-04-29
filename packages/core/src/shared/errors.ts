@@ -1,3 +1,5 @@
+import { type ErrorKnowledge } from "./error-knowledge";
+
 export type ErrorCategory = "user" | "infra" | "provider" | "retryable" | "timeout";
 
 export type DomainErrorDetailValue = string | number | boolean | null | readonly string[];
@@ -10,6 +12,7 @@ export interface DomainError {
   message: string;
   retryable: boolean;
   details?: DomainErrorDetails;
+  knowledge?: ErrorKnowledge;
 }
 
 function createError(
