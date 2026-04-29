@@ -3,7 +3,7 @@
 ## Status
 
 - Round: Spec Round
-- Artifact state: source-of-truth semantics ready for Code Round planning; production code unchanged
+- Artifact state: readiness query implemented and synchronized; recovery write commands remain future
 - Roadmap target: Phase 7 Day-Two Production Controls (`0.9.0` beta target)
 - Compatibility impact: `pre-1.0-policy`; new public query/commands and user-visible recovery
   guidance are planned but not yet active
@@ -34,7 +34,7 @@ This Spec Round accepts five public operation boundaries as candidates:
 
 | Operation | Kind | Role | Code Round state |
 | --- | --- | --- | --- |
-| `deployments.recovery-readiness` | Query | Canonical shared readiness result for retry, redeploy, rollback, and candidates. | Add first or with first write command. |
+| `deployments.recovery-readiness` | Query | Canonical shared readiness result for retry, redeploy, rollback, and candidates. | Active read-only operation. |
 | `deployments.retry` | Command | New attempt from the selected failed attempt's immutable snapshot. | Add after readiness query and command spec/test rows exist. |
 | `deployments.redeploy` | Command | New attempt from current Resource profile and current environment/resource configuration. | Add after readiness query and resource-profile drift gates exist. |
 | `deployments.rollback` | Command | New rollback attempt from a selected rollback candidate. | Add after artifact retention/candidate readiness is persisted. |
@@ -183,10 +183,10 @@ must not appear in readiness output.
 
 - Web: deployment detail recovery panel, derived from readiness, with action buttons hidden until
   write commands are active.
-- CLI: `appaloft deployments recovery-readiness <deploymentId>` target query; failed deploy output
+- CLI: active `appaloft deployments recovery-readiness <deploymentId>` query; failed deploy output
   may suggest show/events/readiness before suggesting writes.
-- HTTP/oRPC: `GET /api/deployments/{deploymentId}/recovery-readiness` target route or equivalent
-  oRPC procedure over the shared query schema.
+- HTTP/oRPC: active `GET /api/deployments/{deploymentId}/recovery-readiness` route and oRPC
+  procedure over the shared query schema.
 - Future MCP/tool: read-only recovery inspection tool plus future write tools mapped to the same
   operation keys.
 - Public docs/help: Docs Round target should be a Deploy or Observe/Troubleshoot page with stable
@@ -217,8 +217,9 @@ must not appear in readiness output.
   rollback.
 - `deployments.stream-events` is active, but remaining gap/cancellation tests are observation
   hardening, not recovery blockers.
-- Public docs/help anchors for deployment recovery are not complete; Docs Round remains required
-  before user-facing Code Round completion.
+- Public docs/help anchors for deployment recovery readiness, retry, redeploy, rollback, and rollback
+  candidates are registered on the recovery page. Future write-command docs remain tied to their
+  Code Rounds.
 
 ## Open Questions
 

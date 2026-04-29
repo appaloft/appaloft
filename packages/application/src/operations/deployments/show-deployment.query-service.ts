@@ -21,6 +21,7 @@ import { type ExecutionContext, toRepositoryContext } from "../../execution-cont
 import {
   type Clock,
   type DeploymentAttemptFailureSummary,
+  type DeploymentAttemptRecoverySummary,
   type DeploymentDetail,
   type DeploymentDetailSectionError,
   type DeploymentDetailSummary,
@@ -33,6 +34,8 @@ import {
   type ServerReadModel,
 } from "../../ports";
 import { tokens } from "../../tokens";
+import { DeploymentRecoveryReadinessQuery } from "./deployment-recovery-readiness.query";
+import { type DeploymentRecoveryReadinessQueryService } from "./deployment-recovery-readiness.query-service";
 import { type ShowDeploymentQuery } from "./show-deployment.query";
 
 function withShowDeploymentDetails(
@@ -119,6 +122,8 @@ export class ShowDeploymentQueryService {
     private readonly resourceReadModel: ResourceReadModel,
     @inject(tokens.serverReadModel)
     private readonly serverReadModel: ServerReadModel,
+    @inject(tokens.deploymentRecoveryReadinessQueryService)
+    private readonly recoveryReadinessQueryService: DeploymentRecoveryReadinessQueryService,
     @inject(tokens.clock)
     private readonly clock: Clock,
   ) {}
@@ -215,6 +220,34 @@ export class ShowDeploymentQueryService {
       const latestFailure = query.includeLatestFailure
         ? latestFailureFromLogs(deployment)
         : undefined;
+      let recoverySummary: DeploymentAttemptRecoverySummary | undefined;
+
+      if (query.includeRecoverySummary) {
+        const readinessResult = await this.recoveryReadinessQueryService.execute(
+          context,
+          DeploymentRecoveryReadinessQuery.create({
+            deploymentId: deployment.id,
+            resourceId: deployment.resourceId,
+            includeCandidates: false,
+          })._unsafeUnwrap(),
+        );
+
+        if (readinessResult.isOk()) {
+          const readiness = readinessResult._unsafeUnwrap();
+          recoverySummary = {
+            source: "deployments.recovery-readiness",
+            retryable: readiness.retryable,
+            redeployable: readiness.redeployable,
+            rollbackReady: readiness.rollbackReady,
+            rollbackCandidateCount: readiness.rollbackCandidateCount,
+            blockedReasonCodes: [
+              ...readiness.retry.reasons,
+              ...readiness.redeploy.reasons,
+              ...readiness.rollback.reasons,
+            ].map((reason) => reason.code),
+          };
+        }
+      }
 
       return ok({
         schemaVersion: "deployments.show/v1",
@@ -248,6 +281,7 @@ export class ShowDeploymentQueryService {
             }
           : {}),
         ...(latestFailure ? { latestFailure } : {}),
+        ...(recoverySummary ? { recoverySummary } : {}),
         nextActions: ["logs", "resource-detail", "resource-health", "diagnostic-summary"],
         sectionErrors,
         generatedAt: this.clock.now(),

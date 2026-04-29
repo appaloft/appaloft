@@ -20,6 +20,7 @@ export class ShowDeploymentQuery extends Query<DeploymentDetail> {
     public readonly includeSnapshot: boolean,
     public readonly includeRelatedContext: boolean,
     public readonly includeLatestFailure: boolean,
+    public readonly includeRecoverySummary: boolean,
   ) {
     super();
   }
@@ -33,6 +34,7 @@ export class ShowDeploymentQuery extends Query<DeploymentDetail> {
           parsed.includeSnapshot,
           parsed.includeRelatedContext,
           parsed.includeLatestFailure,
+          parsed.includeRecoverySummary,
         ),
     );
   }

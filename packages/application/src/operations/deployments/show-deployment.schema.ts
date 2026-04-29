@@ -17,6 +17,7 @@ export const showDeploymentQueryInputSchema = z.object({
   includeSnapshot: booleanInput(true),
   includeRelatedContext: booleanInput(true),
   includeLatestFailure: booleanInput(true),
+  includeRecoverySummary: booleanInput(false),
 });
 
 export type ShowDeploymentQueryInput = z.input<typeof showDeploymentQueryInputSchema>;
