@@ -255,6 +255,26 @@ selected planner, image/Compose artifact intent, generated Dockerfile or Compose
 port, verification steps, and typed Docker command rendering. It must not execute framework CLIs
 during source detection.
 
+Opt-in real fixture smoke is the next confidence layer above headless evidence. It must run only
+when the operator explicitly enables Docker or SSH mutation, and it must start from the same
+resource source/runtime/network profile draft as Quick Deploy before dispatching ids-only
+deployment admission or an equivalent shell workflow. A passing real smoke must prove actual image
+build, container start, internal HTTP verification, runtime metadata/log visibility, and typed
+Docker command rendering for a representative fixture slice. The first representative local Docker
+slice covers:
+
+- static/frontend: Vite or Next static export plus one non-Vite static/frontend fixture such as
+  Angular SPA or SvelteKit static;
+- Node/server: Next SSR or Remix plus one Node HTTP framework fixture such as Express, Fastify,
+  NestJS, Hono, or Koa;
+- Python/server: FastAPI plus Django or Flask. If FastAPI cannot be executed in the current Docker
+  environment because dependency installation is unavailable, the first local slice may use Django
+  plus Flask only when the FastAPI failure is recorded as a migration gap with the exact dependency
+  or fixture-build cause.
+
+SSH smoke may reuse the same fixture/profile harness behind a generic-SSH backend, but absence of a
+real SSH target must be recorded as a migration gap rather than skipped as a pass.
+
 Fixture smoke coverage must be table-driven by fixture descriptors and planner descriptors. Adding
 a new framework should mean adding detection/planner data and a fixture expectation, not adding a
 new public command, framework-specific deployment input field, or transport-only branch.

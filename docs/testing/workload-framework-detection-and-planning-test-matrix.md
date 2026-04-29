@@ -69,7 +69,7 @@ test expectations in the same change.
 
 | Fixture | Matrix rows | Fixed framework/tool versions | Expected detector result | Planner expectation |
 | --- | --- | --- | --- | --- |
-| `next-ssr` | `WF-PLAN-CAT-001` | `next 15.2.4`, `react 19.0.0`, `react-dom 19.0.0`, `pnpm` marker | `node`, `nextjs`, `pnpm`, `ssr`, App Router evidence | `nextjs`, workspace image, `next build`, `next start`, Next router/output metadata |
+| `next-ssr` | `WF-PLAN-CAT-001` | `next 15.2.4`, `react 19.0.0`, `react-dom 19.0.0`, `typescript 5.8.2`, `pnpm` marker | `node`, `nextjs`, `pnpm`, `ssr`, App Router evidence | `nextjs`, workspace image, `next build`, `next start`, Next router/output metadata |
 | `next-standalone` | `WF-PLAN-CAT-001` | `next 15.2.4`, `react 19.0.0`, `react-dom 19.0.0`, `pnpm` marker, `output: "standalone"` | `node`, `nextjs`, `pnpm`, `ssr`, standalone output evidence, Pages Router evidence | `nextjs`, workspace image, `next build`, `node .next/standalone/server.js`, Next router/output metadata |
 | `next-static-export` | `WF-PLAN-CAT-002` | `next 15.2.4`, `react 19.0.0`, `react-dom 19.0.0`, `pnpm` marker | `node`, `nextjs`, `pnpm`, `static` from `output: "export"`, Pages Router evidence | `nextjs-static`, static image, publish `/out`, Next router/output metadata |
 | `vite-spa` | `WF-PLAN-CAT-007` | `vite 5.4.11`, `bun` marker | `node`, `vite`, `bun`, `static` | `vite-static`, static image, publish `/dist` |
@@ -152,10 +152,12 @@ asserts the equivalent Dockerfile/build/run/verification evidence without execut
 
 | Test ID | Preferred automation | Fixture family | Case | Expected result |
 | --- | --- | --- | --- | --- |
-| WF-PLAN-SMOKE-001 | integration, opt-in Docker e2e | Static frontend | Next static export, Vite, React, Vue, Svelte, Solid, Angular, Nuxt generate, Astro static, and SvelteKit static fixtures start from source/runtime/network resource profile fields | Planner selects a static image artifact, generated Dockerfile packages the publish directory into the adapter-owned static server, internal port is 80 unless the resource profile overrides it, and typed Docker build/run commands are renderable from the plan. |
-| WF-PLAN-SMOKE-002 | integration, opt-in Docker e2e | Node HTTP and SSR server | Next SSR/standalone, Remix, Express, Fastify, NestJS, Hono, Koa, and generic Node fixtures start from the same profile vocabulary | Planner selects a workspace-command image artifact with Node/Bun base policy, install/build/start commands, resource-owned internal port, internal HTTP verification, and no deployment-owned framework fields. |
-| WF-PLAN-SMOKE-003 | integration, opt-in Docker e2e | Python HTTP server | FastAPI, Django, Flask, and generic Python fixtures when present start from the same profile vocabulary | Planner selects a workspace-command image artifact with Python base policy, package-manager install/start command, resource-owned internal port, internal HTTP verification, and no deployment-owned framework fields. |
+| WF-PLAN-SMOKE-001 | integration, opt-in Docker e2e | Static frontend | Next static export, Vite, React, Vue, Svelte, Solid, Angular, Nuxt generate, Astro static, and SvelteKit static fixtures start from source/runtime/network resource profile fields | Planner selects a static image artifact, generated Dockerfile packages the publish directory into the adapter-owned static server, internal port is 80 unless the resource profile overrides it, and typed Docker build/run commands are renderable from the plan. Representative opt-in real Docker coverage is tracked by `WF-PLAN-SMOKE-005`; full real Docker/SSH coverage for every static catalog fixture remains a migration gap. |
+| WF-PLAN-SMOKE-002 | integration, opt-in Docker e2e | Node HTTP and SSR server | Next SSR/standalone, Remix, Express, Fastify, NestJS, Hono, Koa, and generic Node fixtures start from the same profile vocabulary | Planner selects a workspace-command image artifact with Node/Bun base policy, install/build/start commands, resource-owned internal port, internal HTTP verification, and no deployment-owned framework fields. Representative opt-in real Docker coverage is tracked by `WF-PLAN-SMOKE-005`; full real Docker/SSH coverage for every Node catalog fixture remains a migration gap. |
+| WF-PLAN-SMOKE-003 | integration, opt-in Docker e2e | Python HTTP server | FastAPI, Django, Flask, and generic Python fixtures when present start from the same profile vocabulary | Planner selects a workspace-command image artifact with Python base policy, package-manager install/start command, resource-owned internal port, internal HTTP verification, and no deployment-owned framework fields. Representative opt-in real Docker coverage is tracked by `WF-PLAN-SMOKE-005`; full real Docker/SSH coverage for every Python catalog fixture remains a migration gap. |
 | WF-PLAN-SMOKE-004 | integration | Unsupported or ambiguous fixture boundary | Unsupported framework evidence or ambiguous hybrid evidence lacks explicit fallback commands | Planning fails with `validation_error` in phase `runtime-plan-resolution`; explicit fallback commands may instead produce a Docker/OCI image plan without adding deployment command fields. |
+| WF-PLAN-SMOKE-005 | opt-in local Docker e2e | Representative real local Docker fixture slice | Vite or Next static export plus Angular SPA, React SPA, or SvelteKit static; Next SSR or Remix plus one Node HTTP framework; FastAPI plus Django or Flask when dependency installation is available, otherwise Django plus Flask with the FastAPI dependency gap recorded | The same resource source/runtime/network profile draft used by Quick Deploy is persisted before ids-only `deployments.create` or equivalent shell workflow; Docker really builds an image, starts a container, resolves the published internal HTTP verification URL, records runtime metadata/logs, and exposes typed Docker build/run command evidence without framework/base-image/buildpack deployment fields. |
+| WF-PLAN-SMOKE-006 | opt-in SSH e2e or contract with migration gap | Representative generic-SSH fixture slice | The same representative fixture descriptors used by `WF-PLAN-SMOKE-005`, executed through generic-SSH when a real target is configured | The harness selects the generic-SSH backend from the same resource profile and proves remote Docker build/run/verification when enabled. Without a configured SSH target, contract coverage may prove backend selection, but real SSH fixture execution remains an explicit migration gap. |
 
 ## Entry Parity Matrix
 
@@ -208,6 +210,21 @@ image artifact intent, docker-container execution, internal HTTP verification, a
 command rendering without adding framework-specific deployment fields. Full real Docker/SSH
 execution for every catalog fixture remains a migration gap until opt-in environment coverage is
 broadened.
+
+`WF-PLAN-SMOKE-005` is the first opt-in real Docker slice and is intentionally narrower than the
+full catalog. It proves a representative static/frontend, Node/server, and Python/server set can
+actually build, run, and verify through the local Docker path. `WF-PLAN-SMOKE-006` keeps SSH on the
+same profile/harness contract; real SSH execution remains a migration gap unless an opt-in target is
+configured.
+
+Current `WF-PLAN-SMOKE-005` local Docker coverage runs Vite SPA, React SPA, Next SSR, Hono,
+Django, and Flask through real image build, container run, internal HTTP verification, deployment
+detail runtime metadata, resource detail state, generated Dockerfile assertions, and Docker
+build/run log evidence. FastAPI remains a real-smoke migration gap in the current local Docker
+environment because pip could not resolve the required transitive `pydantic` dependency while
+building the fixture image. Angular SPA and SvelteKit static remain real-smoke fixture-hardening
+gaps because their current catalog fixtures failed before container start during dependency/build
+execution.
 
 Before a framework family can be marked first-class, Code Round must add at least one planner or
 fallback test for its `WF-PLAN-CAT-*` row plus boundary coverage proving base-image policy,

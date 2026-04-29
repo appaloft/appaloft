@@ -499,6 +499,9 @@ Already done:
   JavaScript/TypeScript/Python fixture catalog resource profiles resolve to Docker/OCI image plans,
   generated Dockerfiles, docker-container execution metadata, internal HTTP verification steps, and
   typed Docker build/run commands without adding framework-specific deployment input.
+- [x] Representative opt-in real local Docker fixture smoke proves at least one static/frontend
+  pair, one Node/server pair, and one Python/server pair can build, run, verify, and expose runtime
+  metadata from the same resource profile vocabulary before ids-only deployment admission.
 
 Required:
 
@@ -527,6 +530,9 @@ Exit criteria:
 - [ ] The zero-to-SSH loop works for at least: Next.js, Vite static SPA, Astro static, Nuxt
   generate, SvelteKit static, Remix, FastAPI, Django, Flask, generic Node, generic Python, generic
   Java, Dockerfile, Docker Compose, prebuilt image, and explicit custom commands.
+- [x] Opt-in real Docker framework fixture smoke covers a representative local slice:
+  Vite or Next static export plus Angular, React, or SvelteKit static, Next SSR or Remix plus a
+  Node HTTP framework, and FastAPI plus Django or Flask when dependency installation is available.
 - [ ] Unsupported frameworks fail with structured `validation_error` in `runtime-plan-resolution`
   unless explicit custom commands make a Docker/OCI image plan possible.
 - [x] Web and CLI can collect the same draft fields for source base directory, publish directory,
@@ -821,6 +827,9 @@ mapping, matrix rows, and Web/CLI draft parity are all checked.
   static-server artifacts where Vite evidence is not sufficient.
 - [x] Static/Node/Python fixture smoke: current supported JavaScript/TypeScript/Python catalog
   resource profiles produce Docker/OCI image artifact plans and headless execution evidence.
+- [x] Static/Node/Python real fixture smoke: representative opt-in local Docker slice builds, runs,
+  verifies internal HTTP, and records runtime metadata/logs from the same resource profile
+  vocabulary.
 - [x] Nuxt/SvelteKit/Astro/Remix: Nuxt generate static, SvelteKit adapter-static/static, Astro
   static, and Remix server planner exist.
 - [ ] Nuxt/SvelteKit/Astro/Remix: add SSR/server modes where Docker/OCI start command is
@@ -873,6 +882,8 @@ Recommended next Spec Rounds before broad Code Rounds:
   equivalent Quick Deploy smoke/acceptance rows for the current JavaScript/TypeScript/Python slice.
 - [x] Framework support tier matrix: add fixture-by-fixture Docker/OCI smoke rows and executable
   headless coverage for the current supported JavaScript/TypeScript/Python catalog.
+- [x] Framework support tier matrix: add and run the first representative opt-in real local Docker
+  fixture smoke slice for static/frontend, Node/server, and Python/server fixtures.
 - [ ] Framework support tier matrix: broaden fixture-by-fixture real Docker/SSH deployment smoke
   rows for the full JavaScript/TypeScript/Python catalog.
 - [ ] Deployment observation and recovery: harden `deployments.stream-events` reconnect/gap/CLI
