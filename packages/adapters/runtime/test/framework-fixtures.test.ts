@@ -102,6 +102,21 @@ const plannerFixtures: PlannerFixtureExpectation[] = [
     startCommand: "pnpm start",
   },
   {
+    matrixIds: "WF-PLAN-CAT-001",
+    fixture: "next-standalone",
+    port: 3000,
+    buildStrategy: "workspace-commands",
+    planner: "nextjs",
+    runtimeKind: "nextjs",
+    applicationShape: "ssr",
+    framework: "nextjs",
+    packageManager: "pnpm",
+    baseImage: "node:22-alpine",
+    installCommand: "pnpm install",
+    buildCommand: "pnpm build",
+    startCommand: "node .next/standalone/server.js",
+  },
+  {
     matrixIds: "WF-PLAN-CAT-002",
     fixture: "next-static-export",
     port: 80,
@@ -425,10 +440,14 @@ interface ResourceProfileDeploySmoke {
   };
   expected: {
     planner: string;
-    framework: string;
+    framework?: string;
     buildStrategy: "static-artifact" | "workspace-commands";
     dockerfilePath: "Dockerfile.appaloft" | "Dockerfile.appaloft-static";
     artifactSource: "static-site" | "workspace-commands";
+    publishDirectory?: string;
+    installCommand?: string;
+    buildCommand?: string;
+    startCommand?: string;
   };
 }
 
@@ -458,44 +477,46 @@ function localFixtureProfile(input: {
   };
 }
 
-const resourceProfileDeploySmokes: ResourceProfileDeploySmoke[] = [
-  {
-    matrixIds: "WF-PLAN-SMOKE-001,QUICK-DEPLOY-ENTRY-015",
-    fixture: "vite-spa",
-    resourceProfile: localFixtureProfile({ fixture: "vite-spa", internalPort: 80 }),
-    expected: {
-      planner: "vite-static",
-      framework: "vite",
-      buildStrategy: "static-artifact",
-      dockerfilePath: "Dockerfile.appaloft-static",
-      artifactSource: "static-site",
-    },
+function smokeMatrixIdFor(fixture: PlannerFixtureExpectation): string {
+  if (fixture.buildStrategy === "static-artifact") {
+    return "WF-PLAN-SMOKE-001";
+  }
+
+  if (
+    fixture.runtimeKind === "fastapi" ||
+    fixture.runtimeKind === "django" ||
+    fixture.runtimeKind === "flask"
+  ) {
+    return "WF-PLAN-SMOKE-003";
+  }
+
+  return "WF-PLAN-SMOKE-002";
+}
+
+const resourceProfileDeploySmokes: ResourceProfileDeploySmoke[] = plannerFixtures.map((fixture) => ({
+  matrixIds: `${smokeMatrixIdFor(fixture)},QUICK-DEPLOY-ENTRY-015`,
+  fixture: fixture.fixture,
+  resourceProfile: localFixtureProfile({
+    fixture: fixture.fixture,
+    internalPort: fixture.port,
+    strategy: fixture.buildStrategy === "static-artifact" ? "static" : "auto",
+  }),
+  expected: {
+    planner: fixture.planner,
+    ...(fixture.framework ? { framework: fixture.framework } : {}),
+    buildStrategy: fixture.buildStrategy,
+    dockerfilePath:
+      fixture.buildStrategy === "static-artifact"
+        ? "Dockerfile.appaloft-static"
+        : "Dockerfile.appaloft",
+    artifactSource:
+      fixture.buildStrategy === "static-artifact" ? "static-site" : "workspace-commands",
+    ...(fixture.publishDirectory ? { publishDirectory: fixture.publishDirectory } : {}),
+    ...(fixture.installCommand ? { installCommand: fixture.installCommand } : {}),
+    ...(fixture.buildCommand ? { buildCommand: fixture.buildCommand } : {}),
+    ...(fixture.startCommand ? { startCommand: fixture.startCommand } : {}),
   },
-  {
-    matrixIds: "WF-PLAN-SMOKE-002,QUICK-DEPLOY-ENTRY-015",
-    fixture: "fastify-server",
-    resourceProfile: localFixtureProfile({ fixture: "fastify-server", internalPort: 3000 }),
-    expected: {
-      planner: "node",
-      framework: "fastify",
-      buildStrategy: "workspace-commands",
-      dockerfilePath: "Dockerfile.appaloft",
-      artifactSource: "workspace-commands",
-    },
-  },
-  {
-    matrixIds: "WF-PLAN-SMOKE-003,QUICK-DEPLOY-ENTRY-015",
-    fixture: "fastapi-uv",
-    resourceProfile: localFixtureProfile({ fixture: "fastapi-uv", internalPort: 8000 }),
-    expected: {
-      planner: "fastapi",
-      framework: "fastapi",
-      buildStrategy: "workspace-commands",
-      dockerfilePath: "Dockerfile.appaloft",
-      artifactSource: "workspace-commands",
-    },
-  },
-];
+}));
 
 describe("DefaultRuntimePlanResolver framework fixtures", () => {
   for (const fixture of plannerFixtures) {
@@ -694,7 +715,7 @@ describe("DefaultRuntimePlanResolver framework fixtures", () => {
           intent: "build-image",
           metadata: expect.objectContaining({
             planner: smoke.expected.planner,
-            framework: smoke.expected.framework,
+            ...(smoke.expected.framework ? { framework: smoke.expected.framework } : {}),
           }),
         }),
       );
@@ -717,6 +738,20 @@ describe("DefaultRuntimePlanResolver framework fixtures", () => {
         },
       ]);
       expect(dockerBuild?.dockerfile).toContain("FROM ");
+      if (smoke.expected.publishDirectory) {
+        expect(dockerBuild?.dockerfile).toContain(
+          smoke.expected.publishDirectory.replace(/^\/+/u, ""),
+        );
+      }
+      if (smoke.expected.installCommand) {
+        expect(dockerBuild?.dockerfile).toContain(smoke.expected.installCommand);
+      }
+      if (smoke.expected.buildCommand) {
+        expect(dockerBuild?.dockerfile).toContain(smoke.expected.buildCommand);
+      }
+      if (smoke.expected.startCommand) {
+        expect(dockerBuild?.dockerfile).toContain(smoke.expected.startCommand);
+      }
 
       const buildCommand = renderRuntimeCommandString(
         docker.buildImage({

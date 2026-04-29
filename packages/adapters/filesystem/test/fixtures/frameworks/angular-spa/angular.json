@@ -4,11 +4,15 @@
   "projects": {
     "angular-spa": {
       "projectType": "application",
+      "sourceRoot": "src",
       "architect": {
         "build": {
           "builder": "@angular-devkit/build-angular:application",
           "options": {
-            "outputPath": "dist/angular-spa"
+            "browser": "src/main.ts",
+            "index": "src/index.html",
+            "outputPath": "dist/angular-spa",
+            "tsConfig": "tsconfig.app.json"
           }
         }
       }
