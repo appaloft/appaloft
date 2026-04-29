@@ -10,7 +10,9 @@ searchAliases:
   - "status"
   - "phase"
   - "错误"
-relatedOperations: []
+relatedOperations:
+  - operator-work.list
+  - operator-work.show
 sidebar:
   label: "Errors and statuses"
   order: 4
@@ -30,6 +32,19 @@ Appaloft 错误不能只给一段 message。公共入口应该保留稳定的 `c
 - `remedies`：可以安全展示或自动建议的恢复动作。
 
 Web、CLI、HTTP/API 和未来 MCP 工具都应该按这些字段渲染错误，不能依赖 message 文本来判断错误类型。
+
+<h2 id="operator-work-ledger">Operator work ledger</h2>
+
+当部署、代理引导、证书签发或远端状态维护这类后台工作没有按预期完成时，先查看工作台账，而不是猜测哪个恢复命令应该运行：
+
+```bash title="查看后台工作"
+appaloft work list
+appaloft work show <workId>
+```
+
+工作台账是只读入口。它汇总 attempt kind、status、phase、关联的 resource/server/deployment/certificate id、稳定 error code/category、是否可重试，以及安全的 `nextActions`。`diagnostic` 表示下一步应该先运行诊断；`manual-review` 表示需要人工确认；`retry` 只表示未来恢复命令可以考虑重试，不会在查询时自动执行；`no-action` 表示当前条目不需要用户动作。
+
+这个入口不会 retry、cancel、recover、dead-letter、delete 或 prune。恢复、清理和重试能力会通过独立的显式命令暴露，避免用户在查看状态时意外改变运行时或远端 SSH 状态。
 
 <h2 id="remote-state-lock">SSH remote state lock</h2>
 

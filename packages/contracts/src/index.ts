@@ -1852,6 +1852,71 @@ export const listDeploymentsResponseSchema = z.object({
   items: z.array(deploymentSummarySchema),
 });
 
+export const operatorWorkKindSchema = z.enum([
+  "deployment",
+  "proxy-bootstrap",
+  "certificate",
+  "remote-state",
+  "route-realization",
+  "runtime-maintenance",
+  "system",
+]);
+
+export const operatorWorkStatusSchema = z.enum([
+  "pending",
+  "running",
+  "retry-scheduled",
+  "succeeded",
+  "failed",
+  "canceled",
+  "dead-lettered",
+  "unknown",
+]);
+
+export const operatorWorkNextActionSchema = z.enum([
+  "diagnostic",
+  "retry",
+  "manual-review",
+  "no-action",
+]);
+
+const operatorWorkSafeDetailValueSchema = z.union([z.string(), z.number(), z.boolean(), z.null()]);
+
+export const operatorWorkItemSchema = z.object({
+  id: z.string(),
+  kind: operatorWorkKindSchema,
+  status: operatorWorkStatusSchema,
+  operationKey: z.string(),
+  phase: z.string().optional(),
+  step: z.string().optional(),
+  projectId: z.string().optional(),
+  resourceId: z.string().optional(),
+  deploymentId: z.string().optional(),
+  serverId: z.string().optional(),
+  domainBindingId: z.string().optional(),
+  certificateId: z.string().optional(),
+  startedAt: z.string().optional(),
+  updatedAt: z.string(),
+  finishedAt: z.string().optional(),
+  errorCode: z.string().optional(),
+  errorCategory: z.string().optional(),
+  retriable: z.boolean().optional(),
+  nextActions: z.array(operatorWorkNextActionSchema),
+  safeDetails: z.record(z.string(), operatorWorkSafeDetailValueSchema).optional(),
+});
+
+export const listOperatorWorkResponseSchema = z.object({
+  schemaVersion: z.literal("operator-work.list/v1"),
+  items: z.array(operatorWorkItemSchema),
+  generatedAt: z.string(),
+});
+
+export const showOperatorWorkResponseSchema = z.object({
+  schemaVersion: z.literal("operator-work.show/v1"),
+  item: operatorWorkItemSchema,
+  generatedAt: z.string(),
+});
+
 export const deploymentDetailSummarySchema = deploymentSummarySchema.omit({
   logs: true,
 });
@@ -2571,6 +2636,12 @@ export type DeploymentResourceInput = z.infer<typeof deploymentResourceInputSche
 export type CreateDeploymentInput = z.infer<typeof createDeploymentInputSchema>;
 export type CreateDeploymentResponse = z.infer<typeof createDeploymentResponseSchema>;
 export type ListDeploymentsResponse = z.infer<typeof listDeploymentsResponseSchema>;
+export type OperatorWorkKind = z.infer<typeof operatorWorkKindSchema>;
+export type OperatorWorkStatus = z.infer<typeof operatorWorkStatusSchema>;
+export type OperatorWorkNextAction = z.infer<typeof operatorWorkNextActionSchema>;
+export type OperatorWorkItem = z.infer<typeof operatorWorkItemSchema>;
+export type ListOperatorWorkResponse = z.infer<typeof listOperatorWorkResponseSchema>;
+export type ShowOperatorWorkResponse = z.infer<typeof showOperatorWorkResponseSchema>;
 export type DeploymentDetailSummary = z.infer<typeof deploymentDetailSummarySchema>;
 export type DeploymentRelatedContext = z.infer<typeof deploymentRelatedContextSchema>;
 export type DeploymentDetailSectionError = z.infer<typeof deploymentDetailSectionErrorSchema>;

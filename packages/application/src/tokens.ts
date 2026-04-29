@@ -135,6 +135,7 @@ export const tokens = {
   showDeploymentQueryService: Symbol.for("appaloft.show_deployment_query_service"),
   streamDeploymentEventsQueryService: Symbol.for("appaloft.stream_deployment_events_query_service"),
   logsQueryService: Symbol.for("appaloft.logs_query_service"),
+  operatorWorkQueryService: Symbol.for("appaloft.operator_work_query_service"),
   deploymentContextDefaultsFactory: Symbol.for("appaloft.deployment_context_defaults_factory"),
   deploymentContextResolver: Symbol.for("appaloft.deployment_context_resolver"),
   deploymentContextBootstrapService: Symbol.for("appaloft.deployment_context_bootstrap_service"),

@@ -671,9 +671,9 @@ Required:
 
 - [ ] Add durable outbox/inbox or equivalent process state for long-running workflows.
 - [ ] Add retry, dedupe, and failure visibility for long-running workflows.
-- [ ] Add operator queries for deployment attempts.
-- [ ] Add operator queries for proxy bootstrap attempts.
-- [ ] Add operator queries for certificate attempts.
+- [x] Add operator queries for deployment attempts.
+- [x] Add operator queries for proxy bootstrap attempts.
+- [x] Add operator queries for certificate attempts.
 - [ ] Add operator queries for remote SSH state locks, migrations, backups, and recovery markers.
 - [ ] Add operator queries for source links, route realization attempts, and worker/job status.
 - [x] Add runtime target capacity diagnostics for disk, inode, memory, CPU, Docker image usage,

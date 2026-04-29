@@ -49,7 +49,7 @@ to an explicit application operation.
 
 ## Business Capability Model
 
-The current Appaloft core is organized into seven capability groups:
+The current Appaloft core is organized into eight capability groups:
 
 - Projects
 - Deployment Targets
@@ -57,6 +57,7 @@ The current Appaloft core is organized into seven capability groups:
 - Resources
 - Deployments
 - Routing / Domain Bindings
+- Operator Work
 - System operations
 
 Each group below lists the currently implemented business operations.
@@ -612,6 +613,32 @@ Current boundary:
 Core next operations expected here:
 - explicit plan deployment without execution
 - stream deployment events
+
+## Operator Work
+
+Business meaning:
+- operator work is the read-only visibility surface for long-running or background Appaloft work
+- it aggregates existing read models before a full durable outbox/inbox/job table exists
+- it helps operators decide which diagnostic or manual review path to use
+
+Implemented operations:
+
+| Capability | Kind | Operation Key | Message | Schema | CLI | oRPC / HTTP |
+| --- | --- | --- | --- | --- | --- | --- |
+| List operator work ledger | Query | `operator-work.list` | `ListOperatorWorkQuery` | `ListOperatorWorkQueryInput` | `appaloft work list` | `GET /api/operator-work` |
+| Show operator work item | Query | `operator-work.show` | `ShowOperatorWorkQuery` | `ShowOperatorWorkQueryInput` | `appaloft work show <workId>` | `GET /api/operator-work/{workId}` |
+
+Current boundary:
+- `operator-work.list` and `operator-work.show` are read-only; they do not retry, cancel, mark
+  recovered, dead-letter, prune, or clean up work
+- the first slice aggregates deployment attempts, latest proxy bootstrap state, and latest
+  certificate attempts from existing read models
+- remote-state locks, source links, route realization attempts, runtime maintenance jobs, and
+  worker status remain future extensions when their persisted read models exist
+- next actions are guidance such as diagnostic/manual review/no-action, not hidden mutation
+  affordances
+- work item detail must not expose raw logs, private keys, raw environment values, certificate
+  material, credential-bearing command lines, or provider-native output
 
 ## Routing / Domain Bindings
 

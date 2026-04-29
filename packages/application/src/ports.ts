@@ -2506,6 +2506,75 @@ export interface DeploymentDetail {
   generatedAt: string;
 }
 
+export const operatorWorkKinds = [
+  "deployment",
+  "proxy-bootstrap",
+  "certificate",
+  "remote-state",
+  "route-realization",
+  "runtime-maintenance",
+  "system",
+] as const;
+
+export type OperatorWorkKind = (typeof operatorWorkKinds)[number];
+
+export const operatorWorkStatuses = [
+  "pending",
+  "running",
+  "retry-scheduled",
+  "succeeded",
+  "failed",
+  "canceled",
+  "dead-lettered",
+  "unknown",
+] as const;
+
+export type OperatorWorkStatus = (typeof operatorWorkStatuses)[number];
+
+export const operatorWorkNextActions = [
+  "diagnostic",
+  "retry",
+  "manual-review",
+  "no-action",
+] as const;
+
+export type OperatorWorkNextAction = (typeof operatorWorkNextActions)[number];
+
+export interface OperatorWorkItem {
+  id: string;
+  kind: OperatorWorkKind;
+  status: OperatorWorkStatus;
+  operationKey: string;
+  phase?: string;
+  step?: string;
+  projectId?: string;
+  resourceId?: string;
+  deploymentId?: string;
+  serverId?: string;
+  domainBindingId?: string;
+  certificateId?: string;
+  startedAt?: string;
+  updatedAt: string;
+  finishedAt?: string;
+  errorCode?: string;
+  errorCategory?: string;
+  retriable?: boolean;
+  nextActions: OperatorWorkNextAction[];
+  safeDetails?: Record<string, string | number | boolean | null>;
+}
+
+export interface OperatorWorkList {
+  schemaVersion: "operator-work.list/v1";
+  items: OperatorWorkItem[];
+  generatedAt: string;
+}
+
+export interface OperatorWorkDetail {
+  schemaVersion: "operator-work.show/v1";
+  item: OperatorWorkItem;
+  generatedAt: string;
+}
+
 export type StreamDeploymentEventsResult =
   | {
       mode: "bounded";

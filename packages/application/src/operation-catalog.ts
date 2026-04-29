@@ -27,6 +27,8 @@ import { setEnvironmentVariableCommandInputSchema } from "./operations/environme
 import { showEnvironmentQueryInputSchema } from "./operations/environments/show-environment.query";
 import { unlockEnvironmentCommandInputSchema } from "./operations/environments/unlock-environment.command";
 import { unsetEnvironmentVariableCommandInputSchema } from "./operations/environments/unset-environment-variable.command";
+import { listOperatorWorkQueryInputSchema } from "./operations/operator-work/list-operator-work.query";
+import { showOperatorWorkQueryInputSchema } from "./operations/operator-work/show-operator-work.query";
 import { archiveProjectCommandInputSchema } from "./operations/projects/archive-project.command";
 import { createProjectCommandInputSchema } from "./operations/projects/create-project.command";
 import { listProjectsQueryInputSchema } from "./operations/projects/list-projects.query";
@@ -79,6 +81,7 @@ type OperationDomain =
   | "environments"
   | "resources"
   | "deployments"
+  | "operator-work"
   | "default-access-domain-policies"
   | "domain-bindings"
   | "certificates"
@@ -953,6 +956,34 @@ export const operationCatalog = [
       cli: "appaloft deployments events <deploymentId>",
       orpc: { method: "GET", path: "/api/deployments/{deploymentId}/events" },
       orpcStream: { method: "GET", path: "/api/deployments/{deploymentId}/events/stream" },
+    },
+  },
+  {
+    key: "operator-work.list",
+    kind: "query",
+    domain: "operator-work",
+    messageName: "ListOperatorWorkQuery",
+    handlerName: "ListOperatorWorkQueryHandler",
+    serviceName: "OperatorWorkQueryService",
+    inputSchema: listOperatorWorkQueryInputSchema,
+    serviceToken: tokens.operatorWorkQueryService,
+    transports: {
+      cli: "appaloft work list",
+      orpc: { method: "GET", path: "/api/operator-work" },
+    },
+  },
+  {
+    key: "operator-work.show",
+    kind: "query",
+    domain: "operator-work",
+    messageName: "ShowOperatorWorkQuery",
+    handlerName: "ShowOperatorWorkQueryHandler",
+    serviceName: "OperatorWorkQueryService",
+    inputSchema: showOperatorWorkQueryInputSchema,
+    serviceToken: tokens.operatorWorkQueryService,
+    transports: {
+      cli: "appaloft work show <workId>",
+      orpc: { method: "GET", path: "/api/operator-work/{workId}" },
     },
   },
   {
