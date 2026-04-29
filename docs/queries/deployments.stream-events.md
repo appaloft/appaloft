@@ -38,11 +38,13 @@ This query inherits:
 
 - [ADR-016: Deployment Command Surface Reset](../decisions/ADR-016-deployment-command-surface-reset.md)
 - [ADR-029: Deployment Event Stream And Recovery Boundary](../decisions/ADR-029-deployment-event-stream-and-recovery-boundary.md)
+- [ADR-034: Deployment Recovery Readiness](../decisions/ADR-034-deployment-recovery-readiness.md)
 - [deployments.show Query Spec](./deployments.show.md)
 - [Deployment Detail And Observation Workflow Spec](../workflows/deployment-detail-and-observation.md)
 - [Deployment Event Stream Error Spec](../errors/deployments.stream-events.md)
 - [Deployment Event Stream Test Matrix](../testing/deployments.stream-events-test-matrix.md)
 - [Deployment Event Stream Implementation Plan](../implementation/deployments.stream-events-plan.md)
+- [Deployment Recovery Readiness Spec](../specs/012-deployment-recovery-readiness/spec.md)
 - [deployments.create Command Spec](../commands/deployments.create.md)
 - [Async Lifecycle And Acceptance](../architecture/async-lifecycle-and-acceptance.md)
 - [Error Model](../errors/model.md)
@@ -108,6 +110,9 @@ type DeploymentObservedEvent = {
     | "deployment-succeeded"
     | "deployment-failed"
     | "deployment-progress";
+  triggerKind?: "create" | "retry" | "redeploy" | "rollback";
+  sourceDeploymentId?: string;
+  rollbackCandidateDeploymentId?: string;
   phase?: "detect" | "plan" | "package" | "deploy" | "verify" | "rollback";
   status?: string;
   retriable?: boolean;
@@ -145,6 +150,11 @@ It must not:
   `resources.runtime-logs`;
 - silently invent success/failure facts not backed by durable state or accepted projections;
 - expose retry or rollback actions as event payloads before those commands exist publicly.
+
+When future recovery commands create new deployment attempts, this query may expose recovery intent
+metadata such as `triggerKind`, `sourceDeploymentId`, and `rollbackCandidateDeploymentId` on the new
+attempt's normal lifecycle envelopes. That metadata is observational only. Recovery eligibility is
+still decided by `deployments.recovery-readiness`, not by the client's stream state.
 
 ## Main Flow
 
@@ -223,6 +233,10 @@ Remaining hardening gaps:
 - projection-rebuild-stable cursors beyond the current deployment sequence token;
 - broader executable coverage for CLI follow/cancellation and stream gap/failure envelopes;
 - richer durable lifecycle fact sourcing when outbox/process state becomes first-class.
+
+ADR-034 clarifies that stream reconnect and gap behavior do not determine retry, redeploy, or
+rollback readiness. A gap envelope means observation continuity is incomplete; readiness must read
+durable deployment, snapshot, artifact, retention, and lifecycle state.
 
 ## Open Questions
 

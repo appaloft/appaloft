@@ -603,6 +603,21 @@ Current boundary:
 - cancel, manual deployment health check, redeploy, reattach, and rollback are not public
   operations in the v1 surface. They must be reintroduced only after new source-of-truth specs,
   test matrices, implementation plans, and Web/API/CLI contracts are accepted.
+- Deployment recovery readiness is now an accepted candidate boundary under
+  [ADR-034: Deployment Recovery Readiness](./decisions/ADR-034-deployment-recovery-readiness.md).
+  The future `deployments.recovery-readiness` query is the shared source for retry, redeploy,
+  rollback candidate, and rollback readiness across Web, CLI, HTTP/oRPC, and future MCP/tool
+  surfaces. It is not active until a Code Round adds the operation catalog entry and executable
+  query slice.
+- Future `deployments.retry` creates a new deployment attempt from a failed/interrupted/canceled/
+  superseded attempt's immutable snapshot intent. It does not replay old events and does not mutate
+  the old attempt.
+- Future `deployments.redeploy` creates a new deployment attempt from the current Resource profile,
+  effective configuration, target, and destination at admission time. It is the "deploy current
+  desired state again" operation, not a retry of an old snapshot.
+- Future `deployments.rollback` creates a new rollback deployment attempt from a retained successful
+  candidate's immutable snapshot and Docker/OCI artifact identity. It does not re-plan from the
+  current Resource profile and does not roll back databases, volumes, or external dependencies.
 - Quick Deploy is an entry workflow over explicit operations, not a separate domain command or
   operation-catalog entry. Web QuickDeploy and CLI interactive `appaloft deploy` must create/select
   context through existing commands and queries, then dispatch `deployments.create`. See
@@ -618,7 +633,10 @@ Current boundary:
 
 Core next operations expected here:
 - explicit plan deployment without execution
-- stream deployment events
+- `deployments.recovery-readiness`
+- `deployments.retry`
+- `deployments.redeploy`
+- `deployments.rollback`
 
 ## Operator Work
 

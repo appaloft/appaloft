@@ -46,11 +46,13 @@ This query inherits:
 - [ADR-017: Default Access Domain And Proxy Routing](../decisions/ADR-017-default-access-domain-and-proxy-routing.md)
 - [ADR-021: Docker/OCI Workload Substrate](../decisions/ADR-021-docker-oci-workload-substrate.md)
 - [ADR-023: Runtime Orchestration Target Boundary](../decisions/ADR-023-runtime-orchestration-target-boundary.md)
+- [ADR-034: Deployment Recovery Readiness](../decisions/ADR-034-deployment-recovery-readiness.md)
 - [deployments.create Command Spec](../commands/deployments.create.md)
 - [Deployment Detail And Observation Workflow Spec](../workflows/deployment-detail-and-observation.md)
 - [Deployment Detail Error Spec](../errors/deployments.show.md)
 - [Deployment Detail Test Matrix](../testing/deployments.show-test-matrix.md)
 - [Deployment Detail Implementation Plan](../implementation/deployments.show-plan.md)
+- [Deployment Recovery Readiness Spec](../specs/012-deployment-recovery-readiness/spec.md)
 - [resources.diagnostic-summary Query Spec](./resources.diagnostic-summary.md)
 - [resources.health Query Spec](./resources.health.md)
 - [resources.runtime-logs Query Spec](./resources.runtime-logs.md)
@@ -80,6 +82,7 @@ type ShowDeploymentQueryInput = {
   includeSnapshot?: boolean;
   includeRelatedContext?: boolean;
   includeLatestFailure?: boolean;
+  includeRecoverySummary?: boolean;
 };
 ```
 
@@ -90,6 +93,7 @@ type ShowDeploymentQueryInput = {
 | `includeSnapshot` | Optional | Includes immutable runtime/access/deployment snapshot detail. Defaults to `true` for detail pages. |
 | `includeRelatedContext` | Optional | Includes resource/project/environment/server/destination navigation context. Defaults to `true`. |
 | `includeLatestFailure` | Optional | Includes the latest structured failure/progress summary when available. Defaults to `true`. |
+| `includeRecoverySummary` | Optional | Includes a compact recovery summary only when it is derived from the shared `deployments.recovery-readiness` policy. Defaults to `false` until the readiness query is active. |
 
 The query input must not accept:
 
@@ -110,8 +114,18 @@ type DeploymentDetail = {
   snapshot?: DeploymentAttemptSnapshot;
   timeline?: DeploymentAttemptTimeline;
   latestFailure?: DeploymentAttemptFailureSummary;
+  recoverySummary?: DeploymentAttemptRecoverySummary;
   nextActions: DeploymentAttemptNextAction[];
   generatedAt: string;
+};
+
+type DeploymentAttemptRecoverySummary = {
+  source: "deployments.recovery-readiness";
+  retryable: boolean;
+  redeployable: boolean;
+  rollbackReady: boolean;
+  rollbackCandidateCount: number;
+  blockedReasonCodes: string[];
 };
 ```
 
@@ -129,6 +143,9 @@ Required behavior:
 - `timeline` contains normalized attempt events/progress summaries already available from persisted
   state or safely derived read models. It is not a live stream.
 - `latestFailure` contains the latest structured error/progress failure summary when one exists.
+- `recoverySummary`, when present, is a compact read-only projection of the shared recovery readiness
+  policy. It may show retry/redeploy/rollback readiness and candidate counts, but it must not expose
+  active write actions unless the corresponding operations are active in the operation catalog.
 - `nextActions` may include read-only deep links or companion query affordances such as
   `logs`, `resource-detail`, `resource-health`, or `diagnostic-summary`. It must not invent
   retry/redeploy/rollback commands before those commands are public again.
@@ -194,6 +211,12 @@ path.
 Timeline/watch behavior remains intentionally separate from this query and is governed by accepted
 candidate `deployments.stream-events`. `deployments.logs` remains the separate attempt-log
 operation.
+
+Deployment recovery readiness is now accepted under ADR-034, but not active. Until
+`deployments.recovery-readiness` is implemented, `deployments.show` must keep recovery actions out of
+`nextActions` and may only point users to read-only logs, event timeline, resource health, and
+diagnostic summary. After readiness is active, any compact recovery summary in this query must be
+derived from the same readiness policy and not recomputed independently by the detail query.
 
 ## Open Questions
 
