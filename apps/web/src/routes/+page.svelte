@@ -78,28 +78,27 @@
   {:else}
     <div class="space-y-8">
       {#if hasNoDeploymentBase}
-        <section class="grid gap-8 border-y py-6 lg:grid-cols-[0.9fr_1.1fr]">
-            <div class="space-y-5">
-              <Badge class="w-fit" variant="outline">{$t(i18nKeys.console.home.targetNeeded)}</Badge>
-              <div class="max-w-2xl space-y-3">
-                <h1 class="text-2xl font-semibold md:text-3xl">{$t(i18nKeys.console.home.deploymentBaseTitle)}</h1>
+        <section class="console-panel overflow-hidden">
+          <div class="grid gap-0 lg:grid-cols-[minmax(0,1fr)_24rem]">
+            <div class="space-y-4 p-5">
+              <Badge class="console-page-kicker" variant="outline">{$t(i18nKeys.console.home.targetNeeded)}</Badge>
+              <div class="max-w-3xl space-y-2">
+                <h1 class="text-2xl font-semibold">{$t(i18nKeys.console.home.deploymentBaseTitle)}</h1>
                 <p class="text-sm leading-6 text-muted-foreground">
                   {$t(i18nKeys.console.home.deploymentBaseBody)}
                 </p>
               </div>
+              <Button href="/deploy" class="w-fit">
+                <Rocket class="size-4" />
+                {$t(i18nKeys.common.actions.newDeployment)}
+              </Button>
             </div>
-            <div class="space-y-5 lg:border-l lg:pl-8">
-              <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                <div class="space-y-1">
-                  <p class="text-sm font-medium">{$t(i18nKeys.common.actions.newDeployment)}</p>
-                  <p class="text-xs text-muted-foreground">detect -> plan -> execute -> verify -> rollback</p>
-                </div>
-                <Button href="/deploy" size="lg" class="w-fit">
-                  <Rocket class="size-4" />
-                  {$t(i18nKeys.common.actions.newDeployment)}
-                </Button>
+            <div class="border-t bg-muted/20 p-5 lg:border-l lg:border-t-0">
+              <div class="mb-3 space-y-1">
+                <p class="text-sm font-medium">{$t(i18nKeys.common.actions.newDeployment)}</p>
+                <p class="font-mono text-xs text-muted-foreground">detect -> plan -> execute -> verify -> rollback</p>
               </div>
-              <div class="grid gap-3">
+              <div class="grid gap-2">
                 {#each [
                   $t(i18nKeys.console.home.deploymentFlowSource),
                   $t(i18nKeys.console.home.deploymentFlowCreateProject),
@@ -107,8 +106,8 @@
                   $t(i18nKeys.console.home.deploymentFlowCreateEnvironment),
                   $t(i18nKeys.console.home.deploymentFlowDeploymentRecord),
                 ] as step, index (step)}
-                  <div class={index === 0 ? "flex items-center gap-3 bg-primary/[0.05] px-4 py-3" : "flex items-center gap-3 bg-muted/30 px-4 py-3"}>
-                    <span class={index === 0 ? "flex size-7 items-center justify-center rounded-md bg-primary text-xs font-medium text-primary-foreground" : "flex size-7 items-center justify-center rounded-md bg-muted text-xs font-medium text-muted-foreground"}>
+                  <div class="flex items-center gap-3 rounded-md bg-background px-3 py-2">
+                    <span class={index === 0 ? "flex size-6 items-center justify-center rounded-md bg-primary text-xs font-medium text-primary-foreground" : "flex size-6 items-center justify-center rounded-md bg-muted text-xs font-medium text-muted-foreground"}>
                       {index + 1}
                     </span>
                     <span class="min-w-0 text-sm font-medium">{step}</span>
@@ -116,6 +115,7 @@
                 {/each}
               </div>
             </div>
+          </div>
         </section>
       {:else if hasProjectsWithoutDeployments}
         <section class="flex flex-col gap-4 bg-amber-50/70 px-4 py-5 md:flex-row md:items-center md:justify-between">
@@ -129,8 +129,8 @@
         </section>
       {/if}
 
-      <section class="grid border-y md:grid-cols-4 md:divide-x">
-        <div class="space-y-3 px-0 py-4 md:px-4">
+      <section class="console-metric-strip md:grid-cols-4">
+        <div class="space-y-3">
           <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">{$t(i18nKeys.common.domain.projects)}</p>
           <p class="text-2xl font-semibold">{projects.length}</p>
             <Button href="/projects" variant="ghost" class="px-0">
@@ -138,7 +138,7 @@
               <ArrowRight class="size-4" />
             </Button>
         </div>
-        <div class="space-y-3 border-t px-0 py-4 md:border-t-0 md:px-4">
+        <div class="space-y-3">
           <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">{$t(i18nKeys.common.domain.deployments)}</p>
           <p class="text-2xl font-semibold">{deployments.length}</p>
             <Button href="/deployments" variant="ghost" class="px-0">
@@ -146,14 +146,14 @@
               <ArrowRight class="size-4" />
             </Button>
         </div>
-        <div class="space-y-3 border-t px-0 py-4 md:border-t-0 md:px-4">
+        <div class="space-y-3">
           <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">{$t(i18nKeys.common.domain.servers)}</p>
           <p class="text-2xl font-semibold">{servers.length}</p>
           <p class="text-sm text-muted-foreground">
             {servers.length > 0 ? $t(i18nKeys.console.home.serverAvailableTarget) : $t(i18nKeys.console.home.serverCreatedDuringDeployment)}
           </p>
         </div>
-        <div class="space-y-3 border-t px-0 py-4 md:border-t-0 md:px-4">
+        <div class="space-y-3">
           <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">{$t(i18nKeys.common.domain.environments)}</p>
           <p class="text-2xl font-semibold">{environments.length}</p>
           <p class="text-sm text-muted-foreground">
@@ -169,7 +169,7 @@
             <p class="mt-1 text-sm text-muted-foreground">{$t(i18nKeys.console.home.latestDeploymentDescription)}</p>
           </div>
             {#if latestDeployment}
-              <div class="border-y py-4">
+              <div class="console-panel space-y-4 p-4">
                 <div class="flex items-start justify-between gap-3">
                   <div>
                     <p class="font-medium">{latestDeployment.runtimePlan.source.displayName}</p>
@@ -185,7 +185,7 @@
                 </Button>
               </div>
             {:else}
-              <div class="border-y bg-muted/25 px-4 py-6 text-sm text-muted-foreground">
+              <div class="console-subtle-panel px-4 py-6 text-sm text-muted-foreground">
                 {$t(i18nKeys.console.home.latestDeploymentEmpty)}
               </div>
             {/if}
@@ -197,11 +197,11 @@
             <p class="mt-1 text-sm text-muted-foreground">{$t(i18nKeys.console.home.projectRelationsDescription)}</p>
           </div>
             {#if projects.length > 0}
-              <div class="divide-y border-y">
+              <div class="console-record-list">
               {#each projects.slice(0, 3) as project (project.id)}
                 <a
                   href={projectDetailHref(project.id)}
-                  class="flex items-center justify-between gap-3 py-3 transition-colors hover:bg-muted/35 sm:px-3"
+                  class="console-record-row sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
                 >
                   <span>
                     <span class="block text-sm font-medium">{project.name}</span>
@@ -215,29 +215,29 @@
               {/each}
               </div>
             {:else}
-              <div class="border-y bg-muted/25 px-4 py-6 text-sm text-muted-foreground">
+              <div class="console-subtle-panel px-4 py-6 text-sm text-muted-foreground">
                 {$t(i18nKeys.console.home.projectRelationsEmpty)}
               </div>
             {/if}
         </section>
       </section>
 
-      <section class="grid border-y md:grid-cols-3 md:divide-x">
-        <div class="px-0 py-4 md:px-4">
+      <section class="console-metric-strip md:grid-cols-3">
+        <div>
           <div class="flex items-center gap-2 text-sm font-medium">
             <ShieldCheck class="size-4 text-muted-foreground" />
             {$t(i18nKeys.console.home.readinessCard)}
           </div>
           <p class="mt-3 text-sm text-muted-foreground">{readiness?.status ?? "unknown"}</p>
         </div>
-        <div class="border-t px-0 py-4 md:border-t-0 md:px-4">
+        <div>
           <div class="flex items-center gap-2 text-sm font-medium">
             <Waypoints class="size-4 text-muted-foreground" />
             {$t(i18nKeys.console.home.modeCard)}
           </div>
           <p class="mt-3 text-sm text-muted-foreground">{version?.mode ?? "self-hosted"}</p>
         </div>
-        <div class="border-t px-0 py-4 md:border-t-0 md:px-4">
+        <div>
           <div class="flex items-center gap-2 text-sm font-medium">
             <Server class="size-4 text-muted-foreground" />
             {$t(i18nKeys.console.home.databaseCard)}

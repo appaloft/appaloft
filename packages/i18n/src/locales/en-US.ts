@@ -886,6 +886,9 @@ export const enUS = {
       workflowStepSucceeded: "Done",
     },
     serverForm: {
+      accessSectionDescription:
+        "Choose the authentication source Appaloft will use for this target. Future deployments reuse the result.",
+      accessSectionTitle: "Access credential",
       choosePrivateKeyFile: "Choose private key file",
       connectivityDraftDescription:
         "Temporarily checks SSH and remote Docker with this form data. It does not create a server or save new credentials.",
@@ -894,6 +897,9 @@ export const enUS = {
       connectivityTestPending: "Testing",
       credentialRequired: "Choose SSH agent, a saved credential, or provide a private key first.",
       hostRequired: "Enter a server host first.",
+      identitySectionDescription:
+        "Define the deployment target name, address, port, and provider capability.",
+      identitySectionTitle: "Target identity",
       localSshAgent: "Local SSH agent",
       localSshAgentDescriptionOne:
         "Local SSH agent uses SSH_AUTH_SOCK and loaded keys on the machine running the Appaloft backend.",
@@ -910,6 +916,9 @@ export const enUS = {
       privateKeyFileReadFailed: "Unable to read this private key file.",
       privateKeyFileSelected: "Selected {{fileName}}",
       privateKeySource: "Private key source",
+      readinessSectionDescription:
+        "Probe SSH and remote Docker before deciding whether to save this target.",
+      readinessSectionTitle: "Pre-registration check",
       savedCredential: "Saved credential",
       savedCredentialAvailable: "{{count}} available",
       savedCredentialUnavailable: "None yet",
@@ -936,6 +945,7 @@ export const enUS = {
         "Run a command-style probe: local targets check the local runner, SSH targets check SSH and Docker.",
       connectivityLastResult: "Latest result",
       connectivityNoResult: "No connectivity result yet.",
+      connectivityTab: "Connectivity",
       connectivityTitle: "Connectivity test",
       createCredentialValidationError:
         "Complete the SSH credential choice before creating this server.",
@@ -966,6 +976,8 @@ export const enUS = {
       credentialUsageUnavailableBody:
         "Usage could not be read safely; retry before treating this credential as unused.",
       credentialUsageUnavailableTitle: "Credential usage unavailable",
+      credentialsTab: "Credentials",
+      dangerZoneTab: "Danger Zone",
       description: "Deployment targets, providers, and runtime health checks",
       detailDescription: "Server details, related deployments, and connectivity test",
       deactivatedAt: "Deactivated",
@@ -1053,7 +1065,9 @@ export const enUS = {
       notFoundBody:
         "The current list does not include this server. It may have been removed or not returned by the backend.",
       notFoundTitle: "Server not found.",
+      overviewTab: "Overview",
       pageTitle: "Servers",
+      proxyAccessTab: "Proxy & Access",
       renameFailed: "Unable to rename server",
       renameLabel: "Display name",
       renameSucceeded: "Server name saved",

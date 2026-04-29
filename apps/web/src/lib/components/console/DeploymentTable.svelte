@@ -49,7 +49,7 @@
   }: Props = $props();
 </script>
 
-<div class="border-y">
+<div class="console-record-list">
   <Table.Root>
     <Table.Header>
       <Table.Row class="hover:bg-transparent">
