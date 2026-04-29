@@ -1,0 +1,19 @@
+{
+  "id": "infra_error.remote-state-resolution",
+  "code": "infra_error",
+  "phase": "remote-state-resolution",
+  "responsibility": "operator",
+  "actionability": "run-diagnostic",
+  "operation": "deployments.create",
+  "summary": "SSH remote Appaloft state could not be prepared. If stderr mentions no space, ENOSPC, or write failures, inspect the target capacity before retrying.",
+  "safeDiagnostic": {
+    "command": ["appaloft", "server", "capacity", "inspect", "<serverId>"],
+    "mutatesState": false
+  },
+  "links": [
+    {
+      "rel": "human-doc",
+      "href": "/docs/observe/diagnostics/#runtime-target-capacity-inspect"
+    }
+  ]
+}

@@ -31,6 +31,9 @@ export const cliDocsHrefs = {
   observabilityRuntimeLogs: resolvePublicDocsHelpHref("observability.runtime-logs"),
   observabilityHealthSummary: resolvePublicDocsHelpHref("observability.health-summary"),
   diagnosticsSafeSupportPayload: resolvePublicDocsHelpHref("diagnostics.safe-support-payload"),
+  diagnosticsRuntimeTargetCapacity: resolvePublicDocsHelpHref(
+    "diagnostics.runtime-target-capacity",
+  ),
   remoteStateLock: resolvePublicDocsHelpHref("errors.remote-state-lock"),
 } as const;
 
@@ -101,6 +104,11 @@ export const cliCommandDescriptions = {
   ),
   serverTest: withDocs("Test server connectivity", "server.connectivity-test"),
   serverDoctor: withDocs("Diagnose server SSH and Docker readiness", "server.connectivity-test"),
+  serverCapacity: withDocs("Server capacity diagnostics", "diagnostics.runtime-target-capacity"),
+  serverCapacityInspect: withDocs(
+    "Inspect disk, inode, Docker, and Appaloft runtime capacity without cleanup",
+    "diagnostics.runtime-target-capacity",
+  ),
   serverProxy: withDocs("Server edge proxy operations", "server.proxy-readiness"),
   serverProxyRepair: withDocs(
     "Repair provider-owned edge proxy infrastructure",

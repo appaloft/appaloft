@@ -130,6 +130,7 @@ Implemented operations:
 | Configure deployment target credential | Command | `servers.configure-credential` | `ConfigureServerCredentialCommand` | `ConfigureServerCredentialCommandInput` | `appaloft server credential <serverId>` | `POST /api/servers/{serverId}/credentials` |
 | List deployment targets | Query | `servers.list` | `ListServersQuery` | `ListServersQueryInput` | `appaloft server list` | `GET /api/servers` |
 | Show deployment target | Query | `servers.show` | `ShowServerQuery` | `ShowServerQueryInput` | `appaloft server show <serverId>` | `GET /api/servers/{serverId}` |
+| Inspect deployment target capacity | Query | `servers.capacity.inspect` | `InspectServerCapacityQuery` | `InspectServerCapacityQueryInput` | `appaloft server capacity inspect <serverId>` | `GET /api/servers/{serverId}/capacity` |
 | Rename deployment target | Command | `servers.rename` | `RenameServerCommand` | `RenameServerCommandInput` | `appaloft server rename <serverId> --name <name>` | `POST /api/servers/{serverId}/rename` |
 | Configure deployment target edge proxy | Command | `servers.configure-edge-proxy` | `ConfigureServerEdgeProxyCommand` | `ConfigureServerEdgeProxyCommandInput` | `appaloft server proxy configure <serverId> --kind none\|traefik\|caddy` | `POST /api/servers/{serverId}/edge-proxy/configuration` |
 | Deactivate deployment target | Command | `servers.deactivate` | `DeactivateServerCommand` | `DeactivateServerCommandInput` | `appaloft server deactivate <serverId>` | `POST /api/servers/{serverId}/deactivate` |
@@ -161,6 +162,12 @@ Implemented operations:
   and deployment/resource/domain rollups. It does not test connectivity, repair proxy state, or
   mutate credentials, resources, deployments, domains, routes, terminal sessions, logs, or audit
   state.
+- `servers.capacity.inspect` is a read-only runtime target diagnostic. It may connect to a
+  local-shell or generic-SSH target and return disk, inode, memory, CPU, Docker image/build-cache,
+  Appaloft runtime-root/state/source-workspace usage, safe reclaimable estimates, and warnings. It
+  must not run Docker prune, delete volumes, delete `/var/lib/appaloft/runtime/state`, remove
+  source workspaces, stop containers, repair proxy state, or mutate Appaloft records. Reclaimable
+  values are estimates for later cleanup/prune decisions, not cleanup execution.
 - `servers.rename` changes only the deployment target/server display name. It preserves the server
   id, host, provider, credential, proxy, lifecycle state, and historical references. Active and
   inactive servers may be renamed; deleted servers are not visible to the normal rename entrypoint.

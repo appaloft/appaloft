@@ -7,6 +7,7 @@ import {
   DeactivateServerCommand,
   DeleteServerCommand,
   DeleteSshCredentialCommand,
+  InspectServerCapacityQuery,
   ListServersQuery,
   ListSshCredentialsQuery,
   OpenTerminalSessionCommand,
@@ -312,6 +313,24 @@ const doctorCommand = EffectCommand.make(
     ),
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.serverDoctor));
 
+const capacityInspectCommand = EffectCommand.make(
+  "inspect",
+  {
+    serverId: serverIdArg,
+  },
+  ({ serverId }) =>
+    runQuery(
+      InspectServerCapacityQuery.create({
+        serverId,
+      }),
+    ),
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.serverCapacityInspect));
+
+const capacityCommand = EffectCommand.make("capacity").pipe(
+  EffectCommand.withDescription(cliCommandDescriptions.serverCapacity),
+  EffectCommand.withSubcommands([capacityInspectCommand]),
+);
+
 const proxyRepairCommand = EffectCommand.make(
   "repair",
   {
@@ -384,6 +403,7 @@ export const serverCommand = EffectCommand.make("server").pipe(
     credentialRotateCommand,
     testCommand,
     doctorCommand,
+    capacityCommand,
     terminalCommand,
     proxyCommand,
   ]),

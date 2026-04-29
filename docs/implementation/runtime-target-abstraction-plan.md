@@ -242,7 +242,9 @@ Current code has the initial target backend shape, but it is still running throu
   shared selection mechanism.
 - Runtime target capacity diagnostics and prune contracts are not first-class yet. Current
   single-server Docker/SSH behavior can leave unused images, BuildKit/build cache, and materialized
-  source workspaces behind after preview cleanup or failed rollout.
+  source workspaces behind after preview cleanup or failed rollout. The first capacity slice exposes
+  `servers.capacity.inspect` as a read-only query for local-shell and generic-SSH targets; prune,
+  cleanup automation, and volume/state deletion remain out of scope for that slice.
 
 The current state is acceptable for the single-server v1 loop. It is not yet ready to add
 Kubernetes because deployment admission still needs to use the registry for pre-acceptance support

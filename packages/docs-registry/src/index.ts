@@ -867,6 +867,23 @@ export const publicDocsHelpTopics = {
     relatedOperation: "resources.diagnostic-summary",
     aliases: ["diagnostic", "support payload", "logs", "secret masking", "诊断"],
   },
+  "diagnostics.runtime-target-capacity": {
+    id: "diagnostics.runtime-target-capacity",
+    title: "Runtime target capacity inspect",
+    description: "How to inspect disk, inode, Docker, and Appaloft runtime usage without cleanup.",
+    page: {
+      "zh-CN": "observe/diagnostics",
+      "en-US": "en/observe/diagnostics",
+    },
+    anchor: "runtime-target-capacity-inspect",
+    localeCoverage: {
+      "zh-CN": "complete",
+      "en-US": "complete",
+    },
+    surfaces: ["cli", "http-api", "mcp"],
+    relatedOperation: "servers.capacity.inspect",
+    aliases: ["capacity", "disk full", "build cache", "docker system df", "容量诊断"],
+  },
   "advanced.control-plane": {
     id: "advanced.control-plane",
     title: "Control-plane modes",
@@ -1006,6 +1023,62 @@ export const publicDocsErrorGuides = {
       "docs/testing/deployment-config-file-test-matrix.md",
     ],
   },
+  "infra_error.remote-state-resolution": {
+    id: "infra_error.remote-state-resolution",
+    code: "infra_error",
+    phase: "remote-state-resolution",
+    responsibility: "operator",
+    actionability: "run-diagnostic",
+    operation: "deployments.create",
+    topicId: "diagnostics.runtime-target-capacity",
+    agentGuidePath: ".well-known/appaloft/errors/infra_error.remote-state-resolution.json",
+    remedies: [
+      {
+        kind: "diagnostic",
+        label:
+          "Inspect the SSH target capacity when remote state preparation reports no space or write failures.",
+        safeByDefault: true,
+        command: ["appaloft", "server", "capacity", "inspect"],
+      },
+      {
+        kind: "retry",
+        label: "Retry after freeing target capacity or resizing the target.",
+        safeByDefault: true,
+      },
+    ],
+    specReferences: [
+      "docs/workflows/deployment-config-file-bootstrap.md",
+      "docs/testing/deployment-config-file-test-matrix.md",
+      "docs/workflows/deployment-runtime-target-abstraction.md",
+    ],
+  },
+  runtime_target_resource_exhausted: {
+    id: "runtime_target_resource_exhausted",
+    code: "runtime_target_resource_exhausted",
+    responsibility: "operator",
+    actionability: "run-diagnostic",
+    operation: "deployments.create",
+    topicId: "diagnostics.runtime-target-capacity",
+    agentGuidePath: ".well-known/appaloft/errors/runtime_target_resource_exhausted.json",
+    remedies: [
+      {
+        kind: "diagnostic",
+        label: "Inspect target disk, inode, Docker image, build-cache, and Appaloft runtime usage.",
+        safeByDefault: true,
+        command: ["appaloft", "server", "capacity", "inspect"],
+      },
+      {
+        kind: "none",
+        label: "Do not prune Docker volumes or Appaloft state roots from this diagnostic.",
+        safeByDefault: true,
+      },
+    ],
+    specReferences: [
+      "docs/workflows/deployment-runtime-target-abstraction.md",
+      "docs/implementation/runtime-target-abstraction-plan.md",
+      "docs/testing/deployment-config-file-test-matrix.md",
+    ],
+  },
 } as const satisfies Record<string, Omit<PublicDocsErrorGuide, "id"> & { readonly id: string }>;
 
 export type PublicDocsErrorGuideId = keyof typeof publicDocsErrorGuides;
@@ -1127,6 +1200,11 @@ export const publicDocsOperationCoverage = [
   },
   { operationKey: "servers.list", status: "documented", topicId: "server.deployment-target" },
   { operationKey: "servers.show", status: "documented", topicId: "server.deployment-target" },
+  {
+    operationKey: "servers.capacity.inspect",
+    status: "documented",
+    topicId: "diagnostics.runtime-target-capacity",
+  },
   { operationKey: "servers.rename", status: "documented", topicId: "server.deployment-target" },
   {
     operationKey: "servers.configure-edge-proxy",

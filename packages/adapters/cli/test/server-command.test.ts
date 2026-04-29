@@ -85,6 +85,105 @@ describe("CLI server commands", () => {
     });
   });
 
+  test("[RUNTIME-CAPACITY-INSPECT-001] server capacity inspect dispatches the application query", async () => {
+    ensureReflectMetadata();
+    const { InspectServerCapacityQuery, createExecutionContext } = await import(
+      "@appaloft/application"
+    );
+    const { createCliProgram } = await import("../src");
+    const queries: AppQuery<unknown>[] = [];
+    const commandBus = {
+      execute: async <T>(_context: unknown, _command: AppCommand<T>) => ok({} as T),
+    } as unknown as CommandBus;
+    const queryBus = {
+      execute: async <T>(_context: unknown, query: AppQuery<T>) => {
+        queries.push(query as AppQuery<unknown>);
+        return ok({
+          schemaVersion: "servers.capacity.inspect/v1",
+          server: {
+            id: "srv_primary",
+            name: "Primary",
+            host: "203.0.113.10",
+            port: 22,
+            providerKey: "generic-ssh",
+            targetKind: "single-server",
+          },
+          inspectedAt: "2026-01-01T00:00:00.000Z",
+          disk: [],
+          inodes: [],
+          docker: {
+            imagesSize: 0,
+            reclaimableImagesSize: 0,
+            buildCacheSize: 0,
+            reclaimableBuildCacheSize: 0,
+            containersSize: 0,
+            volumesSize: 0,
+          },
+          memory: { total: null, available: null, used: null, usePercent: null },
+          cpu: {
+            logicalCores: null,
+            loadAverage1m: null,
+            loadAverage5m: null,
+            loadAverage15m: null,
+          },
+          appaloftRuntime: {
+            runtimeRoot: { path: "/var/lib/appaloft/runtime", size: null, detectable: false },
+            stateRoot: { path: "/var/lib/appaloft/runtime/state", size: null, detectable: false },
+            sourceWorkspace: {
+              path: "/var/lib/appaloft/runtime/ssh-deployments",
+              size: null,
+              detectable: false,
+            },
+          },
+          safeReclaimableEstimate: {
+            stoppedContainersSize: 0,
+            danglingImagesSize: 0,
+            oldBuildCacheSize: 0,
+            oldPreviewWorkspaceCandidatesSize: 0,
+            total: 0,
+          },
+          warnings: [],
+          partial: false,
+        } as T);
+      },
+    } as unknown as QueryBus;
+    const executionContextFactory: ExecutionContextFactory = {
+      create: (input) =>
+        createExecutionContext({
+          ...input,
+          requestId: "req_cli_server_capacity_inspect_test",
+        }),
+    };
+    const program = createCliProgram({
+      version: "0.1.0-test",
+      startServer: async () => {},
+      commandBus,
+      queryBus,
+      executionContextFactory,
+    });
+
+    const writeStdout = process.stdout.write;
+    try {
+      process.stdout.write = (() => true) as typeof process.stdout.write;
+      await program.parseAsync([
+        "node",
+        "appaloft",
+        "server",
+        "capacity",
+        "inspect",
+        "srv_primary",
+      ]);
+    } finally {
+      process.stdout.write = writeStdout;
+    }
+
+    expect(queries).toHaveLength(1);
+    expect(queries[0]).toBeInstanceOf(InspectServerCapacityQuery);
+    expect(queries[0]).toMatchObject({
+      serverId: "srv_primary",
+    });
+  });
+
   test("[SRV-LIFE-ENTRY-005] server deactivate dispatches the application command", async () => {
     ensureReflectMetadata();
     const { DeactivateServerCommand, createExecutionContext } = await import(

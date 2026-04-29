@@ -90,6 +90,12 @@ export { RuntimeServerConnectivityChecker } from "./server-connectivity";
 export { RuntimeDeploymentHealthChecker } from "./deployment-health";
 export { RuntimeResourceHealthProbeRunner } from "./resource-health-probes";
 export { RuntimeResourceRuntimeLogReader } from "./resource-runtime-logs";
+export {
+  parseDockerSizeToBytes,
+  parseRuntimeTargetCapacityOutput,
+  renderRuntimeTargetCapacityScript,
+  RuntimeTargetCapacityInspectorAdapter,
+} from "./runtime-target-capacity";
 export { RuntimeTerminalSessionGateway } from "./terminal-sessions";
 export { SshExecutionBackend } from "./ssh-execution";
 export * from "./runtime-commands";
@@ -1215,6 +1221,7 @@ const singleServerDockerCapabilities: RuntimeTargetCapability[] = [
   "runtime.logs",
   "runtime.health",
   "runtime.cleanup",
+  "runtime.capacity",
   "proxy.route",
 ];
 

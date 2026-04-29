@@ -57,6 +57,7 @@ import { createSshCredentialCommandInputSchema } from "./operations/servers/crea
 import { deactivateServerCommandInputSchema } from "./operations/servers/deactivate-server.command";
 import { deleteServerCommandInputSchema } from "./operations/servers/delete-server.command";
 import { deleteSshCredentialCommandInputSchema } from "./operations/servers/delete-ssh-credential.command";
+import { inspectServerCapacityQueryInputSchema } from "./operations/servers/inspect-server-capacity.query";
 import { listServersQueryInputSchema } from "./operations/servers/list-servers.query";
 import { listSshCredentialsQueryInputSchema } from "./operations/servers/list-ssh-credentials.query";
 import { registerServerCommandInputSchema } from "./operations/servers/register-server.command";
@@ -304,6 +305,20 @@ export const operationCatalog = [
     transports: {
       cli: "appaloft server show <serverId>",
       orpc: { method: "GET", path: "/api/servers/{serverId}" },
+    },
+  },
+  {
+    key: "servers.capacity.inspect",
+    kind: "query",
+    domain: "servers",
+    messageName: "InspectServerCapacityQuery",
+    handlerName: "InspectServerCapacityQueryHandler",
+    serviceName: "InspectServerCapacityQueryService",
+    inputSchema: inspectServerCapacityQueryInputSchema,
+    serviceToken: tokens.inspectServerCapacityQueryService,
+    transports: {
+      cli: "appaloft server capacity inspect <serverId>",
+      orpc: { method: "GET", path: "/api/servers/{serverId}/capacity" },
     },
   },
   {

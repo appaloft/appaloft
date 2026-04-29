@@ -132,6 +132,14 @@ function redactSecrets(input: string, secrets: readonly string[] = []): string {
   );
 }
 
+function isRuntimeTargetCapacityFailure(logs: readonly DeploymentLogEntry[]): boolean {
+  return logs.some((log) =>
+    /\b(no space left on device|enospc|disk quota exceeded|not enough space)\b/i.test(
+      log.message,
+    ),
+  );
+}
+
 function normalizeWorkingDirectory(locator: string): string {
   const resolved = resolve(locator);
   if (existsSync(resolved)) {
@@ -622,6 +630,7 @@ export class SshExecutionBackend implements ExecutionBackend {
       metadata?: Record<string, string>;
     },
   ): Deployment {
+    const capacityFailure = isRuntimeTargetCapacityFailure(input.logs);
     deployment.applyExecutionResult(
       FinishedAt.rehydrate(new Date().toISOString()),
       ExecutionResult.rehydrate({
@@ -629,8 +638,22 @@ export class SshExecutionBackend implements ExecutionBackend {
         status: ExecutionStatusValue.rehydrate("failed"),
         logs: input.logs,
         retryable: input.retryable ?? false,
-        errorCode: ErrorCodeText.rehydrate(input.errorCode),
-        ...(input.metadata ? { metadata: input.metadata } : {}),
+        errorCode: ErrorCodeText.rehydrate(
+          capacityFailure ? "runtime_target_resource_exhausted" : input.errorCode,
+        ),
+        ...(input.metadata || capacityFailure
+          ? {
+              metadata: {
+                ...(input.metadata ?? {}),
+                ...(capacityFailure
+                  ? {
+                      capacityResource: "disk",
+                      capacityInspectCommand: `appaloft server capacity inspect ${deployment.toState().serverId.value}`,
+                    }
+                  : {}),
+              },
+            }
+          : {}),
       }),
     );
     return deployment;

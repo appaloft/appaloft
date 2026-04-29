@@ -12,6 +12,7 @@ searchAliases:
   - "诊断"
 relatedOperations:
   - resources.diagnostic-summary
+  - servers.capacity.inspect
 sidebar:
   label: "Diagnostics"
   order: 4
@@ -31,6 +32,20 @@ sidebar:
 - 服务器和代理 readiness 摘要。
 - 访问地址、域名和证书状态。
 - 已屏蔽的 secret key 名和是否存在，不包含值。
+
+<h2 id="runtime-target-capacity-inspect">Runtime target capacity inspect</h2>
+
+当部署因为磁盘、inode、Docker image store 或 build cache 压力失败时，先运行只读容量诊断：
+
+```bash title="只读检查服务器容量"
+appaloft server capacity inspect srv_primary
+```
+
+这个入口只读取容量信号，不会运行 prune，不会删除 Docker volume，不会删除
+`/var/lib/appaloft/runtime/state`，也不会停止容器。输出会包含 disk、inodes、Docker image/build-cache
+usage、Appaloft runtime/state/source workspace usage、safe reclaimable estimate 和 warnings。
+
+`safeReclaimableEstimate` 是后续 cleanup/prune 决策的估算输入，不代表 Appaloft 已经执行清理。
 
 <h2 id="diagnostic-secret-masking">Secret 屏蔽</h2>
 

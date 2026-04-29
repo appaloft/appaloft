@@ -16,6 +16,7 @@ import {
   RuntimeResourceRuntimeLogReader,
   RuntimeServerConnectivityChecker,
   RuntimeServerEdgeProxyBootstrapper,
+  RuntimeTargetCapacityInspectorAdapter,
   RuntimeTerminalSessionGateway,
   SshExecutionBackend,
 } from "@appaloft/adapter-runtime";
@@ -668,6 +669,15 @@ export function registerRuntimeDependencies(
       (dependencyContainer) =>
         new RuntimeServerConnectivityChecker(
           dependencyContainer.resolve(tokens.edgeProxyProviderRegistry),
+        ),
+    ),
+  });
+  container.register(tokens.runtimeTargetCapacityInspector, {
+    useFactory: instanceCachingFactory(
+      () =>
+        new RuntimeTargetCapacityInspectorAdapter(
+          join(input.config.dataDir, "runtime"),
+          input.config.remoteRuntimeRoot,
         ),
     ),
   });

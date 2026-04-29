@@ -174,6 +174,11 @@ Runtime artifact retention is target-owned and rollout-aware:
 
 Operator-facing surfaces should expose this without making deployment admission target-specific:
 
+- `servers.capacity.inspect` is the first public read-only target capacity query. For the active
+  single-server Docker/Compose backend it returns disk, inode, memory, CPU, Docker image usage,
+  build-cache usage, Appaloft runtime-root/state/source-workspace usage, safe reclaimable
+  estimates, and warnings. It is diagnostic-only and must not prune, delete, stop, repair, or
+  mutate target or Appaloft state.
 - `resources.diagnostic-summary` should include capacity context when a deployment or cleanup
   failure links to target capacity;
 - `resources.health` may degrade or report unknown when capacity blocks runtime observation;
