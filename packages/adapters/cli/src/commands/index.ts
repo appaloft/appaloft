@@ -9,6 +9,7 @@ import { envCommand } from "./environment.js";
 import { pluginsCommand, providersCommand } from "./integrations.js";
 import { doctorCommand, initCommand, serveCommand, versionCommand } from "./lifecycle.js";
 import { projectCommand } from "./project.js";
+import { remoteStateCommand } from "./remote-state.js";
 import { resourceCommand } from "./resource.js";
 import { serverCommand } from "./server.js";
 import { sourceLinksCommand } from "./source-link.js";
@@ -33,6 +34,7 @@ export const mainCommand = EffectCommand.make("appaloft").pipe(
     logsCommand,
     envCommand,
     sourceLinksCommand,
+    remoteStateCommand,
     pluginsCommand,
     providersCommand,
   ]),

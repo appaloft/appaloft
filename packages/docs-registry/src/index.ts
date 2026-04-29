@@ -1,3 +1,10 @@
+import {
+  type ErrorKnowledge,
+  type ErrorKnowledgeActionability,
+  type ErrorKnowledgeResponsibility,
+  errorKnowledgeKey,
+} from "@appaloft/core";
+
 export const publicDocsBasePath = "/docs";
 
 export const publicDocsLocales = ["zh-CN", "en-US"] as const;
@@ -31,6 +38,58 @@ export interface PublicDocsHelpTopic {
 }
 
 export const publicDocsHelpTopics = {
+  "errors.knowledge-contract": {
+    id: "errors.knowledge-contract",
+    title: "Error knowledge contract",
+    description:
+      "How Appaloft errors connect stable machine fields, human documentation, and agent-readable recovery guidance.",
+    page: {
+      "zh-CN": "reference/errors-statuses",
+      "en-US": "en/reference/errors-statuses",
+    },
+    anchor: "error-knowledge-contract",
+    localeCoverage: {
+      "zh-CN": "complete",
+      "en-US": "complete",
+    },
+    surfaces: ["web", "cli", "http-api", "mcp"],
+    aliases: ["error knowledge", "structured errors", "llm guide", "错误知识", "错误契约"],
+    specReferences: [
+      "docs/decisions/ADR-033-error-knowledge-contract.md",
+      "docs/errors/model.md",
+      "docs/testing/error-knowledge-contract-test-matrix.md",
+    ],
+  },
+  "errors.remote-state-lock": {
+    id: "errors.remote-state-lock",
+    title: "Remote state lock",
+    description:
+      "How to understand and recover SSH remote-state lock errors in pure CLI and GitHub Actions deployments.",
+    page: {
+      "zh-CN": "reference/errors-statuses",
+      "en-US": "en/reference/errors-statuses",
+    },
+    anchor: "remote-state-lock",
+    localeCoverage: {
+      "zh-CN": "complete",
+      "en-US": "complete",
+    },
+    surfaces: ["cli", "repository-config", "mcp"],
+    aliases: [
+      "remote state lock",
+      "ssh-pglite lock",
+      "SSH remote state mutation lock",
+      "remote-state-lock",
+      "远端状态锁",
+      "部署锁",
+    ],
+    specReferences: [
+      "docs/decisions/ADR-024-pure-cli-ssh-state-and-server-applied-domains.md",
+      "docs/decisions/ADR-028-command-coordination-scope-and-mutation-admission.md",
+      "docs/workflows/deployment-config-file-bootstrap.md",
+      "docs/testing/deployment-config-file-test-matrix.md",
+    ],
+  },
   "project.concept": {
     id: "project.concept",
     title: "Project",
@@ -848,6 +907,106 @@ export function resolvePublicDocsHelpHref(
   const page = topic.page[locale].replace(/^\/+|\/+$/g, "");
 
   return `${basePath}/${page}/#${topic.anchor}`;
+}
+
+export interface PublicDocsErrorGuide {
+  readonly id: PublicDocsErrorGuideId;
+  readonly code: string;
+  readonly phase?: string;
+  readonly responsibility: ErrorKnowledgeResponsibility;
+  readonly actionability: ErrorKnowledgeActionability;
+  readonly operation?: string;
+  readonly topicId: PublicDocsHelpTopicId;
+  readonly agentGuidePath: string;
+  readonly remedies: NonNullable<ErrorKnowledge["remedies"]>;
+  readonly specReferences: readonly string[];
+}
+
+export const publicDocsErrorGuides = {
+  "infra_error.remote-state-lock": {
+    id: "infra_error.remote-state-lock",
+    code: "infra_error",
+    phase: "remote-state-lock",
+    responsibility: "operator",
+    actionability: "run-diagnostic",
+    operation: "deployments.create",
+    topicId: "errors.remote-state-lock",
+    agentGuidePath: ".well-known/appaloft/errors/infra_error.remote-state-lock.json",
+    remedies: [
+      {
+        kind: "retry",
+        label: "Retry after the active lock holder exits or the stale-lock window passes.",
+        safeByDefault: true,
+      },
+      {
+        kind: "diagnostic",
+        label: "Inspect the remote state lock owner, heartbeat, and recovered-lock journal.",
+        safeByDefault: true,
+      },
+    ],
+    specReferences: [
+      "docs/workflows/deployment-config-file-bootstrap.md",
+      "docs/testing/deployment-config-file-test-matrix.md",
+    ],
+  },
+} as const satisfies Record<string, Omit<PublicDocsErrorGuide, "id"> & { readonly id: string }>;
+
+export type PublicDocsErrorGuideId = keyof typeof publicDocsErrorGuides;
+
+export function getPublicDocsErrorGuide(guideId: PublicDocsErrorGuideId): PublicDocsErrorGuide {
+  return publicDocsErrorGuides[guideId];
+}
+
+export function findPublicDocsErrorGuide(input: {
+  code: string;
+  phase?: string;
+}): PublicDocsErrorGuide | undefined {
+  const guideId = errorKnowledgeKey(input);
+  return Object.hasOwn(publicDocsErrorGuides, guideId)
+    ? publicDocsErrorGuides[guideId as PublicDocsErrorGuideId]
+    : undefined;
+}
+
+export function resolvePublicDocsErrorAgentGuideHref(
+  guideId: PublicDocsErrorGuideId,
+  input: { basePath?: string } = {},
+): string {
+  const guide = getPublicDocsErrorGuide(guideId);
+  const basePath = normalizeDocsBasePath(input.basePath ?? publicDocsBasePath);
+  const path = guide.agentGuidePath.replace(/^\/+|\/+$/g, "");
+
+  return `${basePath}/${path}`;
+}
+
+export function resolvePublicDocsErrorKnowledge(
+  guideId: PublicDocsErrorGuideId,
+  input: { locale?: PublicDocsLocale; basePath?: string } = {},
+): ErrorKnowledge {
+  const guide = getPublicDocsErrorGuide(guideId);
+
+  return {
+    responsibility: guide.responsibility,
+    actionability: guide.actionability,
+    ...(guide.operation ? { operation: guide.operation } : {}),
+    links: [
+      {
+        rel: "human-doc",
+        href: resolvePublicDocsHelpHref(guide.topicId, input),
+        mediaType: "text/html",
+      },
+      {
+        rel: "llm-guide",
+        href: resolvePublicDocsErrorAgentGuideHref(guideId, input),
+        mediaType: "application/json",
+      },
+      ...guide.specReferences.map((href) => ({
+        rel: "spec" as const,
+        href,
+        mediaType: "text/markdown",
+      })),
+    ],
+    remedies: guide.remedies,
+  };
 }
 
 export type PublicDocsOperationCoverageStatus = "documented" | "migration-gap" | "not-applicable";

@@ -63,6 +63,8 @@ describe("SSH mutation coordinator", () => {
     expect(commands).toHaveLength(2);
     expect(commands[0]?.command).toContain('coordination_root="$data_root/locks/coordination"');
     expect(commands[0]?.command).toContain('lock_dir="$scope_root/$scope_hash.lock"');
+    expect(commands[0]?.command).toContain('date -j -u -f "%Y-%m-%dT%H:%M:%SZ"');
+    expect(commands[0]?.command).toContain('stat -f %m "$lock_dir"');
     expect(commands[0]?.command).toContain("scopeKind");
     expect(commands[0]?.command).toContain("preview-lifecycle");
     expect(commands[0]?.command).toContain("source-fingerprint:v1:branch%3Amain");

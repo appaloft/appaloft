@@ -1,8 +1,37 @@
+import { type DomainError } from "@appaloft/core";
 import { createAppComposition, type ShellRuntimeOptions } from "./composition";
 import {
   prepareRemotePgliteStateSync,
   type RemotePgliteStateSyncSession,
 } from "./remote-pglite-state-sync";
+
+function formatDomainError(error: DomainError): string {
+  const phase = typeof error.details?.phase === "string" ? error.details.phase : undefined;
+  const details = [
+    `code=${error.code}`,
+    `category=${error.category}`,
+    ...(phase ? [`phase=${phase}`] : []),
+    `retryable=${String(error.retryable)}`,
+  ];
+  const lines = [error.message, details.join(" ")];
+
+  for (const link of error.knowledge?.links ?? []) {
+    if (link.rel === "human-doc" || link.rel === "llm-guide") {
+      lines.push(`${link.rel}: ${link.href}`);
+    }
+  }
+
+  const firstSafeRemedy = error.knowledge?.remedies?.find((remedy) => remedy.safeByDefault);
+  if (firstSafeRemedy) {
+    lines.push(`remedy: ${firstSafeRemedy.label}`);
+  }
+
+  return `${lines.join("\n")}\n`;
+}
+
+function writeDomainError(error: DomainError): void {
+  process.stderr.write(formatDomainError(error));
+}
 
 function readExitCode(): number {
   const value = process.exitCode;
@@ -15,7 +44,7 @@ export async function runShellCli(options?: ShellRuntimeOptions): Promise<void> 
     env: process.env,
   });
   if (remotePgliteStateSync.isErr()) {
-    process.stderr.write(`${remotePgliteStateSync.error.message}\n`);
+    writeDomainError(remotePgliteStateSync.error);
     process.exit(1);
   }
 
@@ -35,7 +64,7 @@ export async function runShellCli(options?: ShellRuntimeOptions): Promise<void> 
     if (remotePgliteStateSyncSession) {
       const released = await remotePgliteStateSyncSession.releaseForCliRuntime();
       if (released.isErr()) {
-        process.stderr.write(`${released.error.message}\n`);
+        writeDomainError(released.error);
         process.exit(1);
       }
     }
@@ -53,7 +82,7 @@ export async function runShellCli(options?: ShellRuntimeOptions): Promise<void> 
     if (remotePgliteStateSyncSession) {
       const synced = await remotePgliteStateSyncSession.syncBackAndRelease();
       if (synced.isErr()) {
-        process.stderr.write(`${synced.error.message}\n`);
+        writeDomainError(synced.error);
         exitCode = exitCode === 0 ? 1 : exitCode;
       }
     }

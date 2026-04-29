@@ -1,4 +1,5 @@
 import { domainError, err, ok, type Result } from "@appaloft/core";
+import { resolvePublicDocsErrorKnowledge } from "@appaloft/docs-registry";
 import { type RemoteStateSession } from "./deployment-remote-state.js";
 import {
   type DeploymentStateBackendDecision,
@@ -187,9 +188,12 @@ function remotePrepareCommand(input: {
     "  fi",
     '  [ -n "$recorded_stale_after" ] || recorded_stale_after="$stale_after_seconds"',
     '  if [ -n "$last_heartbeat" ]; then',
-    '    heartbeat_epoch="$(date -u -d "$last_heartbeat" +%s 2>/dev/null || true)"',
+    '    heartbeat_epoch="$(date -u -d "$last_heartbeat" +%s 2>/dev/null || date -j -u -f "%Y-%m-%dT%H:%M:%SZ" "$last_heartbeat" +%s 2>/dev/null || true)"',
     "  else",
-    '    heartbeat_epoch="$(stat -c %Y "$lock_dir" 2>/dev/null || true)"',
+    '    heartbeat_epoch=""',
+    "  fi",
+    '  if [ -z "$heartbeat_epoch" ]; then',
+    '    heartbeat_epoch="$(stat -c %Y "$lock_dir" 2>/dev/null || stat -f %m "$lock_dir" 2>/dev/null || true)"',
     "  fi",
     '  if [ -n "$heartbeat_epoch" ]; then',
     "    lock_age_seconds=$((now_epoch - heartbeat_epoch))",
@@ -342,6 +346,16 @@ function retriableInfraError(
     message,
     retryable: true,
     ...(details ? { details } : {}),
+  };
+}
+
+function remoteStateLockError(
+  message: string,
+  details?: Record<string, string | number | boolean | null>,
+): ReturnType<typeof domainError.infra> {
+  return {
+    ...retriableInfraError(message, details),
+    knowledge: resolvePublicDocsErrorKnowledge("infra_error.remote-state-lock"),
   };
 }
 
@@ -501,7 +515,7 @@ export class SshRemoteStateLifecycle {
       const phase = phaseForPrepareFailure(result);
       const error =
         phase === "remote-state-lock"
-          ? retriableInfraError("SSH remote state mutation lock is already held", {
+          ? remoteStateLockError("SSH remote state mutation lock is already held", {
               ...errorDetails({
                 target: this.target,
                 phase,
@@ -616,7 +630,7 @@ export class SshRemoteStateLifecycle {
       return error;
     }
 
-    return retriableInfraError(error.message, {
+    return remoteStateLockError(error.message, {
       ...(error.details ?? {}),
       waitedSeconds: Math.max(0, Math.floor((Date.now() - startedAt) / 1_000)),
       lockAcquireTimeoutSeconds: Math.ceil(this.lockAcquireTimeoutMs / 1_000),

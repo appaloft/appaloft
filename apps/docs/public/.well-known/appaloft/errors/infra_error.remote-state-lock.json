@@ -1,0 +1,53 @@
+{
+  "schema": "https://appaloft.com/schemas/error-guide.v1.json",
+  "id": "infra_error.remote-state-lock",
+  "code": "infra_error",
+  "phase": "remote-state-lock",
+  "responsibility": "operator",
+  "actionability": "run-diagnostic",
+  "summary": "The SSH ssh-pglite remote state root is locked by an Appaloft mutation session.",
+  "safeDetails": [
+    "stateBackend",
+    "host",
+    "port",
+    "lockOwner",
+    "correlationId",
+    "lockStartedAt",
+    "lockHeartbeatAt",
+    "staleAfterSeconds",
+    "waitedSeconds",
+    "retryAfterSeconds",
+    "lockAcquireTimeoutSeconds"
+  ],
+  "diagnostics": [
+    "Check whether another Deploy Docs, Docs Preview, or appaloft/www deployment is still running.",
+    "Run appaloft remote-state lock inspect --server-host <host> with the same SSH target options to read lock owner metadata without entering the deployment mutation path.",
+    "Compare lockHeartbeatAt with staleAfterSeconds before treating the lock as stale.",
+    "Inspect the remote state lock owner metadata and recovered-lock journal before recovery.",
+    "Preserve recovered lock metadata when moving a stale lock out of the active mutation path."
+  ],
+  "remedies": [
+    {
+      "kind": "retry",
+      "safeByDefault": true,
+      "label": "Retry after the active lock holder exits or the stale-lock window passes."
+    },
+    {
+      "kind": "diagnostic",
+      "safeByDefault": true,
+      "label": "Run appaloft remote-state lock inspect before recovery."
+    },
+    {
+      "kind": "diagnostic",
+      "safeByDefault": true,
+      "label": "Run appaloft remote-state lock recover-stale only after the heartbeat is older than the stale window."
+    }
+  ],
+  "humanDocs": "/docs/reference/errors-statuses/#remote-state-lock",
+  "specReferences": [
+    "docs/decisions/ADR-024-pure-cli-ssh-state-and-server-applied-domains.md",
+    "docs/decisions/ADR-028-command-coordination-scope-and-mutation-admission.md",
+    "docs/workflows/deployment-config-file-bootstrap.md",
+    "docs/testing/deployment-config-file-test-matrix.md"
+  ]
+}
