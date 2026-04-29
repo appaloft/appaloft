@@ -40,11 +40,14 @@ Each item includes a stable work id, kind, status, operation key, phase/step whe
 entity ids, safe timestamps, stable failure fields when already known, `retriable` when already
 known, read-only next actions, and safe detail fields.
 
-The first active slice aggregates:
+The active slice reads durable process attempts first, then aggregates compatibility state from:
 
 - deployment attempts from deployment read models;
 - latest proxy bootstrap state from server edge proxy read models;
 - latest certificate attempts from certificate read models.
+
+When a durable process attempt and a compatibility read-model item describe the same work id or
+proxy bootstrap scope, the durable process attempt wins.
 
 ## Safety
 

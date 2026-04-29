@@ -12,6 +12,7 @@ export * from "./domain-route-binding-reader";
 export * from "./domain-route-failure-candidate-reader";
 export * from "./environment-read-model";
 export * from "./environment-repository";
+export * from "./process-attempt-journal";
 export * from "./project-read-model";
 export * from "./project-repository";
 export * from "./resource-deletion-blocker-reader";

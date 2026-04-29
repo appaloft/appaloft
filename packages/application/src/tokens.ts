@@ -44,6 +44,8 @@ export const tokens = {
   deploymentReadModel: Symbol.for("appaloft.deployment_read_model"),
   domainBindingReadModel: Symbol.for("appaloft.domain_binding_read_model"),
   certificateReadModel: Symbol.for("appaloft.certificate_read_model"),
+  processAttemptRecorder: Symbol.for("appaloft.process_attempt_recorder"),
+  processAttemptReadModel: Symbol.for("appaloft.process_attempt_read_model"),
   sshCredentialReadModel: Symbol.for("appaloft.ssh_credential_read_model"),
   sshCredentialUsageReader: Symbol.for("appaloft.ssh_credential_usage_reader"),
   archiveProjectUseCase: Symbol.for("appaloft.archive_project_use_case"),

@@ -19,21 +19,23 @@ mark-recovered, dead-letter, or prune commands.
 
 ## Decision Fit
 
-No new ADR is required for this slice because it does not change command admission, lifecycle
-semantics, retry policy, durable process ownership, or persistence shape. It aggregates existing
-read models and keeps future recovery mutations behind ADR-016, ADR-028, ADR-029, and the async
-lifecycle contract.
+No new ADR is required for this slice because it keeps the public operation surface read-only and
+does not change command admission, retry policy, lifecycle ownership, or recovery semantics. This
+Code Round adds a reusable internal durable process attempt journal so the ledger can read persisted
+attempt state before falling back to existing deployment/proxy/certificate read models. Future
+recovery mutations remain behind ADR-016, ADR-028, ADR-029, and the async lifecycle contract.
 
 ## Scope
 
-The first implementation must expose:
+The implementation must expose:
 
 - deployment attempts from `deployments.list` / deployment read-model state;
 - latest proxy bootstrap visibility from server edge proxy read-model fields;
 - latest certificate attempt visibility from `certificates.list`;
+- durable process attempts from the internal process attempt journal when present;
 - safe next actions limited to diagnostics, manual review, retry hints, or no action.
 
-The first implementation may not:
+The implementation may not:
 
 - create a durable outbox/inbox table;
 - retry, cancel, prune, recover, or dead-letter work;
@@ -49,7 +51,14 @@ The first implementation may not:
 - Supported filters are `kind`, `status`, `resourceId`, `serverId`, `deploymentId`, and `limit`.
 - Supported kinds are `deployment`, `proxy-bootstrap`, `certificate`, `remote-state`,
   `route-realization`, `runtime-maintenance`, and `system`.
-- The first slice populates deployment, proxy-bootstrap, and certificate items from existing state.
+- The ledger reads durable process attempts first, then aggregates existing deployment,
+  proxy-bootstrap, and certificate read-model state for compatibility while those slices migrate.
+- If a durable process attempt and an existing read-model item share the same work id, the durable
+  process attempt wins so status, phase, retry fields, next actions, and safe details come from the
+  reusable journal.
+- Durable process attempts store internal fields including `id`, `kind`, `status`, `operationKey`,
+  `dedupeKey`, `correlationId`, `requestId`, `phase`, `step`, related entity ids, timestamps,
+  error code/category, retriable state, `nextEligibleAt`, `nextActions`, and `safeDetails`.
 - Failed or retry-scheduled work exposes stable error code/category/retriable fields when already
   present, and otherwise omits them instead of fabricating details.
 - Next actions are read-only guidance. They do not expose recovery commands before those commands
@@ -57,10 +66,11 @@ The first implementation may not:
 
 ## Migration Gaps
 
-- Proxy bootstrap read models currently expose latest attempt timestamps and error codes, not a
-  durable proxy attempt id. The ledger uses a stable `proxy-bootstrap:<serverId>` work id until
-  proxy attempts become their own persisted history.
-- Certificate read models expose only the latest attempt. Historical certificate attempt show/list
-  requires a later durable attempt history read model.
+- Proxy bootstrap read models still expose latest attempt timestamps and error codes. New proxy
+  bootstrap command and event-driven attempts are recorded in the durable journal with their attempt
+  ids; older rows without journal records continue to use `proxy-bootstrap:<serverId>`.
+- Certificate read models expose only the latest attempt. New certificate issue/import attempts are
+  recorded in the durable journal; older rows without journal records continue to expose latest
+  certificate attempt visibility from `certificates.list`.
 - Remote-state locks, source links, route realization attempts, runtime maintenance jobs, and
   worker status remain positioned for future slices.
