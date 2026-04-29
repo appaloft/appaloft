@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - .github/workflows/deploy-docs.yml
+      - .github/actions/remote-state-lock-preflight/**
       - appaloft.docs.yml
       - apps/docs/**
       - apps/shell/**
@@ -115,6 +116,13 @@ jobs:
         run: |
           set -euo pipefail
           bun install --frozen-lockfile
+
+      - name: Remote State Lock Preflight
+        uses: ./.github/actions/remote-state-lock-preflight
+        with:
+          ssh-host: ${{ vars.APPALOFT_SSH_HOST }}
+          ssh-user: ${{ steps.settings.outputs.ssh_user }}
+          ssh-private-key: ${{ secrets.APPALOFT_SSH_PRIVATE_KEY }}
 
       - name: Deploy Docs
         shell: bash

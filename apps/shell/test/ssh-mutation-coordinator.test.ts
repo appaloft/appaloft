@@ -68,6 +68,8 @@ describe("SSH mutation coordinator", () => {
     expect(commands[0]?.command).toContain("scopeKind");
     expect(commands[0]?.command).toContain("preview-lifecycle");
     expect(commands[0]?.command).toContain("source-fingerprint:v1:branch%3Amain");
+    expect(commands[0]?.command).toContain('[ ! -d "$lock_dir" ]');
+    expect(commands[0]?.command).toContain("SSH mutation coordination lock could not be created");
     expect(commands[0]?.command).not.toContain("OPENSSH PRIVATE KEY");
     expect(commands[1]?.command).toContain('rm -rf "$lock_dir"');
   });

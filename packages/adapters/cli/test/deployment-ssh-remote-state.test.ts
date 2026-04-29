@@ -55,12 +55,16 @@ describe("CLI SSH remote state lifecycle", () => {
     expect(commands[0]?.command).toContain("mutation.lock");
     expect(commands[0]?.command).toContain("lastHeartbeatAt");
     expect(commands[0]?.command).toContain("staleAfterSeconds");
+    expect(commands[0]?.command).toContain("owner_file_present");
+    expect(commands[0]?.command).toContain("recorded_stale_after=30");
     expect(commands[0]?.command).toContain('date -j -u -f "%Y-%m-%dT%H:%M:%SZ"');
     expect(commands[0]?.command).toContain('stat -f %m "$lock_dir"');
     expect(commands[0]?.command).toContain("locks/recovered");
     expect(commands[0]?.command).toContain("backups");
     expect(commands[0]?.command).toContain("journals");
     expect(commands[0]?.command).toContain("server-applied-routes");
+    expect(commands[0]?.command).toContain('[ ! -d "$lock_dir" ]');
+    expect(commands[0]?.command).toContain("remote state mutation lock could not be created");
     expect(commands[0]?.command).not.toContain("OPENSSH PRIVATE KEY");
 
     const released = await prepared.value.release();

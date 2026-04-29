@@ -1,11 +1,60 @@
-import {
-  type ErrorKnowledge,
-  type ErrorKnowledgeActionability,
-  type ErrorKnowledgeResponsibility,
-  errorKnowledgeKey,
-} from "@appaloft/core";
-
 export const publicDocsBasePath = "/docs";
+
+export type PublicDocsErrorKnowledgeResponsibility =
+  | "user"
+  | "operator"
+  | "system"
+  | "provider"
+  | "appaloft";
+
+export type PublicDocsErrorKnowledgeActionability =
+  | "fix-input"
+  | "wait-retry"
+  | "run-diagnostic"
+  | "auto-recoverable"
+  | "report-bug"
+  | "no-user-action";
+
+export type PublicDocsErrorKnowledgeLinkRel =
+  | "human-doc"
+  | "llm-guide"
+  | "runbook"
+  | "spec"
+  | "source-symbol"
+  | "support";
+
+export interface PublicDocsErrorKnowledgeLink {
+  readonly rel: PublicDocsErrorKnowledgeLinkRel;
+  readonly href: string;
+  readonly mediaType?: string;
+  readonly title?: string;
+}
+
+export type PublicDocsErrorKnowledgeRemedyKind =
+  | "retry"
+  | "command"
+  | "workflow-action"
+  | "diagnostic"
+  | "none";
+
+export interface PublicDocsErrorKnowledgeRemedy {
+  readonly kind: PublicDocsErrorKnowledgeRemedyKind;
+  readonly label: string;
+  readonly safeByDefault: boolean;
+  readonly command?: readonly string[];
+}
+
+export interface PublicDocsErrorKnowledge {
+  readonly responsibility: PublicDocsErrorKnowledgeResponsibility;
+  readonly actionability: PublicDocsErrorKnowledgeActionability;
+  readonly operation?: string;
+  readonly links?: readonly PublicDocsErrorKnowledgeLink[];
+  readonly remedies?: readonly PublicDocsErrorKnowledgeRemedy[];
+}
+
+function errorKnowledgeGuideKey(input: { code: string; phase?: string }): string {
+  return input.phase ? `${input.code}.${input.phase}` : input.code;
+}
 
 export const publicDocsLocales = ["zh-CN", "en-US"] as const;
 export type PublicDocsLocale = (typeof publicDocsLocales)[number];
@@ -913,12 +962,12 @@ export interface PublicDocsErrorGuide {
   readonly id: PublicDocsErrorGuideId;
   readonly code: string;
   readonly phase?: string;
-  readonly responsibility: ErrorKnowledgeResponsibility;
-  readonly actionability: ErrorKnowledgeActionability;
+  readonly responsibility: PublicDocsErrorKnowledgeResponsibility;
+  readonly actionability: PublicDocsErrorKnowledgeActionability;
   readonly operation?: string;
   readonly topicId: PublicDocsHelpTopicId;
   readonly agentGuidePath: string;
-  readonly remedies: NonNullable<ErrorKnowledge["remedies"]>;
+  readonly remedies: readonly PublicDocsErrorKnowledgeRemedy[];
   readonly specReferences: readonly string[];
 }
 
@@ -939,9 +988,17 @@ export const publicDocsErrorGuides = {
         safeByDefault: true,
       },
       {
-        kind: "diagnostic",
+        kind: "command",
         label: "Inspect the remote state lock owner, heartbeat, and recovered-lock journal.",
         safeByDefault: true,
+        command: ["appaloft", "remote-state", "lock", "inspect"],
+      },
+      {
+        kind: "command",
+        label:
+          "Archive a stale remote state lock only after diagnostics show the heartbeat is older than the stale window.",
+        safeByDefault: false,
+        command: ["appaloft", "remote-state", "lock", "recover-stale"],
       },
     ],
     specReferences: [
@@ -961,7 +1018,7 @@ export function findPublicDocsErrorGuide(input: {
   code: string;
   phase?: string;
 }): PublicDocsErrorGuide | undefined {
-  const guideId = errorKnowledgeKey(input);
+  const guideId = errorKnowledgeGuideKey(input);
   return Object.hasOwn(publicDocsErrorGuides, guideId)
     ? publicDocsErrorGuides[guideId as PublicDocsErrorGuideId]
     : undefined;
@@ -981,7 +1038,7 @@ export function resolvePublicDocsErrorAgentGuideHref(
 export function resolvePublicDocsErrorKnowledge(
   guideId: PublicDocsErrorGuideId,
   input: { locale?: PublicDocsLocale; basePath?: string } = {},
-): ErrorKnowledge {
+): PublicDocsErrorKnowledge {
   const guide = getPublicDocsErrorGuide(guideId);
 
   return {

@@ -1,0 +1,143 @@
+name: Remote State Maintenance
+
+run-name: Remote State Maintenance (${{ inputs.action }})
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: Inspect the shared SSH remote-state lock or recover it only when stale.
+        required: true
+        type: choice
+        options:
+          - inspect
+          - recover-stale
+      remote_runtime_root:
+        description: Remote Appaloft runtime root. The state root is <remote_runtime_root>/state.
+        required: false
+        default: /var/lib/appaloft/runtime
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  remote-state-lock:
+    name: Remote State Lock
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Docs production deploys, docs preview deploys, preview cleanup, and this maintenance action
+    # all mutate or inspect the same SSH remote-state root.
+    concurrency:
+      group: appaloft-www-remote-state
+      cancel-in-progress: false
+    steps:
+      - name: Checkout Main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Set up Bun and caches
+        uses: ./.github/actions/setup-bun-turbo
+
+      - name: Validate SSH Settings
+        id: settings
+        shell: bash
+        env:
+          APPALOFT_SSH_HOST: ${{ vars.APPALOFT_SSH_HOST }}
+          APPALOFT_SSH_USER: ${{ vars.APPALOFT_SSH_USER }}
+          APPALOFT_SSH_PRIVATE_KEY: ${{ secrets.APPALOFT_SSH_PRIVATE_KEY }}
+          REMOTE_RUNTIME_ROOT: ${{ inputs.remote_runtime_root }}
+        run: |
+          set -euo pipefail
+
+          missing=0
+          if [ -z "$APPALOFT_SSH_HOST" ]; then
+            echo "::error::Missing repository variable APPALOFT_SSH_HOST. Use the same SSH target as docs deploy and preview."
+            missing=1
+          fi
+          if [ -z "$APPALOFT_SSH_PRIVATE_KEY" ]; then
+            echo "::error::Missing repository secret APPALOFT_SSH_PRIVATE_KEY. Use the same deployment key as docs deploy and preview."
+            missing=1
+          fi
+          if [ -z "$REMOTE_RUNTIME_ROOT" ]; then
+            echo "::error::remote_runtime_root must not be empty."
+            missing=1
+          fi
+          if [ "$missing" -ne 0 ]; then
+            exit 1
+          fi
+
+          {
+            echo "ssh_user=${APPALOFT_SSH_USER:-root}"
+            echo "remote_runtime_root=$REMOTE_RUNTIME_ROOT"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Run Remote State Lock Maintenance
+        id: maintenance
+        shell: bash
+        env:
+          APPALOFT_SSH_HOST: ${{ vars.APPALOFT_SSH_HOST }}
+          APPALOFT_SSH_PRIVATE_KEY: ${{ secrets.APPALOFT_SSH_PRIVATE_KEY }}
+          APPALOFT_SSH_USER: ${{ steps.settings.outputs.ssh_user }}
+          REMOTE_RUNTIME_ROOT: ${{ steps.settings.outputs.remote_runtime_root }}
+          MAINTENANCE_ACTION: ${{ inputs.action }}
+        run: |
+          set -euo pipefail
+
+          key_file="$RUNNER_TEMP/appaloft-remote-state-maintenance.key"
+          output_file="$RUNNER_TEMP/appaloft-remote-state-lock.json"
+          printf '%s\n' "$APPALOFT_SSH_PRIVATE_KEY" > "$key_file"
+          chmod 600 "$key_file"
+
+          cli_args=(
+            remote-state lock "$MAINTENANCE_ACTION"
+            --server-host "$APPALOFT_SSH_HOST"
+            --server-ssh-username "$APPALOFT_SSH_USER"
+            --server-ssh-private-key-file "$key_file"
+            --remote-runtime-root "$REMOTE_RUNTIME_ROOT"
+          )
+
+          set +e
+          bun run apps/shell/src/index.ts "${cli_args[@]}" > "$output_file"
+          exit_code=$?
+          set -e
+
+          STATUS_FILE="$output_file" bun --eval '
+            const fs = require("node:fs");
+            const outputPath = process.env.STATUS_FILE;
+            const summaryPath = process.env.GITHUB_STEP_SUMMARY;
+            let status = {};
+            try {
+              const text = fs.readFileSync(outputPath, "utf8").trim();
+              status = text ? JSON.parse(text) : {};
+            } catch {
+              status = { status: "unavailable" };
+            }
+            const value = (key) => {
+              const current = status[key];
+              return current === undefined || current === null || current === "" ? "n/a" : String(current);
+            };
+            const rows = [
+              ["status", value("status")],
+              ["owner", value("owner")],
+              ["correlationId", value("correlationId")],
+              ["lastHeartbeatAt", value("lastHeartbeatAt")],
+              ["lockAgeSeconds", value("lockAgeSeconds")],
+              ["staleAfterSeconds", value("staleAfterSeconds")],
+              ["recoveredPath", value("recoveredPath")],
+            ];
+            fs.appendFileSync(
+              summaryPath,
+              [
+                "### SSH remote-state lock",
+                "",
+                "| Field | Value |",
+                "| --- | --- |",
+                ...rows.map(([field, current]) => `| ${field} | \`${current.replaceAll("`", "\\`")}\` |`),
+                "",
+              ].join("\n"),
+            );
+          '
+
+          exit "$exit_code"

@@ -20,7 +20,8 @@
     "lockAcquireTimeoutSeconds"
   ],
   "diagnostics": [
-    "Check whether another Deploy Docs, Docs Preview, or appaloft/www deployment is still running.",
+    "Check whether another deploy, preview deploy, cleanup, or other Appaloft mutation is still running against the same SSH remote-state root.",
+    "Appaloft deploy and cleanup commands already perform bounded waiting and stale-only recovery when the heartbeat has aged past the stale window.",
     "Run appaloft remote-state lock inspect --server-host <host> with the same SSH target options to read lock owner metadata without entering the deployment mutation path.",
     "Compare lockHeartbeatAt with staleAfterSeconds before treating the lock as stale.",
     "Inspect the remote state lock owner metadata and recovered-lock journal before recovery.",

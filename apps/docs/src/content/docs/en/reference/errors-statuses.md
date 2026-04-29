@@ -37,10 +37,11 @@ Web, CLI, HTTP/API, and future MCP tools should render errors from those fields 
 Recommended handling:
 
 1. Inspect safe details such as `lockOwner`, `correlationId`, `lockHeartbeatAt`, `staleAfterSeconds`, and `waitedSeconds`.
-2. If the heartbeat is still updating, wait for the active deployment or retry later.
-3. Run `appaloft remote-state lock inspect --server-host <host>` with the same SSH target options to inspect remote lock owner metadata without entering the deployment mutation path.
-4. If the heartbeat is older than the stale window, run `appaloft remote-state lock recover-stale --server-host <host>` to archive the stale lock.
-5. Do not directly delete the remote lock directory unless diagnostics prove no active process owns it and a recovered journal is retained.
+2. Appaloft deploy and cleanup commands already use bounded waiting and stale-only lock recovery when the heartbeat has aged past the stale window.
+3. If the heartbeat is still updating, wait for the active deployment or retry later.
+4. If the error repeats, run `appaloft remote-state lock inspect --server-host <host>` with the same SSH target options to inspect remote lock owner metadata without entering the deployment mutation path.
+5. Run `appaloft remote-state lock recover-stale --server-host <host>` only when diagnostics show the heartbeat is older than the stale window. This archives stale lock metadata and does not force-delete active locks.
+6. Do not directly delete the remote lock directory unless diagnostics prove no active process owns it and a recovered journal is retained.
 
 <h2 id="reference-status-shape">Status shape</h2>
 

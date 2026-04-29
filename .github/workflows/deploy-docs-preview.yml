@@ -34,7 +34,7 @@ jobs:
           docs_preview_required=false
           while IFS= read -r file; do
             case "$file" in
-              .github/workflows/deploy-docs.yml|.github/workflows/deploy-docs-preview.yml|appaloft.docs.yml|apps/docs/*|docs/*|packages/design/*|packages/docs-registry/*|packages/openapi/*|*.md|*.mdx|bun.lock|package.json|tsconfig.base.json|tsconfig.json|turbo.json)
+              .github/workflows/deploy-docs.yml|.github/workflows/deploy-docs-preview.yml|.github/actions/remote-state-lock-preflight/*|appaloft.docs.yml|apps/docs/*|docs/*|packages/design/*|packages/docs-registry/*|packages/openapi/*|*.md|*.mdx|bun.lock|package.json|tsconfig.base.json|tsconfig.json|turbo.json)
                 docs_preview_required=true
                 break
                 ;;
@@ -112,6 +112,13 @@ jobs:
             echo "- Preview host: ${preview_host}"
             echo "- TLS mode: disabled"
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Remote State Lock Preflight
+        uses: ./.github/actions/remote-state-lock-preflight
+        with:
+          ssh-host: ${{ vars.APPALOFT_SSH_HOST }}
+          ssh-user: ${{ steps.settings.outputs.ssh_user }}
+          ssh-private-key: ${{ secrets.APPALOFT_SSH_PRIVATE_KEY }}
 
       - name: Deploy Docs Preview
         id: deploy
@@ -204,6 +211,13 @@ jobs:
           fi
 
           echo "ssh_user=${APPALOFT_SSH_USER:-root}" >> "$GITHUB_OUTPUT"
+
+      - name: Remote State Lock Preflight
+        uses: ./.github/actions/remote-state-lock-preflight
+        with:
+          ssh-host: ${{ vars.APPALOFT_SSH_HOST }}
+          ssh-user: ${{ steps.settings.outputs.ssh_user }}
+          ssh-private-key: ${{ secrets.APPALOFT_SSH_PRIVATE_KEY }}
 
       - name: Cleanup Docs Preview
         shell: bash
