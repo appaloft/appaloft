@@ -96,6 +96,10 @@ describe("public docs help registry", () => {
     expect(knowledge.links?.some((link) => link.rel === "human-doc")).toBe(true);
     expect(knowledge.links?.some((link) => link.rel === "llm-guide")).toBe(true);
     expect(knowledge.remedies?.some((remedy) => remedy.safeByDefault)).toBe(true);
+    expect(knowledge.remedies?.some((remedy) => remedy.kind === "command")).toBe(true);
+    expect(
+      existsSync(resolve(repositoryRoot, ".github/workflows/remote-state-maintenance.yml")),
+    ).toBe(true);
   });
 
   test("[ERROR-KNOWLEDGE-004] public error guides point to existing agent-readable assets", () => {

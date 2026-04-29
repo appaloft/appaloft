@@ -5,6 +5,18 @@ import {
   type RemotePgliteStateSyncSession,
 } from "./remote-pglite-state-sync";
 
+function formatDetailValue(value: unknown): string | null {
+  if (value === undefined || value === null || value === "") {
+    return null;
+  }
+
+  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+    return String(value);
+  }
+
+  return null;
+}
+
 function formatDomainError(error: DomainError): string {
   const phase = typeof error.details?.phase === "string" ? error.details.phase : undefined;
   const details = [
@@ -14,6 +26,29 @@ function formatDomainError(error: DomainError): string {
     `retryable=${String(error.retryable)}`,
   ];
   const lines = [error.message, details.join(" ")];
+
+  if (phase === "remote-state-lock") {
+    const lockDetails = [
+      "lockOwner",
+      "correlationId",
+      "lockStartedAt",
+      "lockHeartbeatAt",
+      "staleAfterSeconds",
+      "waitedSeconds",
+      "lockAcquireTimeoutSeconds",
+      "retryAfterSeconds",
+      "stderr",
+    ]
+      .map((key) => {
+        const value = formatDetailValue(error.details?.[key]);
+        return value ? `${key}=${value}` : null;
+      })
+      .filter((value): value is string => value !== null);
+
+    if (lockDetails.length > 0) {
+      lines.push(`lock: ${lockDetails.join(" ")}`);
+    }
+  }
 
   for (const link of error.knowledge?.links ?? []) {
     if (link.rel === "human-doc" || link.rel === "llm-guide") {
