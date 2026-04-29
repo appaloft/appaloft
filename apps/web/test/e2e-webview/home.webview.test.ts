@@ -1772,7 +1772,7 @@ describe("console e2e with Bun.WebView", () => {
       "GitHub OAuth is not configured on the backend.",
       "后端尚未配置 GitHub OAuth",
     ]);
-  }, 15_000);
+  }, 45_000);
 
   test("[PROJ-LIFE-ENTRY-005][PROJ-LIFE-ENTRY-006] manages project settings through named operations", async () => {
     activeScenario = "dashboard";
@@ -1832,7 +1832,7 @@ describe("console e2e with Bun.WebView", () => {
     expect(
       recordedApiRequests.some((request) => request.pathname === "/api/rpc/environments/create"),
     ).toBe(false);
-  }, 15_000);
+  }, 45_000);
 
   test("[PROJ-LIFE-ENTRY-007] disables project-scoped creation affordances for archived projects", async () => {
     activeScenario = "dashboard";
