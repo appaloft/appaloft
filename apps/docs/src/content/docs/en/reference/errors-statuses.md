@@ -38,8 +38,9 @@ Recommended handling:
 
 1. Inspect safe details such as `lockOwner`, `correlationId`, `lockHeartbeatAt`, `staleAfterSeconds`, and `waitedSeconds`.
 2. If the heartbeat is still updating, wait for the active deployment or retry later.
-3. If the heartbeat is older than the stale window, run the remote-state doctor/recover flow to inspect and archive the stale lock.
-4. Do not directly delete the remote lock directory unless diagnostics prove no active process owns it and a recovered journal is retained.
+3. Run `appaloft remote-state lock inspect --server-host <host>` with the same SSH target options to inspect remote lock owner metadata without entering the deployment mutation path.
+4. If the heartbeat is older than the stale window, run `appaloft remote-state lock recover-stale --server-host <host>` to archive the stale lock.
+5. Do not directly delete the remote lock directory unless diagnostics prove no active process owns it and a recovered journal is retained.
 
 <h2 id="reference-status-shape">Status shape</h2>
 

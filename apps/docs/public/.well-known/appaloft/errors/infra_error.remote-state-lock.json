@@ -21,6 +21,7 @@
   ],
   "diagnostics": [
     "Check whether another Deploy Docs, Docs Preview, or appaloft/www deployment is still running.",
+    "Run appaloft remote-state lock inspect --server-host <host> with the same SSH target options to read lock owner metadata without entering the deployment mutation path.",
     "Compare lockHeartbeatAt with staleAfterSeconds before treating the lock as stale.",
     "Inspect the remote state lock owner metadata and recovered-lock journal before recovery.",
     "Preserve recovered lock metadata when moving a stale lock out of the active mutation path."
@@ -34,7 +35,12 @@
     {
       "kind": "diagnostic",
       "safeByDefault": true,
-      "label": "Run the SSH remote-state doctor/recover flow before removing any lock."
+      "label": "Run appaloft remote-state lock inspect before recovery."
+    },
+    {
+      "kind": "diagnostic",
+      "safeByDefault": true,
+      "label": "Run appaloft remote-state lock recover-stale only after the heartbeat is older than the stale window."
     }
   ],
   "humanDocs": "/docs/reference/errors-statuses/#remote-state-lock",
