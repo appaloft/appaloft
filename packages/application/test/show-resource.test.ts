@@ -501,6 +501,55 @@ describe("ShowResourceQueryService", () => {
     expect(detail.lifecycle.status).toBe("active");
   });
 
+  test("[RES-PROFILE-DRIFT-001] reports informational resource versus latest snapshot drift", async () => {
+    const result = await createService({
+      deployments: [
+        deploymentSummary({
+          runtimePlan: {
+            ...deploymentSummary().runtimePlan,
+            source: {
+              kind: "git-public",
+              locator: "https://github.com/acme/web.git",
+              displayName: "acme/web",
+            },
+            buildStrategy: "workspace-commands",
+            execution: {
+              kind: "host-process",
+              installCommand: "bun install",
+              buildCommand: "bun run build",
+              startCommand: "bun run start",
+              port: 4310,
+            },
+          },
+        }),
+      ],
+    }).execute(createTestContext(), createQuery());
+
+    const detail = unwrap(result);
+    const drift = detail.diagnostics.find(
+      (diagnostic) =>
+        diagnostic.code === "resource_profile_drift" &&
+        diagnostic.fieldPath === "networkProfile.internalPort",
+    );
+
+    expect(drift).toMatchObject({
+      severity: "info",
+      section: "network",
+      comparison: "resource-vs-latest-snapshot",
+      blocksDeploymentAdmission: false,
+      suggestedCommand: "resources.configure-network",
+      resourceValue: {
+        state: "present",
+        displayValue: 3000,
+      },
+      deploymentSnapshotValue: {
+        state: "present",
+        displayValue: 4310,
+      },
+      latestDeploymentId: "dep_new",
+    });
+  });
+
   test("[RES-PROFILE-SHOW-005] returns safe diagnostics for incomplete profile", async () => {
     const result = await createService({
       resources: [incompleteResource()],

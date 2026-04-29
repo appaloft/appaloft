@@ -15,6 +15,7 @@ source selection
   -> resolve state backend; for SSH deploys, ensure, lock, and migrate remote `ssh-pglite`
   -> resolve trusted Appaloft project/environment/resource/server identity outside the file
   -> create resource-owned profile or configure source/runtime/network profile through explicit operations when needed
+     or stop with structured profile drift guidance before deployment admission
   -> apply non-secret env values and resolved secret references through environment commands
   -> deployments.create(projectId, environmentId, resourceId, serverId, destinationId?)
   -> apply server-applied proxy routes from trusted config domain intent when supported by the
@@ -43,6 +44,7 @@ This workflow inherits:
 - [Control-Plane Mode Selection And Adoption](./control-plane-mode-selection-and-adoption.md)
 - [GitHub Action PR Preview Deploy](./github-action-pr-preview-deploy.md)
 - [Resource Create And First Deploy Workflow Spec](./resources.create-and-first-deploy.md)
+- [Resource Profile Drift Visibility](../specs/011-resource-profile-drift-visibility/spec.md)
 - [Deployment Config File Test Matrix](../testing/deployment-config-file-test-matrix.md)
 - [Deployment Config File Implementation Plan](../implementation/deployment-config-file-plan.md)
 - [GitHub Action Deploy Wrapper Implementation Plan](../implementation/github-action-deploy-action-plan.md)
@@ -479,9 +481,29 @@ deployment admission.
 | CPU, memory, replicas, restart policy, rollout overlap/drain | Future resource/runtime-target profile specs | Must be rejected until an ADR/spec and runtime enforcement exist; no silent ignore. |
 
 If a resource already exists and the file changes reusable profile fields, the entry workflow must
-either dispatch explicit resource configuration operations accepted by the operation catalog, or
-fail with a structured profile-drift error. It must not silently mutate resource state through
-`deployments.create`.
+either dispatch explicit resource configuration operations accepted by the operation catalog as named
+workflow steps, or fail with a structured profile-drift error before deployment admission. It must
+not silently mutate resource state through `deployments.create`.
+
+The drift comparison uses the same Resource Profile Drift Visibility vocabulary as `resources.show`:
+
+| Drift section | Config concern examples | Required command when the workflow applies the change |
+| --- | --- | --- |
+| `source` | source kind, locator, Git ref, base directory, Docker image tag/digest | `resources.configure-source` |
+| `runtime` | runtime strategy, install/build/start commands, runtime name, Dockerfile/Compose path, publish directory, build target | `resources.configure-runtime` |
+| `network` | internal port, upstream protocol, exposure mode, target service, host port | `resources.configure-network` |
+| `access` | generated access mode and generated route path prefix from trusted entry inputs when supported | `resources.configure-access` |
+| `health` | HTTP health policy fields | `resources.configure-health` |
+| `configuration` | resource-scoped variable override differences when repository config or trusted flags target resource scope | `resources.set-variable` or `resources.unset-variable` |
+
+Default CLI config deploy behavior for existing-resource drift is fail-first: if the normalized
+profile differs from the current Resource profile and the entrypoint is not explicitly applying the
+matching command step, the workflow returns `resource_profile_drift`, phase
+`resource-profile-resolution`, and does not dispatch `deployments.create`. The error details must
+include safe `resourceId`, drift `section`, `fieldPath`, optional config pointer, and suggested
+operation key or CLI command. Current Resource profile versus latest deployment snapshot drift is
+informational and must not block a config deploy when the normalized profile already matches the
+current Resource profile.
 
 ## Secret And Credential Rules
 
@@ -652,7 +674,7 @@ Config-file errors use stable codes and phases:
 | `validation_error` | `source-link-resolution` | No | Source fingerprint is ambiguous, missing required stable identity, or points at another context without explicit relink. |
 | `validation_error` | `config-domain-resolution` | No | Config domain intent cannot map safely to server-applied or managed domain workflow state, including invalid host/path/TLS shape, missing redirect target, self-redirect, redirect loop, redirect-to-redirect, or unsupported redirect policy. |
 | `unsupported_config_field` | `config-capability-resolution` | No | Known future field such as CPU/memory/replicas or rollout policy is not enforceable by current workflow/resource/runtime target specs. |
-| `resource_profile_drift` | `resource-profile-resolution` | No | Existing resource differs from config and the required explicit profile configuration command is not active. |
+| `resource_profile_drift` | `resource-profile-resolution` | No | Existing resource differs from the normalized config/entry profile and the workflow did not explicitly dispatch the required resource configuration command before deployment. Details include resource id, section, field path, config pointer when known, and suggested command. |
 | `infra_error` | `proxy-domain-realization` | Conditional | Server-applied proxy domain route could not be rendered, applied, reloaded, or verified on the target. |
 
 ## Current Implementation Notes And Migration Gaps

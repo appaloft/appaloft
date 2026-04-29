@@ -16,7 +16,8 @@ This matrix covers the active resource profile lifecycle operations:
 - `resources.delete`
 
 It also verifies that existing `resources.configure-health` remains the dedicated health mutation
-command and that no entrypoint exposes a generic `resources.update`.
+command, that resource profile drift is visible through diagnostics, and that no entrypoint exposes a
+generic `resources.update`.
 
 ## Global References
 
@@ -32,6 +33,7 @@ command and that no entrypoint exposes a generic `resources.update`.
 - [resources.archive Command Spec](../commands/resources.archive.md)
 - [resources.delete Command Spec](../commands/resources.delete.md)
 - [resources.configure-health Command Spec](../commands/resources.configure-health.md)
+- [Resource Profile Drift Visibility](../specs/011-resource-profile-drift-visibility/spec.md)
 - [Resource Lifecycle Error Spec](../errors/resources.lifecycle.md)
 - [Error Model](../errors/model.md)
 - [neverthrow Conventions](../errors/neverthrow-conventions.md)
@@ -45,6 +47,11 @@ command and that no entrypoint exposes a generic `resources.update`.
 | RES-PROFILE-SHOW-003 | `resources.show` | Query service | Archived resource. | Returns detail with `lifecycle.status = "archived"` and no mutation side effects. |
 | RES-PROFILE-SHOW-004 | `resources.show` | Read model | Latest deployment included. | Latest deployment is contextual and does not override lifecycle or health. |
 | RES-PROFILE-SHOW-005 | `resources.show` | Read model | Profile diagnostics requested for incomplete profile. | Returns safe diagnostics without failing the query. |
+| RES-PROFILE-DRIFT-001 | `resources.show` | Query service | Current Resource profile differs from latest deployment snapshot. | Returns `resource_profile_drift` diagnostics grouped by section and field, marks `blocksDeploymentAdmission = false`, and does not fail the query. |
+| RES-PROFILE-DRIFT-002 | `resources.show` / config workflow | Query service / entry preflight | Existing linked resource differs from normalized repository config or trusted entry profile. | Returns or raises drift details with `comparison = resource-vs-entry-profile`, `blocksDeploymentAdmission = true` for config deploy preflight, and includes suggested explicit command. |
+| RES-PROFILE-DRIFT-003 | `resources.show` / config workflow | Redaction contract | Drift includes secret or configuration values. | Diagnostics and errors include key/exposure/kind/scope/reference metadata and masked equality state only; no raw secret values. |
+| RES-PROFILE-DRIFT-004 | HTTP/oRPC | Contract | Resource detail requested with profile diagnostics. | Route returns the shared diagnostic shape from `resources.show`; no new drift-only route or transport-only schema exists. |
+| RES-PROFILE-DRIFT-005 | Web | Entrypoint | Resource detail receives drift diagnostics. | Web renders sectioned drift status and future-only guidance, and points to named resource commands rather than a generic update action. |
 | RES-PROFILE-SOURCE-001 | `resources.configure-source` | Command use case | Valid Git source with explicit `gitRef` and `baseDirectory`. | Persists source, publishes `resource-source-configured`, returns `ok({ id })`. |
 | RES-PROFILE-SOURCE-002 | `resources.configure-source` | Command use case | Ambiguous Git tree URL without explicit split or provider lookup. | Returns `validation_error`, `phase = resource-source-resolution`. |
 | RES-PROFILE-SOURCE-003 | `resources.configure-source` | Command use case | Docker image tag/digest conflict. | Returns `validation_error`, no aggregate mutation. |
@@ -129,6 +136,8 @@ Tests must assert that profile commands do not:
 - retarget source links;
 - write secrets into events, read models, errors, logs, or diagnostics.
 - return plaintext secret values from resource configuration queries or effective deployment snapshot reads.
+- hide resource profile drift by mutating profiles through `deployments.create`.
+- expose a generic `resources.update` action as a drift remedy.
 
 ## Current Implementation Notes And Migration Gaps
 

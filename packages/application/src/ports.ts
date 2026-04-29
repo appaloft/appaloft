@@ -1650,11 +1650,49 @@ export interface ResourceDetailLifecycle {
   deletedAt?: string;
 }
 
+export type ResourceProfileDriftSection =
+  | "source"
+  | "runtime"
+  | "network"
+  | "access"
+  | "health"
+  | "configuration";
+
+export type ResourceProfileDriftComparison =
+  | "resource-vs-entry-profile"
+  | "resource-vs-latest-snapshot"
+  | "entry-profile-vs-latest-snapshot";
+
+export type ResourceProfileDriftSuggestedCommand =
+  | "resources.configure-source"
+  | "resources.configure-runtime"
+  | "resources.configure-network"
+  | "resources.configure-access"
+  | "resources.configure-health"
+  | "resources.set-variable"
+  | "resources.unset-variable";
+
+export interface ResourceProfileDiagnosticValue {
+  state: "present" | "missing" | "masked" | "redacted" | "unknown";
+  displayValue?: string | number | boolean | null;
+  valueHash?: string;
+}
+
 export interface ResourceDetailProfileDiagnostic {
   code: string;
-  severity: "info" | "warning" | "error";
+  severity: "info" | "warning" | "blocking";
   message: string;
   path?: string;
+  section?: ResourceProfileDriftSection;
+  fieldPath?: string;
+  comparison?: ResourceProfileDriftComparison;
+  resourceValue?: ResourceProfileDiagnosticValue;
+  entryProfileValue?: ResourceProfileDiagnosticValue;
+  deploymentSnapshotValue?: ResourceProfileDiagnosticValue;
+  latestDeploymentId?: string;
+  configPointer?: string;
+  blocksDeploymentAdmission?: boolean;
+  suggestedCommand?: ResourceProfileDriftSuggestedCommand;
 }
 
 export interface ResourceDetail {

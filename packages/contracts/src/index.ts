@@ -949,11 +949,43 @@ export const resourceDetailDeploymentContextSchema = resourceHealthDeploymentCon
   lastError: true,
 });
 
+export const resourceProfileDiagnosticValueSchema = z.object({
+  state: z.enum(["present", "missing", "masked", "redacted", "unknown"]),
+  displayValue: z.union([z.string(), z.number(), z.boolean(), z.null()]).optional(),
+  valueHash: z.string().optional(),
+});
+
 export const resourceDetailProfileDiagnosticSchema = z.object({
   code: z.string(),
-  severity: z.enum(["info", "warning", "error"]),
+  severity: z.enum(["info", "warning", "blocking"]),
   message: z.string(),
   path: z.string().optional(),
+  section: z.enum(["source", "runtime", "network", "access", "health", "configuration"]).optional(),
+  fieldPath: z.string().optional(),
+  comparison: z
+    .enum([
+      "resource-vs-entry-profile",
+      "resource-vs-latest-snapshot",
+      "entry-profile-vs-latest-snapshot",
+    ])
+    .optional(),
+  resourceValue: resourceProfileDiagnosticValueSchema.optional(),
+  entryProfileValue: resourceProfileDiagnosticValueSchema.optional(),
+  deploymentSnapshotValue: resourceProfileDiagnosticValueSchema.optional(),
+  latestDeploymentId: z.string().optional(),
+  configPointer: z.string().optional(),
+  blocksDeploymentAdmission: z.boolean().optional(),
+  suggestedCommand: z
+    .enum([
+      "resources.configure-source",
+      "resources.configure-runtime",
+      "resources.configure-network",
+      "resources.configure-access",
+      "resources.configure-health",
+      "resources.set-variable",
+      "resources.unset-variable",
+    ])
+    .optional(),
 });
 
 export const resourceDetailSchema = z.object({

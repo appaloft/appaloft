@@ -8,6 +8,7 @@ import {
   CreateResourceCommand,
   CreateSshCredentialCommand,
   type CreateSshCredentialCommandInput,
+  compareResourceProfileDrift,
   type EnvironmentSummary,
   ListEnvironmentsQuery,
   ListProjectsQuery,
@@ -17,7 +18,9 @@ import {
   RegisterServerCommand,
   type RegisterServerCommandInput,
   type ResourceDetail,
+  type ResourceDetailProfileDiagnostic,
   type ResourceSummary,
+  resourceProfileFromResourceDetail,
   type ServerSummary,
   SetEnvironmentVariableCommand,
   type SetEnvironmentVariableCommandInput,
@@ -97,6 +100,7 @@ export interface DeploymentPromptSeed {
   stateBackend?: DeploymentStateBackendDecision;
   stateBackendPrepared?: boolean;
   serverAppliedRoutes?: DeploymentServerAppliedRouteSeed[];
+  profileDriftPreflight?: boolean;
 }
 
 type ResourceDraftInput = Pick<CreateResourceInput, "name"> &
@@ -1435,6 +1439,85 @@ function validateServerAppliedRouteNetworkIfNeeded(input: {
   });
 }
 
+function primaryProfileDrift(diagnostics: ResourceDetailProfileDiagnostic[]) {
+  return diagnostics.find((diagnostic) => diagnostic.code === "resource_profile_drift");
+}
+
+function profileDriftAdmissionError(
+  diagnostics: ResourceDetailProfileDiagnostic[],
+  resourceId: string,
+) {
+  const drift = primaryProfileDrift(diagnostics);
+
+  return {
+    code: "resource_profile_drift",
+    category: "user",
+    message: "Existing Resource profile differs from the deployment config profile",
+    retryable: false,
+    details: {
+      phase: "resource-profile-resolution",
+      resourceId,
+      driftSection: drift?.section ?? "configuration",
+      driftFieldPath: drift?.fieldPath ?? drift?.path ?? "profile",
+      driftComparison: drift?.comparison ?? "resource-vs-entry-profile",
+      ...(drift?.configPointer ? { configPointer: drift.configPointer } : {}),
+      ...(drift?.suggestedCommand ? { suggestedCommand: drift.suggestedCommand } : {}),
+      blocksDeploymentAdmission: true,
+    },
+  } as const;
+}
+
+function rejectExistingResourceProfileDriftIfNeeded(input: {
+  seed: DeploymentPromptSeed;
+  resource: ResolvedWorkflowResourceReference;
+  sourceLocator: string;
+  deploymentMethod: DeploymentMethod;
+  runtimeProfile: ResourceRuntimeProfileInput;
+  networkProfile: ResourceNetworkProfileInput;
+}) {
+  return Effect.gen(function* () {
+    if (!input.seed.profileDriftPreflight || input.resource.reference.mode !== "existing") {
+      return;
+    }
+
+    const resourceId = input.resource.reference.id;
+    const query = yield* resultToEffect(
+      ShowResourceQuery.create({
+        resourceId,
+        includeLatestDeployment: false,
+        includeAccessSummary: false,
+        includeProfileDiagnostics: true,
+      }),
+    );
+    const cli = yield* CliRuntime;
+    const result = yield* Effect.promise(() => cli.executeQuery<ResourceDetail>(query));
+    const detail = yield* resultToEffect(result);
+    const diagnostics = compareResourceProfileDrift({
+      resource: resourceProfileFromResourceDetail(detail),
+      profile: {
+        source: sourceBindingForDeploymentInput(
+          input.sourceLocator,
+          input.deploymentMethod,
+          input.seed.sourceProfile,
+        ),
+        runtimeProfile: input.runtimeProfile,
+        networkProfile: input.networkProfile,
+      },
+      comparison: "resource-vs-entry-profile",
+      comparedValueKey: "entryProfileValue",
+      blocksDeploymentAdmission: true,
+      configPointerPrefix: "deployment",
+    });
+
+    if (diagnostics.length > 0) {
+      yield* Effect.sync(() => {
+        process.exitCode = 1;
+      });
+      return yield* Effect.fail(profileDriftAdmissionError(diagnostics, resourceId));
+    }
+  });
+}
+
 function sourceLinkConflictError(input: { field: string; expected: string; actual: string }) {
   return domainError.validation("Source link points at another deployment context", {
     phase: "source-link-resolution",
@@ -1698,6 +1781,14 @@ export function resolveInteractiveDeploymentInput(
           seed: resolvedSeed,
           ...(projectIdForLookup ? { projectId: projectIdForLookup } : {}),
           ...(environmentIdForLookup ? { environmentId: environmentIdForLookup } : {}),
+          sourceLocator: normalizedSourceLocator,
+          deploymentMethod,
+          runtimeProfile,
+          networkProfile,
+        });
+        yield* rejectExistingResourceProfileDriftIfNeeded({
+          seed: resolvedSeed,
+          resource,
           sourceLocator: normalizedSourceLocator,
           deploymentMethod,
           runtimeProfile,
