@@ -136,7 +136,11 @@ Codes must be stable identifiers, not localized text. Examples:
 | `invariant_violation` | `domain` | current state and attempted transition |
 | `not_found` | `not-found` | entity type and id |
 | `conflict` | `conflict` | conflict subject and state |
-| `deployment_not_redeployable` | `domain` or `application` | deployment id, resource id, current status |
+| `deployment_not_retryable` | `application` or `conflict` | phase `recovery-admission`; deployment id, resource id, current status, blocked reason code, readiness generated time |
+| `deployment_not_redeployable` | `domain` or `application` | phase `recovery-admission`; deployment id, resource id, current status, profile/readiness blocked reason code |
+| `deployment_not_rollback_ready` | `application` or `conflict` | phase `recovery-admission`; deployment id, resource id, requested rollback candidate id when provided, blocked reason code, missing artifact/snapshot/environment detail when safe |
+| `deployment_rollback_candidate_not_found` | `not-found` | phase `recovery-admission`; deployment id, resource id, rollback candidate id, retention horizon when known |
+| `deployment_recovery_state_stale` | `conflict` | phase `recovery-admission`; deployment id, resource id, readiness generated time, current deployment status/version when known |
 | `coordination_timeout` | `timeout` | coordination scope kind/key, coordination mode, waited seconds, retry hint when available |
 | `provider_error` | `integration` | provider key and operation |
 | `runtime_target_unsupported` | `application` or `integration` | target kind, provider key, missing capability, selected target/destination context |
@@ -211,6 +215,8 @@ Web UI must:
 - map `code` and `phase` to i18n keys;
 - display read-model status for post-acceptance failures;
 - show retry affordances only when `retriable = true` and a retry command exists;
+- show deployment recovery affordances only from `deployments.recovery-readiness`; terminal error
+  `retriable` flags are hints, not command-admission proof;
 - avoid branching on raw `message`.
 
 ### CLI
@@ -220,6 +226,9 @@ CLI must:
 - return stable error code/category/phase in structured output modes;
 - show human text for interactive users;
 - distinguish command rejection from accepted async failure in status/watch commands;
+- for failed or interrupted deployments, prefer `deployments.recovery-readiness` before suggesting
+  retry, redeploy, or rollback; if readiness is unavailable, suggest read-only detail/log/event
+  inspection instead of guessing recovery commands;
 - avoid treating translated text as a machine contract.
 
 ### HTTP API
