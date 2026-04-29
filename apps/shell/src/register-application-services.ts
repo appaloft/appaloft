@@ -64,6 +64,8 @@ import {
   type ExecutionContext,
   ImportCertificateCommandHandler,
   ImportCertificateUseCase,
+  InspectServerCapacityQueryHandler,
+  InspectServerCapacityQueryService,
   IssueCertificateOnCertificateRequestedHandler,
   IssueOrRenewCertificateCommandHandler,
   IssueOrRenewCertificateUseCase,
@@ -200,6 +202,7 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(ListCertificatesQueryHandler);
   container.registerSingleton(ShowProjectQueryHandler);
   container.registerSingleton(ShowSshCredentialQueryHandler);
+  container.registerSingleton(InspectServerCapacityQueryHandler);
   container.registerSingleton(
     tokens.certificateProviderSelectionPolicy,
     ShellCertificateProviderSelectionPolicy,
@@ -266,6 +269,10 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(tokens.showSshCredentialQueryService, ShowSshCredentialQueryService);
   container.registerSingleton(tokens.listServersQueryService, ListServersQueryService);
   container.registerSingleton(tokens.showServerQueryService, ShowServerQueryService);
+  container.registerSingleton(
+    tokens.inspectServerCapacityQueryService,
+    InspectServerCapacityQueryService,
+  );
   container.registerSingleton(tokens.renameServerUseCase, RenameServerUseCase);
   container.registerSingleton(
     tokens.configureServerEdgeProxyUseCase,

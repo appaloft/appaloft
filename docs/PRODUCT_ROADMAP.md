@@ -676,7 +676,7 @@ Required:
 - [ ] Add operator queries for certificate attempts.
 - [ ] Add operator queries for remote SSH state locks, migrations, backups, and recovery markers.
 - [ ] Add operator queries for source links, route realization attempts, and worker/job status.
-- [ ] Add runtime target capacity diagnostics for disk, inode, memory, CPU, Docker image usage,
+- [x] Add runtime target capacity diagnostics for disk, inode, memory, CPU, Docker image usage,
   build-cache usage, source workspace usage, and safe reclaimable estimates.
 - [ ] Add lifecycle commands for retry, cancel, mark-recovered, dead-letter, and prune where state
   can block deployments or create support load.

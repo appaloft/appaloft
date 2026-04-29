@@ -366,6 +366,16 @@ function remoteStateLockError(
   };
 }
 
+function remoteStateResolutionError(
+  message: string,
+  details?: Record<string, string | number | boolean | null>,
+): ReturnType<typeof domainError.infra> {
+  return {
+    ...retriableInfraError(message, details),
+    knowledge: resolvePublicDocsErrorKnowledge("infra_error.remote-state-resolution"),
+  };
+}
+
 function validateTarget(target: SshRemoteStateTarget): Result<void> {
   if (!trimmed(target.host)) {
     return err(
@@ -533,7 +543,7 @@ export class SshRemoteStateLifecycle {
               retryAfterSeconds: Math.ceil(this.lockRetryIntervalMs / 1_000),
               lockAcquireTimeoutSeconds: Math.ceil(this.lockAcquireTimeoutMs / 1_000),
             })
-          : domainError.infra("SSH remote state could not be prepared", {
+          : remoteStateResolutionError("SSH remote state could not be prepared", {
               ...errorDetails({
                 target: this.target,
                 phase,

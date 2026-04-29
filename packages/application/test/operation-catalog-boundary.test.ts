@@ -49,6 +49,7 @@ describe("operation catalog aggregate mutation boundary", () => {
       "credentials.list-ssh",
       "servers.list",
       "servers.show",
+      "servers.capacity.inspect",
       "servers.rename",
       "servers.deactivate",
       "servers.delete-check",
@@ -93,6 +94,25 @@ describe("operation catalog aggregate mutation boundary", () => {
       transports: {
         cli: "appaloft server delete <serverId> --confirm <serverId>",
         orpc: { method: "DELETE", path: "/api/servers/{serverId}" },
+      },
+    });
+    expect(entry?.inputSchema).toBeDefined();
+  });
+
+  test("[RUNTIME-CAPACITY-INSPECT-001] server capacity inspect is exposed as a read-only query", () => {
+    const entry = operationCatalog.find(
+      (candidate) => candidate.key === "servers.capacity.inspect",
+    );
+
+    expect(entry).toMatchObject({
+      kind: "query",
+      domain: "servers",
+      messageName: "InspectServerCapacityQuery",
+      handlerName: "InspectServerCapacityQueryHandler",
+      serviceName: "InspectServerCapacityQueryService",
+      transports: {
+        cli: "appaloft server capacity inspect <serverId>",
+        orpc: { method: "GET", path: "/api/servers/{serverId}/capacity" },
       },
     });
     expect(entry?.inputSchema).toBeDefined();
