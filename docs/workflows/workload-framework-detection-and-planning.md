@@ -136,6 +136,36 @@ does not create transport fields. Entry workflows may use evidence to prefill re
 drafts, but the write boundary remains `resources.create` or a future resource profile update
 operation followed by ids-only `deployments.create`.
 
+Web Quick Deploy, CLI interactive deploy, and repository config/headless deploy must use the same
+resource-profile draft vocabulary before dispatch. The shared draft vocabulary is:
+
+| Draft field | Resource owner field |
+| --- | --- |
+| Source directory or source root subdirectory | `ResourceSourceBinding.baseDirectory` |
+| Publish directory | `ResourceRuntimeProfile.publishDirectory` |
+| Dockerfile path | `ResourceRuntimeProfile.dockerfilePath` |
+| Docker Compose file path | `ResourceRuntimeProfile.dockerComposeFilePath` |
+| Docker build target | `ResourceRuntimeProfile.buildTarget` |
+| Install command | `ResourceRuntimeProfile.installCommand` |
+| Build command | `ResourceRuntimeProfile.buildCommand` |
+| Start command | `ResourceRuntimeProfile.startCommand` |
+| Runtime name | `ResourceRuntimeProfile.runtimeName` |
+| Internal application port | `ResourceNetworkProfile.internalPort` |
+| Upstream protocol, exposure mode, target service, and host port | `ResourceNetworkProfile` |
+| Health path or HTTP health policy | `ResourceRuntimeProfile.healthCheckPath` or resource health policy input |
+
+Framework detection may prefill this draft vocabulary. Repository config may declare the same
+profile fields. CLI flags may override the same profile fields. None of these fields may be
+forwarded to `deployments.create`.
+
+When detection cannot derive a safe production start command, publish directory, Dockerfile path,
+Compose path, or internal port for an inbound app, Web/CLI entry workflows must collect the missing
+field explicitly or fail before mutation. Repository config/headless workflows must either provide
+the missing profile field or receive a structured `validation_error`/`unsupported_config_field`
+before mutation. Generic fallback commands are accepted only as explicit
+`ResourceRuntimeProfile.installCommand`, `buildCommand`, and `startCommand` values that still plan a
+Docker/OCI image.
+
 ### Package Manager And Build Tool Resolution
 
 Planner selection must record the selected package manager or build tool when that choice changes
@@ -200,6 +230,34 @@ deterministic for the selected framework and source base directory.
 - Dockerfile, Compose, and prebuilt image strategies override framework detection for artifact
   construction. Detection may report warnings, package names, or likely health/port hints, but it
   must not replace an explicit Dockerfile, Compose project, or image reference.
+
+### Fixture Deploy Smoke Contract
+
+Framework fixture smoke tests are headless deployment-planning acceptance tests for the current
+support catalog. They must start from the same resource profile fields that Web, CLI, and
+repository config collect, then prove that ids-only deployment admission can resolve a Docker/OCI
+runtime plan.
+
+The canonical smoke path is:
+
+```text
+ResourceSourceBinding + ResourceRuntimeProfile + ResourceNetworkProfile
+  -> SourceInspectionSnapshot
+  -> RuntimePlanResolver
+  -> RuntimeArtifactSnapshot(kind = image or compose-project)
+  -> docker-container or docker-compose execution plan
+  -> generated Dockerfile/build/run command evidence or an opt-in real Docker run
+```
+
+Smoke tests may be headless when the CI environment cannot install dependencies, build images, or
+run Docker. A headless smoke still must prove equivalent execution readiness by asserting the
+selected planner, image/Compose artifact intent, generated Dockerfile or Compose plan, runtime
+port, verification steps, and typed Docker command rendering. It must not execute framework CLIs
+during source detection.
+
+Fixture smoke coverage must be table-driven by fixture descriptors and planner descriptors. Adding
+a new framework should mean adding detection/planner data and a fixture expectation, not adding a
+new public command, framework-specific deployment input field, or transport-only branch.
 
 ### Port And Readiness Rules
 

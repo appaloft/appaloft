@@ -269,12 +269,16 @@ describe("CLI deployment config entry workflow", () => {
       source: {
         gitRef: "main",
         commitSha: "abc123",
+        baseDirectory: "apps/api",
       },
       runtime: {
         strategy: "workspace-commands",
         installCommand: "bun install",
         buildCommand: "bun run build",
         startCommand: "bun run start",
+        dockerfilePath: "deploy/Dockerfile",
+        dockerComposeFilePath: "deploy/compose.yaml",
+        buildTarget: "runner",
         name: "www",
         healthCheck: {
           path: "/ready",
@@ -301,11 +305,15 @@ describe("CLI deployment config entry workflow", () => {
       sourceProfile: {
         gitRef: "main",
         commitSha: "abc123",
+        baseDirectory: "apps/api",
       },
       deploymentMethod: "workspace-commands",
       installCommand: "bun install",
       buildCommand: "bun run build",
       startCommand: "bun run start",
+      dockerfilePath: "deploy/Dockerfile",
+      dockerComposeFilePath: "deploy/compose.yaml",
+      buildTarget: "runner",
       runtimeNameTemplate: "www",
       port: 4310,
       upstreamProtocol: "http",
@@ -336,9 +344,16 @@ describe("CLI deployment config entry workflow", () => {
     ).toMatchObject({
       gitRef: "main",
       commitSha: "abc123",
+      baseDirectory: "apps/api",
     });
     expect(runtimeProfileFromDeploymentInput("workspace-commands", seed)).toMatchObject({
       strategy: "workspace-commands",
+      installCommand: "bun install",
+      buildCommand: "bun run build",
+      startCommand: "bun run start",
+      dockerfilePath: "deploy/Dockerfile",
+      dockerComposeFilePath: "deploy/compose.yaml",
+      buildTarget: "runner",
       healthCheck: {
         http: {
           path: "/ready",
@@ -1391,6 +1406,8 @@ describe("CLI deployment config entry workflow", () => {
               workspace,
               "--method",
               "workspace-commands",
+              "--source-base-directory",
+              "apps/api",
               "--install",
               "bun install --frozen-lockfile",
               "--build",
@@ -1439,6 +1456,9 @@ describe("CLI deployment config entry workflow", () => {
       (command) => command.constructor.name === "CreateResourceCommand",
     );
     expect(resource).toMatchObject({
+      source: {
+        baseDirectory: "apps/api",
+      },
       runtimeProfile: {
         strategy: "workspace-commands",
         runtimeName: "preview-123",

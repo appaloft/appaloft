@@ -143,6 +143,20 @@ test expectations in the same change.
 | WF-PLAN-BOUND-005 | contract | Core stays provider/framework independent | Core value objects use stable platform vocabulary and do not import framework package types, Docker SDK response types, provider SDK types, filesystem readers, or shell executors. |
 | WF-PLAN-BOUND-006 | integration | Sanitized diagnostics only | Planner and runtime failure details include safe evidence fields and omit secrets, registry tokens, raw env values, and unbounded command output. |
 
+## Fixture Deploy Smoke Matrix
+
+These rows prove that representative JavaScript/TypeScript and Python fixtures move beyond
+detect/plan evidence into Docker/OCI execution readiness. Real Docker runs are preferred where the
+environment provides Docker and dependency installs; headless smoke is acceptable when it asserts
+the equivalent Dockerfile/build/run/verification evidence without executing framework CLIs.
+
+| Test ID | Preferred automation | Fixture family | Case | Expected result |
+| --- | --- | --- | --- | --- |
+| WF-PLAN-SMOKE-001 | integration, opt-in Docker e2e | Static frontend | Vite or equivalent SPA fixture starts from source/runtime/network resource profile fields | Planner selects a static image artifact, generated Dockerfile packages the publish directory into the adapter-owned static server, internal port is 80 unless the resource profile overrides it, and typed Docker build/run commands are renderable from the plan. |
+| WF-PLAN-SMOKE-002 | integration, opt-in Docker e2e | Node HTTP server | Express/Fastify/NestJS/Hono/Koa/generic Node fixture starts from the same profile vocabulary | Planner selects a workspace-command image artifact with Node/Bun base policy, install/build/start commands, resource-owned internal port, internal HTTP verification, and no deployment-owned framework fields. |
+| WF-PLAN-SMOKE-003 | integration, opt-in Docker e2e | Python HTTP server | FastAPI/Django/Flask/generic Python fixture starts from the same profile vocabulary | Planner selects a workspace-command image artifact with Python base policy, package-manager install/start command, resource-owned internal port, internal HTTP verification, and no deployment-owned framework fields. |
+| WF-PLAN-SMOKE-004 | integration | Unsupported or ambiguous fixture boundary | Unsupported framework evidence or ambiguous hybrid evidence lacks explicit fallback commands | Planning fails with `validation_error` in phase `runtime-plan-resolution`; explicit fallback commands may instead produce a Docker/OCI image plan without adding deployment command fields. |
+
 ## Entry Parity Matrix
 
 | Test ID | Preferred automation | Entry | Expected test focus |
@@ -151,6 +165,8 @@ test expectations in the same change.
 | WF-PLAN-ENTRY-002 | e2e-preferred | CLI Quick Deploy | CLI uses the same inspection/planner contract as Web, prompts or errors for missing fallback commands, and never sends framework/base-image fields to `deployments.create`. |
 | WF-PLAN-ENTRY-003 | contract | HTTP/oRPC strict deployment admission | HTTP/oRPC deployment create accepts only the shared ids-only command schema and does not read local source files or repository config files. |
 | WF-PLAN-ENTRY-004 | e2e-preferred | Repository config / headless profile | Config profile fields map to resource source/runtime/network/health operations before deployment; unsupported framework/runtime sizing/orchestrator fields are rejected before mutation. |
+| WF-PLAN-ENTRY-005 | contract | Shared draft field vocabulary | Web, CLI, and repository config normalize source base directory, publish directory, Dockerfile path, Compose path, build target, install/build/start commands, runtime name, internal port, network exposure, target service, host port, and health fields into the same `resources.create` profile shape before ids-only `deployments.create`. |
+| WF-PLAN-ENTRY-006 | contract | Explicit fallback commands | For supported JavaScript/TypeScript/Python sources whose framework evidence lacks safe production start or static output evidence, entry workflows accept only explicit profile fallback commands or fail with structured `validation_error` before deployment admission; fallback commands are never deployment command fields. |
 
 ## Current Implementation Notes And Migration Gaps
 
@@ -180,8 +196,18 @@ static, Solid SPA static, SvelteKit adapter-static, Nuxt generate, Astro static,
 Fastify, NestJS, Hono, Koa, generic Node package scripts, FastAPI, Django, and Flask, including
 Angular `angular.json` output-path planning.
 `WF-PLAN-BOUND-001` has command-schema coverage for rejecting framework/package/base-image/buildpack
-deployment fields. This does not yet complete unsupported catalog families, SvelteKit server-adapter
-start inference, Astro SSR, worker plans, or Web/CLI entry parity.
+deployment fields. `WF-PLAN-ENTRY-005` and `WF-PLAN-ENTRY-006` govern the current Web/CLI/repository
+config draft parity slice for JavaScript/TypeScript/Python support. This does not yet complete
+unsupported catalog families, SvelteKit server-adapter start inference, Astro SSR, worker plans, or
+full browser-level Web/CLI entry parity for every catalog fixture.
+
+`WF-PLAN-SMOKE-001` through `WF-PLAN-SMOKE-003` cover the first representative fixture deploy smoke
+slice for Vite static, Fastify Node, and FastAPI Python through headless Docker/OCI execution
+readiness. They prove the resource source/runtime/network profile can resolve to generated
+Dockerfile evidence, image artifact intent, docker-container execution, internal HTTP verification,
+and typed Docker command rendering without adding framework-specific deployment fields. Full real
+Docker/SSH execution for every catalog fixture remains a migration gap until opt-in environment
+coverage is broadened.
 
 Before a framework family can be marked first-class, Code Round must add at least one planner or
 fallback test for its `WF-PLAN-CAT-*` row plus boundary coverage proving base-image policy,

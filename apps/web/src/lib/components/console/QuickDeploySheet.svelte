@@ -310,6 +310,15 @@
   let resourceKind = $state<ResourceKind>(parseResourceKind(browser ? page.url.searchParams.get("resourceKind") : null));
   let resourceDescription = $state(browser ? (page.url.searchParams.get("resourceDescription") ?? "") : "");
   let resourceRuntimeName = $state(browser ? (page.url.searchParams.get("resourceRuntimeName") ?? "") : "");
+  let sourceBaseDirectory = $state(browser ? (page.url.searchParams.get("sourceBaseDirectory") ?? "") : "");
+  let resourceInstallCommand = $state(browser ? (page.url.searchParams.get("resourceInstallCommand") ?? "") : "");
+  let resourceBuildCommand = $state(browser ? (page.url.searchParams.get("resourceBuildCommand") ?? "") : "");
+  let resourceStartCommand = $state(browser ? (page.url.searchParams.get("resourceStartCommand") ?? "") : "");
+  let resourceDockerfilePath = $state(browser ? (page.url.searchParams.get("resourceDockerfilePath") ?? "") : "");
+  let resourceDockerComposeFilePath = $state(
+    browser ? (page.url.searchParams.get("resourceDockerComposeFilePath") ?? "") : "",
+  );
+  let resourceBuildTarget = $state(browser ? (page.url.searchParams.get("resourceBuildTarget") ?? "") : "");
   let resourceInternalPort = $state(
     browser
       ? (page.url.searchParams.get("resourceInternalPort") ??
@@ -555,6 +564,10 @@
     const healthCheckPath = resourceHealthCheckPath.trim();
     const createsResource = !resourceContextEnabled || resourceMode === "new";
 
+    if (sourceBaseDirectory.trim()) {
+      segments.push(`--source-base-directory ${sourceBaseDirectory.trim()}`);
+    }
+
     if (createsStaticSiteResource) {
       segments.push("--method static");
       segments.push(`--publish-dir ${staticPublishDirectory.trim() || "/dist"}`);
@@ -564,6 +577,26 @@
       if (staticBuildCommand.trim()) {
         segments.push(`--build ${staticBuildCommand.trim()}`);
       }
+    }
+    if (!createsStaticSiteResource) {
+      if (resourceInstallCommand.trim()) {
+        segments.push(`--install ${resourceInstallCommand.trim()}`);
+      }
+      if (resourceBuildCommand.trim()) {
+        segments.push(`--build ${resourceBuildCommand.trim()}`);
+      }
+      if (resourceStartCommand.trim()) {
+        segments.push(`--start ${resourceStartCommand.trim()}`);
+      }
+    }
+    if (resourceDockerfilePath.trim()) {
+      segments.push(`--dockerfile-path ${resourceDockerfilePath.trim()}`);
+    }
+    if (resourceDockerComposeFilePath.trim()) {
+      segments.push(`--docker-compose-file-path ${resourceDockerComposeFilePath.trim()}`);
+    }
+    if (resourceBuildTarget.trim()) {
+      segments.push(`--build-target ${resourceBuildTarget.trim()}`);
     }
 
     if (!resourceContextEnabled) {
@@ -1217,6 +1250,13 @@
       setSearchParam(params, "resourceRuntimeName", resourceRuntimeName);
     }
     setSearchParam(params, "resourceInternalPort", resourceInternalPort, "3000");
+    setSearchParam(params, "sourceBaseDirectory", sourceBaseDirectory);
+    setSearchParam(params, "resourceInstallCommand", resourceInstallCommand);
+    setSearchParam(params, "resourceBuildCommand", resourceBuildCommand);
+    setSearchParam(params, "resourceStartCommand", resourceStartCommand);
+    setSearchParam(params, "resourceDockerfilePath", resourceDockerfilePath);
+    setSearchParam(params, "resourceDockerComposeFilePath", resourceDockerComposeFilePath);
+    setSearchParam(params, "resourceBuildTarget", resourceBuildTarget);
     setSearchParam(params, "staticPublishDirectory", staticPublishDirectory, "/dist");
     setSearchParam(params, "staticInstallCommand", staticInstallCommand);
     setSearchParam(params, "staticBuildCommand", staticBuildCommand);
@@ -1278,6 +1318,13 @@
     resourceKind = parseResourceKind(params.get("resourceKind"));
     resourceDescription = params.get("resourceDescription") ?? "";
     resourceRuntimeName = params.get("resourceRuntimeName") ?? "";
+    sourceBaseDirectory = params.get("sourceBaseDirectory") ?? "";
+    resourceInstallCommand = params.get("resourceInstallCommand") ?? "";
+    resourceBuildCommand = params.get("resourceBuildCommand") ?? "";
+    resourceStartCommand = params.get("resourceStartCommand") ?? "";
+    resourceDockerfilePath = params.get("resourceDockerfilePath") ?? "";
+    resourceDockerComposeFilePath = params.get("resourceDockerComposeFilePath") ?? "";
+    resourceBuildTarget = params.get("resourceBuildTarget") ?? "";
     resourceInternalPort = params.get("resourceInternalPort") ?? (nextSourceKind === "static-site" ? "80" : "3000");
     staticPublishDirectory = params.get("staticPublishDirectory") ?? "/dist";
     staticInstallCommand = params.get("staticInstallCommand") ?? "";
@@ -1391,13 +1438,16 @@
 
   function resourceSourceForSource(): ResourceSourceInput {
     const locator = sourceLocator.trim();
+    const baseDirectory = sourceBaseDirectory.trim();
+    const withBaseDirectory = (input: ResourceSourceInput): ResourceSourceInput =>
+      baseDirectory && input.kind !== "docker-image" ? { ...input, baseDirectory } : input;
 
     switch (sourceKind) {
       case "github":
       {
         const selectedRepository =
           githubSourceMode === "browser" ? selectedGitHubRepository : null;
-        return {
+        return withBaseDirectory({
           kind: selectedRepository ? "git-github-app" : gitSourceKindForLocator(locator),
           locator,
           ...(selectedRepository ? { displayName: selectedRepository.fullName } : {}),
@@ -1409,33 +1459,33 @@
                 },
               }
             : {}),
-        };
+        });
       }
       case "remote-git":
-        return {
+        return withBaseDirectory({
           kind: gitSourceKindForLocator(locator),
           locator,
-        };
+        });
       case "docker-image":
         return {
           kind: "docker-image",
           locator,
         };
       case "compose":
-        return {
+        return withBaseDirectory({
           kind: "compose",
           locator,
-        };
+        });
       case "static-site":
-        return {
+        return withBaseDirectory({
           kind: staticSourceKindForLocator(locator),
           locator,
-        };
+        });
       default:
-        return {
+        return withBaseDirectory({
           kind: "local-folder",
           locator,
-        };
+        });
     }
   }
 
@@ -1526,7 +1576,12 @@
       case "docker-image":
         return withHealthCheckPath({ strategy: "prebuilt-image" });
       case "compose":
-        return withHealthCheckPath({ strategy: "docker-compose" });
+        return withHealthCheckPath({
+          strategy: "docker-compose",
+          ...(resourceDockerComposeFilePath.trim()
+            ? { dockerComposeFilePath: resourceDockerComposeFilePath.trim() }
+            : {}),
+        });
       case "static-site":
         return withHealthCheckPath({
           strategy: "static",
@@ -1545,7 +1600,21 @@
             ...(staticBuildCommand.trim() ? { buildCommand: staticBuildCommand.trim() } : {}),
           });
         }
-        return withHealthCheckPath({ strategy: "auto" });
+        return withHealthCheckPath({
+          strategy: resourceDockerfilePath.trim()
+            ? "dockerfile"
+            : resourceDockerComposeFilePath.trim()
+              ? "docker-compose"
+              : "auto",
+          ...(resourceInstallCommand.trim() ? { installCommand: resourceInstallCommand.trim() } : {}),
+          ...(resourceBuildCommand.trim() ? { buildCommand: resourceBuildCommand.trim() } : {}),
+          ...(resourceStartCommand.trim() ? { startCommand: resourceStartCommand.trim() } : {}),
+          ...(resourceDockerfilePath.trim() ? { dockerfilePath: resourceDockerfilePath.trim() } : {}),
+          ...(resourceDockerComposeFilePath.trim()
+            ? { dockerComposeFilePath: resourceDockerComposeFilePath.trim() }
+            : {}),
+          ...(resourceBuildTarget.trim() ? { buildTarget: resourceBuildTarget.trim() } : {}),
+        });
     }
   }
 
@@ -2202,6 +2271,19 @@
                 {/if}
               </div>
             {/if}
+            {#if sourceKind !== "docker-image"}
+              <div class="space-y-2">
+                <label class="text-xs font-medium text-muted-foreground" for="source-base-directory">
+                  {$t(i18nKeys.console.quickDeploy.sourceBaseDirectory)}
+                </label>
+                <Input
+                  id="source-base-directory"
+                  class="font-mono text-xs"
+                  bind:value={sourceBaseDirectory}
+                  placeholder="apps/web"
+                />
+              </div>
+            {/if}
             {#if sourceKind === "static-site"}
               <div class="grid gap-3 sm:grid-cols-3">
                 <div class="space-y-2">
@@ -2240,6 +2322,75 @@
                 <p class="text-xs text-muted-foreground sm:col-span-3">
                   {$t(i18nKeys.console.quickDeploy.staticPublishDirectoryHint)}
                 </p>
+              </div>
+            {:else if sourceKind !== "docker-image"}
+              <div class="grid gap-3 sm:grid-cols-3">
+                <div class="space-y-2">
+                  <label class="text-xs font-medium text-muted-foreground" for="runtime-install-command">
+                    {$t(i18nKeys.console.quickDeploy.runtimeInstallCommand)}
+                  </label>
+                  <Input
+                    id="runtime-install-command"
+                    class="font-mono text-xs"
+                    bind:value={resourceInstallCommand}
+                    placeholder="pnpm install"
+                  />
+                </div>
+                <div class="space-y-2">
+                  <label class="text-xs font-medium text-muted-foreground" for="runtime-build-command">
+                    {$t(i18nKeys.console.quickDeploy.runtimeBuildCommand)}
+                  </label>
+                  <Input
+                    id="runtime-build-command"
+                    class="font-mono text-xs"
+                    bind:value={resourceBuildCommand}
+                    placeholder="pnpm build"
+                  />
+                </div>
+                <div class="space-y-2">
+                  <label class="text-xs font-medium text-muted-foreground" for="runtime-start-command">
+                    {$t(i18nKeys.console.quickDeploy.runtimeStartCommand)}
+                  </label>
+                  <Input
+                    id="runtime-start-command"
+                    class="font-mono text-xs"
+                    bind:value={resourceStartCommand}
+                    placeholder="pnpm start"
+                  />
+                </div>
+                <div class="space-y-2">
+                  <label class="text-xs font-medium text-muted-foreground" for="runtime-dockerfile-path">
+                    {$t(i18nKeys.console.quickDeploy.dockerfilePath)}
+                  </label>
+                  <Input
+                    id="runtime-dockerfile-path"
+                    class="font-mono text-xs"
+                    bind:value={resourceDockerfilePath}
+                    placeholder="Dockerfile"
+                  />
+                </div>
+                <div class="space-y-2">
+                  <label class="text-xs font-medium text-muted-foreground" for="runtime-compose-file-path">
+                    {$t(i18nKeys.console.quickDeploy.dockerComposeFilePath)}
+                  </label>
+                  <Input
+                    id="runtime-compose-file-path"
+                    class="font-mono text-xs"
+                    bind:value={resourceDockerComposeFilePath}
+                    placeholder="compose.yaml"
+                  />
+                </div>
+                <div class="space-y-2">
+                  <label class="text-xs font-medium text-muted-foreground" for="runtime-build-target">
+                    {$t(i18nKeys.console.quickDeploy.buildTarget)}
+                  </label>
+                  <Input
+                    id="runtime-build-target"
+                    class="font-mono text-xs"
+                    bind:value={resourceBuildTarget}
+                    placeholder="runner"
+                  />
+                </div>
               </div>
             {/if}
           </div>

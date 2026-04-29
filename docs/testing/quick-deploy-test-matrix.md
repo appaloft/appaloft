@@ -160,6 +160,9 @@ Then:
 | QUICK-DEPLOY-ENTRY-010 | e2e-preferred | Repository config file parity | Local Web agent may read a selected file and must follow the config workflow contract | CLI supports explicit `--config` and implicit discovery through the same parser/normalizer; GitHub Actions invokes the binary as a non-interactive CLI executor with SSH-server `ssh-pglite` by default for SSH targets | API/automation remains explicit-operation first; no hidden config-file deployment schema |
 | QUICK-DEPLOY-ENTRY-011 | contract | Deploy action wrapper parity | Not applicable unless a local Web agent shells out to the CLI | `appaloft/deploy-action` installs a verified released binary, maps trusted inputs to the same CLI flags as direct CLI usage, and invokes the same repository config workflow | API/automation still call explicit operations or use direct CLI; the action wrapper must not introduce a hidden business command |
 | QUICK-DEPLOY-ENTRY-012 | contract | Control-plane mode parity | Web shows read-only mode until selection is implemented, then uses an explicit select/radio backed by the same resolver | CLI and deploy-action expose equivalent trusted mode/URL/token inputs and keep pure SSH `none` as default | HTTP/oRPC keeps `deployments.create` ids-only; future backend workflow API requires separate ADR/operation contract |
+| QUICK-DEPLOY-ENTRY-013 | contract | Framework/runtime draft field parity | Web maps source base directory, publish directory, Dockerfile path, Compose path, build target, install/build/start commands, runtime name, internal port, network, and health drafts to `resources.create` | CLI flags, config seeds, and interactive prompts where present map the same fields to `resources.create` or `resources.configure-runtime` for existing resources | Repository config declares the same profile fields and maps them before ids-only deployment admission |
+| QUICK-DEPLOY-ENTRY-014 | contract | Explicit fallback command parity | Web requires explicit fallback commands or publish/runtime fields when detection cannot produce safe defaults | CLI non-TTY fails before mutation unless config or flags provide fallback commands; CLI TTY may prompt | API/automation remains explicit-resource-profile first; `deployments.create` never accepts fallback command fields |
+| QUICK-DEPLOY-ENTRY-015 | integration, opt-in e2e | Framework fixture Docker/OCI smoke parity | Web or local Web agent must produce the same source/runtime/network profile draft for representative static, Node, and Python fixtures before ids-only deployment | CLI and repository config/headless flows must map the same profile vocabulary for those fixtures before ids-only deployment | The shared profile produces an image or Compose runtime plan with Docker/OCI execution evidence; no entrypoint sends framework, package, base image, or buildpack fields to `deployments.create` |
 
 ## Error Assertion Rules
 
@@ -216,7 +219,9 @@ framework-signal, classification, catalog, base-image, runtime-capability, and b
 owned by `WF-PLAN-*` rows in
 [Workload Framework Detection And Planning Test Matrix](./workload-framework-detection-and-planning-test-matrix.md).
 Current implementation has detector/planner coverage for initial JavaScript/TypeScript and Python
-framework slices, but full browser/CLI e2e parity is still required before a framework family is
+framework slices. `QUICK-DEPLOY-ENTRY-015` is covered first by headless fixture smoke for the
+representative Vite static, Fastify Node, and FastAPI Python paths; full browser/CLI e2e parity and
+real Docker/SSH execution for every catalog fixture are still required before a framework family is
 marked first-class.
 
 Repository config file rows `QUICK-DEPLOY-WF-045` through `QUICK-DEPLOY-WF-051` and
