@@ -287,6 +287,25 @@ than real Docker execution because the fixture contract avoids dependency instal
 CLI execution by default. Full real Docker/SSH smoke for every JavaScript/TypeScript/Python catalog
 fixture remains a migration gap.
 
+The first real fixture deployment smoke target is a representative opt-in local Docker slice, not
+the full catalog: Vite or Next static export plus Angular SPA, React SPA, or SvelteKit static; Next
+SSR or Remix plus one Node HTTP framework; and FastAPI plus Django or Flask when dependency
+installation is available. If FastAPI cannot execute because the Docker package index cannot
+resolve required dependencies, the local slice may temporarily use Django plus Flask only when the
+FastAPI dependency failure remains recorded as a migration gap. The harness must start from the
+same resource source/runtime/network profile vocabulary as Quick Deploy, dispatch ids-only
+`deployments.create` or an equivalent shell workflow, then prove actual image build, container run,
+internal HTTP verification, runtime metadata/logs, and typed command rendering. Generic-SSH should
+reuse the same fixture descriptors when a real SSH target is configured; until then, real SSH
+fixture execution remains a migration gap rather than a passed condition.
+
+Current opt-in local Docker coverage for this slice passes with Vite SPA, React SPA, Next SSR,
+Hono, Django, and Flask. FastAPI is still a migration gap in the current local Docker environment
+because pip could not resolve the required transitive `pydantic` dependency for the fixture image.
+Angular SPA and SvelteKit static remain fixture-hardening gaps for real Docker execution after
+failing during dependency/build execution before container start. The headless planner/catalog
+coverage for those fixtures remains intact.
+
 `build-requested`, resolved image ids/digests, runtime instance identity, rollback candidate
 capture, command specs on the durable runtime plan boundary, and richer source-file analysis are
 not yet fully implemented across the application and persistence boundary. The remaining generic
