@@ -21,6 +21,7 @@ This workflow inherits:
 - [ADR-028: Command Coordination Scope And Mutation Admission](../decisions/ADR-028-command-coordination-scope-and-mutation-admission.md)
 - [Workload Framework Detection And Planning](./workload-framework-detection-and-planning.md)
 - [Repository Deployment Config File Bootstrap](./deployment-config-file-bootstrap.md)
+- [Resource Profile Drift Visibility](../specs/011-resource-profile-drift-visibility/spec.md)
 - [Error Model](../errors/model.md)
 - [neverthrow Conventions](../errors/neverthrow-conventions.md)
 - [Async Lifecycle And Acceptance](../architecture/async-lifecycle-and-acceptance.md)
@@ -309,7 +310,10 @@ Migration gaps:
 - repository config file support now has a profile-only parser/schema, YAML discovery, CLI
   `--config`, profile-only `appaloft init`, targeted rejection coverage for identity, secret, and
   unsupported fields, and ids-only `deployments.create` admission. Existing-resource profile drift
-  handling and environment/secret command sequencing remain workflow gaps.
+  visibility is governed by
+  [Resource Profile Drift Visibility](../specs/011-resource-profile-drift-visibility/spec.md) and
+  must remain an entry-workflow preflight/read diagnostic instead of a deployment workflow input.
+  Environment/secret command sequencing remains a workflow gap.
 - generated default access route resolution now has a provider boundary and `ResourceAccessSummary`
   projection. Remaining deployment workflow gaps are durable-domain/server-applied precedence in the
   resolver, provider-route projection/retention, and replacing adapter-facing requested route seams

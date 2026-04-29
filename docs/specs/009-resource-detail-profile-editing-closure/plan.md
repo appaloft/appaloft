@@ -57,5 +57,6 @@
 - No schema migration is required.
 - Existing `docs/specs/008-resource-detail-profile-editing` remains the source/runtime/network
   slice. This artifact closes the broader Phase 4 detail/profile editing exit criterion.
-- Resource profile drift visibility remains a later roadmap/ledger item and is not implemented by
-  this closure.
+- Resource profile drift visibility is governed by the later
+  [Resource Profile Drift Visibility](../011-resource-profile-drift-visibility/spec.md) artifact and
+  is not implemented by this closure.

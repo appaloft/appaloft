@@ -63,6 +63,7 @@ export * from "./operations/resources/resource-access-summary.projector";
 export * from "./operations/resources/resource-diagnostic-summary.query-service";
 export * from "./operations/resources/resource-effective-config.query-service";
 export * from "./operations/resources/resource-health.query-service";
+export * from "./operations/resources/resource-profile-drift";
 export * from "./operations/resources/resource-proxy-configuration-preview.query-service";
 export * from "./operations/resources/resource-runtime-logs.query-service";
 export * from "./operations/resources/set-resource-variable.use-case";

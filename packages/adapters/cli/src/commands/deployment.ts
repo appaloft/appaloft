@@ -1362,6 +1362,7 @@ export const deployCommand = EffectCommand.make(
         ...(environmentVariables.length > 0 ? { environmentVariables } : {}),
         ...(sourceFingerprint ? { sourceFingerprint } : {}),
         ...(stateBackendDecision ? { stateBackend: stateBackendDecision } : {}),
+        ...(configResolution ? { profileDriftPreflight: true } : {}),
       };
 
       const stateSession = yield* prepareDeploymentStateSessionIfNeeded(stateBackendDecision);

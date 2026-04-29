@@ -35,6 +35,10 @@ import {
 } from "../../ports";
 import { tokens } from "../../tokens";
 import { type ListResourcesQueryService } from "./list-resources.query-service";
+import {
+  compareResourceProfileDrift,
+  resourceProfileFromDeploymentSnapshot,
+} from "./resource-profile-drift";
 import { type ShowResourceQuery } from "./show-resource.query";
 
 function withShowResourceDetails(
@@ -243,8 +247,16 @@ function deploymentContextFromSummary(
   };
 }
 
-function diagnosticsFromState(state: ResourceState): ResourceDetailProfileDiagnostic[] {
+function diagnosticsFromState(input: {
+  state: ResourceState;
+  source?: ResourceDetailSourceProfile;
+  runtimeProfile?: ResourceDetailRuntimeProfile;
+  networkProfile?: ResourceDetailNetworkProfile;
+  accessProfile?: ResourceAccessProfile;
+  deployment?: DeploymentSummary;
+}): ResourceDetailProfileDiagnostic[] {
   const diagnostics: ResourceDetailProfileDiagnostic[] = [];
+  const { state } = input;
 
   if (!state.sourceBinding) {
     diagnostics.push({
@@ -280,6 +292,24 @@ function diagnosticsFromState(state: ResourceState): ResourceDetailProfileDiagno
       message: "Static runtime profile has no publish directory.",
       path: "runtimeProfile.publishDirectory",
     });
+  }
+
+  if (input.deployment) {
+    diagnostics.push(
+      ...compareResourceProfileDrift({
+        resource: {
+          ...(input.source ? { source: input.source } : {}),
+          ...(input.runtimeProfile ? { runtimeProfile: input.runtimeProfile } : {}),
+          ...(input.networkProfile ? { networkProfile: input.networkProfile } : {}),
+          ...(input.accessProfile ? { accessProfile: input.accessProfile } : {}),
+        },
+        profile: resourceProfileFromDeploymentSnapshot(input.deployment),
+        comparison: "resource-vs-latest-snapshot",
+        comparedValueKey: "deploymentSnapshotValue",
+        latestDeploymentId: input.deployment.id,
+        blocksDeploymentAdmission: false,
+      }),
+    );
   }
 
   return diagnostics;
@@ -359,7 +389,16 @@ export class ShowResourceQueryService {
           status: state.lifecycleStatus.value,
           ...(state.archivedAt ? { archivedAt: state.archivedAt.value } : {}),
         },
-        diagnostics: query.includeProfileDiagnostics ? diagnosticsFromState(state) : [],
+        diagnostics: query.includeProfileDiagnostics
+          ? diagnosticsFromState({
+              state,
+              ...(source ? { source } : {}),
+              ...(runtimeProfile ? { runtimeProfile } : {}),
+              ...(networkProfile ? { networkProfile } : {}),
+              ...(accessProfile ? { accessProfile } : {}),
+              ...(deployment ? { deployment } : {}),
+            })
+          : [],
         generatedAt: this.clock.now(),
       });
     } catch (error) {

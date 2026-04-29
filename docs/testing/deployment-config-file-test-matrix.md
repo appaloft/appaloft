@@ -42,6 +42,7 @@ This matrix inherits:
 - [ADR-025: Control-Plane Modes And Action Execution](../decisions/ADR-025-control-plane-modes-and-action-execution.md)
 - [resources.create Command Spec](../commands/resources.create.md)
 - [deployments.create Command Spec](../commands/deployments.create.md)
+- [Resource Profile Drift Visibility](../specs/011-resource-profile-drift-visibility/spec.md)
 - [Workload Framework Detection And Planning Test Matrix](./workload-framework-detection-and-planning-test-matrix.md)
 - [Quick Deploy Test Matrix](./quick-deploy-test-matrix.md)
 - [Control-Plane Modes Test Matrix](./control-plane-modes-test-matrix.md)
@@ -104,8 +105,8 @@ This matrix inherits:
 | CONFIG-FILE-PROFILE-003 | e2e-preferred | Health policy from config | Config declares HTTP health policy | Values map to resource runtime/health policy | None | Resource profile/health operation -> `deployments.create` |
 | CONFIG-FILE-PROFILE-004 | integration | Unsafe source base directory | Config base directory contains `..`, URL, shell metacharacter, or host absolute path | Workflow stops before mutation | `validation_error`, phase `config-profile-resolution` | No write commands |
 | CONFIG-FILE-PROFILE-005 | integration | Monorepo base directory | Config selects `/apps/api` under the source root | Resource source binding uses safe source-root-relative base directory | None | `resources.create(source.baseDirectory)` -> `deployments.create` |
-| CONFIG-FILE-PROFILE-006 | integration | Existing resource profile drift before configuration commands are active | Existing resource profile differs from config and accepted `resources.configure-source` / `resources.configure-runtime` / `resources.configure-network` operations are not active | Workflow stops before deployment | `resource_profile_drift`, phase `resource-profile-resolution` | No `deployments.create` |
-| CONFIG-FILE-PROFILE-007 | e2e-preferred | Existing resource profile configuration after operations are active | Existing resource profile differs and explicit resource profile configuration operations are active | Relevant `resources.configure-*` commands run before deployment | None | Resource profile configuration command(s) -> `deployments.create` |
+| CONFIG-FILE-PROFILE-006 | integration | Existing resource profile drift blocks default config deploy | Existing resource profile differs from normalized config or trusted entry profile and the workflow is not explicitly applying profile commands | Workflow stops before deployment with section, field path, config pointer when known, and suggested command details | `resource_profile_drift`, phase `resource-profile-resolution` | No `deployments.create` |
+| CONFIG-FILE-PROFILE-007 | e2e-preferred | Existing resource profile configuration through explicit apply step | Existing resource profile differs and the entry workflow has an accepted explicit mode or step to apply profile changes | Relevant `resources.configure-*`, `resources.configure-health`, `resources.set-variable`, or `resources.unset-variable` commands run before deployment | None | Resource profile configuration command(s) -> `deployments.create` |
 | CONFIG-FILE-PROFILE-008 | integration | Domains/TLS stay out of deployment admission | Config declares `access.domains[]` | Values do not enter `deployments.create`; SSH mode persists server-applied route desired state and control-plane mode maps to managed domain intent | None when SSH route desired-state storage is available; `validation_error`, phase `config-domain-resolution` when the selected backend has no supported route-state or managed-domain mapping | SSH mode: route desired state -> `deployments.create` -> proxy realization. Control-plane mode: `domain-bindings.create` separate from deployment. |
 | CONFIG-FILE-PROFILE-009 | integration | Final deployment input is ids-only | Config contains valid source/runtime/network/health profile fields | Final command input contains only project/server/destination/environment/resource ids | None | Assert no source/runtime/network fields on `deployments.create` |
 
@@ -356,8 +357,11 @@ release workflow already produces CLI archives, the static Docker self-host inst
 action metadata, SSH secret temp-key handling, generated access output handling, wrapper-level
 cleanup input/examples, future overlay behavior, and tests.
 
-Profile drift detection, existing-resource profile operation sequencing through
-`resources.configure-source`, `resources.configure-runtime`, and `resources.configure-network`,
+Profile drift visibility and default fail-before-deploy behavior for existing-resource drift,
+existing-resource profile operation sequencing through explicit apply steps using
+`resources.configure-source`, `resources.configure-runtime`, `resources.configure-network`,
+`resources.configure-access`, `resources.configure-health`, `resources.set-variable`, and
+`resources.unset-variable`,
 stored/external secret adapters beyond `ci-env:`, config-file Dockerfile/Compose path mapping,
 operational provisioning of the external SSH e2e secrets/target, server-applied domain route
 realization e2e, managed control-plane domain mapping, and resource sizing support remain target

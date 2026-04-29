@@ -35,6 +35,7 @@ This command inherits the shared platform contracts:
 - [resources.archive Command Spec](./resources.archive.md)
 - [Workload Framework Detection And Planning](../workflows/workload-framework-detection-and-planning.md)
 - [Repository Deployment Config File Bootstrap](../workflows/deployment-config-file-bootstrap.md)
+- [Resource Profile Drift Visibility](../specs/011-resource-profile-drift-visibility/spec.md)
 - [Error Model](../errors/model.md)
 - [neverthrow Conventions](../errors/neverthrow-conventions.md)
 - [Async Lifecycle And Acceptance](../architecture/async-lifecycle-and-acceptance.md)
@@ -458,8 +459,12 @@ Migration gaps:
 - repository config file support now has a profile-only parser/schema, YAML discovery, CLI
   `--config`, profile-only `appaloft init`, and targeted tests proving identity/secret/unsupported
   field rejection plus ids-only `deployments.create`. Existing-resource profile drift handling and
-  environment/secret command sequencing remain workflow gaps, not deployment command fields. Durable
-  source link creation/reuse and explicit relink are handled outside `deployments.create`.
+  environment/secret command sequencing remain workflow gaps, not deployment command fields. Drift
+  visibility is governed by
+  [Resource Profile Drift Visibility](../specs/011-resource-profile-drift-visibility/spec.md) and
+  must fail in the entry workflow before this command when unapplied normalized profile changes would
+  otherwise be ignored. Durable source link creation/reuse and explicit relink are handled outside
+  `deployments.create`.
 - resource listener port is stored as `networkProfile.internalPort`; deployment admission does not read `runtimeProfile.port`.
 - archived-resource admission blocking is specified through `resources.archive`, but remains a
   future implementation gap until explicit resource lifecycle state lands.

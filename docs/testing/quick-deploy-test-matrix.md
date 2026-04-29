@@ -249,8 +249,9 @@ Traefik-backed server-applied route apply/reload/verify for `CONFIG-FILE-DOMAIN-
 Provider-local TLS diagnostics for `tlsMode = auto` routes are visible through proxy configuration
 and resource diagnostics. Operational provisioning of the external SSH e2e secrets/target,
 control-plane domain mapping, first-run project/resource creation e2e, deploy-action wrapper install
-UX, environment overlays, stored/external secret lookup/application, and profile drift remain
-follow-up.
+UX, environment overlays, stored/external secret lookup/application, and profile drift Code Round
+coverage remain follow-up. Profile drift behavior is specified in
+[Resource Profile Drift Visibility](../specs/011-resource-profile-drift-visibility/spec.md).
 
 `QUICK-DEPLOY-WF-055` now has lower-level parser, remote-state, deployment planning, provider
 rendering, and proxy-configuration query coverage for `redirectTo` / `redirectStatus`. A full

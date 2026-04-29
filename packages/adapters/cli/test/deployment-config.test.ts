@@ -1020,7 +1020,7 @@ describe("CLI deployment config entry workflow", () => {
     });
   });
 
-  test("[CONFIG-FILE-ENTRY-015B] deploy action PR preview reconfigures an existing preview resource runtime name", async () => {
+  test("[CONFIG-FILE-PROFILE-006] existing resource profile drift blocks default config deploy", async () => {
     ensureReflectMetadata();
     const workspace = mkdtempSync(join(tmpdir(), "appaloft-preview-runtime-name-existing-"));
     const configPath = join(workspace, "appaloft.preview.yml");
@@ -1059,46 +1059,45 @@ describe("CLI deployment config entry workflow", () => {
         },
         () =>
           withMutedProcessOutput(async () => {
-            await harness.program.parseAsync([
-              "node",
-              "appaloft",
-              "deploy",
-              workspace,
-              "--config",
-              configPath,
-              "--preview",
-              "pull-request",
-              "--preview-id",
-              "pr-125",
-              "--runtime-name",
-              "appaloft-preview-125",
-              "--server-host",
-              "203.0.113.10",
-              "--server-provider",
-              "generic-ssh",
-            ]);
+            const result = await harness.program
+              .parseAsync([
+                "node",
+                "appaloft",
+                "deploy",
+                workspace,
+                "--config",
+                configPath,
+                "--preview",
+                "pull-request",
+                "--preview-id",
+                "pr-125",
+                "--runtime-name",
+                "appaloft-preview-125",
+                "--server-host",
+                "203.0.113.10",
+                "--server-provider",
+                "generic-ssh",
+              ])
+              .then(
+                () => ({ ok: true as const }),
+                (error: unknown) => ({ ok: false as const, error }),
+              );
+
+            expect(result.ok).toBe(false);
+            if (!result.ok) {
+              const errorText = String(result.error);
+              expect(errorText).toContain("resource_profile_drift");
+              expect(errorText).toContain("resource-profile-resolution");
+              expect(errorText).toContain("res_existing");
+              expect(errorText).toContain("resource-vs-entry-profile");
+              expect(errorText).toContain("blocksDeploymentAdmission");
+            }
           }),
       );
     } finally {
       rmSync(workspace, { recursive: true, force: true });
     }
 
-    const configureRuntime = harness.commands.find(
-      (command) => command.constructor.name === "ConfigureResourceRuntimeCommand",
-    );
-
-    expect(configureRuntime).toMatchObject({
-      resourceId: "res_existing",
-      runtimeProfile: {
-        strategy: "workspace-commands",
-        buildCommand: "bun run build",
-        startCommand: "bun run start",
-        runtimeName: "appaloft-preview-125",
-      },
-    });
-    expect(
-      (configureRuntime as { runtimeProfile: Record<string, unknown> }).runtimeProfile,
-    ).not.toHaveProperty("healthCheckPath");
     expect(harness.queries.map((query) => query.constructor.name)).toContain("ShowResourceQuery");
 
     expect(
@@ -1106,16 +1105,16 @@ describe("CLI deployment config entry workflow", () => {
     ).toBeUndefined();
 
     expect(
+      harness.commands.find(
+        (command) => command.constructor.name === "ConfigureResourceRuntimeCommand",
+      ),
+    ).toBeUndefined();
+    expect(
       harness.commands.find((command) => command.constructor.name === "CreateDeploymentCommand"),
-    ).toMatchObject({
-      projectId: "proj_existing",
-      serverId: "srv_existing",
-      environmentId: "env_existing",
-      resourceId: "res_existing",
-    });
+    ).toBeUndefined();
   });
 
-  test("[CONFIG-FILE-ENTRY-015C] deploy action reconfigures an existing resource runtime profile from config", async () => {
+  test("[CONFIG-FILE-ENTRY-015C] deploy action surfaces structured profile drift for existing resources", async () => {
     ensureReflectMetadata();
     const workspace = mkdtempSync(join(tmpdir(), "appaloft-existing-runtime-profile-"));
     const configPath = join(workspace, "appaloft.yml");
@@ -1162,53 +1161,52 @@ describe("CLI deployment config entry workflow", () => {
         },
         () =>
           withMutedProcessOutput(async () => {
-            await harness.program.parseAsync([
-              "node",
-              "appaloft",
-              "deploy",
-              workspace,
-              "--config",
-              configPath,
-              "--method",
-              "static",
-              "--server-host",
-              "203.0.113.10",
-              "--server-provider",
-              "generic-ssh",
-            ]);
+            const result = await harness.program
+              .parseAsync([
+                "node",
+                "appaloft",
+                "deploy",
+                workspace,
+                "--config",
+                configPath,
+                "--method",
+                "static",
+                "--server-host",
+                "203.0.113.10",
+                "--server-provider",
+                "generic-ssh",
+              ])
+              .then(
+                () => ({ ok: true as const }),
+                (error: unknown) => ({ ok: false as const, error }),
+              );
+
+            expect(result.ok).toBe(false);
+            if (!result.ok) {
+              const errorText = String(result.error);
+              expect(errorText).toContain("resource_profile_drift");
+              expect(errorText).toContain("resource-profile-resolution");
+              expect(errorText).toContain("res_existing");
+              expect(errorText).toContain("resource-vs-entry-profile");
+              expect(errorText).toContain("suggestedCommand");
+            }
           }),
       );
     } finally {
       rmSync(workspace, { recursive: true, force: true });
     }
 
-    const configureRuntime = harness.commands.find(
-      (command) => command.constructor.name === "ConfigureResourceRuntimeCommand",
-    );
-
-    expect(configureRuntime).toMatchObject({
-      resourceId: "res_existing",
-      runtimeProfile: {
-        strategy: "static",
-        installCommand: "bun install --frozen-lockfile",
-        buildCommand:
-          "APPALOFT_DOCS_BASE=/ APPALOFT_DOCS_SITE=https://docs.appaloft.com bun run --cwd apps/docs build",
-        publishDirectory: "apps/docs/dist",
-      },
-    });
-
     expect(
       harness.commands.find((command) => command.constructor.name === "CreateResourceCommand"),
     ).toBeUndefined();
-
+    expect(
+      harness.commands.find(
+        (command) => command.constructor.name === "ConfigureResourceRuntimeCommand",
+      ),
+    ).toBeUndefined();
     expect(
       harness.commands.find((command) => command.constructor.name === "CreateDeploymentCommand"),
-    ).toMatchObject({
-      projectId: "proj_existing",
-      serverId: "srv_existing",
-      environmentId: "env_existing",
-      resourceId: "res_existing",
-    });
+    ).toBeUndefined();
   });
 
   test("[CONFIG-FILE-ENTRY-015D] deploy action resolves explicit config and source from nested shell cwd", async () => {

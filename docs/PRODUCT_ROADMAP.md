@@ -874,6 +874,9 @@ Recommended next Spec Rounds before broad Code Rounds:
 
 - [ ] Resource profile lifecycle: remaining profile drift visibility, reset/delete policy
   semantics, and test matrix coverage after source/runtime/network/access profile configuration.
+  Resource profile drift visibility now has a Spec Round artifact at
+  [docs/specs/011-resource-profile-drift-visibility](./specs/011-resource-profile-drift-visibility/spec.md);
+  Code Round, public docs/help, and reset/delete policy semantics remain unchecked.
 - [x] SSH credential lifecycle: `credentials.show` masked detail and usage visibility plus
   `credentials.delete-ssh` delete-when-unused safety across CLI, API, and Web typed confirmation.
 - [x] Framework support tier matrix: fixed-version detector/planner fixtures cover the current

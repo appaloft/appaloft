@@ -371,6 +371,12 @@ Current boundary:
   profile boundary visible to operators and must not introduce Web-only configuration state, imply
   an immediate runtime restart, create a deployment, mutate historical deployment snapshots, bind
   domains, issue certificates, or apply proxy routes.
+- Resource Profile Drift Visibility is part of the `resources.show` diagnostic surface and
+  repository config deploy preflight. It compares current Resource profile, normalized entry
+  workflow profile, and latest deployment snapshot profile; reports sectioned drift for source,
+  runtime, network, access, health, and configuration; and points to explicit remediation commands.
+  It is not a separate operation and must not add profile fields or drift overrides to
+  `deployments.create`.
 - resource-scoped variables and secrets are resource-owned through `resources.set-variable` and
   `resources.unset-variable`; these commands replace only the resource override layer used during
   future deployment snapshot materialization after environment precedence is resolved.

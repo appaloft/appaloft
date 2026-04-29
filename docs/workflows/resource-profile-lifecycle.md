@@ -44,6 +44,7 @@ This workflow inherits:
 - [resources.effective-config Query Spec](../queries/resources.effective-config.md)
 - [resources.archive Command Spec](../commands/resources.archive.md)
 - [resources.delete Command Spec](../commands/resources.delete.md)
+- [Resource Profile Drift Visibility](../specs/011-resource-profile-drift-visibility/spec.md)
 - [Resource Profile Lifecycle Test Matrix](../testing/resource-profile-lifecycle-test-matrix.md)
 - [Resource Profile Lifecycle Implementation Plan](../implementation/resource-profile-lifecycle-plan.md)
 - [Resource Lifecycle Error Spec](../errors/resources.lifecycle.md)
@@ -59,8 +60,10 @@ The workflow gives operators a stable way to:
 2. Change source, runtime, network, or health configuration independently.
 3. Change resource-scoped variables and secrets independently from environment scope.
 4. Inspect the masked effective configuration that future deployments will snapshot.
-5. Retire a resource through archive.
-6. Permanently delete only archived, unreferenced resources.
+5. Inspect profile drift between the current Resource profile, normalized entry workflow profile,
+   and latest deployment snapshot.
+6. Retire a resource through archive.
+7. Permanently delete only archived, unreferenced resources.
 
 Profile changes are reusable configuration for future deployments. They are not deployment
 execution, redeploy, restart, route apply, domain binding, certificate issuance, or runtime
@@ -217,6 +220,38 @@ When the operator wants changed profile state to become runtime state, they must
 deployment through the explicit deployment workflow once that is appropriate. Redeploy remains
 rebuild-required under ADR-016 and is not introduced by this workflow.
 
+## Resource Profile Drift Visibility
+
+Profile drift is read/preflight behavior over this workflow's existing resource-owned concerns. It
+does not introduce a new operation and it does not mutate the Resource.
+
+`resources.show(includeProfileDiagnostics = true)` may report drift across three objects:
+
+- current Resource profile: source, runtime, network, access, health, and resource-scoped
+  configuration state owned by the Resource;
+- entry workflow normalized profile: repository config, trusted CLI/Action flags, Web/local-agent
+  draft input, or future MCP input after profile precedence and schema validation;
+- latest deployment snapshot profile: immutable source/runtime/network/access/health/configuration
+  facts captured by the latest deployment attempt.
+
+Drift must be grouped by section: `source`, `runtime`, `network`, `access`, `health`, or
+`configuration`. Each item should name the canonical field path, comparison type, safe values or
+redacted summaries, whether it blocks deployment admission, and the matching explicit remediation
+operation.
+
+Admission rules:
+
+- Current Resource profile versus latest deployment snapshot drift is informational. It shows that
+  the latest attempt was created from older profile state and does not block a new deployment.
+- Entry workflow normalized profile versus current Resource profile drift blocks config deploy before
+  `deployments.create` unless the entry workflow first dispatches the matching explicit operation
+  such as `resources.configure-source`, `resources.configure-runtime`, `resources.configure-network`,
+  `resources.configure-access`, `resources.configure-health`, `resources.set-variable`, or
+  `resources.unset-variable`.
+- `deployments.create` must not receive entry profile fields or drift overrides.
+- Secret/configuration drift must stay redacted and must never expose raw values in diagnostics,
+  errors, logs, events, or read models.
+
 ## Access And Domain Relationship
 
 Network profile configures the resource endpoint. It does not configure public domains, generated
@@ -235,9 +270,9 @@ network and access profiles, but they keep their own commands and lifecycle even
 | Entrypoint | Required behavior |
 | --- | --- |
 | Web | Resource detail is owner-scoped. Each source/runtime/network/access/health/configuration section dispatches the matching operation and refetches `resources.show`, `resources.effective-config`, or the relevant observation query. Editors must make the future deployment boundary visible: saving them persists durable resource profile or override state for future deployment admission, verification, route planning, or deployment snapshot materialization; it does not create deployments, rewrite historical deployment snapshots, immediately restart current runtime, bind domains, issue certificates, or apply proxy routes. |
-| CLI | Each operation has its own `appaloft resource ...` subcommand. No `appaloft resource update` generic mutation. |
-| oRPC / HTTP | Each operation has its own route using the application command/query schema. No parallel transport-only input shape. |
-| Automation / MCP | Future tools map one-to-one to operation keys. Tools must not combine unrelated source/runtime/network/archive/delete behavior. |
+| CLI | Each operation has its own `appaloft resource ...` subcommand. No `appaloft resource update` generic mutation. `appaloft resource show --json` may expose drift diagnostics, and config deploy must report blocking entry-profile drift with the explicit command to run. |
+| oRPC / HTTP | Each operation has its own route using the application command/query schema. No parallel transport-only input shape. `GET /api/resources/{resourceId}` carries drift diagnostics through `resources.show` rather than a new query. |
+| Automation / MCP | Future tools map one-to-one to operation keys. Tools must not combine unrelated source/runtime/network/archive/delete behavior. Future MCP drift visibility should reuse `resources.show` diagnostics and suggested operation keys. |
 
 ## Current Implementation Notes And Migration Gaps
 

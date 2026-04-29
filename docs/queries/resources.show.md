@@ -44,6 +44,7 @@ This query inherits:
 - [resources.configure-access Command Spec](../commands/resources.configure-access.md)
 - [resources.configure-health Command Spec](../commands/resources.configure-health.md)
 - [Resource Profile Lifecycle Workflow](../workflows/resource-profile-lifecycle.md)
+- [Resource Profile Drift Visibility](../specs/011-resource-profile-drift-visibility/spec.md)
 - [Resource Lifecycle Error Spec](../errors/resources.lifecycle.md)
 - [Error Model](../errors/model.md)
 - [neverthrow Conventions](../errors/neverthrow-conventions.md)
@@ -65,7 +66,7 @@ type ShowResourceQueryInput = {
 | `resourceId` | Required | Resource whose detail profile is requested. |
 | `includeLatestDeployment` | Optional | Includes latest deployment context when the read model can provide it. Defaults to `true` for detail pages. |
 | `includeAccessSummary` | Optional | Includes generated/default access and durable domain route summary when available. Defaults to `true` for detail pages. |
-| `includeProfileDiagnostics` | Optional | Includes safe source/runtime/network profile warnings. Defaults to `false` for compact consumers. |
+| `includeProfileDiagnostics` | Optional | Includes safe source/runtime/network/access/health/configuration profile warnings and drift diagnostics. Defaults to `false` for compact consumers. |
 
 The query input must not accept source locators, deployment command fields, mutable profile fields,
 raw provider ids, shell commands, host paths, tokens, credentials, or live-probe flags.
@@ -109,7 +110,71 @@ Required behavior:
 - `lifecycle.status` is one of `active`, `archived`, or `deleted` where deleted may only appear in
   retained audit/read models. Active read paths should normally return `not_found` after deletion.
 - `diagnostics` contain safe profile warnings such as missing source, missing internal port, static
-  strategy without publish directory, or profile drift. They are not command admission failures.
+  strategy without publish directory, or resource profile drift. They are not whole-query failures.
+
+## Profile Drift Diagnostics
+
+When `includeProfileDiagnostics = true`, `resources.show` is the reusable read surface for Resource
+Profile Drift Visibility. It may compare:
+
+1. current Resource profile versus latest deployment snapshot;
+2. current Resource profile versus a normalized entry workflow profile when the caller has one;
+3. normalized entry workflow profile versus latest deployment snapshot when both are available.
+
+The query itself only reads and reports. It must not dispatch `resources.configure-*`, set or unset
+variables, create deployments, rewrite snapshots, or apply runtime/proxy state.
+
+```ts
+type ResourceProfileDiagnosticValue = {
+  state: "present" | "missing" | "masked" | "redacted" | "unknown";
+  displayValue?: string | number | boolean | null;
+  valueHash?: string;
+};
+
+type ResourceDetailProfileDiagnostic = {
+  code: "missing_profile_field" | "incomplete_profile" | "resource_profile_drift";
+  severity: "info" | "warning" | "blocking";
+  section: "source" | "runtime" | "network" | "access" | "health" | "configuration";
+  fieldPath: string;
+  comparison?:
+    | "resource-vs-entry-profile"
+    | "resource-vs-latest-snapshot"
+    | "entry-profile-vs-latest-snapshot";
+  resourceValue?: ResourceProfileDiagnosticValue;
+  entryProfileValue?: ResourceProfileDiagnosticValue;
+  deploymentSnapshotValue?: ResourceProfileDiagnosticValue;
+  latestDeploymentId?: string;
+  configPointer?: string;
+  blocksDeploymentAdmission: boolean;
+  suggestedCommand?:
+    | "resources.configure-source"
+    | "resources.configure-runtime"
+    | "resources.configure-network"
+    | "resources.configure-access"
+    | "resources.configure-health"
+    | "resources.set-variable"
+    | "resources.unset-variable";
+};
+```
+
+Required drift behavior:
+
+- `resource-vs-latest-snapshot` drift is informational or warning-level. It explains that the latest
+  deployment attempt used an older immutable snapshot and does not block a new deployment.
+- `resource-vs-entry-profile` drift may be `blocking` for repository config deploy or other
+  non-interactive entry workflows when deploying would ignore unapplied profile changes from the
+  normalized entry profile.
+- `entry-profile-vs-latest-snapshot` drift is explanatory only unless the current Resource profile
+  also differs from the entry profile.
+- Each drift item maps to the owning explicit command:
+  - `source` -> `resources.configure-source`;
+  - `runtime` -> `resources.configure-runtime`;
+  - `network` -> `resources.configure-network`;
+  - `access` -> `resources.configure-access`;
+  - `health` -> `resources.configure-health`;
+  - `configuration` -> `resources.set-variable` or `resources.unset-variable`.
+- Secret values and credential-bearing source data must be masked. Diagnostics may report key,
+  exposure, kind, scope, reference identity, and redacted equality state, but never plaintext values.
 
 ## Status And Ownership Rules
 

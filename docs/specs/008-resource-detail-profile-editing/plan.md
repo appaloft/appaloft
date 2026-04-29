@@ -44,5 +44,6 @@
 ## Risks And Migration Gaps
 
 - No schema migration is required.
-- Existing-resource profile drift visibility is intentionally deferred to Phase 7 and must not be
-  implied by this resource detail editing closure.
+- Existing-resource profile drift visibility is governed by
+  [Resource Profile Drift Visibility](../011-resource-profile-drift-visibility/spec.md) and must not
+  be implied by this resource detail editing closure.

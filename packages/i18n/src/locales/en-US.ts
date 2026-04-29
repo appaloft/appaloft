@@ -582,6 +582,10 @@ export const enUS = {
       diagnosticsDescription:
         "Copy a resource, access, proxy, and runtime log summary for troubleshooting or support.",
       diagnosticsTitle: "Diagnostics",
+      profileDiagnosticsEmpty: "No profile diagnostics are currently reported.",
+      profileDiagnosticsLatestDeployment: "Latest deployment",
+      profileDiagnosticsSuggestedCommand: "Suggested command",
+      profileDiagnosticsTitle: "Profile diagnostics",
       deploymentsDescription:
         "Deployment attempts for this resource, newest first, with source and status context.",
       deploymentsTitle: "Deployments",
