@@ -341,8 +341,8 @@
     </div>
   {:else}
     {#if servers.length === 0}
-      <section class="space-y-5 py-2">
-        <Badge class="w-fit" variant="outline">{$t(i18nKeys.common.domain.servers)}</Badge>
+      <section class="console-panel space-y-5 p-5">
+        <Badge class="console-page-kicker" variant="outline">{$t(i18nKeys.common.domain.servers)}</Badge>
         <div class="max-w-2xl space-y-3">
           <h1 class="text-2xl font-semibold md:text-3xl">
             {$t(i18nKeys.console.servers.emptyTitle)}
@@ -367,7 +367,7 @@
       <div class="space-y-8">
         <section class="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
           <div class="max-w-2xl space-y-2">
-            <Badge class="w-fit" variant="outline">{$t(i18nKeys.common.domain.servers)}</Badge>
+            <Badge class="console-page-kicker" variant="outline">{$t(i18nKeys.common.domain.servers)}</Badge>
             <h1 class="text-2xl font-semibold">{$t(i18nKeys.console.servers.focusTitle)}</h1>
             <p class="text-sm leading-6 text-muted-foreground">
               {$t(i18nKeys.console.servers.focusDescription)}
@@ -377,20 +377,20 @@
             <Button class="w-full" href="/servers/new">
               {$t(i18nKeys.common.actions.createServer)}
             </Button>
-            <div class="grid grid-cols-3 divide-x border-y text-center">
-              <div class="px-3 py-3">
+            <div class="console-metric-strip grid-cols-3 text-center">
+              <div>
                 <p class="text-xl font-semibold">{servers.length}</p>
                 <p class="mt-1 text-xs text-muted-foreground">
                   {$t(i18nKeys.common.domain.servers)}
                 </p>
               </div>
-              <div class="px-3 py-3">
+              <div>
                 <p class="text-xl font-semibold">{activeServers}</p>
                 <p class="mt-1 text-xs text-muted-foreground">
                   {$t(i18nKeys.common.status.connected)}
                 </p>
               </div>
-              <div class="px-3 py-3">
+              <div>
                 <p class="text-xl font-semibold">{deployments.length}</p>
                 <p class="mt-1 text-xs text-muted-foreground">
                   {$t(i18nKeys.common.domain.deployments)}
@@ -400,7 +400,7 @@
           </div>
         </section>
 
-      <section class="space-y-4 border-y py-6">
+      <section class="console-panel space-y-4 p-5">
         <div class="max-w-3xl space-y-1">
           <div class="flex items-center gap-2">
             <h2 class="text-lg font-semibold">
@@ -523,37 +523,38 @@
           </p>
         </div>
 
-        <div class="divide-y border-y">
+        <div class="console-record-list">
           {#each servers as server (server.id)}
             <a
               href={`/servers/${server.id}`}
-              class="group grid gap-3 py-4 transition-colors hover:bg-muted/35 sm:grid-cols-[minmax(0,1fr)_32rem_auto] sm:px-3"
+              class="console-record-row group lg:grid-cols-[minmax(12rem,1.1fr)_minmax(10rem,0.9fr)_8rem_10rem_auto] lg:items-center"
             >
-              <div class="min-w-0 space-y-2">
-                <div class="flex flex-wrap items-center gap-2">
+              <div class="min-w-0 space-y-1.5">
+                <div class="flex min-w-0 items-center gap-2">
                   <Server class="size-4 text-muted-foreground" />
-                  <h3 class="truncate text-base font-semibold">{server.name}</h3>
-                  <Badge variant="outline">{server.providerKey}</Badge>
+                  <h3 class="min-w-0 truncate text-base font-semibold">{server.name}</h3>
                 </div>
-                <p class="truncate text-sm text-muted-foreground">
+                <p class="break-all font-mono text-sm text-muted-foreground">
                   {server.host}:{server.port}
                 </p>
               </div>
 
-              <div class="grid gap-1 text-sm text-muted-foreground sm:grid-cols-3">
-                <span class="inline-flex items-center gap-2">
-                  <Network class="size-3.5" />
+              <div class="min-w-0 space-y-1 text-sm text-muted-foreground">
+                <span class="inline-flex min-w-0 items-center gap-2">
+                  <Network class="size-3.5 shrink-0" />
                   {server.providerKey}
                 </span>
-                <span class="inline-flex items-center gap-2">
-                  <ShieldCheck class="size-3.5" />
-                  {countServerDeployments(server)} {$t(i18nKeys.common.domain.deployments)}
-                </span>
-                <span class="truncate">{formatTime(server.createdAt)}</span>
               </div>
 
+              <span class="inline-flex items-center gap-2 text-sm text-muted-foreground">
+                <ShieldCheck class="size-3.5 shrink-0" />
+                {countServerDeployments(server)} {$t(i18nKeys.common.domain.deployments)}
+              </span>
+
+              <span class="text-sm text-muted-foreground">{formatTime(server.createdAt)}</span>
+
               <span
-                class="inline-flex items-center gap-1 text-sm font-medium text-muted-foreground transition-colors group-hover:text-foreground"
+                class="console-inline-action inline-flex items-center gap-1 text-sm font-medium lg:justify-end"
               >
                 {$t(i18nKeys.common.actions.viewDetails)}
                 <ArrowRight class="size-4" />
@@ -565,7 +566,7 @@
       </div>
     {/if}
 
-    <section class="mt-8 space-y-4 border-y py-6">
+    <section class="console-panel mt-8 space-y-4 p-5">
       <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div class="max-w-3xl space-y-1">
           <div class="flex items-center gap-2">
@@ -595,7 +596,7 @@
           {/each}
         </div>
       {:else if sshCredentials.length === 0}
-        <div class="border-y py-4">
+        <div class="console-subtle-panel p-4">
           <p class="text-sm font-medium">
             {$t(i18nKeys.console.servers.savedCredentialLibraryEmptyTitle)}
           </p>
@@ -604,9 +605,9 @@
           </p>
         </div>
       {:else}
-        <div class="divide-y border-y">
+        <div class="console-record-list">
           {#each sshCredentials as credential (credential.id)}
-            <div class="grid gap-4 py-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:px-3">
+            <div class="console-record-row sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
               <div class="min-w-0 space-y-1">
                 <div class="flex flex-wrap items-center gap-2">
                   <KeyRound class="size-4 text-muted-foreground" />

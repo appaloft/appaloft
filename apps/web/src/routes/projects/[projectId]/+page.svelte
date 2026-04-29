@@ -514,26 +514,26 @@
           </div>
         </div>
 
-        <dl class="grid border-y sm:grid-cols-4 sm:divide-x">
-          <div class="px-0 py-4 sm:px-4">
+        <dl class="console-metric-strip sm:grid-cols-4">
+          <div>
             <dt class="text-xs font-medium uppercase tracking-wide text-muted-foreground">
               {$t(i18nKeys.common.domain.resources)}
             </dt>
             <dd class="mt-1 text-2xl font-semibold">{projectResources.length}</dd>
           </div>
-          <div class="border-t px-0 py-4 sm:border-t-0 sm:px-4">
+          <div>
             <dt class="text-xs font-medium uppercase tracking-wide text-muted-foreground">
               {$t(i18nKeys.common.domain.environments)}
             </dt>
             <dd class="mt-1 text-2xl font-semibold">{projectEnvironments.length}</dd>
           </div>
-          <div class="border-t px-0 py-4 sm:border-t-0 sm:px-4">
+          <div>
             <dt class="text-xs font-medium uppercase tracking-wide text-muted-foreground">
               {$t(i18nKeys.common.domain.deployments)}
             </dt>
             <dd class="mt-1 text-2xl font-semibold">{projectDeployments.length}</dd>
           </div>
-          <div class="border-t px-0 py-4 sm:border-t-0 sm:px-4">
+          <div>
             <dt class="text-xs font-medium uppercase tracking-wide text-muted-foreground">
               {$t(i18nKeys.console.projects.publicAccessTitle)}
             </dt>
@@ -542,7 +542,7 @@
         </dl>
       </section>
 
-      <section class="space-y-4 border-y py-5">
+      <section class="console-panel space-y-4 p-5">
         <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div class="space-y-1">
             <div class="flex items-center gap-2">
@@ -638,13 +638,13 @@
             </Button>
           </div>
 
-          <div class="divide-y border-y">
+          <div class="console-record-list">
             {#if projectResources.length > 0}
               {#each projectResources as resource (resource.id)}
                 {@const latestDeployment = latestResourceDeployment(resource, deployments)}
                 <a
                   href={resourceDetailHref(resource)}
-                  class="group grid gap-3 py-4 transition-colors hover:bg-muted/35 sm:grid-cols-[minmax(0,1fr)_18rem_auto] sm:px-3"
+                  class="console-record-row group sm:grid-cols-[minmax(0,1fr)_18rem_auto] sm:items-center"
                 >
                   <div class="min-w-0 space-y-2">
                     <div class="flex min-w-0 flex-wrap items-center gap-2">
@@ -669,7 +669,7 @@
                 </a>
               {/each}
             {:else}
-              <div class="bg-muted/25 px-4 py-6 text-sm text-muted-foreground">
+              <div class="console-subtle-panel px-4 py-6 text-sm text-muted-foreground">
                 {$t(i18nKeys.console.projects.noResources)}
               </div>
             {/if}
@@ -696,7 +696,7 @@
               </p>
             </div>
 
-            <div class="divide-y border-y">
+            <div class="console-record-list">
               {#if projectEnvironments.length > 0}
                 {#each projectEnvironments as environment (environment.id)}
                   <div class="py-3">
@@ -876,12 +876,12 @@
               </p>
             </div>
 
-            <div class="divide-y border-y">
+            <div class="console-record-list">
               {#if projectAccessRoutes.length > 0}
                 {#each projectAccessRoutes.slice(0, 5) as route (`${route.deployment.id}-${route.domain}-${route.pathPrefix}`)}
                   <a
                     href={deploymentDetailHref(route.deployment)}
-                    class="block py-3 transition-colors hover:bg-muted/35"
+                    class="console-record-row block"
                   >
                     <div class="flex flex-wrap items-center justify-between gap-2">
                       <p class="min-w-0 truncate text-sm font-medium">{route.domain}</p>
@@ -927,7 +927,7 @@
               showServer={false}
             />
           {:else}
-            <div class="border-y bg-muted/25 px-4 py-6">
+            <div class="console-subtle-panel px-4 py-6">
               <div class="flex items-start gap-3">
                 <FolderOpen class="mt-0.5 size-4 text-muted-foreground" />
                 <div class="space-y-2">

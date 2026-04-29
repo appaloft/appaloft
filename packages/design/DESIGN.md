@@ -34,8 +34,13 @@ attempt pages.
 
 ## Visual Direction
 
-- Use a monochrome precision base: white/near-black surfaces, narrow gray scales, and visible structure.
-- Use blue only for focus, links, and active affordances.
+- Use a light precision base: cold whites, soft blue-gray borders, and visible structure.
+- The console should read as a calm operator bench, not a generic SaaS CRUD kit: light navigation
+  rail, compact status badges, monospace identifiers, and stable object lists.
+- Avoid gradient backgrounds in the console. Depth should come from spacing, borders, typography,
+  and restrained shadows.
+- Use blue only for focus, links, active affordances, and the thin operational spine on major
+  panels.
 - Use semantic color only for workflow and status meaning:
   - green: succeeded/ready;
   - red: failed/not ready;
@@ -79,6 +84,11 @@ attempt pages.
 
 Web is the reference implementation. Token changes start from Web usage and then flow into Docs and
 future www.
+
+Web console information architecture and interaction grammar are governed by
+[`docs/implementation/web-console-redesign-plan.md`](../../docs/implementation/web-console-redesign-plan.md).
+Use that document before adding new owner pages, tabs, cards, terminal surfaces, operational lists,
+or configuration panels.
 
 ### Docs
 

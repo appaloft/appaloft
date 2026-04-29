@@ -93,6 +93,8 @@
   let projectSearch = $state("");
   let colorMode = $state<"light" | "dark">("light");
   let colorModeReady = $state(false);
+  let sidebarOpen = $state(false);
+  let sidebarReady = $state(false);
 
   const {
     healthQuery,
@@ -185,6 +187,17 @@
       return;
     }
 
+    const storedSidebarState = window.localStorage.getItem("appaloft:console-sidebar-open");
+    if (storedSidebarState === "true" || storedSidebarState === "false") {
+      sidebarOpen = storedSidebarState === "true";
+    } else {
+      sidebarOpen = window.matchMedia("(min-width: 1280px)").matches;
+    }
+
+    requestAnimationFrame(() => {
+      sidebarReady = true;
+    });
+
     const storedMode = window.localStorage.getItem("appaloft:color-mode");
     if (storedMode === "light" || storedMode === "dark") {
       colorMode = storedMode;
@@ -200,6 +213,14 @@
     document.documentElement.classList.toggle("dark", colorMode === "dark");
     document.documentElement.style.colorScheme = colorMode;
     window.localStorage.setItem("appaloft:color-mode", colorMode);
+  });
+
+  $effect(() => {
+    if (!browser || !sidebarReady) {
+      return;
+    }
+
+    window.localStorage.setItem("appaloft:console-sidebar-open", String(sidebarOpen));
   });
 
   $effect(() => {
@@ -270,7 +291,12 @@
   }
 </script>
 
-<SidebarProvider>
+<SidebarProvider
+  bind:open={sidebarOpen}
+  class={!sidebarReady
+    ? "[&_[data-slot=sidebar-container]]:!transition-none [&_[data-slot=sidebar-gap]]:!transition-none"
+    : ""}
+>
   <Sidebar variant="inset" collapsible="icon">
     <SidebarHeader class="gap-3">
       <a class="flex items-center gap-3 px-2 py-2" href="/">
@@ -442,7 +468,8 @@
 
   <SidebarInset>
     <header
-      class="sticky top-0 z-10 flex h-14 items-center justify-between border-b bg-background/80 px-4 backdrop-blur-sm md:px-6"
+      data-console-header
+      class="sticky top-0 z-10 flex h-14 items-center justify-between border-b px-4 backdrop-blur-md md:px-6"
     >
       <div class="flex min-w-0 flex-1 items-center gap-3">
         <SidebarTrigger />
@@ -503,9 +530,9 @@
       </div>
     </header>
 
-    <main class="min-w-0 flex-1 p-4 md:p-6">
+    <main data-console-main class="min-w-0 flex-1 p-4 md:p-6">
       {#if connectionError}
-        <section class="space-y-4 border-y py-5">
+        <section class="console-panel space-y-4 p-5">
           <div class="space-y-2">
             <h2 class="flex items-center gap-2 text-lg font-semibold">
               <ServerCrash class="size-5" />

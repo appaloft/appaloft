@@ -94,7 +94,7 @@
     <div class="space-y-8">
       <section class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
         <div class="max-w-2xl space-y-2">
-          <Badge class="w-fit" variant="outline">
+          <Badge class="console-page-kicker" variant="outline">
             {selectedProject ? selectedProject.name : $t(i18nKeys.console.deployments.allProjects)}
           </Badge>
           <h1 class="text-2xl font-semibold">{$t(i18nKeys.console.deployments.focusTitle)}</h1>
@@ -109,20 +109,20 @@
         </div>
       </section>
 
-      <section class="grid border-y sm:grid-cols-3 sm:divide-x">
-        <div class="px-0 py-4 sm:px-4">
+      <section class="console-metric-strip sm:grid-cols-3">
+        <div>
           <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">
             {$t(i18nKeys.common.domain.currentList)}
           </p>
           <p class="mt-1 text-2xl font-semibold">{visibleDeployments.length}</p>
         </div>
-        <div class="border-t px-0 py-4 sm:border-t-0 sm:px-4">
+        <div>
           <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">
             {$t(i18nKeys.console.deployments.inFlight)}
           </p>
           <p class="mt-1 text-2xl font-semibold">{runningDeployments}</p>
         </div>
-        <div class="border-t px-0 py-4 sm:border-t-0 sm:px-4">
+        <div>
           <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">
             {$t(i18nKeys.console.deployments.needsAttention)}
           </p>
@@ -141,7 +141,7 @@
         {#if visibleDeployments.length > 0}
           <DeploymentTable deployments={visibleDeployments} {projects} {environments} />
         {:else}
-          <div class="bg-muted/25 px-4 py-6 text-sm text-muted-foreground">
+          <div class="console-subtle-panel px-4 py-6 text-sm text-muted-foreground">
             {$t(i18nKeys.console.deployments.noFilteredDeployments)}
           </div>
         {/if}

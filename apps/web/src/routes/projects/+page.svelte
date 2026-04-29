@@ -81,24 +81,24 @@
     <div class="space-y-8">
       <section class="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
         <div class="max-w-2xl space-y-2">
-          <Badge class="w-fit" variant="outline">{$t(i18nKeys.console.projects.focusLabel)}</Badge>
+          <Badge class="console-page-kicker" variant="outline">{$t(i18nKeys.console.projects.focusLabel)}</Badge>
           <h1 class="text-2xl font-semibold">{$t(i18nKeys.console.projects.focusTitle)}</h1>
           <p class="text-sm leading-6 text-muted-foreground">
             {$t(i18nKeys.console.projects.focusDescription)}
           </p>
         </div>
-        <div class="grid grid-cols-3 divide-x border-y text-center md:min-w-80">
-          <div class="px-3 py-3">
+        <div class="console-metric-strip grid-cols-3 text-center md:min-w-80">
+          <div>
             <p class="text-xl font-semibold">{projects.length}</p>
             <p class="mt-1 text-xs text-muted-foreground">{$t(i18nKeys.common.domain.projects)}</p>
           </div>
-          <div class="px-3 py-3">
+          <div>
             <p class="text-xl font-semibold">{activeProjects}</p>
             <p class="mt-1 text-xs text-muted-foreground">
               {$t(i18nKeys.console.projects.projectsWithResources)}
             </p>
           </div>
-          <div class="px-3 py-3">
+          <div>
             <p class="text-xl font-semibold">{resources.length}</p>
             <p class="mt-1 text-xs text-muted-foreground">{$t(i18nKeys.common.domain.resources)}</p>
           </div>
@@ -115,7 +115,7 @@
           </div>
         </div>
 
-        <div class="divide-y border-y">
+        <div class="console-record-list">
           {#each projects as project (project.id)}
             {@const projectResources = resources.filter((resource) => resource.projectId === project.id)}
             {@const latestDeployment = latestProjectDeployment(project, deployments)}
@@ -124,7 +124,7 @@
               projectResources[0]}
             <a
               href={projectDetailHref(project.id)}
-              class="group grid gap-3 py-4 transition-colors hover:bg-muted/35 lg:grid-cols-[minmax(0,1fr)_36rem_auto] lg:px-3"
+              class="console-record-row group lg:grid-cols-[minmax(0,1fr)_36rem_auto] lg:items-center"
             >
               <div class="min-w-0 space-y-2">
                 <div class="flex flex-wrap items-center gap-2">

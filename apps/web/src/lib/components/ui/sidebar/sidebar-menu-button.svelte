@@ -89,6 +89,9 @@
 		<Tooltip.Content
 			side="right"
 			align="center"
+			sideOffset={8}
+			arrowClasses="hidden"
+			class="rounded-md px-2 py-1 text-xs shadow-sm"
 			hidden={sidebar.state !== "collapsed" || sidebar.isMobile}
 			{...tooltipContentProps}
 		>

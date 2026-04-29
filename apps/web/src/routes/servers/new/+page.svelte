@@ -110,23 +110,25 @@
   description={$t(i18nKeys.console.servers.createDescription)}
 >
   <form
-    class="space-y-5"
+    class="space-y-6"
     onsubmit={(event) => {
       event.preventDefault();
       void handleCreateServer();
     }}
   >
-    <section class="space-y-6">
-      <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div class="max-w-2xl space-y-2">
-          <Badge class="w-fit" variant="outline">
+    <section class="space-y-5">
+      <div class="console-owner-header sm:flex-row sm:items-start sm:justify-between">
+        <div class="max-w-3xl space-y-3">
+          <Badge class="console-page-kicker" variant="outline">
             <Server class="size-3.5" />
             {$t(i18nKeys.common.domain.servers)}
           </Badge>
-          <h1 class="text-2xl font-semibold">{$t(i18nKeys.console.servers.createFormTitle)}</h1>
-          <p class="text-sm leading-6 text-muted-foreground">
+          <div class="space-y-2">
+            <h1 class="text-2xl font-semibold md:text-3xl">{$t(i18nKeys.console.servers.createFormTitle)}</h1>
+            <p class="text-sm leading-6 text-muted-foreground">
             {$t(i18nKeys.console.servers.createFormDescription)}
-          </p>
+            </p>
+          </div>
         </div>
         <Button href="/servers" variant="outline">
           <ArrowLeft class="size-4" />
@@ -149,12 +151,12 @@
       </div>
 
       {#if submitError}
-        <div class="mt-4 rounded-md border border-destructive/30 px-3 py-2 text-sm text-destructive">
+        <div class="rounded-md border border-destructive/30 px-3 py-2 text-sm text-destructive">
           <p class="font-medium">{$t(i18nKeys.console.servers.createErrorTitle)}</p>
           <p class="mt-1 text-xs leading-5">{submitError}</p>
         </div>
       {:else if createdServerId}
-        <div class="mt-4 bg-muted/35 px-3 py-2 text-sm">
+        <div class="console-subtle-panel px-3 py-2 text-sm">
           <div class="flex items-start gap-2">
             <CheckCircle2 class="mt-0.5 size-4 text-primary" />
             <div>
@@ -167,7 +169,7 @@
         </div>
       {/if}
 
-      <div class="mt-5 flex flex-col gap-2 sm:flex-row sm:justify-end">
+      <div class="flex flex-col gap-2 sm:flex-row sm:justify-end">
         {#if createdServerId}
           <Button href={`/servers/${createdServerId}`} variant="outline">
             {$t(i18nKeys.common.actions.viewDetails)}
