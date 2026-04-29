@@ -59,7 +59,29 @@ function resourceDetail(): ResourceDetail {
     lifecycle: {
       status: "active",
     },
-    diagnostics: [],
+    diagnostics: [
+      {
+        code: "resource_profile_drift",
+        severity: "info",
+        message:
+          "Resource profile differs from latest deployment snapshot at networkProfile.internalPort.",
+        path: "networkProfile.internalPort",
+        section: "network",
+        fieldPath: "networkProfile.internalPort",
+        comparison: "resource-vs-latest-snapshot",
+        resourceValue: {
+          state: "present",
+          displayValue: 3000,
+        },
+        deploymentSnapshotValue: {
+          state: "present",
+          displayValue: 4310,
+        },
+        latestDeploymentId: "dep_new",
+        blocksDeploymentAdmission: false,
+        suggestedCommand: "resources.configure-network",
+      },
+    ],
     generatedAt: "2026-01-01T00:00:10.000Z",
   };
 }
@@ -99,6 +121,16 @@ describe("resource show HTTP route", () => {
       resource: {
         id: "res_web",
       },
+      diagnostics: [
+        {
+          code: "resource_profile_drift",
+          severity: "info",
+          section: "network",
+          fieldPath: "networkProfile.internalPort",
+          comparison: "resource-vs-latest-snapshot",
+          suggestedCommand: "resources.configure-network",
+        },
+      ],
     });
     expect(capturedQuery).toBeInstanceOf(ShowResourceQuery);
     expect(capturedQuery).toMatchObject({

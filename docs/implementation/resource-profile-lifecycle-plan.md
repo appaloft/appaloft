@@ -30,6 +30,7 @@ profile mutation.
 - [resources.configure-access Command Spec](../commands/resources.configure-access.md)
 - [resources.archive Command Spec](../commands/resources.archive.md)
 - [resources.delete Command Spec](../commands/resources.delete.md)
+- [Resource Profile Drift Visibility](../specs/011-resource-profile-drift-visibility/spec.md)
 - [Resource Lifecycle Error Spec](../errors/resources.lifecycle.md)
 - [resources.create Command Spec](../commands/resources.create.md)
 - [resources.configure-health Command Spec](../commands/resources.configure-health.md)
@@ -55,6 +56,8 @@ profile mutation.
 8. Update Web resource detail/profile sections to dispatch operation-specific calls and refetch
    `resources.show`, `resources.health`, or related observation queries.
 9. Add focused tests from the matrix before broad UI polish.
+10. Add resource profile drift visibility as a read/preflight slice over `resources.show` and config
+    deploy workflow. Do not add a new public query or generic update operation.
 
 ## Expected Modules And Packages
 
@@ -189,7 +192,36 @@ The read model must expose:
 - health policy summary;
 - optional latest deployment context;
 - optional access summary;
-- safe diagnostics.
+- safe diagnostics, including sectioned resource profile drift diagnostics when requested.
+
+## Resource Profile Drift Visibility Code Round
+
+The drift visibility slice should add:
+
+1. A shared application/read-model comparator for safe profile DTOs:
+   - current Resource profile;
+   - optional normalized entry workflow profile;
+   - optional latest deployment snapshot profile.
+2. `resources.show(includeProfileDiagnostics = true)` output that reports:
+   - drift section;
+   - canonical field path;
+   - comparison kind;
+   - safe redacted values or value summaries;
+   - `blocksDeploymentAdmission`;
+   - suggested operation key.
+3. Config deploy workflow preflight that rejects unapplied existing-resource entry-profile drift with
+   `resource_profile_drift`, phase `resource-profile-resolution`, before `deployments.create`.
+4. CLI, HTTP/oRPC, Web, and future MCP/tool metadata reuse of the same diagnostic vocabulary.
+5. Tests for `RES-PROFILE-DRIFT-001` through `RES-PROFILE-DRIFT-005` and
+   `CONFIG-FILE-PROFILE-006`.
+
+The comparator must not:
+
+- load aggregates only to answer a read-model question when safe read models are sufficient;
+- mutate resource profile, deployment snapshot, route, runtime, domain, certificate, or source-link
+  state;
+- expose raw secret values or credential-bearing source locators;
+- decide to auto-apply config drift without an explicit resource command step governed by specs.
 
 ## Error And neverthrow Boundaries
 
@@ -221,6 +253,15 @@ The minimal Code Round deliverable is:
 - tests covering command/query use cases, structured errors, event publication, transport dispatch,
   CLI dispatch, and one browser-level Web profile mutation flow.
 
+For the drift visibility slice, the minimal deliverable is:
+
+- `resources.show` drift diagnostics for current Resource profile versus latest deployment snapshot;
+- config deploy fail-before-deployment drift error for normalized entry profile versus current
+  Resource profile;
+- redaction coverage for configuration/secret drift;
+- HTTP/oRPC and CLI structured output coverage;
+- Web resource detail display for drift status.
+
 ## Non-Goals
 
 This plan does not implement:
@@ -242,6 +283,10 @@ operations without changing deployment command boundaries.
 
 Direct-port user-facing configuration remains blocked until placement conflict guards, adapter
 behavior, and tests are implemented in the same Code Round.
+
+Resource profile drift visibility is now specified as a future read/preflight slice in
+[Resource Profile Drift Visibility](../specs/011-resource-profile-drift-visibility/spec.md). It is
+not implemented by the completed Phase 4 profile editing closure.
 
 `resources.configure-source`, `resources.configure-runtime`, `resources.configure-network`,
 `resources.configure-access`,

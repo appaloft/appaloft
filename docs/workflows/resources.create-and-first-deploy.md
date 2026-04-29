@@ -33,6 +33,7 @@ This workflow inherits:
 - [Quick Deploy Workflow Spec](./quick-deploy.md)
 - [Workload Framework Detection And Planning](./workload-framework-detection-and-planning.md)
 - [Repository Deployment Config File Bootstrap](./deployment-config-file-bootstrap.md)
+- [Resource Profile Drift Visibility](../specs/011-resource-profile-drift-visibility/spec.md)
 - [Error Model](../errors/model.md)
 - [neverthrow Conventions](../errors/neverthrow-conventions.md)
 - [Async Lifecycle And Acceptance](../architecture/async-lifecycle-and-acceptance.md)
@@ -62,8 +63,9 @@ source-derived defaults or operator input, then persist the resource profile thr
 `resources.create` before `deployments.create(resourceId)`.
 
 If a resource already exists and the repository config profile has changed, the workflow must apply
-the change through explicit resource/environment configuration operations once they exist, or fail
-with profile drift. It must not smuggle the changed profile into `deployments.create`.
+the change through explicit resource/environment configuration operations as named workflow steps
+when that mode is accepted, or fail with `resource_profile_drift` before deployment admission. It
+must not smuggle the changed profile into `deployments.create`.
 
 For v1, first-deploy runtime profile choices must produce a Docker/OCI image artifact or Docker
 Compose project governed by [ADR-021](../decisions/ADR-021-docker-oci-workload-substrate.md). A

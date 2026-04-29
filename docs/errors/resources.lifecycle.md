@@ -20,6 +20,7 @@ This spec inherits:
 - [ADR-015: Resource Network Profile](../decisions/ADR-015-resource-network-profile.md)
 - [Resource Profile Lifecycle](../workflows/resource-profile-lifecycle.md)
 - [Repository Deployment Config File Bootstrap](../workflows/deployment-config-file-bootstrap.md)
+- [Resource Profile Drift Visibility](../specs/011-resource-profile-drift-visibility/spec.md)
 - [Error Model](./model.md)
 - [neverthrow Conventions](./neverthrow-conventions.md)
 - [Async Lifecycle And Acceptance](../architecture/async-lifecycle-and-acceptance.md)
@@ -83,6 +84,7 @@ type ResourceLifecycleErrorDetails = {
     | "config-identity"
     | "config-secret-validation"
     | "config-profile-resolution"
+    | "resource-profile-resolution"
     | "resource-persistence"
     | "event-publication"
     | "event-consumption";
@@ -126,6 +128,22 @@ type ResourceLifecycleErrorDetails = {
     | "resource"
     | "deployment";
   variableKind?: "plain-config" | "secret" | "provider-specific" | "deployment-strategy";
+  driftSection?: "source" | "runtime" | "network" | "access" | "health" | "configuration";
+  driftFieldPath?: string;
+  driftComparison?:
+    | "resource-vs-entry-profile"
+    | "resource-vs-latest-snapshot"
+    | "entry-profile-vs-latest-snapshot";
+  configPointer?: string;
+  suggestedCommand?:
+    | "resources.configure-source"
+    | "resources.configure-runtime"
+    | "resources.configure-network"
+    | "resources.configure-access"
+    | "resources.configure-health"
+    | "resources.set-variable"
+    | "resources.unset-variable";
+  blocksDeploymentAdmission?: boolean;
   lifecycleStatus?: "active" | "archived" | "deleted";
   deletedAt?: string;
   deletionBlockers?: ResourceDeletionBlockerKind[];
@@ -181,6 +199,7 @@ and `deployments.create` where deployment admission reads resource lifecycle or 
 | `validation_error` | `validation` | `query-validation` | No | `resources.show` input is invalid. |
 | `not_found` | `not-found` | `resource-read` | No | Resource cannot be found or is not visible. |
 | `infra_error` | `infra` | `resource-read` | Conditional | Resource detail read model cannot be safely read or assembled. |
+| `resource_profile_drift` | `application` or `conflict` | `resource-profile-resolution` | No | An entry workflow normalized profile differs from the current Resource profile and deployment would ignore unapplied resource-owned profile/configuration changes. The error is blocking for config deploy admission, but `resources.show` may also return non-blocking drift diagnostics inside `ok`. |
 | `validation_error` | `validation` | `command-validation` | No | Profile command input shape, idempotency key, confirmation value, or lifecycle reason is invalid. |
 | `resource_archived` | `conflict` | `resource-lifecycle-guard` | No | A source, runtime, network, access, health, or deployment command targeted an archived resource. |
 | `invariant_violation` | `domain` | `resource-lifecycle-guard` | No | Resource aggregate lifecycle transition rejected the requested change. |

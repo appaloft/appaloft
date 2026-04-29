@@ -33,7 +33,7 @@ state, bind domains, issue certificates, or apply proxy routes.
 | RDP-CLOSE-002 | Profile saves use named operations. | An active resource is open in Web. | The operator saves source, runtime, network, access, health, or configuration changes. | Web dispatches the matching `resources.configure-*`, `resources.set-variable`, or `resources.unset-variable` operation and refetches the matching read path. |
 | RDP-CLOSE-003 | Entrypoints share schemas and operation names. | CLI, HTTP/oRPC, Web, docs help, and future tool metadata refer to resource profile editing. | The behavior is exposed or documented. | Each surface uses existing command/query schemas and operation keys; no generic `resources.update` or transport-only resource update shape exists. |
 | RDP-CLOSE-004 | Side effects are explicit. | The operator saves a resource-level profile or config change. | The change is accepted. | The UI/docs/specs make clear that the save does not create deployments, mutate historical snapshots, immediately affect current runtime/workload, bind domains, issue certificates, or apply proxy routes. |
-| RDP-CLOSE-005 | Resource profile drift is not hidden in the closure claim. | Phase 4 resource detail/profile editing closes. | Roadmap status is updated. | Resource profile drift visibility remains a later ledger item, not a blocker for this Phase 4 editing closure. |
+| RDP-CLOSE-005 | Resource profile drift is not hidden in the closure claim. | Phase 4 resource detail/profile editing closes. | Roadmap status is updated. | Resource profile drift visibility remains governed by the later Resource Profile Drift Visibility artifact, not this Phase 4 editing closure. |
 
 ## Domain Ownership
 
@@ -65,9 +65,10 @@ state, bind domains, issue certificates, or apply proxy routes.
 - Adding new command/query schemas for profile editing.
 - Redeploy, restart, rollback, cancel, runtime cleanup, runtime hot reload, or live route apply.
 - Domain binding creation, certificate issuance, default access policy editing, or proxy repair.
-- New profile drift detection or drift reconciliation behavior.
+- New profile drift detection or drift reconciliation behavior; see
+  [Resource Profile Drift Visibility](../011-resource-profile-drift-visibility/spec.md).
 
 ## Open Questions
 
 - None for the Phase 4 resource detail/profile editing closure. Resource profile drift visibility is
-  a later roadmap/ledger item after this closure.
+  governed by [Resource Profile Drift Visibility](../011-resource-profile-drift-visibility/spec.md).

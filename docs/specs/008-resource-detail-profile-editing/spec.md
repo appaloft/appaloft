@@ -65,5 +65,6 @@ and do not immediately restart, rename, stop, or replace a running workload.
 
 ## Open Questions
 
-- None for this resource detail editing closure. Existing-resource profile drift remains Phase 7
-  work.
+- None for this resource detail editing closure. Existing-resource profile drift is governed by the
+  later [Resource Profile Drift Visibility](../011-resource-profile-drift-visibility/spec.md)
+  artifact and remains outside this closure.

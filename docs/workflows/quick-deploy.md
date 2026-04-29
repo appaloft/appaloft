@@ -37,6 +37,7 @@ This workflow inherits:
 - [deployments.create Workflow Spec](./deployments.create.md)
 - [Workload Framework Detection And Planning](./workload-framework-detection-and-planning.md)
 - [Repository Deployment Config File Bootstrap](./deployment-config-file-bootstrap.md)
+- [Resource Profile Drift Visibility](../specs/011-resource-profile-drift-visibility/spec.md)
 - [Control-Plane Mode Selection And Adoption](./control-plane-mode-selection-and-adoption.md)
 - [GitHub Action Deploy Wrapper Implementation Plan](../implementation/github-action-deploy-action-plan.md)
 - [Workflow Spec Format](./WORKFLOW_SPEC_FORMAT.md)
@@ -640,9 +641,13 @@ HTTP/HTTPS redirect verification remains opt-in SSH e2e follow-up.
 The public `appaloft/deploy-action` wrapper is not implemented yet; current tests cover the
 underlying binary process boundary but not release download, checksum verification, action inputs,
 or SSH secret temp-key handling.
-Profile-drift handling, stored/external secret lookup/application beyond `ci-env:`, environment
-overlays, managed control-plane domain mapping, and config-origin diagnostics remain follow-up work
-governed by [Deployment Config File Test Matrix](../testing/deployment-config-file-test-matrix.md)
+Profile-drift visibility is specified in
+[Resource Profile Drift Visibility](../specs/011-resource-profile-drift-visibility/spec.md): entry
+workflows should reuse `resources.show` diagnostics and must fail before deployment admission when an
+existing resource differs from a normalized config/entry profile that the workflow is not explicitly
+applying through named resource commands. Stored/external secret lookup/application beyond `ci-env:`,
+environment overlays, managed control-plane domain mapping, and config-origin diagnostics remain
+follow-up work governed by [Deployment Config File Test Matrix](../testing/deployment-config-file-test-matrix.md)
 and [Source Link State Test Matrix](../testing/source-link-state-test-matrix.md).
 
 Provider-backed disambiguation for slash-containing Git refs and user-facing typed fields for

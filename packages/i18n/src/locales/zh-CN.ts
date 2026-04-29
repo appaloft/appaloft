@@ -552,6 +552,10 @@ export const zhCN = {
       diagnosticSummaryLoading: "正在准备诊断 JSON",
       diagnosticsDescription: "复制资源、访问、代理和运行时日志摘要，用于排查或发给支持人员。",
       diagnosticsTitle: "诊断",
+      profileDiagnosticsEmpty: "当前没有资源 profile 诊断。",
+      profileDiagnosticsLatestDeployment: "最新部署",
+      profileDiagnosticsSuggestedCommand: "建议命令",
+      profileDiagnosticsTitle: "Profile 诊断",
       deploymentsDescription: "这个资源的部署尝试，按最新优先显示来源和状态。",
       deploymentsTitle: "部署",
       domainBindingsDescription:

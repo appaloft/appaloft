@@ -220,6 +220,7 @@
   const resourceEffectiveConfig = $derived<ResourceEffectiveConfig | null>(
     resourceEffectiveConfigQuery.data ?? null,
   );
+  const profileDiagnostics = $derived(resourceDetail?.diagnostics ?? []);
   const resourceHealthOverall = $derived.by((): ResourceHealthViewStatus => {
     if (
       resourceHealthQuery.isPending ||
@@ -4293,6 +4294,55 @@
                     />
                   </div>
                 {/if}
+                <div class="mt-4 space-y-3 rounded-md border bg-muted/20 p-3">
+                  <h3 class="text-sm font-semibold">
+                    {$t(i18nKeys.console.resources.profileDiagnosticsTitle)}
+                  </h3>
+                  {#if profileDiagnostics.length === 0}
+                    <p class="text-sm text-muted-foreground">
+                      {$t(i18nKeys.console.resources.profileDiagnosticsEmpty)}
+                    </p>
+                  {:else}
+                    <div class="space-y-2">
+                      {#each profileDiagnostics as diagnostic (`${diagnostic.code}-${diagnostic.fieldPath ?? diagnostic.path ?? diagnostic.message}`)}
+                        <div class="space-y-2 rounded-md border bg-background p-3">
+                          <div class="flex flex-wrap items-center gap-2">
+                            <Badge
+                              variant={diagnostic.severity === "blocking" ? "destructive" : "outline"}
+                            >
+                              {diagnostic.severity}
+                            </Badge>
+                            {#if diagnostic.section}
+                              <Badge variant="secondary">{diagnostic.section}</Badge>
+                            {/if}
+                            {#if diagnostic.fieldPath ?? diagnostic.path}
+                              <span class="font-mono text-xs text-muted-foreground">
+                                {diagnostic.fieldPath ?? diagnostic.path}
+                              </span>
+                            {/if}
+                          </div>
+                          <p class="text-sm text-foreground">{diagnostic.message}</p>
+                          <div class="flex flex-wrap gap-3 text-xs text-muted-foreground">
+                            {#if diagnostic.latestDeploymentId}
+                              <span>
+                                {$t(i18nKeys.console.resources.profileDiagnosticsLatestDeployment)}:
+                                {diagnostic.latestDeploymentId}
+                              </span>
+                            {/if}
+                            {#if diagnostic.suggestedCommand}
+                              <span>
+                                {$t(i18nKeys.console.resources.profileDiagnosticsSuggestedCommand)}:
+                                <code class="rounded bg-muted px-1 py-0.5">
+                                  {diagnostic.suggestedCommand}
+                                </code>
+                              </span>
+                            {/if}
+                          </div>
+                        </div>
+                      {/each}
+                    </div>
+                  {/if}
+                </div>
               </section>
               {/if}
             </div>

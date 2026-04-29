@@ -64,11 +64,14 @@ Implement in ordered slices:
    - Map config source/runtime/network/health profile fields into `resources.create` for first
      deploy.
    - Map config `runtime.name` into `ResourceRuntimeProfile.runtimeName`.
-   - When `resources.configure-source`, `resources.configure-runtime`, and
-     `resources.configure-network` are active, sequence the relevant commands before deployment for
-     existing resources.
-   - Until those profile configuration commands are active, detect profile drift and fail before
+   - Detect existing-resource profile drift against the current Resource profile before deployment.
+   - Default config deploy behavior is fail-first for unapplied drift: return `resource_profile_drift`
+     with section, field path, config pointer when known, and suggested command before
      `deployments.create`.
+   - When an explicit apply-profile mode or workflow step is accepted, sequence the relevant
+     `resources.configure-source`, `resources.configure-runtime`, `resources.configure-network`,
+     `resources.configure-access`, `resources.configure-health`, `resources.set-variable`, or
+     `resources.unset-variable` commands before deployment for existing resources.
 
 5. Secret handling
    - Reject raw secret material before mutation.
@@ -203,9 +206,9 @@ Implemented slices:
 
 Remaining gaps:
 
-- Existing-resource profile drift detection and explicit `resources.configure-source`,
-  `resources.configure-runtime`, and `resources.configure-network` command sequencing are not
-  implemented yet.
+- Existing-resource profile drift visibility, default fail-before-deployment behavior, and explicit
+  profile apply sequencing are not implemented yet. The governing Spec Round is
+  [Resource Profile Drift Visibility](../specs/011-resource-profile-drift-visibility/spec.md).
 - Config-file support for `runtime.name` and preview-derived default runtime naming is not
   implemented yet.
 - Config-file `access.domains[]` parser support is implemented for provider-neutral `host`,
