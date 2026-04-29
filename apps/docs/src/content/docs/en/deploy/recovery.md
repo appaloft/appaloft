@@ -11,6 +11,7 @@ searchAliases:
   - "retry"
   - "rollback"
 relatedOperations:
+  - deployments.recovery-readiness
   - source-links.relink
   - deployments.cleanup-preview
 sidebar:
@@ -36,6 +37,50 @@ After cleanup, check:
 - The preview access URL is no longer shown as active.
 - Production deployments and normal history were not affected.
 - A later preview with the same id can be created again.
+
+<h2 id="deployment-recovery-readiness">Check deployment recovery readiness</h2>
+
+When a deployment fails, is canceled, or has an interrupted observation stream, inspect recovery readiness before running retry or rollback actions:
+
+```bash
+appaloft deployments recovery-readiness <deploymentId>
+```
+
+This query is read-only. It returns:
+
+- machine-readable `recoverable`, `retryable`, `redeployable`, and `rollbackReady` fields;
+- blocked reasons for `retry`, `redeploy`, and `rollback`;
+- rollback candidates and whether a candidate is missing artifact or snapshot data;
+- safe next actions such as opening detail, logs, the event stream, or a diagnostic summary.
+
+The `retry`, `redeploy`, and `rollback` write commands are not active yet. Even when readiness shows an action is technically possible, `recovery-command-not-active` explains that the command is still unavailable.
+
+<h2 id="deployment-recovery-retry">Retry</h2>
+
+Retry means creating a new deployment attempt from the failed deployment's immutable snapshot intent. It does not replay old events and does not resume a failed phase inside the old attempt.
+
+Until the retry command is active, readiness only tells you whether the retained snapshot and runtime inputs are enough for a same-intent retry.
+
+<h2 id="deployment-recovery-redeploy">Redeploy</h2>
+
+Redeploy means deploying the current Resource profile again. It reads the current resource configuration, environment configuration, target, and destination. It does not reuse the old deployment snapshot.
+
+If the current Resource profile is missing, drifted, or no longer admissible, readiness marks redeploy as blocked.
+
+<h2 id="deployment-recovery-rollback">Rollback</h2>
+
+Rollback means creating a new rollback attempt from a historical successful deployment snapshot and Docker/OCI artifact. It does not re-plan from the current Resource profile and does not restore databases, volumes, queues, or external dependency state.
+
+<h2 id="deployment-recovery-rollback-candidates">Rollback candidates</h2>
+
+A rollback candidate must be a historical successful deployment for the same resource and must still retain:
+
+- deployment snapshot;
+- environment snapshot;
+- runtime target / destination identity;
+- Docker/OCI artifact identity such as image, digest, local image id, or Compose artifact.
+
+If the artifact was pruned, the snapshot is incomplete, the target is incompatible, or recovery would require data/volume rollback, readiness returns a blocked reason and suggests choosing another candidate, redeploying, or running diagnostics first.
 
 <h2 id="deployment-retry-or-rollback">Retry or rollback</h2>
 

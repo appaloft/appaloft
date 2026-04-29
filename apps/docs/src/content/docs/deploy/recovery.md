@@ -12,6 +12,7 @@ searchAliases:
   - "rollback"
   - "恢复"
 relatedOperations:
+  - deployments.recovery-readiness
   - source-links.relink
   - deployments.cleanup-preview
 sidebar:
@@ -37,6 +38,50 @@ Preview cleanup 用于删除某个 pull request、分支或临时来源产生的
 - 预览访问地址是否不再展示为有效入口。
 - 生产部署和普通历史记录是否未被影响。
 - 后续同一 preview id 是否可以重新创建。
+
+<h2 id="deployment-recovery-readiness">检查部署恢复就绪</h2>
+
+当部署失败、被取消或观察流中断时，先读取恢复就绪，而不是直接执行重试或回滚：
+
+```bash
+appaloft deployments recovery-readiness <deploymentId>
+```
+
+这个查询只读。它会返回：
+
+- `recoverable`、`retryable`、`redeployable`、`rollbackReady` 等机器可读字段。
+- `retry`、`redeploy`、`rollback` 三类动作的阻塞原因。
+- 可用的 rollback candidates，以及候选是否缺少 artifact 或快照。
+- 安全的下一步建议，例如查看详情、日志、事件流或诊断摘要。
+
+当前 `retry`、`redeploy`、`rollback` 写命令还没有启用。即使 readiness 判断某个动作在技术上可行，也会通过 `recovery-command-not-active` 说明该命令仍未激活。
+
+<h2 id="deployment-recovery-retry">Retry</h2>
+
+Retry 的语义是“基于失败部署的不可变 snapshot intent 创建新的部署 attempt”。它不是重放旧事件，也不是在旧 attempt 中继续执行失败阶段。
+
+在 retry 命令启用前，readiness 只会告诉你它是否具备同一意图重试所需的快照和运行时输入。
+
+<h2 id="deployment-recovery-redeploy">Redeploy</h2>
+
+Redeploy 的语义是“使用当前 Resource profile 再部署一次”。它会读取当前资源配置、环境配置、target 和 destination，不复用旧部署快照。
+
+如果当前 Resource profile 缺失、漂移或不再能通过 admission，readiness 会把 redeploy 标记为阻塞。
+
+<h2 id="deployment-recovery-rollback">Rollback</h2>
+
+Rollback 的语义是“基于历史成功部署的 snapshot 和 Docker/OCI artifact 创建新的 rollback attempt”。它不会从当前 Resource profile 重新 plan，也不会恢复数据库、volume、队列或外部依赖状态。
+
+<h2 id="deployment-recovery-rollback-candidates">Rollback candidates</h2>
+
+rollback candidate 必须是同一资源下的历史成功部署，并且仍保留必要信息：
+
+- deployment snapshot；
+- environment snapshot；
+- runtime target / destination identity；
+- Docker/OCI artifact identity，例如 image、digest、local image id 或 Compose artifact。
+
+如果 artifact 已被清理、快照不完整、target 不兼容，或恢复需要数据/volume 回滚，readiness 会返回阻塞原因并建议改选候选、重新部署或先做诊断。
 
 <h2 id="deployment-retry-or-rollback">重试还是回滚</h2>
 

@@ -2,9 +2,9 @@
 
 ## Status
 
-Spec Round matrix. These scenarios define required future tests before activating
-`deployments.recovery-readiness`, `deployments.retry`, `deployments.redeploy`, or
-`deployments.rollback`.
+Active readiness-query matrix plus future recovery-command matrix. `deployments.recovery-readiness`
+has automated application and HTTP coverage. `deployments.retry`, `deployments.redeploy`, and
+`deployments.rollback` remain future write-command rows.
 
 ## Governing Sources
 
@@ -20,18 +20,19 @@ Spec Round matrix. These scenarios define required future tests before activatin
 
 ## Readiness Query Coverage
 
-| ID | Scenario | Expected assertion |
-| --- | --- | --- |
-| `DEP-RECOVERY-READINESS-001` | Failed deployment has retained snapshot intent and runtime inputs. | Query returns `retry.ready = true`, safe retry action, and no rollback readiness unless a retained successful candidate exists. |
-| `DEP-RECOVERY-READINESS-002` | Active or non-terminal deployment is inspected. | Query returns retry/rollback blocked with `attempt-not-terminal` and suggests event/detail observation. |
-| `DEP-RECOVERY-READINESS-003` | Failed deployment has missing deployment snapshot. | Query returns retry blocked with `snapshot-missing` and does not offer retry as safe action. |
-| `DEP-RECOVERY-READINESS-004` | Current Resource profile is valid for a fresh deployment. | Query returns `redeploy.ready = true` even when the inspected attempt snapshot is unusable. |
-| `DEP-RECOVERY-READINESS-005` | Current Resource profile is invalid or drifted. | Query returns `redeploy.ready = false` with a stable profile/drift blocked reason and a configuration repair suggestion. |
-| `DEP-RECOVERY-READINESS-006` | Successful prior deployment retains snapshot, environment snapshot, target/destination identity, and artifact identity. | Query returns rollback candidate and `rollback.ready = true`. |
-| `DEP-RECOVERY-READINESS-007` | Prior successful deployment has expired or missing artifact identity. | Query excludes or marks the candidate blocked with `runtime-artifact-missing` or `rollback-candidate-expired`. |
-| `DEP-RECOVERY-READINESS-008` | Prior successful deployment used an incompatible runtime target/destination. | Query blocks rollback with `rollback-candidate-target-mismatch`. |
-| `DEP-RECOVERY-READINESS-009` | Deployment event stream reports reconnect gap. | Query result is based on durable state and is not made ready/blocked solely by the gap envelope. |
-| `DEP-RECOVERY-READINESS-010` | Recovery command is not active in the operation catalog. | Query may show readiness facts but next actions identify unavailable command state with `recovery-command-not-active`. |
+| ID | Scenario | Expected assertion | Automation binding | Status |
+| --- | --- | --- | --- | --- |
+| `DEP-RECOVERY-READINESS-001` | Failed deployment has retained snapshot intent and runtime inputs. | Query returns `retryable = true`, safe read-only actions, and retry command unavailable with `recovery-command-not-active`. | `packages/application/test/deployment-recovery-readiness.test.ts` | Passing |
+| `DEP-RECOVERY-READINESS-002` | Active or non-terminal deployment is inspected. | Query returns retry blocked with `attempt-not-terminal` and redeploy blocked with `resource-runtime-busy`. | `packages/application/test/deployment-recovery-readiness.test.ts` | Passing |
+| `DEP-RECOVERY-READINESS-003` | Failed deployment has missing deployment snapshot. | Query returns retry blocked with `snapshot-missing` and does not offer retry as active command. | planned application fixture | Deferred gap |
+| `DEP-RECOVERY-READINESS-004` | Current Resource profile is valid for a fresh deployment. | Query returns `redeployable = true` even when write command remains inactive. | `packages/application/test/deployment-recovery-readiness.test.ts` via `DEP-RECOVERY-READINESS-001` fixture | Passing |
+| `DEP-RECOVERY-READINESS-005` | Current Resource profile is invalid or drifted. | Query returns `redeployable = false` with a stable profile/drift blocked reason and a configuration repair suggestion. | planned application fixture | Deferred gap |
+| `DEP-RECOVERY-READINESS-006` | Successful prior deployment retains snapshot, environment snapshot, target/destination identity, and artifact identity. | Query returns rollback candidate and `rollbackReady = true`. | `packages/application/test/deployment-recovery-readiness.test.ts` | Passing |
+| `DEP-RECOVERY-READINESS-007` | Prior successful deployment has expired or missing artifact identity. | Query marks the candidate blocked with `runtime-artifact-missing`. | `packages/application/test/deployment-recovery-readiness.test.ts` | Passing |
+| `DEP-RECOVERY-READINESS-008` | Prior successful deployment used an incompatible runtime target/destination. | Query blocks rollback with `rollback-candidate-target-mismatch`. | planned after target compatibility metadata | Deferred gap |
+| `DEP-RECOVERY-READINESS-009` | Deployment event stream reports reconnect gap. | Query result is based on durable state and is not made ready/blocked solely by the gap envelope. | covered by spec; no stream dependency in query service | Passing by construction |
+| `DEP-RECOVERY-READINESS-010` | Recovery command is not active in the operation catalog. | Query may show readiness facts but next actions identify unavailable command state with `recovery-command-not-active`. | `packages/application/test/deployment-recovery-readiness.test.ts` | Passing |
+| `DEP-RECOVERY-READINESS-011` | Missing deployment is requested. | Query returns `not_found` with `queryName = deployments.recovery-readiness`. | `packages/application/test/deployment-recovery-readiness.test.ts` | Passing |
 
 ## Recovery Command Coverage
 
@@ -49,15 +50,15 @@ Spec Round matrix. These scenarios define required future tests before activatin
 
 ## Entrypoint Coverage
 
-| ID | Scenario | Expected assertion |
-| --- | --- | --- |
-| `DEP-RECOVERY-WEB-001` | Web deployment detail renders failed deployment. | UI uses readiness query output for recovery cards and blocked reasons; no hardcoded recovery branching in components. |
-| `DEP-RECOVERY-CLI-001` | CLI inspects failed deployment interactively. | CLI presents retry/redeploy/rollback suggestions only from readiness output and includes read-only inspection commands when blocked. |
-| `DEP-RECOVERY-HTTP-001` | HTTP/oRPC client requests readiness. | Response schema preserves booleans, candidate data, blocked reason codes, and generated state marker. |
-| `DEP-RECOVERY-MCP-001` | Future tool asks for deployment recovery options. | Tool output can map directly to `recoverable`, `retryable`, `redeployable`, `rollbackReady`, and safe next actions without bespoke policy. |
+| ID | Scenario | Expected assertion | Automation binding | Status |
+| --- | --- | --- | --- | --- |
+| `DEP-RECOVERY-WEB-001` | Web deployment detail renders failed deployment. | UI uses readiness query output for recovery cards and blocked reasons; no hardcoded recovery branching in components. | `apps/web` Svelte semantic check | Passing |
+| `DEP-RECOVERY-CLI-001` | CLI inspects failed deployment interactively. | CLI exposes read-only `appaloft deployments recovery-readiness <deploymentId>` and prints readiness output from the shared query. | CLI typecheck / operation catalog | Passing |
+| `DEP-RECOVERY-HTTP-001` | HTTP/oRPC client requests readiness. | Response schema preserves booleans, candidate data, blocked reason codes, and generated state marker. | `packages/orpc/test/deployment-recovery-readiness.http.test.ts` | Passing |
+| `DEP-RECOVERY-MCP-001` | Future tool asks for deployment recovery options. | Tool output can map directly to `recoverable`, `retryable`, `redeployable`, `rollbackReady`, and safe next actions without bespoke policy. | future MCP descriptor | Deferred gap |
 
 ## Current Implementation Notes And Migration Gaps
 
-No executable tests are required in this Spec Round. The next Test-First Round should create focused
-application/query tests for the readiness policy before any Web/API/CLI entrypoint enables recovery
-actions.
+The active readiness query has application and HTTP/oRPC automated coverage plus CLI/Web type-level
+coverage. Remaining deferred gaps belong to future write commands, richer target compatibility
+metadata, artifact retention/prune policy, and future MCP descriptors.

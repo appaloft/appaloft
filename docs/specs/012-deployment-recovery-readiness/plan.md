@@ -145,7 +145,9 @@ Target public docs outcome:
 
 ## Code Round Readiness
 
-Spec Round makes a first **readiness query** Code Round ready from a source-of-truth perspective.
-The next round should be Test-First for the readiness policy/query slice, then implementation of
-`deployments.recovery-readiness`. Write command Code Rounds should follow only after the readiness
-query is active and retention metadata is sufficient.
+The first **readiness query** Code Round is complete for the read-only slice. The active operation
+is implemented through application query service/handler, operation catalog, HTTP/oRPC, CLI, Web
+deployment detail, public docs/help registry, and targeted tests.
+
+Write command Code Rounds should follow only after the readiness query remains stable and retention
+metadata is sufficient.

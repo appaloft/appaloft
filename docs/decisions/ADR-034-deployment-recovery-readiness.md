@@ -28,13 +28,15 @@ commands:
 
 | Operation | Kind | Public state after this ADR | Meaning |
 | --- | --- | --- | --- |
-| `deployments.recovery-readiness` | Query | Accepted candidate | Reads retry, redeploy, rollback readiness and candidate reasons for one deployment/resource context. |
+| `deployments.recovery-readiness` | Query | Active read-only | Reads retry, redeploy, rollback readiness and candidate reasons for one deployment/resource context. |
 | `deployments.retry` | Command | Accepted candidate | Creates a new deployment attempt from the failed attempt's immutable snapshot intent. |
 | `deployments.redeploy` | Command | Accepted candidate | Creates a new deployment attempt from the current Resource profile. |
 | `deployments.rollback` | Command | Accepted candidate | Creates a new rollback deployment attempt from a selected successful rollback candidate snapshot/artifact. |
 
-These operations are not active until a Code Round adds `CORE_OPERATIONS.md`,
-`operation-catalog.ts`, command/query slices, entrypoints, and executable tests in the same change.
+`deployments.recovery-readiness` is active after its first Code Round updates
+`CORE_OPERATIONS.md`, `operation-catalog.ts`, the application query slice, HTTP/oRPC, CLI, Web, public
+docs/help, and executable tests in the same change. The write commands remain accepted candidates
+until their own Code Rounds add command slices, entrypoints, and executable tests.
 
 `deployments.show` may include a compact recovery summary only after it is derived from the same
 readiness policy used by `deployments.recovery-readiness`. It must not independently decide whether
@@ -187,7 +189,7 @@ include secrets, raw environment values, private registry credentials, or unboun
 
 - ADR-016 remains valid: no recovery write operation is public until this ADR's specs, test matrix,
   implementation plan, operation catalog, and entrypoint contracts are implemented together.
-- Recovery readiness becomes the single source of truth for Web, CLI, HTTP/oRPC, and future MCP
+- Recovery readiness is the single source of truth for Web, CLI, HTTP/oRPC, and future MCP
   prompts.
 - `deployments.show` and `deployments.stream-events` stay read-only observation boundaries.
 - Runtime target backends must retain or report artifact/snapshot identity enough to support
@@ -223,9 +225,9 @@ include secrets, raw environment values, private registry credentials, or unboun
 ## Migration Gaps
 
 Current code may retain low-level rollback helpers, runtime artifact fields, or historical rollback
-model objects, but they are internal only. Public recovery readiness, retry, redeploy, and rollback
-entrypoints remain absent until a Code Round implements the accepted candidate operations and updates
-the operation catalog.
+model objects, but they are internal only. Public recovery readiness is active as a read-only query.
+Public retry, redeploy, and rollback entrypoints remain absent until later Code Rounds implement the
+accepted candidate write commands and update the operation catalog.
 
 Current event-stream cursor gaps are observation gaps. They must not be used as recovery blockers
 unless the durable event/progress source itself is also the only available snapshot/artifact evidence.

@@ -66,6 +66,7 @@ describe("operation catalog aggregate mutation boundary", () => {
       "deployments.create",
       "deployments.list",
       "deployments.show",
+      "deployments.recovery-readiness",
       "deployments.logs",
       "deployments.stream-events",
     ];

@@ -5,6 +5,7 @@ import {
   CreateDeploymentCommand,
   type CreateDeploymentCommandInput,
   DeploymentLogsQuery,
+  DeploymentRecoveryReadinessQuery,
   type DeploymentSummary,
   ListDeploymentsQuery,
   ShowDeploymentQuery,
@@ -1424,6 +1425,14 @@ const showDeploymentCommand = EffectCommand.make(
   ({ deploymentId }) => runQuery(ShowDeploymentQuery.create({ deploymentId })),
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.deploymentShow));
 
+const deploymentRecoveryReadinessCommand = EffectCommand.make(
+  "recovery-readiness",
+  {
+    deploymentId: deploymentIdArg,
+  },
+  ({ deploymentId }) => runQuery(DeploymentRecoveryReadinessQuery.create({ deploymentId })),
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.deploymentRecoveryReadiness));
+
 const streamDeploymentEventsCommand = EffectCommand.make(
   "events",
   {
@@ -1452,6 +1461,7 @@ export const deploymentsCommand = EffectCommand.make("deployments").pipe(
   EffectCommand.withSubcommands([
     listDeploymentsCommand,
     showDeploymentCommand,
+    deploymentRecoveryReadinessCommand,
     streamDeploymentEventsCommand,
   ]),
 );

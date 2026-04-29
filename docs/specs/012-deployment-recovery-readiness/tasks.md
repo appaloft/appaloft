@@ -24,28 +24,29 @@
   - `DEP-ROLLBACK-*`
   - `DEP-RECOVERY-WEB-*`, `DEP-RECOVERY-CLI-*`, `DEP-RECOVERY-HTTP-*`, and
     `DEP-RECOVERY-MCP-*`
-- [ ] Add planned automated test bindings for readiness policy/query service.
+- [x] Add automated test bindings for readiness policy/query service.
 - [ ] Add planned automated test bindings for retry/redeploy/rollback command admission.
-- [ ] Add planned automated test bindings for rollback candidate retention and unavailable artifact
+- [x] Add automated test bindings for rollback candidate retention and unavailable artifact
   branches.
-- [ ] Add planned API/oRPC, CLI, Web, and future MCP/tool contract rows.
-- [ ] Add public docs coverage rows or explicit migration gaps for `PUB-DOCS-002`,
+- [x] Add API/oRPC, CLI, Web, and future MCP/tool contract rows.
+- [x] Add public docs coverage rows or explicit migration gaps for `PUB-DOCS-002`,
   `PUB-DOCS-003`, `PUB-DOCS-011`, `PUB-DOCS-012`, `PUB-DOCS-016`, and `PUB-DOCS-017`.
 
 ## Readiness Query Code Round
 
-- [ ] Add `deployments.recovery-readiness` operation catalog entry and `CORE_OPERATIONS.md` active
+- [x] Add `deployments.recovery-readiness` operation catalog entry and `CORE_OPERATIONS.md` active
   query row in the same Code Round.
-- [ ] Add application query schema, query, handler, and query service.
-- [ ] Add a shared recovery readiness policy service reused by `deployments.show` when it renders a
+- [x] Add application query schema, query, handler, and query service.
+- [x] Add a shared recovery readiness policy service reused by `deployments.show` when it renders a
   compact recovery summary.
-- [ ] Add read ports for deployment history, resource profile/lifecycle, target/destination
-  lifecycle, artifact retention, and rollback candidate metadata.
-- [ ] Add persistence/read-model fields or adapters needed to report retained artifact status.
-- [ ] Add HTTP/oRPC route and typed client/query helper.
-- [ ] Add CLI `appaloft deployments recovery-readiness <deploymentId> [--json]`.
-- [ ] Add Web deployment detail recovery panel in read-only mode.
-- [ ] Run targeted tests named with the stable matrix ids.
+- [x] Reuse existing read ports for deployment history, resource profile/lifecycle, runtime target
+  summary, and currently available artifact metadata.
+- [ ] Add richer persistence/read-model fields or adapters needed to report retained artifact
+  retention horizon and target compatibility.
+- [x] Add HTTP/oRPC route and typed client/query helper.
+- [x] Add CLI `appaloft deployments recovery-readiness <deploymentId>`.
+- [x] Add Web deployment detail recovery panel in read-only mode.
+- [x] Run targeted tests named with the stable matrix ids.
 
 ## Retry Code Round
 
@@ -85,27 +86,28 @@
 
 ## Docs Round
 
-- [ ] Add or update public docs page for deployment recovery.
-- [ ] Register stable help anchors for readiness, retry, redeploy, rollback, and rollback
+- [x] Add or update public docs page for deployment recovery.
+- [x] Register stable help anchors for readiness, retry, redeploy, rollback, and rollback
   candidates.
-- [ ] Add Web help links, CLI help/docs links, HTTP/API descriptions, and future MCP/tool
+- [x] Add Web help links, CLI help/docs links, HTTP/API descriptions, and future MCP/tool
   descriptions to the registry.
-- [ ] Mark `zh-CN` and `en-US` locale state explicitly.
-- [ ] Add public error guide entries for recovery admission failures.
+- [x] Mark `zh-CN` and `en-US` locale state explicitly.
+- [ ] Add public error guide entries for recovery admission failures when write commands become
+  active.
 
 ## Verification
 
 - [ ] Run targeted docs/source checks after Code Round.
-- [ ] Run targeted application tests for recovery readiness and commands.
-- [ ] Run targeted API/oRPC contract tests.
-- [ ] Run targeted CLI tests.
-- [ ] Run targeted Web tests.
+- [x] Run targeted application tests for recovery readiness.
+- [x] Run targeted API/oRPC contract tests.
+- [x] Run targeted CLI type/catalog checks.
+- [x] Run targeted Web semantic checks.
 - [ ] Run `bun run lint` before final Code Round closure.
 
 ## Post-Implementation Sync
 
-- [ ] Reconcile ADR-034, feature artifacts, local command/query/workflow/error specs, test
+- [x] Reconcile ADR-034, feature artifacts, local command/query/workflow/error specs, test
   matrices, implementation plans, public docs, operation catalog, and code.
-- [ ] Update migration gaps for artifact retention, event payloads, and public docs.
-- [ ] Confirm `deployments.show`, `deployments.stream-events`, and recovery commands all consume the
-  same readiness semantics.
+- [x] Update migration gaps for artifact retention, event payloads, and public docs.
+- [x] Confirm `deployments.show`, `deployments.stream-events`, and active readiness query consume the
+  same readiness semantics; recovery commands remain future accepted candidates.

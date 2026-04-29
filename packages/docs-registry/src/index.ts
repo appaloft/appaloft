@@ -303,6 +303,39 @@ export const publicDocsHelpTopics = {
     relatedOperation: "source-links.relink",
     aliases: ["relink", "source link", "move repository", "重新关联来源"],
   },
+  "deployment.recovery-readiness": {
+    id: "deployment.recovery-readiness",
+    title: "Deployment recovery readiness",
+    description:
+      "How to inspect retry, redeploy, rollback, and rollback candidate readiness before running recovery actions.",
+    page: {
+      "zh-CN": "deploy/recovery",
+      "en-US": "en/deploy/recovery",
+    },
+    anchor: "deployment-recovery-readiness",
+    localeCoverage: {
+      "zh-CN": "complete",
+      "en-US": "complete",
+    },
+    surfaces: ["web", "cli", "http-api", "mcp"],
+    relatedOperation: "deployments.recovery-readiness",
+    aliases: [
+      "deployment recovery",
+      "recovery readiness",
+      "retry readiness",
+      "rollback candidates",
+      "部署恢复",
+      "恢复就绪",
+      "回滚候选",
+    ],
+    specReferences: [
+      "docs/decisions/ADR-034-deployment-recovery-readiness.md",
+      "docs/specs/012-deployment-recovery-readiness/spec.md",
+      "docs/queries/deployments.recovery-readiness.md",
+      "docs/testing/deployment-recovery-readiness-test-matrix.md",
+    ],
+    webSurfaces: ["apps/web deployment detail recovery panel"],
+  },
   "deployment.preview-cleanup": {
     id: "deployment.preview-cleanup",
     title: "Preview cleanup",
@@ -1422,6 +1455,11 @@ export const publicDocsOperationCoverage = [
   { operationKey: "deployments.create", status: "documented", topicId: "deployment.lifecycle" },
   { operationKey: "deployments.list", status: "documented", topicId: "deployment.lifecycle" },
   { operationKey: "deployments.show", status: "documented", topicId: "deployment.lifecycle" },
+  {
+    operationKey: "deployments.recovery-readiness",
+    status: "documented",
+    topicId: "deployment.recovery-readiness",
+  },
   { operationKey: "deployments.logs", status: "documented", topicId: "observability.runtime-logs" },
   {
     operationKey: "deployments.stream-events",

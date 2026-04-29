@@ -8,6 +8,7 @@ import { showDefaultAccessDomainPolicyQueryInputSchema } from "./operations/defa
 import { cleanupPreviewCommandInputSchema } from "./operations/deployments/cleanup-preview.command";
 import { createDeploymentCommandInputSchema } from "./operations/deployments/create-deployment.command";
 import { deploymentLogsQueryInputSchema } from "./operations/deployments/deployment-logs.query";
+import { deploymentRecoveryReadinessQueryInputSchema } from "./operations/deployments/deployment-recovery-readiness.query";
 import { listDeploymentsQueryInputSchema } from "./operations/deployments/list-deployments.query";
 import { showDeploymentQueryInputSchema } from "./operations/deployments/show-deployment.query";
 import { streamDeploymentEventsQueryInputSchema } from "./operations/deployments/stream-deployment-events.query";
@@ -927,6 +928,20 @@ export const operationCatalog = [
     transports: {
       cli: "appaloft deployments show <deploymentId>",
       orpc: { method: "GET", path: "/api/deployments/{deploymentId}" },
+    },
+  },
+  {
+    key: "deployments.recovery-readiness",
+    kind: "query",
+    domain: "deployments",
+    messageName: "DeploymentRecoveryReadinessQuery",
+    handlerName: "DeploymentRecoveryReadinessQueryHandler",
+    serviceName: "DeploymentRecoveryReadinessQueryService",
+    inputSchema: deploymentRecoveryReadinessQueryInputSchema,
+    serviceToken: tokens.deploymentRecoveryReadinessQueryService,
+    transports: {
+      cli: "appaloft deployments recovery-readiness <deploymentId>",
+      orpc: { method: "GET", path: "/api/deployments/{deploymentId}/recovery-readiness" },
     },
   },
   {

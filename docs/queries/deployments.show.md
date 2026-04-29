@@ -212,11 +212,10 @@ Timeline/watch behavior remains intentionally separate from this query and is go
 candidate `deployments.stream-events`. `deployments.logs` remains the separate attempt-log
 operation.
 
-Deployment recovery readiness is now accepted under ADR-034, but not active. Until
-`deployments.recovery-readiness` is implemented, `deployments.show` must keep recovery actions out of
-`nextActions` and may only point users to read-only logs, event timeline, resource health, and
-diagnostic summary. After readiness is active, any compact recovery summary in this query must be
-derived from the same readiness policy and not recomputed independently by the detail query.
+Deployment recovery readiness is active under ADR-034. `deployments.show` keeps recovery write
+actions out of `nextActions`; when `includeRecoverySummary` is requested, its compact recovery
+summary is derived from the same `deployments.recovery-readiness` query service and not recomputed
+independently by the detail query.
 
 ## Open Questions
 
