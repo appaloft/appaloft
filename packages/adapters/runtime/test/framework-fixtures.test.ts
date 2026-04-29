@@ -8,6 +8,7 @@ import {
   EnvironmentSnapshotId,
   GeneratedAt,
 } from "@appaloft/core";
+import { RuntimeCommandBuilder, renderRuntimeCommandString } from "../src/runtime-commands";
 import { pinnedBunAlpineImage } from "../src/workspace-planners/bun";
 
 function createTestExecutionContext(): ExecutionContext {
@@ -398,6 +399,104 @@ const plannerFixtures: PlannerFixtureExpectation[] = [
   },
 ];
 
+type ResourceRuntimeStrategy = "auto" | "static" | "workspace-commands";
+
+interface ResourceProfileDeploySmoke {
+  matrixIds: string;
+  fixture: string;
+  resourceProfile: {
+    source: {
+      kind: "local-folder";
+      locator: string;
+      baseDirectory: string;
+    };
+    runtimeProfile: {
+      strategy: ResourceRuntimeStrategy;
+      publishDirectory?: string;
+      installCommand?: string;
+      buildCommand?: string;
+      startCommand?: string;
+    };
+    networkProfile: {
+      internalPort: number;
+      upstreamProtocol: "http";
+      exposureMode: "reverse-proxy";
+    };
+  };
+  expected: {
+    planner: string;
+    framework: string;
+    buildStrategy: "static-artifact" | "workspace-commands";
+    dockerfilePath: "Dockerfile.appaloft" | "Dockerfile.appaloft-static";
+    artifactSource: "static-site" | "workspace-commands";
+  };
+}
+
+function shellQuote(input: string): string {
+  return `'${input.replaceAll("'", "'\\''")}'`;
+}
+
+function localFixtureProfile(input: {
+  fixture: string;
+  strategy?: ResourceRuntimeStrategy;
+  internalPort: number;
+}): ResourceProfileDeploySmoke["resourceProfile"] {
+  return {
+    source: {
+      kind: "local-folder",
+      locator: join(fixturesRoot, input.fixture),
+      baseDirectory: ".",
+    },
+    runtimeProfile: {
+      strategy: input.strategy ?? "auto",
+    },
+    networkProfile: {
+      internalPort: input.internalPort,
+      upstreamProtocol: "http",
+      exposureMode: "reverse-proxy",
+    },
+  };
+}
+
+const resourceProfileDeploySmokes: ResourceProfileDeploySmoke[] = [
+  {
+    matrixIds: "WF-PLAN-SMOKE-001,QUICK-DEPLOY-ENTRY-015",
+    fixture: "vite-spa",
+    resourceProfile: localFixtureProfile({ fixture: "vite-spa", internalPort: 80 }),
+    expected: {
+      planner: "vite-static",
+      framework: "vite",
+      buildStrategy: "static-artifact",
+      dockerfilePath: "Dockerfile.appaloft-static",
+      artifactSource: "static-site",
+    },
+  },
+  {
+    matrixIds: "WF-PLAN-SMOKE-002,QUICK-DEPLOY-ENTRY-015",
+    fixture: "fastify-server",
+    resourceProfile: localFixtureProfile({ fixture: "fastify-server", internalPort: 3000 }),
+    expected: {
+      planner: "node",
+      framework: "fastify",
+      buildStrategy: "workspace-commands",
+      dockerfilePath: "Dockerfile.appaloft",
+      artifactSource: "workspace-commands",
+    },
+  },
+  {
+    matrixIds: "WF-PLAN-SMOKE-003,QUICK-DEPLOY-ENTRY-015",
+    fixture: "fastapi-uv",
+    resourceProfile: localFixtureProfile({ fixture: "fastapi-uv", internalPort: 8000 }),
+    expected: {
+      planner: "fastapi",
+      framework: "fastapi",
+      buildStrategy: "workspace-commands",
+      dockerfilePath: "Dockerfile.appaloft",
+      artifactSource: "workspace-commands",
+    },
+  },
+];
+
 describe("DefaultRuntimePlanResolver framework fixtures", () => {
   for (const fixture of plannerFixtures) {
     test(`[${fixture.matrixIds}][WF-PLAN-DET-007] plans pinned ${fixture.fixture} fixture`, async () => {
@@ -498,6 +597,156 @@ describe("DefaultRuntimePlanResolver framework fixtures", () => {
           expect(dockerBuild?.dockerfile).toContain(fixture.buildCommand);
         }
       }
+    });
+  }
+
+  for (const smoke of resourceProfileDeploySmokes) {
+    test(`[${smoke.matrixIds}] headless deploy smoke maps ${smoke.fixture} resource profile to Docker/OCI runtime plan`, async () => {
+      ensureReflectMetadata();
+      const [
+        { FileSystemSourceDetector },
+        { DefaultRuntimePlanResolver },
+        { generateStaticSiteDockerBuild, generateWorkspaceDockerBuild },
+      ] = await Promise.all([
+        import("@appaloft/adapter-filesystem"),
+        import("../src"),
+        import("../src/workspace-planners"),
+      ]);
+      const context = createTestExecutionContext();
+      const deploymentCreateInput = {
+        projectId: "proj_framework_smoke",
+        environmentId: "env_framework_smoke",
+        resourceId: `res_${smoke.fixture.replaceAll("-", "_")}`,
+        serverId: `srv_${smoke.fixture.replaceAll("-", "_")}`,
+      };
+      const requestedDeployment = {
+        method: smoke.resourceProfile.runtimeProfile.strategy,
+        port: smoke.resourceProfile.networkProfile.internalPort,
+        exposureMode: smoke.resourceProfile.networkProfile.exposureMode,
+        upstreamProtocol: smoke.resourceProfile.networkProfile.upstreamProtocol,
+        ...(smoke.resourceProfile.runtimeProfile.publishDirectory
+          ? { publishDirectory: smoke.resourceProfile.runtimeProfile.publishDirectory }
+          : {}),
+        ...(smoke.resourceProfile.runtimeProfile.installCommand
+          ? { installCommand: smoke.resourceProfile.runtimeProfile.installCommand }
+          : {}),
+        ...(smoke.resourceProfile.runtimeProfile.buildCommand
+          ? { buildCommand: smoke.resourceProfile.runtimeProfile.buildCommand }
+          : {}),
+        ...(smoke.resourceProfile.runtimeProfile.startCommand
+          ? { startCommand: smoke.resourceProfile.runtimeProfile.startCommand }
+          : {}),
+      };
+
+      expect(Object.keys(deploymentCreateInput).sort()).toEqual([
+        "environmentId",
+        "projectId",
+        "resourceId",
+        "serverId",
+      ]);
+      expect(smoke.resourceProfile.runtimeProfile).not.toHaveProperty("framework");
+      expect(smoke.resourceProfile.runtimeProfile).not.toHaveProperty("baseImage");
+      expect(deploymentCreateInput).not.toHaveProperty("framework");
+      expect(deploymentCreateInput).not.toHaveProperty("baseImage");
+      expect(deploymentCreateInput).not.toHaveProperty("buildpack");
+
+      const sourceResult = await new FileSystemSourceDetector().detect(
+        context,
+        smoke.resourceProfile.source.locator,
+      );
+
+      expect(sourceResult.isOk()).toBe(true);
+      const source = sourceResult._unsafeUnwrap().source;
+
+      const result = await new DefaultRuntimePlanResolver().resolve(context, {
+        id: `plan_smoke_${smoke.fixture}`,
+        source,
+        server: {
+          id: deploymentCreateInput.serverId,
+          providerKey: "local-shell",
+        },
+        environmentSnapshot: createEnvironmentSnapshot(`snap_smoke_${smoke.fixture}`),
+        detectedReasoning: [`quick deploy smoke detected ${smoke.fixture}`],
+        requestedDeployment,
+        generatedAt: "2026-01-01T00:00:00.000Z",
+      });
+
+      expect(result.isOk()).toBe(true);
+      const plan = result._unsafeUnwrap();
+      const imageName = `appaloft-smoke-${smoke.fixture}:latest`;
+      const docker = RuntimeCommandBuilder.docker();
+      const dockerBuild =
+        plan.buildStrategy === "static-artifact"
+          ? generateStaticSiteDockerBuild({
+              execution: plan.execution,
+              sourceInspection: plan.source.inspection,
+            })
+          : generateWorkspaceDockerBuild({
+              execution: plan.execution,
+              sourceInspection: plan.source.inspection,
+            });
+
+      expect(plan.buildStrategy).toBe(smoke.expected.buildStrategy);
+      expect(plan.packagingMode).toBe("all-in-one-docker");
+      expect(plan.runtimeArtifact).toEqual(
+        expect.objectContaining({
+          kind: "image",
+          intent: "build-image",
+          metadata: expect.objectContaining({
+            planner: smoke.expected.planner,
+            framework: smoke.expected.framework,
+          }),
+        }),
+      );
+      expect(plan.execution).toEqual(
+        expect.objectContaining({
+          kind: "docker-container",
+          dockerfilePath: smoke.expected.dockerfilePath,
+          port: smoke.resourceProfile.networkProfile.internalPort,
+          metadata: expect.objectContaining({
+            "artifact.source": smoke.expected.artifactSource,
+          }),
+        }),
+      );
+      expect(
+        plan.execution.verificationSteps.map((step) => ({ kind: step.kind, label: step.label })),
+      ).toEqual([
+        {
+          kind: "internal-http",
+          label: "Verify internal container health",
+        },
+      ]);
+      expect(dockerBuild?.dockerfile).toContain("FROM ");
+
+      const buildCommand = renderRuntimeCommandString(
+        docker.buildImage({
+          image: imageName,
+          dockerfilePath: `${source.locator}/${plan.execution.dockerfilePath}`,
+          contextPath: source.locator,
+        }),
+        { quote: shellQuote },
+      );
+      const runCommand = renderRuntimeCommandString(
+        docker.runContainer({
+          image: imageName,
+          containerName: `appaloft-smoke-${smoke.fixture}`,
+          publishedPorts: [
+            docker.publishPort({
+              containerPort: smoke.resourceProfile.networkProfile.internalPort,
+              mode: "loopback-ephemeral",
+            }),
+          ],
+        }),
+        { quote: shellQuote },
+      );
+
+      expect(buildCommand).toContain("docker build");
+      expect(buildCommand).toContain(`-f '${source.locator}/${smoke.expected.dockerfilePath}'`);
+      expect(runCommand).toContain("docker run -d");
+      expect(runCommand).toContain(
+        `-p 127.0.0.1::${smoke.resourceProfile.networkProfile.internalPort}`,
+      );
+      expect(runCommand).toContain(`'${imageName}'`);
     });
   }
 

@@ -84,6 +84,15 @@ runtime fields, including optional runtime naming intent, map to `ResourceRuntim
 and exposure fields map to `ResourceNetworkProfile`, health fields map to resource
 health/runtime profile, and final deployment admission remains ids-only.
 
+The shared Quick Deploy draft vocabulary across Web, CLI, and repository config is source base
+directory, publish directory, Dockerfile path, Docker Compose file path, Docker build target,
+install command, build command, start command, runtime name, internal port, upstream protocol,
+exposure mode, target service, host port, and health fields. Web and CLI may label these fields for
+their UI, but they must normalize them to resource source/runtime/network/health profile input
+before dispatch. Repository config may declare the same provider-neutral profile fields and must
+not declare framework-specific deployment fields, base image fields, buildpack fields, orchestrator
+sizing, or identity selectors.
+
 When Quick Deploy collects custom domain/TLS intent, the handling depends on the selected state
 backend. In pure CLI/SSH mode, provider-neutral `access.domains[]` intent from `appaloft.yml` is a
 server-applied proxy route request persisted in SSH-server Appaloft state and realized by the edge
@@ -132,6 +141,11 @@ Quick Deploy must use the ADR-012 domain language while collecting draft values:
   Those suggestions must normalize to resource source/runtime/network profile fields before
   command dispatch; base image and planner selection remain planner output, not user-facing
   deployment command fields.
+- when detection cannot safely infer a production start command, publish directory, Dockerfile path,
+  Compose path, or internal port for the selected source, Quick Deploy must collect explicit
+  fallback profile fields or fail before deployment admission. Explicit fallback commands are
+  resource runtime profile fields and still resolve to Docker/OCI image plans; they are not
+  framework-specific deployment inputs.
 - runtime target selection is not a Quick Deploy draft field. Quick Deploy selects or creates a
   deployment target/server and optional destination; `deployments.create` then resolves the
   registered runtime target backend. Kubernetes, Swarm, Helm, namespace, manifest, ingress-class,

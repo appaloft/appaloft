@@ -767,6 +767,7 @@ export const enUS = {
       applicationPortHint:
         "The workload listens on this internal port. Reverse proxy routing targets this port.",
       applicationPortInvalid: "Application port must be an integer between 1 and 65535.",
+      buildTarget: "Build target",
       chooseSourceDirectoryBrowserHint:
         "Plain browsers cannot read local paths only; enter the path manually.",
       commandPreview: "Command preview",
@@ -784,6 +785,8 @@ export const enUS = {
       composeManifest: "Compose manifest",
       composeManifestPlaceholder: "./deploy/docker-compose.yml",
       defaultBranch: "Default branch",
+      dockerComposeFilePath: "Compose file path",
+      dockerfilePath: "Dockerfile path",
       dockerImage: "Docker image",
       dockerImagePlaceholder: "ghcr.io/acme/app:latest",
       githubOAuthNotConfigured: "GitHub OAuth is not configured on the backend.",
@@ -831,6 +834,7 @@ export const enUS = {
       selectedRepositoryDescription:
         "Repository details will populate the deployment form automatically.",
       sourceAddress: "Source address",
+      sourceBaseDirectory: "Source directory",
       sourceAccess: "Access",
       sourceAccessCompose: "Compose manifest",
       sourceAccessDockerImage: "Registry pull",
@@ -852,6 +856,9 @@ export const enUS = {
       sourceRemoteGitHint: "Use a git source outside GitHub.",
       sourceStaticSite: "Static site",
       sourceStaticSiteHint: "Build or serve a static output directory as a Docker static server.",
+      runtimeBuildCommand: "Build command",
+      runtimeInstallCommand: "Install command",
+      runtimeStartCommand: "Start command",
       staticBuildCommand: "Build command",
       staticInstallCommand: "Install command",
       staticPublishDirectory: "Publish directory",
