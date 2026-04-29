@@ -1,0 +1,88 @@
+name: Remote State Lock Preflight
+description: Inspect and recover only stale SSH remote-state locks before docs deploy work.
+
+inputs:
+  ssh-host:
+    description: SSH host that owns the shared Appaloft remote-state root.
+    required: true
+  ssh-user:
+    description: SSH username.
+    required: true
+  ssh-private-key:
+    description: SSH private key material.
+    required: true
+  remote-runtime-root:
+    description: Remote Appaloft runtime root. The state root is <remote-runtime-root>/state.
+    required: false
+    default: /var/lib/appaloft/runtime
+
+runs:
+  using: composite
+  steps:
+    - name: Recover Stale Remote State Lock
+      shell: bash
+      env:
+        APPALOFT_SSH_HOST: ${{ inputs.ssh-host }}
+        APPALOFT_SSH_USER: ${{ inputs.ssh-user }}
+        APPALOFT_SSH_PRIVATE_KEY: ${{ inputs.ssh-private-key }}
+        REMOTE_RUNTIME_ROOT: ${{ inputs.remote-runtime-root }}
+      run: |
+        set -euo pipefail
+
+        key_file="$RUNNER_TEMP/appaloft-remote-state-preflight.key"
+        output_file="$RUNNER_TEMP/appaloft-remote-state-preflight.json"
+        printf '%s\n' "$APPALOFT_SSH_PRIVATE_KEY" > "$key_file"
+        chmod 600 "$key_file"
+
+        set +e
+        bun run apps/shell/src/index.ts remote-state lock recover-stale \
+          --server-host "$APPALOFT_SSH_HOST" \
+          --server-ssh-username "$APPALOFT_SSH_USER" \
+          --server-ssh-private-key-file "$key_file" \
+          --remote-runtime-root "$REMOTE_RUNTIME_ROOT" > "$output_file"
+        exit_code=$?
+        set -e
+
+        {
+          printf 'remote-state-lock-preflight='
+          cat "$output_file"
+        } | sed 's/`/\\`/g'
+
+        STATUS_FILE="$output_file" bun --eval '
+          const fs = require("node:fs");
+          const outputPath = process.env.STATUS_FILE;
+          const summaryPath = process.env.GITHUB_STEP_SUMMARY;
+          let status = {};
+          try {
+            const text = fs.readFileSync(outputPath, "utf8").trim();
+            status = text ? JSON.parse(text) : {};
+          } catch {
+            status = { status: "unavailable" };
+          }
+          const value = (key) => {
+            const current = status[key];
+            return current === undefined || current === null || current === "" ? "n/a" : String(current);
+          };
+          const rows = [
+            ["status", value("status")],
+            ["owner", value("owner")],
+            ["correlationId", value("correlationId")],
+            ["lastHeartbeatAt", value("lastHeartbeatAt")],
+            ["lockAgeSeconds", value("lockAgeSeconds")],
+            ["staleAfterSeconds", value("staleAfterSeconds")],
+            ["recoveredPath", value("recoveredPath")],
+          ];
+          fs.appendFileSync(
+            summaryPath,
+            [
+              "### SSH remote-state lock preflight",
+              "",
+              "| Field | Value |",
+              "| --- | --- |",
+              ...rows.map(([field, current]) => `| ${field} | \`${current.replaceAll("`", "\\`")}\` |`),
+              "",
+            ].join("\n"),
+          );
+        '
+
+        exit "$exit_code"
