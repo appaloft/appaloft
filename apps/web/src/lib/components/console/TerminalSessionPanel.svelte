@@ -362,7 +362,7 @@
   });
 </script>
 
-<section class="space-y-3">
+<section class="console-panel space-y-3 p-4">
   <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
     <div class="min-w-0">
       <h2 class="text-lg font-semibold">{panelTitle}</h2>
@@ -390,7 +390,7 @@
 
   <div
     bind:this={terminalElement}
-    class="min-h-[22rem] overflow-hidden rounded-md border bg-[#111827] p-2"
+    class="min-h-[28rem] overflow-hidden rounded-md border border-zinc-800 bg-[#111827] p-2 shadow-inner"
     role="button"
     tabindex="0"
     aria-label={panelTitle}

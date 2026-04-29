@@ -342,7 +342,7 @@
       <section class="space-y-6">
         <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div class="max-w-3xl space-y-3">
-            <Badge class="w-fit" variant="outline">
+            <Badge class="console-page-kicker" variant="outline">
               {$t(i18nKeys.common.domain.domainBindings)}
             </Badge>
             <div class="space-y-2">
@@ -354,14 +354,14 @@
               </p>
             </div>
           </div>
-          <div class="grid grid-cols-2 divide-x border-y text-center md:min-w-72">
-            <div class="px-3 py-3">
+          <div class="console-metric-strip grid-cols-2 text-center md:min-w-72">
+            <div>
               <p class="text-xl font-semibold">{domainBindings.length}</p>
               <p class="mt-1 text-xs text-muted-foreground">
                 {$t(i18nKeys.common.domain.domainBindings)}
               </p>
             </div>
-            <div class="px-3 py-3">
+            <div>
               <p class="text-xl font-semibold">
                 {domainBindings.filter((binding) => binding.status === "ready").length}
               </p>
@@ -372,7 +372,7 @@
       </section>
 
       <section class="grid gap-5 xl:grid-cols-[0.9fr_1.1fr]">
-        <section class="space-y-4">
+        <section class="console-panel space-y-4 p-4">
           <div class="flex items-start gap-3">
             <div class="bg-muted p-2">
               <Plus class="size-4" />
@@ -650,7 +650,7 @@
           </form>
         </section>
 
-        <section class="space-y-4">
+        <section class="console-panel space-y-4 p-4">
           <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <h2 class="text-lg font-semibold">
@@ -682,7 +682,7 @@
 
           <div>
             {#if visibleDomainBindings.length > 0}
-              <div class="divide-y border-y">
+              <div class="console-record-list">
               {#each visibleDomainBindings as binding (binding.id)}
                 {@const project = findProject(projects, binding.projectId)}
                 {@const environment = findEnvironment(environments, binding.environmentId)}
@@ -760,7 +760,7 @@
               {/each}
               </div>
             {:else}
-              <div class="border-y bg-muted/25 px-4 py-6">
+              <div class="console-subtle-panel px-4 py-6">
                 <div class="flex items-start gap-3">
                   <Globe2 class="mt-0.5 size-4 text-muted-foreground" />
                   <div class="space-y-1">

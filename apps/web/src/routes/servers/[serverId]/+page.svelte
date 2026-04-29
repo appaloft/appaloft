@@ -1,5 +1,6 @@
 <script lang="ts">
   import { browser } from "$app/environment";
+  import { goto } from "$app/navigation";
   import { page } from "$app/state";
   import { createMutation, createQuery, queryOptions } from "@tanstack/svelte-query";
   import {
@@ -14,6 +15,7 @@
     Save,
     Server,
     ShieldAlert,
+    Terminal,
     TriangleAlert,
     XCircle,
   } from "@lucide/svelte";
@@ -38,6 +40,7 @@
   import { Input } from "$lib/components/ui/input";
   import * as Select from "$lib/components/ui/select";
   import { Skeleton } from "$lib/components/ui/skeleton";
+  import * as Tabs from "$lib/components/ui/tabs";
   import { toDefaultAccessPolicyFormState } from "$lib/console/default-access-policy-form";
   import { webDocsHrefs } from "$lib/console/docs-help";
   import { orpcClient } from "$lib/orpc";
@@ -46,6 +49,23 @@
   import { i18nKeys, t } from "$lib/i18n";
 
   const serverId = $derived(page.params.serverId ?? "");
+  type ServerDetailTab =
+    | "overview"
+    | "connectivity"
+    | "credentials"
+    | "proxy-access"
+    | "deployments"
+    | "terminal"
+    | "danger";
+  const serverDetailTabs = [
+    "overview",
+    "connectivity",
+    "credentials",
+    "proxy-access",
+    "deployments",
+    "terminal",
+    "danger",
+  ] as const;
   const projectsQuery = createQuery(() =>
     queryOptions({
       queryKey: ["projects"],
@@ -135,6 +155,7 @@
   const relatedDeploymentCount = $derived(
     serverRollups?.deployments.total ?? serverDeployments.length,
   );
+  const activeTab = $derived(parseServerDetailTab(page.url.searchParams.get("tab")));
   const defaultAccessModes = ["disabled", "provider", "custom-template"] as const;
   const edgeProxyKindOptions = configureServerEdgeProxyInputSchema.shape.proxyKind.options;
 
@@ -147,7 +168,12 @@
   let serverFormServerId = $state("");
   let serverName = $state("");
   let edgeProxyKind = $state<ConfigureServerEdgeProxyInput["proxyKind"]>("none");
-  let lifecycleFeedback = $state<{
+  let settingsFeedback = $state<{
+    kind: "success" | "error";
+    title: string;
+    detail: string;
+  } | null>(null);
+  let edgeProxyFeedback = $state<{
     kind: "success" | "error";
     title: string;
     detail: string;
@@ -203,7 +229,7 @@
     mutationFn: (input: RenameServerInput) => orpcClient.servers.rename(input),
     onSuccess: (result) => {
       serverName = serverName.trim();
-      lifecycleFeedback = {
+      settingsFeedback = {
         kind: "success",
         title: $t(i18nKeys.console.servers.renameSucceeded),
         detail: result.id,
@@ -212,7 +238,7 @@
       void queryClient.invalidateQueries({ queryKey: ["servers", "show", result.id] });
     },
     onError: (error) => {
-      lifecycleFeedback = {
+      settingsFeedback = {
         kind: "error",
         title: $t(i18nKeys.console.servers.renameFailed),
         detail: readErrorMessage(error),
@@ -224,7 +250,7 @@
       orpcClient.servers.configureEdgeProxy(input),
     onSuccess: (result) => {
       edgeProxyKind = result.edgeProxy.kind;
-      lifecycleFeedback = {
+      edgeProxyFeedback = {
         kind: "success",
         title: $t(i18nKeys.console.servers.edgeProxyConfigured),
         detail: `${result.edgeProxy.kind} · ${edgeProxyStatusLabel(result.edgeProxy.status)}`,
@@ -233,7 +259,7 @@
       void queryClient.invalidateQueries({ queryKey: ["servers", "show", result.id] });
     },
     onError: (error) => {
-      lifecycleFeedback = {
+      edgeProxyFeedback = {
         kind: "error",
         title: $t(i18nKeys.console.servers.edgeProxyConfigureFailed),
         detail: readErrorMessage(error),
@@ -249,7 +275,8 @@
     serverFormServerId = server.id;
     serverName = server.name;
     edgeProxyKind = server.edgeProxy?.kind ?? "none";
-    lifecycleFeedback = null;
+    settingsFeedback = null;
+    edgeProxyFeedback = null;
   });
 
   $effect(() => {
@@ -287,7 +314,7 @@
       return;
     }
 
-    lifecycleFeedback = null;
+    settingsFeedback = null;
     renameServerMutation.mutate({
       serverId: server.id,
       name: serverName.trim(),
@@ -301,7 +328,7 @@
       return;
     }
 
-    lifecycleFeedback = null;
+    edgeProxyFeedback = null;
     configureEdgeProxyMutation.mutate({
       serverId: server.id,
       proxyKind: edgeProxyKind,
@@ -441,6 +468,48 @@
   ): "default" | "secondary" | "outline" | "destructive" {
     return status === "active" ? "default" : "outline";
   }
+
+  function parseServerDetailTab(value: string | null): ServerDetailTab {
+    return serverDetailTabs.includes(value as ServerDetailTab)
+      ? (value as ServerDetailTab)
+      : "overview";
+  }
+
+  function serverTabHref(tab: ServerDetailTab): string {
+    const params = new URLSearchParams(page.url.searchParams);
+    if (tab === "overview") {
+      params.delete("tab");
+    } else {
+      params.set("tab", tab);
+    }
+
+    const query = params.toString();
+    return query ? `${page.url.pathname}?${query}` : page.url.pathname;
+  }
+
+  function selectServerTab(tab: ServerDetailTab, event: MouseEvent): void {
+    event.preventDefault();
+    void goto(serverTabHref(tab), { noScroll: true, keepFocus: true });
+  }
+
+  function serverTabLabel(tab: ServerDetailTab): string {
+    switch (tab) {
+      case "connectivity":
+        return $t(i18nKeys.console.servers.connectivityTab);
+      case "credentials":
+        return $t(i18nKeys.console.servers.credentialsTab);
+      case "danger":
+        return $t(i18nKeys.console.servers.dangerZoneTab);
+      case "deployments":
+        return $t(i18nKeys.common.domain.deployments);
+      case "overview":
+        return $t(i18nKeys.console.servers.overviewTab);
+      case "proxy-access":
+        return $t(i18nKeys.console.servers.proxyAccessTab);
+      case "terminal":
+        return $t(i18nKeys.console.terminal.title);
+    }
+  }
 </script>
 
 <svelte:head>
@@ -460,8 +529,8 @@
       </div>
     </div>
   {:else if !server}
-    <section class="space-y-5 py-2">
-      <Badge class="w-fit" variant="outline">{$t(i18nKeys.errors.backend.notFound)}</Badge>
+    <section class="console-panel space-y-5 p-5">
+      <Badge class="console-page-kicker" variant="outline">{$t(i18nKeys.errors.backend.notFound)}</Badge>
       <div class="mt-4 max-w-2xl space-y-3">
         <h1 class="text-2xl font-semibold md:text-3xl">
           {$t(i18nKeys.console.servers.notFoundTitle)}
@@ -483,7 +552,7 @@
         <div class="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
           <div class="max-w-3xl space-y-3">
             <div class="flex flex-wrap items-center gap-2">
-              <Badge variant="outline">{$t(i18nKeys.common.domain.server)}</Badge>
+              <Badge class="console-page-kicker" variant="outline">{$t(i18nKeys.common.domain.server)}</Badge>
               <Badge variant="secondary">{server.providerKey}</Badge>
               <Badge variant={serverLifecycleVariant(server.lifecycleStatus)}>
                 {serverLifecycleLabel(server.lifecycleStatus)}
@@ -517,32 +586,52 @@
               <Activity class="size-4" />
               {$t(i18nKeys.common.actions.testConnectivity)}
             </Button>
+            <Button href={serverTabHref("terminal")} variant="outline">
+              <Terminal class="size-4" />
+              {$t(i18nKeys.common.actions.openTerminal)}
+            </Button>
           </div>
         </div>
 
-        <div class="grid border-y sm:grid-cols-2 xl:grid-cols-5 xl:divide-x">
-          <div class="px-0 py-4 sm:px-4">
+        <Tabs.Root value={activeTab} class="space-y-5">
+          <Tabs.List
+            class="h-auto w-full justify-start gap-6 overflow-x-auto rounded-none border-b bg-transparent p-0"
+          >
+            {#each serverDetailTabs as tab (tab)}
+              <Tabs.Trigger
+                value={tab}
+                class="h-11 flex-none rounded-none border-x-0 border-t-0 border-b-2 border-transparent bg-transparent px-0 py-0 shadow-none data-[state=active]:border-foreground data-[state=active]:bg-transparent data-[state=active]:shadow-none"
+                onclick={(event) => selectServerTab(tab, event)}
+              >
+                {serverTabLabel(tab)}
+              </Tabs.Trigger>
+            {/each}
+          </Tabs.List>
+
+          <Tabs.Content value="overview" class="mt-0 space-y-5">
+        <div class="console-metric-strip sm:grid-cols-2 xl:grid-cols-5">
+          <div>
             <p class="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
               <Network class="size-4" />
               {$t(i18nKeys.common.domain.provider)}
             </p>
             <p class="mt-2 truncate font-semibold">{server.providerKey}</p>
           </div>
-          <div class="border-t px-0 py-4 sm:border-t-0 sm:px-4">
+          <div>
             <p class="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
               <Server class="size-4" />
               {$t(i18nKeys.common.domain.host)}
             </p>
-            <p class="mt-2 truncate font-semibold">{server.host}</p>
+            <p class="mt-2 break-all font-mono text-sm font-semibold">{server.host}</p>
           </div>
-          <div class="border-t px-0 py-4 sm:px-4 xl:border-t-0">
+          <div>
             <p class="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
               <CircleDashed class="size-4" />
               {$t(i18nKeys.common.domain.port)}
             </p>
             <p class="mt-2 font-semibold">{server.port}</p>
           </div>
-          <div class="border-t px-0 py-4 sm:px-4 xl:border-t-0">
+          <div>
             <p class="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
               <KeyRound class="size-4" />
               {$t(i18nKeys.console.serverForm.sshCredentialTitle)}
@@ -555,7 +644,7 @@
                   $t(i18nKeys.common.status.notConfigured))}
             </p>
           </div>
-          <div class="border-t px-0 py-4 sm:px-4 xl:border-t-0">
+          <div>
             <p class="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
               <CircleDashed class="size-4" />
               {$t(i18nKeys.common.domain.proxy)}
@@ -572,22 +661,22 @@
         </div>
 
         {#if serverRollups}
-          <div class="grid border-y sm:grid-cols-3 sm:divide-x">
-            <div class="px-0 py-4 sm:px-4">
+          <div class="console-metric-strip sm:grid-cols-3">
+            <div>
               <p class="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 <Boxes class="size-4" />
                 {$t(i18nKeys.common.domain.resources)}
               </p>
               <p class="mt-2 font-semibold">{serverRollups.resources.total}</p>
             </div>
-            <div class="border-t px-0 py-4 sm:border-t-0 sm:px-4">
+            <div>
               <p class="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 <Activity class="size-4" />
                 {$t(i18nKeys.common.domain.deployments)}
               </p>
               <p class="mt-2 font-semibold">{serverRollups.deployments.total}</p>
             </div>
-            <div class="border-t px-0 py-4 sm:border-t-0 sm:px-4">
+            <div>
               <p class="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 <Globe2 class="size-4" />
                 {$t(i18nKeys.common.domain.domainBindings)}
@@ -596,9 +685,11 @@
             </div>
           </div>
         {/if}
+          </Tabs.Content>
 
+          <Tabs.Content value="credentials" class="mt-0">
         {#if storedSshCredentialId}
-          <div class="border-y px-0 py-4 sm:px-4">
+          <div class="console-panel p-4">
             <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
               <div class="min-w-0 space-y-1">
                 <div class="flex items-center gap-2">
@@ -635,7 +726,7 @@
 
             {#if sshCredentialDetail}
               <div class="mt-4 grid gap-4 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
-                <div class="bg-muted/25 px-4 py-4">
+                <div class="console-subtle-panel px-4 py-4">
                   <p class="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
                     <KeyRound class="size-4" />
                     {$t(i18nKeys.console.servers.credentialMaterialSummary)}
@@ -676,7 +767,7 @@
                   </dl>
                 </div>
 
-                <div class="bg-muted/25 px-4 py-4">
+                <div class="console-subtle-panel px-4 py-4">
                   <div class="flex flex-wrap items-center justify-between gap-2">
                     <p class="text-sm font-semibold">
                       {$t(i18nKeys.console.servers.credentialUsageTitle)}
@@ -698,7 +789,7 @@
                   </div>
 
                   {#if sshCredentialDetail.usage && sshCredentialDetail.usage.totalServers === 0}
-                    <div class="mt-4 border-y px-0 py-4">
+                    <div class="console-subtle-panel mt-4 p-4">
                       <p class="text-sm font-medium">
                         {$t(i18nKeys.console.servers.credentialUsageEmptyTitle)}
                       </p>
@@ -707,10 +798,10 @@
                       </p>
                     </div>
                   {:else if sshCredentialDetail.usage}
-                    <div class="mt-4 divide-y border-y">
+                    <div class="console-record-list mt-4">
                       {#each sshCredentialDetail.usage.servers as usageServer (usageServer.serverId)}
                         <a
-                          class="flex flex-col gap-2 px-0 py-3 text-sm sm:flex-row sm:items-center sm:justify-between"
+                          class="console-record-row text-sm sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
                           href={`/servers/${usageServer.serverId}`}
                         >
                           <span class="min-w-0">
@@ -749,8 +840,7 @@
             {/if}
           </div>
         {/if}
-
-        <div class="border-y px-0 py-4 sm:px-4">
+        <div class="console-panel p-4">
           <form
             id="server-rename-form"
             class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(14rem,22rem)_auto]"
@@ -790,9 +880,22 @@
             </div>
           </form>
 
+          {#if settingsFeedback}
+            <div
+              class={`mt-4 rounded-md border p-3 text-sm ${settingsFeedback.kind === "error" ? "border-destructive/30 text-destructive" : "border-border text-foreground"}`}
+            >
+              <p class="font-medium">{settingsFeedback.title}</p>
+              <p class="mt-1 text-muted-foreground">{settingsFeedback.detail}</p>
+            </div>
+          {/if}
+        </div>
+          </Tabs.Content>
+
+          <Tabs.Content value="proxy-access" class="mt-0 space-y-5">
+        <div class="console-panel p-4">
           <form
             id="server-edge-proxy-form"
-            class="mt-5 grid gap-4 border-t pt-4 lg:grid-cols-[minmax(0,1fr)_minmax(14rem,22rem)_auto]"
+            class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(14rem,22rem)_auto]"
             onsubmit={configureEdgeProxy}
           >
             <div class="min-w-0 space-y-1">
@@ -847,51 +950,17 @@
             </div>
           </form>
 
-          {#if lifecycleFeedback}
+          {#if edgeProxyFeedback}
             <div
-              class={`mt-4 rounded-md border p-3 text-sm ${lifecycleFeedback.kind === "error" ? "border-destructive/30 text-destructive" : "border-border text-foreground"}`}
+              class={`mt-4 rounded-md border p-3 text-sm ${edgeProxyFeedback.kind === "error" ? "border-destructive/30 text-destructive" : "border-border text-foreground"}`}
             >
-              <p class="font-medium">{lifecycleFeedback.title}</p>
-              <p class="mt-1 text-muted-foreground">{lifecycleFeedback.detail}</p>
+              <p class="font-medium">{edgeProxyFeedback.title}</p>
+              <p class="mt-1 text-muted-foreground">{edgeProxyFeedback.detail}</p>
             </div>
           {/if}
         </div>
 
-        <div class="border-y px-0 py-4 sm:px-4">
-          <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div class="min-w-0 space-y-1">
-              <p class="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                <ShieldAlert class="size-4" />
-                {$t(i18nKeys.console.servers.deleteSafetyTitle)}
-              </p>
-              <p class="text-sm text-muted-foreground">
-                {$t(i18nKeys.console.servers.deleteSafetyDescription)}
-              </p>
-            </div>
-            <div class="flex flex-wrap items-center gap-2">
-              {#if serverDeleteSafetyQuery.isPending}
-                <Badge variant="secondary">{$t(i18nKeys.common.status.loading)}</Badge>
-              {:else if serverDeleteSafety}
-                <Badge variant={serverDeleteSafety.eligible ? "default" : "destructive"}>
-                  {deleteSafetyLabel(serverDeleteSafety)}
-                </Badge>
-                <span class="text-sm text-muted-foreground">
-                  {$t(i18nKeys.console.servers.deleteSafetyBlockerCount, {
-                    count: serverDeleteSafety.blockers.length,
-                  })}
-                </span>
-              {:else if serverDeleteSafetyError}
-                <Badge variant="destructive">{$t(i18nKeys.common.status.failed)}</Badge>
-                <span class="max-w-xl truncate text-sm text-muted-foreground">
-                  {serverDeleteSafetyError}
-                </span>
-              {/if}
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section class="space-y-4 border-y py-6">
+      <section class="console-panel space-y-4 p-5">
         <div class="max-w-3xl space-y-1">
           <div class="flex items-center gap-2">
             <h2 class="text-lg font-semibold">
@@ -1005,136 +1074,180 @@
           </div>
         {/if}
       </section>
+          </Tabs.Content>
 
-      <section class="grid gap-5 xl:grid-cols-[0.9fr_1.1fr]">
-        <section class="space-y-4">
-          <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <div class="flex items-center gap-2">
-                <h2 class="text-lg font-semibold">
-                  {$t(i18nKeys.console.servers.connectivityTitle)}
-                </h2>
+          <Tabs.Content value="danger" class="mt-0">
+        <div class="console-panel p-4">
+          <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div class="min-w-0 space-y-1">
+              <p class="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                <ShieldAlert class="size-4" />
+                {$t(i18nKeys.console.servers.deleteSafetyTitle)}
+              </p>
+              <p class="text-sm text-muted-foreground">
+                {$t(i18nKeys.console.servers.deleteSafetyDescription)}
+              </p>
+            </div>
+            <div class="flex flex-wrap items-center gap-2">
+              {#if serverDeleteSafetyQuery.isPending}
+                <Badge variant="secondary">{$t(i18nKeys.common.status.loading)}</Badge>
+              {:else if serverDeleteSafety}
+                <Badge variant={serverDeleteSafety.eligible ? "default" : "destructive"}>
+                  {deleteSafetyLabel(serverDeleteSafety)}
+                </Badge>
+                <span class="text-sm text-muted-foreground">
+                  {$t(i18nKeys.console.servers.deleteSafetyBlockerCount, {
+                    count: serverDeleteSafety.blockers.length,
+                  })}
+                </span>
+              {:else if serverDeleteSafetyError}
+                <Badge variant="destructive">{$t(i18nKeys.common.status.failed)}</Badge>
+                <span class="max-w-xl truncate text-sm text-muted-foreground">
+                  {serverDeleteSafetyError}
+                </span>
+              {/if}
+            </div>
+          </div>
+        </div>
+          </Tabs.Content>
+
+          <Tabs.Content value="connectivity" class="mt-0">
+            <section class="space-y-4">
+              <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <div class="flex items-center gap-2">
+                    <h2 class="text-lg font-semibold">
+                      {$t(i18nKeys.console.servers.connectivityTitle)}
+                    </h2>
+                    <DocsHelpLink
+                      href={webDocsHrefs.serverConnectivityTest}
+                      ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+                    />
+                  </div>
+                  <p class="mt-1 text-sm text-muted-foreground">
+                    {$t(i18nKeys.console.servers.connectivityDescription)}
+                  </p>
+                </div>
+                {#if connectivityResult}
+                  <Badge variant={connectivityVariant(connectivityResult.status)}>
+                    {connectivityLabel(connectivityResult.status)}
+                  </Badge>
+                {/if}
+              </div>
+
+              <div class="space-y-3">
+                {#if connectivityMutation.isPending}
+                  <div class="bg-muted/25 px-4 py-4 text-sm text-muted-foreground">
+                    {$t(i18nKeys.common.actions.testConnectivity)}...
+                  </div>
+                {:else if connectivityError}
+                  <div class="rounded-md border border-destructive/30 p-4 text-sm text-destructive">
+                    <div class="flex items-start gap-2">
+                      <TriangleAlert class="mt-0.5 size-4" />
+                      <p>{connectivityError}</p>
+                    </div>
+                  </div>
+                {:else if connectivityResult}
+                  <div class="bg-muted/25 px-4 py-3">
+                    <div class="flex flex-wrap items-center justify-between gap-2">
+                      <p class="text-sm font-medium">
+                        {$t(i18nKeys.console.servers.connectivityLastResult)}
+                      </p>
+                      <span class="text-xs text-muted-foreground">
+                        {formatTime(connectivityResult.checkedAt)}
+                      </span>
+                    </div>
+                  </div>
+                  {#each connectivityResult.checks as check (check.name)}
+                    <div class="bg-muted/25 px-4 py-3">
+                      <div class="flex flex-wrap items-center justify-between gap-2">
+                        <p class="flex items-center gap-2 text-sm font-medium">
+                          {#if check.status === "passed"}
+                            <CheckCircle2 class="size-4 text-green-600" />
+                          {:else if check.status === "failed"}
+                            <XCircle class="size-4 text-destructive" />
+                          {:else}
+                            <CircleDashed class="size-4 text-muted-foreground" />
+                          {/if}
+                          {check.name}
+                        </p>
+                        <Badge variant={checkVariant(check.status)}>
+                          {checkLabel(check.status)}
+                        </Badge>
+                      </div>
+                      <p class="mt-2 text-sm leading-6 text-muted-foreground">{check.message}</p>
+                      <p class="mt-2 text-xs text-muted-foreground">{check.durationMs}ms</p>
+                    </div>
+                  {/each}
+                {:else}
+                  <div class="bg-muted/25 px-4 py-4 text-sm text-muted-foreground">
+                    {$t(i18nKeys.console.servers.connectivityNoResult)}
+                  </div>
+                {/if}
+              </div>
+            </section>
+          </Tabs.Content>
+
+          <Tabs.Content value="deployments" class="mt-0">
+            <section class="space-y-4">
+              <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h2 class="text-lg font-semibold">
+                    {$t(i18nKeys.console.servers.connectedDeploymentsTitle)}
+                  </h2>
+                  <p class="mt-1 text-sm text-muted-foreground">
+                    {$t(i18nKeys.console.servers.connectedDeploymentsDescription)}
+                  </p>
+                </div>
+                <Badge variant="outline">{relatedDeploymentCount}</Badge>
+              </div>
+
+              <div>
+                {#if serverDeployments.length > 0}
+                  <DeploymentTable
+                    deployments={serverDeployments.slice(0, 8)}
+                    {projects}
+                    showEnvironment={false}
+                    showServer={false}
+                  />
+                {:else}
+                  <div class="console-subtle-panel px-4 py-6">
+                    <div class="flex items-start gap-3">
+                      <Server class="mt-0.5 size-4 text-muted-foreground" />
+                      <div class="space-y-2">
+                        <p class="text-sm font-medium">
+                          {$t(i18nKeys.console.servers.noDeploymentsTitle)}
+                        </p>
+                        <p class="text-sm text-muted-foreground">
+                          {$t(i18nKeys.console.servers.noDeploymentsBody)}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                {/if}
+              </div>
+            </section>
+          </Tabs.Content>
+
+          <Tabs.Content value="terminal" class="mt-0">
+            <section class="space-y-3">
+              <div class="flex justify-end">
                 <DocsHelpLink
-                  href={webDocsHrefs.serverConnectivityTest}
+                  href={webDocsHrefs.serverTerminalSession}
                   ariaLabel={$t(i18nKeys.common.actions.openDocs)}
                 />
               </div>
-              <p class="mt-1 text-sm text-muted-foreground">
-                {$t(i18nKeys.console.servers.connectivityDescription)}
-              </p>
-            </div>
-            {#if connectivityResult}
-              <Badge variant={connectivityVariant(connectivityResult.status)}>
-                {connectivityLabel(connectivityResult.status)}
-              </Badge>
-            {/if}
-          </div>
-
-          <div class="space-y-3">
-            {#if connectivityMutation.isPending}
-              <div class="bg-muted/25 px-4 py-4 text-sm text-muted-foreground">
-                {$t(i18nKeys.common.actions.testConnectivity)}...
-              </div>
-            {:else if connectivityError}
-              <div class="rounded-md border border-destructive/30 p-4 text-sm text-destructive">
-                <div class="flex items-start gap-2">
-                  <TriangleAlert class="mt-0.5 size-4" />
-                  <p>{connectivityError}</p>
-                </div>
-              </div>
-            {:else if connectivityResult}
-              <div class="bg-muted/25 px-4 py-3">
-                <div class="flex flex-wrap items-center justify-between gap-2">
-                  <p class="text-sm font-medium">
-                    {$t(i18nKeys.console.servers.connectivityLastResult)}
-                  </p>
-                  <span class="text-xs text-muted-foreground">
-                    {formatTime(connectivityResult.checkedAt)}
-                  </span>
-                </div>
-              </div>
-              {#each connectivityResult.checks as check (check.name)}
-                <div class="bg-muted/25 px-4 py-3">
-                  <div class="flex flex-wrap items-center justify-between gap-2">
-                    <p class="flex items-center gap-2 text-sm font-medium">
-                      {#if check.status === "passed"}
-                        <CheckCircle2 class="size-4 text-green-600" />
-                      {:else if check.status === "failed"}
-                        <XCircle class="size-4 text-destructive" />
-                      {:else}
-                        <CircleDashed class="size-4 text-muted-foreground" />
-                      {/if}
-                      {check.name}
-                    </p>
-                    <Badge variant={checkVariant(check.status)}>{checkLabel(check.status)}</Badge>
-                  </div>
-                  <p class="mt-2 text-sm leading-6 text-muted-foreground">{check.message}</p>
-                  <p class="mt-2 text-xs text-muted-foreground">{check.durationMs}ms</p>
-                </div>
-              {/each}
-            {:else}
-              <div class="bg-muted/25 px-4 py-4 text-sm text-muted-foreground">
-                {$t(i18nKeys.console.servers.connectivityNoResult)}
-              </div>
-            {/if}
-          </div>
-        </section>
-
-        <section class="space-y-4">
-          <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h2 class="text-lg font-semibold">
-                {$t(i18nKeys.console.servers.connectedDeploymentsTitle)}
-              </h2>
-              <p class="mt-1 text-sm text-muted-foreground">
-                {$t(i18nKeys.console.servers.connectedDeploymentsDescription)}
-              </p>
-            </div>
-            <Badge variant="outline">{relatedDeploymentCount}</Badge>
-          </div>
-
-          <div>
-            {#if serverDeployments.length > 0}
-              <DeploymentTable
-                deployments={serverDeployments.slice(0, 8)}
-                {projects}
-                showEnvironment={false}
-                showServer={false}
+              <TerminalSessionPanel
+                title={$t(i18nKeys.console.terminal.serverTitle)}
+                description={$t(i18nKeys.console.terminal.serverDescription)}
+                scope={{
+                  kind: "server",
+                  serverId: server.id,
+                }}
               />
-            {:else}
-              <div class="border-y bg-muted/25 px-4 py-6">
-                <div class="flex items-start gap-3">
-                  <Server class="mt-0.5 size-4 text-muted-foreground" />
-                  <div class="space-y-2">
-                    <p class="text-sm font-medium">
-                      {$t(i18nKeys.console.servers.noDeploymentsTitle)}
-                    </p>
-                    <p class="text-sm text-muted-foreground">
-                      {$t(i18nKeys.console.servers.noDeploymentsBody)}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            {/if}
-          </div>
-        </section>
-      </section>
-
-      <section class="space-y-3">
-        <div class="flex justify-end">
-          <DocsHelpLink
-            href={webDocsHrefs.serverTerminalSession}
-            ariaLabel={$t(i18nKeys.common.actions.openDocs)}
-          />
-        </div>
-        <TerminalSessionPanel
-          title={$t(i18nKeys.console.terminal.serverTitle)}
-          description={$t(i18nKeys.console.terminal.serverDescription)}
-          scope={{
-            kind: "server",
-            serverId: server.id,
-          }}
-        />
+            </section>
+          </Tabs.Content>
+        </Tabs.Root>
       </section>
     </div>
   {/if}
