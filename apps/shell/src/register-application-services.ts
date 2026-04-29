@@ -56,6 +56,8 @@ import {
   DeploymentFactory,
   DeploymentLifecycleService,
   DeploymentLogsQueryService,
+  DeploymentRecoveryReadinessQueryHandler,
+  DeploymentRecoveryReadinessQueryService,
   DeploymentSnapshotFactory,
   DiffEnvironmentsQueryService,
   DoctorQueryService,
@@ -197,6 +199,7 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(ResourceEffectiveConfigQueryHandler);
   container.registerSingleton(EnvironmentEffectivePrecedenceQueryHandler);
   container.registerSingleton(ShowDeploymentQueryHandler);
+  container.registerSingleton(DeploymentRecoveryReadinessQueryHandler);
   container.registerSingleton(StreamDeploymentEventsQueryHandler);
   container.registerSingleton(ImportCertificateCommandHandler);
   container.registerSingleton(IssueOrRenewCertificateCommandHandler);
@@ -348,6 +351,10 @@ export function registerApplicationServices(container: DependencyContainer): voi
   container.registerSingleton(tokens.listCertificatesQueryService, ListCertificatesQueryService);
   container.registerSingleton(tokens.listDeploymentsQueryService, ListDeploymentsQueryService);
   container.registerSingleton(tokens.showDeploymentQueryService, ShowDeploymentQueryService);
+  container.registerSingleton(
+    tokens.deploymentRecoveryReadinessQueryService,
+    DeploymentRecoveryReadinessQueryService,
+  );
   container.registerSingleton(tokens.operatorWorkQueryService, OperatorWorkQueryService);
   container.registerSingleton(
     tokens.streamDeploymentEventsQueryService,

@@ -443,6 +443,7 @@ Implemented operations:
 | Cleanup preview deployment | Command | `deployments.cleanup-preview` | `CleanupPreviewCommand` | `CleanupPreviewCommandInput` | `appaloft preview cleanup [path-or-source] --preview pull-request --preview-id pr-123` | - |
 | List deployments | Query | `deployments.list` | `ListDeploymentsQuery` | `ListDeploymentsQueryInput` | `appaloft deployments list` | `GET /api/deployments` |
 | Show deployment detail | Query | `deployments.show` | `ShowDeploymentQuery` | `ShowDeploymentQueryInput` | `appaloft deployments show <deploymentId>` | `GET /api/deployments/{deploymentId}` |
+| Read deployment recovery readiness | Query | `deployments.recovery-readiness` | `DeploymentRecoveryReadinessQuery` | `DeploymentRecoveryReadinessQueryInput` | `appaloft deployments recovery-readiness <deploymentId>` | `GET /api/deployments/{deploymentId}/recovery-readiness` |
 | Read deployment logs | Query | `deployments.logs` | `DeploymentLogsQuery` | `DeploymentLogsQueryInput` | `appaloft logs <deploymentId>` | `GET /api/deployments/{deploymentId}/logs` |
 | Stream deployment events | Query | `deployments.stream-events` | `StreamDeploymentEventsQuery` | `StreamDeploymentEventsQueryInput` | `appaloft deployments events <deploymentId>` | `GET /api/deployments/{deploymentId}/events` and `GET /api/deployments/{deploymentId}/events/stream` |
 
@@ -467,6 +468,11 @@ Current boundary:
 - `deployments.stream-events` is the read-only replay/follow observation surface for one accepted
   deployment attempt. It does not replace immutable detail on `deployments.show`, full attempt
   logs on `deployments.logs`, or reintroduce `deployments.reattach` as a write command.
+- `deployments.recovery-readiness` is the active read-only recovery decision surface. It returns
+  retry, redeploy, rollback, rollback-candidate, blocked-reason, and recommended-action facts for
+  Web, CLI, HTTP/oRPC, and future MCP/tool surfaces. It does not execute recovery and marks
+  `deployments.retry`, `deployments.redeploy`, and `deployments.rollback` as not active until their
+  own Code Rounds.
 - mutation coordination is scope-based, not whole-server based:
   `deployments.create` coordinates by logical resource-runtime scope and
   `deployments.cleanup-preview` coordinates by logical preview-lifecycle scope. Low-level SSH
@@ -603,12 +609,11 @@ Current boundary:
 - cancel, manual deployment health check, redeploy, reattach, and rollback are not public
   operations in the v1 surface. They must be reintroduced only after new source-of-truth specs,
   test matrices, implementation plans, and Web/API/CLI contracts are accepted.
-- Deployment recovery readiness is now an accepted candidate boundary under
+- Deployment recovery readiness is active under
   [ADR-034: Deployment Recovery Readiness](./decisions/ADR-034-deployment-recovery-readiness.md).
-  The future `deployments.recovery-readiness` query is the shared source for retry, redeploy,
+  The `deployments.recovery-readiness` query is the shared read-only source for retry, redeploy,
   rollback candidate, and rollback readiness across Web, CLI, HTTP/oRPC, and future MCP/tool
-  surfaces. It is not active until a Code Round adds the operation catalog entry and executable
-  query slice.
+  surfaces.
 - Future `deployments.retry` creates a new deployment attempt from a failed/interrupted/canceled/
   superseded attempt's immutable snapshot intent. It does not replay old events and does not mutate
   the old attempt.
@@ -633,7 +638,6 @@ Current boundary:
 
 Core next operations expected here:
 - explicit plan deployment without execution
-- `deployments.recovery-readiness`
 - `deployments.retry`
 - `deployments.redeploy`
 - `deployments.rollback`

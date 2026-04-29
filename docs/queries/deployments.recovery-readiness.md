@@ -2,10 +2,9 @@
 
 ## Status
 
-Accepted candidate. This query is specified for the Deployment Recovery Readiness Spec Round and
-must not be exposed as an active public operation until the Code Round updates
-`docs/CORE_OPERATIONS.md`, `packages/application/src/operation-catalog.ts`, executable tests, and
-Web/API/CLI/future MCP entrypoints together.
+Active read-only query. The first Code Round implements this operation in the application query
+slice, operation catalog, HTTP/oRPC, CLI, and Web deployment detail as a read-only recovery decision
+surface. Recovery write commands remain inactive accepted candidates.
 
 ## Governing Sources
 
@@ -97,7 +96,19 @@ Round activation.
 
 ## Current Implementation Notes And Migration Gaps
 
-No active implementation exists yet. `deployments.show` and `deployments.stream-events` remain the
-active observation boundaries. This query is Code Round ready only after test fixtures define the
-durable state combinations for retry, redeploy, rollback candidates, blocked reasons, and stale
-admission guards.
+The active implementation reads deployment and resource read models, returns retry/redeploy/rollback
+readiness facts, includes rollback candidates when requested, exposes `recovery-command-not-active`
+for inactive write commands, and is available through:
+
+- application query service and handler;
+- `packages/application/src/operation-catalog.ts`;
+- HTTP/oRPC `GET /api/deployments/{deploymentId}/recovery-readiness`;
+- CLI `appaloft deployments recovery-readiness <deploymentId>`;
+- Web deployment detail read-only recovery panel.
+
+Deferred gaps:
+
+- write-side admission for `deployments.retry`, `deployments.redeploy`, and `deployments.rollback`;
+- full artifact retention/prune horizon semantics;
+- stale readiness marker enforcement for future write commands;
+- future MCP tool descriptor over the same operation.

@@ -8,6 +8,7 @@ export const cliDocsHrefs = {
   deploymentSource: resolvePublicDocsHelpHref("deployment.source"),
   deploymentPreviewCleanup: resolvePublicDocsHelpHref("deployment.preview-cleanup"),
   deploymentSourceRelink: resolvePublicDocsHelpHref("deployment.source-relink"),
+  deploymentRecoveryReadiness: resolvePublicDocsHelpHref("deployment.recovery-readiness"),
   projectLifecycle: resolvePublicDocsHelpHref("project.lifecycle"),
   serverDeploymentTarget: resolvePublicDocsHelpHref("server.deployment-target"),
   serverSshCredential: resolvePublicDocsHelpHref("server.ssh-credential"),
@@ -43,6 +44,10 @@ export const cliCommandDescriptions = {
   deploymentLogs: withDocs("Show deployment logs", "observability.runtime-logs"),
   deploymentList: withDocs("List deployments", "deployment.lifecycle"),
   deploymentShow: withDocs("Show deployment detail", "deployment.lifecycle"),
+  deploymentRecoveryReadiness: withDocs(
+    "Show retry, redeploy, and rollback readiness for a deployment",
+    "deployment.recovery-readiness",
+  ),
   deploymentEvents: withDocs(
     "Replay or follow deployment lifecycle events",
     "deployment.lifecycle",

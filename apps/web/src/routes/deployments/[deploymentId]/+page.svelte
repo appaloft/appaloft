@@ -21,6 +21,7 @@
     type DeploymentEventStreamEnvelope,
     type DeploymentDetailSummary,
     type DeploymentLogsResponse,
+    type DeploymentRecoveryReadinessResponse,
     shortDeploymentSourceCommitSha,
     sourceCommitShaForDeployment,
     type DeploymentProgressEvent,
@@ -123,11 +124,28 @@
       staleTime: 5_000,
     }),
   );
+  const deploymentRecoveryReadinessQuery = createQuery(() =>
+    queryOptions({
+      queryKey: ["deployments", "recovery-readiness", deploymentId],
+      queryFn: () =>
+        orpcClient.deployments.recoveryReadiness({
+          deploymentId,
+          includeCandidates: true,
+          maxCandidates: 3,
+        }),
+      enabled: browser && deploymentId.length > 0,
+      staleTime: 5_000,
+    }),
+  );
   const pageLoading = $derived(
-    deploymentDetailQuery.isPending || deploymentLogsQuery.isPending || deploymentEventsQuery.isPending,
+    deploymentDetailQuery.isPending ||
+      deploymentLogsQuery.isPending ||
+      deploymentEventsQuery.isPending ||
+      deploymentRecoveryReadinessQuery.isPending,
   );
   const deploymentDetail = $derived(deploymentDetailQuery.data ?? null);
   const deployment = $derived(deploymentDetail?.deployment ?? null);
+  const recoveryReadiness = $derived(deploymentRecoveryReadinessQuery.data ?? null);
   const deploymentLogs = $derived(deploymentLogsQuery.data?.logs ?? []);
   const replayDeploymentEventEnvelopes = $derived(deploymentEventsQuery.data?.envelopes ?? []);
   const deploymentEventEnvelopes = $derived(
@@ -297,6 +315,58 @@
       case "direct":
         return $t(i18nKeys.console.deployments.directPortAccess);
     }
+  }
+
+  function recoveryStatusLabel(ready: boolean, commandActive: boolean): string {
+    if (!ready) {
+      return $t(i18nKeys.common.status.blocked);
+    }
+
+    return commandActive
+      ? $t(i18nKeys.console.deployments.recoveryAvailable)
+      : $t(i18nKeys.console.deployments.recoveryCommandNotActive);
+  }
+
+  function recoveryReasonLabel(reasonCode: string): string {
+    switch (reasonCode) {
+      case "attempt-not-terminal":
+        return $t(i18nKeys.console.deployments.recoveryReasonAttemptNotTerminal);
+      case "attempt-status-not-recoverable":
+        return $t(i18nKeys.console.deployments.recoveryReasonAttemptStatusNotRecoverable);
+      case "snapshot-missing":
+      case "environment-snapshot-missing":
+        return $t(i18nKeys.console.deployments.recoveryReasonSnapshotMissing);
+      case "runtime-artifact-missing":
+        return $t(i18nKeys.console.deployments.recoveryReasonRuntimeArtifactMissing);
+      case "rollback-candidate-not-successful":
+        return $t(i18nKeys.console.deployments.recoveryReasonNoRollbackCandidate);
+      case "resource-profile-invalid":
+        return $t(i18nKeys.console.deployments.recoveryReasonResourceProfileInvalid);
+      case "resource-runtime-busy":
+        return $t(i18nKeys.console.deployments.recoveryReasonResourceRuntimeBusy);
+      case "recovery-command-not-active":
+        return $t(i18nKeys.console.deployments.recoveryReasonCommandNotActive);
+      default:
+        return reasonCode;
+    }
+  }
+
+  function recoveryActionReasons(
+    readiness: DeploymentRecoveryReadinessResponse | null,
+    action: "retry" | "redeploy" | "rollback",
+  ): string[] {
+    if (!readiness) {
+      return [];
+    }
+
+    const reasons =
+      action === "retry"
+        ? readiness.retry.reasons
+        : action === "redeploy"
+          ? readiness.redeploy.reasons
+          : readiness.rollback.reasons;
+
+    return [...new Set(reasons.map((reason) => reason.code))].map(recoveryReasonLabel);
   }
 
   function deploymentSectionErrorMessage(code: string): string {
@@ -799,6 +869,91 @@
               </div>
             </div>
           </section>
+
+          {#if recoveryReadiness}
+            <section class="rounded-md border bg-background p-4" data-testid="deployment-recovery-readiness">
+              <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                <div class="space-y-2">
+                  <h2 class="text-lg font-semibold">
+                    {$t(i18nKeys.console.deployments.recoveryTitle)}
+                  </h2>
+                  <p class="text-sm leading-6 text-muted-foreground">
+                    {$t(i18nKeys.console.deployments.recoveryDescription)}
+                  </p>
+                </div>
+                <Badge variant="outline">
+                  {$t(i18nKeys.console.deployments.recoveryCandidateCount, {
+                    count: recoveryReadiness.rollbackCandidateCount,
+                  })}
+                </Badge>
+              </div>
+
+              <div class="mt-4 grid gap-3 md:grid-cols-3">
+                <div class="rounded-md border bg-muted/20 p-3">
+                  <div class="flex items-center justify-between gap-3">
+                    <p class="text-sm font-medium">
+                      {$t(i18nKeys.console.deployments.recoveryRetryTitle)}
+                    </p>
+                    <Badge variant={recoveryReadiness.retryable ? "secondary" : "outline"}>
+                      {recoveryStatusLabel(
+                        recoveryReadiness.retryable,
+                        recoveryReadiness.retry.commandActive,
+                      )}
+                    </Badge>
+                  </div>
+                  <ul class="mt-3 space-y-1 text-sm text-muted-foreground">
+                    {#each recoveryActionReasons(recoveryReadiness, "retry") as reason (reason)}
+                      <li>{reason}</li>
+                    {:else}
+                      <li>{$t(i18nKeys.console.deployments.recoveryNoReasons)}</li>
+                    {/each}
+                  </ul>
+                </div>
+
+                <div class="rounded-md border bg-muted/20 p-3">
+                  <div class="flex items-center justify-between gap-3">
+                    <p class="text-sm font-medium">
+                      {$t(i18nKeys.console.deployments.recoveryRedeployTitle)}
+                    </p>
+                    <Badge variant={recoveryReadiness.redeployable ? "secondary" : "outline"}>
+                      {recoveryStatusLabel(
+                        recoveryReadiness.redeployable,
+                        recoveryReadiness.redeploy.commandActive,
+                      )}
+                    </Badge>
+                  </div>
+                  <ul class="mt-3 space-y-1 text-sm text-muted-foreground">
+                    {#each recoveryActionReasons(recoveryReadiness, "redeploy") as reason (reason)}
+                      <li>{reason}</li>
+                    {:else}
+                      <li>{$t(i18nKeys.console.deployments.recoveryNoReasons)}</li>
+                    {/each}
+                  </ul>
+                </div>
+
+                <div class="rounded-md border bg-muted/20 p-3">
+                  <div class="flex items-center justify-between gap-3">
+                    <p class="text-sm font-medium">
+                      {$t(i18nKeys.console.deployments.recoveryRollbackTitle)}
+                    </p>
+                    <Badge variant={recoveryReadiness.rollbackReady ? "secondary" : "outline"}>
+                      {recoveryStatusLabel(
+                        recoveryReadiness.rollbackReady,
+                        recoveryReadiness.rollback.commandActive,
+                      )}
+                    </Badge>
+                  </div>
+                  <ul class="mt-3 space-y-1 text-sm text-muted-foreground">
+                    {#each recoveryActionReasons(recoveryReadiness, "rollback") as reason (reason)}
+                      <li>{reason}</li>
+                    {:else}
+                      <li>{$t(i18nKeys.console.deployments.recoveryNoReasons)}</li>
+                    {/each}
+                  </ul>
+                </div>
+              </div>
+            </section>
+          {/if}
 
           <section class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
             <div class="rounded-md border bg-background p-4">

@@ -2,7 +2,8 @@
 
 ## Status
 
-Spec Round implementation plan. No code is implemented by this document.
+Readiness query Code Round implemented. Retry, redeploy, and rollback command slices remain future
+work.
 
 ## Governing Sources
 
@@ -17,14 +18,21 @@ Spec Round implementation plan. No code is implemented by this document.
 
 ### 1. Readiness Query Slice
 
-- Add application-level recovery policy/read model service that depends on deployment repositories
+- [x] Add application-level recovery policy/read model service that depends on deployment repositories
   and read models, not on transport code.
-- Add `deployments.recovery-readiness` query input/output schema and operation-catalog entry.
-- Read durable deployment status, immutable deployment snapshot, environment snapshot, runtime
+- [x] Add `deployments.recovery-readiness` query input/output schema and operation-catalog entry.
+- [x] Read durable deployment status, immutable deployment snapshot, environment snapshot, runtime
   target/destination identity, artifact identity, and resource runtime coordination state.
-- Return stable blocked reason codes and safe next actions without admitting recovery work.
-- Wire HTTP/oRPC, CLI inspection, Web detail consumption, and future MCP/tool-compatible schema only
+- [x] Return stable blocked reason codes and safe next actions without admitting recovery work.
+- [x] Wire HTTP/oRPC, CLI inspection, Web detail consumption, and future MCP/tool-compatible schema only
   after application tests pass.
+
+Current deferred gaps for this slice:
+
+- richer target/destination compatibility checks;
+- explicit artifact retention horizon/prune metadata;
+- future MCP descriptor;
+- full CLI golden-output test beyond type/catalog coverage.
 
 ### 2. Retry Command Slice
 

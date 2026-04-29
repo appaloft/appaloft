@@ -2049,6 +2049,110 @@ export const showDeploymentInputSchema = z.object({
   includeSnapshot: z.boolean().optional(),
   includeRelatedContext: z.boolean().optional(),
   includeLatestFailure: z.boolean().optional(),
+  includeRecoverySummary: z.boolean().optional(),
+});
+
+export const deploymentRecoveryReasonCodeSchema = z.enum([
+  "attempt-not-terminal",
+  "attempt-status-not-recoverable",
+  "snapshot-missing",
+  "environment-snapshot-missing",
+  "runtime-target-missing",
+  "runtime-artifact-missing",
+  "rollback-candidate-not-successful",
+  "rollback-candidate-expired",
+  "rollback-candidate-target-mismatch",
+  "resource-profile-invalid",
+  "resource-runtime-busy",
+  "stateful-data-rollback-unsupported",
+  "recovery-command-not-active",
+]);
+
+export const deploymentRecoveryReadinessReasonSchema = z.object({
+  code: deploymentRecoveryReasonCodeSchema,
+  category: z.enum(["allowed", "blocked", "warning", "info"]),
+  phase: z.string(),
+  relatedDeploymentId: z.string().optional(),
+  relatedEntityId: z.string().optional(),
+  relatedEntityType: z.string().optional(),
+  retriable: z.boolean(),
+  recommendation: z.string().optional(),
+});
+
+export const deploymentRecoveryActionReadinessSchema = z.object({
+  allowed: z.boolean(),
+  commandActive: z.boolean(),
+  reasons: z.array(deploymentRecoveryReadinessReasonSchema),
+  targetOperation: z.enum(["deployments.retry", "deployments.redeploy", "deployments.rollback"]),
+});
+
+export const rollbackCandidateReadinessSchema = z.object({
+  deploymentId: z.string(),
+  finishedAt: z.string(),
+  status: z.literal("succeeded"),
+  sourceSummary: z.string().optional(),
+  artifactSummary: z.string().optional(),
+  environmentSnapshotId: z.string().optional(),
+  runtimeTargetSummary: z.string().optional(),
+  rollbackReady: z.boolean(),
+  reasons: z.array(deploymentRecoveryReadinessReasonSchema),
+});
+
+export const deploymentRecoveryRecommendedActionSchema = z.object({
+  kind: z.enum(["query", "command", "workflow-action"]),
+  targetOperation: z.enum([
+    "deployments.show",
+    "deployments.stream-events",
+    "deployments.logs",
+    "resources.health",
+    "resources.diagnostic-summary",
+    "deployments.retry",
+    "deployments.redeploy",
+    "deployments.rollback",
+  ]),
+  label: z.string(),
+  safeByDefault: z.boolean(),
+  blockedReasonCode: deploymentRecoveryReasonCodeSchema.optional(),
+  commandActive: z.boolean().optional(),
+});
+
+export const deploymentRecoveryReadinessInputSchema = z.object({
+  deploymentId: z.string().min(1),
+  resourceId: z.string().min(1).optional(),
+  includeCandidates: z.boolean().optional(),
+  maxCandidates: z.number().int().positive().optional(),
+});
+
+export const deploymentRecoveryReadinessResponseSchema = z.object({
+  schemaVersion: z.literal("deployments.recovery-readiness/v1"),
+  deploymentId: z.string(),
+  resourceId: z.string(),
+  generatedAt: z.string(),
+  stateVersion: z.string(),
+  recoverable: z.boolean(),
+  retryable: z.boolean(),
+  redeployable: z.boolean(),
+  rollbackReady: z.boolean(),
+  rollbackCandidateCount: z.number().int().nonnegative(),
+  retry: deploymentRecoveryActionReadinessSchema,
+  redeploy: deploymentRecoveryActionReadinessSchema,
+  rollback: z.object({
+    allowed: z.boolean(),
+    commandActive: z.boolean(),
+    reasons: z.array(deploymentRecoveryReadinessReasonSchema),
+    candidates: z.array(rollbackCandidateReadinessSchema),
+    recommendedCandidateId: z.string().optional(),
+  }),
+  recommendedActions: z.array(deploymentRecoveryRecommendedActionSchema),
+});
+
+export const deploymentAttemptRecoverySummarySchema = z.object({
+  source: z.literal("deployments.recovery-readiness"),
+  retryable: z.boolean(),
+  redeployable: z.boolean(),
+  rollbackReady: z.boolean(),
+  rollbackCandidateCount: z.number().int().nonnegative(),
+  blockedReasonCodes: z.array(z.string()),
 });
 
 export const showDeploymentResponseSchema = z.object({
@@ -2059,6 +2163,7 @@ export const showDeploymentResponseSchema = z.object({
   snapshot: deploymentAttemptSnapshotSchema.optional(),
   timeline: deploymentAttemptTimelineSchema.optional(),
   latestFailure: deploymentAttemptFailureSummarySchema.optional(),
+  recoverySummary: deploymentAttemptRecoverySummarySchema.optional(),
   nextActions: z.array(
     z.enum(["logs", "resource-detail", "resource-health", "diagnostic-summary"]),
   ),
@@ -2681,6 +2786,26 @@ export type DeploymentAttemptStatusSummary = z.infer<typeof deploymentAttemptSta
 export type DeploymentAttemptTimeline = z.infer<typeof deploymentAttemptTimelineSchema>;
 export type DeploymentAttemptSnapshot = z.infer<typeof deploymentAttemptSnapshotSchema>;
 export type DeploymentAttemptFailureSummary = z.infer<typeof deploymentAttemptFailureSummarySchema>;
+export type DeploymentRecoveryReasonCode = z.infer<typeof deploymentRecoveryReasonCodeSchema>;
+export type DeploymentRecoveryReadinessReason = z.infer<
+  typeof deploymentRecoveryReadinessReasonSchema
+>;
+export type DeploymentRecoveryActionReadiness = z.infer<
+  typeof deploymentRecoveryActionReadinessSchema
+>;
+export type RollbackCandidateReadiness = z.infer<typeof rollbackCandidateReadinessSchema>;
+export type DeploymentRecoveryRecommendedAction = z.infer<
+  typeof deploymentRecoveryRecommendedActionSchema
+>;
+export type DeploymentRecoveryReadinessInput = z.infer<
+  typeof deploymentRecoveryReadinessInputSchema
+>;
+export type DeploymentRecoveryReadinessResponse = z.infer<
+  typeof deploymentRecoveryReadinessResponseSchema
+>;
+export type DeploymentAttemptRecoverySummary = z.infer<
+  typeof deploymentAttemptRecoverySummarySchema
+>;
 export type ShowDeploymentInput = z.infer<typeof showDeploymentInputSchema>;
 export type ShowDeploymentResponse = z.infer<typeof showDeploymentResponseSchema>;
 export type DeploymentLogsResponse = z.infer<typeof deploymentLogsResponseSchema>;

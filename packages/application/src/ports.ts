@@ -2531,6 +2531,100 @@ export type DeploymentAttemptNextAction =
   | "resource-health"
   | "diagnostic-summary";
 
+export type DeploymentRecoveryReasonCode =
+  | "attempt-not-terminal"
+  | "attempt-status-not-recoverable"
+  | "snapshot-missing"
+  | "environment-snapshot-missing"
+  | "runtime-target-missing"
+  | "runtime-artifact-missing"
+  | "rollback-candidate-not-successful"
+  | "rollback-candidate-expired"
+  | "rollback-candidate-target-mismatch"
+  | "resource-profile-invalid"
+  | "resource-runtime-busy"
+  | "stateful-data-rollback-unsupported"
+  | "recovery-command-not-active";
+
+export interface DeploymentRecoveryReadinessReason {
+  code: DeploymentRecoveryReasonCode;
+  category: "allowed" | "blocked" | "warning" | "info";
+  phase: string;
+  relatedDeploymentId?: string;
+  relatedEntityId?: string;
+  relatedEntityType?: string;
+  retriable: boolean;
+  recommendation?: string;
+}
+
+export interface DeploymentRecoveryActionReadiness {
+  allowed: boolean;
+  commandActive: boolean;
+  reasons: DeploymentRecoveryReadinessReason[];
+  targetOperation: "deployments.retry" | "deployments.redeploy" | "deployments.rollback";
+}
+
+export interface RollbackCandidateReadiness {
+  deploymentId: string;
+  finishedAt: string;
+  status: "succeeded";
+  sourceSummary?: string;
+  artifactSummary?: string;
+  environmentSnapshotId?: string;
+  runtimeTargetSummary?: string;
+  rollbackReady: boolean;
+  reasons: DeploymentRecoveryReadinessReason[];
+}
+
+export interface DeploymentRecoveryRecommendedAction {
+  kind: "query" | "command" | "workflow-action";
+  targetOperation:
+    | "deployments.show"
+    | "deployments.stream-events"
+    | "deployments.logs"
+    | "resources.health"
+    | "resources.diagnostic-summary"
+    | "deployments.retry"
+    | "deployments.redeploy"
+    | "deployments.rollback";
+  label: string;
+  safeByDefault: boolean;
+  blockedReasonCode?: DeploymentRecoveryReasonCode;
+  commandActive?: boolean;
+}
+
+export interface DeploymentRecoveryReadiness {
+  schemaVersion: "deployments.recovery-readiness/v1";
+  deploymentId: string;
+  resourceId: string;
+  generatedAt: string;
+  stateVersion: string;
+  recoverable: boolean;
+  retryable: boolean;
+  redeployable: boolean;
+  rollbackReady: boolean;
+  rollbackCandidateCount: number;
+  retry: DeploymentRecoveryActionReadiness;
+  redeploy: DeploymentRecoveryActionReadiness;
+  rollback: {
+    allowed: boolean;
+    commandActive: boolean;
+    reasons: DeploymentRecoveryReadinessReason[];
+    candidates: RollbackCandidateReadiness[];
+    recommendedCandidateId?: string;
+  };
+  recommendedActions: DeploymentRecoveryRecommendedAction[];
+}
+
+export interface DeploymentAttemptRecoverySummary {
+  source: "deployments.recovery-readiness";
+  retryable: boolean;
+  redeployable: boolean;
+  rollbackReady: boolean;
+  rollbackCandidateCount: number;
+  blockedReasonCodes: string[];
+}
+
 export interface DeploymentDetail {
   schemaVersion: "deployments.show/v1";
   deployment: DeploymentDetailSummary;
@@ -2539,6 +2633,7 @@ export interface DeploymentDetail {
   snapshot?: DeploymentAttemptSnapshot;
   timeline?: DeploymentAttemptTimeline;
   latestFailure?: DeploymentAttemptFailureSummary;
+  recoverySummary?: DeploymentAttemptRecoverySummary;
   nextActions: DeploymentAttemptNextAction[];
   sectionErrors: DeploymentDetailSectionError[];
   generatedAt: string;

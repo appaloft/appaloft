@@ -26,7 +26,10 @@ import {
   type ServerReadModel,
   type ServerSummary,
 } from "../src/ports";
-import { ShowDeploymentQueryService } from "../src/use-cases";
+import {
+  DeploymentRecoveryReadinessQueryService,
+  ShowDeploymentQueryService,
+} from "../src/use-cases";
 
 class FixedClock {
   now(): string {
@@ -376,6 +379,11 @@ function createService(input?: {
       environmentReadModel,
       resourceReadModel,
       serverReadModel,
+      new DeploymentRecoveryReadinessQueryService(
+        deploymentReadModel,
+        resourceReadModel,
+        new FixedClock(),
+      ),
       new FixedClock(),
     ),
   };
@@ -388,6 +396,7 @@ function createQuery(input?: Partial<Parameters<typeof ShowDeploymentQuery.creat
     includeSnapshot: true,
     includeRelatedContext: true,
     includeLatestFailure: true,
+    includeRecoverySummary: false,
     ...input,
   })._unsafeUnwrap();
 }
