@@ -2052,6 +2052,144 @@ export const showDeploymentInputSchema = z.object({
   includeRecoverySummary: z.boolean().optional(),
 });
 
+export const deploymentPlanInputSchema = z.object({
+  projectId: z.string().min(1),
+  environmentId: z.string().min(1),
+  resourceId: z.string().min(1),
+  serverId: z.string().min(1),
+  destinationId: z.string().min(1).optional(),
+  includeAccessPlan: z.boolean().optional(),
+  includeCommandSpecs: z.boolean().optional(),
+});
+
+export const deploymentPlanReasonCodeSchema = z.enum([
+  "resource-source-missing",
+  "resource-source-unnormalized",
+  "runtime-profile-missing",
+  "network-profile-missing",
+  "internal-port-missing",
+  "static-publish-directory-missing",
+  "compose-target-service-missing",
+  "unsupported-framework",
+  "ambiguous-framework",
+  "missing-production-start-command",
+  "missing-static-output",
+  "incompatible-source-strategy",
+  "runtime-target-unsupported",
+  "access-plan-unavailable",
+]);
+
+export const deploymentPlanReasonSchema = z.object({
+  code: deploymentPlanReasonCodeSchema,
+  category: z.enum(["blocked", "warning", "info"]),
+  phase: z.string(),
+  message: z.string(),
+  recommendation: z.string().optional(),
+  relatedEntityId: z.string().optional(),
+  relatedEntityType: z.string().optional(),
+});
+
+export const deploymentPlanResponseSchema = z.object({
+  schemaVersion: z.literal("deployments.plan/v1"),
+  context: z.object({
+    projectId: z.string(),
+    environmentId: z.string(),
+    resourceId: z.string(),
+    serverId: z.string(),
+    destinationId: z.string(),
+    projectName: z.string().optional(),
+    environmentName: z.string().optional(),
+    resourceName: z.string().optional(),
+    serverName: z.string().optional(),
+  }),
+  readiness: z.object({
+    status: z.enum(["ready", "blocked", "warning"]),
+    ready: z.boolean(),
+    reasonCodes: z.array(deploymentPlanReasonCodeSchema),
+  }),
+  source: z.object({
+    kind: runtimePlanSchema.shape.source.shape.kind,
+    displayName: z.string(),
+    locator: z.string(),
+    runtimeFamily: z.string().optional(),
+    framework: z.string().optional(),
+    packageManager: z.string().optional(),
+    applicationShape: z.string().optional(),
+    runtimeVersion: z.string().optional(),
+    projectName: z.string().optional(),
+    detectedFiles: z.array(z.string()),
+    detectedScripts: z.array(z.string()),
+    dockerfilePath: z.string().optional(),
+    composeFilePath: z.string().optional(),
+    jarPath: z.string().optional(),
+    reasoning: z.array(z.string()),
+  }),
+  planner: z.object({
+    plannerKey: z.string(),
+    supportTier: z.enum(["first-class", "generic", "custom", "container-native", "unsupported"]),
+    buildStrategy: runtimePlanSchema.shape.buildStrategy,
+    packagingMode: runtimePlanSchema.shape.packagingMode,
+    targetKind: z.enum(["single-server", "future-multi-server", "future-k8s"]),
+    targetProviderKey: z.string(),
+  }),
+  artifact: z.object({
+    kind: z.enum([
+      "dockerfile-image",
+      "static-server-image",
+      "compose-project",
+      "prebuilt-image",
+      "custom-command-image",
+      "workspace-image",
+    ]),
+    runtimeArtifactKind: z.enum(["image", "compose-project"]).optional(),
+    runtimeArtifactIntent: z.enum(["build-image", "prebuilt-image", "compose-project"]).optional(),
+    image: z.string().optional(),
+    composeFile: z.string().optional(),
+    metadata: z.record(z.string(), z.string()).optional(),
+  }),
+  commands: z.array(
+    z.object({
+      kind: z.enum(["install", "build", "package", "start"]),
+      command: z.string(),
+      source: z.enum(["resource-runtime-profile", "planner"]),
+    }),
+  ),
+  network: z.object({
+    internalPort: z.number().int().positive().optional(),
+    upstreamProtocol: z.enum(["http", "https", "tcp"]).optional(),
+    exposureMode: z.enum(["none", "direct-port", "reverse-proxy"]).optional(),
+    hostPort: z.number().int().positive().optional(),
+    targetServiceName: z.string().optional(),
+  }),
+  health: z.object({
+    enabled: z.boolean(),
+    kind: z.enum(["http", "command", "none"]),
+    path: z.string().optional(),
+    port: z.number().int().positive().optional(),
+  }),
+  access: z
+    .object({
+      routeSource: z.string().optional(),
+      hostname: z.string().optional(),
+      scheme: z.enum(["http", "https"]).optional(),
+      routeCount: z.number().int().nonnegative().optional(),
+      routeGroupCount: z.number().int().nonnegative().optional(),
+    })
+    .optional(),
+  warnings: z.array(deploymentPlanReasonSchema),
+  unsupportedReasons: z.array(deploymentPlanReasonSchema),
+  nextActions: z.array(
+    z.object({
+      kind: z.enum(["query", "command", "workflow-action"]),
+      targetOperation: z.string(),
+      label: z.string(),
+      safeByDefault: z.boolean(),
+      blockedReasonCode: deploymentPlanReasonCodeSchema.optional(),
+    }),
+  ),
+  generatedAt: z.string(),
+});
+
 export const deploymentRecoveryReasonCodeSchema = z.enum([
   "attempt-not-terminal",
   "attempt-status-not-recoverable",
@@ -2803,6 +2941,10 @@ export type DeploymentRecoveryReadinessInput = z.infer<
 export type DeploymentRecoveryReadinessResponse = z.infer<
   typeof deploymentRecoveryReadinessResponseSchema
 >;
+export type DeploymentPlanInput = z.infer<typeof deploymentPlanInputSchema>;
+export type DeploymentPlanReasonCode = z.infer<typeof deploymentPlanReasonCodeSchema>;
+export type DeploymentPlanReason = z.infer<typeof deploymentPlanReasonSchema>;
+export type DeploymentPlanResponse = z.infer<typeof deploymentPlanResponseSchema>;
 export type DeploymentAttemptRecoverySummary = z.infer<
   typeof deploymentAttemptRecoverySummarySchema
 >;

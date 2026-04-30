@@ -3,8 +3,8 @@
 ## Normative Contract
 
 Workload framework detection and planner selection is an internal capability of resource creation
-workflows and `deployments.create` runtime planning. It is not a public command, not a transport
-shortcut, and not a deployment method.
+workflows, `deployments.create` runtime planning, and read-only `deployments.plan` preview. It is
+not a public command, not a transport shortcut, and not a deployment method.
 
 The capability turns a normalized resource source/runtime/network profile into typed source
 inspection evidence and then into a Docker/OCI-backed workload artifact plan governed by
@@ -20,6 +20,7 @@ ResourceSourceBinding + ResourceRuntimeProfile + ResourceNetworkProfile
   -> select framework/runtime planner
   -> resolve base image and typed install/build/start/package steps
   -> produce image or Compose artifact intent
+  -> deployments.plan may return the preview here without execution
   -> deployments.create continues with runtime target execution
 ```
 
@@ -39,6 +40,7 @@ This workflow inherits:
 - [ADR-023: Runtime Orchestration Target Boundary](../decisions/ADR-023-runtime-orchestration-target-boundary.md)
 - [resources.create Command Spec](../commands/resources.create.md)
 - [deployments.create Command Spec](../commands/deployments.create.md)
+- [deployments.plan Query Spec](../queries/deployments.plan.md)
 - [deployments.create Workflow Spec](./deployments.create.md)
 - [Quick Deploy Workflow Spec](./quick-deploy.md)
 - [Resource Create And First Deploy Workflow Spec](./resources.create-and-first-deploy.md)
@@ -46,6 +48,7 @@ This workflow inherits:
 - [deployments.create Test Matrix](../testing/deployments.create-test-matrix.md)
 - [Quick Deploy Test Matrix](../testing/quick-deploy-test-matrix.md)
 - [Deployment Runtime Substrate Implementation Plan](../implementation/deployment-runtime-substrate-plan.md)
+- [Deployment Plan Preview Implementation Plan](../implementation/deployment-plan-preview-plan.md)
 - [Error Model](../errors/model.md)
 - [neverthrow Conventions](../errors/neverthrow-conventions.md)
 - [Async Lifecycle And Acceptance](../architecture/async-lifecycle-and-acceptance.md)

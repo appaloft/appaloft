@@ -8,6 +8,7 @@ import { showDefaultAccessDomainPolicyQueryInputSchema } from "./operations/defa
 import { cleanupPreviewCommandInputSchema } from "./operations/deployments/cleanup-preview.command";
 import { createDeploymentCommandInputSchema } from "./operations/deployments/create-deployment.command";
 import { deploymentLogsQueryInputSchema } from "./operations/deployments/deployment-logs.query";
+import { deploymentPlanQueryInputSchema } from "./operations/deployments/deployment-plan.query";
 import { deploymentRecoveryReadinessQueryInputSchema } from "./operations/deployments/deployment-recovery-readiness.query";
 import { listDeploymentsQueryInputSchema } from "./operations/deployments/list-deployments.query";
 import { showDeploymentQueryInputSchema } from "./operations/deployments/show-deployment.query";
@@ -928,6 +929,20 @@ export const operationCatalog = [
     transports: {
       cli: "appaloft deployments show <deploymentId>",
       orpc: { method: "GET", path: "/api/deployments/{deploymentId}" },
+    },
+  },
+  {
+    key: "deployments.plan",
+    kind: "query",
+    domain: "deployments",
+    messageName: "DeploymentPlanQuery",
+    handlerName: "DeploymentPlanQueryHandler",
+    serviceName: "DeploymentPlanQueryService",
+    inputSchema: deploymentPlanQueryInputSchema,
+    serviceToken: tokens.deploymentPlanQueryService,
+    transports: {
+      cli: "appaloft deployments plan --project <projectId> --environment <environmentId> --resource <resourceId> --server <serverId> [--destination <destinationId>]",
+      orpc: { method: "GET", path: "/api/deployments/plan" },
     },
   },
   {

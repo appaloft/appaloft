@@ -51,6 +51,7 @@ import {
   DeleteSshCredentialCommand,
   type DeploymentEventStreamEnvelope,
   DeploymentLogsQuery,
+  DeploymentPlanQuery,
   type DeploymentProgressEvent,
   type DeploymentProgressObserver,
   DeploymentRecoveryReadinessQuery,
@@ -60,6 +61,7 @@ import {
   deleteServerCommandInputSchema,
   deleteSshCredentialCommandInputSchema,
   deploymentLogsQueryInputSchema,
+  deploymentPlanQueryInputSchema,
   deploymentRecoveryReadinessQueryInputSchema,
   diffEnvironmentsQueryInputSchema,
   EnvironmentEffectivePrecedenceQuery,
@@ -186,6 +188,7 @@ import {
   deploymentEventStreamResponseSchema,
   deploymentEventStreamStreamResponseSchema,
   deploymentLogsResponseSchema,
+  deploymentPlanResponseSchema,
   deploymentProgressEventSchema,
   deploymentRecoveryReadinessResponseSchema,
   diffEnvironmentResponseSchema,
@@ -279,6 +282,7 @@ function routeDescription(
 
 export const apiDocsHrefs = {
   createDeployment: createDeploymentDocsHref,
+  deploymentPlan: resolvePublicDocsHelpHref("deployment.plan-preview"),
   deploymentRecoveryReadiness: resolvePublicDocsHelpHref("deployment.recovery-readiness"),
   serverCredential: resolvePublicDocsHelpHref("server.ssh-credential"),
   serverConnectivity: resolvePublicDocsHelpHref("server.connectivity-test"),
@@ -309,6 +313,10 @@ export const apiRouteDescriptions = {
   createDeployment: routeDescription(
     "Creates a deployment from an explicit project, server, environment, and resource context.",
     "deployment.source",
+  ),
+  deploymentPlan: routeDescription(
+    "Previews detected deployment evidence and the execution plan without creating or running a deployment.",
+    "deployment.plan-preview",
   ),
   deploymentRecoveryReadiness: routeDescription(
     "Reads retry, redeploy, rollback, and rollback candidate readiness for one deployment.",
@@ -1745,6 +1753,17 @@ export const showDeploymentProcedure = base
   .output(showDeploymentResponseSchema)
   .handler(async ({ input, context }) => executeQuery(context, ShowDeploymentQuery.create(input)));
 
+export const deploymentPlanProcedure = base
+  .route({
+    method: "GET",
+    path: "/deployments/plan",
+    description: apiRouteDescriptions.deploymentPlan,
+    successStatus: 200,
+  })
+  .input(deploymentPlanQueryInputSchema)
+  .output(deploymentPlanResponseSchema)
+  .handler(async ({ input, context }) => executeQuery(context, DeploymentPlanQuery.create(input)));
+
 export const deploymentRecoveryReadinessProcedure = base
   .route({
     method: "GET",
@@ -2031,6 +2050,7 @@ export const appaloftOrpcRouter = {
   deployments: {
     list: listDeploymentsProcedure,
     create: createDeploymentProcedure,
+    plan: deploymentPlanProcedure,
     show: showDeploymentProcedure,
     recoveryReadiness: deploymentRecoveryReadinessProcedure,
     createStream: createDeploymentStreamProcedure,
@@ -2213,6 +2233,7 @@ export function mountAppaloftOrpcRoutes(
     "/api/certificates/import",
     "/api/certificates/issue-or-renew",
     "/api/deployments",
+    "/api/deployments/plan",
     "/api/deployments/:deploymentId",
     "/api/deployments/:deploymentId/recovery-readiness",
     "/api/deployments/stream",

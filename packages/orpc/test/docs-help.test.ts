@@ -40,6 +40,7 @@ describe("HTTP API docs help links", () => {
     expect(apiDocsHrefs.operatorWorkLedger).toBe(
       "/docs/reference/errors-statuses/#operator-work-ledger",
     );
+    expect(apiDocsHrefs.deploymentPlan).toBe("/docs/deploy/lifecycle/#deployment-plan-preview");
 
     expect(apiRouteDescriptions.configureServerCredential).toContain(apiDocsHrefs.serverCredential);
     expect(apiRouteDescriptions.rotateSshCredential).toContain(apiDocsHrefs.serverCredential);
@@ -61,5 +62,6 @@ describe("HTTP API docs help links", () => {
     );
     expect(apiRouteDescriptions.openTerminalSession).toContain(apiDocsHrefs.terminalSession);
     expect(apiRouteDescriptions.operatorWorkLedger).toContain(apiDocsHrefs.operatorWorkLedger);
+    expect(apiRouteDescriptions.deploymentPlan).toContain(apiDocsHrefs.deploymentPlan);
   });
 });

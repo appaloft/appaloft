@@ -3,6 +3,7 @@ import { publicDocsBasePath, resolvePublicDocsHelpHref } from "@appaloft/docs-re
 export const webDocsHrefs = {
   docsHome: `${publicDocsBasePath}/`,
   deploymentLifecycle: resolvePublicDocsHelpHref("deployment.lifecycle"),
+  deploymentPlanPreview: resolvePublicDocsHelpHref("deployment.plan-preview"),
   deploymentSource: resolvePublicDocsHelpHref("deployment.source"),
   serverDeploymentTarget: resolvePublicDocsHelpHref("server.deployment-target"),
   serverSshCredential: resolvePublicDocsHelpHref("server.ssh-credential"),

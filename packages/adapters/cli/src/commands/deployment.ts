@@ -5,6 +5,7 @@ import {
   CreateDeploymentCommand,
   type CreateDeploymentCommandInput,
   DeploymentLogsQuery,
+  DeploymentPlanQuery,
   DeploymentRecoveryReadinessQuery,
   type DeploymentSummary,
   ListDeploymentsQuery,
@@ -1425,6 +1426,27 @@ const showDeploymentCommand = EffectCommand.make(
   ({ deploymentId }) => runQuery(ShowDeploymentQuery.create({ deploymentId })),
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.deploymentShow));
 
+const deploymentPlanCommand = EffectCommand.make(
+  "plan",
+  {
+    project: projectOption,
+    environment: environmentOption,
+    resource: resourceOption,
+    server: serverOption,
+    destination: destinationOption,
+  },
+  ({ destination, environment, project, resource, server }) =>
+    runQuery(
+      DeploymentPlanQuery.create({
+        projectId: optionalValue(project) ?? "",
+        environmentId: optionalValue(environment) ?? "",
+        resourceId: optionalValue(resource) ?? "",
+        serverId: optionalValue(server) ?? "",
+        destinationId: optionalValue(destination),
+      }),
+    ),
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.deploymentPlan));
+
 const deploymentRecoveryReadinessCommand = EffectCommand.make(
   "recovery-readiness",
   {
@@ -1461,6 +1483,7 @@ export const deploymentsCommand = EffectCommand.make("deployments").pipe(
   EffectCommand.withSubcommands([
     listDeploymentsCommand,
     showDeploymentCommand,
+    deploymentPlanCommand,
     deploymentRecoveryReadinessCommand,
     streamDeploymentEventsCommand,
   ]),

@@ -42,6 +42,9 @@ describe("CLI docs help links", () => {
     expect(cliDocsHrefs.deploymentSourceRelink).toBe(
       "/docs/deploy/recovery/#deployment-source-relink",
     );
+    expect(cliDocsHrefs.deploymentPlanPreview).toBe(
+      "/docs/deploy/lifecycle/#deployment-plan-preview",
+    );
     expect(cliDocsHrefs.serverTerminalSession).toBe(
       "/docs/servers/operations/proxy-and-terminal/#server-terminal-session",
     );
@@ -71,6 +74,7 @@ describe("CLI docs help links", () => {
       cliDocsHrefs.certificateReadiness,
     );
     expect(cliCommandDescriptions.previewCleanup).toContain(cliDocsHrefs.deploymentPreviewCleanup);
+    expect(cliCommandDescriptions.deploymentPlan).toContain(cliDocsHrefs.deploymentPlanPreview);
     expect(cliCommandDescriptions.sourceLinkRelink).toContain(cliDocsHrefs.deploymentSourceRelink);
     expect(cliCommandDescriptions.remoteStateLockInspect).toContain(cliDocsHrefs.remoteStateLock);
     expect(cliCommandDescriptions.remoteStateLockRecoverStale).toContain(
