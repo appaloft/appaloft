@@ -45,6 +45,11 @@ export interface DeploymentState {
   supersededByDeploymentId?: DeploymentId;
 }
 
+export interface DeploymentExecutionContinuation {
+  allowed: boolean;
+  supersededByDeploymentId?: DeploymentId;
+}
+
 export interface DeploymentVisitor<TContext, TResult> {
   visitDeployment(deployment: Deployment, context: TContext): TResult;
 }
@@ -241,6 +246,22 @@ export class Deployment extends AggregateRoot<DeploymentState> {
 
   canStartNewDeployment(): boolean {
     return this.state.status.canStartNewDeployment();
+  }
+
+  resolveExecutionContinuation(): DeploymentExecutionContinuation {
+    const allowed =
+      this.state.status.allowsExecutionContinuation() && !this.state.supersededByDeploymentId;
+
+    return {
+      allowed,
+      ...(this.state.supersededByDeploymentId
+        ? { supersededByDeploymentId: this.state.supersededByDeploymentId }
+        : {}),
+    };
+  }
+
+  requiresRuntimeCancellationForSupersede(): boolean {
+    return this.state.status.requiresRuntimeCancellationForSupersede();
   }
 
   toState(): DeploymentState {

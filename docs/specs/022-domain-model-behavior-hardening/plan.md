@@ -88,6 +88,12 @@
 - Related application tests after slice 4:
   - `packages/application/test/environment-effective-precedence.test.ts`
   - `packages/application/test/resource-config.test.ts`
+- Slice 5 test bindings:
+  - `DMBH-DEPLOY-001` in `packages/core/test/deployment.test.ts`
+  - Existing behavioral rows: `DEP-CREATE-ADM-023`, `DEP-CREATE-ADM-023B`,
+    `DEP-CREATE-ASYNC-012A`
+- Related application tests after slice 5:
+  - `packages/application/test/create-deployment.test.ts`
 
 ## Risks And Migration Gaps
 

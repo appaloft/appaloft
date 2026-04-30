@@ -122,6 +122,7 @@ Then:
 | DEP-CREATE-ADM-021 | integration | Unresolved project/environment/server/destination/resource | Context cannot be resolved after bootstrap | `err` | `validation_error` or `not_found`, phase `context-resolution` | None | No deployment created |
 | DEP-CREATE-ADM-022 | integration | Context mismatch | Environment/resource/destination does not match project/server context | `err` | `validation_error`, phase `context-resolution` | None | No deployment created |
 | DEP-CREATE-ADM-023 | integration | Supersede previous active deployment | Latest deployment for the same resource is active and the later request takes ownership | `ok({ id })` | None | Previous attempt is canceled; new attempt emits its own acceptance events | Previous attempt records `supersededByDeploymentId`; new attempt becomes the only active deployment |
+| DMBH-DEPLOY-001 | unit + integration | Deployment owns execution-continuation and supersede cancellation decisions | Deployment status and supersede marker vary across running, cancel-requested, canceled, terminal, and superseded cases. | Existing deployment create and execution guard behavior remains unchanged. | Existing errors remain unchanged. | No new events. | Core domain tests prove deployment-owned decisions; application tests prove unchanged supersede behavior. |
 | DEP-CREATE-ADM-023A | integration | Concurrent submit loses atomic active-attempt race | Pre-read sees no active deployment, but another request creates a non-terminal deployment for the same resource before durable state creation | `err` | `deployment_not_redeployable`, phase `redeploy-guard` | None for the rejected attempt | No second deployment is created; first active attempt remains the only non-terminal deployment |
 | DEP-CREATE-ADM-023B | integration | Supersede cancellation failure | Latest same-resource deployment is running, but runtime cancellation fails before takeover | `err` | `conflict`, phase `supersede-previous-deployment` | No new accepted request | Previous attempt remains visible in cancel/supersede state; later request does not take ownership |
 | DEP-CREATE-ADM-023C | integration | Admission waits only on same resource-runtime scope | Another deployment mutation currently owns the same resource-runtime scope while a different resource on the same server is also deployable | Command waits only for the same logical resource-runtime scope; unrelated resources must not be serialized only because they share a server or state backend | `coordination_timeout`, phase `operation-coordination` only when the bounded wait for the same scope expires | No accepted deployment for the timed-out request |
@@ -274,6 +275,10 @@ assertions remain follow-up.
 `DMBH-RES-DEP-001` is covered by `packages/core/test/resource.test.ts` for Resource-owned
 deployment admission predicates and by `packages/application/test/create-deployment.test.ts` for
 unchanged `deployments.create` admission behavior.
+
+`DMBH-DEPLOY-001` is covered by `packages/core/test/deployment.test.ts` for Deployment-owned
+execution-continuation and supersede cancellation decisions and by
+`packages/application/test/create-deployment.test.ts` for unchanged supersede behavior.
 
 Runtime adapter helper tests cover the command construction needed for resource-scoped Docker
 cleanup, explicit superseded-attempt cleanup targeting, loopback ephemeral health-check port

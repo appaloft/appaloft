@@ -25,14 +25,11 @@ export class RepositoryBackedDeploymentExecutionGuard implements DeploymentExecu
       return ok({ allowed: false });
     }
 
-    const state = current.toState();
+    const continuation = current.resolveExecutionContinuation();
     return ok({
-      allowed:
-        state.status.value !== "cancel-requested" &&
-        state.status.value !== "canceled" &&
-        !state.supersededByDeploymentId,
-      ...(state.supersededByDeploymentId
-        ? { supersededByDeploymentId: state.supersededByDeploymentId.value }
+      allowed: continuation.allowed,
+      ...(continuation.supersededByDeploymentId
+        ? { supersededByDeploymentId: continuation.supersededByDeploymentId.value }
         : {}),
     });
   }

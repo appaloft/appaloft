@@ -3,7 +3,7 @@
 ## Status
 
 - Round: Spec Round
-- Artifact state: slices 1, 2, 3, and 4 implemented; ready for slice 5 Spec Round
+- Artifact state: slices 1, 2, 3, 4, and 5 implemented; ready for slice 6 Spec Round
 - Behavior type: no-behavior-change domain model refactor
 - Public behavior impact: none
 
@@ -36,7 +36,7 @@ helpers, providers, and adapters.
 | DMBH-SPEC-002 | Deployment target proxy eligibility is target-owned | A deployment target has optional edge proxy kind/status | generated access, server-applied routes, or proxy bootstrap needs proxy eligibility | Callers ask the target for route/bootstrap eligibility; they do not duplicate `kind === "none"` or `status === "disabled"` checks. |
 | DMBH-SPEC-003 | Domain binding readiness decisions are binding-owned | A domain binding progresses through ownership, certificate, route, ready, not-ready, and deleted states | event handlers or commands need to decide whether a transition applies | Callers invoke `DomainBinding` methods for certificate admission, certificate requirement, route-readiness, idempotent readiness, and retry eligibility instead of branching on status/policy primitives. |
 | DMBH-SPEC-004 | Configuration precedence belongs to configuration values | Environment/resource configuration entries and snapshots share key/exposure/scope identity | a set entry, unset, snapshot, or diff operation runs | Entry identity, scope matching, precedence, and snapshot equality are expressed on configuration value objects or `EnvironmentConfigSet`, not by repeated external string keys or caller-owned state peeling. |
-| DMBH-SPEC-005 | Deployment execution guard uses deployment intent | A deployment may be active, cancel-requested, canceled, superseded, or terminal | execution code decides whether work may continue | The decision is named on `Deployment` or `DeploymentStatusValue`; application guards do not branch on raw status literals. |
+| DMBH-SPEC-005 | Deployment execution guard uses deployment intent | A deployment may be active, cancel-requested, canceled, superseded, or terminal | execution code decides whether work may continue or whether supersede requires runtime cancellation | The decision is named on `Deployment` or `DeploymentStatusValue`; application guards do not branch on raw status literals. |
 | DMBH-SPEC-006 | Workload/runtime compatibility is model-owned | A workload kind and runtime spec must remain compatible | workload declaration validates a static site, worker, or web-server runtime | Compatibility is exposed through `Workload`, `RuntimeSpec`, or owned value-object behavior. |
 
 ## Domain Ownership
