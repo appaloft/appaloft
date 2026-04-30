@@ -58,6 +58,7 @@
 | Continuous F | `AccessRoute`, `RuntimeArtifactKindValue`, and `RuntimeArtifactIntentValue` | Move runtime-plan route/artifact prerequisite checks into VO predicates. | `AccessRoute.create`, `RuntimeArtifactSnapshot.create` |
 | Continuous G | `ResourceBinding`, `ResourceBindingScopeValue`, and `ResourceInjectionModeValue` | Move binding scope/injection coherence into the aggregate with single-VO predicates. | `ResourceBinding.create` |
 | Continuous H | `DomainBinding` route admission values | Move durable binding proxy/redirect admission and route-change equality behind VO predicates. | `DomainBinding.create`, `DomainBinding.configureRoute` |
+| Continuous I | `ResourceExposureModeValue` and `HealthCheckTypeValue` | Move resource network and health admission string checks into VO predicates. | `Resource.create`, `Resource.configureHealthPolicy` |
 
 ## Roadmap And Compatibility
 
@@ -187,6 +188,11 @@
 - Related application tests after Continuous H:
   - none; this is a core-internal route admission predicate refactor already covered by route
     configuration tests in earlier slices.
+- Continuous I test bindings:
+  - `DMBH-RES-001` in `packages/core/test/resource.test.ts`
+- Related application tests after Continuous I:
+  - none; resource command behavior is already covered by previous resource profile tests and this
+    change does not touch public schemas.
 
 ## Risks And Migration Gaps
 
@@ -226,6 +232,8 @@
     `ResourceBinding` behavior.
   - Continuous H migrates domain-binding route proxy/redirect primitive comparisons behind
     `EdgeProxyKindValue` predicates and value-object equality.
+  - Continuous I migrates resource network and health admission primitive comparisons behind
+    `ResourceExposureModeValue` and `HealthCheckTypeValue` predicates.
   - Core value objects may compare their own primitive state internally. Those reads are not
     boundary leaks.
 - A `.codex/skills/domain-driven-develop/SKILL.md` project copy is absent; the current local skill lives under `.agents/skills/domain-driven-develop/SKILL.md`.

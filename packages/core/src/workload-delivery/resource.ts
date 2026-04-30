@@ -552,7 +552,7 @@ function validateResourceNetworkProfile(input: {
     );
   }
 
-  if (input.networkProfile.hostPort && input.networkProfile.exposureMode.value !== "direct-port") {
+  if (input.networkProfile.hostPort && !input.networkProfile.exposureMode.isDirectPort()) {
     return err(
       resourceNetworkResolutionError("Host port is valid only for direct-port resource exposure", {
         ...(input.resourceId ? { resourceId: input.resourceId.value } : {}),
@@ -561,7 +561,7 @@ function validateResourceNetworkProfile(input: {
     );
   }
 
-  if (!input.directPortAllowed && input.networkProfile.exposureMode.value === "direct-port") {
+  if (!input.directPortAllowed && input.networkProfile.exposureMode.isDirectPort()) {
     return err(
       resourceNetworkResolutionError("Direct-port resource exposure is not implemented", {
         ...(input.resourceId ? { resourceId: input.resourceId.value } : {}),
@@ -1261,7 +1261,7 @@ export class Resource extends AggregateRoot<ResourceState> {
       return err(lifecycleGuard.error);
     }
 
-    if (input.policy.enabled && input.policy.type.value !== "http") {
+    if (input.policy.enabled && !input.policy.type.isHttp()) {
       return err(
         domainError.validation("Only HTTP resource health policies are supported", {
           phase: "health-policy-resolution",

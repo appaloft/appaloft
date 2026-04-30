@@ -313,6 +313,8 @@ Boundary rule:
   image reference or Compose file is required.
 - `ResourceNetworkProfile` owns the resource's internal workload endpoint: `internalPort`,
   upstream protocol, exposure mode, and target service selection
+- network exposure mode and health-check type value objects expose direct-port and HTTP predicates;
+  `Resource` composes those predicates for network and health admission
 - the generic user-facing label `port` must map to the domain field
   `ResourceNetworkProfile.internalPort` before dispatching a command
 - resource detail is the owner-scoped console surface for new deployment, deployment history,

@@ -446,6 +446,10 @@ export class HealthCheckTypeValue extends EnumValueObject<(typeof healthCheckTyp
   static rehydrate(value: (typeof healthCheckTypes)[number]): HealthCheckTypeValue {
     return new HealthCheckTypeValue(value);
   }
+
+  isHttp(): boolean {
+    return this.value === "http";
+  }
 }
 
 const healthCheckHttpMethodBrand: unique symbol = Symbol("HealthCheckHttpMethodValue");
@@ -1082,6 +1086,10 @@ export class ResourceExposureModeValue extends EnumValueObject<
 
   static rehydrate(value: (typeof resourceExposureModes)[number]): ResourceExposureModeValue {
     return new ResourceExposureModeValue(value);
+  }
+
+  isDirectPort(): boolean {
+    return this.value === "direct-port";
   }
 }
 
