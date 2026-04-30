@@ -94,6 +94,11 @@
     `DEP-CREATE-ASYNC-012A`
 - Related application tests after slice 5:
   - `packages/application/test/create-deployment.test.ts`
+- Slice 6 test bindings:
+  - `DMBH-WORKLOAD-001` in `packages/core/test/workload.test.ts`
+  - Existing behavioral rows: `WF-PLAN-DET-007`, `WF-PLAN-FAIL-008`
+- Related application tests after slice 6:
+  - none; `Workload` is not yet persisted or exposed through application commands.
 
 ## Risks And Migration Gaps
 

@@ -75,9 +75,18 @@
 - [x] Run `bun test packages/core/test/deployment.test.ts`.
 - [x] Run `bun test packages/application/test/create-deployment.test.ts`.
 
+## Slice 6: Workload Runtime Compatibility Behavior
+
+- [x] `DMBH-WORKLOAD-001`: add Workload behavior tests at
+  `packages/core/test/workload.test.ts`.
+- [x] Add `Workload`, `WorkloadKindValue`, and `RuntimeSpec` behavior for workload/runtime
+  compatibility and web-server port requirements.
+- [x] Refactor workload declaration to call intention methods instead of branching on raw kind and
+  runtime state.
+- [x] Run `bun test packages/core/test/workload.test.ts`.
+
 ## Later Slices
 
-- [ ] Slice 6: harden `Workload` and `RuntimeSpec` compatibility behavior.
 - [ ] Slice 7: audit remaining `toState()` usage and classify boundary allowances.
 
 ## Verification

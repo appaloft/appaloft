@@ -250,6 +250,16 @@ Test names must include the matrix id they prove.
 | WF-PLAN-FAIL-011 | contract/integration | Unsupported runtime target | Workload plan requires a backend capability the selected runtime target lacks | Planning blocks before execution with `unsupported-runtime-target` or command admission fails with `runtime_target_unsupported` in `runtime-target-resolution`. |
 | WF-PLAN-FAIL-012 | contract/integration | Unsupported container-native profile | Dockerfile, Compose, or prebuilt image profile is explicit but unsupported, inconsistent, or missing required target service/image metadata | Planning is blocked with `unsupported-container-native-profile`; framework/buildpack evidence cannot replace the explicit profile. |
 
+## Domain Model Behavior Hardening Matrix
+
+These rows bind no-behavior-change domain-model hardening tests to the workflow contract. They do
+not add public workflow behavior; they prove the core model owns compatibility questions that
+planner and declaration code already rely on.
+
+| Test ID | Preferred automation | Case | Expected result |
+| --- | --- | --- | --- |
+| DMBH-WORKLOAD-001 | unit | Workload/runtime compatibility | `Workload.declare` validates static-site, worker, and web-server runtime combinations through `Workload`/`RuntimeSpec` intention methods; web-server runtimes still require an explicit port. |
+
 ## Boundary Matrix
 
 | Test ID | Preferred automation | Case | Expected result |
