@@ -59,6 +59,22 @@ export class OrganizationPlan extends ValueObject<OrganizationPlanState> {
     return new OrganizationPlan(state);
   }
 
+  hasSeatLimit(): boolean {
+    return this.state.seatLimit !== undefined;
+  }
+
+  canCoverMemberCount(memberCount: number): boolean {
+    return this.state.seatLimit === undefined || memberCount <= this.state.seatLimit;
+  }
+
+  canAcceptMemberCount(memberCount: number): boolean {
+    return this.state.seatLimit === undefined || memberCount < this.state.seatLimit;
+  }
+
+  seatLimitForError(): number | undefined {
+    return this.state.seatLimit;
+  }
+
   toState(): OrganizationPlanState {
     return { ...this.state };
   }
@@ -86,6 +102,10 @@ export class OrganizationMember extends Entity<OrganizationMemberState> {
 
   changeRole(role: OrganizationRoleValue): void {
     this.state.role = role;
+  }
+
+  belongsToUser(userId: UserId): boolean {
+    return this.state.userId.equals(userId);
   }
 
   toState(): OrganizationMemberState {
@@ -162,21 +182,21 @@ export class Organization extends AggregateRoot<OrganizationState> {
     return safeTry(function* () {
       const member = yield* OrganizationMember.create(input);
 
-      if (
-        organization.state.members.some((existing) =>
-          existing.toState().userId.equals(member.toState().userId),
-        )
-      ) {
+      if (organization.hasMemberForUser(input.userId)) {
         return err(
           domainError.conflict("Organization member already exists", {
-            userId: member.toState().userId.value,
+            userId: input.userId.value,
           }),
         );
       }
 
-      const seatLimit = organization.state.plan.toState().seatLimit;
-      if (seatLimit !== undefined && organization.state.members.length >= seatLimit) {
-        return err(domainError.invariant("Organization seat limit exceeded", { seatLimit }));
+      if (!organization.canAcceptAnotherMember()) {
+        const seatLimit = organization.state.plan.seatLimitForError();
+        return err(
+          domainError.invariant("Organization seat limit exceeded", {
+            ...(seatLimit === undefined ? {} : { seatLimit }),
+          }),
+        );
       }
 
       organization.state.members = [...organization.state.members, member];
@@ -194,12 +214,12 @@ export class Organization extends AggregateRoot<OrganizationState> {
     return safeTry(function* () {
       const nextPlan = yield* OrganizationPlan.create(planState);
 
-      const seatLimit = nextPlan.toState().seatLimit;
-      if (seatLimit !== undefined && organization.state.members.length > seatLimit) {
+      if (!organization.canChangeToPlan(nextPlan)) {
+        const seatLimit = nextPlan.seatLimitForError();
         return err(
           domainError.invariant("Cannot downgrade below current organization member count", {
-            members: organization.state.members.length,
-            seatLimit,
+            members: organization.memberCount(),
+            ...(seatLimit === undefined ? {} : { seatLimit }),
           }),
         );
       }
@@ -210,6 +230,22 @@ export class Organization extends AggregateRoot<OrganizationState> {
       });
       return ok(undefined);
     });
+  }
+
+  memberCount(): number {
+    return this.state.members.length;
+  }
+
+  hasMemberForUser(userId: UserId): boolean {
+    return this.state.members.some((existing) => existing.belongsToUser(userId));
+  }
+
+  canAcceptAnotherMember(): boolean {
+    return this.state.plan.canAcceptMemberCount(this.memberCount());
+  }
+
+  canChangeToPlan(plan: OrganizationPlan): boolean {
+    return plan.canCoverMemberCount(this.memberCount());
   }
 
   toState(): OrganizationState {

@@ -3,7 +3,7 @@
 ## Status
 
 - Round: Spec Round
-- Artifact state: slices 1, 2, 3, 4, 5, 6, 7, 8, 9, and 10 implemented; remaining hotspot recorded for future slices
+- Artifact state: slices 1 through 11 implemented; no remaining hotspot from the original boundary audit is open in this artifact
 - Behavior type: no-behavior-change domain model refactor
 - Public behavior impact: none
 
@@ -42,6 +42,7 @@ helpers, providers, and adapters.
 | DMBH-SPEC-008 | Deployment context ownership is model-owned | Environment, Resource, and Destination aggregates belong to selected parent contexts | deployment context resolution or source-link relink validates project/environment/server/destination consistency | Callers ask aggregate-owned intention methods such as `belongsToProject(...)`, `belongsToEnvironment(...)`, `belongsToServer(...)`, and `canDeployToDestination(...)` instead of peeling ids from state for ownership decisions. |
 | DMBH-SPEC-009 | Domain binding redirect target eligibility is binding-owned | A managed canonical redirect source points to a served target binding in the same owner/path scope | route configuration validates an optional redirect target | `DomainBinding` answers whether it can serve as a canonical redirect target; application code does not inspect `redirectTo` state to decide target eligibility. |
 | DMBH-SPEC-010 | Certificate attempt worker selection is certificate-owned | A `certificate-requested` event references a certificate attempt that may be requested, issuing, issued, failed, retry-scheduled, or missing | the certificate worker decides whether to call the provider | `Certificate` resolves and claims the attempt for issuance through intention-revealing behavior; the event handler does not inspect attempt status primitives to skip terminal attempts or prepare provider input. |
+| DMBH-SPEC-011 | Organization membership and seat policy are organization-owned | An organization has a plan and members with user identities and roles | adding members or changing plans evaluates duplicate membership and seat limits | `OrganizationMember` answers member identity questions, `OrganizationPlan` answers seat-capacity questions, and `Organization` coordinates the member count against the plan without peeling child state through `toState()`. |
 
 ## Domain Ownership
 
@@ -63,6 +64,8 @@ helpers, providers, and adapters.
   - `DomainBinding` owns managed canonical redirect target/source eligibility.
   - `Certificate` owns certificate attempt selection, terminal retry/issuance guard decisions, and
     the issue context needed by the certificate worker.
+  - `Organization`, `OrganizationMember`, and `OrganizationPlan` own membership identity and seat
+    capacity checks inside the identity-governance consistency boundary.
 - Upstream/downstream contexts: no new context relationship is introduced.
 
 ## Public Surfaces
