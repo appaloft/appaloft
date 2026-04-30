@@ -1,0 +1,73 @@
+# Plan: Domain Model Behavior Hardening
+
+## Governing Sources
+
+- Domain model: `docs/DOMAIN_MODEL.md`
+- Repository rules: `AGENTS.md`
+- Decisions/ADRs:
+  - `docs/decisions/ADR-026-aggregate-mutation-command-boundary.md`
+  - Existing context-specific ADRs for each slice
+- Local specs:
+  - `docs/commands/deployments.create.md`
+  - `docs/queries/deployments.plan.md`
+  - `docs/workflows/resource-profile-lifecycle.md`
+  - `docs/workflows/routing-domain-and-tls.md`
+  - `docs/workflows/deployment-target-lifecycle.md`
+  - `docs/workflows/workload-framework-detection-and-planning.md`
+- Test matrices:
+  - `docs/testing/deployments.create-test-matrix.md`
+  - `docs/testing/deployment-plan-preview-test-matrix.md`
+  - `docs/testing/resource-profile-lifecycle-test-matrix.md`
+  - `docs/testing/routing-domain-and-tls-test-matrix.md`
+  - `docs/testing/deployment-target-lifecycle-test-matrix.md`
+  - `docs/testing/workload-framework-detection-and-planning-test-matrix.md`
+
+## Architecture Approach
+
+- Add intention-revealing behavior to the owning value object, entity, or aggregate root before
+  touching application callers.
+- Keep `toState()` as a boundary method for persistence, read models, contracts, adapter rendering,
+  fixtures, and assertions.
+- Avoid broad helpers that use primitive state to answer one object's own domain question.
+- Let application services load domain objects, coordinate repositories/ports, and call domain
+  behavior.
+- Keep provider and runtime adapters focused on external translation and execution details.
+
+## Slice Order
+
+| Slice | Owner | Goal | Main callers |
+| --- | --- | --- | --- |
+| 0 | DDD skill and source-of-truth docs | Lock in behavior-placement rules and no-ADR-needed rationale. | n/a |
+| 1 | `Resource`, `ResourceSourceBinding`, resource profile values | Move source descriptor, detector eligibility, internal-port requirement, and deployment request profile questions into Workload Delivery domain behavior. | `deployments.create`, `deployments.plan` |
+| 2 | `DeploymentTarget` edge proxy values | Move generated-route and bootstrap eligibility to Runtime Topology domain behavior. | default access resolver, server bootstrap, deployment plan/create |
+| 3 | `DomainBinding` and owned status/attempt values | Move readiness/certificate/route transition predicates and pending attempt selection into the aggregate. | domain binding commands and event handlers |
+| 4 | `EnvironmentConfigSet` and configuration entry/snapshot values | Move identity, precedence, and diff comparisons into configuration values. | environment/resource config and effective config |
+| 5 | `Deployment` and `DeploymentStatusValue` | Move execution-continuation and supersede status questions into Release Orchestration. | execution guard, deployment create, runtime adapters |
+| 6 | `Workload` and `RuntimeSpec` | Move workload/runtime compatibility questions into Workload Delivery model. | workload declaration |
+| 7 | Boundary audit | Confirm remaining `toState()` usage belongs to allowed serialization/read-model/persistence/adapter/test boundaries. | repository/read-model/adapter code |
+
+## Roadmap And Compatibility
+
+- Roadmap target: no public roadmap phase change; internal model-hardening work that supports the current pre-1.0 line.
+- Version target: not release-defining by itself.
+- Compatibility impact: none. Public behavior, API schema, CLI schema, AI tool manifest, event payloads, read models, and database schema remain unchanged.
+
+## Testing Strategy
+
+- Add or extend core domain unit tests before refactoring callers in each slice.
+- Reuse existing matrix ids for public behavior and add domain-hardening sub-rows only when the
+  matrix lacks low-level coverage for the refactor target.
+- Slice 1 test bindings:
+  - `DMBH-RES-001` in `packages/core/test/resource.test.ts`
+  - Existing behavioral rows: `DEP-CREATE-ADM-003`, `DEP-CREATE-ADM-013`,
+    `RES-PROFILE-NETWORK-003`, `RES-PROFILE-CONFIG-012`, `DPP-QUERY-001`
+- Related application tests after slice 1:
+  - `packages/application/test/create-deployment.test.ts`
+  - `packages/application/test/deployment-plan-preview.test.ts`
+
+## Risks And Migration Gaps
+
+- Some `toState()` usage is intentional boundary serialization. Do not remove it mechanically.
+- Some application query services build read DTOs and may keep boundary state reads.
+- Runtime adapters may serialize deployment state for provider execution; those are adapter boundaries, not domain-policy owners.
+- A `.codex/skills/domain-driven-develop/SKILL.md` project copy is absent; the current local skill lives under `.agents/skills/domain-driven-develop/SKILL.md`.

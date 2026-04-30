@@ -72,6 +72,7 @@ generic `resources.update`.
 | RES-PROFILE-NETWORK-004 | `resources.configure-network` | Command use case | `direct-port` requested without implemented placement guards. | Rejects before persistence. |
 | RES-PROFILE-NETWORK-005 | `resources.configure-network` | Command use case | Two reverse-proxy resources share the same `internalPort`. | Command accepts; no port-collision failure for reverse proxy. |
 | RES-PROFILE-NETWORK-006 | `resources.configure-network` | Command use case | Archived resource. | Returns `resource_archived`, no event. |
+| DMBH-RES-001 | `Resource` | Domain unit | Resource source/runtime/network questions are evaluated for deployment admission and plan preview. | Core domain tests prove `Resource` answers source descriptor availability, source detector enrichment eligibility, internal-port requirement, and profile-derived deployment request behavior without callers peeling primitive state. |
 | RES-PROFILE-ACCESS-001 | `resources.configure-access` | Command use case | Valid profile disables generated default access. | Persists `accessProfile.generatedAccessMode = "disabled"`, publishes `resource-access-configured`, and returns `ok({ id })`. |
 | RES-PROFILE-ACCESS-002 | `resources.configure-access` / `resources.show` | Command/query service | Disabled generated access is changed back to inherit. | Persists `generatedAccessMode = "inherit"` and `resources.show` returns the resource access profile. |
 | RES-PROFILE-ACCESS-003 | `resources.configure-access` / planned access / deployment route snapshot | Command and read model | Valid path prefix `/app` is supplied. | Planned generated access and future generated route snapshots use `/app`; historical snapshots remain unchanged. |
@@ -194,6 +195,11 @@ Automated coverage now exists for:
 - CLI dispatch coverage for source/runtime/network/access/health/config/archive/delete profile
   commands in `packages/adapters/cli/test/resource-command.test.ts` under `RES-PROFILE-ENTRY-003`,
   `RES-PROFILE-ENTRY-006`, and `RES-PROFILE-ENTRY-010`.
+
+`DMBH-RES-001` is covered in `packages/core/test/resource.test.ts` as part of
+[Domain Model Behavior Hardening](../specs/022-domain-model-behavior-hardening/spec.md). It is a
+no-behavior-change domain unit row that supports existing deployment admission and plan-preview
+rows rather than a new public capability.
 
 `RES-PROFILE-SOURCE-006` remains future event-consumer projection work. `RES-PROFILE-DELETE-009`
 event payload coverage is asserted through the successful delete command test.

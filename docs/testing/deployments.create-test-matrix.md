@@ -111,6 +111,7 @@ Then:
 | DEP-CREATE-ADM-011 | integration | Unsupported runtime target backend | Context ids resolve; selected target kind/provider key has no backend with required runtime capabilities | `err` before acceptance when safely detectable | `runtime_target_unsupported`, phase `runtime-target-resolution` | None for accepted request | No accepted deployment |
 | DEP-CREATE-ADM-012 | integration | Cluster target fields in command input | Input includes Kubernetes namespace, manifest, Helm values, Swarm stack, replica, ingress class, or pull-secret fields | `err` at command schema/API boundary | `validation_error`, phase `command-validation` | None | No deployment created; orchestrator configuration must come from target/profile specs |
 | DEP-CREATE-ADM-013 | integration | Inbound resource lacks network profile | Context ids resolve, but inbound resource has no internal listener port | `err` | `validation_error`, phase `resource-network-resolution` | None for accepted request | No accepted deployment |
+| DMBH-RES-DEP-001 | unit/integration | Resource-owned deployment admission predicates | A resource is evaluated for source binding, source inspection enrichment, and internal-port requirements before deployment admission | Existing `DEP-CREATE-ADM-003` and `DEP-CREATE-ADM-013` outcomes remain unchanged | Existing errors remain unchanged | No new events | Domain unit tests bind the Resource-owned predicates; application tests prove unchanged admission behavior |
 | DEP-CREATE-ADM-014 | integration | Resource network profile resolves reverse-proxy target | Resource has `networkProfile.internalPort` and reverse-proxy exposure | `ok({ id })` | None | `deployment-requested`; later async events | Deployment snapshot includes resolved network target without requiring host port |
 | DEP-CREATE-ADM-015 | integration | Two reverse-proxy resources share internal port | Two resources on the same server/destination both have `networkProfile.internalPort = 3000` and reverse-proxy exposure | Both deployments can be accepted when each latest attempt is terminal | None | Separate `deployment-requested` events | Runtime plan snapshots keep separate resource/deployment identity and do not require a unique host port |
 | DEP-CREATE-ADM-016 | integration | Generated default access route resolves | Resource reverse-proxy profile, server proxy ready, default access policy enabled | `ok({ id })` | None | `deployment-requested`; later route realization/progress | Deployment snapshot includes provider-neutral generated access route metadata; `ResourceAccessSummary` projects current generated URL |
@@ -269,6 +270,10 @@ Generated default access route tests are governed by
 Current focused coverage exists for provider-neutral hostname generation, route snapshot projection,
 and `ResourceAccessSummary` display inputs; broader API/Web/CLI and real Docker/SSH same-port route
 assertions remain follow-up.
+
+`DMBH-RES-DEP-001` is covered by `packages/core/test/resource.test.ts` for Resource-owned
+deployment admission predicates and by `packages/application/test/create-deployment.test.ts` for
+unchanged `deployments.create` admission behavior.
 
 Runtime adapter helper tests cover the command construction needed for resource-scoped Docker
 cleanup, explicit superseded-attempt cleanup targeting, loopback ephemeral health-check port

@@ -4,16 +4,26 @@ import {
   ConfigScopeValue,
   ConfigValueText,
   CreatedAt,
+  DisplayNameText,
   EnvironmentId,
   EnvironmentSnapshotId,
   GeneratedAt,
+  PortNumber,
   ProjectId,
   Resource,
+  ResourceExposureModeValue,
+  ResourceGeneratedAccessModeValue,
   ResourceId,
   ResourceKindValue,
   ResourceName,
+  ResourceNetworkProtocolValue,
   ResourceServiceKindValue,
   ResourceServiceName,
+  RoutePathPrefix,
+  RuntimePlanStrategyValue,
+  SourceKindValue,
+  SourceLocator,
+  StaticPublishDirectory,
   UpdatedAt,
   VariableExposureValue,
   VariableKindValue,
@@ -65,6 +75,85 @@ describe("Resource", () => {
     });
 
     expect(resource.isErr()).toBe(true);
+  });
+
+  test("[DMBH-RES-001] Resource answers deployment admission questions without caller-owned primitive checks", () => {
+    const resource = Resource.create({
+      ...baseInput,
+      kind: ResourceKindValue.rehydrate("static-site"),
+      sourceBinding: {
+        kind: SourceKindValue.rehydrate("local-folder"),
+        locator: SourceLocator.rehydrate("/workspace/site"),
+        displayName: DisplayNameText.rehydrate("site"),
+      },
+      runtimeProfile: {
+        strategy: RuntimePlanStrategyValue.rehydrate("static"),
+        publishDirectory: StaticPublishDirectory.rehydrate("/dist"),
+      },
+      networkProfile: {
+        internalPort: PortNumber.rehydrate(80),
+        upstreamProtocol: ResourceNetworkProtocolValue.rehydrate("http"),
+        exposureMode: ResourceExposureModeValue.rehydrate("reverse-proxy"),
+      },
+      accessProfile: {
+        generatedAccessMode: ResourceGeneratedAccessModeValue.rehydrate("inherit"),
+        pathPrefix: RoutePathPrefix.rehydrate("/docs"),
+      },
+    })._unsafeUnwrap();
+
+    expect(resource.requiresInternalPort()).toBe(true);
+    expect(resource.shouldEnrichSourceFromDetector()).toBe(true);
+
+    const source = resource.createDeploymentSourceDescriptor();
+    expect(source.isOk()).toBe(true);
+    if (source.isOk()) {
+      expect(source.value.source.kind.value).toBe("local-folder");
+      expect(source.value.reasoning).toEqual(["Resource source binding kind: local-folder"]);
+    }
+
+    const profile = resource.resolveDeploymentProfile({ operationName: "deployments.create" });
+    expect(profile.isOk()).toBe(true);
+    if (profile.isOk()) {
+      expect(profile.value).toMatchObject({
+        method: "static",
+        publishDirectory: "/dist",
+        port: 80,
+        exposureMode: "reverse-proxy",
+        upstreamProtocol: "http",
+        accessContext: {
+          projectId: "prj_demo",
+          environmentId: "env_demo",
+          resourceId: "res_demo",
+          resourceSlug: "app-stack",
+          exposureMode: "reverse-proxy",
+          upstreamProtocol: "http",
+          routePurpose: "default-resource-access",
+          pathPrefix: "/docs",
+        },
+      });
+    }
+  });
+
+  test("[DMBH-RES-001] Resource rejects missing source binding and missing internal port through domain behavior", () => {
+    const resource = Resource.create({
+      ...baseInput,
+      kind: ResourceKindValue.rehydrate("application"),
+    })._unsafeUnwrap();
+
+    const source = resource.createDeploymentSourceDescriptor();
+    expect(source.isErr()).toBe(true);
+    if (source.isErr()) {
+      expect(source.error.details?.phase).toBe("resource-source-resolution");
+      expect(source.error.details?.resourceId).toBe("res_demo");
+    }
+
+    const profile = resource.resolveDeploymentProfile({ queryName: "deployments.plan" });
+    expect(profile.isErr()).toBe(true);
+    if (profile.isErr()) {
+      expect(profile.error.details?.queryName).toBe("deployments.plan");
+      expect(profile.error.details?.phase).toBe("resource-network-resolution");
+      expect(profile.error.details?.resourceKind).toBe("application");
+    }
   });
 
   test("[RES-PROFILE-CONFIG-012] materializes effective environment snapshot with resource override precedence", () => {
