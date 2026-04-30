@@ -46,6 +46,7 @@ helpers, providers, and adapters.
 | DMBH-SPEC-012 | Domain binding ownership confirmation selection is binding-owned | A domain binding has verification attempts and DNS observation targets | ownership confirmation selects an explicit or latest pending manual attempt and decides idempotent already-bound outcomes | `DomainBinding` prepares ownership confirmation intent and DNS verification context; the use case coordinates DNS, repository, and events without branching on verification attempt internals. |
 | DMBH-SPEC-013 | Resource service cardinality is resource-owned | A resource kind and declared services are supplied for creation | resource admission validates whether multiple services are allowed | `ResourceKindValue` answers whether multiple services are allowed and `Resource` owns the admission error; the create-resource use case does not duplicate resource-kind branching. |
 | DMBH-SPEC-014 | Resource internal-port requirement is VO-owned | A resource kind and service kinds describe inbound runtime traffic | deployment admission asks whether the resource requires an internal listener port | `ResourceKindValue` and `ResourceServiceKindValue` answer inbound-port questions; `Resource.requiresInternalPort()` composes those methods without raw literal branching. |
+| DMBH-SPEC-015 | Domain binding lifecycle gates are status-owned | Domain binding status controls ready, route-failure, and verification-retry transitions | the aggregate handles ready marking, route failure, or verification retry | `DomainBindingStatusValue` answers lifecycle gate predicates; aggregate methods compose those predicates instead of repeating status literal sets. |
 
 ## Domain Ownership
 
@@ -72,6 +73,8 @@ helpers, providers, and adapters.
   - `DomainBinding` owns ownership-confirmation attempt selection and readiness-to-confirm rules.
   - `Resource` and `ResourceKindValue` own service cardinality admission.
   - `ResourceKindValue` and `ResourceServiceKindValue` own internal-port requirement predicates.
+  - `DomainBindingStatusValue` owns binding lifecycle gate predicates used by binding aggregate
+    transitions.
 - Upstream/downstream contexts: no new context relationship is introduced.
 
 ## Public Surfaces

@@ -172,6 +172,17 @@
   kind literals.
 - [x] Run `bun test packages/core/test/resource.test.ts`.
 
+## Continuous D: Domain Binding Lifecycle Gate Behavior
+
+- [x] Extend DomainBinding lifecycle gate behavior tests at `packages/core/test/domain-binding.test.ts`.
+- [x] Add `DomainBindingStatusValue` behavior for ready marking, route failure recording,
+  not-ready duplicate checks, and verification retry eligibility.
+- [x] Refactor `DomainBinding` lifecycle methods to call status value methods instead of repeating
+  raw status literal sets.
+- [x] Run `bun test packages/core/test/domain-binding.test.ts`.
+- [x] Run `bun test packages/application/test/confirm-domain-binding-ownership.test.ts`.
+- [x] Run `bun test packages/application/test/domain-binding-lifecycle.test.ts`.
+
 ## Verification
 
 - [x] Run affected core tests for each slice.

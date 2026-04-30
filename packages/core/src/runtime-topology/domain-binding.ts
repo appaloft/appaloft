@@ -132,6 +132,23 @@ export class DomainBindingStatusValue extends ScalarValueObject<DomainBindingSta
     );
   }
 
+  allowsReadyMarking(): boolean {
+    return this.allowsRouteReadiness();
+  }
+
+  allowsRouteFailureRecording(): boolean {
+    return (
+      this.value === "bound" ||
+      this.value === "certificate_pending" ||
+      this.value === "ready" ||
+      this.value === "not_ready"
+    );
+  }
+
+  allowsVerificationRetry(): boolean {
+    return this.value === "pending_verification" || this.value === "not_ready";
+  }
+
   isActive(): boolean {
     return this.value !== "failed" && this.value !== "deleted";
   }
@@ -146,6 +163,10 @@ export class DomainBindingStatusValue extends ScalarValueObject<DomainBindingSta
 
   isReady(): boolean {
     return this.value === "ready";
+  }
+
+  isNotReady(): boolean {
+    return this.value === "not_ready";
   }
 
   isPendingVerification(): boolean {
@@ -861,15 +882,11 @@ export class DomainBinding extends AggregateRoot<DomainBindingState> {
     correlationId?: string;
     causationId?: string;
   }): Result<void> {
-    if (this.state.status.value === "ready") {
+    if (this.state.status.isReady()) {
       return ok(undefined);
     }
 
-    if (
-      this.state.status.value !== "bound" &&
-      this.state.status.value !== "certificate_pending" &&
-      this.state.status.value !== "not_ready"
-    ) {
+    if (!this.state.status.allowsReadyMarking()) {
       return err(
         domainError.invariant("Domain binding cannot be marked ready from its current state", {
           phase: "domain-ready",
@@ -912,18 +929,13 @@ export class DomainBinding extends AggregateRoot<DomainBindingState> {
     correlationId?: string;
     causationId?: string;
   }): Result<void> {
-    if (
-      this.state.status.value !== "bound" &&
-      this.state.status.value !== "certificate_pending" &&
-      this.state.status.value !== "ready" &&
-      this.state.status.value !== "not_ready"
-    ) {
+    if (!this.state.status.allowsRouteFailureRecording()) {
       return ok(undefined);
     }
 
     const existingFailure = this.state.routeFailure;
     if (
-      this.state.status.value === "not_ready" &&
+      this.state.status.isNotReady() &&
       existingFailure?.deploymentId.equals(input.deploymentId) &&
       existingFailure.failurePhase.equals(input.failurePhase)
     ) {
@@ -1048,10 +1060,7 @@ export class DomainBinding extends AggregateRoot<DomainBindingState> {
       return err(domainError.notFound("DomainBinding", this.state.id.value));
     }
 
-    if (
-      this.state.status.value !== "pending_verification" &&
-      this.state.status.value !== "not_ready"
-    ) {
+    if (!this.state.status.allowsVerificationRetry()) {
       return err(
         domainError.domainVerificationNotPending(
           "Domain binding verification can only be retried while ownership or route readiness is not ready",

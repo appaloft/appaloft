@@ -180,6 +180,13 @@ describe("DomainBinding", () => {
       certificatePolicy: "disabled",
     });
     expect(recoveredRoute.canBecomeReadyAfterRouteRealization()).toBe(true);
+
+    expect(DomainBindingStatusValue.rehydrate("bound").allowsReadyMarking()).toBe(true);
+    expect(DomainBindingStatusValue.rehydrate("ready").allowsRouteFailureRecording()).toBe(true);
+    expect(DomainBindingStatusValue.rehydrate("not_ready").allowsVerificationRetry()).toBe(true);
+    expect(DomainBindingStatusValue.rehydrate("pending_verification").allowsReadyMarking()).toBe(
+      false,
+    );
   });
 
   test("[DMBH-DOMAIN-002] answers canonical redirect target eligibility", () => {
