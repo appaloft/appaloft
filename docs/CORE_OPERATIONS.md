@@ -469,6 +469,12 @@ Current boundary:
   tier, Docker/OCI artifact intent, sanitized command specs, network, health, access summary,
   warnings, and unsupported reasons, and stops before deployment attempt creation or runtime
   execution.
+- `deployments.plan` exposes the same runtime plan resolution contract that `deployments.create`
+  uses before execution. Unsupported frameworks, unsupported runtime families, ambiguous framework
+  or build-tool evidence, missing build/start/internal-port/source-root/artifact output,
+  unsupported runtime target, and unsupported container-native profile cases return a blocked
+  preview with stable phase, reason code, safe evidence, fix path, override path, and affected
+  resource profile field when applicable.
 - buildpack-style detection may appear in `deployments.plan` only as adapter-owned accelerator
   evidence, support tier, builder policy, limitations, and fix paths. Explicit framework planners,
   explicit custom commands, and explicit container-native profiles take precedence, and buildpack

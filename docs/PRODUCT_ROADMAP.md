@@ -528,9 +528,14 @@ Required:
 - [x] Add framework-family matrix rows for detection, base image policy, install/build/start/package
   commands, artifact outputs, internal port behavior, unsupported evidence, and Web/CLI draft
   parity.
-- [ ] Keep buildpack-style detection as an adapter-owned accelerator, not the only way Appaloft
+- [x] Keep buildpack-style detection as an adapter-owned accelerator, not the only way Appaloft
   supports common frameworks. Spec Round artifact:
   [docs/specs/017-buildpack-accelerator-contract-and-preview-guardrails](./specs/017-buildpack-accelerator-contract-and-preview-guardrails/spec.md).
+- [x] Add a shared runtime plan resolution unsupported/override contract so unsupported,
+  ambiguous, and missing planner evidence returns a blocked preview with phase, reason code,
+  evidence, fix path, override path, and affected profile field before execution. Spec Round
+  artifact:
+  [docs/specs/018-runtime-plan-resolution-unsupported-override-contract](./specs/018-runtime-plan-resolution-unsupported-override-contract/spec.md).
 
 Exit criteria:
 
@@ -540,7 +545,7 @@ Exit criteria:
 - [x] Opt-in real Docker framework fixture smoke covers a representative local slice:
   Vite or Next static export plus Angular, React, or SvelteKit static, Next SSR or Remix plus a
   Node HTTP framework, and FastAPI plus Django or Flask when dependency installation is available.
-- [ ] Unsupported frameworks fail with structured `validation_error` in `runtime-plan-resolution`
+- [x] Unsupported frameworks fail with structured `validation_error` in `runtime-plan-resolution`
   unless explicit custom commands make a Docker/OCI image plan possible.
 - [x] Web and CLI can collect the same draft fields for source base directory, publish directory,
   Dockerfile path, Compose path, build target, install/build/start commands, and internal port.
