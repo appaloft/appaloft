@@ -92,6 +92,10 @@ test expectations in the same change.
 | `fastapi-uv` | `WF-PLAN-CAT-009` | `fastapi 0.115.8`, `uvicorn 0.34.0`, `uv` marker | `python`, `fastapi`, `uv`, `serverful-http` | `fastapi`, workspace image, uv install/start defaults |
 | `django-pip` | `WF-PLAN-CAT-010` | `Django 5.1.7`, `pip` requirements | `python`, `django`, `pip`, `serverful-http` | `django`, workspace image, pip install/start default |
 | `flask-pip` | `WF-PLAN-CAT-010` | `Flask 3.1.0`, `pip` requirements | `python`, `flask`, `pip`, `serverful-http` | `flask`, workspace image, pip install/start default |
+| `generic-asgi-uv` | `WF-PLAN-PY-004` | `uvicorn 0.34.0`, `uv` marker | `python`, generic ASGI evidence, `uv`, `serverful-http` | `generic-asgi` or generic `python`, workspace image, deterministic ASGI start default |
+| `generic-wsgi-pip` | `WF-PLAN-PY-005` | `gunicorn 23.0.0`, pip requirements | `python`, generic WSGI evidence, `pip`, `serverful-http` | `generic-wsgi` or generic `python`, workspace image, deterministic WSGI start default |
+| `python-poetry-web` | `WF-PLAN-PY-006` | Poetry metadata/lock marker plus supported web evidence | `python`, detected framework or ASGI/WSGI evidence, `poetry`, `serverful-http` | workspace image, Poetry install/start commands |
+| `python-explicit-start` | `WF-PLAN-PY-007` | Python package evidence plus explicit resource runtime start command | `python`, no unsafe framework selection required, selected package tool, `serverful-http` | generic `python` or custom fallback workspace image using explicit commands |
 
 ## Detection Evidence Matrix
 
@@ -154,6 +158,28 @@ remain tracked by `WF-PLAN-SMOKE-005` and `WF-PLAN-SMOKE-006`.
 | WF-PLAN-JS-012 | integration | Missing production start command or static output | JS/TS evidence without safe production start or static output is rejected with `validation_error` in `runtime-plan-resolution`; explicit custom commands may produce a containerizable image plan. |
 | WF-PLAN-JS-013 | integration | Internal port behavior | Static JS/TS planners default to port 80; serverful/SSR planners use the resource network profile port and do not add deployment-owned `port` input. |
 
+## Python Tested Catalog Closure Matrix
+
+These rows close the Phase 5 Python tested catalog at the headless Docker/OCI readiness layer. They
+do not claim full fixture-by-fixture real Docker or SSH execution; those remain tracked by
+`WF-PLAN-SMOKE-005` and `WF-PLAN-SMOKE-006`.
+
+| Test ID | Preferred automation | Case | Expected result |
+| --- | --- | --- | --- |
+| WF-PLAN-PY-001 | integration | FastAPI with `uv` | `fastapi-uv` records FastAPI dependency, `uv` package tool evidence, ASGI app target evidence, `fastapi` planner metadata, Python base image policy, install/start command specs, workspace image artifact, and resource-owned internal port. |
+| WF-PLAN-PY-002 | integration | Django with pip/requirements | `django-pip` records Django dependency, `manage.py`, WSGI/ASGI module evidence when present, pip/requirements install command, `django` planner metadata, workspace image artifact, and resource-owned internal port. |
+| WF-PLAN-PY-003 | integration | Flask with pip/requirements | `flask-pip` records Flask dependency, app module evidence when present, pip/requirements install command, `flask` planner metadata, workspace image artifact, and resource-owned internal port. |
+| WF-PLAN-PY-004 | integration | Generic deterministic ASGI app | A generic ASGI fixture records Python package tool evidence plus one safe ASGI `module:app` target, selects a generic ASGI/Python planner path, emits Uvicorn start command specs, and avoids framework-specific deployment fields. |
+| WF-PLAN-PY-005 | integration | Generic deterministic WSGI app | A generic WSGI fixture records Python package tool evidence plus one safe WSGI `module:app` target, selects a generic WSGI/Python planner path, emits Gunicorn or equivalent WSGI start command specs, and avoids framework-specific deployment fields. |
+| WF-PLAN-PY-006 | integration | Poetry project | Poetry metadata or `poetry.lock` selects Poetry install/start command rendering without also selecting pip/uv installs unless explicitly owned by the planner. |
+| WF-PLAN-PY-007 | integration | Explicit start-command fallback | Python source with missing or unsupported framework evidence plans only when explicit resource runtime profile install/build/start commands make a Docker/OCI image plan possible. |
+| WF-PLAN-PY-008 | unit/integration | Python package tool precedence | Explicit tool wins, then `uv.lock`, Poetry metadata/`poetry.lock`, PEP 621 `pyproject.toml`, `requirements.txt`, and generic pip fallback; conflicting evidence is diagnostic unless a selected planner requires one unambiguous tool. |
+| WF-PLAN-PY-009 | integration | Missing ASGI/WSGI app target | FastAPI, Django, Flask, generic ASGI, or generic WSGI evidence without a deterministic app target is blocked with `missing-asgi-app`, `missing-wsgi-app`, or `missing-python-app-target` before deployment execution unless explicit start command is supplied. |
+| WF-PLAN-PY-010 | integration | Ambiguous ASGI/WSGI app targets | Multiple plausible Python web app targets are blocked with `ambiguous-python-app-target` unless source base directory, app target, or explicit start command resolves the ambiguity. |
+| WF-PLAN-PY-011 | integration | Missing production start command | Generic Python evidence without safe ASGI/WSGI target and without explicit start command is rejected with `validation_error` in `runtime-plan-resolution`; explicit fallback commands may produce a containerizable image plan. |
+| WF-PLAN-PY-012 | integration | Internal port behavior | Python serverful planners use the resource network profile port and do not add deployment-owned `port` input; missing required port is blocked in `resource-network-resolution` when no deterministic persisted profile value exists. |
+| WF-PLAN-PY-013 | contract/integration | Preview parity | `deployments.plan/v1` exposes ready and blocked Python planner output with source evidence, planner key/support tier, artifact kind, command specs, network, health, warnings, unsupported reasons, and next actions without creating a deployment attempt. |
+
 ## Boundary Matrix
 
 | Test ID | Preferred automation | Case | Expected result |
@@ -215,14 +241,17 @@ adding framework-specific deployment command fields.
 JavaScript/TypeScript tested catalog closure rows `WF-PLAN-JS-001` through `WF-PLAN-JS-013` bind
 the current Next.js, Remix, Nuxt generate, SvelteKit static/ambiguous, Astro static, SPA static,
 Node HTTP framework, generic package-script, missing evidence, and internal-port behavior to
-executable fixture tests.
+executable fixture tests. Python tested catalog closure rows `WF-PLAN-PY-001` through
+`WF-PLAN-PY-013` bind the Python ASGI/WSGI hardening round to executable fixture and contract
+tests.
 Fixed-version framework fixture tests now cover detector evidence for the table above, enforce exact
 manifest/requirements versions, and feed supported fixtures through runtime planning without
 installing dependencies or executing framework CLIs. Planner fixture coverage includes Next.js SSR,
 Next.js standalone output, Next.js static export, Vite, React SPA static, Vue SPA static, Svelte SPA
 static, Solid SPA static, SvelteKit adapter-static, Nuxt generate, Astro static, Remix, Express,
-Fastify, NestJS, Hono, Koa, generic Node package scripts, FastAPI, Django, and Flask, including
-Angular `angular.json` output-path planning.
+Fastify, NestJS, Hono, Koa, generic Node package scripts, FastAPI, Django, Flask, deterministic
+generic ASGI, deterministic generic WSGI, Poetry Python web projects, and explicit Python start
+fallbacks, including Angular `angular.json` output-path planning.
 `WF-PLAN-BOUND-001` has command-schema coverage for rejecting framework/package/base-image/buildpack
 deployment fields. `WF-PLAN-ENTRY-005` and `WF-PLAN-ENTRY-006` govern the current Web/CLI/repository
 config draft parity slice for JavaScript/TypeScript/Python support. This does not yet complete
@@ -233,7 +262,9 @@ full browser-level Web/CLI entry parity for every catalog fixture.
 JavaScript/TypeScript/Python fixture catalog through headless Docker/OCI execution readiness. They
 prove the resource source/runtime/network profile can resolve to generated Dockerfile evidence,
 image artifact intent, docker-container execution, internal HTTP verification, and typed Docker
-command rendering without adding framework-specific deployment fields. Full real Docker/SSH
+command rendering without adding framework-specific deployment fields. Python coverage includes
+FastAPI with `uv`, Django and Flask with pip/requirements, deterministic generic ASGI/WSGI, Poetry,
+explicit start fallback, missing ASGI app, and ambiguous app-target rejection. Full real Docker/SSH
 execution for every catalog fixture remains a migration gap until opt-in environment coverage is
 broadened.
 
