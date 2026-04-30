@@ -44,6 +44,7 @@ helpers, providers, and adapters.
 | DMBH-SPEC-010 | Certificate attempt worker selection is certificate-owned | A `certificate-requested` event references a certificate attempt that may be requested, issuing, issued, failed, retry-scheduled, or missing | the certificate worker decides whether to call the provider | `Certificate` resolves and claims the attempt for issuance through intention-revealing behavior; the event handler does not inspect attempt status primitives to skip terminal attempts or prepare provider input. |
 | DMBH-SPEC-011 | Organization membership and seat policy are organization-owned | An organization has a plan and members with user identities and roles | adding members or changing plans evaluates duplicate membership and seat limits | `OrganizationMember` answers member identity questions, `OrganizationPlan` answers seat-capacity questions, and `Organization` coordinates the member count against the plan without peeling child state through `toState()`. |
 | DMBH-SPEC-012 | Domain binding ownership confirmation selection is binding-owned | A domain binding has verification attempts and DNS observation targets | ownership confirmation selects an explicit or latest pending manual attempt and decides idempotent already-bound outcomes | `DomainBinding` prepares ownership confirmation intent and DNS verification context; the use case coordinates DNS, repository, and events without branching on verification attempt internals. |
+| DMBH-SPEC-013 | Resource service cardinality is resource-owned | A resource kind and declared services are supplied for creation | resource admission validates whether multiple services are allowed | `ResourceKindValue` answers whether multiple services are allowed and `Resource` owns the admission error; the create-resource use case does not duplicate resource-kind branching. |
 
 ## Domain Ownership
 
@@ -68,6 +69,7 @@ helpers, providers, and adapters.
   - `Organization`, `OrganizationMember`, and `OrganizationPlan` own membership identity and seat
     capacity checks inside the identity-governance consistency boundary.
   - `DomainBinding` owns ownership-confirmation attempt selection and readiness-to-confirm rules.
+  - `Resource` and `ResourceKindValue` own service cardinality admission.
 - Upstream/downstream contexts: no new context relationship is introduced.
 
 ## Public Surfaces

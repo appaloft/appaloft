@@ -152,6 +152,17 @@
 - [x] Run `bun test packages/core/test/domain-binding.test.ts`.
 - [x] Run `bun test packages/application/test/confirm-domain-binding-ownership.test.ts`.
 
+## Continuous B: Resource Service Cardinality Behavior
+
+- [x] Extend Resource service cardinality behavior tests at `packages/core/test/resource.test.ts`.
+- [x] Add `ResourceKindValue` behavior for whether a resource kind can declare multiple services.
+- [x] Refactor `Resource.create` to own the multi-service admission error with current
+  `resources.create` error details.
+- [x] Refactor `create-resource.use-case.ts` to remove duplicated resource-kind/service-count
+  branching.
+- [x] Run `bun test packages/core/test/resource.test.ts`.
+- [x] Run `bun test packages/application/test/create-resource.test.ts`.
+
 ## Verification
 
 - [x] Run affected core tests for each slice.

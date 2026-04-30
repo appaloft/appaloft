@@ -649,7 +649,8 @@ Meaning:
 
 Rules:
 - names are unique within a project environment
-- compose-stack resources may contain multiple named services
+- compose-stack resources may contain multiple named services; `ResourceKindValue` answers whether
+  multiple services are allowed and `Resource` owns the admission error
 - a resource may point at a default destination
 - resources answer whether they belong to a selected project/environment context and whether a
   selected destination is compatible with their default destination placement

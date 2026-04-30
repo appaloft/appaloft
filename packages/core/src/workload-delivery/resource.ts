@@ -536,7 +536,7 @@ function validateResourceNetworkProfile(input: {
   }
 
   if (
-    input.kind.value === "compose-stack" &&
+    input.kind.allowsMultipleServices() &&
     input.services.length > 1 &&
     !input.networkProfile.targetServiceName
   ) {
@@ -746,9 +746,13 @@ export class Resource extends AggregateRoot<ResourceState> {
       }
       const normalizedSourceBinding = sourceBinding.value?.toState();
 
-      if (input.kind.value !== "compose-stack" && services.length > 1) {
+      if (!input.kind.allowsMultipleServices() && services.length > 1) {
         return err(
-          domainError.validation("Only compose-stack resources can declare multiple services"),
+          domainError.invariant("Only compose-stack resources can declare multiple services", {
+            phase: "resource-admission",
+            kind: input.kind.value,
+            serviceCount: services.length,
+          }),
         );
       }
 

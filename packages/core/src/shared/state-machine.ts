@@ -988,6 +988,14 @@ export class ResourceKindValue extends EnumValueObject<
   ): ResourceKindValue {
     return new ResourceKindValue(value);
   }
+
+  isComposeStack(): boolean {
+    return this.value === "compose-stack";
+  }
+
+  allowsMultipleServices(): boolean {
+    return this.isComposeStack();
+  }
 }
 
 const resourceServiceKindBrand: unique symbol = Symbol("ResourceServiceKindValue");
