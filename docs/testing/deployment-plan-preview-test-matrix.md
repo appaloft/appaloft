@@ -76,6 +76,17 @@ Test names must include the matrix id they prove.
 | DPP-PLAN-FAIL-005 | contract/integration | Health and environment guardrails | Preview includes planner/buildpack health hints and variable evidence | Planner/buildpack does not claim app-level health without explicit resource health policy; secret values are masked and build-time `PUBLIC_`/`VITE_` rules are visible. |
 | DPP-PLAN-FAIL-006 | contract / future | CLI/API/Web/future MCP metadata parity | Each surface consumes deployment planning output | CLI JSON, API/oRPC, Web typed client, and future MCP/tool metadata preserve the same blocked reason, fix path, override path, and affected profile field shape. |
 
+## Zero-to-SSH Preview Matrix
+
+These rows bind the supported catalog acceptance harness to `deployments.plan/v1`.
+
+| Test ID | Preferred automation | Case | Expected result |
+| --- | --- | --- | --- |
+| ZSSH-PREVIEW-001 | contract/integration | Ready preview for every supported fixture | Every Phase 5 supported descriptor returns `readiness.status = ready` with source evidence, planner key/support tier, artifact intent, command specs, network, health, warnings, next action, and no deployment id or runtime execution. |
+| ZSSH-PREVIEW-002 | contract/integration | Blocked controls reuse 018 | Unsupported, ambiguous, and missing evidence controls return `readiness.status = blocked` with shared 018 phase, reason code, safe evidence, fix path, override path, and affected profile field where applicable. |
+| ZSSH-PREVIEW-003 | contract/integration | Static default port preview | Static descriptors expose static-server `internalPort = 80`, health probe metadata, and no user port requirement. |
+| ZSSH-PREVIEW-004 | contract/integration | Buildpack remains non-winning | First-class, explicit custom, Dockerfile, Compose, and prebuilt-image descriptors keep their winning support tier and artifact intent when buildpack evidence is also present. |
+
 ## Current Implementation Notes And Migration Gaps
 
 `deployments.plan` is active. Executable operation/catalog/API/Web/CLI coverage exists for the
@@ -94,3 +105,9 @@ MCP/tool surfaces are active.
 runtime-plan-resolution unsupported/override contract to `deployments.plan/v1`. They are intended
 to be proven with hermetic contract fixtures and do not require real Docker, buildpack lifecycle,
 SSH, package installation, or framework CLI execution.
+
+`ZSSH-PREVIEW-001` through `ZSSH-PREVIEW-004` are covered by the zero-to-SSH supported catalog
+acceptance harness in
+`packages/adapters/runtime/test/zero-to-ssh-supported-catalog-acceptance.test.ts`. The harness
+constructs ready preview payloads and blocked controls for the Phase 5 supported catalog while
+keeping `deployments.plan` read-only and side-effect free.

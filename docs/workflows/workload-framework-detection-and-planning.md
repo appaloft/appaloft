@@ -333,6 +333,39 @@ Fixture smoke coverage must be table-driven by fixture descriptors and planner d
 a new framework should mean adding detection/planner data and a fixture expectation, not adding a
 new public command, framework-specific deployment input field, or transport-only branch.
 
+### Zero-to-SSH Supported Catalog Acceptance Harness
+
+The Phase 5 supported catalog exit criterion is governed by
+[Zero-to-SSH Supported Catalog Acceptance Harness](../specs/019-zero-to-ssh-supported-catalog-acceptance-harness/spec.md).
+
+The harness is the reusable acceptance contract for every supported fixture descriptor. A supported
+catalog entry is not closed until the descriptor proves:
+
+```text
+resource source/runtime/network/health profile draft
+  -> deployments.plan/v1 ready preview
+  -> ids-only deployments.create admission path
+  -> runtime target backend selected before acceptance
+  -> Docker/OCI artifact intent parity across preview and create planning
+  -> fake/local/generic-SSH render/apply/verify/log capability contract
+  -> readiness, health, runtime log, and access/proxy observation expectations
+```
+
+Default automation must stay hermetic. It may use fake/local/generic-SSH target descriptors,
+runtime target backend registry selection, generated Dockerfile/Compose command rendering, and
+normalized observation expectations. Real local Docker and real SSH fixture smoke are stronger
+confidence layers, but they must be opt-in and must not become required dependencies for the
+default test suite.
+
+The required Phase 5 harness catalog is: Next.js, Vite static SPA, Astro static, Nuxt generate,
+SvelteKit static, Remix, FastAPI, Django, Flask, generic Node, generic Python, generic Java,
+Dockerfile, Docker Compose, prebuilt image, and explicit custom commands.
+
+Unsupported, missing, and ambiguous controls must reuse the shared blocked preview contract from
+[Runtime Plan Resolution Unsupported/Override Contract](../specs/018-runtime-plan-resolution-unsupported-override-contract/spec.md).
+They must not be converted into image-build, runtime apply, health, log, or access failures when
+the problem is knowable during planning.
+
 ### Port And Readiness Rules
 
 `ResourceNetworkProfile.internalPort` is the durable resource endpoint. Framework default ports are

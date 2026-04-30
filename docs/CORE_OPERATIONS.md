@@ -475,6 +475,11 @@ Current boundary:
   unsupported runtime target, and unsupported container-native profile cases return a blocked
   preview with stable phase, reason code, safe evidence, fix path, override path, and affected
   resource profile field when applicable.
+- the Phase 5 supported catalog is closed by a zero-to-SSH acceptance harness over the existing
+  operation set. The harness proves supported fixture descriptors can move from shared resource
+  profile draft through `deployments.plan/v1`, ids-only `deployments.create`, runtime target
+  backend selection, Docker/OCI artifact intent, and normalized readiness/health/log/access
+  observation without adding a new operation or deployment command fields.
 - buildpack-style detection may appear in `deployments.plan` only as adapter-owned accelerator
   evidence, support tier, builder policy, limitations, and fix paths. Explicit framework planners,
   explicit custom commands, and explicit container-native profiles take precedence, and buildpack

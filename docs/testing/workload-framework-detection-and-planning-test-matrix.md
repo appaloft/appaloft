@@ -277,6 +277,44 @@ asserts the equivalent Dockerfile/build/run/verification evidence without execut
 | WF-PLAN-SMOKE-005 | opt-in local Docker e2e | Representative real local Docker fixture slice | Vite or Next static export plus Angular SPA, React SPA, or SvelteKit static; Next SSR or Remix plus one Node HTTP framework; FastAPI plus Django or Flask when dependency installation is available, otherwise Django plus Flask with the FastAPI dependency gap recorded | The same resource source/runtime/network profile draft used by Quick Deploy is persisted before ids-only `deployments.create` or equivalent shell workflow; Docker really builds an image, starts a container, resolves the published internal HTTP verification URL, records runtime metadata/logs, and exposes typed Docker build/run command evidence without framework/base-image/buildpack deployment fields. |
 | WF-PLAN-SMOKE-006 | opt-in SSH e2e or contract with migration gap | Representative generic-SSH fixture slice | The same representative fixture descriptors used by `WF-PLAN-SMOKE-005`, executed through generic-SSH when a real target is configured | The harness selects the generic-SSH backend from the same resource profile and proves remote Docker build/run/verification when enabled. Without a configured SSH target, contract coverage may prove backend selection, but real SSH fixture execution remains an explicit migration gap. |
 
+## Zero-to-SSH Supported Catalog Acceptance Matrix
+
+These rows govern the Phase 5 supported catalog exit criterion. They sit above family-specific
+planner rows and below opt-in real smoke: default automation is hermetic and table-driven, while
+real Docker and real SSH remain explicit opt-in confidence layers.
+
+| Test ID | Preferred automation | Catalog entry | Expected result |
+| --- | --- | --- | --- |
+| ZSSH-CATALOG-001 | integration | Next.js | Supported Next.js fixture resolves from resource profile draft to ready preview, ids-only create path, single-server target backend, Docker/OCI image intent, internal HTTP readiness, runtime log capability, and access/proxy observation expectation. |
+| ZSSH-CATALOG-002 | integration | Vite static SPA | Static SPA fixture uses static-server artifact intent and `internalPort = 80` without deployment-owned port input. |
+| ZSSH-CATALOG-003 | integration | Astro static | Astro static fixture uses static-server artifact intent, publish directory evidence, and normalized readiness/log/access observation. |
+| ZSSH-CATALOG-004 | integration | Nuxt generate | Nuxt generate fixture packages `.output/public` as static-server artifact and keeps buildpack evidence non-winning if present. |
+| ZSSH-CATALOG-005 | integration | SvelteKit static | Explicit static SvelteKit fixture uses adapter-static evidence and static-server `internalPort = 80`; ambiguous SvelteKit remains a blocked control case. |
+| ZSSH-CATALOG-006 | integration | Remix | Remix fixture resolves an SSR/serverful Docker/OCI image with explicit or deterministic internal port before admission. |
+| ZSSH-CATALOG-007 | integration | FastAPI | FastAPI fixture resolves Python tooling, ASGI start command, Docker/OCI image intent, and internal HTTP verification without real dependency installation by default. |
+| ZSSH-CATALOG-008 | integration | Django | Django fixture resolves WSGI/ASGI evidence, command specs, Docker/OCI image intent, and resource-owned port behavior. |
+| ZSSH-CATALOG-009 | integration | Flask | Flask fixture resolves app target evidence, command specs, Docker/OCI image intent, and resource-owned port behavior. |
+| ZSSH-CATALOG-010 | integration | Generic Node | Generic Node fixture resolves production package scripts to Docker/OCI image intent without framework-specific deployment fields. |
+| ZSSH-CATALOG-011 | integration | Generic Python | Generic Python or explicit-command fixture resolves only when app target or explicit commands make a Docker/OCI image plan possible. |
+| ZSSH-CATALOG-012 | integration | Generic Java | Generic deterministic jar or explicit-command JVM fixture resolves to Java Docker/OCI image intent with resource-owned internal port. |
+| ZSSH-CATALOG-013 | integration | Dockerfile | Container-native Dockerfile profile wins over framework/buildpack evidence and resolves a build-image artifact intent. |
+| ZSSH-CATALOG-014 | integration | Docker Compose | Container-native Compose profile wins over framework/buildpack evidence and resolves a Compose project intent with target service behavior. |
+| ZSSH-CATALOG-015 | integration | Prebuilt image | Prebuilt image profile resolves image artifact intent, skips source build commands, and keeps network/health profile resource-owned. |
+| ZSSH-CATALOG-016 | integration | Explicit custom commands | Explicit install/build/start commands produce an `explicit-custom` Docker/OCI image plan without inferred framework commands winning. |
+| ZSSH-PREVIEW-001 | contract/integration | Ready preview for supported fixtures | Every supported descriptor can produce `deployments.plan/v1` ready shape with planner/support tier, artifact, commands, network, health, warnings, next action, and no deployment id. |
+| ZSSH-PREVIEW-002 | contract/integration | Blocked controls reuse 018 | Unsupported, missing, and ambiguous fixtures return readiness `blocked` with shared phase, reason code, safe evidence, fix path, override path, and affected profile field where applicable. |
+| ZSSH-PREVIEW-003 | integration | Static default port | Static descriptors default to static-server `internalPort = 80` and do not require user port input. |
+| ZSSH-PREVIEW-004 | contract/integration | Buildpack non-winning evidence | Buildpack evidence remains diagnostic when first-class planners, explicit custom commands, Dockerfile, Compose, or prebuilt image profiles own the plan. |
+| ZSSH-CREATE-001 | contract/integration | ids-only create path | Every supported descriptor proves final `deployments.create` input remains only context ids. |
+| ZSSH-CREATE-002 | integration | Preview/create artifact parity | Preview and create planning agree on planner key, support tier, artifact intent, command specs, and internal port. |
+| ZSSH-CREATE-003 | integration | Serverful port before admission | Serverful and SSR descriptors supply or prove deterministic persisted `network.internalPort` before create admission. |
+| ZSSH-CREATE-004 | contract | Draft parity across Web/CLI/API/config | Entry surfaces use shared resource profile draft vocabulary and do not define transport-only profile shapes. |
+| ZSSH-RUNTIME-001 | integration | Runtime target before acceptance | local-shell and generic-SSH single-server backends are selected from registry capabilities before acceptance; unsupported providers/capabilities reject before acceptance. |
+| ZSSH-RUNTIME-002 | integration | Hermetic fake/generic-SSH contract | Default tests prove render/apply/verify/log capability through fake/local/generic-SSH descriptors without requiring a real SSH server. |
+| ZSSH-RUNTIME-003 | integration | Observation contract | Readiness, health, logs, and access/proxy summaries are normalized observation expectations, not Docker/SSH payloads. |
+| ZSSH-RUNTIME-004 | opt-in local Docker e2e | Real Docker smoke gate | Real local Docker fixture smoke runs only with `APPALOFT_E2E_FRAMEWORK_DOCKER=true`. |
+| ZSSH-RUNTIME-005 | opt-in SSH e2e | Real SSH smoke gate | Real generic-SSH fixture smoke runs only with explicit SSH target configuration; absence of target is a migration gap, not a pass. |
+
 ## Entry Parity Matrix
 
 | Test ID | Preferred automation | Entry | Expected test focus |
@@ -349,6 +387,17 @@ full catalog. It proves a representative static/frontend, Node/server, and Pytho
 actually build, run, and verify through the local Docker path. `WF-PLAN-SMOKE-006` keeps SSH on the
 same profile/harness contract; real SSH execution remains a migration gap unless an opt-in target is
 configured.
+
+`ZSSH-CATALOG-001` through `ZSSH-CATALOG-016`, `ZSSH-PREVIEW-001` through
+`ZSSH-PREVIEW-004`, `ZSSH-CREATE-001` through `ZSSH-CREATE-004`, and `ZSSH-RUNTIME-001` through
+`ZSSH-RUNTIME-005` are covered by
+`packages/adapters/runtime/test/zero-to-ssh-supported-catalog-acceptance.test.ts`. This is the
+default hermetic Phase 5 supported catalog acceptance harness. It binds Next.js, Vite static SPA,
+Astro static, Nuxt generate, SvelteKit static, Remix, FastAPI, Django, Flask, generic Node,
+generic Python, generic Java, Dockerfile, Docker Compose, prebuilt image, and explicit custom
+commands to one reusable descriptor contract from profile draft through preview, ids-only create,
+runtime target backend selection, Docker/OCI artifact intent, readiness/health/log/access
+observation expectations, and opt-in Docker/SSH smoke gates.
 
 Current `WF-PLAN-SMOKE-005` local Docker coverage runs Vite SPA, React SPA, Next SSR, Hono,
 Django, and Flask through real image build, container run, internal HTTP verification, deployment

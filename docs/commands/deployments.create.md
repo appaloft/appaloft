@@ -317,6 +317,13 @@ identity, Compose file, environment variables, labels, ports, working directory,
 rules. Local shell strings, SSH shell strings, and future Docker API requests are render targets
 for those command specs, not the command contract itself.
 
+The zero-to-SSH supported catalog acceptance harness proves that supported framework and
+container-native fixture descriptors can reach this command boundary without widening it. The
+harness may assert preview/create parity, runtime target backend selection, Docker/OCI artifact
+intent, typed command rendering, readiness/health/log/access observation expectations, and opt-in
+Docker/SSH smoke gates, but it must keep `deployments.create` input limited to deployment context
+ids.
+
 User-authored command text can still appear as a shell-script leaf when the resource runtime profile
 requires custom install/build/start commands. That shell-script leaf must remain scoped to the
 runtime command spec and must not become an untyped metadata bag that decides the deployment

@@ -223,6 +223,12 @@ Required coverage:
   without expanding transport input schemas;
 - unsupported target/provider/capability combinations return structured `runtime-target-resolution`
   errors before acceptance when safely detectable.
+- zero-to-SSH supported catalog acceptance harness binds Next.js, Vite static SPA, Astro static,
+  Nuxt generate, SvelteKit static, Remix, FastAPI, Django, Flask, generic Node, generic Python,
+  generic Java, Dockerfile, Docker Compose, prebuilt image, and explicit custom commands to one
+  reusable descriptor contract covering `deployments.plan/v1`, ids-only `deployments.create`,
+  runtime target backend selection, Docker/OCI artifact intent, fake/local/generic-SSH render/apply
+  evidence, readiness/health, runtime log capability, and access/proxy observation expectations.
 
 ## Minimal Deliverable
 
