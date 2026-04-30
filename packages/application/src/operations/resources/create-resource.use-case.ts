@@ -167,16 +167,6 @@ export class CreateResourceUseCase {
         });
       }
 
-      if (kind.value !== "compose-stack" && services.length > 1) {
-        return err(
-          domainError.invariant("Only compose-stack resources can declare multiple services", {
-            phase: "resource-admission",
-            kind: kind.value,
-            serviceCount: services.length,
-          }),
-        );
-      }
-
       let sourceBinding: ResourceSourceBindingState | undefined;
       if (input.source) {
         sourceBinding = yield* resourceSourceBindingFromInput(input.source);

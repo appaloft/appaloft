@@ -51,6 +51,7 @@
 | 10 | `Certificate` and owned attempt status values | Move certificate-requested worker attempt selection, terminal skip, and issue-context preparation into the certificate aggregate. | `certificate-requested` event handler |
 | 11 | `Organization`, `OrganizationMember`, and `OrganizationPlan` | Move duplicate membership and seat-capacity calculations into identity-governance domain behavior. | core organization aggregate |
 | Continuous A | `DomainBinding` verification attempts | Move ownership-confirmation attempt selection, idempotent already-bound checks, and DNS verification context preparation into the binding aggregate. | `domain-bindings.confirm-ownership` |
+| Continuous B | `Resource` and `ResourceKindValue` service cardinality | Move resource-kind multi-service admission out of create-resource use case and into resource domain behavior. | `resources.create` |
 
 ## Roadmap And Compatibility
 
@@ -144,6 +145,11 @@
   - Matrix rows: `ROUTE-TLS-CMD-007`, `ROUTE-TLS-CMD-010`, `ROUTE-TLS-CMD-016`
 - Related application tests after Continuous A:
   - `packages/application/test/confirm-domain-binding-ownership.test.ts`
+- Continuous B test bindings:
+  - Existing `Resource` tests in `packages/core/test/resource.test.ts`
+  - Matrix row: `RES-CREATE-ADM-025` in `docs/testing/resources.create-test-matrix.md`
+- Related application tests after Continuous B:
+  - `packages/application/test/create-resource.test.ts`
 
 ## Risks And Migration Gaps
 
@@ -169,6 +175,8 @@
     `OrganizationMember`, and `OrganizationPlan` behavior.
   - Continuous A migrates domain-binding ownership-confirmation attempt selection in
     `confirm-domain-binding-ownership.use-case.ts` behind `DomainBinding` behavior.
+  - Continuous B migrates resource service cardinality admission in `create-resource.use-case.ts`
+    behind `Resource` and `ResourceKindValue` behavior.
   - Core value objects may compare their own primitive state internally. Those reads are not
     boundary leaks.
 - A `.codex/skills/domain-driven-develop/SKILL.md` project copy is absent; the current local skill lives under `.agents/skills/domain-driven-develop/SKILL.md`.

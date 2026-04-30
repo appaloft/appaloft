@@ -39,6 +39,8 @@ const baseInput = {
 
 describe("Resource", () => {
   test("allows compose-stack resources to contain multiple services", () => {
+    expect(ResourceKindValue.rehydrate("compose-stack").allowsMultipleServices()).toBe(true);
+
     const resource = Resource.create({
       ...baseInput,
       kind: ResourceKindValue.rehydrate("compose-stack"),
@@ -59,6 +61,8 @@ describe("Resource", () => {
   });
 
   test("rejects multiple services for non-compose resources", () => {
+    expect(ResourceKindValue.rehydrate("application").allowsMultipleServices()).toBe(false);
+
     const resource = Resource.create({
       ...baseInput,
       kind: ResourceKindValue.rehydrate("application"),
@@ -75,6 +79,14 @@ describe("Resource", () => {
     });
 
     expect(resource.isErr()).toBe(true);
+    if (resource.isErr()) {
+      expect(resource.error.code).toBe("invariant_violation");
+      expect(resource.error.details).toMatchObject({
+        phase: "resource-admission",
+        kind: "application",
+        serviceCount: 2,
+      });
+    }
   });
 
   test("[DMBH-RES-001] Resource answers deployment admission questions without caller-owned primitive checks", () => {
