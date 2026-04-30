@@ -1,4 +1,11 @@
-import { type DomainError, err, ok, type Result, type RuntimePlan } from "@appaloft/core";
+import {
+  DeploymentTarget,
+  type DomainError,
+  err,
+  ok,
+  type Result,
+  type RuntimePlan,
+} from "@appaloft/core";
 import { type ExecutionContext } from "../../execution-context";
 import {
   type DefaultAccessDomainProvider,
@@ -49,26 +56,14 @@ type EdgeProxyRouteResolution =
     };
 
 function edgeProxyRouteResolution(input: RuntimePlanResolverInput): EdgeProxyRouteResolution {
-  const edgeProxy = input.server.edgeProxy;
+  const selection = DeploymentTarget.rehydrate(input.server).resolveEdgeProxyForGeneratedRoutes();
 
-  if (!edgeProxy) {
-    return {
-      kind: "disabled",
-      reason: "edge-proxy-missing",
-    };
-  }
-
-  if (edgeProxy.kind.value === "none" || edgeProxy.status.value === "disabled") {
-    return {
-      kind: "disabled",
-      reason: "edge-proxy-disabled",
-    };
-  }
-
-  return {
-    kind: "enabled",
-    proxyKind: edgeProxy.kind.value,
-  };
+  return selection.kind === "enabled"
+    ? {
+        kind: "enabled",
+        proxyKind: selection.proxyKind.value,
+      }
+    : selection;
 }
 
 function enrichRequestedDeployment(

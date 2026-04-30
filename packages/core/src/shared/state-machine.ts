@@ -285,6 +285,14 @@ export class EdgeProxyKindValue extends EnumValueObject<(typeof edgeProxyKinds)[
   static rehydrate(value: (typeof edgeProxyKinds)[number]): EdgeProxyKindValue {
     return new EdgeProxyKindValue(value);
   }
+
+  isDisabled(): boolean {
+    return this.value === "none";
+  }
+
+  isProviderBacked(): boolean {
+    return !this.isDisabled();
+  }
 }
 
 const edgeProxyStatusBrand: unique symbol = Symbol("EdgeProxyStatusValue");
@@ -311,13 +319,21 @@ export class EdgeProxyStatusValue extends StateMachineValueObject<
   }
 
   static initialForKind(kind: EdgeProxyKindValue): EdgeProxyStatusValue {
-    return kind.value === "none"
+    return kind.isDisabled()
       ? new EdgeProxyStatusValue("disabled")
       : new EdgeProxyStatusValue("pending");
   }
 
+  isDisabled(): boolean {
+    return this.value === "disabled";
+  }
+
+  canSelectProvider(kind: EdgeProxyKindValue): boolean {
+    return kind.isProviderBacked() && !this.isDisabled();
+  }
+
   beginBootstrap(kind: EdgeProxyKindValue): Result<EdgeProxyStatusValue> {
-    if (kind.value === "none" || this.value === "disabled") {
+    if (!this.canSelectProvider(kind)) {
       return err(domainError.invariant("Disabled edge proxy cannot be bootstrapped"));
     }
 

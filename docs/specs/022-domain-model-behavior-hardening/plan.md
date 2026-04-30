@@ -64,6 +64,15 @@
 - Related application tests after slice 1:
   - `packages/application/test/create-deployment.test.ts`
   - `packages/application/test/deployment-plan-preview.test.ts`
+- Slice 2 test bindings:
+  - `DMBH-TARGET-001` in `packages/core/test/deployment-target.test.ts`
+  - Existing behavioral rows: `SERVER-BOOT-CMD-010`, `SERVER-BOOT-CMD-013`,
+    `DEF-ACCESS-ROUTE-001`, `DEF-ACCESS-ROUTE-008`
+- Related application tests after slice 2:
+  - `packages/application/test/bootstrap-server-proxy.test.ts`
+  - `packages/application/test/server-edge-proxy-bootstrap.test.ts`
+  - `packages/application/test/create-deployment.test.ts`
+  - `packages/contracts/test/deployment-plan-preview-contract.test.ts`
 
 ## Risks And Migration Gaps
 

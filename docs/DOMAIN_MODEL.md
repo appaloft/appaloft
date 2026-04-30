@@ -107,7 +107,7 @@ owning object rather than from a search for primitive state reads. For example:
 - a `Resource` should answer whether it needs an internal listener port, whether its source binding
   can be enriched from source inspection, and how its profile contributes to deployment admission;
 - a `DeploymentTarget` should answer whether its edge proxy can participate in generated or
-  server-applied route planning;
+  server-applied route planning and whether it can be selected for proxy bootstrap/repair;
 - a `DomainBinding` should answer whether ownership, route, and certificate readiness transitions
   apply;
 - `EnvironmentConfigSet` and its entries should answer identity, precedence, and effective snapshot
@@ -510,6 +510,8 @@ Current scope:
   layer; provider SDK specifics remain outside the aggregate
 - owns current edge proxy intent/status summary for server readiness and proxy-backed deployment
   admission/read-model display
+- owns generated-route proxy selection and proxy bootstrap provider selection; application services
+  should call target behavior instead of branching on edge proxy kind/status primitives
 - changes to current edge proxy intent are deployment-target lifecycle mutations through
   `servers.configure-edge-proxy`; they must not change server identity, host, provider,
   credential, lifecycle state, historical deployment/domain/route/audit references, or
