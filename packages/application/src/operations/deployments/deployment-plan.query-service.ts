@@ -1,11 +1,8 @@
 import {
   type DomainError,
   domainError,
-  err,
   ok,
   type Resource,
-  type ResourceHealthCheckPolicyState,
-  ResourceSourceBinding,
   type Result,
   SourceDescriptor,
   safeTry,
@@ -20,7 +17,6 @@ import {
   type DomainRouteBindingCandidate,
   type DomainRouteBindingReader,
   type RequestedDeploymentConfig,
-  type RequestedDeploymentHealthCheck,
   type RuntimePlanResolver,
   type RuntimeTargetBackendRegistry,
   type RuntimeTargetCapability,
@@ -39,169 +35,18 @@ import { type RuntimePlanResolutionInputBuilder } from "./runtime-plan-resolutio
 function createResourceSourceDescriptor(
   resource: Resource,
 ): Result<{ source: SourceDescriptor; reasoning: string[] }> {
-  const resourceState = resource.toState();
-  const sourceBinding = resourceState.sourceBinding;
-
-  if (!sourceBinding) {
-    return err(
-      domainError.validation("Resource source binding is required for deployment plan preview", {
-        queryName: "deployments.plan",
-        phase: "resource-source-resolution",
-        resourceId: resourceState.id.value,
-      }),
-    );
-  }
-
-  const normalizedBinding = ResourceSourceBinding.create(sourceBinding);
-  if (normalizedBinding.isErr()) {
-    return err(normalizedBinding.error);
-  }
-  const normalizedSourceBinding = normalizedBinding.value.toState();
-  const metadata = ResourceSourceBinding.metadataFromState(normalizedSourceBinding);
-
-  const source = SourceDescriptor.rehydrate({
-    kind: normalizedSourceBinding.kind,
-    locator: normalizedSourceBinding.locator,
-    displayName: normalizedSourceBinding.displayName,
-    ...(metadata ? { metadata } : {}),
-  });
-
-  return ok({
-    source,
-    reasoning: [`Resource source binding kind: ${normalizedSourceBinding.kind.value}`],
-  });
+  return resource.createDeploymentSourceDescriptor().map((descriptor) => ({
+    source: SourceDescriptor.rehydrate(descriptor.source),
+    reasoning: descriptor.reasoning,
+  }));
 }
 
 function shouldEnrichSourceFromDetector(resource: Resource): boolean {
-  const sourceKind = resource.toState().sourceBinding?.kind.value;
-  return sourceKind === "local-folder" || sourceKind === "local-git" || sourceKind === "compose";
-}
-
-function resourceRequiresInternalPort(resource: Resource): boolean {
-  const resourceState = resource.toState();
-  return (
-    resourceState.kind.value === "application" ||
-    resourceState.kind.value === "service" ||
-    resourceState.kind.value === "static-site" ||
-    resourceState.kind.value === "compose-stack" ||
-    resourceState.services.some(
-      (service) => service.kind.value === "web" || service.kind.value === "api",
-    )
-  );
-}
-
-function requestedHealthCheck(
-  policy: ResourceHealthCheckPolicyState,
-): RequestedDeploymentHealthCheck {
-  return {
-    enabled: policy.enabled,
-    type: policy.type.value,
-    intervalSeconds: policy.intervalSeconds.value,
-    timeoutSeconds: policy.timeoutSeconds.value,
-    retries: policy.retries.value,
-    startPeriodSeconds: policy.startPeriodSeconds.value,
-    ...(policy.http
-      ? {
-          http: {
-            method: policy.http.method.value,
-            scheme: policy.http.scheme.value,
-            host: policy.http.host.value,
-            ...(policy.http.port ? { port: policy.http.port.value } : {}),
-            path: policy.http.path.value,
-            expectedStatusCode: policy.http.expectedStatusCode.value,
-            ...(policy.http.expectedResponseText
-              ? { expectedResponseText: policy.http.expectedResponseText.value }
-              : {}),
-          },
-        }
-      : {}),
-    ...(policy.command ? { command: { command: policy.command.command.value } } : {}),
-  };
+  return resource.shouldEnrichSourceFromDetector();
 }
 
 function requestedDeploymentFromResource(resource: Resource): Result<RequestedDeploymentConfig> {
-  const resourceState = resource.toState();
-  const runtimeProfile = resourceState.runtimeProfile;
-  const networkProfile = resourceState.networkProfile;
-  const accessProfile = resourceState.accessProfile;
-  const internalPort = networkProfile?.internalPort.value;
-  const method = runtimeProfile?.strategy.value ?? "auto";
-
-  if (resourceRequiresInternalPort(resource) && !internalPort) {
-    return err(
-      domainError.validation("Resource network profile internalPort is required for deployment", {
-        queryName: "deployments.plan",
-        phase: "resource-network-resolution",
-        resourceId: resourceState.id.value,
-        resourceKind: resourceState.kind.value,
-      }),
-    );
-  }
-
-  if (method === "static" && !runtimeProfile?.publishDirectory) {
-    return err(
-      domainError.validation("Static runtime profiles require publishDirectory for deployment", {
-        queryName: "deployments.plan",
-        phase: "runtime-plan-resolution",
-        resourceId: resourceState.id.value,
-        runtimePlanStrategy: "static",
-      }),
-    );
-  }
-
-  return ok({
-    method,
-    ...(runtimeProfile?.installCommand
-      ? { installCommand: runtimeProfile.installCommand.value }
-      : {}),
-    ...(runtimeProfile?.buildCommand ? { buildCommand: runtimeProfile.buildCommand.value } : {}),
-    ...(runtimeProfile?.startCommand ? { startCommand: runtimeProfile.startCommand.value } : {}),
-    ...(runtimeProfile?.runtimeName
-      ? { runtimeMetadata: { "resource.runtimeName": runtimeProfile.runtimeName.value } }
-      : {}),
-    ...(runtimeProfile?.publishDirectory
-      ? { publishDirectory: runtimeProfile.publishDirectory.value }
-      : {}),
-    ...(runtimeProfile?.dockerfilePath
-      ? { dockerfilePath: runtimeProfile.dockerfilePath.value }
-      : {}),
-    ...(runtimeProfile?.dockerComposeFilePath
-      ? { dockerComposeFilePath: runtimeProfile.dockerComposeFilePath.value }
-      : {}),
-    ...(runtimeProfile?.buildTarget ? { buildTarget: runtimeProfile.buildTarget.value } : {}),
-    ...(internalPort ? { port: internalPort } : {}),
-    ...(networkProfile
-      ? {
-          exposureMode: networkProfile.exposureMode.value,
-          upstreamProtocol: networkProfile.upstreamProtocol.value,
-          ...(accessProfile?.generatedAccessMode.isDisabled()
-            ? {}
-            : {
-                accessContext: {
-                  projectId: resourceState.projectId.value,
-                  environmentId: resourceState.environmentId.value,
-                  resourceId: resourceState.id.value,
-                  resourceSlug: resourceState.slug.value,
-                  ...(resourceState.destinationId
-                    ? { destinationId: resourceState.destinationId.value }
-                    : {}),
-                  exposureMode: networkProfile.exposureMode.value,
-                  upstreamProtocol: networkProfile.upstreamProtocol.value,
-                  routePurpose: "default-resource-access",
-                  ...(accessProfile?.pathPrefix
-                    ? { pathPrefix: accessProfile.pathPrefix.value }
-                    : {}),
-                },
-              }),
-        }
-      : {}),
-    ...(runtimeProfile?.healthCheckPath
-      ? { healthCheckPath: runtimeProfile.healthCheckPath.value }
-      : {}),
-    ...(runtimeProfile?.healthCheck
-      ? { healthCheck: requestedHealthCheck(runtimeProfile.healthCheck) }
-      : {}),
-  });
+  return resource.resolveDeploymentProfile({ queryName: "deployments.plan" });
 }
 
 function compactMetadata(input: Record<string, string | undefined>): Record<string, string> {

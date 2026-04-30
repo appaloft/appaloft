@@ -54,6 +54,17 @@ dispatching explicit operations. The final deployment write remains `deployments
 - aggregate root mutations are domain operations, not generic updates; public commands must use
   intention-revealing names governed by
   [ADR-026: Aggregate Mutation Command Boundary](./decisions/ADR-026-aggregate-mutation-command-boundary.md)
+- domain behavior must live on the object that owns the rule. Value-object-only rules belong on the
+  value object; rules that coordinate multiple value objects owned by one entity belong on the
+  entity; rules that coordinate owned entities/value objects inside one consistency boundary belong
+  on the aggregate root. Domain services may coordinate across aggregate roots, but must not peel
+  one object's state and reimplement that object's own policy.
+- `toState()` is a serialization boundary tool. It is allowed for persistence, read-model mapping,
+  adapter/runtime rendering, DTO/schema translation, fixtures, and assertions. Domain behavior,
+  application services, domain services, providers, and helpers should ask intention-revealing
+  methods such as `requiresInternalPort()`, `canAcceptNewWork(...)`, `canUseGeneratedAccessRoutes()`,
+  or `canMarkReadyFrom...(...)` instead of branching on `.toState().x.value` or `.value === ...`
+  when the answer belongs to the domain object.
 
 ## Aggregate Mutation Command Boundary
 
@@ -84,6 +95,28 @@ Repository methods, persistence adapters, read-model projectors, and migrations 
 terms such as update/upsert internally. Those technical verbs must not leak into business operation
 keys, command names, domain events, Web/API/CLI entrypoints, future MCP tools, or aggregate method
 names.
+
+## Domain Behavior Placement
+
+No-behavior-change refactors that harden the model are governed by
+[Domain Model Behavior Hardening](./specs/022-domain-model-behavior-hardening/spec.md).
+
+When existing code needs to answer a business question, start from the ubiquitous language and the
+owning object rather than from a search for primitive state reads. For example:
+
+- a `Resource` should answer whether it needs an internal listener port, whether its source binding
+  can be enriched from source inspection, and how its profile contributes to deployment admission;
+- a `DeploymentTarget` should answer whether its edge proxy can participate in generated or
+  server-applied route planning;
+- a `DomainBinding` should answer whether ownership, route, and certificate readiness transitions
+  apply;
+- `EnvironmentConfigSet` and its entries should answer identity, precedence, and effective snapshot
+  questions;
+- a `Deployment` should answer execution-continuation and supersede-related status questions;
+- `Workload` and `RuntimeSpec` should answer workload/runtime compatibility questions.
+
+Remaining `toState()` usage must be classified as a boundary read or migrated behind
+intention-revealing methods during the relevant slice.
 
 ## Bounded Contexts
 

@@ -4,6 +4,11 @@ import {
   type EnvironmentSnapshot,
 } from "../configuration/environment-config-set";
 import { AggregateRoot } from "../shared/entity";
+import {
+  type ResourceExposureMode,
+  type ResourceNetworkProtocol,
+  type RuntimePlanStrategy,
+} from "../shared/enums";
 import { domainError } from "../shared/errors";
 import {
   type DestinationId,
@@ -61,6 +66,7 @@ import {
 import { ScalarValueObject } from "../shared/value-object";
 import {
   cloneResourceSourceBindingState,
+  type DeploymentSourceDescriptorState,
   ResourceSourceBinding,
   type ResourceSourceBindingState,
 } from "./source-binding";
@@ -107,6 +113,62 @@ export interface ResourceRuntimeProfileState {
   buildTarget?: DockerBuildTarget;
   healthCheckPath?: HealthCheckPathText;
   healthCheck?: ResourceHealthCheckPolicyState;
+}
+
+export interface ResourceDeploymentHealthCheck {
+  enabled: boolean;
+  type: "http" | "command";
+  intervalSeconds: number;
+  timeoutSeconds: number;
+  retries: number;
+  startPeriodSeconds: number;
+  http?: {
+    method: "GET" | "HEAD" | "POST" | "OPTIONS";
+    scheme: "http" | "https";
+    host: string;
+    port?: number;
+    path: string;
+    expectedStatusCode: number;
+    expectedResponseText?: string;
+  };
+  command?: {
+    command: string;
+  };
+}
+
+export interface ResourceDeploymentAccessContext {
+  projectId: string;
+  environmentId: string;
+  resourceId: string;
+  resourceSlug: string;
+  destinationId?: string;
+  exposureMode: ResourceExposureMode;
+  upstreamProtocol: ResourceNetworkProtocol;
+  routePurpose: "default-resource-access";
+  pathPrefix?: string;
+}
+
+export interface ResourceDeploymentProfile {
+  method: RuntimePlanStrategy;
+  installCommand?: string;
+  buildCommand?: string;
+  startCommand?: string;
+  publishDirectory?: string;
+  dockerfilePath?: string;
+  dockerComposeFilePath?: string;
+  buildTarget?: string;
+  port?: number;
+  healthCheckPath?: string;
+  healthCheck?: ResourceDeploymentHealthCheck;
+  exposureMode?: ResourceExposureMode;
+  upstreamProtocol?: ResourceNetworkProtocol;
+  accessContext?: ResourceDeploymentAccessContext;
+  runtimeMetadata?: Record<string, string>;
+}
+
+export interface ResourceDeploymentSourceDescriptor {
+  source: DeploymentSourceDescriptorState;
+  reasoning: string[];
 }
 
 function resourceRuntimeResolutionError(
@@ -560,6 +622,35 @@ function serializedRuntimeProfile(profile: ResourceRuntimeProfileState): Record<
   };
 }
 
+function deploymentHealthCheckFromPolicy(
+  policy: ResourceHealthCheckPolicyState,
+): ResourceDeploymentHealthCheck {
+  return {
+    enabled: policy.enabled,
+    type: policy.type.value,
+    intervalSeconds: policy.intervalSeconds.value,
+    timeoutSeconds: policy.timeoutSeconds.value,
+    retries: policy.retries.value,
+    startPeriodSeconds: policy.startPeriodSeconds.value,
+    ...(policy.http
+      ? {
+          http: {
+            method: policy.http.method.value,
+            scheme: policy.http.scheme.value,
+            host: policy.http.host.value,
+            ...(policy.http.port ? { port: policy.http.port.value } : {}),
+            path: policy.http.path.value,
+            expectedStatusCode: policy.http.expectedStatusCode.value,
+            ...(policy.http.expectedResponseText
+              ? { expectedResponseText: policy.http.expectedResponseText.value }
+              : {}),
+          },
+        }
+      : {}),
+    ...(policy.command ? { command: { command: policy.command.command.value } } : {}),
+  };
+}
+
 function validateResourceRuntimeProfile(input: {
   resourceId?: ResourceId;
   runtimeProfile: ResourceRuntimeProfileState;
@@ -878,6 +969,136 @@ export class Resource extends AggregateRoot<ResourceState> {
       snapshotId: input.snapshotId,
       createdAt: input.createdAt,
       ...(input.inherited ? { inherited: input.inherited } : {}),
+    });
+  }
+
+  requiresInternalPort(): boolean {
+    return (
+      this.state.kind.value === "application" ||
+      this.state.kind.value === "service" ||
+      this.state.kind.value === "static-site" ||
+      this.state.kind.value === "compose-stack" ||
+      this.state.services.some(
+        (service) => service.kind.value === "web" || service.kind.value === "api",
+      )
+    );
+  }
+
+  createDeploymentSourceDescriptor(): Result<ResourceDeploymentSourceDescriptor> {
+    const sourceBinding = this.state.sourceBinding;
+    if (!sourceBinding) {
+      return err(
+        domainError.validation("Resource source binding is required for deployment admission", {
+          phase: "resource-source-resolution",
+          resourceId: this.state.id.value,
+        }),
+      );
+    }
+
+    return ResourceSourceBinding.create(sourceBinding).map((binding) => {
+      const source = binding.toDeploymentSourceDescriptorState();
+      return {
+        source,
+        reasoning: [`Resource source binding kind: ${source.kind.value}`],
+      };
+    });
+  }
+
+  shouldEnrichSourceFromDetector(): boolean {
+    const sourceBinding = this.state.sourceBinding;
+    if (!sourceBinding) {
+      return false;
+    }
+
+    return ResourceSourceBinding.rehydrate(sourceBinding).canBeEnrichedFromSourceInspection();
+  }
+
+  resolveDeploymentProfile(input?: {
+    operationName?: string;
+    queryName?: string;
+  }): Result<ResourceDeploymentProfile> {
+    const runtimeProfile = this.state.runtimeProfile;
+    const networkProfile = this.state.networkProfile;
+    const accessProfile = this.state.accessProfile;
+    const internalPort = networkProfile?.internalPort.value;
+    const method = runtimeProfile?.strategy.value ?? "auto";
+
+    if (this.requiresInternalPort() && !internalPort) {
+      return err(
+        domainError.validation("Resource network profile internalPort is required for deployment", {
+          ...(input?.operationName ? { commandName: input.operationName } : {}),
+          ...(input?.queryName ? { queryName: input.queryName } : {}),
+          phase: "resource-network-resolution",
+          resourceId: this.state.id.value,
+          resourceKind: this.state.kind.value,
+        }),
+      );
+    }
+
+    if (method === "static" && !runtimeProfile?.publishDirectory) {
+      return err(
+        domainError.validation("Static runtime profiles require publishDirectory for deployment", {
+          ...(input?.operationName ? { commandName: input.operationName } : {}),
+          ...(input?.queryName ? { queryName: input.queryName } : {}),
+          phase: "runtime-plan-resolution",
+          resourceId: this.state.id.value,
+          runtimePlanStrategy: "static",
+        }),
+      );
+    }
+
+    return ok({
+      method,
+      ...(runtimeProfile?.installCommand
+        ? { installCommand: runtimeProfile.installCommand.value }
+        : {}),
+      ...(runtimeProfile?.buildCommand ? { buildCommand: runtimeProfile.buildCommand.value } : {}),
+      ...(runtimeProfile?.startCommand ? { startCommand: runtimeProfile.startCommand.value } : {}),
+      ...(runtimeProfile?.runtimeName
+        ? { runtimeMetadata: { "resource.runtimeName": runtimeProfile.runtimeName.value } }
+        : {}),
+      ...(runtimeProfile?.publishDirectory
+        ? { publishDirectory: runtimeProfile.publishDirectory.value }
+        : {}),
+      ...(runtimeProfile?.dockerfilePath
+        ? { dockerfilePath: runtimeProfile.dockerfilePath.value }
+        : {}),
+      ...(runtimeProfile?.dockerComposeFilePath
+        ? { dockerComposeFilePath: runtimeProfile.dockerComposeFilePath.value }
+        : {}),
+      ...(runtimeProfile?.buildTarget ? { buildTarget: runtimeProfile.buildTarget.value } : {}),
+      ...(internalPort ? { port: internalPort } : {}),
+      ...(networkProfile
+        ? {
+            exposureMode: networkProfile.exposureMode.value,
+            upstreamProtocol: networkProfile.upstreamProtocol.value,
+            ...(accessProfile?.generatedAccessMode.isDisabled()
+              ? {}
+              : {
+                  accessContext: {
+                    projectId: this.state.projectId.value,
+                    environmentId: this.state.environmentId.value,
+                    resourceId: this.state.id.value,
+                    resourceSlug: this.state.slug.value,
+                    ...(this.state.destinationId
+                      ? { destinationId: this.state.destinationId.value }
+                      : {}),
+                    exposureMode: networkProfile.exposureMode.value,
+                    upstreamProtocol: networkProfile.upstreamProtocol.value,
+                    routePurpose: "default-resource-access",
+                    ...(accessProfile?.pathPrefix
+                      ? { pathPrefix: accessProfile.pathPrefix.value }
+                      : {}),
+                  },
+                }),
+          }
+        : {}),
+      ...(runtimeProfile?.healthCheckPath
+        ? { healthCheckPath: runtimeProfile.healthCheckPath.value }
+        : {}),
+      ...(runtimeProfile?.healthCheck
+        ? { healthCheck: deploymentHealthCheckFromPolicy(runtimeProfile.healthCheck) }
+        : {}),
     });
   }
 
