@@ -9,6 +9,7 @@ import {
   CertificateFailurePhaseValue,
   CertificateFingerprintValue,
   CertificateId,
+  type CertificateIssueAttemptContext,
   CertificateIssuedAtValue,
   CertificateSecretRefValue,
   certificateFailurePhases,
@@ -76,6 +77,21 @@ function failurePhaseFromError(error: DomainError, fallback: CertificateFailureP
 
 function safeFailureMessage(error: DomainError): Result<CertificateFailureMessageValue> {
   return CertificateFailureMessageValue.create(error.message || error.code);
+}
+
+function toProviderIssueInput(
+  context: CertificateIssueAttemptContext,
+): CertificateProviderIssueInput {
+  return {
+    certificateId: context.certificateId.value,
+    domainBindingId: context.domainBindingId.value,
+    domainName: context.domainName.value,
+    attemptId: context.attemptId.value,
+    reason: context.reason.value,
+    providerKey: context.providerKey.value,
+    challengeType: context.challengeType.value,
+    requestedAt: context.requestedAt.value,
+  };
 }
 
 async function recordCertificateAttempt(input: {
@@ -194,9 +210,12 @@ export class IssueCertificateOnCertificateRequestedHandler
         return ok(undefined);
       }
 
-      const state = certificate.toState();
-      const attempt = state.attempts.find((candidate) => candidate.id.equals(attemptId));
-      if (!attempt) {
+      const claimResult = certificate.claimAttemptForIssuance({ attemptId });
+      if (claimResult.isErr()) {
+        if (claimResult.error.code !== "not_found") {
+          return err(claimResult.error);
+        }
+
         logger.warn("certificate_request.skipped_missing_attempt", {
           requestId: context.requestId,
           certificateId: certificateId.value,
@@ -205,18 +224,11 @@ export class IssueCertificateOnCertificateRequestedHandler
         return ok(undefined);
       }
 
-      if (
-        attempt.status.value === "issued" ||
-        attempt.status.value === "failed" ||
-        attempt.status.value === "retry_scheduled"
-      ) {
+      if (claimResult.value.kind === "terminal") {
         return ok(undefined);
       }
 
-      const issuingResult = yield* certificate.markAttemptIssuing({ attemptId });
-      if (issuingResult.terminal) {
-        return ok(undefined);
-      }
+      const issueInput = toProviderIssueInput(claimResult.value.context);
 
       await certificateRepository.upsert(
         repositoryContext,
@@ -228,30 +240,19 @@ export class IssueCertificateOnCertificateRequestedHandler
         repositoryContext,
         logger,
         requestId: context.requestId,
-        certificateId: state.id.value,
-        domainBindingId: state.domainBindingId.value,
-        domainName: state.domainName.value,
-        attemptId: attempt.id.value,
-        reason: attempt.reason.value,
-        providerKey: attempt.providerKey.value,
-        challengeType: attempt.challengeType.value,
+        certificateId: issueInput.certificateId,
+        domainBindingId: issueInput.domainBindingId,
+        domainName: issueInput.domainName,
+        attemptId: issueInput.attemptId,
+        reason: issueInput.reason,
+        providerKey: issueInput.providerKey,
+        challengeType: issueInput.challengeType,
         status: "running",
         phase: "provider-request",
         step: "issuing",
-        requestedAt: attempt.requestedAt.value,
+        requestedAt: issueInput.requestedAt,
         updatedAt: clock.now(),
       });
-
-      const issueInput: CertificateProviderIssueInput = {
-        certificateId: state.id.value,
-        domainBindingId: state.domainBindingId.value,
-        domainName: state.domainName.value,
-        attemptId: attempt.id.value,
-        reason: attempt.reason.value,
-        providerKey: attempt.providerKey.value,
-        challengeType: attempt.challengeType.value,
-        requestedAt: attempt.requestedAt.value,
-      };
 
       const issuedResult = await certificateProvider.issue(context, issueInput);
       if (issuedResult.isErr()) {
@@ -283,17 +284,17 @@ export class IssueCertificateOnCertificateRequestedHandler
           repositoryContext,
           logger,
           requestId: context.requestId,
-          certificateId: state.id.value,
-          domainBindingId: state.domainBindingId.value,
-          domainName: state.domainName.value,
-          attemptId: attempt.id.value,
-          reason: attempt.reason.value,
+          certificateId: issueInput.certificateId,
+          domainBindingId: issueInput.domainBindingId,
+          domainName: issueInput.domainName,
+          attemptId: issueInput.attemptId,
+          reason: issueInput.reason,
           providerKey: issueInput.providerKey,
           challengeType: issueInput.challengeType,
           status: error.retryable ? "retry-scheduled" : "failed",
           phase: failurePhase.value,
           step: error.retryable ? "retry_scheduled" : "failed",
-          requestedAt: attempt.requestedAt.value,
+          requestedAt: issueInput.requestedAt,
           updatedAt: failedAt.value,
           finishedAt: failedAt.value,
           errorCode: error.code,
@@ -343,17 +344,17 @@ export class IssueCertificateOnCertificateRequestedHandler
           repositoryContext,
           logger,
           requestId: context.requestId,
-          certificateId: state.id.value,
-          domainBindingId: state.domainBindingId.value,
-          domainName: state.domainName.value,
-          attemptId: attempt.id.value,
-          reason: attempt.reason.value,
+          certificateId: issueInput.certificateId,
+          domainBindingId: issueInput.domainBindingId,
+          domainName: issueInput.domainName,
+          attemptId: issueInput.attemptId,
+          reason: issueInput.reason,
           providerKey: issueInput.providerKey,
           challengeType: issueInput.challengeType,
           status: error.retryable ? "retry-scheduled" : "failed",
           phase: failurePhase.value,
           step: error.retryable ? "retry_scheduled" : "failed",
-          requestedAt: attempt.requestedAt.value,
+          requestedAt: issueInput.requestedAt,
           updatedAt: failedAt.value,
           finishedAt: failedAt.value,
           errorCode: failureCode.value,
@@ -387,17 +388,17 @@ export class IssueCertificateOnCertificateRequestedHandler
         repositoryContext,
         logger,
         requestId: context.requestId,
-        certificateId: state.id.value,
-        domainBindingId: state.domainBindingId.value,
-        domainName: state.domainName.value,
-        attemptId: attempt.id.value,
-        reason: attempt.reason.value,
+        certificateId: issueInput.certificateId,
+        domainBindingId: issueInput.domainBindingId,
+        domainName: issueInput.domainName,
+        attemptId: issueInput.attemptId,
+        reason: issueInput.reason,
         providerKey: issueInput.providerKey,
         challengeType: issueInput.challengeType,
         status: "succeeded",
         phase: "certificate-issued",
         step: "issued",
-        requestedAt: attempt.requestedAt.value,
+        requestedAt: issueInput.requestedAt,
         updatedAt: issuedAt.value,
         finishedAt: issuedAt.value,
         expiresAt: expiresAt.value,

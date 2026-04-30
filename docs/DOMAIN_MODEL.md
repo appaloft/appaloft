@@ -134,8 +134,8 @@ Current boundary audit state:
 - remaining model-hardening hotspots are future slices, not part of a mechanical rewrite:
   context ownership checks in deployment/source-link orchestration have been moved behind aggregate
   behavior; domain-binding redirect target checks have been moved behind aggregate behavior;
-  certificate attempt selection and identity-governance membership/seat calculations remain future
-  slices.
+  certificate attempt selection has been moved behind certificate aggregate behavior;
+  identity-governance membership/seat calculations remain a future slice.
 
 ## Bounded Contexts
 
@@ -594,6 +594,8 @@ Current scope:
 - owns certificate issue/import admission and certificate-required readiness gates
 - owns whether domain-bound, certificate-issued/imported, and route realization events may mark the
   binding ready; application handlers coordinate repositories/events and call aggregate behavior
+- `Certificate` owns certificate attempt worker selection, including missing/terminal attempt
+  handling and the provider issue context prepared from the selected attempt
 - DNS verification, certificate issuance/import, route failure, and domain-ready transitions are
   implemented through explicit command/event workflows while the binding remains the owner of its
   own lifecycle predicates

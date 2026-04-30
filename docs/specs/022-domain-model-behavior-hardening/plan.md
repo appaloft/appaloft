@@ -47,6 +47,7 @@
 | 7 | Boundary audit | Confirm remaining `toState()` usage belongs to allowed serialization/read-model/persistence/adapter/test boundaries. | repository/read-model/adapter code |
 | 8 | `Environment`, `Resource`, and `Destination` context ownership | Move project/environment/server/destination consistency questions into owning aggregates. | deployment context resolver, source-link relink |
 | 9 | `DomainBinding` canonical redirect target behavior | Move served redirect target eligibility into the binding aggregate. | domain binding create and route configuration |
+| 10 | `Certificate` and owned attempt status values | Move certificate-requested worker attempt selection, terminal skip, and issue-context preparation into the certificate aggregate. | `certificate-requested` event handler |
 
 ## Roadmap And Compatibility
 
@@ -122,6 +123,12 @@
 - Related application tests after slice 9:
   - `packages/application/test/domain-binding-lifecycle.test.ts`
   - `packages/application/test/create-domain-binding.test.ts`
+- Slice 10 test bindings:
+  - `DMBH-CERT-001` in `packages/core/test/certificate.test.ts`
+  - Existing behavioral rows: `ROUTE-TLS-EVT-005`, `ROUTE-TLS-EVT-006`,
+    `ROUTE-TLS-EVT-007`, `ROUTE-TLS-EVT-010`, `ROUTE-TLS-SCHED-003`
+- Related application tests after slice 10:
+  - `packages/application/test/issue-or-renew-certificate.test.ts`
 
 ## Risks And Migration Gaps
 
@@ -140,9 +147,10 @@
     `Destination` behavior.
   - Slice 9 migrated route redirect-target checks in `create-domain-binding.use-case.ts` and
     `configure-domain-binding-route.use-case.ts` behind `DomainBinding` behavior.
-  - Remaining future hotspots are certificate attempt selection in
-    `issue-certificate-on-certificate-requested.handler.ts` and identity-governance membership/seat
-    calculations in `packages/core/src/identity-governance/organization.ts`.
+  - Slice 10 migrates certificate attempt selection in
+    `issue-certificate-on-certificate-requested.handler.ts` behind `Certificate` behavior.
+  - The remaining future hotspot is identity-governance membership/seat calculations in
+    `packages/core/src/identity-governance/organization.ts`.
   - Core value objects may compare their own primitive state internally. Those reads are not
     boundary leaks.
 - A `.codex/skills/domain-driven-develop/SKILL.md` project copy is absent; the current local skill lives under `.agents/skills/domain-driven-develop/SKILL.md`.
