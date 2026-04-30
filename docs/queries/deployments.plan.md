@@ -25,6 +25,7 @@ deployment lifecycle events, or execute build/run/verify/proxy work.
 - [Deployment Plan Preview Test Matrix](../testing/deployment-plan-preview-test-matrix.md)
 - [Deployment Plan Preview Error Spec](../errors/deployments.plan.md)
 - [Workload Framework Detection And Planning](../workflows/workload-framework-detection-and-planning.md)
+- [Buildpack Accelerator Contract And Preview Guardrails](../specs/017-buildpack-accelerator-contract-and-preview-guardrails/spec.md)
 - [Deployment Runtime Substrate Plan](../implementation/deployment-runtime-substrate-plan.md)
 - ADR-010, ADR-012, ADR-014, ADR-016, ADR-021, ADR-023
 - [Error Model](../errors/model.md)
@@ -62,6 +63,8 @@ type DeploymentPlanQueryResult = Result<DeploymentPlanPreview, DomainError>;
 - readiness status and reason codes;
 - source inspection evidence;
 - selected planner key and support tier;
+- buildpack accelerator evidence, support tier, limitations, builder policy, detected buildpacks,
+  and fix paths when a buildpack candidate is evaluated;
 - artifact kind and safe artifact summary;
 - sanitized install/build/package/start command specs;
 - internal port, exposure, target service, and health plan;
@@ -98,6 +101,10 @@ known unsupported plan as transport failure.
 - The preview contract has catalog parity rows for ready and blocked JVM/Spring planner output,
   including Maven/Gradle build-tool ambiguity, missing runnable jar, missing production start, and
   unsupported JVM framework remediation reason codes.
+- The preview contract now governs buildpack accelerator parity rows for ready
+  buildpack-accelerated candidates and blocked buildpack candidates. This does not claim real
+  `pack`/lifecycle execution and does not make buildpack the canonical support path for mainstream
+  frameworks.
 - Access plan summary may initially report unavailable when existing read models cannot provide a
   safe summary.
 - Draft profile preview before `resources.create` remains out of scope.

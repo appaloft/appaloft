@@ -210,6 +210,25 @@ by `WF-PLAN-SMOKE-005` and `WF-PLAN-SMOKE-006`.
 | WF-PLAN-JVM-014 | integration | Internal port behavior | JVM serverful planners use the resource network profile port and do not add deployment-owned `port` input; missing required port is blocked in `resource-network-resolution` when no deterministic persisted profile value exists. |
 | WF-PLAN-JVM-015 | contract/integration | Preview parity | `deployments.plan/v1` exposes ready and blocked JVM planner output with source evidence, build tool, planner key/support tier, artifact kind, command specs, network, health, warnings, unsupported reasons, and next actions without creating a deployment attempt. |
 
+## Buildpack Accelerator Contract Matrix
+
+These rows govern the buildpack-style detection accelerator contract. They do not claim real
+`pack`/lifecycle execution; hermetic fake adapter evidence is sufficient until a later adapter
+Code Round governs execution.
+
+| Test ID | Preferred automation | Case | Expected result |
+| --- | --- | --- | --- |
+| WF-PLAN-BP-001 | contract/integration | Explicit planner wins | Source has first-class planner evidence and buildpack-detectable files | Explicit planner remains selected with support tier `first-class`; buildpack evidence is non-winning diagnostic evidence and no planner output is replaced. |
+| WF-PLAN-BP-002 | contract/integration | Explicit custom/container-native profile wins | Resource selects Dockerfile, Compose, prebuilt image, static, or explicit custom commands while buildpack evidence exists | Explicit profile owns artifact construction; buildpack evidence cannot override the strategy or generate deployment input. |
+| WF-PLAN-BP-003 | contract/integration | Unknown buildpack-detectable source | Source has safe buildpack evidence but no first-class planner or explicit custom/container-native profile | Preview reports `buildpack-accelerated`, Docker/OCI image intent, builder policy, detected buildpacks, limitations, and next actions without creating a deployment attempt. |
+| WF-PLAN-BP-004 | contract/integration | Buildpack disabled or unavailable target | Buildpack acceleration is disabled or selected runtime target lacks required build/lifecycle capability | Preview is blocked with `buildpack-disabled` or `buildpack-target-unavailable` and remediation points to explicit runtime/profile fixes. |
+| WF-PLAN-BP-005 | contract/integration | Unsupported builder or lifecycle feature | Buildpack evidence selects a builder, run image, or lifecycle feature outside Appaloft policy | Preview is blocked with `unsupported-buildpack-builder` or `unsupported-buildpack-lifecycle-feature`; unsupported builder values stay adapter diagnostics, not command input. |
+| WF-PLAN-BP-006 | contract/integration | Ambiguous buildpack evidence | Multiple language families, framework hints, or buildpacks conflict without explicit override | Preview is blocked or `requires-override` with `ambiguous-buildpack-evidence`; Appaloft does not guess. |
+| WF-PLAN-BP-007 | integration | Missing internal port | Buildpack candidate describes an inbound HTTP app but `ResourceNetworkProfile.internalPort` is absent | Planning is blocked in `resource-network-resolution` with `internal-port-missing`; buildpack port hints do not become source of truth. |
+| WF-PLAN-BP-008 | integration | Explicit runtime/build/start override precedence | Resource runtime profile supplies explicit install/build/start commands for a buildpack-detectable unknown source | Explicit custom/generic planning wins and buildpack candidate does not replace commands. |
+| WF-PLAN-BP-009 | contract/integration | Environment and variable boundary | Buildpack candidate needs build/runtime variables, including secret-bearing values and build-time/public values | Preview masks secrets, preserves build-time `PUBLIC_`/`VITE_` rules, and never creates deployment-owned environment overrides. |
+| WF-PLAN-BP-010 | contract / future | MCP/tool metadata parity | Future tool descriptor exposes deployment planning | Tool metadata maps to `deployments.plan` and preserves buildpack evidence, tier, limitation, reason-code, and next-action shape. |
+
 ## Boundary Matrix
 
 | Test ID | Preferred automation | Case | Expected result |

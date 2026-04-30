@@ -49,6 +49,7 @@ This workflow inherits:
 - [Quick Deploy Test Matrix](../testing/quick-deploy-test-matrix.md)
 - [Deployment Runtime Substrate Implementation Plan](../implementation/deployment-runtime-substrate-plan.md)
 - [Deployment Plan Preview Implementation Plan](../implementation/deployment-plan-preview-plan.md)
+- [Buildpack Accelerator Contract And Preview Guardrails](../specs/017-buildpack-accelerator-contract-and-preview-guardrails/spec.md)
 - [Error Model](../errors/model.md)
 - [neverthrow Conventions](../errors/neverthrow-conventions.md)
 - [Async Lifecycle And Acceptance](../architecture/async-lifecycle-and-acceptance.md)
@@ -71,6 +72,12 @@ catalog governed by the accepted boundaries:
 A new ADR is required before Appaloft accepts non-Docker runtime substrates, public base-image
 override fields, provider-specific buildpack/runtime preset fields, public orchestrator fields, or
 framework-specific deployment commands.
+
+Buildpack-style detection does not require a new ADR while it stays an adapter-owned accelerator
+behind this workload-planning contract. A new ADR is required before buildpack builder/lifecycle
+fields become public command input, before a concrete buildpack implementation becomes the
+canonical support path for mainstream frameworks, or before buildpack output changes deployment
+admission or runtime substrate semantics.
 
 ## Boundary
 
@@ -104,6 +111,7 @@ The source-of-truth planner outputs are:
 | `artifactIntent` | `build-image`, `prebuilt-image`, or `compose-project` according to ADR-021. |
 | `publishDirectory` or artifact path | Static/build output when the framework produces files or a packaged binary/jar. |
 | `warnings` | Non-fatal planner observations exposed through diagnostics or preflight surfaces. |
+| `buildpackAccelerator` | Optional adapter-owned accelerator evidence, support tier, builder policy, detected buildpacks, limitations, and fix paths. It is preview/planning evidence only and never deployment command input. |
 
 ## Detection Evidence
 
@@ -124,6 +132,7 @@ Minimum evidence categories:
 | Build files | `package.json`, lockfiles, `next.config.*`, `vite.config.*`, `svelte.config.*`, `nuxt.config.*`, `astro.config.*`, `angular.json`, `pyproject.toml`, `requirements.txt`, `Gemfile`, `composer.json`, `go.mod`, `pom.xml`, `build.gradle*`, `.csproj`, `mix.exs`, `Cargo.toml`. |
 | Artifact output | `dist`, `build`, `.next/standalone`, `out`, `.output`, `public`, `target/*.jar`, `build/libs/*.jar`, `bin/*`, compiled binary path. |
 | Runtime endpoint hint | Framework default listener only when deterministic. User-supplied `ResourceNetworkProfile.internalPort` wins. |
+| Buildpack accelerator | Platform files, language-family hints, framework hints, builder evidence, detected buildpacks, lifecycle feature hints, and unsupported/ambiguous/missing evidence reason codes. |
 
 Detectors must not:
 
@@ -131,6 +140,41 @@ Detectors must not:
 - store secrets, tokens, environment values, or raw provider responses as detection evidence;
 - persist provider SDK types, Docker SDK responses, or framework package objects in core state;
 - treat a detected package/project name as the resource id, deployment id, or security boundary.
+
+### Buildpack Accelerator Evidence
+
+Buildpack-style detection is an adapter-owned accelerator and fallback candidate. It may inspect
+safe files and metadata, but it must not run `pack`, buildpack lifecycle phases, project install
+commands, framework CLIs, Docker, SSH, or application code during admission-time detection or
+read-only preview.
+
+The accelerator contract covers:
+
+| Evidence | Examples |
+| --- | --- |
+| Platform files | `project.toml`, `Procfile`, `.buildpacks`, `.cnb`, buildpack/builder config, language manifests, lockfiles. |
+| Language-family hints | Node, Python, JVM, Ruby, PHP, Go, .NET, Rust, Elixir, static, or unknown family evidence. |
+| Framework hints | Safe dependency/config hints that can help a future explicit planner, such as Quarkus, Micronaut, Rails, Laravel, ASP.NET Core, Phoenix, Axum, or generic app-server evidence. |
+| Builder evidence | Default builder policy, selected/allowed builder override source, blocked builder, run image hint, lifecycle feature hint. |
+| Detected buildpacks | Buildpack ids/names/versions when safe; ambiguous or conflicting buildpack lists stay diagnostic evidence. |
+
+Buildpack evidence is non-winning evidence whenever an explicit planner or profile owns the plan.
+If it becomes the selected fallback, the preview support tier is `buildpack-accelerated` and the
+artifact intent must still be Docker/OCI image build intent. The accelerator must not generate
+deployment input overrides, persist hidden runtime/profile changes, or infer Appaloft-owned
+identity.
+
+Buildpack limitations must be visible in `deployments.plan`:
+
+- default builder versus allowed override versus blocked unsupported builder;
+- unsupported lifecycle feature or missing target capability;
+- disabled or unavailable buildpack acceleration;
+- ambiguous language/framework/buildpack evidence;
+- missing internal port for inbound apps;
+- missing deterministic start intent when the selected buildpack evidence cannot prove one;
+- secret masking and build-time/public variable boundary;
+- health policy boundary: buildpack must not infer app-level health unless explicit resource health
+  policy exists.
 
 ## Detection And Plan Input Contract
 
@@ -395,13 +439,18 @@ Planner selection order:
 
 1. Explicit `RuntimePlanStrategy = dockerfile`, `docker-compose`, `prebuilt-image`, or `static`
    uses the strategy-specific planner and must not be overridden by framework detection.
-2. Explicit framework/runtime hints in `ResourceRuntimeProfile`, when accepted by future profile
+2. Explicit custom/resource runtime commands select custom or generic planner fallback when they
+   make the source containerizable and must not be overridden by buildpack evidence.
+3. Explicit framework/runtime hints in `ResourceRuntimeProfile`, when accepted by future profile
    specs, take precedence over inferred evidence.
-3. Framework-specific planners run before generic language planners.
-4. Generic language planners may run only when required install/build/start/package information can
+4. Framework-specific planners run before generic language planners.
+5. Generic language planners may run only when required install/build/start/package information can
    be derived or was supplied explicitly.
-5. Custom planner fallback is allowed only when explicit runtime profile commands make the result
+6. Custom planner fallback is allowed only when explicit runtime profile commands make the result
    containerizable.
+7. Buildpack accelerator candidate may run only after the explicit profile, first-class planner,
+   generic planner, and custom fallback checks decline or block without an explicit user-selected
+   plan. It must report why it won or why it was non-winning.
 
 When multiple frameworks are detected, the planner must prefer the framework attached to the source
 base directory and the selected runtime strategy. If the result is ambiguous, entry workflows must
@@ -471,6 +520,7 @@ Framework detection and planner selection failures use existing deployment error
 | Detected framework/runtime has no supported planner and no explicit fallback commands | `validation_error` | `runtime-plan-resolution` | No |
 | Supported planner lacks required evidence, such as package name, lockfile, start command, artifact path, or publish directory | `validation_error` | `runtime-plan-resolution` or `runtime-artifact-resolution` | No |
 | Base image or package/build command cannot be resolved from accepted evidence | `validation_error` or `provider_error` | `runtime-plan-resolution` | No or conditional by provider cause |
+| Buildpack accelerator is disabled, unavailable, ambiguous, or requires an unsupported builder/lifecycle feature | `validation_error` or preview blocked reason | `runtime-plan-resolution` or `runtime-target-resolution` | No |
 | Image build/package fails after acceptance | `provider_error` or `infra_error` | `image-build` or `runtime-artifact-resolution` | Conditional |
 
 Error details should include safe evidence fields such as `runtimeFamily`, `framework`,
@@ -553,6 +603,10 @@ Current typed detection is limited to:
   source-inspection tests, fixture planner tests, headless Docker/OCI smoke assertions, and
   `deployments.plan/v1` preview contract tests. Full real Docker/SSH execution for every JVM
   fixture and Quarkus/Micronaut planners remain migration gaps.
+- Buildpack accelerator preview guardrails have stable rows for precedence, support tier, builder
+  policy, limitations, unsupported/ambiguous/missing evidence, internal-port behavior, and
+  `deployments.plan/v1` ready/blocked parity. Executable coverage is currently contract-level with
+  hermetic preview payloads; real `pack`/lifecycle execution is not wired.
 
 The following are migration gaps before the mainstream support catalog is complete:
 

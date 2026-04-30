@@ -2468,7 +2468,15 @@ export type DeploymentPlanReasonCode =
   | "missing-static-output"
   | "incompatible-source-strategy"
   | "runtime-target-unsupported"
-  | "access-plan-unavailable";
+  | "access-plan-unavailable"
+  | "buildpack-disabled"
+  | "buildpack-target-unavailable"
+  | "unsupported-buildpack-builder"
+  | "unsupported-buildpack-lifecycle-feature"
+  | "ambiguous-buildpack-evidence"
+  | "missing-buildpack-evidence"
+  | "buildpack-start-intent-missing"
+  | "buildpack-preview-limited";
 
 export interface DeploymentPlanReason {
   code: DeploymentPlanReasonCode;
@@ -2517,11 +2525,45 @@ export interface DeploymentPlanPreview {
   };
   planner: {
     plannerKey: string;
-    supportTier: "first-class" | "generic" | "custom" | "container-native" | "unsupported";
+    supportTier:
+      | "first-class"
+      | "generic"
+      | "custom"
+      | "container-native"
+      | "buildpack-accelerated"
+      | "unsupported"
+      | "ambiguous"
+      | "requires-override";
     buildStrategy: BuildStrategyKind;
     packagingMode: PackagingMode;
     targetKind: TargetKind;
     targetProviderKey: string;
+  };
+  buildpack?: {
+    status: "selected" | "non-winning" | "blocked" | "disabled" | "unavailable";
+    supportTier: "buildpack-accelerated" | "unsupported" | "ambiguous" | "requires-override";
+    evidence: {
+      platformFiles: string[];
+      languageFamilies: string[];
+      frameworkHints: string[];
+      builderEvidence: string[];
+      detectedBuildpacks: Array<{
+        id: string;
+        version?: string;
+      }>;
+    };
+    builderPolicy: {
+      defaultBuilder?: string;
+      requestedBuilder?: string;
+      override: "none" | "allowed" | "blocked";
+      blockedBuilders: string[];
+    };
+    artifactIntent?: RuntimeArtifactIntent;
+    limitations: Array<{
+      code: DeploymentPlanReasonCode | string;
+      message: string;
+      fixPath?: string;
+    }>;
   };
   artifact: {
     kind:

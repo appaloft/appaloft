@@ -307,7 +307,7 @@ export const publicDocsHelpTopics = {
     id: "deployment.plan-preview",
     title: "Deployment plan preview",
     description:
-      "How to inspect detected framework evidence, planner selection, commands, network, health, access routing, and unsupported reasons before execution.",
+      "How to inspect detected framework and buildpack accelerator evidence, planner selection, support tier, commands, network, health, access routing, and unsupported reasons before execution.",
     page: {
       "zh-CN": "deploy/lifecycle",
       "en-US": "en/deploy/lifecycle",
@@ -322,6 +322,7 @@ export const publicDocsHelpTopics = {
     aliases: ["plan preview", "detect plan", "dry run", "部署计划预览", "部署前检查"],
     specReferences: [
       "docs/specs/013-deployment-plan-preview/spec.md",
+      "docs/specs/017-buildpack-accelerator-contract-and-preview-guardrails/spec.md",
       "docs/queries/deployments.plan.md",
       "docs/testing/deployment-plan-preview-test-matrix.md",
       "docs/workflows/workload-framework-detection-and-planning.md",

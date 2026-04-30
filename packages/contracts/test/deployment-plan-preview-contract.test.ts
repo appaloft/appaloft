@@ -487,4 +487,549 @@ describe("deployment plan preview contract", () => {
     expect(parsed.unsupportedReasons[0]?.code).toBe("ambiguous-jvm-build-tool");
     expect(parsed.nextActions[0]?.targetOperation).toBe("resources.configure-runtime");
   });
+
+  test("[WF-PLAN-BP-001] keeps explicit framework planner ahead of buildpack evidence", () => {
+    const parsed = deploymentPlanResponseSchema.parse({
+      schemaVersion: "deployments.plan/v1",
+      context: {
+        projectId: "proj_demo",
+        environmentId: "env_demo",
+        resourceId: "res_next",
+        serverId: "srv_local",
+        destinationId: "dst_local",
+      },
+      readiness: {
+        status: "ready",
+        ready: true,
+        reasonCodes: [],
+      },
+      source: {
+        kind: "local-folder",
+        displayName: "next-with-buildpack-files",
+        locator: "/workspace/next-with-buildpack-files",
+        runtimeFamily: "node",
+        framework: "nextjs",
+        packageManager: "pnpm",
+        applicationShape: "ssr",
+        detectedFiles: ["package.json", "next.config.mjs", "project.toml"],
+        detectedScripts: ["build", "start"],
+        reasoning: ["Next.js evidence is first-class; buildpack evidence is non-winning"],
+      },
+      planner: {
+        plannerKey: "nextjs",
+        supportTier: "first-class",
+        buildStrategy: "workspace-commands",
+        packagingMode: "all-in-one-docker",
+        targetKind: "single-server",
+        targetProviderKey: "local-shell",
+      },
+      buildpack: {
+        status: "non-winning",
+        supportTier: "buildpack-accelerated",
+        evidence: {
+          platformFiles: ["project.toml"],
+          languageFamilies: ["node"],
+          frameworkHints: ["nextjs"],
+          builderEvidence: ["default-builder-policy"],
+          detectedBuildpacks: [{ id: "paketo-buildpacks/nodejs" }],
+        },
+        builderPolicy: {
+          defaultBuilder: "paketobuildpacks/builder-jammy-base",
+          override: "none",
+          blockedBuilders: [],
+        },
+        artifactIntent: "build-image",
+        limitations: [
+          {
+            code: "buildpack-non-winning",
+            message: "First-class Next.js planner takes precedence over buildpack evidence.",
+          },
+        ],
+      },
+      artifact: {
+        kind: "workspace-image",
+        runtimeArtifactKind: "image",
+        runtimeArtifactIntent: "build-image",
+      },
+      commands: [
+        { kind: "install", command: "pnpm install", source: "planner" },
+        { kind: "build", command: "pnpm build", source: "planner" },
+        { kind: "start", command: "pnpm start", source: "planner" },
+      ],
+      network: {
+        internalPort: 3000,
+        upstreamProtocol: "http",
+        exposureMode: "reverse-proxy",
+      },
+      health: {
+        enabled: true,
+        kind: "http",
+        path: "/",
+        port: 3000,
+      },
+      warnings: [],
+      unsupportedReasons: [],
+      nextActions: [
+        {
+          kind: "command",
+          targetOperation: "deployments.create",
+          label: "Deploy",
+          safeByDefault: true,
+        },
+      ],
+      generatedAt: "2026-04-30T00:00:00.000Z",
+    });
+
+    expect(parsed.planner.plannerKey).toBe("nextjs");
+    expect(parsed.planner.supportTier).toBe("first-class");
+    expect(parsed.buildpack?.status).toBe("non-winning");
+  });
+
+  test("[WF-PLAN-BP-002][WF-PLAN-BP-008] keeps explicit custom runtime overrides ahead of buildpack candidate", () => {
+    const parsed = deploymentPlanResponseSchema.parse({
+      schemaVersion: "deployments.plan/v1",
+      context: {
+        projectId: "proj_demo",
+        environmentId: "env_demo",
+        resourceId: "res_custom",
+        serverId: "srv_local",
+        destinationId: "dst_local",
+      },
+      readiness: {
+        status: "ready",
+        ready: true,
+        reasonCodes: [],
+      },
+      source: {
+        kind: "local-folder",
+        displayName: "custom-with-buildpack-files",
+        locator: "/workspace/custom-with-buildpack-files",
+        runtimeFamily: "ruby",
+        applicationShape: "serverful-http",
+        detectedFiles: ["Gemfile", "project.toml"],
+        detectedScripts: [],
+        reasoning: ["Explicit resource runtime commands make the custom plan authoritative"],
+      },
+      planner: {
+        plannerKey: "custom",
+        supportTier: "custom",
+        buildStrategy: "workspace-commands",
+        packagingMode: "all-in-one-docker",
+        targetKind: "single-server",
+        targetProviderKey: "local-shell",
+      },
+      buildpack: {
+        status: "non-winning",
+        supportTier: "buildpack-accelerated",
+        evidence: {
+          platformFiles: ["project.toml"],
+          languageFamilies: ["ruby"],
+          frameworkHints: ["rack"],
+          builderEvidence: ["default-builder-policy"],
+          detectedBuildpacks: [{ id: "paketo-buildpacks/ruby" }],
+        },
+        builderPolicy: {
+          defaultBuilder: "paketobuildpacks/builder-jammy-base",
+          override: "none",
+          blockedBuilders: [],
+        },
+        artifactIntent: "build-image",
+        limitations: [
+          {
+            code: "buildpack-non-winning",
+            message: "Explicit runtime commands take precedence over buildpack evidence.",
+          },
+        ],
+      },
+      artifact: {
+        kind: "custom-command-image",
+        runtimeArtifactKind: "image",
+        runtimeArtifactIntent: "build-image",
+      },
+      commands: [
+        { kind: "install", command: "bundle install", source: "resource-runtime-profile" },
+        {
+          kind: "start",
+          command: "bundle exec rackup -o 0.0.0.0 -p 3000",
+          source: "resource-runtime-profile",
+        },
+      ],
+      network: {
+        internalPort: 3000,
+        upstreamProtocol: "http",
+        exposureMode: "reverse-proxy",
+      },
+      health: {
+        enabled: true,
+        kind: "http",
+        path: "/",
+        port: 3000,
+      },
+      warnings: [],
+      unsupportedReasons: [],
+      nextActions: [
+        {
+          kind: "command",
+          targetOperation: "deployments.create",
+          label: "Deploy",
+          safeByDefault: true,
+        },
+      ],
+      generatedAt: "2026-04-30T00:00:00.000Z",
+    });
+
+    expect(parsed.planner.plannerKey).toBe("custom");
+    expect(parsed.commands.every((command) => command.source === "resource-runtime-profile")).toBe(
+      true,
+    );
+    expect(parsed.buildpack?.status).toBe("non-winning");
+  });
+
+  test("[WF-PLAN-BP-004] exposes disabled or unavailable buildpack accelerator as blocked preview", () => {
+    const parsed = deploymentPlanResponseSchema.parse({
+      schemaVersion: "deployments.plan/v1",
+      context: {
+        projectId: "proj_demo",
+        environmentId: "env_demo",
+        resourceId: "res_unavailable",
+        serverId: "srv_local",
+        destinationId: "dst_local",
+      },
+      readiness: {
+        status: "blocked",
+        ready: false,
+        reasonCodes: ["buildpack-target-unavailable"],
+      },
+      source: {
+        kind: "local-folder",
+        displayName: "buildpack-unavailable-app",
+        locator: "/workspace/buildpack-unavailable-app",
+        runtimeFamily: "php",
+        applicationShape: "serverful-http",
+        detectedFiles: ["composer.json", "project.toml"],
+        detectedScripts: [],
+        reasoning: ["Buildpack evidence exists but the selected target cannot run the lifecycle"],
+      },
+      planner: {
+        plannerKey: "buildpack",
+        supportTier: "unsupported",
+        buildStrategy: "buildpack",
+        packagingMode: "all-in-one-docker",
+        targetKind: "single-server",
+        targetProviderKey: "local-shell",
+      },
+      buildpack: {
+        status: "unavailable",
+        supportTier: "unsupported",
+        evidence: {
+          platformFiles: ["project.toml"],
+          languageFamilies: ["php"],
+          frameworkHints: ["generic-php"],
+          builderEvidence: ["default-builder-policy"],
+          detectedBuildpacks: [{ id: "paketo-buildpacks/php" }],
+        },
+        builderPolicy: {
+          defaultBuilder: "paketobuildpacks/builder-jammy-base",
+          override: "none",
+          blockedBuilders: [],
+        },
+        artifactIntent: "build-image",
+        limitations: [
+          {
+            code: "buildpack-target-unavailable",
+            message: "Selected runtime target lacks buildpack lifecycle support.",
+            fixPath: "Configure explicit runtime commands or select a supported target.",
+          },
+        ],
+      },
+      artifact: {
+        kind: "workspace-image",
+      },
+      commands: [],
+      network: {
+        internalPort: 8080,
+        upstreamProtocol: "http",
+        exposureMode: "reverse-proxy",
+      },
+      health: {
+        enabled: false,
+        kind: "none",
+      },
+      warnings: [],
+      unsupportedReasons: [
+        {
+          code: "buildpack-target-unavailable",
+          category: "blocked",
+          phase: "runtime-target-resolution",
+          message: "Buildpack lifecycle support is unavailable for the selected target.",
+          recommendation: "Configure explicit runtime commands or select a supported target.",
+        },
+      ],
+      nextActions: [
+        {
+          kind: "command",
+          targetOperation: "resources.configure-runtime",
+          label: "Configure runtime",
+          safeByDefault: true,
+          blockedReasonCode: "buildpack-target-unavailable",
+        },
+      ],
+      generatedAt: "2026-04-30T00:00:00.000Z",
+    });
+
+    expect(parsed.readiness.ready).toBe(false);
+    expect(parsed.buildpack?.status).toBe("unavailable");
+    expect(parsed.unsupportedReasons[0]?.code).toBe("buildpack-target-unavailable");
+  });
+
+  test("[DPP-CATALOG-BP-001][WF-PLAN-BP-003][WF-PLAN-BP-009] exposes ready buildpack accelerator output", () => {
+    const parsed = deploymentPlanResponseSchema.parse({
+      schemaVersion: "deployments.plan/v1",
+      context: {
+        projectId: "proj_demo",
+        environmentId: "env_demo",
+        resourceId: "res_unknown",
+        serverId: "srv_local",
+        destinationId: "dst_local",
+        resourceName: "Unknown Web Service",
+      },
+      readiness: {
+        status: "warning",
+        ready: true,
+        reasonCodes: [],
+      },
+      source: {
+        kind: "local-folder",
+        displayName: "unknown-buildpack-app",
+        locator: "/workspace/unknown-buildpack-app",
+        runtimeFamily: "go",
+        applicationShape: "serverful-http",
+        detectedFiles: ["go.mod", "project.toml"],
+        detectedScripts: [],
+        reasoning: ["No first-class planner matched; buildpack evidence is available"],
+      },
+      planner: {
+        plannerKey: "buildpack",
+        supportTier: "buildpack-accelerated",
+        buildStrategy: "buildpack",
+        packagingMode: "all-in-one-docker",
+        targetKind: "single-server",
+        targetProviderKey: "local-shell",
+      },
+      buildpack: {
+        status: "selected",
+        supportTier: "buildpack-accelerated",
+        evidence: {
+          platformFiles: ["project.toml"],
+          languageFamilies: ["go"],
+          frameworkHints: ["generic-http"],
+          builderEvidence: ["default-builder-policy"],
+          detectedBuildpacks: [
+            {
+              id: "paketo-buildpacks/go",
+              version: "4.12.0",
+            },
+          ],
+        },
+        builderPolicy: {
+          defaultBuilder: "paketobuildpacks/builder-jammy-base",
+          override: "allowed",
+          blockedBuilders: [],
+        },
+        artifactIntent: "build-image",
+        limitations: [
+          {
+            code: "buildpack-not-first-class-planner",
+            message:
+              "This preview uses adapter-owned buildpack evidence until an explicit planner exists.",
+          },
+        ],
+      },
+      artifact: {
+        kind: "workspace-image",
+        runtimeArtifactKind: "image",
+        runtimeArtifactIntent: "build-image",
+        metadata: {
+          planner: "buildpack",
+          builder: "paketobuildpacks/builder-jammy-base",
+          applicationShape: "serverful-http",
+        },
+      },
+      commands: [
+        { kind: "package", command: "build OCI image with selected builder", source: "planner" },
+      ],
+      network: {
+        internalPort: 8080,
+        upstreamProtocol: "http",
+        exposureMode: "reverse-proxy",
+      },
+      health: {
+        enabled: false,
+        kind: "none",
+      },
+      warnings: [
+        {
+          code: "buildpack-preview-limited",
+          category: "warning",
+          phase: "runtime-plan-resolution",
+          message:
+            "Buildpack acceleration is preview-only and does not imply first-class framework support.",
+          recommendation:
+            "Add explicit resource runtime commands if the generated plan is not sufficient.",
+        },
+      ],
+      unsupportedReasons: [],
+      nextActions: [
+        {
+          kind: "command",
+          targetOperation: "deployments.create",
+          label: "Deploy",
+          safeByDefault: false,
+        },
+      ],
+      generatedAt: "2026-04-30T00:00:00.000Z",
+    });
+
+    expect(parsed.planner.supportTier).toBe("buildpack-accelerated");
+    expect(parsed.buildpack?.status).toBe("selected");
+    expect(parsed.buildpack?.evidence.detectedBuildpacks[0]?.id).toBe("paketo-buildpacks/go");
+    expect(parsed.health.kind).toBe("none");
+  });
+
+  test("[DPP-CATALOG-BP-002][WF-PLAN-BP-005][WF-PLAN-BP-006][WF-PLAN-BP-007] exposes blocked buildpack guardrails", () => {
+    const parsed = deploymentPlanResponseSchema.parse({
+      schemaVersion: "deployments.plan/v1",
+      context: {
+        projectId: "proj_demo",
+        environmentId: "env_demo",
+        resourceId: "res_ambiguous",
+        serverId: "srv_local",
+        destinationId: "dst_local",
+      },
+      readiness: {
+        status: "blocked",
+        ready: false,
+        reasonCodes: [
+          "ambiguous-buildpack-evidence",
+          "unsupported-buildpack-builder",
+          "internal-port-missing",
+        ],
+      },
+      source: {
+        kind: "local-folder",
+        displayName: "ambiguous-buildpack-app",
+        locator: "/workspace/ambiguous-buildpack-app",
+        applicationShape: "serverful-http",
+        detectedFiles: ["package.json", "Gemfile", "project.toml"],
+        detectedScripts: ["build"],
+        reasoning: ["Multiple buildpack language families were detected"],
+      },
+      planner: {
+        plannerKey: "buildpack",
+        supportTier: "requires-override",
+        buildStrategy: "buildpack",
+        packagingMode: "all-in-one-docker",
+        targetKind: "single-server",
+        targetProviderKey: "local-shell",
+      },
+      buildpack: {
+        status: "blocked",
+        supportTier: "requires-override",
+        evidence: {
+          platformFiles: ["project.toml"],
+          languageFamilies: ["node", "ruby"],
+          frameworkHints: ["express", "rack"],
+          builderEvidence: ["custom-builder"],
+          detectedBuildpacks: [
+            { id: "paketo-buildpacks/nodejs" },
+            { id: "paketo-buildpacks/ruby" },
+          ],
+        },
+        builderPolicy: {
+          defaultBuilder: "paketobuildpacks/builder-jammy-base",
+          override: "blocked",
+          requestedBuilder: "example.com/unsupported/builder:latest",
+          blockedBuilders: ["example.com/unsupported/builder:latest"],
+        },
+        artifactIntent: "build-image",
+        limitations: [
+          {
+            code: "ambiguous-buildpack-evidence",
+            message: "Multiple buildpack language families were detected.",
+            fixPath: "Select a source root or configure explicit runtime commands.",
+          },
+          {
+            code: "unsupported-buildpack-builder",
+            message: "The requested builder is outside Appaloft policy.",
+            fixPath: "Use the default builder or an allowed builder override.",
+          },
+          {
+            code: "internal-port-missing",
+            message: "Inbound buildpack applications still require resource network internalPort.",
+            fixPath: "Run resources.configure-network with an internal port.",
+          },
+        ],
+      },
+      artifact: {
+        kind: "workspace-image",
+      },
+      commands: [],
+      network: {
+        upstreamProtocol: "http",
+        exposureMode: "reverse-proxy",
+      },
+      health: {
+        enabled: false,
+        kind: "none",
+      },
+      warnings: [],
+      unsupportedReasons: [
+        {
+          code: "ambiguous-buildpack-evidence",
+          category: "blocked",
+          phase: "runtime-plan-resolution",
+          message: "Buildpack evidence is ambiguous.",
+          recommendation: "Select a source root or configure explicit runtime commands.",
+        },
+        {
+          code: "unsupported-buildpack-builder",
+          category: "blocked",
+          phase: "runtime-plan-resolution",
+          message: "Requested buildpack builder is unsupported.",
+          recommendation: "Use the default builder or an allowed override.",
+        },
+        {
+          code: "internal-port-missing",
+          category: "blocked",
+          phase: "resource-network-resolution",
+          message: "Buildpack port hints are not the resource network source of truth.",
+          recommendation: "Configure ResourceNetworkProfile.internalPort before deployment.",
+        },
+      ],
+      nextActions: [
+        {
+          kind: "command",
+          targetOperation: "resources.configure-runtime",
+          label: "Configure runtime",
+          safeByDefault: true,
+          blockedReasonCode: "ambiguous-buildpack-evidence",
+        },
+        {
+          kind: "command",
+          targetOperation: "resources.configure-network",
+          label: "Configure network",
+          safeByDefault: true,
+          blockedReasonCode: "internal-port-missing",
+        },
+      ],
+      generatedAt: "2026-04-30T00:00:00.000Z",
+    });
+
+    expect(parsed.readiness.ready).toBe(false);
+    expect(parsed.planner.supportTier).toBe("requires-override");
+    expect(parsed.buildpack?.builderPolicy.override).toBe("blocked");
+    expect(parsed.unsupportedReasons.map((reason) => reason.code)).toContain(
+      "internal-port-missing",
+    );
+  });
 });

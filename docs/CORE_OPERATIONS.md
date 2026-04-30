@@ -469,6 +469,10 @@ Current boundary:
   tier, Docker/OCI artifact intent, sanitized command specs, network, health, access summary,
   warnings, and unsupported reasons, and stops before deployment attempt creation or runtime
   execution.
+- buildpack-style detection may appear in `deployments.plan` only as adapter-owned accelerator
+  evidence, support tier, builder policy, limitations, and fix paths. Explicit framework planners,
+  explicit custom commands, and explicit container-native profiles take precedence, and buildpack
+  fields must not be added to `deployments.create`.
 - `deployments.plan` must not persist plan records, publish deployment lifecycle events, execute
   build/run/verify/proxy work, mutate runtime/server state, or accept source/runtime/network fields
   that belong to resource profile commands.

@@ -168,6 +168,14 @@ Initial stable unsupported or blocked reason codes:
 - `incompatible-source-strategy`
 - `runtime-target-unsupported`
 - `access-plan-unavailable`
+- `buildpack-disabled`
+- `buildpack-target-unavailable`
+- `unsupported-buildpack-builder`
+- `unsupported-buildpack-lifecycle-feature`
+- `ambiguous-buildpack-evidence`
+- `missing-buildpack-evidence`
+- `buildpack-start-intent-missing`
+- `buildpack-preview-limited`
 
 ## Scenarios And Acceptance Criteria
 
@@ -181,6 +189,8 @@ Initial stable unsupported or blocked reason codes:
 | DPP-SPEC-006 | Prebuilt image | Source/runtime profile selects prebuilt image | User requests plan | Artifact kind is prebuilt image, image identity is sanitized, and build commands are absent. |
 | DPP-SPEC-007 | Custom command fallback | Runtime profile provides explicit install/build/start commands | User requests plan | Planner reports custom command image intent and returns sanitized command specs. |
 | DPP-SPEC-008 | Entrypoint parity | Web, CLI, HTTP/oRPC, and future MCP/tool ask for the same ids | Each surface calls the query | They receive the same schema and do not reimplement planner rules locally. |
+| DPP-SPEC-009 | Buildpack-accelerated candidate | No explicit Appaloft planner or explicit profile owns the source, but adapter-owned buildpack evidence can produce an OCI image intent | User requests plan | Result exposes buildpack evidence, `buildpack-accelerated` support tier, builder policy, limitations, and no deployment input overrides. |
+| DPP-SPEC-010 | Blocked buildpack candidate | Buildpack acceleration is disabled, unavailable, ambiguous, missing required evidence, or blocked by unsupported builder/lifecycle policy | User requests plan | Result is `blocked` with stable reason codes and next actions pointing to resource runtime/network configuration or explicit fallback commands. |
 
 ## Public Surfaces
 
@@ -191,6 +201,9 @@ Initial stable unsupported or blocked reason codes:
 - HTTP/oRPC: `GET /api/deployments/plan` or equivalent oRPC query using the shared input schema.
 - Future MCP/tool: read-only deployment planning tool mapped to `deployments.plan`.
 - Public docs/help: deploy page anchor `deployment-plan-preview`.
+
+When buildpack accelerator evidence is present, all surfaces must display it as planner evidence
+and limitations, not as a new deployment method or a replacement for explicit framework planners.
 
 ## Domain Ownership
 

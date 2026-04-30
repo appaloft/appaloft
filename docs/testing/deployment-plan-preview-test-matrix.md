@@ -59,6 +59,8 @@ creating a deployment attempt, publishing deployment events, or executing runtim
 | DPP-CATALOG-004 | contract/integration | Blocked unsupported, ambiguous, or missing Python evidence | `deployments.plan/v1` can expose `blocked` readiness, stable reason code such as `unsupported-framework`, `ambiguous-python-app-target`, `missing-asgi-app`, `missing-wsgi-app`, `missing-production-start-command`, or `internal-port-missing`, safe evidence, and remediation without returning transport failure. |
 | DPP-CATALOG-005 | contract/integration | Ready JVM/Spring supported plan | `deployments.plan/v1` can expose JVM source evidence, Spring Boot framework metadata, Maven/Gradle build tool, planner key/support tier, artifact kind, build/package/start command specs, network, health, warnings, and next actions without deployment id or execution output. |
 | DPP-CATALOG-006 | contract/integration | Blocked unsupported, ambiguous, or missing JVM evidence | `deployments.plan/v1` can expose `blocked` readiness, stable reason code such as `unsupported-framework`, `ambiguous-jvm-build-tool`, `missing-jvm-build-tool`, `missing-runnable-jar`, `missing-production-start-command`, or `internal-port-missing`, safe evidence, and remediation without returning transport failure. |
+| DPP-CATALOG-BP-001 | contract/integration | Ready buildpack-accelerated candidate | `deployments.plan/v1` can expose adapter-owned buildpack evidence, `buildpack-accelerated` support tier, Docker/OCI image intent, builder policy, detected buildpacks, limitations, warnings, and next actions without deployment id, execution output, or deployment input overrides. |
+| DPP-CATALOG-BP-002 | contract/integration | Blocked buildpack candidate | `deployments.plan/v1` can expose `blocked` readiness, stable reason codes such as `buildpack-disabled`, `buildpack-target-unavailable`, `unsupported-buildpack-builder`, `unsupported-buildpack-lifecycle-feature`, `ambiguous-buildpack-evidence`, `missing-buildpack-evidence`, `buildpack-start-intent-missing`, or `internal-port-missing`, safe evidence, limitations, and remediation without returning transport failure. |
 
 ## Current Implementation Notes And Migration Gaps
 
@@ -68,5 +70,8 @@ catalog to the shared preview response shape. `DPP-CATALOG-003` and `DPP-CATALOG
 Python planner catalog to the same preview response shape, including ASGI/WSGI app-target blocked
 reason codes. `DPP-CATALOG-005` and `DPP-CATALOG-006` bind JVM/Spring Boot planner output to the
 same preview response shape, including Maven/Gradle ambiguity, missing runnable jar, missing
-production start, and unsupported JVM framework blocked reason codes. Full future MCP/tool
-descriptors remain a migration gap until MCP/tool surfaces are active.
+production start, and unsupported JVM framework blocked reason codes. `DPP-CATALOG-BP-001` and
+`DPP-CATALOG-BP-002` govern buildpack accelerator preview parity without claiming real
+`pack`/lifecycle execution. Executable contract tests bind these rows to the shared
+`deployments.plan/v1` schema. Full future MCP/tool descriptors remain a migration gap until
+MCP/tool surfaces are active.

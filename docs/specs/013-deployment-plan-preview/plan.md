@@ -84,6 +84,8 @@ Minimum Code Round automation:
 
 - application query tests for ready plan, unsupported framework, missing static output, missing
   start command, Dockerfile, Compose, prebuilt image, and custom-command paths;
+- contract/query tests for ready buildpack-accelerated preview and blocked buildpack guardrails
+  without real buildpack execution;
 - contract tests proving no deployment attempt or events are created;
 - HTTP/oRPC route/client contract tests for the shared query schema;
 - CLI tests for human and JSON output;

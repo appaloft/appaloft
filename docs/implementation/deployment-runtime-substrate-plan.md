@@ -210,6 +210,10 @@ Required coverage:
 - public Web/API/CLI contracts do not accept Docker-native deployment input fields.
 - public Web/API/CLI contracts do not accept framework-specific deployment fields such as
   framework, package name, base image, Kubernetes namespace, buildpack name, or runtime preset.
+- buildpack-style detection is adapter-owned accelerator evidence only: explicit framework
+  planners, explicit custom commands, and explicit container-native profiles win; preview output
+  exposes builder policy, detected buildpacks, limitations, unsupported/ambiguous/missing evidence
+  reason codes, and fix paths without adding deployment input fields.
 - target backend registry selects local and generic-SSH backends by provider key/capabilities
   without expanding transport input schemas;
 - unsupported target/provider/capability combinations return structured `runtime-target-resolution`
@@ -338,6 +342,14 @@ these rows to source inspection, planner/base-image policy, command specs, artif
 Dockerfile generation intent, internal HTTP verification, and headless Docker/OCI execution
 readiness. `deployments.plan/v1` contract coverage proves ready and blocked JVM planner output uses
 the same preview shape and remediation language as the JavaScript/TypeScript/Python closures.
+
+Buildpack accelerator contract and preview guardrails now have stable source-of-truth rows for
+explicit planner precedence, explicit custom/container-native precedence, buildpack-accelerated
+preview, disabled/unavailable target blocking, unsupported builder/lifecycle features, ambiguous
+evidence, missing internal port, explicit override precedence, environment/secret boundary, and
+future MCP/tool metadata parity. The first Code Round should use a hermetic fake adapter-owned
+resolver/contract test and must not wire real `pack` or lifecycle execution until a later
+adapter/runtime spec and tests govern it.
 
 `build-requested`, resolved image ids/digests, runtime instance identity, rollback candidate
 capture, command specs on the durable runtime plan boundary, and richer source-file analysis are
