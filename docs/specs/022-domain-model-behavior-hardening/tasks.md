@@ -131,6 +131,16 @@
 - [x] Run `bun test packages/core/test/certificate.test.ts`.
 - [x] Run `bun test packages/application/test/issue-or-renew-certificate.test.ts`.
 
+## Slice 11: Identity Governance Membership And Seat Behavior
+
+- [x] `DMBH-IDENTITY-001`: add Organization membership/seat behavior tests at
+  `packages/core/test/organization.test.ts`.
+- [x] Add `OrganizationMember`, `OrganizationPlan`, and `Organization` behavior for matching a
+  user, testing member capacity, and validating plan changes against current member count.
+- [x] Refactor `Organization.addMember` and `Organization.changePlan` to call intention methods
+  instead of peeling child state through `toState()` for domain decisions.
+- [x] Run `bun test packages/core/test/organization.test.ts`.
+
 ## Verification
 
 - [x] Run affected core tests for each slice.

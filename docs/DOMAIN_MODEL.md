@@ -135,7 +135,9 @@ Current boundary audit state:
   context ownership checks in deployment/source-link orchestration have been moved behind aggregate
   behavior; domain-binding redirect target checks have been moved behind aggregate behavior;
   certificate attempt selection has been moved behind certificate aggregate behavior;
-  identity-governance membership/seat calculations remain a future slice.
+  identity-governance membership/seat calculations have been moved behind organization aggregate
+  behavior. No hotspot from the original model-hardening boundary audit remains open in this
+  artifact.
 
 ## Bounded Contexts
 
@@ -735,6 +737,8 @@ Meaning:
 Rules:
 - at least one owner must exist at creation time
 - plan changes cannot invalidate the current member count
+- membership identity is owned by `OrganizationMember`; seat capacity is owned by
+  `OrganizationPlan`; `Organization` coordinates those rules across its owned members and plan
 
 Current scope:
 - foundational aggregate in `core`
