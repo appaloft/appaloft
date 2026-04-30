@@ -3,7 +3,7 @@
 ## Status
 
 - Round: Spec Round
-- Artifact state: slices 1, 2, 3, 4, 5, and 6 implemented; ready for slice 7 boundary audit
+- Artifact state: slices 1, 2, 3, 4, 5, 6, and 7 implemented; remaining hotspots recorded for future slices
 - Behavior type: no-behavior-change domain model refactor
 - Public behavior impact: none
 
@@ -38,6 +38,7 @@ helpers, providers, and adapters.
 | DMBH-SPEC-004 | Configuration precedence belongs to configuration values | Environment/resource configuration entries and snapshots share key/exposure/scope identity | a set entry, unset, snapshot, or diff operation runs | Entry identity, scope matching, precedence, and snapshot equality are expressed on configuration value objects or `EnvironmentConfigSet`, not by repeated external string keys or caller-owned state peeling. |
 | DMBH-SPEC-005 | Deployment execution guard uses deployment intent | A deployment may be active, cancel-requested, canceled, superseded, or terminal | execution code decides whether work may continue or whether supersede requires runtime cancellation | The decision is named on `Deployment` or `DeploymentStatusValue`; application guards do not branch on raw status literals. |
 | DMBH-SPEC-006 | Workload/runtime compatibility is model-owned | A workload kind and runtime spec must remain compatible | workload declaration validates a static site, worker, or web-server runtime | `Workload` owns the compatibility rule across workload kind and runtime spec; `RuntimeSpec` owns the single-runtime rule that web-server runtime requires a port. |
+| DMBH-SPEC-007 | Boundary audit classifies remaining state reads | `toState()` remains in core, application, persistence, and adapter code after focused slices | a model-hardening round ends | Remaining state reads are classified as allowed boundary serialization/mapping/specification reads or recorded as future model-hardening hotspots; no whole-repository mechanical rewrite is performed. |
 
 ## Domain Ownership
 

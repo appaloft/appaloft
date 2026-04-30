@@ -241,6 +241,10 @@ export class EnvironmentConfigSnapshot extends ValueObject<EnvironmentConfigSnap
     return this.state.id.value;
   }
 
+  get snapshotId(): EnvironmentSnapshotId {
+    return this.state.id;
+  }
+
   get environmentId(): string {
     return this.state.environmentId.value;
   }

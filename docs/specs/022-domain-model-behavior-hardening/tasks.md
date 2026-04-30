@@ -85,9 +85,15 @@
   runtime state.
 - [x] Run `bun test packages/core/test/workload.test.ts`.
 
-## Later Slices
+## Slice 7: Boundary Audit
 
-- [ ] Slice 7: audit remaining `toState()` usage and classify boundary allowances.
+- [x] Audit remaining `toState()` and primitive `.value` decision reads across core, application,
+  persistence, adapter, provider, integration, plugin, shell, and web packages.
+- [x] Classify persistence/read-model/adapter/DTO/test `toState()` usage as allowed boundary reads.
+- [x] Record remaining non-boundary hotspots as future slices instead of rewriting the whole
+  repository mechanically.
+- [x] Harden the low-risk `Deployment`/`RuntimePlan` state-read cleanup found during the audit.
+- [x] Run `bun test packages/core/test/deployment.test.ts`.
 
 ## Verification
 

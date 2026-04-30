@@ -73,7 +73,7 @@ export class Deployment extends AggregateRoot<DeploymentState> {
     supersedesDeploymentId?: DeploymentId;
     supersededByDeploymentId?: DeploymentId;
   }): Result<Deployment> {
-    if (input.runtimePlan.toState().steps.length === 0) {
+    if (!input.runtimePlan.hasSteps()) {
       return err(domainError.validation("Runtime plan must contain at least one step"));
     }
 
@@ -199,15 +199,12 @@ export class Deployment extends AggregateRoot<DeploymentState> {
       this.state.status = nextStatus;
 
       const executionMetadata = {
-        ...(this.state.runtimePlan.toState().execution.toState().metadata ?? {}),
         ...(resultState.metadata ?? {}),
         ...(resultState.errorCode ? { errorCode: resultState.errorCode.value } : {}),
       };
 
       if (Object.keys(executionMetadata).length > 0) {
-        this.state.runtimePlan = this.state.runtimePlan.withExecution(
-          this.state.runtimePlan.toState().execution.withMetadata(executionMetadata),
-        );
+        this.state.runtimePlan = this.state.runtimePlan.withExecutionMetadata(executionMetadata);
       }
 
       const failurePhase = resultState.metadata?.phase;
@@ -232,8 +229,8 @@ export class Deployment extends AggregateRoot<DeploymentState> {
     return RollbackPlan.create({
       id: input.id,
       deploymentId: this.state.id,
-      snapshotId: this.state.environmentSnapshot.toState().id,
-      target: this.state.runtimePlan.toState().target,
+      snapshotId: this.state.environmentSnapshot.snapshotId,
+      target: this.state.runtimePlan.target,
       steps: [
         PlanStepText.rehydrate("Resolve release snapshot"),
         PlanStepText.rehydrate("Prepare rollback package"),
