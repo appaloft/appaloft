@@ -115,6 +115,8 @@ owning object rather than from a search for primitive state reads. For example:
   effective snapshot, and snapshot diff questions;
 - a `Deployment` should answer execution-continuation and supersede-related status questions;
 - `Workload` and `RuntimeSpec` should answer workload/runtime compatibility questions.
+  `RuntimeSpec` owns single-runtime requirements such as whether a web-server runtime needs a
+  port; `Workload` owns compatibility across its workload kind and owned runtime spec.
 
 Remaining `toState()` usage must be classified as a boundary read or migrated behind
 intention-revealing methods during the relevant slice.
@@ -603,6 +605,8 @@ Meaning:
 Rules:
 - workload kind, build spec, and runtime spec must remain compatible
 - static sites cannot declare worker runtimes
+- static-site workloads must declare static-site runtimes, worker workloads must not declare
+  web-server runtimes, and web-server runtimes must declare their listener port
 
 Current scope:
 - foundational aggregate in `core`

@@ -1228,6 +1228,14 @@ export class WorkloadKindValue extends EnumValueObject<
   ): WorkloadKindValue {
     return new WorkloadKindValue(value);
   }
+
+  isStaticSite(): boolean {
+    return this.value === "static_site";
+  }
+
+  isWorker(): boolean {
+    return this.value === "worker";
+  }
 }
 
 const runtimeKindBrand: unique symbol = Symbol("RuntimeKindValue");
@@ -1251,6 +1259,18 @@ export class RuntimeKindValue extends EnumValueObject<
 
   static rehydrate(value: "web-server" | "worker" | "scheduler" | "static-site"): RuntimeKindValue {
     return new RuntimeKindValue(value);
+  }
+
+  isStaticSite(): boolean {
+    return this.value === "static-site";
+  }
+
+  isWebServer(): boolean {
+    return this.value === "web-server";
+  }
+
+  requiresPort(): boolean {
+    return this.isWebServer();
   }
 }
 

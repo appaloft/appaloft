@@ -29,14 +29,11 @@ export class Workload extends AggregateRoot<WorkloadState> {
   }
 
   static declare(input: WorkloadState): Result<Workload> {
-    if (
-      input.kind.value === "static_site" &&
-      input.runtime.toState().kind.value !== "static-site"
-    ) {
+    if (input.kind.isStaticSite() && !input.runtime.canRunStaticSiteWorkload()) {
       return err(domainError.validation("Static site workloads must use the static-site runtime"));
     }
 
-    if (input.kind.value === "worker" && input.runtime.toState().kind.value === "web-server") {
+    if (input.kind.isWorker() && !input.runtime.canRunWorkerWorkload()) {
       return err(domainError.validation("Worker workloads cannot use the web-server runtime"));
     }
 

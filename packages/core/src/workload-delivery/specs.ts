@@ -66,11 +66,13 @@ export class RuntimeSpec extends ValueObject<RuntimeSpecState> {
   }
 
   static create(input: RuntimeSpecState): Result<RuntimeSpec> {
-    if (input.kind.value === "web-server" && input.port === undefined) {
+    const runtime = new RuntimeSpec(input);
+
+    if (runtime.requiresPort() && input.port === undefined) {
       return err(domainError.validation("Web-server runtimes must declare a port"));
     }
 
-    return ok(new RuntimeSpec(input));
+    return ok(runtime);
   }
 
   static rehydrate(state: RuntimeSpecState): RuntimeSpec {
@@ -79,5 +81,17 @@ export class RuntimeSpec extends ValueObject<RuntimeSpecState> {
 
   toState(): RuntimeSpecState {
     return { ...this.state };
+  }
+
+  requiresPort(): boolean {
+    return this.state.kind.requiresPort();
+  }
+
+  canRunStaticSiteWorkload(): boolean {
+    return this.state.kind.isStaticSite();
+  }
+
+  canRunWorkerWorkload(): boolean {
+    return !this.state.kind.isWebServer();
   }
 }
