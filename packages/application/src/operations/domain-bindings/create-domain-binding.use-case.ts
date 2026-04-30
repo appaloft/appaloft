@@ -259,8 +259,7 @@ export class CreateDomainBindingUseCase {
           );
         }
 
-        const redirectTargetState = redirectTarget.toState();
-        if (redirectTargetState.redirectTo) {
+        if (!redirectTarget.canServeCanonicalRedirectTarget()) {
           return err(
             domainError.validation(
               "Canonical redirect target must be a served domain binding, not another redirect",

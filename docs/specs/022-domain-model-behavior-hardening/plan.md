@@ -46,6 +46,7 @@
 | 6 | `Workload` and `RuntimeSpec` | Move workload/runtime compatibility questions into Workload Delivery model. | workload declaration |
 | 7 | Boundary audit | Confirm remaining `toState()` usage belongs to allowed serialization/read-model/persistence/adapter/test boundaries. | repository/read-model/adapter code |
 | 8 | `Environment`, `Resource`, and `Destination` context ownership | Move project/environment/server/destination consistency questions into owning aggregates. | deployment context resolver, source-link relink |
+| 9 | `DomainBinding` canonical redirect target behavior | Move served redirect target eligibility into the binding aggregate. | domain binding create and route configuration |
 
 ## Roadmap And Compatibility
 
@@ -114,6 +115,13 @@
 - Related application tests after slice 8:
   - `packages/application/test/create-deployment.test.ts`
   - `packages/application/test/relink-source-link.test.ts`
+- Slice 9 test bindings:
+  - `DMBH-DOMAIN-002` in `packages/core/test/domain-binding.test.ts`
+  - Existing behavioral rows: `ROUTE-TLS-CMD-021`, `ROUTE-TLS-ENTRY-016`,
+    `ROUTE-TLS-ENTRY-017`, `ROUTE-TLS-ENTRY-022`
+- Related application tests after slice 9:
+  - `packages/application/test/domain-binding-lifecycle.test.ts`
+  - `packages/application/test/create-domain-binding.test.ts`
 
 ## Risks And Migration Gaps
 
@@ -130,9 +138,10 @@
   - Slice 8 migrated context ownership checks in `deployment-context.resolver.ts` and
     `source-links/relink-source-link.use-case.ts` behind `Environment`, `Resource`, and
     `Destination` behavior.
-  - Remaining future hotspots are route redirect-target checks in
-    `configure-domain-binding-route.use-case.ts`, certificate attempt selection in
-    `issue-certificate-on-certificate-requested.handler.ts`, and identity-governance membership/seat
+  - Slice 9 migrated route redirect-target checks in `create-domain-binding.use-case.ts` and
+    `configure-domain-binding-route.use-case.ts` behind `DomainBinding` behavior.
+  - Remaining future hotspots are certificate attempt selection in
+    `issue-certificate-on-certificate-requested.handler.ts` and identity-governance membership/seat
     calculations in `packages/core/src/identity-governance/organization.ts`.
   - Core value objects may compare their own primitive state internally. Those reads are not
     boundary leaks.

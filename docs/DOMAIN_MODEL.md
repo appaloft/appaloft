@@ -110,7 +110,8 @@ owning object rather than from a search for primitive state reads. For example:
   server-applied route planning and whether it can be selected for proxy bootstrap/repair;
 - a `DomainBinding` should answer whether ownership, route, and certificate readiness transitions
   apply, including certificate issue/import admission and whether a domain-bound, certificate, or
-  route realization event may make the binding ready;
+  route realization event may make the binding ready. It should also answer whether it can serve
+  as the target of a managed canonical redirect alias;
 - `EnvironmentConfigSet` and its entries should answer identity, scope matching, precedence,
   effective snapshot, and snapshot diff questions;
 - a `Deployment` should answer execution-continuation and supersede-related status questions;
@@ -132,8 +133,9 @@ Current boundary audit state:
   intention methods;
 - remaining model-hardening hotspots are future slices, not part of a mechanical rewrite:
   context ownership checks in deployment/source-link orchestration have been moved behind aggregate
-  behavior; domain-binding redirect target checks, certificate attempt selection, and
-  identity-governance membership/seat calculations remain future slices.
+  behavior; domain-binding redirect target checks have been moved behind aggregate behavior;
+  certificate attempt selection and identity-governance membership/seat calculations remain future
+  slices.
 
 ## Bounded Contexts
 
@@ -576,6 +578,8 @@ Rules:
 - active bindings must be unique by normalized project/environment/resource/domain/path scope
 - a binding may be a managed canonical redirect alias when `redirectTo` references an existing
   served binding in the same owner/path scope; redirect aliases still own their source hostname
+- bindings answer whether they can serve as a managed canonical redirect target; redirect aliases
+  cannot serve as redirect targets for other bindings
 - durable bindings require an edge proxy kind; `none` is only valid for deployment runtime
   access-route hints
 - command success means the request is accepted and pending verification, not traffic readiness

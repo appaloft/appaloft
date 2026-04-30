@@ -109,6 +109,17 @@
 - [x] Run `bun test packages/application/test/create-deployment.test.ts`.
 - [x] Run `bun test packages/application/test/relink-source-link.test.ts`.
 
+## Slice 9: Domain Binding Redirect Target Behavior
+
+- [x] `DMBH-DOMAIN-002`: add DomainBinding canonical redirect target behavior tests at
+  `packages/core/test/domain-binding.test.ts`.
+- [x] Add `DomainBinding` behavior for served canonical redirect target eligibility.
+- [x] Refactor domain binding create and route configuration use cases to ask `DomainBinding`
+  whether a found target can serve redirects instead of peeling target state.
+- [x] Run `bun test packages/core/test/domain-binding.test.ts`.
+- [x] Run `bun test packages/application/test/domain-binding-lifecycle.test.ts`.
+- [x] Run `bun test packages/application/test/create-domain-binding.test.ts`.
+
 ## Verification
 
 - [x] Run affected core tests for each slice.
