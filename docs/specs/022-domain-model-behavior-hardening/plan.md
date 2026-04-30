@@ -55,6 +55,7 @@
 | Continuous C | `ResourceKindValue` and `ResourceServiceKindValue` internal-port predicates | Move inbound listener requirement literals out of the aggregate method and into owned value objects. | `Resource.requiresInternalPort()` |
 | Continuous D | `DomainBindingStatusValue` lifecycle gates | Move ready, route-failure, and verification-retry status sets into the status value object. | `DomainBinding` lifecycle methods |
 | Continuous E | `Environment`, `Resource`, and `Destination` context ownership for domain bindings | Reuse aggregate ownership behavior for durable domain binding context admission. | `domain-bindings.create` |
+| Continuous F | `AccessRoute`, `RuntimeArtifactKindValue`, and `RuntimeArtifactIntentValue` | Move runtime-plan route/artifact prerequisite checks into VO predicates. | `AccessRoute.create`, `RuntimeArtifactSnapshot.create` |
 
 ## Roadmap And Compatibility
 
@@ -169,6 +170,11 @@
   - Matrix row: `ROUTE-TLS-CMD-006`
 - Related application tests after Continuous E:
   - `packages/application/test/create-domain-binding.test.ts`
+- Continuous F test bindings:
+  - `DMBH-RUNTIME-001` in `packages/core/test/runtime-plan.test.ts`
+- Related application tests after Continuous F:
+  - none; this is core runtime-plan admission behavior already exercised by higher-level deployment
+    tests.
 
 ## Risks And Migration Gaps
 
@@ -202,6 +208,8 @@
     `DomainBindingStatusValue`.
   - Continuous E migrates `domain-bindings.create` context ownership checks behind `Environment`,
     `Resource`, and `Destination` ownership methods.
+  - Continuous F migrates runtime-plan access-route and artifact prerequisite checks behind owned
+    VO predicates.
   - Core value objects may compare their own primitive state internally. Those reads are not
     boundary leaks.
 - A `.codex/skills/domain-driven-develop/SKILL.md` project copy is absent; the current local skill lives under `.agents/skills/domain-driven-develop/SKILL.md`.
