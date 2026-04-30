@@ -892,6 +892,34 @@ export class Resource extends AggregateRoot<ResourceState> {
     return this.rejectInactiveResource("deployments.create");
   }
 
+  get id(): ResourceId {
+    return this.state.id;
+  }
+
+  get projectId(): ProjectId {
+    return this.state.projectId;
+  }
+
+  get environmentId(): EnvironmentId {
+    return this.state.environmentId;
+  }
+
+  get defaultDestinationId(): DestinationId | undefined {
+    return this.state.destinationId;
+  }
+
+  belongsToProject(projectId: ProjectId): boolean {
+    return this.state.projectId.equals(projectId);
+  }
+
+  belongsToEnvironment(environmentId: EnvironmentId): boolean {
+    return this.state.environmentId.equals(environmentId);
+  }
+
+  canDeployToDestination(destinationId: DestinationId): boolean {
+    return !this.state.destinationId || this.state.destinationId.equals(destinationId);
+  }
+
   setVariable(input: {
     key: ConfigKey;
     value: ConfigValueText;

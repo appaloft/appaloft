@@ -3,7 +3,7 @@
 ## Status
 
 - Round: Spec Round
-- Artifact state: slices 1, 2, 3, 4, 5, 6, and 7 implemented; remaining hotspots recorded for future slices
+- Artifact state: slices 1, 2, 3, 4, 5, 6, 7, and 8 implemented; remaining hotspots recorded for future slices
 - Behavior type: no-behavior-change domain model refactor
 - Public behavior impact: none
 
@@ -39,6 +39,7 @@ helpers, providers, and adapters.
 | DMBH-SPEC-005 | Deployment execution guard uses deployment intent | A deployment may be active, cancel-requested, canceled, superseded, or terminal | execution code decides whether work may continue or whether supersede requires runtime cancellation | The decision is named on `Deployment` or `DeploymentStatusValue`; application guards do not branch on raw status literals. |
 | DMBH-SPEC-006 | Workload/runtime compatibility is model-owned | A workload kind and runtime spec must remain compatible | workload declaration validates a static site, worker, or web-server runtime | `Workload` owns the compatibility rule across workload kind and runtime spec; `RuntimeSpec` owns the single-runtime rule that web-server runtime requires a port. |
 | DMBH-SPEC-007 | Boundary audit classifies remaining state reads | `toState()` remains in core, application, persistence, and adapter code after focused slices | a model-hardening round ends | Remaining state reads are classified as allowed boundary serialization/mapping/specification reads or recorded as future model-hardening hotspots; no whole-repository mechanical rewrite is performed. |
+| DMBH-SPEC-008 | Deployment context ownership is model-owned | Environment, Resource, and Destination aggregates belong to selected parent contexts | deployment context resolution or source-link relink validates project/environment/server/destination consistency | Callers ask aggregate-owned intention methods such as `belongsToProject(...)`, `belongsToEnvironment(...)`, `belongsToServer(...)`, and `canDeployToDestination(...)` instead of peeling ids from state for ownership decisions. |
 
 ## Domain Ownership
 
@@ -55,6 +56,8 @@ helpers, providers, and adapters.
   - `Deployment` owns deployment status/execution-continuation questions.
   - `EnvironmentConfigSet` and configuration entry/snapshot value objects own config identity and precedence.
   - `Workload` and `RuntimeSpec` own workload/runtime compatibility.
+  - `Environment`, `Resource`, and `Destination` own context membership and placement compatibility
+    checks used by deployment context resolution and source-link relink admission.
 - Upstream/downstream contexts: no new context relationship is introduced.
 
 ## Public Surfaces

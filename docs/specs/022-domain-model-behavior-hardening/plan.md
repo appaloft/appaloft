@@ -45,6 +45,7 @@
 | 5 | `Deployment` and `DeploymentStatusValue` | Move execution-continuation and supersede status questions into Release Orchestration. | execution guard, deployment create, runtime adapters |
 | 6 | `Workload` and `RuntimeSpec` | Move workload/runtime compatibility questions into Workload Delivery model. | workload declaration |
 | 7 | Boundary audit | Confirm remaining `toState()` usage belongs to allowed serialization/read-model/persistence/adapter/test boundaries. | repository/read-model/adapter code |
+| 8 | `Environment`, `Resource`, and `Destination` context ownership | Move project/environment/server/destination consistency questions into owning aggregates. | deployment context resolver, source-link relink |
 
 ## Roadmap And Compatibility
 
@@ -107,6 +108,12 @@
 - Related application tests after slice 7:
   - none for the audit itself. Existing slice-specific application tests remain the behavior guard
     for previously migrated callers.
+- Slice 8 test bindings:
+  - `DMBH-CONTEXT-001` in `packages/core/test/context-ownership.test.ts`
+  - Existing behavioral rows: `DEP-CREATE-ADM-022`, `SOURCE-LINK-STATE-011`
+- Related application tests after slice 8:
+  - `packages/application/test/create-deployment.test.ts`
+  - `packages/application/test/relink-source-link.test.ts`
 
 ## Risks And Migration Gaps
 
@@ -120,9 +127,10 @@
     `deployment.factory.ts`, `deployment-plan.query-service.ts`, and related read-side builders use
     state reads to build command/query DTOs, context metadata, or repository specs; those are
     allowed application orchestration/read-model boundaries unless they branch on aggregate policy.
-  - Remaining future hotspots are aggregate ownership/specification predicates that still compare
-    state externally: context ownership checks in `deployment-context.resolver.ts` and
-    `source-links/relink-source-link.use-case.ts`, route redirect-target checks in
+  - Slice 8 migrated context ownership checks in `deployment-context.resolver.ts` and
+    `source-links/relink-source-link.use-case.ts` behind `Environment`, `Resource`, and
+    `Destination` behavior.
+  - Remaining future hotspots are route redirect-target checks in
     `configure-domain-binding-route.use-case.ts`, certificate attempt selection in
     `issue-certificate-on-certificate-requested.handler.ts`, and identity-governance membership/seat
     calculations in `packages/core/src/identity-governance/organization.ts`.

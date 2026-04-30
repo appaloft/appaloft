@@ -87,6 +87,10 @@ export class Project extends AggregateRoot<ProjectState> {
     return visitor.visitProject(this, context);
   }
 
+  get id(): ProjectId {
+    return this.state.id;
+  }
+
   toState(): ProjectState {
     return { ...this.state };
   }
