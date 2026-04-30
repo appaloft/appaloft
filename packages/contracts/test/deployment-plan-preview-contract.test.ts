@@ -161,4 +161,168 @@ describe("deployment plan preview contract", () => {
     expect(parsed.unsupportedReasons[0]?.code).toBe("ambiguous-framework");
     expect(parsed.nextActions[0]?.targetOperation).toBe("resources.configure-runtime");
   });
+
+  test("[DPP-CATALOG-003][WF-PLAN-PY-001][WF-PLAN-PY-012] exposes ready Python planner catalog output", () => {
+    const parsed = deploymentPlanResponseSchema.parse({
+      schemaVersion: "deployments.plan/v1",
+      context: {
+        projectId: "proj_demo",
+        environmentId: "env_demo",
+        resourceId: "res_fastapi",
+        serverId: "srv_local",
+        destinationId: "dst_local",
+        resourceName: "FastAPI App",
+      },
+      readiness: {
+        status: "ready",
+        ready: true,
+        reasonCodes: [],
+      },
+      source: {
+        kind: "local-folder",
+        displayName: "fastapi-uv",
+        locator: "/workspace/fastapi-uv",
+        runtimeFamily: "python",
+        framework: "fastapi",
+        packageManager: "uv",
+        applicationShape: "serverful-http",
+        projectName: "fastapi-uv",
+        detectedFiles: ["pyproject-toml", "uv-lock"],
+        detectedScripts: [],
+        reasoning: ["FastAPI ASGI app evidence detected"],
+      },
+      planner: {
+        plannerKey: "fastapi",
+        supportTier: "first-class",
+        buildStrategy: "workspace-commands",
+        packagingMode: "all-in-one-docker",
+        targetKind: "single-server",
+        targetProviderKey: "local-shell",
+      },
+      artifact: {
+        kind: "workspace-image",
+        runtimeArtifactKind: "image",
+        runtimeArtifactIntent: "build-image",
+        metadata: {
+          planner: "fastapi",
+          baseImage: "python:3.12-slim",
+          applicationShape: "serverful-http",
+          packageManager: "uv",
+        },
+      },
+      commands: [
+        {
+          kind: "install",
+          command: "pip install --no-cache-dir uv && uv sync --frozen --no-dev",
+          source: "planner",
+        },
+        {
+          kind: "start",
+          command: "uv run python -m uvicorn main:app --host 0.0.0.0 --port 3000",
+          source: "planner",
+        },
+      ],
+      network: {
+        internalPort: 3000,
+        upstreamProtocol: "http",
+        exposureMode: "reverse-proxy",
+      },
+      health: {
+        enabled: true,
+        kind: "http",
+        path: "/",
+        port: 3000,
+      },
+      warnings: [],
+      unsupportedReasons: [],
+      nextActions: [
+        {
+          kind: "command",
+          targetOperation: "deployments.create",
+          label: "Deploy",
+          safeByDefault: true,
+        },
+      ],
+      generatedAt: "2026-04-30T00:00:00.000Z",
+    });
+
+    expect(parsed.source.runtimeFamily).toBe("python");
+    expect(parsed.source.packageManager).toBe("uv");
+    expect(parsed.planner.plannerKey).toBe("fastapi");
+    expect(parsed.commands.map((command) => command.kind)).toEqual(["install", "start"]);
+  });
+
+  test("[DPP-CATALOG-004][WF-PLAN-PY-009][WF-PLAN-PY-010] exposes blocked Python planner reasons", () => {
+    const parsed = deploymentPlanResponseSchema.parse({
+      schemaVersion: "deployments.plan/v1",
+      context: {
+        projectId: "proj_demo",
+        environmentId: "env_demo",
+        resourceId: "res_python",
+        serverId: "srv_local",
+        destinationId: "dst_local",
+      },
+      readiness: {
+        status: "blocked",
+        ready: false,
+        reasonCodes: ["ambiguous-python-app-target"],
+      },
+      source: {
+        kind: "local-folder",
+        displayName: "generic-python-ambiguous",
+        locator: "/workspace/generic-python-ambiguous",
+        runtimeFamily: "python",
+        packageManager: "uv",
+        applicationShape: "serverful-http",
+        detectedFiles: ["pyproject-toml", "uv-lock"],
+        detectedScripts: [],
+        reasoning: ["Multiple ASGI app targets were detected"],
+      },
+      planner: {
+        plannerKey: "unsupported",
+        supportTier: "unsupported",
+        buildStrategy: "workspace-commands",
+        packagingMode: "all-in-one-docker",
+        targetKind: "single-server",
+        targetProviderKey: "local-shell",
+      },
+      artifact: {
+        kind: "workspace-image",
+      },
+      commands: [],
+      network: {
+        internalPort: 3000,
+        upstreamProtocol: "http",
+        exposureMode: "reverse-proxy",
+      },
+      health: {
+        enabled: false,
+        kind: "none",
+      },
+      warnings: [],
+      unsupportedReasons: [
+        {
+          code: "ambiguous-python-app-target",
+          category: "blocked",
+          phase: "runtime-plan-resolution",
+          message: "Python ASGI/WSGI app target is ambiguous.",
+          recommendation: "Configure an explicit resource runtime start command before deployment.",
+        },
+      ],
+      nextActions: [
+        {
+          kind: "command",
+          targetOperation: "resources.configure-runtime",
+          label: "Configure runtime",
+          safeByDefault: true,
+          blockedReasonCode: "ambiguous-python-app-target",
+        },
+      ],
+      generatedAt: "2026-04-30T00:00:00.000Z",
+    });
+
+    expect(parsed.readiness.ready).toBe(false);
+    expect(parsed.unsupportedReasons[0]?.code).toBe("ambiguous-python-app-target");
+    expect(parsed.nextActions[0]?.targetOperation).toBe("resources.configure-runtime");
+  });
 });

@@ -1,4 +1,12 @@
-import { err, ok, type Result, type SourceInspectionSnapshot } from "@appaloft/core";
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+import {
+  domainError,
+  err,
+  ok,
+  type Result,
+  type SourceInspectionSnapshot,
+} from "@appaloft/core";
 import {
   commandMentions,
   dockerfileFromExecution,
@@ -13,6 +21,18 @@ import {
 } from "./types";
 
 export type PythonPackageManager = "pip" | "poetry" | "uv";
+export type PythonAppProtocol = "asgi" | "wsgi";
+
+export interface PythonAppTarget {
+  protocol: PythonAppProtocol;
+  module: string;
+  object: string;
+}
+
+export interface PythonAppTargetDiscovery {
+  asgi: PythonAppTarget[];
+  wsgi: PythonAppTarget[];
+}
 
 export function resolvePythonPackageManager(
   inspection?: SourceInspectionSnapshot,
@@ -70,6 +90,98 @@ export function pythonRunCommandFor(
   }
 }
 
+function readSourceFile(path: string): string | null {
+  try {
+    return readFileSync(path, "utf8");
+  } catch {
+    return null;
+  }
+}
+
+function hasPythonObjectTarget(text: string | null, objectName: string): boolean {
+  if (!text) {
+    return false;
+  }
+
+  const escaped = objectName.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+  return new RegExp(
+    `(^|\\n)\\s*(?:async\\s+def\\s+${escaped}\\s*\\(|def\\s+${escaped}\\s*\\(|${escaped}\\s*=)`,
+    "u",
+  ).test(text);
+}
+
+function collectTargets(input: {
+  sourceRoot: string;
+  protocol: PythonAppProtocol;
+  candidates: readonly string[];
+}): PythonAppTarget[] {
+  const targets: PythonAppTarget[] = [];
+
+  for (const candidate of input.candidates) {
+    const filePath = join(input.sourceRoot, candidate);
+    if (!existsSync(filePath)) {
+      continue;
+    }
+
+    const text = readSourceFile(filePath);
+    const module = candidate.replace(/\.py$/u, "");
+
+    for (const objectName of ["app", "application"]) {
+      if (hasPythonObjectTarget(text, objectName)) {
+        targets.push({
+          protocol: input.protocol,
+          module,
+          object: objectName,
+        });
+      }
+    }
+  }
+
+  return targets;
+}
+
+export function discoverPythonAppTargets(sourceRoot: string): PythonAppTargetDiscovery {
+  return {
+    asgi: collectTargets({
+      sourceRoot,
+      protocol: "asgi",
+      candidates: ["asgi.py", "main.py", "app.py"],
+    }),
+    wsgi: collectTargets({
+      sourceRoot,
+      protocol: "wsgi",
+      candidates: ["wsgi.py"],
+    }),
+  };
+}
+
+export function formatPythonAppTarget(target: PythonAppTarget): string {
+  return `${target.module}:${target.object}`;
+}
+
+export function pythonAppTargetValidationError(input: {
+  message: string;
+  reasonCode: "ambiguous-python-app-target" | "missing-asgi-app" | "missing-wsgi-app";
+  inspection?: SourceInspectionSnapshot | undefined;
+  protocol?: PythonAppProtocol;
+  targets?: PythonAppTarget[];
+}) {
+  return domainError.validation(input.message, {
+    phase: "runtime-plan-resolution",
+    reasonCode: input.reasonCode,
+    ...(input.inspection?.runtimeFamily ? { runtimeFamily: input.inspection.runtimeFamily } : {}),
+    ...(input.inspection?.framework ? { framework: input.inspection.framework } : {}),
+    ...(input.inspection?.packageManager ? { packageManager: input.inspection.packageManager } : {}),
+    ...(input.inspection?.applicationShape
+      ? { applicationShape: input.inspection.applicationShape }
+      : {}),
+    ...(input.protocol ? { pythonAppProtocol: input.protocol } : {}),
+    ...(input.targets && input.targets.length > 0
+      ? { pythonAppTargets: input.targets.map(formatPythonAppTarget).join(",") }
+      : {}),
+  });
+}
+
 export function pythonDockerBuild(
   input: WorkspaceDockerfileInput,
 ): GeneratedDockerBuildResult | null {
@@ -98,7 +210,7 @@ export function pythonDockerfile(input: WorkspaceDockerfileInput): string | null
 }
 
 export const pythonWorkspacePlanner: WorkspaceRuntimePlanner = {
-  name: "python",
+  name: "generic-python",
   runtimeKind: "python",
 
   detect(input) {
@@ -135,6 +247,9 @@ export const pythonWorkspacePlanner: WorkspaceRuntimePlanner = {
         runtimeKind: this.runtimeKind,
         baseImage,
         applicationShape: "serverful-http",
+        extra: {
+          packageManager: resolvePythonPackageManager(input.source.inspection),
+        },
       }),
     });
   },

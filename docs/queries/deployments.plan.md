@@ -92,6 +92,9 @@ known unsupported plan as transport failure.
   docs/help, and targeted contract coverage.
 - The query shares the runtime planning boundary with `deployments.create` and stops before attempt
   creation, event publication, or runtime execution.
+- The preview contract has catalog parity rows for ready and blocked JavaScript/TypeScript planner
+  output and ready and blocked Python planner output, including ASGI/WSGI app-target remediation
+  reason codes.
 - Access plan summary may initially report unavailable when existing read models cannot provide a
   safe summary.
 - Draft profile preview before `resources.create` remains out of scope.

@@ -1,0 +1,6 @@
+[project]
+name = "generic-python-ambiguous"
+version = "0.1.0"
+dependencies = [
+  "uvicorn==0.34.0",
+]
