@@ -539,7 +539,7 @@ Required:
 
 Exit criteria:
 
-- [ ] The zero-to-SSH loop works for at least: Next.js, Vite static SPA, Astro static, Nuxt
+- [x] The zero-to-SSH loop works for at least: Next.js, Vite static SPA, Astro static, Nuxt
   generate, SvelteKit static, Remix, FastAPI, Django, Flask, generic Node, generic Python, generic
   Java, Dockerfile, Docker Compose, prebuilt image, and explicit custom commands.
 - [x] Opt-in real Docker framework fixture smoke covers a representative local slice:

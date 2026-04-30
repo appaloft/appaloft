@@ -137,6 +137,11 @@ known unsupported plan as transport failure.
 - The runtime plan resolution unsupported/override contract adds shared blocked reason, fix path,
   override path, and affected profile field semantics for unsupported, ambiguous, and missing
   planner evidence across current and future framework families.
+- The zero-to-SSH supported catalog acceptance harness binds ready preview output for the Phase 5
+  supported catalog to the same fixture descriptors used for ids-only create, runtime target
+  backend selection, Docker/OCI artifact intent, and observation expectations. This is harness
+  coverage over the existing query; it does not add preview mutation, persisted plan records, or
+  deployment input fields.
 - Access plan summary may initially report unavailable when existing read models cannot provide a
   safe summary.
 - Draft profile preview before `resources.create` remains out of scope.

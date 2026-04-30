@@ -178,6 +178,23 @@ Then:
 | DEP-CREATE-SMOKE-006 | contract, opt-in SSH | Generic-SSH Docker Compose path | Resource source/runtime profile selects `docker-compose`; generic-SSH backend registered | `ok({ id })` or opt-in smoke success | Runtime target backend resolves `generic-ssh`; runtime plan snapshot has `buildStrategy = compose-deploy`, `execution.kind = docker-compose-stack`, stable Compose file/workdir metadata, and project-name derivation evidence | Contract verifies selection; opt-in smoke verifies remote execution when enabled |
 | DEP-CREATE-SMOKE-007 | integration | Unsupported runtime target remains structured | Resource/runtime plan is valid but selected target has no required backend capability | `err` before acceptance | Error code is `runtime_target_unsupported`, phase `runtime-target-resolution` | No accepted deployment |
 
+## Zero-to-SSH Create And Runtime Acceptance Matrix
+
+These rows bind `deployments.create` and runtime target selection to the supported catalog
+acceptance harness without changing the command input boundary.
+
+| Test ID | Preferred automation | Case | Given | Expected command result | Expected target/backend evidence | Expected state |
+| --- | --- | --- | --- | --- | --- | --- |
+| ZSSH-CREATE-001 | contract/integration | ids-only create for supported catalog | A supported fixture descriptor has already built or updated resource source/runtime/network/health profile state | `ok({ id })` when the existing create admission path resolves the plan, or hermetic create-path assertion when the harness is not executing a full use case | Final create input contains only `projectId`, `environmentId`, `resourceId`, `serverId`, and optional `destinationId` | No deployment command field carries source, runtime, network, framework, package, base image, buildpack, Docker, SSH, Swarm, or Kubernetes data. |
+| ZSSH-CREATE-002 | integration | Preview/create artifact parity | The same descriptor is resolved through preview and create planning | `ok({ id })` or ready hermetic admission path | Planner key, support tier, artifact intent, command specs, and internal port match preview | Runtime plan snapshot is Docker/OCI-backed. |
+| ZSSH-CREATE-003 | integration | Serverful/SSR port before admission | A serverful or SSR supported fixture is selected | `ok({ id })` only when the resource network profile has explicit or deterministic `internalPort` | No deployment-owned `port` field is accepted | Missing port blocks in `resource-network-resolution` before acceptance. |
+| ZSSH-CREATE-004 | contract | Shared draft parity | Web, CLI, API, repository config, automation, or future tools prepare a supported fixture | Entry workflow dispatches resource profile commands before create | Runtime/source/network/health draft fields are shared profile vocabulary | Transport-only profile shapes are not introduced. |
+| ZSSH-RUNTIME-001 | integration | Runtime target selected before acceptance | A descriptor has a valid Docker/OCI artifact intent | `ok({ id })` only when backend capabilities exist; otherwise `runtime_target_unsupported` before acceptance | Registry selects local-shell and generic-SSH single-server backends by provider key, target kind, and capabilities | No accepted deployment on unsupported provider/capability combinations. |
+| ZSSH-RUNTIME-002 | integration | Hermetic fake/local/generic-SSH render/apply contract | Default CI has no real SSH target | Harness proves capability selection, typed render/apply command evidence, verification, and logs capability through fake/local/generic-SSH descriptors | Generic-SSH contract does not require a live SSH server | Real SSH execution remains opt-in. |
+| ZSSH-RUNTIME-003 | integration | Observation contract | A fixture resolves a runtime target plan | Accepted/harnessed path exposes normalized observation expectations | Readiness, health, runtime logs, and access/proxy summaries use provider-neutral shapes | Docker/SSH payloads stay adapter-owned diagnostics. |
+| ZSSH-RUNTIME-004 | opt-in local Docker e2e | Real local Docker gate | `APPALOFT_E2E_FRAMEWORK_DOCKER=true` is set | Representative real Docker slice may run | Docker builds, runs, verifies HTTP, records logs/metadata | Without the env gate, default tests skip real Docker mutation. |
+| ZSSH-RUNTIME-005 | opt-in SSH e2e | Real generic-SSH gate | Explicit SSH target configuration is supplied | Representative SSH slice may run | Generic-SSH builds/runs/verifies remotely | Without SSH config, real SSH execution is a migration gap, not a passing default. |
+
 ## Event Matrix
 
 | Test ID | Preferred automation | Event | Required assertion |
@@ -266,6 +283,13 @@ Runtime target backend registry unit tests now cover local/generic-SSH single-se
 selection and `runtime_target_unsupported` details. Deployment admission tests still need coverage
 for pre-acceptance unsupported-target rejection once the use case consults the registry before
 accepting the command.
+
+`ZSSH-CREATE-001` through `ZSSH-CREATE-004` and `ZSSH-RUNTIME-001` through `ZSSH-RUNTIME-005` are
+covered by `packages/adapters/runtime/test/zero-to-ssh-supported-catalog-acceptance.test.ts`. The
+harness proves the Phase 5 supported catalog can use ids-only create inputs, runtime target backend
+selection, Docker/OCI artifact intent, and normalized observation expectations without adding
+source/runtime/network/framework/buildpack/provider fields to `deployments.create`. Real local
+Docker and real generic-SSH execution remain opt-in gates.
 
 `DEP-CREATE-ASYNC-019` is not implemented yet. Current generic SSH Docker build failures surface as
 adapter-specific build failures; they are not yet classified into
