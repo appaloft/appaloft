@@ -120,6 +120,17 @@
 - [x] Run `bun test packages/application/test/domain-binding-lifecycle.test.ts`.
 - [x] Run `bun test packages/application/test/create-domain-binding.test.ts`.
 
+## Slice 10: Certificate Attempt Worker Selection Behavior
+
+- [x] `DMBH-CERT-001`: add Certificate attempt worker-selection behavior tests at
+  `packages/core/test/certificate.test.ts`.
+- [x] Add `Certificate` and owned attempt-status behavior for requested/issuing worker claim,
+  terminal attempt skips, missing attempt lookup, and issue-context preparation.
+- [x] Refactor `issue-certificate-on-certificate-requested.handler.ts` to ask `Certificate`
+  whether an attempt can be processed instead of peeling attempt status primitives.
+- [x] Run `bun test packages/core/test/certificate.test.ts`.
+- [x] Run `bun test packages/application/test/issue-or-renew-certificate.test.ts`.
+
 ## Verification
 
 - [x] Run affected core tests for each slice.
