@@ -308,6 +308,9 @@ Boundary rule:
 - runtime command composition belongs to the runtime plan language as typed command specs. Rendered
   shell strings are adapter execution artifacts for local shell, SSH shell, or another executor,
   and must not become the domain object that workflow logic branches on.
+- runtime plan value objects own their own admission predicates: access routes ask edge proxy kind
+  whether domains are allowed/required, and artifact snapshots ask artifact kind/intent whether an
+  image reference or Compose file is required.
 - `ResourceNetworkProfile` owns the resource's internal workload endpoint: `internalPort`,
   upstream protocol, exposure mode, and target service selection
 - the generic user-facing label `port` must map to the domain field

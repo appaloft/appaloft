@@ -734,11 +734,11 @@ export class AccessRoute extends ValueObject<AccessRouteState> {
   }
 
   static create(input: AccessRouteState): Result<AccessRoute> {
-    if (input.proxyKind.value === "none" && input.domains.length > 0) {
+    if (input.proxyKind.isDisabled() && input.domains.length > 0) {
       return err(domainError.validation("Disabled access routes cannot declare domains"));
     }
 
-    if (input.proxyKind.value !== "none" && input.domains.length === 0) {
+    if (input.proxyKind.isProviderBacked() && input.domains.length === 0) {
       return err(domainError.validation("Access routes require at least one domain"));
     }
 
@@ -746,10 +746,8 @@ export class AccessRoute extends ValueObject<AccessRouteState> {
       return err(domainError.validation("Canonical redirect status requires redirect target"));
     }
 
-    if (
-      input.redirectTo &&
-      input.domains.some((domain) => domain.value === input.redirectTo?.value)
-    ) {
+    const redirectTo = input.redirectTo;
+    if (redirectTo && input.domains.some((domain) => domain.equals(redirectTo))) {
       return err(domainError.validation("Canonical redirect cannot target its source domain"));
     }
 
@@ -897,6 +895,10 @@ export class RuntimeArtifactKindValue extends ValueObject<RuntimeArtifactKind> {
   get value(): RuntimeArtifactKind {
     return this.state;
   }
+
+  isComposeProject(): boolean {
+    return this.state === "compose-project";
+  }
 }
 
 const runtimeArtifactIntentBrand: unique symbol = Symbol("RuntimeArtifactIntentValue");
@@ -929,6 +931,10 @@ export class RuntimeArtifactIntentValue extends ValueObject<RuntimeArtifactInten
   get value(): RuntimeArtifactIntent {
     return this.state;
   }
+
+  isPrebuiltImage(): boolean {
+    return this.state === "prebuilt-image";
+  }
 }
 
 export class RuntimeArtifactSnapshot extends ValueObject<RuntimeArtifactSnapshotState> {
@@ -937,11 +943,11 @@ export class RuntimeArtifactSnapshot extends ValueObject<RuntimeArtifactSnapshot
   }
 
   static create(input: RuntimeArtifactSnapshotState): Result<RuntimeArtifactSnapshot> {
-    if (input.intent.value === "prebuilt-image" && !input.image) {
+    if (input.intent.isPrebuiltImage() && !input.image) {
       return err(domainError.validation("Prebuilt image artifacts require an image reference"));
     }
 
-    if (input.kind.value === "compose-project" && !input.composeFile) {
+    if (input.kind.isComposeProject() && !input.composeFile) {
       return err(domainError.validation("Compose project artifacts require a compose file"));
     }
 

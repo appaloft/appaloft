@@ -194,6 +194,15 @@
 - [x] Run `bun test packages/core/test/context-ownership.test.ts`.
 - [x] Run `bun test packages/application/test/create-domain-binding.test.ts`.
 
+## Continuous F: Runtime Plan Value Predicate Behavior
+
+- [x] Extend runtime plan behavior tests at `packages/core/test/runtime-plan.test.ts`.
+- [x] Add `RuntimeArtifactKindValue` and `RuntimeArtifactIntentValue` predicates for artifact
+  prerequisites.
+- [x] Refactor `AccessRoute.create` and `RuntimeArtifactSnapshot.create` to compose owned VO
+  predicates instead of branching on raw primitive values.
+- [x] Run `bun test packages/core/test/runtime-plan.test.ts`.
+
 ## Verification
 
 - [x] Run affected core tests for each slice.
