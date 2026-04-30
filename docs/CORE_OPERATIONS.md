@@ -350,6 +350,9 @@ Current boundary:
   resource health, runtime log availability, and diagnostic copy. The contract is implemented
   through existing observation operations and does not add route mutation, deployment admission,
   domain binding lifecycle, or certificate lifecycle commands.
+- the 2026-04-30 Phase 6 verification found the existing observation operations sufficient for the
+  shared route/access contract; a dedicated route read or repair operation remains future work only
+  if a later Spec Round proves the current surfaces are insufficient.
 - edge-rendered resource access failure diagnostics are internal transport/read behavior, not a new
   public business operation. Gateway-generated 502, 503, and 504 failures may be classified with
   stable Appaloft codes and rendered as safe HTML or problem responses, while owner-facing detail
