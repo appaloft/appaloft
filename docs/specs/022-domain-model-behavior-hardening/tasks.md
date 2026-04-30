@@ -50,9 +50,20 @@
 - [x] Run `bun test packages/application/test/confirm-domain-binding-ownership.test.ts`.
 - [x] Run `bun test packages/application/test/issue-or-renew-certificate.test.ts`.
 
+## Slice 4: Configuration Identity And Precedence Behavior
+
+- [x] `DMBH-CONFIG-001`: add EnvironmentConfigSet behavior tests at
+  `packages/core/test/environment-config-set.test.ts`.
+- [x] Add configuration entry/snapshot-entry behavior for variable identity, scope matching,
+  precedence ordering, and snapshot equality.
+- [x] Refactor `EnvironmentConfigSet` set/unset/snapshot/diff internals to call intention methods
+  instead of peeling entry state for domain decisions.
+- [x] Run `bun test packages/core/test/environment-config-set.test.ts`.
+- [x] Run `bun test packages/application/test/environment-effective-precedence.test.ts`.
+- [x] Run `bun test packages/application/test/resource-config.test.ts`.
+
 ## Later Slices
 
-- [ ] Slice 4: harden `EnvironmentConfigSet` identity/precedence/diff behavior.
 - [ ] Slice 5: harden `Deployment` execution-continuation/supersede behavior.
 - [ ] Slice 6: harden `Workload` and `RuntimeSpec` compatibility behavior.
 - [ ] Slice 7: audit remaining `toState()` usage and classify boundary allowances.

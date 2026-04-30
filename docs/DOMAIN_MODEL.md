@@ -111,8 +111,8 @@ owning object rather than from a search for primitive state reads. For example:
 - a `DomainBinding` should answer whether ownership, route, and certificate readiness transitions
   apply, including certificate issue/import admission and whether a domain-bound, certificate, or
   route realization event may make the binding ready;
-- `EnvironmentConfigSet` and its entries should answer identity, precedence, and effective snapshot
-  questions;
+- `EnvironmentConfigSet` and its entries should answer identity, scope matching, precedence,
+  effective snapshot, and snapshot diff questions;
 - a `Deployment` should answer execution-continuation and supersede-related status questions;
 - `Workload` and `RuntimeSpec` should answer workload/runtime compatibility questions.
 
@@ -485,6 +485,8 @@ Rules:
 Current scope:
 - variables and snapshot logic are inside the aggregate
 - `EnvironmentConfigSet` is modeled as a value object used by `Environment`
+- configuration entries own key/exposure identity, scope matching, precedence comparison, and
+  snapshot equality; callers should not rebuild those comparisons from primitive entry state
 - `EnvironmentLifecycleStatus`, `LockedAt`, optional `LockReason`, `ArchivedAt`, and optional
   `ArchiveReason` are part of the aggregate state
 

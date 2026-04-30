@@ -81,6 +81,13 @@
 - Related application tests after slice 3:
   - `packages/application/test/confirm-domain-binding-ownership.test.ts`
   - `packages/application/test/issue-or-renew-certificate.test.ts`
+- Slice 4 test bindings:
+  - `DMBH-CONFIG-001` in `packages/core/test/environment-config-set.test.ts`
+  - Existing behavioral rows: `ENV-PRECEDENCE-QRY-001`, `ENV-PRECEDENCE-QRY-002`,
+    `RES-PROFILE-CONFIG-009`, `RES-PROFILE-CONFIG-012`
+- Related application tests after slice 4:
+  - `packages/application/test/environment-effective-precedence.test.ts`
+  - `packages/application/test/resource-config.test.ts`
 
 ## Risks And Migration Gaps
 
