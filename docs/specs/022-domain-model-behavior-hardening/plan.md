@@ -52,6 +52,7 @@
 | 11 | `Organization`, `OrganizationMember`, and `OrganizationPlan` | Move duplicate membership and seat-capacity calculations into identity-governance domain behavior. | core organization aggregate |
 | Continuous A | `DomainBinding` verification attempts | Move ownership-confirmation attempt selection, idempotent already-bound checks, and DNS verification context preparation into the binding aggregate. | `domain-bindings.confirm-ownership` |
 | Continuous B | `Resource` and `ResourceKindValue` service cardinality | Move resource-kind multi-service admission out of create-resource use case and into resource domain behavior. | `resources.create` |
+| Continuous C | `ResourceKindValue` and `ResourceServiceKindValue` internal-port predicates | Move inbound listener requirement literals out of the aggregate method and into owned value objects. | `Resource.requiresInternalPort()` |
 
 ## Roadmap And Compatibility
 
@@ -150,6 +151,10 @@
   - Matrix row: `RES-CREATE-ADM-025` in `docs/testing/resources.create-test-matrix.md`
 - Related application tests after Continuous B:
   - `packages/application/test/create-resource.test.ts`
+- Continuous C test bindings:
+  - `DMBH-RES-001` in `packages/core/test/resource.test.ts`
+- Related application tests after Continuous C:
+  - none; this is a core-internal predicate refactor covered by existing resource behavior tests.
 
 ## Risks And Migration Gaps
 
@@ -177,6 +182,8 @@
     `confirm-domain-binding-ownership.use-case.ts` behind `DomainBinding` behavior.
   - Continuous B migrates resource service cardinality admission in `create-resource.use-case.ts`
     behind `Resource` and `ResourceKindValue` behavior.
+  - Continuous C migrates internal-port requirement literals behind `ResourceKindValue` and
+    `ResourceServiceKindValue`.
   - Core value objects may compare their own primitive state internally. Those reads are not
     boundary leaks.
 - A `.codex/skills/domain-driven-develop/SKILL.md` project copy is absent; the current local skill lives under `.agents/skills/domain-driven-develop/SKILL.md`.

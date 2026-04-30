@@ -163,6 +163,15 @@
 - [x] Run `bun test packages/core/test/resource.test.ts`.
 - [x] Run `bun test packages/application/test/create-resource.test.ts`.
 
+## Continuous C: Resource Internal-Port Requirement Behavior
+
+- [x] Extend `DMBH-RES-001` Resource behavior tests at `packages/core/test/resource.test.ts`.
+- [x] Add `ResourceKindValue` and `ResourceServiceKindValue` behavior for inbound listener port
+  requirements.
+- [x] Refactor `Resource.requiresInternalPort()` to compose VO methods instead of branching on raw
+  kind literals.
+- [x] Run `bun test packages/core/test/resource.test.ts`.
+
 ## Verification
 
 - [x] Run affected core tests for each slice.

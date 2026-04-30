@@ -657,6 +657,8 @@ Rules:
 - deployments belong to a resource, not directly to a raw source locator
 - inbound application resources must have a resource-owned network endpoint before deployment
   admission can resolve reverse-proxy upstream targets
+- resource kind and service kind value objects own whether inbound traffic requires an internal
+  listener port
 - `internalPort` means the workload listener inside the runtime environment or container network;
   it is not the server host-published port
 - reverse-proxy resources may share the same `internalPort` on one deployment target because the
