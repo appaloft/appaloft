@@ -121,6 +121,16 @@ owning object rather than from a search for primitive state reads. For example:
 Remaining `toState()` usage must be classified as a boundary read or migrated behind
 intention-revealing methods during the relevant slice.
 
+Current boundary audit state:
+
+- allowed boundary reads remain in persistence repositories, repository mutation specs, read-model
+  and query DTO mapping, runtime adapters, transport/contract rendering, fixtures, and assertions;
+- low-risk `Deployment`/`RuntimePlan` state reads found during the audit were moved behind
+  intention methods;
+- remaining model-hardening hotspots are future slices, not part of a mechanical rewrite:
+  context ownership checks in deployment/source-link orchestration, domain-binding redirect target
+  checks, certificate attempt selection, and identity-governance membership/seat calculations.
+
 ## Bounded Contexts
 
 Current Appaloft is organized around these contexts:

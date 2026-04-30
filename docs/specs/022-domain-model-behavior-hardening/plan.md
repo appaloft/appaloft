@@ -99,10 +99,33 @@
   - Existing behavioral rows: `WF-PLAN-DET-007`, `WF-PLAN-FAIL-008`
 - Related application tests after slice 6:
   - none; `Workload` is not yet persisted or exposed through application commands.
+- Slice 7 test bindings:
+  - no new public behavior row; boundary audit updates this plan and the affected matrix notes.
+  - `packages/core/test/deployment.test.ts` extends `DMBH-DEPLOY-001` to prove the low-risk
+    `Deployment`/`RuntimePlan` boundary cleanup keeps runtime-plan validation and execution
+    metadata merging unchanged.
+- Related application tests after slice 7:
+  - none for the audit itself. Existing slice-specific application tests remain the behavior guard
+    for previously migrated callers.
 
 ## Risks And Migration Gaps
 
 - Some `toState()` usage is intentional boundary serialization. Do not remove it mechanically.
 - Some application query services build read DTOs and may keep boundary state reads.
 - Runtime adapters may serialize deployment state for provider execution; those are adapter boundaries, not domain-policy owners.
+- Boundary audit classification:
+  - `packages/persistence/pg/**`, repository mutation specs, read-model/query mapping, runtime
+    adapters, contract/transport rendering, fixtures, and assertions may keep `toState()`.
+  - `packages/application/src/operations/deployments/deployment-config-bootstrap.service.ts`,
+    `deployment.factory.ts`, `deployment-plan.query-service.ts`, and related read-side builders use
+    state reads to build command/query DTOs, context metadata, or repository specs; those are
+    allowed application orchestration/read-model boundaries unless they branch on aggregate policy.
+  - Remaining future hotspots are aggregate ownership/specification predicates that still compare
+    state externally: context ownership checks in `deployment-context.resolver.ts` and
+    `source-links/relink-source-link.use-case.ts`, route redirect-target checks in
+    `configure-domain-binding-route.use-case.ts`, certificate attempt selection in
+    `issue-certificate-on-certificate-requested.handler.ts`, and identity-governance membership/seat
+    calculations in `packages/core/src/identity-governance/organization.ts`.
+  - Core value objects may compare their own primitive state internally. Those reads are not
+    boundary leaks.
 - A `.codex/skills/domain-driven-develop/SKILL.md` project copy is absent; the current local skill lives under `.agents/skills/domain-driven-develop/SKILL.md`.

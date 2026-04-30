@@ -14,7 +14,11 @@ import {
   EnvironmentConfigSnapshot,
   EnvironmentId,
   EnvironmentSnapshotId,
+  ExecutionResult,
+  ExecutionStatusValue,
   ExecutionStrategyKindValue,
+  ExitCode,
+  FinishedAt,
   GeneratedAt,
   PackagingModeValue,
   PlanStepText,
@@ -27,6 +31,7 @@ import {
   SourceDescriptor,
   SourceKindValue,
   SourceLocator,
+  StartedAt,
   TargetKindValue,
 } from "../src";
 
@@ -86,6 +91,20 @@ function deployment(input: {
   });
 }
 
+function createDeployment(input?: { runtimePlan?: RuntimePlan }) {
+  return Deployment.create({
+    id: DeploymentId.rehydrate("dep_demo"),
+    projectId: ProjectId.rehydrate("prj_demo"),
+    environmentId: EnvironmentId.rehydrate("env_demo"),
+    resourceId: ResourceId.rehydrate("res_demo"),
+    serverId: DeploymentTargetId.rehydrate("srv_demo"),
+    destinationId: DestinationId.rehydrate("dst_demo"),
+    runtimePlan: input?.runtimePlan ?? runtimePlan(),
+    environmentSnapshot: snapshot(),
+    createdAt: CreatedAt.rehydrate("2026-01-01T00:00:00.000Z"),
+  });
+}
+
 describe("Deployment", () => {
   test("[DMBH-DEPLOY-001] answers execution-continuation decisions", () => {
     expect(deployment({ status: "running" }).resolveExecutionContinuation()).toEqual({
@@ -113,5 +132,34 @@ describe("Deployment", () => {
     expect(deployment({ status: "succeeded" }).requiresRuntimeCancellationForSupersede()).toBe(
       false,
     );
+  });
+
+  test("[DMBH-DEPLOY-001] delegates runtime-plan behavior without peeling plan state", () => {
+    const emptyPlan = RuntimePlan.rehydrate({
+      ...runtimePlan().toState(),
+      steps: [],
+    });
+    expect(emptyPlan.hasSteps()).toBe(false);
+    expect(createDeployment({ runtimePlan: emptyPlan }).isErr()).toBe(true);
+
+    const deployablePlan = runtimePlan().withExecutionMetadata({ base: "image" });
+    const deployment = createDeployment({ runtimePlan: deployablePlan })._unsafeUnwrap();
+    deployment.markPlanning(StartedAt.rehydrate("2026-01-01T00:00:01.000Z"));
+    deployment.markPlanned(StartedAt.rehydrate("2026-01-01T00:00:02.000Z"));
+    deployment.start(StartedAt.rehydrate("2026-01-01T00:00:03.000Z"));
+
+    const result = ExecutionResult.rehydrate({
+      status: ExecutionStatusValue.rehydrate("failed"),
+      exitCode: ExitCode.rehydrate(1),
+      retryable: true,
+      logs: [],
+      metadata: { phase: "execute" },
+    });
+    deployment.applyExecutionResult(FinishedAt.rehydrate("2026-01-01T00:00:04.000Z"), result);
+
+    expect(deployment.toState().runtimePlan.toState().execution.toState().metadata).toEqual({
+      base: "image",
+      phase: "execute",
+    });
   });
 });

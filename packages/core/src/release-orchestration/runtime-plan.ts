@@ -1173,11 +1173,19 @@ export class RuntimePlan extends ValueObject<RuntimePlanState> {
     return this.state.generatedAt.value;
   }
 
+  hasSteps(): boolean {
+    return this.state.steps.length > 0;
+  }
+
   withExecution(execution: RuntimeExecutionPlan): RuntimePlan {
     return RuntimePlan.rehydrate({
       ...this.state,
       execution,
     });
+  }
+
+  withExecutionMetadata(metadata: Record<string, string>): RuntimePlan {
+    return this.withExecution(this.state.execution.withMetadata(metadata));
   }
 
   toState(): RuntimePlanState {

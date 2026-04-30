@@ -277,8 +277,9 @@ deployment admission predicates and by `packages/application/test/create-deploym
 unchanged `deployments.create` admission behavior.
 
 `DMBH-DEPLOY-001` is covered by `packages/core/test/deployment.test.ts` for Deployment-owned
-execution-continuation and supersede cancellation decisions and by
-`packages/application/test/create-deployment.test.ts` for unchanged supersede behavior.
+execution-continuation, supersede cancellation decisions, runtime-plan step validation, and
+execution metadata merging. `packages/application/test/create-deployment.test.ts` proves unchanged
+supersede behavior.
 
 Runtime adapter helper tests cover the command construction needed for resource-scoped Docker
 cleanup, explicit superseded-attempt cleanup targeting, loopback ephemeral health-check port
