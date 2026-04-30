@@ -1,5 +1,40 @@
 # Changelog
 
+## [0.6.1](https://github.com/appaloft/appaloft/compare/v0.6.0...v0.6.1) (2026-04-30)
+
+
+### Features
+
+* add buildpack accelerator preview contract ([#143](https://github.com/appaloft/appaloft/issues/143)) ([d4dc7ff](https://github.com/appaloft/appaloft/commit/d4dc7ff7af7c37c6a7bcf8cf377d276ded540fe9))
+* add deployment plan preview ([#139](https://github.com/appaloft/appaloft/issues/139)) ([a8730d9](https://github.com/appaloft/appaloft/commit/a8730d95b014e110dd7354578858f7e3d16ca4a2))
+* add durable process attempt journal ([#134](https://github.com/appaloft/appaloft/issues/134)) ([fbf0fc7](https://github.com/appaloft/appaloft/commit/fbf0fc77e26b8eccfb51b26c6f3b51e637b51ad4))
+* add error knowledge contract ([#130](https://github.com/appaloft/appaloft/issues/130)) ([c961808](https://github.com/appaloft/appaloft/commit/c96180877f7fdaea0be4c9b2519b293c678ebaab))
+* add first-class nextjs runtime planning ([#124](https://github.com/appaloft/appaloft/issues/124)) ([e1130a0](https://github.com/appaloft/appaloft/commit/e1130a0fc4695ed9a5a6f379485b5f702de7d907))
+* add jvm framework planner contract ([#142](https://github.com/appaloft/appaloft/issues/142)) ([ec1f8c7](https://github.com/appaloft/appaloft/commit/ec1f8c768d9a404c51a686de9da6d1fa7813e75e))
+* add operator work ledger queries ([#133](https://github.com/appaloft/appaloft/issues/133)) ([a88f5e0](https://github.com/appaloft/appaloft/commit/a88f5e09c497faaa8ecdd1f0d126cc8f8fa3a42a))
+* add python framework planner contract ([#141](https://github.com/appaloft/appaloft/issues/141)) ([c750505](https://github.com/appaloft/appaloft/commit/c75050522fa986e91e7fb99e9c28cdc4e02efde7))
+* add remote state maintenance workflow ([#131](https://github.com/appaloft/appaloft/issues/131)) ([b525dfb](https://github.com/appaloft/appaloft/commit/b525dfb5516e3459850031c9a2e20548a9fa16a6))
+* add route access diagnostic contract ([#146](https://github.com/appaloft/appaloft/issues/146)) ([ed7f8af](https://github.com/appaloft/appaloft/commit/ed7f8af34e52744c3f2b0ac1df030af447b9d7c1))
+* add runtime plan failure preview contract ([#144](https://github.com/appaloft/appaloft/issues/144)) ([5f802a0](https://github.com/appaloft/appaloft/commit/5f802a04015a2922430a9cf0228531b91ebd1765))
+* add runtime target capacity diagnostics ([#132](https://github.com/appaloft/appaloft/issues/132)) ([0ce6b41](https://github.com/appaloft/appaloft/commit/0ce6b4162dc7579b3f4f9741130c2637d9f2f647))
+* add static spa framework planners ([#126](https://github.com/appaloft/appaloft/issues/126)) ([903d9a7](https://github.com/appaloft/appaloft/commit/903d9a742055beb866ba23c9831c47e5b9c8089e))
+* add zero-to-ssh catalog acceptance harness ([#145](https://github.com/appaloft/appaloft/issues/145)) ([0334df7](https://github.com/appaloft/appaloft/commit/0334df78c3bc652f5c56ad713df5c76a54f5dcd3))
+* align quick deploy runtime draft fields ([#127](https://github.com/appaloft/appaloft/issues/127)) ([573ee01](https://github.com/appaloft/appaloft/commit/573ee010d2953553ea49f5483684eafe61888c8b))
+* **resources:** add profile drift visibility ([#136](https://github.com/appaloft/appaloft/issues/136)) ([fc959f7](https://github.com/appaloft/appaloft/commit/fc959f700e44164083f99270de9df45f0c684716))
+* **runtime:** test node api framework planning catalog ([#125](https://github.com/appaloft/appaloft/issues/125)) ([2b14f74](https://github.com/appaloft/appaloft/commit/2b14f74bd30b306eed7762add2e00a7e7aadd33b))
+* **web:** redesign console surfaces ([#135](https://github.com/appaloft/appaloft/issues/135)) ([3ff7bdb](https://github.com/appaloft/appaloft/commit/3ff7bdb871d1d9ef1bd9db1280b9034e6a6eac93))
+
+
+### Bug Fixes
+
+* **cli:** reuse quick deploy workflow ([#120](https://github.com/appaloft/appaloft/issues/120)) ([95dc871](https://github.com/appaloft/appaloft/commit/95dc8719b7358b6f13d95bf7d04100106b0069ae))
+* reject unsupported deployment targets before acceptance ([#121](https://github.com/appaloft/appaloft/issues/121)) ([d7cc2bc](https://github.com/appaloft/appaloft/commit/d7cc2bc5518613f8ff3c5bb8ae8aaf53e3578038))
+
+
+### Documentation
+
+* specify deployment recovery readiness ([#137](https://github.com/appaloft/appaloft/issues/137)) ([81ec3ca](https://github.com/appaloft/appaloft/commit/81ec3ca8d0a96cedaca620659a31893bd9f24446))
+
 ## [0.6.0](https://github.com/appaloft/appaloft/compare/v0.5.0...v0.6.0) (2026-04-27)
 
 
