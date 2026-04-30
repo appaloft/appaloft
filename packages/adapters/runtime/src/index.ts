@@ -799,6 +799,9 @@ function chooseStrategies(input: {
       startCommand: CommandText.rehydrate(plan.startCommand),
       ...(plan.installCommand ? { installCommand: CommandText.rehydrate(plan.installCommand) } : {}),
       ...(plan.buildCommand ? { buildCommand: CommandText.rehydrate(plan.buildCommand) } : {}),
+      ...(plan.healthCheckPath
+        ? { healthCheckPath: HealthCheckPathText.rehydrate(plan.healthCheckPath) }
+        : {}),
       ...runtimeHealthCheckFields(requestedDeployment),
       port: dockerContainerPort(requestedDeployment),
       metadata: {
