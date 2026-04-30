@@ -391,6 +391,7 @@ const serverDomainBindingStatusSchema = z.enum([
   "ready",
   "not_ready",
   "failed",
+  "deleted",
 ]);
 
 const serverDeploymentStatusCountSchema = z.object({
@@ -1488,6 +1489,7 @@ export const domainBindingSummarySchema = z.object({
     "ready",
     "not_ready",
     "failed",
+    "deleted",
   ]),
   dnsObservation: z
     .object({
@@ -1504,6 +1506,88 @@ export const domainBindingSummarySchema = z.object({
 
 export const listDomainBindingsResponseSchema = z.object({
   items: z.array(domainBindingSummarySchema),
+});
+
+export const showDomainBindingInputSchema = z.object({
+  domainBindingId: z.string().min(1),
+});
+
+export const domainBindingDeleteBlockerSchema = z.object({
+  kind: z.enum(["active-certificate", "certificate-history"]),
+  severity: z.enum(["blocking", "warning"]),
+  message: z.string(),
+  relatedEntityType: z.string().optional(),
+  relatedEntityId: z.string().optional(),
+  count: z.number().optional(),
+});
+
+export const domainBindingDeleteSafetySchema = z.object({
+  domainBindingId: z.string(),
+  safeToDelete: z.boolean(),
+  blockers: z.array(domainBindingDeleteBlockerSchema),
+  warnings: z.array(domainBindingDeleteBlockerSchema),
+  preservesGeneratedAccess: z.literal(true),
+  preservesDeploymentSnapshots: z.literal(true),
+  preservesServerAppliedRouteAudit: z.literal(true),
+});
+
+export const domainBindingDetailSchema = z.object({
+  binding: domainBindingSummarySchema,
+  routeReadiness: z.object({
+    status: z.enum(["ready", "not-ready", "pending", "failed", "deleted"]),
+    routeBehavior: z.enum(["serve", "redirect"]),
+    selectedRoute: routeIntentStatusDescriptorSchema.optional(),
+    contextRoutes: z.array(routeIntentStatusDescriptorSchema),
+  }),
+  generatedAccessFallback: z
+    .union([resourceAccessRouteSummarySchema, plannedResourceAccessRouteSummarySchema])
+    .optional(),
+  proxyReadiness: z.enum(["unknown", "ready", "not-ready", "failed"]).optional(),
+  certificates: z.array(z.lazy(() => certificateSummarySchema)),
+  deleteSafety: domainBindingDeleteSafetySchema,
+});
+
+export const showDomainBindingResponseSchema = domainBindingDetailSchema;
+
+export const configureDomainBindingRouteInputSchema = z.object({
+  domainBindingId: z.string().min(1),
+  redirectTo: z.string().min(1).optional(),
+  redirectStatus: z
+    .union([z.literal(301), z.literal(302), z.literal(307), z.literal(308)])
+    .optional(),
+  idempotencyKey: z.string().min(1).optional(),
+});
+
+export const configureDomainBindingRouteResponseSchema = z.object({
+  id: z.string(),
+});
+
+export const checkDomainBindingDeleteSafetyInputSchema = z.object({
+  domainBindingId: z.string().min(1),
+});
+
+export const checkDomainBindingDeleteSafetyResponseSchema = domainBindingDeleteSafetySchema;
+
+export const deleteDomainBindingInputSchema = z.object({
+  domainBindingId: z.string().min(1),
+  confirmation: z.object({
+    domainBindingId: z.string().min(1),
+  }),
+  idempotencyKey: z.string().min(1).optional(),
+});
+
+export const deleteDomainBindingResponseSchema = z.object({
+  id: z.string(),
+});
+
+export const retryDomainBindingVerificationInputSchema = z.object({
+  domainBindingId: z.string().min(1),
+  idempotencyKey: z.string().min(1).optional(),
+});
+
+export const retryDomainBindingVerificationResponseSchema = z.object({
+  id: z.string(),
+  verificationAttemptId: z.string(),
 });
 
 export const issueOrRenewCertificateInputSchema = z.object({
@@ -3098,6 +3182,30 @@ export type ConfirmDomainBindingOwnershipResponse = z.infer<
   typeof confirmDomainBindingOwnershipResponseSchema
 >;
 export type ListDomainBindingsResponse = z.infer<typeof listDomainBindingsResponseSchema>;
+export type ShowDomainBindingInput = z.infer<typeof showDomainBindingInputSchema>;
+export type ShowDomainBindingResponse = z.infer<typeof showDomainBindingResponseSchema>;
+export type DomainBindingDeleteBlocker = z.infer<typeof domainBindingDeleteBlockerSchema>;
+export type DomainBindingDeleteSafety = z.infer<typeof domainBindingDeleteSafetySchema>;
+export type ConfigureDomainBindingRouteInput = z.infer<
+  typeof configureDomainBindingRouteInputSchema
+>;
+export type ConfigureDomainBindingRouteResponse = z.infer<
+  typeof configureDomainBindingRouteResponseSchema
+>;
+export type CheckDomainBindingDeleteSafetyInput = z.infer<
+  typeof checkDomainBindingDeleteSafetyInputSchema
+>;
+export type CheckDomainBindingDeleteSafetyResponse = z.infer<
+  typeof checkDomainBindingDeleteSafetyResponseSchema
+>;
+export type DeleteDomainBindingInput = z.infer<typeof deleteDomainBindingInputSchema>;
+export type DeleteDomainBindingResponse = z.infer<typeof deleteDomainBindingResponseSchema>;
+export type RetryDomainBindingVerificationInput = z.infer<
+  typeof retryDomainBindingVerificationInputSchema
+>;
+export type RetryDomainBindingVerificationResponse = z.infer<
+  typeof retryDomainBindingVerificationResponseSchema
+>;
 export type IssueOrRenewCertificateInput = z.infer<typeof issueOrRenewCertificateInputSchema>;
 export type IssueOrRenewCertificateResponse = z.infer<typeof issueOrRenewCertificateResponseSchema>;
 export type ImportCertificateInput = z.infer<typeof importCertificateInputSchema>;

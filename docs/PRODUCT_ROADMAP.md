@@ -616,7 +616,8 @@ Required:
   access, durable domain routes, server-applied routes, proxy preview, health, runtime logs,
   deployment logs, and diagnostic copy before adding domain/certificate mutation lifecycle
   surfaces.
-- [ ] Add domain binding show/update/delete/retry lifecycle commands where specs allow mutation
+- [x] Add domain binding show/configure-route/delete-check/delete/retry-verification lifecycle
+  commands where specs allow mutation
   after creation.
 - [ ] Add certificate show/import/revoke/delete/retry semantics around provider-issued and imported
   certificates.
@@ -641,6 +642,12 @@ Phase 6 verification notes from 2026-04-30:
   certificate revoke/delete/retry lifecycle work.
 - Default confidence remains hermetic. Real Traefik, DNS, TLS, Docker, and SSH route smoke stays
   opt-in until its own gate is selected.
+- The domain binding lifecycle slice added show/readback, route-behavior configuration,
+  delete-check, guarded delete, ownership verification retry, and matching Web console affordances
+  under `docs/specs/021-domain-binding-lifecycle`. It intentionally uses
+  `domain-bindings.configure-route` instead of forbidden generic `domain-bindings.update`, keeps
+  certificate readiness read-only, and does not start certificate revoke/delete/retry or deployment
+  retry/redeploy/rollback.
 
 Exit criteria:
 

@@ -13,9 +13,14 @@ import { deploymentRecoveryReadinessQueryInputSchema } from "./operations/deploy
 import { listDeploymentsQueryInputSchema } from "./operations/deployments/list-deployments.query";
 import { showDeploymentQueryInputSchema } from "./operations/deployments/show-deployment.query";
 import { streamDeploymentEventsQueryInputSchema } from "./operations/deployments/stream-deployment-events.query";
+import { checkDomainBindingDeleteSafetyQueryInputSchema } from "./operations/domain-bindings/check-domain-binding-delete-safety.query";
+import { configureDomainBindingRouteCommandInputSchema } from "./operations/domain-bindings/configure-domain-binding-route.command";
 import { confirmDomainBindingOwnershipCommandInputSchema } from "./operations/domain-bindings/confirm-domain-binding-ownership.command";
 import { createDomainBindingCommandInputSchema } from "./operations/domain-bindings/create-domain-binding.command";
+import { deleteDomainBindingCommandInputSchema } from "./operations/domain-bindings/delete-domain-binding.command";
 import { listDomainBindingsQueryInputSchema } from "./operations/domain-bindings/list-domain-bindings.query";
+import { retryDomainBindingVerificationCommandInputSchema } from "./operations/domain-bindings/retry-domain-binding-verification.command";
+import { showDomainBindingQueryInputSchema } from "./operations/domain-bindings/show-domain-binding.query";
 import { archiveEnvironmentCommandInputSchema } from "./operations/environments/archive-environment.command";
 import { cloneEnvironmentCommandInputSchema } from "./operations/environments/clone-environment.command";
 import { createEnvironmentCommandInputSchema } from "./operations/environments/create-environment.command";
@@ -1114,6 +1119,76 @@ export const operationCatalog = [
     transports: {
       cli: "appaloft domain-binding list",
       orpc: { method: "GET", path: "/api/domain-bindings" },
+    },
+  },
+  {
+    key: "domain-bindings.show",
+    kind: "query",
+    domain: "domain-bindings",
+    messageName: "ShowDomainBindingQuery",
+    handlerName: "ShowDomainBindingQueryHandler",
+    serviceName: "ShowDomainBindingQueryService",
+    inputSchema: showDomainBindingQueryInputSchema,
+    serviceToken: tokens.showDomainBindingQueryService,
+    transports: {
+      cli: "appaloft domain-binding show <domainBindingId>",
+      orpc: { method: "GET", path: "/api/domain-bindings/{domainBindingId}" },
+    },
+  },
+  {
+    key: "domain-bindings.configure-route",
+    kind: "command",
+    domain: "domain-bindings",
+    messageName: "ConfigureDomainBindingRouteCommand",
+    handlerName: "ConfigureDomainBindingRouteCommandHandler",
+    serviceName: "ConfigureDomainBindingRouteUseCase",
+    inputSchema: configureDomainBindingRouteCommandInputSchema,
+    serviceToken: tokens.configureDomainBindingRouteUseCase,
+    transports: {
+      cli: "appaloft domain-binding configure-route <domainBindingId>",
+      orpc: { method: "POST", path: "/api/domain-bindings/{domainBindingId}/route" },
+    },
+  },
+  {
+    key: "domain-bindings.delete-check",
+    kind: "query",
+    domain: "domain-bindings",
+    messageName: "CheckDomainBindingDeleteSafetyQuery",
+    handlerName: "CheckDomainBindingDeleteSafetyQueryHandler",
+    serviceName: "CheckDomainBindingDeleteSafetyQueryService",
+    inputSchema: checkDomainBindingDeleteSafetyQueryInputSchema,
+    serviceToken: tokens.checkDomainBindingDeleteSafetyQueryService,
+    transports: {
+      cli: "appaloft domain-binding delete-check <domainBindingId>",
+      orpc: { method: "GET", path: "/api/domain-bindings/{domainBindingId}/delete-check" },
+    },
+  },
+  {
+    key: "domain-bindings.delete",
+    kind: "command",
+    domain: "domain-bindings",
+    messageName: "DeleteDomainBindingCommand",
+    handlerName: "DeleteDomainBindingCommandHandler",
+    serviceName: "DeleteDomainBindingUseCase",
+    inputSchema: deleteDomainBindingCommandInputSchema,
+    serviceToken: tokens.deleteDomainBindingUseCase,
+    transports: {
+      cli: "appaloft domain-binding delete <domainBindingId> --confirm <domainBindingId>",
+      orpc: { method: "DELETE", path: "/api/domain-bindings/{domainBindingId}" },
+    },
+  },
+  {
+    key: "domain-bindings.retry-verification",
+    kind: "command",
+    domain: "domain-bindings",
+    messageName: "RetryDomainBindingVerificationCommand",
+    handlerName: "RetryDomainBindingVerificationCommandHandler",
+    serviceName: "RetryDomainBindingVerificationUseCase",
+    inputSchema: retryDomainBindingVerificationCommandInputSchema,
+    serviceToken: tokens.retryDomainBindingVerificationUseCase,
+    transports: {
+      cli: "appaloft domain-binding retry-verification <domainBindingId>",
+      orpc: { method: "POST", path: "/api/domain-bindings/{domainBindingId}/verification-retries" },
     },
   },
   {

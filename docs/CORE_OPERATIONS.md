@@ -719,8 +719,13 @@ Implemented operations:
 | List default access domain policies | Query | `default-access-domain-policies.list` | `ListDefaultAccessDomainPoliciesQuery` | `ListDefaultAccessDomainPoliciesQueryInput` | `appaloft default-access list` | `GET /api/default-access-domain-policies` |
 | Show default access domain policy | Query | `default-access-domain-policies.show` | `ShowDefaultAccessDomainPolicyQuery` | `ShowDefaultAccessDomainPolicyQueryInput` | `appaloft default-access show --scope system\|deployment-target [--server <serverId>]` | `GET /api/default-access-domain-policies/show` |
 | Create domain binding | Command | `domain-bindings.create` | `CreateDomainBindingCommand` | `CreateDomainBindingCommandInput` | `appaloft domain-binding create <domainName> [--redirect-to <domain>] [--redirect-status 301\|302\|307\|308]` | `POST /api/domain-bindings` |
+| Show domain binding | Query | `domain-bindings.show` | `ShowDomainBindingQuery` | `ShowDomainBindingQueryInput` | `appaloft domain-binding show <domainBindingId>` | `GET /api/domain-bindings/{domainBindingId}` |
+| Configure domain binding route behavior | Command | `domain-bindings.configure-route` | `ConfigureDomainBindingRouteCommand` | `ConfigureDomainBindingRouteCommandInput` | `appaloft domain-binding configure-route <domainBindingId> [--redirect-to <domain>] [--redirect-status 301\|302\|307\|308]` | `POST /api/domain-bindings/{domainBindingId}/route` |
 | Confirm domain binding ownership | Command | `domain-bindings.confirm-ownership` | `ConfirmDomainBindingOwnershipCommand` | `ConfirmDomainBindingOwnershipCommandInput` | `appaloft domain-binding confirm-ownership <domainBindingId> [--verification-mode dns\|manual]` | `POST /api/domain-bindings/{domainBindingId}/ownership-confirmations` |
 | List domain bindings | Query | `domain-bindings.list` | `ListDomainBindingsQuery` | `ListDomainBindingsQueryInput` | `appaloft domain-binding list` | `GET /api/domain-bindings` |
+| Check domain binding delete safety | Query | `domain-bindings.delete-check` | `CheckDomainBindingDeleteSafetyQuery` | `CheckDomainBindingDeleteSafetyQueryInput` | `appaloft domain-binding delete-check <domainBindingId>` | `GET /api/domain-bindings/{domainBindingId}/delete-check` |
+| Delete domain binding | Command | `domain-bindings.delete` | `DeleteDomainBindingCommand` | `DeleteDomainBindingCommandInput` | `appaloft domain-binding delete <domainBindingId> --confirm <domainBindingId>` | `DELETE /api/domain-bindings/{domainBindingId}` |
+| Retry domain binding ownership verification | Command | `domain-bindings.retry-verification` | `RetryDomainBindingVerificationCommand` | `RetryDomainBindingVerificationCommandInput` | `appaloft domain-binding retry-verification <domainBindingId>` | `POST /api/domain-bindings/{domainBindingId}/verification-retries` |
 | Issue or renew certificate | Command | `certificates.issue-or-renew` | `IssueOrRenewCertificateCommand` | `IssueOrRenewCertificateCommandInput` | `appaloft certificate issue-or-renew <domainBindingId>` | `POST /api/certificates/issue-or-renew` |
 | List certificates | Query | `certificates.list` | `ListCertificatesQuery` | `ListCertificatesQueryInput` | `appaloft certificate list` | `GET /api/certificates` |
 
@@ -797,6 +802,17 @@ Current boundary:
   server detail page over the same command; current durable policy readback remains follow-up
 - `domain-bindings.list` exposes the read model used by CLI, API, and Web to observe accepted
   binding records and their verification status
+- `domain-bindings.show` reads one binding with generated access fallback, selected route/access
+  diagnostic context, proxy readiness, delete safety, and read-only certificate readiness context
+- `domain-bindings.configure-route` is the explicit route-behavior update operation for switching
+  between serving traffic and redirecting to an existing served canonical binding in the same
+  owner/path scope; generic `domain-bindings.update` remains forbidden
+- `domain-bindings.delete-check` and `domain-bindings.delete` preserve generated access,
+  deployment snapshot history, server-applied route audit, and certificate history. Delete is
+  blocked while active certificate state is attached and does not revoke/delete certificates.
+- `domain-bindings.retry-verification` creates a new ownership verification attempt and resets DNS
+  observation to a waitable pending state when expected targets are known. It does not retry
+  certificate issuance, route repair, deployment retry, redeploy, or rollback.
 - Web exposes domain binding from both the resource detail page and the standalone domain bindings
   page; the resource detail page is the owner-scoped affordance, while the standalone page is
   cross-resource management over the same command/query contracts
@@ -809,9 +825,8 @@ Current boundary:
 
 Core next operations expected here:
 - preview/show resource proxy configuration
-- import certificate
-- retry failed domain verification or certificate issuance attempt
-- list/show certificate-backed domain binding readiness state
+- certificate revoke/delete/retry lifecycle around provider-issued/imported certificates
+- route repair/reconcile lifecycle when provider route attempts need an explicit public operation
 
 ## System Operations
 

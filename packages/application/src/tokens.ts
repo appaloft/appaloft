@@ -125,10 +125,21 @@ export const tokens = {
   createDeploymentUseCase: Symbol.for("appaloft.create_deployment_use_case"),
   cleanupPreviewUseCase: Symbol.for("appaloft.cleanup_preview_use_case"),
   createDomainBindingUseCase: Symbol.for("appaloft.create_domain_binding_use_case"),
+  configureDomainBindingRouteUseCase: Symbol.for(
+    "appaloft.configure_domain_binding_route_use_case",
+  ),
   confirmDomainBindingOwnershipUseCase: Symbol.for(
     "appaloft.confirm_domain_binding_ownership_use_case",
   ),
+  deleteDomainBindingUseCase: Symbol.for("appaloft.delete_domain_binding_use_case"),
+  retryDomainBindingVerificationUseCase: Symbol.for(
+    "appaloft.retry_domain_binding_verification_use_case",
+  ),
   listDomainBindingsQueryService: Symbol.for("appaloft.list_domain_bindings_query_service"),
+  showDomainBindingQueryService: Symbol.for("appaloft.show_domain_binding_query_service"),
+  checkDomainBindingDeleteSafetyQueryService: Symbol.for(
+    "appaloft.check_domain_binding_delete_safety_query_service",
+  ),
   importCertificateUseCase: Symbol.for("appaloft.import_certificate_use_case"),
   issueOrRenewCertificateUseCase: Symbol.for("appaloft.issue_or_renew_certificate_use_case"),
   certificateRetryScheduler: Symbol.for("appaloft.certificate_retry_scheduler"),

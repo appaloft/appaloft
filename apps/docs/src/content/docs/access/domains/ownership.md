@@ -12,6 +12,7 @@ searchAliases:
   - "所有权"
 relatedOperations:
   - domain-bindings.confirm-ownership
+  - domain-bindings.retry-verification
 sidebar:
   label: "Ownership"
   order: 4
@@ -52,6 +53,8 @@ DNS 指令应该至少包含：
 - 刚添加或修改 DNS 记录。
 - DNS provider 控制台显示记录已生效。
 - Appaloft 提示的是暂时无法解析或超时。
+
+`appaloft domain-binding retry-verification <domainBindingId>` 会创建新的所有权验证 attempt。旧 attempt 会保留为历史；它不会重试证书签发、撤销证书、修复代理路由、重新部署或回滚部署。
 
 需要修复后再重试的情况：
 

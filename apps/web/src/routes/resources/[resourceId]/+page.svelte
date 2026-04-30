@@ -1875,6 +1875,8 @@
         return $t(i18nKeys.common.status.notReady);
       case "failed":
         return $t(i18nKeys.common.status.failed);
+      case "deleted":
+        return $t(i18nKeys.common.status.deleted);
     }
   }
 
@@ -1888,6 +1890,8 @@
       case "failed":
       case "not_ready":
         return "destructive";
+      case "deleted":
+        return "outline";
       case "certificate_pending":
       case "pending_verification":
       case "requested":

@@ -40,6 +40,7 @@ import { environmentLifecycleMigration } from "./migrations/032_environment_life
 import { environmentLockLifecycleMigration } from "./migrations/033_environment_lock_lifecycle";
 import { resourceAccessProfileMigration } from "./migrations/034_resource_access_profile";
 import { processAttemptJournalMigration } from "./migrations/035_process_attempt_journal";
+import { domainBindingDeletedStatusMigration } from "./migrations/036_domain_binding_deleted_status";
 import { PgliteDialect } from "./pglite-dialect";
 import { type Database } from "./schema";
 import { TracingDialect } from "./tracing-dialect";
@@ -169,6 +170,7 @@ class StaticMigrationProvider implements MigrationProvider {
       "033_environment_lock_lifecycle": environmentLockLifecycleMigration,
       "034_resource_access_profile": resourceAccessProfileMigration,
       "035_process_attempt_journal": processAttemptJournalMigration,
+      "036_domain_binding_deleted_status": domainBindingDeletedStatusMigration,
     };
   }
 }
