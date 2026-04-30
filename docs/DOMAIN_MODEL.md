@@ -596,6 +596,8 @@ Current scope:
 - owns certificate issue/import admission and certificate-required readiness gates
 - owns whether domain-bound, certificate-issued/imported, and route realization events may mark the
   binding ready; application handlers coordinate repositories/events and call aggregate behavior
+- owns ownership-confirmation attempt selection, idempotent already-bound confirmation, and the DNS
+  verification context prepared from its current verification attempts and DNS observation
 - `Certificate` owns certificate attempt worker selection, including missing/terminal attempt
   handling and the provider issue context prepared from the selected attempt
 - DNS verification, certificate issuance/import, route failure, and domain-ready transitions are
