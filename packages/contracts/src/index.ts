@@ -2087,6 +2087,14 @@ export const deploymentPlanReasonCodeSchema = z.enum([
   "incompatible-source-strategy",
   "runtime-target-unsupported",
   "access-plan-unavailable",
+  "buildpack-disabled",
+  "buildpack-target-unavailable",
+  "unsupported-buildpack-builder",
+  "unsupported-buildpack-lifecycle-feature",
+  "ambiguous-buildpack-evidence",
+  "missing-buildpack-evidence",
+  "buildpack-start-intent-missing",
+  "buildpack-preview-limited",
 ]);
 
 export const deploymentPlanReasonSchema = z.object({
@@ -2136,12 +2144,58 @@ export const deploymentPlanResponseSchema = z.object({
   }),
   planner: z.object({
     plannerKey: z.string(),
-    supportTier: z.enum(["first-class", "generic", "custom", "container-native", "unsupported"]),
+    supportTier: z.enum([
+      "first-class",
+      "generic",
+      "custom",
+      "container-native",
+      "buildpack-accelerated",
+      "unsupported",
+      "ambiguous",
+      "requires-override",
+    ]),
     buildStrategy: runtimePlanSchema.shape.buildStrategy,
     packagingMode: runtimePlanSchema.shape.packagingMode,
     targetKind: z.enum(["single-server", "future-multi-server", "future-k8s"]),
     targetProviderKey: z.string(),
   }),
+  buildpack: z
+    .object({
+      status: z.enum(["selected", "non-winning", "blocked", "disabled", "unavailable"]),
+      supportTier: z.enum([
+        "buildpack-accelerated",
+        "unsupported",
+        "ambiguous",
+        "requires-override",
+      ]),
+      evidence: z.object({
+        platformFiles: z.array(z.string()),
+        languageFamilies: z.array(z.string()),
+        frameworkHints: z.array(z.string()),
+        builderEvidence: z.array(z.string()),
+        detectedBuildpacks: z.array(
+          z.object({
+            id: z.string(),
+            version: z.string().optional(),
+          }),
+        ),
+      }),
+      builderPolicy: z.object({
+        defaultBuilder: z.string().optional(),
+        requestedBuilder: z.string().optional(),
+        override: z.enum(["none", "allowed", "blocked"]),
+        blockedBuilders: z.array(z.string()),
+      }),
+      artifactIntent: z.enum(["build-image", "prebuilt-image", "compose-project"]).optional(),
+      limitations: z.array(
+        z.object({
+          code: z.string(),
+          message: z.string(),
+          fixPath: z.string().optional(),
+        }),
+      ),
+    })
+    .optional(),
   artifact: z.object({
     kind: z.enum([
       "dockerfile-image",

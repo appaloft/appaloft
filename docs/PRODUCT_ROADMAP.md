@@ -529,7 +529,8 @@ Required:
   commands, artifact outputs, internal port behavior, unsupported evidence, and Web/CLI draft
   parity.
 - [ ] Keep buildpack-style detection as an adapter-owned accelerator, not the only way Appaloft
-  supports common frameworks.
+  supports common frameworks. Spec Round artifact:
+  [docs/specs/017-buildpack-accelerator-contract-and-preview-guardrails](./specs/017-buildpack-accelerator-contract-and-preview-guardrails/spec.md).
 
 Exit criteria:
 
@@ -870,14 +871,17 @@ mapping, matrix rows, and Web/CLI draft parity are all checked.
 - [ ] Rust: add generic Cargo build plus common HTTP framework metadata/defaults.
 - [ ] Elixir: add Phoenix release planner with `mix` and runtime image policy.
 - [ ] Buildpack-style auto-detection: add only after explicit planners remain deterministic; expose
-  generated plan, logs, overrides, and unsupported-field errors.
+  generated plan, builder policy, limitations, overrides/fix paths, and unsupported-field errors.
+  The current Spec Round limits this to adapter-owned accelerator preview/contract guardrails and
+  does not claim real `pack`/lifecycle execution.
 
 ## External Baseline Gap Checklist
 
 External baseline research points to this practical minimum:
 
 - [x] Docker substrate with Dockerfile, Compose, and prebuilt image paths.
-- [ ] Buildpack/auto-detect option with explicit plan output.
+- [ ] Buildpack/auto-detect option with explicit plan output. The contract now has a Phase 5
+  feature artifact and stable matrix ids; Code Round still needs executable preview parity.
 - [x] Static site packaging and first-class publish-directory semantics.
 - [x] Generated domains and custom domains as separate concepts.
 - [ ] Full HTTPS/ACME, force HTTPS, and redirect lifecycle closure.

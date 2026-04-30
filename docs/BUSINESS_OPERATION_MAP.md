@@ -423,6 +423,11 @@ commands must not be treated as implemented until they appear in `CORE_OPERATION
 `CORE_OPERATIONS.md`, `operation-catalog.ts`, Web/API/CLI entrypoints, public docs/help, and
 targeted tests without creating deployment attempts or executing runtime work.
 
+Buildpack-style detection is positioned under the existing internal workload framework detection
+and planning capability plus the `deployments.plan` read-only preview. It is not a new admission
+command, not a replacement for explicit framework planners, and not a reason to add buildpack,
+builder, source, runtime, or network fields to `deployments.create`.
+
 Low-level core/runtime/persistence support for rollback or historical rollback fields may remain as
 internal capability, but public rollback behavior is rebuild-required under ADR-016.
 
