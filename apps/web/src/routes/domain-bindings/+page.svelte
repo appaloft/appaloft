@@ -1,11 +1,26 @@
 <script lang="ts">
   import { browser } from "$app/environment";
   import { createMutation } from "@tanstack/svelte-query";
-  import { ArrowRight, Check, Globe2, Plus, Route, ShieldCheck } from "@lucide/svelte";
+  import {
+    ArrowRight,
+    Check,
+    Globe2,
+    Plus,
+    RefreshCw,
+    Route,
+    Save,
+    Search,
+    ShieldCheck,
+    Trash2,
+  } from "@lucide/svelte";
   import type {
     ConfirmDomainBindingOwnershipInput,
+    ConfigureDomainBindingRouteInput,
     CreateDomainBindingInput,
+    DeleteDomainBindingInput,
     DomainBindingSummary,
+    RetryDomainBindingVerificationInput,
+    ShowDomainBindingResponse,
   } from "@appaloft/contracts";
 
   import { readErrorMessage } from "$lib/api/client";
@@ -75,6 +90,15 @@
     title: string;
     detail: string;
   } | null>(null);
+  let lifecycleFeedback = $state<{
+    kind: "success" | "error";
+    title: string;
+    detail: string;
+  } | null>(null);
+  let bindingDetails = $state<Record<string, ShowDomainBindingResponse>>({});
+  let routeRedirectDrafts = $state<Record<string, string>>({});
+  let routeRedirectStatusDrafts = $state<Record<string, RedirectStatusText>>({});
+  let deleteConfirmationDrafts = $state<Record<string, string>>({});
 
   const filteredEnvironments = $derived.by(() =>
     projectId
@@ -170,6 +194,121 @@
       createFeedback = {
         kind: "error",
         title: $t(i18nKeys.console.domainBindings.confirmOwnershipErrorTitle),
+        detail: readErrorMessage(error),
+      };
+    },
+  }));
+  const showDomainBindingMutation = createMutation(() => ({
+    mutationFn: (input: { domainBindingId: string }) => orpcClient.domainBindings.show(input),
+    onSuccess: (detail, variables) => {
+      bindingDetails = {
+        ...bindingDetails,
+        [variables.domainBindingId]: detail,
+      };
+      lifecycleFeedback = {
+        kind: "success",
+        title: $t(i18nKeys.console.domainBindings.showSuccessTitle),
+        detail: detail.routeReadiness.status,
+      };
+    },
+    onError: (error) => {
+      lifecycleFeedback = {
+        kind: "error",
+        title: $t(i18nKeys.console.domainBindings.showErrorTitle),
+        detail: readErrorMessage(error),
+      };
+    },
+  }));
+  const configureDomainBindingRouteMutation = createMutation(() => ({
+    mutationFn: (input: ConfigureDomainBindingRouteInput) =>
+      orpcClient.domainBindings.configureRoute(input),
+    onSuccess: (_result, variables) => {
+      lifecycleFeedback = {
+        kind: "success",
+        title: $t(i18nKeys.console.domainBindings.configureRouteSuccessTitle),
+        detail: variables.domainBindingId,
+      };
+      void queryClient.invalidateQueries({ queryKey: ["domain-bindings"] });
+      showDomainBindingMutation.mutate({ domainBindingId: variables.domainBindingId });
+    },
+    onError: (error) => {
+      lifecycleFeedback = {
+        kind: "error",
+        title: $t(i18nKeys.console.domainBindings.configureRouteErrorTitle),
+        detail: readErrorMessage(error),
+      };
+    },
+  }));
+  const checkDomainBindingDeleteSafetyMutation = createMutation(() => ({
+    mutationFn: (input: { domainBindingId: string }) => orpcClient.domainBindings.deleteCheck(input),
+    onSuccess: (deleteSafety, variables) => {
+      const existingDetail = bindingDetails[variables.domainBindingId];
+      if (existingDetail) {
+        bindingDetails = {
+          ...bindingDetails,
+          [variables.domainBindingId]: {
+            ...existingDetail,
+            deleteSafety,
+          },
+        };
+      }
+      lifecycleFeedback = {
+        kind: deleteSafety.safeToDelete ? "success" : "error",
+        title: deleteSafety.safeToDelete
+          ? $t(i18nKeys.console.domainBindings.deleteCheckSafeTitle)
+          : $t(i18nKeys.console.domainBindings.deleteCheckBlockedTitle),
+        detail: deleteSafety.safeToDelete
+          ? $t(i18nKeys.console.domainBindings.deleteSafetyPreserves)
+          : deleteSafety.blockers.map((blocker) => blocker.message).join(" "),
+      };
+    },
+    onError: (error) => {
+      lifecycleFeedback = {
+        kind: "error",
+        title: $t(i18nKeys.console.domainBindings.deleteCheckErrorTitle),
+        detail: readErrorMessage(error),
+      };
+    },
+  }));
+  const deleteDomainBindingMutation = createMutation(() => ({
+    mutationFn: (input: DeleteDomainBindingInput) => orpcClient.domainBindings.delete(input),
+    onSuccess: (_result, variables) => {
+      lifecycleFeedback = {
+        kind: "success",
+        title: $t(i18nKeys.console.domainBindings.deleteSuccessTitle),
+        detail: variables.domainBindingId,
+      };
+      deleteConfirmationDrafts = {
+        ...deleteConfirmationDrafts,
+        [variables.domainBindingId]: "",
+      };
+      void queryClient.invalidateQueries({ queryKey: ["domain-bindings"] });
+      showDomainBindingMutation.mutate({ domainBindingId: variables.domainBindingId });
+    },
+    onError: (error) => {
+      lifecycleFeedback = {
+        kind: "error",
+        title: $t(i18nKeys.console.domainBindings.deleteErrorTitle),
+        detail: readErrorMessage(error),
+      };
+    },
+  }));
+  const retryDomainBindingVerificationMutation = createMutation(() => ({
+    mutationFn: (input: RetryDomainBindingVerificationInput) =>
+      orpcClient.domainBindings.retryVerification(input),
+    onSuccess: (result, variables) => {
+      lifecycleFeedback = {
+        kind: "success",
+        title: $t(i18nKeys.console.domainBindings.retryVerificationSuccessTitle),
+        detail: result.verificationAttemptId,
+      };
+      void queryClient.invalidateQueries({ queryKey: ["domain-bindings"] });
+      showDomainBindingMutation.mutate({ domainBindingId: variables.domainBindingId });
+    },
+    onError: (error) => {
+      lifecycleFeedback = {
+        kind: "error",
+        title: $t(i18nKeys.console.domainBindings.retryVerificationErrorTitle),
         detail: readErrorMessage(error),
       };
     },
@@ -288,6 +427,8 @@
         return $t(i18nKeys.common.status.notReady);
       case "failed":
         return $t(i18nKeys.common.status.failed);
+      case "deleted":
+        return $t(i18nKeys.common.status.deleted);
     }
   }
 
@@ -301,6 +442,8 @@
       case "failed":
       case "not_ready":
         return "destructive";
+      case "deleted":
+        return "outline";
       case "certificate_pending":
       case "pending_verification":
       case "requested":
@@ -321,6 +464,53 @@
 
   function selectProjectFilter(value: string): void {
     projectFilter = value === allProjectsFilterValue ? "" : value;
+  }
+
+  function setRouteRedirectDraft(bindingId: string, value: string): void {
+    routeRedirectDrafts = {
+      ...routeRedirectDrafts,
+      [bindingId]: value,
+    };
+  }
+
+  function setRouteRedirectStatusDraft(bindingId: string, value: string): void {
+    routeRedirectStatusDrafts = {
+      ...routeRedirectStatusDrafts,
+      [bindingId]: value as RedirectStatusText,
+    };
+  }
+
+  function setDeleteConfirmationDraft(bindingId: string, value: string): void {
+    deleteConfirmationDrafts = {
+      ...deleteConfirmationDrafts,
+      [bindingId]: value,
+    };
+  }
+
+  function configureDomainBindingRoute(binding: DomainBindingSummary, mode: DomainRouteMode): void {
+    const redirectDraft = routeRedirectDrafts[binding.id] ?? binding.redirectTo ?? "";
+    lifecycleFeedback = null;
+    configureDomainBindingRouteMutation.mutate({
+      domainBindingId: binding.id,
+      ...(mode === "redirect"
+        ? {
+            redirectTo: redirectDraft.trim(),
+            redirectStatus: parseRedirectStatus(
+              routeRedirectStatusDrafts[binding.id] ?? `${binding.redirectStatus ?? 308}`,
+            ),
+          }
+        : {}),
+    });
+  }
+
+  function deleteDomainBinding(binding: DomainBindingSummary): void {
+    lifecycleFeedback = null;
+    deleteDomainBindingMutation.mutate({
+      domainBindingId: binding.id,
+      confirmation: {
+        domainBindingId: deleteConfirmationDrafts[binding.id] ?? "",
+      },
+    });
   }
 </script>
 
@@ -680,6 +870,20 @@
             </Select.Root>
           </div>
 
+          {#if lifecycleFeedback}
+            <div
+              class={[
+                "rounded-md border px-3 py-2 text-sm",
+                lifecycleFeedback.kind === "success"
+                  ? "border-primary/25 bg-primary/5"
+                  : "border-destructive/30 bg-destructive/5 text-destructive",
+              ]}
+            >
+              <p class="font-medium">{lifecycleFeedback.title}</p>
+              <p class="mt-1 break-all text-xs">{lifecycleFeedback.detail}</p>
+            </div>
+          {/if}
+
           <div>
             {#if visibleDomainBindings.length > 0}
               <div class="console-record-list">
@@ -688,6 +892,17 @@
                 {@const environment = findEnvironment(environments, binding.environmentId)}
                 {@const resource = findResource(resources, binding.resourceId)}
                 {@const server = findServer(servers, binding.serverId)}
+                {@const detail = bindingDetails[binding.id]}
+                {@const redirectTargets = domainBindings.filter(
+                  (candidate) =>
+                    candidate.id !== binding.id &&
+                    !candidate.redirectTo &&
+                    candidate.projectId === binding.projectId &&
+                    candidate.environmentId === binding.environmentId &&
+                    candidate.resourceId === binding.resourceId &&
+                    candidate.pathPrefix === binding.pathPrefix &&
+                    candidate.status !== "deleted",
+                )}
                 <article class="py-4 sm:px-3">
                   <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                     <div class="min-w-0 space-y-2">
@@ -716,7 +931,31 @@
                             ? $t(i18nKeys.console.domainBindings.confirmingOwnership)
                             : $t(i18nKeys.console.domainBindings.confirmOwnership)}
                         </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          disabled={retryDomainBindingVerificationMutation.isPending}
+                          onclick={() =>
+                            retryDomainBindingVerificationMutation.mutate({
+                              domainBindingId: binding.id,
+                            })}
+                        >
+                          <RefreshCw class="size-4" />
+                          {$t(i18nKeys.console.domainBindings.retryVerification)}
+                        </Button>
                       {/if}
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        disabled={showDomainBindingMutation.isPending}
+                        onclick={() =>
+                          showDomainBindingMutation.mutate({ domainBindingId: binding.id })}
+                      >
+                        <Search class="size-4" />
+                        {$t(i18nKeys.console.domainBindings.showDetails)}
+                      </Button>
                       <p class="text-xs text-muted-foreground">{formatTime(binding.createdAt)}</p>
                     </div>
                   </div>
@@ -754,6 +993,140 @@
                           ({binding.redirectStatus ?? 308})
                         {/if}
                       </p>
+                    </div>
+                  </div>
+
+                  {#if detail}
+                    <div class="mt-3 grid gap-3 sm:grid-cols-3">
+                      <div class="bg-muted/15 px-3 py-2">
+                        <p class="text-xs text-muted-foreground">
+                          {$t(i18nKeys.console.domainBindings.routeReadiness)}
+                        </p>
+                        <p class="mt-1 text-sm font-medium">
+                          {detail.routeReadiness.status} · {detail.routeReadiness.routeBehavior}
+                        </p>
+                      </div>
+                      <div class="bg-muted/15 px-3 py-2">
+                        <p class="text-xs text-muted-foreground">
+                          {$t(i18nKeys.console.domainBindings.proxyReadiness)}
+                        </p>
+                        <p class="mt-1 text-sm font-medium">
+                          {detail.proxyReadiness ?? $t(i18nKeys.common.status.unknown)}
+                        </p>
+                      </div>
+                      <div class="bg-muted/15 px-3 py-2">
+                        <p class="text-xs text-muted-foreground">
+                          {$t(i18nKeys.console.domainBindings.deleteSafety)}
+                        </p>
+                        <p class="mt-1 text-sm font-medium">
+                          {detail.deleteSafety.safeToDelete
+                            ? $t(i18nKeys.console.domainBindings.deleteCheckSafeTitle)
+                            : $t(i18nKeys.console.domainBindings.deleteCheckBlockedTitle)}
+                        </p>
+                      </div>
+                    </div>
+                  {/if}
+
+                  <div class="mt-3 grid gap-3 lg:grid-cols-[1fr_auto]">
+                    <div class="grid gap-2 sm:grid-cols-[minmax(0,1fr)_7rem_auto_auto]">
+                      <Select.Root
+                        type="single"
+                        value={routeRedirectDrafts[binding.id] ?? binding.redirectTo ?? ""}
+                        onValueChange={(value) => setRouteRedirectDraft(binding.id, value)}
+                        disabled={redirectTargets.length === 0 || binding.status === "deleted"}
+                      >
+                        <Select.Trigger class="w-full">
+                          {routeRedirectDrafts[binding.id] ??
+                            binding.redirectTo ??
+                            $t(i18nKeys.console.domainBindings.noCanonicalDomainOptions)}
+                        </Select.Trigger>
+                        <Select.Content>
+                          {#each redirectTargets as target (target.id)}
+                            <Select.Item value={target.domainName}>{target.domainName}</Select.Item>
+                          {/each}
+                        </Select.Content>
+                      </Select.Root>
+                      <Select.Root
+                        type="single"
+                        value={routeRedirectStatusDrafts[binding.id] ??
+                          `${binding.redirectStatus ?? 308}`}
+                        onValueChange={(value) => setRouteRedirectStatusDraft(binding.id, value)}
+                        disabled={binding.status === "deleted"}
+                      >
+                        <Select.Trigger class="w-full">
+                          {routeRedirectStatusDrafts[binding.id] ?? binding.redirectStatus ?? 308}
+                        </Select.Trigger>
+                        <Select.Content>
+                          <Select.Item value="308">308</Select.Item>
+                          <Select.Item value="301">301</Select.Item>
+                          <Select.Item value="307">307</Select.Item>
+                          <Select.Item value="302">302</Select.Item>
+                        </Select.Content>
+                      </Select.Root>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        disabled={
+                          binding.status === "deleted" ||
+                          configureDomainBindingRouteMutation.isPending ||
+                          !(routeRedirectDrafts[binding.id] ?? binding.redirectTo)
+                        }
+                        onclick={() => configureDomainBindingRoute(binding, "redirect")}
+                      >
+                        <Save class="size-4" />
+                        {$t(i18nKeys.console.domainBindings.configureRedirect)}
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        disabled={binding.status === "deleted" || configureDomainBindingRouteMutation.isPending}
+                        onclick={() => configureDomainBindingRoute(binding, "serve")}
+                      >
+                        <Route class="size-4" />
+                        {$t(i18nKeys.console.domainBindings.configureServe)}
+                      </Button>
+                    </div>
+
+                    <div class="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
+                      <Input
+                        value={deleteConfirmationDrafts[binding.id] ?? ""}
+                        disabled={binding.status === "deleted"}
+                        placeholder={binding.id}
+                        oninput={(event) =>
+                          setDeleteConfirmationDraft(
+                            binding.id,
+                            (event.currentTarget as HTMLInputElement).value,
+                          )}
+                      />
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        disabled={checkDomainBindingDeleteSafetyMutation.isPending}
+                        onclick={() =>
+                          checkDomainBindingDeleteSafetyMutation.mutate({
+                            domainBindingId: binding.id,
+                          })}
+                      >
+                        <Search class="size-4" />
+                        {$t(i18nKeys.console.domainBindings.deleteCheck)}
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="destructive"
+                        disabled={
+                          binding.status === "deleted" ||
+                          deleteDomainBindingMutation.isPending ||
+                          (deleteConfirmationDrafts[binding.id] ?? "") !== binding.id
+                        }
+                        onclick={() => deleteDomainBinding(binding)}
+                      >
+                        <Trash2 class="size-4" />
+                        {$t(i18nKeys.console.domainBindings.deleteBinding)}
+                      </Button>
                     </div>
                   </div>
                 </article>

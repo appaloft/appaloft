@@ -8,11 +8,13 @@ import {
   archiveResourceCommandInputSchema,
   BootstrapServerProxyCommand,
   bootstrapServerProxyCommandInputSchema,
+  CheckDomainBindingDeleteSafetyQuery,
   CheckServerDeleteSafetyQuery,
   CloneEnvironmentCommand,
   type Command,
   type CommandBus,
   ConfigureDefaultAccessDomainPolicyCommand,
+  ConfigureDomainBindingRouteCommand,
   ConfigureResourceAccessCommand,
   ConfigureResourceHealthCommand,
   ConfigureResourceNetworkCommand,
@@ -28,9 +30,11 @@ import {
   CreateProjectCommand,
   CreateResourceCommand,
   CreateSshCredentialCommand,
+  checkDomainBindingDeleteSafetyQueryInputSchema,
   checkServerDeleteSafetyQueryInputSchema,
   cloneEnvironmentCommandInputSchema,
   configureDefaultAccessDomainPolicyCommandInputSchema,
+  configureDomainBindingRouteCommandInputSchema,
   configureResourceAccessCommandInputSchema,
   configureResourceHealthCommandInputSchema,
   configureResourceNetworkCommandInputSchema,
@@ -46,6 +50,7 @@ import {
   createResourceCommandInputSchema,
   createSshCredentialCommandInputSchema,
   DeactivateServerCommand,
+  DeleteDomainBindingCommand,
   DeleteResourceCommand,
   DeleteServerCommand,
   DeleteSshCredentialCommand,
@@ -57,6 +62,7 @@ import {
   DeploymentRecoveryReadinessQuery,
   DiffEnvironmentsQuery,
   deactivateServerCommandInputSchema,
+  deleteDomainBindingCommandInputSchema,
   deleteResourceCommandInputSchema,
   deleteServerCommandInputSchema,
   deleteSshCredentialCommandInputSchema,
@@ -114,6 +120,7 @@ import {
   ResourceRuntimeLogsQuery,
   type ResourceRuntimeLogsQueryInput,
   type ResourceRuntimeLogsResult,
+  RetryDomainBindingVerificationCommand,
   RotateSshCredentialCommand,
   registerServerCommandInputSchema,
   renameEnvironmentCommandInputSchema,
@@ -124,11 +131,13 @@ import {
   resourceHealthQueryInputSchema,
   resourceProxyConfigurationPreviewQueryInputSchema,
   resourceRuntimeLogsQueryInputSchema,
+  retryDomainBindingVerificationCommandInputSchema,
   rotateSshCredentialCommandInputSchema,
   SetEnvironmentVariableCommand,
   SetResourceVariableCommand,
   ShowDefaultAccessDomainPolicyQuery,
   ShowDeploymentQuery,
+  ShowDomainBindingQuery,
   ShowEnvironmentQuery,
   ShowOperatorWorkQuery,
   ShowProjectQuery,
@@ -142,6 +151,7 @@ import {
   setResourceVariableCommandInputSchema,
   showDefaultAccessDomainPolicyQueryInputSchema,
   showDeploymentQueryInputSchema,
+  showDomainBindingQueryInputSchema,
   showEnvironmentQueryInputSchema,
   showOperatorWorkQueryInputSchema,
   showProjectQueryInputSchema,
@@ -164,9 +174,11 @@ import {
   archiveProjectResponseSchema,
   archiveResourceResponseSchema,
   bootstrapServerProxyResponseSchema,
+  checkDomainBindingDeleteSafetyResponseSchema,
   checkServerDeleteSafetyResponseSchema,
   cloneEnvironmentResponseSchema,
   configureDefaultAccessDomainPolicyResponseSchema,
+  configureDomainBindingRouteResponseSchema,
   configureResourceAccessResponseSchema,
   configureResourceHealthResponseSchema,
   configureResourceNetworkResponseSchema,
@@ -181,6 +193,7 @@ import {
   createResourceResponseSchema,
   createSshCredentialResponseSchema,
   deactivateServerResponseSchema,
+  deleteDomainBindingResponseSchema,
   deleteResourceResponseSchema,
   deleteServerResponseSchema,
   deleteSshCredentialResponseSchema,
@@ -223,10 +236,12 @@ import {
   resourceRuntimeLogEventSchema,
   resourceRuntimeLogsResponseSchema,
   resourceRuntimeLogsStreamResponseSchema,
+  retryDomainBindingVerificationResponseSchema,
   rotateSshCredentialResponseSchema,
   setResourceVariableResponseSchema,
   showDefaultAccessDomainPolicyResponseSchema,
   showDeploymentResponseSchema,
+  showDomainBindingResponseSchema,
   showOperatorWorkResponseSchema,
   showProjectResponseSchema,
   showServerResponseSchema,
@@ -427,8 +442,28 @@ export const apiRouteDescriptions = {
     "Creates a custom domain binding for a resource.",
     "domain.custom-domain-binding",
   ),
+  showDomainBinding: routeDescription(
+    "Reads custom domain binding ownership, route readiness, proxy readiness, diagnostics, and certificate readiness.",
+    "domain.custom-domain-binding",
+  ),
+  configureDomainBindingRoute: routeDescription(
+    "Configures whether a custom domain binding serves traffic or redirects to a canonical binding.",
+    "domain.custom-domain-binding",
+  ),
   confirmDomainBindingOwnership: routeDescription(
     "Confirms that a user controls the custom domain.",
+    "domain.ownership-check",
+  ),
+  checkDomainBindingDeleteSafety: routeDescription(
+    "Checks whether a custom domain binding can be deleted without revoking certificates or erasing history.",
+    "domain.custom-domain-binding",
+  ),
+  deleteDomainBinding: routeDescription(
+    "Deletes custom domain binding route intent while preserving generated access, deployment snapshots, and server-applied route audit.",
+    "domain.custom-domain-binding",
+  ),
+  retryDomainBindingVerification: routeDescription(
+    "Starts a new domain ownership verification attempt without retrying certificate issuance.",
     "domain.ownership-check",
   ),
   issueOrRenewCertificate: routeDescription(
@@ -1490,6 +1525,32 @@ export const createDomainBindingProcedure = base
     executeCommand(context, CreateDomainBindingCommand.create(input)),
   );
 
+export const showDomainBindingProcedure = base
+  .route({
+    method: "GET",
+    path: "/domain-bindings/{domainBindingId}",
+    description: apiRouteDescriptions.showDomainBinding,
+    successStatus: 200,
+  })
+  .input(showDomainBindingQueryInputSchema)
+  .output(showDomainBindingResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, ShowDomainBindingQuery.create(input)),
+  );
+
+export const configureDomainBindingRouteProcedure = base
+  .route({
+    method: "POST",
+    path: "/domain-bindings/{domainBindingId}/route",
+    description: apiRouteDescriptions.configureDomainBindingRoute,
+    successStatus: 200,
+  })
+  .input(configureDomainBindingRouteCommandInputSchema)
+  .output(configureDomainBindingRouteResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, ConfigureDomainBindingRouteCommand.create(input)),
+  );
+
 export const confirmDomainBindingOwnershipProcedure = base
   .route({
     method: "POST",
@@ -1501,6 +1562,45 @@ export const confirmDomainBindingOwnershipProcedure = base
   .output(confirmDomainBindingOwnershipResponseSchema)
   .handler(async ({ input, context }) =>
     executeCommand(context, ConfirmDomainBindingOwnershipCommand.create(input)),
+  );
+
+export const checkDomainBindingDeleteSafetyProcedure = base
+  .route({
+    method: "GET",
+    path: "/domain-bindings/{domainBindingId}/delete-check",
+    description: apiRouteDescriptions.checkDomainBindingDeleteSafety,
+    successStatus: 200,
+  })
+  .input(checkDomainBindingDeleteSafetyQueryInputSchema)
+  .output(checkDomainBindingDeleteSafetyResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeQuery(context, CheckDomainBindingDeleteSafetyQuery.create(input)),
+  );
+
+export const deleteDomainBindingProcedure = base
+  .route({
+    method: "DELETE",
+    path: "/domain-bindings/{domainBindingId}",
+    description: apiRouteDescriptions.deleteDomainBinding,
+    successStatus: 200,
+  })
+  .input(deleteDomainBindingCommandInputSchema)
+  .output(deleteDomainBindingResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, DeleteDomainBindingCommand.create(input)),
+  );
+
+export const retryDomainBindingVerificationProcedure = base
+  .route({
+    method: "POST",
+    path: "/domain-bindings/{domainBindingId}/verification-retries",
+    description: apiRouteDescriptions.retryDomainBindingVerification,
+    successStatus: 202,
+  })
+  .input(retryDomainBindingVerificationCommandInputSchema)
+  .output(retryDomainBindingVerificationResponseSchema)
+  .handler(async ({ input, context }) =>
+    executeCommand(context, RetryDomainBindingVerificationCommand.create(input)),
   );
 
 export const listDomainBindingsProcedure = base
@@ -2039,8 +2139,13 @@ export const appaloftOrpcRouter = {
   },
   domainBindings: {
     list: listDomainBindingsProcedure,
+    show: showDomainBindingProcedure,
     create: createDomainBindingProcedure,
+    configureRoute: configureDomainBindingRouteProcedure,
     confirmOwnership: confirmDomainBindingOwnershipProcedure,
+    deleteCheck: checkDomainBindingDeleteSafetyProcedure,
+    delete: deleteDomainBindingProcedure,
+    retryVerification: retryDomainBindingVerificationProcedure,
   },
   certificates: {
     import: importCertificateProcedure,
@@ -2228,7 +2333,11 @@ export function mountAppaloftOrpcRoutes(
     "/api/resources/:resourceId/runtime-logs/stream",
     "/api/terminal-sessions",
     "/api/domain-bindings",
+    "/api/domain-bindings/:domainBindingId",
+    "/api/domain-bindings/:domainBindingId/route",
     "/api/domain-bindings/:domainBindingId/ownership-confirmations",
+    "/api/domain-bindings/:domainBindingId/delete-check",
+    "/api/domain-bindings/:domainBindingId/verification-retries",
     "/api/certificates",
     "/api/certificates/import",
     "/api/certificates/issue-or-renew",

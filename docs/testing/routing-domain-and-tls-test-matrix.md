@@ -117,6 +117,9 @@ Then:
 | ROUTE-TLS-CMD-015 | integration | Duplicate in-flight certificate attempt | Same binding/certificate/reason already issuing | `err` or idempotent `ok` per idempotency key | `certificate_attempt_conflict` when rejected | No duplicate event | No duplicate attempt | No |
 | ROUTE-TLS-CMD-019 | integration | Import manual certificate | Bound or ready binding with `certificatePolicy = manual`; valid chain/key/passphrase | `ok({ certificateId, attemptId })` | None | `certificate-imported` | Certificate active with `source = imported`; no `certificate-issued` | No |
 | ROUTE-TLS-CMD-020 | integration | Import certificate not allowed | Binding is not manual-policy eligible or not durably owned | `err` | `certificate_import_not_allowed`, phase `certificate-admission` | None | No imported certificate attached | No |
+| ROUTE-TLS-CMD-021 | integration | Configure domain binding route behavior | Active binding and optional served canonical target in the same owner/path scope | `ok({ id })` | None | `domain-binding-route-configured` when changed | Binding route behavior switches between serve and redirect without deployment/certificate side effects | No |
+| ROUTE-TLS-CMD-022 | integration | Delete domain binding safely | Binding has no active certificate blockers and exact id confirmation is supplied | `ok({ id })` | None | `domain-binding-deleted` | Binding becomes inactive/deleted; generated access, deployment snapshots, certificate history, and server-applied audit remain | No |
+| ROUTE-TLS-CMD-023 | integration | Retry ownership verification | Binding is pending verification or not ready after DNS/evidence changes | `ok({ id, verificationAttemptId })` | None | `domain-binding-verification-retried` | New verification attempt exists; old attempts remain historical; no certificate retry is dispatched | No |
 
 ## Event Matrix
 
@@ -151,6 +154,8 @@ Then:
 | ROUTE-TLS-READMODEL-008 | integration | DNS pending binding list projection | `domain-bindings.create` accepted a binding before public DNS has converged | `domain-bindings.list` returns `dnsObservation.status = pending`, expected target metadata, and no `domain-bound` implication |
 | ROUTE-TLS-READMODEL-009 | integration | DNS matched binding list projection | DNS observer records the expected public target for a pending binding | `domain-bindings.list` returns `dnsObservation.status = matched` with observed targets and keeps ownership confirmation as a separate gate |
 | ROUTE-TLS-READMODEL-010 | integration | Imported certificate projection | `certificates.import` succeeded for a manual-policy binding | `certificates.list` returns `source = imported`, safe metadata, latest import attempt id, and no raw certificate/key/passphrase material |
+| ROUTE-TLS-READMODEL-011 | integration | Domain binding show readback | Binding has access summary, selected route descriptor, DNS/route status, and certificate context | `domain-bindings.show` returns binding ownership, route readiness, generated access fallback, proxy readiness, selected/context route descriptors, delete safety, and read-only certificate readiness |
+| ROUTE-TLS-READMODEL-012 | integration | Domain binding delete safety | Binding has active certificate state or historical certificate attempts | `domain-bindings.delete-check` blocks active certificate state and warns on historical certificate attempts without mutating state |
 
 ## Workflow Matrix
 
@@ -244,6 +249,11 @@ Then:
 | ROUTE-TLS-ENTRY-018 | e2e-preferred | CLI imports manual certificate | CLI targets a bound manual-policy binding and supplies chain/key/passphrase through secret-safe input | `ok({ certificateId, attemptId })` is printed without secret echo | Per command error contract | `certificate-imported` | `certificate list` shows imported safe metadata only |
 | ROUTE-TLS-ENTRY-019 | e2e-preferred | API imports manual certificate | HTTP/oRPC posts the same command schema through secure transport handling | `ok({ certificateId, attemptId })` response | Per command error contract | `certificate-imported` | `GET /api/certificates` shows imported safe metadata only |
 | ROUTE-TLS-ENTRY-020 | e2e-preferred | Resource-scoped Web imports manual certificate | User opens a manual-policy bound binding from the resource-scoped surface and pastes or uploads chain/key/passphrase | Accepted success is shown without secret echo | Per command error contract | `certificate-imported` | Resource/domain status surfaces show imported state and later ready state when gates pass |
+| ROUTE-TLS-ENTRY-021 | e2e-preferred | CLI/API shows one binding | CLI/API reads `domain-bindings.show` after a binding exists | Shared readback includes ownership, route/proxy/readiness, generated fallback, certificate context, and delete safety | Per query error contract | None | No mutation |
+| ROUTE-TLS-ENTRY-022 | e2e-preferred | CLI/API configures route behavior | CLI/API runs `domain-bindings.configure-route` with redirect target or clears redirect target | Same command semantics across surfaces | Per command error contract | `domain-binding-route-configured` when changed | Binding route behavior changes without certificate/deployment side effects |
+| ROUTE-TLS-ENTRY-023 | e2e-preferred | CLI/API checks delete safety | CLI/API runs `domain-bindings.delete-check` | Same safety blockers/warnings across surfaces | Per query error contract | None | No mutation |
+| ROUTE-TLS-ENTRY-024 | e2e-preferred | CLI/API deletes binding safely | CLI/API supplies exact id confirmation and no delete blockers are present | `ok({ id })` | Per command error contract | `domain-binding-deleted` | Binding is inactive/deleted and route snapshots/generated access remain intact |
+| ROUTE-TLS-ENTRY-025 | e2e-preferred | CLI/API retries ownership verification | CLI/API runs `domain-bindings.retry-verification` on pending/not-ready binding | `ok({ id, verificationAttemptId })` | Per command error contract | `domain-binding-verification-retried` | List/show expose the new attempt count and pending DNS observation |
 
 ## Idempotency Assertions
 

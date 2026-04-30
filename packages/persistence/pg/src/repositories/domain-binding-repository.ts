@@ -59,7 +59,7 @@ class KyselyDomainBindingSelectionVisitor
       .where("resource_id", "=", spec.resourceId.value)
       .where("domain_name", "=", spec.domainName.value)
       .where("path_prefix", "=", spec.pathPrefix.value)
-      .where("status", "<>", "failed");
+      .where("status", "not in", ["failed", "deleted"]);
   }
 }
 

@@ -3,9 +3,11 @@ import {
   type ArchiveProjectCommandInput,
   type ArchiveResourceCommandInput,
   type BootstrapServerProxyCommandInput,
+  type CheckDomainBindingDeleteSafetyQueryInput,
   type CheckServerDeleteSafetyQueryInput,
   type CloneEnvironmentCommandInput,
   type ConfigureDefaultAccessDomainPolicyCommandInput,
+  type ConfigureDomainBindingRouteCommandInput,
   type ConfigureResourceAccessCommandInput,
   type ConfigureResourceHealthCommandInput,
   type ConfigureResourceNetworkCommandInput,
@@ -21,6 +23,7 @@ import {
   type CreateResourceCommandInput,
   type CreateSshCredentialCommandInput,
   type DeactivateServerCommandInput,
+  type DeleteDomainBindingCommandInput,
   type DeleteResourceCommandInput,
   type DeleteServerCommandInput,
   type DeleteSshCredentialCommandInput,
@@ -52,11 +55,13 @@ import {
   type ResourceHealthQueryInput,
   type ResourceProxyConfigurationPreviewQueryInput,
   type ResourceRuntimeLogsQueryInput,
+  type RetryDomainBindingVerificationCommandInput,
   type RotateSshCredentialCommandInput,
   type SetEnvironmentVariableCommandInput,
   type SetResourceVariableCommandInput,
   type ShowDefaultAccessDomainPolicyQueryInput,
   type ShowDeploymentQueryInput,
+  type ShowDomainBindingQueryInput,
   type ShowEnvironmentQueryInput,
   type ShowOperatorWorkQueryInput,
   type ShowProjectQueryInput,
@@ -75,9 +80,11 @@ import {
   type ArchiveProjectResponse,
   type ArchiveResourceResponse,
   type BootstrapServerProxyResponse,
+  type CheckDomainBindingDeleteSafetyResponse,
   type CheckServerDeleteSafetyResponse,
   type CloneEnvironmentResponse,
   type ConfigureDefaultAccessDomainPolicyResponse,
+  type ConfigureDomainBindingRouteResponse,
   type ConfigureResourceAccessResponse,
   type ConfigureResourceHealthResponse,
   type ConfigureResourceNetworkResponse,
@@ -92,6 +99,7 @@ import {
   type CreateResourceResponse,
   type CreateSshCredentialResponse,
   type DeactivateServerResponse,
+  type DeleteDomainBindingResponse,
   type DeleteResourceResponse,
   type DeleteServerResponse,
   type DeleteSshCredentialResponse,
@@ -134,10 +142,12 @@ import {
   type ResourceRuntimeLogEvent,
   type ResourceRuntimeLogsResponse,
   type ResourceRuntimeLogsStreamResponse,
+  type RetryDomainBindingVerificationResponse,
   type RotateSshCredentialResponse,
   type SetResourceVariableResponse,
   type ShowDefaultAccessDomainPolicyResponse,
   type ShowDeploymentResponse,
+  type ShowDomainBindingResponse,
   type ShowOperatorWorkResponse,
   type ShowProjectResponse,
   type ShowServerResponse,
@@ -508,16 +518,46 @@ export type AppaloftOrpcClientContract = {
       ListDomainBindingsResponse,
       AppaloftClientError
     >;
+    show: Client<
+      AppaloftClientContext,
+      ShowDomainBindingQueryInput,
+      ShowDomainBindingResponse,
+      AppaloftClientError
+    >;
     create: Client<
       AppaloftClientContext,
       CreateDomainBindingCommandInput,
       CreateDomainBindingResponse,
       AppaloftClientError
     >;
+    configureRoute: Client<
+      AppaloftClientContext,
+      ConfigureDomainBindingRouteCommandInput,
+      ConfigureDomainBindingRouteResponse,
+      AppaloftClientError
+    >;
     confirmOwnership: Client<
       AppaloftClientContext,
       ConfirmDomainBindingOwnershipCommandInput,
       ConfirmDomainBindingOwnershipResponse,
+      AppaloftClientError
+    >;
+    deleteCheck: Client<
+      AppaloftClientContext,
+      CheckDomainBindingDeleteSafetyQueryInput,
+      CheckDomainBindingDeleteSafetyResponse,
+      AppaloftClientError
+    >;
+    delete: Client<
+      AppaloftClientContext,
+      DeleteDomainBindingCommandInput,
+      DeleteDomainBindingResponse,
+      AppaloftClientError
+    >;
+    retryVerification: Client<
+      AppaloftClientContext,
+      RetryDomainBindingVerificationCommandInput,
+      RetryDomainBindingVerificationResponse,
       AppaloftClientError
     >;
   };

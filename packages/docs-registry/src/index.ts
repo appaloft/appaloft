@@ -1519,6 +1519,16 @@ export const publicDocsOperationCoverage = [
     topicId: "domain.custom-domain-binding",
   },
   {
+    operationKey: "domain-bindings.show",
+    status: "documented",
+    topicId: "domain.custom-domain-binding",
+  },
+  {
+    operationKey: "domain-bindings.configure-route",
+    status: "documented",
+    topicId: "domain.custom-domain-binding",
+  },
+  {
     operationKey: "domain-bindings.confirm-ownership",
     status: "documented",
     topicId: "domain.ownership-check",
@@ -1527,6 +1537,21 @@ export const publicDocsOperationCoverage = [
     operationKey: "domain-bindings.list",
     status: "documented",
     topicId: "domain.custom-domain-binding",
+  },
+  {
+    operationKey: "domain-bindings.delete-check",
+    status: "documented",
+    topicId: "domain.custom-domain-binding",
+  },
+  {
+    operationKey: "domain-bindings.delete",
+    status: "documented",
+    topicId: "domain.custom-domain-binding",
+  },
+  {
+    operationKey: "domain-bindings.retry-verification",
+    status: "documented",
+    topicId: "domain.ownership-check",
   },
   {
     operationKey: "certificates.import",

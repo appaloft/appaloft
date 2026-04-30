@@ -34,10 +34,16 @@ type RoutingDomainTlsErrorDetails = {
   commandName?:
     | "domain-bindings.create"
     | "domain-bindings.confirm-ownership"
+    | "domain-bindings.configure-route"
+    | "domain-bindings.delete"
+    | "domain-bindings.retry-verification"
     | "certificates.issue-or-renew"
     | "certificates.import";
   eventName?:
     | "domain-binding-requested"
+    | "domain-binding-route-configured"
+    | "domain-binding-deleted"
+    | "domain-binding-verification-retried"
     | "domain-bound"
     | "certificate-requested"
     | "certificate-issued"
@@ -49,6 +55,8 @@ type RoutingDomainTlsErrorDetails = {
     | "context-resolution"
     | "domain-binding-admission"
     | "domain-binding-persistence"
+    | "domain-binding-route-configuration"
+    | "domain-binding-delete"
     | "domain-verification"
     | "route-realization"
     | "certificate-context-resolution"
@@ -97,6 +105,8 @@ Admission errors reject the command and return `err(DomainError)`.
 | `conflict` | `domain-binding-admission` | No | Duplicate active binding conflicts with the command. |
 | `domain_binding_proxy_required` | `domain-binding-admission` | No | Durable domain binding requested with proxy disabled. |
 | `domain_binding_context_mismatch` | `context-resolution` | No | Referenced project/environment/resource/server/destination relationship is inconsistent. |
+| `validation_error` | `domain-binding-route-configuration`, `domain-binding-delete` | No | Route configuration, redirect target, or delete confirmation is invalid. |
+| `conflict` | `domain-binding-delete` | No | Delete safety blockers are present, such as active certificate state. |
 | `domain_verification_not_pending` | `domain-verification` | No | Ownership confirmation was requested but no pending verification attempt can be confirmed. |
 | `domain_ownership_unverified` | `domain-verification` | No | DNS-gated ownership confirmation did not observe the expected target. |
 | `dns_lookup_failed` | `domain-verification` | Yes | DNS-gated ownership confirmation could not complete a public DNS lookup through configured resolvers. |

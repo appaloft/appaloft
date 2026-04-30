@@ -71,7 +71,9 @@ Allowed mutation names are specific to the aggregate language, for example:
 - `servers.configure-credential` and `servers.bootstrap-proxy` instead of `servers.update`;
 - `resources.configure-source`, `resources.configure-runtime`, `resources.configure-network`,
   `resources.configure-health`, and `resources.archive` instead of `resources.update`;
-- `domain-bindings.confirm-ownership` instead of `domain-bindings.update`;
+- `domain-bindings.confirm-ownership`, `domain-bindings.configure-route`,
+  `domain-bindings.delete`, and `domain-bindings.retry-verification` instead of
+  `domain-bindings.update`;
 - `certificates.issue-or-renew` instead of `certificates.update`.
 
 If a future behavior appears to require one broad update command, the model is not specific enough.

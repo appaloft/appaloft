@@ -1,7 +1,12 @@
 import {
+  CheckDomainBindingDeleteSafetyQuery,
+  ConfigureDomainBindingRouteCommand,
   ConfirmDomainBindingOwnershipCommand,
   CreateDomainBindingCommand,
+  DeleteDomainBindingCommand,
   ListDomainBindingsQuery,
+  RetryDomainBindingVerificationCommand,
+  ShowDomainBindingQuery,
 } from "@appaloft/application";
 import { certificatePolicies, edgeProxyKinds, tlsModes } from "@appaloft/core";
 import { Args, Command as EffectCommand, Options } from "@effect/cli";
@@ -36,6 +41,7 @@ const verificationModeOption = Options.choice("verification-mode", ["dns", "manu
 );
 const confirmedByOption = Options.text("confirmed-by").pipe(Options.optional);
 const evidenceOption = Options.text("evidence").pipe(Options.optional);
+const deleteConfirmationOption = Options.text("confirm");
 const listProjectIdOption = Options.text("project").pipe(Options.optional);
 const listEnvironmentIdOption = Options.text("environment").pipe(Options.optional);
 const listResourceIdOption = Options.text("resource").pipe(Options.optional);
@@ -129,6 +135,79 @@ const confirmOwnershipCommand = EffectCommand.make(
     ),
 ).pipe(EffectCommand.withDescription(cliCommandDescriptions.domainBindingConfirmOwnership));
 
+const showCommand = EffectCommand.make(
+  "show",
+  {
+    domainBindingId: domainBindingIdArg,
+  },
+  ({ domainBindingId }) => runQuery(ShowDomainBindingQuery.create({ domainBindingId })),
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.domainBindingShow));
+
+const configureRouteCommand = EffectCommand.make(
+  "configure-route",
+  {
+    domainBindingId: domainBindingIdArg,
+    redirectTo: redirectToOption,
+    redirectStatus: redirectStatusOption,
+    idempotencyKey: idempotencyKeyOption,
+  },
+  ({ domainBindingId, idempotencyKey, redirectStatus, redirectTo }) => {
+    const redirectStatusValue = optionalValue(redirectStatus);
+
+    return runCommand(
+      ConfigureDomainBindingRouteCommand.create({
+        domainBindingId,
+        redirectTo: optionalValue(redirectTo),
+        ...(redirectStatusValue
+          ? { redirectStatus: Number(redirectStatusValue) as 301 | 302 | 307 | 308 }
+          : {}),
+        idempotencyKey: optionalValue(idempotencyKey),
+      }),
+    );
+  },
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.domainBindingConfigureRoute));
+
+const deleteCheckCommand = EffectCommand.make(
+  "delete-check",
+  {
+    domainBindingId: domainBindingIdArg,
+  },
+  ({ domainBindingId }) =>
+    runQuery(CheckDomainBindingDeleteSafetyQuery.create({ domainBindingId })),
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.domainBindingDeleteCheck));
+
+const deleteCommand = EffectCommand.make(
+  "delete",
+  {
+    domainBindingId: domainBindingIdArg,
+    confirm: deleteConfirmationOption,
+    idempotencyKey: idempotencyKeyOption,
+  },
+  ({ confirm, domainBindingId, idempotencyKey }) =>
+    runCommand(
+      DeleteDomainBindingCommand.create({
+        domainBindingId,
+        confirmation: { domainBindingId: confirm },
+        idempotencyKey: optionalValue(idempotencyKey),
+      }),
+    ),
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.domainBindingDelete));
+
+const retryVerificationCommand = EffectCommand.make(
+  "retry-verification",
+  {
+    domainBindingId: domainBindingIdArg,
+    idempotencyKey: idempotencyKeyOption,
+  },
+  ({ domainBindingId, idempotencyKey }) =>
+    runCommand(
+      RetryDomainBindingVerificationCommand.create({
+        domainBindingId,
+        idempotencyKey: optionalValue(idempotencyKey),
+      }),
+    ),
+).pipe(EffectCommand.withDescription(cliCommandDescriptions.domainBindingRetryVerification));
+
 const listCommand = EffectCommand.make(
   "list",
   {
@@ -148,5 +227,14 @@ const listCommand = EffectCommand.make(
 
 export const domainBindingCommand = EffectCommand.make("domain-binding").pipe(
   EffectCommand.withDescription(cliCommandDescriptions.domainBinding),
-  EffectCommand.withSubcommands([createCommand, confirmOwnershipCommand, listCommand]),
+  EffectCommand.withSubcommands([
+    createCommand,
+    showCommand,
+    configureRouteCommand,
+    confirmOwnershipCommand,
+    deleteCheckCommand,
+    deleteCommand,
+    retryVerificationCommand,
+    listCommand,
+  ]),
 );
