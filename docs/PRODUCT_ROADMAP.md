@@ -43,11 +43,10 @@ Version selection rules:
 Current release alignment:
 
 <!-- release-alignment:start -->
-- [x] On 2026-04-30, the latest public release is `v0.6.0`; root package
-  and Release Please manifest on `main` are `0.6.0`; the release PR target is
-  `0.7.0`.
-- [x] On 2026-04-30, the roadmap gate allows `Release-As: 0.7.0` because
-  Phase 0 through Phase 5 release rules, required items, and exit criteria are checked.
+- [x] On 2026-04-30, the latest public GitHub Release is `v0.7.0`; root package,
+  Release Please manifest, changelog, and latest fetched tag on `main` are `0.7.0`.
+- [x] On 2026-04-30, the active roadmap target moved to Phase 6 / `0.8.0`; Phase 6
+  remains incomplete until its required items and exit criteria are checked.
 <!-- release-alignment:end -->
 
 Historical alignment notes:
@@ -563,9 +562,8 @@ Exit criteria:
 
 Phase 5 release-gate verification notes from 2026-04-30:
 
-- `0.7.0` is not published yet. The local package manifest, Release Please manifest, and latest
-  public GitHub Release all remain on `0.6.0`, and the Phase 5 gate base is PR #145
-  (`feat: add zero-to-ssh catalog acceptance harness`).
+- `0.7.0` is published as GitHub Release `v0.7.0`; the local package manifest, Release Please
+  manifest, changelog, and latest fetched tag on `main` align on `0.7.0`.
 - The supported catalog contract is closed by
   `docs/specs/019-zero-to-ssh-supported-catalog-acceptance-harness`, the
   `ZSSH-CATALOG-*`, `ZSSH-PREVIEW-*`, `ZSSH-CREATE-*`, and `ZSSH-RUNTIME-*` matrix rows, and the
@@ -611,11 +609,13 @@ Required:
 - [x] Add operation catalog coverage for default access policy operations.
 - [x] Harden `ResourceAccessSummary` route precedence so durable domain bindings and server-applied
   config routes consistently win where specs require it.
-- [ ] Add dedicated route intent/status read or repair surfaces only where existing access, proxy,
-  health, and diagnostic surfaces are insufficient.
-- [ ] Close the shared route intent/status and access failure diagnostic contract across generated
-  access, durable domain routes, server-applied routes, proxy preview, health, runtime logs, and
-  diagnostic copy before adding domain/certificate mutation lifecycle surfaces.
+- [x] Verify no dedicated route intent/status read or repair surface is required for this slice
+  because existing access, proxy, health, log, and diagnostic surfaces carry the shared descriptor;
+  keep future route repair surfaces gated by a later Spec Round.
+- [x] Close the shared route intent/status and access failure diagnostic contract across generated
+  access, durable domain routes, server-applied routes, proxy preview, health, runtime logs,
+  deployment logs, and diagnostic copy before adding domain/certificate mutation lifecycle
+  surfaces.
 - [ ] Add domain binding show/update/delete/retry lifecycle commands where specs allow mutation
   after creation.
 - [ ] Add certificate show/import/revoke/delete/retry semantics around provider-issued and imported
@@ -629,6 +629,18 @@ Required:
   one-shot CLI or remote SSH runtimes without a reachable Appaloft backend service.
 - [ ] Keep access/proxy/log/health failures visible through read models, proxy preview, and
   diagnostics.
+
+Phase 6 verification notes from 2026-04-30:
+
+- The first Phase 6 slice closed `docs/specs/020-route-intent-status-and-access-diagnostics`
+  through a traceability table rather than introducing a new public route operation. The active
+  surfaces remain `resources.show`, `resources.health`, `resources.proxy-configuration.preview`,
+  `resources.runtime-logs`, `resources.diagnostic-summary`, and `deployments.logs`.
+- This slice did not add deployment retry/redeploy/rollback, did not expand ids-only
+  `deployments.create`, did not start domain binding update/delete/retry, and did not start
+  certificate revoke/delete/retry lifecycle work.
+- Default confidence remains hermetic. Real Traefik, DNS, TLS, Docker, and SSH route smoke stays
+  opt-in until its own gate is selected.
 
 Exit criteria:
 
