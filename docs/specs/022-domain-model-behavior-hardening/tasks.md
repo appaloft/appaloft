@@ -218,6 +218,13 @@
 - [x] Refactor route-change detection to use optional value-object equality.
 - [x] Run `bun test packages/core/test/domain-binding.test.ts`.
 
+## Continuous I: Resource Network And Health Value Predicate Behavior
+
+- [x] Extend resource behavior tests at `packages/core/test/resource.test.ts`.
+- [x] Add `ResourceExposureModeValue` and `HealthCheckTypeValue` predicates.
+- [x] Refactor resource network and health admission checks to call those predicates.
+- [x] Run `bun test packages/core/test/resource.test.ts`.
+
 ## Verification
 
 - [x] Run affected core tests for each slice.

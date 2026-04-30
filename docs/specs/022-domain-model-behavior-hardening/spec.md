@@ -51,6 +51,7 @@ helpers, providers, and adapters.
 | DMBH-SPEC-017 | Runtime plan VO admission uses owned predicates | Runtime plan access routes and artifact snapshots validate route/proxy and artifact requirements | `AccessRoute` or `RuntimeArtifactSnapshot` is created | The owning VO composes `EdgeProxyKindValue`, `RuntimeArtifactKindValue`, and `RuntimeArtifactIntentValue` predicates instead of branching on raw primitive values. |
 | DMBH-SPEC-018 | Resource binding scope/injection coherence is aggregate-owned | A resource binding has a scope and injection mode | binding creation validates whether runtime references are allowed | `ResourceBinding` coordinates scope and injection mode predicates; it does not expose the cross-VO rule as raw string branching. |
 | DMBH-SPEC-019 | Domain binding route admission uses VO equality and proxy predicates | A durable domain binding is created or route behavior is configured | the aggregate validates proxy kind, redirect self-targeting, and route-change detection | `DomainBinding` composes `EdgeProxyKindValue.isDisabled()` and value-object equality; it does not compare route primitives directly. |
+| DMBH-SPEC-020 | Resource network and health admission uses VO predicates | A resource network profile or health policy is configured | resource admission validates direct-port and supported health-check type rules | `ResourceExposureModeValue` and `HealthCheckTypeValue` answer single-value predicates; `Resource` composes those predicates without branching on raw mode/type strings. |
 
 ## Domain Ownership
 
@@ -87,6 +88,8 @@ helpers, providers, and adapters.
     `ResourceInjectionModeValue` answer single-value predicates.
   - `DomainBinding` owns route admission/change predicates for proxy kind, redirect target, and
     optional redirect state equality.
+  - `Resource` owns network and health policy admission while exposure mode and health-check type
+    value objects answer direct-port and HTTP-support predicates.
 - Upstream/downstream contexts: no new context relationship is introduced.
 
 ## Public Surfaces

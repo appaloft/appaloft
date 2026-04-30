@@ -8,6 +8,11 @@ import {
   EnvironmentId,
   EnvironmentSnapshotId,
   GeneratedAt,
+  HealthCheckIntervalSeconds,
+  HealthCheckRetryCount,
+  HealthCheckStartPeriodSeconds,
+  HealthCheckTimeoutSeconds,
+  HealthCheckTypeValue,
   PortNumber,
   ProjectId,
   Resource,
@@ -144,6 +149,48 @@ describe("Resource", () => {
           routePurpose: "default-resource-access",
           pathPrefix: "/docs",
         },
+      });
+    }
+  });
+
+  test("[DMBH-RES-001] Resource composes network and health value predicates", () => {
+    expect(ResourceExposureModeValue.rehydrate("direct-port").isDirectPort()).toBe(true);
+    expect(HealthCheckTypeValue.rehydrate("http").isHttp()).toBe(true);
+
+    const invalidHostPort = Resource.create({
+      ...baseInput,
+      kind: ResourceKindValue.rehydrate("application"),
+      networkProfile: {
+        internalPort: PortNumber.rehydrate(3000),
+        upstreamProtocol: ResourceNetworkProtocolValue.rehydrate("http"),
+        exposureMode: ResourceExposureModeValue.rehydrate("reverse-proxy"),
+        hostPort: PortNumber.rehydrate(8080),
+      },
+    });
+    expect(invalidHostPort.isErr()).toBe(true);
+
+    const resource = Resource.create({
+      ...baseInput,
+      kind: ResourceKindValue.rehydrate("application"),
+    })._unsafeUnwrap();
+    const commandHealth = resource.configureHealthPolicy({
+      policy: {
+        enabled: true,
+        type: HealthCheckTypeValue.rehydrate("command"),
+        intervalSeconds: HealthCheckIntervalSeconds.rehydrate(30),
+        timeoutSeconds: HealthCheckTimeoutSeconds.rehydrate(5),
+        retries: HealthCheckRetryCount.rehydrate(3),
+        startPeriodSeconds: HealthCheckStartPeriodSeconds.rehydrate(0),
+      },
+      configuredAt: UpdatedAt.rehydrate("2026-01-01T00:00:00.000Z"),
+      defaultStrategy: RuntimePlanStrategyValue.rehydrate("auto"),
+    });
+
+    expect(commandHealth.isErr()).toBe(true);
+    if (commandHealth.isErr()) {
+      expect(commandHealth.error.details).toMatchObject({
+        phase: "health-policy-resolution",
+        healthCheckType: "command",
       });
     }
   });
