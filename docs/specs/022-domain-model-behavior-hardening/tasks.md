@@ -35,9 +35,23 @@
 - [x] Run `bun test packages/application/test/create-deployment.test.ts`.
 - [x] Run `bun test packages/contracts/test/deployment-plan-preview-contract.test.ts`.
 
+## Slice 3: Domain Binding Certificate And Ready Behavior
+
+- [x] `DMBH-DOMAIN-001`: add DomainBinding behavior tests at
+  `packages/core/test/domain-binding.test.ts`.
+- [x] Add `DomainBinding` or owned value behavior for certificate admission and certificate
+  requirement.
+- [x] Add `DomainBinding` behavior for domain-bound, certificate-issued/imported, and route
+  realization ready gates.
+- [x] Refactor certificate issue/import use cases to ask `DomainBinding` for certificate
+  admission/context.
+- [x] Refactor domain-ready event handlers to ask `DomainBinding` for readiness gates.
+- [x] Run `bun test packages/core/test/domain-binding.test.ts`.
+- [x] Run `bun test packages/application/test/confirm-domain-binding-ownership.test.ts`.
+- [x] Run `bun test packages/application/test/issue-or-renew-certificate.test.ts`.
+
 ## Later Slices
 
-- [ ] Slice 3: harden `DomainBinding` readiness/certificate/route behavior.
 - [ ] Slice 4: harden `EnvironmentConfigSet` identity/precedence/diff behavior.
 - [ ] Slice 5: harden `Deployment` execution-continuation/supersede behavior.
 - [ ] Slice 6: harden `Workload` and `RuntimeSpec` compatibility behavior.

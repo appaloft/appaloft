@@ -109,7 +109,8 @@ owning object rather than from a search for primitive state reads. For example:
 - a `DeploymentTarget` should answer whether its edge proxy can participate in generated or
   server-applied route planning and whether it can be selected for proxy bootstrap/repair;
 - a `DomainBinding` should answer whether ownership, route, and certificate readiness transitions
-  apply;
+  apply, including certificate issue/import admission and whether a domain-bound, certificate, or
+  route realization event may make the binding ready;
 - `EnvironmentConfigSet` and its entries should answer identity, precedence, and effective snapshot
   questions;
 - a `Deployment` should answer execution-continuation and supersede-related status questions;
@@ -566,7 +567,12 @@ Current scope:
 - publishes `domain-binding-requested`
 - records pending verification state and first manual verification attempt
 - records optional canonical redirect target/status metadata for redirect-only route realization
-- DNS verification, certificate issuance, and domain-ready transitions remain future workflow work
+- owns certificate issue/import admission and certificate-required readiness gates
+- owns whether domain-bound, certificate-issued/imported, and route realization events may mark the
+  binding ready; application handlers coordinate repositories/events and call aggregate behavior
+- DNS verification, certificate issuance/import, route failure, and domain-ready transitions are
+  implemented through explicit command/event workflows while the binding remains the owner of its
+  own lifecycle predicates
 
 ### SSH Credential
 

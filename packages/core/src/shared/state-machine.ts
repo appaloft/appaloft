@@ -420,6 +420,10 @@ export class TlsModeValue extends EnumValueObject<(typeof tlsModes)[number]> {
   static rehydrate(value: (typeof tlsModes)[number]): TlsModeValue {
     return new TlsModeValue(value);
   }
+
+  isDisabled(): boolean {
+    return this.value === "disabled";
+  }
 }
 
 const healthCheckTypeBrand: unique symbol = Symbol("HealthCheckTypeValue");

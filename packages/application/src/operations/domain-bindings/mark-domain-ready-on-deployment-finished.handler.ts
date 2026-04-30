@@ -74,26 +74,20 @@ export class MarkDomainReadyOnDeploymentFinishedHandler
           continue;
         }
 
-        const state = domainBinding.toState();
-        if (state.status.value === "ready") {
+        if (domainBinding.isReady()) {
           continue;
         }
 
-        if (
-          state.status.value !== "bound" &&
-          state.status.value !== "certificate_pending" &&
-          state.status.value !== "not_ready"
-        ) {
+        if (!domainBinding.canBecomeReadyAfterRouteRealization()) {
+          const state = domainBinding.toState();
           logger.debug("domain_route_ready.skipped_inactive_binding", {
             requestId: context.requestId,
             domainBindingId: domainBindingId.value,
             deploymentId: deploymentId.value,
             status: state.status.value,
+            tlsMode: state.tlsMode.value,
+            certificatePolicy: state.certificatePolicy.value,
           });
-          continue;
-        }
-
-        if (state.tlsMode.value !== "disabled" && state.certificatePolicy.value !== "disabled") {
           continue;
         }
 
