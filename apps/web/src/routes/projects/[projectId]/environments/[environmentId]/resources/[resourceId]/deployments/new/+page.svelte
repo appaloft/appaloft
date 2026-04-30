@@ -2,8 +2,12 @@
   import { browser } from "$app/environment";
   import { goto } from "$app/navigation";
   import { page } from "$app/state";
-  import { ArrowLeft, Boxes, GitBranch, Play, Server, Waypoints } from "@lucide/svelte";
-  import type { CreateDeploymentInput, DeploymentProgressEvent } from "@appaloft/contracts";
+  import { ArrowLeft, Boxes, Eye, GitBranch, Play, Server, Waypoints } from "@lucide/svelte";
+  import type {
+    CreateDeploymentInput,
+    DeploymentPlanResponse,
+    DeploymentProgressEvent,
+  } from "@appaloft/contracts";
 
   import { readErrorMessage } from "$lib/api/client";
   import ConsoleShell from "$lib/components/console/ConsoleShell.svelte";
@@ -31,6 +35,7 @@
     resourceDetailHref,
   } from "$lib/console/utils";
   import { i18nKeys, t } from "$lib/i18n";
+  import { orpcClient } from "$lib/orpc";
   import { queryClient } from "$lib/query-client";
 
   const { projectsQuery, environmentsQuery, resourcesQuery, serversQuery, deploymentsQuery } =
@@ -66,6 +71,9 @@
   let deploymentProgressStreamError = $state("");
   let deploymentProgressDeploymentId = $state("");
   let deploymentProgressRequestId = $state("");
+  let deploymentPlanPending = $state(false);
+  let deploymentPlanPreview = $state<DeploymentPlanResponse | null>(null);
+  let deploymentPlanError = $state("");
   let feedback = $state<{
     kind: "success" | "error";
     title: string;
@@ -75,6 +83,7 @@
   const selectedServer = $derived(findServer(servers, serverId));
   const deploymentSource = $derived(latestDeployment?.runtimePlan.source ?? null);
   const canCreateDeployment = $derived(Boolean(resource && serverId && !deploymentCreatePending));
+  const canPreviewDeploymentPlan = $derived(Boolean(resource && serverId && !deploymentPlanPending));
 
   $effect(() => {
     if (!browser || !resource) {
@@ -177,6 +186,40 @@
     } finally {
       deploymentCreatePending = false;
     }
+  }
+
+  async function previewResourceDeploymentPlan(): Promise<void> {
+    if (!resource || !canPreviewDeploymentPlan) {
+      return;
+    }
+
+    deploymentPlanPending = true;
+    deploymentPlanError = "";
+    deploymentPlanPreview = null;
+
+    try {
+      deploymentPlanPreview = await orpcClient.deployments.plan({
+        projectId: resource.projectId,
+        environmentId: resource.environmentId,
+        resourceId: resource.id,
+        serverId,
+        ...(destinationId.trim() ? { destinationId: destinationId.trim() } : {}),
+      });
+    } catch (error) {
+      deploymentPlanError = readErrorMessage(error);
+    } finally {
+      deploymentPlanPending = false;
+    }
+  }
+
+  function deploymentPlanStatusLabel(status: DeploymentPlanResponse["readiness"]["status"]): string {
+    if (status === "ready") {
+      return $t(i18nKeys.console.resources.newDeploymentPlanReady);
+    }
+    if (status === "warning") {
+      return $t(i18nKeys.console.resources.newDeploymentPlanWarning);
+    }
+    return $t(i18nKeys.console.resources.newDeploymentPlanBlocked);
   }
 
   function deploymentProgressHref(): string {
@@ -375,6 +418,138 @@
               {:else}
                 <div class="rounded-md border border-dashed px-4 py-4 text-sm text-muted-foreground">
                   {$t(i18nKeys.console.resources.newDeploymentNoSourceSnapshot)}
+                </div>
+              {/if}
+            </div>
+          </section>
+
+          <section class="grid gap-5 border-t py-6 md:grid-cols-[12rem_minmax(0,1fr)]">
+            <div class="flex items-start gap-2">
+              <Eye class="mt-1 size-4 text-muted-foreground" />
+              <div class="space-y-1">
+                <div class="flex items-center gap-2">
+                  <h2 class="font-semibold">
+                    {$t(i18nKeys.console.resources.newDeploymentPlanTitle)}
+                  </h2>
+                  <DocsHelpLink
+                    href={webDocsHrefs.deploymentPlanPreview}
+                    ariaLabel={$t(i18nKeys.common.actions.openDocs)}
+                    className="size-5"
+                  />
+                </div>
+                <p class="text-sm leading-6 text-muted-foreground">
+                  {$t(i18nKeys.console.resources.newDeploymentPlanDescription)}
+                </p>
+              </div>
+            </div>
+
+            <div class="space-y-4">
+              <Button
+                type="button"
+                variant="outline"
+                disabled={!canPreviewDeploymentPlan}
+                onclick={previewResourceDeploymentPlan}
+              >
+                <Eye class="size-4" />
+                {deploymentPlanPending
+                  ? $t(i18nKeys.console.resources.newDeploymentPlanPending)
+                  : $t(i18nKeys.console.resources.newDeploymentPlanAction)}
+              </Button>
+
+              {#if deploymentPlanError}
+                <div class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+                  <p class="font-medium">
+                    {$t(i18nKeys.console.resources.newDeploymentPlanErrorTitle)}
+                  </p>
+                  <p class="mt-1 break-all text-xs">{deploymentPlanError}</p>
+                </div>
+              {/if}
+
+              {#if deploymentPlanPreview}
+                <div class="divide-y rounded-md border bg-background">
+                  <div class="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
+                    <div class="min-w-0">
+                      <p class="truncate text-sm font-medium">
+                        {deploymentPlanPreview.source.framework ??
+                          deploymentPlanPreview.source.runtimeFamily ??
+                          deploymentPlanPreview.source.kind}
+                      </p>
+                      <p class="mt-1 truncate text-xs text-muted-foreground">
+                        {deploymentPlanPreview.source.displayName}
+                      </p>
+                    </div>
+                    <Badge variant={deploymentPlanPreview.readiness.ready ? "secondary" : "outline"}>
+                      {deploymentPlanStatusLabel(deploymentPlanPreview.readiness.status)}
+                    </Badge>
+                  </div>
+
+                  <dl class="grid gap-3 px-4 py-3 text-sm sm:grid-cols-2">
+                    <div>
+                      <dt class="text-muted-foreground">
+                        {$t(i18nKeys.console.resources.newDeploymentPlanPlanner)}
+                      </dt>
+                      <dd class="mt-1 font-medium">
+                        {deploymentPlanPreview.planner.plannerKey} · {deploymentPlanPreview.planner.supportTier}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt class="text-muted-foreground">
+                        {$t(i18nKeys.console.resources.newDeploymentPlanArtifact)}
+                      </dt>
+                      <dd class="mt-1 font-medium">{deploymentPlanPreview.artifact.kind}</dd>
+                    </div>
+                    <div>
+                      <dt class="text-muted-foreground">
+                        {$t(i18nKeys.console.resources.newDeploymentPlanNetworkHealth)}
+                      </dt>
+                      <dd class="mt-1 font-medium">
+                        {deploymentPlanPreview.network.internalPort ?? "-"} · {deploymentPlanPreview.health.kind}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt class="text-muted-foreground">
+                        {$t(i18nKeys.console.resources.generatedAccessRoute)}
+                      </dt>
+                      <dd class="mt-1 font-medium">
+                        {deploymentPlanPreview.access?.hostname ?? "-"}
+                      </dd>
+                    </div>
+                  </dl>
+
+                  <div class="px-4 py-3">
+                    <h3 class="text-sm font-medium">
+                      {$t(i18nKeys.console.resources.newDeploymentPlanCommands)}
+                    </h3>
+                    {#if deploymentPlanPreview.commands.length > 0}
+                      <div class="mt-2 space-y-2">
+                        {#each deploymentPlanPreview.commands as command (`${command.kind}:${command.command}`)}
+                          <p class="rounded-md bg-muted px-3 py-2 font-mono text-xs">
+                            {command.kind}: {command.command}
+                          </p>
+                        {/each}
+                      </div>
+                    {:else}
+                      <p class="mt-2 text-sm text-muted-foreground">
+                        {$t(i18nKeys.console.resources.newDeploymentPlanNoCommands)}
+                      </p>
+                    {/if}
+                  </div>
+
+                  {#if deploymentPlanPreview.warnings.length > 0 || deploymentPlanPreview.unsupportedReasons.length > 0}
+                    <div class="px-4 py-3">
+                      <h3 class="text-sm font-medium">
+                        {$t(i18nKeys.console.resources.newDeploymentPlanReasons)}
+                      </h3>
+                      <ul class="mt-2 space-y-2 text-sm">
+                        {#each [...deploymentPlanPreview.unsupportedReasons, ...deploymentPlanPreview.warnings] as reason (`${reason.code}:${reason.phase}`)}
+                          <li class="rounded-md border px-3 py-2">
+                            <p class="font-medium">{reason.code}</p>
+                            <p class="mt-1 text-muted-foreground">{reason.message}</p>
+                          </li>
+                        {/each}
+                      </ul>
+                    </div>
+                  {/if}
                 </div>
               {/if}
             </div>

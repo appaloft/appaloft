@@ -66,6 +66,7 @@ describe("operation catalog aggregate mutation boundary", () => {
       "deployments.create",
       "deployments.list",
       "deployments.show",
+      "deployments.plan",
       "deployments.recovery-readiness",
       "deployments.logs",
       "deployments.stream-events",
@@ -83,6 +84,23 @@ describe("operation catalog aggregate mutation boundary", () => {
       expect(entry?.transports.cli, key).toBeTruthy();
       expect(entry?.transports.orpc, key).toBeDefined();
     }
+  });
+
+  test("[DEPLOY-PLAN-ENTRY-001] deployment plan preview is exposed as a read-only query", () => {
+    const entry = operationCatalog.find((candidate) => candidate.key === "deployments.plan");
+
+    expect(entry).toMatchObject({
+      kind: "query",
+      domain: "deployments",
+      messageName: "DeploymentPlanQuery",
+      handlerName: "DeploymentPlanQueryHandler",
+      serviceName: "DeploymentPlanQueryService",
+      transports: {
+        cli: "appaloft deployments plan --project <projectId> --environment <environmentId> --resource <resourceId> --server <serverId> [--destination <destinationId>]",
+        orpc: { method: "GET", path: "/api/deployments/plan" },
+      },
+    });
+    expect(entry?.inputSchema).toBeDefined();
   });
 
   test("[SRV-LIFE-ENTRY-012] server delete is exposed through the active operation catalog", () => {

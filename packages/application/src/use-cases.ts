@@ -18,6 +18,7 @@ export * from "./operations/deployments/deployment-execution.guard";
 export * from "./operations/deployments/deployment-lifecycle.service";
 export * from "./operations/deployments/deployment-logs.query-service";
 export * from "./operations/deployments/deployment-mutation-scopes";
+export * from "./operations/deployments/deployment-plan.query-service";
 export * from "./operations/deployments/deployment-recovery-readiness.query-service";
 export * from "./operations/deployments/deployment-snapshot.factory";
 export * from "./operations/deployments/list-deployments.query-service";

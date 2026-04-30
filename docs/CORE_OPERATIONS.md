@@ -441,6 +441,7 @@ Implemented operations:
 | --- | --- | --- | --- | --- | --- | --- |
 | Create deployment | Command | `deployments.create` | `CreateDeploymentCommand` | `CreateDeploymentCommandInput` | `appaloft deploy [path-or-source]` or ids-only flags | `POST /api/deployments` |
 | Cleanup preview deployment | Command | `deployments.cleanup-preview` | `CleanupPreviewCommand` | `CleanupPreviewCommandInput` | `appaloft preview cleanup [path-or-source] --preview pull-request --preview-id pr-123` | - |
+| Preview deployment plan | Query | `deployments.plan` | `DeploymentPlanQuery` | `DeploymentPlanQueryInput` | `appaloft deployments plan --project <projectId> --environment <environmentId> --resource <resourceId> --server <serverId> [--destination <destinationId>]` | `GET /api/deployments/plan` |
 | List deployments | Query | `deployments.list` | `ListDeploymentsQuery` | `ListDeploymentsQueryInput` | `appaloft deployments list` | `GET /api/deployments` |
 | Show deployment detail | Query | `deployments.show` | `ShowDeploymentQuery` | `ShowDeploymentQueryInput` | `appaloft deployments show <deploymentId>` | `GET /api/deployments/{deploymentId}` |
 | Read deployment recovery readiness | Query | `deployments.recovery-readiness` | `DeploymentRecoveryReadinessQuery` | `DeploymentRecoveryReadinessQueryInput` | `appaloft deployments recovery-readiness <deploymentId>` | `GET /api/deployments/{deploymentId}/recovery-readiness` |
@@ -462,6 +463,15 @@ Current boundary:
   not expand into generic cancel, redeploy, rollback, or resource delete behavior. It removes
   current and stale preview runtime state for the same preview fingerprint, preview route desired
   state, and preview source-link identity only.
+- `deployments.plan` is the active read-only deployment plan preview query. It uses the same
+  deployment context references as `deployments.create`, resolves current Resource source/runtime/
+  network/health/access profile into safe source inspection evidence, selected planner/support
+  tier, Docker/OCI artifact intent, sanitized command specs, network, health, access summary,
+  warnings, and unsupported reasons, and stops before deployment attempt creation or runtime
+  execution.
+- `deployments.plan` must not persist plan records, publish deployment lifecycle events, execute
+  build/run/verify/proxy work, mutate runtime/server state, or accept source/runtime/network fields
+  that belong to resource profile commands.
 - `deployments.show` is the active immutable-attempt deployment detail surface. It returns
   deployment context, historical snapshot, timeline, and safe related context while keeping
   deployment logs on `deployments.logs` and current health on `resources.health`.
@@ -599,7 +609,8 @@ Current boundary:
 - CPU, memory, replicas, restart policy, rollout overlap/drain, and similar runtime-target sizing
   fields must not be silently accepted from repository config files until their resource/runtime
   target ADRs, command specs, runtime enforcement, and tests exist.
-- detect and plan happen inside the deployment write flow
+- detect and plan happen inside the deployment write flow and are also visible through read-only
+  query `deployments.plan` before execution
 - build/package work produces or resolves the Docker/OCI image artifact used by one deployment
   attempt. Prebuilt image deployments may skip build work but still snapshot image identity.
 - framework/runtime detection feeds deployment planning through typed `SourceInspectionSnapshot`
@@ -637,7 +648,6 @@ Current boundary:
   governs generated access domains and per-deployment proxy route realization.
 
 Core next operations expected here:
-- explicit plan deployment without execution
 - `deployments.retry`
 - `deployments.redeploy`
 - `deployments.rollback`

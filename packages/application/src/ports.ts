@@ -2442,6 +2442,128 @@ export interface DeploymentSummary {
 
 export type DeploymentDetailSummary = Omit<DeploymentSummary, "logs">;
 
+export type DeploymentPlanReadinessStatus = "ready" | "blocked" | "warning";
+
+export type DeploymentPlanReasonCode =
+  | "resource-source-missing"
+  | "resource-source-unnormalized"
+  | "runtime-profile-missing"
+  | "network-profile-missing"
+  | "internal-port-missing"
+  | "static-publish-directory-missing"
+  | "compose-target-service-missing"
+  | "unsupported-framework"
+  | "ambiguous-framework"
+  | "missing-production-start-command"
+  | "missing-static-output"
+  | "incompatible-source-strategy"
+  | "runtime-target-unsupported"
+  | "access-plan-unavailable";
+
+export interface DeploymentPlanReason {
+  code: DeploymentPlanReasonCode;
+  category: "blocked" | "warning" | "info";
+  phase: string;
+  message: string;
+  recommendation?: string;
+  relatedEntityId?: string;
+  relatedEntityType?: string;
+}
+
+export interface DeploymentPlanPreview {
+  schemaVersion: "deployments.plan/v1";
+  context: {
+    projectId: string;
+    environmentId: string;
+    resourceId: string;
+    serverId: string;
+    destinationId: string;
+    projectName?: string;
+    environmentName?: string;
+    resourceName?: string;
+    serverName?: string;
+  };
+  readiness: {
+    status: DeploymentPlanReadinessStatus;
+    ready: boolean;
+    reasonCodes: DeploymentPlanReasonCode[];
+  };
+  source: {
+    kind: SourceKind;
+    displayName: string;
+    locator: string;
+    runtimeFamily?: string;
+    framework?: string;
+    packageManager?: string;
+    applicationShape?: string;
+    runtimeVersion?: string;
+    projectName?: string;
+    detectedFiles: string[];
+    detectedScripts: string[];
+    dockerfilePath?: string;
+    composeFilePath?: string;
+    jarPath?: string;
+    reasoning: string[];
+  };
+  planner: {
+    plannerKey: string;
+    supportTier: "first-class" | "generic" | "custom" | "container-native" | "unsupported";
+    buildStrategy: BuildStrategyKind;
+    packagingMode: PackagingMode;
+    targetKind: TargetKind;
+    targetProviderKey: string;
+  };
+  artifact: {
+    kind:
+      | "dockerfile-image"
+      | "static-server-image"
+      | "compose-project"
+      | "prebuilt-image"
+      | "custom-command-image"
+      | "workspace-image";
+    runtimeArtifactKind?: RuntimeArtifactKind;
+    runtimeArtifactIntent?: RuntimeArtifactIntent;
+    image?: string;
+    composeFile?: string;
+    metadata?: Record<string, string>;
+  };
+  commands: Array<{
+    kind: "install" | "build" | "package" | "start";
+    command: string;
+    source: "resource-runtime-profile" | "planner";
+  }>;
+  network: {
+    internalPort?: number;
+    upstreamProtocol?: ResourceNetworkProtocol;
+    exposureMode?: ResourceExposureMode;
+    hostPort?: number;
+    targetServiceName?: string;
+  };
+  health: {
+    enabled: boolean;
+    kind: "http" | "command" | "none";
+    path?: string;
+    port?: number;
+  };
+  access?: {
+    routeSource?: string;
+    hostname?: string;
+    scheme?: "http" | "https";
+    routeCount?: number;
+    routeGroupCount?: number;
+  };
+  warnings: DeploymentPlanReason[];
+  unsupportedReasons: DeploymentPlanReason[];
+  nextActions: Array<{
+    kind: "query" | "command" | "workflow-action";
+    targetOperation: string;
+    label: string;
+    safeByDefault: boolean;
+    blockedReasonCode?: DeploymentPlanReasonCode;
+  }>;
+  generatedAt: string;
+}
+
 export type DeploymentDetailSection =
   | "related-context"
   | "timeline"

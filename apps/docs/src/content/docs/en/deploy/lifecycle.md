@@ -13,6 +13,7 @@ searchAliases:
   - "rollback"
 relatedOperations:
   - deployments.create
+  - deployments.plan
   - deployments.show
 sidebar:
   label: "Lifecycle"
@@ -42,6 +43,12 @@ Common failures:
 Plan turns source, runtime, health, and network configuration into an executable plan that explains what Appaloft will run.
 
 The plan should summarize build, start, health check, and access routing decisions.
+
+<h3 id="deployment-plan-preview">Deployment plan preview</h3>
+
+Plan preview runs only `detect -> plan`. It does not create a deployment attempt, write deployment events, or run build, run, verify, or proxy changes.
+
+The preview shows detected framework/runtime evidence, selected planner, artifact kind, install/build/start/package commands, internal port, health check, access route summary, warnings, and unsupported reasons. Fix resource source/runtime/network/health/access profiles first, then run the deployment.
 
 <h3 id="deployment-execute">Execute</h3>
 
