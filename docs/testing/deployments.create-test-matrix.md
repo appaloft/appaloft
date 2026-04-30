@@ -121,6 +121,7 @@ Then:
 | DEP-CREATE-ADM-020 | integration | Legacy source/runtime/network fields | Input includes `sourceLocator`, `source`, `deploymentMethod`, command override fields, `port`, or `networkProfile` | `err` at command schema/API boundary | `validation_error`, phase `command-validation` | None | No deployment created |
 | DEP-CREATE-ADM-021 | integration | Unresolved project/environment/server/destination/resource | Context cannot be resolved after bootstrap | `err` | `validation_error` or `not_found`, phase `context-resolution` | None | No deployment created |
 | DEP-CREATE-ADM-022 | integration | Context mismatch | Environment/resource/destination does not match project/server context | `err` | `validation_error`, phase `context-resolution` | None | No deployment created |
+| DMBH-CONTEXT-001 | unit + integration | Context ownership is model-owned | Environment, Resource, and Destination are checked against selected project/environment/server/destination context | Existing context mismatch outcomes remain unchanged | Existing errors remain unchanged | No new events | Core tests prove aggregate-owned ownership predicates; deployment and source-link application tests prove unchanged admission behavior |
 | DEP-CREATE-ADM-023 | integration | Supersede previous active deployment | Latest deployment for the same resource is active and the later request takes ownership | `ok({ id })` | None | Previous attempt is canceled; new attempt emits its own acceptance events | Previous attempt records `supersededByDeploymentId`; new attempt becomes the only active deployment |
 | DMBH-DEPLOY-001 | unit + integration | Deployment owns execution-continuation and supersede cancellation decisions | Deployment status and supersede marker vary across running, cancel-requested, canceled, terminal, and superseded cases. | Existing deployment create and execution guard behavior remains unchanged. | Existing errors remain unchanged. | No new events. | Core domain tests prove deployment-owned decisions; application tests prove unchanged supersede behavior. |
 | DEP-CREATE-ADM-023A | integration | Concurrent submit loses atomic active-attempt race | Pre-read sees no active deployment, but another request creates a non-terminal deployment for the same resource before durable state creation | `err` | `deployment_not_redeployable`, phase `redeploy-guard` | None for the rejected attempt | No second deployment is created; first active attempt remains the only non-terminal deployment |
@@ -280,6 +281,11 @@ unchanged `deployments.create` admission behavior.
 execution-continuation, supersede cancellation decisions, runtime-plan step validation, and
 execution metadata merging. `packages/application/test/create-deployment.test.ts` proves unchanged
 supersede behavior.
+
+`DMBH-CONTEXT-001` is covered by `packages/core/test/context-ownership.test.ts` for
+Environment/Resource/Destination ownership predicates and by
+`packages/application/test/create-deployment.test.ts` for unchanged deployment context mismatch
+behavior.
 
 Runtime adapter helper tests cover the command construction needed for resource-scoped Docker
 cleanup, explicit superseded-attempt cleanup targeting, loopback ephemeral health-check port

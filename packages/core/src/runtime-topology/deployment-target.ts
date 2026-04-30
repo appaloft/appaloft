@@ -442,6 +442,10 @@ export class DeploymentTarget extends AggregateRoot<DeploymentTargetState> {
     return visitor.visitDeploymentTarget(this, context);
   }
 
+  get id(): DeploymentTargetId {
+    return this.state.id;
+  }
+
   toState(): DeploymentTargetState {
     return { ...this.state };
   }

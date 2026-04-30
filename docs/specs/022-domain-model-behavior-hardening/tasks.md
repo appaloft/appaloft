@@ -95,6 +95,20 @@
 - [x] Harden the low-risk `Deployment`/`RuntimePlan` state-read cleanup found during the audit.
 - [x] Run `bun test packages/core/test/deployment.test.ts`.
 
+## Slice 8: Context Ownership Behavior
+
+- [x] `DMBH-CONTEXT-001`: add context ownership behavior tests at
+  `packages/core/test/context-ownership.test.ts`.
+- [x] Add `Environment`, `Resource`, and `Destination` behavior for project/environment/server
+  membership and destination placement compatibility.
+- [x] Refactor `DeploymentContextResolver` to call context ownership methods instead of peeling
+  aggregate ids from state for domain decisions.
+- [x] Refactor `RelinkSourceLinkUseCase` to call context ownership methods instead of peeling
+  aggregate ids from state for domain decisions.
+- [x] Run `bun test packages/core/test/context-ownership.test.ts`.
+- [x] Run `bun test packages/application/test/create-deployment.test.ts`.
+- [x] Run `bun test packages/application/test/relink-source-link.test.ts`.
+
 ## Verification
 
 - [x] Run affected core tests for each slice.

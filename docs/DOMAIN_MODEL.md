@@ -117,6 +117,9 @@ owning object rather than from a search for primitive state reads. For example:
 - `Workload` and `RuntimeSpec` should answer workload/runtime compatibility questions.
   `RuntimeSpec` owns single-runtime requirements such as whether a web-server runtime needs a
   port; `Workload` owns compatibility across its workload kind and owned runtime spec.
+- `Environment`, `Resource`, and `Destination` should answer deployment context ownership
+  questions such as whether an environment belongs to a project, whether a resource belongs to the
+  selected project/environment, and whether a destination belongs to a selected server.
 
 Remaining `toState()` usage must be classified as a boundary read or migrated behind
 intention-revealing methods during the relevant slice.
@@ -128,8 +131,9 @@ Current boundary audit state:
 - low-risk `Deployment`/`RuntimePlan` state reads found during the audit were moved behind
   intention methods;
 - remaining model-hardening hotspots are future slices, not part of a mechanical rewrite:
-  context ownership checks in deployment/source-link orchestration, domain-binding redirect target
-  checks, certificate attempt selection, and identity-governance membership/seat calculations.
+  context ownership checks in deployment/source-link orchestration have been moved behind aggregate
+  behavior; domain-binding redirect target checks, certificate attempt selection, and
+  identity-governance membership/seat calculations remain future slices.
 
 ## Bounded Contexts
 
@@ -488,6 +492,7 @@ Meaning:
 
 Rules:
 - names are unique within a project
+- environments answer whether they belong to a selected project context
 - snapshots are immutable
 - build-time variables must be explicitly public
 - lifecycle state is explicit; locked environments remain readable but reject new configuration
@@ -546,6 +551,7 @@ Meaning:
 
 Rules:
 - belongs to exactly one deployment target/server
+- destinations answer whether they belong to a selected deployment target/server context
 - names are unique within a target
 - deployments reference the selected destination as well as the selected target
 
@@ -635,6 +641,8 @@ Rules:
 - names are unique within a project environment
 - compose-stack resources may contain multiple named services
 - a resource may point at a default destination
+- resources answer whether they belong to a selected project/environment context and whether a
+  selected destination is compatible with their default destination placement
 - deployments belong to a resource, not directly to a raw source locator
 - inbound application resources must have a resource-owned network endpoint before deployment
   admission can resolve reverse-proxy upstream targets
